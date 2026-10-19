@@ -18,6 +18,9 @@ pub struct Message {
     pub tool_calls: Vec<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
+    /// The model's reasoning for its calls, given back as it came.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_details: Option<Value>,
 }
 
 impl Message {
@@ -27,7 +30,20 @@ impl Message {
             content: content.map(Value::String),
             tool_calls: Vec::new(),
             tool_call_id: None,
+            reasoning_details: None,
         }
+    }
+
+    /// [`Message::assistant_calls`], with the reasoning the model gave for
+    /// them, if any ([`ChatEvent::Reasoning`]).
+    pub fn assistant_calls_with(
+        text: Option<String>,
+        calls: &[ToolCall],
+        reasoning: Option<Value>,
+    ) -> Self {
+        let mut message = Self::assistant_calls(text, calls);
+        message.reasoning_details = reasoning;
+        message
     }
     pub fn system(text: impl Into<String>) -> Self {
         Self::new("system", Some(text.into()))
@@ -55,11 +71,17 @@ impl Message {
         message.tool_calls = calls
             .iter()
             .map(|call| {
-                json!({
+                let mut asked = json!({
                     "id": call.id,
                     "type": "function",
                     "function": {"name": call.name, "arguments": call.args.to_string()},
-                })
+                });
+                // Given back as it came: Gemini's thought signature rides
+                // here, and a call sent back without it is refused.
+                if let Some(extra) = &call.extra {
+                    asked["extra_content"] = extra.clone();
+                }
+                asked
             })
             .collect();
         message
@@ -78,6 +100,10 @@ pub struct ToolCall {
     pub name: String,
     /// The arguments object; `{}` when the model sent none.
     pub args: Value,
+    /// The call's `extra_content`, as the service sent it: through Gemini's
+    /// OpenAI-compatible endpoint the model's thought signature, which the
+    /// next round must carry back with the call ([`Message::assistant_calls`]).
+    pub extra: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,6 +111,13 @@ pub enum ChatEvent {
     Text(String),
     /// Every call of the turn, once the model has finished asking.
     ToolCalls(Vec<ToolCall>),
+    /// The model's `reasoning_details` for the calls of this round, given
+    /// back unchanged with them in the next ([`Message::assistant_calls_with`]),
+    /// as OpenRouter asks; before [`ChatEvent::ToolCalls`].
+    Reasoning(Value),
+    /// The service searched the web for this answer: the first chunk that
+    /// carried its results (`annotations`, OpenRouter's web plugin). Once.
+    Searched,
     Done,
 }
 
@@ -114,22 +147,132 @@ fn functions(tools: &[lamp_gemini::Tool]) -> Vec<Value> {
 /// so the executive's come and go with the executive.
 pub type Declare = Arc<dyn Fn() -> Vec<lamp_gemini::Tool> + Send + Sync>;
 
+/// How much Gemini thinks before it answers through its OpenAI-compatible
+/// endpoint: the floor, as thinking cannot be turned off on Gemini 3 (the
+/// research of 19 Oct; 0.80 to 0.83 s to the first token, published).
+pub const GEMINI_REASONING: &str = "minimal";
+
 pub struct Chat {
     client: reqwest::Client,
     url: String,
     auth: String,
     model: String,
+    /// Fields the request also carries (`llm_extra`, or Gemini's reasoning).
+    extra: serde_json::Map<String, Value>,
+    /// The model takes a look's picture.
+    sees: bool,
     declare: Declare,
 }
 
 impl Chat {
+    /// The configured OpenAI-compatible chat (`llm_*`, the relay on the
+    /// lamps), with `llm_extra`.
     pub fn new(config: &SecondConfig, declare: Declare) -> Result<Self> {
-        Self::with(
+        let mut chat = Self::with(
             &config.llm_base_url,
             &config.llm_model,
             config.llm_key.expose(),
             declare,
+        )?;
+        chat.extra = config.llm_extra.clone();
+        Ok(chat)
+    }
+
+    /// Gemini called directly, through its OpenAI-compatible endpoint
+    /// (`<base>/openai/chat/completions`, the key as a bearer token), with
+    /// thinking at [`GEMINI_REASONING`]. The lamp's tools and a look's
+    /// picture go as they go to the configured chat.
+    pub fn gemini(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
+        let mut chat = Self::with(
+            &format!("{}/openai", base_url.trim_end_matches('/')),
+            model,
+            key,
+            declare,
+        )?;
+        chat.extra
+            .insert("reasoning_effort".into(), json!(GEMINI_REASONING));
+        Ok(chat)
+    }
+
+    /// OpenRouter's OpenAI-compatible chat (`LAMP_SECOND_CHAT=openrouter`):
+    /// `model` a slug of its public list, its providers tried fastest first
+    /// (`provider.sort: "latency"`), thinking at `effort`
+    /// (`reasoning.effort`), and with `search` (`LAMP_SECOND_SEARCH=openrouter`)
+    /// its web plugin on Exa (`plugins`, the `instant` mode, three results),
+    /// which searches before every answer. Read from OpenRouter's docs on 19
+    /// Oct. The lamp's tools and a look's picture go as for the relay.
+    pub fn openrouter(
+        model: &str,
+        effort: &str,
+        key: &str,
+        declare: Declare,
+        search: bool,
+    ) -> Result<Self> {
+        Self::openrouter_at(
+            crate::second_config::OPENROUTER_BASE_URL,
+            model,
+            effort,
+            key,
+            declare,
+            search,
         )
+    }
+
+    pub(crate) fn openrouter_at(
+        base_url: &str,
+        model: &str,
+        effort: &str,
+        key: &str,
+        declare: Declare,
+        search: bool,
+    ) -> Result<Self> {
+        let mut chat = Self::with(base_url, model, key, declare)?;
+        chat.extra
+            .insert("provider".into(), json!({"sort": "latency"}));
+        chat.extra
+            .insert("reasoning".into(), json!({"effort": effort}));
+        if search {
+            chat.extra.insert(
+                "plugins".into(),
+                json!([{"id": "web", "engine": "exa", "mode": "instant", "max_results": 3}]),
+            );
+        }
+        Ok(chat)
+    }
+
+    /// DeepSeek's own OpenAI-compatible chat (`LAMP_SECOND_CHAT=deepseek`),
+    /// with thinking set, never left to its default (on): off for the lamp,
+    /// on only for the probe. A model that takes no picture
+    /// ([`crate::second_config::DEEPSEEK_TEXT_ONLY`]) is never sent one.
+    pub fn deepseek(model: &str, key: &str, declare: Declare, thinking: bool) -> Result<Self> {
+        Self::deepseek_at(
+            crate::second_config::DEEPSEEK_BASE_URL,
+            model,
+            key,
+            declare,
+            thinking,
+        )
+    }
+
+    pub(crate) fn deepseek_at(
+        base_url: &str,
+        model: &str,
+        key: &str,
+        declare: Declare,
+        thinking: bool,
+    ) -> Result<Self> {
+        let mut chat = Self::with(base_url, model, key, declare)?;
+        chat.extra.insert(
+            "thinking".into(),
+            json!({"type": if thinking { "enabled" } else { "disabled" }}),
+        );
+        chat.sees = !crate::second_config::DEEPSEEK_TEXT_ONLY.contains(&model);
+        Ok(chat)
+    }
+
+    /// Whether the model is sent a look's picture.
+    pub fn sees(&self) -> bool {
+        self.sees
     }
 
     fn with(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
@@ -138,6 +281,8 @@ impl Chat {
             url: format!("{}/chat/completions", openai_base(base_url)),
             auth: format!("Bearer {key}"),
             model: model.to_owned(),
+            extra: serde_json::Map::new(),
+            sees: true,
             declare,
         })
     }
@@ -148,6 +293,12 @@ impl Chat {
         let tools = functions(&(self.declare)());
         if !tools.is_empty() {
             body["tools"] = Value::Array(tools);
+        }
+        // The configuration refuses any of the request's own fields here.
+        for (field, value) in &self.extra {
+            if body.get(field).is_none() {
+                body[field] = value.clone();
+            }
         }
         body
     }
@@ -217,6 +368,11 @@ pub(crate) struct Lines {
 }
 
 impl Lines {
+    /// Bytes of a line not yet ended.
+    pub fn pending(&self) -> usize {
+        self.partial.len()
+    }
+
     pub fn push(&mut self, bytes: &[u8]) -> Vec<String> {
         self.partial.extend_from_slice(bytes);
         let mut out = Vec::new();
@@ -236,6 +392,7 @@ struct Pending {
     id: String,
     name: String,
     arguments: String,
+    extra: Option<Value>,
 }
 
 /// Chunks of the completion to events. Tool calls arrive in fragments
@@ -245,6 +402,10 @@ pub(crate) struct Deltas {
     calls: Vec<Pending>,
     /// A chunk said why the completion stopped (`finish_reason`).
     finished: bool,
+    /// `reasoning_details` as they came, in order.
+    reasoning: Vec<Value>,
+    /// A chunk carried the web search's results.
+    searched: bool,
 }
 
 impl Deltas {
@@ -263,6 +424,11 @@ impl Deltas {
         if data == "[DONE]" {
             let mut out = Vec::new();
             if !self.calls.is_empty() {
+                if !self.reasoning.is_empty() {
+                    out.push(ChatEvent::Reasoning(Value::Array(std::mem::take(
+                        &mut self.reasoning,
+                    ))));
+                }
                 out.push(ChatEvent::ToolCalls(self.take_calls()?));
             }
             out.push(ChatEvent::Done);
@@ -277,11 +443,37 @@ impl Deltas {
         let Some(delta) = chunk.pointer("/choices/0/delta") else {
             return Ok(out);
         };
+        if !self.searched
+            && delta["annotations"]
+                .as_array()
+                .is_some_and(|annotations| !annotations.is_empty())
+        {
+            self.searched = true;
+            out.push(ChatEvent::Searched);
+        }
+        if let Some(details) = delta["reasoning_details"].as_array() {
+            if self.reasoning.len() + details.len() > 256 {
+                return Err(Error::Protocol("reasoning details"));
+            }
+            self.reasoning.extend(details.iter().cloned());
+        }
         if let Some(text) = delta["content"].as_str().filter(|t| !t.is_empty()) {
             out.push(ChatEvent::Text(text.to_owned()));
         }
         for call in delta["tool_calls"].as_array().into_iter().flatten() {
-            let index = call["index"].as_u64().unwrap_or(0) as usize;
+            let id = call["id"].as_str().filter(|id| !id.is_empty());
+            let mut index = call["index"].as_u64().unwrap_or(0) as usize;
+            // A whole new call at an index already taken by another (a
+            // service that sends each call whole, without its own index) is
+            // the next call, not more of that one.
+            if let Some(id) = id
+                && self
+                    .calls
+                    .get(index)
+                    .is_some_and(|pending| !pending.id.is_empty() && pending.id != id)
+            {
+                index = self.calls.len();
+            }
             if index >= 64 {
                 return Err(Error::Protocol("tool call index"));
             }
@@ -289,8 +481,11 @@ impl Deltas {
                 self.calls.resize_with(index + 1, Pending::default);
             }
             let pending = &mut self.calls[index];
-            if let Some(id) = call["id"].as_str() {
+            if let Some(id) = id {
                 pending.id = id.to_owned();
+            }
+            if let Some(extra) = call.get("extra_content").filter(|extra| extra.is_object()) {
+                pending.extra = Some(extra.clone());
             }
             if let Some(name) = call.pointer("/function/name").and_then(Value::as_str) {
                 pending.name.push_str(name);
@@ -306,7 +501,8 @@ impl Deltas {
         std::mem::take(&mut self.calls)
             .into_iter()
             .filter(|call| !call.name.is_empty())
-            .map(|call| {
+            .enumerate()
+            .map(|(index, call)| {
                 let args = if call.arguments.trim().is_empty() {
                     json!({})
                 } else {
@@ -314,9 +510,16 @@ impl Deltas {
                         .map_err(|_| Error::Protocol("tool call arguments"))?
                 };
                 Ok(ToolCall {
-                    id: call.id,
+                    // Its result is matched to it by id: one is made for a
+                    // call that came without.
+                    id: if call.id.is_empty() {
+                        format!("call_{index}")
+                    } else {
+                        call.id
+                    },
                     name: call.name,
                     args,
+                    extra: call.extra,
                 })
             })
             .collect()
@@ -379,11 +582,13 @@ data: [DONE]
                         id: "call_a".into(),
                         name: "the_time".into(),
                         args: json!({}),
+                        extra: None,
                     },
                     ToolCall {
                         id: "call_b".into(),
                         name: "remember".into(),
                         args: json!({"fact": "likes tea"}),
+                        extra: None,
                     },
                 ]),
                 ChatEvent::Done
@@ -440,6 +645,201 @@ data: [DONE]
         assert_eq!(deltas.end().unwrap(), [ChatEvent::Done]);
     }
 
+    /// `LAMP_SECOND_CHAT=gemini`: Google's OpenAI-compatible endpoint, the
+    /// key as a bearer token, thinking at its floor, the lamp's tools and a
+    /// look's picture as an image part, as the configured chat sends them.
+    #[test]
+    fn gemini_is_asked_at_its_openai_endpoint_with_minimal_thinking() {
+        let tools: Vec<lamp_gemini::Tool> = serde_json::from_value(json!([
+            {"name": "light_on", "description": "Light on."}
+        ]))
+        .unwrap();
+        let chat = Chat::gemini(
+            "https://generativelanguage.googleapis.com/v1beta/",
+            "gemini-3.6-flash",
+            "g-key",
+            Arc::new(move || tools.clone()),
+        )
+        .unwrap();
+        assert_eq!(
+            chat.url,
+            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        );
+        assert_eq!(chat.auth, "Bearer g-key");
+        let body = chat.body(&[Message::user_seeing("What is this?", &[0xff, 0xd8])]);
+        assert_eq!(body["model"], "gemini-3.6-flash");
+        assert_eq!(body["reasoning_effort"], "minimal");
+        assert_eq!(body["stream"], true);
+        assert_eq!(body["tools"][0]["function"]["name"], "light_on");
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+        assert_eq!(
+            body["messages"][0]["content"][1]["image_url"]["url"],
+            "data:image/jpeg;base64,/9g="
+        );
+    }
+
+    /// `llm_extra` rides on the configured chat's request (an endpoint's own
+    /// reasoning setting), and never replaces the request's own fields.
+    #[test]
+    fn the_configured_chat_carries_its_extra_fields() {
+        let mut chat = Chat::with(
+            "https://relay.example.invalid/v1",
+            "m",
+            "k",
+            Arc::new(Vec::new),
+        )
+        .unwrap();
+        chat.extra =
+            serde_json::from_value(json!({"thinking": {"type": "disabled"}, "model": "not this"}))
+                .unwrap();
+        let body = chat.body(&[Message::user("Hi.")]);
+        assert_eq!(body["thinking"], json!({"type": "disabled"}));
+        assert_eq!(body["model"], "m");
+    }
+
+    /// Gemini's OpenAI-compatible stream gives each call whole, its thought
+    /// signature in `extra_content`; two calls may come at the same index.
+    /// Each is its own call, and the signature goes back with it.
+    #[test]
+    fn whole_calls_keep_their_signatures_and_go_back_with_them() {
+        let recorded = r#"data: {"choices":[{"delta":{"role":"assistant","tool_calls":[{"extra_content":{"google":{"thought_signature":"c2ln"}},"function":{"arguments":"{\"level\":30}","name":"set_brightness"},"id":"function-call-1","type":"function"}]},"index":0}]}
+
+data: {"choices":[{"delta":{"tool_calls":[{"function":{"arguments":"{}","name":"the_time"},"id":"function-call-2","type":"function"}]},"index":0,"finish_reason":"tool_calls"}]}
+
+data: [DONE]
+"#;
+        let got = events(recorded);
+        let ChatEvent::ToolCalls(calls) = &got[0] else {
+            panic!("{got:?}")
+        };
+        assert_eq!(calls.len(), 2, "{calls:?}");
+        assert_eq!(calls[0].name, "set_brightness");
+        assert_eq!(calls[0].args, json!({"level": 30}));
+        assert_eq!(
+            calls[0].extra,
+            Some(json!({"google": {"thought_signature": "c2ln"}}))
+        );
+        assert_eq!(calls[1].name, "the_time");
+        assert_eq!(calls[1].extra, None);
+        let back = serde_json::to_value(Message::assistant_calls(None, calls)).unwrap();
+        assert_eq!(
+            back["tool_calls"][0]["extra_content"],
+            json!({"google": {"thought_signature": "c2ln"}})
+        );
+        assert!(back["tool_calls"][1].get("extra_content").is_none());
+    }
+
+    /// `LAMP_SECOND_CHAT=openrouter`: OpenRouter's chat, the pinned model,
+    /// its providers tried fastest first, thinking at the effort given, and
+    /// its web plugin on Exa only with the search switch; the lamp's tools
+    /// and a look's picture as an image part.
+    #[test]
+    fn openrouter_is_asked_for_the_fastest_provider_and_searches_only_when_switched() {
+        let tools: Vec<lamp_gemini::Tool> = serde_json::from_value(json!([
+            {"name": "light_on", "description": "Light on."}
+        ]))
+        .unwrap();
+        let declare: Declare = Arc::new(move || tools.clone());
+        let plain = Chat::openrouter(
+            "deepseek/deepseek-v4.1-flash-1017",
+            "none",
+            "or-key",
+            declare.clone(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(plain.url, "https://openrouter.ai/api/v1/chat/completions");
+        assert_eq!(plain.auth, "Bearer or-key");
+        let body = plain.body(&[Message::user_seeing("What is this?", &[0xff, 0xd8])]);
+        assert_eq!(body["model"], "deepseek/deepseek-v4.1-flash-1017");
+        assert_eq!(body["provider"], json!({"sort": "latency"}));
+        assert_eq!(body["reasoning"], json!({"effort": "none"}));
+        assert_eq!(body["tools"][0]["function"]["name"], "light_on");
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+        assert!(body.get("plugins").is_none());
+        let searching = Chat::openrouter(
+            "google/gemini-3.6-flash",
+            "minimal",
+            "or-key",
+            declare,
+            true,
+        )
+        .unwrap();
+        let body = searching.body(&[Message::user("Any news?")]);
+        assert_eq!(
+            body["plugins"],
+            json!([{"id": "web", "engine": "exa", "mode": "instant", "max_results": 3}])
+        );
+        assert_eq!(body["reasoning"], json!({"effort": "minimal"}));
+        assert!(searching.sees());
+    }
+
+    /// `LAMP_SECOND_CHAT=deepseek`: DeepSeek's own chat, thinking always set,
+    /// off unless the probe asks; its text-only model is never sent a picture.
+    #[test]
+    fn deepseek_is_asked_with_thinking_set_and_its_text_only_model_sees_nothing() {
+        let off = Chat::deepseek("deepseek-flash", "ds-key", Arc::new(Vec::new), false).unwrap();
+        assert_eq!(off.url, "https://api.deepseek.com/chat/completions");
+        assert_eq!(off.auth, "Bearer ds-key");
+        let body = off.body(&[Message::user("Hi.")]);
+        assert_eq!(body["model"], "deepseek-flash");
+        assert_eq!(body["thinking"], json!({"type": "disabled"}));
+        assert!(off.sees());
+        let on = Chat::deepseek("deepseek-v4-pro", "ds-key", Arc::new(Vec::new), true).unwrap();
+        assert_eq!(on.body(&[])["thinking"], json!({"type": "enabled"}));
+        assert!(!on.sees());
+    }
+
+    /// OpenRouter's reasoning for a round's calls comes back with them, as
+    /// it came; its web search's results are seen once, when they come.
+    #[test]
+    fn reasoning_goes_back_with_the_calls_and_a_search_is_seen_once() {
+        let recorded = r#"data: {"choices":[{"delta":{"annotations":[{"type":"url_citation","url_citation":{"url":"https://a.invalid","title":"A"}}]}}]}
+
+data: {"choices":[{"delta":{"reasoning_details":[{"type":"reasoning.encrypted","data":"c2ln","format":"google-gemini-v1","index":0}]}}]}
+
+data: {"choices":[{"delta":{"annotations":[{"type":"url_citation","url_citation":{"url":"https://b.invalid","title":"B"}}],"tool_calls":[{"index":0,"id":"tool_1","type":"function","function":{"name":"the_time","arguments":"{}"}}]}}]}
+
+data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}
+
+data: [DONE]
+"#;
+        let got = events(recorded);
+        assert_eq!(got[0], ChatEvent::Searched);
+        let details = json!([{"type": "reasoning.encrypted", "data": "c2ln", "format": "google-gemini-v1", "index": 0}]);
+        assert_eq!(got[1], ChatEvent::Reasoning(details.clone()));
+        let ChatEvent::ToolCalls(calls) = &got[2] else {
+            panic!("{got:?}")
+        };
+        assert_eq!(calls[0].name, "the_time");
+        assert_eq!(got[3], ChatEvent::Done);
+        assert_eq!(got.len(), 4);
+        let back = serde_json::to_value(Message::assistant_calls_with(
+            None,
+            calls,
+            Some(details.clone()),
+        ))
+        .unwrap();
+        assert_eq!(back["reasoning_details"], details);
+        let plain = serde_json::to_value(Message::assistant_calls(None, calls)).unwrap();
+        assert!(plain.get("reasoning_details").is_none());
+    }
+
+    /// A call that came without an id is given one, so its result can be
+    /// matched to it.
+    #[test]
+    fn a_call_without_an_id_is_given_one() {
+        let mut deltas = Deltas::default();
+        deltas
+            .data(r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"the_time","arguments":"{}"}}]}}]}"#)
+            .unwrap();
+        let got = deltas.data("[DONE]").unwrap();
+        let ChatEvent::ToolCalls(calls) = &got[0] else {
+            panic!("{got:?}")
+        };
+        assert_eq!(calls[0].id, "call_0");
+    }
+
     #[test]
     fn broken_arguments_are_an_error() {
         let mut deltas = Deltas::default();
@@ -458,6 +858,7 @@ data: [DONE]
             id: "call_a".into(),
             name: "the_time".into(),
             args: json!({"zone": "local"}),
+            extra: None,
         };
         let messages = [
             Message::assistant_calls(Some(String::new()), std::slice::from_ref(&call)),

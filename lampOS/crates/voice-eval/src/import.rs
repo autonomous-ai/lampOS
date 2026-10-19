@@ -775,9 +775,22 @@ pub fn import_trace(
     }
     let (events, unmapped) = parse_trace(&text)?;
     let provider = events.iter().find_map(|e| match &e.kind {
-        EventKind::RunStart { provider_kind } => provider_kind.clone(),
+        EventKind::RunStart { provider_kind, .. } => provider_kind.clone(),
         _ => None,
     });
+    // The second route alone answers as a generating provider does, so it
+    // is imported against the same scenarios; the attempt says which route
+    // it was, for the A/B to tell the two apart (the reviewer on #1686).
+    let voice_route = events.iter().find_map(|e| match &e.kind {
+        EventKind::RunStart { voice_route, .. } => voice_route.clone(),
+        _ => None,
+    });
+    if voice_route
+        .as_deref()
+        .is_some_and(|route| route != "second")
+    {
+        return Err(invalid("trace has an unknown run_start voice_route"));
+    }
     let traced = match provider.as_deref() {
         Some("one_cached_reply") => ProviderKind::FixedReply,
         Some("gemini") => ProviderKind::Gemini,
@@ -873,6 +886,16 @@ pub fn import_trace(
         &trace_records,
     )
     .evidence();
+    let mut evidence = json!({
+        "trace_path": options.events_path.display().to_string(),
+        "trace_sha256": hash(text.as_bytes()),
+        "attribution_assumption": assumption,
+        "room_audio": room,
+        "target_audio": target_audio,
+    });
+    if let Some(route) = &voice_route {
+        evidence["voice_route"] = json!(route);
+    }
     let record = AttemptRecord {
         attempt_id: format!("{}-import-{}", options.run_id, scenario.id),
         run_id: options.run_id.clone(),
@@ -897,13 +920,7 @@ pub fn import_trace(
         },
         status: AttemptStatus::Completed,
         spoken_failure_notice: None,
-        evidence: json!({
-            "trace_path": options.events_path.display().to_string(),
-            "trace_sha256": hash(text.as_bytes()),
-            "attribution_assumption": assumption,
-            "room_audio": room,
-            "target_audio": target_audio,
-        }),
+        evidence,
         unmapped_trace_records: unmapped,
         reproduce: format!(
             "cargo run -p lamp-voice-eval -- import-trace --events {} --scenario {} --out NEW_DIR",

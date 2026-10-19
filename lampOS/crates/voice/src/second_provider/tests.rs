@@ -113,6 +113,7 @@ fn text(piece: &str) -> net::Result<ChatEvent> {
 
 fn call(id: &str, name: &str, args: Value) -> ToolCall {
     ToolCall {
+        extra: None,
         id: id.into(),
         name: name.into(),
         args,
@@ -201,6 +202,14 @@ async fn turn(engine: &mut Engine) -> Vec<String> {
                 assert!(finished);
                 (format!("heard:{text}"), false)
             }
+            // The words' end (`finished`) and the request's times, each
+            // checked by its own test.
+            ProviderOutput::Transcript {
+                request: Some(_),
+                text,
+                finished: true,
+            } if text.is_empty() => continue,
+            ProviderOutput::Stages { .. } => continue,
             ProviderOutput::Transcript {
                 request: Some(_),
                 text,
@@ -437,6 +446,12 @@ async fn a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered() {
     loop {
         match engine.next().await {
             ProviderOutput::Started { .. } => seen.push("started"),
+            // Its times: nothing reached.
+            ProviderOutput::Stages {
+                chat_ms: None,
+                audio_ms: None,
+                ..
+            } => seen.push("stages"),
             ProviderOutput::TurnComplete { .. } => {
                 seen.push("complete");
                 break;
@@ -444,7 +459,7 @@ async fn a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered() {
             other => panic!("{other:?}"),
         }
     }
-    assert_eq!(seen, ["started", "complete"]);
+    assert_eq!(seen, ["started", "stages", "complete"]);
     assert!(begun.elapsed() >= BEGIN_WITHIN, "{:?}", begun.elapsed());
     assert!(calls.lock().unwrap().is_empty());
 }
@@ -579,6 +594,62 @@ async fn a_slow_first_round_makes_one_soft_sound_and_waits_longer() {
 
 fn written_turn(request: u64, words: &str) -> ProviderInput {
     written(request, words)
+}
+
+/// The first builder, 19 Oct: an A/B is scored on each request's first
+/// answer audio, never its wait cue. Every request sends its times before
+/// its end: one that waited with a sound has its words, its cue, its chat's
+/// first event and its answer's first audio; one whose chat never began
+/// has its words and its cue and nothing after; a written one no words.
+#[tokio::test(start_paused = true)]
+async fn each_request_sends_its_times_before_its_end() {
+    async fn times_of(engine: &mut Engine) -> (Option<[bool; 4]>, bool) {
+        let mut times = None;
+        loop {
+            match tokio::time::timeout(Duration::from_secs(30), engine.next())
+                .await
+                .expect("the turn ends")
+            {
+                ProviderOutput::Stages {
+                    words_ms,
+                    cue_ms,
+                    chat_ms,
+                    audio_ms,
+                    ..
+                } => {
+                    times = Some([
+                        words_ms.is_some(),
+                        cue_ms.is_some(),
+                        chat_ms.is_some(),
+                        audio_ms.is_some(),
+                    ])
+                }
+                ProviderOutput::TurnComplete { .. } | ProviderOutput::TurnFailed { .. } => {
+                    return (times, true);
+                }
+                _ => {}
+            }
+        }
+    }
+    let answer = || vec![vec![text("It is noon."), Ok(ChatEvent::Done)]];
+    let mut slow = waiting(Some(Duration::from_millis(2_000)), answer());
+    spoken_turn(&mut slow);
+    assert_eq!(
+        times_of(&mut slow).await,
+        (Some([true, true, true, true]), true)
+    );
+    let mut never = waiting(None, vec![vec![]]);
+    spoken_turn(&mut never);
+    assert_eq!(
+        times_of(&mut never).await,
+        (Some([true, true, false, false]), true)
+    );
+    let mut written = waiting(Some(Duration::from_millis(100)), answer());
+    written.submit(written_turn(2, "What time is it?"));
+    assert_eq!(
+        times_of(&mut written).await,
+        (Some([false, false, true, true]), true)
+    );
 }
 
 /// The next sound is never the one played last.
@@ -822,6 +893,80 @@ async fn the_announcement_is_said_once_per_quiet_spell() {
     assert!(announced(&turn(&mut engine).await));
 }
 
+/// The lamp's words end as the Live route's do: after the last sentence's
+/// audio, one empty piece, finished; a turn that said nothing has none.
+#[tokio::test]
+async fn the_lamps_words_end_with_a_finished_piece_as_the_live_routes_do() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [
+                vec![text("It is noon. Enjoy lunch!"), Ok(ChatEvent::Done)],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        NOT_FOR_ME,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.announcing(false);
+    let pieces = |events: &[ProviderOutput]| -> Vec<(String, bool)> {
+        events
+            .iter()
+            .filter_map(|event| match event {
+                ProviderOutput::Transcript {
+                    request: Some(_),
+                    text,
+                    finished,
+                } => Some((text.clone(), *finished)),
+                _ => None,
+            })
+            .collect()
+    };
+    async fn turn_of(engine: &mut Engine) -> Vec<ProviderOutput> {
+        let mut events = Vec::new();
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+                .await
+                .expect("the turn ends");
+            let done = matches!(event, ProviderOutput::TurnComplete { .. });
+            events.push(event);
+            if done {
+                return events;
+            }
+        }
+    }
+    engine.submit(written(1, "Time?"));
+    let events = turn_of(&mut engine).await;
+    assert_eq!(
+        pieces(&events),
+        [
+            ("It is noon.".to_owned(), false),
+            (" Enjoy lunch!".to_owned(), false),
+            (String::new(), true),
+        ]
+    );
+    // After every packet of audio, before the turn's end.
+    let finished_at = events
+        .iter()
+        .position(|event| matches!(event, ProviderOutput::Transcript { finished: true, .. }))
+        .unwrap();
+    assert!(
+        events[finished_at..]
+            .iter()
+            .all(|event| !matches!(event, ProviderOutput::Audio { .. }))
+    );
+    engine.submit(written(2, "Not you."));
+    let events = turn_of(&mut engine).await;
+    assert!(pieces(&events).is_empty(), "{:?}", pieces(&events));
+}
+
 /// The lamp's only voice (`LAMP_VOICE_ROUTE=second`, `--only-voice`) never
 /// says its voice sounds different: the first answer after a quiet spell
 /// is the model's own first words.
@@ -948,6 +1093,78 @@ async fn a_reminder_is_deferred_as_the_fixture_does() {
         late_by_ms: None,
     });
     assert_eq!(turn(&mut engine).await, ["deferred:Disabled"]);
+}
+
+fn reminder(request: u64, text: &str) -> ProviderInput {
+    ProviderInput::Reminder {
+        request,
+        session: 1,
+        privacy_generation: 1,
+        text: text.into(),
+        late: false,
+        late_by_ms: None,
+    }
+}
+
+/// The only voice (`LAMP_VOICE_ROUTE=second`, with the lamp saying its
+/// reminders) says a due reminder as the Live route does: the chat is
+/// given the Live route's own note for it, the item's words as data, and
+/// what it says is said. A call it makes is not run: a reminder is only
+/// said. An item the Live route would refuse is refused the same way.
+#[tokio::test]
+async fn the_only_voice_says_a_due_reminder_with_the_live_routes_note_and_no_tools() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [
+                vec![text("Time to stretch."), Ok(ChatEvent::Done)],
+                vec![
+                    text("Stretch now."),
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "set_timer",
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, calls, _) = scripted(script.clone());
+    let mut engine = engine.announcing(false).saying_reminders(true);
+    engine.submit(reminder(1, "stretch"));
+    assert_eq!(
+        turn(&mut engine).await,
+        [
+            "started:1".to_owned(),
+            "said:Time to stretch.".into(),
+            "audio:16".into(),
+            "generated".into(),
+            "complete".into(),
+        ]
+    );
+    let note = crate::provider_worker::reminder_note("stretch", false, None).unwrap();
+    assert_eq!(script.asked.lock().unwrap()[0][1], Message::user(note));
+    engine.submit(reminder(2, "stretch"));
+    assert_eq!(
+        turn(&mut engine).await,
+        [
+            "started:2".to_owned(),
+            "said:Stretch now.".into(),
+            "audio:12".into(),
+            "generated".into(),
+            "complete".into(),
+        ]
+    );
+    assert!(calls.lock().unwrap().is_empty(), "no tool ran");
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        2,
+        "no round after the call"
+    );
+    engine.submit(reminder(3, "  "));
+    assert_eq!(turn(&mut engine).await, ["deferred:Invalid"]);
 }
 
 #[tokio::test]
@@ -1134,11 +1351,12 @@ async fn a_look_waits_five_seconds_and_then_says_it_could_not_look() {
         let mut said = Vec::new();
         loop {
             match engine.next().await {
+                // The words' end (`finished`) adds none.
                 ProviderOutput::Transcript {
                     request: Some(_),
                     text,
                     ..
-                } => said.push(text),
+                } if !text.is_empty() => said.push(text),
                 ProviderOutput::TurnComplete { .. } => return (said, begun.elapsed()),
                 ProviderOutput::TurnFailed { .. } => panic!("failed"),
                 _ => {}
@@ -1183,11 +1401,12 @@ async fn a_full_look_without_its_still_still_says_it_could_not_look() {
     let mut said = Vec::new();
     loop {
         match engine.next().await {
+            // The words' end (`finished`) adds none.
             ProviderOutput::Transcript {
                 request: Some(_),
                 text,
                 ..
-            } => said.push(text),
+            } if !text.is_empty() => said.push(text),
             ProviderOutput::TurnComplete { .. } => break,
             ProviderOutput::TurnFailed { .. } => panic!("failed"),
             _ => {}

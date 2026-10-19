@@ -57,6 +57,7 @@ use tokio::{
 };
 
 pub mod net;
+pub mod probe;
 mod services;
 pub mod worker;
 
@@ -387,6 +388,8 @@ pub struct Engine {
     sounds_checked: bool,
     /// The eye a look reads, when the eyes keep a look file.
     look: Option<Look>,
+    /// A due reminder is said, not deferred ([`Engine::saying_reminders`]).
+    reminders: bool,
 }
 
 impl Engine {
@@ -431,6 +434,7 @@ impl Engine {
             begun_last: None,
             sounds_checked: false,
             look: None,
+            reminders: false,
         }
     }
 
@@ -646,7 +650,14 @@ impl Engine {
                 // the words, as on the Live route. With none, the model is
                 // told it saw nothing, never left to describe a picture it
                 // was not given (sixth-P2, #1044).
-                let picture = look
+                // A model that takes no picture is never sent one.
+                let sees = self.shared.services.sees();
+                if look && !sees {
+                    eprintln!(
+                        "lamp-voice second: the lamp looked: no picture with request {request}: the model takes none"
+                    );
+                }
+                let picture = (look && sees)
                     .then(|| match self.look.as_ref().map(|look| look()) {
                         Some(Ok(jpeg)) => Some(jpeg),
                         Some(Err(why)) => {
@@ -680,8 +691,18 @@ impl Engine {
                 // on #1154).
                 let looking = look || text == crate::speak_up::NO_LOOK_NOTE;
                 let shared = self.shared.clone();
+                let begun = Instant::now();
                 let task = tokio::spawn(async move {
-                    answer(&shared, request, text, false, looking, picture, None).await
+                    answer(
+                        &shared,
+                        request,
+                        text,
+                        Asker::Written { looking },
+                        picture,
+                        None,
+                        Times::new(begun),
+                    )
+                    .await
                 });
                 self.turn = Some(Turn {
                     request,
@@ -692,13 +713,69 @@ impl Engine {
                 });
             }
             ProviderInput::Reminder {
-                request, session, ..
-            } => self.urgent.push_back(ProviderOutput::ReminderDeferred {
                 request,
                 session,
-                reason: ReminderDeferral::Disabled,
-            }),
+                text,
+                late,
+                late_by_ms,
+                ..
+            } => {
+                // Deferred unless this route is the lamp's only voice and the
+                // lamp says its reminders: standing by, Gemini says them once
+                // it is back.
+                let note = if self.reminders {
+                    crate::provider_worker::reminder_note(&text, late, late_by_ms)
+                } else {
+                    Err(ReminderDeferral::Disabled)
+                };
+                let note = match note {
+                    Ok(note) => note,
+                    Err(reason) => {
+                        self.urgent.push_back(ProviderOutput::ReminderDeferred {
+                            request,
+                            session,
+                            reason,
+                        });
+                        return;
+                    }
+                };
+                if !self.begin(request, session) {
+                    return;
+                }
+                // Reminder data is not something to remember because it
+                // was said (as on the Live route).
+                crate::remember::keep_out(request);
+                let shared = self.shared.clone();
+                let task = tokio::spawn(async move {
+                    answer(
+                        &shared,
+                        request,
+                        note,
+                        Asker::Reminder,
+                        None,
+                        None,
+                        Times::new(Instant::now()),
+                    )
+                    .await
+                });
+                self.turn = Some(Turn {
+                    request,
+                    audio: None,
+                    sound: Arc::default(),
+                    said: Arc::default(),
+                    task,
+                });
+            }
         }
+    }
+
+    /// A due reminder is said, as the Live route says it, rather than
+    /// deferred: when this route is the lamp's only voice
+    /// (`LAMP_VOICE_ROUTE=second`) and the lamp says its reminders
+    /// (`LAMP_SCHEDULE_SPEAK`). Before any turn only.
+    pub fn saying_reminders(mut self, on: bool) -> Self {
+        self.reminders = on;
+        self
     }
 
     /// A new turn replaces any older one. False for a retired request.
@@ -764,8 +841,11 @@ impl Engine {
 /// refusals are owed even for a retired request.
 pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
     match event {
+        // Owed even for a retired request, as a failure is: an A/B scores
+        // every request (#1686's follow-up).
         ProviderOutput::Ready { .. }
         | ProviderOutput::TurnFailed { .. }
+        | ProviderOutput::Stages { .. }
         | ProviderOutput::ReminderDeferred { .. }
         | ProviderOutput::InputDiscarded { .. }
         | ProviderOutput::OwnershipAssumed { .. }
@@ -836,18 +916,25 @@ async fn spoken(
     before: Option<String>,
     continues_from: Option<u64>,
 ) {
+    let begun = Instant::now();
     let listener = match shared.services.listen().await {
         Ok(listener) => listener,
-        Err(error) => return shared.fail(request, FailedStage::InputOpen, &error).await,
+        Err(error) => {
+            shared.stages(request, &Times::new(begun)).await;
+            return shared.fail(request, FailedStage::InputOpen, &error).await;
+        }
     };
     while let Some(samples) = heard.recv().await {
         if let Err(error) = listener.send(&samples) {
+            shared.stages(request, &Times::new(begun)).await;
             return shared.fail(request, FailedStage::InputOpen, &error).await;
         }
     }
     let finishing = Instant::now();
+    let times = Times::new(finishing);
     let text = match listener.finish(request).await {
         Ok(text) => {
+            reached(&times, |times| &mut times.words);
             eprintln!(
                 "lamp-voice second: request {request} heard {} words, the last {} ms after the line ended",
                 text.split_whitespace().count(),
@@ -857,6 +944,7 @@ async fn spoken(
         }
         Err(error) => {
             eprintln!("lamp-voice second: request {request} speech to text failed: {error}");
+            shared.stages(request, &times).await;
             return shared
                 .fail(request, FailedStage::AwaitingResponse, &error)
                 .await;
@@ -919,12 +1007,14 @@ async fn spoken(
         eprintln!("lamp-voice second: request {request}: its answer is held back: {why}");
     }
     if empty || held || heeded.is_some() {
-        shared
-            .emit(ProviderOutput::TurnComplete {
-                request,
-                idle: true,
-            })
-            .await;
+        if shared.stages(request, &times).await {
+            shared
+                .emit(ProviderOutput::TurnComplete {
+                    request,
+                    idle: true,
+                })
+                .await;
+        }
         return;
     }
     // The first request asked after a hand or the head stopped the lamp: the
@@ -937,7 +1027,67 @@ async fn spoken(
         stop.asked = true;
         Some(crate::provider_worker::STOPPED_NOTE)
     });
-    answer(&shared, request, text, true, false, None, note).await;
+    answer(&shared, request, text, Asker::Spoken, None, note, times).await;
+}
+
+/// Who asked the turn's chat, which sets what it may do.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Asker {
+    /// A person spoke: the wait's sound and the down line may be heard, and
+    /// a tool runs as heard.
+    Spoken,
+    /// The lamp wrote it (a hello, a "Sorry?", a skill's say), or a look
+    /// with `looking`.
+    Written { looking: bool },
+    /// A due reminder, said as the Live route says it: a note to say it, and
+    /// no tool runs (`provider_worker::reminder_note`).
+    Reminder,
+}
+
+/// A request's times for [`ProviderOutput::Stages`], from `from` (a spoken
+/// request's line end as this route got it, a written one's start).
+struct Times {
+    from: Instant,
+    words: Option<u64>,
+    cue: Option<u64>,
+    chat: Option<u64>,
+    audio: Option<u64>,
+}
+
+impl Times {
+    fn new(from: Instant) -> Arc<Mutex<Self>> {
+        Arc::new(Mutex::new(Self {
+            from,
+            words: None,
+            cue: None,
+            chat: None,
+            audio: None,
+        }))
+    }
+}
+
+/// Mark the stage `pick` chooses as reached now, if it was not yet.
+fn reached(times: &Mutex<Times>, pick: impl FnOnce(&mut Times) -> &mut Option<u64>) {
+    if let Ok(mut times) = times.lock() {
+        let ms = u64::try_from(times.from.elapsed().as_millis()).unwrap_or(u64::MAX);
+        pick(&mut times).get_or_insert(ms);
+    }
+}
+
+impl Shared {
+    /// The request's times, before its last event.
+    async fn stages(&self, request: u64, times: &Mutex<Times>) -> bool {
+        let Some(stages) = times.lock().ok().map(|times| ProviderOutput::Stages {
+            request,
+            words_ms: times.words,
+            cue_ms: times.cue,
+            chat_ms: times.chat,
+            audio_ms: times.audio,
+        }) else {
+            return true;
+        };
+        self.emit(stages).await
+    }
 }
 
 /// How an answer stopped short.
@@ -976,17 +1126,21 @@ async fn answer(
     shared: &Shared,
     request: u64,
     said: String,
-    heard: bool,
-    looking: bool,
+    asked: Asker,
     picture: Option<Vec<u8>>,
     note: Option<&'static str>,
+    times: Arc<Mutex<Times>>,
 ) {
+    let heard = asked == Asker::Spoken;
+    let looking = asked == Asker::Written { looking: true };
     // Started now, with the chat request, so it is ready first.
     let mut speech = JoinSet::new();
     let announcement = (shared.announce && shared.announcement_due())
         .then(|| start_speech(shared, &mut speech, ANNOUNCEMENT.to_owned()));
     let (sentences, mut queued) = mpsc::channel(SENTENCES_AHEAD);
     let spoke = AtomicBool::new(false);
+    // The answer's own first audio went (not the announcement's).
+    let answered = AtomicBool::new(false);
     let mut queue = Queue {
         shared,
         speech: &mut speech,
@@ -1004,10 +1158,11 @@ async fn answer(
     // tool is asked with the words alone (the reviewer on #1075).
     let mut seeing = picture.is_some();
     let words = Message::user(said.clone());
-    let asked = match picture {
+    let question = match picture {
         Some(jpeg) => Message::user_seeing(said, &jpeg),
         None => Message::user(said),
     };
+    let writing_times = times.clone();
     let writing = async move {
         let told = (shared.system)();
         let mut messages = vec![Message::system(told.text)];
@@ -1015,7 +1170,7 @@ async fn answer(
         // A note beside the request, never anyone's words (as on the Live
         // route, where a note goes beside what the model hears).
         messages.extend(note.map(Message::system));
-        messages.push(asked);
+        messages.push(question);
         let asked_at = messages.len() - 1;
         let mut round = 0;
         while round < MAX_ROUNDS {
@@ -1026,6 +1181,7 @@ async fn answer(
             let mut split = Sentences::default();
             let mut text = String::new();
             let mut calls = Vec::new();
+            let mut reasoning = None;
             loop {
                 let next = if first && round == 1 {
                     let at = |after: Duration| begun + after;
@@ -1049,6 +1205,7 @@ async fn answer(
                                     "lamp-voice second: request {request} made a sound while its chat had not begun in {} ms",
                                     began.elapsed().as_millis()
                                 );
+                                reached(&writing_times, |times| &mut times.cue);
                                 cue(shared, request, clip).await?;
                                 BEGIN_WITHIN_AFTER_CUE
                             }
@@ -1115,6 +1272,9 @@ async fn answer(
                 };
                 if first {
                     first = false;
+                    if round == 1 {
+                        reached(&writing_times, |times| &mut times.chat);
+                    }
                     eprintln!(
                         "lamp-voice second: request {request} chat round {round} first event in {} ms",
                         began.elapsed().as_millis()
@@ -1141,6 +1301,11 @@ async fn answer(
                         }
                     }
                     ChatEvent::ToolCalls(asked) => calls = asked,
+                    ChatEvent::Reasoning(details) => reasoning = Some(details),
+                    ChatEvent::Searched => eprintln!(
+                        "lamp-voice second: request {request} chat round {round} searched the web in {} ms",
+                        began.elapsed().as_millis()
+                    ),
                     ChatEvent::Done => break,
                 }
             }
@@ -1165,10 +1330,22 @@ async fn answer(
             if calls.is_empty() {
                 return Ok(());
             }
+            // A reminder is only said: its words are data, never an ask
+            // (as the Live route's tool gate holds it).
+            if asked == Asker::Reminder {
+                eprintln!(
+                    "lamp-voice second: request {request} is a reminder: its calls are not run"
+                );
+                return Ok(());
+            }
             if std::mem::take(&mut seeing) {
                 messages[asked_at] = words.clone();
             }
-            messages.push(Message::assistant_calls(Some(text), &calls));
+            messages.push(Message::assistant_calls_with(
+                Some(text),
+                &calls,
+                reasoning.take(),
+            ));
             for call in &calls {
                 let result =
                     (shared.tools)(request, heard, call.name.clone(), call.args.clone()).await;
@@ -1188,7 +1365,8 @@ async fn answer(
             // lamp-52e6: "My voice sounds… Let me look." took no look).
             // Sentences come trimmed: each after the first is said after a
             // space, so the lamp's words read "just now. Hmm," (#1014).
-            if text != ANNOUNCEMENT {
+            let answering = text != ANNOUNCEMENT;
+            if answering {
                 let words = ProviderOutput::Transcript {
                     request: Some(request),
                     text: if std::mem::replace(&mut after, true) {
@@ -1216,7 +1394,10 @@ async fn answer(
                     if !shared.emit(audio).await {
                         return Err(Stop::Gone);
                     }
-                    if !spoke.swap(true, Ordering::Relaxed) {
+                    spoke.store(true, Ordering::Relaxed);
+                    // The answer's, never the announcement's or a cue's.
+                    if answering && !answered.swap(true, Ordering::Relaxed) {
+                        reached(&times, |times| &mut times.audio);
                         eprintln!(
                             "lamp-voice second: request {request} first answer audio {} ms after the words were heard",
                             began.elapsed().as_millis()
@@ -1226,6 +1407,21 @@ async fn answer(
                         *at = Some((shared.clock)());
                     }
                 }
+            }
+        }
+        // The lamp's words for the turn are over, said as the Live route
+        // says its own are over: a last piece, empty and finished. Without
+        // it, what reads the lamp's words line by line (the session's
+        // records, `voice/said`) never had a line from this route (the
+        // first builder, 19 Oct, lamp-4ace).
+        if after {
+            let done = ProviderOutput::Transcript {
+                request: Some(request),
+                text: String::new(),
+                finished: true,
+            };
+            if !shared.emit(done).await {
+                return Err(Stop::Gone);
             }
         }
         Ok(())
@@ -1258,6 +1454,9 @@ async fn answer(
         },
         Err(Stop::Gone) => return,
     };
+    if !shared.stages(request, &times).await {
+        return;
+    }
     shared.emit(last).await;
     // Rendered after a turn is out, never beside its chat and speech on a
     // slow relay (Nine on #1195).

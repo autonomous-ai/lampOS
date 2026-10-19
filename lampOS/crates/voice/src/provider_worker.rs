@@ -691,6 +691,23 @@ pub enum ProviderOutput {
         request: u64,
         key: String,
     },
+    /// The second route's times for `request` (19 Oct: an A/B is scored on
+    /// each request's first answer audio, never a wait cue), sent once,
+    /// before its `TurnComplete` or `TurnFailed`, for every request: in
+    /// milliseconds from the line's end as the route got it (a spoken
+    /// request's End) or from a written request's start. Each is absent
+    /// when the request never came to it. The Live route sends none.
+    Stages {
+        request: u64,
+        /// Speech to text's words came.
+        words_ms: Option<u64>,
+        /// A wait cue began, before any of the answer.
+        cue_ms: Option<u64>,
+        /// The chat's first event (text or a call) of the first round.
+        chat_ms: Option<u64>,
+        /// The answer's first audio was sent.
+        audio_ms: Option<u64>,
+    },
     TurnFailed {
         request: u64,
         stage: FailedStage,
@@ -726,6 +743,17 @@ pub enum ProviderOutput {
         fault: Fault,
         attempts: u32,
     },
+}
+
+/// What a voice route is asked to say for a due item's `text`, or why it
+/// cannot be said: the Live route's own words, so the second route alone
+/// (`LAMP_VOICE_ROUTE=second`) says a reminder as Gemini would.
+pub(crate) fn reminder_note(
+    text: &str,
+    late: bool,
+    late_by_ms: Option<u64>,
+) -> std::result::Result<String, ReminderDeferral> {
+    reminder_policy::checked_note(text, late, late_by_ms)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -1025,7 +1053,8 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
             | ProviderOutput::HoldingAnswer { request, .. }
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
-        | ProviderOutput::NewsAnswered { request, .. } => Some(*request),
+        | ProviderOutput::NewsAnswered { request, .. }
+        | ProviderOutput::Stages { request, .. } => Some(*request),
         };
         request.is_none_or(|request| request > retired_through)
     });

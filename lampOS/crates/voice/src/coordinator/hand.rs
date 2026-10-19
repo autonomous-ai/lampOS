@@ -77,7 +77,10 @@ pub(super) fn cancelled_output(event: &ProviderOutput, through: Option<u64>) -> 
         | ProviderOutput::InputDiscarded { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. }
         | ProviderOutput::OwnershipAssumed { request, .. } => *request,
-        ProviderOutput::Ready { .. } | ProviderOutput::Ended { .. } => None,
+        // Times only, for the records: never anything to schedule.
+        ProviderOutput::Ready { .. }
+        | ProviderOutput::Ended { .. }
+        | ProviderOutput::Stages { .. } => None,
     };
     through
         .zip(request)

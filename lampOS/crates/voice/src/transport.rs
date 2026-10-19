@@ -377,6 +377,15 @@ impl WorkerChannels {
             },
         })
     }
+    /// This worker's input takes a message late, in order and from the
+    /// parent's boot, as the Live provider's does (40de19327): for the second
+    /// route when it is the lamp's only voice (`--only-voice`), whose input is
+    /// checked against fresh authority when it is used, as the provider's is,
+    /// and whose end would end the voice.
+    pub fn taking_late_input(mut self) -> Self {
+        self.data = self.data.taking_late();
+        self
+    }
     /// The peer must already have bound both sockets; startup retries are bounded
     /// by the supervisor and must not attempt to reconnect an established side.
     pub fn connect(&mut self, dir: &Path, role: &str, worker_side: bool) -> io::Result<()> {
@@ -757,6 +766,28 @@ mod tests {
                 .any(|line| line.contains("298000 us old (bound 250000 us) taken late")),
             "{lines:?}"
         );
+    }
+
+    /// The second route alone (`--only-voice`) takes its input late as the
+    /// provider does; standing by, it keeps the bound, as before.
+    #[test]
+    fn the_second_routes_input_takes_a_message_late_only_as_the_only_voice() {
+        let late = |only_voice: bool| {
+            let dir = SessionDirectory::create().unwrap();
+            let (parent_boot, worker_boot) = (new_boot().unwrap(), new_boot().unwrap());
+            let mut parent =
+                WorkerChannels::bind(&dir.path, "second", parent_boot, worker_boot, false).unwrap();
+            let mut worker =
+                WorkerChannels::bind(&dir.path, "second", parent_boot, worker_boot, true).unwrap();
+            if only_voice {
+                worker = worker.taking_late_input();
+            }
+            parent.connect(&dir.path, "second", false).unwrap();
+            worker.connect(&dir.path, "second", true).unwrap();
+            second_late(&mut parent.data, &mut worker.data)
+        };
+        assert_eq!(late(true).unwrap(), Some(4));
+        assert!(late(false).is_err(), "standing by: refused, as before");
     }
 
     /// On the provider's input, a late message from another boot, out of

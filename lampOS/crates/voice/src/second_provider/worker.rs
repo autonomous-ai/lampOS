@@ -7,7 +7,11 @@
 //! conversation thread as a Live session is, with the same tools, and each
 //! turn kept in that thread and the memory's journal as the Live route
 //! keeps its own.
-use super::{Engine, Net, Told, ToolRunner, net::Message, output_request};
+use super::{
+    Engine, Net, Told, ToolRunner,
+    net::{Message, search::Search},
+    output_request,
+};
 use crate::{
     provider_flow::OutputSender,
     provider_link::{LinkContext, ProviderLink, ProviderLinkState},
@@ -232,48 +236,195 @@ pub const WAIT_CUE_ENVIRONMENT: &str = "LAMP_SECOND_WAIT_CUE";
 /// The worker's flag for it, right after the second route's configuration.
 pub const WAIT_CUE_FLAG: &str = "--wait-cue";
 
-/// Whether the service's environment says `LAMP_SECOND_WAIT_CUE=on`.
-pub fn wait_cue_from_environment() -> bool {
-    std::env::var(WAIT_CUE_ENVIRONMENT).ok().as_deref() == Some("on")
-}
-
-/// Take a leading `--wait-cue` off the worker's flags.
-pub fn take_wait_cue(flags: &[String]) -> (bool, &[String]) {
-    match flags {
-        [flag, rest @ ..] if flag == WAIT_CUE_FLAG => (true, rest),
-        _ => (false, flags),
-    }
-}
-
 /// Where the coordinator reads whether a turn the chat never began says
 /// [`super::DOWN_LINE`]. `on` only.
 pub const DOWN_LINE_ENVIRONMENT: &str = "LAMP_SECOND_DOWN_LINE";
-/// The worker's flag for it, after `--wait-cue` if that is given.
+/// The worker's flag for it.
 pub const DOWN_LINE_FLAG: &str = "--down-line";
 
-/// Whether the service's environment says `LAMP_SECOND_DOWN_LINE=on`.
-pub fn down_line_from_environment() -> bool {
-    std::env::var(DOWN_LINE_ENVIRONMENT).ok().as_deref() == Some("on")
-}
-
-/// Take a leading `--down-line` off the worker's flags.
-pub fn take_down_line(flags: &[String]) -> (bool, &[String]) {
-    match flags {
-        [flag, rest @ ..] if flag == DOWN_LINE_FLAG => (true, rest),
-        _ => (false, flags),
-    }
-}
-
 /// The worker's flag when this route is the lamp's only voice
-/// (`LAMP_VOICE_ROUTE=second`), after `--down-line` if that is given: it
-/// says no [`super::ANNOUNCEMENT`], as there is no other voice to differ from.
+/// (`LAMP_VOICE_ROUTE=second`): it says no [`super::ANNOUNCEMENT`], as there
+/// is no other voice to differ from, says due reminders, and takes its
+/// input late as the Live worker does.
 pub const ONLY_VOICE_FLAG: &str = "--only-voice";
 
-/// Take a leading `--only-voice` off the worker's flags.
-pub fn take_only_voice(flags: &[String]) -> (bool, &[String]) {
-    match flags {
-        [flag, rest @ ..] if flag == ONLY_VOICE_FLAG => (true, rest),
-        _ => (false, flags),
+/// Where the coordinator reads which text model this route asks in place of
+/// the configured chat: `gemini` (Google's API, directly), `openrouter`
+/// (OpenRouter) or `deepseek` (DeepSeek's own API). Off unset or empty; any
+/// other value is refused at start.
+pub const CHAT_ENVIRONMENT: &str = "LAMP_SECOND_CHAT";
+/// Where the coordinator reads whether this route's speech is Gemini's own
+/// speech model (`gemini`), the configured voice when it fails. As
+/// [`CHAT_ENVIRONMENT`].
+pub const SPEECH_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH";
+pub const GEMINI_SPEECH_FLAG: &str = "--gemini-speech";
+/// Where the coordinator reads which web search the model may use:
+/// `deepseek` (DeepSeek's Search & Fetch, as functions), `openrouter`
+/// (OpenRouter's web plugin, with `LAMP_SECOND_CHAT=openrouter` only) or
+/// `exa` (`second.json`'s `search_url`). As [`CHAT_ENVIRONMENT`].
+pub const SEARCH_ENVIRONMENT: &str = "LAMP_SECOND_SEARCH";
+
+/// The text model in place of the configured chat (`LAMP_SECOND_CHAT`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChatRoute {
+    Gemini,
+    OpenRouter,
+    DeepSeek,
+}
+
+/// The web search the model may use (`LAMP_SECOND_SEARCH`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SearchRoute {
+    DeepSeek,
+    OpenRouter,
+    Exa,
+}
+
+/// The second route's own flags, given right after its configuration, each
+/// only when on, in the order of the fields.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RouteFlags {
+    /// `LAMP_SECOND_WAIT_CUE=on`.
+    pub wait_cue: bool,
+    /// `LAMP_SECOND_DOWN_LINE=on`.
+    pub down_line: bool,
+    /// `LAMP_VOICE_ROUTE=second`, set by the coordinator's routes.
+    pub only_voice: bool,
+    /// `LAMP_SECOND_CHAT`.
+    pub chat: Option<ChatRoute>,
+    /// `LAMP_SECOND_SPEECH=gemini`.
+    pub gemini_speech: bool,
+    /// `LAMP_SECOND_SEARCH`.
+    pub search: Option<SearchRoute>,
+}
+
+/// Each choice's word in the environment, and its worker flag.
+const CHATS: [(ChatRoute, &str, &str); 3] = [
+    (ChatRoute::Gemini, "gemini", "--gemini-chat"),
+    (ChatRoute::OpenRouter, "openrouter", "--openrouter-chat"),
+    (ChatRoute::DeepSeek, "deepseek", "--deepseek-chat"),
+];
+const SEARCHES: [(SearchRoute, &str, &str); 3] = [
+    (SearchRoute::DeepSeek, "deepseek", "--deepseek-search"),
+    (SearchRoute::OpenRouter, "openrouter", "--openrouter-search"),
+    (SearchRoute::Exa, "exa", "--exa-search"),
+];
+
+/// One of `table`'s words for `value`; nothing unset or empty; why not.
+fn choice<T: Copy>(
+    name: &str,
+    value: Option<std::ffi::OsString>,
+    table: &[(T, &str, &str)],
+) -> Result<Option<T>, String> {
+    let Some(value) = value.filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    table
+        .iter()
+        .find(|(_, word, _)| value == *word)
+        .map(|(route, ..)| Some(*route))
+        .ok_or_else(|| {
+            let words: Vec<&str> = table.iter().map(|(_, word, _)| *word).collect();
+            format!(
+                "{name} is {} or nothing, not {value:?}: the voice does not start",
+                words.join(", ")
+            )
+        })
+}
+
+impl RouteFlags {
+    /// The switches (all but `only_voice`) as `var` gives them from the
+    /// service's environment (`coordinator::second`). The two `on` switches
+    /// are on with `on` only, as before; the others with one of their words,
+    /// off unset or empty, and refused with anything else, as is OpenRouter's
+    /// search without OpenRouter's chat, which it rides on.
+    pub fn from_values(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<Self, String> {
+        let on = |name| var(name).is_some_and(|value| value == "on");
+        let route = Self {
+            wait_cue: on(WAIT_CUE_ENVIRONMENT),
+            down_line: on(DOWN_LINE_ENVIRONMENT),
+            only_voice: false,
+            chat: choice(CHAT_ENVIRONMENT, var(CHAT_ENVIRONMENT), &CHATS)?,
+            gemini_speech: choice(
+                SPEECH_ENVIRONMENT,
+                var(SPEECH_ENVIRONMENT),
+                &[((), "gemini", GEMINI_SPEECH_FLAG)],
+            )?
+            .is_some(),
+            search: choice(SEARCH_ENVIRONMENT, var(SEARCH_ENVIRONMENT), &SEARCHES)?,
+        };
+        if route.search == Some(SearchRoute::OpenRouter)
+            && route.chat != Some(ChatRoute::OpenRouter)
+        {
+            return Err(format!(
+                "{SEARCH_ENVIRONMENT}=openrouter is OpenRouter's web plugin and needs {CHAT_ENVIRONMENT}=openrouter: the voice does not start"
+            ));
+        }
+        Ok(route)
+    }
+
+    /// The worker's flags for these switches, in order.
+    pub fn flags(&self) -> Vec<&'static str> {
+        let mut flags = Vec::new();
+        for (on, flag) in [
+            (self.wait_cue, WAIT_CUE_FLAG),
+            (self.down_line, DOWN_LINE_FLAG),
+            (self.only_voice, ONLY_VOICE_FLAG),
+        ] {
+            if on {
+                flags.push(flag);
+            }
+        }
+        flags.extend(
+            CHATS
+                .iter()
+                .filter(|(route, ..)| self.chat == Some(*route))
+                .map(|(.., flag)| *flag),
+        );
+        if self.gemini_speech {
+            flags.push(GEMINI_SPEECH_FLAG);
+        }
+        flags.extend(
+            SEARCHES
+                .iter()
+                .filter(|(route, ..)| self.search == Some(*route))
+                .map(|(.., flag)| *flag),
+        );
+        flags
+    }
+
+    /// Take the leading flags off the worker's, in order.
+    pub fn take(mut flags: &[String]) -> (Self, &[String]) {
+        let mut next = |flag: &str| match flags {
+            [first, rest @ ..] if first == flag => {
+                flags = rest;
+                true
+            }
+            _ => false,
+        };
+        let wait_cue = next(WAIT_CUE_FLAG);
+        let down_line = next(DOWN_LINE_FLAG);
+        let only_voice = next(ONLY_VOICE_FLAG);
+        let chat = CHATS
+            .iter()
+            .find(|(.., flag)| next(flag))
+            .map(|(chat, ..)| *chat);
+        let gemini_speech = next(GEMINI_SPEECH_FLAG);
+        let search = SEARCHES
+            .iter()
+            .find(|(.., flag)| next(flag))
+            .map(|(search, ..)| *search);
+        (
+            Self {
+                wait_cue,
+                down_line,
+                only_voice,
+                chat,
+                gemini_speech,
+                search,
+            },
+            flags,
+        )
     }
 }
 
@@ -297,25 +448,186 @@ pub fn parse_flags(dir: &Path, flags: &[String]) -> io::Result<crate::provider_w
     Ok(parsed)
 }
 
+/// The key for Gemini's API: `gemini_credential_file`'s, else the Live
+/// route's own when that is a Google API key. A relay's key is never sent
+/// to Google: without a Google key the worker does not start.
+pub fn gemini_key(
+    config: &crate::second_config::SecondConfig,
+    provider: &crate::config::ProviderConfig,
+) -> io::Result<crate::second_config::Key> {
+    if let Some(key) = &config.gemini.key {
+        return Ok(key.clone());
+    }
+    match provider.google_credential_file() {
+        Some(file) => crate::second_config::credential(file),
+        None => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "LAMP_SECOND_CHAT=gemini and LAMP_SECOND_SPEECH=gemini call Google directly and need a Google API key: set gemini_credential_file in the second route's configuration (the Live route's key goes to a relay and is not given to Google)",
+        )),
+    }
+}
+
+/// The real services as `route` sets them: the configured chat and voice,
+/// or Gemini's, OpenRouter's or DeepSeek's in their place, each saying so in
+/// the journal once. OpenRouter's and DeepSeek's keys are the voice unit's
+/// credentials, in `credentials` (its `CREDENTIALS_DIRECTORY`).
+pub fn services(
+    config: crate::second_config::SecondConfig,
+    provider: &crate::config::ProviderConfig,
+    route: RouteFlags,
+    credentials: Option<&std::ffi::OsStr>,
+    declare: super::net::Declare,
+) -> io::Result<Net> {
+    use crate::second_config::{DEEPSEEK_CREDENTIAL, OPENROUTER_CREDENTIAL, unit_credential};
+    let gemini = config.gemini.clone();
+    let hosted = config.hosted.clone();
+    let fallback = config.tts_provider.name();
+    let key = (route.chat == Some(ChatRoute::Gemini) || route.gemini_speech)
+        .then(|| gemini_key(&config, provider))
+        .transpose()?;
+    let mut net = Net::new(config, declare).map_err(io::Error::other)?;
+    let call = |model| {
+        key.as_ref().map(|key| super::services::GeminiCall {
+            base_url: &gemini.base_url,
+            key: key.expose(),
+            model,
+        })
+    };
+    match route.chat {
+        None => {}
+        Some(ChatRoute::Gemini) => {
+            if let Some(call) = call(&gemini.chat_model) {
+                net = net.chatting_with_gemini(&call).map_err(io::Error::other)?;
+            }
+            eprintln!(
+                "lamp-voice second: the text model is Gemini ({}, thinking {}), called directly (LAMP_SECOND_CHAT=gemini)",
+                gemini.chat_model,
+                super::net::GEMINI_REASONING
+            );
+        }
+        Some(ChatRoute::OpenRouter) => {
+            let key = unit_credential(credentials, OPENROUTER_CREDENTIAL)?;
+            let search = route.search == Some(SearchRoute::OpenRouter);
+            net = net
+                .chatting_with_openrouter(key.expose(), search)
+                .map_err(io::Error::other)?;
+            eprintln!(
+                "lamp-voice second: the text model is {} through OpenRouter, the fastest provider first, reasoning {}{} (LAMP_SECOND_CHAT=openrouter)",
+                hosted.openrouter_model,
+                hosted.openrouter_effort,
+                if search {
+                    ", searching the web on Exa before every answer (LAMP_SECOND_SEARCH=openrouter)"
+                } else {
+                    ""
+                }
+            );
+        }
+        Some(ChatRoute::DeepSeek) => {
+            let key = unit_credential(credentials, DEEPSEEK_CREDENTIAL)?;
+            net = net
+                .chatting_with_deepseek(key.expose())
+                .map_err(io::Error::other)?;
+            eprintln!(
+                "lamp-voice second: the text model is DeepSeek's {} on DeepSeek's own API, thinking off (LAMP_SECOND_CHAT=deepseek)",
+                hosted.deepseek_model
+            );
+        }
+    }
+    if route.gemini_speech
+        && let Some(call) = call(&gemini.speech_model)
+    {
+        net = net
+            .speaking_with_gemini(&call, provider.voice())
+            .map_err(io::Error::other)?;
+        eprintln!(
+            "lamp-voice second: speech is Gemini's ({}, voice {}), {fallback} for a sentence it cannot start (LAMP_SECOND_SPEECH=gemini)",
+            gemini.speech_model,
+            provider.voice()
+        );
+    }
+    Ok(net)
+}
+
+/// The web search the model may call as its own functions, as `route` sets
+/// it: DeepSeek's Search & Fetch (its key the unit's `deepseek.key`), or the
+/// search service `second.json` names. OpenRouter's rides on its chat.
+pub fn search_for(
+    config: &crate::second_config::SecondConfig,
+    route: RouteFlags,
+    credentials: Option<&std::ffi::OsStr>,
+) -> io::Result<Option<Search>> {
+    use crate::second_config::{DEEPSEEK_CREDENTIAL, unit_credential};
+    let search = match route.search {
+        None | Some(SearchRoute::OpenRouter) => return Ok(None),
+        Some(SearchRoute::DeepSeek) => {
+            let key = unit_credential(credentials, DEEPSEEK_CREDENTIAL)?;
+            Search::deepseek(key.expose())
+        }
+        Some(SearchRoute::Exa) => {
+            let service = config.search.as_ref().ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "LAMP_SECOND_SEARCH=exa needs search_url and search_credential_file in the second route's configuration",
+                )
+            })?;
+            Search::exa(&service.url, service.key.expose(), service.extra.clone())
+        }
+    }
+    .map_err(io::Error::other)?;
+    let names: Vec<String> = search
+        .declarations()
+        .into_iter()
+        .map(|tool| tool.name)
+        .collect();
+    eprintln!(
+        "lamp-voice second: the model may search the web ({}; LAMP_SECOND_SEARCH)",
+        names.join(", ")
+    );
+    Ok(Some(search))
+}
+
+/// The lamp's functions, then the search's, within Live's bound of
+/// [`lamp_gemini::MAX_TOOLS`]: the search is given room before a skill's
+/// function, and the fetch only when room is left.
+pub fn with_search(
+    mut tools: Vec<lamp_gemini::Tool>,
+    search: &[lamp_gemini::Tool],
+) -> Vec<lamp_gemini::Tool> {
+    let Some((first, rest)) = search.split_first() else {
+        return tools;
+    };
+    tools.truncate(lamp_gemini::MAX_TOOLS - 1);
+    tools.push(first.clone());
+    for tool in rest {
+        if tools.len() < lamp_gemini::MAX_TOOLS {
+            tools.push(tool.clone());
+        }
+    }
+    tools
+}
+
 /// The second route's worker process until Stop. `files` are the Live
 /// provider worker's flags; this route uses the thread's file and the
 /// tools (the memory among them), and has no use yet for the rest. With
-/// `only_voice` (`--only-voice`) it is the lamp's only voice.
-#[allow(clippy::too_many_arguments)]
+/// `route.only_voice` (`--only-voice`) it is the lamp's only voice.
 pub fn serve(
     channels: WorkerChannels,
     boot: BootId,
     provider_config: &Path,
     second_config: &Path,
     files: crate::provider_worker::Files,
-    wait_cue: bool,
-    down_line: bool,
-    only_voice: bool,
+    route: RouteFlags,
 ) -> io::Result<()> {
-    let character = crate::config::ProviderConfig::load(provider_config)?.instruction(false)?;
+    let provider = crate::config::ProviderConfig::load(provider_config)?;
+    let character = provider.instruction(false)?;
     let config = crate::second_config::load_from_path(second_config)?;
     let checked = checks_sounds(&files);
     let tools = files.tools;
+    // As the Live route says them, when this route is the only voice.
+    let reminders = route.only_voice && tools.schedule_speak;
+    if reminders {
+        eprintln!("lamp-voice second: due reminders are said on this route, the lamp's only voice");
+    }
     if let Some(socket) = &tools.memory {
         // As the Live route starts it: each known person's memory apart.
         crate::remember::start(
@@ -323,12 +635,27 @@ pub fn serve(
             tools.who.as_deref().map(crate::known_faces::known_file_of),
         );
     }
+    // The voice unit's credentials (`LoadCredential=`), passed to this
+    // worker alone (`process.rs`).
+    let credentials = std::env::var_os(crate::second_config::CREDENTIALS_ENV);
+    // A web search as functions of its own, with LAMP_SECOND_SEARCH:
+    // declared beside the lamp's tools and answered here.
+    let search = search_for(&config, route, credentials.as_deref())?.map(Arc::new);
+    let searched = search
+        .as_ref()
+        .map(|search| search.declarations())
+        .unwrap_or_default();
     let declared = tools.clone();
     // With `use_skill` the skills' lines are told after the character, as
     // the Live route tells them (#1668).
     let skills_told = tools.clone();
-    let net = Net::new(config, Arc::new(move || crate::tools::declared(&declared)))
-        .map_err(io::Error::other)?;
+    let net = services(
+        config,
+        &provider,
+        route,
+        credentials.as_deref(),
+        Arc::new(move || with_search(crate::tools::declared(&declared), &searched)),
+    )?;
     let thread = files.thread;
     let file = thread.clone();
     let clock = tools.clock;
@@ -389,7 +716,11 @@ pub fn serve(
     };
     let runner: ToolRunner = Arc::new(move |request, heard, name, args| {
         let settings = tools.clone();
+        let search = search.clone();
         Box::pin(async move {
+            if let Some(search) = search.filter(|search| search.answers(&name)) {
+                return search.answer(&name, &args).await;
+            }
             let call = lamp_gemini::ToolCall {
                 id: String::new(),
                 name,
@@ -404,9 +735,10 @@ pub fn serve(
     });
     let mut engine = Engine::new(Arc::new(net), system, runner)
         .checking_sounds(checked)
-        .waiting_with_a_sound(wait_cue)
-        .saying_when_down(down_line)
-        .announcing(!only_voice);
+        .waiting_with_a_sound(route.wait_cue)
+        .saying_when_down(route.down_line)
+        .announcing(!route.only_voice)
+        .saying_reminders(reminders);
     // A look reads the eyes' look file with the Live route's bounds: a full
     // look's still may be older and larger (#836, #941).
     if let Some(path) = files.look.clone() {
@@ -862,8 +1194,11 @@ pub(crate) fn keep(event: &ProviderOutput, file: Option<&Path>) {
             ..
         } => {
             // Sentences come trimmed, those after the first with a space
-            // before; the thread joins its pieces as given.
-            if let Ok(mut thread) = crate::thread::THREAD.lock() {
+            // before; the thread joins its pieces as given. The empty last
+            // piece says the words are over and adds none.
+            if !text.is_empty()
+                && let Ok(mut thread) = crate::thread::THREAD.lock()
+            {
                 thread.lamp(*request, &format!("{} ", text.trim_start()), now);
             }
         }
@@ -1561,5 +1896,205 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
         let a = Some(crate::remember::person_id("A"));
         assert_eq!(opened, [a.clone(), a]);
+    }
+
+    /// Gemini's key: the second route's own `gemini_credential_file`, else
+    /// the Live route's when that is a Google API key. With the Live route
+    /// through a relay and no key of its own, a Gemini switch keeps the
+    /// worker from starting: the relay's key is never sent to Google, and
+    /// without a Gemini switch nothing is asked for.
+    #[test]
+    fn gemini_is_called_with_its_own_key_or_the_live_routes_google_key_never_a_relays() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-second-gemini-key-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let private = |name: &str, text: &str| {
+            let path = dir.join(name);
+            std::fs::write(&path, text).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            path
+        };
+        let llm = private("llm.key", "relay-key");
+        let live = private("live.key", "live-google-key\n");
+        let google = private("google.key", "second-google-key");
+        let second = |extra: String| {
+            let path = private(
+                "second.json",
+                &format!(
+                    r#"{{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"{}"{extra}}}"#,
+                    llm.display()
+                ),
+            );
+            crate::second_config::load_from_path(&path).unwrap()
+        };
+        let provider = |endpoint: &str| -> crate::config::ProviderConfig {
+            serde_json::from_str(&format!(
+                r#"{{"endpoint":"{endpoint}","model":"m","voice":"Kore","credential_file":"{}"}}"#,
+                live.display()
+            ))
+            .unwrap()
+        };
+        let direct = provider(lamp_gemini::GOOGLE_ENDPOINT);
+        let relay = provider("wss://relay.example.invalid/ws/gemini");
+        let own = second(format!(
+            r#","gemini_credential_file":"{}""#,
+            google.display()
+        ));
+        assert_eq!(
+            super::gemini_key(&own, &relay).unwrap().expose(),
+            "second-google-key"
+        );
+        let plain = second(String::new());
+        assert_eq!(
+            super::gemini_key(&plain, &direct).unwrap().expose(),
+            "live-google-key"
+        );
+        let refused = super::gemini_key(&plain, &relay).unwrap_err().to_string();
+        assert!(refused.contains("gemini_credential_file"), "{refused}");
+        assert!(!refused.contains("relay-key") && !refused.contains("live-google-key"));
+        let none: super::super::net::Declare = std::sync::Arc::new(Vec::new);
+        let speech = super::RouteFlags {
+            gemini_speech: true,
+            ..super::RouteFlags::default()
+        };
+        assert!(
+            super::services(second(String::new()), &relay, speech, None, none.clone()).is_err()
+        );
+        assert!(
+            super::services(
+                second(String::new()),
+                &relay,
+                super::RouteFlags::default(),
+                None,
+                none.clone()
+            )
+            .is_ok()
+        );
+        assert!(super::services(second(String::new()), &direct, speech, None, none).is_ok());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// OpenRouter's and DeepSeek's keys are the voice unit's credentials:
+    /// with them the chat starts, without them the worker does not, saying
+    /// which credential it lacks and nothing of a key; DeepSeek's search the
+    /// same; the Exa search needs its service named.
+    #[test]
+    fn the_hosted_chats_and_searches_take_the_units_credentials() {
+        use super::{ChatRoute, RouteFlags, SearchRoute};
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-second-hosted-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let credentials = dir.join("credentials");
+        std::fs::create_dir_all(&credentials).unwrap();
+        let private = |path: std::path::PathBuf, text: &str| {
+            std::fs::write(&path, text).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            path
+        };
+        let llm = private(dir.join("llm.key"), "relay-key");
+        let second = private(
+            dir.join("second.json"),
+            &format!(
+                r#"{{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"{}"}}"#,
+                llm.display()
+            ),
+        );
+        let config = || crate::second_config::load_from_path(&second).unwrap();
+        let provider: crate::config::ProviderConfig = serde_json::from_str(&format!(
+            r#"{{"endpoint":"wss://relay.example.invalid/ws","model":"m","voice":"Kore","credential_file":"{}"}}"#,
+            llm.display()
+        ))
+        .unwrap();
+        let none: super::super::net::Declare = std::sync::Arc::new(Vec::new);
+        let chat = |chat| RouteFlags {
+            chat: Some(chat),
+            ..RouteFlags::default()
+        };
+        let search = |search| RouteFlags {
+            search: Some(search),
+            ..RouteFlags::default()
+        };
+        let dirs = Some(credentials.as_os_str());
+        for (route, name) in [
+            (chat(ChatRoute::OpenRouter), "openrouter.key"),
+            (chat(ChatRoute::DeepSeek), "deepseek.key"),
+        ] {
+            let error = super::services(config(), &provider, route, dirs, none.clone())
+                .err()
+                .unwrap()
+                .to_string();
+            assert!(error.contains(name), "{error}");
+        }
+        let error = super::search_for(&config(), search(SearchRoute::DeepSeek), dirs)
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(error.contains("deepseek.key"), "{error}");
+        private(credentials.join("openrouter.key"), "or-secret\n");
+        private(credentials.join("deepseek.key"), "ds-secret\n");
+        for route in [chat(ChatRoute::OpenRouter), chat(ChatRoute::DeepSeek)] {
+            assert!(super::services(config(), &provider, route, dirs, none.clone()).is_ok());
+            // Without the unit's credentials at all.
+            let error = super::services(config(), &provider, route, None, none.clone())
+                .err()
+                .unwrap()
+                .to_string();
+            assert!(error.contains("CREDENTIALS_DIRECTORY"), "{error}");
+            assert!(!error.contains("secret"), "{error}");
+        }
+        let found = super::search_for(&config(), search(SearchRoute::DeepSeek), dirs)
+            .unwrap()
+            .unwrap();
+        assert!(found.answers(super::super::net::search::FETCH));
+        assert!(
+            super::search_for(&config(), search(SearchRoute::OpenRouter), dirs)
+                .unwrap()
+                .is_none()
+        );
+        assert!(super::search_for(&config(), search(SearchRoute::Exa), dirs).is_err());
+        assert!(
+            super::search_for(&config(), RouteFlags::default(), dirs)
+                .unwrap()
+                .is_none()
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The search's functions go beside the lamp's within Live's bound of
+    /// 32: the search before a skill's last function, the fetch only with
+    /// room left.
+    #[test]
+    fn the_search_is_given_room_before_a_skill_and_the_fetch_only_with_room() {
+        let tool = |name: String| lamp_gemini::Tool {
+            name,
+            description: "A function.".into(),
+            parameters: None,
+            silent: false,
+        };
+        let lamp = |count: usize| -> Vec<lamp_gemini::Tool> {
+            (0..count).map(|i| tool(format!("tool_{i}"))).collect()
+        };
+        let search = [tool("web_search".into()), tool("fetch_page".into())];
+        let names = |tools: Vec<lamp_gemini::Tool>| -> Vec<String> {
+            tools.into_iter().map(|tool| tool.name).collect()
+        };
+        let roomy = names(super::with_search(lamp(10), &search));
+        assert_eq!(roomy.len(), 12);
+        assert_eq!(roomy[10..], ["web_search", "fetch_page"]);
+        let full = names(super::with_search(lamp(32), &search));
+        assert_eq!(full.len(), 32);
+        assert_eq!(full[31], "web_search");
+        assert!(!full.contains(&"tool_31".to_owned()));
+        assert!(!full.contains(&"fetch_page".to_owned()));
+        assert_eq!(names(super::with_search(lamp(5), &[])).len(), 5);
     }
 }

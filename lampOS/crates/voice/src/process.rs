@@ -888,6 +888,10 @@ fn worker_command(
             role,
             var(crate::person::ENVIRONMENT).as_deref(),
         ))
+        .envs(credentials_worker_environment(
+            role,
+            var(crate::second_config::CREDENTIALS_ENV).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -989,9 +993,47 @@ fn person_name_worker_environment(
         .map(|path| (crate::person::ENVIRONMENT, path.to_owned()))
 }
 
+// The voice unit's credentials (`LoadCredential=`, systemd's
+// `CREDENTIALS_DIRECTORY`), to the one worker that reads them: the second
+// route's, for OpenRouter's and DeepSeek's keys. A path, passed only when
+// absolute; the keys themselves never travel in an environment.
+fn credentials_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, std::ffi::OsString)> {
+    value
+        .filter(|path| role == "second" && Path::new(path).is_absolute())
+        .map(|path| (crate::second_config::CREDENTIALS_ENV, path.to_owned()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The voice unit's credentials' directory goes to the second route's
+    /// worker only, and only as an absolute path.
+    #[test]
+    fn the_units_credentials_reach_only_the_second_route() {
+        let absolute = std::ffi::OsStr::new("/run/credentials/lamp-voice.service");
+        assert_eq!(
+            credentials_worker_environment("second", Some(absolute)),
+            Some(("CREDENTIALS_DIRECTORY", absolute.to_owned()))
+        );
+        assert_eq!(credentials_worker_environment("second", None), None);
+        assert_eq!(
+            credentials_worker_environment("second", Some(std::ffi::OsStr::new("run/x"))),
+            None
+        );
+        for role in [
+            "provider", "capture", "speaker", "privacy", "ring", "camera", "unknown",
+        ] {
+            assert_eq!(
+                credentials_worker_environment(role, Some(absolute)),
+                None,
+                "{role}"
+            );
+        }
+    }
 
     #[test]
     fn cleared_worker_environment_passes_only_the_exact_voice_route_opt_in() {
@@ -1161,6 +1203,8 @@ mod tests {
                     "6-7"
                 } else if name == crate::person::ENVIRONMENT {
                     "/etc/lampOS/person/name"
+                } else if name == crate::second_config::CREDENTIALS_ENV {
+                    "/run/credentials/lamp-voice.service"
                 } else {
                     "a-secret"
                 },
@@ -1207,6 +1251,7 @@ mod tests {
             (
                 "second",
                 vec![
+                    "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",

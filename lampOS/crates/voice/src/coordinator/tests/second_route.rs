@@ -33,6 +33,8 @@ use std::{
 const PACKET: usize = crate::provider_flow::PACKET_SAMPLES;
 const LIVE: i16 = 1_000;
 const SECOND: i16 = 2_000;
+/// The second route's wait cue, played before its words.
+const CUE: i16 = 500;
 const LIMIT: Duration = Duration::from_secs(12);
 
 /// What the Live peer does with one request, by Start order.
@@ -98,6 +100,8 @@ struct Script {
     second_packets: usize,
     /// The second route's answers open with these words.
     second_says: Option<&'static str>,
+    /// Packets of a wait cue the second route plays before its words.
+    second_cue: usize,
     /// Speech starts again (a new turn, or speaking over an answer).
     speak_again: Option<When>,
     /// Privacy reports muted once this many turns are settled.
@@ -139,6 +143,7 @@ impl Script {
             live: vec![live],
             second_packets: 12,
             second_says: None,
+            second_cue: 0,
             speak_again: None,
             turns: 1,
             live_back_after: None,
@@ -690,6 +695,10 @@ impl Peers {
                 ProviderInput::End { request, .. } => {
                     self.ended.insert(request);
                     if !live {
+                        // A wait cue first: audio with no words.
+                        if self.script.second_cue > 0 {
+                            self.audio(index, request, self.script.second_cue, CUE);
+                        }
                         if let Some(text) = self.script.second_says {
                             self.peers[index]
                                 .queued
@@ -932,7 +941,10 @@ fn run(script: Script) -> Run {
         }
     };
     let workers = routes
-        .workers(vec!["/etc/provider.json".to_owned()], false, false)
+        .workers(
+            vec!["/etc/provider.json".to_owned()],
+            second::RouteFlags::default(),
+        )
         .unwrap();
     let mut rig = Rig {
         second: None,
@@ -1081,9 +1093,12 @@ fn run(script: Script) -> Run {
 /// The records whose kinds and fields are compared across runs: what a turn
 /// leaves, with neither timing nor the route's own records.
 fn shape(run: &Run) -> BTreeSet<(String, Vec<String>)> {
+    // Nor when an answer began to be heard: on the second route that needs
+    // its words, which these peers send only when a script asks
+    // (`the_answers_first_audio_is_recorded_after_a_wait_cue_never_at_it`).
     run.trace
         .iter()
-        .filter(|e| e["kind"] != "voice_route_switched")
+        .filter(|e| e["kind"] != "voice_route_switched" && e["kind"] != "answer_first_audio")
         .map(|e| {
             let mut keys: Vec<String> = e.as_object().unwrap().keys().cloned().collect();
             keys.sort();
@@ -1699,6 +1714,54 @@ fn the_second_route_alone_answers_a_spoken_request_and_no_gemini_worker_starts()
     assert_eq!(dedup(&gemini.seen.installs), dedup(&alone.seen.installs));
     assert_eq!(dedup(&gemini.seen.phases), dedup(&alone.seen.phases));
     assert!(dedup(&alone.seen.phases).contains(&RingPhase::Speaking));
+}
+
+/// The first builder, 19 Oct: on the second route the first sound had been
+/// its wait cue, not its answer. The session's records say when each turn's
+/// answer began to be heard (`answer_first_audio`): on the second route the
+/// first audio after its words, a cue before them being no answer; on the
+/// Live route its first audio.
+#[test]
+fn the_answers_first_audio_is_recorded_after_a_wait_cue_never_at_it() {
+    let _one = super::pilot_faults::one_session();
+    let order = |run: &Run| -> Vec<&'static str> {
+        run.trace
+            .iter()
+            .filter_map(|e| match e["kind"].as_str() {
+                Some("provider_first_audio") if e["turn"] == 1 => Some("provider_first_audio"),
+                Some("answer_first_audio") if e["turn"] == 1 => Some("answer_first_audio"),
+                Some("transcript") if e["turn"] == 1 => Some("words"),
+                _ => None,
+            })
+            .collect()
+    };
+    let alone = run(Script {
+        second: false,
+        only: true,
+        second_cue: 4,
+        second_says: Some("Sure."),
+        ..Script::question(Live::Answer(12))
+    });
+    alone.assert_clean();
+    assert_eq!(
+        order(&alone),
+        ["provider_first_audio", "words", "answer_first_audio"],
+        "{}",
+        alone.summary()
+    );
+    assert_eq!(alone.events("answer_first_audio").len(), 1);
+    let gemini = run(Script {
+        second: false,
+        ..Script::question(Live::Answer(12))
+    });
+    gemini.assert_clean();
+    let at = |run: &Run, kind: &str| run.events(kind)[0]["at_us"].as_u64().unwrap();
+    assert_eq!(gemini.events("answer_first_audio").len(), 1);
+    assert!(at(&gemini, "answer_first_audio") >= at(&gemini, "provider_first_audio"));
+    assert_eq!(
+        order(&gemini),
+        ["provider_first_audio", "answer_first_audio"]
+    );
 }
 
 /// Alone, the second route's worker is the lamp's only voice: its exit

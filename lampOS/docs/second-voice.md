@@ -31,8 +31,11 @@ service's environment (`SECOND_CONFIG_ENV`). Unset or empty: the route is
 off. The coordinator passes the path to the worker as
 `worker second DIR PARENT WORKER PROVIDER_CONFIG SECOND_CONFIG [flags]`,
 where the flags are the Gemini provider worker's, less `--keep-link`,
-after this route's own `--wait-cue`, `--down-line` and `--only-voice`
-(each only when switched on, in that order).
+after this route's own `--wait-cue`, `--down-line`, `--only-voice`, one
+of `--gemini-chat`, `--openrouter-chat` and `--deepseek-chat`,
+`--gemini-speech`, and one of `--deepseek-search`, `--openrouter-search` and
+`--exa-search` (each only when switched on, in that order; `RouteFlags` in
+`second_provider/worker.rs`).
 
 The field names are V1's (`system/domain/device.go`, `hal/models.py`), so
 whatever carries V1's settings over can copy them. The one change: each
@@ -52,8 +55,24 @@ refused (unknown fields are refused).
 | `tts_credential_file` | no | empty or absent: `llm_credential_file` |
 | `tts_provider` | no | `openai` (the default) or `elevenlabs`; anything else is refused |
 | `tts_voice` | no | the voice; absent: OpenAI `nova`, ElevenLabs `Rachel` |
+| `llm_extra` | no | fields the chat request also carries, for an OpenAI-compatible endpoint that needs its own (DeepSeek's `{"thinking":{"type":"disabled"}}`, a model's `reasoning_effort`); at most 16, never `model`, `messages`, `stream`, `tools` or `tool_choice` |
+| `gemini_base_url` | no | Google's Gemini API for `LAMP_SECOND_CHAT=gemini` and `LAMP_SECOND_SPEECH=gemini`; absent: `https://generativelanguage.googleapis.com/v1beta` |
+| `gemini_credential_file` | no | its Google API key; absent: the Live route's own key, only when `provider.json` goes to Google directly (its endpoint is Google's, `authentication` the API key) |
+| `gemini_chat_model` | no | absent: `gemini-3.6-flash` |
+| `gemini_speech_model` | no | absent: `gemini-3.8-flash-lite-tts` |
+| `search_url`, `search_credential_file` | no, together | the search service `LAMP_SECOND_SEARCH=exa` calls (`web_search`) |
+| `search_extra` | no | fields of the search request of its own (Exa's `type`, say) |
+| `openrouter_model` | no | the slug `LAMP_SECOND_CHAT=openrouter` asks, from OpenRouter's public model list; absent: `deepseek/deepseek-v4.1-flash-1017` |
+| `openrouter_reasoning_effort` | no | `none`, `minimal`, `low`, `medium` or `high`; absent: `minimal` for a `google/` model, `none` for any other |
+| `deepseek_model` | no | the model `LAMP_SECOND_CHAT=deepseek` asks of DeepSeek's own API; absent: `deepseek-flash` (DeepSeek-V4.1-Flash-1017). DeepSeek's peak hours, 01:00–04:00 and 06:00–10:00 UTC on weekdays, cost double; no switch for them |
+
+OpenRouter's and DeepSeek's keys are not in this file: they are the voice
+unit's systemd credentials, `openrouter.key` and `deepseek.key` in its
+`CREDENTIALS_DIRECTORY` ("OpenRouter and DeepSeek", below).
 
 The fallback is V1's: an empty or absent STT or TTS URL or key is the LLM's.
+A Gemini model name is letters, digits, `-`, `.` and `_` only: it goes into
+the request's URL.
 
 Two of V1's values do not carry over as they are. Read from lamp-52e6's V1
 `config.json` on 2026-10-15 (endpoints only):
@@ -201,6 +220,60 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   through the relay `tts-1` `nova` measured peak -7.3 dBFS and RMS -28.8
   dBFS, ElevenLabs Rachel peak -6.4 and RMS -23.5, and the second voice was
   heard much quieter than Gemini's.
+- **Gemini's text model** (`LAMP_SECOND_CHAT=gemini`, `Chat::gemini`):
+  Google's OpenAI-compatible endpoint, `POST <gemini base>/openai/chat/completions`,
+  `Authorization: Bearer <key>`, `reasoning_effort: "minimal"`, streamed,
+  with the lamp's tools and a look's picture as the configured chat sends
+  them. A call's `extra_content` (Gemini's thought signature) is given back
+  with the call in the next round, as Gemini 3 asks; two calls at one index
+  with different ids are two calls; a call without an id is given one.
+- **Gemini's speech** (`LAMP_SECOND_SPEECH=gemini`, `net/gemini_tts.rs`):
+  `POST <gemini base>/models/<model>:streamGenerateContent?alt=sse`,
+  `x-goog-api-key: <key>`, `responseModalities: ["AUDIO"]` and the Live
+  route's own voice (`provider.json`'s `voice`, Kore on the lamps). One
+  request a sentence or first clause, as for the other voices: Google takes
+  no streamed text. The audio comes as base64 parts of server-sent events,
+  24 kHz 16-bit PCM (another rate is refused), and is passed on as it
+  comes, at its own level: no +6 dB, as it is Google's voice like Live's
+  (not measured on a lamp).
+- **OpenRouter's text model** (`LAMP_SECOND_CHAT=openrouter`,
+  `Chat::openrouter`): `POST https://openrouter.ai/api/v1/chat/completions`,
+  `Authorization: Bearer <key>`, the model a slug of its public list
+  (`openrouter_model`), `provider: {"sort": "latency"}` (its providers
+  tried fastest first) and `reasoning: {"effort": …}` (OpenRouter's docs,
+  read 19 Oct). The lamp's tools and a look's picture (an `image_url` part,
+  a base64 `data:` URL) go as for the relay. A round's `reasoning_details`
+  are given back unchanged with its calls in the next round, as OpenRouter
+  asks (`ChatEvent::Reasoning`).
+- **DeepSeek's text model** (`LAMP_SECOND_CHAT=deepseek`, `Chat::deepseek`):
+  `POST https://api.deepseek.com/chat/completions`, `Authorization: Bearer
+  <key>`, `thinking: {"type": "disabled"}`, set always and never left to
+  DeepSeek's default (on). Pictures as `image_url` parts; a model that takes
+  none (`deepseek-v4-pro`, DeepSeek's pricing page) is never sent one: a
+  look asked of it is told it saw nothing (`Services::sees`).
+- **Web search** (`LAMP_SECOND_SEARCH`, `net/search.rs`), declared to the
+  model beside the lamp's tools, within Live's bound of 32 functions (the
+  search before a skill's last function, the fetch only with room left;
+  `worker::with_search`). A turn waits 3 s for a call (`WITHIN`), then goes
+  on with "the search did not answer in time".
+  - `deepseek`: DeepSeek's Search & Fetch API (api-docs.deepseek.com/api/search,
+    read 19 Oct). `web_search(query)` is `POST <deepseek>/v1/tools/search`
+    with `{"query", "count": 3}`; each result's title, its `summary` (written
+    for models) cut at 500 characters and its date go back. `fetch_page(url)`
+    is `POST <deepseek>/v1/tools/fetch` with `{"url"}`; the page's title and
+    its Markdown cut at 2,000 characters go back. $0.75 a thousand
+    successful calls of each from 1 Nov 2026; 5 a second an account.
+  - `openrouter`: OpenRouter's web plugin on Exa, `plugins: [{"id": "web",
+    "engine": "exa", "mode": "instant", "max_results": 3}]` on the chat
+    request, with `LAMP_SECOND_CHAT=openrouter` only. It searches before
+    every answer, which every answer then waits for; OpenRouter's docs
+    suggest its `openrouter:web_search` server tool instead, which lets the
+    model choose (not built).
+  - `exa`: the search service `search_url` names, in Exa's `/search` shape
+    (`x-api-key`, `query`, `numResults` 3, text cut at 500 characters,
+    `search_extra` added). Ready for Exa, whose key the lamp does not have.
+
+  None was run against its service.
 
 A service's answer becomes the turn's failure reason (`fault`): 401 and 403
 Authentication, 402 QuotaExceeded, 429 RateLimited, 5xx ServerUnavailable,
@@ -630,6 +703,19 @@ lamp's voice (`coordinator/second.rs`, `routes`):
 With `second`, the journal says once at start:
 `lamp-voice: the voice route is second only (LAMP_VOICE_ROUTE=second): speech to text, a text model and speech answer every turn; Gemini Live is not used`.
 
+**Telling the sessions apart.** With `second`, and only then, the session's
+`run_start` record carries `"voice_route":"second"` (`Routes::mark`), and
+voice-eval's importer keeps it in the imported attempt's evidence
+(`evidence.voice_route`); an unknown value is refused. `provider_kind` stays
+`gemini`: the kind of provider that may answer every turn, so the A/B's
+sessions import against the same scenarios (the reviewer on #1686).
+
+**What leaves the lamp, on every turn:** each admitted line's audio goes to
+speech to text, its words (and a look's picture) to the text model and the
+answer's text to speech, as in "A turn on the second route" above, now on
+every turn and not only after a take-over
+([service-privacy.md](service-privacy.md), "Which service hears a line").
+
 **How.** The route starts in the state a take-over leaves, with no Gemini
 behind it. `spawn_rig` starts the `second` worker where Gemini's would be,
 in `rig.provider` (`Routes::workers`), with `second::arguments` (Gemini's
@@ -651,7 +737,22 @@ record is written.
   the announcement off (`Engine::announcing`): there is no other voice to
   differ from, and it would be the first thing heard in every answer after
   two quiet minutes, ahead of the model's words.
-- `LAMP_SECOND_WAIT_CUE` and `LAMP_SECOND_DOWN_LINE` work as with a standby.
+- **A due reminder is said**, as the Live route says it, with
+  `LAMP_SCHEDULE_SPEAK` on (`Engine::saying_reminders`): the chat is given
+  the Live route's own note for it (`provider_worker::reminder_note`, the
+  item's words as data), and what it says is the reminder; a call it makes
+  is not run, as the Live route's tool gate holds it, and an item the Live
+  route refuses (empty, over 300 bytes, a control character) is refused the
+  same way. Standing by, a reminder is still deferred
+  (`ReminderDeferral::Disabled`), for Gemini to say once it is back. The
+  journal: `lamp-voice second: due reminders are said on this route, the
+  lamp's only voice`.
+- **Its input is taken late**, in order and from the parent's boot, as the
+  Live worker's is since 40de19327 (`WorkerChannels::taking_late_input`): its
+  input is checked against fresh authority when used, and its end would end
+  the voice. Standing by it keeps the bound, as before.
+- `LAMP_SECOND_WAIT_CUE`, `LAMP_SECOND_DOWN_LINE`, `LAMP_SECOND_CHAT` and
+  `LAMP_SECOND_SPEECH` work as with a standby.
 
 **What differs from Gemini Live**, for the A/B to watch. All of it is as
 after a take-over, but now for every turn:
@@ -659,14 +760,14 @@ after a take-over, but now for every turn:
 - **Latency** is this route's (Latency targets, above): speech to text's last
   words, the chat's first words through the relay, then the first speech.
   A turn leaves the same `turn_finished` record on both routes.
-- **A due reminder is not said.** This route defers it
-  (`ReminderDeferral::Disabled`); with no Gemini to say it later, the
-  schedule's consumer offers it again 5 s after each deferral
-  (`reminders::consumer`, `PACE_US`) for as long as it is due. By the code;
-  not run.
 - **Nothing judges the room.** `room/state` is published by Gemini's worker;
   with no Gemini worker the room is unknown to this route's rule for whom it
-  answers (`LAMP_ATTENTION`) and to its room facts.
+  answers (`LAMP_ATTENTION`) and to its room facts. This waits on purpose:
+  the Live worker judges the room from about twenty points of its own loop
+  (heard, held, judged, answered, spoken over, ended as a sound:
+  `room_told::RoomTold`), checked by the busy-room battery; ported in part,
+  the room would be judged worse than unknown. It is a piece of its own, with
+  that battery.
 - **Live route only, so not on this route:** a tool's look (`LookAsked`;
   this route's looks come from its words, "Let me look."), the name note
   (`Called` is not used), the same-voice check and the staff note,
@@ -685,8 +786,177 @@ nothing reaches a Gemini worker, the second route is sent what Gemini would
 have been, and the speaker's authorities, the ring's phases and the kinds
 and fields of every record are a Gemini run's;
 `the_second_route_alone_exiting_ends_the_voice_as_gemini_does`), the startup
-poll (`startup_takes_the_second_route_alone_as_the_provider`) and the engine
-(`the_only_voice_never_says_it_sounds_different`). Not shown on a lamp.
+poll (`startup_takes_the_second_route_alone_as_the_provider`), the early
+refusal (`run_serve_refuses_a_wrong_route_before_anything_starts`: no session
+folder made), `run_start`'s route
+(`run_start_names_the_second_route_alone_and_nothing_else`) and its import
+(voice-eval's `an_imported_attempt_says_when_the_second_route_answered_alone`),
+the engine (`the_only_voice_never_says_it_sounds_different`,
+`the_only_voice_says_a_due_reminder_with_the_live_routes_note_and_no_tools`)
+and the input taken late
+(`the_second_routes_input_takes_a_message_late_only_as_the_only_voice`). Not
+shown on a lamp.
+
+## Gemini's voice and text model, called directly
+
+The owner, 19 October (06:4x): ElevenLabs costs too much; use Gemini's own
+speech, "just not gemini live", at Live's latency, "the same latency or
+almost the same", and with Live's voice. The research of that morning
+picked Gemini 3.8 Flash-Lite TTS in Kore (half ElevenLabs Flash's price a
+minute of speech, rated above it; its time to first audio is not published,
+and developer reports put it at 1 to 3 s) and Gemini 3.6 Flash with thinking
+at its floor as the text model (0.80 to 0.83 s to the first token,
+published, from the US). Two switches, each off unless set, in the voice
+service's environment, on this route standing by or alone:
+
+- **`LAMP_SECOND_SPEECH=gemini`:** speech is Gemini's speech model
+  (`gemini_speech_model`, absent `gemini-3.8-flash-lite-tts`), in the Live
+  route's own voice (`provider.json`'s `voice`: Kore on the lamps, as the
+  product's `deploy/product/settings/voice-provider.json` sets it), one
+  request a sentence or first clause, its audio passed on as it comes. A
+  sentence Gemini cannot start (a refusal, a quota, a broken connection, or
+  an answer with no sound) is said by the configured voice
+  (`tts_provider`, ElevenLabs on lamp-4ace): `lamp-voice second: Gemini's
+  speech failed (…); ElevenLabs says the sentence`. A sentence Gemini began
+  and then lost fails as any voice's does. The journal at start: `lamp-voice
+  second: speech is Gemini's (<model>, voice Kore), ElevenLabs for a
+  sentence it cannot start (LAMP_SECOND_SPEECH=gemini)`.
+- **`LAMP_SECOND_CHAT=gemini`:** the text model is Gemini
+  (`gemini_chat_model`, absent `gemini-3.6-flash`) through Google's
+  OpenAI-compatible endpoint, called directly, not through the relay, with
+  thinking `minimal`, the lamp's tools (and their thought signatures given
+  back) and a look's picture. The journal at start: `lamp-voice second: the
+  text model is Gemini (<model>, thinking minimal), called directly
+  (LAMP_SECOND_CHAT=gemini)`.
+
+Either is refused at start with a value it does not take (unset or empty
+is off; `LAMP_SECOND_CHAT` also takes `openrouter` and `deepseek`, below):
+`lamp-voice: LAMP_SECOND_SPEECH is gemini or nothing, not "…": the voice
+does not start`. Both need `LAMP_VOICE_SECOND_CONFIG`, and do nothing
+without it.
+
+**The key.** `gemini_credential_file` in the second route's configuration,
+read as its other keys are; absent, the Live route's own key, but only when
+`provider.json` goes to Google directly (its endpoint is Google's own and
+its `authentication` the API key: `ProviderConfig::google_credential_file`).
+A relay's key is never sent to Google. On the lamps `provider.json` goes
+through the company relay, so a switch with no `gemini_credential_file`
+keeps the second worker from starting, and so the voice: `lamp-voice:
+LAMP_SECOND_CHAT=gemini and LAMP_SECOND_SPEECH=gemini call Google directly
+and need a Google API key: set gemini_credential_file in the second route's
+configuration (the Live route's key goes to a relay and is not given to
+Google)`. No key is written in a log, a test or this page.
+
+**The bar**, measured on lamp-4ace on 19 October with Gemini Live, from the
+end-of-speech decision to the first sound: chat lines median 1.70 to
+1.81 s, tool turns 2.02 to 2.21 s, looks 1.1 to 1.3 s, all lines median
+2.0 s and p90 2.6 to 2.9 s. Not yet measured on this route with these
+switches; the probe below is the first step.
+
+**Ready, without keys:** a fast host of DeepSeek's weights (Baseten) is an
+OpenAI-compatible chat, set by `llm_base_url`, `llm_model`,
+`llm_credential_file` and `llm_extra`, and a look's picture goes to it as an
+image part, as it goes to the relay. Exa is `LAMP_SECOND_SEARCH=exa`
+(`search_url`, "What each client speaks"). Neither was run against its
+service.
+
+## OpenRouter and DeepSeek
+
+The owner, 19 October (08:5x and 09:0x): test DeepSeek's models and its web
+search, through OpenRouter with the key the Policy already uses for Jev, and
+on DeepSeek's own API. Off unless set, on this route standing by or alone:
+
+- **`LAMP_SECOND_CHAT=openrouter`:** the text model through OpenRouter,
+  `openrouter_model` (absent: `deepseek/deepseek-v4.1-flash-1017`, the
+  dated 17 October snapshot the owner picked, pinned by its slug in
+  OpenRouter's public `GET /api/v1/models` of 19 Oct, never the moving
+  alias `~deepseek/deepseek-flash-latest`; the second candidate is
+  `google/gemini-3.6-flash`). The journal at start: `lamp-voice second: the
+  text model is <slug> through OpenRouter, the fastest provider first,
+  reasoning <effort> (LAMP_SECOND_CHAT=openrouter)`.
+- **`LAMP_SECOND_CHAT=deepseek`:** the text model on DeepSeek's own API,
+  `deepseek_model` (absent: `deepseek-flash`, which DeepSeek serves with
+  DeepSeek-V4.1-Flash-1017; its docs give no dated name to ask for), thinking
+  off. `deepseek-v4-pro` (V4-Pro-0813, no pictures) is a probe candidate:
+  set, it is never sent a look's picture.
+- **`LAMP_SECOND_SEARCH`:** `deepseek` (DeepSeek's Search & Fetch as
+  `web_search` and `fetch_page`, with any chat), `openrouter` (OpenRouter's
+  web plugin on Exa, with `LAMP_SECOND_CHAT=openrouter` only, refused at
+  start otherwise) or `exa` (`search_url`). The journal at start:
+  `lamp-voice second: the model may search the web (web_search, fetch_page;
+  LAMP_SECOND_SEARCH)`.
+
+Any other value of either is refused at start, and the voice does not start:
+`lamp-voice: LAMP_SECOND_CHAT is gemini, openrouter, deepseek or nothing,
+not "…": the voice does not start`.
+
+**The keys** are the voice unit's systemd credentials, never in a
+configuration file, a log, a test or this page. The unit loads each with
+`LoadCredential=` (the files stay root's alone; systemd gives the service
+its own copy), the coordinator passes the unit's `CREDENTIALS_DIRECTORY` to
+the second worker alone (`process.rs`, an absolute path only), and the
+worker reads `openrouter.key` or `deepseek.key` there as it reads its other
+keys (`second_config::unit_credential`). A switch whose credential is
+missing keeps the worker, and so the voice, from starting, naming the
+credential: `lamp-voice: the voice unit's credential openrouter.key: …`. A
+drop-in for lamp-4ace's unit:
+
+```ini
+[Service]
+LoadCredential=openrouter.key:/etc/lampOS/policy/jev.key
+LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key
+Environment=LAMP_SECOND_CHAT=deepseek
+Environment=LAMP_SECOND_SEARCH=deepseek
+```
+
+OpenRouter's key is the one the Policy already uses for Jev (its unit
+loads `/etc/lampOS/policy/jev.key` as `jev.key`); DeepSeek's is put on the
+lamp by the owner.
+
+### Timing the candidates (`probe-cascade`)
+
+`lamp-voice probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG]`
+(`second_provider/probe.rs`) times the route's candidates from where it
+runs, with the character of `provider.json` and one fixed question, and
+with `--look` once more with that JPEG (at most 184 KiB) as the question's
+picture, to each model that takes one:
+
+- **chat:** the configured chat; Gemini's (with a Google key); through
+  OpenRouter `deepseek/deepseek-v4.1-flash-1017` (reasoning `none`) and
+  `google/gemini-3.6-flash` (`minimal`), and `openrouter_model` if it is
+  another; on DeepSeek's own API each model its `GET /models` lists (at most
+  eight; `deepseek-flash` and `deepseek-v4-pro` if the list fails), thinking
+  off and on;
+- **search:** OpenRouter's web plugin on its first candidate (to the first
+  event and the first chunk with the search's results) and DeepSeek's
+  search (to its answer, with the number of results);
+- **speech:** the configured voice and Gemini's, one fixed sentence each.
+
+No tools are declared. Five runs unless said, at most 50. One line a
+candidate a run, milliseconds and counts only (never the words asked,
+heard or said, a key or a URL):
+
+- chat: `first_ms` (the first text or call), `clause_ms` (the first clause
+  or sentence the route would say, `Sentences`), `done_ms`, and with a
+  search `searched_ms`;
+- search: `first_result_ms`, `results`;
+- speech: `first_audio_ms`, `done_ms`, `audio_ms` (the audio's length);
+
+then each candidate's median and 90th percentile. A candidate without its
+key is left out, saying why. Each time runs from its request's start; it is
+not the lamp's end-of-speech-to-sound time, which also has speech to text's
+last words and the playout hold. Any other OpenAI-compatible endpoint is
+timed by giving it a configuration of its own as `SECOND_CONFIG`. It reads
+the credential files the configurations name and the unit's credentials,
+so on a lamp it runs under systemd with them:
+
+```sh
+systemd-run --pty --wait \
+  -p LoadCredential=openrouter.key:/etc/lampOS/policy/jev.key \
+  -p LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key \
+  /opt/lampOS/voice/current/lamp-voice probe-cascade \
+  /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 20 --look /run/lampos-eyes/sight.jpg
+```
 
 ## Not done
 
@@ -697,8 +967,16 @@ poll (`startup_takes_the_second_route_alone_as_the_provider`) and the engine
   marked `movable`, abandons the line as before.
 - **Onboarding writing `second.json`:** waits on the owner's choice of how a
   lamp is set up. Not built.
-- **`gemini` and `piper` speech:** `gemini` fails with Gemini; `piper` on
-  the device is a later piece.
+- **`gemini` and `piper` as `tts_provider`:** refused; Gemini's speech is
+  `LAMP_SECOND_SPEECH=gemini` instead (above); `piper` on the device is a
+  later piece.
+- **The cascade's overlaps** the research named for Live's short-line time
+  (ending speech to text early and starting the chat before the lamp is
+  sure; warm connections kept open; a search started beside round 1;
+  weather in the prompt) are not built. Connections are kept between
+  requests only as the HTTP client's pool keeps them.
+- **The room on the second route alone** ("Second only", above) waits for
+  its own piece and battery.
 - The services are not probed at startup: the link says Ready and a service
   that cannot be reached fails that turn (`ponytail:` in `worker.rs`).
 
@@ -711,7 +989,7 @@ Reported by the builders:
   written turn with `look` (the lamp taking a look) sends the eyes'
   newest picture with its words, as an OpenAI image part (a JPEG `data:`
   URL) to this route's `llm_base_url` (the company relay and the model
-  behind it, not Gemini), read from `LAMP_EYES_LOOK_FILE` with the Live route's bounds (1 s
+  behind it, not Gemini; Google's Gemini API with `LAMP_SECOND_CHAT=gemini`), read from `LAMP_EYES_LOOK_FILE` with the Live route's bounds (1 s
   and 64 KiB; with `LAMP_LOOK_FULL`, a full look's still and 184 KiB). The
   picture goes in that turn's first chat round only, never into a round
   after a tool, the thread or a later turn; a picture the chat refuses is
