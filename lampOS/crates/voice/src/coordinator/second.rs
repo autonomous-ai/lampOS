@@ -31,7 +31,7 @@
 use super::*;
 pub(super) use crate::second_provider::worker::RouteFlags;
 #[cfg(test)]
-use crate::second_provider::worker::{ChatRoute, SearchRoute};
+use crate::second_provider::worker::{ChatRoute, SearchRoute, SpeechRoute};
 use std::ffi::OsString;
 
 /// 30 s of 16 kHz mono microphone audio.
@@ -1037,7 +1037,7 @@ mod tests {
             down_line: true,
             only_voice: true,
             chat: Some(ChatRoute::Gemini),
-            gemini_speech: true,
+            speech: Some(SpeechRoute::Gemini),
             search: Some(SearchRoute::DeepSeek),
         };
         let given = arguments(&provider, second, &all).unwrap();
@@ -1082,7 +1082,7 @@ mod tests {
             }
         }
         let speech_only = RouteFlags {
-            gemini_speech: true,
+            speech: Some(SpeechRoute::Gemini),
             ..RouteFlags::default()
         };
         let given = arguments(&provider, second, &speech_only).unwrap();
@@ -1197,7 +1197,7 @@ mod tests {
         let flags = |wait_cue, down_line| RouteFlags {
             wait_cue,
             down_line,
-            gemini_speech: true,
+            speech: Some(SpeechRoute::Gemini),
             ..RouteFlags::default()
         };
         assert_eq!(
@@ -1288,10 +1288,28 @@ mod tests {
                 ..RouteFlags::default()
             })
         );
-        assert_eq!(
-            flags(&[("LAMP_SECOND_SPEECH", "gemini")]).map(|f| f.gemini_speech),
-            Ok(true)
-        );
+        // One voice per lamp: each value picks its voice (#1712).
+        for (value, voice) in [
+            ("gemini", SpeechRoute::Gemini),
+            ("elevenlabs", SpeechRoute::ElevenLabs),
+            ("openai", SpeechRoute::OpenAi),
+        ] {
+            let route = RouteFlags::from_values(|name| {
+                (name == "LAMP_SECOND_SPEECH").then(|| OsString::from(value))
+            })
+            .unwrap();
+            assert_eq!(route.speech, Some(voice), "{value}");
+            let given: Vec<String> = route
+                .flags()
+                .iter()
+                .map(|flag| (*flag).to_owned())
+                .collect();
+            assert_eq!(
+                RouteFlags::take(&given).0,
+                route,
+                "{value} goes to the worker"
+            );
+        }
         assert_eq!(
             flags(&[
                 ("LAMP_SECOND_CHAT", "openrouter"),
@@ -1325,8 +1343,8 @@ mod tests {
                 "DeepSeek",
                 "gemini, openrouter, deepseek",
             ),
-            ("LAMP_SECOND_SPEECH", "Gemini", "gemini"),
-            ("LAMP_SECOND_SPEECH", "elevenlabs", "gemini"),
+            ("LAMP_SECOND_SPEECH", "Gemini", "gemini, elevenlabs, openai"),
+            ("LAMP_SECOND_SPEECH", "polly", "gemini, elevenlabs, openai"),
             ("LAMP_SECOND_SEARCH", "google", "deepseek, openrouter, exa"),
         ] {
             let why =

@@ -141,18 +141,6 @@ impl Net {
     }
 }
 
-/// `text` from the configured voice, as packets.
-fn configured(tts: Arc<Tts>, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
-    stream::once(async move { tts.speak(&text).await })
-        .map_ok(|speech| {
-            stream::try_unfold(speech, |mut speech| async move {
-                Ok(speech.next().await?.map(|packet| (packet, speech)))
-            })
-        })
-        .try_flatten()
-        .boxed()
-}
-
 /// Gemini's speech of `text` from its first packet on, or why there is
 /// none: it failed before any sound, or ended with none.
 async fn gemini_first(
@@ -170,38 +158,59 @@ async fn gemini_first(
     Ok(stream::iter([Ok(first)]).chain(rest).boxed())
 }
 
-/// Gemini's speech, the configured voice saying a sentence Gemini could
-/// not start. A sentence Gemini began and then lost fails as any voice's.
-fn with_fallback(
-    gemini: Arc<GeminiTts>,
-    tts: Arc<Tts>,
-    fallback: &'static str,
-    text: String,
-) -> BoxStream<'static, net::Result<Vec<i16>>> {
+/// The lamp's one voice ([`Net`]): Gemini's or the configured one.
+#[derive(Clone)]
+enum Voice {
+    Gemini(Arc<GeminiTts>),
+    Configured(Arc<Tts>, &'static str),
+}
+
+impl Voice {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Gemini(_) => "Gemini",
+            Self::Configured(_, name) => name,
+        }
+    }
+
+    /// The speech of `text` from its first packet on, or why there is none.
+    async fn first(&self, text: &str) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
+        match self {
+            Self::Gemini(gemini) => gemini_first(gemini, text).await,
+            Self::Configured(tts, _) => {
+                let mut speech = tts.speak(text).await?;
+                let first = speech.next().await?;
+                let rest = stream::try_unfold(speech, |mut speech| async move {
+                    Ok(speech.next().await?.map(|packet| (packet, speech)))
+                });
+                Ok(stream::iter(first.map(Ok)).chain(rest).boxed())
+            }
+        }
+    }
+}
+
+/// `text` in the lamp's one voice, never another's (#1712, the owner: "one
+/// voice per lamp"). A sentence the voice fails to start is asked once more;
+/// failing again, it is not said, and the turn goes on as for any speech
+/// that never rendered. A sentence begun and then lost fails as any does.
+fn in_one_voice(voice: Voice, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
     stream::once(async move {
         if !GeminiTts::speaks(&text) {
             return Ok(stream::empty().boxed());
         }
-        // Each sentence's time to its first audio, with its length and how
-        // many were asked beside it, never its words (#1712: through the
-        // relay, 1.89 s from the chat's first event to the first audio).
-        let asking = gemini.asking();
-        let asked = std::time::Instant::now();
-        match gemini_first(&gemini, &text).await {
-            Ok(speech) => {
-                eprintln!(
-                    "lamp-voice second: Gemini's speech began in {} ms ({} characters, {} more asked and not begun)",
-                    asked.elapsed().as_millis(),
-                    text.chars().count(),
-                    asking.others
-                );
-                Ok(speech)
-            }
+        match voice.first(&text).await {
+            Ok(speech) => Ok(speech),
             Err(error) => {
                 eprintln!(
-                    "lamp-voice second: Gemini's speech failed ({error}); {fallback} says the sentence"
+                    "lamp-voice second: {}'s speech failed ({error}); asked once more",
+                    voice.name()
                 );
-                Ok(configured(tts, text))
+                voice.first(&text).await.inspect_err(|again| {
+                    eprintln!(
+                        "lamp-voice second: {}'s speech failed again ({again}); the sentence is not said",
+                        voice.name()
+                    );
+                })
             }
         }
     })
@@ -231,15 +240,11 @@ impl Services for Net {
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
-        match &self.gemini_tts {
-            Some(gemini) => with_fallback(
-                gemini.clone(),
-                self.tts.clone(),
-                self.config.tts_provider.name(),
-                text,
-            ),
-            None => configured(self.tts.clone(), text),
-        }
+        let voice = match &self.gemini_tts {
+            Some(gemini) => Voice::Gemini(gemini.clone()),
+            None => Voice::Configured(self.tts.clone(), self.config.tts_provider.name()),
+        };
+        in_one_voice(voice, text)
     }
 
     fn sees(&self) -> bool {
@@ -308,53 +313,100 @@ mod tests {
         samples.iter().flat_map(|s| s.to_le_bytes()).collect()
     }
 
-    /// `LAMP_SECOND_SPEECH=gemini`: a sentence Gemini refuses before any of
-    /// its sound (a quota, say) is said by the configured voice; one Gemini
-    /// says is Gemini's alone, the configured voice never asked.
+    /// A local plain HTTP server answering each request, on its own
+    /// connection, with the next of `answers`; how many came is read from
+    /// the handle.
+    async fn servers(
+        answers: Vec<(&'static str, Vec<u8>)>,
+    ) -> (String, tokio::task::JoinHandle<usize>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move {
+            let mut came = 0;
+            for (head, body) in answers {
+                let accepted =
+                    tokio::time::timeout(std::time::Duration::from_millis(500), listener.accept())
+                        .await;
+                let Ok(Ok((mut socket, _))) = accepted else {
+                    break;
+                };
+                came += 1;
+                let mut request = Vec::new();
+                let mut buffer = [0; 4096];
+                while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                    let n = socket.read(&mut buffer).await.unwrap();
+                    request.extend_from_slice(&buffer[..n]);
+                }
+                socket.write_all(head.as_bytes()).await.unwrap();
+                socket.write_all(&body).await.unwrap();
+            }
+            came
+        });
+        (format!("http://{address}"), task)
+    }
+
+    const REFUSED: &str =
+        "HTTP/1.1 429 Too Many Requests\r\ncontent-length: 0\r\nconnection: close\r\n\r\n";
+
+    fn gemini_event(samples: &[i16]) -> Vec<u8> {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        let event = serde_json::json!({"candidates": [{"content": {"parts": [
+            {"inlineData": {"mimeType": "audio/l16; rate=24000; channels=1",
+                "data": STANDARD.encode(bytes(samples))}}
+        ]}}]});
+        format!("data: {event}\n\n").into_bytes()
+    }
+
+    const SSE: &str =
+        "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n";
+
+    /// #1712, one voice per lamp: a sentence Gemini refuses is asked of
+    /// Gemini once more, and said when it answers; refused again, it is not
+    /// said. No other voice is ever asked.
     #[tokio::test]
-    async fn a_sentence_gemini_cannot_start_is_said_by_the_configured_voice() {
-        let (refusing, refused) = server(
-            "HTTP/1.1 429 Too Many Requests\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-            Vec::new(),
-        )
+    async fn a_sentence_the_voice_cannot_start_is_asked_once_more_never_of_another() {
+        let (gemini_url, gemini_asked) =
+            servers(vec![(REFUSED, Vec::new()), (SSE, gemini_event(&[7, 9]))]).await;
+        let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g", "Kore").unwrap());
+        let samples = said(in_one_voice(Voice::Gemini(gemini), "Hello there.".into())).await;
+        assert_eq!(samples, [7, 9], "Gemini's own level, on its second asking");
+        assert_eq!(gemini_asked.await.unwrap(), 2);
+
+        let (gemini_url, gemini_asked) = servers(vec![
+            (REFUSED, Vec::new()),
+            (REFUSED, Vec::new()),
+            (SSE, gemini_event(&[1])),
+        ])
         .await;
-        let (openai, asked) = server(PCM, bytes(&[100, -100])).await;
-        let gemini = Arc::new(GeminiTts::new(&refusing, "tts", "g", "Kore").unwrap());
+        let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g", "Kore").unwrap());
+        let results: Vec<_> = in_one_voice(Voice::Gemini(gemini), "Hello there.".into())
+            .collect()
+            .await;
+        assert!(matches!(results.as_slice(), [Err(_)]), "not said");
+        assert_eq!(gemini_asked.await.unwrap(), 2, "asked twice, no more");
+    }
+
+    /// The same for the configured voice: once more, then not said.
+    #[tokio::test]
+    async fn the_configured_voice_is_asked_once_more_then_not() {
+        let (openai, asked) =
+            servers(vec![(REFUSED, Vec::new()), (PCM, bytes(&[100, -100]))]).await;
         let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k", None).unwrap());
-        let samples = said(with_fallback(
-            gemini,
-            tts,
-            "OpenAI's voice",
+        let samples = said(in_one_voice(
+            Voice::Configured(tts, "OpenAI"),
             "Hello there.".into(),
         ))
         .await;
         // The configured voice's level, +6 dB.
         assert_eq!(samples, [200, -200]);
-        assert_eq!((refused.await.unwrap(), asked.await.unwrap()), (1, 1));
-
-        use base64::{Engine, engine::general_purpose::STANDARD};
-        let event = serde_json::json!({"candidates": [{"content": {"parts": [
-            {"inlineData": {"mimeType": "audio/L16;codec=pcm;rate=24000",
-                "data": STANDARD.encode(bytes(&[7, 9]))}}
-        ]}}]});
-        let (speaking, spoke) = server(
-            "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n",
-            format!("data: {event}\n\n").into_bytes(),
-        )
-        .await;
-        let (openai, unasked) = server(PCM, Vec::new()).await;
-        let gemini = Arc::new(GeminiTts::new(&speaking, "tts", "g", "Kore").unwrap());
+        assert_eq!(asked.await.unwrap(), 2);
+        let (openai, asked) = servers(vec![(REFUSED, Vec::new()), (REFUSED, Vec::new())]).await;
         let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k", None).unwrap());
-        let samples = said(with_fallback(
-            gemini,
-            tts,
-            "OpenAI's voice",
-            "Hello there.".into(),
-        ))
-        .await;
-        // Gemini's own level: no gain.
-        assert_eq!(samples, [7, 9]);
-        assert_eq!((spoke.await.unwrap(), unasked.await.unwrap()), (1, 0));
+        let results: Vec<_> = in_one_voice(Voice::Configured(tts, "OpenAI"), "Hello there.".into())
+            .collect()
+            .await;
+        assert!(matches!(results.as_slice(), [Err(_)]));
+        assert_eq!(asked.await.unwrap(), 2);
     }
 
     /// Nothing to say asks no voice at all.
@@ -364,10 +416,10 @@ mod tests {
         let (openai, openai_asked) = server(PCM, Vec::new()).await;
         let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g", "Kore").unwrap());
         let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k", None).unwrap());
-        let samples = said(with_fallback(
-            gemini,
-            tts,
-            "OpenAI's voice",
+        let samples = said(in_one_voice(Voice::Gemini(gemini), "[sigh]".into())).await;
+        assert!(samples.is_empty());
+        let samples = said(in_one_voice(
+            Voice::Configured(tts, "OpenAI"),
             "[sigh]".into(),
         ))
         .await;

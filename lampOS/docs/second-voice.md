@@ -1068,14 +1068,9 @@ service's environment, on this route standing by or alone:
   (`gemini_speech_model`, absent `gemini-3.8-flash-lite-tts`), in the Live
   route's own voice (`provider.json`'s `voice`: Kore on the lamps, as the
   product's `deploy/product/settings/voice-provider.json` sets it), one
-  request a sentence or first clause, its audio passed on as it comes. A
-  sentence Gemini cannot start (a refusal, a quota, a broken connection, or
-  an answer with no sound) is said by the configured voice
-  (`tts_provider`, ElevenLabs on lamp-4ace): `lamp-voice second: Gemini's
-  speech failed (…); ElevenLabs says the sentence`. A sentence Gemini began
-  and then lost fails as any voice's does. The journal at start: `lamp-voice
-  second: speech is Gemini's (<model>, voice Kore), ElevenLabs for a
-  sentence it cannot start (LAMP_SECOND_SPEECH=gemini)`. The answer's first
+  request a sentence or first clause, its audio passed on as it comes. The
+  journal at start: `lamp-voice second: the voice is Gemini (<model>, voice
+  Kore), the lamp's one voice (LAMP_SECOND_SPEECH=gemini)`. The answer's first
   piece goes once six words have come whole (`FIRST_WORDS`,
   `Engine::cutting_first_words`), if no sentence or clause ended sooner,
   and the rest of that sentence follows as one: Gemini takes no streamed
@@ -1103,9 +1098,26 @@ service's environment, on this route standing by or alone:
 
 Either is refused at start with a value it does not take (unset or empty
 is off; `LAMP_SECOND_CHAT` also takes `openrouter` and `deepseek`, below):
-`lamp-voice: LAMP_SECOND_SPEECH is gemini or nothing, not "…": the voice
-does not start`. Both need `LAMP_VOICE_SECOND_CONFIG`, and do nothing
-without it.
+`lamp-voice: LAMP_SECOND_SPEECH is gemini, elevenlabs, openai or nothing,
+not "…": the voice does not start`. Both need `LAMP_VOICE_SECOND_CONFIG`,
+and do nothing without it.
+
+**One voice per lamp** (the owner, 19 Oct: "some lamps ship with Gemini,
+some with ElevenLabs; it's a config, but it should be one voice per lamp").
+`LAMP_SECOND_SPEECH` names the lamp's one voice: `gemini`, `elevenlabs` or
+`openai`; unset, `second.json`'s `tts_provider`. Every sentence, the wait's
+sounds, the down line, reminders and the skills' say (a written turn) are
+that voice's alone (`services::in_one_voice`). A provider chosen over the
+configured one takes its own default voice, since `tts_voice` names one of
+the configured provider's, and the chosen voice's model is
+`LAMP_SECOND_SPEECH_MODEL`'s. No sentence goes to another voice: one the
+voice fails to start (a refusal, a quota, a broken connection, or an answer
+with no sound) is asked of it once more, `lamp-voice second: <voice>'s
+speech failed (…); asked once more`; failing again it is not said, `…
+failed again (…); the sentence is not said`, and the turn goes on as for
+any speech that never rendered. A sentence begun and then lost fails as
+any does. The journal at start names the voice: `the voice is ElevenLabs,
+model eleven_v4_turbo, the lamp's one voice`.
 
 **The key.** The voice unit's credential `gemini.key`
 (`LoadCredential=gemini.key:/etc/lampOS/voice/gemini.key`), read as

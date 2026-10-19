@@ -276,6 +276,16 @@ pub enum ChatRoute {
     DeepSeek,
 }
 
+/// The lamp's one voice (`LAMP_SECOND_SPEECH`): every sentence it says, its
+/// wait's sounds, its reminders and the skills' say, and never another's
+/// (the owner, 19 Oct: "it should be one voice per lamp").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpeechRoute {
+    Gemini,
+    ElevenLabs,
+    OpenAi,
+}
+
 /// The web search the model may use (`LAMP_SECOND_SEARCH`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SearchRoute {
@@ -296,8 +306,9 @@ pub struct RouteFlags {
     pub only_voice: bool,
     /// `LAMP_SECOND_CHAT`.
     pub chat: Option<ChatRoute>,
-    /// `LAMP_SECOND_SPEECH=gemini`.
-    pub gemini_speech: bool,
+    /// `LAMP_SECOND_SPEECH`: the lamp's one voice; `None`, the configured
+    /// voice (`second.json`'s `tts_provider`).
+    pub speech: Option<SpeechRoute>,
     /// `LAMP_SECOND_SEARCH`.
     pub search: Option<SearchRoute>,
 }
@@ -307,6 +318,11 @@ const CHATS: [(ChatRoute, &str, &str); 3] = [
     (ChatRoute::Gemini, "gemini", "--gemini-chat"),
     (ChatRoute::OpenRouter, "openrouter", "--openrouter-chat"),
     (ChatRoute::DeepSeek, "deepseek", "--deepseek-chat"),
+];
+const SPEECHES: [(SpeechRoute, &str, &str); 3] = [
+    (SpeechRoute::Gemini, "gemini", GEMINI_SPEECH_FLAG),
+    (SpeechRoute::ElevenLabs, "elevenlabs", "--elevenlabs-speech"),
+    (SpeechRoute::OpenAi, "openai", "--openai-speech"),
 ];
 const SEARCHES: [(SearchRoute, &str, &str); 3] = [
     (SearchRoute::DeepSeek, "deepseek", "--deepseek-search"),
@@ -337,6 +353,26 @@ fn choice<T: Copy>(
 }
 
 impl RouteFlags {
+    /// Whether the lamp's one voice is Gemini's.
+    pub fn gemini_speech(&self) -> bool {
+        self.speech == Some(SpeechRoute::Gemini)
+    }
+
+    /// The provider the configured voice is asked of: the one chosen, or
+    /// `second.json`'s; `None` when the voice is Gemini's.
+    pub fn voice_provider(
+        &self,
+        configured: crate::second_config::TtsProvider,
+    ) -> Option<crate::second_config::TtsProvider> {
+        use crate::second_config::TtsProvider;
+        match self.speech {
+            Some(SpeechRoute::Gemini) => None,
+            Some(SpeechRoute::ElevenLabs) => Some(TtsProvider::ElevenLabs),
+            Some(SpeechRoute::OpenAi) => Some(TtsProvider::OpenAi),
+            None => Some(configured),
+        }
+    }
+
     /// The switches (all but `only_voice`) as `var` gives them from the
     /// service's environment (`coordinator::second`). The two `on` switches
     /// are on with `on` only, as before; the others with one of their words,
@@ -349,12 +385,7 @@ impl RouteFlags {
             down_line: on(DOWN_LINE_ENVIRONMENT),
             only_voice: false,
             chat: choice(CHAT_ENVIRONMENT, var(CHAT_ENVIRONMENT), &CHATS)?,
-            gemini_speech: choice(
-                SPEECH_ENVIRONMENT,
-                var(SPEECH_ENVIRONMENT),
-                &[((), "gemini", GEMINI_SPEECH_FLAG)],
-            )?
-            .is_some(),
+            speech: choice(SPEECH_ENVIRONMENT, var(SPEECH_ENVIRONMENT), &SPEECHES)?,
             search: choice(SEARCH_ENVIRONMENT, var(SEARCH_ENVIRONMENT), &SEARCHES)?,
         };
         if route.search == Some(SearchRoute::OpenRouter)
@@ -385,9 +416,12 @@ impl RouteFlags {
                 .filter(|(route, ..)| self.chat == Some(*route))
                 .map(|(.., flag)| *flag),
         );
-        if self.gemini_speech {
-            flags.push(GEMINI_SPEECH_FLAG);
-        }
+        flags.extend(
+            SPEECHES
+                .iter()
+                .filter(|(route, ..)| self.speech == Some(*route))
+                .map(|(.., flag)| *flag),
+        );
         flags.extend(
             SEARCHES
                 .iter()
@@ -413,7 +447,10 @@ impl RouteFlags {
             .iter()
             .find(|(.., flag)| next(flag))
             .map(|(chat, ..)| *chat);
-        let gemini_speech = next(GEMINI_SPEECH_FLAG);
+        let speech = SPEECHES
+            .iter()
+            .find(|(.., flag)| next(flag))
+            .map(|(speech, ..)| *speech);
         let search = SEARCHES
             .iter()
             .find(|(.., flag)| next(flag))
@@ -424,7 +461,7 @@ impl RouteFlags {
                 down_line,
                 only_voice,
                 chat,
-                gemini_speech,
+                speech,
                 search,
             },
             flags,
@@ -483,7 +520,7 @@ pub fn gemini_key(
 /// the journal once. OpenRouter's and DeepSeek's keys are the voice unit's
 /// credentials, in `credentials` (its `CREDENTIALS_DIRECTORY`).
 pub fn services(
-    config: crate::second_config::SecondConfig,
+    mut config: crate::second_config::SecondConfig,
     provider: &crate::config::ProviderConfig,
     route: RouteFlags,
     credentials: Option<&std::ffi::OsStr>,
@@ -492,12 +529,21 @@ pub fn services(
     use crate::second_config::{DEEPSEEK_CREDENTIAL, OPENROUTER_CREDENTIAL, unit_credential};
     let gemini = config.gemini.clone();
     let hosted = config.hosted.clone();
+    // The lamp's one voice (#1712). A provider chosen over the configured
+    // one takes its own default voice: a configured voice's name is that
+    // provider's.
+    if let Some(provider) = route.voice_provider(config.tts_provider)
+        && provider != config.tts_provider
+    {
+        config.tts_provider = provider;
+        config.tts_voice = None;
+    }
     let fallback = config.tts_provider.name();
     let configured_model = config
         .tts_model
         .clone()
         .unwrap_or_else(|| super::net::default_model(config.tts_provider).to_owned());
-    let key = (route.chat == Some(ChatRoute::Gemini) || route.gemini_speech)
+    let key = (route.chat == Some(ChatRoute::Gemini) || route.gemini_speech())
         .then(|| gemini_key(provider, credentials))
         .transpose()?;
     let mut net = Net::new(config, declare).map_err(io::Error::other)?;
@@ -548,17 +594,19 @@ pub fn services(
             );
         }
     }
-    if !route.gemini_speech {
-        eprintln!("lamp-voice second: the voice is {fallback}, model {configured_model}");
+    if !route.gemini_speech() {
+        eprintln!(
+            "lamp-voice second: the voice is {fallback}, model {configured_model}, the lamp's one voice"
+        );
     }
-    if route.gemini_speech
+    if route.gemini_speech()
         && let Some(call) = call(&gemini.speech_model)
     {
         net = net
             .speaking_with_gemini(&call, provider.voice())
             .map_err(io::Error::other)?;
         eprintln!(
-            "lamp-voice second: speech is Gemini's ({}, voice {}), {fallback} for a sentence it cannot start (LAMP_SECOND_SPEECH=gemini)",
+            "lamp-voice second: the voice is Gemini ({}, voice {}), the lamp's one voice (LAMP_SECOND_SPEECH=gemini)",
             gemini.speech_model,
             provider.voice()
         );
@@ -1120,7 +1168,7 @@ pub fn serve(
     }
     // Gemini's speech is asked a piece at a time: its first piece goes after
     // a few words, not the whole first sentence (#1712).
-    if route.gemini_speech {
+    if route.gemini_speech() {
         engine = engine.cutting_first_words(crate::second_provider::FIRST_WORDS);
     }
     if look_by_call {
@@ -3729,7 +3777,7 @@ mod tests {
         assert!(!refused.contains("relay-key") && !refused.contains("live-google-key"));
         let none: super::super::net::Declare = std::sync::Arc::new(Vec::new);
         let speech = super::RouteFlags {
-            gemini_speech: true,
+            speech: Some(super::SpeechRoute::Gemini),
             ..super::RouteFlags::default()
         };
         assert!(super::services(second(), &relay, speech, None, none.clone()).is_err());
