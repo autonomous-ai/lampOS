@@ -318,6 +318,56 @@ fn the_lamp_speaking_spoils_only_the_half_second_before_to_a_second_after() {
     assert_eq!(judge(&mut walk, &prompt)["why"], "the lamp was speaking");
 }
 
+/// The voice holds its reply to what is said from the prompt's end to 7 s
+/// on: with the lamp silent after the name, the call in it is accepted.
+/// Before the prompt has played whole, past the window and once the try is
+/// judged, nothing is held.
+#[test]
+fn the_reply_is_held_only_in_the_try_window_and_the_held_call_counts() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    assert!(!walk.near_holds_reply(10 * S));
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    assert!(!walk.near_holds_reply(prompt.ended_us - 1));
+    for after in [0, 2 * S, 7 * S] {
+        assert!(walk.near_holds_reply(prompt.ended_us + after), "{after}");
+    }
+    assert!(!walk.near_holds_reply(prompt.ended_us + 7 * S + 1));
+    room(&mut walk, &prompt, 2_400, 21.0);
+    name(&mut walk, &prompt, 2_000, 0.98);
+    assert_eq!(judge(&mut walk, &prompt)["accepted"], true);
+    assert!(!walk.near_holds_reply(prompt.ended_us + 3 * S));
+}
+
+/// Without a Controls receipt source privacy is `not_available` (Third on
+/// #1802), and this step is offered next rather than waiting on it.
+#[test]
+fn the_step_follows_privacy_that_is_not_available() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    walk.set_privacy_context(
+        privacy::Epoch {
+            device_boot: "device-boot".into(),
+            clock_id: "clock".into(),
+        },
+        false,
+        None,
+        Some("on its base"),
+    );
+    for _ in 0..3 {
+        walk.drain_storage_for_test(S);
+        walk.tick(S, START_QUIET_US, true, false, face(), true);
+    }
+    assert_eq!(walk.kept().steps["privacy"].outcome, Outcome::NotAvailable);
+    assert_eq!(walk.led.as_ref().unwrap().step, Step::HowYouSound);
+    let pending = walk.pending();
+    assert_eq!(
+        pending.invitations[0].step,
+        lamp_msgs::OnboardingStep::HowYouSound,
+        "{pending:?}"
+    );
+}
+
 #[test]
 fn a_clock_jump_or_a_source_restart_spoils_the_try() {
     let store = Store::new(None);

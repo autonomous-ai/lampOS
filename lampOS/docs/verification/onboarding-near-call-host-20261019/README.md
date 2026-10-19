@@ -70,5 +70,56 @@ never waits on a file on this path. Not measured on a lamp.
 
 ## Not shown
 
-A lamp run with a person; the model staying quiet after the person says its
-name; the attention rule's handling of the lamp's own reply during the step.
+A lamp run with a person; the hold measured on a lamp (that the model's
+"Yes?" is never heard during a try).
+
+## Rebase and reply hold (2026-10-19)
+
+Rebased onto `origin/seventh/onboarding-privacy-proof` (d7df17aac: #1792 on
+lamp-voice d3870f543 with Third's review fixes). Conflicts were the docs and a comment line in `crates/voice/Cargo.toml`;
+`lamp-near-call` was already a `lamp-voice` dependency upstream. Fourth's #1892
+consumer: `Calibrated::fits` now also refuses a try scored outside 0.95..=1;
+this step only keeps tries `near_try` accepted (score at least 0.95, scores
+over 1 refused as invalid) and `valid_try` checks the same range on load, so
+what it writes still fits. No API changed. The step runs after privacy is
+done, skipped or `not_available` (privacy without a Controls receipt source),
+as before.
+`onboarding::near_flow_tests::the_step_follows_privacy_that_is_not_available`
+pins the `not_available` case; an early close's retry keeps privacy led, so
+this step waits for it.
+
+The reply hold: while a try's window is open (prompt end .. +7 s), an
+utterance heard in it ends unanswered (`onboarding_near_call`), on both routes.
+`coordinator::tests::second_route::a_call_in_the_near_call_window_is_not_answered_on_either_route`
+runs the real coordinator loop with Gemini Live and with
+`LAMP_VOICE_ROUTE=second`: inside the window nothing is played and the turn's
+outcome is `onboarding_near_call`; with the window closed before the call the
+same call is answered (48 samples from that route). With the gate forced off
+the test fails. `onboarding::near_flow_tests::the_reply_is_held_only_in_the_try_window_and_the_held_call_counts`:
+held from the prompt's end through 7 s, not before nor after nor once judged,
+and the held call is accepted.
+
+## Re-stack on #1792 43fcedc90 (2026-10-19)
+
+Re-stacked onto `origin/seventh/onboarding-privacy-proof` at 43fcedc90 (#1792
+folded, on lamp-voice 473038541). The near-call step applied cleanly. The
+reply hold conflicted only in `coordinator/tests/second_route.rs`, where
+lamp-voice had added #1670's
+`the_second_route_alone_gives_mood_what_was_heard_and_the_voices_phases`
+at the same place; both tests are kept. The rig's new `second_hears` field
+defaults to `None` in `Script::question`, so the near-call test takes it
+unchanged; `near_window_ms` and the `TEST_NEAR_WINDOW` setup merged without
+conflict. Same toolchain and environment as above.
+
+| # | Command | Result |
+|---|---|---|
+| 1 | `cargo +1.96.0 fmt --all --check` | pass |
+| 2 | `cargo +1.96.0 clippy -j2 --workspace --all-targets -- -D warnings` | pass, no warnings |
+| 3 | `cargo +1.96.0 test -j2 -p lamp-voice --lib onboarding -- --test-threads=1` | 69 passed |
+| 3 | `cargo +1.96.0 test -j2 -p lamp-voice --lib near -- --test-threads=1` | 30 passed |
+| 3 | `cargo +1.96.0 test -j2 -p lamp-voice --lib a_call_in_the_near_call_window_is_not_answered_on_either_route -- --test-threads=1` | 1 passed |
+| 3 | `cargo +1.96.0 test -j2 -p lamp-near-call -- --test-threads=1` | 7 passed |
+| 3 | `cargo +1.96.0 test -j2 -p lamp-msgs onboarding -- --test-threads=1` | 1 passed |
+| 3 | `cargo +1.96.0 test -j2 -p lamp-skills onboarding -- --test-threads=1` | 3 passed |
+| 4 | `cargo +1.96.0 test -j2 -p lamp-voice -- --test-threads=1` | 2431 passed, 0 failed, 12 ignored (lib 2191) |
+| 5 | `cargo +1.96.0 build -j2 --workspace` | pass |

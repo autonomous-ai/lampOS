@@ -157,6 +157,9 @@ struct Script {
     ignores_stop: Option<&'static str>,
     /// The scenario's own bound, past which capture reports a fault.
     limit: Duration,
+    /// Onboarding's near-call try window is open over these milliseconds
+    /// from the scenario's start (#1803).
+    near_window_ms: Option<(u64, u64)>,
 }
 
 impl Script {
@@ -188,6 +191,7 @@ impl Script {
             second_fails: None,
             ignores_stop: None,
             limit: LIMIT,
+            near_window_ms: None,
         }
     }
 }
@@ -1162,6 +1166,14 @@ fn run(script: Script) -> Run {
     // the coordinator and the peers share it from here.
     let limit = script.limit;
     let clock_scope = crate::scenario_clock::Scope::enter(limit * 2).unwrap();
+    let origin = monotonic_us();
+    TEST_NEAR_WINDOW.with(|window| {
+        window.set(
+            script
+                .near_window_ms
+                .map(|(from, to)| (origin + from * 1_000, origin + to * 1_000)),
+        )
+    });
     let mut owner = Controller::new(new_boot().unwrap(), now());
     let boot = owner.snapshot(now()).unwrap().boot();
     let mut startup = StartupEvents::default();
@@ -1243,6 +1255,7 @@ fn run(script: Script) -> Run {
     let result = finish_active_run(
         &mut rig, &mut owner, &mut reply, &mut trace, &mut None, result,
     );
+    TEST_NEAR_WINDOW.with(|window| window.set(None));
     let mut exits = vec![
         ("speaker", matches!(rig.speaker.try_exit(), Ok(Some(_)))),
         ("capture", matches!(rig.capture.try_exit(), Ok(Some(_)))),
@@ -2810,5 +2823,48 @@ fn the_second_route_alone_gives_mood_what_was_heard_and_the_voices_phases() {
         RingPhase::Speaking,
     ] {
         assert!(phases.contains(&phase), "{phase:?}: {phases:?}");
+    }
+}
+
+/// #1803: in onboarding's near-call try window the person calls the lamp's
+/// name for the measurement, and an answer within a second of it spoils the
+/// try. The voice holds its reply to it, on Gemini Live and on the second
+/// route alone: the turn ends unanswered, nothing is played, and it is not
+/// counted as a sound. Past the window the same call is answered.
+#[test]
+fn a_call_in_the_near_call_window_is_not_answered_on_either_route() {
+    let _one = super::pilot_faults::one_session();
+    for only in [false, true] {
+        let held = run(Script {
+            second: false,
+            only,
+            near_window_ms: Some((0, 7_000)),
+            mute_at_frame: Some(300),
+            ..Script::question(Live::Answer(12))
+        });
+        held.assert_clean();
+        assert!(held.played(1).is_empty(), "{only}: {}", held.summary());
+        assert_eq!(held.finished(1)["outcome"], "onboarding_near_call");
+        let endpoint = held.events("local_endpoint");
+        assert_eq!(endpoint.len(), 1, "{endpoint:?}");
+        assert!(endpoint[0]["onboarding_near_call"].is_string());
+        assert!(endpoint[0].get("not_speech").is_none());
+        let after = run(Script {
+            second: false,
+            only,
+            near_window_ms: Some((0, 1)),
+            ..Script::question(Live::Answer(12))
+        });
+        after.assert_clean();
+        assert_eq!(
+            after.played(1),
+            vec![if only { SECOND } else { LIVE }; 48],
+            "{only}"
+        );
+        assert!(
+            after.events("local_endpoint")[0]
+                .get("onboarding_near_call")
+                .is_none()
+        );
     }
 }

@@ -474,6 +474,16 @@ impl Onboarding {
         });
     }
 
+    /// Whether a try's window is open at `at_us`, from the prompt's end to
+    /// the end of its collection (7 s): the voice holds its reply to what is
+    /// said in it, since an answer within a second of the name spoils the
+    /// try (#1803).
+    pub(crate) fn near_holds_reply(&self, at_us: u64) -> bool {
+        self.near.listening.as_ref().is_some_and(|listening| {
+            at_us >= listening.ended_us && at_us - listening.ended_us <= COLLECT_MS * 1_000
+        })
+    }
+
     /// Judge the try being listened for, once its evidence is all in. Pure
     /// computation on bounded buffers; never waits for storage.
     pub(super) fn near_judge(&mut self, now_us: u64) {

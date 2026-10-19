@@ -245,6 +245,22 @@ invalid (a score that is not finite or outside 0 to 1, an impossible
 hearing, so the try says it was unsure. No sound, no mic2 ratio and no voice
 identity is used or kept.
 
+**The reply is held.** An answer that starts within a second of the name
+spoils the try, and a model hearing its name answers ("Yes?"). So while a
+try's window is open, from the prompt's end to 7 s on, the voice holds its
+reply to what is said: an utterance heard in it ends unanswered when it ends,
+however long it runs past the window, as a sound does
+(`coordinator.rs`, `near_call_window` and the `AdmissionStep::End` arm that
+drops a turn; `Onboarding::near_holds_reply`). Its End never goes to the model
+and nothing of an answer is played, on Gemini Live and on the second route
+(`LAMP_VOICE_ROUTE=second`) alike, since both are the coordinator's
+`rig.provider`. Its record says `onboarding_near_call` (the endpoint's field
+and the turn's outcome), not `not_speech`, so it is not counted as a short
+sound. Outside the window, and with no near-call try open, nothing changes;
+Stop, mute and physical privacy are not touched. Tests:
+`coordinator::tests::second_route::a_call_in_the_near_call_window_is_not_answered_on_either_route`,
+`onboarding::near_flow_tests::the_reply_is_held_only_in_the_try_window_and_the_held_call_counts`.
+
 **The end.** At most five prompts, and the step stops asking once five can't
 reach three accepted (`asks_again`). Three accepted calls make the bar
 (`near_rise`: the quietest less 3 dB, held to 16–24 dB); the bar and its
@@ -280,7 +296,4 @@ The bus is drained without waiting, at most every 20 ms.
 Tests: `onboarding::near_flow_tests`, `onboarding::storage::tests::the_near_call_bar_is_written_or_removed_only_on_the_worker`
 and the coordinator's held-write test; the record is in
 [verification/onboarding-near-call-host-20261019](verification/onboarding-near-call-host-20261019/README.md).
-Not shown: a lamp run with a person, whether the model stays quiet after the
-person says its name (an answer that starts within a second of the name spoils
-that try), and whether the lamp's own reply to its name is held back by the
-attention rule during this step.
+Not shown: a lamp run with a person.
