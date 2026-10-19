@@ -5,6 +5,26 @@ list and the answers belong to the first builder (Queue #1722, continued from
 #705). Sixth shares lamp-52e6 through Fifth, with a scoped loan and exact
 restoration; every hardware result below names its lamp. Newest first.
 
+## 2026-10-19 — journal ready; mic1 privacy review fixed
+
+Ready for lamp-voice: yes (#1768, journal-attribution slice only).
+#1675 remains open; #1748 is not ready on its newly reviewed head yet.
+
+- #1768 at `2f2b75abd`: native ARM64 `39208475675` green; host gate as below.
+  Taken out of draft for the reviewer/First. Default-change lamp check remains
+  First's before integration. No voice-matcher authorization is added.
+- Third's #1748/#1707 review found no P1, one P2 and P3s. Fixed Ears-only
+  50 ms message/declaration expiry, the bounded privacy drain after filesystem
+  preparation, and audio-only failure/backoff instead of pump teardown.
+  Documented existing 50 ms receiver grace, silent mute with a live source,
+  lampos-group access and operator-managed recorder retention.
+- #1748 final head `84a2ac245`, host fmt/clippy and full bus+ears 162/0/1.
+  Native `39209878364` running. #1707 doc correction `3ea986f14`, native
+  `39209507161` running. Earlier d68cab679 artifact is superseded, not for
+  deployment, although its local download SHA matches CI.
+- Asked Fifth for a scoped read-only52e6preflight (loan/units/hashes/flags/
+  subscribers), Queue comment `6261127988`. No loan granted or device action.
+
 ## 2026-10-19 — preserve completed journal scope, PR #1768
 
 Ready for lamp-voice: no. Draft #1768 at `2f2b75abd`; native ARM64 pending.
