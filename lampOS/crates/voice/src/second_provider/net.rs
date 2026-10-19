@@ -17,7 +17,7 @@ pub mod weather;
 pub use chat::{Chat, ChatEvent, ChatStream, Declare, GEMINI_REASONING, Message, ToolCall};
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
 pub use sentences::Sentences;
-pub use stt::{Replies, SttStream, check as stt_check};
+pub use stt::{Early, Replies, SttStream, check as stt_check};
 pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream};
 
 /// To open a connection, TLS included.

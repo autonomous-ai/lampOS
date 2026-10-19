@@ -1067,6 +1067,7 @@ fn second_route_worker_environment(
         crate::second_config::KEY_TERMS_ENV,
         crate::local_time::PLACE_ENVIRONMENT,
         crate::second_provider::net::weather::ENVIRONMENT,
+        crate::second_provider::PREPARED_ENVIRONMENT,
         crate::second_provider::net::key_terms::ENVIRONMENT,
     ]
     .into_iter()
@@ -1334,7 +1335,9 @@ mod tests {
                     "Hanoi"
                 } else if name == crate::local_time::PLACE_ENVIRONMENT {
                     "Hanoi, Vietnam"
-                } else if name == crate::second_provider::net::weather::ENVIRONMENT {
+                } else if name == crate::second_provider::net::weather::ENVIRONMENT
+                    || name == crate::second_provider::PREPARED_ENVIRONMENT
+                {
                     "on"
                 } else {
                     "a-secret"
@@ -1392,6 +1395,7 @@ mod tests {
                     "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_KNOWN_NAMES=on",
+                    "LAMP_SECOND_PREPARED=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
                     "LAMP_SECOND_WEATHER=on",
                 ],

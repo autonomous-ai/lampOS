@@ -8,6 +8,7 @@ use futures_util::{
     stream::{self, BoxStream},
 };
 use std::sync::Arc;
+use tokio::sync::mpsc;
 
 /// Speech-to-text, a chat model and text-to-speech.
 pub trait Services: Send + Sync + 'static {
@@ -37,11 +38,19 @@ pub trait Listener: Send {
     /// The final words; empty when nothing was heard.
     /// `request` names the turn in the journal.
     fn finish(self: Box<Self>, request: u64) -> BoxFuture<'static, net::Result<String>>;
+    /// The words it has before they are final, for one taker; none from a
+    /// listener that never has any.
+    fn early(&mut self) -> Option<mpsc::UnboundedReceiver<net::Early>> {
+        None
+    }
 }
 
 impl Listener for SttStream {
     fn send(&self, samples: &[i16]) -> net::Result<()> {
         SttStream::send(self, samples)
+    }
+    fn early(&mut self) -> Option<mpsc::UnboundedReceiver<net::Early>> {
+        self.take_early()
     }
     fn finish(self: Box<Self>, request: u64) -> BoxFuture<'static, net::Result<String>> {
         Box::pin(SttStream::finish(*self, request))
