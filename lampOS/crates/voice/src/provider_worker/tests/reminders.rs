@@ -886,6 +886,7 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
         schedule_speak: true,
         who: None,
         names_checked: false,
+        photo_faces: false,
         mark: None,
         onboarding: None,
         reports_stop: false,
