@@ -246,7 +246,9 @@ Memory, Expression and skills take `--zone system`, which follows that file,
 across daylight saving and without a restart (skills since #1384). Schedule
 takes `--zone ${LAMP_ZONE}` from `zone.env`, which install writes from the
 image's zone and setup writes again with the person's. The voice
-tells the time from `/etc/localtime` itself. The policy keeps none: only its
+reads `/etc/localtime` through the same crate, `lamp-local-time` (#820):
+the time it tells, night, and the days of what is remembered and marked,
+each moment with its own offset, a new zone taken up without a restart. The policy keeps none: only its
 hello and progress news would use one, and the product doesn't pass them.
 `install`'s `the_parts_that_keep_local_time_read_the_zone_setup_saves` holds
 the units to this.

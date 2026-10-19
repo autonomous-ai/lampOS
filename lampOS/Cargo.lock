@@ -2265,6 +2265,7 @@ dependencies = [
  "lamp-expression",
  "lamp-gemini",
  "lamp-ipc",
+ "lamp-local-time",
  "lamp-msgs",
  "lamp-policy",
  "lamp-ring",

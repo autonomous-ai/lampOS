@@ -448,12 +448,13 @@ time, from its opening note, and nothing said whose it was.
   taken only there or as `UTC`: the folder's top-level `EST`, `MST` and
   `HST` have no summer time, so "EST" for the East Coast would be an hour
   off New York's half the year (the reviewer on #1552). The zone file is read from
-  `/usr/share/zoneinfo` with the voice's own reader (`local_time.rs`). Only
+  `/usr/share/zoneinfo` and read by `lamp-local-time`, as every part
+  reads the lamp's own zone (#820). Only
   `[A-Za-z0-9_+/-]` is taken, with no `..`, no `//` and no leading or
   trailing `/`, and the file must be a zone file. A slim zone file, which
   lists no changes past its last rule change, has its closing rule worked
-  out (`Mm.w.d` dates; a `Jn` or `n` rule gives nothing). The lamp's own
-  time is read exactly as before.
+  out, and since #820 so has the lamp's own: before, past the changes its
+  file listed, its time was not told.
 - **The answer names the place, and the lamp's own beside it:**
   `{"now":"In London it is 10:40 in the morning, Sunday 18 October 2026.
   Said aloud: twenty to eleven in the morning. Here in Ho Chi Minh it is

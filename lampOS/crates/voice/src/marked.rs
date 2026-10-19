@@ -265,9 +265,12 @@ pub fn list(marks: &Path) -> io::Result<Vec<String>> {
     Ok(found.into_iter().map(|(_, line)| line).collect())
 }
 
-/// A mark's time as the lamp's local date and minute.
+/// A mark's time as the lamp's local date and minute: with the zone's
+/// offset at the mark, not now's (#820). UTC only while the lamp's zone
+/// cannot be read at all.
 fn when(unix_ms: u64) -> String {
-    let offset = i64::from(crate::local_time::offset_here().unwrap_or(0));
+    let offset = crate::local_time::system()
+        .map_or(0, |zone| i64::from(zone.offset_minutes_at(unix_ms)) * 60);
     let seconds = (unix_ms / 1000) as i64 + offset;
     let (year, month, day) = crate::local_time::civil(seconds.div_euclid(86_400));
     let minute = seconds.rem_euclid(86_400) / 60;
