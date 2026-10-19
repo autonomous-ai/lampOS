@@ -2350,7 +2350,7 @@ async fn answer(
                 {
                     did(Did::Worked(monotonic_us()));
                 }
-                let result = match (&shared.scoped_tools, &scope) {
+                let mut result = match (&shared.scoped_tools, &scope) {
                     (Some(run), Some(scope)) => {
                         run(
                             request,
@@ -2368,6 +2368,23 @@ async fn answer(
                 };
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
+                }
+                // A finished task's news asked about (`check_agent_task`):
+                // its key is never the model's, and the coordinator puts it
+                // on this turn, so the tasks part is told it was heard once
+                // the turn is heard whole, as on the Live route (#1390).
+                if crate::agent_tasks::is_tool(&call.name)
+                    && let Some(key) = crate::agent_tasks::take_news_key(&mut result)
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} was answered the news ({key}); it rides on the turn"
+                    );
+                    if !shared
+                        .emit(ProviderOutput::NewsAnswered { request, key })
+                        .await
+                    {
+                        return Err(Stop::Gone);
+                    }
                 }
                 messages.push(Message::tool(call.id.clone(), result.to_string()));
             }

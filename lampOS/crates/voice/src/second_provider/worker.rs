@@ -1647,10 +1647,9 @@ async fn run_call(
         {
             room.answered_by_a_call(request, monotonic_us());
         }
-        match &scope {
-            Some(scope) => crate::tools::answer_scoped(&settings, &call, request, heard, scope),
-            None => crate::tools::answer(&settings, &call, request, heard),
-        }
+        // A news key stays in the answer: the turn takes it out before
+        // its model reads it, and tells the coordinator (#1390).
+        crate::tools::answer_keeping_news(&settings, &call, request, heard, scope.as_ref())
     })
     .await
     .unwrap_or_else(|_| crate::tools::unavailable())

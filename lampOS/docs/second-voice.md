@@ -997,6 +997,19 @@ record is written.
   (`ReminderDeferral::Disabled`), for Gemini to say once it is back. The
   journal: `lamp-voice second: due reminders are said on this route, the
   lamp's only voice`.
+- **The voice's own sayings are said**, as on Live (the first builder's
+  20:15 on #1722): task news told unasked and progress news (each a
+  written turn of the news's note, at the same quiet moment), a skill's say
+  (`LAMP_SAY`, answered `spoken` on the same proof), and news asked about
+  (`check_agent_task`), whose key the turn takes out of the answer before
+  its model reads it and sends as `NewsAnswered` (`docs/tasks.md`). So the
+  tasks part is told a finished task was heard once its turn is heard
+  whole, and closes its harness, as on Live. Tests:
+  `coordinator::tests::second_route::news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live`
+  and `a_skills_say_is_said_and_answered_spoken_on_the_second_route_as_on_live`
+  (the loop, both routes), and `second_provider`'s
+  `news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models` and
+  `news_asked_by_voice_through_this_route_is_put_on_the_turn`.
 - **Its input is taken late**, in order and from the parent's boot, as the
   Live worker's is since 40de19327 (`WorkerChannels::taking_late_input`): its
   input is checked against fresh authority when used, and its end would end
