@@ -287,8 +287,10 @@ Voice's. A base requires `base_selected_mask` to exactly match its working
 electrodes (4095 for all twelve, 3823/0x0EEF for lamp-4ace's ten), and a complete
 explicit profile: twelve independently specified touch thresholds and twelve
 release thresholds, baseline filters, FFI/SFI/ESI, global/per-pad CDC/CDT,
-debounce, ECR and auto-configuration limits. Unknown fields and missing
-electrical settings fail validation before I/O. There is no shared-threshold
+debounce, ECR and auto-configuration limits. Missing electrical settings
+and a known setting's bad value fail validation before I/O. A field this
+build doesn't know, at any depth, is read past and named once (below, "A
+newer build's files"). There is no shared-threshold
 shortcut, and the served path never changes a threshold by itself; every
 working pad is calibrated through its own assembled shell with a person at
 the lamp (`calibrate-touch`, below). The arrays are indexed by electrode
@@ -666,9 +668,48 @@ section, described below; absent/off never opens chip 1.
 The file is the board's wiring and nothing else: the chip, and for each
 button and head pad its name (the same names, in the same order, as the
 controls' own configuration), its line, whether a press or a touch pulls
-it low, and how it is held when nothing drives it. A field nobody knows
-is refused. `deploy/lamp-4ace/controls-pins.json` and
+it low, and how it is held when nothing drives it. A field it doesn't
+know at its top is refused: this file is kept beside its build's binary,
+and the touch path's file (with `reset` and `base`) is never read as it.
+A field inside a pin is read past and named, as on the touch path.
+`deploy/lamp-4ace/controls-pins.json` and
 `deploy/lamp-4ace/controls.json` are lamp-4ace's.
+
+### A newer build's files (#1680)
+
+The product's `/etc/lampOS/controls/controls.json` and
+`controls-pins.json` (the touch path's) are written by install's settings,
+so after a put-back an older build may read a newer one's
+(`docs/updates.md`, "Every part's saved data, one version ahead").
+`lamp_controls::forward` reads them one release forward:
+
+- A field this build doesn't know, at any depth, is read past, and the
+  journal names it once at start, by its path, never its value:
+  `lamp-controls: /etc/lampOS/controls/controls-pins.json: fields this
+  build does not read, ignored: head_hold_ms, head_pads[1].sensitivity`.
+  What this build knows reads exactly as before. A field this build
+  writes only when set is not named when the file has it as `null` or
+  `false`, so an unknown field with such a value is read past unnamed.
+- Still refused, and the controls don't start:
+  - a file that doesn't parse;
+  - a known field with a bad value (a new `pull`, a strip `mode` it
+    doesn't know);
+  - a field named like a key's, by its name;
+  - a field about privacy this build doesn't know (`privacy`, `slide` or
+    `mute` in its name), by its name. The privacy slide is read only as
+    this build knows it, and what it can't read is never taken as no slide
+    (Third's design C on #1722). The `privacy` section itself stays
+    strict, and a file without one reads as before.
+- serde's reason is told only as its category, line and column, never its
+  message, which can hold a value (the reviewer's P3 on #2061): `not read
+  (data error at line 12, column 16)`.
+
+Tests: `forward::tests`;
+`the_products_files_one_release_ahead_are_read_and_their_new_fields_named`,
+`privacy_keys_and_bad_values_are_still_refused_and_no_value_is_shown` and
+`new_wiring_reads_a_newer_builds_fields_past_and_the_legacy_schema_stays_strict`
+(`tests/touch_pins.rs`); the strip's layers in `tests/mpr121.rs`; the
+replay naming them (`tests/touch_program.rs`).
 
 Every configured line is read together every `every_ms` (5 on lamp-4ace)
 and given as one complete observation stamped with the moment of the
