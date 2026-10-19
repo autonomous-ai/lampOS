@@ -37,7 +37,8 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
                      lamp-skills remove [--dir DIR] NAME\n       \
                      lamp-skills list [--dir DIR]\n       \
-                     lamp-skills pack [--out DIR] SKILL_DIR";
+                     lamp-skills pack [--out DIR] SKILL_DIR\n       \
+                     lamp-skills asked [--dir DIR]";
 /// Where the product keeps its skills (`deploy/product/lamp-skills.service`):
 /// the core ones `lamp-update install` writes and the installable ones.
 const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
@@ -147,7 +148,7 @@ fn main() -> ExitCode {
     let given: Vec<String> = std::env::args().skip(1).collect();
     match given.first().map(String::as_str) {
         Some("test") => return test(&given[1..]),
-        Some(command @ ("install" | "remove" | "list" | "pack")) => {
+        Some(command @ ("install" | "remove" | "list" | "pack" | "asked")) => {
             return manage(command, &given[1..]);
         }
         _ => {}
@@ -319,6 +320,19 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         ("install", [from]) => package::install(&dir, Path::new(from)),
         ("remove", [name]) => package::remove(&dir, name),
         ("list", []) => package::list(&dir).map(|listed| listed.trim_end().to_owned()),
+        // The manage helper (#1722): one request on the standard input, its
+        // answer on the standard output, as systemd hands it a connection
+        // to `lamp-skills-manage.socket`; the journal says what was done.
+        ("asked", []) => {
+            return match package::asked(&dir, std::io::stdin(), std::io::stdout()) {
+                Ok(true) => ExitCode::SUCCESS,
+                Ok(false) => ExitCode::FAILURE,
+                Err(error) => {
+                    eprintln!("lamp-skills: asked: not answered: {error}");
+                    ExitCode::FAILURE
+                }
+            };
+        }
         ("pack", [skill]) => {
             package::pack(Path::new(skill), &out).map(|path| format!("packed {}", path.display()))
         }

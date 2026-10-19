@@ -1,9 +1,11 @@
 //! The app's skills page (#1722, the first builder's 17:21 on mobile's
 //! design): `skills.list`, every skill folder on the lamp as the running
 //! `lamp-skills` loads it, each with its group, whether it can be removed or
-//! turned off, and what it may use in plain words. Read only: nothing here
-//! removes, installs or changes a skill. Off unless `LAMP_SKILLS_PAGE=on`,
-//! with `LAMP_CLOUD=on`; without it the kind is answered as any this lamp
+//! turned off, and what it may use in plain words; and `skills.remove`, an
+//! installed or made-here skill taken off on the person's tap, through
+//! `lamp-skills`' own remove ([`remove`]), never a core one. Nothing here
+//! installs or changes a skill. Off unless `LAMP_SKILLS_PAGE=on`, with
+//! `LAMP_CLOUD=on`; without it each kind is answered as any this lamp
 //! lacks, `not on this lamp: skills.list` (`docs/cloud.md`, "The skills
 //! page").
 //!
@@ -19,7 +21,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-/// `on` answers `skills.list`, with `LAMP_CLOUD=on`. Anything else: the
+/// `on` answers `skills.list` and `skills.remove`, with `LAMP_CLOUD=on`. Anything else: the
 /// kind is one this lamp lacks.
 pub const ENVIRONMENT: &str = "LAMP_SKILLS_PAGE";
 
@@ -70,6 +72,10 @@ pub struct Places {
     /// `lamp-skills --state-dir` (#1886); a snooze is kept only in its
     /// memory, so it is never known here.
     pub off: PathBuf,
+    /// The manage helper's socket, root's, which removes a skill for the
+    /// page ([`lamp_skills::package::MANAGE_SOCKET`]): `lamp-cloud` never
+    /// writes the folder itself.
+    pub manage: PathBuf,
 }
 
 impl Places {
@@ -79,6 +85,7 @@ impl Places {
         Self {
             folder: "/var/lib/lampOS/skills".into(),
             off: "/var/lib/lampos-skills-state/off".into(),
+            manage: lamp_skills::package::MANAGE_SOCKET.into(),
         }
     }
 }
@@ -233,6 +240,99 @@ pub fn list(places: &Places) -> Result<Value, String> {
     Ok(json!({"version": VERSION, "skills": rows, "left_out": left_out}))
 }
 
+/// What `skills.remove` says of a `name` that is not a skill's: the name
+/// is not said back, so nothing the app sent is echoed.
+pub const NOT_A_NAME: &str =
+    "name must be a skill's name: 1 to 64 lowercase letters, digits and hyphens";
+
+/// `skills.remove {"name"}` (#1722): an installed or made-here skill taken
+/// off the lamp, on the person's tap in the app. `lamp-cloud` talks to the
+/// network, so it never writes the skills folder (the first builder's 18:33):
+/// it asks the manage helper over its local socket ([`ask_helper`]), root's
+/// `lamp-skills asked`, which checks the request again itself and runs
+/// `lamp-skills`' own remove ([`lamp_skills::package::remove`]): renamed
+/// aside under the folder's lock, gone at once for the running program, then
+/// deleted. The reply is the page as it now is, [`list`]'s, read after the
+/// remove. A core skill is refused, and so is a name that is not a skill's
+/// (no `/`, `..`, NUL or more than 64 bytes get past
+/// [`lamp_skills::package::skill_name_ok`]) or one not on the lamp, here
+/// before the helper is asked and by the helper again.
+pub fn remove(places: &Places, data: &Value) -> Result<Value, String> {
+    let name = data
+        .get("name")
+        .and_then(Value::as_str)
+        .filter(|name| lamp_skills::package::skill_name_ok(name))
+        .ok_or(NOT_A_NAME)?;
+    fs::read_dir(&places.folder).map_err(|_| "the lamp's skills can't be read now".to_owned())?;
+    let (folder, loaded) = lamp_skills::load_each(&places.folder)
+        .into_iter()
+        .find(|(folder, _)| folder.file_name() == Some(std::ffi::OsStr::new(name)))
+        .ok_or_else(|| format!("no skill {name} on this lamp"))?;
+    if row(&folder, loaded, None).group == Group::Core {
+        return Err(format!(
+            "{name} is a core skill: it comes with the lamp, so it can't be removed"
+        ));
+    }
+    match ask_helper(&places.manage, name) {
+        Ok(said) => eprintln!("lamp-cloud: skills.remove from the app: {said}"),
+        Err(Asked::Refused(why)) => {
+            eprintln!("lamp-cloud: skills.remove {name} from the app refused: {why}");
+            return Err(cut(&one_line(&why), WHY_MOST));
+        }
+        Err(Asked::Unanswered(error)) => {
+            eprintln!(
+                "lamp-cloud: skills.remove {name}: the manage helper did not answer: {error}"
+            );
+            return Err(NOT_CHANGED.to_owned());
+        }
+    }
+    list(places)
+}
+
+/// What the app is told when the manage helper can't be reached or does
+/// not answer.
+pub const NOT_CHANGED: &str = "the lamp's skills can't be changed now";
+
+/// The longest `skills.remove` waits for the manage helper's answer: a
+/// remove takes milliseconds, but it waits for the folder's lock while an
+/// install by hand runs.
+pub const ASK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Why the manage helper did not remove a skill.
+enum Asked {
+    /// It answered no, and why.
+    Refused(String),
+    /// It could not be asked, or its answer did not come or was not one.
+    Unanswered(String),
+}
+
+/// `{"remove": NAME}` asked of the manage helper at `socket`, one line each
+/// way ([`lamp_skills::package::asked`]): what it did, or why not. The
+/// helper is root's and owns the folder; `lamp-cloud` writes nothing there.
+fn ask_helper(socket: &Path, name: &str) -> Result<String, Asked> {
+    use std::io::{BufRead, Write};
+    let unanswered = |error: std::io::Error| Asked::Unanswered(error.to_string());
+    let stream = std::os::unix::net::UnixStream::connect(socket).map_err(unanswered)?;
+    stream
+        .set_read_timeout(Some(ASK_TIMEOUT))
+        .map_err(unanswered)?;
+    stream
+        .set_write_timeout(Some(ASK_TIMEOUT))
+        .map_err(unanswered)?;
+    writeln!(&stream, "{}", json!({ "remove": name })).map_err(unanswered)?;
+    let mut line = String::new();
+    std::io::BufReader::new((&stream).take(lamp_skills::package::ASKED_MOST))
+        .read_line(&mut line)
+        .map_err(unanswered)?;
+    let answer: Value = serde_json::from_str(line.trim_end())
+        .map_err(|_| Asked::Unanswered(format!("not an answer: {:?}", cut(&line, 200))))?;
+    match (answer["done"].as_str(), answer["refused"].as_str()) {
+        (Some(said), None) => Ok(said.to_owned()),
+        (None, Some(why)) => Err(Asked::Refused(why.to_owned())),
+        _ => Err(Asked::Unanswered(format!("not an answer: {answer}"))),
+    }
+}
+
 /// A folder as the page shows it, loaded or not.
 fn row(
     folder: &Path,
@@ -377,7 +477,23 @@ pub mod tests {
         Places {
             folder: root.join("skills"),
             off: root.join("off"),
+            manage: root.join("m.sock"),
         }
+    }
+
+    /// The manage helper on `places.manage`, a real Unix socket on a short
+    /// `/tmp` path: each connection answered by `lamp_skills::package::asked`
+    /// over the folder, as systemd's `Accept=yes` hands one to `lamp-skills
+    /// asked`. Only the process starting differs.
+    pub fn helper(places: &Places) {
+        let _ = fs::remove_file(&places.manage);
+        let listener = std::os::unix::net::UnixListener::bind(&places.manage).unwrap();
+        let folder = places.folder.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let _ = lamp_skills::package::asked(&folder, &stream, &stream);
+            }
+        });
     }
 
     /// A skill that loads: a tool started only when asked, with `toml` for
@@ -657,6 +773,202 @@ pub mod tests {
             list(&places),
             Err("the lamp's skills can't be read now".to_owned())
         );
+    }
+
+    /// A core, a made-here and an installed skill, side by side, with the
+    /// manage helper.
+    fn three(name: &str) -> Places {
+        let places = places(name);
+        helper(&places);
+        skill(
+            &places,
+            "dance",
+            "Dance",
+            "",
+            "kind = \"core\"\n[permissions]\nbody = true",
+        );
+        skill(
+            &places,
+            "plant-water",
+            "Water the plant",
+            "made: here\n",
+            "[permissions]\nbody = true",
+        );
+        skill(
+            &places,
+            "tutor",
+            "Desk tutor",
+            "",
+            "kind = \"installable\"\n[permissions]\nbody = true",
+        );
+        places
+    }
+
+    fn names(reply: &Value) -> Vec<&str> {
+        reply["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["name"].as_str().unwrap())
+            .collect()
+    }
+
+    /// What is in the folder, hidden folders among them: a remove leaves
+    /// nothing beside the skills.
+    fn folder_holds(places: &Places) -> Vec<String> {
+        let mut found: Vec<String> = fs::read_dir(&places.folder)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        found.sort();
+        found
+    }
+
+    #[test]
+    fn a_core_skill_is_never_removed() {
+        let places = three("rm-core");
+        assert_eq!(
+            remove(&places, &json!({"name": "dance"})),
+            Err("dance is a core skill: it comes with the lamp, so it can't be removed".to_owned())
+        );
+        assert!(places.folder.join("dance/skill.toml").exists());
+        assert_eq!(folder_holds(&places), ["dance", "plant-water", "tutor"]);
+    }
+
+    #[test]
+    fn a_skill_made_here_is_removed_and_the_page_is_given_as_it_now_is() {
+        let places = three("rm-made");
+        let reply = remove(&places, &json!({"name": "plant-water"})).unwrap();
+        assert_eq!(reply, list(&places).unwrap());
+        assert_eq!(names(&reply), ["dance", "tutor"]);
+        assert_eq!(reply["version"], VERSION);
+        assert!(!places.folder.join("plant-water").exists());
+        assert_eq!(folder_holds(&places), ["dance", "tutor"]);
+        // Asked again, it is not there.
+        assert_eq!(
+            remove(&places, &json!({"name": "plant-water"})),
+            Err("no skill plant-water on this lamp".to_owned())
+        );
+    }
+
+    #[test]
+    fn an_installed_skill_is_removed() {
+        let places = three("rm-installed");
+        let reply = remove(&places, &json!({"name": "tutor"})).unwrap();
+        assert_eq!(names(&reply), ["dance", "plant-water"]);
+        assert_eq!(folder_holds(&places), ["dance", "plant-water"]);
+    }
+
+    /// One that does not load is still the person's to take off.
+    #[test]
+    fn an_installed_skill_that_does_not_load_is_removed_too() {
+        let places = three("rm-broken");
+        fs::write(places.folder.join("tutor/skill.toml"), "not toml [").unwrap();
+        assert_eq!(list(&places).unwrap()["skills"][1]["loads"], false);
+        let reply = remove(&places, &json!({"name": "tutor"})).unwrap();
+        assert_eq!(names(&reply), ["dance", "plant-water"]);
+    }
+
+    #[test]
+    fn an_unknown_name_and_every_path_trick_are_refused_and_nothing_is_touched() {
+        let places = three("rm-tricks");
+        // A folder beside the skills folder, which `../victim` would name.
+        let victim = places.folder.with_file_name("victim");
+        fs::create_dir_all(&victim).unwrap();
+        assert_eq!(
+            remove(&places, &json!({"name": "juggle"})),
+            Err("no skill juggle on this lamp".to_owned())
+        );
+        let long = "a".repeat(65);
+        for data in [
+            json!({"name": ".."}),
+            json!({"name": "."}),
+            json!({"name": "../victim"}),
+            json!({"name": "tutor/../dance"}),
+            json!({"name": "/var/lib/lampOS/skills/tutor"}),
+            json!({"name": "tutor\0"}),
+            json!({"name": "\0"}),
+            json!({"name": ".removed-tutor-1"}),
+            json!({"name": "Tutor"}),
+            json!({"name": "desk_tutor"}),
+            json!({"name": "tutor "}),
+            json!({"name": ""}),
+            json!({"name": long}),
+            json!({"name": 7}),
+            json!({"name": null}),
+            json!({"name": ["tutor"]}),
+            json!({}),
+            json!("tutor"),
+            Value::Null,
+        ] {
+            assert_eq!(remove(&places, &data), Err(NOT_A_NAME.to_owned()), "{data}");
+        }
+        assert!(victim.exists());
+        assert_eq!(folder_holds(&places), ["dance", "plant-water", "tutor"]);
+        // 64 bytes is a name, which this lamp does not have.
+        let most = "a".repeat(64);
+        assert_eq!(
+            remove(&places, &json!({"name": most})),
+            Err(format!("no skill {most} on this lamp"))
+        );
+    }
+
+    /// A link named as a skill is `lamp-skills`' to refuse: what it points
+    /// at is never removed.
+    #[test]
+    fn a_link_named_as_a_skill_is_left_as_it_is() {
+        let places = three("rm-link");
+        let elsewhere = places.folder.with_file_name("elsewhere");
+        fs::create_dir_all(&elsewhere).unwrap();
+        fs::write(elsewhere.join("keep"), "kept").unwrap();
+        std::os::unix::fs::symlink(&elsewhere, places.folder.join("linked")).unwrap();
+        let why = remove(&places, &json!({"name": "linked"})).unwrap_err();
+        assert!(why.contains("is not a skill's folder"), "{why}");
+        assert!(elsewhere.join("keep").exists());
+        assert!(places.folder.join("linked").exists());
+    }
+
+    /// A folder `lamp-cloud` can't change (the product's, root's, under
+    /// its unit's `ProtectSystem=strict`) refuses in `lamp-skills`' words,
+    /// and the skill stays whole.
+    #[test]
+    fn a_folder_that_cannot_be_changed_leaves_the_skill_whole() {
+        use std::os::unix::fs::PermissionsExt;
+        let places = three("rm-readonly");
+        fs::set_permissions(&places.folder, fs::Permissions::from_mode(0o555)).unwrap();
+        let refused = remove(&places, &json!({"name": "tutor"}));
+        fs::set_permissions(&places.folder, fs::Permissions::from_mode(0o755)).unwrap();
+        let why = refused.unwrap_err();
+        assert!(why.starts_with("not removed: "), "{why}");
+        assert!(why.len() <= WHY_MOST);
+        assert!(places.folder.join("tutor/skill.toml").exists());
+        assert_eq!(folder_holds(&places), ["dance", "plant-water", "tutor"]);
+    }
+
+    /// Without the helper, nothing is removed and the app is told so in
+    /// plain words; `lamp-cloud` never falls back to writing the folder.
+    #[test]
+    fn without_the_manage_helper_nothing_is_removed() {
+        let places = three("rm-nohelper");
+        fs::remove_file(&places.manage).unwrap();
+        assert_eq!(
+            remove(&places, &json!({"name": "tutor"})),
+            Err(NOT_CHANGED.to_owned())
+        );
+        // One that answers nothing a helper would.
+        let listener = std::os::unix::net::UnixListener::bind(&places.manage).unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                use std::io::Write;
+                let _ = writeln!(&stream, "{{\"removed\": true}}");
+            }
+        });
+        assert_eq!(
+            remove(&places, &json!({"name": "tutor"})),
+            Err(NOT_CHANGED.to_owned())
+        );
+        assert_eq!(folder_holds(&places), ["dance", "plant-water", "tutor"]);
     }
 
     #[test]

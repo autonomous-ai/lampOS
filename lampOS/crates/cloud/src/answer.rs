@@ -231,6 +231,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 crate::schedule::cancel(adapter, data)
             }
         }
+        // An installed or made-here skill taken off on the person's tap
+        // (#1722), never a core one: the page as it now is.
+        "skills.remove" if lamp.skills().is_some() => {
+            let places = lamp.skills().ok_or_else(|| not_here(kind))?;
+            crate::skills::remove(&places, data).map(Some)
+        }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -497,6 +503,7 @@ pub mod tests {
             Err("not on this lamp: skills.list".to_owned())
         );
         let places = crate::skills::tests::places("answer");
+        crate::skills::tests::helper(&places);
         crate::skills::tests::skill(
             &places,
             "dance",
@@ -511,8 +518,31 @@ pub mod tests {
         assert_eq!(listed["version"], 1);
         assert_eq!(listed["skills"][0]["name"], "dance");
         assert_eq!(listed["skills"][0]["can_remove"], false);
+        // A core skill is not removed, and an installed one is.
+        assert_eq!(
+            answer(&mut lamp, "skills.remove", &json!({"name": "dance"})),
+            Err("dance is a core skill: it comes with the lamp, so it can't be removed".to_owned())
+        );
+        crate::skills::tests::skill(
+            lamp.skills.as_ref().unwrap(),
+            "tutor",
+            "Desk tutor",
+            "",
+            "[permissions]\nbody = true",
+        );
+        let after = answer(&mut lamp, "skills.remove", &json!({"name": "tutor"}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(after["skills"].as_array().unwrap().len(), 1);
+        assert_eq!(after["skills"][0]["name"], "dance");
+        // Off, removing is refused as any kind this lamp lacks.
+        lamp.skills = None;
+        assert_eq!(
+            answer(&mut lamp, "skills.remove", &json!({"name": "dance"})),
+            Err("not on this lamp: skills.remove".to_owned())
+        );
         // The other skills kinds are not built: refused as before.
-        for kind in ["skills.remove", "skills.catalog", "skills.install"] {
+        for kind in ["skills.catalog", "skills.install"] {
             assert_eq!(
                 answer(&mut lamp, kind, &json!({"name": "dance"})),
                 Err(not_here(kind))

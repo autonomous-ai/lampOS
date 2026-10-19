@@ -766,3 +766,125 @@ fn a_list_says_each_skills_name_kind_version_and_what_it_may_use() {
         ]
     );
 }
+
+/// The manage helper as systemd runs it for a connection to its socket
+/// (`lamp-skills-manage.socket`, `Accept=yes`): the real program, `lamp-skills
+/// asked`, its standard input and output one end of a Unix socket, asked
+/// `line` straight, with nobody before it to check the request (#1722).
+fn ask_helper(skills: &Path, line: &[u8]) -> (serde_json::Value, bool) {
+    use std::io::{BufRead, Write};
+    use std::os::unix::net::UnixStream;
+    use std::process::{Command, Stdio};
+    let (mut ours, theirs) = UnixStream::pair().unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+        .args(["asked", "--dir"])
+        .arg(skills)
+        .stdin(Stdio::from(std::os::fd::OwnedFd::from(
+            theirs.try_clone().unwrap(),
+        )))
+        .stdout(Stdio::from(std::os::fd::OwnedFd::from(theirs)))
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    ours.write_all(line).unwrap();
+    ours.shutdown(std::net::Shutdown::Write).unwrap();
+    let mut answer = String::new();
+    std::io::BufReader::new(&ours)
+        .read_line(&mut answer)
+        .unwrap();
+    let status = child.wait().unwrap();
+    (serde_json::from_str(&answer).unwrap(), status.success())
+}
+
+/// The helper checks each request itself, whoever connects: a core skill
+/// and a name that is not a skill's are refused with nothing touched, and
+/// only `{"remove": NAME}` is taken (#1722, the first builder's 18:33).
+#[test]
+fn the_manage_helper_refuses_core_skills_and_bad_names_on_its_own() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    copy(&skills_root().join("dance"), &skills.join("dance"));
+    tutor(&skills, "1.0.0");
+    let victim = dir.path().join("victim");
+    fs::create_dir_all(&victim).unwrap();
+
+    let (answer, ok) = ask_helper(&skills, b"{\"remove\": \"dance\"}\n");
+    assert!(!ok);
+    assert_eq!(
+        answer["refused"],
+        "dance is a core skill: it comes with the lamp and can't be removed"
+    );
+    for line in [
+        &b"{\"remove\": \"..\"}\n"[..],
+        b"{\"remove\": \"../victim\"}\n",
+        b"{\"remove\": \"desk-tutor/../dance\"}\n",
+        b"{\"remove\": \"desk-tutor\\u0000\"}\n",
+        b"{\"remove\": \".removed-desk-tutor-1\"}\n",
+        b"{\"remove\": \"Desk-tutor\"}\n",
+        b"{\"remove\": \"\"}\n",
+    ] {
+        let (answer, ok) = ask_helper(&skills, line);
+        assert!(!ok, "{}", String::from_utf8_lossy(line));
+        assert!(
+            answer["refused"]
+                .as_str()
+                .unwrap()
+                .ends_with("is not a skill's name: 1 to 64 lowercase letters, digits and hyphens"),
+            "{answer}"
+        );
+    }
+    let long = format!("{{\"remove\": \"{}\"}}\n", "a".repeat(65));
+    let (answer, ok) = ask_helper(&skills, long.as_bytes());
+    assert!(
+        !ok && answer["refused"]
+            .as_str()
+            .unwrap()
+            .contains("is not a skill's name")
+    );
+    for line in [
+        &b"{\"remove\": 7}\n"[..],
+        b"{\"remove\": \"desk-tutor\", \"also\": 1}\n",
+        b"[\"desk-tutor\"]\n",
+        b"remove desk-tutor\n",
+        b"",
+    ] {
+        let (answer, ok) = ask_helper(&skills, line);
+        assert!(!ok);
+        assert_eq!(
+            answer["refused"],
+            "a request is one line, {\"remove\": NAME}"
+        );
+    }
+    // Past its bound, the request is cut and taken for none.
+    let big = format!(
+        "{{\"remove\": \"desk-tutor\", \"pad\": \"{}\"}}\n",
+        "x".repeat(5_000)
+    );
+    let (answer, ok) = ask_helper(&skills, big.as_bytes());
+    assert!(
+        !ok && answer["refused"]
+            .as_str()
+            .unwrap()
+            .starts_with("a request is")
+    );
+    let (answer, ok) = ask_helper(&skills, b"{\"install\": \"/tmp/x.tar\"}\n");
+    assert!(
+        !ok && answer["refused"]
+            .as_str()
+            .unwrap()
+            .starts_with("install is not taken here yet")
+    );
+    assert!(victim.exists());
+    assert_eq!(left(&skills), ["dance", "desk-tutor"]);
+
+    let (answer, ok) = ask_helper(&skills, b"{\"remove\": \"desk-tutor\"}\n");
+    assert!(ok, "{answer}");
+    assert!(
+        answer["done"]
+            .as_str()
+            .unwrap()
+            .starts_with("removed desk-tutor")
+    );
+    assert_eq!(left(&skills), ["dance"]);
+}
