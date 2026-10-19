@@ -209,6 +209,12 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          down at the desk must never lose their light",
     ),
     (
+        "watch-you-leave",
+        "not yet tried on a lamp (#1669 (e)): it turns the base when the sitter leaves \
+         (`room/stood_up`, `LAMP_ACTIVITY=on`), so it is tried at the arm hour with someone at the \
+         arm, and whether the small turn reads as watching someone go is for that check",
+    ),
+    (
         "not-feeling-well",
         "not yet tried on a lamp (#1681): whether its droop and dim on `lamp/health`'s `error` \
          read as a lamp a little unwell, not a status light, is for the lamp check",

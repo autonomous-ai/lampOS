@@ -280,6 +280,11 @@ struct ChoiceFile {
     /// The value a call that gives none is made as (#1679: a light show
     /// asked with no hint is a party). Without it, such a call has none.
     default: Option<String>,
+    /// In a skill with a trigger and no tool (#1669 (e), watching someone
+    /// leave): the choice is this field of the message that fired it, as
+    /// it is when the steps are made. A value not in `one_of`, or none,
+    /// chooses nothing, so only the steps for every run are made.
+    field: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1779,7 +1784,23 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         Ok(())
     };
     if let Some(choice) = &file.choice {
-        argument(&choice.name, &choice.about)?;
+        match &choice.field {
+            None => argument(&choice.name, &choice.about)?,
+            Some(field) => {
+                if file.tool.is_some() || triggers.is_empty() || choice.default.is_some() {
+                    return Err(
+                        "a choice read from a field is a trigger's: a skill with a trigger, no tool and no default"
+                            .into(),
+                    );
+                }
+                if !plain_name(&choice.name) || field.is_empty() {
+                    return Err(format!(
+                        "choice {:?}: a plain name, and the trigger's field it is read from",
+                        choice.name
+                    ));
+                }
+            }
+        }
         let mut values = choice.one_of.clone();
         values.sort();
         values.dedup();
@@ -4311,7 +4332,14 @@ fn calls(
     let chosen = skill
         .choice
         .as_ref()
-        .and_then(|choice| args[&choice.name].as_str().or(choice.default.as_deref()));
+        .and_then(|choice| match (&choice.field, trigger) {
+            // The trigger's own message, as it fired (#1669 (e)).
+            (Some(field), Some(trigger)) => latest
+                .get(&trigger.topic)
+                .and_then(|(value, _, _)| value[field.as_str()].as_str()),
+            (Some(_), None) => None,
+            (None, _) => args[&choice.name].as_str().or(choice.default.as_deref()),
+        });
     let twice = skill
         .flag
         .as_ref()

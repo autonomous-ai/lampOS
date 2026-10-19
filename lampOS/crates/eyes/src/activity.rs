@@ -10,7 +10,7 @@
 //! arithmetic on the looks it is given: the bus is `bus_out`'s.
 use crate::faces;
 use crate::who::{SAME_PERSON, likeness};
-use lamp_msgs::{Activity, RoomActivity, StoodUp};
+use lamp_msgs::{Activity, RoomActivity, Side, StoodUp};
 use std::collections::VecDeque;
 
 /// A face at least this share of the picture's height is at the desk:
@@ -65,6 +65,11 @@ const STOOD_RISE: f32 = 0.5;
 const STOOD_SHRINK: f32 = 0.85;
 /// And was not seen again for this long.
 const STOOD_GONE_US: u64 = 2_000_000;
+/// The side of the picture someone left by: their last centre across it,
+/// as a share of its width, short of this from an edge. Between the two,
+/// near the middle, no side. Provisional: the arm hour sets it (#1669).
+const LEFT_BY_LEFT: f32 = 0.35;
+const LEFT_BY_RIGHT: f32 = 0.65;
 
 /// One look's face, as shares of the picture's height, and how far down it
 /// looks.
@@ -74,6 +79,9 @@ pub struct Look {
     /// Across, in the same unit as `height`, so a distance is one measure.
     pub centre_x: f32,
     pub centre_y: f32,
+    /// The centre across, as a share of the picture's width: 0 its left
+    /// edge, 1 its right.
+    pub across: f32,
     /// The nose between the eyes (0) and the mouth (1): more is lower,
     /// the head bowed.
     pub pitch: f32,
@@ -87,6 +95,7 @@ impl Look {
 
     fn of(face: &faces::Face, filled: (usize, usize)) -> Self {
         let tall = filled.1.max(1) as f32;
+        let wide = filled.0.max(1) as f32;
         let [left_eye, right_eye, nose, mouth_left, mouth_right] = face.marks;
         let eyes = (left_eye.1 + right_eye.1) / 2.0;
         let mouth = (mouth_left.1 + mouth_right.1) / 2.0;
@@ -95,6 +104,7 @@ impl Look {
             height: face.height / tall,
             centre_x: (face.x + face.width / 2.0) / tall,
             centre_y: (face.y + face.height / 2.0) / tall,
+            across: (face.x + face.width / 2.0) / wide,
             pitch: if span.abs() > f32::EPSILON {
                 ((nose.1 - eyes) / span).clamp(-1.0, 2.0)
             } else {
@@ -154,8 +164,9 @@ pub struct Judge {
     sitter: Option<Look>,
     /// The sitter's last looks, for standing up.
     recent: VecDeque<(u64, Look)>,
-    /// A face lost as if standing up, when, and the sitting it left.
-    leaving: Option<(u64, u32)>,
+    /// A face lost as if standing up, when, the sitting it left, and the
+    /// side of the picture it was last seen at.
+    leaving: Option<(u64, u32, Option<Side>)>,
     said: Option<(Activity, u64)>,
     journaled_at: Option<u64>,
     /// With the recogniser: the sitter's prints, and what is asked for.
@@ -318,6 +329,7 @@ impl Judge {
                     height: take(|look| look.height),
                     centre_x: take(|look| look.centre_x),
                     centre_y: take(|look| look.centre_y),
+                    across: take(|look| look.across),
                     pitch: take(|look| look.pitch),
                 });
                 self.samples = Vec::new();
@@ -409,19 +421,26 @@ impl Judge {
                 .sitting_from
                 .zip(self.last_face)
                 .map_or(0, |(from, last)| ((last - from) / 1_000_000) as u32);
-            self.leaving = Some((now_us, sitting));
+            let side = if last.across < LEFT_BY_LEFT {
+                Some(Side::Left)
+            } else if last.across > LEFT_BY_RIGHT {
+                Some(Side::Right)
+            } else {
+                None
+            };
+            self.leaving = Some((now_us, sitting, side));
         }
     }
 
     /// Someone stood up and left: once, [`STOOD_GONE_US`] after the face was
     /// lost rising, if it did not come back.
     pub fn stood_up(&mut self, now_us: u64) -> Option<StoodUp> {
-        let (lost_at, sitting_s) = self.leaving?;
+        let (lost_at, sitting_s, side) = self.leaving?;
         if now_us.saturating_sub(lost_at) < STOOD_GONE_US {
             return None;
         }
-        self.leaving = Some((u64::MAX / 2, 0));
-        (lost_at < u64::MAX / 2).then_some(StoodUp { sitting_s })
+        self.leaving = Some((u64::MAX / 2, 0, None));
+        (lost_at < u64::MAX / 2).then_some(StoodUp { sitting_s, side })
     }
 
     /// What the face at the desk shows at `now_us`, while the eyes look.
@@ -502,6 +521,7 @@ mod tests {
         height: 0.22,
         centre_x: 0.6,
         centre_y: 0.45,
+        across: 0.45,
         pitch: 0.5,
     };
 
@@ -875,6 +895,7 @@ mod tests {
         judge.looked(132 * S + S / 2, &[]);
         let up = judge.stood_up(133 * S).unwrap();
         assert_eq!(up.sitting_s, 130);
+        assert_eq!(up.side, None, "left from the middle: no side");
         assert_eq!(judge.stood_up(134 * S), None, "once");
         // A face that only looked away (no rise) is not standing up.
         let mut judge = seated();
@@ -896,6 +917,35 @@ mod tests {
         judge.looked(131 * S, &[]);
         judge.looked(132 * S, &[SEATED]);
         assert_eq!(judge.stood_up(134 * S), None);
+    }
+
+    /// For watching them go (#1669): the side of the picture they were last
+    /// seen at as they rose, a third of it or less from an edge; near the
+    /// middle, none.
+    #[test]
+    fn standing_up_says_the_side_of_the_picture_they_left_by() {
+        for (across, side) in [
+            (0.2, Some(Side::Left)),
+            (0.8, Some(Side::Right)),
+            (0.5, None),
+        ] {
+            let sat = Look { across, ..SEATED };
+            let mut judge = Judge::default();
+            looks(&mut judge, 0, 130, Some(sat));
+            for (k, centre) in [0.45, 0.38, 0.30, 0.22].iter().enumerate() {
+                judge.looked(
+                    130 * S + k as u64 * 250_000,
+                    &[Look {
+                        centre_y: *centre,
+                        height: 0.22 * (1.0 - 0.06 * k as f32),
+                        ..sat
+                    }],
+                );
+            }
+            judge.looked(131 * S, &[]);
+            judge.looked(132 * S + S / 2, &[]);
+            assert_eq!(judge.stood_up(133 * S).unwrap().side, side, "{across}");
+        }
     }
 
     #[test]
