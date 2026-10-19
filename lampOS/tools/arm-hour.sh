@@ -110,14 +110,16 @@ tell | Arm B, sparse: speaking-ab.sh --arms on --seconds 200 --speaking crates/e
 question | Which reads as alive, A or B? (and both arms' starts=)
 end
 row | 3 | "Look for my keys" | moves | 5 min
-do | Say "Hey Lamp, look for my keys." Say "stop" to end it.
-watch | The desk first, then a few places either side, each said; it stops when asked.
-sheet | #1871 (no run sheet yet)
+do | Hand near the arm. Keys on the desk off to one side, not in front. When the screen says PLAY, say "Hey Lamp, look for my keys." Say "stop" to end it, or let it finish.
+watch | The head comes down and looks at the desk first, then a little left or right, each place said; it stops at the keys or after five looks; "stop" ends it at once and the head is up about 2 s later.
+sheet | #2034, Nine, 20 Oct 04:15; tools/trials.sh look (#2040, merged and in the build on the lamp)
+trial | look
 end
 row | 4 | Pointing the light ("light my book") | moves | 5 min
-do | Put a book on the desk and say "Hey Lamp, light my book."
-watch | The head comes down over the desk, looks, and the base turns toward the book.
-sheet | #1730 (no run sheet for this row: #1730's sheet is row 5's)
+do | Hand near the arm. A book on the desk a little to one side. When the screen says PLAY, say "Hey Lamp, light my book." Afterwards ask for the light you want: the white light is kept.
+watch | The head comes down over the desk, the light goes a clear white, it looks; the base turns toward the book once if it is off to one side; the pose holds about two minutes, then the head goes back.
+sheet | #2034, Nine, 20 Oct 04:15; tools/trials.sh point (#2040, merged and in the build on the lamp)
+trial | point
 end
 row | 5 | Light scenes that move the head (reading, focus) | moves | 3 min
 do | Hands near the head, not under it; say "Lamp, reading light please.", later "Lamp, light for focus please."
@@ -132,9 +134,9 @@ watch | Each touch gives its own event, and nothing comes while hands are away.
 sheet | #1722, Thirteen, 19 Oct 16:18Z (its steps.sh --write keeps a new pins file: by hand)
 end
 row | 7 | Bedtime and Morning (the droop at night) | moves | 5 min
-do | Leave the lamp alone in the evening light, then come back for the morning.
-watch | Dimmer, warmer, quieter, a slow settle; in the morning the reverse.
-sheet | #1732, Second (no run sheet yet)
+do | Not run this morning: #1732 is a draft on no build, and at 08:00 only its morning window is open. Skip it.
+watch | Nothing.
+sheet | #2034, Nine, 20 Oct 04:15: why it can't be shown at 08:00, and what five minutes would need once it lands
 end
 row | 8 | Not feeling well (the droop) | moves | 20 min
 do | Move any cable from under the arm; stand beside it; nobody talks to the lamp. When told (about 4:45 after the eyes stop), hold an open hand 5 cm under the head, not touching, until the droop is over; say "stop" only if it would hit something.
