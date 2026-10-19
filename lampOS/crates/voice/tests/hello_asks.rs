@@ -172,6 +172,9 @@ fn answered(arrival: &mut Arrival, start_us: u64) -> (Hello, Duration) {
 fn an_arrival_a_say_now_and_one_hello_then_none_within_twenty_minutes() {
     let place = Place::new("chain", true);
     let (mut arrival, now) = place.arrival();
+    // Both decision subscribers exist before the first response populates
+    // the publisher's cache; the second reply is an immediate rule result.
+    let (mut next, next_now) = place.arrival_from(2_000 * S);
     let (hello, waited) = answered(&mut arrival, now);
     assert_eq!(hello, Hello::SayNow);
     // Far inside the voice's 2 s with a judge that answers at once.
@@ -185,8 +188,7 @@ fn an_arrival_a_say_now_and_one_hello_then_none_within_twenty_minutes() {
     arrival.said(now);
     assert!(!arrival.due(QUIET, now + S));
     // Someone else within twenty minutes: the policy's own rule says wait.
-    let (mut next, now) = place.arrival_from(2_000 * S);
-    assert_eq!(answered(&mut next, now).0, Hello::Wait);
+    assert_eq!(answered(&mut next, next_now).0, Hello::Wait);
     assert_eq!(next.take_told().unwrap()["answer"], "wait");
 }
 

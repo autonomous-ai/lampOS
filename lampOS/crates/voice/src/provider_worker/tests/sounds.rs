@@ -11,6 +11,7 @@ fn quiet() -> (crate::room_told::Room, bool) {
 fn checked(on: bool) -> Options {
     Options {
         reporting: Reporting::Typed,
+        holding_answer: false,
         tools: crate::tools::Settings::default(),
         attention: Some(quiet),
         name_signal: false,

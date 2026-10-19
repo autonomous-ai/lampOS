@@ -100,6 +100,9 @@ pub(super) struct CloudRequest {
     /// A second voice route can take this input over (`second.rs`): a link
     /// change leaves it for the switch instead of abandoning it.
     pub(super) movable: bool,
+    /// A continuation of this connection's answer cannot move to another
+    /// provider route, even before it has been submitted or answered.
+    pub(super) same_session_only: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -126,6 +129,7 @@ impl CloudRequest {
             input_abandoned: false,
             outcome: None,
             movable: false,
+            same_session_only: false,
         })
     }
 
@@ -144,6 +148,7 @@ impl CloudRequest {
                 local_not_submitted: true,
             }),
             movable: false,
+            same_session_only: false,
         }
     }
 

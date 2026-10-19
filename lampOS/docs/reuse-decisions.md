@@ -1278,3 +1278,16 @@ waits without blocking control. The [host verification](verification/resend-lost
 covers lost connections, output/tool exclusions, repeated loss, capacity and
 cancellation. The switch remains off pending the lamp check; reconnect and
 acoustic latency on hardware have not been measured.
+
+## A holding phrase followed by the promised answer (#1579)
+
+V1's `hal/realtime/voice_agent/gemini_live.py::_async_receive_turn` uses a
+bounded response-outcome check for extended thinking, and
+`hal/realtime/response_outcome.py::spoken_response_complete` treats a future
+promise as incomplete. Keep the interruption, routing and playback checks;
+change the recovery to one same-session written note for an exact, bounded
+holding-only transcript with no function call. Reuse V2's normal turn owner,
+speaker retirement and quiet-input gates. This adds no semantic classifier,
+fallback route or retry loop. The switch is off until the lamp check; the
+[behavior and host verification](holding-answer.md) distinguish queued-note
+latency from the unmeasured audible answer.

@@ -207,6 +207,7 @@ pub(super) fn commit_sound_turn(
             input_abandoned: false,
             outcome: Some(RequestOutcome::Complete),
             movable: false,
+            same_session_only: false,
         },
         local_input_ended: true,
         plan,
