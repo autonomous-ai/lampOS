@@ -7,7 +7,8 @@
 //! a recording is replayed.
 use lamp_bus::Header;
 use lamp_msgs::{
-    Faces, Light, LightPattern, LightRequest, PatternKind, SkillEvent, SkillStage, Speech,
+    Faces, Light, LightPattern, LightRequest, PatternKind, RoomPresence, SkillEvent, SkillStage,
+    Speech,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -20,6 +21,7 @@ use std::{
 pub mod clock;
 pub mod glow;
 pub mod package;
+pub mod visits;
 
 /// Whether the body plays `name` on its mood socket: one of the clips in its
 /// own table (`lamp_body::clips::ALL`), but `idle`, which is the body's own.
@@ -140,6 +142,9 @@ struct SkillFile {
     /// What the model is told of a call while the tool's run, which holds
     /// no pose, is under way.
     still: Option<String>,
+    /// What the room's presence was over the last hours, for the model
+    /// (#1685, "was anyone here while I was out?").
+    history: Option<HistoryFile>,
     /// Local hours when the skill never starts itself.
     quiet: Option<QuietFile>,
     #[serde(rename = "do")]
@@ -184,6 +189,15 @@ struct ChoiceFile {
 struct FlagFile {
     name: String,
     about: String,
+}
+
+/// `[history]`: a tool's call is told who was at the lamp over the last
+/// `within` (#1685), from `room/presence`, times only.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HistoryFile {
+    topic: String,
+    within: String,
 }
 
 /// `[again]`: within `within` of the tool's last run, a call runs only if
@@ -598,6 +612,9 @@ pub struct Skill {
     flag: Option<FlagFile>,
     again: Option<Again>,
     still: String,
+    /// With `[history]`: how far back a call is told who was at the lamp
+    /// (#1685).
+    pub history_us: Option<u64>,
     /// Local minutes of the day, from and to, when it never starts itself.
     quiet: Option<(u16, u16)>,
     /// Each step, and the name of the trigger it is made for, if only one.
@@ -649,6 +666,11 @@ impl Skill {
                     .map(|test| (test.topic.clone(), "a [[while]]")),
             )
             .chain(looks.then(|| (Faces::TOPIC.to_owned(), "a look at a face")))
+            .chain(
+                self.history_us
+                    .is_some()
+                    .then(|| (RoomPresence::TOPIC.to_owned(), "[history]")),
+            )
             .chain(
                 self.again
                     .is_some()
@@ -1572,6 +1594,30 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         ));
     }
     file.permissions.check()?;
+    // Who was at the lamp (#1685): a person asks, so a tool alone starts
+    // it, and it reads `room/presence` alone, which carries times only.
+    let history_us = match &file.history {
+        None => None,
+        Some(history) => {
+            if file.tool.is_none() || !triggers.is_empty() {
+                return Err(
+                    "[history] is told to a tool's call: in a skill started by its tool alone"
+                        .into(),
+                );
+            }
+            if history.topic != RoomPresence::TOPIC {
+                return Err(format!(
+                    "[history] topic is {}: who was at the lamp, times only",
+                    RoomPresence::TOPIC
+                ));
+            }
+            let within_us = duration_us(&history.within)?;
+            if !(60_000_000..=visits::KEPT_US).contains(&within_us) {
+                return Err("[history] within is 1m to 24h: what the lamp keeps".into());
+            }
+            Some(within_us)
+        }
+    };
     let skill = Skill {
         name,
         description,
@@ -1587,6 +1633,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         flag: file.flag,
         again,
         still,
+        history_us,
         quiet,
         steps,
     };
@@ -1941,6 +1988,8 @@ pub struct Engine {
     ask_policy: bool,
     /// The local time: minutes east of UTC, and one moment on both clocks.
     clock: Option<(i32, u64, u64)>,
+    /// Who was at the lamp, from `room/presence`, for a `[history]` (#1685).
+    visits: visits::Visits,
 }
 
 fn event(skill: &str, stage: SkillStage, why: String, allowed: Option<bool>) -> SkillEvent {
@@ -1966,6 +2015,7 @@ impl Engine {
             skip_ask,
             ask_policy: false,
             clock: None,
+            visits: visits::Visits::default(),
         }
     }
 
@@ -2025,6 +2075,29 @@ impl Engine {
     }
 
     /// Minutes since local midnight at `now_us`, if the local time is known.
+    /// A `[history]` skill's calls, its note to the model followed by the
+    /// lamp's record of who was at it over its `within` (#1685): each time
+    /// of day when the local time is known, and how long ago.
+    fn told_history(&self, skill: &Skill, calls: Vec<Call>, now_us: u64) -> Vec<Call> {
+        let Some(within_us) = skill.history_us else {
+            return calls;
+        };
+        let ago = visits::ago(now_us);
+        let record = self
+            .visits
+            .told(now_us, within_us, |at_us| match self.local_minute(at_us) {
+                Some(minute) => format!("at {:02}:{:02}, {}", minute / 60, minute % 60, ago(at_us)),
+                None => ago(at_us),
+            });
+        calls
+            .into_iter()
+            .map(|call| match call {
+                Call::Say(note) => Call::Say(format!("{note}\n\n{record}")),
+                other => other,
+            })
+            .collect()
+    }
+
     fn local_minute(&self, now_us: u64) -> Option<u16> {
         let (offset, at_us, unix_ms) = self.clock?;
         let ms = i128::from(unix_ms) + (i128::from(now_us) - i128::from(at_us)) / 1_000;
@@ -2255,6 +2328,14 @@ impl Engine {
         let Ok(value) = serde_json::from_slice::<Value>(payload) else {
             return Vec::new();
         };
+        // Who was at the lamp, for a `[history]` (#1685): times only.
+        if topic == RoomPresence::TOPIC
+            && let Ok(presence) = serde_json::from_value::<RoomPresence>(value.clone())
+            && presence.check().is_ok()
+        {
+            self.visits
+                .seen(presence.someone, presence.nobody_s, now_us);
+        }
         // Words still coming count too: the model may call before the end.
         if topic == Speech::TOPICS[0]
             && let Some(text) = value["text"].as_str()
@@ -2533,7 +2614,11 @@ impl Engine {
                 format!("the model called {name} with {args}"),
                 None,
             )],
-            calls: calls(&self.latest, skill, None, now_us, args, None),
+            calls: self.told_history(
+                skill,
+                calls(&self.latest, skill, None, now_us, args, None),
+                now_us,
+            ),
             ask: None,
             queue: false,
             from: None,

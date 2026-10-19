@@ -1,0 +1,308 @@
+//! Who was at the lamp over the last hours, from `room/presence` (#1685,
+//! "was anyone here while I was out?"): when someone was there, and when the
+//! lamp could not tell. Times only, kept in memory and lost at a restart:
+//! never a picture, a face or who anyone was, as `room/presence` carries
+//! none (`docs/presence.md`).
+use lamp_msgs::RoomPresence;
+use std::collections::VecDeque;
+
+/// A value of `room/presence` means nothing past this: a later one after a
+/// longer gap means the lamp could not tell meanwhile.
+const LASTS_US: u64 = RoomPresence::LASTS.as_micros() as u64;
+/// The longest a skill may look back ([`crate::Skill`]'s `[history]`).
+pub const KEPT_US: u64 = 24 * 3_600_000_000;
+/// The most spells, and stretches unseen, kept: the oldest go first.
+const MOST: usize = 64;
+
+/// When someone was at the lamp, and when it could not tell, on the
+/// engine's clock.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Visits {
+    /// Each spell someone was at the lamp: from, and until, none while it
+    /// goes on.
+    spells: VecDeque<(u64, Option<u64>)>,
+    /// Each stretch the lamp could not tell: from, until.
+    unseen: VecDeque<(u64, u64)>,
+    /// The newest value: when, and whether someone was there.
+    last: Option<(u64, bool)>,
+}
+
+impl Visits {
+    /// A value of `room/presence` at `at_us`. A spell begins when someone
+    /// comes and ends when the value says nobody, back at the moment the
+    /// last face or voice was (`nobody_s` before). A gap past a value's
+    /// three seconds is a stretch the lamp could not tell: a spell going on
+    /// then ends where it was last known.
+    pub fn seen(&mut self, someone: bool, nobody_s: u32, at_us: u64) {
+        if let Some((last_us, _)) = self.last
+            && at_us < last_us
+        {
+            return;
+        }
+        let mut open = matches!(self.spells.back(), Some((_, None)));
+        if let Some((last_us, _)) = self.last
+            && at_us > last_us + LASTS_US
+        {
+            if open && let Some((_, until)) = self.spells.back_mut() {
+                *until = Some(last_us);
+                open = false;
+            }
+            self.unseen.push_back((last_us, at_us));
+        }
+        match (open, someone) {
+            (false, true) => self.spells.push_back((at_us, None)),
+            (true, false) => {
+                if let Some((from, until)) = self.spells.back_mut() {
+                    let left = at_us.saturating_sub(u64::from(nobody_s) * 1_000_000);
+                    *until = Some(left.max(*from));
+                }
+            }
+            _ => {}
+        }
+        self.last = Some((at_us, someone));
+        let since = at_us.saturating_sub(KEPT_US);
+        while self.spells.len() > MOST
+            || self
+                .spells
+                .front()
+                .is_some_and(|(_, until)| until.is_some_and(|until| until < since))
+        {
+            self.spells.pop_front();
+        }
+        while self.unseen.len() > MOST
+            || self.unseen.front().is_some_and(|(_, until)| *until < since)
+        {
+            self.unseen.pop_front();
+        }
+    }
+
+    /// What the record says of the last `within_us` before `now_us`, in
+    /// words for the model, with each time as `when` says it (a local time
+    /// of day, or how long ago).
+    pub fn told(&self, now_us: u64, within_us: u64, when: impl Fn(u64) -> String) -> String {
+        let Some((last_us, someone)) = self.last else {
+            return "The lamp has no record of who was at it: its eyes have said nothing about \
+                    the room since it started (presence is off, or they could not see). Say you \
+                    can't tell."
+                .into();
+        };
+        let since = now_us.saturating_sub(within_us);
+        let seeing = now_us <= last_us + LASTS_US;
+        let mut lines: Vec<(u64, String)> = Vec::new();
+        for (from, until) in &self.spells {
+            match until {
+                Some(until) if *until >= since => lines.push((
+                    *from,
+                    format!(
+                        "- someone was at the lamp for {}, {}",
+                        length(until - from),
+                        when(*from)
+                    ),
+                )),
+                Some(_) => {}
+                None if seeing && someone => lines.push((
+                    *from,
+                    format!(
+                        "- someone has been at the lamp for {}, since {}, and still is",
+                        length(now_us.saturating_sub(*from)),
+                        when(*from)
+                    ),
+                )),
+                None => {}
+            }
+        }
+        for (from, until) in &self.unseen {
+            if *until >= since {
+                lines.push((
+                    *from,
+                    format!(
+                        "- it could not see or hear the room for {}, {}",
+                        length(until - from),
+                        when(*from)
+                    ),
+                ));
+            }
+        }
+        if !seeing {
+            lines.push((
+                last_us,
+                format!(
+                    "- it has not been able to see the room since {}",
+                    when(last_us)
+                ),
+            ));
+        }
+        lines.sort_by_key(|(from, _)| *from);
+        let visits = self
+            .spells
+            .iter()
+            .filter(|(_, until)| until.is_some_and(|until| until >= since))
+            .count();
+        let mut told = format!(
+            "The lamp's record of the room over the last {}, times only, from its eyes and ears: it \
+             never knows who anyone was, and keeps no picture.",
+            length(within_us)
+        );
+        for (_, line) in lines {
+            told.push('\n');
+            told.push_str(&line);
+        }
+        if visits == 0 {
+            told.push_str("\n- nobody else was at the lamp in that time");
+        }
+        told
+    }
+}
+
+/// A length of time as a person says it: under a minute, minutes, or hours
+/// and minutes.
+fn length(us: u64) -> String {
+    let minutes = us / 60_000_000;
+    match minutes {
+        0 => "under a minute".into(),
+        1..=59 => format!("{minutes} min"),
+        _ if minutes.is_multiple_of(60) => format!("{} h", minutes / 60),
+        _ => format!("{} h {} min", minutes / 60, minutes % 60),
+    }
+}
+
+/// How long before `now_us` it was: the `when` of a record whose local time
+/// is not known.
+pub fn ago(now_us: u64) -> impl Fn(u64) -> String {
+    move |at_us| format!("{} ago", length(now_us.saturating_sub(at_us)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const S: u64 = 1_000_000;
+    const M: u64 = 60 * S;
+
+    /// The eyes' values once a second, `someone` from each spell's start
+    /// until 20 s after its end, `nobody_s` counting otherwise, from `from`
+    /// to `to` (seconds), but none in `shut`.
+    fn said(visits: &mut Visits, spells: &[(u64, u64)], shut: &[(u64, u64)], to: u64) {
+        let mut last_face = None;
+        for second in 0..=to {
+            if shut
+                .iter()
+                .any(|(from, until)| (*from..*until).contains(&second))
+            {
+                continue;
+            }
+            if spells
+                .iter()
+                .any(|(from, until)| (*from..*until).contains(&second))
+            {
+                last_face = Some(second);
+            }
+            let someone = last_face.is_some_and(|face| second - face < 20);
+            let nobody_s = match last_face {
+                _ if someone => 0,
+                Some(face) => (second - face) as u32,
+                None => second as u32,
+            };
+            visits.seen(someone, nobody_s, second * S);
+        }
+    }
+
+    /// Someone left at 30 s; a visitor came at 10 min for three, and the
+    /// person came back at 30 min: two spells before the one going on, each
+    /// ended where the last face was, not 20 s later.
+    #[test]
+    fn a_visit_while_someone_was_out_is_kept_as_a_spell_with_its_length() {
+        let mut visits = Visits::default();
+        said(
+            &mut visits,
+            &[(0, 30), (600, 780), (1_800, 1_900)],
+            &[],
+            1_900,
+        );
+        assert_eq!(
+            visits.spells,
+            [
+                (0, Some(29 * S)),
+                (600 * S, Some(779 * S)),
+                (1_800 * S, None)
+            ]
+        );
+        let told = visits.told(1_900 * S, 12 * 60 * M, ago(1_900 * S));
+        assert!(
+            told.ends_with(
+                "\n- someone was at the lamp for under a minute, 31 min ago\
+                 \n- someone was at the lamp for 2 min, 21 min ago\
+                 \n- someone has been at the lamp for 1 min, since 1 min ago, and still is"
+            ),
+            "{told}"
+        );
+        assert!(told.starts_with("The lamp's record of the room over the last 12 h"));
+        assert!(!told.contains("nobody else"));
+    }
+
+    /// Nobody but the one there now: said so. The eyes shut for ten
+    /// minutes: a stretch it could not tell, and a spell going on then ends
+    /// where it was last known.
+    #[test]
+    fn a_stretch_unseen_is_said_and_nobody_else_is_said_when_nobody_came() {
+        let mut visits = Visits::default();
+        said(&mut visits, &[(0, 2_000)], &[(300, 900)], 1_000);
+        assert_eq!(visits.unseen, [(299 * S, 900 * S)]);
+        assert_eq!(visits.spells, [(0, Some(299 * S)), (900 * S, None)]);
+        let told = visits.told(1_000 * S, 60 * M, ago(1_000 * S));
+        assert!(
+            told.contains("\n- it could not see or hear the room for 10 min, 11 min ago"),
+            "{told}"
+        );
+        let mut alone = Visits::default();
+        said(&mut alone, &[(0, 100)], &[], 100);
+        let told = alone.told(100 * S, 60 * M, ago(100 * S));
+        assert!(
+            told.ends_with("and still is\n- nobody else was at the lamp in that time"),
+            "{told}"
+        );
+    }
+
+    /// No value ever: no record, and the model is told to say so. Values
+    /// that stopped: the room not seen since then.
+    #[test]
+    fn with_no_value_there_is_no_record_and_with_values_stopped_it_says_since_when() {
+        let none = Visits::default();
+        assert!(none.told(10 * S, M, ago(10 * S)).contains("no record"));
+        let mut stopped = Visits::default();
+        said(&mut stopped, &[(0, 50)], &[], 60);
+        let told = stopped.told(10 * M, 60 * M, ago(10 * M));
+        assert!(
+            told.contains("\n- it has not been able to see the room since 9 min ago"),
+            "{told}"
+        );
+        assert!(!told.contains("still is"), "{told}");
+    }
+
+    /// Only the last day is kept, and spells past the window are not told.
+    #[test]
+    fn spells_older_than_the_window_are_not_told_nor_older_than_a_day_kept() {
+        let mut visits = Visits::default();
+        visits.seen(true, 0, 0);
+        visits.seen(false, 20, 100 * S);
+        let late = 25 * 3_600 * S;
+        visits.seen(false, 30, late - 2 * S);
+        visits.seen(true, 0, late);
+        assert_eq!(visits.spells, [(late, None)]);
+        let mut window = Visits::default();
+        window.seen(true, 0, 0);
+        window.seen(false, 20, 100 * S);
+        window.seen(false, 0, 3 * 3_600 * S);
+        let told = window.told(3 * 3_600 * S, 60 * M, ago(3 * 3_600 * S));
+        assert!(!told.contains("someone was"), "{told}");
+        assert!(told.contains("nobody else"), "{told}");
+    }
+
+    #[test]
+    fn a_length_is_said_as_a_person_says_it() {
+        assert_eq!(length(59 * S), "under a minute");
+        assert_eq!(length(3 * M), "3 min");
+        assert_eq!(length(120 * M), "2 h");
+        assert_eq!(length(135 * M), "2 h 15 min");
+    }
+}
