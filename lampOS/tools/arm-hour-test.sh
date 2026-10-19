@@ -311,6 +311,126 @@ for _ in $(seq 1 100); do grep -q "back after a stop" "$T/calls" 2>/dev/null && 
 has "put back after TERM" "$T/calls" "back after a stop"
 kill $pid 2>/dev/null; wait $pid 2>/dev/null
 
+# --preflight: read-only. A lamp stand-in that runs what it is given against
+# stand-in systemctl and sudo; gh a stand-in too. Nothing of a row's steps
+# runs, and one line a row says ready, by hand, or what is missing.
+mkdir -p "$T/lampbin" "$T/bin" "$T/tr" "$T/skills/rest-your-eyes"
+cat >"$T/lamp-exec" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$1" >>"$FAKE/calls"
+PATH=$FAKE/lampbin:$PATH bash -c "$1"
+EOF
+cat >"$T/lampbin/systemctl" <<'EOF'
+#!/usr/bin/env bash
+case $1 in
+  is-active) [[ $2 == --quiet ]] && shift; grep -qx -- "${2%.service}" "$FAKE/active" ;;
+  list-units) sed 's/$/.service loaded active running x/' "$FAKE/active" ;;
+  show) echo 4242 ;;
+  *) echo "systemctl $* was not to run" >>"$FAKE/calls"; exit 1 ;;
+esac
+EOF
+cat >"$T/lampbin/sudo" <<'EOF'
+#!/usr/bin/env bash
+[[ $1 == -n ]] && shift
+"$@"
+EOF
+cat >"$T/tr/trials.sh" <<'EOF'
+#!/usr/bin/env bash
+[[ ${2:-} == --dry ]] || { echo "trials.sh $* was not to run" >>"$FAKE/calls"; exit 9; }
+case $1 in
+  nudges) printf '  setup: cp -a @SRC@/rest-your-eyes @SKILLS_DIR@/rest-your-eyes\n  switch: lamp-skills.service|LAMP_SKILL_NUDGES=on\n' ;;
+  *) echo "no row '$1'" >&2; exit 2 ;;
+esac
+EOF
+cat >"$T/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "pr view") grep -qx "$3" "$FAKE/gh-merged" && echo MERGED || echo OPEN ;;
+  "run view") grep -qx "$3" "$FAKE/gh-green" && echo success || echo failure ;;
+  "api "*/artifacts*) r=${2#*/runs/}; cat "$FAKE/gh-artifacts-${r%%/*}" 2>/dev/null ;;
+  "api "*/comments/*) cat "$FAKE/comment-${2##*/}" 2>/dev/null ;;
+  *) echo "gh $* was not to run" >>"$FAKE/calls"; exit 1 ;;
+esac
+EOF
+chmod +x "$T/lamp-exec" "$T/lampbin/"* "$T/tr/trials.sh" "$T/bin/gh"
+printf 'lamp-body\nlamp-skills\n' >"$T/active"
+echo 11 >"$T/gh-merged"
+echo 77 >"$T/gh-green"
+echo lampos-arm64-aaaa >"$T/gh-artifacts-77"
+printf 'Lines:\n```bash\necho hi\n```\n' >"$T/comment-55"
+cp "$T/comment-55" "$T/comment-56"
+sha=$(printf 'echo hi\n' | shasum -a 256 | cut -d' ' -f1)
+cat >"$T/rows-pf" <<'EOF'
+row | 1 | Ready | moves | 1 min
+do | a
+watch | b
+sheet | s
+need | running | lamp-body
+need | merged | 11
+need | there | true
+need | on the Mac | mac: true
+lamp | STEP-ONE-RAN
+mac | echo STEP-MAC-RAN >>"$FAKE/calls"
+trial | nudges
+mac | gh run download 77 -R x -n lampos-arm64-aaaa -D /tmp/none
+mac | gh api repos/autonomous-ai/lampOS/issues/comments/55 --jq .body | awk 'x' >f && echo "@SHA@  f" | shasum -a 256 -c
+back | BACK-RAN
+end
+row | 2 | Missing | still | 1 min
+do | a
+watch | b
+sheet | s
+need | running | lamp-body lamp-gone
+need | merged | 12
+need | a thing on the lamp | false
+need | a thing on the Mac | mac: false
+trial | nosuchrow
+mac | gh run download 78 -R x -n lampos-arm64-bbbb -D /tmp/none
+mac | gh run download 77 -R x -n lampos-arm64-cccc -D /tmp/none
+mac | gh api repos/autonomous-ai/lampOS/issues/comments/56 --jq .body | awk 'x' >f && echo "@OTHER@  f" | shasum -a 256 -c
+end
+row | 3 | By hand | still | 1 min
+do | a
+watch | b
+sheet | s
+end
+EOF
+sed -i '' -e "s/@SHA@/$sha/" -e "s/@OTHER@/$(printf '%064d' 0)/" "$T/rows-pf" 2>/dev/null || sed -i -e "s/@SHA@/$sha/" -e "s/@OTHER@/$(printf '%064d' 0)/" "$T/rows-pf"
+preflight() { ARM_LAMP=$T/lamp-exec ARM_TRIALS=$T/tr/trials.sh ARM_ROWS_FILE=$T/rows-pf PATH=$T/bin:$PATH "$SCRIPT" --preflight "$@" >"$T/out" 2>&1 </dev/null; }
+reset
+preflight; check "--preflight with a row missing" 1 $?
+has "--preflight: the lamp's parts" "$T/out" "lamp-body.service: ? ?"
+has "--preflight: sudo" "$T/out" "sudo without a password: yes"
+has "--preflight: a ready row" "$T/out" "row 1, Ready: ready"
+has "--preflight: a row by hand" "$T/out" "row 3, By hand: by hand, nothing to check"
+for want in "lamp-gone not running" "#12 not merged" "a thing on the lamp;" "a thing on the Mac;" "trials.sh has no row nosuchrow" \
+  "run 78 not green (failure)" "run 77 no longer has lampos-arm64-cccc" "comment 56 no longer gives 00000000"; do
+  has "--preflight: row 2 says $want" "$T/out" "$want"
+done
+grep '^row 2, Missing: MISSING: ' "$T/out" | grep -q 'lamp-gone' && ok || bad "row 2's missing not on its one line"
+hasnt "--preflight ran no lamp step" "$T/calls" "STEP-ONE-RAN"
+hasnt "--preflight ran no mac step" "$T/calls" "STEP-MAC-RAN"
+hasnt "--preflight ran no put-back" "$T/calls" "BACK-RAN"
+hasnt "--preflight ran nothing it shouldn't" "$T/calls" "was not to run"
+[[ ! -e $T/log ]] && ok || bad "--preflight wrote the hour's log"
+# Ready alone: exit 0.
+reset
+preflight --only 1; check "--preflight, every row ready" 0 $?
+# A trial's skill not beside trials.sh, and its switched unit not running.
+reset
+rm -rf "$T/skills/rest-your-eyes"; echo lamp-body >"$T/active"
+preflight --only 1; check "--preflight, a trial not ready" 1 $?
+has "--preflight: the trial's skill" "$T/out" "skill rest-your-eyes not beside trials.sh"
+has "--preflight: the trial's unit" "$T/out" "lamp-skills.service not running"
+# The real table: a line for each of its 19 rows, and none of its steps run.
+reset
+printf 'lamp-body\n' >"$T/active"
+ARM_ROWS_FILE= ARM_LAMP=$T/lamp-exec ARM_TRIALS=$T/tr/trials.sh PATH=$T/bin:$PATH "$SCRIPT" --preflight >"$T/out" 2>&1 </dev/null
+[[ $(grep -c '^row [0-9]*, ' "$T/out") == 19 ]] && ok || bad "the real table's preflight has $(grep -c '^row [0-9]*, ' "$T/out") row lines, not 19"
+hasnt "the real table's preflight ran nothing it shouldn't" "$T/calls" "was not to run"
+hasnt "the real table's preflight installed nothing" "$T/calls" "install -D"
+hasnt "the real table's preflight restarted nothing" "$T/calls" "systemctl restart"
+
 # The real table, the morning's 19 rows: all there, in order, each with its
 # two lines and its run sheet, and every row that moves asks for the hand.
 reset

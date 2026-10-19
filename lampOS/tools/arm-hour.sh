@@ -8,6 +8,7 @@
 #   arm-hour.sh --from N      # from row N
 #   arm-hour.sh --only N      # row N alone
 #   arm-hour.sh --dry         # print every row's lines and steps, run nothing
+#   arm-hour.sh --preflight   # read-only, before the hour: is each row ready?
 #
 # Each row:
 #  1. says, in two lines, what the person does and what they watch for;
@@ -42,7 +43,7 @@
 #   ARM_ROWS_FILE  rows to use in place of the table below (arm-hour-test.sh)
 set -uo pipefail
 
-usage() { sed -n '7,10p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+usage() { sed -n '7,11p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 
 TRIALS=${ARM_TRIALS:-/home/orangepi/lampos-tools/trials.sh}
 LOG=${ARM_LOG:-./arm-hour-$(date '+%Y%m%d-%H%M').log}
@@ -64,6 +65,12 @@ LOG=${ARM_LOG:-./arm-hour-$(date '+%Y%m%d-%H%M').log}
 #   sheet  where the run sheet is
 #   question  the row's own question after its proof, in place of "Did it
 #          pass?"; the answer is logged as it is given
+#   need   for --preflight only, and read-only: what the row needs before
+#          the hour. "running | UNIT ..." (each active on the lamp),
+#          "skill | NAME ..." (in the running lamp-skills' folder), "merged |
+#          PR ..." (merged), "run | RUN ARTIFACT" (a green run that still
+#          has it), or "WHAT | COMMAND" (on the lamp, "mac: COMMAND" on the
+#          Mac), there when it exits 0
 # A row with no steps is done by hand: its two lines, then the question.
 # ---------------------------------------------------------------------------
 # Read with read, not $(cat <<...): bash 3.2 counts quotes inside a here-doc
@@ -73,6 +80,7 @@ row | 1 | The safe fold before an unplug | moves | 25 min
 do | Hands near the arm but off it, desk clear; say each line when asked; never touch the cable.
 watch | The arm folds slowly (under 30 s) to its rest and stays held, no sag; then the bottom LEDs breathe dim amber and it says "My arm is folded. You can unplug me now."; asked to look or dance after, it doesn't move.
 sheet | #1722, Fifth, 20 Oct 04:43, row 1 without the reboot (any lamp; scripted, fifth-rows.sh)
+need | running | lamp-body lamp-voice lamp-expression lamp-skills
 mac | d=/tmp/fifth-row1; rm -rf $d && mkdir -p $d && gh api repos/autonomous-ai/lampOS/issues/comments/6278063826 --jq .body | awk '/^```bash$/{f=1;next} f&&/^```$/{exit} f' >$d/fifth-rows.sh && echo "d8a06babff6bf85043dadefc69039451d57951b43d52bdd52aef50c78b115b70  $d/fifth-rows.sh" | shasum -a 256 -c && gh run download 39313641196 -R autonomous-ai/lampOS -n lampos-arm64-396e8a2b3eea57322bf38a27ec453e2d0cebb74c -D $d/a && mv $d/a/lamp-voice $d/a/lamp-expression $d/a/lamp-body $d/a/lamp-skills $d/ && rm -rf $d/a && for f in skill.toml SKILL.md; do gh api -H 'Accept: application/vnd.github.raw' "repos/autonomous-ai/lampOS/contents/lampOS/skills/prepare-unplug/$f?ref=396e8a2b3eea57322bf38a27ec453e2d0cebb74c" >$d/$f || exit 1; done
 lamp | rm -rf /tmp/fifth-row1 && mkdir -p /tmp/fifth-row1
 mac | ${ARM_SCP:-scp} -q /tmp/fifth-row1/* "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/fifth-row1/
@@ -102,6 +110,7 @@ row | 2 | Moves with its words while it speaks | moves | 10 min
 do | Listen to the same two-minute story twice, A then B, hands near the arm. Say "stop" at any jerk.
 watch | A nods on most words; B about once a sentence, on a word that stands out. Each nod about 2 degrees, a small roll as a sentence begins, one soft settle when the story ends. Nothing jerks.
 sheet | #2034, Thirteen, 20 Oct 04:13 (#2030 in the build; #1759's speaking-ab.sh, 7b19b8bba or later)
+need | merged | 2030
 tell | The build has #2030. Take the lamp's own speaking section out of its catalogue first, as Thirteen's sheet says.
 tell | Arm A, dense: jq '.speaking += {"sentence_nods":0,"stress_step":0,"nod_spacing_us":0}' crates/expression/alive-behaviours.json >dense.json, then speaking-ab.sh --arms on --seconds 200 --speaking dense.json with "Hey Lamp, tell me a two-minute story about a cat who loved the rain."
 tell | Arm B, sparse: speaking-ab.sh --arms on --seconds 200 --speaking crates/expression/alive-behaviours.json, the same line. Note each arm's starts=, ends= and offsets= lines.
@@ -111,18 +120,22 @@ row | 3 | "Look for my keys" | moves | 5 min
 do | Hand near the arm. Keys on the desk off to one side, not in front. When the screen says PLAY, say "Hey Lamp, look for my keys." Say "stop" to end it, or let it finish.
 watch | The head comes down and looks at the desk first, then a little left or right, each place said; it stops at the keys or after five looks; "stop" ends it at once and the head is up about 2 s later.
 sheet | #2034, Nine, 20 Oct 04:15; tools/trials.sh look (#2040, merged and in the build on the lamp)
+need | running | lamp-body
 trial | look
 end
 row | 4 | Pointing the light ("light my book") | moves | 5 min
 do | Hand near the arm. A book on the desk a little to one side. When the screen says PLAY, say "Hey Lamp, light my book." Afterwards ask for the light you want: the white light is kept.
 watch | The head comes down over the desk, the light goes a clear white, it looks; the base turns toward the book once if it is off to one side; the pose holds about two minutes, then the head goes back.
 sheet | #2034, Nine, 20 Oct 04:15; tools/trials.sh point (#2040, merged and in the build on the lamp)
+need | running | lamp-body
 trial | point
 end
 row | 5 | Light scenes that move the head (reading, focus) | moves | 3 min
 do | Hands near the head, not under it; say "Lamp, reading light please.", later "Lamp, light for focus please."
 watch | The head tips down smoothly and the arm leans in; the light goes white and brighter; it holds 60 s, then the head returns.
 sheet | #1730, Fifth, 19 Oct 19:44Z
+need | skill | light-scenes
+need | running | lamp-body
 proof | sudo journalctl -u lamp-skills --since -5min -o cat | grep -E 'light-scenes (Triggered|Done)' | tail -3
 proof | lamp-bus latest light/state
 end
@@ -130,6 +143,7 @@ row | 6 | Touch pads | still | 20 min
 do | Hands off for 11 s counting aloud, then each head pad: a tap, a 1 s stroke and a 3 s hold; then hands away 60 s.
 watch | Each touch gives its own event, and nothing comes while hands are away.
 sheet | #1722, Thirteen, 19 Oct 16:18Z (its steps.sh --write keeps a new pins file: by hand)
+need | running | lamp-controls
 end
 row | 7 | Bedtime and Morning (the droop at night) | moves | 5 min
 do | Not run this morning: #1732 is a draft on no build, and at 08:00 only its morning window is open. Skip it.
@@ -140,6 +154,7 @@ row | 8 | Not feeling well (the droop) | moves | 20 min
 do | Move any cable from under the arm; stand beside it; nobody talks to the lamp. When told (about 4:45 after the eyes stop), hold an open hand 5 cm under the head, not touching, until the droop is over; say "stop" only if it would hit something.
 watch | About 305 s after the stop the head droops slowly once and the ring goes pale and low, breathing slowly; after the eyes start again the light is back within 12 s, with no second droop.
 sheet | #1722, Fifth, 20 Oct 03:57 (any lamp; scripted, fifth-rows.sh)
+need | running | lamp-body lamp-eyes
 mac | d=/tmp/fifth-row8; rm -rf $d && mkdir -p $d && gh api repos/autonomous-ai/lampOS/issues/comments/6277160673 --jq .body | awk '/^```bash$/{f=1;next} f&&/^```$/{exit} f' >$d/fifth-rows.sh && echo "1be88030af34ef0096781a0103c69a6451e795024706d67fc7aa35de3c182133  $d/fifth-rows.sh" | shasum -a 256 -c && gh run download 39299260822 -R autonomous-ai/lampOS -n lampos-arm64-782e6ef34547008443828158fe3540fd2cd23cec -D $d/a && mv $d/a/lamp-skills $d/a/lamp-health $d/ && rm -rf $d/a && for f in skill.toml SKILL.md; do gh api -H 'Accept: application/vnd.github.raw' "repos/autonomous-ai/lampOS/contents/lampOS/skills/not-feeling-well/$f?ref=782e6ef34547008443828158fe3540fd2cd23cec" >$d/$f || exit 1; done
 lamp | rm -rf /tmp/fifth-row8 && mkdir -p /tmp/fifth-row8
 mac | ${ARM_SCP:-scp} -q /tmp/fifth-row8/* "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/fifth-row8/
@@ -161,6 +176,7 @@ row | 9 | Faces from a photo, confirmed at the lamp | still | 5 min
 do | A consenting person's photo is added while they are out of view; then they sit facing the lamp and answer "Yes, remember me."
 watch | The lamp asks once, by the name chosen, and keeps them.
 sheet | #1968, Ten, 19 Oct 20:04Z (the photo is copied from the Mac: by hand)
+need | python3, and the eyes' who.sock open to this user | command -v python3 >/dev/null && test -w /run/lampos-eyes/who.sock
 proof | python3 -c 'import socket;s=socket.socket(socket.AF_UNIX);s.settimeout(10);s.connect("/run/lampos-eyes/who.sock");s.sendall(b"{\"list\":true}\n");print(s.makefile().readline().strip())'
 proof | python3 -c 'import socket;s=socket.socket(socket.AF_UNIX);s.settimeout(10);s.connect("/run/lampos-eyes/who.sock");s.sendall(b"{\"who\":true}\n");print(s.makefile().readline().strip())'
 end
@@ -168,6 +184,9 @@ row | 10 | The first five minutes | moves | 15 min
 do | A new person in the chair, a hand near the arm. Once they sit, the lamp starts its first five minutes on its own; they answer each step as it asks. Say "stop" at any jerk.
 watch | In order: where they sit (still for 3 s, face seen); their name, and whether it may remember their face (kept only on a yes); "Hey Lamp" called from the chair up to 5 times, with no answer to those; privacy, not available here; giving way (they push the head gently, more than a nudge, hold 1 to 2 s, let go: it says it felt that and nods); preferences, one question at a time.
 sheet | #1964, Seventh, 20 Oct 04:34 and 04:39 (build c334d25ae: #1792, #2004, #1964, #1998; ARM64 39328531309)
+need | run | 39328531309 lampos-arm64-c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d
+need | running | lamp-voice lamp-name lamp-ears lamp-body lamp-eyes
+need | the voice's body socket (LAMP_BODY_MOOD_SOCKET) | sudo -n cat /proc/$(systemctl show -p MainPID --value lamp-voice)/environ | tr '\0' '\n' | grep -q '^LAMP_BODY_MOOD_SOCKET='
 mac | R=39328531309 S=c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d; [ "$(gh run view $R -R autonomous-ai/lampOS --json conclusion -q .conclusion)" = success ] || { echo "run $R is not green: skip this row"; exit 1; }; mkdir -p /tmp/seventh-$S && gh run download $R -R autonomous-ai/lampOS -n lampos-arm64-$S -D /tmp/seventh-$S
 mac | S=c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d; ${ARM_SCP:-scp} -q /tmp/seventh-$S/lamp-voice "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/lamp-voice-$S
 lamp | systemctl cat lamp-voice | grep -E '^(ExecStart|Environment)='
@@ -187,6 +206,7 @@ row | 11 | Setup for a home, the 5 s reset | still | 3 min
 do | Nothing at the lamp: a read-only check only. The reset itself waits for the owner (it wipes lamp-4ace's person and key and takes it off the office network).
 watch | Nothing changes on the lamp. A 0 on the last line means the button would do nothing.
 sheet | #2034, Nine, 20 Oct 04:46 (the reset run itself, with a way back, is there for the owner's yes)
+need | running | lamp-controls
 proof | for u in lamp-setup.service lamp-setup-reset.service lampos-setup-done.path; do printf '%s: ' $u; systemctl is-enabled $u 2>&1; done
 proof | for f in /etc/lampOS/setup/serve.json /etc/lampOS/setup/reset-plan.json /var/lib/lampos-setup/done; do [ -e $f ] && echo "$f: present" || echo "$f: missing"; done
 proof | tr '\0' ' ' </proc/$(systemctl show -p MainPID --value lamp-controls)/cmdline | grep -o -- '--pins [^ ]*' | cut -d' ' -f2 | xargs grep -c '"reset"'
@@ -206,6 +226,8 @@ row | 14 | Watches you leave | moves | 3 min
 do | Sit facing the lamp for 3 minutes, then stand and walk off to one side.
 watch | One short turn of the base toward the side they left (about 3 s), then back.
 sheet | #2012, Sixth, 19 Oct 18:15Z; #2022
+need | skill | watch-you-leave
+need | running | lamp-body lamp-eyes
 proof | sudo journalctl -u lamp-skills --since -10min -o cat | grep watch-you-leave | tail -3
 proof | lamp-bus latest room/stood_up
 end
@@ -213,6 +235,7 @@ row | 15 | Two people at the desk | still | 10 min
 do | Two people sit at the desk and talk to each other; each line to the lamp is said when the screen asks, the rest is ordinary talk.
 watch | The lamp says nothing while they talk; it answers A's time question, A's follow-up, and B's timer, and nothing of B's aside or the closing chat.
 sheet | #2034, Eighth, 20 Oct 04:27 (second route; lamp-4ace's unit as it is, nothing switched)
+need | the voice on the second route, busy-near, spoken-to on | e=$(sudo -n cat /proc/$(systemctl show -p MainPID --value lamp-voice)/environ | tr '\0' '\n'); for v in LAMP_VOICE_ROUTE=second LAMP_ATTENTION=busy-near LAMP_SPOKEN_TO=on; do printf '%s\n' "$e" | grep -qx "$v" || exit 1; done
 proof | sudo journalctl -u lamp-voice --since -1min -o cat | grep -c 'lamp-voice second: request' || true
 tell | A and B talk to each other for about a minute, not to the lamp: what they did this morning, lunch plans. Normal voices, turned to each other.
 say | A, turned to the lamp: "Hey Lamp, what time is it?"
@@ -237,6 +260,7 @@ row | 17 | A mute closes the camera at once | still | 10 min
 do | Five rounds on today's voice, then five on #1941's: mute (the button, or a 3 s hand on the head), wait 3 s, unmute. Only the real button or hand.
 watch | The camera closes each time. Pass: on #1941's voice, mute to "camera closed" is under 100 ms at the median and under 500 ms every round (today's is about 1.0 to 1.5 s).
 sheet | #1941, Seventh, 19 Oct 18:57Z; #1722, Seventh, 20 Oct 03:27
+need | running | lamp-eyes lamp-voice
 tell | A, today's voice: five rounds of mute, 3 s, unmute.
 proof | sudo journalctl -u lamp-eyes --since -5min -o short-monotonic | grep 'camera closed' | tail -10
 mac | mkdir -p /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063 && gh run download 39266127252 -R autonomous-ai/lampOS -n lampos-arm64-05f8290d316825f0b6f5a9d4a72af0d093e7d063 -D /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063
@@ -260,6 +284,7 @@ row | 19 | The light goes out when you leave, for real | still | 25 min
 do | Run 1: sit 2 minutes, leave view and earshot for 10, come back. Run 2: sit 30 s, leave within earshot, and once the light is out say "Hey Lamp, what time is it?" from out of view.
 watch | The light fades to the ember over about 30 s with no step, after 10 minutes (run 2: 1) with nobody, and comes back within a second of a face or the voice.
 sheet | #1677, Nine, 19 Oct 18:59Z; #1722, Nine, 20 Oct 03:26 (from the Mac: presence-check.sh, a phone filming from the doorway)
+need | presence-check.sh on the Mac (ARM_PRESENCE_CHECK) | mac: test -x "${ARM_PRESENCE_CHECK:-/nonexistent}"
 tell | Run 1: sit 2 minutes, then leave view and earshot for 10 minutes, then come back.
 mac | p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && SECONDS_FOR=960 ./presence-check.sh lamp-4ace quiet
 tell | Run 2: sit 30 s, leave within earshot; once the light is out, say "Hey Lamp, what time is it?" from out of view.
@@ -390,7 +415,7 @@ run_row() { # N
 
   if [[ $DRY == 1 ]]; then
     [[ $MOVES == moves ]] && say_ "    ask: Hand near the arm? (y)"
-    printf '%s\n' "$lines" | grep -E '^(lamp|mac|trial|say|tell|wait|proof|back) *\|' | sed 's/^/    /'
+    printf '%s\n' "$lines" | grep -E '^(need|lamp|mac|trial|say|tell|wait|proof|back) *\|' | sed 's/^/    /'
     return 0
   fi
 
@@ -464,11 +489,151 @@ EOF
   }
 }
 
+# ---------------------------------------------------------------------------
+# --preflight: read-only, before the hour (the first builder, #1722, 04:51).
+# One line a row: ready, by hand, or what it is missing. None of a row's steps
+# runs; what is checked is its need lines, and what its steps show it needs:
+# a trial is a row of ARM_TRIALS's trials.sh (its --dry), with the skills its
+# setup copies beside it and the units it switches running; a build a mac
+# step downloads (gh run download RUN ... -n ARTIFACT) is from a green run
+# that still has it; a script a mac step fetches from a comment still has the
+# SHA-256 the step checks. First, each running lamp part's program and
+# SHA-256, to compare with the morning build.
+REPO=autonomous-ai/lampOS
+
+IFS= read -r -d '' PARTS_CHECK <<'CHECK' || true
+for u in $(systemctl list-units --type=service --state=running --plain --no-legend 'lamp-*' | awk '{print $1}'); do
+  p=$(systemctl show -p MainPID --value "$u")
+  [ "${p:-0}" -gt 0 ] || continue
+  e=$(sudo -n readlink "/proc/$p/exe" 2>/dev/null)
+  h=$(sudo -n sha256sum "/proc/$p/exe" 2>/dev/null | cut -c1-12)
+  printf '  %s: %s %s\n' "$u" "${e:-?}" "${h:-?}"
+done
+sudo -n true 2>/dev/null && echo "  sudo without a password: yes" || echo "  sudo without a password: NO, and the rows need it"
+CHECK
+
+# On the lamp: what trial @ROW@ of trials.sh @TRIALS@ is missing, if anything.
+IFS= read -r -d '' TRIAL_CHECK <<'CHECK' || true
+t=@TRIALS@ r=@ROW@
+[ -x "$t" ] || { printf 'no trials.sh at %s; ' "$t"; exit 0; }
+out=$("$t" "$r" --dry 2>/dev/null) || { printf 'trials.sh has no row %s; ' "$r"; exit 0; }
+src=$(dirname "$t")/../skills
+for s in $(printf '%s\n' "$out" | grep -o '@SRC@/[A-Za-z0-9_-]*' | sort -u); do
+  [ -d "$src/${s#@SRC@/}" ] || printf 'skill %s not beside trials.sh; ' "${s#@SRC@/}"
+done
+for u in $(printf '%s\n' "$out" | sed -n 's/^  switch: \([^|]*\)|.*/\1/p' | sort -u); do
+  systemctl is-active --quiet "$u" || printf '%s not running; ' "$u"
+done
+CHECK
+
+# On the lamp: which of the skills @NAMES@ the running lamp-skills lacks.
+IFS= read -r -d '' SKILL_CHECK <<'CHECK' || true
+p=$(systemctl show -p MainPID --value lamp-skills)
+d=$(tr '\0' '\n' <"/proc/${p:-0}/cmdline" 2>/dev/null | grep -A1 -x -- --dir | sed -n 2p)
+[ -n "$d" ] || { printf 'lamp-skills not running; '; exit 0; }
+for n in @NAMES@; do sudo -n test -d "$d/$n" || printf 'skill %s not in %s; ' "$n" "$d"; done
+CHECK
+
+run_missing() { # RUN ARTIFACT
+  local conclusion
+  conclusion=$(gh run view "$1" -R "$REPO" --json conclusion -q .conclusion </dev/null 2>/dev/null)
+  if [[ $conclusion != success ]]; then
+    printf 'run %s not green (%s); ' "$1" "${conclusion:-unknown}"
+    return
+  fi
+  gh api "repos/$REPO/actions/runs/$1/artifacts?per_page=100" --jq '.artifacts[] | select(.expired | not) | .name' </dev/null 2>/dev/null |
+    grep -qx -- "$2" || printf 'run %s no longer has %s; ' "$1" "$2"
+}
+
+need_missing() { # VALUE: "KIND | REST"
+  local what rest n check
+  what=$(printf '%s' "${1%%|*}" | sed 's/^ *//; s/ *$//')
+  rest=$(printf '%s' "${1#*|}" | sed 's/^ *//; s/ *$//')
+  case $what in
+    running) on_lamp "for u in $rest; do systemctl is-active --quiet \$u || printf '%s not running; ' \$u; done" 2>/dev/null ;;
+    skill) check=${SKILL_CHECK//@NAMES@/$rest}; on_lamp "$check" 2>/dev/null ;;
+    merged)
+      for n in $rest; do
+        [[ $(gh pr view "$n" -R "$REPO" --json state -q .state </dev/null 2>/dev/null) == MERGED ]] || printf '#%s not merged; ' "$n"
+      done
+      ;;
+    run) run_missing ${rest%% *} ${rest#* } ;;
+    *)
+      if [[ $rest == mac:* ]]; then
+        bash -c "${rest#mac: }" </dev/null >/dev/null 2>&1 || printf '%s; ' "$what"
+      else
+        on_lamp "$rest" >/dev/null 2>&1 || printf '%s; ' "$what"
+      fi
+      ;;
+  esac
+}
+
+steps_missing() { # LINES
+  local step kind value check got
+  local run_re='gh run download ([0-9]+) .*-n (lampos-arm64-[0-9a-f]+)'
+  local sha_re='issues/comments/([0-9]+) .*echo "([0-9a-f]{64})  '
+  while IFS= read -r step; do
+    kind=$(echo "$step" | sed 's/ *|.*//')
+    value=$(echo "$step" | sed 's/^[a-z]* *| *//')
+    case $kind in
+      trial)
+        check=${TRIAL_CHECK//@TRIALS@/$TRIALS}
+        on_lamp "${check//@ROW@/$value}" 2>/dev/null
+        ;;
+      mac)
+        [[ $value =~ $run_re ]] && run_missing "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+        if [[ $value =~ $sha_re ]]; then
+          local id=${BASH_REMATCH[1]} sha=${BASH_REMATCH[2]}
+          got=$(gh api "repos/$REPO/issues/comments/$id" --jq .body </dev/null 2>/dev/null |
+            awk '/^```bash$/{f=1;next} f&&/^```$/{exit} f' | shasum -a 256 | cut -d' ' -f1)
+          [[ $got == "$sha" ]] || printf 'comment %s no longer gives %s; ' "$id" "${sha:0:8}"
+        fi
+        ;;
+    esac
+  done <<EOF
+$(printf '%s\n' "$1" | grep -E '^(trial|mac) *\|' || true)
+EOF
+}
+
+preflight() {
+  local row lines needs runs missing not_ready=0
+  say_ "The lamp's parts as they run now (program, SHA-256 start), for the morning build:"
+  on_lamp "$PARTS_CHECK" || say_ "  the lamp could not be read"
+  say_ ""
+  # Not n: header sets that one.
+  for row in $(row_numbers); do
+    [[ -n $ONLY && $row != "$ONLY" ]] && continue
+    [[ $row -lt $FROM ]] && continue
+    header "$row"
+    lines=$(row_lines "$row")
+    needs=$(printf '%s\n' "$lines" | field need)
+    runs=$(printf '%s\n' "$lines" | grep -E '^(lamp|mac|trial|say|tell|wait) *\|' || true)
+    missing=$(
+      while IFS= read -r value; do
+        [[ -n $value ]] && need_missing "$value"
+      done <<EOF
+$needs
+EOF
+      steps_missing "$lines"
+    )
+    if [[ -n $missing ]]; then
+      say_ "row $row, $TITLE: MISSING: ${missing%; }"
+      not_ready=1
+    elif [[ -z $runs && -z $needs ]]; then
+      say_ "row $row, $TITLE: by hand, nothing to check"
+    else
+      say_ "row $row, $TITLE: ready"
+    fi
+  done
+  return $not_ready
+}
+
 exec 3<&0
-DRY=0 FROM=1 ONLY=
+DRY=0 FROM=1 ONLY= PREFLIGHT=0
 while [[ $# -gt 0 ]]; do
   case $1 in
     --dry) DRY=1 ;;
+    --preflight) PREFLIGHT=1 ;;
     --from) FROM=${2:?}; shift ;;
     --only) ONLY=${2:?}; shift ;;
     -h | --help) usage ;;
@@ -478,6 +643,12 @@ while [[ $# -gt 0 ]]; do
 done
 if [[ $DRY == 0 ]]; then
   [[ -n ${ARM_LAMP:-} ]] || { echo "ARM_LAMP: the command that runs a shell string on the lamp" >&2; exit 2; }
+fi
+if [[ $PREFLIGHT == 1 ]]; then
+  preflight
+  exit $?
+fi
+if [[ $DRY == 0 ]]; then
   trap 'say_ ""; stop' INT TERM
   for n in $(row_numbers); do
     [[ -n $ONLY && $n != "$ONLY" ]] && continue
