@@ -639,6 +639,15 @@ impl Engine {
         }
     }
 
+    /// How lively the idle layer's moves are from the lamp's inner state, from
+    /// -0.5 to 0.5 ([`lamp_msgs::mood_liveliness`]), added to the catalogue's
+    /// energy; `None`, the catalogue's alone (#1670).
+    pub fn set_mood_liveliness(&mut self, liveliness: Option<f32>) {
+        if let Some(life) = &mut self.life {
+            life.set_mood_liveliness(liveliness);
+        }
+    }
+
     /// Whether the privacy switch is closed, as `voice/privacy` says at a
     /// request from the head (#711): a tap then gets no look up.
     pub fn set_privacy_muted(&mut self, muted: bool) {

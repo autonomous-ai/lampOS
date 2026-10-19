@@ -134,6 +134,30 @@ mod tests {
         }
     }
 
+    /// #1670: the moves' liveliness takes the same two terms as the pace: 0
+    /// calm and awake, up to 0.5 with energy, down to -0.5 dozing, and -0.5
+    /// asleep.
+    #[test]
+    fn the_liveliness_agrees_with_the_pace() {
+        use lamp_msgs::mood_liveliness;
+        assert_eq!(mood_liveliness(0.70, 0.30, false), 0.0);
+        assert_eq!(mood_liveliness(0.85, 0.70, false), 0.5);
+        assert_eq!(mood_liveliness(0.0, 0.30, false), -0.5);
+        assert_eq!(mood_liveliness(0.0, 0.30, true), -0.5);
+        for awake in 0..=20 {
+            for energy in 0..=20 {
+                let (awake, energy) = (awake as f32 / 20.0, energy as f32 / 20.0);
+                let (lively, pace) = (
+                    mood_liveliness(awake, energy, false),
+                    mood_pace(awake, energy, false),
+                );
+                // Livelier exactly where the breath is quicker.
+                assert_eq!(lively > 0.0, pace > 1.0, "{awake} {energy}");
+                assert_eq!(lively < 0.0, pace < 1.0, "{awake} {energy}");
+            }
+        }
+    }
+
     /// What `read` gives once the thread has found it, within two seconds.
     fn soon<T: PartialEq + std::fmt::Debug>(wanted: T, mut read: impl FnMut() -> T) {
         let deadline = std::time::Instant::now() + Duration::from_secs(2);

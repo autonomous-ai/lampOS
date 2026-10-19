@@ -73,7 +73,7 @@ changed):
 | Falling asleep | 23:00 to 06:00 local time, the voice resting, the body free, and the eyes reporting nobody for 15 minutes | Over 4 s, everything else gives way to the sleeping pose: the head bowed 0.023 rad (15 counts, all lamp-4ace's down reach allows) |
 | Asleep | Until woken | Only a slow breath: the head lifts 0.015 rad (10 counts) over 9 s. No clip begins: a bang, talk in the room, the voice listening are not answered by Expression |
 | Waking | Its name; a tap, double tap or stroke (an enabled `controls/gesture` that is not a long press); a reminder newly due (`schedule/due`, once each); the voice thinking or speaking; outside the night, the first face seen | A stretch of 2.7 s: the head rises 0.065 rad by 0.9 s, tilts 0.04 and turns 0.03 by 1.5 s (the turn only where the body takes it, outside rest), and settles, while the bow and the rest of the plan cross back over |
-| Energy | Always | One number, 0 to 1 (0.5 in the catalogue): the same moves 0.7 to 1.3 times as large and 1.25 to 0.75 times as long. The breath's period never changes, so it stays with the ring |
+| Energy | Always | One number, 0 to 1 (0.5 in the catalogue): the same moves 0.7 to 1.3 times as large and 1.25 to 0.75 times as long. Where Mood runs, its liveliness (`lamp_msgs::mood_liveliness`, -0.5 to 0.5: its breath's pace laid on that range, 0 when calm and awake) is added to the catalogue's, within 0 to 1: livelier with energy, quieter dozing and asleep, exactly where the breath is quicker or slower (#1670). The breath's period is the lamp's one breath, so it stays with the ring |
 
 Woken, it falls asleep again only after nobody again for the whole 15
 minutes. A long hold of the base is the mute today and will be Sleep when
