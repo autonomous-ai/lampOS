@@ -107,3 +107,4 @@ list".
   - Only 3 settles fired, 0 nods and 0 sways. Expression was "still for work" in 372 of 796 samples.
   - **thirteen-P3** (concentration shouldn't zero the lamp's own speaking moves). P2 withdrawn: resumable voice takes `voice/sound` by design.
 - `speaking-ab.sh`: `--arms`, staging in `/var/lib`, and it now counts voice levels and Expression's offsets (13/13 tests).
+- **#1744 merged** by the first builder as `09108bad1` (step 1 run on c0a4; head pads with the hardware lead on #1764).
