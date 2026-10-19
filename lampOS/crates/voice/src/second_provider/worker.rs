@@ -1539,6 +1539,16 @@ pub fn serve(
     // A holding-only answer is asked to go on, as on Live
     // (`LAMP_HOLDING_ANSWER=on`; the first builder's 22:54 on #1722).
     engine = engine.holding_answers(files.holding_answer);
+    // A line lost on the network is asked once more when a service host
+    // answers again, the link's own check (`LAMP_RESEND_LOST_LINE=on`; the
+    // first builder's 00:02 on #1722). As the only voice, with its hosts.
+    if files.resend_lost_line
+        && let Some(targets) = probe_targets.clone()
+    {
+        engine = engine.resending(Arc::new(move || {
+            Box::pin(super::link::any_answers(targets.clone()))
+        }));
+    }
     // As the lamp's only voice this route keeps the room itself (#1712).
     if route.only_voice {
         engine = engine.keeping_room(keeping_room(

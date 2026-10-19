@@ -264,6 +264,9 @@ pub type CutIn = Arc<dyn Fn(u64) + Send + Sync>;
 /// whether the lamp hums for it (a misheard cut-in, `LAMP_MISHEARD_HUM`), as
 /// the Live worker tells the coordinator (`ProviderOutput::Unclear`, #926).
 pub type AskAgain = Arc<dyn Fn(u64) -> Option<(&'static str, bool)> + Send + Sync>;
+/// Whether the link is back: any service host takes a bare connection
+/// (`link::any_answers`), for a line lost on the network ([`Engine::resending`]).
+pub type LinkBack = Arc<dyn Fn() -> BoxFuture<'static, bool> + Send + Sync>;
 /// Whether the lamp's own last line before `request` was a question, in a
 /// conversation going on (`worker::lamp_just_asked`): then a checked sound
 /// with a word in it is the person's answer, as on the Live route.
@@ -342,6 +345,9 @@ struct Shared {
     /// [`Engine::holding_answers`]: a spoken turn answered only with a
     /// holding phrase sends `HoldingAnswer`.
     holding_answer: bool,
+    /// [`Engine::resending`]: a spoken line whose chat was lost on the
+    /// network is asked once more when the link is back.
+    resend: Option<LinkBack>,
     asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
@@ -750,6 +756,7 @@ impl Engine {
                 ask_again: None,
                 misheard_at_us: Mutex::new(None),
                 holding_answer: false,
+                resend: None,
                 asked: None,
                 cues: None,
                 down: None,
@@ -984,8 +991,6 @@ impl Engine {
         self
     }
 
-    /// A spoken turn's words are judged with `heed` before they are answered.
-    /// Before any turn only: the turns share it.
     /// `LAMP_HOLDING_ANSWER=on` (`--holding-answer`), as on Live: a spoken
     /// turn whose whole answer only asks the person to wait ("One moment.",
     /// `holding_answer::holding_only`), with nothing called in any round,
@@ -999,6 +1004,22 @@ impl Engine {
         self
     }
 
+    /// `LAMP_RESEND_LOST_LINE=on`, as on Live (the first builder's 00:02 on
+    /// #1722): a spoken line whose chat was lost on the network
+    /// ([`link::lost`]) before any word was said or anything called is asked
+    /// once more, if `back` finds the link back within
+    /// `resend::RESEND_WITHIN_US` of the failure and no newer line has begun
+    /// meanwhile; otherwise the turn fails as before, and the link's own
+    /// check and down line follow. Never twice. Before any turn only.
+    pub fn resending(mut self, back: LinkBack) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.resend = Some(back);
+        }
+        self
+    }
+
+    /// A spoken turn's words are judged with `heed` before they are answered.
+    /// Before any turn only: the turns share it.
     pub fn heeding(mut self, heed: Heed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.heed = Some(heed);
@@ -1770,6 +1791,44 @@ async fn say_down(shared: &Shared, request: u64, heard: bool) -> Result<(), Stop
         eprintln!("lamp-voice second: request {request} said it can't think right now");
     }
     Ok(())
+}
+
+/// How often a lost line's wait asks whether the link is back.
+const LINK_BACK_EVERY: Duration = Duration::from_millis(250);
+
+/// Whether the link is back (`back`) within `resend::RESEND_WITHIN_US` of
+/// now, with no newer line begun meanwhile (`begun` no longer `request`):
+/// asked every [`LINK_BACK_EVERY`], each ask bounded by what is left.
+async fn link_back_in_time(shared: &Shared, request: u64, back: &LinkBack) -> bool {
+    let until =
+        tokio::time::Instant::now() + Duration::from_micros(crate::resend::RESEND_WITHIN_US);
+    let newer = || {
+        shared
+            .begun
+            .lock()
+            .ok()
+            .and_then(|begun| *begun)
+            .is_some_and(|(of, _)| of != request)
+    };
+    loop {
+        if newer() {
+            eprintln!(
+                "lamp-voice second: request {request} lost on the network: a newer line has begun, so it is not asked again"
+            );
+            return false;
+        }
+        if tokio::time::timeout_at(until, back()).await == Ok(true) {
+            return !newer();
+        }
+        if tokio::time::Instant::now() + LINK_BACK_EVERY >= until {
+            eprintln!(
+                "lamp-voice second: request {request} lost on the network: the link was not back within {} s, so it is not asked again",
+                crate::resend::RESEND_WITHIN_US / 1_000_000
+            );
+            return false;
+        }
+        tokio::time::sleep(LINK_BACK_EVERY).await;
+    }
 }
 
 pub fn fault(error: &net::Error) -> Fault {
@@ -2783,6 +2842,10 @@ async fn answer(
             messages.clone_from(&prepared.messages);
         }
         let asked_at = messages.len() - 1;
+        // Round 1's bounds run from here, or from its one ask again after a
+        // line lost on the network (`LAMP_RESEND_LOST_LINE`).
+        let mut from = begun;
+        let mut resent = false;
         let mut round = 0;
         while round < MAX_ROUNDS {
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -2801,7 +2864,7 @@ async fn answer(
             let mut reasoning = None;
             loop {
                 let next = if first && round == 1 {
-                    let at = |after: Duration| begun + after;
+                    let at = |after: Duration| from + after;
                     let cues = shared.cues.as_ref().filter(|_| heard);
                     let first_wait = if cues.is_some() {
                         CUE_AFTER
@@ -2872,6 +2935,28 @@ async fn answer(
                             "lamp-voice second: request {request} chat round {round} failed after {} ms: {error}",
                             began.elapsed().as_millis()
                         );
+                        // Lost on the network before any word or call: asked
+                        // once more if the link is back in time (#1722).
+                        if first
+                            && round == 1
+                            && !resent
+                            && heard
+                            && let Some(back) = &shared.resend
+                            && link::lost(&fault(&error))
+                        {
+                            resent = true;
+                            if link_back_in_time(shared, request, back).await {
+                                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                                    return Err(Stop::Gone);
+                                }
+                                eprintln!(
+                                    "lamp-voice second: request {request} lost on the network ({error}): the link is back, asked once more"
+                                );
+                                from = tokio::time::Instant::now();
+                                stream = shared.services.chat(messages.clone());
+                                continue;
+                            }
+                        }
                         // A chat that answers with a refusal before any word
                         // (401, 429, a 5xx) is as down as one that never
                         // begins: the line, not silence (#1844's B).
