@@ -872,7 +872,12 @@ service writes a name said once right.
 With `LAMP_BUS=on` in its unit the eyes also publish every face the
 detector finds, not only the one the body is told to look at, on
 `humans/faces/tracked` ([bus.md](bus.md), "On the lamp";
-`crates/eyes/src/bus_out.rs`). For each face:
+`crates/eyes/src/bus_out.rs`). At start the journal says what this process
+says on the bus, and which of `room/presence` and `room/activity` it
+doesn't with the switch that would, as `said on the bus: humans/faces/tracked,
+diagnostics; not said: room/presence (LAMP_PRESENCE), room/activity
+(LAMP_ACTIVITY)`: a build without a part, or a switch that didn't reach the
+process, shows there before any trial waits for it. For each face:
 
 - **a passing id** (`f1`, `f2`, ...): the same from one look to the next
   for as long as its box overlaps where it was within the last 1.5 s,
