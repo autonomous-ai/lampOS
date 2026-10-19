@@ -3058,7 +3058,7 @@ pub(crate) fn texts_task(
     let news: Box<dyn crate::messages::Untold> = match tools
         .tasks
         .as_ref()
-        .and_then(|place| crate::task_news::ForTexts::for_tasks(&place.directory))
+        .and_then(crate::task_news::ForTexts::for_tasks)
     {
         Some(news) => Box::new(news),
         None => Box::new(crate::messages::NoNews),

@@ -1397,6 +1397,7 @@ mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: false,
+                make_skill: false,
             }),
             schedule_tools: true,
             schedule_speak: true,
@@ -1629,6 +1630,7 @@ mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         };
         assert_eq!(
             settings,
@@ -2155,6 +2157,7 @@ mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         };
         let with = Settings {
             tasks: Some(place.clone()),
