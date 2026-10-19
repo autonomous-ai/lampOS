@@ -4668,6 +4668,13 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1396:** I posted on #705 what the owner will see at 10:00 (V1's Lamp page; `lamp-cloud`'s drop-in decides online or offline). The backend `lamp-v2` change waits locally, untested, for my user's yes on writes and tests.
 - **Waiting on my user:** writes and tests in the app and backend repositories.
 
+## 2026-10-19, 09:39 ICT: #1701 merged; #1396's backend and app PRs up; #1673's piece 3 fixed and gating again
+
+- **My user said yes** to writes in the backend and app repositories (08:5x).
+- **#1396:** the backend PR is up (08:57) and the app PR is up (09:38, draft). Both repositories are private, so the lampOS issues carry only these two lines (the first builder, 06:50).
+- **#1701 merged** (09:01). Its P3, Monday's A/B written into `same-voice.md` and the `LAMP_SAME_VOICE_MODEL` row, is next: a docs follow-up after the current gate, since the `switches` test reads that table.
+- **#1673's piece 3, a fault of mine caught by the gate before any push:** `lamp-cloud`'s texts tick was a `select!` beside the MQTT client's `poll`, and it dropped that `poll` every 50 ms, even with `LAMP_MESSAGES` off. `poll` makes the connection itself, so a broker slower than 50 ms to answer would never be joined. The gate's reconnect test failed, and a new test shows it: a broker answering CONNECT after 300 ms got 17 connects in 5 s and no subscription. Now one `poll` is kept until it ends, and the tick runs beside it only while texts are taken. The new test and all 7 of `online`'s pass, and the two connection tests passed 10 of 10. The gate is running again; then the PR replaces #1697.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
