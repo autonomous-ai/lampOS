@@ -784,6 +784,86 @@ pub(crate) fn early_query(heard: &str, month_and_year: Option<String>) -> Option
     (!query.is_empty() && query.chars().count() <= 128).then_some(query)
 }
 
+/// The weather last fetched, and when.
+type Weather = Arc<Mutex<Option<(Instant, String)>>>;
+
+/// What the model is told of the weather fetched at `at`, while it is
+/// fresh ([`crate::second_provider::net::weather::FRESH`]).
+fn weather_told(fetched: Option<(Instant, String)>, now: Instant) -> Option<String> {
+    let (at, said) = fetched?;
+    let ago = now.checked_duration_since(at)?;
+    (ago <= crate::second_provider::net::weather::FRESH).then(|| {
+        format!(
+            " The weather where you are, as of {} minutes ago: {said} Use it when someone asks about the weather here; never bring it up unasked.",
+            ago.as_secs() / 60
+        )
+    })
+}
+
+/// Ask the weather in `place` every 15 minutes, on the worker's runtime:
+/// its coordinates once, then the forecast. A failure is said once until
+/// the next success; the weather kept goes stale on its own.
+async fn weather_task(place: String, weather: Weather) {
+    use crate::second_provider::net::weather;
+    let mut every = tokio::time::interval(weather::EVERY);
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut at = None;
+    let mut failing = false;
+    loop {
+        every.tick().await;
+        if at.is_none() {
+            at = match weather::locate(&place).await {
+                Ok(Some(found)) => Some(found),
+                Ok(None) => {
+                    if !std::mem::replace(&mut failing, true) {
+                        eprintln!(
+                            "lamp-voice second: no place named {place} was found for the weather"
+                        );
+                    }
+                    None
+                }
+                Err(error) => {
+                    if !std::mem::replace(&mut failing, true) {
+                        eprintln!(
+                            "lamp-voice second: the weather's place was not looked up: {error}"
+                        );
+                    }
+                    None
+                }
+            };
+        }
+        let Some((latitude, longitude)) = at else {
+            continue;
+        };
+        let began = Instant::now();
+        match weather::fetch(latitude, longitude, &place).await {
+            Ok(Some(said)) => {
+                if std::mem::replace(&mut failing, false)
+                    || weather.lock().is_ok_and(|kept| kept.is_none())
+                {
+                    eprintln!(
+                        "lamp-voice second: the weather in {place} came in {} ms",
+                        began.elapsed().as_millis()
+                    );
+                }
+                if let Ok(mut kept) = weather.lock() {
+                    *kept = Some((Instant::now(), said));
+                }
+            }
+            Ok(None) => {
+                if !std::mem::replace(&mut failing, true) {
+                    eprintln!("lamp-voice second: the weather came with nothing for now");
+                }
+            }
+            Err(error) => {
+                if !std::mem::replace(&mut failing, true) {
+                    eprintln!("lamp-voice second: the weather was not fetched: {error}");
+                }
+            }
+        }
+    }
+}
+
 /// What the model is told of the time, with the lamp's place after it
 /// ([`crate::local_time::place_told`]); the place alone when the time is not
 /// known.
@@ -919,6 +999,17 @@ pub fn serve(
     if let Some(place) = &place {
         eprintln!("lamp-voice second: the lamp's place is {place} (LAMP_PLACE)");
     }
+    // The weather where the lamp stands, asked ahead (#1712): of its place,
+    // or else the place its zone names.
+    let weather: Weather = Arc::default();
+    let weather_place = crate::second_provider::net::weather::on(
+        std::env::var(crate::second_provider::net::weather::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    )
+    .then(|| place.clone().or_else(crate::local_time::zone_place_here))
+    .flatten();
+    let weather_now = weather.clone();
     let system = move || {
         let now = Instant::now();
         let Ok(mut sessions) = sessions.lock() else {
@@ -942,10 +1033,18 @@ pub fn serve(
         } else {
             String::new()
         };
-        // The lamp's own place, with `LAMP_PLACE`, beside its time (#1712).
+        // The lamp's own place, with `LAMP_PLACE`, beside its time (#1712),
+        // and the weather there while it is fresh.
         let time = with_place(
             crate::local_time::told_here(clock, places),
             crate::local_time::place_told(place.as_deref()),
+        );
+        let time = with_place(
+            time,
+            weather_told(
+                weather_now.lock().ok().and_then(|weather| weather.clone()),
+                Instant::now(),
+            ),
         );
         system_message(
             &character,
@@ -1125,6 +1224,13 @@ pub fn serve(
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
+    if let Some(place) = weather_place {
+        eprintln!(
+            "lamp-voice second: the weather in {place} is asked of Open-Meteo every 15 minutes ({})",
+            crate::second_provider::net::weather::ENVIRONMENT
+        );
+        runtime.spawn(weather_task(place, weather));
+    }
     if let Some((chat, root)) = texts {
         let (character, tools) = texts_from;
         runtime.spawn(texts_task(chat, character, tools, root));
@@ -3198,6 +3304,26 @@ mod tests {
             .map(|n| tool(&format!("f{n}")))
             .collect();
         assert_eq!(super::with_look(full).len(), lamp_gemini::MAX_TOOLS);
+    }
+
+    /// #1712: the weather is told while fresh, never once stale.
+    #[test]
+    fn the_weather_is_told_while_fresh() {
+        let now = Instant::now();
+        let said = "In Hanoi now: 31°C, partly cloudy.".to_owned();
+        let fresh = super::weather_told(
+            Some((now, said.clone())),
+            now + Duration::from_secs(20 * 60),
+        )
+        .unwrap();
+        assert!(
+            fresh.starts_with(" The weather where you are, as of 20 minutes ago: In Hanoi now"),
+            "{fresh}"
+        );
+        assert!(fresh.contains("never bring it up unasked"));
+        let stale = now + crate::second_provider::net::weather::FRESH + Duration::from_secs(1);
+        assert_eq!(super::weather_told(Some((now, said)), stale), None);
+        assert_eq!(super::weather_told(None, now), None);
     }
 
     /// #1712: the lamp's place follows its time, or stands alone.
