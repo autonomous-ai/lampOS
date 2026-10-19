@@ -401,3 +401,5 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   #2021's command posted for the first builder's run on lamp-4ace through the
   relay. The thread trial row is #2029 on lamp-voice, with Tests' three
   changes; trials-test 283/0.
+- #2020 merged. #2029: Tests' P2 (a timed known-file check) fixed. #2021: the
+  peer read's three P3s fixed (one-for-one cut, whole words, each thing once).
