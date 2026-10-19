@@ -27,6 +27,8 @@
 #               script holds no address and no credential.
 #   ARM_TRIALS  trials.sh's path on the lamp (/home/orangepi/lampos-tools/trials.sh)
 #   ARM_LOG     where the log goes (./arm-hour-YYYYmmdd-HHMM.log)
+#   ARM_LAMP_HOST  the lamp for a file copied from the Mac, as scp takes it
+#               (orangepi@lamp-4ace.local)
 #   ARM_PRESENCE_CHECK  #1677's presence-check.sh on the Mac, in a checkout of
 #               the morning build's commit (row 19)
 #   ARM_ROWS_FILE  rows to use in place of the table below (arm-hour-test.sh)
@@ -145,10 +147,21 @@ watch | The old network is back within 60 s after the wrong one; the right one j
 sheet | #1995, El (no run sheet yet)
 end
 row | 17 | A mute closes the camera at once | still | 10 min
-do | Five rounds: mute (button or a 3 s hand on the head), wait 3 s, unmute; on today's voice, then on #1941's.
-watch | The camera closes; the builder reads mute to "camera closed" from the journal.
-sheet | #1941, Seventh, 19 Oct 18:57Z (#1941's build is put in by hand)
-proof | journalctl -u lamp-eyes --since -10min -o short-monotonic | grep 'camera closed' | tail -10
+do | Five rounds on today's voice, then five on #1941's: mute (the button, or a 3 s hand on the head), wait 3 s, unmute. Only the real button or hand.
+watch | The camera closes each time. Pass: on #1941's voice, mute to "camera closed" is under 100 ms at the median and under 500 ms every round (today's is about 1.0 to 1.5 s).
+sheet | #1941, Seventh, 19 Oct 18:57Z; #1722, Seventh, 20 Oct 03:27
+tell | A, today's voice: five rounds of mute, 3 s, unmute.
+proof | journalctl -u lamp-eyes --since -5min -o short-monotonic | grep 'camera closed' | tail -10
+mac | mkdir -p /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063 && gh run download 39266127252 -R autonomous-ai/lampOS -n lampos-arm64-05f8290d316825f0b6f5a9d4a72af0d093e7d063 -D /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063
+mac | scp /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063
+lamp | systemctl cat lamp-voice | grep '^ExecStart=' | tail -1
+tell | Is that today's voice? If not, q now. Otherwise Enter to put #1941's voice in.
+lamp | sudo install -D -m 0755 /tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063 /var/lib/lampos-seventh/05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice && sudo mkdir -p /run/systemd/system/lamp-voice.service.d && systemctl cat lamp-voice | grep '^ExecStart=' | tail -1 | sed -E 's#^ExecStart=[^ ]+#ExecStart=/var/lib/lampos-seventh/05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice#' | { printf '[Service]\nExecStart=\n'; cat; } | sudo tee /run/systemd/system/lamp-voice.service.d/60-seventh.conf >/dev/null && sudo systemctl daemon-reload && sudo systemctl restart lamp-voice
+tell | B, #1941's voice: five rounds of mute, 3 s, unmute.
+proof | journalctl -u lamp-eyes --since -5min -o short-monotonic | grep 'camera closed' | tail -10
+proof | journalctl -u lamp-voice --since -5min -o short-monotonic | grep 'the eyes are told no' | tail -10
+back | sudo rm -f /run/systemd/system/lamp-voice.service.d/60-seventh.conf && sudo systemctl daemon-reload && sudo systemctl restart lamp-voice && sudo rm -rf /var/lib/lampos-seventh /tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063
+back | mac: rm -rf /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063
 end
 row | 18 | Smoky air | moves | 3 min
 do | Nobody near the head.
