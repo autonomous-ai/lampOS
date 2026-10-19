@@ -1,0 +1,22 @@
+{
+  "checked_at_utc": "2026-10-19T20:08:00Z",
+  "frozen_music_head": "b59fc17757b6f6dc8f0138c8ac1da077fff06726",
+  "review_kind": "Static review of merged #1986, #2001 and #2011 against the frozen Music rehearsal; no runtime qualification.",
+  "required_compile_adjustment": "Add make_skill: false to the Music agent_tasks::Place test fixture when porting onto #2011.",
+  "preserve": [
+    "Keep holding-answer called_any independent of Music accepted-offer-only acted accounting.",
+    "Preserve original SpokenTurn, scope, request/session/privacy identity and existing offer deadline across resend.",
+    "Retain the first && round == 1 retry guard; no retry after a successful ToolCalls event or completed tool round.",
+    "Keep Tasks on ordinary ToolAnswer transport without requested-audio authority; preserve news-key extraction and private-offer separation.",
+    "Preserve #2016 scoped held-result handling, #2017 warm name carry without PCM replay, and #2008/#2026 speaking-face scope narrowing."
+  ],
+  "regressions_to_run_after_actual_bedtime_landing": [
+    "Accepted Music followed by holding prose: one socket call, one private offer, no HoldingAnswer.",
+    "Written holding continuation cannot authorize Music or expose a private offer.",
+    "Resend before any event retains original identity and runs Music once; failure after a Music call cannot retry the side effect.",
+    "make_skill off/on remains generic and conveys no requested-audio context or offer.",
+    "Speaking-face narrowing invalidates a personal prepared Music call; later scope revocation suppresses a pending reply.",
+    "Warm name carry preserves only words and timing; each listener consumes its own PCM once, and only the fresh eligible turn authorizes Music."
+  ],
+  "status": "Final Music port remains queued behind actual authored Bedtime landing. Existing focused rehearsal gates do not qualify these later upstream changes."
+}
