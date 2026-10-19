@@ -10,7 +10,7 @@
 use lamp_cloud::account::{self, Account};
 use lamp_cloud::lamp::{self, Places, Real, Ring, Texts, Wifi};
 use lamp_cloud::wire::Identity;
-use lamp_cloud::{beat, online, ping, reports};
+use lamp_cloud::{beat, online, ping, reports, skills};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -164,6 +164,8 @@ fn main() -> ExitCode {
         ring: Ring::default(),
         texts: Texts::on(lamp_cloud::chat::on_from_environment()),
         reports: shared,
+        // The app's skills page (#1722): only with LAMP_SKILLS_PAGE=on too.
+        skills: skills::on_from_environment().then(skills::Places::product),
     };
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -186,6 +188,7 @@ fn main() -> ExitCode {
         ring: Ring::default(),
         texts: Texts::default(),
         reports: None,
+        skills: None,
     };
     runtime.block_on(async move {
         let looks = async move {

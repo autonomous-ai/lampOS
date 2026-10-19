@@ -1777,6 +1777,7 @@ dependencies = [
  "lamp-ipc",
  "lamp-msgs",
  "lamp-setup",
+ "lamp-skills",
  "lamp-voice",
  "reqwest",
  "rumqttc",
@@ -1784,6 +1785,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "toml",
  "webpki-roots 1.0.9",
 ]
 

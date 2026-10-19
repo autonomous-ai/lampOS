@@ -12,4 +12,5 @@ pub mod light;
 pub mod online;
 pub mod ping;
 pub mod reports;
+pub mod skills;
 pub mod wire;

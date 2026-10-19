@@ -68,6 +68,9 @@ pub struct Real {
     pub texts: Texts,
     /// Health and crash reports, with `LAMP_REPORTS=on` (#1683).
     pub reports: Option<std::sync::Arc<crate::reports::Shared>>,
+    /// Where the app's skills page reads the skills, with
+    /// `LAMP_SKILLS_PAGE=on` (#1722).
+    pub skills: Option<crate::skills::Places>,
 }
 
 /// Texts from the app (`crate::chat`, #1673): whether they are taken, the
@@ -517,6 +520,10 @@ impl Lamp for Real {
         self.reports.clone()
     }
 
+    fn skills(&self) -> Option<crate::skills::Places> {
+        self.skills.clone()
+    }
+
     fn new_run(&mut self, now_ms: u64) -> String {
         self.texts.stream.new_run(now_ms)
     }
@@ -653,6 +660,7 @@ mod tests {
             ring: Ring::default(),
             texts: Texts::default(),
             reports: None,
+            skills: None,
         };
         let level = Volume {
             volume: 35,
@@ -762,6 +770,7 @@ mod tests {
             ring: Ring::default(),
             texts: Texts::default(),
             reports: None,
+            skills: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.
