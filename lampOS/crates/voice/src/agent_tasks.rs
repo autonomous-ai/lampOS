@@ -1076,6 +1076,23 @@ fn may_confirm(pending: &Pending, request: u64, heard: bool, now: Instant) -> bo
         && now.duration_since(pending.at) <= CONFIRM_WITHIN
 }
 
+/// The note a request is given beside its words on a route that keeps only
+/// the words of its last exchanges, not its calls (the second route,
+/// `crate::second_provider`): a task this voice prepared is waiting for the
+/// person's yes, within [`CONFIRM_WITHIN`]. Without it, on lamp-4ace on 19
+/// Oct the yes was taken as a new hand-over: the work was prepared again
+/// and asked about again, and never started (#1712). None when nothing is
+/// waiting, or for the request that prepared it.
+pub fn pending_note(request: u64, now: Instant) -> Option<String> {
+    let pending = PENDING.lock().ok()?.clone()?;
+    (request > pending.request && now.duration_since(pending.at) <= CONFIRM_WITHIN).then(|| {
+        format!(
+            "(For you to know, not to answer: you have prepared a task for {} and asked the person whether to start it. If they say yes now, call {CONFIRM}; do not call {START} again for that work.)",
+            pending.who
+        )
+    })
+}
+
 /// Run one call. Blocking, for a thread of its own. `heard`: the request the
 /// call came in was something a person said, not something the lamp wrote.
 pub fn run(

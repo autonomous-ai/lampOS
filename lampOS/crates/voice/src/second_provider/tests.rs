@@ -2031,3 +2031,123 @@ async fn a_line_the_name_began_is_asked_with_the_name_note() {
         [Message::system("SYSTEM"), Message::user("What time is it?")]
     );
 }
+
+/// #1712, lamp-4ace's A/B on 19 Oct: a hand-over prepared on this route,
+/// then the person's yes. This route's history keeps words only, so the yes
+/// is asked with the note that a task waits for it, and the model's
+/// `confirm_agent_task` starts it: the tasks part is asked to confirm, not
+/// to prepare again.
+#[test]
+fn a_yes_after_a_hand_over_on_this_route_starts_it() {
+    let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let directory = std::env::temp_dir().join(format!("second-yes-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&directory);
+    std::fs::create_dir_all(&directory).unwrap();
+    let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+    let seen = crate::agent_tasks::tests::tasks_part(
+        &directory,
+        vec![
+            ("request.sock", status(0)),
+            (
+                "request.sock",
+                json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+            ),
+            ("request.sock", status(1)),
+            (
+                "voice.sock",
+                json!({"ok":true,"id":7,"queued":true,"revision":2}),
+            ),
+        ],
+    );
+    let place = crate::agent_tasks::Place {
+        directory: directory.clone(),
+        target: crate::agent_tasks::DEFAULT_TARGET.into(),
+        who: false,
+        lead_in: false,
+        asked: false,
+        needs: None,
+        staff_note: false,
+        accounts: false,
+    };
+    let settings = crate::tools::Settings {
+        tasks: Some(place),
+        ..crate::tools::Settings::default()
+    };
+    let task = "Write a short story";
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Ask Claude Code to write a short story.".to_owned()),
+                Ok("Yes. Please start it.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        crate::agent_tasks::START,
+                        json!({ "task": task }),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Shall I start it?"), Ok(ChatEvent::Done)],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        crate::agent_tasks::CONFIRM,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    text("Okay, giving that to Claude Code."),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        worker::tool_runner(settings, None),
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .noting_a_task_waiting(Arc::new(|request| {
+        crate::agent_tasks::pending_note(request, std::time::Instant::now())
+    }));
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            for request in 1..=2 {
+                engine.submit(start(request));
+                engine.submit(audio(request, 1));
+                engine.submit(end(request));
+                assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+            }
+        });
+    let _ = std::fs::remove_dir_all(&directory);
+    let asked = script.asked.lock().unwrap();
+    // The yes, round 1: the note that a task waits for it, beside its words.
+    assert!(
+        asked[2].iter().any(|message| message.role == "system"
+            && message
+                .content
+                .as_ref()
+                .and_then(Value::as_str)
+                .is_some_and(|note| note.contains(crate::agent_tasks::CONFIRM))),
+        "{:?}",
+        asked[2]
+    );
+    let ops: Vec<Value> = seen.try_iter().collect();
+    let ops: Vec<&str> = ops.iter().filter_map(|op| op["op"].as_str()).collect();
+    assert_eq!(ops, ["status", "prepare", "status", "confirm"]);
+}

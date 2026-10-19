@@ -181,6 +181,10 @@ pub type StaffNote = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 /// began (`worker::Heeding::telling_the_name`, `crate::called`): asked
 /// after the request is judged, with its request.
 pub type NameNote = Arc<dyn Fn(u64) -> Option<&'static str> + Send + Sync>;
+/// The note a spoken request gets while a task this voice prepared waits
+/// for the person's yes (`crate::agent_tasks::pending_note`): with its
+/// request, to the note or nothing.
+pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
 
 /// What every turn task shares.
 struct Shared {
@@ -211,6 +215,8 @@ struct Shared {
     staff: Option<StaffNote>,
     /// With `LAMP_NAME_NOTE=on`: the note for a line the lamp's name began.
     name_note: Option<NameNote>,
+    /// With the tasks part: the note that a prepared task waits for a yes.
+    task_waiting: Option<TaskNote>,
 }
 
 /// A stop to be told beside a request's chat ([`crate::provider_worker::STOPPED_NOTE`]).
@@ -455,6 +461,7 @@ impl Engine {
                 stop_untold: Mutex::new(None),
                 staff: None,
                 name_note: None,
+                task_waiting: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -525,6 +532,18 @@ impl Engine {
     pub fn noting_the_name(mut self, note: NameNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.name_note = Some(note);
+        }
+        self
+    }
+
+    /// While a task this voice prepared waits for the person's yes, a spoken
+    /// request is told so beside its words (`note`, with the tasks part):
+    /// this route's history keeps the words of its last exchanges, not its
+    /// calls, so without it a yes was taken as a new hand-over (#1712).
+    /// Before any turn only.
+    pub fn noting_a_task_waiting(mut self, note: TaskNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.task_waiting = Some(note);
         }
         self
     }
@@ -1128,7 +1147,16 @@ async fn spoken(
         .as_ref()
         .and_then(|note| note(request))
         .map(str::to_owned);
-    let notes = stopped.into_iter().chain(staff).chain(named).collect();
+    // A task prepared and waiting for a yes: this route's history keeps the
+    // words of its last exchanges, not its calls, so the model is told, or a
+    // yes is taken as a new hand-over (#1712).
+    let waiting = shared.task_waiting.as_ref().and_then(|note| note(request));
+    let notes = stopped
+        .into_iter()
+        .chain(staff)
+        .chain(named)
+        .chain(waiting)
+        .collect();
     answer(&shared, request, text, Asker::Spoken, None, notes, times).await;
 }
 

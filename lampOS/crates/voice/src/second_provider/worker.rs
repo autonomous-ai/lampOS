@@ -735,6 +735,7 @@ pub fn serve(
         .clone()
         .filter(|_| files.staff_note)
         .map(staff_noting);
+    let has_tasks = tools.tasks.is_some();
     let runner = tool_runner(tools, search);
     let system: crate::second_provider::System = Arc::new(system);
     let mut engine = Engine::new(
@@ -752,6 +753,12 @@ pub fn serve(
     .saying_reminders(reminders);
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
+    }
+    // A hand-over waiting for its yes, with the tasks part (#1712).
+    if has_tasks {
+        engine = engine.noting_a_task_waiting(Arc::new(|request| {
+            crate::agent_tasks::pending_note(request, Instant::now())
+        }));
     }
     // A look reads the eyes' look file with the Live route's bounds: a full
     // look's still may be older and larger (#836, #941).
