@@ -371,6 +371,12 @@ struct Shared {
     /// A spoken turn's chat begins on the line's early words
     /// ([`Engine::preparing`]).
     prepare: bool,
+    /// A listener is kept connected for the next line
+    /// ([`Engine::keeping_a_listener_ready`]): the one kept, and how many
+    /// have been opened, so an expiry takes only its own.
+    keep_listener: bool,
+    spare: Mutex<Option<Kept>>,
+    spares: AtomicU64,
     /// The request begun last, with its session, for a look asked by a call.
     begun: Mutex<Option<(u64, u64)>>,
     /// The spoken request being answered and its words, until any of its
@@ -602,6 +608,9 @@ const POLICY_POLL: Duration = Duration::from_millis(50);
 /// these). A written or reminded turn has none.
 #[derive(Default)]
 struct Marks {
+    /// The privacy generation the line began under: a listener kept for it
+    /// must be of the same one ([`Kept`]).
+    privacy: u64,
     /// Begun over the lamp's audible answer, and not the first after a
     /// stop, which is told that instead, with `--cut-in-told`
     /// (`LAMP_CUT_IN_TOLD`, [`crate::cut_in_told::NOTE`]).
@@ -736,6 +745,9 @@ impl Engine {
                 words_heard: None,
                 look_by_call: false,
                 prepare: false,
+                keep_listener: false,
+                spare: Mutex::new(None),
+                spares: AtomicU64::new(0),
                 begun: Mutex::new(None),
                 in_flight: Mutex::new(None),
                 answered_request: Mutex::new(None),
@@ -877,6 +889,37 @@ impl Engine {
     pub fn answering_the_lamp(mut self, asked: Asked) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.asked = Some(asked);
+        }
+        self
+    }
+
+    /// Whether the microphone may be listened to, and under which privacy
+    /// generation, from each authority the worker installs: a kept listener
+    /// goes at once when listening stops (the privacy switch, a mute) or
+    /// the generation changes, before any line's sound could reach it
+    /// (#1712, the first builder at 00:31).
+    pub fn listening(&self, allowed: bool, generation: u64) {
+        if let Ok(mut spare) = self.shared.spare.lock()
+            && spare
+                .as_ref()
+                .is_some_and(|kept| !allowed || kept.generation != generation)
+            && let Some(kept) = spare.take()
+        {
+            kept.opening.abort();
+        }
+    }
+
+    /// Speech to text's socket for the next line is opened while this one
+    /// is heard and kept with `KeepAlive`, so the next line's sound goes to
+    /// it from its first block (`LAMP_SECOND_STT_WARM=on`, #1712, the first
+    /// builder at 00:25). Each line opened its own socket as it began, and
+    /// its sound waited until the socket was open, then went at once: on
+    /// lamp-4ace 8 of 12 lines' words waited 0.9 to 2.3 s for Deepgram to
+    /// hear the burst. A kept socket found closed is not used, and the line
+    /// opens its own as before. Before any turn only.
+    pub fn keeping_a_listener_ready(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.keep_listener = on;
         }
         self
     }
@@ -1112,6 +1155,7 @@ impl Engine {
             ProviderInput::Start {
                 request,
                 session,
+                privacy_generation,
                 continues,
                 continues_cut_off,
                 after_stop,
@@ -1219,6 +1263,7 @@ impl Engine {
                     follows_on,
                     sound: sound.clone(),
                     called: AtomicBool::new(false),
+                    privacy: privacy_generation,
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
@@ -1715,13 +1760,68 @@ async fn spoken(
         .into_iter()
         .collect();
     let begun = Instant::now();
-    let mut listener = match shared.services.listen().await {
+    // The listener kept ready for this line, if one is, of this privacy
+    // generation, and still open; otherwise its own, opened now. One found
+    // closed is dropped without a word.
+    let kept = shared.spare.lock().ok().and_then(|mut spare| spare.take());
+    let kept = match kept {
+        Some(kept) if kept.generation == marks.privacy => match kept.opening.await {
+            Ok(Ok(listener)) if listener.open() => Some(listener),
+            _ => None,
+        },
+        Some(kept) => {
+            kept.opening.abort();
+            None
+        }
+        None => None,
+    };
+    let from = if kept.is_some() {
+        "kept ready"
+    } else {
+        "opened"
+    };
+    let connected = match kept {
+        Some(listener) => Ok(listener),
+        None => shared.services.listen().await,
+    };
+    let mut listener = match connected {
         Ok(listener) => listener,
         Err(error) => {
             shared.stages(request, &Times::new(begun)).await;
             return shared.fail(request, FailedStage::InputOpen, &error).await;
         }
     };
+    // How long the line's sound waited for it, in its 10 ms blocks.
+    eprintln!(
+        "lamp-voice second: request {request}: speech to text {from} in {} ms, {} ms of the line's sound waiting",
+        begun.elapsed().as_millis(),
+        heard.len() * 10
+    );
+    // And the next line's, opened while this one is heard, kept at most
+    // [`KEPT_FOR`]: a lamp nobody talks to keeps nothing open.
+    if shared.keep_listener {
+        let number = shared.spares.fetch_add(1, Ordering::Relaxed) + 1;
+        if let Ok(mut spare) = shared.spare.lock()
+            && let Some(old) = spare.replace(Kept {
+                number,
+                generation: marks.privacy,
+                opening: tokio::spawn(shared.services.listen()),
+            })
+        {
+            old.opening.abort();
+        }
+        let expiring = Arc::downgrade(&shared);
+        tokio::spawn(async move {
+            tokio::time::sleep(KEPT_FOR).await;
+            if let Some(shared) = expiring.upgrade()
+                && let Ok(mut spare) = shared.spare.lock()
+                && spare.as_ref().is_some_and(|kept| kept.number == number)
+                && let Some(kept) = spare.take()
+            {
+                kept.opening.abort();
+            }
+        });
+    }
     // The words before they are final, for a chat begun on them.
     let mut early = if shared.prepare {
         listener.early()
@@ -2036,6 +2136,24 @@ async fn spoken(
         prepared,
     )
     .await;
+}
+
+/// Where the worker reads [`Engine::keeping_a_listener_ready`]: `on`, and
+/// nothing else.
+pub const STT_WARM_ENVIRONMENT: &str = "LAMP_SECOND_STT_WARM";
+
+/// How long a listener kept for the next line is kept: a conversation's
+/// lines come seconds apart, and after this the lamp keeps nothing open
+/// (#1712, the first builder at 00:31: "at most a few minutes").
+pub const KEPT_FOR: Duration = Duration::from_secs(180);
+
+/// A listener opening, or open, for the next line
+/// ([`Engine::keeping_a_listener_ready`]): which one it is, the privacy
+/// generation it was opened under, and its connection.
+struct Kept {
+    number: u64,
+    generation: u64,
+    opening: JoinHandle<net::Result<Box<dyn Listener>>>,
 }
 
 /// Where the worker reads [`Engine::preparing`]: `on`, and nothing else.

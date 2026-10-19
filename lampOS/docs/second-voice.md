@@ -505,6 +505,29 @@ order is kept. A written turn is the same from the chat on.
   clause went to ElevenLabs 2.8 s after the words), and 6 with Gemini's
   (`FIRST_WORDS`). `LAMP_SECOND_FIRST_WORDS=N` sets it, from 0 (whole
   clauses only) to 20, for an A/B.
+- **Each line's speech-to-text socket is journaled as it is taken:**
+  `request N: speech to text opened in C ms, A ms of the line's sound
+  waiting` (or `kept ready`). The line's sound comes in 10 ms blocks from
+  its start and waits until the socket is open, then goes at once (#1712,
+  the first builder at 00:25: on lamp-4ace 8 of 12 lines' words came 0.9
+  to 2.3 s after the line, `Finalize`'s answer reaching only 0.3 to 1.2 s
+  of the 1.1 to 2.8 s sent; Deepgram was still hearing the burst).
+- **With `LAMP_SECOND_STT_WARM=on`, the next line's socket is kept open**
+  (off unless set; `Engine::keeping_a_listener_ready`). As a line takes its
+  socket, the next is opened in the background and kept with `KeepAlive`
+  (every 5 s, `KEEP_ALIVE`). The next line takes it at once, so its sound
+  goes live from its first block. Its bounds (the first builder at 00:31):
+  - **at most 3 minutes** (`KEPT_FOR`), then it is closed, so a lamp
+    nobody talks to keeps nothing open; a line after that opens its own;
+  - **closed at once when listening stops** (the privacy switch, a mute)
+    or the microphone's privacy generation changes (`Engine::listening`,
+    from each authority the worker installs), and never used for a line of
+    another generation; no audio is sent on it before a line takes it;
+  - **one found closed** (`Listener::open`, `SttStream::still_open`) is
+    dropped without a word, and the line opens its own as before.
+
+  The cost is one idle socket to the relay's proxy during a conversation:
+  Deepgram bills the audio sent, and `KeepAlive` sends none.
 - **With `LAMP_SECOND_PREPARED=on` the chat is begun on the line's early
   words** (off unless set; #1712, the first builder at 17:02: the route's
   first word came about 3.4 s after a line, Live's 2.4 s, and the bar is
