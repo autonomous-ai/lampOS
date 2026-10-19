@@ -14,6 +14,7 @@
 //! Off unless `LAMP_ONBOARDING=on` and `LAMP_ONBOARDING_FILE` names an
 //! absolute path: then nothing here runs, no function is declared and no
 //! file is read or written.
+pub(crate) mod giving_way;
 pub(crate) mod hardware;
 pub(crate) mod near;
 pub(crate) mod privacy;
@@ -101,8 +102,8 @@ impl Step {
 
     /// PLACEHOLDER (#841): the steps whose parts other builders own. Each
     /// is passed over until its part can be measured from here: head touch
-    /// (third, #711) and whether the body gives way (fifth, #780). Privacy
-    /// and how they sound (#1803) have their own availability.
+    /// (third, #711). Privacy, how they sound (#1803) and giving way (#1800)
+    /// have their own availability.
     fn available(self) -> bool {
         matches!(
             self,
@@ -114,7 +115,9 @@ impl Step {
     /// it was skipped.
     fn reportable(self, outcome: Outcome) -> bool {
         match self {
-            Step::WhereYouSit | Step::Privacy | Step::HowYouSound => outcome == Outcome::Skipped,
+            Step::WhereYouSit | Step::Privacy | Step::HowYouSound | Step::GivingWay => {
+                outcome == Outcome::Skipped
+            }
             _ => outcome != Outcome::NotAvailable,
         }
     }
@@ -131,7 +134,7 @@ impl Step {
         }
     }
 
-    /// Only the future GivingWay step may request a completion movement.
+    /// Only the GivingWay step may request a completion movement.
     /// Other onboarding steps stay physically still (the owner's #841 decision).
     fn gesture(self) -> &'static str {
         match self {
@@ -368,6 +371,7 @@ pub struct Onboarding {
     gesture: Option<&'static str>,
     privacy_flow: PrivacyFlow,
     near: near::NearFlow,
+    giving: giving_way::GivingWayFlow,
     /// Unix milliseconds, for evidence dated by the bus (tests set their own).
     unix_clock: fn() -> u64,
 }
@@ -464,6 +468,7 @@ impl Onboarding {
             gesture: None,
             privacy_flow: PrivacyFlow::default(),
             near: near::NearFlow::default(),
+            giving: giving_way::GivingWayFlow::default(),
             unix_clock: unix_ms,
             looked: None,
             felt: None,
@@ -507,6 +512,7 @@ impl Onboarding {
         self.privacy_flow.attempt = None;
         self.privacy_flow.pending_result = None;
         self.forget_near();
+        self.forget_giving();
         self.owed = None;
         self.gesture = None;
     }
@@ -569,6 +575,7 @@ impl Onboarding {
             self.privacy_flow.pending_result = None;
             self.privacy_flow.loaded = false;
             self.forget_near();
+            self.forget_giving();
             self.checkpoint_bytes = None;
         }
         if !snapshot.ready {
@@ -752,6 +759,8 @@ impl Onboarding {
             self.privacy_available()
         } else if step == Step::HowYouSound {
             self.near_available()
+        } else if step == Step::GivingWay {
+            self.giving_way_available()
         } else {
             (self.available)(step)
         }
@@ -1136,9 +1145,9 @@ impl Onboarding {
 
     /// The one pending invitation, of whichever measured step is led.
     pub(crate) fn pending(&self) -> lamp_msgs::OnboardingPending {
-        match self.near_pending() {
-            Some(near) => lamp_msgs::OnboardingPending {
-                invitations: vec![near],
+        match self.near_pending().or_else(|| self.giving_pending()) {
+            Some(offer) => lamp_msgs::OnboardingPending {
+                invitations: vec![offer],
             },
             None => self.privacy_pending(),
         }
@@ -1147,6 +1156,8 @@ impl Onboarding {
     pub(crate) fn take_invitation(&mut self, token: u64, now_us: u64) -> Option<String> {
         if self.near_pending().is_some() {
             self.take_near_invitation(token, now_us)
+        } else if self.giving_pending().is_some() {
+            self.take_giving_invitation(token, now_us)
         } else {
             self.take_privacy_invitation(token, now_us)
         }
@@ -1154,16 +1165,19 @@ impl Onboarding {
 
     pub(crate) fn bind_invitation(&mut self, token: u64, voice_boot: BootId, turn: u64) -> bool {
         self.bind_near_invitation(token, voice_boot, turn)
+            || self.bind_giving_invitation(token, voice_boot, turn)
             || self.bind_privacy_invitation(token, voice_boot, turn)
     }
 
     pub(crate) fn invitation_binding(&self) -> Option<(BootId, u64)> {
         self.near_binding()
+            .or_else(|| self.giving_binding())
             .or_else(|| self.privacy_invitation_binding())
     }
 
     pub(crate) fn invitation_refused(&mut self, token: u64, now_us: u64) {
         self.near_invitation_refused(token, now_us);
+        self.giving_invitation_refused(token, now_us);
         self.privacy_invitation_refused(token, now_us);
     }
 
@@ -1175,6 +1189,7 @@ impl Onboarding {
         now_us: u64,
     ) {
         self.near_invitation_finished(voice_boot, turn, delivered_whole, now_us);
+        self.giving_invitation_finished(voice_boot, turn, delivered_whole, now_us);
         self.privacy_invitation_finished(voice_boot, turn, delivered_whole, now_us);
     }
 
@@ -1301,6 +1316,8 @@ impl Onboarding {
         if paused {
             self.invalidate_privacy(privacy::Invalidation::FenceFailure);
             self.invalidate_near();
+            // Giving way under the pause is not available: offered later.
+            self.giving_way_paused(now_us);
             // The keeper's pause stops the walk; a step being led is asked
             // again afterwards.
             if self.led.take().is_some_and(|led| led.asked_us.is_some()) {
@@ -1311,6 +1328,7 @@ impl Onboarding {
         }
         // A try is judged on its own evidence, whatever storage is doing.
         self.near_judge(now_us);
+        self.giving_judge(now_us);
         if !self.storage_idle() {
             return None;
         }
@@ -1354,6 +1372,10 @@ impl Onboarding {
         }
         if step == Step::HowYouSound {
             self.near_tick(now_us, quiet_us, can_speak, face.is_some());
+            return None;
+        }
+        if step == Step::GivingWay {
+            self.giving_tick(now_us, quiet_us, can_speak, face.is_some());
             return None;
         }
         let gone = self
@@ -1522,6 +1544,7 @@ impl Onboarding {
                 self.invalidate_privacy(privacy::Invalidation::Redo);
                 self.forget_near();
                 self.near.generation = 0;
+                self.redo_giving();
                 self.privacy_flow.loaded = true;
                 self.privacy_flow.maintenance_failed = false;
                 self.privacy_flow.failures = 0;
@@ -1562,6 +1585,10 @@ impl Onboarding {
                     // A skip leaves any earlier bar as it is; late evidence
                     // and a late write of this walk are dropped.
                     self.invalidate_near();
+                    self.finish(step, outcome, None, now_us);
+                } else if step == Step::GivingWay {
+                    // Late evidence of this walk's try is dropped.
+                    self.forget_giving();
                     self.finish(step, outcome, None, now_us);
                 } else {
                     self.finish(step, outcome, None, now_us);
@@ -1653,7 +1680,7 @@ pub fn tools() -> Vec<Tool> {
                           to lead has ended: done, skipped because they asked to skip it, or failed. If \
                           they want to skip the rest, call it skipped for the step you are on. Then go on \
                           talking as the step asked. Only for the step you are leading now; \
-                          where_you_sit, how_you_sound and privacy can only be skipped; the runner requires physical evidence."
+                          where_you_sit, how_you_sound, privacy and giving_way can only be skipped; the runner requires physical evidence."
                 .into(),
             parameters: Some(json!({
                 "type": "object",
@@ -1701,6 +1728,12 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
                 (Some(Step::HowYouSound), Some(_)) => {
                     return (
                         json!({"error":"How they call you is learned only from their calls heard from their seat. You can only skip it if they ask."}),
+                        true,
+                    );
+                }
+                (Some(Step::GivingWay), Some(_)) => {
+                    return (
+                        json!({"error":"Giving way is done only when the body feels a hand move its head and let go. You can only skip it if they ask."}),
                         true,
                     );
                 }
@@ -2315,6 +2348,8 @@ mod tests {
     }
 }
 
+#[cfg(test)]
+mod giving_way_flow_tests;
 #[cfg(test)]
 mod near_flow_tests;
 #[cfg(test)]

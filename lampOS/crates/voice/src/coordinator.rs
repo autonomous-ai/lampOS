@@ -4160,6 +4160,11 @@ fn conversation_with_gate(
     let mut onboarding_ears = onboarding
         .as_ref()
         .and_then(|_| crate::onboarding::near::Ears::from_environment());
+    // The giving-way step's evidence (#1800): `body/hand` and
+    // `body/joint_states`, drained without waiting.
+    let mut onboarding_feel = onboarding
+        .as_ref()
+        .and_then(|_| crate::onboarding::giving_way::Feel::from_environment());
     // News from the work handed to agents on other computers, told
     // unasked at a good moment (`docs/tasks.md`).
     #[cfg(test)]
@@ -4818,6 +4823,20 @@ fn conversation_with_gate(
             if let Some(ears) = onboarding_ears.as_mut() {
                 for seen in ears.take(monotonic_us()) {
                     walk.near_seen(seen);
+                }
+            }
+            // No body to give way: the step is not available.
+            walk.set_giving_way_available(
+                says.is_some()
+                    && bus_out.is_some()
+                    && body_link.is_some()
+                    && onboarding_feel.is_some()
+                    && !trace.onboarding_privacy_disabled,
+            );
+            if let Some(feel) = onboarding_feel.as_mut() {
+                let now_us = monotonic_us();
+                for felt in feel.take(now_us) {
+                    walk.giving_way_felt(felt, now_us);
                 }
             }
         }
@@ -8023,6 +8042,9 @@ fn conversation_with_gate(
                         match offer.step {
                             lamp_msgs::OnboardingStep::Privacy => "onboarding_privacy_invitation",
                             lamp_msgs::OnboardingStep::HowYouSound => "onboarding_near_call_prompt",
+                            lamp_msgs::OnboardingStep::GivingWay => {
+                                "onboarding_giving_way_invitation"
+                            }
                         },
                         provider_session,
                         rig.playout_start,

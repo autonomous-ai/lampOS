@@ -40,7 +40,7 @@ const COLLECT_MS: u64 = WINDOW_MS + RISE_MS;
 const DELIVERY_GRACE_US: u64 = 300_000;
 /// The Unix clock may drift from the monotonic one by this much over a try;
 /// more is a jump, and the try's window can't be trusted.
-const CLOCK_SLACK_MS: u64 = 1_000;
+pub(super) const CLOCK_SLACK_MS: u64 = 1_000;
 /// Speaking history kept from before the prompt's end: at least the
 /// echo guard (`ECHO_BEFORE_MS`, 500 ms) before any hearing in the window.
 const HISTORY_MS: u64 = 1_500;

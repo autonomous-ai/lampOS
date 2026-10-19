@@ -49,6 +49,11 @@ pub mod trajectory;
 pub mod units;
 
 pub const JOINT_COUNT: usize = 5;
+/// A joint that gave way and then moved more than this many counts from
+/// where it gave way, while in a hand, was moved by the hand (`body.rs`,
+/// `in_hand_after`). Here, outside the Linux-only `body` module, so onboarding's
+/// giving-way step (#1800) judges by the same rule.
+pub const HAND_MOVED: u16 = 15;
 /// Model number from the pinned STS3215 SDK table, not a device observation.
 pub const STS3215_MODEL_NUMBER: u16 = 777;
 

@@ -11,6 +11,9 @@ pub enum OnboardingStep {
     /// One prompt to call the lamp by name from the person's usual seat
     /// (#1803). Only the prompt's identity travels here, never a measurement.
     HowYouSound,
+    /// One invitation to move the lamp's head gently by hand (#1800). Only
+    /// its identity travels here, never what the body felt.
+    GivingWay,
 }
 
 /// The runner owns these identities. A new invitation token is required after
@@ -106,5 +109,8 @@ mod tests {
             serde_json::from_str(&text.replace("privacy", "how_you_sound")).unwrap();
         assert_eq!(near.invitations[0].step, OnboardingStep::HowYouSound);
         assert!(near.check().is_ok());
+        let giving: OnboardingPending =
+            serde_json::from_str(&text.replace("privacy", "giving_way")).unwrap();
+        assert_eq!(giving.invitations[0].step, OnboardingStep::GivingWay);
     }
 }

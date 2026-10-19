@@ -122,7 +122,7 @@ const CONTACT_FLOOR: [u16; 3] = [650, 750, 550];
 const CONTACT_YAW_SHARE: u16 = 55;
 const CONTACT_STEPS: u8 = 3;
 const HAND_STEPS: u16 = 50;
-const HAND_MOVED: u16 = 15;
+use crate::HAND_MOVED;
 const LIMP_LAG: u16 = 11;
 /// With `--give-way`, a joint whose goal is more than `STALL_SLACK` counts
 /// from where it is, whose load is over `STALL_LOAD` and which moves no
