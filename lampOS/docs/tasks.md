@@ -660,10 +660,42 @@ are off:
 - **Without the switch** nothing of this is said or read, and the part
   starts, stops and reports as before.
 
-Not yet: writing `targets.json` from `harness machines --json` (#1676 B6
-step 3, which waits on the first builder's word on aliases), installing
-Harness (`lamp-update harness-on`, B5) and signing in a lamp with no
-screen (openharness#1410).
+- **Targets written from the person's machines** (`--targets-from-machines
+  ENGINE`, only with `--set-up-later`; off unless set, #1676 B6 step 3).
+  While Harness is signed in (`signed_in` `yes`, not `offline`), every five
+  looks (five minutes on a lamp, after everything else on the Harness
+  worker), the part runs `harness machines --json` and writes
+  `targets.json` from it:
+  - **which:** every machine but the lamp itself (Harness's `current`), at
+    most 8, newest first as Harness lists them;
+  - **aliases:** the first is `office`, the alias the voice asks for unless
+    `LAMP_TASKS_TARGET` names another, so today's voice finds it with no
+    change. Each other is its Harness name (else its hostname) made into an
+    alias: lower case letters and digits, `-` between words, at most 32
+    bytes (`MacBook Air` is `macbook-air`), `computer` with nothing left,
+    and `-2`, `-3` … where two would be the same;
+  - **each target:** the machine's id, the folder `~/harnesses/lamp-tasks`
+    (lamp-4ace's today; Harness makes it the first time) and `ENGINE`
+    (`claude`, `codex` or `opencode`), until Harness says which engines a
+    machine has (openharness#1410's question 2).
+
+  **Never over someone else's file.** The part writes only where there's
+  no file, or the file is one it wrote: `targets.json.from-machines`
+  beside it holds the sha256 of what it wrote. A file a person or a
+  pairing wrote is left as it is, and the journal says so once. The mark
+  is written before the file and names both the old and the new, so a stop
+  between the two never makes the part's own file look like someone
+  else's. Each write goes beside the file, synced, then renamed over it,
+  0600. With no machine but the lamp, the part removes its own file: no
+  computer again. The file is read back by the look above, at once, with
+  the same strictness, and a task already handed over keeps its target.
+  One journal line a change, with how many targets and never their names.
+
+Not yet: installing Harness (`lamp-update harness-on`, B5) and signing in a
+lamp with no screen (Harness's box ticket, `harness login --ticket`; #1410).
+The reset plan doesn't list `targets.json.from-machines`. A mark left after
+a reset changes nothing: a missing file is the part's to write anyway, and
+a file a person writes has another sha256.
 
 Tests: `engine::tests::targets_read_again_are_used_from_then_on_and_a_task_keeps_its_own`,
 `engine::tests::targets_for_a_newer_build_read_again_are_off_until_valid_ones_come`,
@@ -673,7 +705,13 @@ Tests: `engine::tests::targets_read_again_are_used_from_then_on_and_a_task_keeps
 (a mutation that reads the file only once fails it),
 `without_set_up_later_the_report_is_as_before`,
 `tests/runtime_failures.rs`: `set_up_later_runs_with_no_harness_and_no_targets_and_refuses_with_why`
-(the real binary; without the switch the same start fails).
+(the real binary; without the switch the same start fails),
+`tests/harness.rs`: `the_machines_are_one_call_read_as_harness_lists_them`,
+`runtime::tests::targets_from_machines_name_the_first_office_and_the_rest_by_name`,
+`runtime::tests::targets_are_written_from_machines_only_where_the_file_is_the_parts_own`
+(writing over a file without the part's mark fails it),
+`tests/runtime.rs`: `targets_from_machines_are_written_and_used_while_signed_in`
+(asking while signed out fails it), `targets_from_machines_needs_an_engine_and_set_up_later`.
 
 ## Host qualification and first lamp check
 

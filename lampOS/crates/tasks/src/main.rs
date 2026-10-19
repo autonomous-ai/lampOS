@@ -58,6 +58,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut push_wait = false;
     let mut close_told = false;
     let mut set_up_later = false;
+    let mut from_machines = None;
     let mut seen = std::collections::BTreeSet::new();
     while let Some(arg) = args.next() {
         if !seen.insert(arg.clone()) {
@@ -72,6 +73,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--push-wait" => push_wait = true,
             "--close-told" => close_told = true,
             "--set-up-later" => set_up_later = true,
+            "--targets-from-machines" => {
+                let engine = args
+                    .next()
+                    .ok_or("--targets-from-machines needs claude, codex or opencode")?;
+                from_machines = Some(
+                    serde_json::from_value::<lamp_tasks::harness::EngineKind>(
+                        serde_json::Value::String(engine),
+                    )
+                    .map_err(|_| "--targets-from-machines needs claude, codex or opencode")?,
+                );
+            }
             "--dir" => dir = Some(PathBuf::from(args.next().ok_or("--dir needs a path")?)),
             "--socket" => socket = Some(PathBuf::from(args.next().ok_or("--socket needs a path")?)),
             "--voice-socket" => {
@@ -102,6 +114,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             _ => return Err("unknown option".into()),
         }
+    }
+    if from_machines.is_some() && !set_up_later {
+        return Err("--targets-from-machines writes targets only with --set-up-later".into());
     }
     if push_wait && !watch {
         return Err("--push-wait reads with the watch; it cannot go with --no-watch".into());
@@ -149,6 +164,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         set_up_later: set_up_later.then_some(SetUpLater {
             targets: targets_path,
             every: SET_UP_LOOK_EVERY,
+            from_machines,
         }),
     };
     let clock = SystemClock::new(boot_id.as_deref())?;

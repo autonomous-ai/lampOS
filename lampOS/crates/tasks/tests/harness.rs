@@ -1,9 +1,9 @@
 //! Scripted local executable fixtures. No installed Harness, daemon, account,
 //! remote agent, credentials or provider is invoked by these tests.
 use lamp_tasks::harness::{
-    Cli, CliConfig, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES,
-    MOST_LISTED, MOST_WAITED, PS_STDOUT_LIMIT, SignIn, Target, iso_unix_ms, parse_auth_status,
-    parse_ps, parse_wait,
+    AccountMachine, Cli, CliConfig, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed,
+    MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED, PS_STDOUT_LIMIT, SignIn, Target, iso_unix_ms,
+    parse_auth_status, parse_machines, parse_ps, parse_wait,
 };
 use serde_json::{Value, json};
 use std::{
@@ -1032,6 +1032,70 @@ fn sign_in_is_one_auth_status_read_as_harness_gives_it() {
         rig.plan(json!({"auth":step}));
         assert_eq!(rig.cli().signed_in(), Err(code.into()));
     }
+}
+
+/// #1676: the machines as `harness machines --json` lists them (openharness
+/// `machinesListCommand`: the backend's row with `current` added), one call,
+/// each named by its own name, else its hostname, with other fields passed
+/// over; the same strictness as the launch's preflight.
+#[test]
+fn the_machines_are_one_call_read_as_harness_lists_them() {
+    let other = "ffffffffffffffffffffffffffffffff";
+    let listing = format!(
+        "{}\n{}\n{}\n",
+        json!({"machineId":MACHINE,"name":"Office iMac","hostname":"imac.local","status":"online","agentCount":3,"current":false}),
+        json!({"machineId":other,"name":null,"hostname":"  lamp  ","status":"online","agentCount":0,"current":true}),
+        json!({"machineId":"0123456789abcdef0123456789abcdee","name":" ","hostname":null,"status":"offline","agentCount":0,"current":false}),
+    );
+    let rig = Rig::new();
+    rig.plan(json!({"machines":{"stdout":listing}}));
+    assert_eq!(
+        rig.cli().machines().unwrap(),
+        [
+            AccountMachine {
+                machine_id: MACHINE.into(),
+                label: "Office iMac".into(),
+                current: false
+            },
+            AccountMachine {
+                machine_id: other.into(),
+                label: "lamp".into(),
+                current: true
+            },
+            AccountMachine {
+                machine_id: "0123456789abcdef0123456789abcdee".into(),
+                label: "".into(),
+                current: false
+            },
+        ]
+    );
+    let calls = rig.calls();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0]["args"], json!(["machines", "--json"]));
+    assert_eq!(parse_machines(b""), Ok(vec![]));
+    for bad in [
+        format!("{}\n", json!({"machineId":"01234567","current":false})),
+        format!(
+            "{}\n{}\n",
+            json!({"machineId":MACHINE,"current":true}),
+            json!({"machineId":other,"current":true})
+        ),
+        format!(
+            "{}\n{}\n",
+            json!({"machineId":MACHINE,"current":false}),
+            json!({"machineId":MACHINE,"current":false})
+        ),
+        "{malformed}\n".into(),
+    ] {
+        assert_eq!(
+            parse_machines(bad.as_bytes()),
+            Err("machines_invalid_reply"),
+            "{bad}"
+        );
+    }
+    let rig = Rig::new();
+    rig.plan(json!({"machines":{"exit":1,"stdout":"{}"}}));
+    assert_eq!(rig.cli().machines(), Err("machines_failed".into()));
 }
 
 const OTHER: &str = "33333333-3333-4333-8333-333333333333";
