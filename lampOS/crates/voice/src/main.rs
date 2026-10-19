@@ -48,7 +48,8 @@ fn stt_check_options(rest: &[String]) -> Result<(u32, u32)> {
 
 /// `probe-cascade`'s `[RUNS] [--look JPEG | --wire [--kept]]`, in that
 /// order: five runs, every candidate and no look unless said; at most 50
-/// runs. With `--wire`, `Some`, holding whether `--kept` was given.
+/// runs, 20 with `--kept`. With `--wire`, `Some`, holding whether `--kept`
+/// was given.
 fn probe_options(rest: &[String]) -> Result<(u32, Option<std::path::PathBuf>, Option<bool>)> {
     let usage = || {
         io::Error::other(
@@ -66,7 +67,9 @@ fn probe_options(rest: &[String]) -> Result<(u32, Option<std::path::PathBuf>, Op
         [flag, kept] if flag == "--wire" && kept == "--kept" => (None, Some(true)),
         _ => return Err(usage().into()),
     };
-    if !(1..=50).contains(&runs) {
+    if !(1..=50).contains(&runs)
+        || (wire == Some(true) && runs > lamp_voice::second_provider::probe::wire::MOST_KEPT_RUNS)
+    {
         return Err(usage().into());
     }
     Ok((runs, look, wire))

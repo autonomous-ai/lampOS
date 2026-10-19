@@ -119,6 +119,10 @@ impl Arm {
     }
 }
 
+/// The most runs `--kept` takes: each makes 12 paid requests and waits 5 s
+/// four times (the reviewer on #2044).
+pub const MOST_KEPT_RUNS: u32 = 20;
+
 /// How long the kept connection sits idle before [`Arm::Idle`]: past any
 /// retransmission timeout, so the kernel restarts slow start unless
 /// `net.ipv4.tcp_slow_start_after_idle` is 0 (the first builder on #1934).
@@ -753,6 +757,70 @@ fn run_cold(prepared: &Prepared, runs: u32) -> io::Result<()> {
     Ok(())
 }
 
+/// What became of one arm's request on a kept connection ([`kept_arms`]).
+#[derive(Debug)]
+pub enum Asked {
+    /// Answered 200: its times, and the request's size.
+    Timed(Times, usize),
+    /// Not timed: refused (its status; 0 when nothing came), or not made
+    /// because the connection was no longer kept for it (`None`).
+    Closed(Option<u16>),
+    /// A step failed, told by its name and kind.
+    Failed(String),
+}
+
+/// One run's three arms ([`Arm::ALL`]) on `connection`, whose making took
+/// `connected`: `body(at)` is each arm's request, and the idle one waits
+/// `idle` first. Only a 200 is timed, so a refused answer never mixes into
+/// an arm's medians. Once an answer doesn't keep the connection, or a post
+/// fails, the arms after it are [`Asked::Closed`]: a real turn would then pay
+/// a new connection (the reviewer on #2044).
+pub fn kept_arms(
+    connection: Connection,
+    connected: Times,
+    auth: &str,
+    body: impl Fn(usize) -> io::Result<Vec<u8>>,
+    idle: Duration,
+) -> io::Result<Vec<Asked>> {
+    let mut connection = Some(connection);
+    let mut asked = Vec::with_capacity(Arm::ALL.len());
+    for (at, arm) in Arm::ALL.into_iter().enumerate() {
+        let Some(open) = connection.as_mut() else {
+            asked.push(Asked::Closed(None));
+            continue;
+        };
+        if arm == Arm::Idle {
+            std::thread::sleep(idle);
+        }
+        let body = body(at)?;
+        let posted = open.post(auth, &body, true);
+        match posted {
+            Ok((send, answer)) => {
+                if !answer.kept {
+                    connection = None;
+                }
+                if answer.status == 200 {
+                    let mut times = if arm == Arm::First {
+                        connected
+                    } else {
+                        Times::default()
+                    };
+                    times.send = send;
+                    times.answer = answer;
+                    asked.push(Asked::Timed(times, body.len()));
+                } else {
+                    asked.push(Asked::Closed(Some(answer.status)));
+                }
+            }
+            Err(error) => {
+                connection = None;
+                asked.push(Asked::Failed(error.to_string()));
+            }
+        }
+    }
+    Ok(asked)
+}
+
 /// Three requests a target and size on one kept connection ([`Arm`]).
 fn run_kept(prepared: &Prepared, runs: u32) -> io::Result<()> {
     let Prepared {
@@ -776,48 +844,40 @@ fn run_kept(prepared: &Prepared, runs: u32) -> io::Result<()> {
                 let (url, _, _) = chats[index].wire(&size.messages(character, run));
                 let url = reqwest::Url::parse(url).map_err(|_| io::Error::other("url"))?;
                 let mut times = Times::default();
-                let mut connection = match Connection::open(&url, Some(tls.clone()), &mut times) {
-                    Ok(connection) => Some(connection),
+                let connection = match Connection::open(&url, Some(tls.clone()), &mut times) {
+                    Ok(connection) => connection,
                     Err(error) => {
                         println!("{} failed: {error}", line(Arm::First));
                         kept.iter_mut().for_each(|arm| arm.failed += 1);
                         continue;
                     }
                 };
-                for (at, arm) in Arm::ALL.into_iter().enumerate() {
-                    let Some(open) = connection.as_mut() else {
-                        kept[at].closed += 1;
-                        continue;
-                    };
-                    if arm == Arm::Idle {
-                        std::thread::sleep(IDLE);
-                    }
-                    // Each request its own changing part, as turns are.
-                    let (_, auth, body) =
+                // Each request its own changing part, as turns are.
+                let (_, auth, _) = chats[index].wire(&size.messages(character, run));
+                let body = |at: usize| {
+                    let (_, _, body) =
                         chats[index].wire(&size.messages(character, run * 3 + at as u32));
-                    let body = serde_json::to_vec(&body)?;
-                    kept[at].bytes = body.len();
-                    let posted = open.post(auth, &body, true);
-                    match posted {
-                        Ok((send, answer)) => {
-                            let mut arm_times = if arm == Arm::First {
-                                times
-                            } else {
-                                Times::default()
-                            };
-                            arm_times.send = send;
-                            arm_times.answer = answer;
-                            println!("{} {}", line(arm), arm_times.shown(body.len()));
-                            kept[at].keep(&arm_times);
-                            if !answer.kept {
+                    serde_json::to_vec(&body).map_err(io::Error::from)
+                };
+                let asked = kept_arms(connection, times, auth, body, IDLE)?;
+                for ((at, arm), asked) in Arm::ALL.into_iter().enumerate().zip(asked) {
+                    match asked {
+                        Asked::Timed(times, bytes) => {
+                            println!("{} {}", line(arm), times.shown(bytes));
+                            kept[at].bytes = bytes;
+                            kept[at].keep(&times);
+                            if !times.answer.kept {
                                 println!("{}: the service did not keep the connection", line(arm));
-                                connection = None;
                             }
                         }
-                        Err(error) => {
+                        Asked::Closed(Some(status)) => {
+                            println!("{} not timed: answered {status}", line(arm));
+                            kept[at].closed += 1;
+                        }
+                        Asked::Closed(None) => kept[at].closed += 1,
+                        Asked::Failed(error) => {
                             println!("{} failed: {error}", line(arm));
                             kept[at].failed += 1;
-                            connection = None;
                         }
                     }
                 }
@@ -983,6 +1043,101 @@ mod tests {
             b"HTTP/1.1 429 Too Many\r\nContent-Length: 2\r\n\r\n{}".to_vec(),
         ]);
         assert_eq!((answer.status, answer.kept), (429, false));
+    }
+
+    /// A local server on one connection: each of `answers` in turn, a status
+    /// and whether it keeps the connection. Gives its port, and on join
+    /// whether no second connection was asked for.
+    fn serving(answers: Vec<(u16, bool)>) -> (u16, std::thread::JoinHandle<bool>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut asked = Vec::new();
+            let mut buffer = [0u8; 4096];
+            for (status, keep) in answers {
+                let end = loop {
+                    if let Some(end) = asked.windows(4).position(|four| four == b"\r\n\r\n") {
+                        break end;
+                    }
+                    let n = socket.read(&mut buffer).unwrap();
+                    asked.extend_from_slice(&buffer[..n]);
+                };
+                let head = String::from_utf8(asked[..end].to_vec()).unwrap();
+                let length: usize = head
+                    .lines()
+                    .find_map(|line| line.strip_prefix("Content-Length: "))
+                    .unwrap()
+                    .parse()
+                    .unwrap();
+                while asked.len() < end + 4 + length {
+                    let n = socket.read(&mut buffer).unwrap();
+                    asked.extend_from_slice(&buffer[..n]);
+                }
+                asked.drain(..end + 4 + length);
+                let close = if keep { "" } else { "Connection: close\r\n" };
+                let answer = if status == 200 {
+                    let mut parts = chunked(&[ROLE, WORDS, "data: [DONE]"]);
+                    parts[0] =
+                        format!("HTTP/1.1 200 OK\r\n{close}Transfer-Encoding: chunked\r\n\r\n")
+                            .into_bytes();
+                    parts.concat()
+                } else {
+                    format!("HTTP/1.1 {status} No\r\n{close}Content-Length: 2\r\n\r\n{{}}")
+                        .into_bytes()
+                };
+                socket.write_all(&answer).unwrap();
+                if !keep {
+                    break;
+                }
+            }
+            listener.set_nonblocking(true).unwrap();
+            listener.accept().is_err()
+        });
+        (port, server)
+    }
+
+    /// The reviewer's P3s on #2044: only a 200 is timed, and once the
+    /// connection isn't kept the arms after it are closed, never made on a
+    /// new one.
+    #[test]
+    fn the_arms_time_only_200s_and_stop_where_the_connection_is_not_kept() {
+        let arms = |answers: Vec<(u16, bool)>| {
+            let (port, server) = serving(answers);
+            let url = reqwest::Url::parse(&format!("http://127.0.0.1:{port}/v1/chat/completions"))
+                .unwrap();
+            let mut connected = Times::default();
+            let connection = Connection::open(&url, None, &mut connected).unwrap();
+            let asked = kept_arms(
+                connection,
+                connected,
+                "Bearer k",
+                |_| Ok(b"{}".to_vec()),
+                Duration::ZERO,
+            )
+            .unwrap();
+            assert!(server.join().unwrap(), "one connection");
+            asked
+                .into_iter()
+                .map(|asked| match asked {
+                    Asked::Timed(times, _) => format!("timed kept={}", times.answer.kept),
+                    Asked::Closed(status) => format!("closed {status:?}"),
+                    Asked::Failed(error) => format!("failed {error}"),
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            arms(vec![(200, true), (200, true), (200, true)]),
+            ["timed kept=true", "timed kept=true", "timed kept=true"]
+        );
+        assert_eq!(
+            arms(vec![(200, true), (200, false)]),
+            ["timed kept=true", "timed kept=false", "closed None"]
+        );
+        assert_eq!(
+            arms(vec![(401, true)]),
+            ["closed Some(401)", "closed None", "closed None"]
+        );
     }
 
     /// `--kept`: two requests go on one connection, each answered whole.
