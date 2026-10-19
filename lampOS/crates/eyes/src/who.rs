@@ -66,14 +66,18 @@ pub fn keep_known(path: &Path, name: Option<&str>, face: Option<&str>) {
         let _ = std::fs::remove_file(path);
         return;
     };
-    // The face first, so a new name is never read beside an older face.
+    // The name first, then the face (the reviewer on #2008). The voice reads
+    // face, name, face; between the two writes it can only see the new name
+    // beside the old face, which matches nobody and narrows a line to the
+    // room. The other order could pair the old name with the new face and
+    // keep a newcomer's line as the one before's.
+    replace_line(path, name);
     match face {
         Some(face) => replace_line(&beside, face),
         None => {
             let _ = std::fs::remove_file(&beside);
         }
     }
-    replace_line(path, name);
 }
 
 fn replace_line(path: &Path, line: &str) {
