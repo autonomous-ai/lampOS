@@ -1065,7 +1065,8 @@ pub fn serve(
         .unwrap_or_default();
     let declared = tools.clone();
     // The time here is told in every request; the_time is for elsewhere.
-    let places = tools.clock && tools.places;
+    let clock = tools.clock;
+    let places = clock && tools.places;
     // With `use_skill` the skills' lines are told after the character, as
     // the Live route tells them (#1668).
     let skills_told = tools.clone();
@@ -1198,7 +1199,7 @@ pub fn serve(
         // The lamp's own place, with `LAMP_PLACE`, beside its time (#1712),
         // and the weather there while it is fresh.
         let time = with_place(
-            crate::local_time::told_asked_here(places),
+            crate::local_time::told_asked_here(clock, places),
             crate::local_time::place_told(place.as_deref()),
         );
         let time = with_place(
@@ -2566,7 +2567,7 @@ pub(crate) fn texts_ends(
         texts_system_message(
             &character,
             crate::agent_tasks::noted(
-                crate::local_time::told_asked_here(told.clock && told.places),
+                crate::local_time::told_asked_here(told.clock, told.places),
                 told.tasks.as_ref(),
             )
             .as_deref(),
@@ -3883,8 +3884,20 @@ mod tests {
         assert!(!told.text.contains("spare key"), "{}", told.text);
         assert!(told.text.starts_with("You are a lamp."), "{}", told.text);
         assert!(told.history.is_empty());
-        // Told the time as it is asked (#1712), where this machine has one.
+        // Told the time as it is asked (#1712) with `LAMP_CLOCK`, and as
+        // before without it (the first builder on #1921), where this
+        // machine has one.
         if crate::local_time::offset_here().is_some() {
+            assert!(told.text.contains("give it roughly"), "{}", told.text);
+            assert!(!told.text.contains("as you were asked"), "{}", told.text);
+            let (texts, _) = texts_ends(
+                "You are a lamp.".into(),
+                crate::tools::Settings {
+                    clock: true,
+                    ..Default::default()
+                },
+            );
+            let told = texts();
             assert!(
                 told.text.contains("Your clock read this as you were asked"),
                 "{}",
