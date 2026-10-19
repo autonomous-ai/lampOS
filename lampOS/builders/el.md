@@ -27,7 +27,7 @@ Never `lamp-voice`, and never another builder's branch.
 - Deploy folders: `deploy/lamp-06c1/`
 - Log: [lampOS/docs/work-log-el.md](https://github.com/autonomous-ai/lampOS/blob/lamp-el/lampOS/docs/work-log-el.md) on `lamp-el`
 - Tasks: the `builder:el` issues, in the order of the Queue issue
-  ([#705](https://github.com/autonomous-ai/lampOS/issues/705)). Its person
+  ([#1722](https://github.com/autonomous-ai/lampOS/issues/1722), continued from #705). Its person
   asked it to help with
   [#820](https://github.com/autonomous-ai/lampOS/issues/820) (the third's):
   the start lines that pull request #844 still lacks, offered to the third
@@ -48,7 +48,7 @@ Never `lamp-voice`, and never another builder's branch.
 - Touch any lamp but `lamp-06c1`, or that one before the first builder says
   yes to sharing it.
 - Stop, replace or install a part or service on `lamp-06c1` without first
-  commenting `el holding <part> on lamp-06c1 until <time +07>` on #705, or
+  commenting `el holding <part> on lamp-06c1 until <time +07>` on #1722, or
   touch a part jarvis holds; `released <part>` when done. Whoever holds
   `body` (or `hal`) is the only writer on `/dev/ttyACM0`. Motion, sound and
   light are asked of the person first, even under a hold.
