@@ -1,0 +1,570 @@
+# The production test cases, version 0: how each check in the coverage
+# matrix is run, by whom, with what, and what it leaves as evidence.
+#
+# The matrix (lampOS/production/matrix-v0.toml, #1785) says WHAT is checked;
+# a case here says HOW. Every case names the matrix check ids it covers, so
+# `rtm.py` can build the traceability matrix and find gaps: a check with no
+# case, a case with no script, a limit not set.
+#
+# EVERY LIMIT, DURATION, FIXTURE AND STOP BELOW IS A PROPOSAL AWAITING THE
+# HARDWARE LEAD (`approved = false`), as the matrix's are. A changed case is a
+# new version of this file, never an edit made to pass a unit.
+#
+# Who runs a case: a hardware builder (builders/HARDWARE-TEMPLATE.md) runs the
+# `agent` steps and asks its person for the `person` steps. A question the
+# person does not answer is `not_checked`, never a pass. A qualification case
+# can wear or damage a unit: it runs only with the person's yes at the lamp
+# and the operator's stop in reach, never in a routine run.
+#
+# Each case:
+# - id: TC-<group>-<nn>. RT routine, ST station (fixture), IN integrated,
+#   QL qualification.
+# - checks: the matrix ids it gives a verdict for. An id the matrix does not
+#   have yet is a proposed new id for its next version.
+# - order: the run order within a lamp's run (hardware-process.md, "Order on a
+#   new revision": routine first, the long soak last).
+# - executor: selftest (the lamp's own report), script, manual, or both.
+# - script / script_status: what runs it; ready (works on V2 now), port (a V1
+#   bench script to port, #1764 item 3) or none (to be written).
+# - pre, fixture: what must be true, and the instruments needed.
+# - agent, person: the steps, in order.
+# - expect, limit: the pass, and whether its number is set (set: a number
+#   exists, the self-test's own or proposed here, approved with the matrix;
+#   missing: no number yet, the hardware lead's to give).
+# - stop: what ends the case at once; recorded `interrupted`, never a pass.
+# - evidence: what the run keeps (into the fleet record, never this repo).
+# - answers: how the verdict reaches lamp-station's answers file.
+# - blocked_by: what stops it being run today.
+
+[suite]
+version = "0"
+matrix = "lampOS/production/matrix-v0.toml"
+approved = false
+
+# ── Routine: every lamp, every run ──────────────────────────────────────────
+
+[[case]]
+id = "TC-RT-01"
+title = "Assembly inspection"
+group = "routine"
+order = 10
+checks = ["assembly_inspection"]
+executor = "manual"
+script = ""
+script_status = "ready"
+pre = ["lamp on the station, power off"]
+fixture = []
+agent = ["read the inspection list to the person, one item at a time"]
+person = ["look at each item and answer pass or fail with what was seen: shell closed, cables seated, nothing loose or rattling when tilted"]
+expect = "every item on the list passes"
+limit = "missing"
+stop = ""
+evidence = ["each item's answer and time"]
+answers = "one step: check assembly_inspection, verdict, reason naming the failed item"
+blocked_by = ["the inspection list is the hardware lead's"]
+
+[[case]]
+id = "TC-RT-02"
+title = "Head pad lines and polarity for this unit"
+group = "routine"
+order = 20
+checks = ["touch_by_hand"]
+executor = "script+manual"
+script = "lampOS steps.sh (#1744)"
+script_status = "ready"
+pre = ["lamp powered, lamp-controls stopped for the discovery"]
+fixture = []
+agent = ["run the head-pad discovery (#1744's steps.sh)", "write the found pair and polarity into the unit's pins file", "start lamp-controls again"]
+person = ["touch and release each head pad in turn when asked, holding about 2 s"]
+expect = "two lines found, each following the finger (high or low only while touched), written to the pins file"
+limit = "set"
+stop = "a line whose idle level changes with no touch (cb94's line 97, #1764): record fail, do not write the pins file"
+evidence = ["the lines, polarity and pulse counts", "the pins file written"]
+answers = "feeds TC-RT-03; a failed discovery is touch_by_hand fail with the reason"
+blocked_by = ["which lines are standard (97/98 on three units) is the hardware lead's"]
+
+[[case]]
+id = "TC-RT-03"
+title = "Factory self-test"
+group = "routine"
+order = 30
+checks = ["voice_mic", "room_mic", "speaker", "base_yaw", "shoulder", "elbow", "head_roll", "head_pitch", "head_move", "ring", "camera", "touch", "touch_by_hand", "air", "board", "storage"]
+executor = "selftest"
+script = "lamp-selftest --occasion factory"
+script_status = "ready"
+pre = ["lampos.target running", "the lamp has spoken for 4 s or more since it started (the speaker check reads that turn)", "the person beside the lamp: the head moves a few counts and the ring lights"]
+fixture = []
+agent = ["say what will move (the head, a few counts) and where the stop is", "run lamp-selftest --occasion factory", "copy /var/lib/lamp-selftest/latest.json off the lamp"]
+person = ["ask the lamp something with a long answer before the run", "when asked by the self-test: touch each head pad, press the button"]
+expect = "every part pass, or not_fitted where the revision allows it; no not_checked"
+limit = "set"
+stop = "the person's stop: stop lampos.target's body, record interrupted"
+evidence = ["latest.json, whole"]
+answers = "no steps: latest.json goes to lamp-station as --selftest"
+blocked_by = []
+
+[[case]]
+id = "TC-RT-04"
+title = "Speaker buzz and rattle"
+group = "routine"
+order = 40
+checks = ["speaker_buzz"]
+executor = "manual"
+script = ""
+script_status = "ready"
+pre = ["a quiet station (no other lamp playing, hardware-process.md)"]
+fixture = ["quiet station"]
+agent = ["make the lamp speak a fixed sentence at its normal level, then loud"]
+person = ["listen at arm's length: buzz, rattle or distortion? pass or fail with what was heard"]
+expect = "no buzz, rattle or distortion at either level"
+limit = "set"
+stop = ""
+evidence = ["the answer and time (no audio is kept)"]
+answers = "one step: speaker_buzz"
+blocked_by = []
+
+[[case]]
+id = "TC-RT-05"
+title = "Ring pixels"
+group = "routine"
+order = 50
+checks = ["ring_pixels"]
+executor = "manual"
+script = ""
+script_status = "port"
+pre = []
+fixture = []
+agent = ["light the whole ring white, then red, green, blue, 3 s each (port of rgb_test.py through the lamp's light part)"]
+person = ["look at every pixel in each colour: any dark, stuck or wrong-coloured? pass or fail with the pixel's place"]
+expect = "all 32 pixels light in every colour"
+limit = "set"
+stop = ""
+evidence = ["the answer and the pixel numbers that failed"]
+answers = "one step: ring_pixels"
+blocked_by = ["rgb_test.py to port to V2's light part"]
+
+[[case]]
+id = "TC-RT-06"
+title = "Privacy switch closes microphones and camera"
+group = "routine"
+order = 60
+checks = ["privacy_switch"]
+executor = "script+manual"
+script = ""
+script_status = "none"
+pre = []
+fixture = []
+agent = ["read mic2, mic1 and camera state", "after the switch: read them again; both microphones silent and the camera dark", "after the switch back: all three back"]
+person = ["slide the privacy switch closed when asked, then open"]
+expect = "closed: no audio on either microphone and no frame; open: all three back within 5 s"
+limit = "set"
+stop = ""
+evidence = ["the three states before, closed and after, with times"]
+answers = "one step: privacy_switch"
+blocked_by = ["a script that reads the three states through the lamp's parts"]
+
+[[case]]
+id = "TC-RT-07"
+title = "A face at desk distance"
+group = "routine"
+order = 70
+checks = ["camera_face_distance"]
+executor = "script+manual"
+script = ""
+script_status = "none"
+pre = []
+fixture = ["tape marks at 40 and 80 cm"]
+agent = ["watch humans/faces/tracked while the person stands at each mark"]
+person = ["sit facing the lamp at 40 cm, then at 80 cm, 5 s each"]
+expect = "a face tracked within 2 s at both distances (no picture kept)"
+limit = "set"
+stop = ""
+evidence = ["tracked or not at each distance, with time to track"]
+answers = "one step: camera_face_distance"
+blocked_by = ["a script that reads faces/tracked off the bus"]
+
+[[case]]
+id = "TC-RT-08"
+title = "Final spoken exchange"
+group = "routine"
+order = 90
+checks = ["spoken_exchange"]
+executor = "manual"
+script = ""
+script_status = "ready"
+pre = ["every other routine case done", "the lamp on the station network"]
+fixture = []
+agent = ["ask the person to speak"]
+person = ["say \"Hey Lamp, what time is it?\"; did it answer with the right time? pass or fail"]
+expect = "a spoken answer with the right time"
+limit = "set"
+stop = ""
+evidence = ["the answer and time (nothing of the exchange is recorded)"]
+answers = "one step: spoken_exchange"
+blocked_by = []
+
+# ── Station checks: need a fixture, optional in matrix v0 ───────────────────
+
+[[case]]
+id = "TC-ST-01"
+title = "Microphone tone read-back and noise floor"
+group = "station"
+order = 100
+checks = ["voice_mic_tone", "room_mic_tone"]
+executor = "script"
+script = "mic_test.sh TONE=1 (port)"
+script_status = "port"
+pre = ["a quiet station"]
+fixture = ["reference speaker at a fixed distance", "quiet station"]
+agent = ["play the reference tone at the fixed level", "read it on mic2 and mic1 through the lamp's ears, and 2 s of silence for the floor"]
+person = []
+expect = "the tone within a dB window on each microphone; the floor under a limit"
+limit = "missing"
+stop = ""
+evidence = ["tone level and floor per microphone, in dBFS"]
+answers = "two steps with measurements: voice_mic_tone, room_mic_tone"
+blocked_by = ["tone, fixture and window are the hardware lead's", "mic_test.sh to port to V2's ears"]
+
+[[case]]
+id = "TC-ST-02"
+title = "Speaker level at a reference microphone"
+group = "station"
+order = 110
+checks = ["speaker_level"]
+executor = "script"
+script = ""
+script_status = "none"
+pre = ["a quiet station"]
+fixture = ["reference microphone at a fixed distance"]
+agent = ["play a fixed sweep or tone", "read the level at the reference microphone"]
+person = []
+expect = "level within a dB window"
+limit = "missing"
+stop = ""
+evidence = ["level in dB SPL or dBFS of the reference"]
+answers = "one step with measurement: speaker_level"
+blocked_by = ["reference microphone and window are the hardware lead's"]
+
+[[case]]
+id = "TC-ST-03"
+title = "Camera focus and exposure on a test card"
+group = "station"
+order = 120
+checks = ["camera_test_card"]
+executor = "script"
+script = "camera_capture_test.sh (port)"
+script_status = "port"
+pre = []
+fixture = ["test card at desk distance, fixed light"]
+agent = ["capture a full-resolution frame of the card through the lamp's eyes", "measure sharpness and exposure on the card"]
+person = ["place the card on its mark"]
+expect = "sharpness and exposure within limits (the frame is of the card only, never a person)"
+limit = "missing"
+stop = ""
+evidence = ["sharpness and exposure numbers; the card frame stays at the station"]
+answers = "one step with measurement: camera_test_card"
+blocked_by = ["card, fixture and limits are the hardware lead's", "camera_capture_test.sh to port: on V2 the eyes own the camera"]
+
+[[case]]
+id = "TC-ST-04"
+title = "Air sensor against a reference"
+group = "station"
+order = 130
+checks = ["air_reference"]
+executor = "script"
+script = ""
+script_status = "none"
+pre = ["revision has the air sensor"]
+fixture = ["reference CO2/PM2.5 meter, or a sealed box"]
+agent = ["read air/state and the reference side by side for 5 minutes"]
+person = ["put the lamp and the reference in the box"]
+expect = "CO2 and PM2.5 within a window of the reference"
+limit = "missing"
+stop = ""
+evidence = ["both readings over the 5 minutes"]
+answers = "one step with measurement: air_reference (not_fitted on draft-a-no-air)"
+blocked_by = ["reference and window are the hardware lead's"]
+
+[[case]]
+id = "TC-ST-05"
+title = "Servo range and load at rest"
+group = "station"
+order = 140
+checks = ["servo_range"]
+executor = "script+manual"
+script = ""
+script_status = "none"
+pre = ["the person at the arm, the operator's stop in reach"]
+fixture = ["operator stop"]
+agent = ["say what will move and where the stop is", "through lamp-body (the only writer on the servo bus), move each joint slowly to each end of its limits and back", "read load at rest on each joint"]
+person = ["watch the arm, a hand ready; stop if it touches anything"]
+expect = "each joint reaches both limits; load at rest under a limit"
+limit = "missing"
+stop = "the operator's stop, or the body's own stop (docs/body.md)"
+evidence = ["each joint's reached range and rest load"]
+answers = "one step with measurement: servo_range"
+blocked_by = ["load limit is the hardware lead's", "a range move through lamp-body; never write a servo calibration"]
+
+[[case]]
+id = "TC-ST-06"
+title = "SD card write and read-back"
+group = "station"
+order = 150
+checks = ["storage_write_read"]
+executor = "script"
+script = "robots/lamp/hardware/test/tools/burn-in.sh --skip-thermal --ram 512"
+script_status = "ready"
+pre = ["at least 512 MB free on the card"]
+fixture = []
+agent = ["run burn-in.sh's storage stage (256 MB at no more than 4 MB/s)", "record the card's make and size (from /sys/block/mmcblk*/device)"]
+person = []
+expect = "filesystem clean and read-back checksums match"
+limit = "set"
+stop = ""
+evidence = ["burn-in.json storage block", "card make and size"]
+answers = "one step: storage_write_read"
+blocked_by = ["where the card's make and size go in the record is open (#1700)"]
+
+# ── Integrated: all parts at once ───────────────────────────────────────────
+
+[[case]]
+id = "TC-IN-01"
+title = "Servo noise in the voice microphone"
+group = "integrated"
+order = 200
+checks = ["interference_servos_mic"]
+executor = "script"
+script = ""
+script_status = "none"
+pre = ["a quiet station", "the person at the arm"]
+fixture = ["quiet station", "operator stop"]
+agent = ["record 10 s of mic2 with the arm still, then 10 s while it plays a normal move", "compare the two noise levels"]
+person = ["watch the arm, a hand ready"]
+expect = "noise rise in mic2 under a limit; no dropped blocks"
+limit = "missing"
+stop = "the operator's stop"
+evidence = ["noise still and moving, dropped-block count"]
+answers = "one step with measurement: interference_servos_mic"
+blocked_by = ["noise limit is the hardware lead's", "a script that reads mic2 and drives a move"]
+
+[[case]]
+id = "TC-IN-02"
+title = "Audio duplex: speaker playing while the room microphone listens"
+group = "integrated"
+order = 210
+checks = ["interference_speaker_room_mic"]
+executor = "script"
+script = ""
+script_status = "none"
+pre = ["a quiet station"]
+fixture = ["quiet station"]
+agent = ["play speech on the speaker for 10 minutes", "count dropped blocks on both microphones and the level on mic1"]
+person = []
+expect = "no dropped block on either microphone; level within a limit"
+limit = "missing"
+stop = ""
+evidence = ["dropped blocks per microphone, level over time"]
+answers = "one step with measurement: interference_speaker_room_mic"
+blocked_by = ["limit is the hardware lead's", "a script"]
+
+# ── Qualification: a few units per revision and batch, never routine ───────
+
+[[case]]
+id = "TC-QL-01"
+title = "Give way to a hand"
+group = "qualification"
+order = 300
+checks = ["servo_give_way"]
+executor = "script+manual"
+script = ""
+script_status = "none"
+pre = ["the routine run passed", "the person's yes at the lamp, the operator's stop in reach"]
+fixture = ["operator stop"]
+agent = ["say what will move and where the stop is", "hold a pose, then play a slow move; watch lamp-body's give-way events"]
+person = ["push the arm firmly 10 times while it holds and 10 times while it moves"]
+expect = "it gives way all 20 times (the body's own bounds, #780)"
+limit = "set"
+stop = "the operator's stop"
+evidence = ["each push's time and whether a give-way was logged"]
+answers = "one step with measurement (gave way n of 20): servo_give_way"
+blocked_by = ["a script that reads give-way events from lamp-body"]
+
+[[case]]
+id = "TC-QL-02"
+title = "Power under peak"
+group = "qualification"
+order = 310
+checks = ["power_servo_peak"]
+executor = "script+manual"
+script = ""
+script_status = "none"
+pre = ["the person's yes at the lamp, the operator's stop in reach"]
+fixture = ["meter or scope on the supply at the board", "operator stop"]
+agent = ["play the servos' heaviest move with the speaker loud and the ring full white, 5 times", "read each servo's own voltage register during it"]
+person = ["read the supply's lowest voltage off the meter"]
+expect = "the supply never below the board's brown-out level"
+limit = "missing"
+stop = "the operator's stop; any reboot or brown-out"
+evidence = ["lowest supply voltage, servo voltages over time"]
+answers = "one step with measurement: power_servo_peak"
+blocked_by = ["the brown-out level is the hardware lead's", "a meter", "a peak-move script through lamp-body"]
+
+[[case]]
+id = "TC-QL-03"
+title = "Power cut and back, 20 times"
+group = "qualification"
+order = 320
+checks = ["recovery_power_cut"]
+executor = "script+manual"
+script = ""
+script_status = "none"
+pre = ["the person's yes at the lamp", "every install synced (joining.md)"]
+fixture = ["a switched outlet or relay, worked by the person"]
+agent = ["before each cut, say idle or mid-move", "after each cut: wait for the lamp, check the voice is back unmuted, the arm folded safe, and run the self-test's storage check"]
+person = ["cut the power when asked, 10 times at idle and 10 mid-move, then restore it"]
+expect = "back by itself every time, nothing muted, arm safe, no storage error"
+limit = "set"
+stop = "the first SD-card I/O or ext4 error: stop, record fail (repeated cuts can corrupt a card)"
+evidence = ["each cut's time, kind, time to voice back, storage verdict"]
+answers = "one step with measurement (recovered n of 20): recovery_power_cut"
+blocked_by = ["a cut-loop script", "whether a relay fixture is used is the hardware lead's"]
+
+[[case]]
+id = "TC-QL-04"
+title = "Board heat under a fixed 10-minute load"
+group = "qualification"
+order = 330
+checks = ["board_load_temperature"]
+executor = "script+manual"
+script = "robots/lamp/hardware/test/tools/burn-in.sh --skip-storage --ram 512"
+script_status = "ready"
+pre = ["both fans fitted", "lamp idle for 10 minutes first", "the person's yes at the lamp"]
+fixture = []
+agent = ["run burn-in.sh's thermal soak (600 s, every core)", "the guard pauses the load at 85 °C and stops at 88 °C"]
+person = ["confirm both fans spin before the start"]
+expect = "hottest zone under 85 °C for the whole 600 s, no guard pause"
+limit = "set"
+stop = "88 °C: the load is killed, recorded fail"
+evidence = ["burn-in.json thermal block: peak_c, paused_s, stopped_at_c"]
+answers = "one step with measurement (peak °C): board_load_temperature"
+blocked_by = []
+
+[[case]]
+id = "TC-QL-05"
+title = "Memory test"
+group = "qualification"
+order = 340
+checks = ["memory_test"]
+executor = "script"
+script = "robots/lamp/hardware/test/tools/burn-in.sh --skip-storage --skip-thermal"
+script_status = "ready"
+pre = ["the person's yes at the lamp"]
+fixture = []
+agent = ["run burn-in.sh's memory stage (memtester over the free RAM less 1 GB)", "the thermal guard runs throughout"]
+person = []
+expect = "no mismatch"
+limit = "set"
+stop = "the thermal guard's 88 °C: recorded interrupted"
+evidence = ["burn-in.json memory block: tested_mb, mismatches"]
+answers = "one step with measurement (mismatches): memory_test"
+blocked_by = ["memory_test is not in matrix v0: a new id for its next version"]
+
+[[case]]
+id = "TC-QL-06"
+title = "Servo endurance, 30 minutes"
+group = "qualification"
+order = 350
+checks = ["servo_endurance"]
+executor = "script+manual"
+script = ""
+script_status = "none"
+pre = ["the routine run and TC-QL-01 passed", "the person's yes at the lamp", "the person at the arm, the operator's stop in reach"]
+fixture = ["operator stop"]
+agent = ["say what will move and where the stop is", "play the arm's normal moves in a loop through lamp-body for 30 minutes, within the joint limits", "log each joint's temperature, load and voltage every step"]
+person = ["stay at the arm the whole time"]
+expect = "every joint under 58 °C, no temperature or load stop in the 30 minutes"
+limit = "set"
+stop = "the body's own stop (docs/body.md): 62 °C, or a load stop (the fourth give-way in a minute, or again within 2 s); the operator's stop"
+evidence = ["per-joint peak temperature and load, give-way count, stop reason if any"]
+answers = "one step with measurement (hottest joint °C): servo_endurance"
+blocked_by = ["the 58 °C pass is set from a known-good unit's run first", "a move-loop script through lamp-body"]
+
+[[case]]
+id = "TC-QL-07"
+title = "Wi-Fi lost and the relay unreachable, 10 times each"
+group = "qualification"
+order = 360
+checks = ["recovery_wifi_lost"]
+executor = "script"
+script = ""
+script_status = "none"
+pre = ["the person's yes at the lamp", "a station link to the lamp that does not ride its Wi-Fi (cable or serial)"]
+fixture = ["wired or serial station link"]
+agent = ["turn the lamp's Wi-Fi off for 30 s and back, 10 times", "block the relay for 30 s and unblock, 10 times", "after each: the lamp back online and talking, without a hand"]
+person = []
+expect = "recovers by itself every time"
+limit = "set"
+stop = ""
+evidence = ["each round's time to recover"]
+answers = "one step with measurement (recovered n of 20): recovery_wifi_lost"
+blocked_by = ["a link that survives the lamp's Wi-Fi going (the bench hub joins the lamp's own hotspot)", "a script"]
+
+[[case]]
+id = "TC-QL-08"
+title = "Each part restarted alone"
+group = "qualification"
+order = 370
+checks = ["recovery_part_restart"]
+executor = "script"
+script = ""
+script_status = "none"
+pre = ["the person's yes at the lamp", "lampos.target running"]
+fixture = []
+agent = ["for each unit in lampos.target, one at a time: restart it", "check every other part stays healthy in lamp/health and the restarted one comes back"]
+person = []
+expect = "the others keep working each time; the restarted part comes back"
+limit = "set"
+stop = ""
+evidence = ["per part: time back, any other part that went unhealthy"]
+answers = "one step with measurement (parts passed n of N): recovery_part_restart"
+blocked_by = ["a script"]
+
+[[case]]
+id = "TC-QL-09"
+title = "Air sensor failed reads over 10 minutes"
+group = "qualification"
+order = 380
+checks = ["air_read_failures"]
+executor = "script"
+script = "sen5x_opi_test.py read (port)"
+script_status = "port"
+pre = ["the person's yes at the lamp", "revision has the air sensor"]
+fixture = []
+agent = ["count air/state updates and failed reads for 10 minutes, through the lamp's air part (never a second reader on the I2C bus)"]
+person = []
+expect = "failed-read rate under a limit"
+limit = "missing"
+stop = ""
+evidence = ["reads, failures, rate"]
+answers = "one step with measurement (failure %): air_read_failures (not_fitted on draft-a-no-air)"
+blocked_by = ["limit is the hardware lead's", "sen5x_opi_test.py to port to read through the air part"]
+
+[[case]]
+id = "TC-QL-10"
+title = "Long soak, 8 hours"
+group = "qualification"
+order = 390
+checks = ["long_soak"]
+executor = "script+manual"
+script = ""
+script_status = "none"
+pre = ["every other qualification case passed on this unit", "the person's yes; someone near the lamp while the arm moves"]
+fixture = ["operator stop"]
+agent = ["run the cases above at a gentle pace in a loop for 8 hours, the thermal guard and the body's stops on", "watch for faults and unplanned restarts"]
+person = ["stay in reach of the stop while the arm moves"]
+expect = "no fault and no unplanned restart in 8 hours"
+limit = "set"
+stop = "any stop of the cases it runs; the operator's stop"
+evidence = ["every fault and restart with its time; per-hour peaks"]
+answers = "one step: long_soak"
+blocked_by = ["long_soak is not in matrix v0: a new id for its next version", "the cases it loops need their scripts first"]
