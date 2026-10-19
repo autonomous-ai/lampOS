@@ -259,6 +259,9 @@ order; it does not return observations. New operations are:
 These are shapes, not an ordered script: IDs must come from successful
 responses in the same person's store. `search` returns ranked records with
 their provenance; `forget` returns a count after removal and index checks.
+The base `remember` may also name the person's own exchanges it came from,
+`{"op":"remember",…,"source_ids":[3]}` (#1693); forgetting it then removes
+them, one step back. The legacy store ignores them.
 `session_open` returns a frozen `snapshot`; default `conversation_end`
 returns bounded model `input`, without invoking a model. With `submit:true`,
 the current build validates references and returns
@@ -353,9 +356,24 @@ the unchanged legacy client, used unless the new Days client is selected.
     the TV must never empty it (the reviewer on #1723).
   - Both clear the conversation thread and stop journalling until a fresh
     worker starts, as `forget` does. `forget` with nothing is as before.
-  - Still not covered: earlier turns of the same conversation, said before
-    the thing was kept, aren't linked to it, so `forget {source_id}` leaves
-    them until they are 30 days old. `forget_everything` removes them.
+  - **The conversation it came up in** (#1693, the first builder's 23:57):
+    - **What's sent:** at `remember`, the voice sends the exchanges of the
+      conversation it's in. That's the person's own, journalled so far,
+      since the writer's last 45 s gap or change of person. They go as
+      `source_ids`, and the store keeps them as where the thing came from
+      (`remember_from`: only the person's own exchanges).
+    - **What `forget` removes:** "Forget that" on it removes those turns
+      too: one step back, exchanges only. It doesn't remove what those
+      turns were shown, or another conversation.
+    - **Never waited for:** a writer busy at that moment leaves it kept as
+      before.
+    - **Unchanged:** without the switch, `remember` is as before, and so is
+      the room's rule: `forget_everything` empties only the known person's
+      own scope, never the room's (#1723).
+    - **Tests:** `days::a_kept_thing_goes_with_the_conversation_it_came_up_in_and_nothing_else`
+      and `voice_forget::forget_that_removes_the_conversation_a_kept_thing_came_up_in`
+      (the voice's client against the real store: the turn goes, an earlier
+      conversation stays).
   - Tests: `remember::tests::with_the_switch_what_recall_gave_and_everything_can_be_forgotten`
     (requests and scopes, the switch off), and `crates/memory/tests/voice_forget.rs`
     (through the voice's Days client against the real store: what recall

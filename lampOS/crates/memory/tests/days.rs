@@ -1594,3 +1594,59 @@ fn an_empty_result_closes_the_job_with_nothing_kept_and_frees_its_place() {
         );
     }
 }
+
+/// #1693: a kept thing remembered with the conversation it came up in goes
+/// with that conversation's exchanges, one step back and the person's own
+/// only: an unrelated conversation, a thing only shown in it, and another
+/// person's stay. Without `from` it is as before.
+#[test]
+fn a_kept_thing_goes_with_the_conversation_it_came_up_in_and_nothing_else() {
+    let scratch = Scratch::new("kept-origins");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    let kettle = store.remember(&room, NOW, "the kettle is orange").unwrap();
+    let earlier = store
+        .append(&room, NOW, "what's the weather", "Sunny", &[])
+        .unwrap();
+    let said = store
+        .append(
+            &room,
+            NOW,
+            "my violet umbrella is in the car",
+            "Good to know",
+            &[kettle],
+        )
+        .unwrap();
+    let umbrella = store
+        .remember_from(&room, NOW, "the violet umbrella is in the car", &[said])
+        .unwrap();
+    let echo = store
+        .append(&room, NOW, "where's my umbrella", "In the car", &[umbrella])
+        .unwrap();
+    let mai = person("mai");
+    let theirs = store
+        .append(&mai, NOW, "my bike is blue", "Noted", &[])
+        .unwrap();
+    // Only the person's own exchanges may be where it came from.
+    assert!(store.remember_from(&room, NOW, "x", &[theirs]).is_err());
+    assert!(store.remember_from(&room, NOW, "x", &[kettle]).is_err());
+
+    store.forget(&room, umbrella).unwrap();
+    for gone in [umbrella, said, echo] {
+        assert!(store.record(&room, gone).unwrap().is_none(), "{gone}");
+    }
+    for kept in [kettle, earlier] {
+        assert!(store.record(&room, kept).unwrap().is_some(), "{kept}");
+    }
+    assert!(store.record(&mai, theirs).unwrap().is_some());
+
+    // Kept without its conversation, it is as before: that stays.
+    let plain_said = store
+        .append(&room, NOW, "the bins go out Friday", "OK", &[])
+        .unwrap();
+    let bins = store
+        .remember(&room, NOW, "the bins go out on Friday")
+        .unwrap();
+    store.forget(&room, bins).unwrap();
+    assert!(store.record(&room, plain_said).unwrap().is_some());
+}
