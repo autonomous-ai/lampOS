@@ -158,8 +158,9 @@ pub struct Alive {
     pub states: Vec<Voice>,
     /// How long the idle layer takes to come in and to go out.
     pub blend_us: u64,
-    /// The energy the style of every move here is drawn from, 0 to 1, until
-    /// the inner state (task 35, #713) says it.
+    /// The energy the style of every move here is drawn from, 0 to 1. Where
+    /// Mood runs, its liveliness moves it by up to a half either way (#1670,
+    /// `Life::energy`).
     pub energy: f32,
     pub breath: Breath,
     pub drift: Drift,
@@ -635,6 +636,8 @@ pub(crate) struct Life {
     privacy_muted: bool,
     /// The lamp's one breath's phase now, where Mood keeps it (#1670).
     mood_breath: Option<f64>,
+    /// How lively the moves are from the lamp's inner state (#1670).
+    mood_liveliness: Option<f32>,
     tapped_muted_us: Option<u64>,
     /// The body seen moving (its own shift at rest, #933, a gesture, or
     /// this layer's look up at a tap falling back): the goals it last said
@@ -714,6 +717,7 @@ impl Life {
             voice_muted: false,
             privacy_muted: false,
             mood_breath: None,
+            mood_liveliness: None,
             tapped_muted_us: None,
             body_goals: None,
             body_fast_since: None,
@@ -960,6 +964,18 @@ impl Life {
         self.mood_breath = phase;
     }
 
+    /// How lively the moves are from the lamp's inner state (#1670).
+    pub(crate) fn set_mood_liveliness(&mut self, liveliness: Option<f32>) {
+        self.mood_liveliness = liveliness;
+    }
+
+    /// The energy the style of every move is drawn from: the catalogue's,
+    /// moved by the lamp's inner state where Mood says it, within 0 to 1, so
+    /// no move passes the bounds checked at energy 1.
+    fn energy(&self) -> f32 {
+        (self.alive.energy + self.mood_liveliness.unwrap_or(0.0)).clamp(0.0, 1.0)
+    }
+
     /// Muted for privacy: the switch last said closed, or the voice's own
     /// mute last said (not its sleep, which a tap wakes).
     fn muted(&self) -> bool {
@@ -1051,8 +1067,8 @@ impl Life {
             .map_or(0, |last| now_us.saturating_sub(last))
             .min(200_000);
         self.last_us = Some(now_us);
-        let size = size(self.alive.energy);
-        let pace = pace(self.alive.energy);
+        let size = size(self.energy());
+        let pace = pace(self.energy());
         let mut planned = Planned::default();
         // Nobody is absent while the eyes are not looking, nor while the
         // voice has someone to listen or answer to.

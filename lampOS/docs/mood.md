@@ -7,9 +7,12 @@ ring, working light or speakers, change a microphone's state, or select a
 voice reply. Its first readers are the lamp's one breath, the ring's at
 rest and the head's in Expression's idle layer, which take its phase while
 Mood runs (#1670,
-[ring-choreography.md](ring-choreography.md#the-lamps-one-breath-1670)); they
-shape only the resting face and the idle head, and never decide whether the
-ring may show anything or the body may move.
+[ring-choreography.md](ring-choreography.md#the-lamps-one-breath-1670)), and
+the energy of that idle layer's moves, which its liveliness moves
+(`mood_liveliness`, [alive.md](alive.md)); they shape only the resting face
+and the idle head, and never decide whether the ring may show anything or
+the body may move. Warmth has no reader yet: nothing the lamp shows has a
+colour warmth Mood could move.
 
 The component is off unless explicitly enabled. There is no model, transcript
 classification, word storage, face history, familiarity learning (the eyes keep how often a

@@ -247,6 +247,21 @@ pub fn input_from_message(
     })
 }
 
+/// What Mood's last state says at `now_us` (#1670): the lamp's one breath's
+/// phase, and how lively the idle layer's moves are. Both `None` for no
+/// state, or one from anyone but Mood, not valid, before its stamp or past
+/// its 2.5 s ([`lamp_msgs::MoodState::fresh_in`]).
+pub fn mood_in(message: Option<&lamp_bus::Message>, now_us: u64) -> (Option<f64>, Option<f32>) {
+    let Some(mood) = message.and_then(|message| lamp_msgs::MoodState::fresh_in(message, now_us))
+    else {
+        return (None, None);
+    };
+    (
+        mood.breath_at(now_us).map(|(phase, _)| phase),
+        Some(mood.liveliness()),
+    )
+}
+
 /// One owner, held by the OS even when the process is killed. The file is
 /// deliberately not unlinked: another process may already be waiting on it.
 pub fn owner_lock(root: &Path) -> io::Result<File> {
@@ -463,7 +478,8 @@ impl Service {
         self
     }
 
-    /// Breathes the head with the lamp's one breath where Mood keeps it
+    /// Breathes the head with the lamp's one breath where Mood keeps it,
+    /// and makes the idle layer's moves livelier or quieter as Mood says
     /// (#1670, `mood/state`): the same phase the ring's resting breath takes
     /// ([`lamp_msgs::MoodState::breath_in`]). With no fresh mood, the plain
     /// breath on the boot clock, as before.
@@ -504,11 +520,9 @@ impl Service {
                 // A bus that cannot be read is no mood.
                 *state = bus.latest(lamp_msgs::MoodState::TOPIC).ok().flatten();
             }
-            let phase = state
-                .as_ref()
-                .and_then(|message| lamp_msgs::MoodState::breath_in(message, began))
-                .map(|(phase, _)| phase);
+            let (phase, liveliness) = mood_in(state.as_ref(), began);
             self.engine.set_mood_breath(phase);
+            self.engine.set_mood_liveliness(liveliness);
         }
         // The zone or offset given, and a minute since the last (#820).
         let due = self.local.is_some()
