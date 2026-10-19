@@ -105,6 +105,17 @@ struct Exchange {
     written: Option<String>,
 }
 
+/// A completed exchange, preserving the scope bound when its response began.
+/// This is journal attribution, not request-admission identity authorization.
+#[derive(Debug, PartialEq, Eq)]
+pub struct FinishedExchange {
+    pub request: u64,
+    pub age: Duration,
+    pub heard: String,
+    pub said: String,
+    pub whose: Option<String>,
+}
+
 pub struct Thread {
     exchanges: VecDeque<Exchange>,
     /// What has been heard since the last answer, and when.
@@ -556,10 +567,10 @@ impl Thread {
     /// The exchanges that are over and were not given out before, for the
     /// lamp's memory ([`crate::remember`]): every one but the newest, and
     /// the newest too when `done` is its request. Each with its request,
-    /// how long ago it began, what the person said and what the lamp did.
+    /// how long ago it began, what was said, and its originally bound scope.
     /// An answer with no word in it is passed over: it is not something
     /// the lamp said.
-    pub fn finished(&mut self, done: u64, now: Instant) -> Vec<(u64, Duration, String, String)> {
+    pub fn finished(&mut self, done: u64, now: Instant) -> Vec<FinishedExchange> {
         let newest = self.exchanges.back().map(|last| last.request);
         self.exchanges
             .iter_mut()
@@ -569,14 +580,17 @@ impl Thread {
             })
             .filter_map(|exchange| {
                 exchange.journalled = true;
-                exchange.lamp.chars().any(char::is_alphanumeric).then(|| {
-                    (
-                        exchange.request,
-                        now.saturating_duration_since(exchange.at),
-                        exchange.person.trim().to_owned(),
-                        exchange.lamp.trim().to_owned(),
-                    )
-                })
+                exchange
+                    .lamp
+                    .chars()
+                    .any(char::is_alphanumeric)
+                    .then(|| FinishedExchange {
+                        request: exchange.request,
+                        age: now.saturating_duration_since(exchange.at),
+                        heard: exchange.person.trim().to_owned(),
+                        said: exchange.lamp.trim().to_owned(),
+                        whose: exchange.whose.clone(),
+                    })
             })
             .collect()
     }
@@ -1603,7 +1617,7 @@ mod tests {
         assert_eq!(thread.recall(at(5), ROOM).unwrap(), recalled);
         let finished = thread.finished(2, at(5));
         assert_eq!(finished.len(), 1);
-        assert_eq!(finished[0].0, 2);
+        assert_eq!(finished[0].request, 2);
     }
 
     /// #1505: the thread file as a later build writes it, with a field this
@@ -1770,6 +1784,40 @@ mod tests {
     }
 
     #[test]
+    fn finished_scope_is_the_response_scope_even_when_someone_else_arrives_before_flush() {
+        let start = Instant::now();
+        let mut thread = Thread::new();
+        thread.seen_now(Some("p-a".into()));
+        thread.person("My question", true, start);
+        thread.lamp(1, "Your answer", start);
+        thread.seen_now(Some("p-b".into()));
+        thread.at_lamp(Some("p-b".into()));
+        let done = thread.finished(1, start + Duration::from_secs(1));
+        assert_eq!(done[0].whose.as_deref(), Some("p-a"));
+        assert_eq!(done[0].request, 1);
+    }
+
+    #[test]
+    fn a_finished_batch_preserves_room_and_both_peoples_scopes() {
+        let start = Instant::now();
+        let mut thread = Thread::new();
+        for (request, whose) in [(1, None), (2, Some("p-a")), (3, Some("p-b"))] {
+            thread.seen_now(whose.map(str::to_owned));
+            thread.person("Question", true, start);
+            thread.lamp(request, "Answer", start);
+        }
+        thread.seen_now(Some("p-c".into()));
+        thread.at_lamp(Some("p-c".into()));
+        let done = thread.finished(3, start);
+        assert_eq!(
+            done.iter()
+                .map(|exchange| (exchange.request, exchange.whose.as_deref()))
+                .collect::<Vec<_>>(),
+            [(1, None), (2, Some("p-a")), (3, Some("p-b"))]
+        );
+    }
+
+    #[test]
     fn a_finished_exchange_is_given_out_once_and_forgetting_drops_them_all() {
         let start = Instant::now();
         let at = |seconds: u64| start + Duration::from_secs(seconds);
@@ -1780,12 +1828,13 @@ mod tests {
         assert!(thread.finished(0, at(2)).is_empty());
         assert_eq!(
             thread.finished(1, at(4)),
-            [(
-                1,
-                Duration::from_secs(3),
-                "How do I take my coffee?".to_owned(),
-                "Black.".to_owned()
-            )]
+            [FinishedExchange {
+                request: 1,
+                age: Duration::from_secs(3),
+                heard: "How do I take my coffee?".to_owned(),
+                said: "Black.".to_owned(),
+                whose: None,
+            }]
         );
         assert!(thread.finished(1, at(5)).is_empty());
         // An answer that never completed is given out when the next begins;
@@ -1796,7 +1845,7 @@ mod tests {
         let given: Vec<u64> = thread
             .finished(9, at(9))
             .into_iter()
-            .map(|(request, ..)| request)
+            .map(|exchange| exchange.request)
             .collect();
         assert_eq!(given, [2]);
         assert_eq!(thread.finished(4, at(9)).len(), 1);

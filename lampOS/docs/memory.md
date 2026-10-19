@@ -399,8 +399,13 @@ then use that person's scope:
   2,400, and not at all when theirs filled them, so an answer is no longer
   than before. Their entries come first and carry `"theirs":true`. Either
   part not answering is a memory that did not answer.
-- **Each exchange** goes to the journal of whoever was known at the lamp when
-  the request was over, read then, not when the writer sends it. With Days,
+- **Each exchange** keeps the person scope already stored in the conversation
+  thread when that exchange was created. Finishing a request or flushing a batch
+  does not look at the current face again: A's exchange stays A's after B appears,
+  and a room exchange stays in the room. Both legacy and Days writers receive
+  each exchange's own scope; keep/forget exclusions remain request-specific.
+  This preserves the existing thread attribution, not a newly authenticated
+  speaker identity at request admission. With Days,
   an exchange links only that person's sources, because the store numbers
   and links records within one person; a different person at the lamp ends
   the conversation being collected, which is sent to `conversation_end` in
