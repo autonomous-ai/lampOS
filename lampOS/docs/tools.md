@@ -405,8 +405,23 @@ after `--use-skill`) a session is told of `reports_stop`, with no
 arguments: "stop sending reports" (#1683, [cloud.md](cloud.md), "Health and
 crash reports"). It is the voice's own, never a skill, and comes before the
 executive's and the skills' functions, so it is never the one cut past 32;
-a skill cut for it is named on the setup line (#1706). The voice puts
-`{"share": false}` on `reports/request` and answers from `lamp-cloud`'s
+a skill cut for it is named on the setup line (#1706).
+
+The switch declares two functions, `reports_stop` and `reports_state`
+(below), so a session is told two more than without it. A product lamp
+declares 31 without it (the voice's own 13, the actions part's 17 and
+Dance's) and 32 with it: the voice's own 15 and the actions part's 17 fill
+the 32, and Dance's `dance`, the product's one skill function, is the one
+cut (`; skills not given: dance (past 32: …)` on the setup line). On any
+lamp it is the last skills' functions, in order, that make room for the
+two; the executive's are cut only once the skills' are gone. With
+`LAMP_USE_SKILL=on` as well, `use_skill` would be the 33rd, and the link's
+check leaves it out (`use_skill (past 32)` in the journal). Tests:
+`with_reports_on_a_product_lamp_is_at_32_and_dance_is_cut`
+(`crates/update/tests/functions.rs`) and
+`reports_add_two_functions_and_the_last_skills_are_cut_past_32`.
+
+The voice puts `{"share": false}` on `reports/request` and answers from `lamp-cloud`'s
 `reports/state` within 2 s: `{"ok": true, "say": "I've stopped sending
 reports."}`, or "I'm not sending any reports." when they were off. With
 nobody taking the ask (`lamp-cloud` not running), or no answer in time, it

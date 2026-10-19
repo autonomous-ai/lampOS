@@ -2540,6 +2540,59 @@ mod tests {
         assert!(crate::reports_stop::arguments(None).is_empty());
     }
 
+    /// The reviewer's P3 on #1906: `LAMP_REPORTS=on` declares two more,
+    /// `reports_stop` and `reports_state`, before the executive's and the
+    /// skills', so past 32 it is the last skills' functions that are cut,
+    /// two of them, and the setup line names them.
+    #[test]
+    fn reports_add_two_functions_and_the_last_skills_are_cut_past_32() {
+        let (dir, mut settings) = many_skills("reports-count");
+        // Off: the voice's own five and the executive's twenty-five, and two
+        // of the three skills' functions; show_verdict is past 32.
+        assert_eq!(core_tools(&settings).len(), 30);
+        let off: Vec<String> = declared(&settings)
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect();
+        assert_eq!(off.len(), 32);
+        assert_eq!(&off[30..], ["dance", "check_my_work"]);
+        // On: two more of the voice's own, and the two skills' that fitted
+        // are cut for them; the executive's all stay.
+        settings.reports_stop = true;
+        assert_eq!(core_tools(&settings).len(), 32);
+        let on = declared(&settings);
+        assert_eq!(on.len(), 32);
+        let names: Vec<&str> = on.iter().map(|tool| tool.name.as_str()).collect();
+        assert_eq!(
+            &names[5..7],
+            [crate::reports_stop::NAME, crate::reports_stop::STATE_NAME]
+        );
+        assert!((0..25).all(|n| names.contains(&format!("light_{n}").as_str())));
+        let cut: Vec<&str> = off
+            .iter()
+            .map(String::as_str)
+            .filter(|name| !names.contains(name))
+            .collect();
+        assert_eq!(cut, ["dance", "check_my_work"]);
+        let said = crate::session_tools::setup_line(&on, &settings);
+        assert!(
+            said.ends_with(
+                "; skills not given: dance, check_my_work, show_verdict (past 32: LAMP_USE_SKILL=on reaches them)"
+            ),
+            "{said}"
+        );
+        let (kept, left_out) = admitted(on);
+        assert!(left_out.is_empty(), "{left_out:?}");
+        assert_eq!(kept.len(), 32);
+        // With use_skill as well, it is the 33rd, and the link's check
+        // leaves it out (as tools.md says, until it is given room).
+        settings.use_skill = true;
+        let (kept, left_out) = admitted(declared(&settings));
+        assert_eq!(kept.len(), 32);
+        assert_eq!(left_out, ["use_skill (past 32)"]);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     /// The reviewer on #1706: the setup line's two notes with `use_skill`,
     /// the skills past its bound and its lines named alone or left out.
     #[test]

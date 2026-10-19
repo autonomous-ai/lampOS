@@ -31,10 +31,33 @@ pub fn mood_pace(awake: f32, energy: f32, asleep: bool) -> f32 {
     if asleep {
         return MOOD_PACE_SLOWEST;
     }
-    let lively = ((energy - CALM_ENERGY) / (MOST_ENERGY - CALM_ENERGY)).clamp(0.0, 1.0);
-    let dozy = ((MOOD_PACE_DOZING - awake) / MOOD_PACE_DOZING).clamp(0.0, 1.0);
+    let (lively, dozy) = lively_and_dozy(awake, energy);
     (1.0 + (MOOD_PACE_QUICKEST - 1.0) * lively - (1.0 - MOOD_PACE_SLOWEST) * dozy)
         .clamp(MOOD_PACE_SLOWEST, MOOD_PACE_QUICKEST)
+}
+
+/// How far the lamp's moves go from their authored style in this state,
+/// from -0.5 to 0.5: its [`mood_pace`] laid on that range, 0 at the plain
+/// pace, 0.5 at the quickest and -0.5 at the slowest, so the moves are
+/// livelier exactly where the breath is quicker and never the other way.
+/// Expression adds it to its catalogue's energy (#1670).
+pub fn mood_liveliness(awake: f32, energy: f32, asleep: bool) -> f32 {
+    let pace = mood_pace(awake, energy, asleep);
+    if pace >= 1.0 {
+        0.5 * (pace - 1.0) / (MOOD_PACE_QUICKEST - 1.0)
+    } else {
+        -0.5 * (1.0 - pace) / (1.0 - MOOD_PACE_SLOWEST)
+    }
+    .clamp(-0.5, 0.5)
+}
+
+/// How lively, from energy over the calm, and how dozy, as awake falls
+/// under [`MOOD_PACE_DOZING`]: each from 0 to 1.
+fn lively_and_dozy(awake: f32, energy: f32) -> (f32, f32) {
+    (
+        ((energy - CALM_ENERGY) / (MOST_ENERGY - CALM_ENERGY)).clamp(0.0, 1.0),
+        ((MOOD_PACE_DOZING - awake) / MOOD_PACE_DOZING).clamp(0.0, 1.0),
+    )
 }
 
 /// The lamp's one breath as Mood keeps it (#1670): where it is at the
@@ -183,12 +206,25 @@ impl MoodState {
     /// unexpired, checked, and as [`Self::breath_at`] says. Every reader of
     /// the breath takes it here, so none reads it differently.
     pub fn breath_in(message: &lamp_bus::Message, now_us: u64) -> Option<(f64, f32)> {
+        Self::fresh_in(message, now_us)?.breath_at(now_us)
+    }
+
+    /// The state in a bus message if it holds at `now_us`: from source
+    /// `mood`, unexpired, checked, stamped no later than now and within its
+    /// [`MOOD_STATE_TTL_US`]. Every reader takes Mood's state here.
+    pub fn fresh_in(message: &lamp_bus::Message, now_us: u64) -> Option<Self> {
         if message.expired || message.header.source != "mood" {
             return None;
         }
         let state = message.parse::<Self>().ok()?;
         state.check().ok()?;
-        state.breath_at(now_us)
+        let since = now_us.checked_sub(state.stamp.at_us)?;
+        (since < MOOD_STATE_TTL_US).then_some(state)
+    }
+
+    /// [`mood_liveliness`] of this state.
+    pub fn liveliness(&self) -> f32 {
+        mood_liveliness(self.awake, self.energy, self.asleep)
     }
 }
 
