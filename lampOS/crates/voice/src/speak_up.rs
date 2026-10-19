@@ -158,25 +158,46 @@ pub const NO_LOOK_NOTE: &str = "(You tried to look, but your eye is shut just no
 /// Whether an answer that opens like this is the lamp saying it will look:
 /// its own words are how it asks for its eyes. Only "let me look" and its
 /// two longer forms; "let me see" is something people say before any answer.
+/// The phrase must close where it ends, with `.`, `!`, `…`, `,`, `;`, `:` or
+/// a dash, as the character says it ("say exactly \"Let me look.\""): a word
+/// after it is something else. On lamp-4ace on 19 Oct the second route's
+/// "Let me look that up" before a web search took two pictures, and the
+/// model described the desk unasked (#1712). Until the closing mark comes,
+/// more words may follow, so it is not yet a look.
 pub fn asks_to_look(opening: &str) -> bool {
-    let plain: String = opening
-        .chars()
-        .map(|c| {
-            if c.is_alphabetic() {
-                c.to_ascii_lowercase()
-            } else {
-                ' '
-            }
-        })
-        .collect();
-    let words: Vec<&str> = plain.split_whitespace().collect();
+    // Each word, lowercased, with where it ends in `opening`.
+    let mut words: Vec<(String, usize)> = Vec::new();
+    let mut began = None;
+    for (at, c) in opening.char_indices() {
+        if c.is_alphabetic() {
+            began.get_or_insert(at);
+        } else if let Some(from) = began.take() {
+            words.push((opening[from..at].to_lowercase(), at));
+        }
+    }
+    if let Some(from) = began {
+        words.push((opening[from..].to_lowercase(), opening.len()));
+    }
+    let closes = |rest: &str| {
+        rest.trim_start()
+            .chars()
+            .next()
+            .is_some_and(|c| matches!(c, '.' | '!' | '…' | ',' | ';' | ':' | '—' | '–' | '-'))
+    };
     [
         &["let", "me", "look"][..],
         &["let", "me", "take", "a", "look"][..],
         &["let", "me", "have", "a", "look"][..],
     ]
     .iter()
-    .any(|phrase| words.len() >= phrase.len() && words[..phrase.len()] == **phrase)
+    .any(|phrase| {
+        words.len() >= phrase.len()
+            && words
+                .iter()
+                .zip(phrase.iter())
+                .all(|((word, _), said)| word == said)
+            && closes(&opening[words[phrase.len() - 1].1..])
+    })
 }
 
 const THERE_FOR_US: u64 = 3_000_000;
@@ -652,13 +673,26 @@ mod tests {
         for (opening, asks) in [
             ("Let me look.", true),
             ("Let me look... okay.", true),
-            ("let me take a look", true),
+            ("let me take a look.", true),
             ("Let me have a look!", true),
+            ("Let me look, one moment.", true),
+            ("Let me look — okay.", true),
+            // Not closed yet: more words may follow.
+            ("Let me look", false),
+            ("let me take a look", false),
+            // #1712: a word after it is something else, never a look.
+            ("Let me look that up.", false),
+            ("Let me look that up for you.", false),
+            ("Let me look into it.", false),
+            ("Let me look it up.", false),
+            ("Let me look up the weather.", false),
+            ("Let me look for that.", false),
+            ("Let me take a look at the forecast.", false),
             ("Let me see... that's four!", false),
             ("Let me think.", false),
             ("Let", false),
             ("Let me", false),
-            ("I'll let me look", false),
+            ("I'll let me look.", false),
             ("Look, it's simple.", false),
             ("", false),
         ] {

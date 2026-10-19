@@ -117,7 +117,14 @@ giving the model one with everything said was switched off).
 - The coordinator hears the lamp's own words as they arrive. An answer that
   opens with "let me look", "let me take a look" or "let me have a look"
   (`speak_up::asks_to_look`; not "let me see", which people say before any
-  answer) is the lamp asking for its eyes: `look_asked` in the record.
+  answer) is the lamp asking for its eyes: `look_asked` in the record. The
+  phrase must close where it ends, with `.`, `!`, `…`, `,`, `;`, `:` or a
+  dash: a word after it is something else, and until the closing mark
+  comes more words may follow, so it is not yet a look. On lamp-4ace on 19
+  October the second route's "Let me look that up", before a web search,
+  took two pictures and the model described the desk unasked (#1712);
+  "Let me look that up", "Let me look into it" and "Let me take a look at
+  the forecast" take none.
   Only in a turn someone spoke: in one the lamp wrote itself (its own look,
   a hello, a "Sorry?", a reminder) the words ask nothing, so looks never
   chain with nobody speaking (`coordinator::own_turn`, the worker's
