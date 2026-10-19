@@ -695,6 +695,19 @@ When the coordinator switches (below):
   check and no staff note, the two things it guards on the Live route. On
   lamp-4ace on 2026-10-16 this route answered "Me." and half a question
   between colleagues while Gemini's session was renewed; both are held now.
+  With `LAMP_REPORTS=on`, a held line whose heard words name `report`,
+  `reports`, `sharing`, `sending` or `data` (`attention::HELD_ASKED_WORDS`,
+  #1925; any other is sent nowhere) is still asked once, told only the
+  functions done though a line's answer is held
+  (`attention::DONE_THOUGH_HELD`, today `reports_stop`), with a note that
+  nothing said now is heard (`HELD_NOTE`), as the Live route's model hears
+  every line and its `reports_stop` is done though held (the first builder
+  on #1722, 16:44). Only those calls are run, with no round after; any
+  words are dropped and nothing is played. The turn ends when that round
+  does, given up after `HELD_WITHIN` (6 s); a line begun meanwhile replaces
+  it, and words carried from a line it cut short are answered beside it.
+  The round costs one more chat request per held line naming reports, only
+  with the switch.
 - **Back to Gemini:** silently, at the next idle moment with Gemini Ready,
   or at the start of the next turn if the room never goes quiet. Nothing
   is said about it.
