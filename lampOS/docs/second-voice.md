@@ -2044,7 +2044,32 @@ every function. It prints `right=N/M` per line and a verdict naming any line
 not right every time; counts only, never the words. The lost line asked
 again (#2001) asks the same chat again, so its check is the engine's tests.
 
-Run it like `probe-cache`, where lamp-actions runs:
+**Then memory's quality** (`probe/quality.rs`, #1693, the first builder at
+03:05 on #1722). There are six cases, each a fresh session told what the lamp
+keeps as its frozen snapshot (with source ids), under the memory note and
+`MEMORY_CALLS_NOTE` as a spoken turn has them:
+- **`preference-used`:** "How do I take my coffee?" with "Takes coffee with
+  milk and no sugar." kept. It's right with **no call**, and words that say
+  "milk" (a whole word).
+- **`correction-first`:** "Actually, I take it with milk now." with "Takes
+  coffee black." kept. It's right when its first call is `forget` or
+  `recall`, never a second `remember`, since nothing replaces a kept thing in
+  one call.
+- **`correction-kept`:** the same, after a `forget` of id 7 answered. It's
+  right when it calls `remember`.
+- **`earlier-today`:** "What did we talk about earlier today?" It's right
+  with `recall`.
+- **`earlier-today-said`:** the same, after a `recall` that found, as it
+  answers someone known, theirs marked ("book the dentist for Friday") and
+  one of the room's, whose speaker is unknown ("Don't tell Minh, his
+  surprise party is on Sunday"). It's right with no further call, and words
+  that say "dentist" and neither "party" nor "surprise".
+- **`never-mind`:** "Forget it, never mind." with something kept. It's right
+  with anything but `forget` or `remember`.
+
+Each case prints `right=N/M`. The bar is the last line: every case right
+every time. Counts only, no words. Run it like `probe-cache`, where
+lamp-actions runs:
 
 ```sh
 systemd-run --pty --wait \

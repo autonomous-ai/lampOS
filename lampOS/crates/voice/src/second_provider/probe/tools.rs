@@ -294,6 +294,13 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
     for line in sayings_verdict(&ask_sayings(&today, &character, runs).await) {
         println!("{line}");
     }
+    println!(
+        "tools: memory's quality, {} cases, {runs} runs of each (#1693)",
+        super::quality::CASES.len()
+    );
+    for line in super::quality::verdict(&super::quality::ask(&today, &character, runs).await) {
+        println!("{line}");
+    }
     Ok(())
 }
 
