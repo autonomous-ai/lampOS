@@ -187,18 +187,25 @@ are **5,806 passed, 1 failed, 29 ignored**, none filtered; Voice itself is
 **2,256 passed, 1 failed, 12 ignored**, **316.73 s**. Base `df722db2d0`
 already contains #1976. The complete second-route test file and Expression
 speaking implementation/test blobs match that base. All **1,583** frozen
-source hashes match. This is a failed gate. The later Voice targets,
-Voice-eval, doc tests, full Update and build are being completed separately;
-their results will not erase the failure or constitute a passing complete
-gate. No caps feature push or PR is claimed.
+source hashes match. This is a failed gate. The [previously unreached checks](verification/second-integration-checkpoint-20261019/caps-foundation-unreached.json)
+now pass: remaining Voice **243/0/0**, **53.55 s**; Voice-eval **546/0/0**,
+**143.95 s**; docs **1/0/0**, **5.24 s**; complete Update **129/0/1**,
+**67.28 s**; and workspace build **25.40 s**. No filters, and every frozen
+source hash matches in both the checkout and source-only copy. These
+results preserve the original failure. First's 16:57 UTC direction is to
+publish the four parts with that inherited failure disclosed. The motion
+owner's test-only #1990 is open; its native gate and actual landing remain
+pending. Caps publication proceeds on that basis, with automatic ARM64 still
+required before it is ready to merge.
 
-Music is being composed privately above the four split commits, preserving
+Music is committed privately as `c82c04d6df` above the four split commits, preserving
 ScopedSystem, notes-aware preparation, bounded TTS and shutdown. Independent
 review of the other 47 changed files found no P1/P2; the two documentation
 links it identified are corrected. Additional cross-cases cover scoped
 identity, revocation after preparation, empty speech and Stop through the
 real worker with the Music runner. They are source preparation, not yet
-runtime-qualified. Music remains queued behind actual Bedtime landing.
+runtime-qualified. The final three-file review also found no P1/P2 and verified
+all parent tests remain. Music remains queued behind actual Bedtime landing.
 
 Bedtime and Tasks have only their original automatic PR ARM64 run,
 following First's no-duplicate-dispatch direction. GitHub's [Actions incident](https://www.githubstatus.com/incidents/8tzbpcnl75jp)
