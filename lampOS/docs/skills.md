@@ -328,6 +328,13 @@ skills".)
   each topic's newest value. A look uses only a list of faces whose lifespan
   still lasts; with none, the other steps run without it. Time comes from its own monotonic
   clock, read when a message arrives.
+- It waits on every topic's socket, the Policy's answers and its own wake
+  at once (`poll`), at most 250 ms. So a message, a tool call, a test's
+  skip or a run's end is taken as it comes, and each topic still gives one
+  message a pass. Until 19 Oct it waited on each topic in its turn, the
+  250 ms shared among them, and a tool call waited out a topic's turn:
+  about 49 ms each with three topics on the Intel Mac, against under 1 ms
+  after (#1806, `tests/call_wait.rs`).
 - **The ask.** `LAMP_SKILLS_ASK` says how a run that a trigger starts is
   allowed (a tool's run is asked for by a person and never is):
   - `policy`: the Policy's gate (#958, `lamp-policy --gate`). The run's
