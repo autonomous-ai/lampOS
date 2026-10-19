@@ -613,6 +613,18 @@ pub fn with_search(
     tools
 }
 
+/// Told after the character in spoken turns on this route, whose model reads
+/// what was heard as words (#1712, the first builder's scoring of 19 Oct:
+/// "what is the weather like in Hanoi" heard as "Hannover" or answered with
+/// "You asking what the weather's like here?"; "Night!" at 1 pm, the
+/// character's example; a poem of two lines).
+pub(crate) const SPOKEN_NOTE: &str = "\n\nYou read what people say as words, and your ears turn some words into others, names and places most of all. When a question is plainly about the weather, a price, a time or a place, answer it for the likeliest meaning, here first, and search if you need to; ask back only when you cannot guess at all. Greet and say goodbye for the time of day it is now. A poem you are asked for has at least four lines.";
+
+/// The character with [`SPOKEN_NOTE`] after it.
+fn spoken_character(character: &str) -> String {
+    format!("{character}{SPOKEN_NOTE}")
+}
+
 /// What the model is told of the time, with the lamp's place after it
 /// ([`crate::local_time::place_told`]); the place alone when the time is not
 /// known.
@@ -723,6 +735,8 @@ pub fn serve(
     // What the texts' task is built from, kept before the spoken turns take
     // their own (`texts_task`).
     let texts_from = (character.clone(), tools.clone());
+    // Spoken turns only: a text is typed, not heard (#1712).
+    let character = spoken_character(&character);
     let sessions = std::sync::Mutex::new(Sessions::default());
     let place = crate::local_time::place_here();
     if let Some(place) = &place {
@@ -2761,6 +2775,18 @@ mod tests {
             None
         );
         assert!(!heeding.holds_call(10, "set_timer"), "called by name");
+    }
+
+    /// #1712: spoken turns are told how to take what they heard; the
+    /// character comes first, unchanged.
+    #[test]
+    fn spoken_turns_are_told_to_answer_the_likeliest_meaning() {
+        let told = super::spoken_character("CHARACTER");
+        assert!(told.starts_with("CHARACTER\n\n"));
+        assert!(told.contains("answer it for the likeliest meaning, here first"));
+        assert!(told.contains("ask back only when you cannot guess at all"));
+        assert!(told.contains("for the time of day it is now"));
+        assert!(told.contains("at least four lines"));
     }
 
     /// #1712: the lamp's place follows its time, or stands alone.

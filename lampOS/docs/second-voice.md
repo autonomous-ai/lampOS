@@ -847,6 +847,16 @@ after a take-over, but now for every turn:
   going on (`LAMP_GOING_ON_ASKS`, which also ends a busy room sooner once
   answered) and another voice's line (the same-voice check). The busy-room
   battery on lamp-4ace is its check.
+- **How to take what it heard** (`worker::SPOKEN_NOTE`, spoken turns
+  only, after the character): the ears turn some words into others, names
+  and places most of all; a question plainly about the weather, a price, a
+  time or a place is answered for the likeliest meaning, here first, with
+  a search if needed, and asked back only when it cannot be guessed; greet
+  and say goodbye for the time of day; a poem has at least four lines. From
+  the first builder's scoring of 19 Oct: "what is the weather like in
+  Hanoi" was answered "You asking what the weather's like here today?",
+  "Night!" came at 1 pm (the character's example), and a poem had two
+  lines. A text is typed, not heard, and is not told it.
 - **The lamp's place** (`LAMP_PLACE`, "Hanoi, Vietnam"): told beside the
   time, "You are in Hanoi, Vietnam. When someone asks about the weather,
   the news or anything nearby without naming a place, they mean Hanoi,
