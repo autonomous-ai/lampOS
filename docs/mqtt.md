@@ -357,8 +357,8 @@ before synthesis; valid requests acknowledge `starting`, then `success` or
 | `tts.set` | Persist TTS voice/provider/language/speed config | `provider`, `voice`, `language`, optional `speed` |
 | `tts.preview` | One-shot TTS preview (no config write) | `text` (required), optional `provider`/`voice`/`language`/`speed` |
 | `wakeword.gate` | Set the top-level wake-word gate (async; acks `starting`) | `enabled` (required boolean) |
-| `wakeword.settings.get` | Read the wake settings: gate, phrases, chime, wake light, listening window, plus limits (synchronous) | _(none)_ |
-| `wakeword.settings.set` | Save any subset of the wake settings through the `PUT /api/device/config` path; replies once with the saved settings | any of `enabled`, `phrases`, `chime`, `light`, `followup_s` |
+| `wakeword.settings.get` | Read the wake settings: gate, phrases, chime, wake light, listening window, tap-to-talk chime and light, plus limits (synchronous) | _(none)_ |
+| `wakeword.settings.set` | Save any subset of the wake settings through the `PUT /api/device/config` path; replies once with the saved settings | any of `enabled`, `phrases`, `chime`, `light`, `followup_s`, `tap_chime`, `tap_light` |
 | `wakeword.light.preview` | Play a candidate wake light for 3 s via HAL `POST /led/wake-light/preview`; nothing is saved (synchronous) | `color`, optional `effect`/`speed` |
 | `cloud_perception.set` | Turn camera or voice cloud perceptions **off** (opt-out only; async; acks `starting`) | any of `motion`, `emotion`, `pose`, `fire_hazard`, `speaker_id`, `speech_emotion` (must be `false`) |
 | `voice.input_mode` | Select voice input behavior (async ack) | `mode`: `automatic` or `tap_to_talk` |
@@ -622,6 +622,8 @@ same rules.
 {"cmd": "data", "kind": "wakeword.settings.get", "data": {}}
 {"cmd": "data", "kind": "wakeword.settings.set", "data": {"phrases": ["sam", "hey sam"], "chime": true,
   "light": {"enabled": true, "color": [16, 9, 3], "effect": "spin", "speed": 1.5}, "followup_s": 5}}
+{"cmd": "data", "kind": "wakeword.settings.set", "data": {"tap_chime": true,
+  "tap_light": {"enabled": true, "color": [3, 16, 9], "effect": "breathing", "speed": 1.2}}}
 {"cmd": "data", "kind": "wakeword.light.preview", "data": {"color": [16, 9, 3], "effect": "spin", "speed": 1.5}}
 ```
 
@@ -634,7 +636,8 @@ same rules.
  "chime": true, "has_light": true,
  "light": {"enabled": true, "color": [16, 9, 3], "effect": "spin", "speed": 1.5},
  "light_effects": ["solid", "breathing", "spin", "blink"], "light_speed_min": 0.25, "light_speed_max": 3,
- "followup_s": 5, "followup_custom": true, "followup_min_s": 3, "followup_max_s": 30}
+ "followup_s": 5, "followup_custom": true, "followup_min_s": 3, "followup_max_s": 30,
+ "tap_chime": true, "tap_light": {"enabled": true, "color": [4, 8, 16], "effect": "breathing", "speed": 1.2}}
 ```
 
 - `enabled` is the **Require attention trigger** gate (config `wakeword`). The
@@ -663,9 +666,17 @@ same rules.
   without the wake phrase (`followup_min_s`–`followup_max_s`). While
   `followup_custom` is false it is HAL's image default (5 s on Intern v2 and
   Lamp), or 10 s when HAL is down.
+- `tap_chime` and `tap_light` are the tap-to-talk cues: the chime when a
+  recording starts and the light while it runs. They are saved apart from the
+  wake cues and only matter while `voice_input_mode` is `tap_to_talk`; show them
+  there instead of the wake settings. At least one stays on, so turning both
+  off fails with `keep the tap-to-talk chime or light on, so you can tell
+  recording started`. `tap_light` follows the `light` rules (same board look
+  while unset, same effects and speeds, send all four fields); try a look with
+  `wakeword.light.preview`.
 
 `set` changes only the fields it sends, and an empty payload fails with
-`nothing to change`. Phrases, chime, light and the listening window apply live.
+`nothing to change`. Phrases, chimes, lights and the listening window apply live.
 Changing `enabled` restarts HAL (up to 30 s): if the update is still running
 after 5 s, the reply is `success` with the saved settings and `applying: true`,
 and a later restart failure is published as a separate `failure` for the same
@@ -1433,7 +1444,7 @@ survives HAL restarts.
 
 #### `realtime.get` / `realtime.set` — Realtime voice settings over MQTT
 
-The phone twin of the web **Settings → Realtime** page (debug-only on the web).
+The phone twin of the web **Settings → Realtime** page.
 
 ```json
 {"cmd": "data", "kind": "realtime.get"}
@@ -1445,7 +1456,8 @@ choices to offer:
 ```json
 {
   "config": {"enabled": true, "provider": "gemini", "model": "…", "voice": "Kore",
-             "reasoning": "LOW", "base_url": "", "has_api_key": false},
+             "reasoning": "LOW", "base_url": "", "has_api_key": false,
+             "fast_voice": true, "fast_voice_pause_s": 2, "fast_voice_silent_timeout_s": 5},
   "options": {"providers": ["gemini", "openai", "gptlive", "pipecat_v1", "none"],
               "voices": {"gemini": ["…"], "openai": ["…"], "gptlive": ["…"], "pipecat_v1": []},
               "reasoning": {"gemini": ["MINIMAL", "LOW", "MEDIUM", "HIGH"], "openai": ["…"], "gptlive": [], "pipecat_v1": []}}
@@ -1457,9 +1469,18 @@ The key is never returned; `has_api_key` says whether an override is stored.
 `web_search` appears only for `pipecat_v1`. An empty voice or reasoning list
 means that provider has no such knob, so hide the selector.
 
+`fast_voice` is the web **Faster replies** toggle, in effect (default on for
+Intern v2). HAL applies it to Gemini only, so show it, and the two waits, only
+for `gemini`. `fast_voice_pause_s` is how long the device waits after a pause
+mid-sentence before answering (0.8–6 s, default 2; the web offers 1, 1.5, 2, 3,
+4, 6). `fast_voice_silent_timeout_s` is how long a silent Gemini has before the
+main agent answers instead (3–8 s, default 5; the web offers 3, 4, 5, 6, 8).
+With Faster replies on, `voice` is the voice those replies speak in.
+
 `realtime.set` saves any subset of `enabled`, `provider`, `model`, `voice`,
-`reasoning`, `api_key`, `base_url` and `web_search` (pipecat_v1 only). Omitted
-fields stay unchanged. It acks `starting`, validates against the same option
+`reasoning`, `api_key`, `base_url`, `web_search` (pipecat_v1 only),
+`fast_voice`, `fast_voice_pause_s` and `fast_voice_silent_timeout_s`. Omitted
+fields stay unchanged; a wait outside its range acks `failure`. It acks `starting`, validates against the same option
 lists, saves `config.json`, restarts HAL, then acks `success` or `failure`:
 
 ```json

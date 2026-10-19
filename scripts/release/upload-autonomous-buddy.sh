@@ -109,7 +109,7 @@ for arch in "${architectures[@]}"; do
 done
 
 # Fail closed: a fetch failure must never replace metadata with an incomplete document.
-gsutil cp "gs://${GCS_BUCKET}/${METADATA_PATH}" "$METADATA_TMP"
+ota_metadata_fetch "gs://${GCS_BUCKET}/${METADATA_PATH}" "$METADATA_TMP"
 ota_metadata_unpack "$METADATA_TMP" "$PAYLOAD_TMP"
 if jq -e '.signed != null or .format == "autonomous-ota/v1"' "$METADATA_TMP" >/dev/null && [[ -z "${OTA_SIGNING_PRIVATE_KEY:-}" ]]; then
   echo "Error: signing key required to update signed OTA metadata" >&2
@@ -124,8 +124,7 @@ updated_metadata=$(jq --slurpfile entries "$ENTRIES_TMP" \
   "$PAYLOAD_TMP")
 printf '%s\n' "$updated_metadata" > "$PAYLOAD_TMP"
 ota_metadata_sign "$PAYLOAD_TMP" "$METADATA_TMP"
-gsutil -h "Content-Type:application/json" -h "Cache-Control:no-cache, no-store, must-revalidate" \
-  cp "$METADATA_TMP" "gs://${GCS_BUCKET}/${METADATA_PATH}"
+ota_metadata_publish "$METADATA_TMP" "gs://${GCS_BUCKET}/${METADATA_PATH}"
 if [[ "$DMG_TARGET" == "dmg-signed" ]]; then
   for arch in "${architectures[@]}"; do
     gcs_path="${GCS_PATH:-${BUCKET_PREFIX}/ota/autonomous-buddy/${arch}/${new_version}.dmg}"

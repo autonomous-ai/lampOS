@@ -128,6 +128,11 @@ class EmotionPerception(PerceptionBase[EmotionPerceptionSession]):
     def _label_thresholds(self) -> dict[str, float] | None:
         return self._default_config.label_thresholds if self._default_config else None
 
+    def check_capacity(self) -> None:
+        """Raise BatcherOverloaded when the emotion batcher is full (call before decoding)."""
+        if self._emotion_batcher is not None:
+            self._emotion_batcher.check_capacity()
+
     async def predict_face(self, face_crop: cv2t.MatLike, *, gate: bool = True) -> Emotion | None:
         """Classify emotion from a single pre-cropped face; ``gate=False`` returns the raw argmax."""
         if self._emotion_batcher is None:

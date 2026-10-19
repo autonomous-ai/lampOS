@@ -85,6 +85,8 @@ class PosePerceptionSession(
         cur_ts: float = time.time()
         if cur_ts - self._last_update_ts < self._config.frame_interval:
             return self._last_prediction
+        # Stamped first: a refused or failed frame rests a full interval (busy server).
+        self._last_update_ts = cur_ts
 
         estimator_2d = cast(PoseEstimator2D, self._pose2d_batcher.predictor)
 
@@ -179,7 +181,6 @@ class PosePerceptionSession(
             if ergo_result is not None:
                 result.ergo = ergo_result
 
-        self._last_update_ts = cur_ts
         self._last_prediction = result
 
         if result.pose_2d.joints:

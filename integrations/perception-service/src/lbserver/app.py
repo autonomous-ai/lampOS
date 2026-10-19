@@ -159,8 +159,9 @@ app.include_router(livez_router)
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
 async def proxy_http(request: Request, path: str) -> Response:
-    backend: str = http_rr.next()
-    url: str = f"{backend}{INTERNAL_PREFIX}/{path}"
+    # SIGHUP may rebind http_rr mid-request; keep the selector this request started with.
+    rr = http_rr
+    backend: str = rr.next()
 
     headers: dict[str, str] = {
         k: v
@@ -181,14 +182,29 @@ async def proxy_http(request: Request, path: str) -> Response:
         logger.error("[HTTP] No pooled client; lifespan did not run")
         raise HTTPException(status_code=503, detail="Proxy not ready")
 
-    try:
-        resp = await client.request(
+    async def _send(target: str) -> httpx.Response:
+        return await client.request(
             method=request.method,
-            url=url,
+            url=f"{target}{INTERNAL_PREFIX}/{path}",
             headers=headers,
             params=dict(request.query_params),
             content=body,
         )
+
+    try:
+        try:
+            resp = await _send(backend)
+        except httpx.ConnectError:
+            # Refused = the request never reached it (slot stopped or restarting):
+            # skip it for a while and try the next slot once. Timeouts and HTTP
+            # errors are never retried, since the backend may be overloaded.
+            rr.mark_down(backend)
+            retry = rr.next()
+            if retry == backend:
+                raise
+            logger.warning("[HTTP] %s refused the connection; retrying on %s", backend, retry)
+            backend = retry
+            resp = await _send(backend)
     # TimeoutException subclasses RequestError, so it must be caught first.
     except httpx.TimeoutException:
         logger.error(
@@ -198,6 +214,8 @@ async def proxy_http(request: Request, path: str) -> Response:
     except httpx.RequestError as e:
         logger.error("[HTTP] Backend unreachable: %s -- %s", backend, e)
         raise HTTPException(status_code=502, detail=f"Backend unreachable: {backend}")
+
+    url = f"{backend}{INTERNAL_PREFIX}/{path}"  # for the log line below
 
     content = resp.content
     resp_headers = dict(resp.headers)

@@ -25,7 +25,7 @@ import {
   Workflow, Users, Camera, Radar, ChartColumn, Move3d, Bluetooth, ScrollText,
   Terminal, FileCode, Hexagon, ExternalLink, SlidersHorizontal, ChevronRight,
   Server, Zap, LogOut, Clock, Search, X, CornerDownLeft, Plug, Blocks,
-  CalendarClock, Handshake, Facebook, ShoppingBag, ShoppingCart, Store, Cable, Lightbulb, ShieldCheck,
+  CalendarClock, Handshake, Facebook, ShoppingBag, ShoppingCart, Store, Cable, Lightbulb, ShieldCheck, Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -56,7 +56,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineEleme
 const EMBED_SECTIONS = new Set<Section>(["api-docs", "agent-config"]);
 
 // Sections shown without ?debug=true.
-const PUBLIC_SECTIONS = new Set<Section>(["sensing", "chat", "pairing", "overview", "system", "flow", "camera", "face-owners", "bluetooth", "logs", "cli", "settings:device", "settings:wifi", "settings:voice", "settings:face", "settings:privacy", "settings:mcp", "settings:plugins", "settings:timezone", "settings:led", "settings:scheduled", "settings:facebook", "settings:shopify", "settings:amazon", "settings:ebay"]);
+const PUBLIC_SECTIONS = new Set<Section>(["sensing", "chat", "pairing", "overview", "system", "flow", "camera", "face-owners", "bluetooth", "logs", "cli", "settings:device", "settings:realtime", "settings:wifi", "settings:voice", "settings:face", "settings:privacy", "settings:mcp", "settings:plugins", "settings:timezone", "settings:led", "settings:scheduled", "settings:facebook", "settings:shopify", "settings:amazon", "settings:ebay"]);
 
 // Prune a group's children by debug mode and capability; drops subgroups left empty.
 function filterNavChildren(
@@ -381,6 +381,11 @@ function NavGroupItem({ entry, section, setSection, closeSidebar, leafHref, open
               >
                 <NavIcon id={child.id} size={15} />
                 {child.label}
+                {child.spark && (
+                  <span className="lm-snav-spark" title="New features inside" aria-label="New features inside">
+                    <Sparkles size={12} strokeWidth={2.2} aria-hidden="true" />
+                  </span>
+                )}
               </a>
             );
           })}

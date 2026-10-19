@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -9,6 +9,18 @@ from config import settings
 from core.perception.base.predictor import gpu_lock
 
 logger = logging.getLogger(__name__)
+
+
+def batch_warmups(
+    batch_size: int, build: Callable[[int], dict[str, np.ndarray]]
+) -> list[dict[str, np.ndarray]]:
+    """Warmup inputs at batch 1 and at batch_size (#612).
+
+    TensorRT builds engines for the shapes it has seen; warming only at max batch
+    left batch 1 uncovered, so a lone request could rebuild the engine mid-serving.
+    """
+    sizes = [1] if batch_size <= 1 else [1, batch_size]
+    return [build(n) for n in sizes]
 
 
 def prepare_ort_session(

@@ -53,3 +53,14 @@ func TestLegacyAgentTargetsCannotBeServiceReplacements(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdaterCommandsCannotBeServiceComponents(t *testing.T) {
+	for _, key := range []string{"recover", "rollback", "rollback-to-legacy"} {
+		if !ReservedOTAService(key) {
+			t.Fatalf("updater command %s not reserved", key)
+		}
+		if err := ValidateOTAServiceComponent(key, OTAComponent{Service: key}); err == nil {
+			t.Fatalf("updater command %s accepted as component", key)
+		}
+	}
+}

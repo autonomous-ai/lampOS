@@ -426,6 +426,7 @@ Dòng `flushing` hiển thị danh sách label thô — đó là mode trên các
 | `HAL_FIRE_HAZARD_DETECTOR` | `owlv2` | Tên detector trong đường dẫn endpoint mặc định |
 | `DL_FIRE_HAZARD_ENDPOINT` | `/detect/<detector>` | Đường dẫn endpoint nối vào sau `DL_BACKEND_URL` |
 | `HAL_FIRE_HAZARD_API_TIMEOUT_S` | `15.0` | Timeout HTTP của OWLv2 |
+| `HAL_FIRE_HAZARD_JPEG_QUALITY` | `80` | Chất lượng JPEG của khung hình gửi lên OWLv2. Yêu cầu dùng lại một kết nối HTTPS và thử lại một lần nếu kết nối cũ đã bị đóng |
 | `HAL_FIRE_HAZARD_CONFIDENCE_THRESHOLD` | `0.3` | Detection của OWLv2 dưới mức này bị bỏ |
 | `HAL_FIRE_HAZARD_OVERLAP_THRESHOLD` | `0.2` | Mức chồng lấn lửa/vật tối thiểu để thành `safe_fire` hoặc `hazard_fire`; dưới mức này lửa là `unsure_fire` |
 | `HAL_FIRE_HAZARD_CONFIRM_S` | `10.0` | OWLv2 phải liên tục thấy lửa (hoặc khói) trong bao lâu mới cảnh báo |

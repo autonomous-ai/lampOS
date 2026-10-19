@@ -119,8 +119,8 @@
   --lm-yellow:      #FCD34D;
 
   --lm-text:        #F0EEE8;
-  --lm-text-dim:    #9A9080;
-  --lm-text-muted:  #504A3C;
+  --lm-text-dim:    #B5AC9C;
+  --lm-text-muted:  #7A7262;
 
   /* Theme-constant: this ink always rests on the amber fill. */
   --lm-on-amber:    #1A1206;
@@ -626,6 +626,22 @@
   background: linear-gradient(180deg, var(--lm-amber), color-mix(in srgb, var(--lm-amber) 70%, transparent));
   box-shadow: 0 0 8px var(--lm-amber-glow);
   transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* Sparkle after a nav label: a quiet twinkle that invites a click. */
+.lm-snav-spark {
+  display: inline-flex;
+  margin-left: -2px;
+  color: var(--lm-amber);
+  opacity: 0.85;
+  animation: lm-snav-twinkle 2.8s ease-in-out infinite;
+}
+@keyframes lm-snav-twinkle {
+  0%, 100% { opacity: 0.55; transform: scale(0.9) rotate(0deg); }
+  50%      { opacity: 1;    transform: scale(1.08) rotate(12deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lm-snav-spark { animation: none; }
 }
 
 .lm-snav-item:hover,

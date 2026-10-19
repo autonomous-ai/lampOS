@@ -6,7 +6,7 @@ import { WAKE_FOLLOWUP_CHOICES_S, WAKE_FOLLOWUP_DEFAULT_S, type VoiceInputMode }
 import { WAKE_LOOK_DEFAULT, swatch, type WakeLook } from "@/lib/ledColor";
 import { WakeLightEditor } from "./WakeLightEditor";
 import { copyText } from "@/lib/clipboard";
-import { C, Field, PasswordField, SectionCard, LABEL_STYLE, INPUT_STYLE, INPUT_READONLY_STYLE, INPUT_PAD_ONE_ICON, FIELD_GAP, ADMIN_PASSWORD_MIN } from "./shared";
+import { C, Field, PasswordField, SectionCard, LABEL_STYLE, HINT_STYLE, INPUT_STYLE, INPUT_READONLY_STYLE, INPUT_PAD_ONE_ICON, FIELD_GAP, ADMIN_PASSWORD_MIN } from "./shared";
 
 // Mirrors config.NormalizeWakePhrases on the server.
 const MAX_WAKE_PHRASES = 30;
@@ -17,8 +17,11 @@ function normalizePhrase(raw: string): string {
 }
 
 // Editable wake phrases: chips with remove, an add field, and restore-defaults.
-// The chime and the light are the two ways a wake is noticed; at least one stays on.
-function WakeCues({ chime, setChime, lightOn, setLightOn, look, setLook }: {
+// The chime and the light are the two ways listening is noticed (after a wake
+// phrase, or when a tap-to-talk recording starts); at least one stays on.
+function ListenCues({ id, chimeLabel, lightLabel, chime, setChime, lightOn, setLightOn, look, setLook }: {
+  id: "wake" | "tap";
+  chimeLabel: string; lightLabel: string;
   chime: boolean; setChime: (v: boolean) => void;
   lightOn: boolean; setLightOn: (v: boolean) => void;
   look: WakeLook; setLook: (v: WakeLook) => void;
@@ -27,23 +30,23 @@ function WakeCues({ chime, setChime, lightOn, setLightOn, look, setLook }: {
   const row: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: C.text };
   return (
     <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-      <label htmlFor="wake_chime" style={{ ...row, cursor: lightOn ? "pointer" : "not-allowed" }}>
-        <input id="wake_chime" type="checkbox" checked={chime} disabled={chime && !lightOn}
+      <label htmlFor={`${id}_chime`} style={{ ...row, cursor: lightOn ? "pointer" : "not-allowed" }}>
+        <input id={`${id}_chime`} type="checkbox" checked={chime} disabled={chime && !lightOn}
           onChange={(e) => setChime(e.target.checked)} style={{ flexShrink: 0 }} />
-        Play a chime when a wake phrase is heard
+        {chimeLabel}
       </label>
       <div style={{ ...row, flexWrap: "wrap" }}>
-        <label htmlFor="wake_light" style={{ ...row, cursor: chime ? "pointer" : "not-allowed" }}>
-          <input id="wake_light" type="checkbox" checked={lightOn} disabled={lightOn && !chime}
+        <label htmlFor={`${id}_light`} style={{ ...row, cursor: chime ? "pointer" : "not-allowed" }}>
+          <input id={`${id}_light`} type="checkbox" checked={lightOn} disabled={lightOn && !chime}
             onChange={(e) => { setLightOn(e.target.checked); if (!e.target.checked) setOpen(false); }} style={{ flexShrink: 0 }} />
-          Light up when a wake phrase is heard
+          {lightLabel}
         </label>
         {lightOn && (
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
-            aria-controls="wake-light-editor"
+            aria-controls={`${id}-light-editor`}
             style={{
               display: "flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999,
               background: open ? C.amberDim : C.surface, border: `1px solid ${open ? C.amber : C.border}`,
@@ -56,12 +59,12 @@ function WakeCues({ chime, setChime, lightOn, setLightOn, look, setLook }: {
         )}
       </div>
       {(!chime || !lightOn) && (
-        <div style={{ fontSize: 11.5, color: C.textMuted }}>
+        <div style={HINT_STYLE}>
           Keep the chime or the light on, so you can tell the device heard you.
         </div>
       )}
       {lightOn && open && (
-        <div id="wake-light-editor">
+        <div id={`${id}-light-editor`}>
           <WakeLightEditor look={look} onChange={setLook} />
         </div>
       )}
@@ -328,6 +331,7 @@ export function DeviceSection({
   agentName, wakePhrases, setWakePhrases, wakePhrasesDefault, wakeNameAnywhere = false, wakeChime, setWakeChime,
   wakeFollowupS, setWakeFollowupS,
   wakeLightOn, setWakeLightOn, wakeLook, setWakeLook,
+  tapChime, setTapChime, tapLightOn, setTapLightOn, tapLook, setTapLook,
 }: {
   active: boolean;
   deviceId: string;
@@ -358,6 +362,13 @@ export function DeviceSection({
   setWakeLightOn?: (v: boolean) => void;
   wakeLook?: WakeLook;
   setWakeLook?: (v: WakeLook) => void;
+  // Tap-to-talk cues, separate from the wake cues; present only in Settings.
+  tapChime?: boolean;
+  setTapChime?: (v: boolean) => void;
+  tapLightOn?: boolean;
+  setTapLightOn?: (v: boolean) => void;
+  tapLook?: WakeLook;
+  setTapLook?: (v: WakeLook) => void;
 }) {
   const showAdminPasswordFields = setAdminPassword !== undefined;
   const showRotateField = setRotateAdminPassword !== undefined;
@@ -419,15 +430,25 @@ export function DeviceSection({
               </label>
             ))}
           </div>
-          <p id="voice-input-help" style={{ margin: "8px 0 0", fontSize: 11.5, lineHeight: 1.45, color: C.textMuted }}>
+          <p id="voice-input-help" style={{ ...HINT_STYLE, margin: "8px 0 0" }}>
             {voiceInputMode === "automatic"
               ? "Your device detects speech and sends it when you finish speaking."
-              : "Tap once to start speaking, then tap again to send. Pauses won't send your message. While your device is speaking, tap to stop it, then tap again to start recording."}
+              : "Tap once, then speak after the chime or light. Tap again when you finish to send. Pausing won't send your message. If you don't tap again within about 30 seconds, recording stops and nothing is sent. While your device is speaking, a tap stops it; tap again to start recording."}
           </p>
           {voiceInputMode === "tap_to_talk" && (
-            <p style={{ margin: "5px 0 0", fontSize: 11.5, lineHeight: 1.45, color: C.textMuted }}>
+            <p style={{ ...HINT_STYLE, margin: "5px 0 0" }}>
               No wake phrase or gaze needed. Your automatic wake preference is kept. The physical mic switch still applies.
             </p>
+          )}
+          {voiceInputMode === "tap_to_talk" && setTapChime && setTapLightOn && setTapLook && (
+            <ListenCues
+              id="tap"
+              chimeLabel="Play a chime when recording starts"
+              lightLabel="Light up while recording"
+              chime={tapChime ?? true} setChime={setTapChime}
+              lightOn={tapLightOn ?? true} setLightOn={setTapLightOn}
+              look={tapLook ?? WAKE_LOOK_DEFAULT} setLook={setTapLook}
+            />
           )}
         </fieldset>
       )}
@@ -438,11 +459,11 @@ export function DeviceSection({
             <input type="checkbox" checked={wakeWord ?? false} onChange={(e) => setWakeWord(e.target.checked)} style={{ flexShrink: 0 }} />
             <span style={{ whiteSpace: "nowrap" }}>Require attention trigger</span>
           </label>
-          <div style={{ marginTop: 5, marginLeft: 23, fontSize: 11.5, lineHeight: 1.45, color: C.textMuted }}>
+          <div style={{ ...HINT_STYLE, marginTop: 5, marginLeft: 23 }}>
             Require an attention trigger before handling speech. When off, your device keeps its existing always-listening behavior.
           </div>
           {setWakePhrases ? (
-            <div style={{ marginTop: 10, marginLeft: 23, fontSize: 11.5, lineHeight: 1.45, color: C.textMuted }}>
+            <div style={{ ...HINT_STYLE, marginTop: 10, marginLeft: 23 }}>
               <label htmlFor="wake_phrase_new" style={{ display: "block", marginBottom: 6 }}>
                 {wakeNameAnywhere ? (
                   <>
@@ -459,7 +480,10 @@ export function DeviceSection({
               </label>
               <WakePhraseEditor phrases={wakePhrases ?? []} setPhrases={setWakePhrases} defaults={wakePhrasesDefault ?? []} nameAnywhere={wakeNameAnywhere} />
               {setWakeChime && setWakeLightOn && setWakeLook ? (
-                <WakeCues
+                <ListenCues
+                  id="wake"
+                  chimeLabel="Play a chime when a wake phrase is heard"
+                  lightLabel="Light up when a wake phrase is heard"
                   chime={wakeChime ?? true} setChime={setWakeChime}
                   lightOn={wakeLightOn ?? true} setLightOn={setWakeLightOn}
                   look={wakeLook ?? WAKE_LOOK_DEFAULT} setLook={setWakeLook}
@@ -475,7 +499,7 @@ export function DeviceSection({
               )}
             </div>
           ) : !!wakePhrases?.length && (
-            <div style={{ marginTop: 10, marginLeft: 23, fontSize: 11.5, lineHeight: 1.45, color: C.textMuted }}>
+            <div style={{ ...HINT_STYLE, marginTop: 10, marginLeft: 23 }}>
               <div style={{ marginBottom: 6 }}>
                 Spoken wake phrases (other triggers: tap, gaze, or a recognized person){agentName ? ` — current agent: ${agentName}` : ""}:
               </div>

@@ -3,14 +3,14 @@
        start-runpod-master start-runpod-master-ssl start-runpod-slave start-runpod-slave-ssl \
        start-nginx start-nginx-ssl stop-nginx gen-ssl-cert \
        start-runpod-dlserver start-runpod-dlserver-slot start-runpod-lbserver stop-runpod-dlserver stop-runpod-lbserver start-jupyter \
-       deploy-dlserver print-dlserver-pid \
+       deploy-dlserver dlserver-two-slot dlserver-single dlserver-mode require-single-slot print-dlserver-pid \
        info \
        test test-api test-local \
        test-action test-action-api test-action-local \
        test-fer test-fer-api test-fer-local \
        test-ser test-ser-unit test-ser-api test-ser-local test-embed-unit \
        test-pose test-pose-api test-pose-local \
-       test-object test-object-unit test-object-api test-object-local \
+       test-object test-object-unit test-object-api test-object-local test-batching-unit \
        test-audio test-audio-api test-audio-local \
        test-crypto test-crypto-api test-crypto-local \
        test-lb test-lb-local \
@@ -52,7 +52,7 @@ DLSERVER_SLOT_A ?= 8001
 DLSERVER_SLOT_B ?= 8002
 DLSERVER_STATE_FILE ?= $(RUN_DIR)/dlserver-active
 ifndef DLSERVER_PORT
-DLSERVER_PORT := $(shell sed -n 's|^http://127.0.0.1:\([0-9][0-9]*\)$$|\1|p' $(DLSERVER_STATE_FILE) 2>/dev/null | grep . || echo $(DLSERVER_SLOT_A))
+DLSERVER_PORT := $(shell sed -n 's|^http://127.0.0.1:\([0-9][0-9]*\)$$|\1|p' $(DLSERVER_STATE_FILE) 2>/dev/null | head -1 | grep . || echo $(DLSERVER_SLOT_A))
 endif
 # Slot A keeps the historical paths; other slots get a -<port> suffix.
 ifeq ($(DLSERVER_PORT),$(DLSERVER_SLOT_A))
@@ -217,7 +217,13 @@ define START_DLSERVER
 @echo "dlserver started on port $(DLSERVER_PORT) (auto-restart enabled)"
 endef
 
-start-runpod-dlserver: install stop-runpod-dlserver
+# In two-slot mode `install` would rewrite the venv under the slot that keeps serving.
+require-single-slot:
+	@if [ "$$(grep -c '^http://' $(DLSERVER_STATE_FILE) 2>/dev/null || echo 0)" -gt 1 ]; then \
+		echo "two-slot mode is on: run make dlserver-single first"; exit 1; \
+	fi
+
+start-runpod-dlserver: require-single-slot install stop-runpod-dlserver
 	$(START_DLSERVER)
 
 # Same without `install`: the deploy starts the new slot while the old one still
@@ -229,10 +235,21 @@ stop-runpod-dlserver:
 	@bash scripts/stop-tree.sh dlserver $(DLSERVER_PORT) $(DLSERVER_WRAPPER_PID) $(DLSERVER_PID) $(DLSERVER_LOG_DIR)
 
 # Zero-downtime deploy of new dlserver code (two slots). See docs/deployment.md.
+DLSERVER_SLOTS_ENV = RUN_DIR=$(RUN_DIR) LOG_ROOT=$(LOG_ROOT) DLSERVER_STATE_FILE=$(DLSERVER_STATE_FILE) \
+	DLSERVER_SLOT_A=$(DLSERVER_SLOT_A) DLSERVER_SLOT_B=$(DLSERVER_SLOT_B) LBSERVER_PORT=$(LBSERVER_PORT)
+
 deploy-dlserver:
-	@RUN_DIR=$(RUN_DIR) LOG_ROOT=$(LOG_ROOT) DLSERVER_STATE_FILE=$(DLSERVER_STATE_FILE) \
-		DLSERVER_SLOT_A=$(DLSERVER_SLOT_A) DLSERVER_SLOT_B=$(DLSERVER_SLOT_B) \
-		LBSERVER_PORT=$(LBSERVER_PORT) bash scripts/deploy-dlserver.sh
+	@$(DLSERVER_SLOTS_ENV) bash scripts/deploy-dlserver.sh
+
+# Optional second slot on the same GPU (#612): manual, back to single after a container restart.
+dlserver-two-slot:
+	@$(DLSERVER_SLOTS_ENV) bash scripts/dlserver-mode.sh two
+
+dlserver-single:
+	@$(DLSERVER_SLOTS_ENV) bash scripts/dlserver-mode.sh single
+
+dlserver-mode:
+	@$(DLSERVER_SLOTS_ENV) bash scripts/dlserver-mode.sh status
 
 # For scripts/runpod-autostart.sh: pid file of the slot lbserver sends traffic to.
 print-dlserver-pid:
@@ -316,7 +333,7 @@ test: test-api test-local
 
 test-api: test-action-api test-fer-api test-ser-api test-pose-api test-object-api test-audio-api test-crypto-api
 
-test-local: test-action-local test-fer-local test-ser-local test-pose-local test-object-local test-audio-local test-crypto-local test-lb-local
+test-local: test-action-local test-fer-local test-ser-local test-pose-local test-object-local test-audio-local test-crypto-local test-lb-local test-batching-unit
 
 test-action: test-action-api test-action-local
 
@@ -361,6 +378,9 @@ test-object: test-object-unit test-object-api test-object-local
 # No leading '-': a failing unit test fails the target.
 test-object-unit:
 	DL_API_KEY=$${DL_API_KEY:-test} python -m pytest tests/object_unit/ -v
+
+test-batching-unit:
+	DL_API_KEY=$${DL_API_KEY:-test} python -m pytest tests/batching_unit/ -v
 
 test-object-api:
 	-python -m pytest tests/object_api/ -v

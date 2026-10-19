@@ -45,7 +45,7 @@ PAYLOAD_TMP=$(mktemp)
 BACKEND_URL="${BACKEND_URL:-https://storage.googleapis.com/${GCS_BUCKET}/${GCS_PATH}}"
 
 echo "========== Fetch metadata from gs://${GCS_BUCKET}/${METADATA_PATH} =========="
-if gsutil cp "gs://${GCS_BUCKET}/${METADATA_PATH}" "$METADATA_TMP" 2>/dev/null; then
+if ota_metadata_fetch "gs://${GCS_BUCKET}/${METADATA_PATH}" "$METADATA_TMP" 2>/dev/null; then
   ota_metadata_unpack "$METADATA_TMP" "$PAYLOAD_TMP"
 else
   printf '{}' >"$PAYLOAD_TMP"
@@ -62,7 +62,7 @@ PY
 echo "$updated_metadata" > "$PAYLOAD_TMP"
 ota_metadata_sign "$PAYLOAD_TMP" "$METADATA_TMP"
 echo "========== Upload metadata (backend: v${new_version}) =========="
-gsutil -h "Content-Type:application/json" -h "Cache-Control:no-cache, no-store, must-revalidate" cp "$METADATA_TMP" "gs://${GCS_BUCKET}/${METADATA_PATH}"
+ota_metadata_publish "$METADATA_TMP" "gs://${GCS_BUCKET}/${METADATA_PATH}"
 rm -f "$METADATA_TMP" "$PAYLOAD_TMP"
 
 rm -f "$ZIP_PATH" "$AUTONOMOUS_CHAT_BIN"

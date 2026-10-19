@@ -20,6 +20,9 @@ class _FakePerception:
     def is_ready(self) -> bool:
         return True
 
+    def check_capacity(self) -> None:
+        pass
+
     def has_preset(self, name: str) -> bool:
         return name in self._presets
 

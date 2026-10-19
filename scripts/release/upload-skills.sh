@@ -125,7 +125,7 @@ METADATA_TMP=$(mktemp)
 PAYLOAD_TMP=$(mktemp)
 trap 'rm -rf "$WORK_DIR" "$ENTRIES_FILE" "$METADATA_TMP" "$PAYLOAD_TMP"' EXIT
 source "${RELEASE_DIR}/ota-metadata.sh"
-if gsutil cp "$METADATA_GCS" "$METADATA_TMP" 2>/dev/null; then
+if ota_metadata_fetch "$METADATA_GCS" "$METADATA_TMP" 2>/dev/null; then
   ota_metadata_unpack "$METADATA_TMP" "$PAYLOAD_TMP"
   python3 - "$PAYLOAD_TMP" "$ENTRIES_FILE" "$(date '+%Y-%m-%d %H:%M:%S %z')" <<'PY'
 import json
@@ -144,9 +144,7 @@ d["skills"] = skills
 json.dump(d, open(metadata_path, "w"), indent=4)
 PY
   ota_metadata_sign "$PAYLOAD_TMP" "$METADATA_TMP"
-  gsutil -h "Cache-Control:no-cache, no-store, must-revalidate" \
-         -h "Content-Type:application/json" \
-         cp "$METADATA_TMP" "$METADATA_GCS"
+  ota_metadata_publish "$METADATA_TMP" "$METADATA_GCS"
   echo "Updated metadata.json with per-skill versions"
 else
   echo "Warning: could not update metadata.json"

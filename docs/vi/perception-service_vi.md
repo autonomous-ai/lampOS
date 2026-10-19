@@ -73,10 +73,31 @@ deploy server trước bản HAL gửi tên mới (server cũ bỏ qua `preset` 
 định của nó). Cả hai graph dùng profile TensorRT tường minh (1–500 query, tối ưu cho 46) và
 được warm ở 46 và 1 query, nên engine được build lúc khởi động, trên slot đang rảnh khi
 deploy hai slot (khoảng 97 s trên GPU hiện tại), không bao giờ giữa chừng một request.
+Các mô hình ảnh (FER, pose 2D/3D, action, bộ phát hiện vật thể ONNX) khởi động ở batch 1
+và batch tối đa, để TensorRT dựng đủ dải batch ngay lúc khởi động thay vì ở yêu cầu đơn lẻ
+đầu tiên.
 Schema request:
 [`integrations/perception-service/docs/api.md`](../../integrations/perception-service/docs/api.md#object-detection--websocket--http).
 Lựa chọn model và output:
 [`integrations/perception-service/docs/perceptions.md`](../../integrations/perception-service/docs/perceptions.md).
+
+**Quá tải.** Batcher của mỗi mô hình từ chối việc thay vì xếp hàng không giới hạn:
+khi hàng đợi vượt max(32, batch × 8), hoặc một yêu cầu đã chờ GPU quá 8 s, máy chủ
+trả `503` kèm `Retry-After: 2` (khung hình WebSocket nhận `{"error": "busy"}`), và
+HAL lùi lại 2–30 s. Speaker embedding không đi qua batcher nên không bị giới hạn
+kiểu này. Tham số: `OVERLOAD__*` trong
+[`configuration.md`](../../integrations/perception-service/docs/configuration.md#overload-overload__).
+
+**Chế độ hai slot (tùy chọn).** Có thể chạy thêm một slot dlserver thứ hai cạnh slot
+đầu trên cùng GPU, bật tắt bằng tay (`make dlserver-two-slot`, `make dlserver-single`,
+`make dlserver-mode`). Nó cần thêm khoảng 9.7 GB bộ nhớ GPU, luôn chạy cùng code với
+slot đầu, và khởi động lại container sẽ quay về một slot. Deploy khi đang ở chế độ hai
+slot sẽ về một slot, deploy, rồi bật lại cả hai; khởi động lại tại chỗ
+(`make start-runpod-master`) sẽ từ chối cho tới khi chạy `make dlserver-single`. lbserver bỏ qua slot từ chối kết nối
+trong 10 s. Đo thực tế: thông lượng OWLv2 tăng 26 % nhưng giọng nói chậm hơn khi tải
+cao và bộ nhớ GPU gấp đôi, nên có sẵn nhưng không khuyến nghị cho lưu lượng bình
+thường. Chi tiết:
+[Chế độ hai slot](../../integrations/perception-service/docs/deployment.md#two-slot-mode-optional).
 
 ## Thiết bị dùng nó thế nào
 

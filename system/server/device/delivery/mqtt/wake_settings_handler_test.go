@@ -57,6 +57,9 @@ func TestWakeSettingsGetReportsDefaultsAndHALFollowup(t *testing.T) {
 	if s.FollowupS != 5 || s.FollowupCustom || s.FollowupMinS != 3 || s.FollowupMaxS != 30 {
 		t.Fatalf("followup = %d custom=%v [%d,%d]", s.FollowupS, s.FollowupCustom, s.FollowupMinS, s.FollowupMaxS)
 	}
+	if !s.TapChime || !reflect.DeepEqual(s.TapLight, s.Light) {
+		t.Fatalf("tap cues = chime %v light %+v", s.TapChime, s.TapLight)
+	}
 	if s.MaxPhrases != 30 || s.MaxPhraseChars != 40 || len(s.LightEffects) != 4 || s.VoiceInputMode != "automatic" {
 		t.Fatalf("limits = %+v", s)
 	}
@@ -94,6 +97,21 @@ func TestWakeSettingsSetSavesAndRepliesWithSettings(t *testing.T) {
 	}
 }
 
+func TestWakeSettingsSetSavesTapCues(t *testing.T) {
+	h, _, send, read := wakeSettingsTest(t)
+	send(domain.KindWakeSettingsSet, `{"tap_chime":false,"tap_light":{"enabled":true,"color":[3,16,9],"effect":"blink","speed":0.5}}`)
+	s := decodeWakeSettings(t, read(domain.KindWakeSettingsSet, "success"))
+	if want := (domain.WakeLightLook{Enabled: true, Color: []int{3, 16, 9}, Effect: "blink", Speed: 0.5}); s.TapChime || !reflect.DeepEqual(s.TapLight, want) {
+		t.Fatalf("tap cues = chime %v light %+v", s.TapChime, s.TapLight)
+	}
+	if !s.Chime || !reflect.DeepEqual(s.Light.Color, []int{4, 8, 16}) {
+		t.Fatalf("tap cues changed the wake cues: chime %v light %+v", s.Chime, s.Light)
+	}
+	if h.config.TapChime == nil || *h.config.TapChime || h.config.TapLight == nil || h.config.WakeChime != nil || h.config.WakeLight != nil {
+		t.Fatal("tap cues not saved apart from the wake cues")
+	}
+}
+
 func TestWakeSettingsSetRejectsBadInputWithoutSaving(t *testing.T) {
 	h, _, send, read := wakeSettingsTest(t)
 	for _, data := range []string{
@@ -104,11 +122,15 @@ func TestWakeSettingsSetRejectsBadInputWithoutSaving(t *testing.T) {
 		`{"light":{"effect":"rainbow"}}`,
 		`{"light":{"color":[0,0,0]}}`,
 		`{"phrases":["123"]}`,
+		`{"tap_chime":false,"tap_light":{"enabled":false}}`,
+		`{"tap_light":{"effect":"rainbow"}}`,
+		`{"tap_light":{"color":[0,0,0]}}`,
 	} {
 		send(domain.KindWakeSettingsSet, data)
 		read(domain.KindWakeSettingsSet, "failure")
 	}
-	if h.config.WakeChime != nil || h.config.WakeFollowupS != nil || h.config.WakeLight != nil || h.config.WakePhrases != nil {
+	if h.config.WakeChime != nil || h.config.WakeFollowupS != nil || h.config.WakeLight != nil || h.config.WakePhrases != nil ||
+		h.config.TapChime != nil || h.config.TapLight != nil {
 		t.Fatal("rejected payload changed the config")
 	}
 }

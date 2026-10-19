@@ -71,6 +71,9 @@ class _Model:
     def is_ready(self) -> bool:
         return True
 
+    def check_capacity(self) -> None:
+        pass
+
     async def predict_face(self, face_crop, **kwargs):
         self.calls.append(kwargs)
         gated = kwargs.get("gate", True)

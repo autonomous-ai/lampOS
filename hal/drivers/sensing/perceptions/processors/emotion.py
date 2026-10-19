@@ -27,6 +27,7 @@ from hal.drivers.sensing.presence_service import PresenceState, PresenseService
 
 from .base import Perception
 from .emotion_gating import gate_reading, load_label_thresholds
+from .utils import retry_after_s
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +313,12 @@ class RemoteEmotionRecognizer:
                         threshold=self._threshold,
                         detail=f"quota exhausted — recognition paused {_RATE_LIMIT_BACKOFF_S:.0f}s",
                     )
+                return None
+            if resp.status_code == 503:
+                # Server busy (#612): a short pause, not the 5-minute quota pause.
+                delay = retry_after_s(resp.headers)
+                self._backoff_until = time.time() + delay
+                logger.warning("[activity.emotion] HTTP 503 (server busy) — pausing for %.0fs", delay)
                 return None
             if resp.status_code != 200:
                 logger.warning(

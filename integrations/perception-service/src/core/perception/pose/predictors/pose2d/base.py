@@ -15,7 +15,7 @@ from core.models.pose import RawPose2DDetection
 from core.perception.base import PredictorBase
 from core.utils.common import get_or_default
 from core.utils.files import ensure_downloaded
-from core.utils.runtime import prepare_ort_session
+from core.utils.runtime import batch_warmups, prepare_ort_session
 
 
 class PoseEstimator2D(PredictorBase[cv2t.MatLike, RawPose2DDetection]):
@@ -64,7 +64,10 @@ class PoseEstimator2D(PredictorBase[cv2t.MatLike, RawPose2DDetection]):
         self._model_path = ensure_downloaded(self._model_path, remote=self._remote_url)
         self._logger.info("Loading model from %s", self._model_path)
         W, H = self._input_size
-        warmup = {self.ONNX_INPUT_NAME: np.zeros((self._batch_size, 3, H, W), dtype=np.float32)}
+        warmup = batch_warmups(
+            self._batch_size,
+            lambda n: {self.ONNX_INPUT_NAME: np.zeros((n, 3, H, W), dtype=np.float32)},
+        )
         self._session = prepare_ort_session(self._model_path, warmup_inputs=warmup)
         self._running = True
         self._logger.info("Ready")

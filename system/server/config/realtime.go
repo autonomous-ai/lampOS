@@ -18,6 +18,15 @@ type RealtimeConfig struct {
 	OpenAI    *OpenAIRealtime    `json:"openai,omitempty" yaml:"openai"`
 	GPTLive   *GPTLiveRealtime   `json:"gptlive,omitempty" yaml:"gptlive"`
 	PipecatV1 *PipecatV1Realtime `json:"pipecat_v1,omitempty" yaml:"pipecatV1"`
+	// FastVoice toggles HAL's fast voice mode (Gemini turn mode): shorter endpoint waits, earlier upload and the model's own voice,
+	// for more Gemini use. nil → on for Intern v2, off elsewhere.
+	FastVoice *bool `json:"fast_voice,omitempty" yaml:"fastVoice"`
+	// FastVoicePauseS caps how long fast voice waits after a pause the turn
+	// model calls unfinished (FastVoicePauseMinS..MaxS); nil → default.
+	FastVoicePauseS *float64 `json:"fast_voice_pause_s,omitempty" yaml:"fastVoicePauseS"`
+	// FastVoiceSilentTimeoutS is how long fast voice waits on a silent model
+	// before handing the turn on (FastVoiceSilentTimeoutMinS..MaxS); nil → default.
+	FastVoiceSilentTimeoutS *float64 `json:"fast_voice_silent_timeout_s,omitempty" yaml:"fastVoiceSilentTimeoutS"`
 	// Pinned is set the first time an operator edits this block. Unpinned
 	// blocks are rewritten from DefaultRealtimeConfig on every start.
 	Pinned bool `json:"pinned,omitempty" yaml:"pinned"`
@@ -249,6 +258,64 @@ func (c *Config) RealtimeReasoning() string {
 
 // RealtimeWebSearch returns the resolved in-session web-search toggle for the
 // active provider: the operator override when set, else the HAL default (on).
+// Fast voice pause bounds and default (seconds) — mirror hal/config.py FAST_VOICE_PAUSE_*.
+const (
+	FastVoicePauseMinS     = 0.8
+	FastVoicePauseMaxS     = 6.0
+	FastVoicePauseDefaultS = 2.0
+)
+
+// RealtimeFastVoicePauseS reports the effective fast voice pause wait.
+func (c *Config) RealtimeFastVoicePauseS() float64 {
+	if c.Realtime != nil && c.Realtime.FastVoicePauseS != nil {
+		return *c.Realtime.FastVoicePauseS
+	}
+	return FastVoicePauseDefaultS
+}
+
+// ValidateFastVoicePauseS rejects a pause outside the bounds HAL applies.
+func ValidateFastVoicePauseS(s float64) error {
+	if s < FastVoicePauseMinS || s > FastVoicePauseMaxS {
+		return fmt.Errorf("fast_voice_pause_s must be between %.1f and %.1f seconds", FastVoicePauseMinS, FastVoicePauseMaxS)
+	}
+	return nil
+}
+
+// Fast voice silent-model timeout bounds and default (seconds) — mirror hal/config.py.
+const (
+	FastVoiceSilentTimeoutMinS     = 3.0
+	FastVoiceSilentTimeoutMaxS     = 8.0
+	FastVoiceSilentTimeoutDefaultS = 5.0
+)
+
+// RealtimeFastVoiceSilentTimeoutS reports the effective silent-model timeout.
+func (c *Config) RealtimeFastVoiceSilentTimeoutS() float64 {
+	if c.Realtime != nil && c.Realtime.FastVoiceSilentTimeoutS != nil {
+		return *c.Realtime.FastVoiceSilentTimeoutS
+	}
+	return FastVoiceSilentTimeoutDefaultS
+}
+
+// ValidateFastVoiceSilentTimeoutS rejects a timeout outside the bounds HAL applies.
+func ValidateFastVoiceSilentTimeoutS(s float64) error {
+	if s < FastVoiceSilentTimeoutMinS || s > FastVoiceSilentTimeoutMaxS {
+		return fmt.Errorf("fast_voice_silent_timeout_s must be between %.0f and %.0f seconds", FastVoiceSilentTimeoutMinS, FastVoiceSilentTimeoutMaxS)
+	}
+	return nil
+}
+
+// FastVoiceDefaultDeviceType is the device class fast voice is on by default for.
+const FastVoiceDefaultDeviceType = "intern-v2"
+
+// RealtimeFastVoice reports the effective fast voice setting: the owner's choice,
+// else on for Intern v2 and off elsewhere. Mirrors hal/config.py.
+func (c *Config) RealtimeFastVoice() bool {
+	if c.Realtime != nil && c.Realtime.FastVoice != nil {
+		return *c.Realtime.FastVoice
+	}
+	return c.DeviceTypeOrDefault() == FastVoiceDefaultDeviceType
+}
+
 func (c *Config) RealtimeWebSearch() *bool {
 	if c.RealtimeProvider() != "pipecat_v1" {
 		return nil
@@ -264,7 +331,7 @@ func (c *Config) RealtimeWebSearch() *bool {
 // Valid knob values per provider — KEEP IN SYNC with the hal/realtime/ enums
 // and the OpenAI voice list in hal/routes/voice.py. Case-sensitive.
 var (
-	realtimeGeminiVoices    = map[string]bool{"Puck": true, "Charon": true, "Kore": true, "Fenrir": true, "Aoede": true}
+	realtimeGeminiVoices    = stringSet(RealtimeGeminiVoiceList)
 	realtimeOpenAIVoices    = map[string]bool{"alloy": true, "ash": true, "coral": true, "echo": true, "fable": true, "onyx": true, "nova": true, "sage": true, "shimmer": true}
 	realtimeGPTLiveVoices   = stringSet(RealtimeGPTLiveVoiceList)
 	realtimeGeminiThinking  = map[string]bool{"MINIMAL": true, "LOW": true, "MEDIUM": true, "HIGH": true}
@@ -284,8 +351,15 @@ func stringSet(list []string) map[string]bool {
 // Ordered option lists — the SINGLE SOURCE the web reads via GET realtime
 // options. Order matters: the first reasoning entry is the cheapest default.
 var (
-	RealtimeProviders       = []string{"gemini", "openai", "gptlive", "pipecat_v1", "none"}
-	RealtimeGeminiVoiceList = []string{"Puck", "Charon", "Kore", "Fenrir", "Aoede"}
+	RealtimeProviders = []string{"gemini", "openai", "gptlive", "pipecat_v1", "none"}
+	// All 30 Gemini Live prebuilt voices (hal/realtime/enums/gemini.py GeminiVoice).
+	RealtimeGeminiVoiceList = []string{
+		"Puck", "Charon", "Kore", "Fenrir", "Aoede", "Zephyr", "Leda", "Orus",
+		"Callirrhoe", "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba",
+		"Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar",
+		"Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi",
+		"Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat",
+	}
 	RealtimeOpenAIVoiceList = []string{"alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"}
 	// GPT-Live voices: the set gpt-live-1 accepts at session.start (BFF
 	// GPT-Live integration doc, verified on the real model 2026-09-17).

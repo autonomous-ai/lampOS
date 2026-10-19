@@ -84,7 +84,9 @@ class InputPolicy:
             return
         if self.device_capture:
             if active:
-                set_emotion(presets.EMO_LISTENING)
+                from hal import wake_light
+                if wake_light.tap_enabled():
+                    set_emotion(presets.EMO_LISTENING)
             else:
                 from hal import app_state
                 app_state.clear_listening_cue()

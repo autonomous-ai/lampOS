@@ -108,6 +108,11 @@ class AudioEmotionPerception(PerceptionBase[AudioEmotionPerceptionSession]):
             config=config,
         )
 
+    def check_capacity(self) -> None:
+        """Raise BatcherOverloaded when the audio emotion batcher is full (call before decoding)."""
+        if self._batcher is not None:
+            self._batcher.check_capacity()
+
     async def predict_audio(self, audio: Audio) -> AudioEmotionDetection:
         """Classify emotion from a single audio utterance."""
         if self._batcher is None:

@@ -63,3 +63,26 @@ def test_no_profile_leaves_trt_options_unchanged(fake_ort):
     session = runtime.prepare_ort_session(Path("model.onnx"))
     opts = _trt_options(session)
     assert not [k for k in opts if k.startswith("trt_profile_")]
+
+
+import numpy as np  # noqa: E402
+
+
+def _shape_builder(n):
+    return {"x": np.zeros((n, 3), dtype=np.float32)}
+
+
+def test_batch_warmups_covers_batch_1_and_max():
+    shapes = [w["x"].shape[0] for w in runtime.batch_warmups(4, _shape_builder)]
+    assert shapes == [1, 4]
+
+
+def test_batch_warmups_single_batch_runs_once():
+    assert [w["x"].shape[0] for w in runtime.batch_warmups(1, _shape_builder)] == [1]
+
+
+def test_prepare_session_runs_every_warmup_shape(fake_ort):
+    session = runtime.prepare_ort_session(
+        Path("model.onnx"), warmup_inputs=runtime.batch_warmups(4, _shape_builder)
+    )
+    assert sorted({r["x"].shape[0] for r in session.runs}) == [1, 4]

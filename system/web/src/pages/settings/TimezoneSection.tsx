@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { C, SectionCard, LABEL_STYLE, INPUT_STYLE } from "@/components/setup/shared";
+import { C, SectionCard, LABEL_STYLE, HINT_STYLE, INPUT_STYLE } from "@/components/setup/shared";
 import { getTimezone, setTimezone } from "@/lib/api";
 import { useTheme } from "@/lib/useTheme";
 
@@ -359,7 +359,7 @@ export function TimezoneSection({ active }: { active: boolean }) {
           </div>
 
           {preview && (
-            <div style={{ fontSize: 12, color: C.textMuted }}>
+            <div style={HINT_STYLE}>
               Local time there now: <span style={{ color: C.text }}>{preview}</span>
             </div>
           )}

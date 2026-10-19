@@ -34,13 +34,32 @@ class ServicePublisherTests(unittest.TestCase):
         before = {'hal': {'version': '9.0.0'}, 'lamp-os': {
             'service': 'lamp-os', 'replaces': ['os-server', 'hal'], 'version': '1.0.0',
             'min_version': '0.9.0', 'min_version_by_device': {'lamp': '1.0.0'},
-            'activate_by_device': {'lamp': True}}}
+            'activate_by_device': {'lamp': True},
+            'activation_release_by_device': {'lamp': {'version': '1.0.0', 'sha256': 'old'}}}}
         result, after = self.run_case(before)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(after['hal'], before['hal'])
         self.assertEqual(after['lamp-os']['min_version'], '0.9.0')
-        self.assertEqual(after['lamp-os']['activate_by_device'], {'lamp': True})
+        self.assertEqual(after['lamp-os']['activate_by_device'], {'lamp': False})
+        self.assertNotIn('activation_release_by_device', after['lamp-os'])
         self.assertEqual(after['lamp-os']['min_version_by_device'], {'lamp': '1.0.0'})
+
+    def test_rejects_older_release_without_changing_feed(self):
+        before = {'lamp-os': {'service': 'lamp-os', 'replaces': ['hal', 'os-server'],
+                              'version': '2.0.0', 'sha256': 'old'}}
+        result, after = self.run_case(before)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('older than', result.stderr)
+        self.assertEqual(after, before)
+
+    def test_republishing_same_artifact_preserves_activation_binding(self):
+        entry = {'service': 'lamp-os', 'replaces': ['hal', 'os-server'],
+                 'version': '1.2.3', 'sha256': 'abc', 'activate_by_device': {'lamp': True},
+                 'activation_release_by_device': {'lamp': {'version': '1.2.3', 'sha256': 'abc'}}}
+        result, after = self.run_case({'lamp-os': entry})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(after['lamp-os']['activation_release_by_device'], entry['activation_release_by_device'])
+        self.assertEqual(after['lamp-os']['activate_by_device'], {'lamp': True})
 
     def test_rejects_topology_mutation(self):
         result, _ = self.run_case({'lamp-os': {'service': 'lamp-os', 'replaces': ['hal']}})
@@ -54,13 +73,13 @@ class ServicePublisherTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
 
     def test_rejects_unmanaged_or_protected_replacements(self):
-        for replacements in ('ssh', 'unknown-service', 'hal hal', 'lamp-os', 'recover', 'rollback'):
+        for replacements in ('ssh', 'unknown-service', 'hal hal', 'lamp-os', 'recover', 'rollback', 'rollback-to-legacy'):
             with self.subTest(replacements=replacements):
                 result, _ = self.run_case(replacements=replacements)
                 self.assertNotEqual(result.returncode, 0)
 
     def test_cli_verbs_cannot_be_service_components(self):
-        for component in ('recover', 'rollback'):
+        for component in ('recover', 'rollback', 'rollback-to-legacy'):
             result, _ = self.run_case(component=component)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('Invalid service component', result.stderr)

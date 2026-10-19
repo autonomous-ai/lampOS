@@ -346,8 +346,8 @@ nhận HAL nhận yêu cầu phát, không đảm bảo audio đã phát xong.
 | `tts.set` | Lưu cấu hình TTS voice/provider/language/speed | `provider`, `voice`, `language`, `speed` (tùy chọn) |
 | `tts.preview` | Preview TTS một lần (không ghi config) | `text` (bắt buộc), tùy chọn `provider`/`voice`/`language`/`speed` |
 | `wakeword.gate` | Bật/tắt wake-word gate top-level (bất đồng bộ; ack `starting`) | `enabled` (boolean bắt buộc) |
-| `wakeword.settings.get` | Đọc cài đặt đánh thức: gate, câu đánh thức, tiếng chime, đèn đánh thức, thời gian nghe tiếp, kèm các giới hạn (đồng bộ) | _(không có)_ |
-| `wakeword.settings.set` | Lưu một phần bất kỳ của cài đặt đánh thức qua đúng đường `PUT /api/device/config`; trả lời một lần kèm cài đặt đã lưu | bất kỳ trong `enabled`, `phrases`, `chime`, `light`, `followup_s` |
+| `wakeword.settings.get` | Đọc cài đặt đánh thức: gate, câu đánh thức, tiếng chime, đèn đánh thức, thời gian nghe tiếp, chime và đèn của tap-to-talk, kèm các giới hạn (đồng bộ) | _(không có)_ |
+| `wakeword.settings.set` | Lưu một phần bất kỳ của cài đặt đánh thức qua đúng đường `PUT /api/device/config`; trả lời một lần kèm cài đặt đã lưu | bất kỳ trong `enabled`, `phrases`, `chime`, `light`, `followup_s`, `tap_chime`, `tap_light` |
 | `wakeword.light.preview` | Chạy thử một đèn đánh thức trong 3 giây qua HAL `POST /led/wake-light/preview`; không lưu gì (đồng bộ) | `color`, tùy chọn `effect`/`speed` |
 | `cloud_perception.set` | **Tắt** các luồng nhận thức camera hoặc giọng nói qua cloud (chỉ opt-out; bất đồng bộ; ack `starting`) | một hoặc nhiều `motion`, `emotion`, `pose`, `fire_hazard`, `speaker_id`, `speech_emotion` (phải là `false`) |
 | `voice.input_mode` | Chọn cách nhập giọng nói (ack bất đồng bộ) | `mode`: `automatic` hoặc `tap_to_talk` |
@@ -604,6 +604,8 @@ HTTP và MQTT được xếp hàng và theo cùng luật.
 {"cmd": "data", "kind": "wakeword.settings.get", "data": {}}
 {"cmd": "data", "kind": "wakeword.settings.set", "data": {"phrases": ["sam", "hey sam"], "chime": true,
   "light": {"enabled": true, "color": [16, 9, 3], "effect": "spin", "speed": 1.5}, "followup_s": 5}}
+{"cmd": "data", "kind": "wakeword.settings.set", "data": {"tap_chime": true,
+  "tap_light": {"enabled": true, "color": [3, 16, 9], "effect": "breathing", "speed": 1.2}}}
 {"cmd": "data", "kind": "wakeword.light.preview", "data": {"color": [16, 9, 3], "effect": "spin", "speed": 1.5}}
 ```
 
@@ -616,7 +618,8 @@ HTTP và MQTT được xếp hàng và theo cùng luật.
  "chime": true, "has_light": true,
  "light": {"enabled": true, "color": [16, 9, 3], "effect": "spin", "speed": 1.5},
  "light_effects": ["solid", "breathing", "spin", "blink"], "light_speed_min": 0.25, "light_speed_max": 3,
- "followup_s": 5, "followup_custom": true, "followup_min_s": 3, "followup_max_s": 30}
+ "followup_s": 5, "followup_custom": true, "followup_min_s": 3, "followup_max_s": 30,
+ "tap_chime": true, "tap_light": {"enabled": true, "color": [4, 8, 16], "effect": "breathing", "speed": 1.2}}
 ```
 
 - `enabled` là gate **Require attention trigger** (config `wakeword`). Cài đặt
@@ -644,9 +647,17 @@ HTTP và MQTT được xếp hàng và theo cùng luật.
   lời mà không cần câu đánh thức (`followup_min_s`–`followup_max_s`). Khi
   `followup_custom` là false thì đó là mặc định của image do HAL báo (5 giây
   trên Intern v2 và Lamp), hoặc 10 giây khi HAL không chạy.
+- `tap_chime` và `tap_light` là tín hiệu của tap-to-talk: tiếng chime khi bắt
+  đầu ghi âm và đèn trong lúc ghi. Chúng được lưu riêng với tín hiệu đánh thức
+  và chỉ có tác dụng khi `voice_input_mode` là `tap_to_talk`; hiện chúng ở chế
+  độ đó thay cho cài đặt đánh thức. Phải giữ ít nhất một cái, nên tắt cả hai sẽ
+  lỗi `keep the tap-to-talk chime or light on, so you can tell recording
+  started`. `tap_light` theo đúng luật của `light` (chưa lưu thì dùng kiểu của
+  board, cùng effect và speed, gửi đủ bốn trường); thử kiểu đèn bằng
+  `wakeword.light.preview`.
 
 `set` chỉ đổi các trường được gửi; payload rỗng lỗi `nothing to change`. Câu
-đánh thức, chime, đèn và thời gian nghe tiếp áp dụng ngay. Đổi `enabled` sẽ
+đánh thức, các tiếng chime, các đèn và thời gian nghe tiếp áp dụng ngay. Đổi `enabled` sẽ
 restart HAL (tối đa 30 giây): nếu sau 5 giây vẫn chưa xong, device trả
 `success` kèm cài đặt đã lưu và `applying: true`, còn lỗi restart sau đó được
 gửi thành một `failure` riêng cùng kind. Lỗi kiểm tra dữ liệu luôn trả
@@ -1395,7 +1406,7 @@ mic cũng bật đèn báo tắt mic, và lựa chọn được giữ qua các l
 
 #### `realtime.get` / `realtime.set` — Cài đặt realtime voice qua MQTT
 
-Bản điện thoại của trang **Settings → Realtime** trên web (trên web chỉ hiện ở chế độ debug).
+Bản điện thoại của trang **Settings → Realtime** trên web.
 
 ```json
 {"cmd": "data", "kind": "realtime.get"}
@@ -1406,7 +1417,8 @@ Bản điện thoại của trang **Settings → Realtime** trên web (trên web
 ```json
 {
   "config": {"enabled": true, "provider": "gemini", "model": "…", "voice": "Kore",
-             "reasoning": "LOW", "base_url": "", "has_api_key": false},
+             "reasoning": "LOW", "base_url": "", "has_api_key": false,
+             "fast_voice": true, "fast_voice_pause_s": 2, "fast_voice_silent_timeout_s": 5},
   "options": {"providers": ["gemini", "openai", "gptlive", "pipecat_v1", "none"],
               "voices": {"gemini": ["…"], "openai": ["…"], "gptlive": ["…"], "pipecat_v1": []},
               "reasoning": {"gemini": ["MINIMAL", "LOW", "MEDIUM", "HIGH"], "openai": ["…"], "gptlive": [], "pipecat_v1": []}}
@@ -1418,9 +1430,18 @@ Key không bao giờ được trả về; `has_api_key` cho biết có key riên
 chỉ xuất hiện với `pipecat_v1`. Danh sách voice hay reasoning rỗng nghĩa là provider
 đó không có tùy chọn này, nên ẩn ô chọn.
 
+`fast_voice` là công tắc **Faster replies** trên web, giá trị đang áp (mặc định
+bật trên Intern v2). HAL chỉ áp nó cho Gemini, nên chỉ hiện nó và hai mốc chờ
+khi provider là `gemini`. `fast_voice_pause_s` là thời gian device chờ khi người
+nói ngừng giữa câu trước khi trả lời (0.8–6 giây, mặc định 2; web cho chọn 1,
+1.5, 2, 3, 4, 6). `fast_voice_silent_timeout_s` là thời gian Gemini im lặng
+trước khi agent chính trả lời thay (3–8 giây, mặc định 5; web cho chọn 3, 4, 5,
+6, 8). Khi bật Faster replies, `voice` là giọng của các câu trả lời đó.
+
 `realtime.set` lưu bất kỳ trường nào trong `enabled`, `provider`, `model`, `voice`,
-`reasoning`, `api_key`, `base_url` và `web_search` (chỉ pipecat_v1). Trường bỏ trống
-giữ nguyên. Lệnh ack `starting`, kiểm tra theo cùng danh sách lựa chọn, lưu
+`reasoning`, `api_key`, `base_url`, `web_search` (chỉ pipecat_v1), `fast_voice`,
+`fast_voice_pause_s` và `fast_voice_silent_timeout_s`. Trường bỏ trống giữ
+nguyên; mốc chờ nằm ngoài khoảng sẽ ack `failure`. Lệnh ack `starting`, kiểm tra theo cùng danh sách lựa chọn, lưu
 `config.json`, restart HAL rồi ack `success` hoặc `failure`:
 
 ```json

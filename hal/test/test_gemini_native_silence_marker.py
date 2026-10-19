@@ -47,7 +47,9 @@ def receive(monkeypatch, packets, *, live=False):
     return list(agent._recv_queue.queue)
 
 
-@pytest.mark.parametrize('parts', [['NO_REPLY'], ['NO_', 'REPLY'], ['<no ', 'speech>'], ['<no speech>']])
+# The last case is a device turn (2026-10-16): Gemini repeated the marker in square brackets.
+@pytest.mark.parametrize('parts', [['NO_REPLY'], ['NO_', 'REPLY'], ['<no ', 'speech>'], ['<no speech>'],
+                                   ['[no speech]'], ['<no ', 'speech>', '', '[no speech]']])
 def test_complete_marker_drops_same_packet_and_split_audio_before_delivery(monkeypatch, parts):
     events = receive(monkeypatch, [packet(text, True, i == len(parts) - 1) for i, text in enumerate(parts)])
     assert not any(isinstance(event, OutputEvent) and isinstance(event.output, AudioOutput) for event in events)

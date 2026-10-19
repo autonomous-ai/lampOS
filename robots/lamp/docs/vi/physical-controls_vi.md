@@ -119,9 +119,10 @@ hay speaker. Các consumer capture không đọc được frame camera lưu đ�
 khởi động, các thiết bị đã cấu hình vẫn khóa cho tới khi đồng bộ GPIO; lỗi
 đọc/claim ban đầu thì tiếp tục giữ privacy khóa.
 
-Mở khóa dùng luồng wake/listening microphone hiện có và khôi phục camera/speaker
+Mở khóa chỉ mở lại microphone (không chạy action tap, không chime, không cue bằng lời,
+không đèn listening, không cửa sổ nghe tiếp; thiết bị đang ngủ vẫn ngủ) và khôi phục camera/speaker
 về trạng thái trước đó. Camera hoặc speaker đã tắt trước khi khóa thì vẫn tắt;
-lệnh tắt thủ công trong lúc khóa cũng được giữ lại. Chime xác nhận ngắn tuân theo trạng thái mute loa đã khôi phục; cue listening bằng lời đã tắt. Mute do **scene** đặt không phải sở thích người
+lệnh tắt thủ công trong lúc khóa cũng được giữ lại. Mute do **scene** đặt không phải sở thích người
 dùng: khi công tắc đánh thức thiết bị khỏi sleep (scene night: camera và
 speaker tắt) tắt scene trong lúc còn đang khóa, `deactivate_scene()` đổi
 snapshot của privacy (`privacy.speaker_before` / `privacy.camera_before` →
@@ -170,7 +171,7 @@ Sau tone dừng cục bộ, recorder được giải phóng độc lập với b
 
 Bắt đầu bản ghi mới thay thế lời trả lời cũ đang chờ, kể cả khi TTS chưa phát: hủy STT/realtime cục bộ, xóa TTS đang chờ và yêu cầu OS chặn lời nói cũ mà không hủy tác vụ agent. Yêu cầu OS chạy bất đồng bộ với mốc thời gian thu nên đến muộn cũng không làm mất lời trả lời mới. Công việc provider đã hủy vẫn giữ chỗ đến khi dọn xong; giới hạn hai chỗ vẫn áp dụng.
 
-Tap khi TTS đang phát chỉ ngắt; nếu realtime đang trả lời thì tap cũng hủy stream phản hồi để các đoạn audio sau không phát tiếp. Tap sau mới thu. Đèn đang ngủ được đánh thức trước mà chưa thu. Cả ngắt lời và đánh thức đều phát ping xác nhận ngắn có sẵn (~120 ms), lần lượt sau khi dừng TTS hoặc khôi phục trạng thái loa do sleep mute. Ping này khác tone sẵn sàng thu và không báo mic đang ghi âm; vẫn tôn trọng mute loa chủ động. Mic mute phần mềm có thể được mở để thu; khóa mic vật lý vẫn chặn. Hold/factory reset GPIO, swipe/hold MPR121 và cử chỉ pet TTP223 giữ vai trò hiện có. Startup và privacy-switch vẫn dùng action wake gốc và không giả lập tap ghi âm. Harness ON giữ chính sách cử chỉ riêng bên dưới.
+Tap khi TTS đang phát chỉ ngắt; nếu realtime đang trả lời thì tap cũng hủy stream phản hồi để các đoạn audio sau không phát tiếp. Tap sau mới thu. Đèn đang ngủ được đánh thức trước mà chưa thu. Cả ngắt lời và đánh thức đều phát ping xác nhận ngắn có sẵn (~120 ms), lần lượt sau khi dừng TTS hoặc khôi phục trạng thái loa do sleep mute. Ping này khác tone sẵn sàng thu và không báo mic đang ghi âm; vẫn tôn trọng mute loa chủ động. Mic mute phần mềm có thể được mở để thu; khóa mic vật lý vẫn chặn. Hold/factory reset GPIO, swipe/hold MPR121 và cử chỉ pet TTP223 giữ vai trò hiện có. Startup dùng action wake gốc; privacy-switch chỉ mở lại microphone. Cả hai không giả lập tap ghi âm. Harness ON giữ chính sách cử chỉ riêng bên dưới.
 
 ### Presence enter và quay về phía đèn — trigger wake
 
@@ -292,6 +293,8 @@ Debounce mỗi edge là 200 ms (tick nhấn và nhả track độc lập để t
 
 ## Detect MPR121 (`hal/drivers/mpr121.py`)
 
+Body touch của Lamp mặc định đã tắt theo yêu cầu team hardware: `boards.orangepi_sun60.enabled` là `false` trong `robots/lamp/mpr121.json`. HAL bỏ qua khởi tạo và polling MPR121, nên toàn bộ gesture chạm thân đều tắt. Wiring và thông số bên dưới được giữ để dùng khi chủ động bật lại. Cần restart HAL sau khi triển khai thay đổi cấu hình.
+
 Wiring MPR121 theo flow cấu hình GPIO do từng device quản lý: HAL đọc
 `mpr121.json` trong thư mục được chọn qua `DEVICES_DIR` và `DEVICE_TYPE`
 (hiện là `robots/lamp/`), rồi chọn board đã detect từ map `boards`. Hiện chỉ
@@ -308,7 +311,7 @@ trước khi dùng; HAL không tự sửa boot overlay:
 {
   "boards": {
     "orangepi_sun60": {
-      "enabled": true,
+      "enabled": false,
       "bus": 0,
       "address": 90,
       "electrodes": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
@@ -758,7 +761,7 @@ Harness ON dùng thu giọng thủ công bằng tap, không tự nghe môi trư�
 
 Action mode/focus dùng worker hiện có và API Go loopback; không tự retry HTTP. Kết quả dùng phrase đa ngôn ngữ trong `hal/i18n.py`, tôn trọng speaker mute và quyền LED sleep/privacy/TTS. Chuyển focus cần capability Harness `focus.step` đã thương lượng; CLI cũ trả lỗi rõ ràng, không chuyển transport. Phần CLI tương ứng đang chờ; chưa kiểm chứng tương thích trên thiết bị đã cài.
 
-Khi HAL khởi động, đồng bộ vị trí privacy-switch không giả lập nhấn nút: vị trí cho phép mic khôi phục quyền mic/ngoại vi mà không đánh thức thiết bị, mở conversation focus, phát chime/câu đang nghe hoặc lên lịch LED listening. Thao tác gạt thật từ mute sang unmute vẫn giữ wake/focus và chime xác nhận ngắn, không phát cue listening bằng lời. Khởi động ở vị trí mute vẫn áp hardware privacy lock đồng bộ.
+Khi HAL khởi động, đồng bộ vị trí privacy-switch không giả lập nhấn nút: vị trí cho phép mic khôi phục quyền mic/ngoại vi mà không đánh thức thiết bị, mở conversation focus, phát chime/câu đang nghe hoặc lên lịch LED listening. Thao tác gạt thật từ mute sang unmute cũng vậy: chỉ mở lại mic, không wake, không focus, không chime, không đèn listening. Khởi động ở vị trí mute vẫn áp hardware privacy lock đồng bộ.
 
 Khi sleep được khôi phục sau HAL restart (kể cả software update), privacy-switch đang mở không được unmute mic đang ngủ hoặc khởi chạy voice pipeline. Mic và speaker bị mute bởi sleep giữ nguyên cho đến khi wake thật. Nếu privacy đã lưu trạng thái speaker mute do sleep, wake gỡ mute tạm thời đó bên dưới privacy lock; âm thanh vẫn bị chặn cho đến khi mở privacy. Trạng thái speaker sau khi gỡ mute được lưu để HAL restart tiếp không khôi phục mute do sleep đã kết thúc. Speaker do người dùng mute trước sleep vẫn giữ mute.
 

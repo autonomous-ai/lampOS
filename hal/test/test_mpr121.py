@@ -1,5 +1,6 @@
 """MPR121 register setup, touch grouping, and worker lifecycle without hardware."""
 
+import json
 import threading
 import errno
 import time
@@ -168,7 +169,11 @@ class TestMPR121(unittest.TestCase):
 
     def test_lamp_thresholds_are_loaded_and_written_to_chip(self):
         device_dir = Path(__file__).resolve().parents[2] / "robots" / "lamp"
-        config = load_mpr121_config(device_dir, "orangepi_sun60")
+        declaration = json.loads((device_dir / "mpr121.json").read_text())
+        # Exercise the retained tuning with an explicitly enabled test declaration.
+        declaration["boards"]["orangepi_sun60"]["enabled"] = True
+        with mock.patch.object(Path, "read_text", return_value=json.dumps(declaration)):
+            config = load_mpr121_config(device_dir, "orangepi_sun60")
         handler = MPR121Handler(config)
         handler._bus = bus = mock.Mock()
         bus.read_regs.return_value = b'\x24'

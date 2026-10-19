@@ -24,6 +24,16 @@ func (s *Service) validateRealtimeSet(d domain.RealtimeSetData) error {
 			return err
 		}
 	}
+	if d.FastVoicePauseS != nil {
+		if err := config.ValidateFastVoicePauseS(*d.FastVoicePauseS); err != nil {
+			return err
+		}
+	}
+	if d.FastVoiceSilentTimeoutS != nil {
+		if err := config.ValidateFastVoiceSilentTimeoutS(*d.FastVoiceSilentTimeoutS); err != nil {
+			return err
+		}
+	}
 	if d.WebSearch != nil {
 		target := strings.ToLower(strings.TrimSpace(d.Provider))
 		if target == "" {
@@ -58,6 +68,17 @@ func applyRealtimeSet(c *config.Config, d domain.RealtimeSetData) {
 	}
 	if d.BaseURL != "" {
 		rt.BaseURL = d.BaseURL
+	}
+	if d.FastVoice != nil {
+		rt.FastVoice = d.FastVoice
+	}
+	if d.FastVoicePauseS != nil {
+		pause := *d.FastVoicePauseS
+		rt.FastVoicePauseS = &pause
+	}
+	if d.FastVoiceSilentTimeoutS != nil {
+		timeout := *d.FastVoiceSilentTimeoutS
+		rt.FastVoiceSilentTimeoutS = &timeout
 	}
 	if d.Model == "" && d.Voice == "" && d.Reasoning == "" && d.WebSearch == nil {
 		return

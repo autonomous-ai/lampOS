@@ -217,6 +217,11 @@ type Config struct {
 	// WakeLight is the owner's listening light on a wake; nil = on with the board look.
 	WakeLight      *WakeLight `json:"wake_light,omitempty" yaml:"wakeLight"`
 	VoiceInputMode string     `json:"voice_input_mode,omitempty" yaml:"voice_input_mode"`
+	// TapChime plays the ready chime when a tap-to-talk recording starts; nil = on.
+	TapChime *bool `json:"tap_chime,omitempty" yaml:"tapChime"`
+	// TapLight is the listening light while a tap-to-talk recording runs; nil = on
+	// with the board look. HAL reads both live.
+	TapLight *WakeLight `json:"tap_light,omitempty" yaml:"tapLight"`
 
 	// CloudPerception opts into camera and voice perceptions that upload frames,
 	// face crops or audio to the DL backend. Unset means all off; HAL reads it at boot.
@@ -389,6 +394,16 @@ func (c *Config) WakeChimeEnabled() bool {
 // WakeLightEnabled reports whether a wake lights the strip (default on).
 func (c *Config) WakeLightEnabled() bool {
 	return c.WakeLight == nil || c.WakeLight.Enabled == nil || *c.WakeLight.Enabled
+}
+
+// TapChimeEnabled reports the tap-to-talk ready chime toggle (default on).
+func (c *Config) TapChimeEnabled() bool {
+	return c.TapChime == nil || *c.TapChime
+}
+
+// TapLightEnabled reports whether a tap-to-talk recording lights the strip (default on).
+func (c *Config) TapLightEnabled() bool {
+	return c.TapLight == nil || c.TapLight.Enabled == nil || *c.TapLight.Enabled
 }
 
 // WakeFollowupSeconds reports the listening window after a wake (default WakeFollowupDefaultS).

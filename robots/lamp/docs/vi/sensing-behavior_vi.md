@@ -324,6 +324,7 @@ bằng và trên 0.2; còn lại là `unsure_fire`.
 dùng được hoặc đang tạm dừng vì 429 đều là "không có quan sát": streak và escalation giữ
 nguyên. Sau HTTP 429, HAL tạm dừng gọi 5 s × 2^(n−1) cho lần 429 thứ n liên tiếp, tối đa
 60 s, jitter ±20 %. Mọi reply khác đặt lại bộ đếm.
+Mã `503` từ máy chủ perception nghĩa là máy chủ đang bận: lamp bỏ qua các lần kiểm tra trong khoảng `Retry-After` của máy chủ (2–30 s, mặc định 5 s, dao động ±20 %) thay vì thử lại ngay.
 
 **Xác nhận.** Streak được giữ theo loại: flame (bất kỳ nhãn lửa nào trong ba nhãn) và
 smoke. Streak flame vẫn giữ khi nhãn đổi qua lại giữa `safe_fire`/`hazard_fire`/
@@ -347,7 +348,7 @@ trị enum, không bao giờ có frame:
 
 | Event | Khi nào | Params |
 |---|---|---|
-| `fire_hazard_stats` | Mỗi giờ một lần, cộng một dòng cuối với `observation_complete: false` khi processor bị gỡ | `window_s`, `observation_complete`, `owlv2_calls` (tổng của `owlv2_ok`, `owlv2_timeout`, `owlv2_error`, `owlv2_http_error`, `owlv2_rate_limited`, `owlv2_encryption_unavailable`), `owlv2_preset_fallback` (đếm thêm, ngoài kết quả của chính lời gọi fallback), `owlv2_backoff_skipped` (lượt rơi vào lúc tạm dừng vì 429, không gửi gì), `owlv2_other`, `owlv2_ms_p50` / `owlv2_ms_max` (chỉ lời gọi thành công; null khi không có mẫu), `gate_runs`, `gate_hits`, `gate_unavailable`, `gate_ms_p50`, `escalations`, `samples_dropped` (mẫu latency vượt 720 mỗi cửa sổ), `gate_state` (`loading`, `ready` hoặc `unavailable`) |
+| `fire_hazard_stats` | Mỗi giờ một lần, cộng một dòng cuối với `observation_complete: false` khi processor bị gỡ | `window_s`, `observation_complete`, `owlv2_calls` (tổng của `owlv2_ok`, `owlv2_timeout`, `owlv2_error`, `owlv2_http_error`, `owlv2_rate_limited`, `owlv2_busy` (503, máy chủ bận), `owlv2_encryption_unavailable`), `owlv2_preset_fallback` (đếm thêm, ngoài kết quả của chính lời gọi fallback), `owlv2_backoff_skipped` (lượt rơi vào lúc tạm dừng vì 429 hoặc 503, không gửi gì), `owlv2_other`, `owlv2_ms_p50` / `owlv2_ms_max` (chỉ lời gọi thành công; null khi không có mẫu), `gate_runs`, `gate_hits`, `gate_unavailable`, `gate_ms_p50`, `escalations`, `samples_dropped` (mẫu latency vượt 720 mỗi cửa sổ), `gate_state` (`loading`, `ready` hoặc `unavailable`) |
 | `fire_hazard_alert` | Mỗi lần gửi `fire_hazard.detected` | `types` (các loại nguy cơ đã sắp xếp), `first_seen_age_ms` (streak xác nhận đã chạy bao lâu khi cảnh báo được gửi; -1 khi không rõ), `gate_state` |
 
 ## Chuyển động (Motion)
@@ -860,6 +861,7 @@ Lamp nhận diện trạng thái cảm xúc **của người dùng** qua ba kên
    1. **Gate theo label (phía HAL)** — HAL gửi crop với `raw: true` và tự gate xác suất trả về trong `emotion_gating.py`: argmax phải vượt ngưỡng riêng của nó (`anger 0.8`, `sad 0.8`, `happy 0.5`, `surprise 0.6`, `disgust 0.7`, `fear 0.5`; chỉnh theo từng thiết bị bằng `HAL_EMOTION_LABEL_THRESHOLDS`, giá trị này thay thế toàn bộ map), nếu không sẽ bị thay bằng Neutral mang **xác suất của chính Neutral**, rồi áp `EMOTION_CONFIDENCE_THRESHOLD`. Reading không qua gate là **không có reading**, không phải Neutral. Với perception server cũ (bỏ qua `raw`), server tự gate bằng map `label_gating.py` và HAL dùng nguyên label đó. `result.json` ghi bên nào đã gate (`gate: hal|server`) và, khi HAL gate, xác suất của mọi class.
    2. **Occupancy (phía HAL)** — mỗi lần flush theo `EMOTION_FLUSH_S`, `Happy` fire chỉ với 1 frame, nhưng mọi label khác phải chiếm **đa số tuyệt đối số lần nhận diện của người đó trong 10s gần nhất**, tính cả những lần không trả về gì (hòa nhau không tính là đa số), **và phải có ít nhất 2 reading**. Số lần nhận diện đếm theo mỗi lần phát hiện mặt, không phải mỗi sensing tick, nên nếu không có sàn này thì một khuôn mặt chỉ xuất hiện 1 lần trong cửa sổ sẽ khiến 1 reading đơn lẻ trở thành "đa số" 1-của-1. Mặt quay về phía màn hình bị đọc thành Anger, nên trước đây 1 frame Anger đơn lẻ giữa cả chục response rỗng vẫn thắng vote.
    3. **Dedup theo bucket** — `(user, positive|negative)` với TTL `EMOTION_DEDUP_WINDOW_S` (300s), nên mỗi cực chỉ báo tối đa 1 lần mỗi 5 phút.
+   Mã `503` (máy chủ bận) tạm dừng nhận diện trong khoảng `Retry-After` của máy chủ (2–30 s, mặc định 5 s); khoảng dừng 5 phút vẫn áp dụng cho `429` (hết hạn mức).
 2. **Cảm xúc giọng nói** (phụ) — event `speech_emotion.detected` từ `hal/drivers/voice/speech_emotion/`. Chạy ở cuối mỗi phiên STT đã nhận diện được speaker, cùng WAV bytes đã dùng cho speaker recognition. Dùng `emotion2vec_plus_large` trên perception-service qua HTTP. Xem [Speech Emotion Recognition](../../../../docs/speech-emotion.md) cho pipeline đầy đủ.
 3. **Body action** (cấp 3) — emotional X3D actions từ action recognition **cố ý bị loại** khỏi `motion.activity` (giờ thuần vật lý: sedentary/drink/break/celebrate). Một event type `motion.emotional` riêng đang được lên kế hoạch.
 

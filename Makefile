@@ -652,5 +652,4 @@ upload-service:
 
 promote-service:
 	@test -n "$(COMPONENT)" || (echo "COMPONENT is required" >&2; exit 1)
-	@test -n "$(OTA_SIGNING_PRIVATE_KEY)" -a -n "$(OTA_SIGNING_KEY_ID)" || (echo "Service metadata requires OTA signing credentials" >&2; exit 1)
 	FOR="$(FOR)" ACTIVATE="$(ACTIVATE)" bash scripts/release/promote-ota.sh "$(COMPONENT)" $(V)

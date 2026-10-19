@@ -1,0 +1,26 @@
+name: lampOS nightly full run
+
+# GitHub starts a scheduled workflow only from the default branch (main), so
+# this file lives here and does one thing: it starts "lampOS on ARM64"
+# (.github/workflows/lampos-arm64.yml on lamp-voice) on lamp-voice as a
+# manual run with `full`, which runs every test, the realtime group included,
+# and opens an issue if it fails. The job itself is defined only on
+# lamp-voice. See lampOS/docs/realtime-tests.md on lamp-voice.
+on:
+  schedule:
+    # 19:00 UTC, 02:00 in Vietnam.
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  start:
+    runs-on: ubuntu-latest
+    steps:
+      - name: start the full ARM64 run on lamp-voice
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run lampos-arm64.yml --ref lamp-voice -f full=true

@@ -3,9 +3,9 @@ import { toast } from "sonner";
 import { restoreAutonomousDefaults } from "@/lib/api";
 import { Pencil, X, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import type { SectionId } from "@/hooks/setup/types";
-import { C, FIELD_GAP, ADMIN_PASSWORD_MIN, LABEL_STYLE, INPUT_STYLE, INPUT_READONLY_STYLE, INPUT_FOCUS_SHADOW, INPUT_ERROR_SHADOW, INPUT_PAD_ONE_ICON, INPUT_PAD_TWO_ICONS } from "./styles";
+import { C, FIELD_GAP, ADMIN_PASSWORD_MIN, LABEL_STYLE, HINT_STYLE, INPUT_STYLE, INPUT_READONLY_STYLE, INPUT_FOCUS_SHADOW, INPUT_ERROR_SHADOW, INPUT_PAD_ONE_ICON, INPUT_PAD_TWO_ICONS } from "./styles";
 
-export { C, FIELD_GAP, ADMIN_PASSWORD_MIN, LABEL_STYLE, INPUT_STYLE, INPUT_READONLY_STYLE, INPUT_FOCUS_SHADOW, INPUT_ERROR_SHADOW, INPUT_PAD_ONE_ICON, INPUT_PAD_TWO_ICONS };
+export { C, FIELD_GAP, ADMIN_PASSWORD_MIN, LABEL_STYLE, HINT_STYLE, INPUT_STYLE, INPUT_READONLY_STYLE, INPUT_FOCUS_SHADOW, INPUT_ERROR_SHADOW, INPUT_PAD_ONE_ICON, INPUT_PAD_TWO_ICONS };
 
 // Red error line under an invalid input; renders null without an error.
 export function FieldError({ message }: { message?: string }) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { hwUrl, type WakeLightEffect } from "@/lib/api";
 import { fromHsv, swatch, toHsv, type RGB, type WakeLook } from "@/lib/ledColor";
-import { C, LABEL_STYLE } from "./shared";
+import { C, HINT_STYLE, LABEL_STYLE } from "./shared";
 
 const COLORS: { label: string; color: RGB }[] = [
   { label: "Listening blue", color: [4, 8, 16] },
@@ -121,7 +121,7 @@ export function WakeLightEditor({ look, onChange }: { look: WakeLook; onChange: 
             animation: animation(look.effect, look.speed),
           }}
         />
-        <div style={{ fontSize: 11.5, lineHeight: 1.45, color: C.textMuted }}>
+        <div style={HINT_STYLE}>
           Changes play on the device for a few seconds so you can see them.
           They are kept when you save.
           {deviceNote && <div style={{ color: C.amber, marginTop: 4 }}>{deviceNote}</div>}

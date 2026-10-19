@@ -141,3 +141,16 @@ def test_process_face_records_gate_in_debug_prediction(monkeypatch):
 
     assert len(debug.predictions) == 1
     assert debug.predictions[0]["gate"] == "hal"
+
+
+def test_503_pauses_recognition_briefly(monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(mod.time, "time", lambda: now[0])
+
+    def post(url, data, headers, timeout):
+        return types.SimpleNamespace(status_code=503, text="busy", headers={"Retry-After": "2"})
+
+    monkeypatch.setattr(mod.requests, "post", post)
+    r = _recognizer()
+    assert r.recognize(CROP) is None
+    assert 1.6 <= r._backoff_until - now[0] <= 2.4

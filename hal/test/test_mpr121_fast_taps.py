@@ -1,6 +1,8 @@
 """Lamp's sampled chip-status pulses, not simulated ADC or physical touch timing."""
 
+import json
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -15,7 +17,12 @@ def mode(request):
 
 
 def replay(mode, samples):
-    config = load_mpr121_config(Path(__file__).resolve().parents[2] / "robots/lamp", "orangepi_sun60")
+    device_dir = Path(__file__).resolve().parents[2] / "robots/lamp"
+    declaration = json.loads((device_dir / "mpr121.json").read_text())
+    # Keep gesture regression coverage while production body touch is disabled.
+    declaration["boards"]["orangepi_sun60"]["enabled"] = True
+    with mock.patch.object(Path, "read_text", return_value=json.dumps(declaration)):
+        config = load_mpr121_config(device_dir, "orangepi_sun60")
     factory = {
         "standard": _GestureRecognizer,
         "device": lambda delay: _GestureRecognizer(delay, multi_click=False),

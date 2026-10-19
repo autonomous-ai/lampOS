@@ -483,6 +483,7 @@ The `flushing` line shows the raw label list — that's the mode-over-samples th
 | `HAL_FIRE_HAZARD_DETECTOR` | `owlv2` | Detector name in the default endpoint path |
 | `DL_FIRE_HAZARD_ENDPOINT` | `/detect/<detector>` | Endpoint path appended to `DL_BACKEND_URL` |
 | `HAL_FIRE_HAZARD_API_TIMEOUT_S` | `15.0` | OWLv2 HTTP timeout |
+| `HAL_FIRE_HAZARD_JPEG_QUALITY` | `80` | JPEG quality of the frame sent to OWLv2. The request reuses one HTTPS connection and retries once if the pooled connection was dropped |
 | `HAL_FIRE_HAZARD_CONFIDENCE_THRESHOLD` | `0.3` | OWLv2 detections below this are dropped |
 | `HAL_FIRE_HAZARD_OVERLAP_THRESHOLD` | `0.2` | Min fire/object overlap for `safe_fire` or `hazard_fire`; below it a flame is `unsure_fire` |
 | `HAL_FIRE_HAZARD_CONFIRM_S` | `10.0` | How long OWLv2 must keep seeing flame (or smoke) before it alerts |

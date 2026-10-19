@@ -330,8 +330,9 @@ API key and reports which models finished loading.
 | `401` | Missing/invalid `X-API-Key` |
 | `404` | `GET /api/crypto/public-key` when crypto disabled |
 | `502` | lbserver: backend unreachable (connect refused -- the backend is **down**) |
-| `503` | Model/dependency unavailable for the requested perception |
+| `503` | Model/dependency unavailable for the requested perception, or **server busy**: the request was refused (backlog full) or dropped (waited over `OVERLOAD__MAX_WAIT_S`). Busy replies carry `Retry-After` (seconds) and `detail` starting with `Server busy` |
 | `504` | lbserver: backend timed out after `lb.http_timeout` (the backend is **hung** -- it accepted the connection and never replied). nginx returns its own `504` if `proxy_read_timeout` (45s) expires first |
+| WS `{"error": "busy"}` | dlserver: this frame was refused or dropped because the server is busy; the socket stays open, send the next frame as usual |
 | WS `1008` | lbserver: encryption required but key exchange missing |
 | WS `1011` | lbserver: key exchange failed, backend unreachable, or backend handshake timed out |
 

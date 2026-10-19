@@ -14,7 +14,7 @@ from core.models.object import RawObjectDetection
 from core.perception.object.predictors.base import ObjectDetector
 from core.utils.detection import nms_xywh
 from core.utils.files import ensure_downloaded
-from core.utils.runtime import prepare_ort_session
+from core.utils.runtime import batch_warmups, prepare_ort_session
 
 
 class ONNXObjectDetector(ObjectDetector, ABC):
@@ -66,16 +66,18 @@ class ONNXObjectDetector(ObjectDetector, ABC):
             "Ready — %d default classes, nms=%s", len(self._class_names), self._nms
         )
 
-    def _build_warmup_inputs(self) -> dict[str, np.ndarray] | None:
-        """Build dummy ONNX inputs for warmup inference at startup."""
+    def _build_warmup_inputs(self) -> list[dict[str, np.ndarray]] | None:
+        """Dummy ONNX inputs at batch 1 and max batch for warmup at startup."""
         try:
             sz = self.WARMUP_IMGSZ
             dummy = np.zeros((sz, sz, 3), dtype=np.uint8)
-            batch = [dummy] * self._batch_size
-            preprocessed = self.preprocess(batch)
-            img_batch = np.stack(preprocessed, axis=0)
             classes = self._class_names[:1] or ["dummy"]
-            return self._build_onnx_inputs(img_batch, classes)
+
+            def build(n: int) -> dict[str, np.ndarray]:
+                img_batch = np.stack(self.preprocess([dummy] * n), axis=0)
+                return self._build_onnx_inputs(img_batch, classes)
+
+            return batch_warmups(self._batch_size, build)
         except Exception as e:
             self._logger.warning("Could not build warmup inputs: %s", e)
             return None

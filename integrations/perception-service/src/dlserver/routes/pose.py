@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import TypeAdapter, ValidationError
 
+from core.perception.base.batching import BatcherOverloaded
 from dlserver.models.pose import (
     PoseConfigRequest,
     PoseFrameRequest,
@@ -72,6 +73,9 @@ async def pose_estimation_ws(websocket: WebSocket):
                         logger.warning("Unknown pose WS message type: %s", raw[:200])
             except WebSocketDisconnect:
                 raise
+            except BatcherOverloaded:
+                # Busy: skip this frame without a traceback; the client keeps streaming.
+                await websocket.send_json({"error": "busy"})
             except Exception as e:
                 logger.exception("Error processing pose WS message")
                 await websocket.send_json({"error": "Processing failed"})

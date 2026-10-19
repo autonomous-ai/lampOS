@@ -1392,7 +1392,7 @@ class RealtimeOrchestrator:
             self.execution_completed
             and config.REALTIME_PROVIDER.strip().lower() == "gemini"
             and not had_tool_or_interruption
-            and re.fullmatch(r"\s*(?:(?:NO_REPLY|<\s*no\s+speech\s*>)\s*)+", "".join(silence_text), re.IGNORECASE)
+            and re.fullmatch(r"\s*(?:(?:NO_REPLY|[<\[]\s*no\s+speech\s*[>\]])\s*)+", "".join(silence_text), re.IGNORECASE)
         )
 
         # Look replay continues the same logical turn: recycling now would orphan the sent image.

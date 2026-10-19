@@ -153,11 +153,23 @@ class LBSetting(BaseModel):
     max_connections: int = 100
     max_keepalive: int = 20
 
-    # Two-slot deploy (scripts/deploy-dlserver.sh). When set, lbserver replaces the
-    # loopback entry of `backends` with the URL in this file, at startup and on
-    # SIGHUP, and records what it applied in "<state_file>.applied". Empty = off,
-    # which is exactly the single-dlserver behaviour.
+    # Two-slot switch (scripts/deploy-dlserver.sh, scripts/dlserver-mode.sh). When
+    # set, lbserver replaces the loopback entry of `backends` with the URLs in this
+    # file (one loopback URL per line; line 1 is the primary slot, two lines = both
+    # slots serve), at startup and on SIGHUP, and records what it applied in
+    # "<state_file>.applied". Empty = off, which is exactly the single-dlserver behaviour.
     state_file: str = ""
+
+
+class OverloadSetting(BaseModel):
+    """Per-batcher overload limits (#612). Past them a request gets 503 + Retry-After."""
+
+    # Under HAL's 15 s client timeout, so a served result still reaches the lamp.
+    max_wait_s: float = 8.0
+    # Backlog cap = max(max_pending_min, batch_size * max_pending_per_batch).
+    max_pending_min: int = 32
+    max_pending_per_batch: int = 8
+    retry_after_s: float = 2.0
 
 
 class Settings(BaseSettings):
@@ -187,6 +199,7 @@ class Settings(BaseSettings):
     audio_embedder: AudioEmbedderSetting = AudioEmbedderSetting()
 
     input_limits: InputLimitSetting = InputLimitSetting()
+    overload: OverloadSetting = OverloadSetting()
 
     crypto: CryptoSetting = CryptoSetting()
     lb: LBSetting = LBSetting()

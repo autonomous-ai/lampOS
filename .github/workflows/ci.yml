@@ -72,3 +72,25 @@ jobs:
       # Checks the setup.sh SKILLS_CATALOG block that TestCatalogMatchesTree cannot see.
       - name: skill catalog matches the skills/ tree
         run: python3 scripts/skills/gen_catalog.py --check
+
+  lamp-os-package:
+    name: lampOS OTA package — adapter and release contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: release package and transaction contracts
+        run: |
+          python3 -m unittest discover -s scripts/release/tests
+          python3 -m unittest discover -s scripts/provision/tests -p test_software_update_services.py
+          bash -n scripts/release/upload-lamp-os.sh scripts/release/lamp-os-build-container.sh scripts/provision/software-update
+      - name: adapter formatting, lint and tests
+        run: |
+          cargo fmt --manifest-path scripts/release/lamp-os-adapter/Cargo.toml -- --check
+          cargo clippy --locked --manifest-path scripts/release/lamp-os-adapter/Cargo.toml --all-targets -- -D warnings
+          cargo test --locked --manifest-path scripts/release/lamp-os-adapter/Cargo.toml

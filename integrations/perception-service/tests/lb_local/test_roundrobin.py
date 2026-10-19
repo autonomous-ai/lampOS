@@ -27,6 +27,22 @@ class TestRoundRobin:
             rr.next()
         assert exc_info.value.status_code == 503
 
+    def test_marked_down_backend_is_skipped_then_returns(self, monkeypatch):
+        import lbserver.utils.roundrobin as rr_mod
+
+        now = [100.0]
+        monkeypatch.setattr(rr_mod.time, "monotonic", lambda: now[0])
+        rr = RoundRobin(["a", "b"], down_for_s=10.0)
+        rr.mark_down("a")
+        assert [rr.next() for _ in range(3)] == ["b", "b", "b"]
+        now[0] += 10.1
+        assert sorted({rr.next() for _ in range(4)}) == ["a", "b"]
+
+    def test_all_down_still_returns_a_backend(self):
+        rr = RoundRobin(["a"])
+        rr.mark_down("a")
+        assert rr.next() == "a"
+
     def test_thread_safety(self):
         backends = ["a", "b", "c"]
         rr = RoundRobin(backends)

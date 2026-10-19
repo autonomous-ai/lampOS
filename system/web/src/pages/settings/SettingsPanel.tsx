@@ -149,12 +149,18 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
   const [wakeFollowupS, setWakeFollowupS] = useState(WAKE_FOLLOWUP_DEFAULT_S);
   const [wakeLightOn, setWakeLightOn] = useState(true);
   const [wakeLook, setWakeLook] = useState<WakeLook>(WAKE_LOOK_DEFAULT);
+  const [tapChime, setTapChime] = useState(true);
+  const [tapLightOn, setTapLightOn] = useState(true);
+  const [tapLook, setTapLook] = useState<WakeLook>(WAKE_LOOK_DEFAULT);
   const [realtimeProvider, setRealtimeProvider] = useState("gemini");
   const [realtimeVoice, setRealtimeVoice] = useState("Kore");
   const [realtimeReasoning, setRealtimeReasoning] = useState("MINIMAL");
   const [realtimeApiKey, setRealtimeApiKey] = useState("");
   const [realtimeBaseUrl, setRealtimeBaseUrl] = useState("");
   const [realtimeWebSearch, setRealtimeWebSearch] = useState(true);
+  const [realtimeFastVoice, setRealtimeFastVoice] = useState(false);
+  const [realtimeFastVoicePauseS, setRealtimeFastVoicePauseS] = useState(2);
+  const [realtimeFastVoiceSilentS, setRealtimeFastVoiceSilentS] = useState(5);
   const [channel, setChannel] = useState<ChannelType>("telegram");
   const [teleToken, setTeleToken] = useState("");
   const [teleUserId, setTeleUserId] = useState("");
@@ -208,6 +214,9 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
     wakeFollowupS: number;
     wakeLightOn: boolean;
     wakeLook: WakeLook;
+    tapChime: boolean;
+    tapLightOn: boolean;
+    tapLook: WakeLook;
     voiceInputMode: VoiceInputMode;
     channel: ChannelType;
     teleUserId: string; slackUserId: string;
@@ -222,6 +231,9 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
     realtimeReasoning: string;
     realtimeBaseUrl: string;
     realtimeWebSearch: boolean;
+    realtimeFastVoice: boolean;
+    realtimeFastVoicePauseS: number;
+    realtimeFastVoiceSilentS: number;
   };
   const [baseline, setBaseline] = useState<InitialSnapshot | null>(null);
 
@@ -282,6 +294,9 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
         }
         setWakeLightOn(cfg.wake_light_enabled ?? true);
         setWakeLook(wakeLookFrom(cfg.wake_light));
+        setTapChime(cfg.tap_chime ?? true);
+        setTapLightOn(cfg.tap_light_enabled ?? true);
+        setTapLook(wakeLookFrom(cfg.tap_light));
         if (cfg.realtime) {
           setRealtimeEnabled(cfg.realtime.enabled ?? true);
           setRealtimeProvider(cfg.realtime.provider || "gemini");
@@ -289,6 +304,9 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
           if (cfg.realtime.reasoning) setRealtimeReasoning(cfg.realtime.reasoning);
           setRealtimeBaseUrl(cfg.realtime.base_url ?? "");
           setRealtimeWebSearch(cfg.realtime.web_search ?? true);
+          setRealtimeFastVoice(cfg.realtime.fast_voice ?? false);
+          setRealtimeFastVoicePauseS(cfg.realtime.fast_voice_pause_s ?? 2);
+          setRealtimeFastVoiceSilentS(cfg.realtime.fast_voice_silent_timeout_s ?? 5);
           setRealtimeLoaded({ apiKey: !!cfg.realtime.has_api_key });
         }
         setChannel((cfg.channel as ChannelType) || "telegram");
@@ -374,6 +392,9 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
           wakeFollowupS: cfg.wake_followup_s ?? WAKE_FOLLOWUP_DEFAULT_S,
           wakeLightOn: cfg.wake_light_enabled ?? true,
           wakeLook: wakeLookFrom(cfg.wake_light),
+          tapChime: cfg.tap_chime ?? true,
+          tapLightOn: cfg.tap_light_enabled ?? true,
+          tapLook: wakeLookFrom(cfg.tap_light),
           voiceInputMode: cfg.voice_input_mode ?? "automatic",
           channel: (cfg.channel as ChannelType) || "telegram",
           teleUserId: cfg.telegram_user_id ?? "",
@@ -394,6 +415,9 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
           realtimeReasoning: cfg.realtime?.reasoning || "MINIMAL",
           realtimeBaseUrl: cfg.realtime?.base_url ?? "",
           realtimeWebSearch: cfg.realtime?.web_search ?? true,
+          realtimeFastVoice: cfg.realtime?.fast_voice ?? false,
+          realtimeFastVoicePauseS: cfg.realtime?.fast_voice_pause_s ?? 2,
+          realtimeFastVoiceSilentS: cfg.realtime?.fast_voice_silent_timeout_s ?? 5,
         });
       })
       .catch((err: Error) => setError(err.message))
@@ -467,6 +491,9 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
     wakeFollowupS !== baseline.wakeFollowupS ||
     wakeLightOn !== baseline.wakeLightOn ||
     !sameWakeLook(wakeLook, baseline.wakeLook) ||
+    tapChime !== baseline.tapChime ||
+    tapLightOn !== baseline.tapLightOn ||
+    !sameWakeLook(tapLook, baseline.tapLook) ||
     voiceInputMode !== baseline.voiceInputMode ||
     channel !== baseline.channel ||
     teleUserId !== baseline.teleUserId ||
@@ -484,6 +511,9 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
     realtimeReasoning !== baseline.realtimeReasoning ||
     realtimeBaseUrl !== baseline.realtimeBaseUrl ||
     realtimeWebSearch !== baseline.realtimeWebSearch ||
+    realtimeFastVoice !== baseline.realtimeFastVoice ||
+    realtimeFastVoicePauseS !== baseline.realtimeFastVoicePauseS ||
+    realtimeFastVoiceSilentS !== baseline.realtimeFastVoiceSilentS ||
     !!password || !!adminPassword || !!llmApiKey || !!ttsApiKey ||
     !!sttApiKey || !!deepgramApiKey || !!mqttPassword ||
     !!teleToken || !!slackBotToken || !!slackAppToken || !!discordBotToken ||
@@ -540,6 +570,10 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
       if (realtimeProvider === "pipecat_v1") realtime.web_search = realtimeWebSearch;
       if (realtimeBaseUrl) realtime.base_url = realtimeBaseUrl;
       if (realtimeApiKey) realtime.api_key = realtimeApiKey;
+      // Only a real change: any new value in the block restarts HAL.
+      if (realtimeFastVoice !== baseline?.realtimeFastVoice) realtime.fast_voice = realtimeFastVoice;
+      if (realtimeFastVoicePauseS !== baseline?.realtimeFastVoicePauseS) realtime.fast_voice_pause_s = realtimeFastVoicePauseS;
+      if (realtimeFastVoiceSilentS !== baseline?.realtimeFastVoiceSilentS) realtime.fast_voice_silent_timeout_s = realtimeFastVoiceSilentS;
       body.realtime = realtime;
       body.wakeword = wakeWord;
       if (wakeChime !== baseline?.wakeChime) body.wake_chime = wakeChime;
@@ -547,6 +581,11 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
       if (wakeLightOn !== baseline?.wakeLightOn || !baseline || !sameWakeLook(wakeLook, baseline.wakeLook)) {
         const light: WakeLightConfig = { enabled: wakeLightOn, ...wakeLook };
         body.wake_light = light;
+      }
+      if (tapChime !== baseline?.tapChime) body.tap_chime = tapChime;
+      if (tapLightOn !== baseline?.tapLightOn || !baseline || !sameWakeLook(tapLook, baseline.tapLook)) {
+        const light: WakeLightConfig = { enabled: tapLightOn, ...tapLook };
+        body.tap_light = light;
       }
       // [] restores the built-in list (which then follows agent renames).
       if (!samePhrases(wakePhrases, baseline?.wakePhrases ?? [])) {
@@ -613,7 +652,8 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
         ...savedLlm, llmConfigMode,
         sttBaseUrl, sttProvider, sttLanguage,
         ttsBaseUrl, ttsProvider, ttsVoice, ttsSpeed,
-        wakeWord, wakePhrases, wakeChime, wakeFollowupS, wakeLightOn, wakeLook, voiceInputMode,
+        wakeWord, wakePhrases, wakeChime, wakeFollowupS, wakeLightOn, wakeLook,
+        tapChime, tapLightOn, tapLook, voiceInputMode,
         channel,
         teleUserId, slackUserId,
         discordGuildId, discordUserId,
@@ -622,7 +662,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
         mqttEndpoint, mqttPort, mqttUsername,
         faChannel, fdChannel,
         realtimeEnabled, realtimeProvider, realtimeVoice,
-        realtimeReasoning, realtimeBaseUrl, realtimeWebSearch,
+        realtimeReasoning, realtimeBaseUrl, realtimeWebSearch, realtimeFastVoice, realtimeFastVoicePauseS, realtimeFastVoiceSilentS,
       });
       setPassword(""); setAdminPassword("");
       setLlmApiKey(""); setTtsApiKey(""); setSttApiKey("");
@@ -654,8 +694,8 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
     sttProvider, sttLanguage, sttLoaded,
     ttsApiKey, ttsBaseUrl, ttsLoaded, ttsProvider, ttsVoice, ttsSpeed, deviceId,
     mqttEndpoint, mqttUsername, mqttPassword, mqttPort, faChannel, fdChannel,
-    realtimeEnabled, wakeWord, wakePhrases, wakePhrasesDefault, wakeChime, wakeFollowupS, wakeLightOn, wakeLook, voiceInputMode, realtimeProvider, realtimeVoice, realtimeReasoning, realtimeApiKey, realtimeBaseUrl,
-    realtimeWebSearch,
+    realtimeEnabled, wakeWord, wakePhrases, wakePhrasesDefault, wakeChime, wakeFollowupS, wakeLightOn, wakeLook, tapChime, tapLightOn, tapLook, voiceInputMode, realtimeProvider, realtimeVoice, realtimeReasoning, realtimeApiKey, realtimeBaseUrl,
+    realtimeWebSearch, realtimeFastVoice, realtimeFastVoicePauseS, realtimeFastVoiceSilentS,
   ]);
 
   const showSave = activeSection !== "mcp" && activeSection !== "plugins" && activeSection !== "face" && activeSection !== "privacy" && activeSection !== "voice" && activeSection !== "runtime" && activeSection !== "timezone" && activeSection !== "led" && activeSection !== "scheduled" && activeSection !== "facebook" && activeSection !== "shopify" && activeSection !== "ebay" && activeSection !== "amazon";
@@ -732,6 +772,12 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
               setWakeLightOn={setWakeLightOn}
               wakeLook={wakeLook}
               setWakeLook={setWakeLook}
+              tapChime={tapChime}
+              setTapChime={setTapChime}
+              tapLightOn={tapLightOn}
+              setTapLightOn={setTapLightOn}
+              tapLook={tapLook}
+              setTapLook={setTapLook}
             />
 
             <WifiSection
@@ -833,6 +879,9 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
               apiKey={realtimeApiKey} setApiKey={setRealtimeApiKey}
               baseUrl={realtimeBaseUrl} setBaseUrl={setRealtimeBaseUrl}
               webSearch={realtimeWebSearch} setWebSearch={setRealtimeWebSearch}
+              fastVoice={realtimeFastVoice} setFastVoice={setRealtimeFastVoice}
+              fastVoicePauseS={realtimeFastVoicePauseS} setFastVoicePauseS={setRealtimeFastVoicePauseS}
+              fastVoiceSilentS={realtimeFastVoiceSilentS} setFastVoiceSilentS={setRealtimeFastVoiceSilentS}
             />
             {activeSection === "realtime" && hasDefaults && (
               <RestoreDefaultsButton section="realtime" />

@@ -19,22 +19,24 @@ SAFE = "a single fireplace"
 
 
 class _Resp:
-    def __init__(self, status: int, body=None):
+    def __init__(self, status: int, body=None, headers=None):
         self.status_code = status
         self._body = body if body is not None else {"detections": []}
         self.text = json.dumps(self._body)
         self.content = self.text.encode()
+        self.headers = headers or {}
 
     def json(self):
         return self._body
 
 
 class _FakePost:
-    """Scripted stand-in for requests.post; records each posted JSON body."""
+    """Scripted stand-in for Session.post; records each posted JSON body and session."""
 
     def __init__(self, *responses):
         self.responses = list(responses)
         self.bodies: list[dict] = []
+        self.sessions: list[int] = []
 
     def __call__(self, url, data=None, headers=None, timeout=None):
         self.bodies.append(json.loads(data))
@@ -56,7 +58,12 @@ def plaintext(monkeypatch):
 @pytest.fixture
 def post(monkeypatch, plaintext):
     fake = _FakePost(_Resp(200))
-    monkeypatch.setattr(fire_hazard.requests, "post", fake)
+
+    def session_post(self, *args, **kwargs):
+        fake.sessions.append(id(self))
+        return fake(*args, **kwargs)
+
+    monkeypatch.setattr(fire_hazard.requests.Session, "post", session_post)
     return fake
 
 
@@ -358,6 +365,60 @@ def test_inside_backoff_returns_none_without_posting(post, monkeypatch):
     now[0] += 1.0
     assert det.detect(FRAME) is None
     assert len(post.bodies) == n
+
+
+# --- upload size and connection reuse (#612) ------------------------------------
+
+from hal.drivers.sensing.perceptions.processors.utils import img2b64  # noqa: E402
+
+
+def test_img2b64_quality_shrinks_the_jpeg():
+    frame = np.random.default_rng(0).integers(0, 255, (120, 160, 3), dtype=np.uint8)
+    assert len(img2b64(frame, 80)) < len(img2b64(frame))
+
+
+def test_upload_uses_configured_jpeg_quality(post, monkeypatch):
+    seen: list[int | None] = []
+    monkeypatch.setattr(
+        fire_hazard, "img2b64", lambda frame, quality=None: seen.append(quality) or "eA=="
+    )
+    monkeypatch.setattr(config, "FIRE_HAZARD_JPEG_QUALITY", 80)
+    _detector().detect(FRAME)
+    assert seen == [80]
+
+
+def test_consecutive_calls_reuse_one_session(post):
+    det = _detector()
+    det.detect(FRAME)
+    det.detect(FRAME)
+    assert len(post.sessions) == 2 and len(set(post.sessions)) == 1
+
+
+def test_dropped_connection_is_retried_once(post):
+    post.responses = [requests.ConnectionError("reset by peer"), _Resp(200, {"detections": []})]
+    assert _detector().detect(FRAME) == []
+    assert len(post.bodies) == 2 and post.bodies[0] == post.bodies[1]
+
+
+def test_second_dropped_connection_is_no_observation(post):
+    post.responses = [requests.ConnectionError("reset"), requests.ConnectionError("reset"), _Resp(200)]
+    assert _detector().detect(FRAME) is None
+    assert len(post.bodies) == 2
+
+
+def test_connect_timeout_is_not_retried(post):
+    post.responses = [requests.ConnectTimeout("slow"), _Resp(200)]
+    assert _detector().detect(FRAME) is None
+    assert len(post.bodies) == 1
+
+
+def test_cleanup_closes_the_detector_session(plaintext, monkeypatch):
+    det = _detector()
+    closed: list[bool] = []
+    monkeypatch.setattr(det._http, "close", lambda: closed.append(True))
+    p, _, _ = _perception(_FakeGate(), det)
+    p.cleanup()
+    assert closed == [True]
 
 
 def test_failed_call_keeps_streak():
@@ -754,3 +815,37 @@ def test_results_applied_in_order():
         clock.t += STEP
     assert seen == sorted(seen) and len(set(seen)) == 5
     assert p._streaks["flame"][0] == T0
+
+
+# --- 503 = server busy (#612) ---------------------------------------------------
+
+from hal.drivers.sensing.perceptions.processors.utils import retry_after_s  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    ("headers", "lo", "hi"),
+    [
+        ({"Retry-After": "2"}, 1.6, 2.4),
+        ({"Retry-After": "100"}, 24.0, 36.0),   # clamped to 30 s, then jittered
+        ({"Retry-After": "0"}, 1.6, 2.4),       # clamped up to 2 s
+        ({}, 4.0, 6.0),                         # default 5 s
+        ({"Retry-After": "Wed, 21 Oct 2015 07:28:00 GMT"}, 4.0, 6.0),  # date form -> default
+    ],
+)
+def test_retry_after_is_clamped_and_jittered(headers, lo, hi):
+    for _ in range(50):
+        assert lo <= retry_after_s(headers) <= hi
+
+
+def test_503_pauses_detection_for_retry_after(post, monkeypatch):
+    now = [5000.0]
+    monkeypatch.setattr(fire_hazard.time, "time", lambda: now[0])
+    det = _detector()
+    post.responses = [_Resp(503, {"detail": "busy"}, {"Retry-After": "2"})]
+    assert det.detect(FRAME) is None
+    assert det.last_outcome == "busy"
+    assert 1.6 <= det._backoff_until - now[0] <= 2.4
+    n = len(post.bodies)
+    now[0] += 1.0
+    assert det.detect(FRAME) is None
+    assert len(post.bodies) == n  # still inside the pause: no request sent

@@ -306,7 +306,7 @@ The top-level `voice_input_mode` setting selects `automatic` (default, including
 
 The saved `wakeword` flag is preserved. HAL's effective `WAKEWORD_ENABLED` is false in tap-to-talk, so gaze, presence, boot-greeting focus and spoken wake phrases cannot open a recording or follow-up window. Tap-to-talk also forces effective `LIVE_MODE=false` and `REALTIME_TURN_DETECTION=off`, even when environment settings request Live or server VAD, so only the finish tap commits the turn. Returning to automatic restores the configured Live/turn-detection settings and saved wake choice. Harness ON keeps its existing manual capture policy regardless of the device setting.
 
-Device captures reuse the existing manual capture controller with a device owner tag and the authoritative Harness routing generation. Enabling Harness, losing the routing snapshot, changing generation, stopping/muting the voice service or restarting HAL cancels pending input; it cannot be rerouted to another owner. Ownership is rechecked before realtime upload, commit and final dispatch; late invalidation discards pending realtime activity. Cancellation before a valid finish prevents commit and discards/resets the provider session, including audio already uploaded. Silence never commits automatically; recorder failure or `HAL_MAX_SESSION_DURATION_S` (default 30 seconds) discards the capture. Device capture feedback is owned by `_internal/device_capture.py`: after the first microphone frame, a short 40 ms ready tone and listening visual mark local recorder readiness without waiting for the STT connection. Audio is buffered during connection within the recording limit (default 30 seconds). A finish tap stops input and publishes the realtime endpoint before playing a short falling tone and before the cloud final drain; it acknowledges local capture completion, not delivery. Finishing after local readiness but before STT connects preserves the buffered audio for submission after connection succeeds. A tap before local readiness cancels without sending. A bounded background worker warms echo-reference filter code when the pipeline is constructed, even while muted or asleep, without opening the microphone or changing active AEC state. This avoids paying the cold import on the first wake. Device manual input skips the fixed 500 ms voice startup delay; Automatic and Harness retain it. Accepted device taps wake the recorder worker immediately. Device arecord uses a 10 ms period (retaining the default buffer) and a 10 ms initial readiness read; capture checks stop between 10 ms reads while STT uploads remain batched at 64 ms. Its termination grace is 100 ms before kill/reap so a full pipe after finalization cannot hold the next tap for two seconds. Automatic/Harness recorder settings are unchanged. While TTS is playing, a tap only interrupts it; during a realtime reply it also cancels the response stream so subsequent audio segments cannot resume playback. While asleep, a tap only wakes the device. Another tap starts capture. Hardware microphone privacy remains authoritative.
+Device captures reuse the existing manual capture controller with a device owner tag and the authoritative Harness routing generation. Enabling Harness, losing the routing snapshot, changing generation, stopping/muting the voice service or restarting HAL cancels pending input; it cannot be rerouted to another owner. Ownership is rechecked before realtime upload, commit and final dispatch; late invalidation discards pending realtime activity. Cancellation before a valid finish prevents commit and discards/resets the provider session, including audio already uploaded. Silence never commits automatically; recorder failure or `HAL_MAX_SESSION_DURATION_S` (default 30 seconds) discards the capture. Device capture feedback is owned by `_internal/device_capture.py`: after the first microphone frame, the ready chime (the same ~120 ms ping as a wake phrase) and the listening light mark local recorder readiness without waiting for the STT connection. `config.json` `tap_chime` and `tap_light` (Settings → General → Tap to talk, both default on) turn them off separately from the wake cues; see **Tap-to-talk cues** below. Audio is buffered during connection within the recording limit (default 30 seconds). A finish tap stops input and publishes the realtime endpoint before playing a short falling tone and before the cloud final drain; it acknowledges local capture completion, not delivery. Finishing after local readiness but before STT connects preserves the buffered audio for submission after connection succeeds. A tap before local readiness cancels without sending. A bounded background worker warms echo-reference filter code when the pipeline is constructed, even while muted or asleep, without opening the microphone or changing active AEC state. This avoids paying the cold import on the first wake. Device manual input skips the fixed 500 ms voice startup delay; Automatic and Harness retain it. Accepted device taps wake the recorder worker immediately. Device arecord uses a 10 ms period (retaining the default buffer) and a 10 ms initial readiness read; capture checks stop between 10 ms reads while STT uploads remain batched at 64 ms. Its termination grace is 100 ms before kill/reap so a full pipe after finalization cannot hold the next tap for two seconds. Automatic/Harness recorder settings are unchanged. While TTS is playing, a tap only interrupts it; during a realtime reply it also cancels the response stream so subsequent audio segments cannot resume playback. While asleep, a tap only wakes the device. Another tap starts capture. Hardware microphone privacy remains authoritative.
 
 Device recording and network finalization are separated in `_internal/device_voice_pipeline.py`. `_internal/device_turn_queue.py` reserves at most two outstanding turns before accepting recording, including the active recording and any upload/finalization. Finishing releases the recorder after the local stop cue; a subsequent tap can record while the previous STT session drains. Each turn owns a realtime worker in `_internal/device_realtime.py`; model work is serialized in capture order independently of the STT dispatch FIFO. STT transcripts, speaker identity, OS handled-sync events and transcript fallback can finish later on that FIFO. Slow or failed STT does not cancel realtime; fallback requires an available transcript. The two-reservation bound covers the total outstanding work, and network work does not block capture. Native model audio also waits cancellably for the device microphone input guard before playback. The finalizer preserves a newer capture’s thinking/listening visuals. When both slots are occupied, another recording is rejected before the ready cue. Cancellation invalidates pending turns; an uploader retains its slot until its provider releases resources. Mandatory TTS replies wait while device input owns the microphone, without reporting active playback; optional speech retains its suppression policy. Input/playback admission is atomic, and the guard remains held until the microphone closes. Deferred mandatory speech is bounded to 32 requests / 64 KiB of text; a full queue rejects further requests. Starting another recording cancels older local STT/realtime turns and clears deferred speech even when TTS has not started. A timestamp-scoped OS cancellation mutes older agent replies and fillers without aborting their tasks or hardware actions. The cutoff is captured before new input admission, so delayed cancellation cannot mute the new turn; device fallback dispatch retains the original capture time even when it reaches OS late. Local cancellation does not wait for HTTP. Remote suppression is best effort if OS is unreachable; cancelled uploaders retain their bounded reservation until cleanup finishes. Replacing the TTS provider or voice cancels deferred replies on the retired output service; active capture guards and cues transfer to the replacement before it is published, while original guards remain owned until mic close.
 
@@ -716,12 +716,24 @@ maps the effects to LED engine effects (`EFFECTS`: `solid` = steady colour,
 `breathing` = `breathing_fine`, `spin` = `pulse`, `blink` = `blink`) and reads
 the config live. `app_state._apply_emotion_led_display` uses
 `wake_light.listening_preset()` for every `listening` emotion display, so the
-owner's look also applies to button-tap listening. When `wake_light.enabled` is
+owner's look also applies to button-tap listening in Automatic mode. When `wake_light.enabled` is
 false, voice-triggered listening cues (`fire_listening_cue` and the bare-wake
 LED) are skipped; HAL forces the light back on if both the chime and the light
 are off, so a wake always gives feedback. os-server enforces the same rule:
 `keepsWakeCue` (`system/device/config_update.go`) rejects an update that would
 leave both `wake_chime` and `wake_light` off with `config.ErrNoWakeCue`.
+
+**Tap-to-talk cues.** Tap to talk has its own pair, edited under **Tap to talk** in
+Settings → General: `config.json` `tap_chime` (default on) plays the ready chime
+when a tapped recording starts (`DeviceCapture._cue`; the finish tap keeps its
+40 ms falling tone and both follow the toggle), and `tap_light` (same shape as
+`wake_light`) is the light while it records. In tap to talk only a tapped
+recording shows `listening`, so `wake_light.listening_preset()` returns the
+`tap_light` look while `VOICE_INPUT_MODE` is `tap_to_talk`; unset fields keep the
+board look, not the wake look. `wake_light.tap_enabled()` gates the light
+(`InputPolicy.set_capturing`) and forces it on when the tap chime is off too.
+os-server's `keepsTapCue` rejects turning both off with `config.ErrNoTapCue`.
+HAL reads both live; changing them restarts nothing.
 
 `POST /led/wake-light/preview` (HAL) with body `{color, effect, speed}` plays the
 candidate look for 3 s and then restores the previous light; nothing is saved.
@@ -776,6 +788,14 @@ phrase was lost. `AutonomousSTTSession.send_keepalive()` is now a no-op for Flux
 a stale session, and the turn reconnects with its pre-roll replayed. The recv
 loop now logs server `Error` messages and unexpected closes, which used to be
 dropped silently.
+
+A capture that opens no turn (a language-gate or live-guard skip, or a live
+session) used to drop the pre-connected session without closing it, then open a
+new one. Each abandoned socket idled until the server killed it — on Flux
+`INACTIVE_CLIENT … did not receive a websocket Ping message in the last 60 seconds`,
+exactly 60 s after its open, once per rejected capture (48 on one Intern v2 boot,
+2026-10-16). `_vad_loop` now closes it off the mic thread
+(`_retire_keepalive_session`); only a turn hands the session on.
 
 The button tap's chime never waits behind other audio: `TTSService.try_play_ack_chime()`
 takes the output stream only if it is free and otherwise skips, so the sound
@@ -3626,7 +3646,7 @@ fails, that capture is accepted. Playback starting during the hold drops the cap
 - A capture is judged once, even when live falls back to a turn. A reject clears
   the VAD lookback (the held audio was consumed) and any pending listening cue.
 
-`HAL_LANG_GATE` selects `enforce` (default), `shadow` (log, never reject) or `off`.
+`HAL_LANG_GATE` defaults to `off` (no language gate). Set `enforce` to enable rejection or `shadow` to log without rejecting.
 `HAL_LANG_ID_CPUS` (for example `0,1,2,3`; empty = no pin) runs loading and
 inference on one worker thread pinned with `sched_setaffinity`;
 `HAL_LANG_ID_THREADS` defaults to one per pinned CPU, else 2.
@@ -3659,6 +3679,59 @@ open session. In 10 clips of 5 s English followed directly by 5 s Vietnamese (an
 stayed open through the Vietnamese, and Nova-3 `en` transcribed none of the
 Vietnamese: each transcript held only the English, including the trailing English.
 The Vietnamese did keep the turn open until about 1 s after it stopped.
+
+### Fast voice (more Gemini use)
+
+Every device has the flag; it is **on by default for Intern v2 only**
+(`device_type` / `DEVICE_TYPE` `intern-v2`) and off elsewhere. When off nothing
+below changes. The **Faster replies** checkbox on Settings → Realtime (Gemini)
+writes `config.json` `realtime.fast_voice` (also accepted by `realtime.set` as
+`fast_voice`; the Go field is `RealtimeConfig.FastVoice`, absent = the device
+default; `RealtimeFastVoice()` reports the effective value to the web);
+`HAL_FAST_VOICE=1|0` wins over both. It applies only to Gemini in turn mode (`REALTIME_ENABLED`,
+provider `gemini`, `LIVE_MODE` off; live mode already streams); anywhere else
+`hal.config.FAST_VOICE` stays false. It shortens the device's own waits
+between the person stopping and the question reaching Gemini:
+
+| Wait | Off | On | Tune with |
+|---|---|---|---|
+| Silence clock before Smart Turn (`SILENCE_TIMEOUT_S`) | `HAL_SILENCE_TIMEOUT` (profile 1.2 s, code 2.5 s) | 0.65 s; Smart Turn still holds an unfinished sentence | `HAL_FAST_VOICE_SILENCE_S` |
+| Deepgram `endpointing` (`stt/autonomous.py`, `stt/deepgram.py`) | 1500 ms | 400 ms, so the wake word is confirmed by a final mid-sentence and the final drain ends sooner | `HAL_FAST_VOICE_STT_ENDPOINTING_MS` |
+| Closed wake window upload (`start_realtime_turn`) | Buffered until the capture ends, then flushed | Streamed from the frame where an STT partial opens the wake gate; only a confirmed wake (final, assembled transcript or follow-up focus) commits, else the streamed activity is discarded (`discard_open_activity("wake-unconfirmed")`) | — |
+| Final-drain overlap (`early_authorized`) | Follow-up focus or wake disabled only | Also a final-confirmed wake word | — |
+| Smart Turn "unfinished" wait (`TURN_END_MAX_PAUSE_S`, fallback capped to it) | 6.0 s | `realtime.fast_voice_pause_s` (default 2.0 s, 0.8–6.0; web **Wait after you pause**); Smart Turn calls most Vietnamese questions unfinished (p≈0.08), which held them 5.5 s on device | `HAL_FAST_VOICE_MAX_PAUSE_S` |
+| Silent-model hand-off (`REALTIME_RECV_QUEUE_TIMEOUT_S`; a server still sending messages keeps the turn) | 8.0 s | `realtime.fast_voice_silent_timeout_s` (default 5 s, 3–8; web **Hand off when Gemini stays silent**); a freshly reconnected session once stayed silent 9.5 s before the main agent took over | `HAL_FAST_VOICE_SILENT_TIMEOUT_S` |
+| Speaker-ID prepass join at commit | 0.2 s | 0 s (identity is corrected downstream) | `HAL_FAST_VOICE_PREPASS_JOIN_S` |
+| Language gate hold | Gap `HAL_LANG_GATE_UTTERANCE_GAP_S` (1.0 s), then the silence clock restarts from zero | Gap capped at the silence clock; the clock still restarts from zero (counting the held quiet tail cut quiet speakers off at session start) | — |
+| Rebuild readiness after an idle park | Checked once | Waits up to 0.5 s for the prepare thread that joined the rebuild | — |
+| Reply voice | Our TTS (e.g. ElevenLabs) after the reply text | Gemini's own audio (`REALTIME_NATIVE_AUDIO` forced on, voice from `realtime.gemini.voice`) | — |
+
+The Gemini model is **not** changed: plain `gemini-3.8-live` delegated or
+stayed silent every turn on device (2026-09-18), so fast voice keeps the
+configured model. More Gemini use comes from more turns reaching Gemini sooner,
+including audio streamed before a capture is later dropped as noise (the
+existing discard path handles it). Unit coverage: `hal/test/test_fast_voice.py`.
+On device 172.168.20.203 (2026-10-15/16) answers started in about 2.5–4.7 s
+instead of 5–10 s; a wake confirmed early by a partial reached 1.4–2.6 s. The
+rest is Gemini's own response time.
+
+The fast voice speaks in `realtime.gemini.voice`: os-server accepts all 30
+Gemini Live prebuilt voices (`RealtimeGeminiVoiceList`, same set as HAL
+`GeminiVoice`); Vietnamese replies were judged natural on device with Achernar.
+
+Native playback runs inside the turn, while nobody reads the microphone. With
+the arecord backend the pipe queues that audio (about 2 s), and the voice loop
+used to read it back as fresh speech: the opening words of the device's own
+reply ("Bây giờ…", "Để tôi…") opened a follow-up turn. With
+`REALTIME_NATIVE_AUDIO` on, `_vad_loop` now drops the queued audio after each
+turn (`_discard_stale_mic_backlog`: queued frames return at once, so it stops at
+the first read that waits; at most 4 s; the continuous capture pump already drops
+playback audio). ElevenLabs replies are unaffected: they mostly play after the
+turn, while the loop drains the mic.
+
+Gemini sometimes writes its silence marker as `[no speech]` instead of
+`<no speech>`; every marker matcher accepts both, so native audio for a
+marker-only reply is held back instead of played.
 
 ### `config.json` `realtime` block
 

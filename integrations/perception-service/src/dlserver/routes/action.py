@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import TypeAdapter, ValidationError
 
+from core.perception.base.batching import BatcherOverloaded
 from dlserver.models.action import (
     ActionConfigRequest,
     ActionFrameRequest,
@@ -72,6 +73,9 @@ async def action_analysis_ws(websocket: WebSocket):
                         logger.warning("Unknown action WS message type: %s", raw[:200])
             except WebSocketDisconnect:
                 raise
+            except BatcherOverloaded:
+                # Busy: skip this frame without a traceback; the client keeps streaming.
+                await websocket.send_json({"error": "busy"})
             except Exception as e:
                 logger.exception("Error processing action WS message")
                 await websocket.send_json({"error": "Processing failed"})

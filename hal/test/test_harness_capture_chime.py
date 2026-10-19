@@ -40,11 +40,16 @@ def test_muted_speaker_does_not_play_capture_cue(finished):
 def test_device_capture_cue_is_short_and_respects_mute(finished):
     service = TTSService.__new__(TTSService)
     service._np = np
+    service._ack_chime_cache = None
     samples = service._device_capture_chime_samples(24000, finished=finished)
-    assert samples.shape == (960, 1)
+    # Ready is the audible wake-phrase ping; finish stays a 40 ms falling tone.
+    assert samples.shape == ((960, 1) if finished else (2880, 1))
     assert samples.dtype == np.float32
     assert np.isfinite(samples).all()
-    assert np.max(abs(samples)) <= .28
+    if finished:
+        assert np.max(abs(samples)) <= .28
+    else:
+        assert np.array_equal(samples, service._ack_chime_samples(24000))
     service._sd = Mock()
     service._backend = Mock(available=True)
     service._speaker_muted = lambda: True

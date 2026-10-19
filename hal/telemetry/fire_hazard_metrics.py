@@ -30,7 +30,7 @@ _SAMPLE_CAP = 720
 # Outcomes counted as an OWLv2 call (the denominator of owlv2_calls); encryption_unavailable
 # fails before sending but is still a check that wanted OWLv2 and got no observation.
 _CALL_OUTCOMES = (
-    "ok", "timeout", "error", "http_error", "rate_limited", "encryption_unavailable",
+    "ok", "timeout", "error", "http_error", "rate_limited", "busy", "encryption_unavailable",
 )
 
 
@@ -71,7 +71,7 @@ class FireHazardStats:
         """One OWLv2 round. Latency is sampled for successful calls only.
 
         ``preset_fallback`` is counted in addition to the fallback call's own
-        outcome; ``backoff`` (no request sent inside the 429 window) is counted
+        outcome; ``backoff`` (no request sent inside a 429 or 503 pause) is counted
         separately, not as a call. Anything else is counted as ``other``.
         """
         try:

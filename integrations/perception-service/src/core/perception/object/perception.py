@@ -95,6 +95,11 @@ class ObjectPerception(PerceptionBase[ObjectPerceptionSession]):
             return False
         return name in self._object_detector.preset_names
 
+    def check_capacity(self) -> None:
+        """Raise BatcherOverloaded when the detection batcher is full (call before decoding)."""
+        if self._batcher is not None:
+            self._batcher.check_capacity()
+
     async def predict_image(
         self,
         image: cv2t.MatLike,

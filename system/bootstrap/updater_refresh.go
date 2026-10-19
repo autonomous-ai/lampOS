@@ -105,6 +105,14 @@ func (b *Bootstrap) refreshUpdater(ctx context.Context) {
 		slog.Warn("updater refresh: promoted activation protocol unsupported")
 		return
 	}
+	// A stale CDN copy must not remove migration or rollback capabilities after
+	// customers have received the foundation update, even while still on V1.
+	for _, protocol := range []string{"preflight", "cleanup"} {
+		if updaterSupportsProtocol(current, protocol) && !updaterSupportsProtocol(published, protocol) {
+			slog.Warn("updater refresh: refusing capability downgrade", "protocol", protocol)
+			return
+		}
+	}
 	if sha256.Sum256(published) == sha256.Sum256(current) {
 		return
 	}

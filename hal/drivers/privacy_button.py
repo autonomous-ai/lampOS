@@ -213,40 +213,6 @@ class PrivacyButtonHandler:
             except Exception as e:
                 logger.warning("Mic switch watchdog reconcile failed: %s", e)
 
-    def _paint_listening_after_cue(self):
-        """Fire the blue LISTENING pulse after the unmute "I'm listening" TTS cue finishes
-        so the strip settles on a clear "ready to listen" cue instead of the warm-white
-        last-frame from the TTS wave.
-
-        Poll _tts_speaking (up to 5s) rather than sleeping a fixed delay.
-        """
-        deadline = time.monotonic() + 5.0
-        while time.monotonic() < deadline:
-            if self._stopped.is_set() or state._hw_mic_switch_muted is True or state._mic_muted:
-                return
-            if state._music_playing:
-                return
-            if not state._tts_speaking:
-                break
-            if self._stopped.wait(0.1):
-                return
-        else:
-            logger.info("mic switch unmute listening cue: TTS never quiesced -- skipping")
-            return
-        # Small settle after TTS end so the wave's teardown restore lands
-        # first; painting into a live restore path races the effect thread.
-        if self._stopped.wait(0.15):
-            return
-        if state._hw_mic_switch_muted is True or state._mic_muted:
-            return
-        try:
-            from hal.presets import EMO_LISTENING
-
-            state._apply_emotion_led_display(EMO_LISTENING, 0.7, force_led=True)
-            logger.info("mic switch unmute -- painted LISTENING cue on strip")
-        except Exception as e:
-            logger.warning("mic switch unmute listening cue failed: %s", e)
-
     def _apply_state_locked(self, muted: bool, *, initial: bool = False):
         """Push mic state to match the switch position.
 
@@ -270,19 +236,6 @@ class PrivacyButtonHandler:
         from hal.routes.voice import mute_mic, stop_tts, unmute_mic
 
         try:
-            if initial and not muted:
-                # Reading the boot position is state reconciliation, not a
-                # user gesture: restore hardware access without wake/focus/cues.
-                if extended:
-                    privacy.apply(False, self._config)
-                if state._sleeping:
-                    # An open hardware switch permits microphone access; it
-                    # does not override the mute restored from sleep's sidecar.
-                    logger.info("mic switch startup → preserved sleeping microphone state")
-                    return
-                unmute_mic()
-                logger.info("mic switch startup → restored unmuted state without wake")
-                return
             if muted:
                 logger.info("mic switch → muting")
                 stop_tts()
@@ -291,32 +244,21 @@ class PrivacyButtonHandler:
                 audio_stop()
                 state._apply_mic_muted_led(force=True)
                 mute_mic()
-            else:
+                return
+            # Opening the switch only gives the microphone back: no chime, listening
+            # light, spoken cue or follow-up window. The owner talks when ready.
+            if not initial:
                 logger.info("mic switch → unmuting")
-                t0 = time.monotonic()
-                # Symmetric: never leave the red showing while the mic is
-                # hot — kill it immediately, even mid-wave.
+                # Never leave the red showing while the mic is hot.
                 state._clear_mic_muted_led(force=True)
-                logger.info("[mic-switch-trace] unmute step1 clear_red done +%.0fms", (time.monotonic() - t0) * 1000)
-                from hal.drivers.button_actions import single_click_action
-
-                t_sca = time.monotonic()
-                if extended:
-                    try:
-                        single_click_action("privacy-switch", announce=False, chime=False,
-                                            unmute_output=False)
-                    finally:
-                        privacy.apply(False, self._config)
-                    from hal.drivers.button_actions import play_ack_chime, announce_listening_cue
-                    play_ack_chime("privacy-switch")
-                    announce_listening_cue("privacy-switch")
-                else:
-                    single_click_action("mic-switch")
-                logger.info("[mic-switch-trace] unmute step2 single_click_action done +%.0fms (cumul=%.0fms)", (time.monotonic() - t_sca) * 1000, (time.monotonic() - t0) * 1000)
-                threading.Thread(
-                    target=self._paint_listening_after_cue,
-                    daemon=True,
-                    name="mic-switch-listening-cue",
-                ).start()
+            if extended:
+                privacy.apply(False, self._config)
+            if state._sleeping:
+                # An open hardware switch permits microphone access; it
+                # does not override the mute restored from sleep's sidecar.
+                logger.info("mic switch → preserved sleeping microphone state")
+                return
+            unmute_mic()
+            logger.info("mic switch → restored unmuted state without wake")
         except Exception as e:
             logger.warning("Mic switch apply failed: %s", e)

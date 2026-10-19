@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { C, ConfirmDialog, SectionCard } from "@/components/setup/shared";
+import { C, ConfirmDialog, HINT_STYLE, SectionCard } from "@/components/setup/shared";
 import { disableGuardMode, getDeviceConfig, getGuardMode, updateDeviceConfig } from "@/lib/api";
 import type { CloudPerception } from "@/lib/api";
 
@@ -157,8 +157,8 @@ export function PrivacySection({ active }: { active: boolean }) {
         />
         <span>
           <span style={{ display: "block", fontSize: 13.5, color: C.text }}>{label}</span>
-          <span style={{ display: "block", fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>{purpose}</span>
-          <span style={{ display: "block", fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+          <span style={{ ...HINT_STYLE, display: "block" }}>{purpose}</span>
+          <span style={{ ...HINT_STYLE, display: "block" }}>
             {upload} Sent to {destination}.
           </span>
         </span>
@@ -232,7 +232,7 @@ export function PrivacySection({ active }: { active: boolean }) {
         <div style={{ fontSize: 13.5, color: C.text }}>
           Guard mode: <strong>{guard === null ? "unknown" : guard ? "on" : "off"}</strong>
         </div>
-        <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.5, marginTop: 4 }}>
+        <div style={{ ...HINT_STYLE, marginTop: 4 }}>
           While guard mode is on, each person, movement or fire hint the robot notices is sent to
           your Telegram with a camera photo. It is off until you ask the robot to guard the room.
         </div>

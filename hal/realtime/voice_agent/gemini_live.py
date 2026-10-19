@@ -111,11 +111,12 @@ class _SilenceMarkerAudioGate:
         text = re.sub(r"\s+", "", self._text).upper()
         if not text:
             return False
-        tail = re.sub(r"^(?:(?:NO_REPLY)|(?:<NOSPEECH>))+", "", text)
-        return not tail or any(marker.startswith(tail) for marker in ("NO_REPLY", "<NOSPEECH>"))
+        # Gemini writes the marker with angle or square brackets.
+        tail = re.sub(r"^(?:NO_REPLY|<NOSPEECH>|\[NOSPEECH\])+", "", text)
+        return not tail or any(marker.startswith(tail) for marker in ("NO_REPLY", "<NOSPEECH>", "[NOSPEECH]"))
 
     def _complete(self):
-        return bool(re.fullmatch(r"\s*(?:(?:NO_REPLY|<\s*no\s+speech\s*>)\s*)+", self._text, re.I))
+        return bool(re.fullmatch(r"\s*(?:(?:NO_REPLY|[<\[]\s*no\s+speech\s*[>\]])\s*)+", self._text, re.I))
 
     def observe(self, text):
         if not self._enabled or self._released:
@@ -1042,8 +1043,8 @@ class GeminiLiveAgent(VoiceAgentBase):
             # Most are real answers; a filler such as "Let me take a look at
             # that" here promised work nobody will do. The model does not call
             # complete_response reliably, so it is reported, not filtered on.
-            # Silence-marker-only generations ("<no speech>", "{pause}") are skipped.
-            reply = _spoken_response.replace("<no speech>", "").replace("{pause}", "").strip()
+            # Silence-marker-only generations ("<no speech>", "[no speech]", "{pause}") are skipped.
+            reply = re.sub(r"[<\[]\s*no\s+speech\s*[>\]]|\{pause\}", "", _spoken_response, flags=re.I).strip()
             if fallback or _routing_received or not reply:
                 return
             logger.info(

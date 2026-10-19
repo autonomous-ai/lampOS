@@ -3,6 +3,8 @@
 import logging
 import time
 
+from hal import config
+
 logger = logging.getLogger("hal.voice")
 
 
@@ -21,7 +23,8 @@ class DeviceCapture:
     def _cue(self, finished=False):
         edge = "finish" if finished else "ready"
         logger.info("[tap-latency] event=%s_cue_begin at=%.6f", edge, time.monotonic())
-        if self.tts:
+        # Owner toggle (tap_chime); the tap light covers feedback when it is off.
+        if self.tts and config.tap_chime_enabled():
             self.tts.play_device_capture_chime(finished=finished)
         logger.info("[tap-latency] event=%s_cue_done at=%.6f", edge, time.monotonic())
 

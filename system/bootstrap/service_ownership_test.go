@@ -133,10 +133,10 @@ func TestServiceRecoveryPrecedesUpdatesAndSkipsOrphanHAL(t *testing.T) {
 		t.Fatalf("recovery calls %q %v", data, err)
 	}
 }
-func TestServiceMetadataRequiresSignatureAndSafeNames(t *testing.T) {
+func TestServiceMetadataAcceptsConfiguredTrustModeAndRequiresSafeNames(t *testing.T) {
 	payload := []byte(`{"lamp-os":{"service":"lamp-os","replaces":["hal"],"version":"1.0.0","url":"https://example.com/a","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}`)
-	if meta, err := decodeOTAMetadataPayload(payload, false); err != nil || len(meta) != 0 {
-		t.Fatalf("unsigned service entry not filtered: %v %v", meta, err)
+	if meta, err := decodeOTAMetadataPayload(payload, false); err != nil || len(meta) != 1 {
+		t.Fatalf("unsigned service entry rejected: %v %v", meta, err)
 	}
 	if _, err := decodeOTAMetadataPayload(payload, true); err != nil {
 		t.Fatal(err)
@@ -176,12 +176,12 @@ func TestServiceUpdaterHeaderIsExact(t *testing.T) {
 }
 
 func TestUnsignedServiceMetadataPreservesLegacyUpdates(t *testing.T) {
-	payload := []byte(`{"hal":{"version":"2.0.0","url":"https://example.com/hal"},"lamp-os":{"service":"lamp-os","replaces":["hal"],"version":"1.0.0"}}`)
+	payload := []byte(`{"hal":{"version":"2.0.0","url":"https://example.com/hal"},"lamp-os":{"service":"lamp-os","replaces":["hal"],"version":"1.0.0","url":"https://example.com/lamp","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}`)
 	meta, err := decodeOTAMetadataPayload(payload, false)
-	if err != nil || len(meta) != 1 || meta["hal"].Version != "2.0.0" {
+	if err != nil || len(meta) != 2 || meta["hal"].Version != "2.0.0" {
 		t.Fatalf("legacy feed changed: %+v %v", meta, err)
 	}
-	if _, exists := meta["lamp-os"]; exists {
-		t.Fatal("unsigned service component retained")
+	if _, exists := meta["lamp-os"]; !exists {
+		t.Fatal("unsigned service component missing")
 	}
 }

@@ -389,3 +389,70 @@ func TestRealtime_PipecatV1(t *testing.T) {
 		t.Errorf("seed pipecat_v1 wrong: %+v", seed.PipecatV1)
 	}
 }
+
+// Fast voice is on by default for Intern v2 only; an explicit choice wins anywhere.
+func TestRealtimeFastVoiceDefaultsOnForInternV2Only(t *testing.T) {
+	t.Setenv("DEVICE_TYPE", "")
+	on, off := true, false
+	for _, tc := range []struct {
+		device string
+		set    *bool
+		want   bool
+	}{
+		{"intern-v2", nil, true},
+		{"intern-v2", &off, false},
+		{"lamp", nil, false},
+		{"lamp", &on, true},
+		{"", nil, false},
+	} {
+		c := &Config{DeviceType: tc.device, Realtime: &RealtimeConfig{FastVoice: tc.set}}
+		if got := c.RealtimeFastVoice(); got != tc.want {
+			t.Errorf("device=%q set=%v: RealtimeFastVoice()=%v, want %v", tc.device, tc.set, got, tc.want)
+		}
+	}
+	if !(&Config{DeviceType: "intern-v2"}).RealtimeFastVoice() {
+		t.Error("intern-v2 without a realtime block should default to fast voice on")
+	}
+}
+
+// The fast voice pause defaults to 2 s, keeps an owner value and rejects values HAL would clamp.
+func TestRealtimeFastVoicePause(t *testing.T) {
+	if got := (&Config{}).RealtimeFastVoicePauseS(); got != FastVoicePauseDefaultS {
+		t.Fatalf("default pause = %v, want %v", got, FastVoicePauseDefaultS)
+	}
+	set := 3.5
+	if got := (&Config{Realtime: &RealtimeConfig{FastVoicePauseS: &set}}).RealtimeFastVoicePauseS(); got != set {
+		t.Fatalf("owner pause = %v, want %v", got, set)
+	}
+	for _, s := range []float64{FastVoicePauseMinS, 2, FastVoicePauseMaxS} {
+		if err := ValidateFastVoicePauseS(s); err != nil {
+			t.Errorf("ValidateFastVoicePauseS(%v) = %v, want nil", s, err)
+		}
+	}
+	for _, s := range []float64{0, 0.5, 6.5} {
+		if ValidateFastVoicePauseS(s) == nil {
+			t.Errorf("ValidateFastVoicePauseS(%v) accepted an out-of-range pause", s)
+		}
+	}
+}
+
+// The silent-model timeout defaults to 5 s, keeps an owner value and rejects values HAL would clamp.
+func TestRealtimeFastVoiceSilentTimeout(t *testing.T) {
+	if got := (&Config{}).RealtimeFastVoiceSilentTimeoutS(); got != FastVoiceSilentTimeoutDefaultS {
+		t.Fatalf("default timeout = %v, want %v", got, FastVoiceSilentTimeoutDefaultS)
+	}
+	set := 4.0
+	if got := (&Config{Realtime: &RealtimeConfig{FastVoiceSilentTimeoutS: &set}}).RealtimeFastVoiceSilentTimeoutS(); got != set {
+		t.Fatalf("owner timeout = %v, want %v", got, set)
+	}
+	for _, s := range []float64{FastVoiceSilentTimeoutMinS, 5, FastVoiceSilentTimeoutMaxS} {
+		if err := ValidateFastVoiceSilentTimeoutS(s); err != nil {
+			t.Errorf("ValidateFastVoiceSilentTimeoutS(%v) = %v, want nil", s, err)
+		}
+	}
+	for _, s := range []float64{0, 2.5, 9} {
+		if ValidateFastVoiceSilentTimeoutS(s) == nil {
+			t.Errorf("ValidateFastVoiceSilentTimeoutS(%v) accepted an out-of-range timeout", s)
+		}
+	}
+}

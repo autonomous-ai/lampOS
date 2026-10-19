@@ -26,7 +26,7 @@ from hal.telemetry.fire_hazard_metrics import FireHazardStats
 from .base import Perception
 from .fire_gate import FireGate, GateVerdict
 from .models import FireHazard, FireHazardEnum
-from .utils import bbox_area, bbox_intersection, img2b64, xywh_to_xyxy
+from .utils import bbox_area, bbox_intersection, img2b64, retry_after_s, xywh_to_xyxy
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,9 @@ class RemoteFireHazardDetector:
         self._crypto: CryptoSession | None = None
         self._backoff_until: float = 0.0
         self._rate_limited_in_a_row: int = 0
+        # One pooled HTTPS connection: a new TLS handshake per call cost ~170 ms (#612).
+        # Safe to share: OWLv2 runs on a single worker with one request in flight.
+        self._http: requests.Session = requests.Session()
         # Telemetry only: how the last detect() ended, and whether it fell back to classes.
         self.last_outcome: str = "none"
         self.last_preset_fallback: bool = False
@@ -159,7 +162,20 @@ class RemoteFireHazardDetector:
             headers["X-API-Key"] = self._api_key
 
         data = self._crypto.wrap_http_request(plain_body) if self._crypto is not None else plain_body
-        return requests.post(self._url, data=data, headers=headers, timeout=self._timeout)
+        try:
+            return self._http.post(self._url, data=data, headers=headers, timeout=self._timeout)
+        except requests.ConnectionError as e:
+            if isinstance(e, requests.Timeout):
+                raise
+            # Calls can be hours apart, so the proxy may have closed the pooled
+            # connection, and requests never retries a POST by itself. Detection
+            # has no side effects, so one retry on a fresh connection is safe.
+            logger.debug("[fire_hazard] connection dropped (%s), retrying once", e)
+            return self._http.post(self._url, data=data, headers=headers, timeout=self._timeout)
+
+    def close(self) -> None:
+        """Release the pooled connection."""
+        self._http.close()
 
     def _call_api(self, frame: cv2t.MatLike) -> list[dict[str, Any]] | None:
         """POST frame to the object detection endpoint; None = no observation.
@@ -172,7 +188,7 @@ class RemoteFireHazardDetector:
             return None
         preset = config.FIRE_HAZARD_PRESET
         try:
-            image_b64 = img2b64(frame)
+            image_b64 = img2b64(frame, config.FIRE_HAZARD_JPEG_QUALITY)
             used_preset = bool(preset)
             if used_preset:
                 resp = self._post({"image_b64": image_b64, "preset": preset})
@@ -199,6 +215,13 @@ class RemoteFireHazardDetector:
                     "[fire_hazard] HTTP 429 (quota) — pausing detection for %.0fs: %s",
                     delay, resp.text[:120],
                 )
+                return None
+            if resp.status_code == 503:
+                # Server busy (#612): skip this check without counting a 429 streak.
+                self.last_outcome = "busy"
+                delay = retry_after_s(resp.headers)
+                self._backoff_until = time.time() + delay
+                logger.warning("[fire_hazard] HTTP 503 (server busy) — pausing detection for %.0fs", delay)
                 return None
             self._rate_limited_in_a_row = 0
             if resp.status_code != 200:
@@ -629,3 +652,6 @@ class FireHazardPerception(Perception[cv2t.MatLike]):
         self._owlv2_executor.shutdown(wait=False, cancel_futures=True)
         self._stats.maybe_report(self._clock(), final=True, gate_state=self._gate.state)
         self._gate.close()
+        close = getattr(self._detector, "close", None)
+        if close is not None:
+            close()

@@ -48,8 +48,12 @@ if (mode !== 'verify-only') writeFileSync(zip, `${version}-${arch}-zip`)
 set -euo pipefail
 printf 'gsutil %s\n' "$*" >> "$TEST_CALLS"
 while [[ "$1" == "-h" ]]; do shift 2; done
+if [[ "$1" == "stat" ]]; then
+  [[ "${TEST_FETCH_FAIL:-0}" == "0" ]] || exit 92
+  echo "Generation: 7"; exit 0
+fi
 [[ "$1" == "cp" ]] || exit 91
-if [[ "$2" == gs://*/metadata.json ]]; then
+if [[ "$2" == gs://*/metadata.json#7 ]]; then
   [[ "${TEST_FETCH_FAIL:-0}" == "0" ]] || exit 92
   cp "$TEST_REMOTE" "$3"
 elif [[ "$3" == gs://*/metadata.json ]]; then

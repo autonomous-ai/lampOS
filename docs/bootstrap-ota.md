@@ -1325,8 +1325,16 @@ HAL version is the plain text file `hal/VERSION_HAL` (installed as `/opt/hal/VER
 
 ## Service replacement through the existing OTA feed
 
-Service-defined components use the existing signed metadata payload; there is no
+Service-defined components use the existing metadata feed and trust mode; there is no
 second release manifest and no architecture-specific `runtime`, `v2` or `v3` key.
+A device without `signing_public_key` accepts the legacy unsigned feed, including
+service installation and subsequent updates. Service packages still require a
+valid SHA-256 and URL in either mode. If a public key is configured, signature
+verification remains mandatory; an invalid or missing signature never falls back
+to legacy mode. Publishing to GCS uses the existing gsutil credentials. Optional
+release signing remains available, and a signed feed cannot be overwritten as
+unsigned merely because the publishing shell lacks its key.
+
 A component describes the actual service being shipped:
 
 ```json
@@ -1337,6 +1345,7 @@ A component describes the actual service being shipped:
     "sha256": "<artifact SHA-256>",
     "min_version_by_device": {"lamp": "0.1.0"},
     "activate_by_device": {"lamp": true},
+    "activation_release_by_device": {"lamp": {"version": "0.1.0", "sha256": "<same artifact SHA-256>"}},
     "service": "lamp-os",
     "replaces": ["hal", "os-server"]
   }
@@ -1346,12 +1355,15 @@ A component describes the actual service being shipped:
 The component key and bare service name must match. `replaces` names existing
 `hal`/`os-server` or registered service-defined components, not arbitrary
 system services. Other legacy components are not replacement targets in this revision. Bootstrap itself cannot be replaced by this mechanism. Names,
-ownership and signed metadata are validated before a service transition. No
+ownership and metadata are validated before a service transition. No
 command line or shell hook is accepted from these fields.
 
-Initial migration is automatic when the signed service entry explicitly sets
+Initial migration is automatic when the service entry explicitly sets
 `activate_by_device[device_type]` to `true` and has a nonempty, valid
-`min_version_by_device[device_type]` no greater than the published version.
+`min_version_by_device[device_type]` no greater than the published version, plus
+`activation_release_by_device[device_type]` matching the exact published version
+and SHA-256. An old boolean-only promotion does not authorize migration.
+`ACTIVATE=1` selects the current published version and writes that binding.
 The release operator enables this through promotion; the device user does not
 need SSH or a CLI command:
 
@@ -1361,14 +1373,18 @@ make promote-service COMPONENT=lamp-os FOR=lamp V=0.1.0 ACTIVATE=1
 
 Bootstrap discovers promoted service components and invokes
 `software-update lamp-os --activate-promoted`. The updater checks the freshly
-fetched signed metadata and actual device type again before using the existing
-service transition transaction. Unsigned metadata, missing device targeting,
+fetched metadata and actual device type again before using the existing
+service transition transaction. Missing device targeting,
 invalid promotion floors, conflicting ownership, and obsolete updater support
 cannot authorize a first installation. Compatible bootstrap and updater releases
-must reach devices before enabling activation in the feed.
+must reach devices before enabling activation in the feed. Initial automatic
+`lamp-os` migration requires updater preflight and cleanup protocols as well as
+activation support; older activation-only updaters are rejected before cutover.
 
-Publishing alone does not activate a service. Promotion without `ACTIVATE`
-preserves existing activation settings. `ACTIVATE=0 FOR=lamp` disables future
+Publishing a changed version/artifact clears activation flags and bindings; the
+new artifact needs a fresh explicit activation promotion. Republishing the same
+version/hash preserves them. Promotion without `ACTIVATE` preserves existing
+activation settings. `ACTIVATE=0 FOR=lamp` removes its binding and disables future
 first installations for Lamp; it does not uninstall or roll back an active
 service. The flag targets a device type, not a device ID or percentage rollout.
 
@@ -1379,6 +1395,8 @@ activation. Independent service components can coexist. The manual operator
 command `sudo software-update lamp-os --activate` remains available for testing;
 it is not required for fleet migration.
 
+Updater refresh also preserves installed preflight and cleanup capabilities: a stale published script cannot remove them, including while the device still runs V1.
+
 ### Package adapter contract
 
 The ZIP contains `VERSION` matching the metadata version, executable
@@ -1386,10 +1404,23 @@ The ZIP contains `VERSION` matching the metadata version, executable
 systemd unit; packages do not supply arbitrary systemd units. The entrypoint
 supports fixed arguments:
 
+- `bin/service prepare`: required for initial `lamp-os` migration, with
+  `SERVICE_PREFLIGHT` containing `1` in the ZIP. Prepare isolated candidate data
+  and validate configuration/prerequisites without stopping current owners or
+  touching hardware. Other existing services can opt in with the same marker.
 - `bin/service serve`: supervise this component and its child processes.
 - `bin/service health`: query the running component and return JSON containing
   `ready: true`, the matching `version`, and its running supervisor `pid`. The
   updater checks that PID against systemd's MainPID under a bounded deadline.
+- `bin/service cleanup`: packages with `SERVICE_CLEANUP=1` use this fixed command
+  after stop to remove only their own lifecycle resources. Cleanup is bounded and
+  must succeed before recovery restarts previous hardware owners.
+
+The future V2 ZIP must implement and qualify `prepare`, `serve`, `health` and
+its stop/cleanup lifecycle. Updating bootstrap/software-update alone does not add
+V1-to-V2 credentials, calibration or settings conversion to the existing ZIP.
+An existing `lamp-os` ZIP without `SERVICE_PREFLIGHT=1` is rejected for initial
+migration; do not promote it merely because the updater has been upgraded.
 
 The health adapter must not start a second runtime or move hardware. Readiness
 proves only the package's declared startup checks, not successful conversation,
@@ -1399,10 +1430,16 @@ make any existing V2 build installable.
 
 ### Transition, data and rollback boundaries
 
-Download and validate the candidate before stopping current services. The updater
+Download, extract and run declared `prepare` before stopping current services.
+Preparation failure removes staging and leaves the old owners running. For an
+installed service update, prepare an initial private-data snapshot; after stopping
+writers, take a second consistent snapshot and prepare it again before switching.
+A failure at that second stage uses journaled recovery. The updater
 records the previous ownership and recovery state, stops the declared old owners
 and verifies they have stopped before starting the replacement. On failure, or
-recovery of an interrupted transition, it restores the previous configuration.
+recovery of an interrupted transition, it attempts to restore the previous
+configuration. Failed stop, cleanup or restart leaves the recovery journal and
+blocks cutover; it is not proof that V1 has already recovered.
 Persisted ownership also prevents legacy OTA paths or reboot from resurrecting
 superseded hardware owners. Rollback must not restart an ancestor while its
 replacement remains active.
@@ -1414,6 +1451,21 @@ private state snapshots for rollback; rolling back can discard writes made since
 the snapshot. Packages must not mutate shared V1 data and then claim rollback is
 complete merely because the old binary starts.
 
+The first successful activation retains a separate legacy checkpoint that later
+service updates do not overwrite. `software-update rollback lamp-os` selects the
+previous release; `software-update rollback-to-legacy lamp-os` restores the initial
+legacy ownership/running state even after V2 updates. A missing or mismatched
+checkpoint fails closed rather than inventing the previous state. Bootstrap runs
+pending recovery at startup before waiting for a metadata URL or parsing poll
+settings. A recovery error stops startup; the journal remains for retry.
+The narrow exception is a validated bootstrap self-update journal while another
+process actually holds the updater's `flock`: the new bootstrap serves `/health`
+so the installer can finish, but every OTA mutation still returns update-in-progress.
+PID files are not evidence of an active installer. When the lock is released, a
+remaining journal follows normal recovery. After V2 replaces HAL/os-server,
+validated bootstrap/web recovery remains allowed; journals targeting the replaced
+HAL/os-server/device profile remain blocked.
+
 Bootstrap remains independent and updateable. A compatibility declaration prevents
 replacing it or the updater with an older implementation that does not understand
 service ownership and recovery. This compatibility check does not substitute for
@@ -1424,65 +1476,104 @@ voice/hardware acceptance remain required before rollout.
 
 ### Publishing a service component
 
-Build and qualify the package separately, then publish using the existing signing
-credentials (`OTA_SIGNING_PRIVATE_KEY`, `OTA_SIGNING_KEY_ID`):
+Build and qualify the package separately, then publish using the existing GCS
+credentials. Signing is optional, as with legacy component releases:
 
 ```bash
 make upload-service COMPONENT=lamp-os V=0.1.0 PACKAGE=/path/lamp-os.zip REPLACES='hal os-server'
 make promote-service COMPONENT=lamp-os FOR=lamp V=0.1.0 ACTIVATE=1
 ```
 
-The publisher requires signed metadata, validates the package, preserves existing
+The publisher validates the package and its SHA-256, preserves existing
 promotion floors and other components, and rejects topology changes under an
-existing key. Package URLs include the content hash. A version cannot be reused
-with different content while it is the feed's current version. Serialize release
-publishing as with the existing release scripts; metadata publishing is not a
-concurrent multi-writer transaction. Promotion with `ACTIVATE=1` authorizes automatic first installation on the
+existing key. Package URLs include the content hash. Publishing an older version
+than the feed is rejected; the current version cannot be reused with different
+content. All release metadata writers read an immutable GCS generation and publish
+with a generation-match precondition. Concurrent changes abort publication; retry
+from a fresh feed read, never overwrite another operator's promotion with stale
+metadata. Existing GCS authentication and optional signing are unchanged.
+Promotion with `ACTIVATE=1` authorizes automatic first installation of that artifact on the
 selected device type; later updates continue to follow the promotion floor.
-If an automatic activation fails after the transition starts, recovery restores
-the previous services and records the rejected version so polling does not keep
-retrying it. A pending recovery journal is retained if that rejection cannot be
-persisted. `ACTIVATE=0` preserves existing version floors.
+If automatic activation fails after the transition starts, recovery attempts to
+restore previous services and records the rejected version so polling does not
+keep retrying it. The pending journal is retained when stop, cleanup, restoration
+or recording the rejection fails; manual diagnosis may still be required. `ACTIVATE=0` preserves existing version floors.
 
-### Build the V2 supervisor from main
-
-From a checkout containing the release tooling, run:
+### Build and publish the complete V2 service package
 
 ```bash
 make upload-lamp-os
 ```
 
-This command fetches `refs/heads/lamp-voice` from the checkout's `origin` into a
-private temporary repository, freezes the fetched commit, and extracts only
-`lampOS/`. It does not switch the current branch or include dirty source files.
-Using that workspace's pinned Rust toolchain and lockfile, it runs
-`cargo zigbuild --locked --release --target aarch64-unknown-linux-gnu -p lamp-keeper`.
-Prerequisites are Cargo/rustup, cargo-zigbuild, Zig, the pinned toolchain's
-`aarch64-unknown-linux-gnu` target, and authenticated `gsutil`.
+The command fetches and freezes `origin`'s `lamp-voice` commit in an isolated
+source directory. It builds the Rust workspace binaries and the OTA lifecycle
+adapter in a disposable Linux ARM64 Docker container, using the source's pinned
+Rust toolchain and lockfiles. Host Cargo/Zig are no longer required. Prerequisites:
+Docker with Linux ARM64 support, git, curl, Python 3.10+ and authenticated gsutil.
+`OTA_SIGNING_PRIVATE_KEY` / `OTA_SIGNING_KEY_ID` are optional. The Debian bookworm builder
+requires a Debian 12-compatible ARM64 runtime; this is not a universal robot image.
 
-The resulting supervisor is uploaded as `lamp-os`, with `build.json`, `VERSION` and
-`SHA256SUMS`, under
-`gs://${GCS_BUCKET}/${BUCKET_PREFIX}/services/lamp-os/builds/<version>/<commit>/<sha256>/`.
-The existing defaults are `s3-autonomous-upgrade-3` and `os`; environment overrides
-work as for other release commands. The command downloads the stored binary and
-checks its SHA-256 before reporting success. It validates an ARM64 ELF header
-before uploading. This is a build/provenance check, not a hardware qualification.
+The ZIP contains `VERSION`, `bin/service` (the Rust OTA lifecycle adapter),
+`bin/lamp-keeper`, the required V2 runtime binaries including the turn-end worker,
+SHA-pinned models/ONNX Runtime, linked non-glibc shared libraries, character and
+policy resources, unit templates, and a full file checksum manifest. Device secrets
+and calibration are never copied from a developer's test Lamp. `lamp-update` and
+`lamp-surround` binaries may be included but their independent update services are
+not activated: bootstrap owns this release's updates.
 
-This first-stage artifact is the `lamp-keeper` supervisor, intended to become
-`bin/service` in a later `lamp-os` service package. It is **not** the complete V2
-OTA ZIP: child binaries, models, device configuration/calibration and rendered
-units must be packaged and qualified separately. No OTA metadata, version floor,
-or activation setting is changed. Use `upload-service` only once that full
-package is ready; V1 and other device types remain unaffected by this upload.
+`system/VERSION_LAMP_OS` advances its patch after a complete package is built.
+The ZIP's VERSION and package.json contain the version; package.json also records
+the frozen source commit. Publication reuses `upload-service`: one content-addressed
+ZIP in `gs://${GCS_BUCKET}/${BUCKET_PREFIX}/services/lamp-os/<sha256>.zip` and one
+`lamp-os` entry in the existing OTA JSON, with `replaces: ["hal", "os-server"]`.
+Existing promotion floors are preserved, but a changed artifact clears activation
+flags/bindings and requires fresh activation promotion. Defaults remain bucket
+`s3-autonomous-upgrade-3`, prefix `os`. Retain version-file changes in release
+history; a stale checkout cannot publish an older version over the feed.
 
-`system/VERSION_LAMP_OS` tracks this release stream independently of HAL and
-bootstrap. It starts at `0.0.0`; after a valid binary build, `upload-lamp-os`
-increments its patch version (first upload: `0.0.1`). That version is written to
-`build.json`, the uploaded `VERSION` file, and the GCS path. The keeper reads the
-release's `VERSION` file for OTA health; this command does not modify the Rust
-crate version. As with the existing release commands, a failed upload after the
-bump leaves the version file advanced. Keep release invocations serialized and
-retain the updated version file in the release history; do not hand-bump it.
+For local artifact validation without publishing or advancing the version file:
 
-If Cargo is missing from the caller's PATH, the command also checks
-`${CARGO_HOME:-$HOME/.cargo}/bin` for an existing installation. It does not install Rust.
+```bash
+LAMP_OS_BUILD_ONLY=1 LAMP_OS_OUTPUT=/path/lamp-os.zip make upload-lamp-os
+```
+
+The complete generic ZIP still needs a prepared device: root-owned,
+non-group/world-writable `/etc/lampOS/package-profile.json` with `unit_id`, a
+`substitutions` map for the manifest's declared placeholders, and optional
+`required_paths`. Values such as servo poses, device paths and service accounts
+must come from that Lamp. Private `/etc/lampOS/voice/provider.json` and controls
+configuration remain separately provisioned. Missing prerequisites or another
+host's identity fail preflight. This command does not implement automatic V1
+credential/calibration conversion. V2 runtime state placed outside the updater's
+private data directory is not covered by its data snapshot; schema changes there
+need a separately qualified backward-compatible migration/rollback policy.
+Inspect the packaged manifest for exact
+requirements before selecting a device for migration.
+
+The adapter creates child units and ownership drop-ins only under
+`/run/systemd/system`, binds them to `lamp-os`, and journals its own files before
+writing them. It does not enable or mask child/legacy units persistently. Normal
+shutdown and the fixed `ExecStopPost` cleanup operation remove only unchanged
+owned files; stop/cleanup failure prevents assuming rollback is complete. The
+`SERVICE_CLEANUP` marker opts into this operation; the updater also invokes
+cleanup synchronously after stopping a marked package, including recovery, so
+a failed systemd post-stop hook cannot be mistaken for success; existing packages without the
+marker keep their behavior. The generated top-level unit allows 60 seconds for
+shutdown. Upgrade the updater before installing this package: the adapter checks
+its cleanup capability and fails safely on older updaters. The keeper runs as a
+monitored child with its implicit installer disabled. The shared bus directory
+under `/run/lampos-bus` is intentionally retained until reboot; cleanup does not
+recursively remove IPC data.
+
+Health reports the adapter PID, version and child systemd activity with freshness
+checking. It does not prove successful speech, provider connectivity or physical
+motion safety. Real-device activation, reboot/interruption recovery and rollback
+must be tested before a migration promotion. No generic profile implies permission
+to replace other robot types or all Lamps.
+
+The release inventory also carries `lamp-selftest`, `lamp-settings` and
+`lamp-setup` when built upstream; adding their executables does not enable their
+services or run self-test/reset operations. `lamp-memory-fixture`,
+`lamp-records-fixture` and the current `lamp-same-voice pairs` measurement CLI
+are development tools and are excluded. Unknown binaries still fail packaging
+so a new runtime cannot be silently omitted.

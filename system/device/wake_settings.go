@@ -28,12 +28,14 @@ func (s *Service) WakeSettings() domain.WakeSettings {
 		MaxPhraseChars: config.MaxWakePhraseRunes,
 		Chime:          s.config.WakeChimeEnabled(),
 		HasLight:       Has(deviceType, CapLight),
-		Light:          wakeLightLook(s.config),
+		Light:          lightLook(s.config.WakeLight, s.config.WakeLightEnabled()),
 		LightEffects:   slices.Clone(config.WakeLightEffects),
 		LightSpeedMin:  config.WakeLightSpeedMin,
 		LightSpeedMax:  config.WakeLightSpeedMax,
 		FollowupMinS:   config.WakeFollowupMinS,
 		FollowupMaxS:   config.WakeFollowupMaxS,
+		TapChime:       s.config.TapChimeEnabled(),
+		TapLight:       lightLook(s.config.TapLight, s.config.TapLightEnabled()),
 	}
 	if s.config.WakeFollowupS != nil {
 		out.FollowupS, out.FollowupCustom = *s.config.WakeFollowupS, true
@@ -43,15 +45,15 @@ func (s *Service) WakeSettings() domain.WakeSettings {
 	return out
 }
 
-// wakeLightLook fills the owner's saved wake light over the board's listening look.
-func wakeLightLook(c *config.Config) domain.WakeLightLook {
+// lightLook fills an owner's saved wake or tap light over the board's listening look.
+func lightLook(w *config.WakeLight, enabled bool) domain.WakeLightLook {
 	look := domain.WakeLightLook{
-		Enabled: c.WakeLightEnabled(),
+		Enabled: enabled,
 		Color:   slices.Clone(config.WakeLightDefault.Color),
 		Effect:  config.WakeLightDefault.Effect,
 		Speed:   config.WakeLightDefault.Speed,
 	}
-	if w := c.WakeLight; w != nil {
+	if w != nil {
 		if len(w.Color) == 3 {
 			look.Color = slices.Clone(w.Color)
 		}

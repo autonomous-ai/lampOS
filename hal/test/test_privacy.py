@@ -233,7 +233,7 @@ def test_manual_speaker_mute_during_sleep_survives_wake(monkeypatch, privacy_loc
     assert state._speaker_muted
 
 
-def test_extended_unlock_restores_after_shared_wake_without_unmuting_output():
+def test_extended_unlock_reopens_mic_without_unmuting_output():
     state._mic_muted = True
     state._speaker_muted = True
     handler = PrivacyButtonHandler(config())
@@ -243,10 +243,12 @@ def test_extended_unlock_restores_after_shared_wake_without_unmuting_output():
         mock.patch("hal.drivers.button_actions.play_ack_chime"),
         mock.patch("hal.drivers.button_actions.announce_listening_cue"),
         mock.patch.object(state, "_clear_mic_muted_led"),
-        mock.patch("hal.drivers.privacy_button.threading.Thread"),
+        mock.patch("hal.routes.voice.unmute_mic") as unmute,
     ):
         handler._apply_state_locked(False)
-    click.assert_called_once_with("privacy-switch", announce=False, chime=False, unmute_output=False)
+    # The flip only reopens the microphone; it never runs the tap action.
+    click.assert_not_called()
+    unmute.assert_called_once_with()
     assert not privacy.camera_muted and not privacy.speaker_muted
     assert state._speaker_muted
 

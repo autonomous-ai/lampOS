@@ -918,7 +918,7 @@ def run_realtime_turn(
             if (not native_started and not native_played and not first_sentence_sent and not delegated
                     and not look_replayed and execution_completed
                     and (not transcript or re.fullmatch(
-                        r"\s*(?:(?:NO_REPLY|<\s*no\s+speech\s*>)\s*)+", transcript, re.IGNORECASE))
+                        r"\s*(?:(?:NO_REPLY|[<\[]\s*no\s+speech\s*[>\]])\s*)+", transcript, re.IGNORECASE))
                     and getattr(realtime, "intentional_silence", False) is True):
                 # Gemini completed a marker-only silent decision. Reuse the
                 # rejection route (including its feature flag and KPI exclusion)

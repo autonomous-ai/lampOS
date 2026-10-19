@@ -1,8 +1,8 @@
-"""Exercise the release command without network, compilation or publication."""
+"""Test the full-package release orchestration without compiling or publishing."""
 import json
 import os
-import shutil
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -10,13 +10,15 @@ import unittest
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'upload-lamp-os.sh'
 MOCK = r'''
-import io, json, os, pathlib, shutil, sys, tarfile
+import io, json, os, pathlib, sys, tarfile
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 root = pathlib.Path(os.environ['MOCK_ROOT'])
 with (root / 'calls').open('a') as f:
     f.write(json.dumps([name, *args]) + '\n')
-if name == 'git':
+if name == 'openssl':
+    print('ED25519 Public-Key:')
+elif name == 'git':
     if 'get-url' in args:
         print('https://example.invalid/repo.git')
     elif 'fetch' in args and os.environ.get('FETCH_FAIL'):
@@ -25,104 +27,97 @@ if name == 'git':
         print('a' * 40)
     elif 'archive' in args:
         with tarfile.open(fileobj=sys.stdout.buffer, mode='w|') as tar:
-            for path in ['lampOS/Cargo.lock', 'lampOS/rust-toolchain.toml']:
-                data = b'fixture\n'
+            for path, data in [('lampOS/Cargo.lock', b'fixture\n'),
+                               ('lampOS/rust-toolchain.toml', b'[toolchain]\nchannel = "1.96.0"\n')]:
                 item = tarfile.TarInfo(path); item.size = len(data)
                 tar.addfile(item, io.BytesIO(data))
-elif name == 'cargo' and '--help' not in args:
-    if os.environ.get('BUILD_FAIL'):
-        sys.exit(1)
-    path = pathlib.Path(os.environ['CARGO_TARGET_DIR']) / 'aarch64-unknown-linux-gnu/release/lamp-keeper'
-    path.parent.mkdir(parents=True)
-    data = bytearray(64); data[:6] = b'\x7fELF\x02\x01'; data[18:20] = (183).to_bytes(2, 'little')
-    if os.environ.get('BAD_ARCH'):
-        data[18:20] = (62).to_bytes(2, 'little')
-    path.write_bytes(data)
-elif name == 'gsutil':
-    sources = args[args.index('cp') + 1:-1]; dest = args[-1]
-    if dest.startswith('gs://'):
-        (root / 'destination').write_text(dest)
-        for src in sources:
-            shutil.copy2(src, root / pathlib.Path(src).name)
-    else:
-        shutil.copy2(root / 'lamp-os', dest)
-        if os.environ.get('CORRUPT_DOWNLOAD'):
-            pathlib.Path(dest).write_bytes(b'corrupt')
+elif name == 'docker' and args[0] == 'run' and os.environ.get('BUILD_FAIL'):
+    sys.exit(1)
+'''
+PACKAGER = '''import json, os, pathlib, sys, zipfile
+if os.environ.get('PACKAGE_FAIL'): sys.exit(1)
+args = dict(zip(sys.argv[1::2], sys.argv[2::2]))
+assert args['--source-commit'] == 'a' * 40
+assert '--libraries' in args and '--adapter' in args
+with zipfile.ZipFile(args['--output'], 'w') as z:
+    z.writestr('VERSION', args['--version'])
+pathlib.Path(os.environ['MOCK_ROOT'], 'packaged.json').write_text(json.dumps(args))
+'''
+PUBLISHER = '''#!/usr/bin/env bash
+set -eu
+[ "$COMPONENT" = lamp-os ]
+[ "$REPLACES" = 'hal os-server' ]
+[ -f "$PACKAGE" ]
+printf '%s' "$V" > "$MOCK_ROOT/published"
 '''
 
 
 class UploadLampOSTests(unittest.TestCase):
-    def run_case(self, initial_version="0.0.9", cargo_off_path=False, **flags):
+    def run_case(self, build_only=False, signing=True, initial_version='0.0.9', **flags):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             checkout = root / 'checkout'
             scripts = checkout / 'scripts/release'; scripts.mkdir(parents=True)
-            shutil.copy2(SCRIPT, scripts / SCRIPT.name)
-            shutil.copy2(SCRIPT.parent / 'ota-config.sh', scripts / 'ota-config.sh')
+            for name in (SCRIPT.name, 'ota-config.sh', 'ota-metadata.sh'):
+                shutil.copy2(SCRIPT.parent / name, scripts / name)
+            (scripts / 'lamp_os_package.py').write_text(PACKAGER)
+            (scripts / 'fetch_lamp_os_assets.py').write_text('')
+            (scripts / 'upload-service.sh').write_text(PUBLISHER)
             version_file = checkout / 'system/VERSION_LAMP_OS'
             version_file.parent.mkdir(); version_file.write_text(initial_version + '\n')
             bindir = root / 'bin'; bindir.mkdir()
-            for name in ('git', 'cargo', 'zig', 'gsutil'):
+            for name in ('git', 'docker', 'gsutil', 'openssl'):
                 tool = bindir / name
-                tool.write_text(f'#!{sys.executable}\n' + MOCK)
-                tool.chmod(0o755)
+                tool.write_text(f'#!{sys.executable}\n' + MOCK); tool.chmod(0o755)
+            key = root / 'test-key'
+            key.write_text('fixture; openssl is mocked')
             env = dict(os.environ, MOCK_ROOT=str(root), PATH=f'{bindir}:{os.environ["PATH"]}',
-                       GCS_BUCKET='test-bucket', BUCKET_PREFIX='test-prefix', **flags)
-            if cargo_off_path:
-                cargo_home = root / 'rustup-cargo'
-                (cargo_home / 'bin').mkdir(parents=True)
-                shutil.move(bindir / 'cargo', cargo_home / 'bin/cargo')
-                env['CARGO_HOME'] = str(cargo_home)
-                env['PATH'] = f'{bindir}:/usr/bin:/bin:/usr/sbin:/sbin'
+                       LAMP_OS_BUILD_ONLY='1' if build_only else '0', **flags)
+            for name in ('OTA_SIGNING_PRIVATE_KEY', 'OTA_SIGNING_KEY_ID', 'LAMP_OS_OUTPUT', 'VERSION_FILE'):
+                env.pop(name, None)
+            if signing:
+                env.update(OTA_SIGNING_PRIVATE_KEY=str(key), OTA_SIGNING_KEY_ID='fixture')
+                if signing == 'partial':
+                    env.pop('OTA_SIGNING_PRIVATE_KEY')
             result = subprocess.run(['bash', str(scripts / SCRIPT.name)], env=env, text=True, capture_output=True)
-            calls = [json.loads(line) for line in (root / 'calls').read_text().splitlines()]
-            manifest = json.loads((root / 'build.json').read_text()) if (root / 'build.json').exists() else None
-            destination = (root / 'destination').read_text() if (root / 'destination').exists() else ''
-            if manifest:
-                self.assertEqual(version_file.read_text().strip(), manifest['version'])
-                self.assertEqual((root / 'VERSION').read_text().strip(), manifest['version'])
-            else:
-                self.assertEqual(version_file.read_text().strip(), initial_version)
-            return result, calls, manifest, destination
+            calls = [json.loads(line) for line in (root / 'calls').read_text().splitlines()] if (root / 'calls').exists() else []
+            published = (root / 'published').read_text() if (root / 'published').exists() else None
+            return result, calls, published, version_file.read_text().strip()
 
-    def test_builds_pinned_branch_and_verifies_binary_without_promoting(self):
-        result, calls, manifest, destination = self.run_case()
+    def test_publishes_complete_package_through_existing_signed_publisher(self):
+        result, calls, published, version = self.run_case()
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((published, version), ('0.0.10', '0.0.10'))
         self.assertTrue(any('refs/heads/lamp-voice' in call for call in calls))
-        self.assertTrue(any('--locked' in call and 'lamp-keeper' in call for call in calls))
-        self.assertEqual(manifest['source_commit'], 'a' * 40)
-        self.assertFalse(manifest['complete_ota_package'])
-        self.assertEqual(manifest['version'], '0.0.10')
-        self.assertIn('/builds/0.0.10/', destination)
-        self.assertIn('/' + 'a' * 40 + '/' + manifest['sha256'] + '/', destination)
-        uploads = [call for call in calls if call[0] == 'gsutil']
-        self.assertEqual(len(uploads), 2)
-        self.assertFalse(any('metadata.json' in arg for call in uploads for arg in call))
+        self.assertTrue(any(call[:2] == ['docker', 'run'] and 'linux/arm64' in call for call in calls))
+        self.assertFalse(any('promote' in arg for call in calls for arg in call))
 
-    def test_finds_installed_cargo_outside_shell_path(self):
-        result, _, manifest, _ = self.run_case(cargo_off_path=True)
+    def test_build_only_does_not_publish_or_bump_version(self):
+        result, _, published, version = self.run_case(build_only=True, signing=False)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(manifest['version'], '0.0.10')
+        self.assertIsNone(published)
+        self.assertEqual(version, '0.0.9')
 
-    def test_failure_before_valid_binary_never_uploads(self):
-        for flag in ('FETCH_FAIL', 'BUILD_FAIL', 'BAD_ARCH'):
-            with self.subTest(flag=flag):
-                result, calls, _, _ = self.run_case(**{flag: '1'})
+    def test_unsigned_publish_without_key(self):
+        result, calls, published, version = self.run_case(signing=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((published, version), ('0.0.10', '0.0.10'))
+
+    def test_partial_signing_fails_before_expensive_build(self):
+        result, calls, published, version = self.run_case(signing='partial')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('configure both', result.stderr)
+        self.assertEqual(calls, [])
+        self.assertIsNone(published)
+        self.assertEqual(version, '0.0.9')
+
+    def test_fetch_build_package_and_version_errors_never_publish(self):
+        for flags in ({'FETCH_FAIL': '1'}, {'BUILD_FAIL': '1'}, {'PACKAGE_FAIL': '1'}, {'initial_version': 'bad'}):
+            with self.subTest(flags=flags):
+                result, _, published, version = self.run_case(**flags)
                 self.assertNotEqual(result.returncode, 0)
-                self.assertFalse(any(call[0] == 'gsutil' for call in calls))
-
-    def test_initial_version_and_invalid_version(self):
-        result, _, manifest, _ = self.run_case(initial_version='0.0.0')
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(manifest['version'], '0.0.1')
-        result, calls, _, _ = self.run_case(initial_version='bad-version')
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(any(call[0] == 'gsutil' for call in calls))
-
-    def test_corrupt_stored_binary_is_not_reported_as_success(self):
-        result, _, _, _ = self.run_case(CORRUPT_DOWNLOAD='1')
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('SHA-256 mismatch', result.stderr)
+                self.assertIsNone(published)
+                self.assertEqual(version, flags.get('initial_version', '0.0.9'))
 
 
 if __name__ == '__main__':

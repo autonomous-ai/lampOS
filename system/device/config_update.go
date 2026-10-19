@@ -66,6 +66,9 @@ func (s *Service) GetPublicConfig() domain.ConfigPublicResponse {
 		WakeFollowupS:            s.config.WakeFollowupS,
 		WakeLight:                s.config.WakeLight,
 		WakeLightEnabled:         s.config.WakeLightEnabled(),
+		TapChime:                 s.config.TapChimeEnabled(),
+		TapLight:                 s.config.TapLight,
+		TapLightEnabled:          s.config.TapLightEnabled(),
 		DeviceID:                 deviceID,
 		Mac:                      GetDeviceMac(),
 		NetworkSSID:              s.config.NetworkSSID,
@@ -103,9 +106,12 @@ func (s *Service) RealtimePublic() domain.RealtimePublic {
 		Voice:     s.config.RealtimeVoice(),
 		Reasoning: s.config.RealtimeReasoning(),
 		// Only the explicit override: re-persisting a derived URL breaks /ws/gemini.
-		BaseURL:   s.config.RealtimeBaseURLOverride(),
-		HasAPIKey: s.config.RealtimeHasAPIKey(),
-		WebSearch: s.config.RealtimeWebSearch(),
+		BaseURL:                 s.config.RealtimeBaseURLOverride(),
+		HasAPIKey:               s.config.RealtimeHasAPIKey(),
+		WebSearch:               s.config.RealtimeWebSearch(),
+		FastVoice:               s.config.RealtimeFastVoice(),
+		FastVoicePauseS:         s.config.RealtimeFastVoicePauseS(),
+		FastVoiceSilentTimeoutS: s.config.RealtimeFastVoiceSilentTimeoutS(),
 	}
 }
 
@@ -364,6 +370,15 @@ func applyVoicePipelineFields(c *config.Config, data domain.UpdateConfigRequest,
 		light.Color = slices.Clone(light.Color)
 		c.WakeLight = &light
 	}
+	if data.TapChime != nil {
+		on := *data.TapChime
+		c.TapChime = &on
+	}
+	if data.TapLight != nil {
+		light := *data.TapLight
+		light.Color = slices.Clone(light.Color)
+		c.TapLight = &light
+	}
 	if data.WakePhrases != nil {
 		next := append([]string(nil), (*data.WakePhrases)...)
 		if len(next) == 0 {
@@ -542,6 +557,11 @@ func (s *Service) UpdateConfig(data domain.UpdateConfigRequest) error {
 			return err
 		}
 	}
+	if data.TapLight != nil {
+		if err := data.TapLight.Validate(); err != nil {
+			return err
+		}
+	}
 	if data.WakePhrases != nil {
 		phrases, err := config.NormalizeWakePhrases(*data.WakePhrases)
 		if err != nil {
@@ -578,6 +598,10 @@ func (s *Service) UpdateConfig(data domain.UpdateConfigRequest) error {
 	if !keepsWakeCue(s.config, data) {
 		s.wakeApply.mu.Unlock()
 		return config.ErrNoWakeCue
+	}
+	if !keepsTapCue(s.config, data) {
+		s.wakeApply.mu.Unlock()
+		return config.ErrNoTapCue
 	}
 
 	// Mutate inside WithLockSave so the model watcher cannot interleave.
@@ -856,6 +880,18 @@ func keepsWakeCue(c *config.Config, data domain.UpdateConfigRequest) bool {
 	}
 	if data.WakeLight != nil {
 		light = data.WakeLight.Enabled == nil || *data.WakeLight.Enabled
+	}
+	return chime || light
+}
+
+// keepsTapCue is false when the update would leave tap-to-talk with neither chime nor light.
+func keepsTapCue(c *config.Config, data domain.UpdateConfigRequest) bool {
+	chime, light := c.TapChimeEnabled(), c.TapLightEnabled()
+	if data.TapChime != nil {
+		chime = *data.TapChime
+	}
+	if data.TapLight != nil {
+		light = data.TapLight.Enabled == nil || *data.TapLight.Enabled
 	}
 	return chime || light
 }

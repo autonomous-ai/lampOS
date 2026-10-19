@@ -29,7 +29,7 @@ func ReservedOTAService(key string) bool {
 		return true
 	}
 	switch key {
-	case OTAKeyHermes, OTAKeyOpenClaw, OTAKeyCodex, OTAKeyClaudeCode, OTAKeyPicoClaw, OTAKeyOpenCode, OTAKeyBootstrap, OTAKeyWeb, OTAKeyDevice, OTAKeyBuddy, "nginx", "system", "agent", "devices", "signed", "bootstrap-server", "ssh", "sshd", "dbus", "systemd", "networking", "network-manager", "recover", "rollback":
+	case OTAKeyHermes, OTAKeyOpenClaw, OTAKeyCodex, OTAKeyClaudeCode, OTAKeyPicoClaw, OTAKeyOpenCode, OTAKeyBootstrap, OTAKeyWeb, OTAKeyDevice, OTAKeyBuddy, "nginx", "system", "agent", "devices", "signed", "bootstrap-server", "ssh", "sshd", "dbus", "systemd", "networking", "network-manager", "recover", "rollback", "rollback-to-legacy":
 		return true
 	}
 	return false

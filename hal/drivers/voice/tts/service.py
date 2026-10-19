@@ -2277,11 +2277,13 @@ class TTSService:
         )
 
     def _device_capture_chime_samples(self, rate: int, *, finished: bool):
-        """A 40 ms rising/falling tone keeps capture feedback brief and distinct."""
+        """Ready plays the wake-phrase ping; finish is a 40 ms falling tone."""
+        if not finished:
+            return self._ack_chime_samples(rate)
         np = self._np
         duration = 0.04
         t = np.arange(int(rate * duration)) / rate
-        start, end = (880.0, 587.33) if finished else (587.33, 880.0)
+        start, end = 880.0, 587.33
         phase = 2 * np.pi * (start * t + (end - start) * t * t / (2 * duration))
         envelope = np.sin(np.pi * np.arange(len(t)) / max(1, len(t) - 1)) ** 2
         return (0.28 * envelope * np.sin(phase)).astype(np.float32).reshape(-1, 1)

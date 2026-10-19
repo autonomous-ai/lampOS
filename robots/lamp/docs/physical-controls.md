@@ -122,10 +122,11 @@ the camera or speaker. Cached camera frames are hidden from capture consumers.
 At HAL startup the configured peripherals remain closed until GPIO synchronizes;
 a failed initial read/claim keeps privacy locked.
 
-Unlock uses the existing microphone wake/listening flow and restores camera and
+Unlock only reopens the microphone (no tap action, chime, spoken cue, listening
+light or follow-up window; a sleeping device stays asleep) and restores camera and
 speaker to their previous states. A camera or speaker already disabled before
 locking stays disabled; an explicit manual disable during the lock is also
-preserved. The short acknowledgement chime respects the restored speaker mute; the spoken listening cue is disabled.
+preserved.
 A mute that a **scene** set is not a preference: when the switch that wakes the
 device from sleep (night scene: camera and speaker off) deactivates the scene
 while the lock is still held, `deactivate_scene()` retargets the privacy
@@ -176,7 +177,7 @@ After the local stop cue, the recorder is released independently of STT finaliza
 
 Starting a new recording supersedes the previous pending voice reply, including when TTS has not begun: local STT/realtime work is cancelled, deferred TTS is cleared, and OS suppresses older speech without aborting the agent task. Remote suppression runs asynchronously with a capture-time cutoff, so a delayed cancellation cannot silence the new turn. Cancelled provider work retains its slot until cleanup; the two-slot limit still applies.
 
-A tap during TTS only interrupts; during a realtime reply it also cancels the response stream to prevent later audio segments from playing. The next tap starts recording. A sleeping lamp first wakes without recording. Both interruption and wake play the existing short acknowledgment ping (~120 ms), after stopping TTS or restoring sleep-owned speaker state respectively. This is distinct from the capture-ready tone and does not mean the mic is recording; explicit speaker mute is still respected. A software-muted mic can be unmuted for capture; hardware privacy blocks it. GPIO holds/factory reset, MPR121 swipes/holds and TTP223 pet gestures retain their existing roles. Startup and privacy-switch actions still use the original wake action and never simulate a recording tap. Harness ON retains its separate gesture policy below.
+A tap during TTS only interrupts; during a realtime reply it also cancels the response stream to prevent later audio segments from playing. The next tap starts recording. A sleeping lamp first wakes without recording. Both interruption and wake play the existing short acknowledgment ping (~120 ms), after stopping TTS or restoring sleep-owned speaker state respectively. This is distinct from the capture-ready tone and does not mean the mic is recording; explicit speaker mute is still respected. A software-muted mic can be unmuted for capture; hardware privacy blocks it. GPIO holds/factory reset, MPR121 swipes/holds and TTP223 pet gestures retain their existing roles. Startup uses the original wake action; the privacy switch only reopens the microphone. Neither simulates a recording tap. Harness ON retains its separate gesture policy below.
 
 ### Presence enter and turning toward the lamp as wake triggers
 
@@ -298,6 +299,8 @@ Per-edge debounce is 200 ms (press and release ticks tracked independently so a 
 
 ## MPR121 detection (`hal/drivers/mpr121.py`)
 
+Lamp body touch is disabled by default at the hardware team's request: `boards.orangepi_sun60.enabled` is `false` in `robots/lamp/mpr121.json`. HAL skips MPR121 initialization and polling, disabling all body-touch gestures. The retained wiring and tuning below apply only if explicitly re-enabled. Restart HAL after deploying a configuration change.
+
 MPR121 wiring follows the device-owned GPIO configuration flow: HAL reads
 `mpr121.json` in the directory selected by `DEVICES_DIR` and `DEVICE_TYPE`
 (currently `robots/lamp/`), then selects the detected board from its `boards`
@@ -316,7 +319,7 @@ does not modify boot overlays automatically:
 {
   "boards": {
     "orangepi_sun60": {
-      "enabled": true,
+      "enabled": false,
       "bus": 0,
       "address": 90,
       "electrodes": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
@@ -783,7 +786,7 @@ Harness ON uses manual tap-to-record capture, not ambient listening. A tap while
 
 Mode/focus actions use the existing worker and loopback Go APIs; no automatic HTTP retry. Outcomes use localized phrases in `hal/i18n.py` and respect speaker mute and sleep/privacy/TTS LED ownership. Focus stepping requires the negotiated Harness `focus.step` capability; an older CLI fails explicitly without another transport. The CLI counterpart is pending; installed-device interoperability is not yet verified.
 
-At HAL startup, the privacy switch position is reconciled without simulating a button press: an unmuted position restores mic/peripheral access without waking the device, granting conversation focus, playing the acknowledgement/listening phrase, or scheduling the listening LED cue. A real muted-to-unmuted switch transition retains wake/focus and the short acknowledgement chime, with no spoken listening cue. Startup in the muted position still applies the hardware privacy lock synchronously.
+At HAL startup, the privacy switch position is reconciled without simulating a button press: an unmuted position restores mic/peripheral access without waking the device, granting conversation focus, playing the acknowledgement/listening phrase, or scheduling the listening LED cue. A real muted-to-unmuted switch transition does the same: it only reopens the microphone, with no wake, focus, chime or listening light. Startup in the muted position still applies the hardware privacy lock synchronously.
 
 When sleep is restored after a HAL restart (including a software update), an open privacy switch does not unmute the sleeping microphone or start its voice pipeline. Sleep-owned microphone and speaker mutes remain in effect until a real wake. If privacy captured the speaker's sleep mute, waking clears that temporary mute underneath the privacy lock; output stays blocked until privacy is released. The cleared speaker preference is persisted so a later HAL restart cannot restore the expired sleep mute. A speaker mute that the user set before sleep remains muted.
 

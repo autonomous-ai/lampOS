@@ -19,50 +19,17 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-RUN_DIR=${RUN_DIR:-/tmp}
-LOG_ROOT=${LOG_ROOT:-/workspace/logs}
-DLSERVER_STATE_FILE=${DLSERVER_STATE_FILE:-$RUN_DIR/dlserver-active}
-LBSERVER_PORT=${LBSERVER_PORT:-7999}
-DLSERVER_SLOT_A=${DLSERVER_SLOT_A:-8001}
-DLSERVER_SLOT_B=${DLSERVER_SLOT_B:-8002}
-export RUN_DIR LOG_ROOT DLSERVER_STATE_FILE LBSERVER_PORT DLSERVER_SLOT_A DLSERVER_SLOT_B
-STATE=$DLSERVER_STATE_FILE
-READY_TIMEOUT=${DEPLOY_READY_TIMEOUT:-900}
-DRAIN=${DEPLOY_DRAIN_SECONDS:-35}
-MIN_FREE_MB=${DEPLOY_MIN_FREE_GPU_MB:-12000}
-LOG="$LOG_ROOT/deploy/deploy.log"
-mkdir -p "$(dirname "$LOG")" "$RUN_DIR"
+source scripts/dlserver-slots.sh
 
-log() { echo "[deploy $(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOG"; }
-abort() { log "ABORT: $* -- traffic unchanged"; exit 1; }
-gpu() { nvidia-smi --query-gpu=memory.used,memory.free,memory.total --format=csv,noheader,nounits 2>/dev/null | head -1; }
-listener() { ss -lntpH "sport = :$1" 2>/dev/null | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2; }
-slot_of() { sed -n 's|^http://127.0.0.1:\([0-9][0-9]*\)$|\1|p' "$1" 2>/dev/null | grep .; }
-rev_file() { if [ "$1" = "$DLSERVER_SLOT_A" ]; then echo "$RUN_DIR/dlserver.rev"; else echo "$RUN_DIR/dlserver-$1.rev"; fi; }
-# Close fd 9 (the deploy lock) for make and everything it execs: the dlserver
-# start target detaches a long-lived wrapper process (nohup setsid ... &), and an
-# inherited fd 9 would keep that process holding the lock forever after this
-# script exits, permanently blocking every later deploy.
-mk() { make --no-print-directory "$@" 9>&- >>"$LOG" 2>&1; }
-KEY=${DL_API_KEY:-$(grep -E '^DL_API_KEY=' .env 2>/dev/null | head -1 | cut -d= -f2- | tr -d "\"'" | tr -d '[:space:]')}
-health() { curl -sf -m 10 -H "X-API-Key: $KEY" "http://127.0.0.1:$1/hal/api/dl/health"; }
-# Models ready on the active slot but not on the new one, space-separated.
-missing_models() {
-    python - "$1" "$2" <<'EOF'
-import json, sys
-def ready(raw):
-    m = json.loads(raw)["models"]
-    out = {k for k, v in m.items() if v is True}
-    out |= {f"object_detectors.{k}" for k, v in (m.get("object_detectors") or {}).items() if v is True}
-    return out
-print(" ".join(sorted(ready(sys.argv[1]) - ready(sys.argv[2]))))
-EOF
-}
-# lbserver can be restarted by its watchdog at any moment, so always ask who
-# listens on the LB port now instead of reusing a pid read earlier.
-lb_pid() { listener "$LBSERVER_PORT"; }
-acked() { local p; p=$(lb_pid); [ -n "$p" ] && grep -q "\"pid\": $p," "$STATE.applied" 2>/dev/null; }
-acked_on() { acked && grep -q "127.0.0.1:$1\"" "$STATE.applied"; }
+# Two-slot mode: drop to one slot, deploy exactly as in single mode, then start
+# the second slot again on the new code. One slot serves throughout, and old and
+# new code never serve side by side.
+if [ "$(slot_count)" -gt 1 ]; then
+    log "two-slot mode: dropping to single, deploying, then back to two slots"
+    bash scripts/dlserver-mode.sh single || abort "could not drop to a single slot"
+    bash scripts/deploy-dlserver.sh || { log "deploy failed; staying in single mode (make dlserver-two-slot to retry)"; exit 1; }
+    exec bash scripts/dlserver-mode.sh two
+fi
 
 exec 9>"$RUN_DIR/dlserver-deploy.lock"
 flock -n 9 || abort "another deploy is running"
@@ -139,18 +106,12 @@ trap on_signal INT TERM HUP
 
 mk start-runpod-dlserver-slot DLSERVER_PORT="$idle" || fail "make start-runpod-dlserver-slot failed"
 log "slot $idle starting; waiting up to ${READY_TIMEOUT}s for its models"
-deadline=$((SECONDS + READY_TIMEOUT))
-while :; do
-    # dlserver binds its port only after the lifespan loaded every model, so the
-    # first answer is final: a model missing now failed to load and will not appear.
-    if got=$(health "$idle"); then
-        missing=$(missing_models "$want" "$got") || fail "cannot parse health of slot $idle"
-        [ -z "$missing" ] || fail "slot $idle is up but missing models: $missing"
-        break
-    fi
-    [ "$SECONDS" -lt "$deadline" ] || fail "slot $idle not ready after ${READY_TIMEOUT}s"
-    sleep 5
-done
+missing=$(wait_ready "$idle" "$want"); rc=$?
+case $rc in
+    0) ;;
+    1) fail "slot $idle is up but missing models: $missing" ;;
+    *) fail "slot $idle not ready after ${READY_TIMEOUT}s" ;;
+esac
 log "slot $idle ready gpu=$(gpu)"
 
 # --- switch --------------------------------------------------------------------------

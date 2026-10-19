@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 from hal.board.mpr121 import MPR121Config, load_mpr121_config
 
@@ -19,9 +20,13 @@ class TestMPR121Config(unittest.TestCase):
             self.assertEqual(config.swipe_axis, (0, 1))
             self.assertFalse(hasattr(config, "harness_voice_chord"))
 
-    def test_only_lamp_declares_hardware(self):
+    def test_lamp_body_touch_is_disabled_with_tuning_retained(self):
         root = Path(__file__).resolve().parents[2] / "robots"
-        config = load_mpr121_config(root / "lamp", "orangepi_sun60")
+        self.assertIsNone(load_mpr121_config(root / "lamp", "orangepi_sun60"))
+        declaration = json.loads((root / "lamp" / "mpr121.json").read_text())
+        declaration["boards"]["orangepi_sun60"]["enabled"] = True
+        with mock.patch.object(Path, "read_text", return_value=json.dumps(declaration)):
+            config = load_mpr121_config(root / "lamp", "orangepi_sun60")
         self.assertIsInstance(config, MPR121Config)
         self.assertEqual(config.tap_min_electrodes, 3)
         self.assertEqual(config.debounce_ms, 10)

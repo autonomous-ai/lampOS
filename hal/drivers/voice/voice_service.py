@@ -155,18 +155,55 @@ class VoiceService:
 
         cleaned: str = VoiceService.RT_MARKER_RE.sub(replace_marker, text)
         cleaned = re.sub(r"  +", " ", cleaned).strip()
-        cleaned = re.sub(r"^(?:(?:<\s*no\s+speech\s*>|\{\s*pause\s*\})\s*)+",
+        cleaned = re.sub(r"^(?:(?:[<\[]\s*no\s+speech\s*[>\]]|\{\s*pause\s*\})\s*)+",
                          "", cleaned, flags=re.IGNORECASE)
         if VoiceService._pending_rt_silence_marker(cleaned):
             return ""
         return cleaned
+
+    # Most stale audio a reader can hand back (an arecord pipe holds about 2 s).
+    STALE_MIC_BACKLOG_MAX_S = 4.0
+
+    def _discard_stale_mic_backlog(self, mic, frame_size: int, device_rate: int) -> float:
+        """Drop audio the mic queued while nobody read it, e.g. the device's own reply.
+
+        A turn that plays its answer itself (the realtime model's own voice) stops
+        reading the mic until it ends; the reader then hands back that queued audio,
+        which starts with the device's own words, as if someone had just spoken.
+        Queued frames return at once and a live one waits for the clock, so stop at
+        the first read that waits. Returns the seconds of audio dropped.
+        """
+        if isinstance(mic, ContinuousCapture):
+            return 0.0  # its pump already drops playback audio
+        frame_s = frame_size / float(device_rate)
+        dropped = 0.0
+        while self._running and dropped < VoiceService.STALE_MIC_BACKLOG_MAX_S:
+            started = time.monotonic()
+            mic.read(frame_size)
+            if time.monotonic() - started >= frame_s * 0.5:
+                break
+            dropped += frame_s
+        if dropped:
+            logger.info("Dropped %.2fs of mic audio queued during the turn", dropped)
+        return dropped
+
+    @staticmethod
+    def _retire_keepalive_session(session) -> None:
+        """Close an unused pre-connected STT session off the mic thread (close() waits)."""
+        def close() -> None:
+            try:
+                session.close()
+            except Exception:
+                logger.debug("STT keepalive: closing an unused session failed", exc_info=True)
+
+        threading.Thread(target=close, daemon=True, name="stt-keepalive-retire").start()
 
     @staticmethod
     def _pending_rt_silence_marker(text: str) -> bool:
         partial = " ".join(text.lower().split())
         partial = re.sub(r"^\{\s*", "{", partial)
         return bool(partial) and any(
-            marker.startswith(partial) for marker in ("<no speech>", "{pause}")
+            marker.startswith(partial) for marker in ("<no speech>", "[no speech]", "{pause}")
         )
 
     def __init__(
@@ -1386,6 +1423,13 @@ class VoiceService:
                         # Same gate before the per-turn STT + realtime sessions open.
                         logger.info("[turn] language gate rejected the capture — no session opened")
                         decision = "skip"
+                    if decision != "turn" and keepalive_session is not None:
+                        # Only a turn hands the pre-connected session on (and closes it).
+                        # A skipped or live capture closes it here: an abandoned socket
+                        # idles until the server drops it (Flux: INACTIVE_CLIENT after
+                        # 60 s), one per rejected capture.
+                        VoiceService._retire_keepalive_session(keepalive_session)
+                        keepalive_session = None
                     if decision == "skip" and pending_listening_cue_id is not None:
                         from hal import app_state
 
@@ -1412,6 +1456,10 @@ class VoiceService:
                             wake_focus_at_entry=wake_focus_at_entry,
                         ):
                             return
+                        if hal_config.REALTIME_NATIVE_AUDIO:
+                            # The reply played inside the turn, while nobody read the mic.
+                            # (The lookback is cleared below for every turn.)
+                            self._discard_stale_mic_backlog(mic, frame_size, device_rate)
                     keepalive_session = None
                     speech_start = None
                     speech_pre_buffer = []
@@ -2814,6 +2862,8 @@ class VoiceService:
         # start_realtime_turn() retries on every audio chunk; log the fallback once.
         realtime_unavailable_logged = False
         audio_turn = None
+        # Fast voice: this take streamed on a wake partial before any final confirmed it.
+        streamed_unconfirmed = [False]
         prepare_started = False
         prepare_endpoint_waited = False
         prepare_done = threading.Event()
@@ -2863,9 +2913,18 @@ class VoiceService:
                 wakeword_followup_active = (
                     wakeword_followup_active or self._wakeword_focus.is_active()
                 )
+                # Fast voice streams a closed-window turn once an STT partial opens the
+                # wake gate, not after the capture ends. Only a confirmed wake commits:
+                # an unconfirmed stream is discarded when the capture ends.
+                fast_wake_stream = voice_cfg.FAST_VOICE and (
+                    wake_word_confirmed.is_set()
+                    or (wake_word_detected.is_set() and not capture_complete.is_set())
+                )
                 if (
-                    (not capture_complete.is_set() and not wakeword_followup_active)
-                    or not (wake_word_confirmed.is_set() or wakeword_followup_active)
+                    (not capture_complete.is_set() and not wakeword_followup_active
+                     and not fast_wake_stream)
+                    or not (wake_word_confirmed.is_set() or wakeword_followup_active
+                            or fast_wake_stream)
                     or not hal_config.REALTIME_ENABLED
                 ):
                     return False
@@ -2902,9 +2961,14 @@ class VoiceService:
                     for audio_f32 in rt_audio_buffer:
                         self._realtime.append_audio(audio_f32, turn=audio_turn)
                     realtime_turn_started = True
+                    streamed_unconfirmed[0] = not (
+                        wake_word_confirmed.is_set() or wakeword_followup_active
+                    )
                     logger.info(
-                        "[realtime] Wake-word/follow-up authorized; flushed %d buffered frame(s)",
+                        "[realtime] Wake-word/follow-up authorized; flushed %d buffered frame(s)%s",
                         len(rt_audio_buffer),
+                        " (STT partial; commits only once the wake is confirmed)"
+                        if streamed_unconfirmed[0] else "",
                     )
                     return True
                 except AudioTurnSessionChanged:
@@ -3373,7 +3437,10 @@ class VoiceService:
                 wakeword_followup_active = (
                     wakeword_followup_active or self._wakeword_focus.is_active()
                 )
-            early_authorized = not hal_config.WAKEWORD_ENABLED or wakeword_followup_active
+            early_authorized = (
+                not hal_config.WAKEWORD_ENABLED or wakeword_followup_active
+                or (voice_cfg.FAST_VOICE and wake_word_confirmed.is_set())
+            )
             overlap_drain = (
                 realtime_allowed and hal_config.REALTIME_ENABLED and self._running
                 and manual_capture is None and early_authorized
@@ -3612,6 +3679,22 @@ class VoiceService:
                     logger.info(
                         "Wake-word partial rejected — no matching final STT result; dropping turn"
                     )
+            if (
+                streamed_unconfirmed[0]
+                and realtime_turn_started
+                and not wake_word_confirmed.is_set()
+                and not (hal_config.WAKEWORD_ENABLED and self._wakeword_focus.is_active())
+            ):
+                # Never commit audio streamed on a partial the final did not confirm.
+                logger.info("[realtime] Fast voice: wake not confirmed — discarding the streamed audio")
+                try:
+                    self._realtime.discard_open_activity("wake-unconfirmed")
+                except Exception:
+                    logger.debug("[realtime] wake-unconfirmed discard failed", exc_info=True)
+                realtime_turn_started = False
+                realtime_deferred = False
+                audio_turn = None
+                rt_audio_buffer.clear()
 
             # A VAD-confirmed utterance can begin while the camera is pointed away from
             # the remembered user.
@@ -3766,9 +3849,12 @@ class VoiceService:
                 and not is_noise_turn(combined, buf_duration, rt_audio_is_speech)
                 and early_realtime_result is None
             ):
+                # The prepare thread returns just after the rebuild it joined; fast
+                # voice's shorter capture can check before it does, so give it a moment.
+                prepare_grace_s = 0.5 if voice_cfg.FAST_VOICE else 0.0
                 if (not prepare_error and self._realtime.wait_until_available()
                         and self._running and not reply_stop.is_set()
-                        and prepare_done.is_set() and not prepare_error):
+                        and prepare_done.wait(timeout=prepare_grace_s) and not prepare_error):
                     try:
                         audio_turn = self._realtime.bind_audio_turn()
                         self._realtime.send_text(build_turn_context(turn_speaker_display))

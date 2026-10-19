@@ -1,14 +1,16 @@
 """Shared utilities for protocol handlers."""
 
 import base64
+import math
 import secrets
 
 import cv2
 import cv2.typing as cv2t
 import numpy as np
-from fastapi import WebSocket
+from fastapi import HTTPException, WebSocket
 
 from config import settings
+from core.perception.base.batching import BatcherOverloaded
 
 
 def decode_image(image_b64: str) -> cv2t.MatLike:
@@ -36,3 +38,12 @@ async def verify_ws_api_key(websocket: WebSocket) -> bool:
             await websocket.close(code=1008, reason="Invalid or missing API key")
             return False
     return True
+
+
+def overloaded_http(exc: BatcherOverloaded) -> HTTPException:
+    """503 + Retry-After: the batcher refused or dropped the request because the server is busy."""
+    return HTTPException(
+        status_code=503,
+        detail=f"Server busy: {exc}",
+        headers={"Retry-After": str(max(1, math.ceil(exc.retry_after_s)))},
+    )

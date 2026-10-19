@@ -5,6 +5,7 @@ import os
 import threading
 from typing import Any, Callable, Dict, List, Optional
 
+from hal import config as _hal_config
 from hal.presets import LANG_EN
 from hal.drivers.voice.stt.provider import STTProvider, STTSession
 
@@ -14,7 +15,10 @@ DEFAULT_MODEL = "flux-general-en"
 DEFAULT_LANGUAGE = LANG_EN
 
 DEFAULT_INTERIM_RESULTS = "true"
-DEFAULT_ENDPOINTING_MS = 1500
+# Fast voice: a sooner final confirms the wake word and ends the drain sooner.
+DEFAULT_ENDPOINTING_MS = (
+    int(os.environ.get("HAL_FAST_VOICE_STT_ENDPOINTING_MS", "400")) if _hal_config.FAST_VOICE else 1500
+)
 DEFAULT_ENCODING = "linear16"
 
 # Keep mic audio out of Deepgram's Model Improvement Program (training); sent on every connect.

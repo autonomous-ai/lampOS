@@ -13,7 +13,7 @@ from core.models.pose import RawPose3DDetection
 from core.perception.base import PredictorBase
 from core.utils.common import get_or_default
 from core.utils.files import ensure_downloaded
-from core.utils.runtime import prepare_ort_session
+from core.utils.runtime import batch_warmups, prepare_ort_session
 
 # Input type: (keypoints (T, K, 2), scores (T, K))
 Pose3DInput = tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]
@@ -72,9 +72,12 @@ class PoseEstimator3DLifting(PredictorBase[Pose3DInput, RawPose3DDetection | Non
             return
         self._model_path = ensure_downloaded(self._model_path, remote=self._remote_url)
         self._logger.info("Loading model from %s", self._model_path)
-        warmup = {self.ONNX_INPUT_NAME: np.zeros(
-            (self._batch_size, self._n_frames, self.ONNX_NUM_JOINTS, 3), dtype=np.float32,
-        )}
+        warmup = batch_warmups(
+            self._batch_size,
+            lambda n: {self.ONNX_INPUT_NAME: np.zeros(
+                (n, self._n_frames, self.ONNX_NUM_JOINTS, 3), dtype=np.float32,
+            )},
+        )
         self._session = prepare_ort_session(self._model_path, warmup_inputs=warmup)
         self._running = True
         self._logger.info("Ready")

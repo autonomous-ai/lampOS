@@ -5,11 +5,20 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Any, Generic, TypeVar
 
+from config import settings
 from core.perception.base.predictor import PredictorBase
 from core.utils.common import deep_hash, get_or_default
 
 INPUT_T = TypeVar("INPUT_T")
 OUTPUT_T = TypeVar("OUTPUT_T")
+
+
+class BatcherOverloaded(RuntimeError):
+    """The batcher refused or dropped a request; routes answer 503 + Retry-After."""
+
+    def __init__(self, reason: str, retry_after_s: float):
+        super().__init__(reason)
+        self.retry_after_s = retry_after_s
 
 
 @dataclass
@@ -18,6 +27,7 @@ class BatchingQueueItem(Generic[INPUT_T, OUTPUT_T]):
     future: asyncio.Future[OUTPUT_T]
     kwargs_key: int = 0
     kwargs: dict[str, Any] = field(default_factory=dict)
+    enqueued_at: float = field(default_factory=time.monotonic)
 
 
 class InputBatcher(Generic[INPUT_T, OUTPUT_T]):
@@ -28,17 +38,27 @@ class InputBatcher(Generic[INPUT_T, OUTPUT_T]):
 
     DEFAULT_BATCH_SIZE: int = 1
     DEFAULT_BATCH_TIMEOUT_S: float = 0.1
-    MAX_QUEUE_FACTOR: int = 100
+    DROP_LOG_INTERVAL_S: float = 10.0
 
     def __init__(
         self,
         predictor: PredictorBase[INPUT_T, OUTPUT_T],
         batch_size: int | None = None,
         batch_timeout: float | None = None,
+        max_wait_s: float | None = None,
+        max_pending: int | None = None,
     ):
         self._predictor: PredictorBase[INPUT_T, OUTPUT_T] = predictor
         self._batch_size: int = get_or_default(batch_size, self.DEFAULT_BATCH_SIZE)
         self._batch_timeout: float = get_or_default(batch_timeout, self.DEFAULT_BATCH_TIMEOUT_S)
+        limits = settings.overload
+        self._max_wait_s: float = get_or_default(max_wait_s, limits.max_wait_s)
+        self._max_pending: int = get_or_default(
+            max_pending, max(limits.max_pending_min, self._batch_size * limits.max_pending_per_batch)
+        )
+        self._retry_after_s: float = limits.retry_after_s
+        self._dropped: int = 0
+        self._last_drop_log: float = 0.0
 
         self._logger: logging.Logger = logging.getLogger(
             f"{self.__class__.__module__}.{self.__class__.__name__}"
@@ -77,7 +97,8 @@ class InputBatcher(Generic[INPUT_T, OUTPUT_T]):
             self._queue = None
             self._running_loop = None
         if self._queue is None:
-            self._queue = asyncio.Queue(maxsize=self._batch_size * self.MAX_QUEUE_FACTOR)
+            # Unbounded: the cap is enforced on queue + pending in submit().
+            self._queue = asyncio.Queue()
         if self._running_loop is None or self._running_loop.done():
             self._running_loop = asyncio.create_task(self._loop())
         return self._queue
@@ -105,26 +126,48 @@ class InputBatcher(Generic[INPUT_T, OUTPUT_T]):
     def is_ready(self) -> bool:
         return self._running and self._predictor.is_ready()
 
+    def _backlog(self) -> int:
+        """Items waiting for the GPU: still queued plus already pulled into pending."""
+        queued = self._queue.qsize() if self._queue is not None else 0
+        return queued + len(self._pending_items)
+
+    def _note_drop(self, n: int, why: str) -> None:
+        self._dropped += n
+        now = time.monotonic()
+        if now - self._last_drop_log >= self.DROP_LOG_INTERVAL_S:
+            self._last_drop_log = now
+            self._logger.warning(
+                "Overloaded: %s (%d dropped since last log, backlog %d/%d)",
+                why, self._dropped, self._backlog(), self._max_pending,
+            )
+            self._dropped = 0
+
+    def check_capacity(self, n: int = 1) -> None:
+        """Raise BatcherOverloaded if n more items would not fit.
+
+        Cheap, so callers check it before expensive work (decoding, other models).
+        """
+        if self._backlog() + n > self._max_pending:
+            self._note_drop(n, "backlog full")
+            raise BatcherOverloaded(f"backlog full ({self._max_pending})", self._retry_after_s)
+
     async def submit(self, inputs: list[INPUT_T], **kwargs: Any) -> list[asyncio.Future[OUTPUT_T]]:
         """Submit inputs for batched inference; returns one future per input.
 
-        Extra kwargs are forwarded to ``predictor.predict()`` and group items into sub-batches.
+        Raises BatcherOverloaded at once when the backlog is full. Extra kwargs are
+        forwarded to ``predictor.predict()`` and group items into sub-batches.
         """
         if not self._running:
             raise RuntimeError("InputBatcher is not running")
         queue = self._ensure_loop()
+        self.check_capacity(len(inputs))
         kwargs_key = deep_hash(kwargs) if kwargs else 0
         futures: list[asyncio.Future[OUTPUT_T]] = []
         loop = asyncio.get_running_loop()
         for inp in inputs:
             future: asyncio.Future[OUTPUT_T] = loop.create_future()
-            await queue.put(
-                BatchingQueueItem(
-                    input=inp,
-                    future=future,
-                    kwargs_key=kwargs_key,
-                    kwargs=kwargs,
-                )
+            queue.put_nowait(
+                BatchingQueueItem(input=inp, future=future, kwargs_key=kwargs_key, kwargs=kwargs)
             )
             futures.append(future)
 
@@ -165,7 +208,19 @@ class InputBatcher(Generic[INPUT_T, OUTPUT_T]):
                 self._last_dispatch_ts = time.monotonic()
                 dispatch_items: list[BatchingQueueItem[INPUT_T, OUTPUT_T]] = []
                 while len(dispatch_items) < self._batch_size and self._pending_items:
-                    dispatch_items.append(self._pending_items.popleft())
+                    item = self._pending_items.popleft()
+                    if item.future.done():  # caller gave up (cancelled)
+                        self._note_drop(1, "caller cancelled")
+                        continue
+                    if self._last_dispatch_ts - item.enqueued_at > self._max_wait_s:
+                        item.future.set_exception(
+                            BatcherOverloaded(f"waited over {self._max_wait_s:g}s", self._retry_after_s)
+                        )
+                        self._note_drop(1, "waited too long")
+                        continue
+                    dispatch_items.append(item)
+                if not dispatch_items:
+                    continue
 
                 groups: dict[
                     int,

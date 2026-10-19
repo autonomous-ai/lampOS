@@ -21,31 +21,45 @@ def _ack(state):
 
 class TestResolveBackends:
     def test_replaces_loopback_keeps_remote_order(self):
-        assert resolve_backends([LOCAL_A, REMOTE], LOCAL_B) == [LOCAL_B, REMOTE]
+        assert resolve_backends([LOCAL_A, REMOTE], [LOCAL_B]) == [LOCAL_B, REMOTE]
 
     def test_no_active_keeps_configured(self):
-        assert resolve_backends([LOCAL_A, REMOTE], None) == [LOCAL_A, REMOTE]
+        assert resolve_backends([LOCAL_A, REMOTE], []) == [LOCAL_A, REMOTE]
 
     def test_remote_only_config_ignores_active(self):
-        assert resolve_backends([REMOTE], LOCAL_B) == [REMOTE]
+        assert resolve_backends([REMOTE], [LOCAL_B]) == [REMOTE]
 
     def test_localhost_spelling_is_loopback_and_deduped(self):
-        assert resolve_backends(["http://localhost:8001", LOCAL_A], LOCAL_B) == [LOCAL_B]
+        assert resolve_backends(["http://localhost:8001", LOCAL_A], [LOCAL_B]) == [LOCAL_B]
+
+    def test_two_local_slots_replace_loopback_in_order(self):
+        assert resolve_backends([LOCAL_A, REMOTE], [LOCAL_A, LOCAL_B]) == [LOCAL_A, LOCAL_B, REMOTE]
 
 
 class TestReadActive:
     def test_missing_file_is_none(self, tmp_path):
-        assert read_active(tmp_path / "nope") is None
+        assert read_active(tmp_path / "nope") == []
 
     def test_blank_file_is_none(self, tmp_path):
         f = tmp_path / "s"
         f.write_text("\n")
-        assert read_active(f) is None
+        assert read_active(f) == []
 
     def test_strips_newline_and_trailing_slash(self, tmp_path):
         f = tmp_path / "s"
         f.write_text(LOCAL_B + "/\n")
-        assert read_active(f) == LOCAL_B
+        assert read_active(f) == [LOCAL_B]
+
+    def test_reads_two_lines_deduped(self, tmp_path):
+        f = tmp_path / "s"
+        f.write_text(f"{LOCAL_A}\n{LOCAL_B}/\n{LOCAL_A}\n")
+        assert read_active(f) == [LOCAL_A, LOCAL_B]
+
+    def test_rejects_non_loopback_on_any_line(self, tmp_path):
+        f = tmp_path / "s"
+        f.write_text(f"{LOCAL_A}\n{REMOTE}\n")
+        with pytest.raises(ValueError):
+            read_active(f)
 
     def test_rejects_non_loopback(self, tmp_path):
         f = tmp_path / "s"
@@ -104,6 +118,14 @@ class TestInstallSwitch:
         assert _picks(app_mod.http_rr, 2) == [LOCAL_B, REMOTE]
         assert _ack(state) == {"pid": os.getpid(), "backends": [LOCAL_B, REMOTE]}
 
+    def test_sighup_with_two_slots_serves_both_and_acks(self, switch):
+        app_mod, state = switch
+        app_mod.install_switch()
+        state.write_text(f"{LOCAL_A}\n{LOCAL_B}\n")
+        os.kill(os.getpid(), signal.SIGHUP)
+        assert _picks(app_mod.http_rr, 3) == [LOCAL_A, LOCAL_B, REMOTE]
+        assert _ack(state)["backends"] == [LOCAL_A, LOCAL_B, REMOTE]
+
     def test_bad_state_file_keeps_current_backends(self, switch):
         app_mod, state = switch
         state.write_text(LOCAL_B)
@@ -145,3 +167,67 @@ def test_proxy_follows_switch(switch, monkeypatch):
         os.kill(os.getpid(), signal.SIGHUP)
         client.get("/hal/api/dl/health")
     assert seen == [8001, 8002]
+
+
+def _mock_backend(monkeypatch, app_mod, handler):
+    monkeypatch.setattr(app_mod, "BACKENDS", [LOCAL_A])
+    monkeypatch.setattr(app_mod, "INTERNAL_PREFIX", "")
+    monkeypatch.setattr(app_mod.settings.crypto, "enabled", False)
+    real_client = httpx.AsyncClient
+
+    def _client(**kwargs):
+        kwargs["transport"] = httpx.MockTransport(handler)
+        return real_client(**kwargs)
+
+    monkeypatch.setattr("lbserver.app.httpx.AsyncClient", _client)
+
+
+def test_proxy_retries_once_on_refused_connection(switch, monkeypatch):
+    app_mod, state = switch
+    seen: list[int] = []
+
+    def _backend(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.port)
+        if request.url.port == 8002:
+            raise httpx.ConnectError("refused", request=request)
+        return httpx.Response(200, json={})
+
+    _mock_backend(monkeypatch, app_mod, _backend)
+    state.write_text(f"{LOCAL_B}\n{LOCAL_A}\n")
+    app_mod.install_switch()
+    with TestClient(app_mod.app) as client:
+        assert client.get("/hal/api/dl/health").status_code == 200  # 8002 refused -> 8001
+        assert client.get("/hal/api/dl/health").status_code == 200  # 8002 skipped while down
+    assert seen == [8002, 8001, 8001]
+
+
+def test_proxy_does_not_retry_timeouts(switch, monkeypatch):
+    app_mod, state = switch
+    seen: list[int] = []
+
+    def _backend(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.port)
+        raise httpx.ReadTimeout("slow", request=request)
+
+    _mock_backend(monkeypatch, app_mod, _backend)
+    state.write_text(f"{LOCAL_A}\n{LOCAL_B}\n")
+    app_mod.install_switch()
+    with TestClient(app_mod.app) as client:
+        assert client.get("/hal/api/dl/health").status_code == 504
+    assert seen == [8001]
+
+
+def test_single_backend_refusal_is_still_502(switch, monkeypatch):
+    app_mod, state = switch
+    seen: list[int] = []
+
+    def _backend(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.port)
+        raise httpx.ConnectError("refused", request=request)
+
+    _mock_backend(monkeypatch, app_mod, _backend)
+    state.write_text(f"{LOCAL_A}\n")
+    app_mod.install_switch()
+    with TestClient(app_mod.app) as client:
+        assert client.get("/hal/api/dl/health").status_code == 502
+    assert seen == [8001]

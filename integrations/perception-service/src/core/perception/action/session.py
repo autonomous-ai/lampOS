@@ -76,6 +76,12 @@ class ActionPerceptionSession(
         """
         cur_ts: float = time.time()
         if cur_ts - self._last_update_ts >= self._config.frame_interval:
+            # Stamped first: a refused or failed frame rests a full interval, so a busy
+            # server is not retried at the client's frame rate.
+            self._last_update_ts = cur_ts
+            # Check the action batcher before the person detector, whose GPU work
+            # would be thrown away if the action step is refused.
+            self._action_batcher.check_capacity()
             if self._person_batcher is not None and self._config.person_detection_enabled:
                 person_detector = cast(PersonDetector, self._person_batcher.predictor)
                 person_futures = await self._person_batcher.submit([input])
@@ -118,7 +124,6 @@ class ActionPerceptionSession(
             detected_actions = sorted(detected_actions, key=lambda x: x.conf, reverse=True)
 
             self._last_prediction = HumanActionDetection(actions=detected_actions)
-            self._last_update_ts = cur_ts
 
         if self._last_prediction is not None:
             detected_actions = self._last_prediction.actions

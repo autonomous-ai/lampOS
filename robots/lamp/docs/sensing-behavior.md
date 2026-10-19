@@ -325,6 +325,7 @@ least as high and above 0.2; otherwise `unsure_fire`.
 encryption or a 429 pause is "no observation": streaks and escalation stay as they were.
 After an HTTP 429 HAL pauses calls for 5 s × 2^(n−1) for the n-th 429 in a row, capped at
 60 s, with ±20 % jitter. Any other reply resets the count.
+A `503` from the perception server means it is busy: the lamp skips checks for the server's `Retry-After` (2–30 s, default 5 s, ±20 % jitter) instead of retrying at once.
 
 **Confirm.** Streaks are kept per kind: flame (any of the three fire labels) and smoke.
 A flame streak survives a `safe_fire`/`hazard_fire`/`unsure_fire` label flip; the alert
@@ -348,7 +349,7 @@ values only, never frames:
 
 | Event | When | Params |
 |---|---|---|
-| `fire_hazard_stats` | Once an hour, plus a final row with `observation_complete: false` when the processor is removed | `window_s`, `observation_complete`, `owlv2_calls` (sum of `owlv2_ok`, `owlv2_timeout`, `owlv2_error`, `owlv2_http_error`, `owlv2_rate_limited`, `owlv2_encryption_unavailable`), `owlv2_preset_fallback` (counted on top of the fallback call's own outcome), `owlv2_backoff_skipped` (rounds inside a 429 pause, nothing sent), `owlv2_other`, `owlv2_ms_p50` / `owlv2_ms_max` (successful calls only; null with no sample), `gate_runs`, `gate_hits`, `gate_unavailable`, `gate_ms_p50`, `escalations`, `samples_dropped` (latency samples beyond 720 per window), `gate_state` (`loading`, `ready` or `unavailable`) |
+| `fire_hazard_stats` | Once an hour, plus a final row with `observation_complete: false` when the processor is removed | `window_s`, `observation_complete`, `owlv2_calls` (sum of `owlv2_ok`, `owlv2_timeout`, `owlv2_error`, `owlv2_http_error`, `owlv2_rate_limited`, `owlv2_busy` (503, server busy), `owlv2_encryption_unavailable`), `owlv2_preset_fallback` (counted on top of the fallback call's own outcome), `owlv2_backoff_skipped` (rounds inside a 429 or 503 pause, nothing sent), `owlv2_other`, `owlv2_ms_p50` / `owlv2_ms_max` (successful calls only; null with no sample), `gate_runs`, `gate_hits`, `gate_unavailable`, `gate_ms_p50`, `escalations`, `samples_dropped` (latency samples beyond 720 per window), `gate_state` (`loading`, `ready` or `unavailable`) |
 | `fire_hazard_alert` | Each sent `fire_hazard.detected` | `types` (sorted hazard types), `first_seen_age_ms` (how long the confirming streak had been running when the alert was sent; -1 when unknown), `gate_state` |
 
 ## Motion
@@ -864,6 +865,7 @@ Lamp detects the **user's** emotional state via three channels:
    1. **Per-label gate (HAL side)** — HAL posts the crop with `raw: true` and gates the returned probabilities in `emotion_gating.py`: the argmax must clear its own bar (`anger 0.8`, `sad 0.8`, `happy 0.5`, `surprise 0.6`, `disgust 0.7`, `fear 0.5`; override per device with `HAL_EMOTION_LABEL_THRESHOLDS`, which replaces the whole map) or Neutral stands in carrying Neutral's own probability, and `EMOTION_CONFIDENCE_THRESHOLD` is applied to the result. A reading that fails is **no reading**, not Neutral. Against an older perception server that ignores `raw`, the server gates with its own `label_gating.py` map and HAL takes its label as-is. `result.json` records which side gated (`gate: hal|server`) and, for HAL, every class probability.
    2. **Occupancy (HAL side)** — on each `EMOTION_FLUSH_S` flush, `Happy` fires on a single frame, but every other label must hold a **strict majority of that person's recognition attempts in the trailing 10s**, counting attempts that returned nothing (an exact tie does not qualify), **and be at least 2 readings**. Attempts are counted per face detection, not per sensing tick, so without that floor a face seen once in the window makes a single reading a trivial 1-of-1 majority. A face turned toward a monitor reads as Anger, so a lone Anger frame among a dozen empty responses used to win the vote outright.
    3. **Bucket dedup** — `(user, positive|negative)` with a `EMOTION_DEDUP_WINDOW_S` TTL (300s), so each polarity reports at most once per 5 minutes.
+   A `503` (server busy) pauses recognition for the server's `Retry-After` (2–30 s, default 5 s); the 5-minute pause stays for `429` (quota).
 2. **Speech emotion** (secondary) — `speech_emotion.detected` event from `hal/drivers/voice/speech_emotion/`. Runs at the end of every speaker-identified STT session against the same WAV used for speaker recognition. Uses `emotion2vec_plus_large` on perception-service via HTTP. See [Speech Emotion Recognition](../../../docs/speech-emotion.md) for the full pipeline.
 3. **Body action** (tertiary) — emotional X3D actions from action recognition are **intentionally dropped** from `motion.activity` (which is purely physical: sedentary/drink/break/celebrate). A dedicated `motion.emotional` event type is planned for these.
 

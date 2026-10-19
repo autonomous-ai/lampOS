@@ -23,13 +23,11 @@ if [[ -z "$component" ]]; then
   exit 1
 fi
 
-# Activation is an explicit signed promotion, including direct script invocation.
+# Activation is explicit; signing follows the configured feed trust mode.
 if [[ -n "${ACTIVATE:-}" ]]; then
+  ota_metadata_signing_preflight
   [[ "$ACTIVATE" = 0 || "$ACTIVATE" = 1 ]] || { echo 'ACTIVATE must be 0 or 1' >&2; exit 1; }
   [[ -n "${FOR:-}" ]] || { echo 'Activation promotion requires FOR=<device_type>' >&2; exit 1; }
-  : "${OTA_SIGNING_PRIVATE_KEY:?Activation metadata must be signed}"
-  : "${OTA_SIGNING_KEY_ID:?OTA_SIGNING_KEY_ID is required}"
-  [[ -r "$OTA_SIGNING_PRIVATE_KEY" ]] || { echo 'Signing key is not readable' >&2; exit 1; }
 fi
 
 METADATA_PATH="${BUCKET_PREFIX}/ota/metadata.json"
@@ -39,8 +37,17 @@ PAYLOAD_TMP=$(mktemp)
 trap 'rm -f "$METADATA_TMP" "$PAYLOAD_TMP"' EXIT
 
 echo "========== Fetch metadata from ${METADATA_GCS} =========="
-gsutil cp "$METADATA_GCS" "$METADATA_TMP"
+ota_metadata_fetch "$METADATA_GCS" "$METADATA_TMP"
+if [[ -n "${ACTIVATE:-}" ]]; then
+  ota_metadata_preserve_trust "$METADATA_TMP"
+fi
 ota_metadata_unpack "$METADATA_TMP" "$PAYLOAD_TMP"
+# Ordinary service updates use the same trust policy as service activation.
+# Legacy component promotion keeps its existing behavior.
+if jq -e --arg component "$component" '.[$component] | type == "object" and .service == $component' "$PAYLOAD_TMP" >/dev/null; then
+  ota_metadata_signing_preflight
+  ota_metadata_preserve_trust "$METADATA_TMP"
+fi
 
 python3 - "$PAYLOAD_TMP" "$component" "$override_min" "${FOR:-}" "${ACTIVATE:-}" <<'PY'
 import json, re, sys
@@ -76,12 +83,21 @@ if activation:
         if not isinstance(value, str) or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', value):
             sys.exit('Activation requires numeric major.minor.patch versions')
         return tuple(map(int, value.split('.')))
-    if activation == '1' and (version(target) == (0, 0, 0) or version(target) > version(entry.get('version'))):
-        sys.exit('Activation floor must be positive and no greater than the published version')
+    if activation == '1' and (version(target) == (0, 0, 0) or version(target) != version(entry.get('version'))):
+        sys.exit('Activation must select the exact current published version')
+    if activation == '1' and not re.fullmatch(r'[0-9a-f]{64}', entry.get('sha256', '')):
+        sys.exit('Activation requires the published artifact SHA-256')
     activations = entry.setdefault('activate_by_device', {})
     if not isinstance(activations, dict) or any(not isinstance(k, str) or not k or type(v) is not bool for k, v in activations.items()):
         sys.exit('Invalid activate_by_device map')
+    releases = entry.setdefault('activation_release_by_device', {})
+    if not isinstance(releases, dict):
+        sys.exit('Invalid activation_release_by_device map')
     activations[only_for] = activation == '1'
+    if activation == '1':
+        releases[only_for] = {'version': entry['version'], 'sha256': entry['sha256']}
+    else:
+        releases.pop(only_for, None)
     if activation == '0':
         json.dump(data, open(path, 'w'), indent=2)
         print('%s: automatic activation disabled for %s; existing installations unchanged' % (where, only_for))
@@ -102,8 +118,6 @@ PY
 
 echo "========== Upload metadata to ${METADATA_GCS} =========="
 ota_metadata_sign "$PAYLOAD_TMP" "$METADATA_TMP"
-gsutil -h "Content-Type:application/json" \
-       -h "Cache-Control:no-cache, no-store, must-revalidate" \
-       cp "$METADATA_TMP" "$METADATA_GCS"
+ota_metadata_publish "$METADATA_TMP" "$METADATA_GCS"
 
 echo "Promoted. Devices with current version below min_version will now auto-update."

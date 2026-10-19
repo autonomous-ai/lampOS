@@ -30,6 +30,13 @@ export const LABEL_STYLE: CSSProperties = {
   marginBottom: 6,
 };
 
+// Explanatory notes under settings controls; textDim keeps them readable on dark cards.
+export const HINT_STYLE: CSSProperties = {
+  fontSize: 12.5,
+  lineHeight: 1.5,
+  color: C.textDim,
+};
+
 export const INPUT_STYLE: CSSProperties = {
   width: "100%",
   boxSizing: "border-box",

@@ -7,6 +7,7 @@ import threading
 from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import urlencode
 
+from hal import config as _hal_config
 from hal.drivers.voice.stt.provider import STTProvider, STTSession
 from hal.drivers.voice.tts.openai import _ensure_openai_v1
 
@@ -17,7 +18,10 @@ DEFAULT_MODEL = "nova-3-general"
 DEFAULT_LANGUAGE = "en"
 
 DEFAULT_ENCODING = "linear16"
-DEFAULT_ENDPOINTING_MS = 1500
+# Fast voice: a sooner final confirms the wake word and ends the drain sooner.
+DEFAULT_ENDPOINTING_MS = (
+    int(os.environ.get("HAL_FAST_VOICE_STT_ENDPOINTING_MS", "400")) if _hal_config.FAST_VOICE else 1500
+)
 DEFAULT_INTERIM_RESULTS = "true"
 
 

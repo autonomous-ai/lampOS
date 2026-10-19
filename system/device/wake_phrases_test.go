@@ -115,6 +115,39 @@ func TestWakeNeedsTheChimeOrTheLight(t *testing.T) {
 	}
 }
 
+func TestTapToTalkNeedsTheChimeOrTheLight(t *testing.T) {
+	off, on := false, true
+	c := baseConfig()
+	if !c.TapChimeEnabled() || !c.TapLightEnabled() {
+		t.Fatal("tap-to-talk cues default on")
+	}
+	if !keepsTapCue(c, domain.UpdateConfigRequest{TapChime: &off}) {
+		t.Fatal("chime off is fine while the light is on")
+	}
+	if keepsTapCue(c, domain.UpdateConfigRequest{TapChime: &off, TapLight: &config.WakeLight{Enabled: &off}}) {
+		t.Fatal("turning both off must be rejected")
+	}
+	look := &config.WakeLight{Enabled: &off, Color: []int{40, 0, 20}, Effect: "blink", Speed: 2}
+	applyUpdate(c, domain.UpdateConfigRequest{TapLight: look}, "")
+	look.Color[0] = 1
+	if c.TapLightEnabled() || c.TapLight.Color[0] != 40 || c.TapLight.Effect != "blink" {
+		t.Fatalf("tap light must persist as its own copy, got %+v", c.TapLight)
+	}
+	if !c.WakeLightEnabled() || c.WakeLight != nil {
+		t.Fatal("the tap light must not change the wake light")
+	}
+	if keepsTapCue(c, domain.UpdateConfigRequest{TapChime: &off}) {
+		t.Fatal("chime off with the saved light off must be rejected")
+	}
+	if !keepsTapCue(c, domain.UpdateConfigRequest{TapChime: &off, TapLight: &config.WakeLight{Enabled: &on}}) {
+		t.Fatal("swapping chime for light in one request is fine")
+	}
+	pub := (&Service{config: c}).GetPublicConfig()
+	if !pub.TapChime || pub.TapLightEnabled || pub.TapLight == nil || pub.TapLight.Effect != "blink" {
+		t.Fatalf("public tap cues = %v %v %+v", pub.TapChime, pub.TapLightEnabled, pub.TapLight)
+	}
+}
+
 func TestWakeLightPersistsAndIsPublic(t *testing.T) {
 	c := baseConfig()
 	look := &config.WakeLight{Color: []int{0, 20, 40}, Effect: "spin", Speed: 1.5}

@@ -208,7 +208,7 @@ def test_start_waits_for_previous_watchdog_to_exit(hardware):
 
 @pytest.mark.parametrize("extended", [False, True])
 @pytest.mark.parametrize("initial", [False, True])
-def test_boot_restore_does_not_masquerade_as_user_unmute(hardware, extended, initial):
+def test_unmute_only_reopens_the_microphone(hardware, extended, initial):
     config = PrivacyButtonConfig(disable_camera_on_mute=extended, mute_speaker_on_mute=extended)
     handler = PrivacyButtonHandler(config)
     with (
@@ -224,18 +224,14 @@ def test_boot_restore_does_not_masquerade_as_user_unmute(hardware, extended, ini
     ):
         handler._apply_state_locked(False, initial=initial)
         assert state._hw_mic_switch_muted is False
+        # Boot restore and a user flip alike only give the microphone back:
+        # no tap action, chime, spoken cue or listening window.
+        unmute.assert_called_once_with()
+        click.assert_not_called()
+        chime.assert_not_called()
+        announce.assert_not_called()
         if initial:
-            unmute.assert_called_once_with()
-            click.assert_not_called()
-            chime.assert_not_called()
-            announce.assert_not_called()
             hardware[1].assert_not_called()
-        else:
-            unmute.assert_not_called()
-            click.assert_called_once()
-            if extended:
-                chime.assert_called_once_with("privacy-switch")
-                announce.assert_called_once_with("privacy-switch")
         if extended:
             apply_privacy.assert_called_once_with(False, config)
         else:

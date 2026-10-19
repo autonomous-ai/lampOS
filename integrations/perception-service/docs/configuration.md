@@ -154,8 +154,9 @@ them to the GPU predictor in batches. Two knobs per model:
 | `BATCH_SIZE` | Max items dispatched in a single `predict()` call. Higher = better GPU utilization under concurrent load, but more VRAM per call. |
 | `BATCH_TIMEOUT` | Max seconds to wait for the batch to fill before dispatching what's available. Lower = less latency under light load. |
 
-Both default to `1` / `0.1` when omitted. The predictor's ONNX warmup runs at
-`BATCH_SIZE` so TensorRT pre-allocates the right amount of VRAM. SER is the
+Both default to `1` / `0.1` when omitted. Image predictors warm up at batch 1 and at
+`BATCH_SIZE`, so TensorRT builds the whole batch range (and pre-allocates its VRAM)
+at startup rather than on the first lone request (#612). SER is the
 exception: it warms up at batch 1 with two shapes (2 s and 8 s), the two ends of
 its input bound (`MIN_AUDIO_S`/`MAX_AUDIO_S`), not `SER__BATCH_SIZE`.
 
@@ -174,6 +175,27 @@ Recommended values for an RTX A5000 (24 GB) with all models loaded:
 | ECAPA-TDNN (audio) | 8 | 0.05 | ~50 MB model, small mel input |
 | YOLO-World (object) | 2 | 0.05 | ~500 MB model + CLIP encoder |
 | OWLv2 (object) | 1 | 0.05 | ~600 MB model, 1008×1008 ViT |
+
+### Overload (`OVERLOAD__*`)
+
+Each `InputBatcher` refuses work instead of queueing it without limit (#612). A
+request refused or dropped here gets HTTP `503` with `Retry-After`; a WebSocket
+frame gets `{"error": "busy"}` and the socket stays open.
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `OVERLOAD__MAX_WAIT_S` | `8.0` | A request still waiting for the GPU after this long is dropped before it runs. Kept under HAL's 15 s client timeout |
+| `OVERLOAD__MAX_PENDING_MIN` | `32` | Floor of the per-batcher backlog cap |
+| `OVERLOAD__MAX_PENDING_PER_BATCH` | `8` | Backlog cap = max(`MAX_PENDING_MIN`, `BATCH_SIZE` × this); a request past it is refused at once |
+| `OVERLOAD__RETRY_AFTER_S` | `2.0` | Seconds sent in `Retry-After` (rounded up, at least 1) |
+
+HTTP routes check for room before decoding the image or audio, so a refused request
+costs almost nothing. Stream sessions (pose, action, object) rest a full frame
+interval after a refused frame, and the action session checks the action batcher
+before running the person detector, so no GPU work is thrown away.
+
+Speaker embedding (`/audio-recognizer/embed`) does not go through a batcher and is
+not limited here.
 
 ### Object detectors (all opt-in)
 

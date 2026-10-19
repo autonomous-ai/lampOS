@@ -964,6 +964,12 @@ type RealtimeSetData struct {
 	BaseURL   string `json:"base_url,omitempty"`  // optional override; empty → llm_base_url-derived
 	// WebSearch toggles the in-session web_search tool (pipecat_v1 only); nil = unchanged.
 	WebSearch *bool `json:"web_search,omitempty"`
+	// FastVoice toggles HAL's fast voice mode (more Gemini use); nil = unchanged.
+	FastVoice *bool `json:"fast_voice,omitempty"`
+	// FastVoicePauseS sets fast voice's longest pause wait in seconds; nil = unchanged.
+	FastVoicePauseS *float64 `json:"fast_voice_pause_s,omitempty"`
+	// FastVoiceSilentTimeoutS sets how long fast voice waits on a silent model; nil = unchanged.
+	FastVoiceSilentTimeoutS *float64 `json:"fast_voice_silent_timeout_s,omitempty"`
 }
 
 // MQTTRealtimeSetCommand wraps the full realtime.set downlink envelope for unmarshalling.
@@ -1014,6 +1020,10 @@ type WakeSettings struct {
 	FollowupCustom bool `json:"followup_custom"`
 	FollowupMinS   int  `json:"followup_min_s"`
 	FollowupMaxS   int  `json:"followup_max_s"`
+	// TapChime and TapLight are the tap-to-talk recording cues (voice_input_mode
+	// "tap_to_talk"); at least one stays on. TapLight uses the same effects and speeds.
+	TapChime bool          `json:"tap_chime"`
+	TapLight WakeLightLook `json:"tap_light"`
 	// Applying is true when the set reply was sent while HAL was still restarting for a gate change.
 	Applying bool `json:"applying,omitempty"`
 }
@@ -1034,11 +1044,14 @@ type WakeSettingsSetData struct {
 	Chime     *bool             `json:"chime,omitempty"`
 	Light     *config.WakeLight `json:"light,omitempty"`
 	FollowupS *int              `json:"followup_s,omitempty"`
+	TapChime  *bool             `json:"tap_chime,omitempty"`
+	TapLight  *config.WakeLight `json:"tap_light,omitempty"`
 }
 
 // Empty reports a payload that changes nothing.
 func (d WakeSettingsSetData) Empty() bool {
-	return d.Enabled == nil && d.Phrases == nil && d.Chime == nil && d.Light == nil && d.FollowupS == nil
+	return d.Enabled == nil && d.Phrases == nil && d.Chime == nil && d.Light == nil && d.FollowupS == nil &&
+		d.TapChime == nil && d.TapLight == nil
 }
 
 // UpdateRequest maps the payload onto the shared PUT /api/device/config request.
@@ -1049,6 +1062,8 @@ func (d WakeSettingsSetData) UpdateRequest() UpdateConfigRequest {
 		WakeChime:     d.Chime,
 		WakeLight:     d.Light,
 		WakeFollowupS: d.FollowupS,
+		TapChime:      d.TapChime,
+		TapLight:      d.TapLight,
 	}
 }
 
@@ -1279,6 +1294,13 @@ type RealtimePublic struct {
 	HasAPIKey bool   `json:"has_api_key"`
 	// WebSearch is set only for pipecat_v1.
 	WebSearch *bool `json:"web_search,omitempty"`
+	// FastVoice is the effective fast voice setting (default on for Intern v2
+	// only; HAL applies it to Gemini only).
+	FastVoice bool `json:"fast_voice"`
+	// FastVoicePauseS is the effective fast voice pause wait (seconds).
+	FastVoicePauseS float64 `json:"fast_voice_pause_s"`
+	// FastVoiceSilentTimeoutS is the effective silent-model timeout (seconds).
+	FastVoiceSilentTimeoutS float64 `json:"fast_voice_silent_timeout_s"`
 }
 
 // ConfigPublicResponse is returned by GET /api/device/config; secrets appear only as Has* presence flags.
@@ -1323,14 +1345,19 @@ type ConfigPublicResponse struct {
 	// WakeLight is the saved wake light; WakeLightEnabled is its effective toggle.
 	WakeLight        *config.WakeLight `json:"wake_light,omitempty"`
 	WakeLightEnabled bool              `json:"wake_light_enabled"`
-	DeviceID         string            `json:"device_id"`
-	Mac              string            `json:"mac"`
-	NetworkSSID      string            `json:"network_ssid"`
-	MQTTEndpoint     string            `json:"mqtt_endpoint"`
-	MQTTUsername     string            `json:"mqtt_username"`
-	MQTTPort         int               `json:"mqtt_port"`
-	FAChannel        string            `json:"fa_channel"`
-	FDChannel        string            `json:"fd_channel"`
+	// TapChime and TapLightEnabled are the effective tap-to-talk cue toggles (default
+	// true); TapLight is the saved tap-to-talk light look.
+	TapChime        bool              `json:"tap_chime"`
+	TapLight        *config.WakeLight `json:"tap_light,omitempty"`
+	TapLightEnabled bool              `json:"tap_light_enabled"`
+	DeviceID        string            `json:"device_id"`
+	Mac             string            `json:"mac"`
+	NetworkSSID     string            `json:"network_ssid"`
+	MQTTEndpoint    string            `json:"mqtt_endpoint"`
+	MQTTUsername    string            `json:"mqtt_username"`
+	MQTTPort        int               `json:"mqtt_port"`
+	FAChannel       string            `json:"fa_channel"`
+	FDChannel       string            `json:"fd_channel"`
 
 	// CloudPerception is never omitted so the web can render every toggle.
 	CloudPerception config.CloudPerception `json:"cloud_perception"`
@@ -1423,6 +1450,10 @@ type UpdateConfigRequest struct {
 	// WakeLight replaces the wake light look and toggle; nil keeps it.
 	WakeLight      *config.WakeLight `json:"wake_light,omitempty"`
 	VoiceInputMode *string           `json:"voice_input_mode,omitempty" binding:"omitempty,oneof=automatic tap_to_talk"`
+	// TapChime toggles the tap-to-talk ready chime; nil keeps it.
+	TapChime *bool `json:"tap_chime,omitempty"`
+	// TapLight replaces the tap-to-talk light look and toggle; nil keeps it.
+	TapLight *config.WakeLight `json:"tap_light,omitempty"`
 
 	// CloudPerception changes camera cloud opt-ins; omitted keys and an omitted object keep their value.
 	CloudPerception *CloudPerceptionSetData `json:"cloud_perception,omitempty"`

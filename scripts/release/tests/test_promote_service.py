@@ -13,7 +13,7 @@ SOURCE = SCRIPT.read_text().split("<<'PY'\n", 1)[1].split('\nPY\n', 1)[0]
 
 class PromotionTests(unittest.TestCase):
     def promote(self, activation='', device='lamp', component='lamp-os', floor='', overrides=None):
-        entry = dict(service='lamp-os', version='1.2.3', min_version='0.0.0',
+        entry = dict(service='lamp-os', version='1.2.3', sha256='a' * 64, min_version='0.0.0',
                      activate_by_device={'other': True}, min_version_by_device={'other': '1.0.0'})
         entry.update(overrides or {})
         with tempfile.TemporaryDirectory() as directory:
@@ -31,6 +31,8 @@ class PromotionTests(unittest.TestCase):
             self.assertEqual(data['lamp-os']['min_version_by_device'],
                              {'lamp': '1.2.3', 'other': '1.0.0'} if value == '1' else {'other': '1.0.0'})
             self.assertEqual(data['untouched'], {'version': '9.0.0'})
+            self.assertEqual(data['lamp-os']['activation_release_by_device'],
+                             {'lamp': {'version': '1.2.3', 'sha256': 'a' * 64}} if value == '1' else {})
 
     def test_ordinary_promotion_preserves_activation(self):
         result, data = self.promote()
@@ -39,7 +41,8 @@ class PromotionTests(unittest.TestCase):
 
     def test_invalid_activation_is_rejected(self):
         cases = [dict(device=''), dict(component='hal'), dict(activation='yes'),
-                 dict(floor='0.0.0'), dict(floor='2.0.0'), dict(floor='invalid'),
+                 dict(floor='0.0.0'), dict(floor='1.0.0'), dict(floor='2.0.0'), dict(floor='invalid'),
+                 dict(overrides={'sha256': 'invalid'}),
                  dict(overrides={'service': 'wrong'}), dict(overrides={'activate_by_device': []}),
                  dict(overrides={'activate_by_device': {'lamp': 'true'}})]
         for case in cases:
@@ -48,13 +51,13 @@ class PromotionTests(unittest.TestCase):
                 result, _ = self.promote(**args)
                 self.assertNotEqual(result.returncode, 0)
 
-    def test_direct_script_requires_signing_before_fetch(self):
+    def test_partial_signing_configuration_fails_before_fetch(self):
         env = dict(os.environ, ACTIVATE='1', FOR='lamp')
         env.pop('OTA_SIGNING_PRIVATE_KEY', None)
-        env.pop('OTA_SIGNING_KEY_ID', None)
+        env['OTA_SIGNING_KEY_ID'] = 'partial'
         result = subprocess.run(['bash', str(SCRIPT), 'lamp-os'], env=env, text=True, capture_output=True)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Activation metadata must be signed', result.stderr)
+        self.assertIn('configure both', result.stderr)
         self.assertNotIn('Fetch metadata', result.stdout)
 
 

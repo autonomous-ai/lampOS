@@ -304,7 +304,7 @@ Cấu hình top-level `voice_input_mode` chọn `automatic` (mặc định, kể
 
 Cờ `wakeword` đã lưu được giữ nguyên. `WAKEWORD_ENABLED` hiệu dụng của HAL là false trong tap-to-talk, nên gaze, presence, focus từ boot greeting và wake phrase không mở bản ghi hay cửa sổ follow-up. Tap-to-talk cũng ép giá trị hiệu dụng `LIVE_MODE=false` và `REALTIME_TURN_DETECTION=off`, kể cả khi biến môi trường yêu cầu Live hoặc server VAD, để chỉ tap kết thúc mới commit lượt. Chuyển về automatic khôi phục cấu hình Live/turn detection và lựa chọn wake đã lưu. Harness ON giữ chính sách thu thủ công hiện tại, độc lập với cấu hình này.
 
-Bản ghi trên thiết bị dùng lại bộ điều khiển thu thủ công với nhãn owner device và generation định tuyến Harness có thẩm quyền. Bật Harness, mất snapshot định tuyến, đổi generation, stop/mute voice service hoặc restart HAL sẽ hủy input đang dở; bản ghi không được chuyển sang owner khác. Owner được kiểm tra lại trước khi upload audio sang realtime, commit và dispatch cuối; nếu mất quyền sau đó thì activity realtime đang chờ bị loại bỏ. Hủy trước tap kết thúc hợp lệ ngăn commit và loại bỏ/reset phiên provider, kể cả audio đã upload. Im lặng không tự commit; lỗi recorder hoặc chạm giới hạn `HAL_MAX_SESSION_DURATION_S` (mặc định 30 giây) làm hủy bản ghi. Phản hồi thu trên device do `_internal/device_capture.py` quản lý: sau frame mic đầu tiên, tone ngắn 40 ms và hiệu ứng listening báo recorder cục bộ sẵn sàng, không chờ kết nối STT. Audio được giữ trong buffer lúc kết nối trong giới hạn thời lượng bản ghi (mặc định 30 giây). Tap kết thúc dừng input và công bố endpoint realtime trước tone đi xuống và trước khi chờ cloud chốt transcript; tone xác nhận đã dừng thu, không xác nhận đã gửi thành công. Tap kết thúc sau khi mic sẵn sàng nhưng trước khi STT kết nối vẫn giữ audio để gửi khi kết nối thành công. Tap trước khi mic sẵn sàng hủy và không gửi. Một worker nền có giới hạn warm code bộ lọc tham chiếu khử vọng ngay khi tạo pipeline, kể cả đang mute hoặc ngủ, không mở mic hay thay trạng thái AEC đang chạy. Lần đánh thức đầu không phải trả chi phí import lạnh này. Input thủ công device bỏ chờ khởi động voice cố định 500 ms; Automatic và Harness giữ nguyên. Tap trên device được chấp nhận sẽ đánh thức recorder worker ngay. Arecord của device dùng period 10 ms (giữ buffer mặc định), đọc 10 ms đầu để xác nhận mic; capture kiểm tra dừng giữa các lần đọc 10 ms, còn STT vẫn gom gói 64 ms. Thời gian chờ terminate giới hạn 100 ms trước khi kill/reap để pipe đầy sau khi chốt không giữ tap kế tiếp hai giây. Cấu hình recorder automatic/Harness không đổi. Khi TTS đang phát, tap chỉ ngắt; nếu realtime đang trả lời thì tap cũng hủy stream phản hồi để các đoạn audio tiếp theo không phát trở lại. Khi đang ngủ, tap chỉ đánh thức. Tap tiếp theo mới thu. Khóa mic vật lý luôn có quyền ưu tiên.
+Bản ghi trên thiết bị dùng lại bộ điều khiển thu thủ công với nhãn owner device và generation định tuyến Harness có thẩm quyền. Bật Harness, mất snapshot định tuyến, đổi generation, stop/mute voice service hoặc restart HAL sẽ hủy input đang dở; bản ghi không được chuyển sang owner khác. Owner được kiểm tra lại trước khi upload audio sang realtime, commit và dispatch cuối; nếu mất quyền sau đó thì activity realtime đang chờ bị loại bỏ. Hủy trước tap kết thúc hợp lệ ngăn commit và loại bỏ/reset phiên provider, kể cả audio đã upload. Im lặng không tự commit; lỗi recorder hoặc chạm giới hạn `HAL_MAX_SESSION_DURATION_S` (mặc định 30 giây) làm hủy bản ghi. Phản hồi thu trên device do `_internal/device_capture.py` quản lý: sau frame mic đầu tiên, chime sẵn sàng (cùng tiếng ping ~120 ms như wake phrase) và đèn listening báo recorder cục bộ sẵn sàng, không chờ kết nối STT. `tap_chime` và `tap_light` trong `config.json` (Settings → General → Tap to talk, mặc định đều bật) tắt riêng hai cue này, độc lập với cue của wake; xem **Cue của tap-to-talk** bên dưới. Audio được giữ trong buffer lúc kết nối trong giới hạn thời lượng bản ghi (mặc định 30 giây). Tap kết thúc dừng input và công bố endpoint realtime trước tone đi xuống và trước khi chờ cloud chốt transcript; tone xác nhận đã dừng thu, không xác nhận đã gửi thành công. Tap kết thúc sau khi mic sẵn sàng nhưng trước khi STT kết nối vẫn giữ audio để gửi khi kết nối thành công. Tap trước khi mic sẵn sàng hủy và không gửi. Một worker nền có giới hạn warm code bộ lọc tham chiếu khử vọng ngay khi tạo pipeline, kể cả đang mute hoặc ngủ, không mở mic hay thay trạng thái AEC đang chạy. Lần đánh thức đầu không phải trả chi phí import lạnh này. Input thủ công device bỏ chờ khởi động voice cố định 500 ms; Automatic và Harness giữ nguyên. Tap trên device được chấp nhận sẽ đánh thức recorder worker ngay. Arecord của device dùng period 10 ms (giữ buffer mặc định), đọc 10 ms đầu để xác nhận mic; capture kiểm tra dừng giữa các lần đọc 10 ms, còn STT vẫn gom gói 64 ms. Thời gian chờ terminate giới hạn 100 ms trước khi kill/reap để pipe đầy sau khi chốt không giữ tap kế tiếp hai giây. Cấu hình recorder automatic/Harness không đổi. Khi TTS đang phát, tap chỉ ngắt; nếu realtime đang trả lời thì tap cũng hủy stream phản hồi để các đoạn audio tiếp theo không phát trở lại. Khi đang ngủ, tap chỉ đánh thức. Tap tiếp theo mới thu. Khóa mic vật lý luôn có quyền ưu tiên.
 
 Thu âm trên device và chốt kết quả qua mạng được tách trong `_internal/device_voice_pipeline.py`. `_internal/device_turn_queue.py` giữ chỗ cho tối đa hai lượt chưa hoàn tất trước khi nhận bản ghi, gồm lượt đang thu và lượt đang upload/chốt kết quả. Khi kết thúc, recorder được giải phóng sau tone dừng cục bộ; tap tiếp theo có thể thu trong lúc STT của lượt trước còn chốt. Mỗi lượt sở hữu một worker realtime trong `_internal/device_realtime.py`; công việc model chạy tuần tự theo thứ tự thu, độc lập với FIFO dispatch STT. Transcript STT, nhận diện người nói, sự kiện đồng bộ OS đã xử lý và fallback transcript có thể hoàn tất sau trên FIFO đó. STT chậm hoặc lỗi không hủy realtime; fallback cần transcript sẵn có. Giới hạn hai chỗ giữ áp dụng cho tổng công việc chưa hoàn tất, và công việc mạng không chặn thu âm. Audio trực tiếp từ model cũng đợi guard input mic trên device được nhả trước khi phát, và có thể hủy trong lúc đợi. Worker chốt không ghi đè hiệu ứng thinking/listening của bản ghi mới hơn. Nếu cả hai chỗ đều bận, bản ghi mới bị từ chối trước tone sẵn sàng. Hủy làm vô hiệu các lượt đang chờ; uploader vẫn giữ chỗ đến khi provider giải phóng tài nguyên. TTS trả lời bắt buộc đợi trong lúc input device giữ mic, không báo đang phát; lời nói tùy chọn giữ chính sách chặn hiện có. Nhận input và nhận playback dùng cùng cơ chế đồng bộ; guard chỉ nhả sau khi mic đóng. Hàng đợi lời trả lời bắt buộc giới hạn 32 yêu cầu / 64 KiB văn bản; khi đầy sẽ từ chối yêu cầu mới. Bắt đầu bản ghi mới hủy lượt STT/realtime cũ và xóa lời nói đang chờ dù TTS chưa phát. OS nhận mốc thời gian để chặn lời trả lời và filler cũ, không hủy tác vụ hay hành động phần cứng của agent. Mốc được lấy trước khi nhận bản ghi mới nên yêu cầu hủy đến muộn không chặn lượt mới; fallback giữ thời điểm thu gốc dù đến OS muộn. Hủy cục bộ không đợi HTTP. Chặn phía OS là best effort nếu OS không truy cập được; uploader đã hủy vẫn giữ chỗ trong giới hạn đến khi dọn tài nguyên xong. Đổi provider hoặc giọng TTS sẽ hủy lời trả lời đang chờ của output service cũ; guard và cue của bản ghi đang thu được chuyển sang service mới trước khi công bố instance đó, còn guard cũ được giữ đến khi mic đóng.
 
@@ -700,11 +700,23 @@ effect của LED engine (`EFFECTS`: `solid` = màu đứng yên, `breathing` =
 `breathing_fine`, `spin` = `pulse`, `blink` = `blink`) và đọc config trực tiếp.
 `app_state._apply_emotion_led_display` dùng `wake_light.listening_preset()` cho mọi
 lần hiển thị emotion `listening`, nên kiểu đèn của chủ máy áp dụng cả khi nghe do
-bấm nút. Khi `wake_light.enabled` là false, các cue nghe do giọng nói kích hoạt
+bấm nút ở chế độ Automatic. Khi `wake_light.enabled` là false, các cue nghe do giọng nói kích hoạt
 (`fire_listening_cue` và LED của bare wake) bị bỏ qua; HAL tự bật lại đèn nếu cả
 chime lẫn đèn đều tắt, để lần gọi luôn có phản hồi. os-server áp cùng quy tắc:
 `keepsWakeCue` (`system/device/config_update.go`) từ chối update khiến cả
 `wake_chime` và `wake_light` cùng tắt bằng `config.ErrNoWakeCue`.
+
+**Cue của tap-to-talk.** Tap to talk có cặp cue riêng, chỉnh trong mục **Tap to
+talk** ở Settings → General: `tap_chime` trong `config.json` (mặc định bật) phát
+chime sẵn sàng khi bản ghi bằng tap bắt đầu (`DeviceCapture._cue`; tap kết thúc
+vẫn giữ tone đi xuống 40 ms và cả hai theo cùng công tắc), còn `tap_light` (cùng
+dạng với `wake_light`) là đèn trong lúc thu. Ở tap to talk chỉ bản ghi bằng tap mới
+hiện `listening`, nên `wake_light.listening_preset()` trả kiểu đèn `tap_light` khi
+`VOICE_INPUT_MODE` là `tap_to_talk`; trường không đặt giữ kiểu đèn của board, không
+lấy kiểu đèn của wake. `wake_light.tap_enabled()` chặn đèn
+(`InputPolicy.set_capturing`) và tự bật lại khi chime tap cũng tắt. `keepsTapCue`
+của os-server từ chối tắt cả hai bằng `config.ErrNoTapCue`. HAL đọc trực tiếp cả
+hai; đổi không cần restart gì.
 
 `POST /led/wake-light/preview` (HAL) với body `{color, effect, speed}` phát thử
 kiểu đèn trong 3 s rồi khôi phục đèn trước đó; không lưu gì. Trả `{status, painted}`;
@@ -754,6 +766,14 @@ stream, nên gần như mọi session dựng sẵn chết sau vài giây và l�
 vẫn được nhận ra là stale, và lượt đó kết nối lại kèm phát lại pre-roll. Vòng recv
 giờ ghi log tin `Error` của server và các lần đóng bất thường, trước đây bị bỏ qua
 im lặng.
+
+Một capture không mở lượt nào (bị language gate hoặc live guard bỏ qua, hoặc đi vào
+live session) trước đây vứt session dựng sẵn mà không đóng, rồi mở session mới.
+Mỗi socket bị bỏ rơi nằm chờ tới khi server ngắt — với Flux là
+`INACTIVE_CLIENT … did not receive a websocket Ping message in the last 60 seconds`,
+đúng 60 s sau lúc mở, mỗi capture bị loại một lần (48 lần trong một lần boot
+Intern v2, 2026-10-16). Giờ `_vad_loop` đóng nó ngoài luồng mic
+(`_retire_keepalive_session`); chỉ lượt thật mới nhận session đó.
 
 Tiếng chime khi bấm nút không bao giờ chờ sau âm thanh khác: `TTSService.try_play_ack_chime()`
 chỉ ghi khi output stream đang rảnh, bận thì bỏ qua, nên tiếng không bao giờ trễ
@@ -3548,8 +3568,8 @@ Nếu một lần inference lỗi, capture đó được chấp nhận. Playback
   reject xóa VAD lookback (audio đã giữ đã được tiêu thụ) và mọi listening cue đang
   chờ.
 
-`HAL_LANG_GATE` chọn `enforce` (mặc định), `shadow` (ghi log, không bao giờ reject)
-hoặc `off`. `HAL_LANG_ID_CPUS` (ví dụ `0,1,2,3`; rỗng = không pin) chạy load và
+`HAL_LANG_GATE` mặc định là `off` (tắt language gate). Đặt `enforce` để bật chặn
+hoặc `shadow` để chỉ ghi log, không reject. `HAL_LANG_ID_CPUS` (ví dụ `0,1,2,3`; rỗng = không pin) chạy load và
 inference trên một worker thread được pin bằng `sched_setaffinity`;
 `HAL_LANG_ID_THREADS` mặc định một thread cho mỗi CPU được pin, nếu không là 2.
 `HAL_LANG_GATE_DUMP_DIR` ghi phần lời nói được chấm điểm và capture đã giữ thành
@@ -3581,6 +3601,57 @@ khác có thêm 5 s tiếng Anh sau đó), cổng chấp nhận phần tiếng A
 suốt phần tiếng Việt, và Nova-3 `en` không phiên âm phần tiếng Việt nào: mỗi
 transcript chỉ chứa tiếng Anh, kể cả phần tiếng Anh ở cuối. Phần tiếng Việt vẫn giữ
 lượt mở cho tới khoảng 1 s sau khi dừng.
+
+### Fast voice (tốn Gemini hơn)
+
+Mọi device đều có cờ này; **chỉ Intern v2 mặc định bật** (`device_type` /
+`DEVICE_TYPE` `intern-v2`), device khác mặc định tắt. Khi tắt thì không có gì
+dưới đây thay đổi. Ô **Faster replies** ở Settings → Realtime (Gemini) ghi
+`config.json` `realtime.fast_voice` (lệnh `realtime.set` cũng nhận
+`fast_voice`; field Go là `RealtimeConfig.FastVoice`, vắng = mặc định của device;
+`RealtimeFastVoice()` trả giá trị đang áp dụng cho web); `HAL_FAST_VOICE=1|0`
+thắng cả hai. Chỉ áp dụng cho Gemini ở turn mode (`REALTIME_ENABLED`, provider
+`gemini`, `LIVE_MODE` tắt; live mode vốn đã stream); ngoài ra
+`hal.config.FAST_VOICE` luôn false. Nó rút ngắn các khoảng chờ của chính thiết
+bị từ lúc người ngừng nói tới lúc câu hỏi tới Gemini:
+
+| Khoảng chờ | Tắt | Bật | Chỉnh bằng |
+|---|---|---|---|
+| Đồng hồ im lặng trước Smart Turn (`SILENCE_TIMEOUT_S`) | `HAL_SILENCE_TIMEOUT` (profile 1.2 s, code 2.5 s) | 0.65 s; Smart Turn vẫn giữ câu chưa nói xong | `HAL_FAST_VOICE_SILENCE_S` |
+| `endpointing` của Deepgram (`stt/autonomous.py`, `stt/deepgram.py`) | 1500 ms | 400 ms, để wake word được final xác nhận giữa câu và bước drain final xong sớm hơn | `HAL_FAST_VOICE_STT_ENDPOINTING_MS` |
+| Upload khi cửa sổ wake đang đóng (`start_realtime_turn`) | Giữ lại tới khi thu xong rồi mới flush | Stream từ frame mà partial STT mở cổng wake; chỉ commit khi wake được xác nhận (final, transcript ghép hoặc follow-up focus), không thì activity đã stream bị bỏ (`discard_open_activity("wake-unconfirmed")`) | — |
+| Chạy song song với drain final (`early_authorized`) | Chỉ khi có follow-up focus hoặc tắt wake | Thêm trường hợp wake word đã được final xác nhận | — |
+| Chờ khi Smart Turn cho là câu "chưa xong" (`TURN_END_MAX_PAUSE_S`, fallback không vượt nó) | 6.0 s | `realtime.fast_voice_pause_s` (mặc định 2.0 s, 0.8–6.0; web **Wait after you pause**); Smart Turn cho phần lớn câu hỏi tiếng Việt là chưa xong (p≈0.08), từng giữ chúng 5.5 s trên device | `HAL_FAST_VOICE_MAX_PAUSE_S` |
+| Chuyển lượt khi model im lặng (`REALTIME_RECV_QUEUE_TIMEOUT_S`; server vẫn gửi message thì lượt vẫn giữ) | 8.0 s | `realtime.fast_voice_silent_timeout_s` (mặc định 5 s, 3–8; web **Hand off when Gemini stays silent**); một session vừa kết nối lại từng im 9.5 s rồi agent chính mới nhận | `HAL_FAST_VOICE_SILENT_TIMEOUT_S` |
+| Chờ speaker-ID prepass lúc commit | 0.2 s | 0 s (danh tính được sửa ở bước sau) | `HAL_FAST_VOICE_PREPASS_JOIN_S` |
+| Cổng ngôn ngữ giữ capture | Khoảng lặng `HAL_LANG_GATE_UTTERANCE_GAP_S` (1.0 s), rồi đồng hồ im lặng đếm lại từ 0 | Khoảng lặng không vượt đồng hồ im lặng; đồng hồ vẫn đếm lại từ 0 (tính phần im lặng cuối pre-roll từng cắt mất câu của người nói nhỏ ngay đầu phiên) | — |
+| Kiểm tra rebuild sẵn sàng sau idle park | Kiểm một lần | Chờ tối đa 0.5 s cho thread prepare đã join rebuild | — |
+| Giọng trả lời | TTS của mình (vd ElevenLabs) sau khi có chữ | Âm thanh gốc của Gemini (`REALTIME_NATIVE_AUDIO` bị ép bật, giọng lấy từ `realtime.gemini.voice`) | — |
+
+**Không** đổi model Gemini: `gemini-3.8-live` thường từng chuyển hết cho agent
+chính hoặc im lặng mọi lượt trên thiết bị (2026-09-18), nên fast voice giữ model
+đang cấu hình. Tốn Gemini hơn vì nhiều lượt tới Gemini sớm hơn, kể cả audio đã
+stream rồi capture mới bị loại là tiếng ồn (đường discard sẵn có xử lý). Test:
+`hal/test/test_fast_voice.py`. Trên device 172.168.20.203 (2026-10-15/16) câu
+trả lời bắt đầu sau khoảng 2.5–4.7 s thay vì 5–10 s; wake được partial xác nhận
+sớm đạt 1.4–2.6 s. Phần còn lại là thời gian phản hồi của chính Gemini.
+
+Fast voice nói bằng giọng `realtime.gemini.voice`: os-server nhận đủ 30 giọng
+dựng sẵn của Gemini Live (`RealtimeGeminiVoiceList`, cùng bộ với `GeminiVoice`
+của HAL); trên device, câu trả lời tiếng Việt bằng giọng Achernar nghe tự nhiên.
+
+Audio gốc được phát ngay trong lượt, lúc không ai đọc microphone. Với backend
+arecord, pipe dồn lại phần audio đó (khoảng 2 s) và vòng nghe từng đọc lại như
+lời mới: mấy chữ đầu câu trả lời của chính device ("Bây giờ…", "Để tôi…") mở ra
+một lượt nghe tiếp. Khi `REALTIME_NATIVE_AUDIO` bật, `_vad_loop` giờ bỏ phần
+audio dồn đó sau mỗi lượt (`_discard_stale_mic_backlog`: frame dồn trả về ngay,
+nên dừng ở lần đọc đầu tiên phải chờ; tối đa 4 s; pump capture liên tục vốn đã
+bỏ audio lúc phát). Câu trả lời ElevenLabs không bị ảnh hưởng: chúng chủ yếu phát
+sau lượt, lúc vòng nghe đang xả mic.
+
+Gemini đôi khi viết marker im lặng là `[no speech]` thay vì `<no speech>`; mọi
+chỗ so khớp marker đều nhận cả hai, nên audio gốc của câu chỉ có marker bị giữ
+lại thay vì phát ra.
 
 ### Block `realtime` trong `config.json`
 

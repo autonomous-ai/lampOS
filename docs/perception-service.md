@@ -71,10 +71,30 @@ server must be deployed before a HAL build that sends the new name (an older ser
 ignores `preset` and answers 200 with its default classes). Both graphs use explicit
 TensorRT profiles (1–500 queries, optimized for 46) and are warmed at 46 and 1 queries,
 so engines are built at startup, on the idle slot during a two-slot deploy (about 97 s
-on the current GPU), never in the middle of a request. Request schema:
+on the current GPU), never in the middle of a request. Image models (FER, pose 2D/3D,
+action, ONNX object detectors) warm up at batch 1 and at their max batch, so TensorRT
+builds the full batch range at startup instead of on the first lone request. Request schema:
 [`integrations/perception-service/docs/api.md`](../integrations/perception-service/docs/api.md#object-detection--websocket--http).
 Model choices and outputs:
 [`integrations/perception-service/docs/perceptions.md`](../integrations/perception-service/docs/perceptions.md).
+
+**Overload.** Each model's batcher refuses work instead of queueing it without
+limit: when its backlog passes max(32, batch × 8), or a request has waited over
+8 s for the GPU, the server answers `503` with `Retry-After: 2` (WebSocket frames
+get `{"error": "busy"}`), and HAL backs off 2–30 s. Speaker embedding is not
+batched and is not limited this way. Knobs: `OVERLOAD__*` in
+[`configuration.md`](../integrations/perception-service/docs/configuration.md#overload-overload__).
+
+**Two-slot mode (optional).** A second dlserver slot can serve next to the first on
+the same GPU, turned on and off by hand (`make dlserver-two-slot`,
+`make dlserver-single`, `make dlserver-mode`). It needs about 9.7 GB more GPU memory,
+always runs the same code as the first slot, and a container restart returns to one
+slot. A deploy in two-slot mode drops to one slot, deploys, then restores both; the
+in-place restart (`make start-runpod-master`) refuses until `make dlserver-single`.
+lbserver skips a slot that refuses connections for 10 s. Measured: +26 % OWLv2
+throughput but slower voice under load and double the GPU memory, so it is
+available but not recommended for normal traffic. Details:
+[Two-slot mode](../integrations/perception-service/docs/deployment.md#two-slot-mode-optional).
 
 ## Using it from a device
 

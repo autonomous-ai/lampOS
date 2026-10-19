@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import TypeAdapter, ValidationError
 
+from core.perception.base.batching import BatcherOverloaded
 from dlserver.models.facial_emotion import (
     EmotionConfigRequest,
     EmotionFrameRequest,
@@ -15,7 +16,7 @@ from dlserver.models.facial_emotion import (
     EmotionRequest,
     EmotionResponse,
 )
-from dlserver.utils.common import decode_image, verify_ws_api_key
+from dlserver.utils.common import decode_image, overloaded_http, verify_ws_api_key
 from dlserver.utils.state import get_emotion_model
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -76,6 +77,9 @@ async def emotion_analysis_ws(websocket: WebSocket):
                         logger.warning("Unknown emotion WS message type: %s", raw[:200])
             except WebSocketDisconnect:
                 raise
+            except BatcherOverloaded:
+                # Busy: skip this frame without a traceback; the client keeps streaming.
+                await websocket.send_json({"error": "busy"})
             except Exception as e:
                 logger.exception("Error processing facial emotion WS message")
                 await websocket.send_json({"error": "Processing failed"})
@@ -104,6 +108,10 @@ async def emotion_recognize(req: EmotionRecognizeRequest):
     emotion_model = get_emotion_model()
     if emotion_model is None or not emotion_model.is_ready():
         raise HTTPException(status_code=503, detail="Facial emotion model not loaded")
+    try:
+        emotion_model.check_capacity()
+    except BatcherOverloaded as exc:
+        raise overloaded_http(exc) from exc
 
     try:
         face_crop = decode_image(req.image_b64)
@@ -140,6 +148,8 @@ async def emotion_recognize(req: EmotionRecognizeRequest):
         )
     except HTTPException:
         raise
+    except BatcherOverloaded as exc:
+        raise overloaded_http(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception:

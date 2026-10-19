@@ -1,7 +1,7 @@
 {
   "boards": {
     "orangepi_sun60": {
-      "enabled": true,
+      "enabled": false,
       "bus": 0,
       "address": 90,
       "electrodes": [

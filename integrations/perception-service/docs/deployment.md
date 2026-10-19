@@ -143,7 +143,8 @@ Override with `DLSERVER_PORT`, `LBSERVER_PORT`, `JUPYTER_PORT` make variables.
 | `make start-runpod-dlserver` | Background dlserver with auto-restart watchdog |
 | `make start-runpod-dlserver-slot` | Start one dlserver slot without `install` (used by the deploy) |
 | `make deploy-dlserver` | Zero-downtime deploy of new dlserver code (two slots) |
-| `make print-dlserver-pid` | Pid file of the serving slot (used by autostart) |
+| `make dlserver-two-slot` / `make dlserver-single` / `make dlserver-mode` | Optional second dlserver slot on the same GPU: turn on, turn off, show status (see [Two-slot mode](#two-slot-mode-optional)) |
+| `make print-dlserver-pid` | Pid file of the primary serving slot (used by autostart) |
 | `make start-runpod-lbserver` | Background lbserver with auto-restart watchdog |
 | `make start-nginx` | Start nginx (HTTP) |
 | `make start-nginx-ssl` | Start nginx (HTTPS, auto-generates self-signed cert) |
@@ -236,6 +237,45 @@ To turn the feature off, stop slot B if it runs
 lbserver, so this does not unset it: with the state file gone, lbserver falls
 back to serving from `LB__BACKENDS` directly, which is the two-slot deploy
 effectively off, not the env var unset.
+
+### Two-slot mode (optional)
+
+Between deploys one slot serves. When traffic needs it, a second slot can serve
+alongside it on the same GPU, switched by hand (#612):
+
+| Command | What it does |
+|---------|--------------|
+| `make dlserver-two-slot` | Starts the idle slot on the **same code** as the active one, waits until it serves every model the active slot serves, then points lbserver at both (state file lists both, SIGHUP, ack checked) |
+| `make dlserver-single` | Points lbserver at one slot (8001 when it is alive, else the live one), drains 35 s, stops the other |
+| `make dlserver-mode` | Prints the mode, each slot (running / DOWN, commit) and GPU memory |
+
+- The second slot needs about 9.7 GB of GPU memory; `dlserver-two-slot` refuses
+  below `DEPLOY_MIN_FREE_GPU_MB` (12000 MB) free.
+- It refuses when the checkout differs from the active slot's commit (`run make
+  deploy-dlserver first`), so both slots always run the same code.
+- `make deploy-dlserver` in two-slot mode drops to single, deploys exactly as
+  above, then turns two-slot back on with the new code. One slot serves
+  throughout. If the deploy fails it stays in single mode
+  (`make dlserver-two-slot` to retry).
+- The in-place restart (`make start-runpod-master` / `make start-runpod-dlserver`)
+  refuses in two-slot mode, because `install` would rewrite the venv under the slot
+  that keeps serving: run `make dlserver-single` first.
+- The state file is in `/tmp`, so a container restart always comes back in single
+  mode. Restarting lbserver alone keeps the current mode.
+- Switching to single drops open WebSocket streams on the stopped slot once; HAL
+  reconnects.
+- lbserver skips a slot that refuses connections (HTTP only) for 10 s and sends
+  that request once to the other slot. Timeouts and HTTP errors are never retried.
+- The two slots are separate processes, so their GPU work interleaves instead of
+  queuing behind one lock. Measured on the production GPU (2026-10-15): OWLv2 peak
+  6.45 → 8.13 req/s (+26 %), but voice gets slower under load (speaker embed p95
+  157–162 → 216–231 ms, SER p95 129–131 → 197–218 ms) and GPU memory doubles
+  (10.1 → 19.8 GB). Available, **not recommended** for normal traffic: single mode
+  plus the overload limits is the default.
+
+The scripts are `scripts/dlserver-mode.sh` and `scripts/deploy-dlserver.sh`, sharing
+`scripts/dlserver-slots.sh`; `tests/scripts_local/test_dlserver_mode.py` runs them
+against stand-in tools.
 
 ### Testing
 

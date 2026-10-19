@@ -1,8 +1,9 @@
 """Owner-chosen listening light shown when the device wakes (config.json `wake_light`).
 
-Unset fields fall back to the board's `listening` emotion preset, so a device the
-owner never customised keeps its existing cue. The owner may turn the light off
-only while the wake chime is on: a wake must always give some feedback.
+Tap to talk has its own light (config.json `tap_light`) shown while a tapped
+recording runs. Unset fields fall back to the board's `listening` emotion preset,
+so a device the owner never customised keeps its existing cue. Either light may
+be off only while its chime is on: listening must always give some feedback.
 """
 import copy
 from typing import Optional
@@ -28,8 +29,12 @@ SPEED_MIN = 0.25
 SPEED_MAX = 3.0
 
 
-def _owner() -> dict:
-    raw = config._os_cfg_get("wake_light", None)
+def _tap_mode() -> bool:
+    return getattr(config, "VOICE_INPUT_MODE", "automatic") == "tap_to_talk"
+
+
+def _owner(key: str = "wake_light") -> dict:
+    raw = config._os_cfg_get(key, None)
     return raw if isinstance(raw, dict) else {}
 
 
@@ -45,6 +50,11 @@ def valid_color(color) -> Optional[list[int]]:
 def enabled() -> bool:
     """Whether a wake lights the strip; forced on when the chime is off too."""
     return _owner().get("enabled") is not False or not config.wake_chime_enabled()
+
+
+def tap_enabled() -> bool:
+    """Whether a tap-to-talk recording lights the strip; forced on when its chime is off too."""
+    return _owner("tap_light").get("enabled") is not False or not config.tap_chime_enabled()
 
 
 def look_preset(color=None, effect=None, speed=None) -> dict:
@@ -65,6 +75,9 @@ def look_preset(color=None, effect=None, speed=None) -> dict:
 
 
 def listening_preset() -> dict:
-    """The owner's listening look (read live, so an admin edit applies to the next wake)."""
-    owner = _owner()
+    """The owner's listening look (read live, so an admin edit applies to the next wake).
+
+    In tap to talk only a tapped recording shows listening, so it uses the tap light.
+    """
+    owner = _owner("tap_light" if _tap_mode() else "wake_light")
     return look_preset(owner.get("color"), owner.get("effect"), owner.get("speed"))

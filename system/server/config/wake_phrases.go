@@ -79,6 +79,9 @@ const (
 // ErrNoWakeCue rejects turning off both the wake chime and the wake light.
 var ErrNoWakeCue = fmt.Errorf("keep the wake chime or the wake light on, so a wake is noticeable")
 
+// ErrNoTapCue rejects turning off both the tap-to-talk chime and light.
+var ErrNoTapCue = fmt.Errorf("keep the tap-to-talk chime or light on, so you can tell recording started")
+
 // Validate checks the effect, speed and colour; zero values mean "board default".
 func (w *WakeLight) Validate() error {
 	if w.Effect != "" && !slices.Contains(WakeLightEffects, w.Effect) {

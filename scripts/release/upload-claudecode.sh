@@ -25,7 +25,7 @@ METADATA_TMP=$(mktemp)
 PAYLOAD_TMP=$(mktemp)
 trap 'rm -f "$METADATA_TMP" "$PAYLOAD_TMP"' EXIT
 
-if ! gsutil cp "$METADATA_GCS" "$METADATA_TMP" 2>/dev/null; then
+if ! ota_metadata_fetch "$METADATA_GCS" "$METADATA_TMP" 2>/dev/null; then
   echo "Note: $METADATA_GCS not found — bootstrapping with empty object."
   printf '{}' > "$PAYLOAD_TMP"
 else
@@ -47,9 +47,7 @@ PY
 
 ota_metadata_sign "$PAYLOAD_TMP" "$METADATA_TMP"
 
-gsutil -h "Cache-Control:no-cache, no-store, must-revalidate" \
-       -h "Content-Type:application/json" \
-       cp "$METADATA_TMP" "$METADATA_GCS"
+ota_metadata_publish "$METADATA_TMP" "$METADATA_GCS"
 
 echo "Updated $METADATA_GCS: claudecode.version = ${VERSION}"
 echo "Fleet is NOT updated yet — run 'make promote-claudecode' to raise min_version."

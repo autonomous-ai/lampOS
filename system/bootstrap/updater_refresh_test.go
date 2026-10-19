@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -203,5 +204,27 @@ func TestRefreshUpdaterRechecksActivationAfterDownload(t *testing.T) {
 	data, err := os.ReadFile(dest)
 	if err != nil || string(data) != original {
 		t.Fatalf("activation compatibility state was stale: %q %v", data, err)
+	}
+}
+
+func TestRefreshUpdaterPreservesMigrationCapabilitiesBeforeActivation(t *testing.T) {
+	original := "#!/bin/sh\n# Service OTA protocol: 1\n# Service OTA activation protocol: 1\n# Service OTA preflight protocol: 1\n# Service OTA cleanup protocol: 1\necho current\n"
+	for _, protocol := range []string{"preflight", "cleanup"} {
+		t.Run(protocol, func(t *testing.T) {
+			b, _ := serviceBootstrap(t)
+			dest := withTempUpdaterPath(t, original)
+			published := strings.ReplaceAll(original, "# Service OTA "+protocol+" protocol: 1\n", "")
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(published))
+			}))
+			defer server.Close()
+			b.cfg.MetadataURL = server.URL + "/os/ota/metadata.json"
+			b.client = server.Client()
+			b.refreshUpdater(context.Background())
+			data, err := os.ReadFile(dest)
+			if err != nil || string(data) != original {
+				t.Fatalf("stale feed removed %s before migration: %v", protocol, err)
+			}
+		})
 	}
 }

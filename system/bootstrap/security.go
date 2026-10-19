@@ -88,9 +88,12 @@ func decodeOTAMetadata(data []byte, encodedPublicKey string) (domain.OTAMetadata
 
 func validateOTAMetadata(metadata domain.OTAMetadata) error {
 	for key, component := range metadata {
-		if component.Service != "" || len(component.Replaces) > 0 || len(component.ActivateByDevice) > 0 {
+		if component.Service != "" || len(component.Replaces) > 0 || len(component.ActivateByDevice) > 0 || len(component.ActivationReleaseByDevice) > 0 {
 			if err := domain.ValidateOTAServiceComponent(key, component); err != nil {
 				return err
+			}
+			if err := domain.ValidateOTAActivationReleases(component); err != nil {
+				return fmt.Errorf("metadata[%s]: %w", key, err)
 			}
 			if strings.TrimSpace(component.URL) == "" {
 				return fmt.Errorf("service metadata[%s].url is empty", key)

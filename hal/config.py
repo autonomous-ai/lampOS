@@ -193,6 +193,11 @@ def wake_chime_enabled() -> bool:
     return _os_cfg_get("wake_chime", True) is not False
 
 
+def tap_chime_enabled() -> bool:
+    """Owner toggle (config.json `tap_chime`, default on) for the tap-to-talk ready chime."""
+    return _os_cfg_get("tap_chime", True) is not False
+
+
 def custom_wake_phrases() -> list[str]:
     """Owner-edited wake phrases (config.json `wake_phrases`); [] means the built-in list.
 
@@ -329,6 +334,9 @@ FIRE_HAZARD_DETECTOR = os.environ.get("HAL_FIRE_HAZARD_DETECTOR", "owlv2")
 FIRE_HAZARD_ENDPOINT = os.environ.get("DL_FIRE_HAZARD_ENDPOINT", f"/detect/{FIRE_HAZARD_DETECTOR}")
 FIRE_HAZARD_BACKEND_URL: str = DL_BACKEND_URL.rstrip("/") + "/" + FIRE_HAZARD_ENDPOINT.strip("/") if DL_BACKEND_URL else ""
 FIRE_HAZARD_API_TIMEOUT_S = float(os.environ.get("HAL_FIRE_HAZARD_API_TIMEOUT_S", "15.0"))
+# JPEG quality of the frame sent to OWLv2. 80 roughly halves the upload against
+# OpenCV's default 95, with no decision change on the 16-image test (#612).
+FIRE_HAZARD_JPEG_QUALITY = int(os.environ.get("HAL_FIRE_HAZARD_JPEG_QUALITY", "80"))
 # Server-side prompt preset sent instead of the 46 class strings; empty = send classes.
 FIRE_HAZARD_PRESET = os.environ.get("HAL_FIRE_HAZARD_PRESET", "fire_hazard_v1")
 # On-lamp gate: a fire/smoke score at or above this sends the frame to OWLv2.
@@ -753,8 +761,56 @@ if VOICE_INPUT_MODE == "tap_to_talk":
 elif LIVE_MODE and REALTIME_TURN_DETECTION.strip().lower() in ("off", "none", ""):
     REALTIME_TURN_DETECTION = "server_vad"
 
+# Fast voice: answer a spoken question sooner for more Gemini use; when off nothing
+# below changes. Precedence: HAL_FAST_VOICE env > config.json realtime.fast_voice >
+# default (on for Intern v2, off elsewhere). Applies to Gemini turn mode only (live
+# mode already streams). Keep in sync with RealtimeFastVoice in system/server/config.
+FAST_VOICE_DEFAULT: bool = resolve_device_type() == "intern-v2"
+REALTIME_FAST_VOICE: bool = os.environ.get(
+    "HAL_FAST_VOICE", str(_RT.get("fast_voice", FAST_VOICE_DEFAULT))
+).lower() in ("1", "true", "yes")
+FAST_VOICE: bool = (
+    REALTIME_FAST_VOICE
+    and REALTIME_ENABLED
+    and REALTIME_PROVIDER.strip().lower() == "gemini"
+    and not LIVE_MODE
+)
+
+# Fast voice: longest wait after the person pauses while Smart Turn still calls the
+# sentence unfinished (it misjudges Vietnamese). Owner setting realtime.fast_voice_pause_s;
+# HAL_FAST_VOICE_MAX_PAUSE_S wins. Bounds mirror FastVoicePause* in system/server/config.
+FAST_VOICE_PAUSE_MIN_S, FAST_VOICE_PAUSE_MAX_S, FAST_VOICE_PAUSE_DEFAULT_S = 0.8, 6.0, 2.0
+try:
+    REALTIME_FAST_VOICE_PAUSE_S: float = float(os.environ.get(
+        "HAL_FAST_VOICE_MAX_PAUSE_S", _RT.get("fast_voice_pause_s", FAST_VOICE_PAUSE_DEFAULT_S),
+    ))
+except (TypeError, ValueError):
+    REALTIME_FAST_VOICE_PAUSE_S = FAST_VOICE_PAUSE_DEFAULT_S
+REALTIME_FAST_VOICE_PAUSE_S = min(max(REALTIME_FAST_VOICE_PAUSE_S, FAST_VOICE_PAUSE_MIN_S), FAST_VOICE_PAUSE_MAX_S)
+
+# Fast voice: hand a turn on when Gemini sends nothing for this long (instead of
+# REALTIME_RECV_QUEUE_TIMEOUT_S); a turn whose server is still talking stays alive.
+# Owner setting realtime.fast_voice_silent_timeout_s; HAL_FAST_VOICE_SILENT_TIMEOUT_S
+# wins. Bounds mirror FastVoiceSilentTimeout* in system/server/config.
+FAST_VOICE_SILENT_TIMEOUT_MIN_S, FAST_VOICE_SILENT_TIMEOUT_MAX_S = 3.0, 8.0
+FAST_VOICE_SILENT_TIMEOUT_DEFAULT_S = 5.0
+try:
+    REALTIME_FAST_VOICE_SILENT_TIMEOUT_S: float = float(os.environ.get(
+        "HAL_FAST_VOICE_SILENT_TIMEOUT_S",
+        _RT.get("fast_voice_silent_timeout_s", FAST_VOICE_SILENT_TIMEOUT_DEFAULT_S),
+    ))
+except (TypeError, ValueError):
+    REALTIME_FAST_VOICE_SILENT_TIMEOUT_S = FAST_VOICE_SILENT_TIMEOUT_DEFAULT_S
+REALTIME_FAST_VOICE_SILENT_TIMEOUT_S = min(
+    max(REALTIME_FAST_VOICE_SILENT_TIMEOUT_S, FAST_VOICE_SILENT_TIMEOUT_MIN_S),
+    FAST_VOICE_SILENT_TIMEOUT_MAX_S,
+)
+if FAST_VOICE:
+    REALTIME_RECV_QUEUE_TIMEOUT_S = REALTIME_FAST_VOICE_SILENT_TIMEOUT_S
+
 # Play the model's own audio for realtime-handled turns instead of our TTS.
-REALTIME_NATIVE_AUDIO: bool = os.environ.get(
+# Fast voice always does: a second TTS round trip waits on the reply text first.
+REALTIME_NATIVE_AUDIO: bool = FAST_VOICE or os.environ.get(
     "HAL_REALTIME_NATIVE_AUDIO", str(_RT.get("native_audio", False))
 ).lower() in ("1", "true", "yes")
 
