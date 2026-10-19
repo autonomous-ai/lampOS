@@ -225,6 +225,9 @@ pub enum Did {
 }
 /// Where the engine says what the lamp did.
 pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
+/// The note a spoken request gets on whether it called the lamp by name
+/// ([`Engine::noting_whether_called`]): with its request and words.
+pub type CallNote = Arc<dyn Fn(u64, &str) -> Option<&'static str> + Send + Sync>;
 /// Told a spoken request's words once they are heard and it is to be
 /// answered, before its chat begins ([`Engine::hearing_words`]).
 pub type WordsHeard = Arc<dyn Fn(u64, &str) + Send + Sync>;
@@ -264,6 +267,8 @@ struct Shared {
     name_note: Option<NameNote>,
     /// The note for a line let out only as the conversation going on.
     conversation_alone: Option<NameNote>,
+    /// The note on whether a line called the lamp by name.
+    call_note: Option<CallNote>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
@@ -568,6 +573,7 @@ impl Engine {
                 staff: None,
                 name_note: None,
                 conversation_alone: None,
+                call_note: None,
                 task_waiting: None,
                 did: None,
                 hold: None,
@@ -737,6 +743,17 @@ impl Engine {
     pub fn telling_what_it_did(mut self, did: LampDid) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.did = Some(did);
+        }
+        self
+    }
+
+    /// Each spoken line is asked with `note`'s words beside it: answer it,
+    /// when its words or the lamp's name called the lamp; otherwise, it may
+    /// not be for the lamp, and then it is left alone (`worker::call_note`,
+    /// #1712). Before any turn only.
+    pub fn noting_whether_called(mut self, note: CallNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.call_note = Some(note);
         }
         self
     }
@@ -1593,10 +1610,23 @@ async fn spoken(
         .as_ref()
         .and_then(|note| note(request))
         .map(str::to_owned);
+    // Said by name: answer it; else it may not be for the lamp. The line let
+    // out by a conversation alone has its own note for that.
+    let call = alone
+        .is_none()
+        .then(|| {
+            shared
+                .call_note
+                .as_ref()
+                .and_then(|note| note(request, &text))
+        })
+        .flatten()
+        .map(str::to_owned);
     let notes = stopped
         .into_iter()
         .chain(staff)
         .chain(named)
+        .chain(call)
         .chain(alone)
         .chain(waiting)
         .collect();

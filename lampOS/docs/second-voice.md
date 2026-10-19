@@ -1001,12 +1001,7 @@ after a take-over, but now for every turn:
   battery on lamp-4ace is its check.
 - **How to take what it heard** (`worker::SPOKEN_NOTE`, spoken turns
   only, after the character): the ears turn some words into others, names
-  and places most of all; much of what reaches it is not said to it, and a
-  line plainly people talking to each other, a remark to the room, a call,
-  a video or a noise is left alone with `not_for_me`, which is right, not
-  rude (the first builder on #1712, 17:26: DeepSeek answered what the rule
-  let out where Gemini declined, 5 of 12; the count is `called not_for_me`
-  against `first answer audio`); a question plainly about the weather, a price, a
+  and places most of all; a question plainly about the weather, a price, a
   time or a place is answered for the likeliest meaning, here first, with
   a search if needed, and asked back only when it cannot be guessed; greet
   and say goodbye for the time of day; a poem has at least four lines. From
@@ -1049,6 +1044,20 @@ after a take-over, but now for every turn:
   the model sees it (`worker::LONE_WORDS`): "What's the price of gold?"
   heard as "Surprise" was answered "Oh! I do like a surprise." "And
   Paris?" is a question and goes on.
+- **Said by name, or perhaps not for the lamp** (`worker::call_note`,
+  `Engine::noting_whether_called`). Each spoken line gets one note beside
+  its words. A line whose words or the lamp's name heard in its sound
+  called the lamp (`Attention::called_for_itself`) gets "this was said to
+  you by name: answer it" (`BY_NAME_NOTE`). Every other line, a face alone
+  included, gets the decline note (`DECLINE_NOTE`): much of what reaches it
+  is not said to it, and a line plainly people talking to each other, a
+  remark to the room, a call, a video or a noise is left alone with
+  `not_for_me`, which is right, not rude. A line let out by a conversation
+  alone has `CONVERSATION_ALONE` in its place. Without the rule, the line's
+  own words decide (`called_by_name`). The first builder on #1712: at 17:26
+  DeepSeek answered what the rule let out where Gemini declined, and at
+  17:56 it declined "Lamp, what time is it?". The count on played lines is
+  `called not_for_me` against `first answer audio`.
 - **A line going on from the last one hears its sound first.** The
   coordinator ends a line at a short pause, so the owner's "Lamp, … what's
   the weather?" came as pieces of about 1.3 s, each a speech-to-text stream

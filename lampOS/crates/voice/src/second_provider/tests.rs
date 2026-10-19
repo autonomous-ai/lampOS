@@ -3224,3 +3224,47 @@ async fn a_line_going_on_from_one_unanswered_hears_its_sound_first() {
         "the first line was answered"
     );
 }
+
+/// #1712: each spoken line is asked with the note the hook gives, beside
+/// its words: answer it when said by name, else it may be declined.
+#[tokio::test]
+async fn each_spoken_line_is_asked_with_its_call_note() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Lamp, what time is it?".to_owned()),
+                Ok("Okay yeah sure.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("Noon."), Ok(ChatEvent::Done)],
+                vec![Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.noting_whether_called(Arc::new(|_, words| {
+        Some(worker::call_note(crate::attention::called_by_name(words)))
+    }));
+    for request in 1..=2 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    }
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(
+        asked[0],
+        [
+            Message::system("SYSTEM"),
+            Message::system(worker::BY_NAME_NOTE),
+            Message::user("Lamp, what time is it?"),
+        ]
+    );
+    assert!(asked[1].contains(&Message::system(worker::DECLINE_NOTE)));
+    assert!(!asked[1].contains(&Message::system(worker::BY_NAME_NOTE)));
+}

@@ -677,7 +677,7 @@ pub fn with_search(
 /// "what is the weather like in Hanoi" heard as "Hannover" or answered with
 /// "You asking what the weather's like here?"; "Night!" at 1 pm, the
 /// character's example; a poem of two lines).
-pub(crate) const SPOKEN_NOTE: &str = "\n\nYou read what people say as words, and your ears turn some words into others, names and places most of all. Much of what reaches you is not said to you: when a line is plainly people talking to each other, a remark to the room, someone on a call, a video or a noise, call not_for_me and say nothing; leaving it alone is right, not rude, and a person who wants you says so. When a question is plainly about the weather, a price, a time or a place, answer it for the likeliest meaning, here first, and search if you need to; ask back only when you cannot guess at all. Greet and say goodbye for the time of day it is now. A poem you are asked for has at least four lines.";
+pub(crate) const SPOKEN_NOTE: &str = "\n\nYou read what people say as words, and your ears turn some words into others, names and places most of all. When a question is plainly about the weather, a price, a time or a place, answer it for the likeliest meaning, here first, and search if you need to; ask back only when you cannot guess at all. Greet and say goodbye for the time of day it is now. A poem you are asked for has at least four lines.";
 
 /// Why a line of a word or two is held ([`lone_words`]).
 pub(crate) const LONE_WORDS: &str = "a word or two in a conversation, no question and no short word said to the lamp, and nothing shows it was said to the lamp: no name, nobody turned to it";
@@ -698,6 +698,23 @@ fn lone_words(heard: &str) -> bool {
 
 /// Told after [`SPOKEN_NOTE`] when the model looks by a call (#1712).
 pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look: it is how you look, and you will then be shown what you see.";
+
+/// Told beside a spoken line that its words or the lamp's name heard in its
+/// sound called the lamp for: answer it (the first builder on #1712, 18:09:
+/// at 17:56 DeepSeek declined "Lamp, what time is it?" and "Hey Lamp, tell
+/// me a short joke").
+pub(crate) const BY_NAME_NOTE: &str =
+    "(For you to know, not to answer: this was said to you by name: answer it.)";
+/// Told beside every other spoken line: it may not be for the lamp, and
+/// then it is left alone (17:26: DeepSeek answered what the rule let out,
+/// where Gemini declined).
+pub(crate) const DECLINE_NOTE: &str = "(For you to know, not to answer: much of what reaches you is not said to you. When this line is plainly people talking to each other, a remark to the room, someone on a call, a video or a noise, call not_for_me and say nothing; leaving it alone is right, not rude, and a person who wants you says so.)";
+
+/// The note for a spoken line: [`BY_NAME_NOTE`] when it called the lamp by
+/// name, else [`DECLINE_NOTE`].
+pub(crate) fn call_note(by_name: bool) -> &'static str {
+    if by_name { BY_NAME_NOTE } else { DECLINE_NOTE }
+}
 
 /// The character with [`SPOKEN_NOTE`] after it, and [`LOOK_CALL_NOTE`]
 /// when the model looks by a call.
@@ -1234,6 +1251,16 @@ pub fn serve(
                 heeding.lock().ok()?.name_note_for(request)
             }));
         }
+        // Said by name, or perhaps not for the lamp: its note (#1712).
+        {
+            let heeding = heeding.clone();
+            engine = engine.noting_whether_called(Arc::new(move |request, _| {
+                heeding
+                    .lock()
+                    .ok()
+                    .map(|heeding| heeding.call_note_for(request))
+            }));
+        }
         // In such a line, nothing set to come from people's talk (#1712).
         {
             let heeding = heeding.clone();
@@ -1279,6 +1306,12 @@ pub fn serve(
                 .lock()
                 .ok()
                 .and_then(|mut heeding| heeding.heed(request, said, heard, from))
+        }));
+    }
+    // Without the rule, a line's own words say whether it called the lamp.
+    if !files.attention {
+        engine = engine.noting_whether_called(Arc::new(|_, words| {
+            Some(call_note(crate::attention::called_by_name(words)))
         }));
     }
     if checked {
@@ -1604,6 +1637,9 @@ pub(crate) struct Heeding {
     noted: Option<(u64, Option<&'static str>)>,
     /// The request last let out only as the conversation going on.
     alone: Option<u64>,
+    /// The request last let out because its words or the lamp's name heard
+    /// in its sound called the lamp.
+    by_name: Option<u64>,
     /// The rule's session, as a Live session is one (#1712, the first
     /// builder at 16:43): the route's turns are judged as one session's, so
     /// one past its first [`crate::attention::FRESH_REQUESTS`] is trusted as
@@ -1720,6 +1756,7 @@ impl Heeding {
             name_note: None,
             noted: None,
             alone: None,
+            by_name: None,
             session: 1,
             session_for: None,
             held_run: 0,
@@ -2032,6 +2069,8 @@ impl Heeding {
         }
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
+        // Its words or the name heard called the lamp, not a face alone.
+        self.by_name = (played && attention.called_for_itself()).then_some(request);
         // A call let out: the conversation goes on from it.
         if called {
             self.called_at = Some(Instant::now());
@@ -2076,6 +2115,12 @@ impl Heeding {
     /// holds the schedule's (#1522, #1712).
     pub(crate) fn holds_call(&self, request: u64, name: &str) -> bool {
         self.alone == Some(request) && crate::policy_holds::SCHEDULE_HELD.contains(&name)
+    }
+
+    /// The note for `request` judged: [`BY_NAME_NOTE`] if its words or the
+    /// lamp's name called the lamp, else [`DECLINE_NOTE`].
+    pub(crate) fn call_note_for(&self, request: u64) -> &'static str {
+        call_note(self.by_name == Some(request))
     }
 
     /// The note for `request` if the rule let it out only as the
@@ -3526,8 +3571,10 @@ mod tests {
         assert!(!told.contains("take_a_look"));
         assert!(super::spoken_character("CHARACTER", true).ends_with(super::LOOK_CALL_NOTE));
         assert!(told.contains("answer it for the likeliest meaning, here first"));
-        assert!(told.contains("call not_for_me and say nothing"));
-        assert!(told.contains("leaving it alone is right, not rude"));
+        assert!(
+            !told.contains("not_for_me"),
+            "the decline is the line's own note"
+        );
         assert!(told.contains("ask back only when you cannot guess at all"));
         assert!(told.contains("for the time of day it is now"));
         assert!(told.contains("at least four lines"));
@@ -3647,6 +3694,52 @@ mod tests {
         assert_eq!(judged("Hey, Lynn. How are you today?"), None);
         assert_eq!(judged("Lynn, what time is it?"), None);
         assert!(judged("Daniel, are you coming to the meeting?").is_some());
+    }
+
+    /// #1712, the first builder at 18:09: a line its words or the lamp's
+    /// name called the lamp for is told to answer, with no decline line; a
+    /// line let out by a face alone gets the decline line.
+    #[test]
+    fn a_line_said_by_name_is_told_to_answer_and_a_face_only_line_may_decline() {
+        let signs = |turned: Option<bool>, names: Vec<(u64, f32)>| super::Signs {
+            room: crate::room_told::Room::Busy,
+            going_on: false,
+            lamp_asked: false,
+            turned,
+            names,
+            near: false,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_002_000_000);
+        let note = |heard: &str, signs: super::Signs| {
+            let mut heeding = super::Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            assert_eq!(heeding.judge(9, line, heard, signs), None, "{heard}");
+            heeding.call_note_for(9)
+        };
+        assert_eq!(
+            note("Lamp, what time is it?", signs(None, Vec::new())),
+            super::BY_NAME_NOTE
+        );
+        assert_eq!(
+            note("Hey Lamp, tell me a short joke.", signs(None, Vec::new())),
+            super::BY_NAME_NOTE
+        );
+        assert_eq!(
+            note(
+                "What time is it?",
+                signs(None, vec![(1_000_000_000, crate::attention::SURE_SCORE)])
+            ),
+            super::BY_NAME_NOTE,
+            "lamp-name heard it"
+        );
+        assert_eq!(
+            note("What time is it?", signs(Some(true), Vec::new())),
+            super::DECLINE_NOTE
+        );
+        assert!(super::BY_NAME_NOTE.contains("answer it"));
+        assert!(!super::BY_NAME_NOTE.contains("not_for_me"));
+        assert!(super::DECLINE_NOTE.contains("call not_for_me and say nothing"));
     }
 
     /// #1712: the weather is told while fresh, never once stale.
