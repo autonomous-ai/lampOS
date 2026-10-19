@@ -505,7 +505,7 @@ fn modified_ms(file: &Path) -> Option<u64> {
 }
 
 /// Days since 1970-01-01 of a civil date (Howard Hinnant's algorithm).
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+pub(crate) fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let year = if month <= 2 { year - 1 } else { year };
     let era = year.div_euclid(400);
     let year_of_era = year - era * 400;

@@ -496,6 +496,19 @@ cargo run -p lamp-voice-eval -- render-stimuli .cache/acoustic NEW_REPORT.json  
 Every failed attempt carries a reproduction command; fake attempts reproduce
 exactly with `--attempt-seed`.
 
+## Waiting answers held and cut, per route: `waiting-cuts` (#1866)
+
+    journalctl -u lamp-voice --since '<test start>' -o short-iso \
+      | sudo lamp-voice-eval waiting-cuts [--since ...] [--until ...] [--sessions DIR] [--json]
+
+Counts, per run and per route, the waiting answers a new sound waited for,
+let go, stopped or was cut by (with words or without), short follow-ups
+kept, stops, and their times. It reads the journal on stdin and the session
+records (`--sessions`, default `/var/lib/lampOS/voice/sessions`): the
+journal alone does not carry the wait's decisions, the words or the route.
+`--since`/`--until` filter the journal's own stamps. Only counts and
+numbers are printed. What each count means: `group-talk.md`, "Counting it".
+
 ## A session's minutes, with no words: `export` (#1119)
 
 Builders without the lamp make test cases from what it did. `export` takes a
