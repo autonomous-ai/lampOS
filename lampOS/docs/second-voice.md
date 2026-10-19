@@ -1897,6 +1897,25 @@ The relay is `deepseek_base_url` (or `LAMP_SECOND_DEEPSEEK_BASE_URL`) with
 the route's credential. DeepSeek's own API takes the unit's `deepseek.key`.
 A target without its URL or key is left out, saying so.
 
+**On one kept connection** (`--wire --kept`, the first builder on #1934,
+20 Oct 04:16): each target and size is asked three requests on one
+connection (`Arm`):
+- **first:** it makes the connection, so it pays all the steps above.
+- **straight:** right after, with no connect, TLS or slow start.
+- **idle:** after 5 s with nothing sent (`IDLE`). This is what a real turn
+  pays on the route's kept connection. Unless
+  `net.ipv4.tcp_slow_start_after_idle` is 0, the kernel restarts slow start
+  after idle, so a request over about 13 KB waits a round trip again.
+
+Each request has its own changing part, as turns do. An answer is read to
+its body's end, so the connection can carry the next request. A service
+that doesn't keep it ends that run's arms, counted as `closed`.
+
+The lines are `wire kept target=… size=… run=… arm=…`, then each arm's
+medians. `wire kept idle-less-straight target=… size=…` is what restarting
+slow start costs a turn, and `wire kept relay-less-direct size=… arm=…` is
+the relay's share on a kept connection.
+
 **The output:** one line per request:
 `wire target=relay size=lamp run=1 bytes=… status=200 dns_ms=… tcp_ms=…
 tls_ms=… send_ms=… first_byte_ms=… first_event_ms=… second_event_ms=…
@@ -1922,6 +1941,9 @@ systemd-run --pty --wait \
   /opt/lampOS/voice/current/lamp-voice probe-cascade \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10 --wire
 ```
+
+`--wire --kept` takes the same command with `--kept` after `--wire`. Its 10
+runs ask 120 requests and wait 5 s 40 times, about 4 minutes.
 
 ### How much the prompt cache holds (`probe-cache`)
 
