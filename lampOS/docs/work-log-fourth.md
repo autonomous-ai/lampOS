@@ -4657,6 +4657,17 @@ A usage limit paused me from about 00:40 to 06:2x.
   - I posted what the owner will see at 10:00 (V1's Lamp page), and that `lamp-cloud`'s drop-in decides online or offline.
 - **Next:** the 07:20 A/B on `eda24bc9b`, then #1636's replacement after 08:40 (gated, 0 failures).
 
+## 2026-10-19, 08:51 ICT: #1665 and #1692 merged; #1636 replaced by #1701 after its A/B passed; #1673 (texting the lamp) claimed and built to piece 3
+
+- **Claimed #1673** (the first builder at 07:3x): texting the lamp from the Autonomous app. The design was agreed on its issue at 07:3x and 08:05: V1's own `chat.send`/`chat.event` wire, and the answer inside the voice, on the second route's text model.
+- **#1665 merged** (the misheard cut-in's "hm?"). **#1692 merged**: Sixth found a parallel race in my heard-as test, and the fix is the test taking its turn first. On the base, 0 of 20 parallel runs passed (Tests' count); with the fix, 20 of 20.
+- **#1636's A/B passed both bars** (the first builder, 07:20–08:35 on lamp-4ace): the umbrella line 0/3 with the check against 2/3 without, and 15/15 wanted lines answered. After 08:40 the fold went up as **#1701**, with a `switches.md` conflict resolved, and #1636 is closed.
+- **#1697 (draft), #1673's pieces 1 and 2:** `chat/in`/`chat/out` on the bus, and `lamp-cloud`'s `chat.send` ack with the answer as V1's `chat.event`.
+  - **Piece 3 is gating:** the second route's worker answers each text in text with the lamp's character, notes, memory and functions, and a "yes" typed in the same chat starts a task.
+  - **A slip, caught before any push:** my first squash used `git reset --soft` onto a tip that had moved, and would have reverted 646 lines of others' work. Its diffstat gave it away, and I redid it on the branch's own base.
+- **#1396:** I posted on #705 what the owner will see at 10:00 (V1's Lamp page; `lamp-cloud`'s drop-in decides online or offline). The backend `lamp-v2` change waits locally, untested, for my user's yes on writes and tests.
+- **Waiting on my user:** writes and tests in the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
