@@ -89,3 +89,10 @@ list".
 - #1752 merged by the reviewer; #1595 closed. #1744 approved (one commit `b020337e3`; the CI step went back to DevOps).
 - **#933** (moves while it speaks): taken. The design is on #933 (12:4x), and the first builder said yes (12:32). → **#1759** takes over #1365 (Third's product `speaking` section, stacked on #1067); #1365 closed with a pointer.
 - lamp-cb94, read-only under the lock with its person's yes: `/etc/lampOS/update/` backed up and logged in Twelve's change log; `/etc/lampOS/body/` absent; Expression from 16 Oct (no `sway_yaw`); its catalogue equals the product's. No unattended stand (the first builder, 12:41): #1744's run and #933's A/B wait for the person at the arm.
+- #1759's review: no finding. Its merge is the first builder's, after #1067 and the cb94 A/B.
+- #1744 + head-pad discovery (the first builder on #1362, 12:54): it uses `lamp-controls discover-head` (cb94 has no gpiod tools); exactly two driven lines with two touches each, pull following the polarity; `--to N`.
+- lamp-cb94, with its person, under the lock:
+  - 06:11Z: step 1 refused, `joint 1 has torque on` (a SIGTERM-ended body run keeps holding).
+  - 06:13Z: step 2 found 97/98 (97 active-low, 98 active-high), but Controls then read "touched" at rest, so the previous pins were restored. Line 97's idle level changes between readings: posted on #1362 and as Found by thirteen on #1764. lamp-controls hit its start limit; `reset-failed`.
+- **#1776**: `lamp-body --let-go-at-stop` (the first builder's yes, 13:14). A lamp asked to stop that got down is let go; one that didn't keeps holding. Tests on the fake bus; lamp-body 310/0.
+- #1744 folded to `e43d429f3`: stands pass `--let-go-at-stop on`, and a held lamp is let go first, after a yes. jq is checked. Tests 41/41. Step 1 on cb94 waits for #1776's build.
