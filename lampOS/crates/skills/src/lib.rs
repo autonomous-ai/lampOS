@@ -249,6 +249,16 @@ struct TriggerFile {
     /// A chance held back by a `[[while]]` condition waits this long, while
     /// the trigger still holds, for the conditions to hold.
     wait: Option<String>,
+    /// The field rose at least this much within this while (#1684).
+    rise: Option<RiseFile>,
+}
+
+/// `rise = { by = 100, within = "3m" }`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RiseFile {
+    by: f64,
+    within: String,
 }
 
 /// A `[[while]]` condition.
@@ -333,15 +343,31 @@ pub struct Frame {
     pub lasting_us: u64,
 }
 
-/// What a `say` asks of the voice: a note it phrases, or what it keeps.
+/// The say service's priority for a skill's own words when its say names
+/// none: the voice's normal one (`lamp_voice::say::NORMAL_PRIORITY`).
+pub const SAY_PRIORITY: u8 = 5;
+/// The highest priority a skill's say may ask (#1684): 8, a due reminder's,
+/// which the voice says after a second of quiet. 9 is the voice's own.
+pub const MOST_SAY_PRIORITY: u8 = 8;
+/// How long a say may wait for the voice when it names no `expires`: not
+/// begun by then, it is of no use, the moment has passed.
+pub const SAY_EXPIRES_MS: u64 = 30_000;
+/// The longest a say may wait (the voice's `LONGEST_EXPIRY_MS`).
+const MOST_SAY_EXPIRES_MS: u64 = 3_600_000;
+/// The most bytes of a skill's own words the voice takes
+/// (`lamp_voice::say::MOST_WORDS_BYTES`).
+pub const MOST_WORDS_BYTES: usize = 900;
+
+/// What a `say` asks of the voice: a note it phrases, its exact words, or
+/// what it keeps.
 fn say_step(say: toml::Value) -> Result<Call, String> {
-    const WHAT: &str = "say is a note in words, or { from = \"schedule\" } or { from = \"tasks\" }";
+    const WHAT: &str = "say is a note in words, or { from = \"schedule\" } or { from = \"tasks\" }, \
+                        or { text = ... } or { note = ... } with an optional priority and expires";
     match say {
         toml::Value::String(note) if note.trim().is_empty() => Err(WHAT.into()),
         toml::Value::String(note) => Ok(Call::Say(note)),
-        toml::Value::Table(table) => {
-            let mut keys = table.keys();
-            if keys.next().map(String::as_str) != Some("from") || keys.next().is_some() {
+        toml::Value::Table(table) if table.contains_key("from") => {
+            if table.len() != 1 {
                 return Err(format!("{WHAT}: a say table has from and nothing else"));
             }
             match table["from"].as_str() {
@@ -352,6 +378,59 @@ fn say_step(say: toml::Value) -> Result<Call, String> {
                 )),
                 None => Err(format!("{WHAT}: from is a word")),
             }
+        }
+        toml::Value::Table(table) => {
+            if let Some(key) = table
+                .keys()
+                .find(|key| !["text", "note", "priority", "expires"].contains(&key.as_str()))
+            {
+                return Err(format!("{WHAT}: say.{key} is not known"));
+            }
+            let (words, exact) = match (table.get("text"), table.get("note")) {
+                (Some(text), None) => (text, true),
+                (None, Some(note)) => (note, false),
+                _ => return Err(format!("{WHAT}: one of text or note")),
+            };
+            let words = words
+                .as_str()
+                .filter(|words| {
+                    !words.trim().is_empty()
+                        && words.len() <= MOST_WORDS_BYTES
+                        && !words.chars().any(char::is_control)
+                })
+                .ok_or(format!(
+                    "say's text or note is words, 1 to {MOST_WORDS_BYTES} bytes, with no control characters"
+                ))?
+                .to_owned();
+            let priority = match table.get("priority") {
+                None => SAY_PRIORITY,
+                Some(priority) => priority
+                    .as_integer()
+                    .and_then(|priority| u8::try_from(priority).ok())
+                    .filter(|priority| *priority <= MOST_SAY_PRIORITY)
+                    .ok_or(format!(
+                        "say.priority is a whole number from 0 to {MOST_SAY_PRIORITY}: 9 is the voice's own"
+                    ))?,
+            };
+            let expires_ms = match table.get("expires") {
+                None => SAY_EXPIRES_MS,
+                Some(expires) => {
+                    expires
+                        .as_str()
+                        .ok_or_else(|| "say.expires is a duration".to_owned())
+                        .and_then(duration_us)?
+                        / 1_000
+                }
+            };
+            if !(1_000..=MOST_SAY_EXPIRES_MS).contains(&expires_ms) {
+                return Err("say.expires is 1s to 1h".into());
+            }
+            Ok(Call::Words(Words {
+                words,
+                exact,
+                priority,
+                expires_ms,
+            }))
         }
         _ => Err(WHAT.into()),
     }
@@ -507,7 +586,9 @@ impl Permissions {
             Call::Light { .. } | Call::Dim { .. } | Call::Out { .. } | Call::Show { .. } => {
                 ("light", self.light)
             }
-            Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. } => ("speak", self.speak),
+            Call::Say(_) | Call::Words(_) | Call::SayFrom(..) | Call::Sound { .. } => {
+                ("speak", self.speak)
+            }
             Call::Look => ("look", self.look),
             Call::AfterSay | Call::Ends => return None,
         };
@@ -761,6 +842,8 @@ enum Test {
     NotEquals(String, Value),
     Above(String, f64),
     Below(String, f64),
+    /// The field is a number: a rise with no level of its own.
+    Number(String),
 }
 
 impl Test {
@@ -776,6 +859,7 @@ impl Test {
             Self::NotEquals(field, unwanted) => !equal(&value[field], unwanted),
             Self::Above(field, line) => value[field].as_f64().is_some_and(|got| got > *line),
             Self::Below(field, line) => value[field].as_f64().is_some_and(|got| got < *line),
+            Self::Number(field) => value[field].as_f64().is_some(),
         }
     }
 }
@@ -826,6 +910,59 @@ pub struct Trigger {
     /// someone talking when the moment comes, and the lamp acts once the
     /// talk ends. 0: a chance held back is spent.
     pub wait_us: u64,
+    /// It holds only while its field rose this much within a while (#1684).
+    pub rise: Option<Rise>,
+}
+
+/// A trigger's `rise` (#1684): the field's newest reading is at least `by`
+/// above the lowest of the readings of its topic in the `within_us` before
+/// it. Smoke near the lamp raises PM2.5 by hundreds within minutes; a city's
+/// haze raises it by tens over hours, so a rise tells them apart where a
+/// level can't.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Rise {
+    pub field: String,
+    pub by: f64,
+    pub within_us: u64,
+}
+
+/// The most readings a rise keeps: an hour of readings every second. Past
+/// it the oldest goes, which can only make a rise smaller, never larger.
+const MOST_RISE_READINGS: usize = 3_600;
+
+/// The readings a rise compares with, as a sliding minimum: each kept
+/// reading is lower than every one kept after it, so the first is the
+/// lowest of the while.
+#[derive(Debug, Default)]
+struct Readings {
+    kept: std::collections::VecDeque<(u64, f64)>,
+    /// Whether the newest reading rose, for an answer that comes later.
+    risen: bool,
+}
+
+impl Readings {
+    /// Whether `value` at `now_us` is at least `rise.by` above the lowest
+    /// reading of the `rise.within_us` before it; then it is kept. With no
+    /// reading in that while (the sensor was silent, or the program has
+    /// just started or reloaded), nothing rose.
+    fn rose(&mut self, value: f64, now_us: u64, rise: &Rise) -> bool {
+        let from = now_us.saturating_sub(rise.within_us);
+        while self.kept.front().is_some_and(|(at, _)| *at < from) {
+            self.kept.pop_front();
+        }
+        self.risen = self
+            .kept
+            .front()
+            .is_some_and(|(_, lowest)| value - lowest >= rise.by);
+        while self.kept.back().is_some_and(|(_, kept)| *kept >= value) {
+            self.kept.pop_back();
+        }
+        self.kept.push_back((now_us, value));
+        if self.kept.len() > MOST_RISE_READINGS {
+            self.kept.pop_front();
+        }
+        self.risen
+    }
 }
 
 /// One call a step makes, as the program sends it and a test expects it.
@@ -878,6 +1015,10 @@ pub enum Call {
     },
     /// A note for the voice to say in its own words.
     Say(String),
+    /// A skill's own words as its say table sets them out (#1684): said as
+    /// written (`text`) or phrased by the model (`note`), at a priority, and
+    /// spent if not begun within a while.
+    Words(Words),
     /// Words the voice keeps itself and says when asked (#939, (c)): the
     /// reminder due, or the news of work handed over. The voice keeps the
     /// words and their delivery (a reminder's acknowledgement, news told
@@ -898,6 +1039,35 @@ pub enum Call {
     /// The trigger of a run that holds something until it ends stopped
     /// holding: what it held is given back. Alone in its run.
     Ends,
+}
+
+/// A say written as a table: `{ text = "..." }` or `{ note = "..." }`, with
+/// its `priority` and `expires` (#1684).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Words {
+    /// The words, or the note.
+    pub words: String,
+    /// `text`: the voice says them as they are written, never in words of
+    /// the model's own (the say service's `text`). `note`: a note it phrases.
+    pub exact: bool,
+    /// The say service's priority, 0 to [`MOST_SAY_PRIORITY`].
+    pub priority: u8,
+    /// Not begun within this, it is spent.
+    pub expires_ms: u64,
+}
+
+impl Words {
+    /// The say service's ask, without the skill's name.
+    pub fn ask(&self) -> Value {
+        let mut ask = json!({ "priority": self.priority, "expires_in_ms": self.expires_ms });
+        ask[self.key()] = json!(self.words);
+        ask
+    }
+
+    /// `text` for exact words, `note` for a note.
+    pub fn key(&self) -> &'static str {
+        if self.exact { "text" } else { "note" }
+    }
 }
 
 /// Where the words of a [`Call::SayFrom`] are kept, in the voice.
@@ -1024,6 +1194,12 @@ impl Call {
                 ("light", args)
             }
             Self::Say(note) => ("say", json!({ "note": note })),
+            Self::Words(words) => {
+                let mut args =
+                    json!({ "priority": words.priority, "expires_ms": words.expires_ms });
+                args[words.key()] = json!(words.words);
+                ("say", args)
+            }
             Self::SayFrom(source, task) => {
                 let mut args = json!({ "from": source.name() });
                 if let Some(task) = task {
@@ -1194,7 +1370,36 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             );
         }
     };
-    let mut test = test(&file.topic, file.field, file.equals, file.above, file.below)?;
+    let rise = match file.rise {
+        None => None,
+        Some(rise) => {
+            let Some(field) = file.field.clone() else {
+                return Err("rise is of a field: name it".into());
+            };
+            if file.equals.is_some() || file.below.is_some() || each.is_some() {
+                return Err(
+                    "rise goes with a field and, for a level too, above: not with equals, below or each"
+                        .into(),
+                );
+            }
+            if !(rise.by.is_finite() && rise.by > 0.0) {
+                return Err("rise.by is a number above 0".into());
+            }
+            let within_us = duration_us(&rise.within)?;
+            if !(1_000_000..=MOST_WAIT_US).contains(&within_us) {
+                return Err("rise.within is 1s to 1h".into());
+            }
+            Some(Rise {
+                field,
+                by: rise.by,
+                within_us,
+            })
+        }
+    };
+    let mut test = match (&rise, &file.field, file.above) {
+        (Some(_), Some(field), None) => Test::Number(field.clone()),
+        _ => test(&file.topic, file.field, file.equals, file.above, file.below)?,
+    };
     match (file.near, &mut test) {
         (None, _) => {}
         (Some(near), Test::Faces(least)) if (0.0..=1.0).contains(&near) => *least = near,
@@ -1218,6 +1423,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         rearm_line,
         cooldown_us: optional(&file.cooldown)?,
         wait_us,
+        rise,
     })
 }
 
@@ -1655,6 +1861,14 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                         .into(),
                 );
             }
+            // A tool's say is the note for the model's own answer, said in
+            // its turn: there is no say of the skill's to word or rank.
+            if matches!(call, Call::Words(_)) && file.tool.is_some() {
+                return Err(
+                    "say as a table of text or note, in a skill with a tool: the model answers the call in its own turn, so its say is a note"
+                        .into(),
+                );
+            }
             said = true;
             steps.push(Step::Call(call));
         }
@@ -1711,7 +1925,9 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             .filter(|(on, step)| {
                 matches!(
                     step,
-                    Step::Call(Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. })
+                    Step::Call(
+                        Call::Say(_) | Call::Words(_) | Call::SayFrom(..) | Call::Sound { .. }
+                    )
                 ) && match on {
                     None => true,
                     Some(Only::Trigger(on)) => Some(on) == name,
@@ -2154,6 +2370,9 @@ struct Watch {
     open: bool,
     /// With `each`: whether each item in its last message held; none before its first.
     items: Option<BTreeMap<String, bool>>,
+    /// With `rise`: the readings it compares with, since the start or the
+    /// last reload.
+    readings: Readings,
 }
 
 /// A trigger that held: what was said of it, and the calls to make.
@@ -2328,8 +2547,11 @@ impl Engine {
         // reviewer on #1042). With no value kept yet, the topic is new to the
         // program, and its first message, the bus's kept value, only says
         // what is there, as at the start.
+        // A rise begins again too (#1684): an edit may have changed its
+        // field or its while, and readings kept for another are not its.
         for watch in self.watches.values_mut() {
             watch.items = None;
+            watch.readings = Readings::default();
         }
         for skill in &self.skills {
             for (index, trigger) in skill.triggers.iter().enumerate() {
@@ -2467,27 +2689,39 @@ impl Engine {
         {
             return None;
         }
-        let holds = |trigger: &Trigger, item: Option<&String>| {
-            Self::fresh(&self.latest, &trigger.topic, now_us).is_some_and(|value| {
-                match (&trigger.each, item) {
-                    (Some((list, key)), Some(name)) => {
-                        value[list].as_array().into_iter().flatten().any(|item| {
-                            item_name(&item[key]).as_ref() == Some(name) && trigger.test.holds(item)
-                        })
+        // A rise holds as it did at its newest reading, the one the answer
+        // is to: nothing newer came to compare.
+        let rose = |index: usize, trigger: &Trigger| {
+            trigger.rise.is_none()
+                || self
+                    .watches
+                    .get(&(skill.name.clone(), index))
+                    .is_some_and(|watch| watch.readings.risen)
+        };
+        let holds = |index: usize, trigger: &Trigger, item: Option<&String>| {
+            rose(index, trigger)
+                && Self::fresh(&self.latest, &trigger.topic, now_us).is_some_and(|value| {
+                    match (&trigger.each, item) {
+                        (Some((list, key)), Some(name)) => {
+                            value[list].as_array().into_iter().flatten().any(|item| {
+                                item_name(&item[key]).as_ref() == Some(name)
+                                    && trigger.test.holds(item)
+                            })
+                        }
+                        _ => trigger.test.holds(value),
                     }
-                    _ => trigger.test.holds(value),
-                }
-            })
+                })
         };
         let trigger = match &run.from {
             Some((index, item)) => {
                 let trigger = skill.triggers.get(*index)?;
-                holds(trigger, item.as_ref()).then_some(Some(trigger))?
+                holds(*index, trigger, item.as_ref()).then_some(Some(trigger))?
             }
             None => skill
                 .triggers
                 .iter()
-                .any(|trigger| holds(trigger, None))
+                .enumerate()
+                .any(|(index, trigger)| holds(index, trigger, None))
                 .then_some(None)?,
         };
         let run_item = run.from.as_ref().and_then(|(_, item)| item.as_deref());
@@ -2612,6 +2846,17 @@ impl Engine {
                     continue;
                 }
                 let started = *watch.started_us.get_or_insert(now_us);
+                // A rise compares the field's readings: a message without
+                // one (the sensor not knowing it yet) is passed over, as if
+                // it never came, and breaks nothing (#1684).
+                let mut rose = true;
+                if let Some(rise) = &trigger.rise {
+                    let Some(reading) = value[&rise.field].as_f64().filter(|got| got.is_finite())
+                    else {
+                        continue;
+                    };
+                    rose = watch.readings.rose(reading, now_us, rise);
+                }
                 if let Some(line) = &trigger.rearm_line {
                     if !line.test.holds(&value) {
                         watch.past_line_us = None;
@@ -2619,7 +2864,7 @@ impl Engine {
                         watch.disarmed = false;
                     }
                 }
-                if !trigger.test.holds(&value) {
+                if !(rose && trigger.test.holds(&value)) {
                     if watch
                         .last_held_us
                         .is_none_or(|held| now_us - held >= trigger.gap_us)
@@ -3406,6 +3651,45 @@ mod tests {
 
     /// #940: with the switch, a gesture or a move says who asks; without
     /// it, the datagram is as before.
+    /// #1684 (a): a rise compares with the lowest reading of its while
+    /// before the newest, never with the newest itself, and forgets what
+    /// is older than the while.
+    #[test]
+    fn a_rise_is_over_the_lowest_reading_of_its_while_before() {
+        let rise = Rise {
+            field: "pm2_5".into(),
+            by: 100.0,
+            within_us: 180_000_000,
+        };
+        let mut readings = Readings::default();
+        let s = |seconds: u64| seconds * 1_000_000;
+        assert!(!readings.rose(500.0, s(0), &rise), "nothing before it");
+        assert!(!readings.rose(90.0, s(5), &rise));
+        assert!(!readings.rose(150.0, s(10), &rise));
+        assert!(readings.rose(190.0, s(15), &rise), "100 over 90");
+        assert!(readings.risen);
+        assert!(
+            readings.rose(400.0, s(185), &rise),
+            "90 at 5 s is still in it"
+        );
+        assert!(
+            !readings.rose(240.0, s(190), &rise),
+            "now the lowest is 150"
+        );
+        assert!(!readings.risen);
+        assert!(readings.kept.len() <= 3, "{:?}", readings.kept);
+        // A climb every second keeps every reading, at most an hour's.
+        let mut climbing = Readings::default();
+        let long = Rise {
+            within_us: 3_600_000_000,
+            ..rise
+        };
+        for at in 0..5_000 {
+            climbing.rose(at as f64, s(at), &long);
+        }
+        assert_eq!(climbing.kept.len(), MOST_RISE_READINGS);
+    }
+
     #[test]
     fn a_body_ask_says_who_asks_only_with_the_switch() {
         let parse = |text: String| serde_json::from_str::<Value>(&text).unwrap();
