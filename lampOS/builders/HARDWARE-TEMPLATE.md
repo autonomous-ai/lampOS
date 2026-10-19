@@ -29,7 +29,8 @@ it's what issues are labelled with. This file never names the person or their ac
 - Record every run in the fleet record, passes included: device ID,
   hardware revision and batch, the lampOS commit, the suite version, the
   station, each check's verdict and measurement, manual steps with times,
-  repairs and the retest.
+  repairs and the retest, as `lamp-station` writes it
+  ([production-testing.md](../docs/production-testing.md#the-run-record)).
 - Report a failure on its issue, with the run linked. A failure that two or more lamps share goes to the first
   builder, who opens one issue for it.
 - Diagnose with its person, and write down a physical repair. A software
