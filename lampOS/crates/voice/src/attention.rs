@@ -132,10 +132,95 @@ pub fn take_busy(flags: &[String]) -> (bool, &[String]) {
 /// farther off (`docs/ears.md`). Someone at the desk can also be talking to
 /// someone else: so the name must be heard as well.
 pub const NEAR_FLAG: &str = "--attention-near";
-/// A name heard at least this surely counts as a call when it is close.
-pub const NEAR_SCORE: f32 = 0.95;
-/// Close: the room microphone this far over its quiet during the request.
-pub const NEAR_RISE_DB: f32 = 18.0;
+/// A name heard at least this surely counts as a call when it is close:
+/// setup's measurement uses the same bar (`lamp_near_call::SCORE`).
+pub const NEAR_SCORE: f32 = lamp_near_call::SCORE;
+/// Close: the room microphone this far over its quiet during the request,
+/// unless this home's own bar is used ([`near_rise_db`]).
+pub const NEAR_RISE_DB: f32 = lamp_near_call::DEFAULT_RISE_DB;
+/// `on`: the near rule's bar is this home's, measured at setup from the
+/// person's own chair (#753, `lamp_near_call::FILE`), in place of
+/// [`NEAR_RISE_DB`]. Off unless set; without a fitting file the bar stays.
+/// Passed to the Live and the second route's workers, which judge with it.
+pub const NEAR_CALIBRATED_ENVIRONMENT: &str = "LAMP_ATTENTION_NEAR_CALIBRATED";
+/// How often the file is looked at again: a new measurement is used within
+/// this, with no restart.
+pub const NEAR_READ_EVERY: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// The near rule's bar now, in dB over the room's quiet: this home's with
+/// [`NEAR_CALIBRATED_ENVIRONMENT`] on and a file that fits, else
+/// [`NEAR_RISE_DB`]. Looks at the file at most every [`NEAR_READ_EVERY`],
+/// and reads it only when it has changed. The journal says the bar in use
+/// when it changes.
+pub fn near_rise_db() -> f32 {
+    static BAR: std::sync::OnceLock<Option<std::sync::Mutex<NearBar>>> = std::sync::OnceLock::new();
+    BAR.get_or_init(|| {
+        (std::env::var(NEAR_CALIBRATED_ENVIRONMENT).ok().as_deref() == Some("on"))
+            .then(|| std::sync::Mutex::new(NearBar::new(lamp_near_call::FILE.into())))
+    })
+    .as_ref()
+    .and_then(|bar| {
+        bar.lock()
+            .ok()
+            .map(|mut bar| bar.now(std::time::Instant::now()))
+    })
+    .unwrap_or(NEAR_RISE_DB)
+}
+
+/// This home's bar as last read from its file ([`near_rise_db`]).
+#[derive(Debug)]
+pub struct NearBar {
+    path: std::path::PathBuf,
+    looked: Option<std::time::Instant>,
+    modified: Option<Option<std::time::SystemTime>>,
+    bar: f32,
+}
+
+impl NearBar {
+    pub fn new(path: std::path::PathBuf) -> Self {
+        Self {
+            path,
+            looked: None,
+            modified: None,
+            bar: NEAR_RISE_DB,
+        }
+    }
+
+    /// The bar at `now`: the file's, looked at again once
+    /// [`NEAR_READ_EVERY`] has passed, or [`NEAR_RISE_DB`] with none that
+    /// fits.
+    pub fn now(&mut self, now: std::time::Instant) -> f32 {
+        if self
+            .looked
+            .is_some_and(|looked| now.saturating_duration_since(looked) < NEAR_READ_EVERY)
+        {
+            return self.bar;
+        }
+        self.looked = Some(now);
+        let modified = std::fs::metadata(&self.path)
+            .and_then(|metadata| metadata.modified())
+            .ok();
+        if self.modified == Some(modified) {
+            return self.bar;
+        }
+        let first = self.modified.is_none();
+        self.modified = Some(modified);
+        let read = lamp_near_call::read(&self.path);
+        let bar = read.unwrap_or(NEAR_RISE_DB);
+        if first || bar != self.bar {
+            eprintln!(
+                "lamp-voice: the near rule's bar is {bar:.1} dB over the room's quiet ({})",
+                if read.is_some() {
+                    "this home's, measured at setup"
+                } else {
+                    "the default: no measurement that fits"
+                }
+            );
+        }
+        self.bar = bar;
+        bar
+    }
+}
 const NAMED_NEAR: &str = "its name was heard close to the lamp";
 /// The reason an answer is let out for a request said to the lamp from
 /// close to it (`crate::addressed`, `LAMP_ADDRESSED=on`).
@@ -1612,6 +1697,42 @@ impl Attention {
 
 #[cfg(test)]
 mod tests {
+    /// #753: this home's bar is read from setup's file once it fits, looked
+    /// at again only every [`NEAR_READ_EVERY`], and the default is kept
+    /// without one, or with one its own tries don't make.
+    #[test]
+    fn this_homes_near_bar_is_read_from_setups_file_and_the_default_kept_without_one() {
+        use super::{NEAR_READ_EVERY, NEAR_RISE_DB, NearBar};
+        use std::time::{Duration, Instant};
+        let folder = std::env::temp_dir().join(format!("lamp-near-bar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let path = folder.join("near-call.json");
+        let mut bar = NearBar::new(path.clone());
+        let at = Instant::now();
+        assert_eq!(bar.now(at), NEAR_RISE_DB);
+        let tries = [22.4, 25.0, 23.1].map(|rise_db| lamp_near_call::Try {
+            rise_db,
+            score: 0.98,
+        });
+        let measured = lamp_near_call::Calibrated::of(tries.to_vec(), 1_760_000_000).unwrap();
+        lamp_near_call::write(&path, &measured).unwrap();
+        // Not looked at again within the interval.
+        assert_eq!(bar.now(at + Duration::from_secs(1)), NEAR_RISE_DB);
+        assert_eq!(bar.now(at + NEAR_READ_EVERY), 19.4);
+        assert_eq!(bar.now(at + NEAR_READ_EVERY * 2), 19.4);
+        // A bar its tries don't make, then no file: the default again.
+        let edited = lamp_near_call::Calibrated {
+            near_rise_db: 30.0,
+            ..measured
+        };
+        std::thread::sleep(Duration::from_millis(20));
+        lamp_near_call::write(&path, &edited).unwrap();
+        assert_eq!(bar.now(at + NEAR_READ_EVERY * 3), NEAR_RISE_DB);
+        std::fs::remove_dir_all(&folder).unwrap();
+        assert_eq!(bar.now(at + NEAR_READ_EVERY * 4), NEAR_RISE_DB);
+    }
+
     use super::*;
 
     /// The calls held in the played scenes of 2026-10-14 had their name

@@ -2276,7 +2276,7 @@ async fn serve_with_visual<C: Connect>(
                             && let Some((began, ended)) = attention.window()
                         {
                             let rise = rise_in(&ears_levels, (began, ended), monotonic_us());
-                            attention.set_near(rise.is_some_and(|rise| rise >= crate::attention::NEAR_RISE_DB));
+                            attention.set_near(rise.is_some_and(|rise| rise >= crate::attention::near_rise_db()));
                         }
                         if attention.waits_for_policy(request, room, going_on, turned)
                             && let Ok(first) = notice
@@ -2419,7 +2419,7 @@ async fn serve_with_visual<C: Connect>(
                                 && let Some((began, ended)) = attention.window()
                             {
                                 let rise = rise_in(&ears_levels, (began, ended), monotonic_us());
-                                attention.set_near(rise.is_some_and(|rise| rise >= crate::attention::NEAR_RISE_DB));
+                                attention.set_near(rise.is_some_and(|rise| rise >= crate::attention::near_rise_db()));
                                 judged_rise = rise.map(|rise| (request, rise));
                             }
                             // Said to the lamp from close to it, over the

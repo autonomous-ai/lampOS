@@ -649,10 +649,24 @@ they spread over more than 10 dB.
 
 Only numbers are kept, never sound: `/var/lib/lampOS/voice/near-call.json`
 (0600, written whole), `{"near_rise_db", "tries": [{"rise_db", "score"}],
-"at_unix_s"}`. A file whose bar its own tries don't make is not used.
-Setup's step (Seventh) takes the tries. The rule reading the bar on both
-routes, behind its own switch, and the reset's removal of the file come
-next.
+"at_unix_s"}`. A file whose bar its own tries don't make is not used, nor
+one with a try no step could have accepted (a score outside 0.95 to 1, or
+not a number).
+Setup's step (Seventh) takes the tries.
+
+**The rule reads it with `LAMP_ATTENTION_NEAR_CALIBRATED=on`** (off unless
+set), on both routes: the Live worker's busy-near rule and `--addressed`
+judgement, the second route's heeding, and the coordinator's room floor. Each
+takes the bar from `attention::near_rise_db()`, which looks at the file at
+most every 10 s and reads it only when it has changed, so a new measurement is
+used without a restart. A missing or unfit file keeps 18 dB. Each process's
+journal says the bar in use when it changes: "lamp-voice: the near rule's
+bar is 19.4 dB over the room's quiet (this home's, measured at setup)", or
+"(the default: no measurement that fits)". The switch goes to the two
+routes' workers alone (`process.rs`). The reset wipes the file
+(`reset-plan-product.json`, and lamp-06c1's plan). `NEAR_SCORE` and
+`NEAR_RISE_DB` are `lamp-near-call`'s own, so setup and the rule share one
+bar.
 
 What each costs. 5: in a busy room a question put to the lamp without
 its name in the service's text and without a face turned to it is not
