@@ -118,6 +118,7 @@ pub const UNITS: &[&str] = &[
     "lamp-selftest.service",
     "lamp-setup-change@.service",
     "lamp-setup-reset.service",
+    "lamp-setup-wifi@.service",
     "lamp-setup.service",
     "lamp-skills.service",
     "lamp-tasks.service",

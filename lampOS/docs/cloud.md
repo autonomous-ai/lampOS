@@ -546,8 +546,9 @@ updates this section in the same pull request.
 
 ## Changed after setup (#1959)
 
-The person changes a name or the lamp's time zone from the app, without a
-reset. Off unless `LAMP_SETTINGS_CHANGE=on`, with `LAMP_CLOUD=on`.
+The person changes a name, the lamp's time zone or its Wi-Fi from the app,
+without a reset. Off unless `LAMP_SETTINGS_CHANGE=on`, with `LAMP_CLOUD=on`;
+the Wi-Fi needs `LAMP_SETTINGS_WIFI=on` too (below).
 
 - **The kinds:** `timezone.set {"timezone"}` (V1's own kind and shapes),
   `person.name.set {"name"}` (the person's name setup asks for; `""` removes
@@ -567,7 +568,9 @@ reset. Off unless `LAMP_SETTINGS_CHANGE=on`, with `LAMP_CLOUD=on`.
   (`lamp-setup-change.socket`: root's, group `lampos`, 0660, `Accept=yes`, 4
   connections at most), and each connection starts `lamp-setup change` as root
   (`lamp-setup-change@.service`). The helper checks every request itself
-  (`setup.md`, "Changed after setup").
+  (`setup.md`, "Changed after setup"). **The socket's group is the gate:** the
+  unit always passes `--enable`, so once installed any `lampos` process can
+  ask for a change; the switch only decides whether `lamp-cloud` asks.
 - **Refusals** are the helper's words, never the value asked: `name must be at
   most 64 characters on one line`, `name must be 1 to 64 characters` (a rename
   to nothing), `timezone must be a zone the lamp knows, such as
@@ -575,7 +578,49 @@ reset. Off unless `LAMP_SETTINGS_CHANGE=on`, with `LAMP_CLOUD=on`.
   socket is not there.
 - **Not yet:** the helper's two units are in `deploy/product/` but not in
   `lamp-update`'s install list, so no lamp has them until their lamp check.
-  Wi-Fi (`wifi.set`) is #1959's second piece.
+
+### The Wi-Fi (`wifi.set`)
+
+V1 has no Wi-Fi kind on the broker (a V1 lamp changes Wi-Fi only on its
+hotspot's `/wifi` page), so this one is new. Off unless
+`LAMP_SETTINGS_WIFI=on` **beside** `LAMP_SETTINGS_CHANGE=on` and
+`LAMP_CLOUD=on`; without it, `not on this lamp: wifi.set`.
+
+- **Asked:** `{"cmd":"data","kind":"wifi.set","data":{"ssid":"…","password":"…","request_id":"…"}}`.
+  `request_id` is optional, the app's own, 1 to 64 printable characters, and
+  said back. An open network has `"password": ""`.
+- **Answered:** `starting` at once, then, as the same kind, `success` with
+  `data: {"ssid", "request_id"}`, or `failure` with `error` and
+  `data: {"request_id"}`. The errors are setup's page's words (`a Wi-Fi
+  password has 8 to 63 characters`, `the Wi-Fi name is longer than 32
+  bytes`, …) or what the change came to: `wrong WiFi password: the router
+  rejected the key; the lamp is back on its old Wi-Fi`, `connected to the new
+  WiFi, but the lamp's server could not be reached; the lamp is back on its
+  old Wi-Fi`, or `…; the old Wi-Fi did not come back within 60 s, and the
+  lamp keeps trying it`. Also `a Wi-Fi change is already under way` (one at a
+  time) and `the lamp is not on its broker`.
+- **The result may come only after the lamp is back online:** the lamp's link
+  to the app is over the very network that changes. The helper is waited on
+  180 s over a local socket the network change does not touch, and results
+  are handed to the broker only while connected and kept until its PubAck.
+  One handed and lost with the old connection goes again, first, on the next
+  one, with the same `request_id`. Kept in `lamp-cloud`'s memory only: a
+  `lamp-cloud` restarted mid-change loses its result (the change itself
+  finishes in root's helper either way).
+- **Confirmed and the way back:** root's Wi-Fi helper (`setup.md`, "The
+  Wi-Fi changed after setup") takes the new network only once it is joined
+  with an address and a TCP connection to the broker `lamp-cloud` is on (sent
+  in its line) is made, within 60 s; else the old network comes back, 60 s
+  at most, and never the hotspot. The lamp says what happened aloud, never
+  the network's name or password. **The socket's group is the gate**
+  (`lamp-setup-wifi.socket`, group `lampos`, 0660; the unit always passes
+  `--enable`): once installed, any `lampos` process can ask for a Wi-Fi
+  change, and only one whose broker the new network reaches is kept.
+- **The password** goes from the app's message into the helper's line and
+  the lamp's network file, and nowhere else: never a reply, an error or a
+  journal line (`lamp-cloud` journals no payload). **The backend passes the
+  password through to the lamp and never stores or logs it** (the backend's
+  side, to be confirmed by them).
 
 ## Not yet known, for the backend (#1396)
 

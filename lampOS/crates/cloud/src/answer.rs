@@ -180,6 +180,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         }
         // Names and the time zone after setup (#1959): handed to root's
         // helper, answered `starting` now and its result later.
+        // The Wi-Fi (#1959's second piece), with its own switch too.
+        crate::settings::WIFI_KIND if lamp.changes().is_some_and(|c| c.wifi_on()) => {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            changes.start_wifi(data)?;
+            Ok(None)
+        }
         kind if crate::settings::KINDS.contains(&kind) && lamp.changes().is_some() => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::line(kind, data)?;

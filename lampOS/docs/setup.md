@@ -433,7 +433,10 @@ standard input and output. It reads one line (at most 4 KiB), answers
 changed (below). It checks every request itself, whoever connects: exactly
 one of `{"person_name": s}`, `{"display_name": s}` or `{"timezone": s}`.
 Without `--enable` every request is refused, "changes after setup are off",
-and nothing is written. A refusal never holds the value asked, and the
+and nothing is written. **The socket's group is the gate:** the unit always
+passes `--enable`, so once installed any `lampos` process can ask for these
+changes; `LAMP_SETTINGS_CHANGE` only decides whether `lamp-cloud` asks. A
+refusal never holds the value asked, and the
 journal says what changed, never a name ("the person's name was changed (8
 characters)"); a zone is said.
 
@@ -452,6 +455,67 @@ a turn, a conversation that never ends and a voice that says nothing given up
 at the bound); the binary on standard input and output with a journal line
 holding no name; the product's reset wiping the lamp's name and the units
 running the helper. Not run on a lamp.
+
+## The Wi-Fi changed after setup (#1959, built, off unless set)
+
+The person gives the lamp a new Wi-Fi from the app (`wifi.set`, `cloud.md`),
+without a reset. Off unless `lamp-cloud` has `LAMP_SETTINGS_WIFI=on` beside
+`LAMP_SETTINGS_CHANGE=on`: its own switch, since this is the one change that
+can take the lamp off the network the app reaches it on.
+
+**Root's helper, `lamp-setup wifi`** (`crates/setup/src/wifi_change.rs`), on a
+socket of its own: `/run/lampos-setup-wifi/wifi.sock` (`lamp-setup-wifi.socket`:
+root's, group `lampos`, 0660, `Accept=yes`, **one connection at a time**), each
+connection starting `lamp-setup-wifi@.service` as root, with the names'
+helper's sandbox (`NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`)
+less what the radio needs: the network (the broker's check), netlink, and
+writes to `/etc` (the Wi-Fi file and V1's `device-sta-mode`, which edits
+`/etc/dhcpcd.conf`), `/run` and the real `/tmp` (`wpa_cli`'s reply socket, so
+no `PrivateTmp`). The names' helper has `PrivateNetwork=yes` and could not.
+**The socket's group is the gate:** the unit always passes `--enable`, so once
+installed any `lampos` process can ask for a Wi-Fi change, and only one whose
+broker the new network reaches is kept. One line in,
+`{"wifi": {"ssid", "password", "broker": "host:port"}}`, checked with setup's
+own `wpa_conf` and its page's words (`serve::refused_words`); one line out at
+the end, `{"done": {"ssid"}}` or `{"refused": why}`.
+
+**It never strands the lamp:**
+1. The old network's file is kept beside the live one
+   (`wpa_supplicant-wlan0.conf.lamp-previous`, 0600) until the new one is
+   confirmed. A lamp with no Wi-Fi file is refused, with nothing changed.
+2. The new file is written as setup writes it, and V1's `device-sta-mode`
+   restarts the radio, as setup's join does.
+3. **Confirmed** = the new name is the one joined, with a station address,
+   and a TCP connection to the broker `lamp-cloud` is on is made and closed
+   (3 s at most, name lookup included), within 60 s (setup's own bound). Two
+   rejected keys stop early, as setup's join does.
+4. Otherwise the old file goes back, the radio again, and the old network is
+   waited for (an address and the broker), 60 s at most. A lamp whose old
+   network does not come back either stays on it and keeps trying it:
+   **never the hotspot**, since after setup there is no setup page behind it.
+
+**The lamp says what happened**, through the voice's say service (`LAMP_SAY`,
+`speaking-first.md`) as `text` from the skill `wifi`, never the network's name
+or password: "I'm on the new Wi-Fi now."; "I couldn't join that one, so I've
+gone back to the old Wi-Fi."; and with neither network back, "I can't reach any
+Wi-Fi. Hold my button for five seconds to set me up again." at most once a
+minute, for 10 minutes at most or until a network is back. The voice speaks
+through its model, so the last line is said only if the voice can still speak
+with no network (a recording, as #830's offline line, is not built).
+
+**The password** is in the request line and the network file, and nowhere
+else: no reply, error or journal line holds it, and the journal holds no
+network name either, only its length.
+
+Tests (`crates/setup/tests/wifi_change.rs`, with a fake network manager): a
+network that joins and reaches the broker kept, and the old file gone; the old
+file kept while waiting; a wrong password, a network out of range, one with no
+address and one without the broker each back on the old network, never the
+hotspot; an old network that does not come back kept, within 2 min; no Wi-Fi
+file refused; the request's checks in setup's words; the password and the names
+in no reply or journal line, for every outcome; the switch off, the radio
+untouched; the three lines, and the lost line at most once a minute and given
+up at its bound; the units. Not run on a lamp.
 
 ## On a lamp
 
