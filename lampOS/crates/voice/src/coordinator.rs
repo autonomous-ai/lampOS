@@ -5523,7 +5523,8 @@ fn conversation_with_gate(
                 record(
                     trace,
                     json!({"kind":"duplex_summary","at_us":monotonic_us(),"yields":yields,"commits":commits,"resumes":resumes,
-                    "fallen_back_at_end":fallen_back,"hearing_margin_db":playback_mask.hearing_margin_db(),
+                    "fallen_back_at_end":fallen_back,"fruitless_forgiven":playback_mask.fruitless_forgiven(),
+                    "hearing_margin_db":playback_mask.hearing_margin_db(),
                     "margin_scope":"person in the clear against own voice, both before cancellation; not addressee evidence"}),
                 )?;
             }
@@ -8356,6 +8357,13 @@ fn hear_capture_block(
         mask.hearing_levels_db(),
         at_us,
     )?;
+    if listened.forgiven {
+        record(
+            trace,
+            json!({"kind":"duplex_fruitless_forgiven","at_us":at_us,"frame_sequence":sequence,
+            "forgiven_so_far":mask.fruitless_forgiven(),"forgiven_after_ms":crate::turn_taking::FORGIVE_FRUITLESS_US / 1_000}),
+        )?;
+    }
     if let Some(interval) = trace.yield_interval.as_mut() {
         interval.last_frame_sequence = sequence;
         if echo.is_none() && interval.missing_evidence_since.is_none() {

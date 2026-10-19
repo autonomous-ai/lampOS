@@ -1,0 +1,3 @@
+# From 10:00, ten seconds of music (a ringtone, a video clip): nothing.
+clock = "10:00"
+none = true
