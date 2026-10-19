@@ -3904,6 +3904,9 @@ thread_local! {
     /// monotonic microseconds, in place of onboarding's own.
     static TEST_NEAR_WINDOW: std::cell::Cell<Option<(u64, u64)>> =
         const { std::cell::Cell::new(None) };
+    /// The same for the step's sentence window.
+    static TEST_SENTENCE_WINDOW: std::cell::Cell<Option<(u64, u64)>> =
+        const { std::cell::Cell::new(None) };
 }
 
 /// Whether onboarding's near-call try window is open at `at_us` (#1803):
@@ -3916,6 +3919,19 @@ fn near_call_window(onboarding: Option<&crate::onboarding::Onboarding>, at_us: u
         return (from..to).contains(&at_us);
     }
     onboarding.is_some_and(|walk| walk.near_holds_reply(at_us))
+}
+
+/// Whether the sentence part's window of onboarding's `how_you_sound` is
+/// open at `at_us` (#1803): a line that ends in it is the person's sentence.
+/// Unlike a name in the near-call window, its End goes on, so the words
+/// come back; its answer is held (the turn ends as its words arrive, or as
+/// its first answer audio does), and the words are counted, never kept.
+fn sentence_window(onboarding: Option<&crate::onboarding::Onboarding>, at_us: u64) -> bool {
+    #[cfg(test)]
+    if let Some((from, to)) = TEST_SENTENCE_WINDOW.with(std::cell::Cell::get) {
+        return (from..to).contains(&at_us);
+    }
+    onboarding.is_some_and(|walk| walk.sentence_window(at_us))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4101,6 +4117,9 @@ fn conversation_with_gate(
     // A turn heard during the near-call step's try window (#1803): it ends
     // unanswered, however long it runs past the window.
     let mut near_call_turn: Option<u64> = None;
+    // The turn whose line ended in the sentence window (#1803): its words
+    // are counted for onboarding and its answer is never played.
+    let mut sentence_turn: Option<u64> = None;
     // The answer whose words are arriving, and whether any of them has been
     // a word yet.
     let mut answer_words: Option<(u64, bool)> = None;
@@ -5244,6 +5263,20 @@ fn conversation_with_gate(
                     {
                         return Err(io::Error::other("invalid provider audio frame").into());
                     }
+                    // An answer to the sentence whose words have not come
+                    // back first (Gemini Live) ends before it is played.
+                    if sentence_turn == Some(request)
+                        && reply
+                            .as_ref()
+                            .is_some_and(|current| current.owner.turn() == request)
+                    {
+                        cancel_reply(owner, reply, trace, "onboarding_sentence")?;
+                        speaker_pending = None;
+                        provider_queue.clear();
+                        snapshot = owner.snapshot(now())?;
+                        rig.publish(snapshot)?;
+                        last_publish = monotonic_us();
+                    }
                     if let Some(current) = reply.as_mut().filter(|r| r.owner.turn() == request) {
                         if current.pcm.len() + samples.len() > MAX_REPLY_SAMPLES {
                             return Err(io::Error::other(
@@ -5372,7 +5405,36 @@ fn conversation_with_gate(
                         }
                         _ => false,
                     };
-                    if !held && let Some(bus) = bus_out.as_mut() {
+                    // The sentence's words (#1803): only their count goes to
+                    // onboarding, nothing is published, and its answer ends
+                    // here, before any of it is played.
+                    let sentence = request.is_none() && finished && sentence_turn.is_some();
+                    if sentence && let Some(turn) = sentence_turn.take() {
+                        let words = crate::wait_words::words_in(&text);
+                        if let Some(walk) = onboarding.as_mut() {
+                            walk.sentence_words(words);
+                        }
+                        record(
+                            trace,
+                            json!({"kind":"onboarding_sentence_words","turn":turn,
+                                "words":words,"at_us":monotonic_us()}),
+                        )?;
+                        if reply
+                            .as_ref()
+                            .is_some_and(|current| current.owner.turn() == turn)
+                        {
+                            cancel_reply(owner, reply, trace, "onboarding_sentence")?;
+                            speaker_pending = None;
+                            provider_queue.clear();
+                            snapshot = owner.snapshot(now())?;
+                            rig.publish(snapshot)?;
+                            last_publish = monotonic_us();
+                        }
+                    }
+                    if !held
+                        && !sentence
+                        && let Some(bus) = bus_out.as_mut()
+                    {
                         match request {
                             Some(turn) => bus.said(turn, &text, finished, monotonic_us()),
                             None => bus.heard(&text, finished, monotonic_us()),
@@ -5495,10 +5557,13 @@ fn conversation_with_gate(
                             json!({"kind":"body_gesture_asked","turn":turn,"gesture":gesture,"at_us":monotonic_us()}),
                         )?;
                     }
-                    record(
-                        trace,
-                        json!({"kind":"transcript","turn":request,"text":text,"finished":finished,"at_us":monotonic_us(),"input_correlation":if request.is_none(){"unreliable; session scoped"}else{"output lineage"}}),
-                    )?
+                    // The sentence's words are counted above and not kept.
+                    if !sentence {
+                        record(
+                            trace,
+                            json!({"kind":"transcript","turn":request,"text":text,"finished":finished,"at_us":monotonic_us(),"input_correlation":if request.is_none(){"unreliable; session scoped"}else{"output lineage"}}),
+                        )?
+                    }
                 }
                 ProviderOutput::Interrupted { request } => {
                     record(
@@ -6758,6 +6823,24 @@ fn conversation_with_gate(
                         .as_mut()
                         .ok_or_else(|| io::Error::other("speech end lost its owner"))?;
                     let input_end_us = audio.captured_at_us;
+                    // A line ending in the sentence window: its speech and
+                    // whether it was said close, numbers only.
+                    sentence_turn = None;
+                    if sentence_window(onboarding.as_ref(), monotonic_us()) {
+                        let turn = current.owner.turn();
+                        let speech_ms =
+                            speech_levels.len() as u64 * u64::from(lamp_audio::BLOCK_MS);
+                        let close = said_close(&speech_levels, &loud_blocks, &rise).is_some();
+                        sentence_turn = Some(turn);
+                        if let Some(walk) = onboarding.as_mut() {
+                            walk.sentence_line(speech_ms, close, monotonic_us());
+                        }
+                        record(
+                            trace,
+                            json!({"kind":"onboarding_sentence_line","turn":turn,
+                                "speech_ms":speech_ms,"said_close":close,"at_us":monotonic_us()}),
+                        )?;
+                    }
                     // The lamp is sure the person has finished. A request
                     // whose end went early sends nothing more: what it
                     // waited for was this moment, and from here its answer

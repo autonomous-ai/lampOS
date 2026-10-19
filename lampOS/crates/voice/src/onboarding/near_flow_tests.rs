@@ -1,5 +1,8 @@
 //! The near-call step (#1803), with a scripted bus and Unix clock.
-use super::near::{NEAR_DONE, NEAR_FAILED, Seen};
+use super::near::{
+    NEAR_DONE, NEAR_FAILED, SENTENCE_AGAIN, SENTENCE_CLOSER, SENTENCE_DONE, SENTENCE_FAILED,
+    SENTENCE_FIRST, SENTENCE_LOUDER, Seen,
+};
 use super::*;
 use lamp_msgs::{NameHeard, RoomSound};
 use std::cell::Cell;
@@ -197,6 +200,13 @@ fn outcome(walk: &Onboarding) -> Option<Outcome> {
         .map(|kept| kept.outcome)
 }
 
+/// The name part's outcome, with the step not yet decided: its sentence
+/// part follows.
+fn named(walk: &Onboarding) -> Option<Outcome> {
+    assert_eq!(outcome(walk), None, "the step waits for its sentence part");
+    walk.near.named()
+}
+
 /// Lets the step finish once no prompt is asked again: the notes said.
 fn settle(walk: &mut Onboarding, at: u64) -> Vec<&'static str> {
     let mut notes = Vec::new();
@@ -239,7 +249,7 @@ fn three_calls_from_the_seat_keep_a_bar_and_only_they_mark_the_step_done() {
     assert_eq!(walk.pending().invitations.len(), 0);
     assert_eq!(outcome(&walk), None, "nothing done before the bar is kept");
     assert_eq!(settle(&mut walk, 60 * S), [NEAR_DONE]);
-    assert_eq!(outcome(&walk), Some(Outcome::Done));
+    assert_eq!(named(&walk), Some(Outcome::Done));
     assert_eq!(lamp_near_call::read(&store.near_file()), Some(19.4));
     use std::os::unix::fs::PermissionsExt;
     let mode = std::fs::metadata(store.near_file())
@@ -551,7 +561,7 @@ fn too_few_calls_or_too_far_apart_keep_no_file_and_the_default() {
         assert_eq!(judge(&mut walk, &prompt)["why"], "the name wasn't heard");
     }
     assert_eq!(settle(&mut walk, 70 * S), [NEAR_FAILED]);
-    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    assert_eq!(named(&walk), Some(Outcome::Failed));
     assert!(!store.near_file().exists());
     assert_eq!(walk.kept().near_call_prompts, 3);
     assert_eq!(lamp_near_call::read(&store.near_file()), None);
@@ -562,7 +572,7 @@ fn too_few_calls_or_too_far_apart_keep_no_file_and_the_default() {
         assert_eq!(call(&mut walk, turn * 20 * S, rise, turn)["accepted"], true);
     }
     settle(&mut walk, 80 * S);
-    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    assert_eq!(named(&walk), Some(Outcome::Failed));
     assert!(!store.near_file().exists());
 }
 
@@ -582,8 +592,13 @@ fn five_prompts_at_most() {
     settle(&mut walk, 120 * S);
     assert_eq!(walk.kept().near_call_prompts, 5);
     assert_eq!(walk.kept().near_call_tries.len(), 2);
-    assert_eq!(outcome(&walk), Some(Outcome::Failed));
-    assert!(walk.pending().invitations.is_empty());
+    assert_eq!(named(&walk), Some(Outcome::Failed));
+    assert!(
+        walk.pending()
+            .invitations
+            .iter()
+            .all(|invitation| invitation.attempt > 5)
+    );
     assert!(!store.near_file().exists());
 }
 
@@ -720,6 +735,232 @@ fn a_held_near_call_write_never_holds_the_loop_and_nothing_is_done_before_it() {
     assert!(!store.near_file().exists());
     drop(release);
     assert_eq!(settle(&mut walk, 100 * S), [NEAR_DONE]);
+    assert_eq!(named(&walk), Some(Outcome::Done));
+    assert_eq!(lamp_near_call::read(&store.near_file()), Some(19.4));
+}
+
+// The sentence part (#1803, the first builder's ruling (a)).
+
+/// Three accepted calls: the bar is kept and the sentence part begins.
+fn past_the_name(walk: &mut Onboarding) {
+    for (turn, rise) in [(1, 22.4), (2, 25.0), (3, 23.1)] {
+        assert_eq!(call(walk, turn * 20 * S, rise, turn)["accepted"], true);
+    }
+    assert_eq!(settle(walk, 70 * S), [NEAR_DONE]);
+    assert_eq!(named(walk), Some(Outcome::Done));
+}
+
+/// A sentence prompt asked and played whole at `at`: its words.
+fn ask(walk: &mut Onboarding, at: u64, turn: u64) -> String {
+    let token = offer(walk, at);
+    assert!(walk.pending().invitations[0].attempt > 5);
+    let words = walk.take_invitation(token, at).unwrap();
+    let boot = BootId::new([3; 16]).unwrap();
+    assert!(walk.bind_invitation(token, boot, turn));
+    walk.invitation_finished(boot, turn, true, at);
+    words
+}
+
+/// A line ended 4 s after the prompt, its words back, and the try judged.
+fn sentence(
+    walk: &mut Onboarding,
+    at: u64,
+    speech_ms: u64,
+    close: bool,
+    words: Option<usize>,
+) -> Value {
+    walk.sentence_line(speech_ms, close, at + 4 * S);
+    if let Some(words) = words {
+        walk.sentence_words(words);
+    }
+    for now in [at + 5 * S, at + 18 * S + 1] {
+        walk.tick(now, START_QUIET_US, true, false, face(), true);
+        walk.drain_storage_for_test(now);
+    }
+    walk.take_records()
+        .into_iter()
+        .rfind(|row| row["kind"] == "onboarding_sentence_try")
+        .expect("a sentence try was judged")
+}
+
+#[test]
+fn a_sentence_said_close_with_its_words_covering_it_ends_the_step_done_and_keeps_none_of_it() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    past_the_name(&mut walk);
+    assert_eq!(ask(&mut walk, 80 * S, 4), SENTENCE_FIRST);
+    // Its window holds no name try: the near-call gate stays shut.
+    assert!(walk.sentence_window(80 * S) && walk.sentence_window(95 * S));
+    assert!(!walk.sentence_window(95 * S + 1) && !walk.near_holds_reply(81 * S));
+    let judged = sentence(&mut walk, 80 * S, 3_000, true, Some(9));
+    assert_eq!(judged["accepted"], true, "{judged}");
+    assert_eq!(judged["words"], 9);
+    assert_eq!(settle(&mut walk, 100 * S), [SENTENCE_DONE]);
     assert_eq!(outcome(&walk), Some(Outcome::Done));
+    assert_eq!(walk.kept().sentence_prompts, 1);
+    assert_eq!(lamp_near_call::read(&store.near_file()), Some(19.4));
+    // Only counts are kept: the file has no field for the sentence.
+    let kept: Value =
+        serde_json::from_slice(&std::fs::read(store.path.join("progress.json")).unwrap()).unwrap();
+    let mut fields: Vec<&String> = kept.as_object().unwrap().keys().collect();
+    fields.sort();
+    assert_eq!(
+        fields,
+        [
+            "near_call_prompts",
+            "near_call_tries",
+            "privacy_discard_pending",
+            "privacy_invitation_tries",
+            "sentence_prompts",
+            "steps"
+        ]
+    );
+}
+
+#[test]
+fn too_quiet_is_coached_a_little_louder_once_and_a_fragment_a_little_closer() {
+    // Not said close: "louder", then a good sentence is done.
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    past_the_name(&mut walk);
+    ask(&mut walk, 80 * S, 4);
+    let judged = sentence(&mut walk, 80 * S, 3_000, false, Some(9));
+    assert_eq!(
+        (judged["accepted"].clone(), judged["short"].clone()),
+        (json!(false), json!("level"))
+    );
+    assert_eq!(outcome(&walk), None);
+    assert_eq!(ask(&mut walk, 110 * S, 5), SENTENCE_LOUDER);
+    assert_eq!(
+        sentence(&mut walk, 110 * S, 2_500, true, Some(6))["accepted"],
+        true
+    );
+    assert_eq!(settle(&mut walk, 130 * S), [SENTENCE_DONE]);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+    // A fragment: one word for 4 s of speech, "closer", then failed with
+    // the one coaching spent; the name part's bar stands.
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    past_the_name(&mut walk);
+    ask(&mut walk, 80 * S, 4);
+    assert_eq!(
+        sentence(&mut walk, 80 * S, 4_000, true, Some(1))["short"],
+        "coverage"
+    );
+    assert_eq!(ask(&mut walk, 110 * S, 5), SENTENCE_CLOSER);
+    // Words that never came back fall short the same way.
+    assert_eq!(
+        sentence(&mut walk, 110 * S, 4_000, true, None)["short"],
+        "coverage"
+    );
+    assert_eq!(settle(&mut walk, 140 * S), [SENTENCE_FAILED]);
+    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    assert!(walk.pending().invitations.is_empty());
+    assert_eq!(walk.kept().sentence_prompts, 2);
+    assert_eq!(lamp_near_call::read(&store.near_file()), Some(19.4));
+}
+
+#[test]
+fn the_step_is_the_sentences_whatever_the_name_part_came_to() {
+    // Nobody called: no bar, and the sentence part still runs and decides.
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    for (turn, at) in [(1, 10 * S), (2, 30 * S), (3, 50 * S)] {
+        let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        judge(&mut walk, &prompt);
+    }
+    assert_eq!(settle(&mut walk, 70 * S), [NEAR_FAILED]);
+    assert_eq!(named(&walk), Some(Outcome::Failed));
+    ask(&mut walk, 80 * S, 4);
+    // Nothing said in the window: "louder".
+    let judged = sentence_none(&mut walk, 80 * S);
+    assert_eq!(judged["short"], "level");
+    ask(&mut walk, 110 * S, 5);
+    assert_eq!(
+        sentence(&mut walk, 110 * S, 2_000, true, Some(5))["accepted"],
+        true
+    );
+    settle(&mut walk, 130 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+    assert!(!store.near_file().exists());
+    // A kept "done" needs its sentence asked.
+    let mut progress = walk.kept().clone();
+    assert!(progress.check().is_ok());
+    progress.sentence_prompts = 0;
+    assert!(progress.check().is_err());
+    progress.sentence_prompts = 3;
+    assert!(progress.check().is_err());
+}
+
+/// The window and the words' wait pass with no line.
+fn sentence_none(walk: &mut Onboarding, at: u64) -> Value {
+    walk.tick(at + 18 * S - 1, START_QUIET_US, true, false, face(), true);
+    assert!(
+        !walk
+            .take_records()
+            .iter()
+            .any(|row| row["kind"] == "onboarding_sentence_try"),
+        "judged before the window and the wait passed"
+    );
+    walk.tick(at + 18 * S, START_QUIET_US, true, false, face(), true);
+    walk.drain_storage_for_test(at + 18 * S);
+    walk.take_records()
+        .into_iter()
+        .rfind(|row| row["kind"] == "onboarding_sentence_try")
+        .expect("judged")
+}
+
+#[test]
+fn late_lines_skip_redo_and_a_new_cycle_in_the_sentence_part() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    past_the_name(&mut walk);
+    ask(&mut walk, 80 * S, 4);
+    // A line ending past the window is not the sentence.
+    walk.sentence_line(3_000, true, 96 * S);
+    walk.sentence_words(9);
+    assert_eq!(sentence_none(&mut walk, 80 * S)["short"], "level");
+    // A new voice cycle keeps the prompt spent and the bar is kept again;
+    // what fell short is not known, so the next prompt only asks again.
+    drop(walk);
+    let mut walk = store.cycle(100 * S);
+    assert_eq!(settle(&mut walk, 100 * S), [NEAR_DONE]);
+    let token = offer(&mut walk, 110 * S);
+    assert_eq!(
+        walk.take_invitation(token, 110 * S).unwrap(),
+        SENTENCE_AGAIN
+    );
+    // Claimed and never judged: with both prompts spent the step fails.
+    drop(walk);
+    let mut walk = store.cycle(120 * S);
+    assert_eq!(settle(&mut walk, 120 * S), [NEAR_DONE, SENTENCE_FAILED]);
+    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    // Redo forgets the sentence's prompts too.
+    walk.apply_mailbox("{\"redo\":true}\n", 130 * S);
+    walk.drain_storage_for_test(130 * S);
+    assert_eq!(walk.kept().sentence_prompts, 0);
+    // A skip in the sentence part ends the step skipped; its late line and
+    // words change nothing.
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    past_the_name(&mut walk);
+    ask(&mut walk, 80 * S, 4);
+    report_skip(&walk);
+    walk.read_us = None;
+    walk.drain_storage_for_test(81 * S);
+    walk.tick(81 * S, START_QUIET_US, true, false, face(), true);
+    walk.drain_storage_for_test(81 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Skipped));
+    assert!(!walk.sentence_window(82 * S));
+    walk.sentence_line(3_000, true, 82 * S);
+    walk.sentence_words(9);
+    walk.tick(99 * S, START_QUIET_US, true, false, face(), true);
+    assert!(
+        !walk
+            .take_records()
+            .iter()
+            .any(|row| row["kind"] == "onboarding_sentence_try")
+    );
+    assert_eq!(outcome(&walk), Some(Outcome::Skipped));
     assert_eq!(lamp_near_call::read(&store.near_file()), Some(19.4));
 }
