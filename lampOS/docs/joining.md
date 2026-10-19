@@ -620,6 +620,9 @@ kept by `hw-first` ([builders/hw-first.md](../builders/hw-first.md)).
 - **The hardware lead** (a person) approves the suite's limits, durations,
   fixtures and stop conditions, and the shipment gate. A changed limit is a
   versioned decision.
+- **The suite and the record:** the coverage matrix, its file
+  (`production/matrix-v<N>.toml`), the station tool `lamp-station` and the
+  record each run leaves are in [production-testing.md](production-testing.md).
 
 ## What was not shown, and open questions
 
