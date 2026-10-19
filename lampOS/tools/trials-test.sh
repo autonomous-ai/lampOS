@@ -110,6 +110,11 @@ case $1 in
     # $FAKE/pub-fails: the next pub fails, once.
     [[ -e $FAKE/pub-fails ]] && { rm -f "$FAKE/pub-fails"; exit 1; }
     if [[ -e $FAKE/answer ]]; then cat "$FAKE/answer" >>"$FAKE/journal"; rm -f "$FAKE/answer"; fi
+    # $FAKE/answer2, "match<TAB>unit<TAB>line": a second line, at the pub
+    # whose arguments hold match (a behaviour done when its cause ends).
+    if [[ -e $FAKE/answer2 ]] && [[ $* == *"$(cut -f1 "$FAKE/answer2")"* ]]; then
+      cut -f2- "$FAKE/answer2" >>"$FAKE/journal"; rm -f "$FAKE/answer2"
+    fi
     ;;
   hz) [[ -e $file ]] ;;
   latest) cat "$file" 2>/dev/null ;;
@@ -137,6 +142,7 @@ echo '{"ok":true}'
 EOF
 chmod +x "$T/bin/"*
 
+export TRIALS_THEN_WAIT=0
 export PATH="$T/bin:$PATH" FAKE=$T TRIALS_UNIT_DIR=$T/units TRIALS_ASIDE_DIR=$T/run TRIALS_PROC=$T/proc TRIALS_SUDO= \
   LAMP_BUS_BIN=$T/bin/lamp-bus TRIALS_CALL=$T/bin/fake-call TRIALS_WAIT=2
 
@@ -149,7 +155,7 @@ hasnt() { if grep -qF -- "$3" "$2"; then bad "$1 ('$3' in $2)"; else ok; fi; }
 no_dropin() { if ls "$T/units"/*.d/zz-trial.conf >/dev/null 2>&1; then bad "$1: a drop-in is left"; else ok; fi; }
 reset() {
   rm -rf "$T/units"/* "$T/calls" "$T/journal" "$T/answer" "$T/env-ignored" "$T/restarts" \
-    "$T/restarts-before-failing" "$T/bus" "$T/state"/* "$T/pub-fails" "$T/skills"/*
+    "$T/restarts-before-failing" "$T/bus" "$T/state"/* "$T/pub-fails" "$T/skills"/* "$T/answer2"
   mkdir -p "$T/bus"
   : >"$T/calls"
 }
@@ -165,6 +171,11 @@ answer() { # ROW
   if [[ $in == bus:* ]]; then
     local topic=${in#bus:}
     (sleep 1; printf '%s\n' "$example" >"$T/bus/${topic//\//_}") &
+  elif [[ -n $(field "$1" "first example") ]]; then
+    printf '%s\t%s\n' "$in" "$(field "$1" "first example")" >"$T/answer"
+    local then
+    then=$(dry "$1" | sed -n 's/^  then: pub [^ ]* [^ ]* \([^ ]*\) .*/\1/p' | tail -1)
+    printf '%s\t%s\t%s\n' "$then" "$in" "$example" >"$T/answer2"
   else
     printf '%s\t%s\n' "$in" "$example" >"$T/answer"
     if ! dry "$1" | grep -qE '^  cause: (pub|keep|call) '; then
@@ -230,7 +241,8 @@ reset
 mkdir -p "$T/skills/light-out"
 echo "the lamp's own" >"$T/skills/light-out/skill.toml"
 cp "$T/skills/light-out/skill.toml" "$T/before.toml"
-(sleep 2; printf '%s\t%s\n' lamp-skills.service "$(field light-out example)" >>"$T/journal") &
+(sleep 2; printf '%s\t%s\n' lamp-skills.service "$(field light-out "first example")" >>"$T/journal") &
+printf '%s\t%s\t%s\n' '"someone":true' lamp-skills.service "$(field light-out example)" >"$T/answer2"
 TRIALS_WAIT=10 "$SCRIPT" light-out >"$T/out" 2>&1; check "light-out with an earlier copy" 0 $?
 wait
 has "light-out: --zone carried" "$T/out" "on: lamp-skills.service has +--zone system"
@@ -240,6 +252,27 @@ has "light-out: someone said back after" "$T/calls" 'lamp-bus pub room/presence 
 cmp -s "$T/skills/light-out/skill.toml" "$T/before.toml" && ok || bad "light-out: the lamp's own copy not put back"
 after=$(grep -c 'someone":false' "$T/calls"); sleep 2
 [[ $(grep -c 'someone":false' "$T/calls") == "$after" ]] && ok || bad "light-out: still publishing after the end"
+# light-out holds while nobody is there and says Done only when its trigger
+# ends (the first builder, #1722, 20 Oct 00:28): no Done until someone is
+# said back, after Triggered; the trial says so, and Done passes.
+reset
+printf '%s\t%s\n' lamp-skills.service "$(field light-out "first example")" >"$T/answer"
+printf '%s\t%s\t%s\n' '"someone":true' lamp-skills.service "$(field light-out example)" >"$T/answer2"
+"$SCRIPT" light-out >"$T/out" 2>&1; check "light-out: Done after someone is back" 0 $?
+has "light-out: began said" "$T/out" "began: lamp-skills: light-out Triggered"
+first=$(grep -n 'began: ' "$T/out" | cut -d: -f1); back=$(grep -n 'then: lamp-bus pub room/presence latest {"someone":true' "$T/out" | cut -d: -f1); at_pass=$(grep -n "PASS: light-out" "$T/out" | cut -d: -f1)
+[[ -n $first && -n $back && -n $at_pass && $first -lt $back && $back -lt $at_pass ]] && ok || bad "light-out: not Triggered, then someone back, then PASS: $first $back $at_pass"
+# Triggered but never Done: FAIL, said.
+reset
+printf '%s\t%s\n' lamp-skills.service "$(field light-out "first example")" >"$T/answer"
+TRIALS_WAIT=1 "$SCRIPT" light-out >"$T/out" 2>&1; check "light-out: Triggered, no Done" 1 $?
+has "light-out: no Done said" "$T/out" "FAIL: light-out: no line matching /light-out Done"
+# Never Triggered: FAIL on the first line, and someone isn't said back early.
+reset
+TRIALS_WAIT=1 "$SCRIPT" light-out >"$T/out" 2>&1; check "light-out: never Triggered" 1 $?
+has "light-out: no Triggered said" "$T/out" "FAIL: light-out: no line matching /light-out Triggered/"
+hasnt "light-out: no then-step without Triggered" "$T/out" "then: "
+
 # The copy the trial ran: no [quiet], its trigger as the build's; gone after.
 reset
 (sleep 1; cp "$T/skills/light-out/skill.toml" "$T/trial.toml") &
