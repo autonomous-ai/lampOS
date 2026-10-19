@@ -4710,6 +4710,18 @@ A usage limit paused me from about 00:40 to 06:2x.
   - **A Flux trial behind a switch,** English only, against Nova-3 with `Finalize` on the same lines: next. The protocol is read (`ForceEndTurn`, `EndOfTurn`'s `trigger`, `CloseStream`).
 - **#753, Seventh's onboarding step:** the measurement is posted and agreed (14:06). Each try is the name heard once at 0.95 or more, and mic1's largest rise in the second after it. The lamp speaking spoils only that span, from 0.5 s before the hearing. The bar is the quietest of three tries less 3 dB, held to 16–24, kept as numbers only. The functions and the file come as a small crate of their own, `lamp-near-call`, after the key-terms PR. The consumer behind `LAMP_ATTENTION_NEAR_CALIBRATED` comes after that.
 
+## 2026-10-19, 15:23 ICT: #828 and #829 closed on my checkpoints; the key terms up (#1818); the near call's crate up (#1823); the Flux trial gating
+
+- **The lead's new rule (#1711): checkpoints for long issues.** I posted both of mine at 14:46. The first builder closed both at 14:51:
+  - **#828**, 27 merged, closed. The stop bar isn't met, and continues in #1808, mine. The microphone goes on the Hardware Queue.
+  - **#829**, 32 merged, closed. It continues in #1809 (two real people), mine, and #1810 (the lamp turns to the one it answers), unassigned.
+  - Both of mine wait on the owner's recordings or two real people.
+- **A correction:** my 11:34 note on #829 named the wrong PR. Eighth's fix is #1627, not #1701, and the comment now says so.
+- **#1818, step 1 of #1712's hearing half:** `LAMP_SECOND_KNOWN_NAMES`, opened on #1712's branch after Third's 14:33 rebase.
+  - **Gate:** 2883 passed and 4 failed. All 4 are in files it doesn't touch, and each passed alone at the same head.
+- **#1823, `lamp-near-call` for Seventh's setup step (#753):** one try, the loop, the bar and the file, 7 tests. The reviewer found nothing (15:22), and it merges once ARM64 is green.
+- **Step 2, the Flux trial (`LAMP_SECOND_FLUX`):** committed on #1818's branch, 13 tests of its own. Gating now. It hasn't been run against Deepgram.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
