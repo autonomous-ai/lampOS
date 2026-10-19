@@ -386,3 +386,9 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   its conversation's earlier turns. Found: forgetting an observation climbs
   recursively through what sessions were shown and removes unrelated kept
   things. Shown by a test; left for the first builder's call.
+- Memory on the second route keeps nothing (the first builder's 00:34): Third
+  owns it. My FEW_TOOLS guess didn't fit (it was off); I read the functions'
+  descriptions for Third (they never say that words alone keep nothing).
+- #2003 also carries the observation rule, one step back, at the first
+  builder's yes (`7996c39e7`): the pinned test is changed with its reason, and
+  the kettle test is added.
