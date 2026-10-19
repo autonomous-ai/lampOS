@@ -1,6 +1,6 @@
 """Phonon synthesis worker — runs under the Phonon venv, not HAL's.
 
-Usage: <phonon-venv>/bin/python phonon_worker.py --model DIR [--lang en] [--quant q8] [--threads N]
+Usage: <phonon-venv>/bin/python phonon_worker.py --model DIR [--lang en] [--quant q8] [--threads N] [--cpus 6-7]
 
 Kept free of `hal` imports: it runs with the interpreter that has `ptts` installed
 (/opt/phonon/.venv by default), so HAL's Python and numpy stay untouched.
@@ -17,6 +17,7 @@ Protocol (stdin = JSON lines, stdout = binary frames, stderr = logs):
 
 import argparse
 import json
+import os
 import queue
 import struct
 import sys
@@ -38,13 +39,42 @@ def _log(msg: str) -> None:
     print(f"[phonon-worker] {msg}", file=sys.stderr, flush=True)
 
 
+def _parse_cpus(spec: str) -> set:
+    """"6-7" or "0,6-7" -> {6, 7} / {0, 6, 7}; malformed parts are skipped."""
+    cpus = set()
+    for part in spec.split(","):
+        lo, _, hi = part.strip().partition("-")
+        try:
+            cpus.update(range(int(lo), int(hi or lo) + 1))
+        except ValueError:
+            continue
+    return cpus
+
+
+def _pin(spec: str) -> None:
+    """Pin this process to the CPUs in `spec` that exist here; no-op if none do."""
+    if not spec or not hasattr(os, "sched_setaffinity"):
+        return
+    allowed = os.sched_getaffinity(0)
+    cpus = _parse_cpus(spec) & allowed
+    if not cpus:
+        _log(f"cpus {spec!r} not on this board ({sorted(allowed)}), not pinning")
+        return
+    os.sched_setaffinity(0, cpus)
+    _log(f"pinned to cpus {sorted(cpus)}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
     ap.add_argument("--lang", default="en")
     ap.add_argument("--quant", default="q8")
     ap.add_argument("--threads", type=int, default=0)
+    ap.add_argument("--cpus", default="")
     args = ap.parse_args()
+
+    # Before the engine loads, so every thread it starts inherits the mask.
+    _pin(args.cpus)
 
     import numpy as np
     import ptts

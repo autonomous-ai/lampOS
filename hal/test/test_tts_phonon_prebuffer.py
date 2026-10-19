@@ -92,5 +92,30 @@ def test_cancel_reaches_the_worker(monkeypatch):
     assert PhononTTSBackend.supports_synthesis_cancellation is True
 
 
-def test_prebuffer_env_default_is_1200_ms():
-    assert phonon.PHONON_PREBUFFER_S == 1.2
+def test_prebuffer_env_default_is_200_ms():
+    assert phonon.PHONON_PREBUFFER_S == 0.2
+
+
+def test_worker_pinned_to_a76_cores_by_default():
+    worker = phonon._Worker("/m", "en", "q8", phonon.PHONON_THREADS, phonon.PHONON_CPUS)
+
+    assert worker._argv[-2:] == ["--cpus", "6-7"]
+    assert phonon.PHONON_THREADS == 1
+
+
+def test_worker_parses_cpu_lists():
+    from hal.drivers.voice.tts import phonon_worker
+
+    assert phonon_worker._parse_cpus("6-7") == {6, 7}
+    assert phonon_worker._parse_cpus("0, 6-7") == {0, 6, 7}
+    assert phonon_worker._parse_cpus("x,3") == {3}
+    assert phonon_worker._parse_cpus("") == set()
+
+
+def test_every_audio_tag_is_stripped():
+    strip = phonon._strip_audio_tags
+
+    assert strip("[curious, warm] I see you, chin on hand.") == "I see you, chin on hand."
+    assert strip("Oh! [laughs softly] That tickles. [pause] Again?") == "Oh! That tickles. Again?"
+    assert strip("[dramatic tone]") == ""
+    assert strip("No tags here.") == "No tags here."

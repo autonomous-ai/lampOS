@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import queue
+import re
 import subprocess
 import threading
 import time
@@ -26,13 +27,17 @@ PHONON_MODEL_DIR = os.environ.get("HAL_PHONON_MODEL", os.path.join(PHONON_DIR, "
 # Text normalization only (numbers, symbols): en, fr, de, es, pt or none.
 PHONON_LANG = os.environ.get("HAL_PHONON_LANG", "en")
 PHONON_QUANT = os.environ.get("HAL_PHONON_QUANT", "q8")
-# 0 = the engine's default (all cores).
-PHONON_THREADS = int(os.environ.get("HAL_PHONON_THREADS", "0") or 0)
-# Head start before a sentence starts playing. Phonon opens each sentence with 80 ms
-# chunks that take 100-330 ms each to make, then switches to larger chunks that run
-# ahead of real time. Measured on a lamp with HAL busy: playing the first chunk at
-# once fell up to 1.1 s behind, heard as holes in the first second of speech.
-PHONON_PREBUFFER_S = max(0.0, float(os.environ.get("HAL_PHONON_PREBUFFER_MS", "1200") or 0) / 1000.0)
+# CPUs the worker is pinned to, e.g. "6-7" or "6,7"; empty = no pinning. 6-7 are the
+# A733's two Cortex-A76 cores. Any thread on a Cortex-A55 holds back every chunk:
+# on lamp-a0ae all 8 cores ran at RTF 0.55-0.74 and needed a 0.5-0.85 s head start,
+# 6-7 with one thread ran at RTF 0.49 with no head start needed. CPUs the board
+# lacks are dropped.
+PHONON_CPUS = os.environ.get("HAL_PHONON_CPUS", "6-7")
+# Engine compute threads; 0 = the engine's default (all cores). One beat two on 6-7.
+PHONON_THREADS = int(os.environ.get("HAL_PHONON_THREADS", "1") or 0)
+# Head start before a sentence starts playing, as margin for a busy HAL. Pinned to
+# 6-7, every chunk arrived before it was due, so 200 ms is enough.
+PHONON_PREBUFFER_S = max(0.0, float(os.environ.get("HAL_PHONON_PREBUFFER_MS", "200") or 0) / 1000.0)
 
 WORKER_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "phonon_worker.py")
 
@@ -47,10 +52,8 @@ _CANCEL_POLL_S = 0.1
 _FRAME_HEADER = 9  # struct ">IBI": request id, kind, payload length
 _READY, _PCM, _END, _ERROR = 0, 1, 2, 3
 
-_AUDIO_TAGS = (
-    "laugh", "sigh", "whisper", "gasp", "gulp", "nervous",
-    "excited", "frustrated", "sorrowful", "calm",
-)
+# Phonon interprets no audio tags, so every [direction] goes, not only known ones.
+_AUDIO_TAG_RE = re.compile(r"\s*\[[^\[\]]*\]")
 
 
 def list_voices(model_dir: str = PHONON_MODEL_DIR) -> List[str]:
@@ -86,27 +89,18 @@ def model_installed(model_dir: str = PHONON_MODEL_DIR) -> bool:
 
 
 def _strip_audio_tags(text: str) -> str:
-    """Drop ElevenLabs-style [laugh] tags; Phonon would read them aloud."""
-    out, i = [], 0
-    while i < len(text):
-        if text[i] == "[":
-            end = text.find("]", i)
-            if end != -1 and text[i + 1 : end].strip().lower().startswith(_AUDIO_TAGS):
-                i = end + 1
-                continue
-        out.append(text[i])
-        i += 1
-    return "".join(out).strip()
+    """Drop ElevenLabs-style tags such as [curious, warm]; Phonon would read them aloud."""
+    return _AUDIO_TAG_RE.sub("", text).strip()
 
 
 class _Worker:
     """One phonon_worker.py process; requests are served one at a time."""
 
-    def __init__(self, model_dir: str, lang: str, quant: str, threads: int):
+    def __init__(self, model_dir: str, lang: str, quant: str, threads: int, cpus: str):
         self._argv = [
             PHONON_PYTHON, WORKER_SCRIPT,
             "--model", model_dir, "--lang", lang, "--quant", quant,
-            "--threads", str(threads),
+            "--threads", str(threads), "--cpus", cpus,
         ]
         self._proc: Optional[subprocess.Popen] = None
         self._frames: "queue.Queue" = queue.Queue()
@@ -269,12 +263,12 @@ _workers: dict = {}
 _workers_lock = threading.Lock()
 
 
-def _shared_worker(model_dir: str, lang: str, quant: str, threads: int) -> _Worker:
-    key = (model_dir, lang, quant, threads)
+def _shared_worker(model_dir: str, lang: str, quant: str, threads: int, cpus: str) -> _Worker:
+    key = (model_dir, lang, quant, threads, cpus)
     with _workers_lock:
         worker = _workers.get(key)
         if worker is None:
-            worker = _workers[key] = _Worker(model_dir, lang, quant, threads)
+            worker = _workers[key] = _Worker(model_dir, lang, quant, threads, cpus)
         return worker
 
 
@@ -285,12 +279,14 @@ class PhononTTSBackend(TTSBackend):
     supports_synthesis_cancellation = True
 
     def __init__(self, model_dir: str = "", lang: str = "", quant: str = "",
-                 threads: Optional[int] = None, prebuffer_s: Optional[float] = None):
+                 threads: Optional[int] = None, prebuffer_s: Optional[float] = None,
+                 cpus: Optional[str] = None):
         self._model_dir = model_dir or PHONON_MODEL_DIR
         self._prebuffer_s = PHONON_PREBUFFER_S if prebuffer_s is None else prebuffer_s
         self._worker = _shared_worker(
             self._model_dir, lang or PHONON_LANG, quant or PHONON_QUANT,
             PHONON_THREADS if threads is None else threads,
+            PHONON_CPUS if cpus is None else cpus,
         )
         self._warned_speed = False
         if self.available:
