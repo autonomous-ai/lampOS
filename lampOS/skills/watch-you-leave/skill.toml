@@ -49,6 +49,11 @@ about = "The side of the camera's picture the person left by."
 one_of = ["left", "right"]
 field = "side"
 
+# Every unit runs LAMP_SKILLS_ASK=skip today. Under the Policy's gate this
+# would almost always be refused: it says no while it has seen nobody near
+# (`someone_here == Some(false)`, crates/policy/src/moment.rs), and this
+# runs about 2 s after the face is gone. Before that gate goes on, it needs
+# an ask that fits a departure (the reviewer on #2012).
 [ask]
 policy = "nudge"
 

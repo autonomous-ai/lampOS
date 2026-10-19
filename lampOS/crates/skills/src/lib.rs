@@ -283,8 +283,8 @@ struct ChoiceFile {
     default: Option<String>,
     /// In a skill with a trigger and no tool (#1669 (e), watching someone
     /// leave): the choice is this field of the message that fired it, as
-    /// it is when the steps are made. A value not in `one_of`, or none,
-    /// chooses nothing, so only the steps for every run are made.
+    /// it is when the steps are made. A message whose value is not in
+    /// `one_of`, or has none, does not hold the trigger ([`chooses`]).
     field: Option<String>,
 }
 
@@ -3699,7 +3699,7 @@ impl Engine {
                                     && trigger.test.holds(item)
                             })
                         }
-                        _ => trigger.test.holds(value),
+                        _ => trigger.test.holds(value) && chooses(skill, value),
                     }
                 })
         };
@@ -3878,7 +3878,7 @@ impl Engine {
                         watch.disarmed = false;
                     }
                 }
-                if !(rose && trigger.test.holds(&value)) {
+                if !(rose && trigger.test.holds(&value) && chooses(skill, &value)) {
                     if watch
                         .last_held_us
                         .is_none_or(|held| now_us - held >= trigger.gap_us)
@@ -4325,6 +4325,24 @@ fn arguments(skill: &Skill, args: &Value) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Whether a trigger's message chooses something, for a skill whose
+/// `[choice]` is read from it (`field`, #1669 (e)): only a value in
+/// `one_of` lets it hold, so a message that chooses nothing neither runs
+/// the skill, nor asks the Policy, nor starts its cooldown (the reviewer on
+/// #2012: a departure from the middle used up Watch you leave's ten
+/// minutes). Every other skill's trigger is as its test says.
+fn chooses(skill: &Skill, value: &Value) -> bool {
+    skill
+        .choice
+        .as_ref()
+        .and_then(|choice| Some((choice.field.as_deref()?, choice)))
+        .is_none_or(|(field, choice)| {
+            value[field]
+                .as_str()
+                .is_some_and(|chosen| choice.one_of.iter().any(|one| one == chosen))
+        })
 }
 
 /// One of `count`, picked from the time: the same time picks the same, so a
