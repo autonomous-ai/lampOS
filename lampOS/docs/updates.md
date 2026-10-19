@@ -1130,8 +1130,6 @@ the file is never read back.
 | eyes | forgets waiting, `/var/lib/lampos-eyes/set-aside/forgets-pending` | JSON | none | read | n/a | set aside as `forgets-pending.unreadable-<unix s>` with a line, never counted as records, and forgetting goes on; merged back at a start once it can be read (`who.rs` `pending`, #1680) |
 | skills | skills the person turned off, `/var/lib/lampos-skills-state/off` (cloud reads it too, `cloud/src/skills.rs:81`) | text lines | none | n/a | n/a | a line that isn't a plain name is skipped with no line (`skills/src/lib.rs:3158-3170`) and gone at the next rewrite (`lib.rs:3178-3190`) |
 | cloud | login a ping rotated, `/var/lib/lampos-cloud/rotated.json` | JSON | none | read (`cloud/src/account.rs:14`) | n/a | unreadable falls back to setup's account silently (`main.rs:124-128`); the next rotation overwrites it whole |
-| cloud | queue state, `/var/lib/lampos-cloud/reports/state.json` | JSON | none | read; no `serde(default)`, so a retyped or missing field fails | n/a | **starts empty silently** (`reports.rs:791-793`): `seq` back to 0, the next report reuses seq 1 (tested) |
-| cloud | queued reports, `/var/lib/lampos-cloud/reports/<seq>.json` | JSON | `schema` `lamp-report/1`, written, never checked | read as `Value` | a `kind` other than `crash` or `stopped` | **deleted with no line** (`reports.rs:821-840`, tested with `"kind": "panic"`) |
 | records | voice sessions, `/var/lib/lampOS/voice/sessions` | folders | n/a | an extra file in a session is refused (`records/src/store.rs:22-28`, `394-396`) | n/a | that session is kept and reported and the run exits 1 (`run.rs:253-261`); a newer voice's sessions are never pruned |
 | eyes | faces from photos, `<people>.from-photos` (only with `--photo-dir`, not in the product unit) | JSON | `version` 1; any other **deletes the file** (`eyes/src/photo.rs:195-209`) | read | n/a | dropped with a line. Off in the product |
 | voice | person's light, `/var/lib/lampOS/light/person.json` (`LAMP_LIGHT_KEEP`, not set in the product) | JSON | none | read (`msgs/src/lib.rs:597`) | an unknown colour filtered (`ring_light.rs:170-175`) | dropped silently, overwritten at the next change. Off |
@@ -1152,7 +1150,12 @@ the file is never read back.
 | voice | relay key `/etc/lampOS/voice/credential`; person's name `/etc/lampOS/person/name` | text | n/a | n/a | n/a | key read raw (`config.rs:400`); an unfit name is no name, with a line (`person.rs`) |
 | voice | sessions and first output, `/var/lib/lampOS/voice/sessions/…`, `first-output/*.jsonl` | JSONL | first output `schema` 1 | — | — | written only, never read back at start |
 | cloud | setup's account, `/etc/lampOS/setup/backend.json` | JSON | none | read (`account.rs:14`, all `serde(default)`) | n/a | an extra field reads. A changed type or bad JSON refuses to start, exit 2 (`main.rs:120-123`) |
-| cloud | report choices, `/var/lib/lampos-cloud/reports.json`, `/etc/lampOS/setup/reports.json` | JSON | `asked`; above 1 reads as "no" (`reports.rs:712-713`) | `Value` | an unknown `by` is none (`reports.rs:669`) | read per send; unreadable is "no" |
+| cloud | the person's own reports choice, `/var/lib/lampos-cloud/reports.json` (#2052) | JSON | none; the fields `share`, `at`, `by`, `held` | **read as off**, whatever `share` says, and kept for a roll forward, with a line (`cloud/src/reports.rs:774-814`). A no given over it is not taken for one already given: written, the queue deleted, `stopped` sent (`reports.rs:1163`) | an unknown `by`, or a `held` that isn't a boolean: read as off the same way | unreadable (garbage, cut short, no boolean `share`, can't be opened) **reads as off, never falls through to setup's yes**, and at start is set aside whole as `reports.json.unread-<s>`, an off written in its place, with a line (`reports.rs:1094-1126`). A newer record with a `share` that isn't a boolean is one of these: set aside and replaced by an off, not kept in place, which fails safe |
+| cloud | setup's reports answer, `/etc/lampOS/setup/reports.json` | JSON | `asked`; above 1 reads as "no", said by nothing (a re-ask, as designed) | **read as off** with a line, left there (#2052, `reports.rs:815-854`) | n/a | unreadable reads as off with a line; left where it is, since it is root's and `lamp-cloud` can't write `/etc` |
+| setup | its reports answer, `/etc/lampOS/setup/reports.json` | JSON | `asked` 1 (`setup/src/serve.rs:592`) | n/a | n/a | written whole by `reports_record` (`serve.rs:595-615`, `694-700`), never read back by setup |
+| cloud | queue state, `/var/lib/lampos-cloud/reports/state.json` | JSON | none | read, dropped at the next save; a missing field is its default (`serde(default)`, `reports.rs:911`) | n/a | unreadable is set aside whole as `state.json.unread-<s>` with a line (`reports.rs:1130-1156`); the next `seq` goes past every report still on flash (`reports.rs:1052`). Lost with the queue empty, `seq` starts again at 1: harmless, since the backend drops a duplicate by `(device, seq, sent_at)` |
+| cloud | queued reports, `/var/lib/lampos-cloud/reports/<seq>.json` | JSON | `schema` `lamp-report/1`; a higher one is **kept where it is and not sent**, with a line (`reports.rs:945-993`) | read, and sent as is | a `kind` other than `crash` or `stopped`: kept and not sent, as a newer schema | unreadable (garbage, cut short, over 4 KiB, no `sent_at`) is set aside whole as `<seq>.json.unread-<s>`, never sent, with a line; the rest are read. A no deletes the kept newer ones too (`reports.rs:1280`) |
+| cloud | exit notes, `/run/lampos-exits/<unit>@<at_us>.json` (root's, 0644) | JSON | none | read | a new `result` sends no crash | unreadable is skipped with one line and left whole: `lamp-cloud` can't write the folder, and `/run` goes at the next boot; `write_whole`'s `.tmp` is no longer read (`reports.rs:1457-1508`) |
 | setup | serve config (only `lamp-update install --setup on` writes it, `update/src/install.rs:375-384`), `/etc/lampOS/setup/serve.json` | JSON | none | read, dropped with a line (`setup/src/serve.rs`, `read`) | n/a | an extra field is dropped and named in the journal; a bad known value or bad JSON still refuses to start, exit 2. Not in update's settings list, so a put-back never restores it |
 | setup | reset plan, `/etc/lampOS/setup/reset-plan.json` | JSON | none | **refused**, except `keep_back`, whose every entry is dropped with a line and its path wiped (`setup/src/reset.rs`, `read`) | a `wipe` entry that isn't a plain path's text **refuses the reset**; a newer plan's extra plain path is wiped (still checked against `PROTECTED`) | all or nothing: a refused plan journals nothing, keeps the marker and wipes nothing; `watch-reset` keeps watching and tells the person who holds the button "Nothing was wiped. Update me, then reset again." (say service, network only), the other commands exit 2. A bad known value or bad JSON is refused as before. Not restored by a put-back |
 | setup | done marker `/var/lib/lampos-setup/done`; reset journal `reset.json` | file / JSON | `version` written, never read | n/a | n/a | existence only (`serve.rs:702-703`, `reset.rs:333`) |
@@ -1203,11 +1206,12 @@ test does (#1512):
 7. **controls**, **expression** (#2065), **records**, **body**: read their files
    one release forward (one PR each).
 8. The medium rows after: **cloud** (reports deleted and `state.json`
-   reset silently), **eyes** (`forgets-pending`: done, set aside with a
-   line), **skills** (`off`). The eyes' `.from-photos` stays as it is: a
-   file it can't read, a later version's included, is deleted on purpose,
-   since unconfirmed prints out of the 30 days' reach are no one's to keep
-   (the reviewer on #1968).
+   reset silently; done in #2077, with the choice read as off
+   when it can't be read), **eyes** (`forgets-pending`: done, set aside
+   with a line), **skills** (`off`). The eyes' `.from-photos` stays as it
+   is: a file it can't read, a later version's included, is deleted on
+   purpose, since unconfirmed prints out of the 30 days' reach are no
+   one's to keep (the reviewer on #1968).
 
 ## Most likely wrong on a lamp
 
