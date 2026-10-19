@@ -8,10 +8,10 @@
 //! with `unwell` says it is in error in the lamp's health.
 use lamp_msgs::{Health, HealthItem, Level, Voice};
 use lamp_update::{
-    Config, Outcome, World,
+    Config, Outcome, World, apply,
     fetch::{Channel, Fetch},
     judge::UnitState,
-    manifest::{self, File, Manifest, Model, Unit, sha256_hex},
+    manifest::{self, File, Manifest, Model, Setting, Unit, sha256_hex},
     own,
     quiet::Heard,
     round, unit,
@@ -182,6 +182,11 @@ struct FakeSystemd {
     /// `systemctl show` fails from the first restart on.
     unreachable_after_restart: bool,
     unreachable: bool,
+    /// What starting lamp-update-apply runs: none, and its start is skipped
+    /// (a lamp without it), doing nothing.
+    applier: Option<Box<dyn FnMut() -> Result<(), String>>>,
+    /// The next reload stops the round dead, as a power cut would.
+    cut_at_reload: bool,
 }
 
 impl FakeSystemd {
@@ -242,11 +247,17 @@ impl Systemd for FakeSystemd {
 
     fn reload(&mut self) -> Result<(), String> {
         self.calls.borrow_mut().push("reload".into());
+        if std::mem::take(&mut self.cut_at_reload) {
+            panic!("the lamp lost power");
+        }
         Ok(())
     }
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
         self.calls.borrow_mut().push(format!("restart {unit}"));
+        if unit == apply::UNIT {
+            return self.applier.as_mut().map_or(Ok(()), |applier| applier());
+        }
         self.restarted_at.push((unit.to_owned(), self.now.get()));
         self.unreachable |= self.unreachable_after_restart;
         self.start(unit);
@@ -392,6 +403,8 @@ impl Lamp {
             crashing: Vec::new(),
             unreachable_after_restart: false,
             unreachable: false,
+            applier: None,
+            cut_at_reload: false,
         };
         for unit in [
             "lamp-voice.service",
@@ -416,6 +429,7 @@ impl Lamp {
             running: None,
             updater: manifest::UPDATER,
             models: false,
+            settings: false,
         };
         Self {
             _folder: folder,
@@ -491,6 +505,7 @@ impl Lamp {
             units: carried,
             min_updater: None,
             models: Vec::new(),
+            settings: Vec::new(),
         }
     }
 
@@ -3488,4 +3503,264 @@ fn with_models_off_a_new_updater_confirms_and_the_build_waits_for_models() {
     assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
     assert_eq!(lamp.read(FACE), "face 2");
     assert_eq!(lamp.own_build(), new);
+}
+
+/// The controls' settings at their product path, as install wrote and
+/// recorded them, the controls reading them, and lamp-update-apply ready:
+/// what a product lamp has (#1680).
+fn lamp_with_settings() -> (Lamp, Rc<RefCell<Vec<String>>>) {
+    let mut lamp = Lamp::new();
+    let controls = sha("controls 1");
+    let write = |root: &Path, path: &str, text: &str| {
+        let at = root.join(path.trim_start_matches('/'));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(at, text).unwrap();
+    };
+    write(
+        &lamp.root,
+        "/etc/systemd/system/lamp-controls.service",
+        &format!(
+            "[Service]\nExecStart=/opt/lampOS/controls/{controls}/lamp-controls serve --config /etc/lampOS/controls/controls.json\n"
+        ),
+    );
+    write(&lamp.root, CONTROLS_JSON, "controls 1");
+    write(&lamp.root, RECORDS_JSON, "records 1");
+    let state = serde_json::json!({
+        "installed": {"sequence": 1, "commit": format!("{:040}", 1)},
+        "previous": null,
+        "refused": [],
+        "made": [],
+        "settings": {
+            CONTROLS_JSON: sha("controls 1"),
+            RECORDS_JSON: sha("records 1"),
+        },
+    });
+    write(
+        &lamp.root,
+        "/var/lib/lampos-update/state.json",
+        &state.to_string(),
+    );
+    lamp.config.settings = true;
+    let tmpfiles = Rc::new(RefCell::new(Vec::new()));
+    let (root, key, ran) = (lamp.root.clone(), lamp.config.key, Rc::clone(&tmpfiles));
+    lamp.systemd.applier = Some(Box::new(move || {
+        apply::run(
+            &root,
+            &root.join("var/lib/lampos-update"),
+            &key,
+            &mut |path| {
+                ran.borrow_mut().push(path.to_owned());
+                Ok(())
+            },
+            &mut |_| {},
+        )
+    }));
+    (lamp, tmpfiles)
+}
+
+const CONTROLS_JSON: &str = "/etc/lampOS/controls/controls.json";
+const RECORDS_JSON: &str = "/etc/lampOS/records.json";
+const TMPFILES_CONF: &str = "/etc/tmpfiles.d/lampos.conf";
+
+/// Build `sequence`: build 1's binaries, and these settings.
+fn publish_settings(lamp: &mut Lamp, sequence: u64, settings: Vec<Setting>) {
+    let mut manifest = lamp.manifest(
+        sequence,
+        &[
+            ("lamp-voice", "voice 1"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+    manifest.min_updater = Some(manifest::SETTINGS_UPDATER);
+    manifest.settings = settings;
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let envelope = manifest::seal(&bytes, &lamp.key).unwrap();
+    lamp.channel
+        .files
+        .insert(format!("{CHANNEL}{}", manifest::ENVELOPE), envelope);
+}
+
+#[test]
+fn with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted() {
+    let (mut lamp, tmpfiles) = lamp_with_settings();
+    // The lamp's own records bound, changed since install wrote it.
+    fs::write(lamp.root.join("etc/lampOS/records.json"), "this lamp's").unwrap();
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![
+            Setting::new(CONTROLS_JSON, "controls 2"),
+            Setting::new(RECORDS_JSON, "records 2"),
+            Setting::new(TMPFILES_CONF, "d /run/lampos-bus 2770 root lampos -\n"),
+        ],
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 2");
+    assert_eq!(lamp.read(RECORDS_JSON), "this lamp's");
+    assert_eq!(
+        lamp.read(TMPFILES_CONF),
+        "d /run/lampos-bus 2770 root lampos -\n"
+    );
+    assert_eq!(*tmpfiles.borrow(), [TMPFILES_CONF]);
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with(&format!("kept {RECORDS_JSON}"))),
+        "{:?}",
+        lamp.said
+    );
+    // The settings before the parts, and only the part reading one restarted.
+    let calls = lamp.calls();
+    let applied = calls
+        .iter()
+        .position(|call| call == &format!("restart {}", apply::UNIT))
+        .unwrap();
+    let controls = calls
+        .iter()
+        .position(|call| call == "restart lamp-controls.service")
+        .unwrap();
+    assert!(applied < controls, "{calls:?}");
+    assert!(
+        !calls
+            .iter()
+            .any(|call| call == "restart lamp-voice.service"),
+        "{calls:?}"
+    );
+    let state = lamp.state();
+    assert_eq!(state["settings"][CONTROLS_JSON], sha("controls 2"));
+    assert_eq!(state["settings"][RECORDS_JSON], sha("records 1"));
+    assert_eq!(
+        state["settings"][TMPFILES_CONF],
+        sha("d /run/lampos-bus 2770 root lampos -\n")
+    );
+    assert!(!lamp.exists("/var/lib/lampos-update/apply/request.json"));
+    assert!(lamp.exists("/var/lib/lampos-update/apply/back.json"));
+}
+
+#[test]
+fn with_apply_off_a_builds_settings_are_not_written_and_that_is_said() {
+    let (mut lamp, _) = lamp_with_settings();
+    lamp.config.settings = false;
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![Setting::new(CONTROLS_JSON, "controls 2")],
+    );
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
+    assert!(!lamp.calls().iter().any(|call| call.contains(apply::UNIT)));
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("settings are not written") && line.contains(apply::SWITCH)),
+        "{:?}",
+        lamp.said
+    );
+}
+
+#[test]
+fn a_build_put_back_puts_its_settings_back_byte_for_byte() {
+    let (mut lamp, _) = lamp_with_settings();
+    let before = lamp.state()["settings"].clone();
+    lamp.systemd.crashing.push("lamp-controls.service".into());
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![Setting::new(CONTROLS_JSON, "controls 2")],
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::RolledBack { sequence: 2, .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
+    assert_eq!(lamp.state()["settings"], before);
+    assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+}
+
+#[test]
+fn a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written() {
+    let (mut lamp, _) = lamp_with_settings();
+    lamp.systemd.applier = None;
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![Setting::new(CONTROLS_JSON, "controls 2")],
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, .. } if why.contains("did nothing")),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
+    assert!(
+        !lamp
+            .calls()
+            .iter()
+            .any(|call| call == "restart lamp-controls.service")
+    );
+    // Nothing was written, so nothing is asked back: the round ends, the
+    // journal cleared and the build refused, and the next start is quiet.
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+    assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+    assert!(!lamp.exists("/var/lib/lampos-update/apply/request.json"));
+    let restarts = |lamp: &Lamp| {
+        lamp.calls()
+            .iter()
+            .filter(|call| *call == &format!("restart {}", apply::UNIT))
+            .count()
+    };
+    let asked = restarts(&lamp);
+    let again = lamp.round();
+    assert!(!matches!(again, Outcome::RolledBack { .. }), "{again:?}");
+    assert_eq!(restarts(&lamp), asked, "{again:?}");
+}
+
+/// The reviewer on #1913, 19:50: a product lamp installed before #1680 has
+/// install's tmpfiles with no record; a build's newer tmpfiles reach it.
+#[test]
+fn a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles() {
+    let (mut lamp, tmpfiles) = lamp_with_settings();
+    let at = lamp.root.join(TMPFILES_CONF.trim_start_matches('/'));
+    fs::create_dir_all(at.parent().unwrap()).unwrap();
+    fs::write(&at, lamp_update::install::TMPFILES).unwrap();
+    assert!(lamp.state()["settings"].get(TMPFILES_CONF).is_none());
+    let new = format!(
+        "{}d /run/lampos-new 0755 root root -\n",
+        lamp_update::install::TMPFILES
+    );
+    publish_settings(&mut lamp, 2, vec![Setting::new(TMPFILES_CONF, &new)]);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(TMPFILES_CONF), new);
+    assert_eq!(*tmpfiles.borrow(), [TMPFILES_CONF]);
+    assert_eq!(lamp.state()["settings"][TMPFILES_CONF], sha(&new));
+}
+
+#[test]
+fn a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start() {
+    let (mut lamp, _) = lamp_with_settings();
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![Setting::new(CONTROLS_JSON, "controls 2")],
+    );
+    lamp.systemd.cut_at_reload = true;
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| lamp.round()));
+    assert!(cut.is_err());
+    assert_eq!(
+        lamp.read(CONTROLS_JSON),
+        "controls 2",
+        "written before the cut"
+    );
+    assert!(lamp.exists("/var/lib/lampos-update/journal.json"));
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::RolledBack { sequence: 2, .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
+    assert_eq!(lamp.state()["settings"][CONTROLS_JSON], sha("controls 1"));
 }

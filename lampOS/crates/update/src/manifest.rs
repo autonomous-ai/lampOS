@@ -29,11 +29,28 @@ pub const SCHEMA: u32 = 1;
 /// This updater's own level: raised whenever the updater learns to apply
 /// something an older one cannot. A manifest whose `min_updater` is above
 /// it is refused whole, before anything is fetched or written. 2: the
-/// build's `models` (#1680).
-pub const UPDATER: u64 = 2;
+/// build's `models` (#1680). 3: its `settings` (#1680).
+pub const UPDATER: u64 = 3;
 /// The level a build that carries models needs: an updater below it does
 /// not read the field.
 pub const MODELS_UPDATER: u64 = 2;
+/// The level a build that carries settings needs.
+pub const SETTINGS_UPDATER: u64 = 3;
+/// At most this many settings in one build, and this many bytes of them in
+/// all: today's are 14 files and about 40 KB.
+pub const MOST_SETTINGS: usize = 128;
+pub const MOST_SETTINGS_BYTES: usize = 160 * 1024;
+/// The settings a build may carry: these files, and any file under these
+/// folders. Never a key, setup's answers, the lamp's own poses or the
+/// update key: those are the person's or the lamp's (docs/updates.md).
+pub const SETTING_FILES: &[&str] = &["/etc/lampOS/records.json", "/etc/tmpfiles.d/lampos.conf"];
+pub const SETTING_FOLDERS: &[&str] = &[
+    "/etc/lampOS/expression/",
+    "/etc/lampOS/controls/",
+    "/var/lib/lampOS/skills/",
+];
+/// The modes a setting may have.
+pub const SETTING_MODES: &[&str] = &["0644", "0600"];
 /// At most this many models in one build.
 pub const MOST_MODELS: usize = 64;
 /// Where models live: their paths are under it, and its `models/` is the
@@ -112,6 +129,129 @@ pub struct Manifest {
     /// byte for byte what an updater before the field reads.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub models: Vec<Model>,
+    /// The product's settings and tmpfiles, inline (#1680): written by
+    /// `lamp-update-apply` at the switch, each only where the lamp has not
+    /// changed it. Left out when there are none, and not written.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub settings: Vec<Setting>,
+}
+
+/// A setting a build carries: its path, and its text, SHA-256 and mode; or
+/// `removed`, without them. Read by `lamp-update-apply`, a copy only
+/// `install` writes, so it is a contract for good: these fields keep their
+/// meaning, and one it does not know is ignored, never refused.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Setting {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    /// `0644` or `0600`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    /// The build no longer has it: removed where it is still the build's.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub removed: bool,
+}
+
+impl Setting {
+    /// A setting with this text, 0644.
+    pub fn new(path: &str, text: &str) -> Self {
+        Self {
+            path: path.to_owned(),
+            text: Some(text.to_owned()),
+            sha256: Some(sha256_hex(text.as_bytes())),
+            mode: Some("0644".to_owned()),
+            removed: false,
+        }
+    }
+
+    /// Its mode as a number.
+    pub fn mode_bits(&self) -> u32 {
+        self.mode
+            .as_deref()
+            .and_then(|mode| u32::from_str_radix(mode, 8).ok())
+            .unwrap_or(0o644)
+    }
+}
+
+/// A setting's path: one of [`SETTING_FILES`], or a file under one of
+/// [`SETTING_FOLDERS`] whose parts are plain.
+pub fn is_setting_path(path: &str) -> bool {
+    if SETTING_FILES.contains(&path) {
+        return true;
+    }
+    path.len() < 512
+        && !path.ends_with('/')
+        && SETTING_FOLDERS.iter().any(|folder| {
+            path.strip_prefix(folder).is_some_and(|rest| {
+                rest.split('/').all(|part| {
+                    !part.is_empty()
+                        && !part.starts_with('.')
+                        && part
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte))
+                })
+            })
+        })
+}
+
+/// Each setting checked: a path it may have, once; its text with its
+/// SHA-256 and a mode it may have, or `removed` with neither.
+pub fn check_settings(settings: &[Setting]) -> Result<(), Refused> {
+    if settings.len() > MOST_SETTINGS {
+        return Err(refused(format!("more than {MOST_SETTINGS} settings")));
+    }
+    let mut paths = std::collections::BTreeSet::new();
+    let mut bytes = 0;
+    for setting in settings {
+        if !is_setting_path(&setting.path) {
+            return Err(refused(format!(
+                "{:?} is not a path a build's settings may have",
+                setting.path
+            )));
+        }
+        if !paths.insert(setting.path.as_str()) {
+            return Err(refused(format!("{} is listed twice", setting.path)));
+        }
+        if setting.removed {
+            if setting.text.is_some() || setting.sha256.is_some() || setting.mode.is_some() {
+                return Err(refused(format!(
+                    "{} is removed, and has a text, SHA-256 or mode",
+                    setting.path
+                )));
+            }
+            continue;
+        }
+        let (Some(text), Some(sha256)) = (&setting.text, &setting.sha256) else {
+            return Err(refused(format!("{} has no text or SHA-256", setting.path)));
+        };
+        if sha256_hex(text.as_bytes()) != *sha256 {
+            return Err(refused(format!(
+                "{} does not match its SHA-256",
+                setting.path
+            )));
+        }
+        if !setting
+            .mode
+            .as_deref()
+            .is_some_and(|mode| SETTING_MODES.contains(&mode))
+        {
+            return Err(refused(format!(
+                "{}'s mode is not one of {}",
+                setting.path,
+                SETTING_MODES.join(", ")
+            )));
+        }
+        bytes += text.len();
+    }
+    if bytes > MOST_SETTINGS_BYTES {
+        return Err(refused(format!(
+            "the settings are {bytes} bytes, and at most {MOST_SETTINGS_BYTES}"
+        )));
+    }
+    Ok(())
 }
 
 /// A model a part reads: where it goes on the lamp, where it is fetched
@@ -347,9 +487,9 @@ pub enum Opened {
     TooOld(TooOld),
 }
 
-/// [`open_as`], with a build for a newer updater told apart: a round may
-/// still take the newer `lamp-update` it carries, and only that (#1680).
-pub fn open_or_too_old(envelope: &[u8], key: &[u8; 32], updater: u64) -> Result<Opened, Refused> {
+/// The manifest's bytes alone, once their signature with `key` is checked:
+/// what `lamp-update-apply` reads, whatever updater the build needs.
+pub fn signed(envelope: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, Refused> {
     if envelope.len() as u64 > MOST_ENVELOPE_BYTES {
         return Err(refused("the envelope is too large"));
     }
@@ -377,6 +517,13 @@ pub fn open_or_too_old(envelope: &[u8], key: &[u8; 32], updater: u64) -> Result<
     UnparsedPublicKey::new(&ED25519, key)
         .verify(&manifest, &signature)
         .map_err(|_| refused("the signature does not match the manifest"))?;
+    Ok(manifest)
+}
+
+/// [`open_as`], with a build for a newer updater told apart: a round may
+/// still take the newer `lamp-update` it carries, and only that (#1680).
+pub fn open_or_too_old(envelope: &[u8], key: &[u8; 32], updater: u64) -> Result<Opened, Refused> {
+    let manifest = signed(envelope, key)?;
     if let Some(too_old) = too_old(&manifest, updater) {
         return Ok(Opened::TooOld(too_old));
     }
@@ -455,7 +602,13 @@ fn check(manifest: &Manifest) -> Result<(), Refused> {
         }
         check_hash_and_size(&unit.file_name(), &unit.sha256, unit.size, MOST_UNIT_BYTES)?;
     }
-    check_models(manifest)
+    check_models(manifest)?;
+    if !manifest.settings.is_empty() && manifest.min_updater.unwrap_or(1) < SETTINGS_UPDATER {
+        return Err(refused(format!(
+            "a build with settings needs min_updater {SETTINGS_UPDATER} or more"
+        )));
+    }
+    check_settings(&manifest.settings)
 }
 
 fn check_models(manifest: &Manifest) -> Result<(), Refused> {
@@ -630,6 +783,7 @@ mod tests {
             }],
             min_updater: None,
             models: Vec::new(),
+            settings: Vec::new(),
         }
     }
 
@@ -715,6 +869,90 @@ mod tests {
         let mut twice = with.clone();
         twice.models.push(model);
         assert!(parse(&serde_json::to_vec(&twice).unwrap()).is_err());
+    }
+
+    #[test]
+    fn settings_are_read_only_with_the_updater_they_need_and_their_own_paths() {
+        let plain = serde_json::to_vec(&manifest()).unwrap();
+        assert!(!String::from_utf8_lossy(&plain).contains("settings"));
+        let setting = Setting::new("/etc/lampOS/expression/expression.json", "{}\n");
+        let mut with = manifest();
+        with.settings = vec![setting.clone()];
+        let why = parse(&serde_json::to_vec(&with).unwrap()).unwrap_err().0;
+        assert!(why.contains("min_updater 3"), "{why}");
+        with.min_updater = Some(SETTINGS_UPDATER);
+        assert_eq!(parse(&serde_json::to_vec(&with).unwrap()).unwrap(), with);
+        for path in [
+            "/etc/lampOS/records.json",
+            "/etc/tmpfiles.d/lampos.conf",
+            "/etc/lampOS/controls/controls-pins.json",
+            "/var/lib/lampOS/skills/welcome-back/lights/warm_glow.toml",
+        ] {
+            assert!(is_setting_path(path), "{path}");
+        }
+        // Never a key, setup's answers, the lamp's own poses, the update key,
+        // nor a path out of its folder.
+        for path in [
+            "/etc/lampOS/voice/credential",
+            "/etc/lampOS/voice/provider.json",
+            "/etc/lampOS/policy/jev.key",
+            "/etc/lampOS/update/key.pub",
+            "/etc/lampOS/zone.env",
+            "/etc/lampOS/setup/serve.json",
+            "/etc/lampOS/body/lamp.env",
+            "/etc/lampOS/person/name",
+            "/etc/lampOS/controls/../update/key.pub",
+            "/etc/lampOS/controls/.hidden",
+            "/etc/lampOS/controls/",
+            "/etc/tmpfiles.d/other.conf",
+            "/etc/passwd",
+        ] {
+            assert!(!is_setting_path(path), "{path}");
+            let mut bad = with.clone();
+            bad.settings[0].path = path.into();
+            assert!(parse(&serde_json::to_vec(&bad).unwrap()).is_err(), "{path}");
+        }
+        let mut wrong = with.clone();
+        wrong.settings[0].text = Some("{\"other\":1}".into());
+        assert!(parse(&serde_json::to_vec(&wrong).unwrap()).is_err());
+        let mut open = with.clone();
+        open.settings[0].mode = Some("0666".into());
+        assert!(parse(&serde_json::to_vec(&open).unwrap()).is_err());
+        let mut gone = with.clone();
+        gone.settings[0] = Setting {
+            path: setting.path.clone(),
+            text: None,
+            sha256: None,
+            mode: None,
+            removed: true,
+        };
+        assert!(parse(&serde_json::to_vec(&gone).unwrap()).is_ok());
+        let mut twice = with.clone();
+        twice.settings.push(setting);
+        assert!(parse(&serde_json::to_vec(&twice).unwrap()).is_err());
+    }
+
+    /// `lamp-update-apply` is as old as the lamp's install: it reads a
+    /// setting with a field it does not know, and the signed bytes of a
+    /// build for any updater.
+    #[test]
+    fn a_setting_with_a_field_it_does_not_know_is_still_read() {
+        let text = r#"{"path":"/etc/lampOS/records.json","text":"x","sha256":"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881","mode":"0644","owner":"lampos"}"#;
+        let setting: Setting = serde_json::from_str(text).unwrap();
+        assert_eq!(setting.text.as_deref(), Some("x"));
+        assert!(check_settings(&[setting]).is_ok());
+        let key = throwaway();
+        let mut newer = manifest();
+        newer.min_updater = Some(UPDATER + 5);
+        newer.files.push(File {
+            name: "lamp-update".into(),
+            sha256: sha256_hex(b"u"),
+            size: 1,
+        });
+        let bytes = serde_json::to_vec(&newer).unwrap();
+        let envelope = seal(&bytes, &key).unwrap();
+        assert_eq!(signed(&envelope, &public(&key)).unwrap(), bytes);
+        assert!(signed(&envelope, &public(&throwaway())).is_err());
     }
 
     #[test]

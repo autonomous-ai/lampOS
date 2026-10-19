@@ -144,6 +144,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-update-back.timer",
         include_str!("../../../deploy/product/lamp-update-back.timer"),
     ),
+    // The build's settings and tmpfiles, written at a round's switch from
+    // the same fixed path, and started only by a round (#1680, crate::apply).
+    (
+        "lamp-update-apply.service",
+        include_str!("../../../deploy/product/lamp-update-apply.service"),
+    ),
     // The passive self-test, five minutes after the lamp starts and every
     // six hours (#812). Its service is started by its timer alone.
     (
@@ -395,6 +401,21 @@ pub fn models_from(text: &str) -> Result<Vec<Model>, String> {
         .map_err(|error| error.to_string())
 }
 
+/// The product's settings as a build carries them (#1680, crate::apply):
+/// every one of [`SETTINGS`] and the tmpfiles, 0644. Never setup's, the
+/// voice's service, the keys or the zone, which are the lamp's; nor the
+/// product skills' files, which a round places from the build's
+/// `lamp-product-skills` (crate::product_skills) and the skills guard judges.
+pub fn product_settings() -> Vec<manifest::Setting> {
+    let skills = format!("{}/", crate::product_skills::FOLDER);
+    SETTINGS
+        .iter()
+        .filter(|(path, _)| !path.starts_with(&skills))
+        .chain([&(TMPFILES_PATH, TMPFILES)])
+        .map(|(path, text)| manifest::Setting::new(path, text))
+        .collect()
+}
+
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
 pub const TMPFILES: &str = include_str!("../../../deploy/product/lampos.conf");
 pub const TMPFILES_PATH: &str = "/etc/tmpfiles.d/lampos.conf";
@@ -490,12 +511,19 @@ const TIMED: &[&str] = &[
     "lamp-update-back.service",
 ];
 
+/// Services a round starts, and never enabled.
+const STARTED_BY_A_ROUND: &[&str] = &[crate::apply::UNIT];
+
 /// The units enabled: the target, and what starts outside it.
 fn enabled() -> Vec<String> {
     PRODUCT
         .iter()
         .map(|(name, _)| *name)
-        .filter(|name| name.ends_with(".service") && !TIMED.contains(name))
+        .filter(|name| {
+            name.ends_with(".service")
+                && !TIMED.contains(name)
+                && !STARTED_BY_A_ROUND.contains(name)
+        })
         .chain([
             "lampos.target",
             "lamp-records.timer",
@@ -973,6 +1001,12 @@ pub fn install(
     for (path, bytes) in &for_systemd {
         put(config, path, bytes, 0o644, &mut changed)?;
     }
+    // The tmpfiles are install's, recorded as the settings are, so a
+    // build's newer tmpfiles reach this lamp (#1680, crate::apply).
+    state.settings.insert(
+        TMPFILES_PATH.to_owned(),
+        manifest::sha256_hex(TMPFILES.as_bytes()),
+    );
     let mut defaults = SETTINGS.to_vec();
     if config.setup {
         defaults.extend_from_slice(SETUP_SETTINGS);
@@ -1905,8 +1939,11 @@ mod tests {
         let parts = parts();
         // lamp-update-back starts from its fixed path, which no round
         // switches (#1680).
-        let linked =
-            |name: &&str| name.ends_with(".service") && *name != "lamp-update-back.service";
+        let linked = |name: &&str| {
+            name.ends_with(".service")
+                && *name != "lamp-update-back.service"
+                && *name != crate::apply::UNIT
+        };
         for (name, text) in PRODUCT.iter().filter(|(name, _)| linked(name)) {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }

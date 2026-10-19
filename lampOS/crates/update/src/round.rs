@@ -28,6 +28,7 @@
 //! Without `apply` it stops after step 5 and says what it would do, having
 //! written nothing.
 use crate::{
+    apply,
     fetch::{Channel, Fetch},
     judge::{Before, UnitState, Watch, part_of},
     manifest::{self, Manifest, Model, Opened, TooOld},
@@ -99,6 +100,9 @@ pub struct Config {
     /// `LAMP_UPDATE_MODELS=on`: the models a build carries are fetched,
     /// checked and switched with the parts (crate::models, #1680).
     pub models: bool,
+    /// `LAMP_UPDATE_APPLY=on`: the settings and tmpfiles a build carries
+    /// are written at the switch by `lamp-update-apply` (crate::apply).
+    pub settings: bool,
 }
 
 impl Config {
@@ -374,6 +378,9 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         placings: Vec::new(),
         fetching: Vec::new(),
         model_backs: Vec::new(),
+        envelope: Vec::new(),
+        setting_writes: Vec::new(),
+        applying: None,
     };
     if !config.apply {
         let state = run.records.peek_state();
@@ -381,17 +388,26 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
             Ok((manifest, changes, placing))
                 if changes.is_empty()
                     && run.placings.is_empty()
+                    && run.setting_writes.is_empty()
                     && !placing.as_ref().is_some_and(Placing::writes) =>
             {
                 Outcome::UpToDate(manifest.sequence)
             }
-            Ok((manifest, changes, placing)) => Outcome::Would(describe(
-                &manifest,
-                &changes,
-                placing.as_ref(),
-                &run.placings,
-                &run.fetching,
-            )),
+            Ok((manifest, changes, placing)) => {
+                let mut lines = describe(
+                    &manifest,
+                    &changes,
+                    placing.as_ref(),
+                    &run.placings,
+                    &run.fetching,
+                );
+                lines.extend(
+                    run.setting_writes
+                        .iter()
+                        .map(|path| format!("{path}: the build's, by lamp-update-apply")),
+                );
+                Outcome::Would(lines)
+            }
             Err(outcome) => outcome,
         };
     }
@@ -444,6 +460,12 @@ struct Run<'r, 'w> {
     fetching: Vec<Model>,
     /// The model paths a switch moved, as they were: put back in reverse.
     model_backs: Vec<ModelBack>,
+    /// The envelope read, as it came: staged for `lamp-update-apply`.
+    envelope: Vec<u8>,
+    /// The settings the build writes here (crate::apply), and the build
+    /// `lamp-update-apply` was asked to write them for: put back with it.
+    setting_writes: Vec<String>,
+    applying: Option<u64>,
 }
 
 /// A unit as it is to be put back.
@@ -504,7 +526,11 @@ impl Run<'_, '_> {
                 product_skills::FOLDER
             ));
         }
-        if changes.is_empty() && !writes && self.placings.is_empty() {
+        if changes.is_empty()
+            && !writes
+            && self.placings.is_empty()
+            && self.setting_writes.is_empty()
+        {
             // Nothing of this build is this lamp's to change: it runs it.
             if let Some(placing) = &placing {
                 record_skills(&mut state, &placing.steps);
@@ -532,7 +558,7 @@ impl Run<'_, '_> {
         if let Err(outcome) = self.skills_still_load(&manifest, &changes, placing.as_ref()) {
             return outcome;
         }
-        if changes.is_empty() && self.placings.is_empty() {
+        if changes.is_empty() && self.placings.is_empty() && self.setting_writes.is_empty() {
             // Only the product skills change: lamp-skills reloads its
             // folder by itself, so nothing is restarted.
             return self.place_alone(&mut state, build, placing);
@@ -646,10 +672,14 @@ impl Run<'_, '_> {
             .map_err(|error| Outcome::Failed(format!("the units cannot be read: {error}")))?;
         let carried = self.carried_units(&manifest, &installed)?;
         let taken = self.models_of(&manifest, state, &installed)?;
+        self.settings_of(&manifest, state, envelope)?;
+        // A part that reads a model or a setting the switch changes is
+        // restarted with it.
         let touched: Vec<String> = self
             .placings
             .iter()
             .map(|placing| placing.model.path.clone())
+            .chain(self.setting_writes.iter().cloned())
             .collect();
         let changes = plan(
             self.config,
@@ -803,6 +833,85 @@ impl Run<'_, '_> {
             }
         }
         Ok(taken)
+    }
+
+    /// The settings the build writes on this lamp ([`Run::setting_writes`]):
+    /// each still the build's before, or never there. One the lamp changed
+    /// is kept, and said. With the switch off none is written, and that is
+    /// said: a round writes no setting, as before the field.
+    fn settings_of(
+        &mut self,
+        manifest: &Manifest,
+        state: &State,
+        envelope: Vec<u8>,
+    ) -> Result<(), Outcome> {
+        self.setting_writes.clear();
+        if manifest.settings.is_empty() {
+            return Ok(());
+        }
+        let steps = apply::plan(
+            &self.config.root,
+            &manifest.settings,
+            &state.settings,
+            &state.settings_writing,
+        )
+        .map_err(|error| Outcome::Failed(format!("the settings cannot be read: {error}")))?;
+        let writes = apply::writes(&steps);
+        if !self.config.settings {
+            if !writes.is_empty() {
+                self.say(&format!(
+                    "build {}'s settings are not written ({}): {}=on is not set",
+                    manifest.sequence,
+                    writes.join(", "),
+                    apply::SWITCH
+                ));
+            }
+            return Ok(());
+        }
+        for step in &steps {
+            if let apply::Act::Keep(why) = &step.act {
+                self.say(&format!(
+                    "kept {}: {why}; the build's is not written",
+                    step.setting.path
+                ));
+            }
+        }
+        self.setting_writes = writes;
+        self.envelope = envelope;
+        Ok(())
+    }
+
+    /// Asks `lamp-update-apply` to apply the build's settings, or put them
+    /// back, and takes what it did into the state.
+    fn ask_apply(&mut self, op: apply::Op, sequence: u64) -> Result<(), String> {
+        let records = self.records.folder().to_owned();
+        let envelope = (op == apply::Op::Apply).then_some(self.envelope.as_slice());
+        apply::stage(&records, op, sequence, envelope)
+            .map_err(|error| format!("the settings cannot be staged: {error}"))?;
+        self.world
+            .systemd
+            .restart(apply::UNIT)
+            .map_err(|why| format!("{}: {why}", apply::UNIT))?;
+        let mut state = self
+            .records
+            .state(self.world.say)
+            .map_err(|error| format!("the state cannot be read: {error}"))?;
+        let done = apply::merge(&records, &mut state)
+            .map_err(|error| format!("what {} did cannot be read: {error}", apply::UNIT))?;
+        if !done {
+            return Err(format!("{} did nothing (is it installed?)", apply::UNIT));
+        }
+        self.records
+            .save_state(&state)
+            .and_then(|()| apply::finish(&records))
+            .map_err(|error| format!("the state cannot be written: {error}"))
+    }
+
+    /// The settings the state now records, as `lamp-update-apply` left them:
+    /// taken into the round's own copy of the state.
+    fn settings_now(&mut self, state: &mut State) {
+        let now = self.records.peek_state();
+        state.settings = now.settings;
     }
 
     /// The build's units for this lamp's parts, fetched and checked. Small:
@@ -1300,6 +1409,26 @@ impl Run<'_, '_> {
                 troubles.push(format!("{} cannot be put back: {error}", back.path));
             }
         }
+        if let Some(sequence) = self.applying {
+            let records = self.records.folder().to_owned();
+            if apply::wrote(&records, sequence) {
+                if let Err(why) = self.ask_apply(apply::Op::Back, sequence) {
+                    troubles.push(format!("the settings cannot be put back: {why}"));
+                }
+            } else {
+                // No back.json of this build: lamp-update-apply wrote
+                // nothing (it never ran, or failed before its first write),
+                // so there is nothing to put back, and nothing to ask of a
+                // unit that may not run at all.
+                self.say(&format!(
+                    "the settings need no putting back: {} wrote nothing for build {sequence}",
+                    apply::UNIT
+                ));
+                if let Err(error) = apply::finish(&records) {
+                    troubles.push(format!("the settings' request cannot be removed: {error}"));
+                }
+            }
+        }
         if troubles.is_empty() {
             Ok(())
         } else {
@@ -1400,6 +1529,7 @@ impl Run<'_, '_> {
                 })
                 .collect(),
             models: self.model_backs.clone(),
+            settings: !self.setting_writes.is_empty(),
             skills: skills.clone(),
         };
         if let Err(error) = self
@@ -1408,6 +1538,16 @@ impl Run<'_, '_> {
             .and_then(|()| self.records.save_journal(&journal))
         {
             return Outcome::Failed(format!("the journal cannot be written: {error}"));
+        }
+        // The settings first, by lamp-update-apply: one that fails puts back
+        // what it wrote, and nothing else has moved.
+        if !self.setting_writes.is_empty() {
+            self.applying = Some(build.sequence);
+            let applied = self.ask_apply(apply::Op::Apply, build.sequence);
+            self.settings_now(state);
+            if let Err(why) = applied {
+                return self.put_back(state, &build, &backs, None, why, String::new());
+            }
         }
         // A linked part's unit is written only when the build changes it;
         // its link is what moves.
@@ -1436,6 +1576,7 @@ impl Run<'_, '_> {
             && let Err(why) = self.quiet.for_at_least(QUIET, now)
         {
             let restored = self.put_units_and_links_back(&backs);
+            self.settings_now(state);
             if let Err(error) = restored.and_then(|()| {
                 self.records
                     .clear_journal()
@@ -1569,6 +1710,7 @@ impl Run<'_, '_> {
             build.sequence
         ));
         let (after, old, files_back) = self.restore(backs, failed);
+        self.settings_now(state);
         if !files_back {
             // Not all is as it was: the journal stays, for the next start
             // to try again, and nothing is pruned that a path still names.
@@ -1692,6 +1834,7 @@ impl Run<'_, '_> {
             journal.build.sequence
         ));
         self.model_backs = journal.models.clone();
+        self.applying = journal.settings.then_some(journal.build.sequence);
         let mut backs = Vec::new();
         for switching in &journal.units {
             let text = match self.records.previous(&switching.unit) {
@@ -1798,6 +1941,7 @@ impl Run<'_, '_> {
             units: Vec::new(),
             min_updater: None,
             models: Vec::new(),
+            settings: Vec::new(),
         };
         match self.own_switch(&only_the_updater) {
             Ok(Some(Outcome::SelfSwitched { from, to, .. })) => Some(Outcome::Climbs {

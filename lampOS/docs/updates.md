@@ -459,9 +459,11 @@ units").
 part through its `current` link, the product units, users and zone, the
 product settings and every product skill (`/var/lib/lampOS/skills/`),
 enabled and not started ([install.md](install.md)). A round writes only
-the units a build carries for this lamp by name, never the product's
-settings or skills: a product lamp gets a new product skill or switch when
-`lamp-update install` is run again. `check` never writes, whatever `--apply` says. `once` and `check` end with
+the units a build carries for this lamp by name, and with
+`LAMP_UPDATE_APPLY=on` the product's settings and tmpfiles the build
+carries (below, "Settings and tmpfiles"), and its product skills from
+`lamp-product-skills` (above); otherwise a product lamp
+gets a new product skill or switch when `lamp-update install` is run again. `check` never writes, whatever `--apply` says. `once` and `check` end with
 0 (up to date, switched, or only saying), 1 (refused, put back, failed), 3
 (the channel cannot be reached), 4 (no quiet moment); a wrong option with 2.
 `serve` prints a round's outcome only when it differs from the last. The
@@ -695,6 +697,89 @@ second copy. If every model changed at once, that would be 99.5 MB beside
 the old ones, plus the archive while it is unpacked, plus
 `--keep-free-mb`.
 
+### Settings and tmpfiles (`LAMP_UPDATE_APPLY`, off)
+
+A build can carry the product's settings and tmpfiles (`apply.rs`,
+#1680): a `settings` list in the signed manifest, each entry `path`,
+`text` (inline), `sha256` and `mode` (`0644` or `0600`), or `path` and
+`removed: true`. `lamp-update manifest --settings on` writes install's own
+(`install::SETTINGS` and `lampos.conf`, `install::product_settings`), but
+for the product skills' files under `/var/lib/lampOS/skills/`: those are
+`lamp-product-skills`', placed by the round and judged by the skills
+guard, so one file never has two writers at the switch. It also raises `min_updater` to 3 (`manifest::SETTINGS_UPDATER`). `UPDATER` is 3.
+A manifest without settings doesn't write the field. A path must be
+`/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`, or a file in
+plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
+`/var/lib/lampOS/skills/`; any other refuses the build. So a build never
+writes a key, the voice's service, the zone, setup's answers,
+`body/lamp.env`, `person/name` or the update key: those are setup's, the
+person's or the lamp's. At most 128 settings and 160 KB of text.
+
+With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
+
+- **Three-way.** For each setting: the build's before (its SHA-256 in
+  `state.json`'s `settings`, as install or the last apply wrote it), the
+  build's now (the manifest), and the lamp's now (the file). The lamp's now
+  equal to the build's now is only recorded. Equal to the build's before,
+  or never there and never recorded, it is written. Otherwise it is the
+  lamp's own: kept and said (`kept PATH: this lamp's own`). One the lamp
+  removed after it was recorded stays removed. A `removed` setting goes
+  only where the file is still the build's before. Install records the
+  `lampos.conf` it writes; on a lamp installed before that, a
+  `lampos.conf` with no record that is one install ever shipped
+  (`apply::TMPFILES_SHIPPED`) is the build's before, and any other is the
+  lamp's own. The round looks at this at step 4. A build whose only change is its settings is switched too.
+- **Root, small.** At the switch, after the journal and before any unit,
+  link or model moves, the round stages `apply/request.json` and the
+  build's envelope in its records and starts `lamp-update-apply.service`
+  (`systemctl restart`, which waits for a one-shot). That runs
+  `/usr/local/lib/lampos/lamp-update-back apply`, install's fixed copy,
+  never `update/current`. It checks the envelope's signature again with
+  `/etc/lampOS/update/key.pub` and the path rules above, reads the records
+  from `state.json` and never writes it. It writes `apply/back.json` (each
+  file's bytes and mode as they were, or absent, and its record) and syncs
+  it before the first write, writes each file whole, then runs
+  `systemd-tmpfiles --create /etc/tmpfiles.d/lampos.conf` if that file
+  changed and is there, then writes `apply/done.json` (the records the state takes). The
+  round takes those into `state.json` and removes the request. Its unit:
+  `ProtectSystem=strict`, writable only `/etc/lampOS`,
+  `/etc/tmpfiles.d`, `/var/lib/lampOS`, the records and `/run` (for the
+  tmpfiles), the update key read-only, no network.
+- **Restarted with it.** A part whose unit names a written path, or its
+  folder as a folder, is restarted and watched with the switch, as for a
+  model: the controls for `controls.json`, the expression for
+  `expression.json`. The skills reload by themselves, and the records'
+  check reads its file at each run.
+- **Put back.** A failed apply, a part not well after the switch, or a
+  switch cut short (the journal's `settings`) asks `lamp-update-apply` to
+  put back, after the units, links and models. It restores each file from
+  `back.json` byte for byte, with its mode, or removes one the build added
+  and the folders the apply made for it while they are empty, and its
+  record, unless the lamp changed it again since (kept and said). A file
+  already as it was (a put-back cut short and asked again) gets its record
+  back too. A `back.json` of another build is never used. Then the
+  tmpfiles are created again if they are there; nothing they made is
+  removed. `back.json` stays as the way back by hand. With no `back.json`
+  of this build the apply wrote nothing, so `lamp-update-apply` isn't
+  asked at all: the build is put back and refused, and the journal
+  cleared.
+- **Not installed.** On a lamp installed before this, there is no
+  `lamp-update-apply.service` or no `apply` in lamp-update-back: nothing is
+  done, the round says `lamp-update-apply.service did nothing`, and the
+  build is put back and refused, the journal cleared, since nothing was
+  written. Running `lamp-update install` again
+  installs both.
+
+`back.json`, the request and `done.json` are read by a
+lamp-update-back as old as the lamp's install, as `self.json` is: their
+fields keep their meaning, a newer one may add fields, and each side
+ignores what it doesn't know. So does a setting in the manifest.
+
+Off, or absent: a build's settings aren't written, and the round says
+which (`build N's settings are not written (...): LAMP_UPDATE_APPLY=on is
+not set`). The rest of the build is taken as today. Users and groups
+aren't carried: a later step, when a build needs a new one.
+
 ## What was measured, and where
 
 On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
@@ -737,6 +822,25 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   a blank lamp given build 1 by `lamp-update install`, then a round that
   switches to build 2, keeps `update/current` naming a folder that is there.
   Without the fix the round removes that folder and the test fails.
+- Settings and tmpfiles (#1680, `apply.rs` and `tests/round.rs`,
+  `LAMP_UPDATE_APPLY` on unless said): a setting still the build's is
+  written at the switch, before any part restarts, and only the part whose
+  unit reads it is restarted; one the lamp changed or removed is kept; the
+  tmpfiles are created once when `lampos.conf` changed; a part not well,
+  and a switch cut short after the apply, put each file back byte for byte
+  with its mode and its record; one changed again since is kept; another
+  build's `back.json` is never used; an envelope signed with another key,
+  or of another build, writes nothing; a lamp without lamp-update-apply puts
+  the build back with nothing written, its journal cleared and the build
+  refused; with the switch off nothing is written and that is said. With
+  the put-back left out, the two put-back tests of `tests/round.rs` fail.
+  From the review of #1913: a product lamp whose `lampos.conf` install wrote
+  without a record takes the build's, and an unrecorded one of its own is
+  kept; install records it; a put-back asked again after being cut short
+  puts every record back; the tmpfiles are created only when they are
+  there; a new skill's folder goes with it and one the person added to
+  stays; a link left beside a temp file is replaced, never written
+  through. Each fails with its fix taken out.
 - Models in the manifest (#1680, `tests/round.rs`, `LAMP_UPDATE_MODELS`
   on unless said): a changed eyes model is fetched once, checked, and its
   path linked into the store with the eyes switched, install's file kept
@@ -936,6 +1040,11 @@ committed, never the owner's real key). `L` is the runbook's SSH alias.
 - Models in the manifest (`LAMP_UPDATE_MODELS`): tested on the Mac only
   (`tests/round.rs`). A download cut short starts again from nothing; it
   isn't resumed. No published build carries models yet.
+- Settings and tmpfiles (`LAMP_UPDATE_APPLY`): tested on the Mac only
+  (`apply.rs`, `tests/round.rs`), with lamp-update-apply called in the
+  round's place of systemd. The unit's sandbox, `systemd-tmpfiles` and
+  `systemctl restart` of a one-shot haven't run on a lamp. No published
+  build carries settings yet.
 - The keeper,
   `lampos.target`, timers, models and libraries a build does not carry,
   configuration under `/etc/lampOS` (but for `second.json`, above), and a

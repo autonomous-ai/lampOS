@@ -27,9 +27,10 @@ lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setu
 lamp-update harness-off
 lamp-update harness-on
 lamp-update back
+lamp-update apply
 lamp-update check-units --cat FILE [--product DIR]
 lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --sequence N --commit SHA --files-url URL
-                     [--min-updater N] [--models FILE]
+                     [--min-updater N] [--models FILE] [--settings on|off]
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
 lamp-update public-key --key-file PRIVATE
 lamp-update --help
@@ -61,6 +62,11 @@ back    lamp-update-back (installed as /usr/local/lib/lampos/lamp-update-back, s
         lamp-update is not running or 10 minutes have passed, update/current names the
         old build again, the new one is refused, and lamp-update is started again.
         Otherwise it changes nothing. As root, on the lamp itself.
+apply   lamp-update-apply (lamp-update-back apply, started by a round with
+        LAMP_UPDATE_APPLY=on): the request the round staged in its records, done. It
+        writes the build's settings and tmpfiles, each only where the lamp still has the
+        build's before, keeps a file as it was before its first write, and puts them back
+        when asked. Without a request it changes nothing. As root, on the lamp itself.
 
   --channel-url   the channel's folder, https://.../ or file:///.../, ending in /
   --channel       the channel followed (lamp-voice)
@@ -91,6 +97,8 @@ manifest  writes DIR/manifest.json for the binaries in --binaries, the units of
           any). It must carry lamp-update, and N is at most this program's updater.
           --models FILE: the models in FILE (deploy/product/models.json's form) are
           carried, and N is then at least 2.
+          --settings on: the product's settings and tmpfiles are carried, and N is
+          then at least 3.
 sign      writes the signed envelope (lampos-manifest.json) for a manifest, with a
           private key: an unencrypted PKCS#8 Ed25519 key in base64.
 public-key prints the public key of a private key, in base64: what a lamp is given.
@@ -123,6 +131,7 @@ fn main() -> ExitCode {
         "harness-off" => harness_off(&options),
         "harness-on" => harness_on(&options),
         "back" => back(&options),
+        "apply" => apply(&options),
         "check-units" => return check_units(&options),
         "manifest" => make_manifest(&options),
         "sign" => sign(&options),
@@ -212,8 +221,14 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
             "files-url",
             "min-updater",
             "models",
+            "settings",
         ],
     )?;
+    let settings = match options.get("settings").map(String::as_str) {
+        None | Some("off") => Vec::new(),
+        Some("on") => install::product_settings(),
+        Some(_) => return Err("--settings is on or off".into()),
+    };
     let models = match options.get("models") {
         None => Vec::new(),
         Some(path) => {
@@ -234,7 +249,7 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
     let sequence = wanted(options, "sequence")?
         .parse()
         .map_err(|_| "--sequence is a whole number".to_owned())?;
-    let made = publish::make(
+    let made = publish::make_with(
         Path::new(wanted(options, "binaries")?),
         Path::new(wanted(options, "deploy")?),
         Path::new(wanted(options, "skills")?),
@@ -244,15 +259,17 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
         wanted(options, "files-url")?,
         min_updater,
         models,
+        settings,
     )
     .map_err(|error| error.to_string())?;
     println!(
-        "manifest of build {} of {}: {} binaries, {} units, {} models",
+        "manifest of build {} of {}: {} binaries, {} units, {} models, {} settings",
         made.sequence,
         made.channel,
         made.files.len(),
         made.units.len(),
-        made.models.len()
+        made.models.len(),
+        made.settings.len()
     );
     Ok(())
 }
@@ -379,6 +396,34 @@ fn back(options: &BTreeMap<String, String>) -> Result<(), String> {
         own::Back::Nothing | own::Back::Waiting => {}
     }
     Ok(())
+}
+
+/// `lamp-update apply`: lamp-update-apply, from lamp-update-back's fixed
+/// path (#1680).
+fn apply(options: &BTreeMap<String, String>) -> Result<(), String> {
+    known(options, &[])?;
+    let key_file = "/etc/lampOS/update/key.pub";
+    let key = fs::read_to_string(key_file).map_err(|error| format!("{key_file}: {error}"))?;
+    let key = manifest::read_public_key(&key).map_err(|why| format!("{key_file}: {why}"))?;
+    let mut say = |line: &str| eprintln!("lamp-update-apply: {line}");
+    let mut tmpfiles = |path: &str| {
+        let status = Command::new("systemd-tmpfiles")
+            .args(["--create", path])
+            .status()
+            .map_err(|error| format!("systemd-tmpfiles: {error}"))?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!("systemd-tmpfiles --create {path}: {status}"))
+        }
+    };
+    lamp_update::apply::run(
+        Path::new("/"),
+        Path::new(lamp_update::install::RECORDS),
+        &key,
+        &mut tmpfiles,
+        &mut say,
+    )
 }
 
 fn sign(options: &BTreeMap<String, String>) -> Result<(), String> {
@@ -510,6 +555,7 @@ fn config(
         running,
         updater: manifest::UPDATER,
         models: lamp_update::models::on(std::env::var(lamp_update::models::SWITCH).ok().as_deref()),
+        settings: lamp_update::apply::on(std::env::var(lamp_update::apply::SWITCH).ok().as_deref()),
     };
     Ok((
         config,

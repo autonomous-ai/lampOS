@@ -264,6 +264,7 @@ impl Lamp {
             units: Vec::new(),
             min_updater: None,
             models: Vec::new(),
+            settings: Vec::new(),
         };
         let bytes = serde_json::to_vec(&manifest).unwrap();
         channel.files.insert(
@@ -1597,6 +1598,18 @@ fn tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder() 
         .unwrap()
         .1;
     assert!(voice.contains("/var/lib/lampOS/voice/sessions/${INVOCATION_ID}"));
+}
+
+/// The reviewer on #1913, 19:50: the tmpfiles install writes are recorded,
+/// so a build's newer tmpfiles reach the lamp.
+#[test]
+fn install_records_the_tmpfiles_it_writes() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    assert_eq!(
+        lamp.state().settings[install::TMPFILES_PATH],
+        sha256_hex(install::TMPFILES.as_bytes())
+    );
 }
 
 /// A newer build's default reaches a setting nobody changed; a setting

@@ -8,7 +8,7 @@
 //! what is published.
 use crate::{
     install,
-    manifest::{self, File, Manifest, Model, SCHEMA, Unit},
+    manifest::{self, File, Manifest, Model, SCHEMA, Setting, Unit},
     product_skills, unit,
 };
 use std::{fs, io, path::Path};
@@ -41,10 +41,44 @@ pub fn make(
     min_updater: Option<u64>,
     models: Vec<Model>,
 ) -> io::Result<Manifest> {
+    make_with(
+        binaries,
+        deploy,
+        skills,
+        channel,
+        sequence,
+        commit,
+        files_url,
+        min_updater,
+        models,
+        Vec::new(),
+    )
+}
+
+/// [`make`], with the product's `settings` carried too (#1680):
+/// `min_updater` is then at least [`manifest::SETTINGS_UPDATER`].
+#[allow(clippy::too_many_arguments)]
+pub fn make_with(
+    binaries: &Path,
+    deploy: &Path,
+    skills: &Path,
+    channel: &str,
+    sequence: u64,
+    commit: &str,
+    files_url: &str,
+    min_updater: Option<u64>,
+    models: Vec<Model>,
+    settings: Vec<Setting>,
+) -> io::Result<Manifest> {
     let min_updater = if models.is_empty() {
         min_updater
     } else {
         Some(min_updater.unwrap_or(1).max(manifest::MODELS_UPDATER))
+    };
+    let min_updater = if settings.is_empty() {
+        min_updater
+    } else {
+        Some(min_updater.unwrap_or(1).max(manifest::SETTINGS_UPDATER))
     };
     let mut files = Vec::new();
     let sums = fs::read_to_string(binaries.join("SHA256SUMS")).ok();
@@ -136,6 +170,7 @@ pub fn make(
         units,
         min_updater,
         models,
+        settings,
     };
     let mut bytes = serde_json::to_vec_pretty(&made).map_err(io::Error::other)?;
     bytes.push(b'\n');
@@ -358,5 +393,51 @@ mod tests {
         )
         .unwrap_err();
         assert!(why.to_string().contains("carries no lamp-update"), "{why}");
+    }
+
+    #[test]
+    fn the_products_settings_are_carried_with_the_updater_they_need() {
+        let folder = tempfile::tempdir().unwrap();
+        let out = folder.path().join("out");
+        let deploy = folder.path().join("deploy");
+        fs::create_dir_all(&out).unwrap();
+        fs::create_dir_all(&deploy).unwrap();
+        fs::write(out.join("lamp-update"), b"update").unwrap();
+        let settings = crate::install::product_settings();
+        let commit = "c".repeat(40);
+        let url = "https://channel.test/build-8/";
+        let skills = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+        let made = make_with(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            8,
+            &commit,
+            url,
+            None,
+            Vec::new(),
+            settings.clone(),
+        )
+        .unwrap();
+        assert_eq!(made.settings, settings);
+        assert_eq!(made.min_updater, Some(manifest::SETTINGS_UPDATER));
+        let written = fs::read(out.join("manifest.json")).unwrap();
+        assert_eq!(manifest::parse(&written).unwrap(), made);
+        // Every product setting and the tmpfiles, and none of the keys.
+        let paths: Vec<&str> = made.settings.iter().map(|s| s.path.as_str()).collect();
+        assert!(paths.contains(&"/etc/lampOS/expression/expression.json"));
+        assert!(paths.contains(&"/etc/tmpfiles.d/lampos.conf"));
+        assert!(
+            !paths
+                .iter()
+                .any(|path| path.contains("credential") || path.contains("key"))
+        );
+        // The product skills are lamp-product-skills', never a setting.
+        assert!(
+            !paths
+                .iter()
+                .any(|path| path.starts_with("/var/lib/lampOS/skills/"))
+        );
     }
 }

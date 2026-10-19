@@ -606,7 +606,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    daemon-reload`, and `systemctl enable` of every part, `lampos.target`,
    `lamp-update.service`, `lamp-records.timer`, `lamp-selftest.timer` and
    `lamp-update-back.timer` (each timer's service is started by the timer
-   alone; lamp-update-back's also by lamp-update's `OnFailure=`, #1680);
+   alone; lamp-update-back's also by lamp-update's `OnFailure=`, #1680;
+   `lamp-update-apply.service` is never enabled: only a round starts it,
+   updates.md, "Settings and tmpfiles");
    then records the debt
    paid. It starts nothing and never writes setup's marker. A run whose
    enable fails, or that is stopped anywhere after its first unit is

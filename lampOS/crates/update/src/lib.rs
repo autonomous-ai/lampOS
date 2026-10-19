@@ -8,7 +8,9 @@
 //! [`product_skills`] is the product's skill folders a build carries;
 //! [`round`] is one round of an update, with all of them; and [`own`] is
 //! lamp-update switching itself, and putting itself back; [`models`] the
-//! models a build carries.
+//! models a build carries; [`apply`] the settings and tmpfiles it carries,
+//! written by `lamp-update-apply`.
+pub mod apply;
 pub mod check_units;
 pub mod fetch;
 pub mod install;

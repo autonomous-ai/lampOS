@@ -1,0 +1,31 @@
+# lamp-update-apply: writes the product settings and tmpfiles a build carries, at a round's switch, and puts them
+# back with the build (lampOS/docs/updates.md, #1680). Started only by a round of lamp-update with LAMP_UPDATE_APPLY=on,
+# which stages a request and the build's signed envelope in its records; never enabled. It runs from the fixed path
+# that only `lamp-update install` writes, never from /opt/lampOS/update/current, which a round can write. It checks
+# the envelope's signature again with the lamp's own key, writes only the paths a build's settings may name (the
+# expression's and the controls' folders, records.json, the product skills and /etc/tmpfiles.d/lampos.conf), keeps
+# every one the lamp changed, and keeps each file as it was in its records before the first write. Without a request
+# it does nothing. Outside lampos.target, as lamp-update is.
+[Unit]
+Description=lampOS updates, a build's settings and tmpfiles (lamp-update-apply)
+# A lamp not installed since #1680 has no lamp-update-back: its start is then skipped, the round finds nothing done
+# and puts the build back, with nothing written.
+ConditionPathExists=/usr/local/lib/lampos/lamp-update-back
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/lib/lampos/lamp-update-back apply
+StandardInput=null
+SyslogIdentifier=lamp-update-apply
+TimeoutStartSec=60
+NoNewPrivileges=yes
+PrivateNetwork=yes
+ProtectSystem=strict
+# The settings' folders, the skills, the records, and what systemd-tmpfiles --create of lampos.conf makes (in /run
+# and /var/lib/lampOS). The update key stays read-only.
+ReadWritePaths=/etc/lampOS /etc/tmpfiles.d /var/lib/lampOS /var/lib/lampos-update /run
+ReadOnlyPaths=-/etc/lampOS/update
+ProtectHome=yes
+PrivateTmp=yes
