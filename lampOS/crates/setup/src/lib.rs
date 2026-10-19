@@ -7,6 +7,7 @@ pub mod scan;
 pub mod serve;
 pub mod wake;
 pub mod wifi;
+pub mod wifi_change;
 
 use lamp_bus::Subscriber;
 use lamp_msgs::TouchEvent;
