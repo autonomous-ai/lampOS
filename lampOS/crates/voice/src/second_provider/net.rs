@@ -14,7 +14,9 @@ mod stt;
 mod tts;
 pub mod weather;
 
-pub use chat::{Chat, ChatEvent, ChatStream, Declare, GEMINI_REASONING, Message, Narrow, ToolCall};
+pub use chat::{
+    Chat, ChatEvent, ChatStream, Declare, GEMINI_REASONING, Message, Narrow, ToolCall, cache_counts,
+};
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
 pub use sentences::Sentences;
 pub use stt::{Early, Replies, SttStream, check as stt_check};

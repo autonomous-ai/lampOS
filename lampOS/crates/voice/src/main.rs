@@ -660,6 +660,18 @@ fn run() -> Result<()> {
             channels.connect(Path::new(dir), role, true)?;
             lamp_voice::second_provider::worker::serve(channels, parent, Path::new(provider_config), Path::new(second_config), files, route)?;
         }
+        // probe-cache PROVIDER_CONFIG SECOND_CONFIG [RUNS]
+        [command, provider_config, second_config, rest @ ..] if command == "probe-cache" => {
+            let usage = || io::Error::other("usage: probe-cache PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20]");
+            let runs = match rest {
+                [] => 3,
+                [runs] => runs.parse().ok().filter(|runs| (1..=20).contains(runs)).ok_or_else(usage)?,
+                _ => return Err(usage().into()),
+            };
+            tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                lamp_voice::second_provider::probe::cache::run(Path::new(provider_config), Path::new(second_config), runs),
+            )?;
+        }
         // probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG]
         [command, provider_config, second_config, rest @ ..] if command == "probe-cascade" => {
             let (runs, look) = probe_options(rest)?;

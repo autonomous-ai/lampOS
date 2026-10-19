@@ -1478,6 +1478,50 @@ systemd-run --pty --wait \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 20 --look /run/lampos-eyes/sight.jpg
 ```
 
+### How much the prompt cache holds (`probe-cache`)
+
+`lamp-voice probe-cache PROVIDER_CONFIG SECOND_CONFIG [RUNS]` (1 to 20,
+three unless said) settles where DeepSeek puts the functions in its prompt,
+which `LAMP_SECOND_STEADY_FIRST` depends on (#1712, the first builder at
+18:56). It asks DeepSeek's `hosted.deepseek_model`, thinking off, with the
+unit's `deepseek.key`. Each run asks each arm twice, 5 s apart (`PAUSE`).
+The second request's changing part is not the first's, as the time and the
+room change between turns:
+
+- **same:** the whole request twice, unchanged: what the cache holds at
+  most;
+- **one:** the character, then the changing part, in one system message, as
+  today;
+- **steady:** the character alone, an exchange, then the changing part as a
+  system message, as `LAMP_SECOND_STEADY_FIRST=on` lays it out;
+- **steady-bare:** `steady` with no functions, to count them.
+
+The functions are the voice's own, as a spoken turn declares them: the
+decline, the time, the memory's, the faces', a mark, setup's walk and the
+stop of reports. The actions part's light and volume aren't among them. The
+changing part is the probe's own, about 1 KB.
+
+Each arm's line gives both requests' `first_event_ms`, `prompt_tokens` and
+`cached_tokens`. Then come the medians of the second requests, the functions'
+size (steady less steady-bare), and a verdict:
+- **the functions are held with what comes before the changing part:**
+  steady's cached tokens reach steady-bare's plus 80% of the functions. The
+  switch lets the cache hold the character, the functions and the exchanges.
+- **otherwise, they're not held before the changing part.** DeepSeek puts
+  them after every system message, so the changing part has to leave the
+  system messages for them to be held.
+- A third line says when today's layout (one) holds them too: DeepSeek puts
+  them first.
+
+It prints counts and milliseconds only. Run it like `probe-cascade`:
+
+```sh
+systemd-run --pty --wait \
+  -p LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key \
+  /opt/lampOS/voice/current/lamp-voice probe-cache \
+  /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 3
+```
+
 ## Not done
 
 - **Gemini Terminal** (a wrong key or configuration) still ends the voice
