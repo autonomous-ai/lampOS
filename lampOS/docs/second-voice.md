@@ -1122,8 +1122,14 @@ after a take-over, but now for every turn:
   that came back with no words carries it, the name cut off on its own; one
   whose words came back carries nothing. A line in the same session that
   the coordinator says continues it, or that begins within 1.5 s of its end
-  when it was not answered (`CARRY_AFTER_END`), has that sound sent into
-  its stream first:
+  when it was not answered (`CARRY_AFTER_END`), takes that piece's time,
+  so a name lamp-name heard in it counts for the line. Its sound is sent
+  again only when lamp-name heard no name there (`Engine::knowing_the_name_heard`,
+  `worker::Heeding::name_heard_since`, read from the bus's last hearing):
+  sent again, 1.5 s of it still held the words back about 2 s (the first
+  builder at 19:21). With the name heard, `request N goes on from request
+  M: the name heard in it counts; its sound is not sent again`; without,
+  that sound goes into the line's stream first:
   `request N goes on from request M: its <ms> ms of sound go first`. Its
   window then begins where the first piece's did, so a name lamp-name heard
   there counts for it, and the old words are not put before its own as well.

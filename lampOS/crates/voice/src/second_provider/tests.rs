@@ -3368,3 +3368,59 @@ async fn only_a_wordless_piece_carries_and_only_its_last_moments() {
         "its last 1.5 s, then its own"
     );
 }
+
+/// #1712, the first builder at 19:21: a wordless piece whose name lamp-name
+/// heard gives the next line its time, so the name counts, but not its
+/// sound, which held the words back about 2 s. Without the name heard, the
+/// sound goes again for speech to text to find it.
+#[tokio::test]
+async fn a_wordless_piece_with_the_name_heard_lends_its_time_not_its_sound() {
+    let frame = lamp_audio::CAPTURE_SAMPLES;
+    let run = |name_heard: bool| async move {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(String::new()), Ok("what's the weather?".to_owned())].into()),
+            chats: Mutex::new([vec![text("Sunny."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let windows: Arc<Mutex<Vec<(u64, u64)>>> = Arc::default();
+        let seen = windows.clone();
+        let asked_from: Arc<Mutex<Vec<u64>>> = Arc::default();
+        let asked = asked_from.clone();
+        let mut engine = engine
+            .heeding(Arc::new(move |request, window, _, _| {
+                seen.lock().unwrap().push((request, window.0));
+                None
+            }))
+            .knowing_the_name_heard(Arc::new(move |from_us| {
+                asked.lock().unwrap().push(from_us);
+                name_heard
+            }));
+        engine.submit(start(1));
+        engine.submit(audio_at(1, 1, 1_000));
+        engine.submit(end(1));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        engine.submit(start(2));
+        engine.submit(audio_at(2, 1, 9_000));
+        engine.submit(end(2));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let window = windows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(of, _)| *of == 2)
+            .map(|(_, from)| *from);
+        let asked = asked_from.lock().unwrap().clone();
+        (script.samples_heard.load(Ordering::Relaxed), window, asked)
+    };
+    assert_eq!(
+        run(true).await,
+        (2 * frame, Some(1_000), vec![1_000]),
+        "the name heard: its time, not its sound"
+    );
+    assert_eq!(
+        run(false).await,
+        (3 * frame, Some(1_000), vec![1_000]),
+        "no name heard: its sound goes again"
+    );
+}

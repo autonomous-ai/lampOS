@@ -699,6 +699,12 @@ fn lone_words(heard: &str) -> bool {
 /// Told after [`SPOKEN_NOTE`] when the model looks by a call (#1712).
 pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look: it is how you look, and you will then be shown what you see.";
 
+/// Whether a hearing of the name at `at_us` with `score` is one since
+/// `from_us`, as the rule takes a hearing for a line.
+fn name_counts(score: f32, at_us: u64, from_us: u64) -> bool {
+    score >= crate::called::LEAST_SCORE && at_us.saturating_add(crate::called::BEFORE_US) >= from_us
+}
+
 /// Told beside a spoken line that its words or the lamp's name heard in its
 /// sound called the lamp for: answer it (the first builder on #1712, 18:09:
 /// at 17:56 DeepSeek declined "Lamp, what time is it?" and "Hey Lamp, tell
@@ -1275,6 +1281,16 @@ pub fn serve(
             let heeding = heeding.clone();
             engine = engine.noting_the_name(Arc::new(move |request| {
                 heeding.lock().ok()?.name_note_for(request)
+            }));
+        }
+        // The name heard in a wordless piece counts for the line going on from
+        // it without its sound sent again (#1712).
+        {
+            let heeding = heeding.clone();
+            engine = engine.knowing_the_name_heard(Arc::new(move |from_us| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.name_heard_since(from_us))
             }));
         }
         // Said by name, or perhaps not for the lamp: its note (#1712).
@@ -2204,6 +2220,26 @@ impl Heeding {
     /// holds the schedule's (#1522, #1712).
     pub(crate) fn holds_call(&self, request: u64, name: &str) -> bool {
         self.alone == Some(request) && crate::policy_holds::SCHEDULE_HELD.contains(&name)
+    }
+
+    /// Whether the lamp's name was heard (`name/heard`, at
+    /// `called::LEAST_SCORE` or more) since `from_us`, less
+    /// `called::BEFORE_US`, by this process's clock. Read from the bus's last
+    /// hearing, so the rule's own queue of hearings keeps it.
+    pub(crate) fn name_heard_since(&self, from_us: u64) -> bool {
+        let Some((bus, _)) = &self.bus else {
+            return false;
+        };
+        let Ok(Some(message)) = bus.latest(lamp_msgs::NameHeard::TOPIC) else {
+            return false;
+        };
+        let Ok(name) = message.parse::<lamp_msgs::NameHeard>() else {
+            return false;
+        };
+        let now_ms = unix_ms(SystemTime::now());
+        let ago_ms = now_ms.saturating_sub(message.header.at_unix_ms) + u64::from(name.ago_ms);
+        let at_us = monotonic_us().saturating_sub(ago_ms * 1_000);
+        name_counts(name.score, at_us, from_us)
     }
 
     /// The note for `request` judged: [`BY_NAME_NOTE`] if its words or the
@@ -3935,6 +3971,26 @@ mod tests {
         assert!(super::BY_NAME_NOTE.contains("answer it"));
         assert!(!super::BY_NAME_NOTE.contains("not_for_me"));
         assert!(super::DECLINE_NOTE.contains("call not_for_me and say nothing"));
+    }
+
+    /// #1712: a hearing of the name counts for a piece begun at `from` when
+    /// it is sure enough and no earlier than the rule's own allowance before.
+    #[test]
+    fn a_name_hearing_counts_from_its_time_and_score() {
+        let from = 10_000_000;
+        let sure = crate::called::LEAST_SCORE;
+        assert!(super::name_counts(sure, from + 200_000, from));
+        assert!(super::name_counts(
+            sure,
+            from - crate::called::BEFORE_US,
+            from
+        ));
+        assert!(!super::name_counts(
+            sure,
+            from - crate::called::BEFORE_US - 1,
+            from
+        ));
+        assert!(!super::name_counts(sure - 0.01, from + 200_000, from));
     }
 
     /// #1712: the weather is told while fresh, never once stale.

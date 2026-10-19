@@ -272,6 +272,9 @@ pub enum Did {
 }
 /// Where the engine says what the lamp did.
 pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
+/// Whether the lamp's name was heard since a time, by this process's clock
+/// ([`Engine::knowing_the_name_heard`]).
+pub type NameSounded = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 /// The note a spoken request gets on whether it called the lamp by name
 /// ([`Engine::noting_whether_called`]): with its request and words.
 pub type CallNote = Arc<dyn Fn(u64, &str) -> Option<&'static str> + Send + Sync>;
@@ -316,6 +319,8 @@ struct Shared {
     conversation_alone: Option<NameNote>,
     /// The note on whether a line called the lamp by name.
     call_note: Option<CallNote>,
+    /// Whether the lamp's name was heard since a time.
+    name_sounded: Option<NameSounded>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
@@ -621,6 +626,7 @@ impl Engine {
                 name_note: None,
                 conversation_alone: None,
                 call_note: None,
+                name_sounded: None,
                 task_waiting: None,
                 did: None,
                 hold: None,
@@ -790,6 +796,18 @@ impl Engine {
     pub fn telling_what_it_did(mut self, did: LampDid) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.did = Some(did);
+        }
+        self
+    }
+
+    /// `heard` says whether the lamp's name was heard since a time: a line
+    /// going on from a wordless piece whose name was heard takes that
+    /// piece's time, so the name counts for it, and not its sound, which
+    /// held the words back about 2 s (#1712, the first builder at 19:21).
+    /// Before any turn only.
+    pub fn knowing_the_name_heard(mut self, heard: NameSounded) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.name_sounded = Some(heard);
         }
         self
     }
@@ -1034,12 +1052,27 @@ impl Engine {
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
                     Some(kept) => {
-                        eprintln!(
-                            "lamp-voice second: request {request} goes on from request {}: its {} ms of sound go first",
-                            kept.request,
-                            kept.samples.len() / 16
-                        );
-                        let _ = audio.try_send(kept.samples.iter().copied().collect());
+                        // The name heard in the piece counts by its time
+                        // alone; its sound goes again only when the name was
+                        // not heard, for speech to text to find it.
+                        let name_heard = self
+                            .shared
+                            .name_sounded
+                            .as_ref()
+                            .is_some_and(|heard| heard(kept.said_from));
+                        if name_heard {
+                            eprintln!(
+                                "lamp-voice second: request {request} goes on from request {}: the name heard in it counts; its sound is not sent again",
+                                kept.request
+                            );
+                        } else {
+                            eprintln!(
+                                "lamp-voice second: request {request} goes on from request {}: its {} ms of sound go first",
+                                kept.request,
+                                kept.samples.len() / 16
+                            );
+                            let _ = audio.try_send(kept.samples.iter().copied().collect());
+                        }
                         // The line began with the sound carried: the name
                         // heard in it is this line's.
                         if let Ok(mut said) = said.lock() {
