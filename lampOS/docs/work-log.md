@@ -29,8 +29,8 @@ lamp qualification and merging.
 
 The [14:30 UTC checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6269677751)
 acknowledges the missed checkpoint and the new second-route requirement.
-The full Queue and own PR reviews were reread at 16:27 UTC. The current
-integration tip is `c1024721ce` after #1925; the separate #1976 motion fix
+The full Queue and own PR reviews were reread at 16:55 UTC. The current
+integration tip is `1b98d6de32`; #1925, the separate #1976 stress-bar fix
 and #1966 Tasks fix are merged. Foundation preparation starts at `df722db2d0`. The
 Bedtime publication is based on #1712's `b919291458`: Deepgram, DeepSeek and
 ElevenLabs. No provider session or device is started by these host tests.
@@ -167,13 +167,38 @@ implementation match `74ea4d028b`. The separate #1976 correction has since
 merged into #1712; this frozen source predates it. This is a failed gate,
 not a completed passing workspace run. No unchanged-source rerun is planned.
 
-The requested Bedtime split has three foundations: durable output caps,
-leased rest and bounded Say, then scheduled Skills. The first two are
-independent; scheduled Skills needs both. The final authored skill can stay
-to its three folder files, the install list and the installer test. Shared
-interface tests, private state/reset coverage and disabled switches remain
-with their owning runtime change. The foundation heads will be gated
-separately; the original native result does not qualify a future split.
+First approved the four-part Bedtime sequence at 16:32 UTC and moved the
+lamp trial to after its actual landing. Four local, unpushed commits now
+form the sequence: output caps `e1fdc20374f638899e612ef0967d3d414c29708a`
+on `df722db2d0`; bounded rest/Say `0bbbe5234d0df0d7b3cc99ab8c6a8195a638485f`;
+scheduled Skills `fd31d9c98e283089253b063d6181010846da2741`; and authored
+Bedtime `7f4cc5c2674afcd0b9cdacd2e93ec0eb42bec733`. Their individual scopes
+are 28, 19, 26 and five files. The last commit contains only the three skill
+folder files, the install list and the installer test. Shared interface
+tests, private state/reset coverage and disabled switches stay with the
+owning runtime change. All original verification documents are archived on
+this log branch. The original native result does not qualify these heads.
+
+The [caps foundation host attempt](verification/second-integration-checkpoint-20261019/caps-foundation-motion-failure.json)
+passed formatting **3.76 s** and strict workspace/all-target Clippy
+**60.46 s**. The 27-crate consumer gate stopped after **956.83 s** at the
+inherited second-route motion assertion **1 nods**. Completed summaries
+are **5,806 passed, 1 failed, 29 ignored**, none filtered; Voice itself is
+**2,256 passed, 1 failed, 12 ignored**, **316.73 s**. Base `df722db2d0`
+already contains #1976. The complete second-route test file and Expression
+speaking implementation/test blobs match that base. All **1,583** frozen
+source hashes match. This is a failed gate. The later Voice targets,
+Voice-eval, doc tests, full Update and build are being completed separately;
+their results will not erase the failure or constitute a passing complete
+gate. No caps feature push or PR is claimed.
+
+Music is being composed privately above the four split commits, preserving
+ScopedSystem, notes-aware preparation, bounded TTS and shutdown. Independent
+review of the other 47 changed files found no P1/P2; the two documentation
+links it identified are corrected. Additional cross-cases cover scoped
+identity, revocation after preparation, empty speech and Stop through the
+real worker with the Music runner. They are source preparation, not yet
+runtime-qualified. Music remains queued behind actual Bedtime landing.
 
 Bedtime and Tasks have only their original automatic PR ARM64 run,
 following First's no-duplicate-dispatch direction. GitHub's [Actions incident](https://www.githubstatus.com/incidents/8tzbpcnl75jp)
