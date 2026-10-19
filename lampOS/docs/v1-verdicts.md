@@ -414,3 +414,50 @@ Judged, but with one fact still to confirm:
 | EXT.27 | Lines 71 to 106 of SOUL.md |
 | All Policy rows | The Policy measurement is V2's own of 2026-10-14 ([policy.md](policy.md)) |
 
+
+## The owner's scope decisions, 2026-10-19
+
+On 19 Oct, between 07:1x and 07:3x, the owner went through every V1 capability that was deferred, dropped or waiting for a verdict, one at a time. The question for each was whether it fits V2's direction. Their rule (verbatim): "we don't wna totblindly move v1 features to v2. it must make sense. it must fit with v2 product philosophy. v1 was not perfect." While answering, they set how each one is built: "think in terms of skills all the time. that's the modular architecture design we do with skills, topics, and actions", and "we should have core skills and installable skills. but we should try to build everything as skills. core skills like core apple apps right always installed on the phone and then installable skills like installable apps".
+
+No lamp has shipped. V2 is installed on the current lamps before they ship, so nothing migrates from V1, and updates must carry a shipped lamp to V3, V4 and V5 in place ("1 is gone. but we need to build it in a way that v3 v4 v5 will be updated fine").
+
+**Kinds of decision:**
+- **Core skill:** always installed.
+- **Installable skill:** the person chooses it.
+- **System:** built in, below the skills.
+- **Not in V2.**
+- **Deferred.**
+
+| Capability (V1 sheet or source) | Decision | Issue |
+|---|---|---|
+| Knowing who is speaking by voice (S04) | In V2 | #1675 |
+| Reading mood from face or voice (S06, S07; V1's speech emotion) | In V2 | #1671 |
+| Activity and posture (S08) | In V2 | #1678 |
+| Habits and wellbeing nudges beyond Stretch break (A06, EXT.16) | In V2, as skills | #1685 |
+| Text chat from a phone (I02, V1's Telegram) | In V2, through the Autonomous app, not Telegram | #1673 |
+| Email, calendar and other connectors (I05) | Through hand-overs: the computer's agent has them, and the lamp keeps no accounts | #1676 |
+| Buddy (I04) | Not in V2 | |
+| The remote perception service (I06) | Not in V2. The lamp's own eyes stay, and a look's picture goes to the voice's model on either route | |
+| Guard mode (S12) | Installable skill | #1685 |
+| "Was anyone here while I was out?" | Installable skill | #1685 |
+| Music and the lamp as a speaker (B09, HAL-2.17) | Installable skill ("music for users to relax") | #1685 |
+| Noticing a known phone arriving | Not in V2 | |
+| Camera off by voice | Not in V2: "when it comes to privacy, the switch is definite" | |
+| Following a named thing, "look for my keys" (HAL-3.14) | Installable skill | #1685 |
+| Enrolling a face from a photo, "who is this?" | Installable skill | #1685 |
+| Pointing the head and light (HAL-4.11) | Core skill | #1679 |
+| Light scenes (GO-2.1, HAL-4.20) | Core skill | #1679 |
+| Light shows and effects | Core skill | #1679 |
+| The light dims and goes out when nobody is there | Core skill | #1677 |
+| A light while booting, and a face for a failed part (GO-3.17) | System | #1681 |
+| "I'm unplugging you": the arm folds first | Core skill | #1674 |
+| Smoke and bad-air alerts (HAL-3.4) | Core skill, never worded as a certified alarm | #1684 |
+| Health and crash reports reaching the company (GO-3.13, HAL-5.17) | System, opt-in at setup: only health and crashes, never sound, pictures or words | #1683 |
+| Languages | English only at launch | |
+| With no internet | A recorded notice now. Spoken commands offline come later, as a core skill | |
+| Joys: swaying to music, glancing at a laugh, watching you leave | Core skills | #1669 |
+| The base strip as a slider | Deferred | |
+| Round-screen eyes, a light while updating | Not in V2 (no screen; updates run while the lamp sleeps) | |
+| V1 lamps in homes moved to V2 | Not needed: no lamp has shipped | |
+
+**Superseded rows:** where a row above differs from a verdict earlier on this page, the row above stands.
