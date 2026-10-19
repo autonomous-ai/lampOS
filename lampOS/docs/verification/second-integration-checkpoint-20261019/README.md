@@ -1,15 +1,19 @@
 # Second integration checkpoint, 2026-10-19
 
-Current status (17:30 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
+Current status (17:39 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
 passed automatic ARM64: **7,684 nextest (1 leaky), 48 skipped**, plus
 **4 doc and 12 separate harness tests**. [Native evidence](caps-foundation-arm64.json)
 records the exact head, base and merge checkout. The [host motion failure](caps-foundation-motion-failure.json)
 and [remaining passing targets](caps-foundation-unreached.json) stay separate.
-The other three foundation gates continue locally; [isolated composition checks](split-composition-isolated.json)
-passed complete Update **132/0/1** and workspace build after the recorded
-[shared-cache compilation failure](split-composition-initial.json). Music's
-[first new preflight failure](music-foundations-teardown-failure.json) is
-preserved; its test-only macOS teardown correction is under validation.
+[Rest/Say](rest-foundation-host.json) passed **6,776/0/30** and
+[scheduled Skills](routine-foundation-host.json) passed **4,898/0/20**, none
+filtered, with formatting, strict Clippy and build green. [Authored Bedtime](authored-foundation-host-failure.json)
+reported **4,418/1/19** outside Update, the inherited motion assertion;
+[isolated Update and build](split-composition-isolated.json) passed
+**132/0/1** and workspace build. The earlier [shared-cache compilation failure](split-composition-initial.json)
+stays recorded. Music's [replacement preflight](music-foundations-preflight.json)
+passed all selected cases after the test-only correction; the [first failure](music-foundations-teardown-failure.json)
+is preserved. Its full consumer gate is now running.
 The [work log](../../work-log.md) carries current integration status.
 
 Historical checkpoint (15:26 UTC): #1732 is published as `22c9c730bd` onto #1712.
