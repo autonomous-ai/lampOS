@@ -19,6 +19,8 @@ Ready for integration: no (#1732 published on #1712; ARM64 39277565437 pending)
 
 Ready for integration: no (#1757 follows Bedtime; newer notes-aware preparation in validation)
 
+Ready for integration: yes (#1966; local Tasks gate and automatic ARM64 39276235123 passed)
+
 The active work is #1672, Bedtime and Morning, followed by the allocated
 requested-music slice of #1685. Queue updates go to
 [#1722](https://github.com/autonomous-ai/lampOS/issues/1722), because #705
@@ -27,7 +29,8 @@ lamp qualification and merging.
 
 The [14:30 UTC checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6269677751)
 acknowledges the missed checkpoint and the new second-route requirement.
-The full Queue and all three own PR reviews were read at 15:45 UTC. The
+The full Queue and all three own PR reviews were read at 16:01 UTC. Tasks
+checks and reviews were reread at 16:08 UTC after native completion. The
 Bedtime publication is based on #1712's `b919291458`: Deepgram, DeepSeek and
 ElevenLabs. No provider session or device is started by these host tests.
 
@@ -68,7 +71,14 @@ sign-in before its unchanged message assertions. The full Tasks gate passed
 **179/0/0**, none filtered, **39.94 s**; formatting **3.66 s** and strict
 all-target Tasks Clippy **13.33 s** passed. The race is row 36 of #1569.
 [Its native run](https://github.com/autonomous-ai/lampOS/actions/runs/39276235123)
-is pending. First merges it separately.
+now has a terminal successful conclusion. [The exact evidence](verification/second-integration-checkpoint-20261019/tasks-diagnostic-sync-arm64.json)
+records **7,595 nextest passed (1 leaky), 48 skipped**, plus **4 doc** and
+**12 separate harness tests**. It tested GitHub merge checkout
+`910e7931e7eaadbdc0f05bcd1b944e02747b0950` against base
+`b919291458c3618838c5f4b56520cf3b2cd739a5`, not the later integration tip.
+Release, relay signals, binary hashes and artifact upload passed. Four
+existing example filename-collision warnings remain recorded. The PR is
+mergeable with no review findings; First merges it separately.
 
 Earlier full host attempts remain failures. The [first attempt](verification/second-integration-checkpoint-20261019/bedtime-second-route-full-first-failure.json)
 on `08d9177cb4` stopped at that Tasks race. The [combined preparation attempt](verification/second-integration-checkpoint-20261019/bedtime-combined-policy-failure.json)
@@ -138,13 +148,13 @@ a full-suite total. The complete replacement workspace test/build gate is
 now running on that same frozen source; it reuses only the identical-source
 formatting and Clippy results.
 
-Bedtime and Tasks still have only their original automatic PR ARM64 run,
-following First's no-duplicate-dispatch direction. All Tasks job steps report
-success, including full tests, docs/harness tests and artifact upload, but
-GitHub still reports the run and check as in progress. Bedtime's release
-build passed and full tests are running. Both PRs remain draft until their
-run has a terminal successful conclusion. Exact checkout identity and counts
-will be recorded from the completed run logs.
+Bedtime and Tasks have only their original automatic PR ARM64 run,
+following First's no-duplicate-dispatch direction. GitHub's [Actions incident](https://www.githubstatus.com/incidents/8tzbpcnl75jp)
+reported delayed workflow processing at 15:56 UTC. Tasks showed successful
+steps before its run and check finally reported success; the exact evidence
+is recorded above. Bedtime's release build passed and its full tests still
+report in progress. Bedtime remains draft until its own terminal success;
+Music remains queued for actual landing and final native qualification.
 
 The full Bedtime read returned four P2s and a topic-registration gap. This
 PR was returned to draft. Matching binary/unit installation is now documented;
