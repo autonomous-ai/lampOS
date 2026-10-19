@@ -403,3 +403,6 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   changes; trials-test 283/0.
 - #2020 merged. #2029: Tests' P2 (a timed known-file check) fixed. #2021: the
   peer read's three P3s fixed (one-for-one cut, whole words, each thing once).
+- #2029 folded and rebased (light-show row). #2021: `passes` renamed to the
+  wrong-and-intrusive half, with `missed_of_worth`. Memory's quality on the
+  cheaper voice is #2037: six probe-tools cases, counts only.
