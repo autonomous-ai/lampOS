@@ -121,21 +121,31 @@ fn level(bytes: &[u8]) -> f64 {
 }
 
 /// Where a line's sound ends, in seconds of the audio sent: the end of its
-/// last block within [`SOUND_UNDER_PEAK_DB`] of the loudest block up to it
-/// and over [`SOUND_FLOOR_RMS`]. A level that stays up after the words, a
-/// noisy room's, keeps the end at the line's end, so such a line waits for
-/// `CloseStream` as before.
+/// last block within [`SOUND_UNDER_PEAK_DB`] of the line's peak up to it
+/// and over [`SOUND_FLOOR_RMS`]. The peak is the loudest median of five
+/// blocks in a row, so a loud sound up to two blocks long (a click, a tap,
+/// a double tap, a click across a block's edge) doesn't raise the bar for
+/// the words after it (Jarvis on #1993 and #2046). A longer one, a cough,
+/// still does, and a word shorter than three blocks doesn't set it. A level
+/// that stays up after the words, a noisy room's, keeps the end at the
+/// line's end, so such a line waits for `CloseStream` as before.
 #[derive(Debug, Default)]
 struct LineSound {
     peak: f64,
     to: f64,
+    /// The last five blocks' levels, newest last.
+    recent: [f64; 5],
 }
 
 impl LineSound {
     /// A block sent, ending `ends_at` seconds into the audio.
     fn sent(&mut self, bytes: &[u8], ends_at: f64) {
         let level = level(bytes);
-        self.peak = self.peak.max(level);
+        self.recent.rotate_left(1);
+        self.recent[4] = level;
+        let mut five = self.recent;
+        five.sort_by(f64::total_cmp);
+        self.peak = self.peak.max(five[2]);
         if level > SOUND_FLOOR_RMS && level >= self.peak * 10f64.powf(-SOUND_UNDER_PEAK_DB / 20.0) {
             self.to = ends_at;
         }
@@ -1471,6 +1481,58 @@ mod tests {
         );
     }
 
+    /// Jarvis's P3s on #1993 (04:31) and #2046 (05:35): a loud sound up to
+    /// two blocks long, a click, a tap, a double tap or a click across a
+    /// block's edge, doesn't set the bar for the words after it. Before the
+    /// voice, or just before the last word, a final word 19 dB under the
+    /// voice (-40 dBFS) still waits for `CloseStream`.
+    #[tokio::test(start_paused = true)]
+    async fn a_lone_loud_block_does_not_raise_the_bar_for_the_last_word() {
+        const HANG: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.3,"channel":{"alternatives":[{"transcript":"hang"}]}}"#;
+        // About -0.8 dBFS, and -40 and -35 dBFS.
+        const CLICK: i16 = 30_000;
+        let first: &[(usize, i16)] = &[(1, CLICK), (14, SOUND), (2, 0), (5, 328), (28, 0)];
+        let before_the_word: &[(usize, i16)] =
+            &[(15, SOUND), (1, CLICK), (1, 0), (5, 583), (28, 0)];
+        // A double tap, and a 5 ms click across a block's edge (two blocks
+        // at -9.8 dBFS), before the voice; two clicks just before the word.
+        let double: &[(usize, i16)] = &[(2, CLICK), (13, SOUND), (2, 0), (5, 328), (28, 0)];
+        let across: &[(usize, i16)] = &[(2, 10_607), (13, SOUND), (2, 0), (5, 328), (28, 0)];
+        let two_before: &[(usize, i16)] = &[(15, SOUND), (2, CLICK), (5, 583), (28, 0)];
+        for runs in [first, before_the_word, double, across, two_before] {
+            let (words, at_end, took) = finish_sounding_as(runs, HANG, true).await;
+            assert_eq!(words, "hang from close", "{runs:?}");
+            assert_eq!(took, Duration::from_millis(800));
+            assert!(at_end.ends_with(", words from=close_stream"), "{at_end}");
+        }
+        // Three loud blocks in a row are a sound of the line's: they set it.
+        let mut sound = LineSound::default();
+        let block = |sample: i16| -> Vec<u8> {
+            std::iter::repeat_n(sample.to_le_bytes(), 320)
+                .flatten()
+                .collect()
+        };
+        let mut at = 0.0;
+        let mut sent = |sound: &mut LineSound, sample: i16| {
+            at += 0.02;
+            sound.sent(&block(sample), at);
+        };
+        for sample in [CLICK, CLICK, SOUND, SOUND, SOUND, CLICK, CLICK] {
+            sent(&mut sound, sample);
+        }
+        assert!(
+            (sound.peak - f64::from(SOUND)).abs() < 1.0,
+            "two clicks: {}",
+            sound.peak
+        );
+        sent(&mut sound, CLICK);
+        assert!(
+            (sound.peak - f64::from(CLICK)).abs() < 1.0,
+            "three in a row: {}",
+            sound.peak
+        );
+    }
+
     /// Jarvis's P3 on #1993: a stop word's stream ([`SttStream::finished`])
     /// keeps `CloseStream` after a short answer, whatever is left: over the
     /// lamp a stop word can be pushed under any bar (#828).
@@ -1501,17 +1563,19 @@ mod tests {
             at += 0.02;
             sound.sent(&block(sample), at);
         };
+        // The words, three blocks: what sets the peak, as a median of five.
         sent(&mut sound, SOUND);
         sent(&mut sound, -SOUND);
-        assert!((sound.to - 0.04).abs() < 1e-9);
+        sent(&mut sound, SOUND);
+        assert!((sound.to - 0.06).abs() < 1e-9);
         // -48 dBFS, 27 dB under: sound. -51 dBFS, just over 30 dB under:
         // quiet, as are -75 dBFS and silence.
         sent(&mut sound, 130);
-        assert!((sound.to - 0.06).abs() < 1e-9);
+        assert!((sound.to - 0.08).abs() < 1e-9);
         for quiet in [92, 6, 0] {
             sent(&mut sound, quiet);
         }
-        assert!((sound.to - 0.06).abs() < 1e-9);
+        assert!((sound.to - 0.08).abs() < 1e-9);
         // A far voice: its -45 dBFS words and a -58 dBFS ending are sound,
         // -62 dBFS is under the floor.
         let mut far = LineSound::default();
