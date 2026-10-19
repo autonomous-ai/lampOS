@@ -110,3 +110,13 @@ list".
 - **#1744 merged** by the first builder as `09108bad1` (step 1 run on c0a4; head pads with the hardware lead on #1764).
 - **reviewer-two** (from #1814, merged 18:15): read #1779, #1821, #1826, #1860 and #1861; handed back #1783, #1795, #1846 and #1901 (outside the lane). **Merged #1891** (`e64f66fc3`, the base strip off unless set) and **#1887** (`461cb2549`, lamp-station, with my P3 taken). #1807 waits for its rebase.
 - Own: **#1867** (thirteen-P1, gaze off without `--gaze`; reviewed, Fifth's peer read, folded `2b0c7b91f`), **#1868** (thirteen-P3), **#1898** (`steps.sh` skips the strip calibration while the strip is off). #1867 and #1868 wait for a c0a4 person window.
+- **#1898 merged.** #1919 (lamp-voice's build: `UNITS` 24, `speak_up`'s `breath`) merged 13:50.
+- **#1922** (the second route's answer nods and sways the head, onto #1712): its dispatched ARM64 run is green, and the merge is the first builder's.
+- **#1953** (the head's speaking moves follow the voice's own level: the quiet, speaking and stress bars scale with the turn's running level against 0.34, with floors; engine tests at 0.33×, 1.0× and 1.2×; a hiss nods nothing): green, **merged into #1712** by the first builder (22:16).
+- reviewer-two: read #1937 (P2: a watch counted visits before the ring showed its mark; fixed), then #1963, the same patch on today's lamp-voice (lamp-skills 181/0); merge on green ARM64 and the third builder's privacy read. #1956, #1957 and #1968 handed back (outside the lane).
+- Smoke and bad-air (the first builder's 21:51): already Jarvis's #1836. c0a4 has no air sensor (read-only, under the lock), so the traces go to lamp-4ace. Row stays with Jarvis (the first builder, 21:54).
+- **#1965**, the touch pads row (the first builder, 21:54; plan on #1722):
+  - Each lamp's head pads read from their own rest. `discover-head --rest-seconds` counts changes with hands away, and the factory step refuses a pad whose rest changed (cb94's 97).
+  - The step writes `head_rest` (`rest`, `reads: level|pulses`). A pulse pad is touched only while it pulses, so a flip is no touch.
+  - The reviewer's P2 is fixed (`c1ddc42ca`): `pulses` needs a burst of fast changes, and two quick taps on a level pad give no `reads`, so the step asks again.
+  - It's the first builder's merge after the 08:00 arm-hour trial.
