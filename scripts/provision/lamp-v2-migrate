@@ -1,0 +1,393 @@
+#!/usr/bin/env python3
+"""Prepare a V1 Lamp for the generic lamp-os (V2) package, then activate it.
+
+Run on the lamp as root. It reads this lamp's own hardware and poses, writes
+what the package's preflight requires (docs/bootstrap-ota.md, "Migrating a V1
+Lamp"), and hands the switch itself to `software-update lamp-os --activate`,
+which restores V1 on its own when V2 does not become ready.
+
+  lamp-v2-migrate [--dry-run] [--force] [--no-activate] [--package ZIP]
+  lamp-v2-migrate --rollback
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import pwd
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+import zipfile
+
+UPDATER = '/usr/local/bin/software-update'
+BOOTSTRAP_JSON = '/root/config/bootstrap.json'
+V1_CONFIG = '/root/config/config.json'
+PROFILE = '/etc/lampOS/package-profile.json'
+# The Lamp's part user. Its V1 image account already has dialout, audio and video.
+LAMP_USER = 'orangepi'
+# The voice's microphone option names the V1 Lamp's capture card (lamp-voice options.rs).
+MICROPHONES = {'device_micro2': 'mic2'}
+# Measured on two V1 Lamps of this model (lampOS docs/body.md: 727,553 and
+# 782,557). The camera and joints are the same part on every unit, so their
+# middle is a start; body.md's procedure measures this lamp's own once V2 runs.
+MODEL_GAZE = '755,555'
+VOICE_OPTIONS = ('--noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone {mic} '
+                 '--reference-clock capture --reference-recovery bounded --provider-continuation kept-start '
+                 '--playout-start-ms 350 --end-silence-ms 600 --endpoint smart-turn-fast --call-wait-ms 2000')
+PARTS = ('voice', 'eyes', 'body', 'policy', 'name', 'controls', 'expression', 'actions', 'memory')
+# The generic controls unit runs without --touch, whose pins file has no reset line.
+TOUCH_ONLY_PINS = ('reset', 'legacy_head')
+DIRECTORIES = (
+    # path, mode, owned by the part user
+    ('/var/lib/lampOS', 0o755, False),
+    ('/var/lib/lampOS/voice', 0o700, False),
+    ('/var/lib/lampOS/voice/sessions', 0o700, False),
+    ('/var/lib/lampos-memory', 0o700, True),
+    ('/var/lib/lampos-actions', 0o755, True),
+    ('/var/lib/lampos-locks', 0o755, False),
+    ('/var/lib/lampos-locks/motor', 0o700, True),
+    ('/var/lib/lampos-locks/camera', 0o700, True),
+)
+
+
+class Refused(Exception):
+    pass
+
+
+def say(line):
+    print(f'lamp-v2-migrate: {line}', flush=True)
+
+
+def run(*args, check=True, timeout=120, **kwargs):
+    return subprocess.run(args, check=check, text=True, capture_output=True, timeout=timeout, **kwargs)
+
+
+def read(root, path):
+    return (Path(root) / path.lstrip('/')).read_text()
+
+
+# --- what this lamp is ---------------------------------------------------------
+
+def servo_device(root):
+    by_id = Path(root) / 'dev/serial/by-id'
+    links = sorted(p for p in by_id.glob('usb-1a86_*') if p.is_symlink()) if by_id.is_dir() else []
+    if len(links) != 1:
+        raise Refused(f'expected one servo adapter under /dev/serial/by-id, found {len(links)}')
+    return '/dev/' + os.readlink(links[0]).rsplit('/', 1)[-1]
+
+
+def camera(root):
+    found = []
+    for node in sorted((Path(root) / 'sys/class/video4linux').glob('video*')):
+        device = node / 'device'
+        if (node / 'index').exists() and (node / 'index').read_text().strip() != '0':
+            continue
+        interface = Path(os.path.realpath(device))
+        usb = interface.parent
+        if not (usb / 'idVendor').exists():
+            continue
+        ident = f'{(usb / "idVendor").read_text().strip()}:{(usb / "idProduct").read_text().strip()}'
+        found.append((f'/dev/{node.name}', f'{ident}@{usb.name}'))
+    if len(found) != 1:
+        raise Refused(f'expected one USB camera, found {len(found)}')
+    return found[0]
+
+
+def card_ids(root):
+    cards = Path(root) / 'proc/asound/cards'
+    return re.findall(r'^\s*\d+\s+\[(\S+)\s*\]', cards.read_text(), re.M) if cards.exists() else []
+
+
+def microphone(root):
+    for card, option in MICROPHONES.items():
+        if card in card_ids(root):
+            return option
+    raise Refused(f'no supported microphone card ({", ".join(MICROPHONES)}) in /proc/asound/cards')
+
+
+def mixer(root, check_control):
+    if 'allwinnerhdmi' not in card_ids(root):
+        raise Refused('speaker card allwinnerhdmi not found')
+    if not check_control('allwinnerhdmi', 'Speaker'):
+        raise Refused('mixer control Speaker not found on allwinnerhdmi')
+    return 'allwinnerhdmi', 'Speaker'
+
+
+def fast_cpus(root):
+    speeds = {}
+    for cpu in (Path(root) / 'sys/devices/system/cpu').glob('cpu[0-9]*'):
+        top = cpu / 'cpufreq/cpuinfo_max_freq'
+        if top.exists():
+            speeds[int(cpu.name[3:])] = int(top.read_text())
+    if not speeds:
+        raise Refused('no CPU frequencies under /sys')
+    fastest = max(speeds.values())
+    return ' '.join(str(n) for n in sorted(n for n, s in speeds.items() if s == fastest))
+
+
+def judge_zones(root):
+    types = [p.read_text().strip() for p in (Path(root) / 'sys/class/thermal').glob('thermal_zone*/type')]
+    zones = [z for z in ('cpu', 'skin') if any(t.startswith(z) for t in types)]
+    if not zones:
+        raise Refused('no cpu or skin thermal zone')
+    return ' '.join(f'--judge-zone {z}' for z in zones)
+
+
+def profile(hostname, hardware, poses):
+    servo, (camera_device, camera_usb) = hardware['servo'], hardware['camera']
+    return {'unit_id': hostname, 'substitutions': {
+        'UNIT_ID': hostname,
+        'LAMP_USER': LAMP_USER,
+        'MEMORY_USER': LAMP_USER,
+        'SERVO_DEVICE': servo,
+        'CAMERA_DEVICE': camera_device,
+        'CAMERA_USB': camera_usb,
+        'MOTOR_LOCK_DIR': '/var/lib/lampos-locks/motor',
+        'CAMERA_LOCK_DIR': '/var/lib/lampos-locks/camera',
+        'VOICE_OPTIONS': VOICE_OPTIONS.format(mic=hardware['microphone']),
+        'BODY_POSES': poses,
+        'FAST_CPUS': hardware['fast_cpus'],
+        'MEMORY_DIR': '/var/lib/lampos-memory',
+        'MEMORY_SOCKET': '/var/lib/lampos-memory/memory.sock',
+        'ACTIONS_DIR': '/var/lib/lampos-actions',
+        'MIXER_CARD': hardware['mixer'][0],
+        'MIXER_CONTROL': hardware['mixer'][1],
+        'HEALTH_EXPECT': ' '.join(f'--expect {p}' for p in PARTS),
+        'JUDGE_ZONES': hardware['judge_zones'],
+    }}
+
+
+def body_poses(lamp_env):
+    """BODY_POSES from lamp-body-measure's lamp.env, with the model gaze when it has none."""
+    match = re.search(r'^BODY_POSES="([^"\n]*)"\s*$', lamp_env, re.M)
+    if not match or '--home ' not in match[1]:
+        raise Refused('lamp.env has no BODY_POSES with --home')
+    poses = match[1]
+    if '--gaze ' not in poses:
+        poses += f' --gaze {MODEL_GAZE}'
+    if any(c in poses for c in '%$\\"\''):
+        raise Refused('BODY_POSES holds a character a unit cannot carry')
+    return poses
+
+
+def generic_pins(text):
+    pins = json.loads(text)
+    for key in TOUCH_ONLY_PINS:
+        pins.pop(key, None)
+    return json.dumps(pins, indent=2) + '\n'
+
+
+# --- the package -------------------------------------------------------------
+
+def metadata_url():
+    url = os.environ.get('OTA_METADATA_URL', '')
+    if not url and Path(BOOTSTRAP_JSON).exists():
+        url = json.loads(Path(BOOTSTRAP_JSON).read_text()).get('metadata_url', '')
+    if not url:
+        raise Refused(f'no metadata_url in {BOOTSTRAP_JSON} and OTA_METADATA_URL unset')
+    return url
+
+
+def fetch_package(directory):
+    with urllib.request.urlopen(metadata_url(), timeout=30) as response:
+        feed = json.loads(response.read())
+    entry = (feed.get('signed') or feed).get('lamp-os') if isinstance(feed, dict) else None
+    if not isinstance(entry, dict) or not entry.get('url') or not re.fullmatch(r'[0-9a-f]{64}', entry.get('sha256', '')):
+        raise Refused('the OTA feed has no lamp-os package')
+    archive = Path(directory) / 'lamp-os.zip'
+    say(f'downloading lamp-os {entry.get("version")}')
+    with urllib.request.urlopen(entry['url'], timeout=600) as response, archive.open('wb') as out:
+        shutil.copyfileobj(response, out)
+    if hashlib.sha256(archive.read_bytes()).hexdigest() != entry['sha256']:
+        raise Refused('downloaded lamp-os does not match the feed sha256')
+    return archive
+
+
+def unpack(archive, directory):
+    with zipfile.ZipFile(archive) as z:
+        names = set(z.namelist())
+        needed = {'tools/lamp-body-measure', 'SERVICE_PREFLIGHT'} | {f'provision/{n}' for n in
+                                                                      ('voice-provider.json', 'controls.json', 'controls-pins.json')}
+        if not needed <= names:
+            raise Refused(f'this lamp-os package cannot migrate a V1 lamp; it lacks {sorted(needed - names)}')
+        for name in needed:
+            target = Path(directory) / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(z.read(name))
+    tool = Path(directory) / 'tools/lamp-body-measure'
+    tool.chmod(0o755)
+    return Path(directory)
+
+
+# --- the lamp's poses ---------------------------------------------------------
+
+MEASURE_TOOL = '/usr/local/sbin/lamp-v2-migrate-measure'
+MEASURE_LOCKS = '/run/lamp-v2-migrate-locks'
+
+
+def measure(tool, hostname, servo):
+    """Read the lamp at rest with V1's HAL stopped; HAL is started again whatever happens."""
+    # The tool wants its lock directory 0700 under root-owned, non-writable
+    # parents, and it runs as the part user: neither may live under /tmp.
+    shutil.rmtree(MEASURE_LOCKS, ignore_errors=True)
+    os.mkdir(MEASURE_LOCKS, 0o700)
+    user = pwd.getpwnam(LAMP_USER)
+    os.chown(MEASURE_LOCKS, user.pw_uid, user.pw_gid)
+    shutil.copyfile(tool, MEASURE_TOOL)
+    os.chmod(MEASURE_TOOL, 0o755)
+    hal_was_active = run('systemctl', 'is-active', '--quiet', 'hal', check=False).returncode == 0
+    try:
+        if hal_was_active:
+            run('systemctl', 'stop', 'hal', timeout=60)
+            time.sleep(2)
+        if run('fuser', servo, check=False).returncode == 0:
+            raise Refused(f'{servo} is still open by another program')
+        # The tool refuses CAP_SYS_ADMIN (tty exclusivity): run it as the part user.
+        result = run('runuser', '-u', LAMP_USER, '--', MEASURE_TOOL, '--device', servo, '--unit-id', hostname,
+                     '--lock-directory', MEASURE_LOCKS, check=False, timeout=60)
+    finally:
+        if hal_was_active:
+            run('systemctl', 'start', 'hal', check=False, timeout=60)
+        Path(MEASURE_TOOL).unlink(missing_ok=True)
+        shutil.rmtree(MEASURE_LOCKS, ignore_errors=True)
+    if result.returncode != 0:
+        raise Refused(f'measuring the poses failed: {result.stderr.strip()} (is the lamp folded and still?)')
+    return result.stdout
+
+
+# --- writing -------------------------------------------------------------------
+
+def write(path, content, mode, force, dry_run, written):
+    target = Path(path)
+    if target.exists() and target.read_text() != content and not force:
+        raise Refused(f'{path} already exists with other content; rerun with --force to replace it')
+    if dry_run:
+        say(f'would write {path} ({oct(mode)})')
+        return
+    target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    temporary = target.with_name(target.name + '.new')
+    temporary.write_text(content)
+    os.chmod(temporary, mode)
+    os.replace(temporary, target)
+    written.append(path)
+
+
+def make_directories(dry_run):
+    user = pwd.getpwnam(LAMP_USER)
+    for path, mode, owned in DIRECTORIES:
+        if dry_run:
+            say(f'would create {path} ({oct(mode)}{", " + LAMP_USER if owned else ""})')
+            continue
+        Path(path).mkdir(exist_ok=True)
+        os.chmod(path, mode)
+        if owned:
+            os.chown(path, user.pw_uid, user.pw_gid)
+
+
+def preflight():
+    if os.geteuid() != 0:
+        raise Refused('run as root')
+    updater = Path(UPDATER).read_text() if Path(UPDATER).exists() else ''
+    if '# Service OTA preflight protocol: 1' not in updater:
+        raise Refused('software-update is too old for lamp-os; update bootstrap first')
+    device_type = json.loads(Path(V1_CONFIG).read_text()).get('device_type', '') if Path(V1_CONFIG).exists() else ''
+    if device_type != 'lamp':
+        raise Refused(f'this is not a Lamp (device_type {device_type!r})')
+    if run('systemctl', 'is-active', '--quiet', 'lamp-os', check=False).returncode == 0:
+        raise Refused('lamp-os is already active')
+    try:
+        pwd.getpwnam(LAMP_USER)
+    except KeyError:
+        raise Refused(f'user {LAMP_USER} does not exist') from None
+
+
+def activate():
+    say('activating lamp-os (software-update restores V1 if V2 does not become ready)')
+    started = run(UPDATER, 'lamp-os', '--activate', check=False, timeout=60)
+    print(started.stdout + started.stderr, end='')
+    unit = re.search(r'running as (\S+)\.service', started.stdout + started.stderr)
+    if not unit:
+        return started.returncode
+    deadline = time.monotonic() + 900
+    while time.monotonic() < deadline:
+        state = run('systemctl', 'is-active', unit[1], check=False).stdout.strip()
+        if state not in ('activating', 'active'):
+            break
+        time.sleep(5)
+    log = run('journalctl', '-u', unit[1], '--no-pager', '-o', 'cat', check=False).stdout
+    print(log, end='')
+    if run('systemctl', 'is-active', '--quiet', 'lamp-os', check=False).returncode == 0:
+        say('lamp-os is active: this lamp now runs V2')
+        return 0
+    say('lamp-os did not become ready; V1 was restored. Part logs: journalctl -u "lamp-*" --since "-15min"')
+    return 1
+
+
+def migrate(args):
+    preflight()
+    hostname = Path('/etc/hostname').read_text().strip()
+    hardware = {
+        'servo': servo_device('/'),
+        'camera': camera('/'),
+        'microphone': microphone('/'),
+        'mixer': mixer('/', lambda card, control: run('amixer', '-c', card, 'sget', control, check=False).returncode == 0),
+        'fast_cpus': fast_cpus('/'),
+        'judge_zones': judge_zones('/'),
+    }
+    say(f'{hostname}: ' + json.dumps(hardware))
+    with tempfile.TemporaryDirectory(prefix='lamp-v2-migrate-') as work:
+        archive = Path(args.package) if args.package else fetch_package(work)
+        package = unpack(archive, work)
+        lamp_env_path = Path('/etc/lampOS/body/lamp.env')
+        if lamp_env_path.exists() and not args.remeasure:
+            lamp_env = lamp_env_path.read_text()
+            say(f'using the poses in {lamp_env_path}')
+        elif args.dry_run:
+            say('would stop hal for a few seconds and measure the poses (lamp folded and still)')
+            lamp_env = 'BODY_POSES="--home 0,0,0"\n'
+        else:
+            say('measuring the poses: hal stops for a few seconds; the lamp must be folded and still')
+            lamp_env = measure(package / 'tools/lamp-body-measure', hostname, hardware['servo'])
+        poses = body_poses(lamp_env)
+        settings = package / 'provision'
+        written = []
+        write('/etc/lampOS/body/lamp.env', lamp_env, 0o644, args.force or args.remeasure, args.dry_run, written)
+        write(PROFILE, json.dumps(profile(hostname, hardware, poses), indent=2) + '\n', 0o644, args.force, args.dry_run, written)
+        write('/etc/lampOS/voice/provider.json', (settings / 'voice-provider.json').read_text(), 0o600, args.force, args.dry_run, written)
+        write('/etc/lampOS/controls/controls.json', (settings / 'controls.json').read_text(), 0o644, args.force, args.dry_run, written)
+        write('/etc/lampOS/controls/controls-pins.json', generic_pins((settings / 'controls-pins.json').read_text()),
+              0o644, args.force, args.dry_run, written)
+        make_directories(args.dry_run)
+        for path in written:
+            say(f'wrote {path}')
+    if args.dry_run or args.no_activate:
+        say('not activating' + (' (dry run)' if args.dry_run else ''))
+        return 0
+    return activate()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--dry-run', action='store_true', help='detect and print, change nothing')
+    parser.add_argument('--force', action='store_true', help='replace lampOS settings that differ')
+    parser.add_argument('--remeasure', action='store_true', help='measure the poses again')
+    parser.add_argument('--no-activate', action='store_true', help='prepare only')
+    parser.add_argument('--package', help='a lamp-os ZIP to read instead of the feed\'s')
+    parser.add_argument('--rollback', action='store_true', help='return this lamp to V1')
+    args = parser.parse_args()
+    try:
+        if args.rollback:
+            return subprocess.run([UPDATER, 'rollback-to-legacy', 'lamp-os']).returncode
+        return migrate(args)
+    except Refused as error:
+        say(f'refused: {error}')
+        return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main())

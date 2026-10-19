@@ -1594,15 +1594,71 @@ installed or started: `lamp-cloud` connects to the company broker, is opt-in and
 must not share V1 os-server's MQTT client ID, and `lamp-skills` also needs the
 product skills and settings that this ZIP does not carry yet.
 `lamp-body-measure` is a factory/provisioning tool that writes one lamp's
-`BODY_POSES` at rest; no product unit starts it, so it is excluded, and poses are
-never shipped or copied from another lamp. `lamp-memory-fixture`,
+`BODY_POSES` at rest. No unit starts it; the generic ZIP carries it as
+`tools/lamp-body-measure`, for the V1 migration script below, and poses are never
+shipped or copied from another lamp. `lamp-memory-fixture`,
 `lamp-records-fixture`, `lamp-policy-replay` and the current
 `lamp-same-voice pairs` measurement CLI are development tools and are excluded.
 Unknown binaries still fail packaging so a new runtime cannot be silently
 omitted.
 
 The generic ZIP still renders main's `DEFAULT_UNITS` from `lampOS/deploy/units`.
-The V2 product installer uses `lampOS/deploy/product` (setup gating, more
-services and timers, settings and different paths), so a lamp migrated with this
-ZIP is not yet equivalent to a V2 product install. Building and packaging
-successfully proves the package contract, not a fully configured V2 lamp.
+Where those templates differ from the part's own unit in `lampOS/deploy/product`
+in a way that stops the lamp, the packager aligns them and fails if either side
+changed shape:
+
+- `lamp-policy.service` runs as `@LAMP_USER@` instead of `DynamicUser` (outside
+  the bus group), with `StateDirectoryMode=0700` (lamp-policy refuses a 0755 log
+  directory) and the product unit's `--endpoint` (the Jev relay; without it the
+  policy calls its built-in default).
+- Every part whose product unit sets `LAMP_BUS=on`, `LAMP_BUS_AUDIO=on` or
+  `--bus-root /run/lampos-bus` gets the same: the voice, body and eyes join the bus
+  and the voice publishes the microphone, so name hears it and health hears every
+  part.
+
+The ZIP also carries the product's `voice-provider.json`, `controls.json` and
+`controls-pins.json` templates under `provision/`. The V2 product installer still
+installs more (setup gating, schedule, skills, ears, air, records, the voice's
+other `LAMP_*` features, `current` links), so a migrated lamp is not yet a full V2
+product install.
+
+### Migrating a V1 Lamp
+
+`scripts/provision/lamp-v2-migrate` runs on the lamp as root after the package is
+on the feed. It changes nothing with `--dry-run`, and otherwise:
+
+1. Checks the lamp: `device_type` `lamp`, an updater with the preflight protocol,
+   `lamp-os` not yet active, the `orangepi` account.
+2. Reads the hardware: the one `1a86` servo adapter under `/dev/serial/by-id`,
+   the one USB camera (`/dev/video0`, `vendor:product@usb-port`), the
+   `device_micro2` microphone (`--microphone mic2`), `allwinnerhdmi`/`Speaker`,
+   the fastest CPUs and the `cpu`/`skin` thermal zones. Anything ambiguous or
+   missing refuses.
+3. Downloads the feed's `lamp-os` ZIP (`OTA_METADATA_URL` or
+   `/root/config/bootstrap.json`, checked against its sha256; `--package ZIP`
+   reads a local one) and refuses a package without `tools/` and `provision/`.
+4. Measures the poses unless `/etc/lampOS/body/lamp.env` exists (`--remeasure`
+   measures again): HAL stops for a few seconds, `lamp-body-measure` reads the
+   lamp at rest as `orangepi` (it refuses root) with no register writes, and HAL
+   starts again whatever happens. The lamp must be folded and still. The gaze is
+   not measured by the tool; without one the body would refuse `--gaze-socket`,
+   so the script adds `--gaze 755,555`, the middle of the two V1 Lamps measured
+   in lampOS `docs/body.md`, to be measured on the lamp later.
+5. Writes `/etc/lampOS/body/lamp.env`, `package-profile.json`,
+   `voice/provider.json` (0600), `controls/controls.json` and
+   `controls/controls-pins.json` (without the touch-only `reset`/`legacy_head`,
+   since the generic controls unit runs without `--touch`), and creates the voice
+   sessions, memory, actions and lock directories. A file that differs is left
+   alone unless `--force`.
+6. Runs `software-update lamp-os --activate` and waits. Prepare writes the
+   credentials; if V2 does not become ready, the updater restores V1.
+
+`--no-activate` stops after step 5 and `--rollback` runs
+`software-update rollback-to-legacy lamp-os`. The script does not promote
+anything and does not change other lamps.
+
+Verified on lamp-a63e (V1, 2026-10-19) with packages built from lamp-voice
+`ec9b26a`: V1 to V2, then V2 to V2 updates, every part active and health `ok`.
+Its voice could not reach Gemini (the campaign-api quota of that device,
+`quota_exceeded`), so speech was not verified and the voice restarts until the
+quota returns.
