@@ -196,6 +196,7 @@ mod tests {
             },
             light: Light::new(true, colour, 3).unwrap(),
             pattern: None,
+            fade_ms: None,
         }
     }
 

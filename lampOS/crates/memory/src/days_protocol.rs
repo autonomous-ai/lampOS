@@ -56,6 +56,11 @@ enum Extra {
         person: Who,
         session: String,
     },
+    /// #1693 (3): one open thread to ask about once (`Days::follow_up`).
+    FollowUp {
+        #[serde(default)]
+        person: Who,
+    },
     ConversationEnd {
         #[serde(default)]
         person: Who,
@@ -194,6 +199,9 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             store.session_close(&one(person)?, &session)?;
             json!({"ok":true})
         }
+        Extra::FollowUp { person } => {
+            json!({"ok":true,"follow_up":store.follow_up(&one(person)?)?})
+        }
         Extra::ConversationEnd {
             person,
             conversation,
@@ -246,6 +254,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "forget",
             "session_open",
             "session_close",
+            "follow_up",
             "conversation_end",
             "tidy_apply",
         ];

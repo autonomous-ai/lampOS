@@ -1,0 +1,15 @@
+# From 05:45, nobody. Ten minutes of nobody come at 05:55, in the night, which
+# is the lamp's sleep: nothing then. The chance is kept and taken as the
+# night ends, at 06:00 (900 s); someone sits down at 960 s.
+clock = "05:45"
+
+[[expect]]
+at = "900s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 30000, until = "ends" }
+
+[[expect]]
+at = "960s"
+within = "1s"
+call = "ends"

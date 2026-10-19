@@ -40,6 +40,8 @@ pub mod gaze;
 pub mod gesture;
 pub mod idle;
 pub mod moves;
+#[cfg(any(target_os = "linux", test))]
+pub mod poses;
 pub mod protocol;
 pub mod readback;
 pub mod runtime;

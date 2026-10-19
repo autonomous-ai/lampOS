@@ -67,11 +67,15 @@ pub struct Glow {
     renewing: Option<Renewing>,
 }
 
+/// What is asked of the ring: the light, how it moves, and how slowly it
+/// is faded into (#1677).
+type Asked = (Light, Option<LightPattern>, Option<u32>);
+
 /// The renewals of a skill's light: the light asked again, with its
-/// pattern, their stop, and their thread, which gives back what the light
-/// was outranked by.
+/// pattern and fade, their stop, and their thread, which gives back what
+/// the light was outranked by.
 struct Renewing {
-    held: Arc<Mutex<(Light, Option<LightPattern>)>>,
+    held: Arc<Mutex<Asked>>,
     stop: mpsc::Sender<()>,
     thread: JoinHandle<Vec<String>>,
 }
@@ -111,7 +115,7 @@ fn reached(bus: &Bus) -> Option<Subscriber> {
 fn seen(
     reached: Option<&mut Subscriber>,
     source: &str,
-    held: &Mutex<(Light, Option<LightPattern>)>,
+    held: &Mutex<Asked>,
     pulses: &Mutex<HashMap<String, Instant>>,
 ) {
     let Some(reached) = reached else {
@@ -165,21 +169,27 @@ impl Glow {
         }
     }
 
-    /// Asks the ring for what `call`, a light or a dim, makes of the light,
-    /// and says how it went.
+    /// Asks the ring for what `call`, a light, a dim or the light going
+    /// out, makes of the light, and says how it went.
     pub fn ask(&mut self, call: &Call) -> String {
-        let what = match call {
-            Call::Light { colour, .. } => format!("light {colour}"),
-            _ => "dim".into(),
+        let (what, verb) = match call {
+            Call::Light { colour, .. } => (format!("light {colour}"), "dim"),
+            Call::Out { .. } => ("light out".into(), "put out"),
+            _ => ("dim".into(), "dim"),
         };
         let Some(light) = asked(call, self.light.as_ref()) else {
-            return format!("{what}: left alone, since no light is on to dim");
+            return format!("{what}: left alone, since no light is on to {verb}");
         };
         // The skill's steps build on each other as written, whether or not
         // the last one could be asked. A dim is steady.
         self.light = Some(light.clone());
         let pattern = match call {
             Call::Light { pattern, .. } => *pattern,
+            _ => None,
+        };
+        // A light going out is faded into, when its step says over how long.
+        let fade = match call {
+            Call::Out { over_ms, .. } => *over_ms,
             _ => None,
         };
         // Looked at each time, so a ring that starts during the run is asked
@@ -200,15 +210,17 @@ impl Glow {
             None => (outranked(&self.glows.bus), reached(&self.glows.bus)),
         };
         let until_us = lamp_ipc::monotonic_us() + GLOW_HOLDS_US;
-        if let Err(error) = ask_ring(&self.glows, &self.source, (&light, pattern), until_us) {
+        let asking = (light.clone(), pattern, fade);
+        if let Err(error) = ask_ring(&self.glows, &self.source, &asking, until_us) {
             return format!("{what}: light/request not written ({error})");
         }
         let level = light.level;
         let moving = pattern.map_or(String::new(), |pattern| self.moving(pattern));
+        let fading = fade.map_or(String::new(), |ms| format!(", faded into over {ms} ms"));
         match &self.renewing {
-            Some(renewing) => *locked(&renewing.held) = (light, pattern),
+            Some(renewing) => *locked(&renewing.held) = asking,
             None => {
-                let held = Arc::new(Mutex::new((light, pattern)));
+                let held = Arc::new(Mutex::new(asking));
                 let (stop, stopped) = mpsc::channel::<()>();
                 let (glows, source, again) =
                     (self.glows.clone(), self.source.clone(), Arc::clone(&held));
@@ -221,10 +233,9 @@ impl Glow {
                     {
                         heard(told.as_mut(), &source, &mut by);
                         seen(drawn.as_mut(), &source, &again, &glows.pulses);
-                        let (light, pattern) = locked(&again).clone();
+                        let asked = locked(&again).clone();
                         let until_us = lamp_ipc::monotonic_us() + GLOW_HOLDS_US;
-                        let asked = (&light, pattern);
-                        if let Err(error) = ask_ring(&glows, &source, asked, until_us) {
+                        if let Err(error) = ask_ring(&glows, &source, &asked, until_us) {
                             eprintln!("lamp-skills: {source}'s light not asked again: {error}");
                         }
                     }
@@ -234,6 +245,9 @@ impl Glow {
                 });
                 self.renewing = Some(Renewing { held, stop, thread });
             }
+        }
+        if matches!(call, Call::Out { .. }) {
+            return format!("{what}: asked of the ring{fading}");
         }
         format!("{what}: asked of the ring at level {level}{moving}")
     }
@@ -276,11 +290,11 @@ impl Glow {
         let Renewing { held, stop, thread } = renewing?;
         drop(stop);
         let by = thread.join().unwrap_or_default();
-        let (light, pattern) = locked(&held).clone();
+        let asked = locked(&held).clone();
         // A time already passed: the ring lets it go at once, and shows the
         // person's light again.
         let until_us = lamp_ipc::monotonic_us().saturating_sub(1);
-        let back = match ask_ring(&glows, &source, (&light, pattern), until_us) {
+        let back = match ask_ring(&glows, &source, &asked, until_us) {
             Ok(()) => "light given back: asked again with a time already passed".into(),
             Err(error) => format!(
                 "light not given back at once: light/request not written ({error}); the ring lets it go within {} s",
@@ -298,7 +312,9 @@ impl Glow {
 /// The light a step asks for, from what the light is so far (`from`): a
 /// colour at its level, or else at the level the light has
 /// ([`LEVEL_UNKNOWN`] when that is not known); a dim steps down from a
-/// light that is on, never below 1. None for a dim with no light on.
+/// light that is on, never below 1; out is that light off (the ring's
+/// ember, never dark: it still shows the lamp can hear). None for a dim or
+/// out with no light on.
 pub fn asked(call: &Call, from: Option<&Light>) -> Option<Light> {
     match call {
         Call::Light { colour, level, .. } => Some(Light {
@@ -311,16 +327,21 @@ pub fn asked(call: &Call, from: Option<&Light>) -> Option<Light> {
             colour: from.colour.clone(),
             level: from.level.saturating_sub(*steps).max(1),
         }),
+        Call::Out { .. } => from.filter(|from| from.on).map(|from| Light {
+            on: false,
+            ..from.clone()
+        }),
         _ => None,
     }
 }
 
-/// One `light/request` from `source` at skill priority for a light and
-/// its pattern, holding until `until_us` on the host's monotonic clock.
+/// One `light/request` from `source` at skill priority for a light, its
+/// pattern and its fade, holding until `until_us` on the host's monotonic
+/// clock.
 fn ask_ring(
     glows: &Glows,
     source: &str,
-    (light, pattern): (&Light, Option<LightPattern>),
+    (light, pattern, fade_ms): &Asked,
     until_us: u64,
 ) -> io::Result<()> {
     let request = LightRequest {
@@ -331,7 +352,8 @@ fn ask_ring(
             until_us,
         },
         light: light.clone(),
-        pattern,
+        pattern: *pattern,
+        fade_ms: *fade_ms,
     };
     locked(&glows.out)
         .publish_json(lamp_ipc::monotonic_us(), &request)

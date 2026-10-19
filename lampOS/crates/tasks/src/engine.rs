@@ -41,6 +41,13 @@ pub const WATCH_FOLLOW_MS: u64 = 600_000;
 
 /// The newest store kept aside, or none; a folder that can't be read says
 /// nothing rather than stopping the part.
+fn valid_targets(targets: &BTreeMap<String, Target>) -> bool {
+    targets.len() <= 32
+        && targets
+            .iter()
+            .all(|(alias, target)| token(alias, 64) && target.validate().is_ok())
+}
+
 fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
     persistence.kept_aside().unwrap_or_else(|error| {
         eprintln!("tasks: the stores kept aside could not be listed: {error}");
@@ -928,6 +935,9 @@ pub struct Engine<P: Persistence> {
     /// `version`: hand-overs are refused until they match this build
     /// (#1505).
     targets_newer: Option<u32>,
+    /// No Harness program to hand over with (`serve --set-up-later`):
+    /// every hand-over is refused, with why.
+    no_harness: bool,
     targets: BTreeMap<String, Target>,
     state: State,
     last_clock: Clock,
@@ -956,12 +966,7 @@ impl<P: Persistence> Engine<P> {
         now: &Clock,
     ) -> Result<Self, Error> {
         now.check()?;
-        if !hex(session_id, 32)
-            || targets.len() > 32
-            || targets
-                .iter()
-                .any(|(alias, target)| !token(alias, 64) || target.validate().is_err())
-        {
+        if !hex(session_id, 32) || !valid_targets(&targets) {
             return Err(err(
                 "configuration",
                 "Task targets or service identity are invalid.",
@@ -1118,6 +1123,7 @@ impl<P: Persistence> Engine<P> {
             kept_aside,
             set_aside,
             targets_newer: None,
+            no_harness: false,
         })
     }
 
@@ -1132,6 +1138,26 @@ impl<P: Persistence> Engine<P> {
     /// every hand-over is refused, with why, until they match (#1505).
     pub fn targets_newer(&mut self, version: u32) {
         self.targets_newer = Some(version);
+        self.targets.clear();
+    }
+
+    /// Targets read again (`serve --set-up-later`): hand-overs from now on
+    /// use them, and a task already handed over keeps its own target. Empty
+    /// when the file is gone. Refused, and the ones before kept, when they
+    /// are not valid.
+    pub fn set_targets(&mut self, targets: BTreeMap<String, Target>) -> Result<(), Error> {
+        if !valid_targets(&targets) {
+            return Err(err("configuration", "Task targets are invalid."));
+        }
+        self.targets = targets;
+        self.targets_newer = None;
+        Ok(())
+    }
+
+    /// There is no Harness program to hand over with: every hand-over is
+    /// refused, with why, until the part starts again with one.
+    pub fn no_harness(&mut self) {
+        self.no_harness = true;
     }
 
     /// The name a newer build's store was set aside under as this one
@@ -1233,7 +1259,7 @@ impl<P: Persistence> Engine<P> {
             "uncertain":count(DispatchState::Uncertain),"observations":self.state.tasks.iter().map(|t|t.observations.len()).sum::<usize>(),
             "speech_claimed":speech(SpeechState::Claimed),"speech_spoken":speech(SpeechState::Spoken),"speech_uncertain":speech(SpeechState::Uncertain),"completion":"unverified",
             "last_handover":self.last_handover.map(|handed| if handed { "handed" } else { "failed" }),
-            "set_aside":self.kept_aside,"targets_newer":self.targets_newer})
+            "set_aside":self.kept_aside,"targets_newer":self.targets_newer,"targets":self.targets.len(),"no_harness":self.no_harness})
     }
 
     pub fn handle(
@@ -1368,6 +1394,12 @@ impl<P: Persistence> Engine<P> {
                     return Err(err(
                         "targets_newer",
                         "The task targets were written for a newer build; hand-overs are off until they match this build.",
+                    ));
+                }
+                if self.no_harness {
+                    return Err(err(
+                        "no_harness",
+                        "Harness is not installed on this lamp; hand-overs are off until it is.",
                     ));
                 }
                 // Full: the oldest task that is over gives way. Only when
@@ -3968,6 +4000,78 @@ mod tests {
         assert_eq!(refused.code, "targets_newer");
         assert!(engine.state.tasks.is_empty());
         assert_eq!(engine.summary()["targets_newer"], 2);
+    }
+
+    /// #1676: targets read again are used by the next hand-over, while a
+    /// task handed over before keeps its own; targets that are not valid
+    /// are refused and the ones before kept; and none at all leave nothing
+    /// to hand over to.
+    #[test]
+    fn targets_read_again_are_used_from_then_on_and_a_task_keeps_its_own() {
+        let (mut engine, _memory) = opened();
+        let first = prepare(&mut engine, 10);
+        let mut moved = targets();
+        moved.get_mut("desk").unwrap().project = "moved-project".into();
+        engine.set_targets(moved.clone()).unwrap();
+        let second = prepare(&mut engine, 20);
+        let project = |id: u64| {
+            engine
+                .state
+                .tasks
+                .iter()
+                .find(|t| t.id == id)
+                .unwrap()
+                .launch
+                .target
+                .project
+                .clone()
+        };
+        assert_eq!(project(first), "review-project");
+        assert_eq!(project(second), "moved-project");
+        let mut bad = moved.clone();
+        bad.get_mut("desk").unwrap().machine_id = "not-a-machine".into();
+        assert_eq!(engine.set_targets(bad).unwrap_err().code, "configuration");
+        assert_eq!(engine.targets, moved, "the ones before are kept");
+        engine.set_targets(BTreeMap::new()).unwrap();
+        assert_eq!(engine.summary()["targets"], 0);
+        let refused = engine
+            .handle(
+                &preparation(&engine, "Review this project."),
+                &clock(30),
+                false,
+            )
+            .unwrap_err();
+        assert_eq!(refused.code, "target");
+    }
+
+    /// #1676: targets for a newer build read again turn hand-overs off and
+    /// list none, and valid ones read after turn them on again.
+    #[test]
+    fn targets_for_a_newer_build_read_again_are_off_until_valid_ones_come() {
+        let (mut engine, _memory) = opened();
+        engine.targets_newer(2);
+        assert_eq!(engine.summary()["targets"], 0);
+        engine.set_targets(targets()).unwrap();
+        assert!(engine.summary()["targets_newer"].is_null());
+        prepare(&mut engine, 10);
+    }
+
+    /// #1676: with no Harness program, a task offered is refused with why
+    /// and nothing is kept.
+    #[test]
+    fn with_no_harness_a_task_offered_is_refused_with_why() {
+        let (mut engine, _memory) = opened();
+        engine.no_harness();
+        let refused = engine
+            .handle(
+                &preparation(&engine, "Review this project."),
+                &clock(0),
+                false,
+            )
+            .unwrap_err();
+        assert_eq!(refused.code, "no_harness");
+        assert!(engine.state.tasks.is_empty());
+        assert_eq!(engine.summary()["no_harness"], true);
     }
 
     /// A stored state with a field twice is refused, as before #1512, and

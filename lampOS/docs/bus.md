@@ -361,9 +361,10 @@ of each, and its kind and period as a declaration, are in
 | `voice/link` | Whether the provider can be reached | latched | Voice, with `LAMP_BUS=on` and `LAMP_VOICE_LINK=on` (#830): unavailable once down for 5 s, reason `transport` | Once a second |
 | `lamp/online` | Whether the lamp can reach the internet, worked out from the parts' links | latched | Health, with `--online on` (#830) | Once a second |
 | `room/state` | Quiet or busy | latched | Voice, later the situation | When it changes, and once a second |
+| `room/presence` | Whether anyone is at the lamp: someone (a face or a voice within 20 s), or nobody for how long (#1677, [presence.md](presence.md)) | latched | Eyes, with `LAMP_PRESENCE=on` | Once a second while they look, and when someone comes or goes; each good for 3 s |
 | `light/command`, `light/state` | The light asked for, and the light shown | latched | The executive and `lamp-cloud` (the app's Light row); the ring's owner | When it changes, and once a second |
 | `light/test`, `light/drawn` | A self-test's colour, shown for 2 s at most; the light the ring actually drew | latched | The self-test; the ring's owner | Asked once a colour; drawn when it changes, and once a second |
-| `light/request` | A light asked for that lapses, with its asker, priority and time, and how it moves (`pattern`: breathe, candle or one pulse, #940) | event | Skills and other parts (`lamp-cloud`'s preview, [cloud.md](cloud.md)) | Asked, and asked again to keep it, at most 30 s ahead |
+| `light/request` | A light asked for that lapses, with its asker, priority and time, how it moves (`pattern`: breathe, candle or one pulse, #940), and how slowly it is faded into (`fade_ms`, #1677) | event | Skills and other parts (`lamp-cloud`'s preview, [cloud.md](cloud.md)) | Asked, and asked again to keep it, at most 30 s ahead |
 | `light/reached` | A requested light the ring has shown at rest for 350 ms, with its asker (#1146) | event | The ring's owner, with `LAMP_LIGHT_REQUESTS=on` | When a request's light has been shown 350 ms, and again after each renewal while it is; never inside a turn |
 | `light/outranked` | A request the ring holds but doesn't show: its asker, and `by`, the asker shown over it or `person` (#940) | event | The ring's owner, with `LAMP_LIGHT_REQUESTS=on` | When it is taken hidden, loses its place, or what is over it changes, and again after each renewal while it stays hidden |
 | `diagnostics` | Each part's health: ok, warning, error or stale | stream | Every part | Once a second |
@@ -415,6 +416,7 @@ that owns it:
 | Topic | Published by | Read by |
 |---|---|---|
 | `room/state` | the voice's provider worker, on each change and once a second | the policy, and Expression |
+| `room/presence` | the eyes, with `LAMP_PRESENCE=on`, from their looks and `voice/heard` ([presence.md](presence.md)) | `lamp-skills` (Light out when you leave); Messages (#1673) |
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
 | `policy/decisions` | the policy ([policy.md](policy.md)) | nothing yet |
 | `body/joint_states` | the body ([body.md](body.md), "On the bus") | nothing yet; recorded to measure how the lamp moves |

@@ -1,4 +1,6 @@
-use lamp_tasks::runtime::{Config, SystemClock, read_targets_or_newer, request, serve};
+use lamp_tasks::runtime::{
+    Config, SET_UP_LOOK_EVERY, SetUpLater, SystemClock, read_targets_or_newer, request, serve,
+};
 use std::{
     io::{self, Read},
     path::PathBuf,
@@ -55,6 +57,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut progress = false;
     let mut push_wait = false;
     let mut close_told = false;
+    let mut set_up_later = false;
     let mut seen = std::collections::BTreeSet::new();
     while let Some(arg) = args.next() {
         if !seen.insert(arg.clone()) {
@@ -68,6 +71,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--progress" => progress = true,
             "--push-wait" => push_wait = true,
             "--close-told" => close_told = true,
+            "--set-up-later" => set_up_later = true,
             "--dir" => dir = Some(PathBuf::from(args.next().ok_or("--dir needs a path")?)),
             "--socket" => socket = Some(PathBuf::from(args.next().ok_or("--socket needs a path")?)),
             "--voice-socket" => {
@@ -110,9 +114,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     // Targets written for a newer build: the part runs with hand-overs off
     // and says so, rather than stopping and saying nothing (#1505).
-    let (targets, targets_newer) = match read_targets_or_newer(
-        &targets.ok_or("--targets is required")?,
-    )? {
+    let targets_path = targets.ok_or("--targets is required")?;
+    let read = match read_targets_or_newer(&targets_path) {
+        // With `--set-up-later` no file is no computer yet: the part runs
+        // with hand-overs off, and uses the file once it is written (#1676).
+        Err(error) if set_up_later && error.kind() == io::ErrorKind::NotFound => {
+            eprintln!("tasks: no task targets yet; hand-overs are off until they are written");
+            Ok(Default::default())
+        }
+        read => read?,
+    };
+    let (targets, targets_newer) = match read {
         Ok(targets) => (targets, None),
         Err(version) => {
             eprintln!(
@@ -134,6 +146,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         push_wait,
         close_told,
         targets_newer,
+        set_up_later: set_up_later.then_some(SetUpLater {
+            targets: targets_path,
+            every: SET_UP_LOOK_EVERY,
+        }),
     };
     let clock = SystemClock::new(boot_id.as_deref())?;
     let executable = executable.ok_or("--harness is required")?;

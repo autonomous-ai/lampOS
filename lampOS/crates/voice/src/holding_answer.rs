@@ -18,6 +18,18 @@ fn enabled(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+pub(crate) fn arguments_from_environment() -> Vec<String> {
+    arguments(std::env::var(ENVIRONMENT).ok().as_deref())
+}
+
+fn arguments(value: Option<&str>) -> Vec<String> {
+    if enabled(value) {
+        vec![FLAG.to_owned()]
+    } else {
+        Vec::new()
+    }
+}
+
 pub(crate) fn take(flags: &[String]) -> (bool, &[String]) {
     match flags.first().map(String::as_str) {
         Some(FLAG) => (true, &flags[1..]),
@@ -164,7 +176,6 @@ fn holding_only(text: &str) -> bool {
             | "just a moment"
             | "give me a second"
             | "give me a moment"
-            | "let me see"
     )
 }
 
@@ -208,12 +219,27 @@ mod tests {
     }
 
     #[test]
+    fn holding_worker_arguments_are_empty_unless_on_and_preserve_the_following_flags() {
+        for value in [None, Some(""), Some("off"), Some("true"), Some("ON")] {
+            assert!(arguments(value).is_empty(), "{value:?}");
+        }
+        let mut flags = arguments(Some("on"));
+        assert_eq!(flags, [FLAG]);
+        flags.push("--camera".into());
+        let (on, rest) = take(&flags);
+        assert!(on);
+        assert_eq!(rest, ["--camera"]);
+        let (on, rest) = take(&flags[1..]);
+        assert!(!on);
+        assert_eq!(rest, ["--camera"]);
+    }
+
+    #[test]
     fn whole_holding_phrases_accept_case_spacing_and_terminal_punctuation() {
         for phrase in [
             "Let me think",
             "One moment.",
             "give me a second!",
-            "Let me see…",
             "  LET ME\nTHINK...  ",
             "Just a moment.",
             "Let me think for a second.",
@@ -223,6 +249,8 @@ mod tests {
         for phrase in [
             "",
             "  ...",
+            "Let me see",
+            "  LET ME\nSEE…  ",
             "Let me see. It is yellow.",
             "One moment of silence",
             "Give me a second opinion",
@@ -304,7 +332,7 @@ mod tests {
         text(&mut track, old, "The answer is four.");
         track.called(old);
         assert_eq!(finish(&mut track, old), None);
-        text(&mut track, of, "Let me see.");
+        text(&mut track, of, "Let me think.");
         assert_eq!(finish(&mut track, of), Some(of));
     }
 
@@ -314,7 +342,7 @@ mod tests {
             let mut track = Tracker::default();
             let of = lineage(1, 2);
             start(&mut track, of);
-            text(&mut track, of, "Let me see.");
+            text(&mut track, of, "Let me think.");
             let notice = match failure {
                 0 => Notice::Unavailable {
                     error: lamp_gemini::Error::NotConnected,

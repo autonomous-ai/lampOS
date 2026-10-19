@@ -73,6 +73,13 @@ pub struct LightRequest {
     /// ring without patterns shows the light steady.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pattern: Option<LightPattern>,
+    /// How long the ring takes to come into this light from what it shows,
+    /// in ms, if slowly (#1677): a light going out when nobody is there
+    /// fades like something falling asleep, never snapping off. Within
+    /// [`LightRequest::FADE_MS`]; none, the ring's own quick ease. A ring
+    /// without fades eases as quickly as ever.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fade_ms: Option<u32>,
 }
 
 /// The ways a skill's light may move (#940 item 3), V1's effects judged by
@@ -179,6 +186,9 @@ impl LightRequest {
     pub const TYPE: &str = "lamp_msgs/LightRequest";
     pub const VERSION: u32 = 1;
     pub const TOPIC: &str = "light/request";
+    /// A fade from a second, longer than any ease of the face, to a minute:
+    /// longer is not seen as a fade, only as a light that is not answering.
+    pub const FADE_MS: std::ops::RangeInclusive<u32> = 1_000..=60_000;
 
     /// Each request is a message of its own: several askers share the topic.
     pub fn declaration() -> Declaration {
@@ -188,6 +198,15 @@ impl LightRequest {
     pub fn check(&self) -> Result<(), Invalid> {
         self.claim.check()?;
         self.light.check()?;
+        if let Some(fade) = self.fade_ms
+            && !Self::FADE_MS.contains(&fade)
+        {
+            return Err(Invalid(format!(
+                "a fade of {fade} ms: from {} to {} ms",
+                Self::FADE_MS.start(),
+                Self::FADE_MS.end()
+            )));
+        }
         match &self.pattern {
             Some(_) if !self.light.on => Err(Invalid("a light that is off has no pattern".into())),
             Some(pattern) => pattern.check(self.light.level),
@@ -310,6 +329,7 @@ mod tests {
             claim: claim(Priority::Skill, 10_000_000),
             light: Light::new(true, "warm", 3).unwrap(),
             pattern: None,
+            fade_ms: None,
         };
         let text = serde_json::to_string(&request).unwrap();
         assert_eq!(
@@ -347,6 +367,7 @@ mod tests {
             claim: claim(Priority::Skill, 10_000_000),
             light: Light::new(true, "warm", 3).unwrap(),
             pattern: Some(breath),
+            fade_ms: None,
         };
         let text = serde_json::to_string(&request).unwrap();
         assert!(
@@ -411,6 +432,34 @@ mod tests {
         };
         assert!(pulse.check(1).is_err(), "unseen at level 1");
         assert!(pulse.check(2).is_ok());
+    }
+
+    /// #1677: a light going out asks the ring to fade into it, from a
+    /// second to a minute; a request without one is written as before.
+    #[test]
+    fn a_light_request_may_ask_to_fade_in_from_a_second_to_a_minute() {
+        let out = LightRequest {
+            claim: claim(Priority::Skill, 10_000_000),
+            light: Light::new(false, "warm", 3).unwrap(),
+            pattern: None,
+            fade_ms: Some(30_000),
+        };
+        let text = serde_json::to_string(&out).unwrap();
+        assert!(text.ends_with(",\"fade_ms\":30000}"), "{text}");
+        assert_eq!(serde_json::from_str::<LightRequest>(&text).unwrap(), out);
+        assert!(out.check().is_ok());
+        for (fade, holds) in [(999, false), (1_000, true), (60_000, true), (60_001, false)] {
+            let asked = LightRequest {
+                fade_ms: Some(fade),
+                ..out.clone()
+            };
+            assert_eq!(asked.check().is_ok(), holds, "{fade} ms");
+        }
+        // An older asker's request reads as one with no fade.
+        let older = text.replace(",\"fade_ms\":30000", "");
+        let read: LightRequest = serde_json::from_str(&older).unwrap();
+        assert_eq!(read.fade_ms, None);
+        assert!(!serde_json::to_string(&read).unwrap().contains("fade"));
     }
 
     #[test]

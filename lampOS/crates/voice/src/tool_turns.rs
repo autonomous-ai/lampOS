@@ -619,6 +619,7 @@ mod tests {
             who: false,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: None,
             staff_note: false,
         };

@@ -366,6 +366,7 @@ pub fn serve(
         .as_deref()
         .filter(|_| files.room_facts)
         .and_then(|root| lamp_bus::Bus::new(root).ok());
+    let (texts_system, texts_runner) = texts_ends(character.clone(), tools.clone());
     let sessions = std::sync::Mutex::new(Sessions::default());
     let system = move || {
         let now = Instant::now();
@@ -470,7 +471,12 @@ pub fn serve(
         .enable_all()
         .build()?;
     if let Some((chat, root)) = texts {
-        runtime.spawn(crate::messages::serve(chat, system, runner, root));
+        runtime.spawn(crate::messages::serve(
+            chat,
+            texts_system,
+            texts_runner,
+            root,
+        ));
     }
     runtime.block_on(run(channels, boot, engine, thread))
 }
@@ -838,6 +844,61 @@ pub(crate) fn system_message(
     Told {
         text: told + &thread.unwrap_or_default(),
         history: recent.into_iter().flat_map(messages).collect(),
+    }
+}
+
+/// What a text's answer (#1673) is told, and how its functions run. It is
+/// told the character, the time and place, the room's memory and the
+/// skills, never the room's spoken conversation or the kept things of the
+/// person in view: the person texting may be elsewhere, and need not be
+/// them (the reviewer on #1713). Its functions run as nobody's at the lamp
+/// (`crate::tools::answer_typed`).
+pub(crate) fn texts_ends(
+    character: String,
+    tools: crate::tools::Settings,
+) -> (crate::second_provider::System, ToolRunner) {
+    let told = tools.clone();
+    let system: crate::second_provider::System = Arc::new(move || {
+        let skills = if told.use_skill {
+            crate::use_skill::section(&crate::tools::skill_tools(&told))
+        } else {
+            String::new()
+        };
+        texts_system_message(
+            &character,
+            crate::agent_tasks::noted(
+                crate::local_time::told_here(told.clock, told.places),
+                told.tasks.as_ref(),
+            )
+            .as_deref(),
+            &(crate::remember::told_for_texts() + &skills),
+        )
+    });
+    let runner: ToolRunner = Arc::new(move |request, _heard, name, args| {
+        let settings = tools.clone();
+        Box::pin(async move {
+            let call = lamp_gemini::ToolCall {
+                id: String::new(),
+                name,
+                args,
+            };
+            tokio::task::spawn_blocking(move || {
+                crate::tools::answer_typed(&settings, &call, request)
+            })
+            .await
+            .unwrap_or_else(|_| crate::tools::unavailable())
+        })
+    });
+    (system, runner)
+}
+
+/// The system message for a text's answer (#1673): the character, the time
+/// and place, and `memory`, the room's note. No thread and no history: a
+/// text is not the room's spoken conversation (the reviewer on #1713).
+pub(crate) fn texts_system_message(character: &str, time: Option<&str>, memory: &str) -> Told {
+    Told {
+        text: format!("{character}{}{memory}", time.unwrap_or_default()),
+        history: Vec::new(),
     }
 }
 
@@ -1544,6 +1605,51 @@ mod tests {
         assert!(told.history.is_empty(), "{:?}", told.history);
         assert!(!told.text.contains("Try some tea"), "{}", told.text);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The reviewer on #1713: a text's answer is never told what was said at
+    /// the lamp. With a spoken exchange in the thread, the spoken turn's
+    /// system message has it, and a text's has neither it nor any history.
+    #[test]
+    fn a_texts_system_message_never_has_the_rooms_spoken_conversation() {
+        let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
+        let request = 41;
+        for event in [
+            ProviderOutput::Transcript {
+                request: None,
+                text: "Where did I put the spare key?".into(),
+                finished: true,
+            },
+            ProviderOutput::Transcript {
+                request: Some(request),
+                text: "Under the blue mat.".into(),
+                finished: true,
+            },
+            ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            },
+        ] {
+            keep(&event, None);
+        }
+        let spoken = system_message("You are a lamp.", Some(" It is noon."), "", None);
+        assert!(
+            spoken.text.contains("Under the blue mat."),
+            "{}",
+            spoken.text
+        );
+        let typed =
+            texts_system_message("You are a lamp.", Some(" It is noon."), "\n\nYour memory\n");
+        assert_eq!(typed.text, "You are a lamp. It is noon.\n\nYour memory\n");
+        assert!(typed.history.is_empty());
+        // As the worker gives a text's answer its system message.
+        let (texts, _) = texts_ends("You are a lamp.".into(), crate::tools::Settings::default());
+        let told = texts();
+        assert!(!told.text.contains("Under the blue mat."), "{}", told.text);
+        assert!(!told.text.contains("spare key"), "{}", told.text);
+        assert!(told.text.starts_with("You are a lamp."), "{}", told.text);
+        assert!(told.history.is_empty());
+        *crate::thread::THREAD.lock().unwrap() = kept;
     }
 
     /// The reviewer on #1100: this route reads the eyes' file only as a

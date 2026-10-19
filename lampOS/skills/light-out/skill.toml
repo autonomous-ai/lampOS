@@ -1,0 +1,46 @@
+# Light out when you leave (#1677; the owner, 19 Oct 07:2x: the light dims and
+# goes out when nobody is there and comes back when you sit down, a core
+# skill). It reads the eyes' room/presence (LAMP_PRESENCE=on in lamp-eyes),
+# the one signal of someone at the lamp that Messages reads too (#1673), and
+# asks the ring for the light going out (LAMP_LIGHT_REQUESTS=on in the voice
+# and lamp-skills): the person's own light is never touched, and it is
+# theirs again, as they kept it (LAMP_LIGHT_KEEP), the moment the ask ends.
+# Written to lamp-skills' schema (docs/skills.md); its defaults are in
+# docs/presence.md.
+needs = ["eyes", "light"]
+# A core skill (docs/skills.md, "Core and installable skills"), held out of
+# the product's install until its lamp check (install::NOT_PRODUCT_SKILLS).
+# Without the eyes' room/presence it does nothing.
+kind = "core"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: whether anyone is at the lamp,
+# the voice's state, and the light. It never speaks or moves.
+[permissions]
+topics = ["room/presence", "voice/state"]
+light = true
+
+[trigger]
+topic = "room/presence"
+field = "nobody_s"
+above = 599               # nobody for ten minutes: faces and voices miss a person reading face down, so longer than V1's 5-minute dim
+rearm = "ends"            # once each time nobody is there; again only after someone came back
+wait = "1h"               # the lamp speaking when the ten minutes come (a reminder into an empty room): it goes out once that ends
+
+[[while]]                 # never in the middle of a turn
+topic = "voice/state"
+field = "state"
+equals = "resting"
+
+[quiet]                   # not at night: the night is the lamp's sleep (Expression's 23:00 to 06:00)
+from = "23:00"
+to = "06:00"
+
+[ask]
+policy = "light"
+
+[[do]]
+# Out over 30 s, like falling asleep: to the ring's ember, never dark, which
+# still shows the lamp can hear. Given back the moment someone is seen or
+# heard, or when the eyes stop looking.
+light = { out = true, over = "30s", until = "ends" }

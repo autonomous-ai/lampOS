@@ -560,7 +560,9 @@ now reads the state of the release after it:
   handed over before are still watched, told and, with `--close-told`,
   closed, each by the target it was stored with.
 - **The warnings' order:** not ready, then bus failures, then targets for
-  a newer build, then a store set aside, then the last hand-over failed.
+  a newer build, then (with `--set-up-later`, below) why hand-overs are
+  off and a targets file that isn't valid, then a store set aside, then
+  the last hand-over failed.
 
 Tests: `engine::tests::the_next_releases_state_opens_and_keeps_its_tasks`
 (a field this build doesn't know on every stored type, a close under way,
@@ -605,6 +607,73 @@ speech history. Account, local Harness identity, operator target, store reset
 and personal-data erasure need First's explicit reconciliation/reset wiring.
 The private database contains task and answer text; it belongs in that reset
 manifest. Deleting the database is not an ordinary retry strategy.
+
+## Before the lamp is set up for hand-overs (`--set-up-later`, #1676)
+
+A home lamp gets Harness, its sign-in and the person's computers after the
+tasks part is installed. Without the switch, the part stops at start with
+no `targets.json` or no program at `--harness`, and systemd restarts it
+again and again, saying nothing useful. `lamp-tasks serve --set-up-later`
+(off unless set; no unit sets it yet) lets it run, and says why hand-overs
+are off:
+
+- **No targets file:** the part starts with no target. Every `prepare` is
+  refused with `target`, as for an alias it doesn't have, and
+  `{"op":"targets"}` lists none.
+- **The targets file is read again when it changes.** Once a minute
+  (`SET_UP_LOOK_EVERY`) the part compares the file's device, inode, size
+  and modification time with the last read. When they differ, it reads
+  the file with the same strictness as at start:
+  - **valid:** the next hand-over uses it. A task handed over before keeps
+    the target it was stored with;
+  - **for a newer build:** hand-overs off, as above (`targets_newer`);
+  - **gone:** no target again;
+  - **not valid:** the targets before it are kept, and the `tasks`
+    diagnostic warns "The task targets file changed and is not valid; the
+    targets before it are kept", with `targets_invalid`.
+
+  The journal has one line a change, with how many targets and never their
+  names, since an alias may be a computer's name. A computer added after
+  sign-in is used within a minute, with no restart.
+- **No Harness program** at `--harness` (not there at all; one there and
+  not fit to run is refused as before): the part runs with a stand-in that
+  sends nothing. Every `prepare` is refused, code `no_harness`. Harness put
+  on later is used once the part starts again.
+- **The sign-in** is read once a minute with `harness auth status --json`
+  (one line, `loggedIn`, and `offline` when signed in but its sign-in
+  couldn't be renewed just now). It goes on the Harness worker after
+  launches, reads, closes and progress, so it never sits on a request's
+  path. One failed read keeps what was known.
+- **Health:** the `tasks` diagnostic gives `handovers_off` and a message:
+
+  | `handovers_off` | Message |
+  |---|---|
+  | `no_harness` | Harness is not installed on this lamp; hand-overs are off until it is |
+  | `no_computer` | No computer to hand tasks to yet: the task targets are missing or empty |
+  | `not_signed_in` | Harness is not signed in to the person's account; hand-overs fail until it is |
+
+  Their level is ok: a lamp not yet set up isn't unwell. With the sign-in
+  read, `signed_in` is `yes`, `offline` or `no`. Targets for a newer build
+  keep their own warning. Being signed out doesn't refuse a `prepare`: the
+  sign-in read is up to a minute old, and the hand-over then fails as
+  before ("could not hand the last task over").
+- **Without the switch** nothing of this is said or read, and the part
+  starts, stops and reports as before.
+
+Not yet: writing `targets.json` from `harness machines --json` (#1676 B6
+step 3, which waits on the first builder's word on aliases), installing
+Harness (`lamp-update harness-on`, B5) and signing in a lamp with no
+screen (openharness#1410).
+
+Tests: `engine::tests::targets_read_again_are_used_from_then_on_and_a_task_keeps_its_own`,
+`engine::tests::targets_for_a_newer_build_read_again_are_off_until_valid_ones_come`,
+`engine::tests::with_no_harness_a_task_offered_is_refused_with_why`,
+`tests/harness.rs`: `sign_in_is_one_auth_status_read_as_harness_gives_it`,
+`tests/runtime.rs`: `set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off`
+(a mutation that reads the file only once fails it),
+`without_set_up_later_the_report_is_as_before`,
+`tests/runtime_failures.rs`: `set_up_later_runs_with_no_harness_and_no_targets_and_refuses_with_why`
+(the real binary; without the switch the same start fails).
 
 ## Host qualification and first lamp check
 
@@ -1119,6 +1188,36 @@ with what went wrong on lamp-4ace on 2026-10-16: a description too long
 for the link left those sessions without any function).
 What a prepared or handed-over task is, and what reaches the tasks part, is
 unchanged.
+
+### The person's own accounts, asked of their computer (#1676, off unless `LAMP_TASKS_ACCOUNTS=on`)
+
+Only with `LAMP_TASKS_ASKED=on` (the voice's `--tasks-accounts`, right after
+`--tasks-asked`). The lamp keeps no calendar, email or other account of the
+person's: their computer's agent has those connectors, so the lamp hands such
+an ask over (the owner, 19 Oct 07:1x, "via hand-overs").
+
+- **The session note** (`agent_tasks::session_note`) says the person's own
+  calendar, meetings, email and other accounts are on their computer, not
+  with the lamp, and that the lamp's timers and reminders are not their
+  calendar. An ask about them ("what's on my calendar today", "any email
+  from …", "when is my next meeting") is handed over with
+  `start_agent_task`, in the person's words, and its answer told when it
+  comes, never answered from what the model knows or from `list_reminders`.
+- **No office:** the descriptions, the note and the read-back's `where` say
+  "the person's computer", not their office computer, since a home has no
+  office. Nothing else in the descriptions changes, so each fits its 1,024
+  bytes as before (`every_description_fits_the_service_whatever_the_switches`
+  covers the switch).
+- **No new function:** the session's 32 functions are nearly all used, so
+  this is wording only. The read-back and the person's yes come first, as
+  for any hand-over: the ask leaves the lamp for their computer.
+- **Not yet shown:** an ask answered end to end on a lamp. It needs the
+  computer's agent to have calendar and mail connectors in a session Harness
+  starts, which is the owner's to set up (#1676); until then it's shown with
+  an ask that needs none.
+
+Tests: `agent_tasks::tests::with_accounts_the_persons_calendar_and_email_are_handed_over_and_no_office_is_named`,
+`agent_tasks::tests::the_accounts_switch_is_on_only_with_asked_and_taken_after_it`.
 
 ### Asked of the staff, done by the lamp (#854, off unless `LAMP_TASKS_ASKED=on`)
 

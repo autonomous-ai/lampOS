@@ -174,9 +174,10 @@ pub struct Status {
     pub run: u64,
     pub set_up_completed: bool,
     pub runtime_phase: String,
-    /// Which lamp this is, beyond V1's fields: the Autonomous app keeps V1's
-    /// Lamp and this one as two products and stops before the setup POST when
-    /// the lamp on the hotspot is not the one claimed (#1396, Fourth's (a)).
+    /// Which lamp this is, beyond V1's fields. The backend keeps one device
+    /// type, `lamp`, for both generations, and the Autonomous app learns
+    /// which Lamp it set up from this (#1396, decided 19 Oct); `lamp-cloud`
+    /// says the same on every MQTT reply.
     pub generation: &'static str,
 }
 

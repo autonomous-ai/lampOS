@@ -1,0 +1,16 @@
+# From 10:00, someone at the desk until 30 s, then nobody: the eyes say
+# nobody from 50 s (20 s after the last face), counted from 30 s. Ten minutes
+# of nobody come at 630 s: the light goes out over 30 s, held until someone
+# sits down at 900 s, when it is given back.
+clock = "10:00"
+
+[[expect]]
+at = "630s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 30000, until = "ends" }
+
+[[expect]]
+at = "900s"
+within = "1s"
+call = "ends"

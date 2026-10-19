@@ -1291,3 +1291,20 @@ speaker retirement and quiet-input gates. This adds no semantic classifier,
 fallback route or retry loop. The switch is off until the lamp check; the
 [behavior and host verification](holding-answer.md) distinguish queued-note
 latency from the unmeasured audible answer.
+
+## Presence and the light going out (#1677, 2026-10-19)
+
+V1's `hal/drivers/sensing/presence_service.py` dimmed the light to 20%
+after 5 minutes without camera motion or a voice turn or gesture
+(`HAL_IDLE_TIMEOUT_S`), cleared it after 15 (`HAL_AWAY_TIMEOUT_S`), told
+the agent to announce it, and restored the person's light on motion, never
+while asleep and never over a light they had turned off. Keep: the
+person's own light restored as it was, nothing while the lamp sleeps,
+nothing over a light already off. Change: the evidence is the eyes' faces
+and a voice heard (`voice/heard`), since V2's eyes find faces, not motion;
+one stage after 10 minutes instead of two, faded over 30 s by the ring
+(`LightRequest::fade_ms`) so it reads as falling asleep; out is the ring's
+ember, never dark. Drop: the announcement. The signal is one topic,
+`room/presence`, said by the eyes for every reader (the light and #1673's
+Messages), never "nobody" while the eyes are not looking. Off unless
+`LAMP_PRESENCE=on`; not run on a lamp. See [presence.md](presence.md).

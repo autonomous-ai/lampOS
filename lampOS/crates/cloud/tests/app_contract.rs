@@ -182,6 +182,10 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         let sent = me.data("2026-10-18T10:00:00Z", kind, &result).to_string();
         let reply: Value = serde_json::from_str(&sent).unwrap();
         assert_eq!(reply["status"], "success", "{kind}: {reply}");
+        // The page is a Lamp 2's by this, in the envelope beside `device`
+        // (`DeviceSystemInfo.generation`, #1396 19 Oct).
+        assert_eq!(reply["generation"], "lamp-v2", "{kind}: {reply}");
+        assert_eq!(reply["device"], "lamp", "{kind}: {reply}");
         replies.insert(kind, reply["data"].clone());
     }
     serving.join().unwrap();

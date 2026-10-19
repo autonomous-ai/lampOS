@@ -1733,6 +1733,15 @@ It takes the same exclusive ownership of the servo port as
 `lamp-body-inspect`, so neither can run while the other does. Stop every
 other owner of the port first.
 
+**`lamp-body-measure`** (#1682) is the factory's per-lamp step: the same
+read-only rest read, made into this lamp's `lamp.env` (`lamp_body::poses`):
+`--home` and `--folded-arm` as found, `--stand` as lamp-4ace's with this
+lamp's roll and yaw, the default `--pitch-window` checked against the rest
+pitch and the pitch servo's limits, `--torque on`, and `--gaze` left for its
+own measurement. It writes the file only with `--write`, never over one
+already there, and refuses a read taken with torque on (install.md, "At the
+factory, once per lamp").
+
 ### Reading a run without stopping it
 
 Two lines let a run be read from the journal while it goes on (#705), since

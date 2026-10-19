@@ -203,6 +203,12 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
          32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
     ),
+    (
+        "light-out",
+        "it reads `room/presence`, which the eyes say only with `LAMP_PRESENCE=on` (#1677), off \
+         until the light going out and coming back has been seen on a lamp: someone reading face \
+         down at the desk must never lose their light",
+    ),
 ];
 
 /// One file of a product skill, `lampOS/skills/SKILL/FILE`, and where
