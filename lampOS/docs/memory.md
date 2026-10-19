@@ -485,6 +485,33 @@ then use that person's scope:
   and links records within one person; a different person at the lamp ends
   the conversation being collected, which is sent to `conversation_end` in
   its own scope.
+- **Seeing someone speak** (`LAMP_SECOND_SPEAKING_FACE=on`, the second
+  route only, off unless set; `crates/voice/src/speaking_faces.rs`). It needs
+  `LAMP_SECOND_SCOPED_CONTEXT=on` too, which tells and files each turn for
+  its lease; without it the worker says "seeing who speaks is not on" and
+  nothing changes. A heard
+  line's scope is admitted as above, when its sound begins. When its words
+  are final, before anything is told with them, one more input is read: the
+  eyes' `humans/faces/tracked` (`LAMP_EYES_SPEAKING=on`), looked at every
+  100 ms on the worker's own thread. A face *speaks through the line* when
+  it reads `yes` in at least half of the looks between the line's start and
+  end (at least three looks).
+  - **Only the known person's face** (its passing id is the eyes'
+    `known-face`, and the known name is still the admitted person's): the
+    line stays theirs.
+  - **Any other face, alone or with theirs:** the line may be someone
+    else's, and its lease narrows to the room (`ScopeLease::narrow_to_room`).
+    The chat is told the room's note and exchanges, its memory calls run in
+    the room's scope, and its exchange is filed in the room's thread, so
+    the journal takes it as the room's too. A chat already begun on its
+    early words (`LAMP_SECOND_PREPARED`) is dropped and asked again. The
+    answer is not held up, and the narrowing is one way: nothing widens a
+    scope again. Both faces speaking narrows on purpose (Third on #2008):
+    at worst the known person's own line loses their context once.
+  - **No face,** or too few looks: nothing changes.
+  - **Nothing new is kept:** the looks are passing ids and states, in memory
+    only and dropped after 30 s, and each reading is used for its line and
+    gone.
 - **The session note**, for a session opened while someone is known: the
   room's note, then what they asked to keep. Legacy reads theirs then, in
   300 ms at most; Days opens a second frozen snapshot in their scope within

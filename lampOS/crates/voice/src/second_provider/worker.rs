@@ -1433,6 +1433,32 @@ pub fn serve(
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
     }
+    // Seeing someone speak (`LAMP_SECOND_SPEAKING_FACE=on`, the first
+    // builder on #1722, 00:08): the eyes' faces, read every 100 ms on their
+    // own thread, say whose a line is when another face spoke it. Only with
+    // the memory's known file, the bus and the scoped context, which tells
+    // and files each turn for its lease (Second on #2008); the reader stops
+    // when this worker returns.
+    let _speaking_reader = match (&scope_file, files.bus_root.as_deref()) {
+        (Some(known), Some(root))
+            if crate::speaking_faces::from_environment() && engine.scopes_context() =>
+        {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let reader = crate::speaking_faces::read_from(eyes.clone(), root);
+            if reader.is_some() {
+                engine = engine.seeing_who_speaks(eyes, known.clone());
+            }
+            reader
+        }
+        _ => {
+            if crate::speaking_faces::from_environment() && !engine.scopes_context() {
+                eprintln!(
+                    "lamp-voice second: seeing who speaks is not on: it needs LAMP_SECOND_SCOPED_CONTEXT=on"
+                );
+            }
+            None
+        }
+    };
     if let (Some(early), Some(search)) = (early, search) {
         engine = engine.hearing_words(Arc::new(move |request, heard| {
             let Some(query) = early_query(heard, crate::local_time::month_and_year_here()) else {
@@ -4387,6 +4413,80 @@ mod tests {
             None
         );
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Third on #2008: a line narrowed to the room (seeing someone speak)
+    /// files its exchange, the person's words and the lamp's answer, in the
+    /// room's thread, never the admitted person's; one not narrowed stays
+    /// theirs.
+    #[test]
+    fn a_narrowed_lines_exchange_is_the_rooms_not_the_known_persons() {
+        use crate::memory_scope::{FaceCache, RequestKey, RequestScope};
+        let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
+        let known = std::env::temp_dir().join(format!("ten-narrowed-{}", std::process::id()));
+        std::fs::write(&known, "A").unwrap();
+        let cache = FaceCache::default();
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&known),
+        );
+        let a = crate::remember::person_id("A");
+        crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .at_lamp(Some(a.clone()));
+        for (request, words, narrowed) in
+            [(51, "The code is 417.", true), (52, "Mine is 9.", false)]
+        {
+            let scope = RequestScope::new(
+                RequestKey {
+                    worker: lamp_turn_owner::BootId::new([16; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                cache.snapshot(Instant::now()),
+            );
+            let lease = scope.lease();
+            if narrowed {
+                lease.narrow_to_room();
+            }
+            for event in [
+                ProviderOutput::Transcript {
+                    request: None,
+                    text: words.into(),
+                    finished: true,
+                },
+                ProviderOutput::Transcript {
+                    request: Some(request),
+                    text: "Noted.".into(),
+                    finished: true,
+                },
+                ProviderOutput::TurnComplete {
+                    request,
+                    idle: true,
+                },
+            ] {
+                keep_scoped(&event, None, Some(&lease));
+            }
+        }
+        let now = Instant::now();
+        let (room, theirs) = {
+            let thread = crate::thread::THREAD.lock().unwrap();
+            (
+                thread.recall_for(None, now, 4096).unwrap_or_default(),
+                thread.recall_for(Some(&a), now, 4096).unwrap_or_default(),
+            )
+        };
+        *crate::thread::THREAD.lock().unwrap() = kept;
+        std::fs::remove_file(known).unwrap();
+        assert!(
+            room.contains("The code is 417.") && !room.contains("Mine is 9."),
+            "{room}"
+        );
+        assert!(
+            theirs.contains("Mine is 9.") && !theirs.contains("417"),
+            "{theirs}"
+        );
     }
 
     /// The reviewer on #1713: a text's answer is never told what was said at

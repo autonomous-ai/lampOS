@@ -47,6 +47,8 @@ pub struct Ids {
     seen: Vec<(u32, [f32; 4], u64)>,
     /// Each face's mouth, when speaking is judged (`LAMP_EYES_SPEAKING=on`).
     pub mouths: Option<speaking::Mouths>,
+    /// The last look's ids, in the detector's order.
+    last: Vec<u32>,
 }
 
 fn overlap(a: &[f32; 4], b: &[f32; 4]) -> f32 {
@@ -89,6 +91,7 @@ impl Ids {
             };
             ids.push(id);
         }
+        self.last.clone_from(&ids);
         ids
     }
 }
@@ -327,6 +330,15 @@ impl BusOut {
                 .reduce(f32::max);
             presence.away.looked(now_us, tall);
         }
+    }
+
+    /// The passing id the last look gave the face at `index` of what the
+    /// detector found, only while speaking is judged: the eyes' `known-face`
+    /// file names it beside the known person's name, so the voice can tell
+    /// whether the face seen speaking is theirs.
+    pub fn speaking_id(&self, index: usize) -> Option<String> {
+        self.ids.mouths.as_ref()?;
+        self.ids.last.get(index).map(|id| format!("f{id}"))
     }
 
     /// Call from the loop whether or not the camera is open: with it closed

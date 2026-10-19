@@ -4177,6 +4177,163 @@ async fn b_first_line_after_a_reaches_the_memory_as_bs() {
     std::fs::remove_file(path).unwrap();
 }
 
+/// Seeing someone speak (`LAMP_SECOND_SPEAKING_FACE=on`, the first builder
+/// on #1722, 00:08 and 00:23): A is known at the lamp with face `f1`. A line
+/// that `f2` is seen speaking through is told as the room's, and its memory
+/// call runs with the room's scope; a line A's own face speaks stays A's;
+/// one both faces speak through is the room's (Third on #2008).
+/// Deepgram and DeepSeek are the script; the eyes are a feeder thread.
+#[tokio::test]
+async fn a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    use crate::speaking_faces::{SpeakingFaces, known_face_of};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let path = std::env::temp_dir().join(format!(
+        "ten-speaking-face-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::write(&path, "A").unwrap();
+    std::fs::write(known_face_of(&path), "f1\n").unwrap();
+    let remember = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "m1",
+                "remember",
+                json!({"text":"my test code is 417"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Lamp, remember that my test code is 417.".to_owned()),
+                Ok("Lamp, remember that my test code is 417.".to_owned()),
+                Ok("Lamp, remember that my test code is 417.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                remember(),
+                vec![text("Got it."), Ok(ChatEvent::Done)],
+                remember(),
+                vec![text("Got it."), Ok(ChatEvent::Done)],
+                remember(),
+                vec![text("Got it."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let cache = Arc::new(FaceCache::default());
+    let scopes: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
+    let seen = scopes.clone();
+    let runner: ScopedToolRunner = Arc::new(move |_, _, _, _, lease: ScopeLease| {
+        seen.lock()
+            .unwrap()
+            .push(lease.scope().unwrap().person().map(str::to_owned));
+        Box::pin(async { json!({"ok":true}) })
+    });
+    let eyes = Arc::new(SpeakingFaces::default());
+    let mut engine = engine
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([14; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            Some(Arc::new(|lease: &ScopeLease| {
+                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+            })),
+        )
+        .seeing_who_speaks(eyes.clone(), path.clone())
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&path),
+    );
+    for (line, speaking) in [(1, &["f2"][..]), (2, &["f1"]), (3, &["f1", "f2"])] {
+        // The eyes, while the line is said: one face speaking, one not.
+        let done = Arc::new(AtomicBool::new(false));
+        let feeder = {
+            let (eyes, done) = (eyes.clone(), done.clone());
+            std::thread::spawn(move || {
+                while !done.load(Ordering::Acquire) {
+                    let faces = lamp_msgs::Faces {
+                        faces: ["f1", "f2"]
+                            .map(|id| lamp_msgs::Face {
+                                id: id.to_owned(),
+                                xmin: 0.1,
+                                ymin: 0.1,
+                                xmax: 0.3,
+                                ymax: 0.4,
+                                confidence: 1.0,
+                                yaw: None,
+                                facing: None,
+                                speaking: Some(lamp_msgs::Speaking {
+                                    state: if speaking.contains(&id) {
+                                        lamp_msgs::SpeakingState::Yes
+                                    } else {
+                                        lamp_msgs::SpeakingState::No
+                                    },
+                                    score: 0.9,
+                                    from: None,
+                                }),
+                            })
+                            .into(),
+                    };
+                    eyes.look(Instant::now(), Some(&faces));
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+            })
+        };
+        engine.submit(start(line));
+        engine.submit(audio(line, 1));
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        engine.submit(end(line));
+        turn(&mut engine).await;
+        done.store(true, Ordering::Release);
+        feeder.join().unwrap();
+    }
+    let a = crate::remember::person_id("A");
+    assert_eq!(*scopes.lock().unwrap(), [None, Some(a.clone()), None]);
+    let asked = script.asked.lock().unwrap();
+    let room = Message::system("for None");
+    let a_told = Message::system(format!("for {:?}", Some(a.as_str())));
+    assert_eq!(asked[0][0], room, "f2's line is told as the room's");
+    assert_eq!(asked[1][0], room, "and so is its round after the call");
+    assert_eq!(asked[2][0], a_told, "A's own face's line stays A's");
+    assert_eq!(asked[4][0], room, "both faces' line is the room's");
+    std::fs::remove_file(known_face_of(&path)).unwrap();
+    std::fs::remove_file(path).unwrap();
+}
+
+/// Second on #2008: without a scoped builder (`LAMP_SECOND_SCOPED_CONTEXT`
+/// off) a turn is told for the sticky person whatever its lease says, so
+/// seeing who speaks is refused there and taken with one.
+#[test]
+fn seeing_who_speaks_needs_the_scoped_context() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    let runner = || -> ScopedToolRunner {
+        Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }))
+    };
+    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+    let boot = lamp_turn_owner::BootId::new([15; 16]).unwrap();
+    let (engine, _, _) = scripted(Arc::new(Script::default()));
+    let engine = engine
+        .with_memory_scope(boot, Arc::new(FaceCache::default()), runner(), None)
+        .seeing_who_speaks(eyes.clone(), "/run/lampos-eyes/known".into());
+    assert!(engine.shared.speaking.is_none());
+    let (engine, _, _) = scripted(Arc::new(Script::default()));
+    let scoped: ScopedSystem = Arc::new(|_: &ScopeLease| Told::from("scoped".to_owned()));
+    let engine = engine
+        .with_memory_scope(boot, Arc::new(FaceCache::default()), runner(), Some(scoped))
+        .seeing_who_speaks(eyes, "/run/lampos-eyes/known".into());
+    assert!(engine.shared.speaking.is_some());
+}
+
 /// #1712, item 4 (`LAMP_GOING_ON_ASKS`, #1522): a line the rule says waits
 /// for the Policy is asked once the Policy's hook decides it is played, and
 /// not at all when held; a hook that never decides lets it be played after

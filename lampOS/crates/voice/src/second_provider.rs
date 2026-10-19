@@ -404,6 +404,12 @@ struct Shared {
     /// The answer's first piece goes once this many words have come
     /// ([`Engine::cutting_first_words`]).
     first_words: Option<usize>,
+    /// Seeing someone speak (`LAMP_SECOND_SPEAKING_FACE=on`,
+    /// [`crate::speaking_faces`]): the eyes' looks and their known file.
+    speaking: Option<(
+        Arc<crate::speaking_faces::SpeakingFaces>,
+        std::path::PathBuf,
+    )>,
 }
 
 /// The last spoken line's sound, at most [`KEPT_SAMPLES`], for a line that
@@ -768,6 +774,7 @@ impl Engine {
                 answered_request: Mutex::new(None),
                 cut: Mutex::new(None),
                 first_words: None,
+                speaking: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -862,6 +869,30 @@ impl Engine {
                 scope,
             )
         })
+    }
+
+    /// A line any face other than the known person's was seen speaking
+    /// through is told and kept as the room's (`LAMP_SECOND_SPEAKING_FACE=on`,
+    /// [`crate::speaking_faces`]): `known` is the eyes' known file, with its
+    /// face beside it. Only after [`Self::with_memory_scope`] with a scoped
+    /// builder (`LAMP_SECOND_SCOPED_CONTEXT=on`); refused otherwise.
+    pub fn seeing_who_speaks(
+        mut self,
+        eyes: Arc<crate::speaking_faces::SpeakingFaces>,
+        known: std::path::PathBuf,
+    ) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        // Without a scoped builder a turn is told and filed for the sticky
+        // person, whatever its lease says, so a narrowed line would still
+        // carry their memory and history (Second on #2008): refused.
+        if shared.scoped_system.is_none() {
+            eprintln!(
+                "lamp-voice second: seeing who speaks is not on: it needs LAMP_SECOND_SCOPED_CONTEXT=on"
+            );
+            return self;
+        }
+        shared.speaking = Some((eyes, known));
+        self
     }
 
     /// Short sounds let through are checked (`--sounds-checked`, #800).
@@ -1917,6 +1948,34 @@ async fn spoken(
                 .await;
         }
     };
+    // Seeing someone speak: a line admitted as the known person's that any
+    // other face spoke is the room's, before anything is told or filed with
+    // it. Only ever narrowed (the first builder, #1722 00:23).
+    if let (Some((eyes, known)), Some(scope)) = (&shared.speaking, scope.as_ref())
+        && let Some(person) = scope
+            .scope()
+            .and_then(|scope| scope.person())
+            .map(str::to_owned)
+    {
+        let speakers = eyes.speakers(begun, finishing);
+        let known = known.clone();
+        let pair =
+            tokio::task::spawn_blocking(move || crate::speaking_faces::known_with_face(&known))
+                .await
+                .ok()
+                .flatten();
+        if crate::speaking_faces::someone_elses(&speakers, &person, pair) {
+            scope.narrow_to_room();
+            eprintln!(
+                "lamp-voice second: request {request}: a face not the known person's was seen speaking it: told and kept as the room's"
+            );
+            if prepared.take().is_some() {
+                eprintln!(
+                    "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+                );
+            }
+        }
+    }
     if let Ok(mut last) = shared.heard_last.lock() {
         *last = Some((request, text.clone()));
     }
