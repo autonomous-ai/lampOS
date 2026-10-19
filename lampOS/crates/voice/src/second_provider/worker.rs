@@ -1052,6 +1052,61 @@ fn weather_told(fetched: Option<(Instant, String)>, now: Instant) -> Option<Stri
 /// Ask the weather in `place` every 15 minutes, on the worker's runtime:
 /// its coordinates once, then the forecast. A failure is said once until
 /// the next success; the weather kept goes stale on its own.
+/// The air as `air/state` says it, read every five seconds while the
+/// voice runs (`LAMP_AIR_FACTS=on`): a fresh reading feeling stuffy or very
+/// stuffy keeps the count going, anything else starts it again, as the Live
+/// worker reads it.
+async fn air_task(bus: lamp_bus::Bus, air: Arc<Mutex<crate::air_told::AirTold>>) {
+    let mut every = tokio::time::interval(Duration::from_secs(5));
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        every.tick().await;
+        let fresh_ms = crate::air_told::FRESH_FOR.as_millis() as u64;
+        let now_ms = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64);
+        let reading = bus
+            .latest(lamp_msgs::AirState::TOPIC)
+            .ok()
+            .flatten()
+            .filter(|message| now_ms.saturating_sub(message.header.at_unix_ms) < fresh_ms)
+            .and_then(|message| message.parse::<lamp_msgs::AirState>().ok());
+        let stuffy = reading.is_some_and(|reading| {
+            matches!(
+                reading.feel,
+                lamp_msgs::AirFeel::Stuffy | lamp_msgs::AirFeel::VeryStuffy
+            )
+        });
+        if let Ok(mut air) = air.lock() {
+            air.seen(
+                stuffy,
+                reading.and_then(|reading| reading.co2_ppm),
+                monotonic_us(),
+            );
+        }
+    }
+}
+
+/// The air's note for a spoken request: due (stuffy ten minutes, not told
+/// in three hours) and the room not `busy` at that moment, then counted as
+/// told. In a busy room it is neither said nor counted.
+fn air_noting(
+    air: Arc<Mutex<crate::air_told::AirTold>>,
+    busy: impl Fn(u64) -> bool + Send + Sync + 'static,
+) -> crate::second_provider::TaskNote {
+    Arc::new(move |request| {
+        let now = monotonic_us();
+        if busy(now) {
+            return None;
+        }
+        let mut air = air.lock().ok()?;
+        let note = air.due(now)?;
+        air.told(now);
+        eprintln!("lamp-voice second: request {request} is told the air is stuffy");
+        Some(note)
+    })
+}
+
 async fn weather_task(place: String, weather: Weather) {
     use crate::second_provider::net::weather;
     let mut every = tokio::time::interval(weather::EVERY);
@@ -1418,6 +1473,31 @@ pub fn serve(
     .doing_though_held(though_held)
     .announcing(!route.only_voice)
     .saying_reminders(reminders);
+    // The air, with `LAMP_AIR_FACTS=on` and the bus (#1712's map, item 6).
+    let air = files
+        .air_facts
+        .then(|| {
+            files
+                .bus_root
+                .as_deref()
+                .and_then(|root| lamp_bus::Bus::new(root).ok())
+        })
+        .flatten()
+        .map(|bus| {
+            (
+                bus,
+                Arc::new(Mutex::new(crate::air_told::AirTold::default())),
+            )
+        });
+    if let Some((_, told)) = &air {
+        // The room this process keeps, as the Live worker reads its own.
+        let busy = |now| {
+            crate::room_told::room()
+                .lock()
+                .is_ok_and(|mut room| room.at(now) == crate::room_told::Room::Busy)
+        };
+        engine = engine.noting_the_air(air_noting(told.clone(), busy));
+    }
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
     }
@@ -1643,6 +1723,12 @@ pub fn serve(
             crate::second_provider::net::weather::ENVIRONMENT
         );
         runtime.spawn(weather_task(place, weather));
+    }
+    if let Some((bus, told)) = air {
+        eprintln!(
+            "lamp-voice second: a stuffy room is told beside what a person says (LAMP_AIR_FACTS)"
+        );
+        runtime.spawn(air_task(bus, told));
     }
     if let Some((chat, root)) = texts {
         let (character, tools) = texts_from;
@@ -3220,6 +3306,36 @@ pub async fn run(
 
 #[cfg(test)]
 mod tests {
+    /// #1712's map, item 6: the air's note is due after ten minutes of a
+    /// stuffy room, never in a busy one, told once, and not again within
+    /// three hours.
+    #[test]
+    fn the_airs_note_is_given_once_when_due() {
+        let air = Arc::new(Mutex::new(crate::air_told::AirTold::default()));
+        let busy = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let room_busy = busy.clone();
+        let note = super::air_noting(air.clone(), move |_| {
+            room_busy.load(std::sync::atomic::Ordering::Relaxed)
+        });
+        let now = monotonic_us();
+        air.lock()
+            .unwrap()
+            .seen(true, Some(1180), now.saturating_sub(5 * 60_000_000));
+        assert_eq!(note(1), None, "stuffy five minutes: not yet");
+        air.lock().unwrap().seen(false, None, now);
+        air.lock()
+            .unwrap()
+            .seen(true, Some(1180), now.saturating_sub(11 * 60_000_000));
+        // Due, but the room is busy: not said, and not counted as told
+        // (Fourth's case, from #1978).
+        busy.store(true, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(note(2), None, "never in a busy room");
+        busy.store(false, std::sync::atomic::Ordering::Relaxed);
+        let said = note(3).expect("due once the room is not busy");
+        assert!(said.contains("1200"), "{said}");
+        assert_eq!(note(4), None, "told once");
+    }
+
     /// #1712, the first builder at 16:43: the route's lines are judged as
     /// one session's, as a Live session's, so in a busy room one past the
     /// session's first two is trusted when the rule is not strict. Before,

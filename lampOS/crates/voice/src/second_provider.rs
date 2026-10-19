@@ -360,6 +360,8 @@ struct Shared {
     name_sounded: Option<NameSounded>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
+    /// With `LAMP_AIR_FACTS=on`: the air's note, when it is due.
+    air: Option<TaskNote>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
@@ -740,6 +742,7 @@ impl Engine {
                 call_note: None,
                 name_sounded: None,
                 task_waiting: None,
+                air: None,
                 did: None,
                 hold: None,
                 words_heard: None,
@@ -1083,6 +1086,16 @@ impl Engine {
     pub fn noting_a_task_waiting(mut self, note: TaskNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.task_waiting = Some(note);
+        }
+        self
+    }
+
+    /// A spoken request is told, beside its words, that the air has been
+    /// stuffy a while, when `note` says so (`LAMP_AIR_FACTS=on`,
+    /// `crate::air_told`, as the Live route tells it). Before any turn only.
+    pub fn noting_the_air(mut self, note: TaskNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.air = Some(note);
         }
         self
     }
@@ -2080,6 +2093,8 @@ async fn spoken(
         );
         crate::provider_worker::CALLED_NOTE.to_owned()
     });
+    // A stuffy room, told beside what a person says (#1712's map, item 6).
+    let air = shared.air.as_ref().and_then(|note| note(request));
     // Let out only as the conversation going on: it may be people's talk.
     let alone = shared
         .conversation_alone
@@ -2108,6 +2123,7 @@ async fn spoken(
         .chain(waiting)
         .chain(follows_on)
         .chain(called)
+        .chain(air)
         .collect();
     if let Some(carried) = carried {
         eprintln!(
