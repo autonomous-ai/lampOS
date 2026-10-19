@@ -1,0 +1,2 @@
+{"topic":"voice/state","declaration":{"type":"lamp_msgs/VoiceState","version":1,"kind":"latest"}}
+{"header":{"topic":"voice/state","kind":"latest","enc":"json","type":"lamp_msgs/VoiceState","source":"lamp_bus_cli","boot":"d2aab97594db0e69","seq":1,"at_us":0,"at_unix_ms":1792113822405},"payload_b64":"eyJzdGF0ZSI6InJlc3RpbmcifQ=="}

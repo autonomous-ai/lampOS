@@ -93,6 +93,9 @@ pub use reports::*;
 mod familiar;
 pub use familiar::*;
 
+mod activity;
+pub use activity::*;
+
 /// Why a message is not one its type allows, in words.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Invalid(pub String);
@@ -1336,6 +1339,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(presence_topics())
         .chain(reports_topics())
         .chain(familiar_topics())
+        .chain(activity_topics())
         .find_map(|(name, declaration)| (name == topic).then_some(declaration))
 }
 
