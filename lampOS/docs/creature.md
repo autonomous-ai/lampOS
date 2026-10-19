@@ -132,7 +132,7 @@ is released or the reader has failed.
 |---|---|---|
 | Someone sits down | Looks up, eye brightens; a person it knows gets a word now and then ("you're back"), a stranger a glance | Faces now; who it knows to build |
 | You look at it | Looks back; the eye opens | To build |
-| You leave | Watches you go a moment, settles | To build |
+| You leave | Watches you go a moment, settles | Built, not yet tried: `skills/watch-you-leave` (#1669 (e)), a small base turn toward the side the sitter left by, held about 2 s; a core skill held out of the product until the arm hour |
 | You have been working long without a break | Once in a while, a stretch of its own, as an invitation, never a lecture | To build |
 
 ### The air and the day

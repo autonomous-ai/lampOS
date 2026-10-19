@@ -1,0 +1,3 @@
+# The sitter leaves from the middle (no side): nothing.
+clock = "10:00"
+none = true
