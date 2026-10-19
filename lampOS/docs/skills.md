@@ -771,7 +771,12 @@ mark = { colour = "blue", level = 1 }   # a faint light while on: level 1 or 2, 
   with `LAMP_LIGHT_REQUESTS=on`, and given back when it goes off. **While
   the ring doesn't show it, the watch takes nothing about the desk** (the
   peer read on #1807): until `light/reached` says it is shown, no visit
-  begins, ends or is texted, and `skills/events` says so. The first
+  begins, ends or is texted, and `skills/events` says so; from the moment
+  it is turned on too, so a ring that never answers never has anyone
+  watched without a sign (reviewer-two on #1937,
+  `nothing_is_taken_until_the_ring_first_shows_its_mark`). A case's
+  recording says the ring's word as `light_reached.jsonl` (and
+  `light_outranked.jsonl`), taken as the program takes it. The first
   builder's four rules for when the ring says it is outranked
   (`light/outranked`), each pinned by a test (#1937):
   1. **The person's own light over it pauses the watch** ("turn the light

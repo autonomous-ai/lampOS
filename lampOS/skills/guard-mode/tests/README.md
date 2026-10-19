@@ -6,7 +6,9 @@ record` writes, as Light out's were: `room/presence` once a second, each good
 for 3 s, someone until 20 s after the last face or voice, as the eyes say it
 with `LAMP_PRESENCE=on`; `humans/faces/tracked` once a second, half a second
 off, a face 0.2 of the picture's height while someone is near; the person's
-ask on `voice/heard` at 2 s; and in one case a sample of `voice/privacy`, the
+ask on `voice/heard` at 2 s; the ring's word that the mark shows,
+`light/reached`, at 4.35 s, in every case where the mark is asked for but
+one; and in one case a sample of `voice/privacy`, the
 voice's lease, once a second. What the eyes know of the face at the lamp is
 not on the bus (it is the eyes' known file, which the program reads), so a
 case says it as `[[known]]`: from `at`, that name, or with none, nobody
@@ -19,6 +21,7 @@ lamp-skills`, which runs every skill's cases).
 
 | Case | What it holds | Result |
 |---|---|---|
+| `no-visit-is-counted-before-the-ring-shows-its-mark` | As the case below, with no `light/reached`: a ring that never says the mark shows (reviewer-two on #1937) | Pass: the mark at 4 s, and nothing else: the visit at 14:31 is not counted or texted |
 | `a-visit-gives-one-text-with-its-time-and-length` | Asked at 14:20; the desk empty from 49 s; someone at 14:31 (660 s) for two minutes, a face it doesn't know | Pass: the mark at 4 s; one text at 799 s, when they've gone: "Someone I don't know was at your desk at 14:31, for about 2 minutes." |
 | `a-second-visit-within-ten-minutes-is-not-texted` | Visits at 14:31, 14:36 and 14:45, a minute each, heard but no face | Pass: texts at 739 s and 1579 s; none for the second, 300 s after the first text |
 | `your-face-back-ends-it` | A, whose face the eyes know, asks and leaves; back at 14:40 and known at 1202 s | Pass: the mark at 4 s, given back at 1202 s; no text |

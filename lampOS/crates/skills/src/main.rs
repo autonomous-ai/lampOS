@@ -1223,14 +1223,10 @@ fn mark_signs(watching: &mut Watching, out: &mut Publisher) -> Outs {
         if !watching.marks.contains_key(&skill) {
             continue;
         }
+        outs.extend(watching.watches.ring_said(&skill, shown, by.as_deref()));
         // The person's own light is never asked over (the first builder's
         // ruling on #1937): the watch pauses until they ask again.
-        if by.as_deref() == Some(LightOutranked::PERSON) {
-            outs.extend(watching.watches.paused_by_person(&skill));
-            continue;
-        }
-        outs.extend(watching.watches.mark_shown(&skill, shown, by.as_deref()));
-        if shown {
+        if shown || by.as_deref() == Some(LightOutranked::PERSON) {
             continue;
         }
         let now = clock::now();

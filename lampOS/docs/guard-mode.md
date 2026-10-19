@@ -36,7 +36,10 @@ relay delivers it (mobile-P1; [messages.md](messages.md), "Unasked texts").
   (`LAMP_LIGHT_REQUESTS=on`) it refuses to turn on. **While the mark isn't
   shown, nothing is counted** (the peer read's P2 on #1807): until the ring
   says it is shown (`light/reached`), no visit begins, ends or is texted,
-  and the journal and `skills/events` say so. When the ring says the mark
+  and the journal and `skills/events` say so. That holds from the moment
+  it's turned on, before the ring's first word, so a ring that never
+  answers (no ring worker, the voice down) never has anyone watched
+  without a sign (reviewer-two on #1937). When the ring says the mark
   is outranked (`light/outranked`), the first builder's four rules (#1937):
   1. **Your own light over it pauses it.** Say "turn the light off" on the
      way out, and the lamp makes no claim over your light and counts

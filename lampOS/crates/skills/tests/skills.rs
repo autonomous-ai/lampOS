@@ -8212,7 +8212,7 @@ fn a_watch_is_turned_only_by_its_tool_and_holds_to_its_permissions() {
 /// gives the mark back, with no text.
 #[test]
 fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
-    use lamp_msgs::{MessageOut, RoomPresence};
+    use lamp_msgs::{LightReached, MessageOut, RoomPresence};
     // Short: a socket's whole path has to fit in 103 bytes.
     let dir = tempfile::Builder::new()
         .prefix("gm")
@@ -8231,6 +8231,9 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
         .unwrap();
     let mut heard = bus
         .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+        .unwrap();
+    let mut reached = bus
+        .publisher_declared(LightReached::TOPIC, &LightReached::declaration(), "ring")
         .unwrap();
     let known = root.join("known");
     let tools = root.join("tools");
@@ -8337,6 +8340,17 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
         (mark.claim.source.as_str(), mark.claim.priority),
         ("skill:guard-mode", Priority::Skill)
     );
+    // The ring says the mark shows: the watch counts from here.
+    reached
+        .publish_json(
+            1,
+            &LightReached {
+                source: mark.claim.source.clone(),
+                light: mark.light.clone(),
+            },
+        )
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
     // A leaves; someone comes and stays two minutes, then goes.
     fs::remove_file(&known).unwrap();
     say(&mut presence, true);
@@ -8384,7 +8398,8 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
 }
 
 /// The peer read's P2 on #1807, the program: guard mode counts only while
-/// the ring shows its mark. Told the mark is outranked by another program's
+/// the ring shows its mark. Before the ring first says it shows, a visit
+/// is not counted (reviewer-two on #1937). Told the mark is outranked by another program's
 /// light (Light out's, as the desk empties), the program gives the mark back
 /// and asks for it again with a new claim; until the ring says it is shown
 /// again (`light/reached`), a visit is not counted and nothing is texted;
@@ -8508,6 +8523,12 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
         .unwrap();
     let source = mark.claim.source.clone();
     assert_eq!(source, "skill:guard-mode");
+    // The ring has not said yet that the mark shows (reviewer-two on
+    // #1937): a visit is not counted.
+    visit(&mut presence);
+    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    // The old claim's renewals while the clock went on: not the test's.
+    while next(&mut requests, Duration::from_millis(300)).is_some() {}
     // Another program's light over it: given back, and asked for anew.
     outranked
         .publish_json(

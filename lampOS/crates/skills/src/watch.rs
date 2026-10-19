@@ -13,10 +13,11 @@
 //!   mark shows. It never starts itself: a watch has no trigger, and a load
 //!   or a restart leaves it off.
 //! - **A sign while on, or no counting.** Its faint `mark` is asked of the
-//!   ring while it is on. Whenever the ring says the mark is not shown
-//!   (`light/outranked`), the watch counts no visit and texts nothing until
-//!   the ring says it is shown again (`light/reached`): nobody is watched
-//!   without a sign (the peer read on #1807). Outranked by another
+//!   ring while it is on. It counts no visit and texts nothing until the
+//!   ring says the mark is shown (`light/reached`), from the start and
+//!   again whenever the ring says it is not (`light/outranked`): nobody is
+//!   watched without a sign, also when the ring never answers (the peer
+//!   read on #1807, reviewer-two on #1937). Outranked by another
 //!   program's light, the program asks for the mark again with a new claim.
 //!   Outranked by the person's own light ("turn the light off" on the way
 //!   out), it never does: a person is never overridden. The watch pauses,
@@ -224,8 +225,9 @@ impl Visit {
 struct On {
     /// When it was asked: it ends by itself `most` after.
     since_us: u64,
-    /// The ring says its mark is not shown: nothing about the desk is taken
-    /// until it says it is again.
+    /// The ring has not said its mark is shown (`light/reached`), or has
+    /// said since that it is not: nothing about the desk is taken until it
+    /// says it is. So from the start, until the ring's first word.
     hidden: bool,
     /// The person's own light is over its mark: paused until they ask for
     /// it again in words, never asked for over them.
@@ -345,7 +347,7 @@ impl Watch {
         }
         self.on = Some(On {
             since_us: now_us,
-            hidden: false,
+            hidden: true,
             paused: false,
             blind_at_us: None,
             asker: asker.map(str::to_owned),
@@ -474,7 +476,7 @@ impl Watch {
         }
         on.hidden = !shown;
         vec![Out::Said(if shown {
-            "its mark shows again: counting visits".into()
+            "its mark shows: counting visits".into()
         } else {
             format!(
                 "its mark is not shown (outranked by {}): no visit counted until it is",
@@ -734,6 +736,18 @@ impl Watches {
         })
     }
 
+    /// The ring says `skill`'s mark is shown (`light/reached`) or not
+    /// (`light/outranked`, `by` what): the person's own light over it
+    /// pauses its watch ([`Self::paused_by_person`]); anything else hides
+    /// it or shows it ([`Self::mark_shown`]). As the program takes the
+    /// ring's word, and a case's recording.
+    pub fn ring_said(&mut self, skill: &str, shown: bool, by: Option<&str>) -> Outs {
+        if !shown && by == Some(lamp_msgs::LightOutranked::PERSON) {
+            return self.paused_by_person(skill);
+        }
+        self.mark_shown(skill, shown, by)
+    }
+
     /// The person's own light is over `skill`'s mark: its watch pauses.
     pub fn paused_by_person(&mut self, skill: &str) -> Outs {
         self.each.get_mut(skill).map_or_else(Vec::new, |entry| {
@@ -809,12 +823,46 @@ mod tests {
     }
 
     /// On, asked at 0 by `asker`, heard a second before.
+    /// A watch on, its mark shown by the ring.
     fn on(asker: Option<&str>) -> Watch {
         let mut watch = Watch::default();
         watch
             .turn(true, &spec(), SECOND, heard(0), asker, true)
             .unwrap();
+        watch.mark_shown(true, None);
         watch
+    }
+
+    /// Reviewer-two on #1937: from `on` until the ring first says its mark
+    /// is shown, nothing about the desk is taken, so a ring that never
+    /// answers never has anyone watched without a sign.
+    #[test]
+    fn nothing_is_taken_until_the_ring_first_shows_its_mark() {
+        let spec = spec();
+        let mut watch = Watch::default();
+        watch
+            .turn(true, &spec, SECOND, heard(0), Some("known-a"), true)
+            .unwrap();
+        assert!(watch.presence(false, MINUTE, None, &spec).is_empty());
+        assert!(
+            watch
+                .presence(true, 2 * MINUTE, Some(600), &spec)
+                .is_empty()
+        );
+        watch.face(true, 2 * MINUTE, None);
+        assert!(watch.known(Some("known-a"), 3 * MINUTE, None).is_empty());
+        assert!(watch.presence(false, 4 * MINUTE, None, &spec).is_empty());
+        assert!(watch.is_on(), "the asker's face ends nothing unseen");
+        let shown = watch.mark_shown(true, None);
+        assert!(matches!(&shown[..], [Out::Said(why)] if why.contains("shows")));
+        assert!(watch.mark_shown(true, None).is_empty(), "said once");
+        watch.presence(false, 5 * MINUTE, None, &spec);
+        watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec);
+        watch.presence(true, 12 * MINUTE, None, &spec);
+        assert_eq!(
+            texts(&watch.presence(false, 12 * MINUTE + SECOND, None, &spec)),
+            ["Someone was at your desk at 14:31, for about 2 minutes."]
+        );
     }
 
     fn texts(outs: &[Out]) -> Vec<&str> {
@@ -1059,7 +1107,7 @@ mod tests {
         assert!(watch.presence(false, 4 * MINUTE, None, &spec).is_empty());
         assert!(watch.is_on());
         let shown = watch.mark_shown(true, None);
-        assert!(matches!(&shown[..], [Out::Said(why)] if why.contains("shows again")));
+        assert!(matches!(&shown[..], [Out::Said(why)] if why.contains("shows")));
         watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec);
         watch.presence(true, 12 * MINUTE, None, &spec);
         assert_eq!(
