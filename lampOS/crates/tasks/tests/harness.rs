@@ -23,12 +23,63 @@ const MACHINE: &str = "0123456789abcdef0123456789abcdef";
 const AGENT: &str = "11111111-1111-4111-8111-111111111111";
 const CREATION: &str = "22222222-2222-4222-8222-222222222222";
 
+/// One test with processes at a time (#1569 row 18). On macOS a child that
+/// another test thread spawns while this one makes a child's pipes can take
+/// them before they are close-on-exec, and keep them until it exits: the
+/// harness then finds them open at its cleanup (`cleanup_incomplete`,
+/// `pipes_open`). Beside a thread spawning `sleep 1` in a loop, 6 of 10 runs
+/// of this file failed so; without it, none. Linux makes pipes close-on-exec
+/// at once, and CI runs each test in a process of its own.
+static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+thread_local! {
+    /// The Rigs this thread holds, and the turn while it holds any.
+    static TURN: std::cell::RefCell<(usize, Option<std::sync::MutexGuard<'static, ()>>)> =
+        const { std::cell::RefCell::new((0, None)) };
+}
+
+/// This test's turn ([`ONE_AT_A_TIME`]), held by each of its Rigs: a test
+/// may make several, and the turn ends with the last.
+struct Turn;
+impl Turn {
+    fn take() -> Self {
+        TURN.with(|turn| {
+            let mut turn = turn.borrow_mut();
+            if turn.0 == 0 {
+                // A test that failed while holding it leaves it poisoned; the
+                // next one still runs alone.
+                turn.1 = Some(
+                    ONE_AT_A_TIME
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner),
+                );
+            }
+            turn.0 += 1;
+        });
+        Self
+    }
+}
+impl Drop for Turn {
+    fn drop(&mut self) {
+        TURN.with(|turn| {
+            let mut turn = turn.borrow_mut();
+            turn.0 -= 1;
+            if turn.0 == 0 {
+                turn.1 = None;
+            }
+        });
+    }
+}
+
 struct Rig {
     root: tempfile::TempDir,
     config: CliConfig,
+    /// The last field, so the turn ends after the rest of the Rig is gone.
+    _turn: Turn,
 }
 impl Rig {
     fn new() -> Self {
+        let turn = Turn::take();
         let root = tempfile::Builder::new()
             .prefix("tasks-harness-")
             .permissions(fs::Permissions::from_mode(0o700))
@@ -50,7 +101,11 @@ impl Rig {
             cancel: None,
             as_person: false,
         };
-        let rig = Self { root, config };
+        let rig = Self {
+            root,
+            config,
+            _turn: turn,
+        };
         rig.plan(
             json!({"machines":{"default":true},"new":{"default":true},"show":{"default":true}}),
         );
