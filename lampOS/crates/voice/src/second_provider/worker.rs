@@ -1119,6 +1119,11 @@ pub fn serve(
     if look_by_call {
         engine = engine.looking_by_call();
     }
+    // A spoken turn's chat begun on the line's early words (#1712).
+    if std::env::var(crate::second_provider::PREPARED_ENVIRONMENT).ok().as_deref() == Some("on") {
+        eprintln!("lamp-voice second: a spoken turn's chat begins on the line's early words (LAMP_SECOND_PREPARED)");
+        engine = engine.preparing(true);
+    }
     // A hand-over waiting for its yes, with the tasks part (#1712).
     if has_tasks {
         engine = engine.noting_a_task_waiting(Arc::new(|request| {

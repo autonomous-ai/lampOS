@@ -324,6 +324,29 @@ end of the line: the person's words, then the chat answer, each sentence
 said as it is complete while the next is still being written. Sentence
 order is kept. A written turn is the same from the chat on.
 
+- **With `LAMP_SECOND_PREPARED=on` the chat is begun on the line's early
+  words** (off unless set; #1712, the first builder at 17:02: the route's
+  first word came about 3.4 s after a line, Live's 2.4 s, and the bar is
+  under 2.0 s). Speech to text tells the turn the words it has before they
+  are final (`net::Early`). With Nova-3 that's at the line's end, the
+  finals and the last interim's words while `Finalize`'s answer is still to
+  come. Round 1 of the chat is asked on them at once (`Prepared`), its
+  events kept, with nothing said and no tool run. When the words are final
+  it's kept only if all three hold:
+  - the words are the early ones, as letters, digits and spaces in any case;
+  - the turn's system message and history are as they were;
+  - no note goes beside the words, but the name note on words that name the
+    lamp, which tells nothing new.
+
+  Otherwise it's dropped and round 1 is asked as before. Neither the rule
+  nor a tool runs early, since both change what the lamp knows or does.
+  The cost is a dropped round now and then, and one more of the system
+  message's memory recalls for each line it's begun on. The journal says
+  `request N: its chat is begun on the line's early words`, then `… is
+  kept, begun T ms ago` or `… is dropped: <why>`. In a host test on the
+  paused clock, with a 400 ms `Finalize` answer and a chat's 600 ms to its
+  first event, the first answer audio came 600 ms after the line's end,
+  against 1,000 ms without it.
 - **The chat starts without `CloseStream`'s round trip when it can.** It
   never starts before the coordinator's end of the line: speech to text's
   own end of an utterance comes after 300 ms of silence and would answer a

@@ -27,11 +27,18 @@ struct Script {
     token: Arc<()>,
     /// How many times the voice was asked to make ready ([`Services::warm`]).
     warmed: Arc<AtomicUsize>,
+    /// Each listener's early words, given as its line ends.
+    early: Mutex<VecDeque<Vec<net::Early>>>,
+    /// The final words come this long after the line's end, as `Finalize`'s
+    /// answer does.
+    finish_after: Option<Duration>,
 }
 
 struct ScriptListener {
     heard: net::Result<String>,
     samples: Arc<AtomicUsize>,
+    early: Vec<net::Early>,
+    finish_after: Option<Duration>,
 }
 impl Listener for ScriptListener {
     fn send(&self, samples: &[i16]) -> net::Result<()> {
@@ -39,7 +46,19 @@ impl Listener for ScriptListener {
         Ok(())
     }
     fn finish(self: Box<Self>, _request: u64) -> BoxFuture<'static, net::Result<String>> {
-        Box::pin(async move { self.heard })
+        Box::pin(async move {
+            if let Some(after) = self.finish_after {
+                tokio::time::sleep(after).await;
+            }
+            self.heard
+        })
+    }
+    fn early(&mut self) -> Option<mpsc::UnboundedReceiver<net::Early>> {
+        let (said, early) = mpsc::unbounded_channel();
+        for words in std::mem::take(&mut self.early) {
+            let _ = said.send(words);
+        }
+        Some(early)
     }
 }
 
@@ -50,6 +69,8 @@ impl Services for Script {
             None => Ok(Box::new(ScriptListener {
                 heard: self.heard.lock().unwrap().pop_front().unwrap(),
                 samples: self.samples_heard.clone(),
+                early: self.early.lock().unwrap().pop_front().unwrap_or_default(),
+                finish_after: self.finish_after,
             }) as Box<dyn Listener>),
         };
         Box::pin(async move { result })
@@ -741,6 +762,121 @@ async fn the_owners_ten_lines_are_let_out_though_each_answer_was_cut_by_the_next
         assert_eq!(*verdict, None, "request {request} was held");
     }
     *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+}
+
+/// #1712 (`LAMP_SECOND_PREPARED`, the first builder at 17:02): with the
+/// switch, a spoken turn's chat is begun on the line's early words, so its
+/// first words come as the final words do, not a chat's wait after them.
+/// Final words that are the early ones keep it, asked once; other words drop
+/// it and ask again; without the switch nothing is begun early.
+#[tokio::test(start_paused = true)]
+async fn a_chat_begun_on_the_early_words_is_kept_when_they_are_the_lines() {
+    for (prepare, early, final_words, asked, first_audio_ms) in [
+        // The chat's 600 ms run beside `Finalize`'s 400 ms.
+        (true, "what time is it", "What time is it?", 1, 600),
+        (true, "what time", "What time is it?", 2, 1_000),
+        (false, "what time is it", "What time is it?", 1, 1_000),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(final_words.to_owned())].into()),
+            early: Mutex::new([vec![net::Early::Words(early.to_owned())]].into()),
+            finish_after: Some(Duration::from_millis(400)),
+            first_event_after: Some(Duration::from_millis(600)),
+            chats: Mutex::new(
+                [
+                    vec![text("It's noon."), Ok(ChatEvent::Done)],
+                    vec![text("It's noon."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.preparing(prepare);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        let ended = tokio::time::Instant::now();
+        engine.submit(end(1));
+        let mut first_audio = None;
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+                .await
+                .expect("the turn ends");
+            if matches!(event, ProviderOutput::Audio { .. }) && first_audio.is_none() {
+                first_audio = Some(ended.elapsed());
+            }
+            if matches!(event, ProviderOutput::TurnComplete { .. }) {
+                break;
+            }
+        }
+        let asked_count = script.asked.lock().unwrap().len();
+        assert_eq!(
+            asked_count, asked,
+            "{early:?} then {final_words:?}, prepare {prepare}"
+        );
+        let first_audio = first_audio.expect("the answer is said");
+        assert!(
+            first_audio >= Duration::from_millis(first_audio_ms)
+                && first_audio < Duration::from_millis(first_audio_ms + 50),
+            "{early:?}, prepare {prepare}: {first_audio:?}"
+        );
+        // Round 1 was asked with words the line had.
+        let words = &script.asked.lock().unwrap()[asked - 1];
+        assert_eq!(
+            words.last(),
+            Some(&Message::user(if asked == 1 && prepare {
+                early
+            } else {
+                final_words
+            }))
+        );
+    }
+}
+
+/// When the early words stand for round 1 (`Prepared::misfit`): the same
+/// words whatever the case and punctuation, the same conversation, and no
+/// note but the name note on words that name the lamp.
+#[test]
+fn early_words_stand_only_for_the_same_line_asked_the_same_way() {
+    let (early, done) = mpsc::unbounded_channel();
+    drop(early);
+    let prepared = Prepared {
+        words: "lamp what time is it".to_owned(),
+        messages: vec![
+            Message::system("SYSTEM".to_owned()),
+            Message::user("lamp what time is it".to_owned()),
+        ],
+        events: done,
+        at: Instant::now(),
+        task: None,
+    };
+    let base = [Message::system("SYSTEM".to_owned())];
+    assert_eq!(prepared.misfit(&base, &[], "Lamp, what time is it?"), None);
+    let name = crate::called::NOTE.to_owned();
+    assert_eq!(
+        prepared.misfit(&base, std::slice::from_ref(&name), "Lamp, what time is it?"),
+        None
+    );
+    assert!(
+        prepared
+            .misfit(&base, &[], "Lamp, what time is it now?")
+            .is_some()
+    );
+    assert!(
+        prepared
+            .misfit(
+                &[Message::system("OTHER".to_owned())],
+                &[],
+                "Lamp, what time is it?"
+            )
+            .is_some()
+    );
+    assert!(
+        prepared
+            .misfit(&base, &["(A note.)".to_owned()], "Lamp, what time is it?")
+            .is_some()
+    );
+    assert_eq!(plain_words("  Lamp,  what's IT? "), "lamp what s it");
 }
 
 /// A round after a tool ran is not given up: the timer is set, so the

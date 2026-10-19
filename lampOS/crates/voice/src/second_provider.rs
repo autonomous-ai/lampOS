@@ -274,6 +274,9 @@ struct Shared {
     words_heard: Option<WordsHeard>,
     /// The model looks by calling [`LOOK_CALL`] ([`Engine::looking_by_call`]).
     look_by_call: bool,
+    /// A spoken turn's chat begins on the line's early words
+    /// ([`Engine::preparing`]).
+    prepare: bool,
     /// The request begun last, with its session, for a look asked by a call.
     begun: Mutex<Option<(u64, u64)>>,
     /// The spoken request being answered and its words, until any of its
@@ -570,6 +573,7 @@ impl Engine {
                 hold: None,
                 words_heard: None,
                 look_by_call: false,
+                prepare: false,
                 begun: Mutex::new(None),
                 in_flight: Mutex::new(None),
                 answered_request: Mutex::new(None),
@@ -665,6 +669,16 @@ impl Engine {
     pub fn answering_the_lamp(mut self, asked: Asked) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.asked = Some(asked);
+        }
+        self
+    }
+
+    /// A spoken turn's chat begins on the words its speech to text has
+    /// before they are final (`LAMP_SECOND_PREPARED=on`, [`Prepared`]).
+    /// Before any turn only.
+    pub fn preparing(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.prepare = on;
         }
         self
     }
@@ -1125,6 +1139,7 @@ impl Engine {
                         picture,
                         Vec::new(),
                         Times::new(begun),
+                        None,
                     )
                     .await
                 });
@@ -1183,6 +1198,7 @@ impl Engine {
                         None,
                         Vec::new(),
                         Times::new(Instant::now()),
+                        None,
                     )
                     .await
                 });
@@ -1376,22 +1392,47 @@ async fn spoken(
 ) {
     let (request, scope) = context;
     let begun = Instant::now();
-    let listener = match shared.services.listen().await {
+    let mut listener = match shared.services.listen().await {
         Ok(listener) => listener,
         Err(error) => {
             shared.stages(request, &Times::new(begun)).await;
             return shared.fail(request, FailedStage::InputOpen, &error).await;
         }
     };
-    while let Some(samples) = heard.recv().await {
-        if let Err(error) = listener.send(&samples) {
-            shared.stages(request, &Times::new(begun)).await;
-            return shared.fail(request, FailedStage::InputOpen, &error).await;
+    // The words before they are final, for a chat begun on them.
+    let mut early = if shared.prepare {
+        listener.early()
+    } else {
+        None
+    };
+    let mut prepared: Option<Prepared> = None;
+    loop {
+        tokio::select! {
+            samples = heard.recv() => {
+                let Some(samples) = samples else { break };
+                if let Err(error) = listener.send(&samples) {
+                    shared.stages(request, &Times::new(begun)).await;
+                    return shared.fail(request, FailedStage::InputOpen, &error).await;
+                }
+            }
+            Some(said) = next_early(&mut early) => {
+                prepared = prepared_on(&shared, request, prepared, said);
+            }
         }
     }
     let finishing = Instant::now();
     let times = Times::new(finishing);
-    let text = match listener.finish(request).await {
+    let finish = listener.finish(request);
+    tokio::pin!(finish);
+    let finished = loop {
+        tokio::select! {
+            finished = &mut finish => break finished,
+            Some(said) = next_early(&mut early) => {
+                prepared = prepared_on(&shared, request, prepared, said);
+            }
+        }
+    };
+    let text = match finished {
         Ok(text) => {
             reached(&times, |times| &mut times.words);
             eprintln!(
@@ -1501,6 +1542,7 @@ async fn spoken(
                 None,
                 Vec::new(),
                 times,
+                None,
             )
             .await;
             return;
@@ -1577,8 +1619,165 @@ async fn spoken(
         None,
         notes,
         times,
+        prepared,
     )
     .await;
+}
+
+/// Where the worker reads [`Engine::preparing`]: `on`, and nothing else.
+pub const PREPARED_ENVIRONMENT: &str = "LAMP_SECOND_PREPARED";
+
+/// Round 1 of a spoken turn's chat begun on the line's early words
+/// (`LAMP_SECOND_PREPARED`, #1712, the first builder at 17:02: the route's
+/// first word came about 3.4 s after a line, Live's 2.4 s). Its events are
+/// kept as they come; nothing is said and no tool runs. When the line's
+/// words are final it is kept if they are its words and nothing else asked
+/// differs ([`Prepared::misfit`]), and dropped otherwise, or at once when
+/// the person goes on. Neither the rule nor a tool runs early: both change
+/// what the lamp knows or does.
+struct Prepared {
+    words: String,
+    messages: Vec<Message>,
+    events: mpsc::UnboundedReceiver<net::Result<ChatEvent>>,
+    at: Instant,
+    task: Option<JoinHandle<()>>,
+}
+
+impl Drop for Prepared {
+    fn drop(&mut self) {
+        if let Some(task) = self.task.take() {
+            task.abort();
+        }
+    }
+}
+
+impl Prepared {
+    /// The chat asked on `words`, as round 1 would be asked: the turn's
+    /// system message and history, then the words.
+    fn begin(shared: &Shared, words: String) -> Self {
+        let told = (shared.system)();
+        let mut messages = vec![Message::system(told.text)];
+        messages.extend(told.history);
+        messages.push(Message::user(words.clone()));
+        let mut chat = shared.services.chat(messages.clone());
+        let (kept, events) = mpsc::unbounded_channel();
+        let task = tokio::spawn(async move {
+            while let Some(event) = chat.next().await {
+                if kept.send(event).is_err() {
+                    break;
+                }
+            }
+        });
+        Self {
+            words,
+            messages,
+            events,
+            at: Instant::now(),
+            task: Some(task),
+        }
+    }
+
+    /// Why it can't stand for round 1 asked with `messages`: `base`, its
+    /// system message and history; `notes` beside the words, then `said`.
+    /// `None` when it can: the same words (as letters, digits and spaces,
+    /// whatever the case), the same conversation, and no note it lacks but
+    /// the name note on words that name the lamp, which tells nothing new.
+    fn misfit(&self, base: &[Message], notes: &[String], said: &str) -> Option<&'static str> {
+        if plain_words(&self.words) != plain_words(said) {
+            Some("the final words are not the early ones")
+        } else if self.messages.get(..self.messages.len().saturating_sub(1)) != Some(base) {
+            Some("the conversation changed")
+        } else if !notes.iter().all(|note| {
+            [crate::called::NOTE, crate::called::NOTE_HEARD_AS].contains(&note.as_str())
+                && crate::attention::called_by_name(said)
+        }) {
+            Some("a note goes beside the words")
+        } else {
+            None
+        }
+    }
+
+    /// Its events, those kept and those still to come, as round 1's.
+    fn into_events(mut self) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+        let events = std::mem::replace(&mut self.events, mpsc::unbounded_channel().1);
+        // The task goes with the stream: dropping it stops the chat.
+        let task = AbortOnDrop(self.task.take());
+        futures_util::stream::unfold((events, task), |(mut events, task)| async move {
+            events.recv().await.map(|event| (event, (events, task)))
+        })
+        .boxed()
+    }
+}
+
+/// A task stopped when this is dropped.
+struct AbortOnDrop(Option<JoinHandle<()>>);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        if let Some(task) = self.0.take() {
+            task.abort();
+        }
+    }
+}
+
+/// `words` as letters, digits and single spaces, lower case: what the early
+/// and the final words are compared as.
+fn plain_words(words: &str) -> String {
+    words
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { ' ' })
+        .collect::<String>()
+        .to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// The next of a listener's early words; never, once there are none.
+async fn next_early(early: &mut Option<mpsc::UnboundedReceiver<net::Early>>) -> Option<net::Early> {
+    let Some(receiver) = early.as_mut() else {
+        return std::future::pending().await;
+    };
+    match receiver.recv().await {
+        Some(said) => Some(said),
+        None => {
+            *early = None;
+            std::future::pending().await
+        }
+    }
+}
+
+/// What a turn's prepared chat is once `said` comes: begun on new early
+/// words, kept on the same, dropped when the person went on.
+fn prepared_on(
+    shared: &Shared,
+    request: u64,
+    prepared: Option<Prepared>,
+    said: net::Early,
+) -> Option<Prepared> {
+    match said {
+        net::Early::Words(words) => {
+            if prepared
+                .as_ref()
+                .is_some_and(|prepared| prepared.words == words)
+            {
+                return prepared;
+            }
+            drop(prepared);
+            eprintln!(
+                "lamp-voice second: request {request}: its chat is begun on the line's early words"
+            );
+            Some(Prepared::begin(shared, words))
+        }
+        net::Early::Resumed => {
+            if prepared.is_some() {
+                eprintln!(
+                    "lamp-voice second: request {request}: the chat begun on its early words is dropped: the person went on"
+                );
+            }
+            None
+        }
+    }
 }
 
 /// Who asked the turn's chat, which sets what it may do.
@@ -1677,6 +1876,9 @@ async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> 
 /// Chat, speech and the turn's last events, for the person's `said`, with
 /// the picture of a look (`looking`). The picture goes in this request only,
 /// never into the thread or a later turn's history.
+// The prepared round is the turn's eighth input; a struct of them all would
+// only rename the arguments.
+#[allow(clippy::too_many_arguments)]
 async fn answer(
     shared: &Shared,
     context: (u64, Option<crate::memory_scope::ScopeLease>),
@@ -1685,6 +1887,7 @@ async fn answer(
     picture: Option<Vec<u8>>,
     notes: Vec<String>,
     times: Arc<Mutex<Times>>,
+    prepared: Option<Prepared>,
 ) {
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
@@ -1714,6 +1917,7 @@ async fn answer(
     // tool is asked with the words alone (the reviewer on #1075).
     let mut seeing = picture.is_some();
     let words = Message::user(said.clone());
+    let prepared_for = prepared.map(|prepared| (prepared, said.clone()));
     let question = match picture {
         Some(jpeg) => Message::user_seeing(said, &jpeg),
         None => Message::user(said),
@@ -1726,10 +1930,32 @@ async fn answer(
         let told = (shared.system)();
         let mut messages = vec![Message::system(told.text)];
         messages.extend(told.history);
+        // A chat begun on the early words stands for round 1 if it fits.
+        let mut prepared = prepared_for.and_then(|(prepared, said)| {
+            match prepared.misfit(&messages, &notes, &said) {
+                None => {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the chat begun on its early words is kept, begun {} ms ago",
+                        prepared.at.elapsed().as_millis()
+                    );
+                    Some(prepared)
+                }
+                Some(why) => {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the chat begun on its early words is dropped: {why}"
+                    );
+                    None
+                }
+            }
+        });
         // A note beside the request, never anyone's words (as on the Live
         // route, where a note goes beside what the model hears).
         messages.extend(notes.into_iter().map(Message::system));
         messages.push(question);
+        // What round 1 was asked, kept for the rounds after it.
+        if let Some(prepared) = &prepared {
+            messages.clone_from(&prepared.messages);
+        }
         let asked_at = messages.len() - 1;
         let mut round = 0;
         while round < MAX_ROUNDS {
@@ -1738,7 +1964,10 @@ async fn answer(
             }
             round += 1;
             let mut refused = false;
-            let mut stream = shared.services.chat(messages.clone());
+            let mut stream = match prepared.take() {
+                Some(prepared) if round == 1 => prepared.into_events(),
+                _ => shared.services.chat(messages.clone()),
+            };
             let mut first = true;
             let mut split = Sentences::default();
             let mut text = String::new();

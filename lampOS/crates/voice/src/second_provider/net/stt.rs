@@ -347,6 +347,21 @@ pub struct SttStream {
     words: Option<mpsc::UnboundedReceiver<String>>,
     /// What the service has sent back so far, by kind.
     replies: Arc<Replies>,
+    /// The words a line has before they are final, until taken
+    /// ([`Self::take_early`]).
+    early: Option<mpsc::UnboundedReceiver<Early>>,
+}
+
+/// Words a stream has before they are final, for a chat begun on them
+/// (`LAMP_SECOND_PREPARED`, #1712, the first builder at 17:02): with
+/// Nova-3, at the line's end, the finals and the last interim's words while
+/// `Finalize`'s answer is still to come.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Early {
+    /// The words so far, likely the line's.
+    Words(String),
+    /// The person went on: the words given are not the line's.
+    Resumed,
 }
 
 impl SttStream {
@@ -423,6 +438,7 @@ impl SttStream {
         let (audio, queued) = mpsc::channel(QUEUE);
         let words_at = Arc::new(OnceLock::new());
         let (said, words) = mpsc::unbounded_channel();
+        let (early_words, early) = mpsc::unbounded_channel();
         let replies = Arc::new(Replies::default());
         Self {
             audio: Some(audio),
@@ -430,12 +446,13 @@ impl SttStream {
                 socket,
                 queued,
                 Arc::clone(&words_at),
-                said,
+                (said, early_words),
                 Arc::clone(&replies),
             )),
             words_at,
             words: Some(words),
             replies,
+            early: Some(early),
         }
     }
 
@@ -444,6 +461,12 @@ impl SttStream {
     /// when the stream ends (#828).
     pub fn take_words(&mut self) -> Option<mpsc::UnboundedReceiver<String>> {
         self.words.take()
+    }
+
+    /// The words the line has before they are final ([`Early`]), for one
+    /// taker.
+    pub fn take_early(&mut self) -> Option<mpsc::UnboundedReceiver<Early>> {
+        self.early.take()
     }
 
     /// What the service has sent back on this stream so far, by kind.
@@ -646,7 +669,7 @@ async fn run<S>(
     socket: tokio_tungstenite::WebSocketStream<S>,
     mut queued: mpsc::Receiver<Outgoing>,
     words_at: Arc<OnceLock<Instant>>,
-    said: mpsc::UnboundedSender<String>,
+    (said, early): (mpsc::UnboundedSender<String>, mpsc::UnboundedSender<Early>),
     replies: Arc<Replies>,
 ) -> Result<(String, Option<String>)>
 where
@@ -732,6 +755,12 @@ where
                 if transcript.settled(sent) {
                     let _ = write.send(close_stream()).await;
                     return Ok(ending(&transcript, &at_end, None, "settled"));
+                }
+                // The words so far, the last interim's among them, while
+                // `Finalize`'s answer comes: a chat may begin on them.
+                let (words, interim) = transcript.words();
+                if interim && words.chars().any(char::is_alphanumeric) {
+                    let _ = early.send(Early::Words(words));
                 }
                 write
                     .send(Message::text(r#"{"type":"Finalize"}"#))
@@ -1386,6 +1415,58 @@ mod tests {
         assert_eq!(words, "hang from close");
         assert_eq!(took, Duration::from_millis(850));
         assert!(at_end.ends_with(", words from=close_stream"), "{at_end}");
+    }
+
+    /// #1712 (`LAMP_SECOND_PREPARED`, the first builder at 17:02): at the
+    /// line's end, with an interim's words still to be made final, they are
+    /// given at once as early words, before `Finalize`'s answer; words
+    /// already settled give none, as they are final at once.
+    #[tokio::test(start_paused = true)]
+    async fn an_interims_words_are_given_early_at_the_lines_end() {
+        use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
+        const FINALIZED: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":1.0,"channel":{"alternatives":[{"transcript":"hello lamp"}]}}"#;
+        const ENDED: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"start":0.0,"duration":1.0,"channel":{"alternatives":[{"transcript":"hello lamp"}]}}"#;
+        for (before, early_words) in [(INTERIM, Some("hello")), (ENDED, None)] {
+            let (near, far) = tokio::io::duplex(1 << 16);
+            let server = tokio::spawn(async move {
+                let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+                let mut told = false;
+                while let Some(Ok(message)) = socket.next().await {
+                    match message {
+                        Message::Binary(_) if !told => {
+                            told = true;
+                            socket.send(Message::text(before)).await.unwrap();
+                        }
+                        Message::Text(text) if text.contains("Finalize") => {
+                            tokio::time::sleep(Duration::from_millis(300)).await;
+                            socket.send(Message::text(FINALIZED)).await.unwrap();
+                        }
+                        Message::Text(text) if text.contains("CloseStream") => break,
+                        _ => {}
+                    }
+                }
+            });
+            let mut stream =
+                SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+            let mut early = stream.take_early().unwrap();
+            assert!(stream.take_early().is_none(), "one taker");
+            for _ in 0..50 {
+                stream.send(&[0; 320]).unwrap();
+            }
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let began = Instant::now();
+            let finishing = tokio::spawn(stream.finish_told());
+            if let Some(words) = early_words {
+                assert_eq!(early.recv().await, Some(Early::Words(words.to_owned())));
+                assert_eq!(began.elapsed(), Duration::ZERO, "before Finalize's answer");
+            }
+            let (words, _) = finishing.await.unwrap().unwrap();
+            assert_eq!(words, "hello lamp");
+            if early_words.is_none() {
+                assert!(early.try_recv().is_err(), "settled words are final at once");
+            }
+            server.abort();
+        }
     }
 
     /// A local plain websocket server stands in for Deepgram.
