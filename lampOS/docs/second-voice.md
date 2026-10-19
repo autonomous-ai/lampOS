@@ -1051,6 +1051,42 @@ lamp's voice (`coordinator/second.rs`, `routes`):
   A value is taken exactly: `Second` or ` second` is refused. A bounded run
   (`lamp-voice directed`) has no second route, and refuses `second`.
 
+**The lamps' voice since 19 October** (the owner, #1712). The product unit
+(`deploy/product/lamp-voice.service`), lamp-52e6's, the repo's lamp-4ace
+unit and the attended pilot set `LAMP_VOICE_ROUTE=second`, as lamp-4ace runs
+it: `LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json`,
+`LAMP_SECOND_CHAT=deepseek`, `LAMP_SECOND_SEARCH=deepseek`,
+`LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo`, the down-line and the wait cue.
+Live stays a per-lamp setting: a drop-in with `LAMP_VOICE_ROUTE=gemini`.
+
+**A product lamp needs nothing a person adds** (the first builder at 21:08
+and 21:14). Every service goes through the Autonomous relay with the one key
+the lamp already has:
+- DeepSeek's chat and search go through the relay
+  (`LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek`,
+  #1939), with second.json's `llm_credential_file`, so the unit loads no
+  credential.
+- Speech to text and the voice fall back to the text model's base and key,
+  as on V1.
+
+It needs two files in `/etc/lampOS/voice`, root's and 0600:
+
+| File | Placed by | What reads it |
+|---|---|---|
+| `second.json` | install, and an update round before it writes a voice unit that names it, from `deploy/product/settings/second.json` (the relay's `…/api/v1/ai`, `gpt-4.1-mini`, ElevenLabs), kept up to date while it is install's own; a lamp's own is kept. On a lamp whose updater predates the round's step, the voice places the same bytes as it starts when the file is missing (`second_config::place_product_if_missing`; updates.md) | `LAMP_VOICE_SECOND_CONFIG` |
+| `credential` | setup (the user's key), or install from V1's config; the same file `provider.json` names | second.json's `llm_credential_file`, for every service |
+
+Without either, the voice does not start, and the route never falls back to
+Live. `lamp-selftest`'s `voice_route` part names what is missing (`selftest.md`).
+
+lamp-4ace's repo unit takes DeepSeek through the relay too (the owner,
+21:3x: "instead of using their direct deepseek key"), and loads only
+Gemini's key (`LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key`).
+The A/B of DeepSeek direct against the relay takes `deepseek.key` in
+`probe-cascade`'s own transient unit, never in the voice's. Its own
+second.json names `second-llm.key`, `second-stt.key` and `second-tts.key`,
+which hold the relay key.
+
 With `second`, the journal says once at start:
 `lamp-voice: the voice route is second only (LAMP_VOICE_ROUTE=second): speech to text, a text model and speech answer every turn; Gemini Live is not used`.
 

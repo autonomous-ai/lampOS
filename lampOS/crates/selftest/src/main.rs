@@ -4,7 +4,7 @@
 use lamp_bus::Bus;
 use lamp_msgs::{Occasion, SelfTest, Verdict};
 use lamp_selftest::{
-    AGAIN_AFTER, BUDGET, hand, head, kernel, listen, mic, quiet, report, ring, speaker,
+    AGAIN_AFTER, BUDGET, hand, head, kernel, listen, mic, quiet, report, ring, speaker, voice_route,
 };
 use std::{path::PathBuf, process::ExitCode, time::Instant};
 
@@ -119,6 +119,11 @@ fn main() -> ExitCode {
     }));
     checks.push(Box::new(kernel::Kernel {
         path: kernel::KMSG.into(),
+    }));
+    // The second route's files, looked at and never read for a key (#1712).
+    checks.push(Box::new(voice_route::VoiceRoute {
+        unit: voice_route::UNIT.into(),
+        drop_ins: voice_route::DROP_INS.into(),
     }));
     // Only at the factory is someone there to be asked to touch.
     if arguments.occasion == Occasion::Factory {
