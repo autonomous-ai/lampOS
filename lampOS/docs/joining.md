@@ -562,6 +562,24 @@ the lamp.
   ten). Do what they agree to and write the difference in the log.
 - **Photographs only of the lamp**, with no person, face or screen.
 
+## The voice to build and test with (the owner, 19 Oct 2026)
+
+Every builder builds and tests the voice on the second route
+(`LAMP_VOICE_ROUTE=second`, [second-voice.md](second-voice.md)): Deepgram
+for speech to text, DeepSeek for chat and search, and ElevenLabs
+(`eleven_v4_turbo`) as the lamp's one voice. Gemini Live costs too much for a
+lamp people talk to all day.
+
+- **Played tests, scenes and checks of the voice run on the second route.**
+  A voice feature is done when it works there. One that works only on Live
+  is not done.
+- **No Live sessions on a lamp,** except a comparison the first builder names
+  on #1712, the issue where the flow is built.
+- **A suite, tool or script that starts a Live session** is named on the
+  Queue (#1722), and it is moved to the second route.
+- **Live stays a setting** (`LAMP_VOICE_ROUTE=gemini`) for a lamp that is
+  set up with it, not the lamp to build against.
+
 ## Facts every lamp builder needs
 
 Measured on lamp-52e6 on 2026-10-14 ([body.md](body.md), the
