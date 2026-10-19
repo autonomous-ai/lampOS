@@ -5081,3 +5081,64 @@ async fn a_kept_listener_goes_after_its_time_or_when_listening_stops() {
         assert_eq!(listened(&played), expected, "{gone}");
     }
 }
+
+/// #1712 (the first builder at 03:48): the journal counts a line's words in
+/// the line it cut short and in the lamp's own answer, as plain words, any
+/// case and punctuation, never the words.
+#[test]
+fn a_lines_words_are_counted_against_the_line_before_and_the_lamps_answer() {
+    assert_eq!(
+        super::shared_words("Hey Lamp, what time is it?", "hey lamp what time is it"),
+        6
+    );
+    assert_eq!(
+        super::shared_words("Four in the morning.", "Hey Lamp, what time is it?"),
+        0
+    );
+    assert_eq!(
+        super::shared_words("it's four in the morning", " It's four in the morning."),
+        5
+    );
+    assert_eq!(super::shared_words("", "anything"), 0);
+}
+
+/// The words of the latest answer sent to the voice are kept with its
+/// request, for that count; a newer answer replaces them.
+#[tokio::test]
+async fn the_latest_answers_words_are_kept_for_the_count() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("What time is it".to_owned()),
+                Ok("And tomorrow".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("It's four."), Ok(ChatEvent::Done)],
+                vec![text("Rain."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script.clone());
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    let said = engine.shared.lamp_said.lock().unwrap().clone();
+    assert_eq!(said.0, 1);
+    assert!(said.1.contains("It's four."), "{said:?}");
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    turn(&mut engine).await;
+    let said = engine.shared.lamp_said.lock().unwrap().clone();
+    assert_eq!(said.0, 2);
+    assert!(
+        said.1.contains("Rain.") && !said.1.contains("four"),
+        "{said:?}"
+    );
+}

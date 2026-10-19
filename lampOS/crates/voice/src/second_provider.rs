@@ -359,6 +359,10 @@ struct Shared {
     /// The words last heard, with their request: a request that goes on
     /// from one given up after an early end begins with them.
     heard_last: Mutex<Option<(u64, String)>>,
+    /// The words of the latest answer sent to the voice so far, and its
+    /// request: for the journal's count of a line's words that were the
+    /// lamp's own ([`shared_words`]), never its words.
+    lamp_said: Mutex<(u64, String)>,
     /// The stop to be told (`after_stop`), with the request it is for.
     stop_untold: Mutex<Option<StopToTell>>,
     /// A held line is asked for the calls done though it is held
@@ -762,6 +766,7 @@ impl Engine {
                 down: None,
                 announce: true,
                 heard_last: Mutex::new(None),
+                lamp_said: Mutex::new((0, String::new())),
                 stop_untold: Mutex::new(None),
                 though_held: false,
                 staff: None,
@@ -2041,6 +2046,7 @@ async fn spoken(
                 text.split_whitespace().count(),
                 finishing.elapsed().as_millis()
             );
+            tell_whose_words(&shared, request, &text);
             text
         }
         Err(error) => {
@@ -2504,6 +2510,67 @@ impl Drop for AbortOnDrop {
 
 /// `words` as letters, digits and single spaces, lower case: what the early
 /// and the final words are compared as.
+/// How many of `heard`'s words are among `other`'s, each word as its letters
+/// and digits in lower case ("It's" is "its"), so the count is never more
+/// than the line's own words.
+fn shared_words(heard: &str, other: &str) -> usize {
+    let key = |word: &str| -> String {
+        word.chars()
+            .filter(|c| c.is_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .collect()
+    };
+    let others: std::collections::HashSet<String> = other.split_whitespace().map(key).collect();
+    heard
+        .split_whitespace()
+        .map(key)
+        .filter(|word| !word.is_empty() && others.contains(word))
+        .count()
+}
+
+/// The journal's count, never the words, of how many of a line's words were
+/// in the line it cut short and in the lamp's latest answer so far (#1712,
+/// the first builder at 03:48: on lamp-4ace one line said once became two
+/// requests of 6 words each, the second begun with nothing played; the same
+/// words again read as a replay, the lamp's own as an echo).
+fn tell_whose_words(shared: &Shared, request: u64, heard: &str) {
+    let words = heard.split_whitespace().count();
+    if words == 0 {
+        return;
+    }
+    let cut = shared
+        .cut
+        .lock()
+        .ok()
+        .and_then(|cut| {
+            cut.as_ref()
+                .map(|carried| (carried.request, carried.text.clone()))
+        })
+        .filter(|(of, _)| *of < request);
+    let said = shared
+        .lamp_said
+        .lock()
+        .ok()
+        .map(|said| said.clone())
+        .filter(|(of, said)| *of != 0 && *of < request && !said.trim().is_empty());
+    if cut.is_none() && said.is_none() {
+        return;
+    }
+    let cut = cut.map_or(String::new(), |(of, text)| {
+        format!(
+            ", {} in request {of}'s words it cut short",
+            shared_words(heard, &text)
+        )
+    });
+    let said = said.map_or(String::new(), |(of, text)| {
+        format!(
+            ", {} in the lamp's answer to request {of} so far",
+            shared_words(heard, &text)
+        )
+    });
+    eprintln!("lamp-voice second: request {request}: of its {words} words{cut}{said}");
+}
+
 fn plain_words(words: &str) -> String {
     words
         .chars()
@@ -3435,6 +3502,13 @@ impl Queue<'_> {
             );
         }
         self.started = true;
+        if let Ok(mut said) = self.shared.lamp_said.lock() {
+            if said.0 != self.request {
+                *said = (self.request, String::new());
+            }
+            said.1.push(' ');
+            said.1.push_str(&text);
+        }
         let turn = net::Turn {
             request: self.request,
             heard_at: self.heard_at,

@@ -516,6 +516,17 @@ order is kept. A written turn is the same from the chat on.
   the first builder at 00:25: on lamp-4ace 8 of 12 lines' words came 0.9
   to 2.3 s after the line, `Finalize`'s answer reaching only 0.3 to 1.2 s
   of the 1.1 to 2.8 s sent; Deepgram was still hearing the burst).
+- **Whose words a line's are, counted, never the words** (#1712, the
+  first builder at 03:48: on lamp-4ace one line said once became two
+  requests of 6 words each, the second begun with nothing played). When a
+  line's words are final, after its `heard N words` line, the journal
+  says `request N: of its W words, K in request M's words it cut short, J
+  in the lamp's answer to request A so far` (each part only when there is
+  one; `tell_whose_words`). Words are compared whole, as their letters and
+  digits in lower case (`shared_words`). The same words again read as a
+  replay of the line before; the lamp's own as an echo of its answer; few
+  of either as someone speaking. The route keeps the words of its latest
+  answer sent to the voice, with its request, for this (`lamp_said`).
 - **With `LAMP_SECOND_STT_WARM=on`, the next line's socket is kept open**
   (off unless set; `Engine::keeping_a_listener_ready`). As a line takes its
   socket, the next is opened in the background and kept with `KeepAlive`
