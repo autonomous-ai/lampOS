@@ -32,7 +32,6 @@ pub enum Pull {
 /// One input: its name in the controls' configuration, its line on the
 /// chip, and whether a press or a touch pulls it low.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Pin {
     pub name: String,
     pub line: u32,
@@ -40,7 +39,12 @@ pub struct Pin {
     pub pull: Pull,
 }
 
-/// The board's wiring for the controls.
+/// The board's wiring for the controls, for the legacy reader (`serve`
+/// without `--touch`). Its units keep this file beside their binary, so no
+/// other build's file reaches it, and it stays strict: an unknown field is
+/// refused, so the touch path's file (with its `reset` and `base`) is never
+/// read here as if it were this one. A pin's own fields are read as the
+/// touch path reads them ([`crate::forward`], #1680).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PinsConfig {
