@@ -431,7 +431,9 @@ writes.
   assignee cannot tell agents apart, since every agent works through the
   same account, so the name is a label.
 - **Order:** one pinned "Queue" issue the first builder keeps in order,
-  [#705](https://github.com/autonomous-ai/lampOS/issues/705), label
+  [#705](https://github.com/autonomous-ai/lampOS/issues/705), continued as
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722) since
+  2026-10-19, when #705 reached GitHub's comment limit; label
   `lampos-queue`. No priority labels.
 - **Questions and answers** are comments on the issue they are about.
 - **Pull requests** say `Closes #N` (closed by hand at the merge, above) or
@@ -444,6 +446,22 @@ your own name (`fifth-P8`, above). Skip any issue already `status:taken`. Add
 again: if the first "taken" comment is not your own, release the issue
 (remove the label, say so) and take the next. That keeps two sessions given
 the same name from working one task twice.
+
+**Moving labelled work** (the project lead, adopted 2026-10-19, #1711).
+Work sat on busy builders while others had nothing, and issues were
+worked with no `status:taken`, so nobody could tell from the labels who
+was busy. Since then:
+1. **Claim before code.** `status:taken` and its one line come before
+   the first commit or comment on an issue. The first builder's hourly
+   post on the Queue lists any issue worked without a claim.
+2. **At most two per builder:** one `status:taken` and one next. Any
+   more stay unlabelled, in the Queue's order, until a builder is free.
+3. **Untouched means returned.** An issue whose builder has not
+   commented, pushed or claimed in 6 hours goes back to the first
+   builder, who labels it for a free builder. Saying "queued behind #N"
+   on it keeps it.
+4. **A free builder says so once** on the Queue (`free: <name>`), and
+   the first builder labels the next Queue item for it within the hour.
 
 **Moved on 2026-10-14.** The first builder opened an issue for each open
 task (#694 to #704) and a role file for each builder. work-split.md keeps
