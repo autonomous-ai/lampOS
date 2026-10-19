@@ -585,10 +585,17 @@ order is kept. A written turn is the same from the chat on.
   journaled once, without words, when the words are in: "lamp-voice second: request N at the line's end:
   settled=<bool>, speech_final=<bool>, finals cover <ms|none> of <ms> ms
   sent, pending=<none|interim D ms after the last final|speech_started D
-  ms after the last final>, last final <T ms before End|none>[, finalize
-  answered in <A> ms to <E> ms|, finalize unanswered], results <N> with
-  words, <M> without, words from=<settled|finalize|close_stream>[+interim]",
-  the last naming which path gave the words. The results count every
+  ms after the last final>, last final <T ms before End|none>[; closed by
+  the service <C> ms after finalize, before its answer: settled=…, finals
+  cover … of … ms sent, …, <W> words][, finalize answered in <A> ms to <E>
+  ms|, finalize unanswered], results <N> with words, <M> without, words
+  from=<settled|finalize|close_stream|closed_early>[+interim]",
+  the last naming which path gave the words. `closed_early` is the service
+  ending the stream after `Finalize` and before its answer, with no
+  `CloseStream` asked: the turn goes on with the words so far, and the
+  part in `;` says when, how far the finals reached at the close and how
+  many words there were, never the words, so a line that lost its end shows
+  (the reviewer on #1954). The results count every
   result the service sent, interim and final: none with words says the
   service heard no words at all (#1712: on lamp-4ace on 19 Oct at 15:21 the
   owner's line had finals covering 3.07 of 3.79 s and no words). `+interim`
