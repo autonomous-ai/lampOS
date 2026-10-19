@@ -41,7 +41,9 @@
 #   TRIALS_PROC        where a process's environ and cmdline are read (/proc)
 #   TRIALS_SUDO        the command to run as root (sudo, or nothing as root)
 #   TRIALS_WAIT        overrides every row's wait, in seconds
-#   TRIALS_CALL        sends a call: COMMAND SOCKET LINE (socat, else nc -U)
+#   TRIALS_CALL        sends a call: COMMAND SOCKET LINE (socat, else nc -U;
+#                      for send and sendfile, socat)
+#   TRIALS_ETC         where the lamp's settings are read (/etc)
 #   LAMP_BUS_BIN       lamp-bus (on PATH, else /usr/local/bin/lamp-bus)
 set -euo pipefail
 
@@ -50,6 +52,7 @@ usage() { sed -n '7,9p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 HERE=$(cd "$(dirname "$0")" && pwd)
 SKILLS_SRC=${TRIALS_SKILLS_SRC:-$HERE/../skills}
 UNIT_DIR=${TRIALS_UNIT_DIR:-/run/systemd/system}
+ETC=${TRIALS_ETC:-/etc}
 ASIDE_DIR=${TRIALS_ASIDE_DIR:-/run}
 PROC=${TRIALS_PROC:-/proc}
 if [[ -n ${TRIALS_SUDO+set} ]]; then
@@ -82,7 +85,13 @@ DROPIN=zz-trial.conf
 #            "keepfile PATH TEXT" (TEXT written to PATH every second until
 #            the end, as a file another part keeps fresh), "call NAME JSON"
 #            (a skill's function called on lamp-skills' call.sock, as the
-#            voice calls it), "run COMMAND", or "play LINE"
+#            voice calls it), "send SOCKET LINE" (one line to a part's
+#            socket as root with socat; a reply without "done" fails, and
+#            only done or the refusal is printed), "run COMMAND", or "play
+#            LINE". AFTER may also "sendfile SOCKET FILE": each line of FILE
+#            sent so, if FILE is there (what SETUP saved to put back), with
+#            neither the lines nor the replies printed, since they may hold
+#            a person's name
 #   AFTER    optional: lines as CAUSE's, run at the end before the units are
 #            restarted (a light given back, a presence ended)
 #   FIRST    optional: for a behaviour that is done only when its cause
@@ -102,10 +111,12 @@ DROPIN=zz-trial.conf
 # In SETASIDE, SETUP and AFTER, @SKILLS_DIR@, @SKILLS_USER@ and @SKILLS_GROUP@
 # are the running lamp-skills' --dir, user and group, @MEMORY_DIR@ and
 # @MEMORY_SOCKET@ are lamp-memory's --dir and --socket, @EYES_KNOWN_FILE@ is
-# lamp-eyes' --known-file, and @SRC@ is TRIALS_SKILLS_SRC. CAUSE's keepfile
-# takes them too.
+# lamp-eyes' --known-file, @SRC@ is TRIALS_SKILLS_SRC, @ASIDE@ is the
+# trial's own root-only set-aside folder, @UNIT_DIR@ is where drop-ins go
+# (units a trial installs go there too, gone at a reboot), and @ETC@ is
+# TRIALS_ETC. CAUSE's keepfile takes them too.
 # ---------------------------------------------------------------------------
-ROWS="light-out scenes who-was-here activity forget thread reports nudges smoky dusty light-show"
+ROWS="light-out scenes who-was-here activity forget thread reports nudges smoky dusty light-show settings"
 # Rows not here, and why: printed by `list`.
 NOT_HERE="bedtime    Bedtime and Morning (#1732): a draft, not merged; three switches, --zone and its daily state, and it moves the body
 nudges     the other three nudges (#1957): sip-of-water, stand-up and wind-down are tried by hand, as rest-your-eyes is here
@@ -339,6 +350,41 @@ call light_show {"show":"calm"}'
       EXAMPLE='lamp-skills: light-show Done: …; show calm: 5 frames shown; …'
       IN="lamp-skills.service"
       WAIT=90 ;;
+    settings)
+      # #1982 (on lamp-voice): root's helper for changes after setup, as
+      # lamp-cloud asks it with LAMP_SETTINGS_CHANGE=on (the first builder's
+      # (a), #1722 03:16): its two units, in deploy/product/ and on no lamp
+      # yet, installed for the trial in the transient unit folder, and the
+      # lines lamp-cloud sends (cloud settings.rs `line`) sent to its socket.
+      # The app's half, over the broker, stays with lamp-cloud's host tests.
+      # The trial's copy of the socket is root's group: lamp-4ace has no
+      # lampos, and only the trial connects. The zone tried is Asia/Bangkok,
+      # the lamp's own offset, so nothing's day shifts. The old name and zone
+      # are saved first and sent back at the end; the helper's waiting
+      # instance is stopped, so lamp-schedule isn't restarted onto a zone it
+      # already has, and the units are removed and checked gone. Its lines:
+      # setup main.rs, "lamp-setup: change: {}", the change's `said`.
+      ABOUT="settings changed after setup: root's helper sets the person's name and the zone, both put back (#1982)"
+      NOTE="the checkout's lampOS/deploy/product beside its skills folder (the two units are copied from it), a build with #1982's lamp-setup at /opt/lampOS/setup/current/lamp-setup, /etc/lampOS/setup/serve.json, setup done (/var/lib/lampos-setup/done, the socket's condition), and socat. Neither the saved name nor a reply is printed. For a minute the person's name is \"Trial\" and the zone Asia/Bangkok (the same offset), then both are as they were. No Wi-Fi"
+      SETUP="! systemctl cat lamp-setup-change.socket >/dev/null 2>&1 || { echo 'lamp-setup-change.socket is already on this lamp: not touched'; exit 1; }
+zone=\$(cat @ETC@/timezone 2>/dev/null || readlink @ETC@/localtime | sed 's|.*/zoneinfo/||'); [ -n \"\$zone\" ] || { echo 'the zone now is not known: nothing changed'; exit 1; }; name=\$(sed 's/[\\\\\"]/\\\\&/g' @ETC@/lampOS/person/name 2>/dev/null); printf '{\"person_name\":\"%s\"}\n{\"timezone\":\"%s\"}\n' \"\$name\" \"\$zone\" >@ASIDE@/settings.back
+sed 's/^SocketGroup=lampos/SocketGroup=root/' @SRC@/../deploy/product/lamp-setup-change.socket >@UNIT_DIR@/lamp-setup-change.socket
+cp @SRC@/../deploy/product/lamp-setup-change@.service @UNIT_DIR@/lamp-setup-change@.service
+systemctl daemon-reload && systemctl start lamp-setup-change.socket"
+      # No part's switch: the helper takes --enable from its own unit, and
+      # lamp-cloud isn't in the path. The marker restarts lamp-skills and
+      # shows the trial's machinery runs, as scenes' does.
+      SWITCHES="lamp-skills.service|LAMP_TRIAL=settings"
+      CAUSE='send /run/lampos-setup-change/change.sock {"person_name":"Trial"}
+send /run/lampos-setup-change/change.sock {"timezone":"Asia/Bangkok"}'
+      AFTER="sendfile /run/lampos-setup-change/change.sock @ASIDE@/settings.back
+run systemctl stop lamp-setup-change.socket 'lamp-setup-change@*.service'; rm -f @UNIT_DIR@/lamp-setup-change.socket @UNIT_DIR@/lamp-setup-change@.service; systemctl daemon-reload; ! systemctl cat lamp-setup-change.socket >/dev/null 2>&1"
+      FIRST="change: the person's name was changed"
+      FIRSTEX="lamp-setup: change: the person's name was changed (5 characters)"
+      PROOF='change: the time zone is now Asia/Bangkok'
+      EXAMPLE='lamp-setup: change: the time zone is now Asia/Bangkok'
+      IN='lamp-setup-change@*'
+      WAIT=30 ;;
     *) return 1 ;;
   esac
 }
@@ -385,7 +431,24 @@ placeholders() { # TEXT: with the @...@ names filled from the running units
     [[ -n $value ]] || { say "lamp-eyes.service has no --known-file" >&2; exit 3; }
     text=${text//@EYES_KNOWN_FILE@/$value}
   fi
+  text=${text//@ASIDE@/${ASIDE:-@ASIDE@}}
+  text=${text//@UNIT_DIR@/$UNIT_DIR}
+  text=${text//@ETC@/$ETC}
   printf '%s\n' "${text//@SRC@/$SKILLS_SRC}"
+}
+
+# One line to a part's socket as root, and its one-line reply: through
+# TRIALS_CALL, else socat (lamp-4ace has no nc -U, and no Python is run on a
+# lamp).
+send_line() { # SOCKET LINE
+  if [[ -n ${TRIALS_CALL:-} ]]; then
+    $TRIALS_CALL "$1" "$2"
+  elif command -v socat >/dev/null; then
+    printf '%s\n' "$2" | $SUDO socat -t 15 - "UNIX-CONNECT:$1"
+  else
+    say "FAIL: socat is needed on the lamp to send to $1"
+    return 1
+  fi
 }
 
 # Where the journal is now, so the watch reads only what comes after it: its
@@ -569,6 +632,32 @@ act() { # WHEN LINE
         return 1
       fi
       printf '  answered: %s\n' "$(printf '%s' "$answered" | head -1 | cut -c1-200)"
+      ;;
+    send | sendfile)
+      # send SOCKET LINE, or sendfile SOCKET FILE: each line of FILE. A
+      # reply is never printed, only done or the refusal (the helper's own
+      # words, which never hold the value): a name's reply holds the name.
+      # sendfile's lines are what SETUP saved and may hold a person's name,
+      # so they aren't printed either.
+      local socket=${rest%% *} what=${rest#* } line answered n=0
+      what=$(placeholders "$what")
+      if [[ $kind == sendfile ]]; then
+        $SUDO test -e "$what" || { say "$when: nothing saved to send back"; return 0; }
+        what=$($SUDO cat "$what")
+      fi
+      while IFS= read -r line; do
+        [[ -n $line ]] || continue
+        n=$((n + 1))
+        if [[ $kind == send ]]; then say "$when: $line to $socket"; else say "$when: saved line $n sent back to $socket"; fi
+        answered=$(send_line "$socket" "$line") || { say "FAIL: nothing answered on $socket"; return 1; }
+        if [[ $answered == *'"done"'* ]]; then
+          printf '  answered: done\n'
+        else
+          printf '  answered: %s\n' "$(printf '%s' "$answered" | sed -n 's/.*"refused": *"\([^"]*\)".*/refused: \1/p' | head -1)"
+          say "FAIL: $socket refused it"
+          return 1
+        fi
+      done <<<"$what"
       ;;
     run)
       rest=$(placeholders "$rest")
