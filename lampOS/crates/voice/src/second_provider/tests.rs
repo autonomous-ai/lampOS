@@ -874,6 +874,21 @@ async fn a_resumed_turn_drops_the_chat_begun_on_its_early_words() {
     );
 }
 
+/// #1712, the first builder at 18:26: the first piece waits for 4 words
+/// with the configured voice and 6 with Gemini's, unless
+/// `LAMP_SECOND_FIRST_WORDS` says otherwise (0: whole clauses only).
+#[test]
+fn the_first_piece_waits_for_four_words_with_the_configured_voice() {
+    assert_eq!(first_words_for(None, false), Some(CONFIGURED_FIRST_WORDS));
+    assert_eq!(first_words_for(None, true), Some(FIRST_WORDS));
+    assert_eq!(first_words_for(Some("3"), false), Some(3));
+    assert_eq!(first_words_for(Some("8"), true), Some(8));
+    assert_eq!(first_words_for(Some("0"), false), None);
+    for unfit in ["", "x", "-1", "21"] {
+        assert_eq!(first_words_for(Some(unfit), false), Some(4), "{unfit:?}");
+    }
+}
+
 /// When the early words stand for round 1 (`Prepared::misfit`): the same
 /// words whatever the case and punctuation, the same conversation, and no
 /// note but the name note on words that name the lamp.

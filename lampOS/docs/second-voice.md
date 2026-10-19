@@ -388,6 +388,18 @@ order is kept. A written turn is the same from the chat on.
   the first builder at 17:27: the chat's first clause about 0.9 s and the
   voice's first audio about 0.3 s, but the first answer audio 1.4 to 3.9 s
   after the words).
+  Each chat request is journaled too, without words: `chat request B
+  bytes, M messages, T tools; its answer began in A ms; the last request S
+  s before` (or `the first request of this client`). A is the response's
+  headers. A gap over the client's 90 s pool keep means a new connection
+  (the first builder at 18:26: the first event came in 0.9 to 1.9 s on
+  lamp-4ace, 0.7 s from the probe).
+- **The answer's first piece goes after a few words** if no clause or
+  sentence ended sooner: 4 with the configured voice
+  (`CONFIGURED_FIRST_WORDS`; the first builder at 18:26: a 9-word first
+  clause went to ElevenLabs 2.8 s after the words), and 6 with Gemini's
+  (`FIRST_WORDS`). `LAMP_SECOND_FIRST_WORDS=N` sets it, from 0 (whole
+  clauses only) to 20, for an A/B.
 - **With `LAMP_SECOND_PREPARED=on` the chat is begun on the line's early
   words** (off unless set; #1712, the first builder at 17:02: the route's
   first word came about 3.4 s after a line, Live's 2.4 s, and the bar is

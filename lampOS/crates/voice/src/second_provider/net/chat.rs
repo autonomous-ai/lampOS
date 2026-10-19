@@ -162,6 +162,9 @@ pub struct Chat {
     /// The model takes a look's picture.
     sees: bool,
     declare: Declare,
+    /// When the last request went, for the journal: a connection idle past
+    /// the client's pool keep (`http_client`, 90 s) is made anew.
+    last_sent: std::sync::Mutex<Option<std::time::Instant>>,
 }
 
 impl Chat {
@@ -284,6 +287,7 @@ impl Chat {
             extra: serde_json::Map::new(),
             sees: true,
             declare,
+            last_sent: std::sync::Mutex::new(None),
         })
     }
 
@@ -305,6 +309,12 @@ impl Chat {
 
     pub async fn send(&self, messages: &[Message]) -> Result<ChatStream> {
         let body = self.body(messages);
+        let asked = std::time::Instant::now();
+        let before = self
+            .last_sent
+            .lock()
+            .ok()
+            .and_then(|mut last| last.replace(asked));
         let response = post(
             &self.client,
             &self.url,
@@ -312,6 +322,17 @@ impl Chat {
             &body,
         )
         .await?;
+        // What was asked and how soon the service began to answer, without
+        // words (#1712, the first builder at 18:26: the chat's first event
+        // came in 0.9 to 1.9 s on lamp-4ace, 0.7 s from the probe).
+        eprintln!(
+            "lamp-voice second: {}",
+            asked_told(
+                &body,
+                asked.elapsed(),
+                before.map(|at| asked.duration_since(at))
+            )
+        );
         Ok(ChatStream {
             response,
             lines: Lines::default(),
@@ -320,6 +341,28 @@ impl Chat {
             done: false,
         })
     }
+}
+
+/// A chat request in the journal's words: its size, its messages and tools,
+/// how soon its answer began (the response's headers), and how long before
+/// it the last request went, which says whether its connection was kept.
+fn asked_told(
+    body: &Value,
+    began: std::time::Duration,
+    since_last: Option<std::time::Duration>,
+) -> String {
+    let count = |field: &str| body[field].as_array().map_or(0, Vec::len);
+    format!(
+        "chat request {} bytes, {} messages, {} tools; its answer began in {} ms; {}",
+        body.to_string().len(),
+        count("messages"),
+        count("tools"),
+        began.as_millis(),
+        since_last.map_or(
+            "the first request of this client".to_owned(),
+            |since| format!("the last request {} s before", since.as_secs())
+        )
+    )
 }
 
 pub struct ChatStream {
@@ -529,6 +572,35 @@ impl Deltas {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #1712, the first builder at 18:26: a chat request is journaled by its
+    /// size and counts, how soon its answer began, and the gap since the
+    /// last request; never its words.
+    #[test]
+    fn a_chat_request_is_journaled_without_words() {
+        let body = json!({
+            "model": "m",
+            "messages": [{"role": "user", "content": "secret words"}],
+            "tools": [{"type": "function"}, {"type": "function"}],
+        });
+        let told = asked_told(
+            &body,
+            std::time::Duration::from_millis(412),
+            Some(std::time::Duration::from_secs(95)),
+        );
+        assert_eq!(
+            told,
+            format!(
+                "chat request {} bytes, 1 messages, 2 tools; its answer began in 412 ms; the last request 95 s before",
+                body.to_string().len()
+            )
+        );
+        assert!(!told.contains("secret"));
+        assert!(
+            asked_told(&json!({}), std::time::Duration::ZERO, None)
+                .ends_with("the first request of this client")
+        );
+    }
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     /// Feed recorded bytes cut at every `|`.

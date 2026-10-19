@@ -1166,10 +1166,16 @@ pub fn serve(
             );
         }));
     }
-    // Gemini's speech is asked a piece at a time: its first piece goes after
-    // a few words, not the whole first sentence (#1712).
-    if route.gemini_speech() {
-        engine = engine.cutting_first_words(crate::second_provider::FIRST_WORDS);
+    // The answer's first piece goes after a few words, not the whole first
+    // clause or sentence: Gemini's speech is asked a piece at a time, and the
+    // configured voice waited for a 9-word clause on lamp-4ace (#1712).
+    if let Some(words) = crate::second_provider::first_words_for(
+        std::env::var(crate::second_provider::FIRST_WORDS_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+        route.gemini_speech(),
+    ) {
+        engine = engine.cutting_first_words(words);
     }
     if look_by_call {
         engine = engine.looking_by_call();
