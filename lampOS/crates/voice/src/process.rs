@@ -1063,6 +1063,7 @@ fn second_route_worker_environment(
 ) -> Vec<(&'static str, std::ffi::OsString)> {
     [
         crate::second_config::GEMINI_BASE_URL_ENV,
+        crate::second_config::DEEPSEEK_BASE_URL_ENV,
         crate::second_config::SPEECH_MODEL_ENV,
         crate::second_config::KEY_TERMS_ENV,
         crate::local_time::PLACE_ENVIRONMENT,
@@ -1341,6 +1342,8 @@ mod tests {
                     "/run/credentials/lamp-voice.service"
                 } else if name == crate::second_config::GEMINI_BASE_URL_ENV {
                     "https://relay.example.invalid/v1beta"
+                } else if name == crate::second_config::DEEPSEEK_BASE_URL_ENV {
+                    "https://relay.example.invalid/deepseek"
                 } else if name == crate::second_config::SPEECH_MODEL_ENV {
                     "gemini-3.8-flash-lite-tts"
                 } else if name == crate::second_config::KEY_TERMS_ENV {
@@ -1410,6 +1413,7 @@ mod tests {
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_SECOND_CHAT_WARM=on",
+                    "LAMP_SECOND_DEEPSEEK_BASE_URL=https://relay.example.invalid/deepseek",
                     "LAMP_SECOND_FEW_TOOLS=on",
                     "LAMP_SECOND_FIRST_WORDS=4",
                     "LAMP_SECOND_FLUX=on",

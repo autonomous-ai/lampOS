@@ -140,7 +140,14 @@ impl Net {
     /// The text model is DeepSeek's own (`LAMP_SECOND_CHAT=deepseek`),
     /// thinking off.
     pub fn chatting_with_deepseek(mut self, key: &str) -> net::Result<Self> {
-        self.chat = Arc::new(Chat::deepseek(
+        let base = self
+            .config
+            .hosted
+            .deepseek_base_url
+            .clone()
+            .unwrap_or_else(|| crate::second_config::DEEPSEEK_BASE_URL.to_owned());
+        self.chat = Arc::new(Chat::deepseek_at(
+            &base,
             &self.config.hosted.deepseek_model,
             key,
             self.declare.clone(),

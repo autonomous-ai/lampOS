@@ -66,10 +66,22 @@ refused (unknown fields are refused).
 | `openrouter_model` | no | the slug `LAMP_SECOND_CHAT=openrouter` asks, from OpenRouter's public model list; absent: `deepseek/deepseek-v4.1-flash-1017` |
 | `openrouter_reasoning_effort` | no | `none`, `minimal`, `low`, `medium` or `high`; absent: `minimal` for a `google/` model, `none` for any other |
 | `deepseek_model` | no | the model `LAMP_SECOND_CHAT=deepseek` asks of DeepSeek's own API; absent: `deepseek-flash` (DeepSeek-V4.1-Flash-1017). DeepSeek's peak hours, 01:00–04:00 and 06:00–10:00 UTC on weekdays, cost double; no switch for them |
+| `deepseek_base_url` | no | the relay `LAMP_SECOND_CHAT=deepseek` and `LAMP_SECOND_SEARCH=deepseek` go through instead of DeepSeek's own API (#1934): `<base>/chat/completions`, `<base>/v1/tools/search` and `/v1/tools/fetch`, with the relay's credential (`llm_credential_file`) as the bearer, and no `deepseek.key`; absent: DeepSeek's own API with `deepseek.key`. `LAMP_SECOND_DEEPSEEK_BASE_URL` in the unit's environment goes over it |
 
 OpenRouter's and DeepSeek's keys are not in this file: they are the voice
 unit's systemd credentials, `openrouter.key` and `deepseek.key` in its
-`CREDENTIALS_DIRECTORY` ("OpenRouter and DeepSeek", below).
+`CREDENTIALS_DIRECTORY` ("OpenRouter and DeepSeek", below). With
+`deepseek_base_url`, DeepSeek's chat and search take the relay's credential
+instead, so a lamp with only its relay key runs them (#1934, the lead's
+task: lamps carry no provider keys). The journal then says DeepSeek is asked
+"through the relay with its credential", with no URL or key, and
+`probe-cascade` times `chat=deepseek-relay(…)` beside the direct one. The
+relay's base is `https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek`,
+with DeepSeek's own paths under it and the relay key as the bearer. It
+passes the bodies and streams through unchanged, and answers `GET
+<base>/models` for `LAMP_SECOND_CHAT_WARM`. A missing key is 401 and past
+the lamp's limit 429. Search and fetch are 5 calls a second for the whole
+relay (the backend on #1934, 21:0x).
 
 The fallback is V1's: an empty or absent STT or TTS URL or key is the LLM's.
 A Gemini model name is letters, digits, `-`, `.` and `_` only: it goes into
