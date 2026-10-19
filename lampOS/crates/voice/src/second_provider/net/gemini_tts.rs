@@ -7,7 +7,7 @@
 //! ([speech generation](https://ai.google.dev/gemini-api/docs/speech-generation),
 //! read 2026-10-19).
 use super::{
-    CONNECT, Error, Result, STALL,
+    Error, Result,
     chat::Lines,
     chunk, http_client, post,
     tts::{Packets, without_tags},
@@ -99,31 +99,16 @@ impl GeminiTts {
     /// long it took, or `None` when not asked or nothing came. Asked as a
     /// line begins, so the answer's first sentence does not open it.
     pub async fn warm(&self) -> Option<(u16, Duration)> {
-        {
-            let mut used = self.used.lock().ok()?;
-            if used.is_some_and(|at| at.elapsed() < WARM_AFTER) {
-                return None;
-            }
-            *used = Some(Instant::now());
-        }
-        let began = Instant::now();
-        let request = self
-            .client
-            .get(&self.model_url)
-            .header("x-goog-api-key", &self.key);
-        let mut response = tokio::time::timeout(CONNECT + STALL, request.send())
-            .await
-            .ok()?
-            .ok()?;
-        let status = response.status().as_u16();
-        let mut read = 0;
-        while read <= WARM_BYTES {
-            match tokio::time::timeout(STALL, response.chunk()).await {
-                Ok(Ok(Some(bytes))) => read += bytes.len(),
-                _ => break,
-            }
-        }
-        Some((status, began.elapsed()))
+        let (status, took, _) = super::warm_get(
+            &self.client,
+            &self.used,
+            WARM_AFTER,
+            &self.model_url,
+            ("x-goog-api-key", &self.key),
+            WARM_BYTES,
+        )
+        .await?;
+        Some((status, took))
     }
 
     /// Start speaking `text`; its samples come from the stream as they

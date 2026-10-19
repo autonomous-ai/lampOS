@@ -394,6 +394,21 @@ order is kept. A written turn is the same from the chat on.
   headers. A gap over the client's 90 s pool keep means a new connection
   (the first builder at 18:26: the first event came in 0.9 to 1.9 s on
   lamp-4ace, 0.7 s from the probe).
+  Each piece asked of the configured voice (OpenAI's or ElevenLabs) is
+  journaled at its first audio byte, without words: `request R ElevenLabs
+  piece K: C chars, sent S ms after the words were heard on a reused|new
+  connection; its first audio byte A ms after it went`. C counts the text
+  sent; A is from the request's going to the body's first byte. At the
+  turn's end, one line for its pieces: `request R ElevenLabs: B of N pieces
+  began, U on a reused connection, C chars; the first piece's first audio
+  byte A ms after it went, the slowest M ms` (`never came` when the first
+  never began). "Reused" is read, not guessed: the response's local socket
+  (hyper's `HttpInfo`) is one an earlier response or warming came on (the
+  last 8 kept). The client speaks HTTP/1.1 only, so pieces asked while one
+  still downloads each open their own connection. Gemini's voice is not
+  journaled this way (#1712, the first builder at 19:57: `eleven_v4_turbo`'s
+  first sound came about 690 ms after its first piece went on lamp-4ace,
+  request 2: 2185 to 2875 ms after the words; Flash 306 ms from the probe).
   After the first request, the line also says whether its tools and its
   first message are the last request's, hashed: `; its tools and first
   message as the last request's`, or which of the two is not. A service's
@@ -453,6 +468,23 @@ order is kept. A written turn is the same from the chat on.
   paid for the handshake (the first builder at 18:26: the chat's first
   event 0.9 to 1.9 s on lamp-4ace, 0.7 s from the probe). A warming that
   fails changes nothing; the chat connects as before.
+- **With `LAMP_SECOND_SPEECH_WARM=on` the configured voice's connection is
+  opened as a line begins** (off unless set, as the chat's switch is; its
+  own switch, since `LAMP_SECOND_CHAT_WARM` names the chat), when no piece
+  or warming went in the last 60 s (`tts::WARM_AFTER`, the chat's). Only
+  when the configured voice is the lamp's one voice; Gemini's is warmed
+  whenever it is. It's a GET of `<base>/models` with the key
+  (ElevenLabs: `<base>/elevenlabs/models` on the proxy, `/v1/models`
+  direct), read whole (at most 256 KiB), so the answer's first piece goes
+  on a connection already made. No text is sent, so no characters are
+  billed: ElevenLabs bills the text of speech requests, and `GET
+  /v1/models` lists models. The Autonomous proxy has no route for it (404,
+  `Cannot GET …`, read from the Mac on 19 Oct) and keeps the connection
+  open after it, so the warming still opens it. The journal says
+  `ElevenLabs: the speech connection opened ahead in T ms (HTTP S)`, and the
+  first piece's line says `reused`. A warming runs beside the line and
+  never holds a piece up: a piece asked while it is in flight opens its own
+  connection, and one that fails changes nothing.
 - **The answer's first piece goes after a few words** if no clause or
   sentence ended sooner: 4 with the configured voice
   (`CONFIGURED_FIRST_WORDS`; the first builder at 18:26: a 9-word first

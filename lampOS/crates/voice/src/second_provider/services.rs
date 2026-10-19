@@ -19,13 +19,28 @@ pub trait Services: Send + Sync + 'static {
     fn chat(&self, messages: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>>;
     /// `text` spoken, as 24 kHz mono packets; dropping it stops the download.
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>>;
+    /// As [`Services::speak`], a piece of `turn`'s answer, which the voice
+    /// may journal ([`net::Tts::speak_for`]).
+    fn speak_for(
+        &self,
+        text: String,
+        turn: net::Turn,
+    ) -> BoxStream<'static, net::Result<Vec<i16>>> {
+        let _ = turn;
+        self.speak(text)
+    }
+    /// `request`'s turn is over: the voice's line on its pieces, if it
+    /// keeps one ([`net::Tts::told`]).
+    fn spoken(&self, request: u64) {
+        let _ = request;
+    }
     /// Whether the chat model takes a look's picture; one that does not is
     /// told it saw nothing ([`crate::speak_up::NO_LOOK_NOTE`]).
     fn sees(&self) -> bool {
         true
     }
     /// Make ready to speak as a line begins: nothing, unless a voice keeps
-    /// a connection to open ahead ([`GeminiTts::warm`]).
+    /// a connection to open ahead ([`GeminiTts::warm`], [`Tts::warm`]).
     fn warm(&self) -> BoxFuture<'static, ()> {
         Box::pin(async {})
     }
@@ -69,11 +84,17 @@ pub struct Net {
     /// `LAMP_SECOND_CHAT_WARM=on`: the chat's connection is opened as a line
     /// begins ([`Chat::warm`]).
     warm_chat: bool,
+    /// `LAMP_SECOND_SPEECH_WARM=on`: the configured voice's connection is
+    /// opened as a line begins ([`Tts::warm`]).
+    warm_speech: bool,
 }
 
 /// Where the worker reads whether the chat's connection is opened as a line
 /// begins: `on`, and nothing else.
 pub const CHAT_WARM_ENVIRONMENT: &str = "LAMP_SECOND_CHAT_WARM";
+/// Where the worker reads whether the configured voice's connection is
+/// opened as a line begins: `on`, and nothing else.
+pub const SPEECH_WARM_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_WARM";
 
 /// Gemini's API as the route calls it: where, with which key and model.
 pub struct GeminiCall<'a> {
@@ -91,6 +112,7 @@ impl Net {
             gemini_tts: None,
             declare,
             warm_chat: false,
+            warm_speech: false,
             config: Arc::new(config),
         })
     }
@@ -101,6 +123,16 @@ impl Net {
     /// probe).
     pub fn warming_the_chat(mut self, on: bool) -> Self {
         self.warm_chat = on;
+        self
+    }
+
+    /// The configured voice's connection is opened ahead as a line begins,
+    /// when it has been idle ([`Tts::warm`], `LAMP_SECOND_SPEECH_WARM=on`,
+    /// #1712: `eleven_v4_turbo`'s first sound came about 690 ms after its
+    /// first piece went on lamp-4ace at 19:41; Flash 306 ms from the probe).
+    /// Gemini's voice is warmed whenever it is the lamp's.
+    pub fn warming_the_speech(mut self, on: bool) -> Self {
+        self.warm_speech = on;
         self
     }
 
@@ -199,11 +231,18 @@ impl Voice {
     }
 
     /// The speech of `text` from its first packet on, or why there is none.
-    async fn first(&self, text: &str) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
+    async fn first(
+        &self,
+        text: &str,
+        turn: Option<net::Turn>,
+    ) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
         match self {
             Self::Gemini(gemini) => gemini_first(gemini, text).await,
             Self::Configured(tts, _) => {
-                let mut speech = tts.speak(text).await?;
+                let mut speech = match turn {
+                    Some(turn) => tts.speak_for(text, turn).await?,
+                    None => tts.speak(text).await?,
+                };
                 let first = speech.next().await?;
                 let rest = stream::try_unfold(speech, |mut speech| async move {
                     Ok(speech.next().await?.map(|packet| (packet, speech)))
@@ -218,19 +257,23 @@ impl Voice {
 /// voice per lamp"). A sentence the voice fails to start is asked once more;
 /// failing again, it is not said, and the turn goes on as for any speech
 /// that never rendered. A sentence begun and then lost fails as any does.
-fn in_one_voice(voice: Voice, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+fn in_one_voice(
+    voice: Voice,
+    text: String,
+    turn: Option<net::Turn>,
+) -> BoxStream<'static, net::Result<Vec<i16>>> {
     stream::once(async move {
         if !GeminiTts::speaks(&text) {
             return Ok(stream::empty().boxed());
         }
-        match voice.first(&text).await {
+        match voice.first(&text, turn).await {
             Ok(speech) => Ok(speech),
             Err(error) => {
                 eprintln!(
                     "lamp-voice second: {} failed to start a sentence ({error}); asked once more",
                     voice.name()
                 );
-                voice.first(&text).await.inspect_err(|again| {
+                voice.first(&text, turn).await.inspect_err(|again| {
                     eprintln!(
                         "lamp-voice second: {} failed again ({again}); the sentence is not said",
                         voice.name()
@@ -241,6 +284,16 @@ fn in_one_voice(voice: Voice, text: String) -> BoxStream<'static, net::Result<Ve
     })
     .try_flatten()
     .boxed()
+}
+
+impl Net {
+    /// The lamp's one voice: Gemini's, or the configured one.
+    fn voice(&self) -> Voice {
+        match &self.gemini_tts {
+            Some(gemini) => Voice::Gemini(gemini.clone()),
+            None => Voice::Configured(self.tts.clone(), self.config.tts_provider.name()),
+        }
+    }
 }
 
 impl Services for Net {
@@ -265,11 +318,21 @@ impl Services for Net {
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
-        let voice = match &self.gemini_tts {
-            Some(gemini) => Voice::Gemini(gemini.clone()),
-            None => Voice::Configured(self.tts.clone(), self.config.tts_provider.name()),
-        };
-        in_one_voice(voice, text)
+        in_one_voice(self.voice(), text, None)
+    }
+
+    fn speak_for(
+        &self,
+        text: String,
+        turn: net::Turn,
+    ) -> BoxStream<'static, net::Result<Vec<i16>>> {
+        in_one_voice(self.voice(), text, Some(turn))
+    }
+
+    fn spoken(&self, request: u64) {
+        if let Some(told) = self.tts.told(request) {
+            eprintln!("lamp-voice second: {told}");
+        }
     }
 
     fn sees(&self) -> bool {
@@ -279,6 +342,9 @@ impl Services for Net {
     fn warm(&self) -> BoxFuture<'static, ()> {
         let gemini = self.gemini_tts.clone();
         let chat = self.warm_chat.then(|| self.chat.clone());
+        // The configured voice only when it is the lamp's one voice.
+        let configured = (self.warm_speech && gemini.is_none()).then(|| self.tts.clone());
+        let provider = self.config.tts_provider.name();
         Box::pin(async move {
             let speech = async {
                 if let Some(gemini) = gemini
@@ -300,7 +366,17 @@ impl Services for Net {
                     );
                 }
             };
-            tokio::join!(speech, chatting);
+            let configured_speech = async {
+                if let Some(tts) = configured
+                    && let Some((status, took)) = tts.warm().await
+                {
+                    eprintln!(
+                        "lamp-voice second: {provider}: the speech connection opened ahead in {} ms (HTTP {status})",
+                        took.as_millis()
+                    );
+                }
+            };
+            tokio::join!(speech, chatting, configured_speech);
         })
     }
 }
@@ -407,7 +483,12 @@ mod tests {
         let (gemini_url, gemini_asked) =
             servers(vec![(REFUSED, Vec::new()), (SSE, gemini_event(&[7, 9]))]).await;
         let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g", "Kore").unwrap());
-        let samples = said(in_one_voice(Voice::Gemini(gemini), "Hello there.".into())).await;
+        let samples = said(in_one_voice(
+            Voice::Gemini(gemini),
+            "Hello there.".into(),
+            None,
+        ))
+        .await;
         assert_eq!(samples, [7, 9], "Gemini's own level, on its second asking");
         assert_eq!(gemini_asked.await.unwrap(), 2);
 
@@ -418,7 +499,7 @@ mod tests {
         ])
         .await;
         let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g", "Kore").unwrap());
-        let results: Vec<_> = in_one_voice(Voice::Gemini(gemini), "Hello there.".into())
+        let results: Vec<_> = in_one_voice(Voice::Gemini(gemini), "Hello there.".into(), None)
             .collect()
             .await;
         assert!(matches!(results.as_slice(), [Err(_)]), "not said");
@@ -434,6 +515,7 @@ mod tests {
         let samples = said(in_one_voice(
             Voice::Configured(tts, "OpenAI"),
             "Hello there.".into(),
+            None,
         ))
         .await;
         // The configured voice's level, +6 dB.
@@ -441,9 +523,13 @@ mod tests {
         assert_eq!(asked.await.unwrap(), 2);
         let (openai, asked) = servers(vec![(REFUSED, Vec::new()), (REFUSED, Vec::new())]).await;
         let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k", None).unwrap());
-        let results: Vec<_> = in_one_voice(Voice::Configured(tts, "OpenAI"), "Hello there.".into())
-            .collect()
-            .await;
+        let results: Vec<_> = in_one_voice(
+            Voice::Configured(tts, "OpenAI"),
+            "Hello there.".into(),
+            None,
+        )
+        .collect()
+        .await;
         assert!(matches!(results.as_slice(), [Err(_)]));
         assert_eq!(asked.await.unwrap(), 2);
     }
@@ -455,11 +541,12 @@ mod tests {
         let (openai, openai_asked) = server(PCM, Vec::new()).await;
         let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g", "Kore").unwrap());
         let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k", None).unwrap());
-        let samples = said(in_one_voice(Voice::Gemini(gemini), "[sigh]".into())).await;
+        let samples = said(in_one_voice(Voice::Gemini(gemini), "[sigh]".into(), None)).await;
         assert!(samples.is_empty());
         let samples = said(in_one_voice(
             Voice::Configured(tts, "OpenAI"),
             "[sigh]".into(),
+            None,
         ))
         .await;
         assert!(samples.is_empty());
