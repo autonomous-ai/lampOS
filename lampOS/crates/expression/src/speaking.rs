@@ -60,7 +60,7 @@ const ONSET_US: u64 = 300_000;
 const STRESS_STEP: f32 = 0.15;
 /// At most one nod a sentence, and never two within this, whatever the
 /// catalogue's `nod_gap_us`: people nod on a few stressed words and are
-/// still in between.
+/// still in between. Each is the default of a catalogue key (`Speaking`).
 const NOD_SPACING_US: u64 = 4_000_000;
 /// The recent level a stressed word is measured against follows the sound
 /// this fast.
@@ -87,9 +87,30 @@ pub struct Speaking {
     pub settle: BodyOffsets,
     pub settle_us: u64,
     pub settle_after_us: u64,
+    /// How often it nods (the first builder on #2030): at most this many
+    /// nods a sentence (0: no limit; 1 without it), a word standing at least
+    /// `stress_step` over its sentence's mean so far (0.15 without it), and
+    /// never two nods within `nod_spacing_us` (4 s without it; `nod_gap_us`
+    /// if that is longer). The arm hour sets them to compare two rates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sentence_nods: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stress_step: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nod_spacing_us: Option<u64>,
 }
 
 impl Speaking {
+    fn sentence_nods(&self) -> u32 {
+        self.sentence_nods.unwrap_or(1)
+    }
+    fn stress_step(&self) -> f32 {
+        self.stress_step.unwrap_or(STRESS_STEP)
+    }
+    fn nod_spacing_us(&self) -> u64 {
+        self.nod_spacing_us.unwrap_or(NOD_SPACING_US)
+    }
+
     pub fn check(&self, limits: BodyOffsets) -> Result<(), Error> {
         let within = |pose: BodyOffsets| {
             pose.values()
@@ -103,6 +124,14 @@ impl Speaking {
         if !self.sway_roll.is_finite() || !(0.0..=limits.head_roll).contains(&self.sway_roll) {
             return Err(Error(
                 "speaking: sway_roll must be within the head roll limit".into(),
+            ));
+        }
+        if self.sentence_nods() > 10
+            || !(0.0..=0.5).contains(&self.stress_step())
+            || self.nod_spacing_us() > 10_000_000
+        {
+            return Err(Error(
+                "speaking: sentence_nods must be 0..10, stress_step 0..0.5 and nod_spacing_us at most 10 s".into(),
             ));
         }
         if !(0.0..=1.0).contains(&self.stress_level) || !(1.0..=10.0).contains(&self.stress_rise) {
@@ -142,7 +171,7 @@ pub(crate) struct SpeechMotion {
     sentence_since: Option<u64>,
     sentence_level: f32,
     sentence_voiced: u32,
-    sentence_nodded: bool,
+    sentence_nods: u32,
     quiet_since: Option<u64>,
     paused: bool,
     spoke_since: Option<u64>,
@@ -182,12 +211,13 @@ impl SpeechMotion {
         };
     }
 
-    /// A sentence begins: its own level and its nod start again.
-    fn new_sentence(&mut self, now_us: u64) {
-        self.sentence_since = Some(now_us);
+    /// A sentence begins at `since` (none: between turns): its own level
+    /// and its nods start again.
+    fn new_sentence(&mut self, since: Option<u64>) {
+        self.sentence_since = since;
         self.sentence_level = 0.0;
         self.sentence_voiced = 0;
-        self.sentence_nodded = false;
+        self.sentence_nods = 0;
     }
 
     /// Whether an answer that ends now, as it should, has spoken long enough
@@ -279,7 +309,7 @@ impl SpeechMotion {
                     // A new sentence: the head rolls over to the other side,
                     // a little more or less each time.
                     self.paused = false;
-                    self.new_sentence(now_us);
+                    self.new_sentence(Some(now_us));
                     self.sways += 1;
                     let towards = if self.side > 0.0 { -1.0 } else { 1.0 };
                     let size = 0.75 + 0.25 * fraction(self.sways, 2);
@@ -289,20 +319,21 @@ impl SpeechMotion {
             let stressed = level >= stress_level
                 && level >= self.recent * rules.stress_rise
                 && self.sentence_voiced > 0
-                && level >= self.sentence_level + STRESS_STEP;
+                && level >= self.sentence_level + rules.stress_step();
             let past_onset = self
                 .sentence_since
                 .is_some_and(|since| now_us.saturating_sub(since) >= ONSET_US);
-            let gap = rules.nod_gap_us.max(NOD_SPACING_US);
+            let gap = rules.nod_gap_us.max(rules.nod_spacing_us());
+            let limit = rules.sentence_nods();
             if stressed
                 && past_onset
-                && !self.sentence_nodded
+                && (limit == 0 || self.sentence_nods < limit)
                 && self
                     .nod
                     .is_none_or(|(at, _)| now_us.saturating_sub(at) >= gap)
             {
                 self.nods += 1;
-                self.sentence_nodded = true;
+                self.sentence_nods += 1;
                 self.nod = Some((now_us, 0.7 + 0.3 * fraction(self.nods, 1)));
             }
             if level >= SOUND_FLOOR {
@@ -324,9 +355,7 @@ impl SpeechMotion {
             self.recent = 0.0;
             self.voice = 0.0;
             self.voiced = 0;
-            self.sentence_since = None;
-            self.new_sentence(now_us);
-            self.sentence_since = None;
+            self.new_sentence(None);
             if self.side != 0.0 {
                 self.sway_to(rules, 0.0, now_us);
             }
@@ -388,6 +417,9 @@ mod tests {
             settle: head(0.03),
             settle_us: 600_000,
             settle_after_us: 1_500_000,
+            sentence_nods: None,
+            stress_step: None,
+            nod_spacing_us: None,
         }
     }
 
@@ -592,5 +624,22 @@ mod tests {
         let mut fast = rules();
         fast.nod_gap_us = 100_000;
         assert!(fast.check(limits).is_err());
+        // The rate's own keys: none, or within their bounds.
+        for (nods, step, spacing, ok) in [
+            (Some(0), Some(0.0), Some(0), true),
+            (Some(3), Some(0.5), Some(10_000_000), true),
+            (Some(11), None, None, false),
+            (None, Some(0.6), None, false),
+            (None, Some(-0.1), None, false),
+            (None, None, Some(10_000_001), false),
+        ] {
+            let mut rate = rules();
+            (rate.sentence_nods, rate.stress_step, rate.nod_spacing_us) = (nods, step, spacing);
+            assert_eq!(
+                rate.check(limits).is_ok(),
+                ok,
+                "{nods:?} {step:?} {spacing:?}"
+            );
+        }
     }
 }

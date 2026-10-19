@@ -249,7 +249,12 @@ concentrating, asleep, or once someone has cut in, and nothing is owed after.
   `speaking_engine.rs`'s
   `a_loud_story_nods_a_handful_of_times_not_every_two_seconds` draws a story
   from that voice's measured spread: 12 nods in 150 s, 156 without the
-  rule.
+  rule. Each is a catalogue key, so the arm hour can compare two rates from one
+  build (the first builder on #2030, 03:32): `sentence_nods` (1 without
+  it; 0 is no limit, up to 10), `stress_step` (0.15; 0 to 0.5) and
+  `nod_spacing_us` (4 s; up to 10 s). All three at 0 nod as before the rule
+  (`the_catalogue_can_turn_the_nod_limits_off_for_a_dense_arm`: 156 nods
+  against 12).
 - **A sway between sentences.** After `pause_us` (0.35 s) of the lamp silent
   (level under 0.06), as the next sentence begins (level back over 0.12),
   the head rolls over `sway_us` (0.6 s) to the other side: `sway_roll`

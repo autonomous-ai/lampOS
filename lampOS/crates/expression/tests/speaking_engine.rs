@@ -397,15 +397,17 @@ fn an_answer_said_200_ms_ahead_nods_and_sways_at_the_catalogues_own_lag() {
 /// words). Words drawn from that spread, the same each run,
 /// said 200 ms ahead at the catalogue's own lag: a handful of nods, never
 /// two in a sentence, and its sways.
-#[test]
-fn a_loud_story_nods_a_handful_of_times_not_every_two_seconds() {
+/// The story above, through the alive catalogue changed by `tune`: its
+/// nods and sway starts.
+fn loud_story(tune: impl FnOnce(&mut Catalogue)) -> (usize, usize) {
     let spread = [0.46, 0.55, 0.67, 0.74, 0.80, 0.84, 0.88, 0.91, 0.94, 1.0];
     let mut seed: u64 = 0x2030;
     let mut draw = move || {
         seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
         spread[(seed >> 33) as usize % spread.len()]
     };
-    let catalogue = Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+    let mut catalogue = Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+    tune(&mut catalogue);
     let mut lamp = Lamp::new(catalogue, Room::Quiet);
     let (from, end) = (1_000_000, 151_000_000);
     let mut outputs = Vec::new();
@@ -440,13 +442,34 @@ fn a_loud_story_nods_a_handful_of_times_not_every_two_seconds() {
         outputs.push((at, lamp.engine.tick(at)));
         at += TICK;
     }
-    let nods = starts(&outputs, "nodding on a stressed word");
-    let sways = starts(&outputs, "swaying between sentences");
-    eprintln!("a loud story: {nods} nods, {sways} sway starts in 150 s");
+    (
+        starts(&outputs, "nodding on a stressed word"),
+        starts(&outputs, "swaying between sentences"),
+    )
+}
+
+#[test]
+fn a_loud_story_nods_a_handful_of_times_not_every_two_seconds() {
+    let (nods, sways) = loud_story(|_| {});
     assert!((3..=13).contains(&nods), "{nods} nods in 150 s");
     // A sway holds the head over to the next pause, so the name stays on
     // across sentences: at least one.
     assert!(sways >= 1, "{sways} sways");
+}
+
+/// The arm hour compares two rates side by side (the first builder on
+/// #2030, 03:32): the same build, its catalogue with no limit a sentence,
+/// no step and no spacing, nods as before the limits, many times more.
+#[test]
+fn the_catalogue_can_turn_the_nod_limits_off_for_a_dense_arm() {
+    let (dense, _) = loud_story(|catalogue| {
+        let speaking = catalogue.speaking.as_mut().unwrap();
+        speaking.sentence_nods = Some(0);
+        speaking.stress_step = Some(0.0);
+        speaking.nod_spacing_us = Some(0);
+    });
+    let (sparse, _) = loud_story(|_| {});
+    assert!(dense >= 5 * sparse, "dense {dense}, sparse {sparse}");
 }
 
 #[test]
