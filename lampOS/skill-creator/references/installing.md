@@ -32,10 +32,19 @@ ssh orangepi@lamp-xxxx.local '
 `/opt/lampOS/skills/current/lamp-skills` is a product lamp's; a lamp set up
 by hand runs the one its unit names (`systemctl cat lamp-skills`).
 `install` says what it installed and what the skill may use, or why not
-(the skill does not load, says `kind = "core"`, or would take a core
-skill's place), and takes a package (`lamp-skills pack`) the same way.
+(the skill does not load, says `kind = "core"`, would take a core
+skill's place, or has a `tool` name another skill on the lamp has), and
+takes a package (`lamp-skills pack`) the same way. It replaces an
+installed skill of the same name with whatever version it is given, older
+or none too, and deletes what an install or remove that was killed left.
 `lamp-skills list` shows every skill on the lamp, its kind, its version and
-what it may use. On a lamp whose `lamp-skills` has no `install` yet, copy
+what it may use.
+
+Both end with how many functions the skills give the model: a session takes
+32, the voice's own and the actions part's first (30 on a product lamp), and
+past 32 the last skills' are dropped unless the voice runs with
+`LAMP_USE_SKILL=on` (#1696), so tell the owner if a new tool would not reach
+the model. On a lamp whose `lamp-skills` has no `install` yet, copy
 the folder beside the live one under a name beginning with a dot (the
 runtime skips it), then move it in whole.
 

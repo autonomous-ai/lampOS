@@ -11,14 +11,14 @@
 //! and SHA-256, each checked before anything is installed. A signature has
 //! a reserved place, `lamp-skill.sig`, and is NOT checked: signing is in
 //! the backlog. There is no fetch from a network: a package is a local file.
-use super::{SkillKind, load, plain_name, version_ok};
+use super::{Skill, SkillKind, load, load_each, plain_name, version_ok};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs, io,
     io::Read,
-    os::unix::fs::PermissionsExt,
+    os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
 };
 
@@ -39,6 +39,10 @@ pub const MOST_BYTES: u64 = 16 * 1024 * 1024;
 const MOST_PACKAGE_BYTES: u64 = MOST_BYTES + 2 * 1024 * 1024;
 /// The most parts a file's path in a skill may have (`tests/CASE/FILE`).
 const MOST_DEPTH: usize = 4;
+/// The most functions a session is given, the voice's own and the actions
+/// part's told first, then the skills' in their folders' order
+/// (`docs/tools.md`): past it, the last are left out.
+pub const SESSION_FUNCTIONS: usize = 32;
 
 /// `lamp-skill.json`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,9 +108,39 @@ fn path_ok(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The plain file at `path`, opened without following a link at its end and
+/// checked as opened: a regular file, and the one its folder listed
+/// (`listed`, by its device and inode). A file swapped for a link or for
+/// another file between the listing and the open is refused, never read:
+/// run as root on a folder another user can write, a link swapped in would
+/// otherwise copy a file only root may read into the skill, made 0644.
+/// Opened without blocking too, so a fifo swapped in does not hang it.
+fn open_plain(path: &Path, listed: &fs::Metadata) -> Result<fs::File, String> {
+    let file = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)
+        .map_err(|error| {
+            if error.raw_os_error() == Some(libc::ELOOP) {
+                "a link: a skill is plain files and folders".to_owned()
+            } else {
+                error.to_string()
+            }
+        })?;
+    let opened = file.metadata().map_err(|error| error.to_string())?;
+    if !opened.is_file() {
+        return Err("not a plain file".into());
+    }
+    if (opened.dev(), opened.ino()) != (listed.dev(), listed.ino()) {
+        return Err("changed while it was read: not the file its folder listed".into());
+    }
+    Ok(file)
+}
+
 /// Every file of the skill folder `dir` but hidden ones (their name begins
 /// with a dot, as the loader passes them over). A link, or anything but a
-/// plain file or folder, refuses it: a skill is plain files.
+/// plain file or folder, refuses it: a skill is plain files. Each file is
+/// read as [`open_plain`] opens it.
 pub fn read_folder(dir: &Path) -> Result<Files, String> {
     let mut files = Files::new();
     let mut total = 0u64;
@@ -147,16 +181,25 @@ pub fn read_folder(dir: &Path) -> Result<Files, String> {
                 return Err(format!("{path}: not a plain file"));
             }
             path_ok(&path)?;
-            total += meta.len();
-            if total > MOST_BYTES || files.len() >= MOST_FILES {
-                return Err(format!(
-                    "more than {MOST_FILES} files or {MOST_BYTES} bytes: too big for a skill"
-                ));
+            let too_big = || {
+                format!("more than {MOST_FILES} files or {MOST_BYTES} bytes: too big for a skill")
+            };
+            if total + meta.len() > MOST_BYTES || files.len() >= MOST_FILES {
+                return Err(too_big());
             }
             let mut bytes = Vec::new();
-            fs::File::open(entry.path())
-                .and_then(|file| file.take(MOST_BYTES + 1).read_to_end(&mut bytes))
-                .map_err(|error| format!("{path}: {error}"))?;
+            open_plain(&entry.path(), &meta)
+                .and_then(|file| {
+                    file.take(MOST_BYTES - total + 1)
+                        .read_to_end(&mut bytes)
+                        .map_err(|error| error.to_string())
+                })
+                .map_err(|why| format!("{path}: {why}"))?;
+            // What was read, which may be more than was listed.
+            total += bytes.len() as u64;
+            if total > MOST_BYTES {
+                return Err(too_big());
+            }
             files.insert(path, bytes);
         }
     }
@@ -245,9 +288,16 @@ pub fn read_package(path: &Path) -> Result<Package, String> {
         ));
     }
     let mut bytes = Vec::new();
-    fs::File::open(path)
-        .and_then(|file| file.take(MOST_PACKAGE_BYTES + 1).read_to_end(&mut bytes))
-        .map_err(|error| error.to_string())?;
+    open_plain(path, &meta).and_then(|file| {
+        file.take(MOST_PACKAGE_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|error| error.to_string())
+    })?;
+    if bytes.len() as u64 > MOST_PACKAGE_BYTES {
+        return Err(format!(
+            "more than {MOST_PACKAGE_BYTES} bytes: too big for a skill"
+        ));
+    }
     let mut archive = tar::Archive::new(&bytes[..]);
     let (mut manifest, mut signature) = (None, None);
     let mut files = Files::new();
@@ -422,17 +472,110 @@ fn hidden_place(skills: &Path, what: &str, name: &str) -> PathBuf {
     skills.join(format!(".{what}-{name}-{}", std::process::id()))
 }
 
+/// The skills folder held by this install or remove for its whole run (an
+/// advisory lock on the folder itself, given back when the run ends, killed
+/// or not), so two never interleave: a staged or set-aside folder another
+/// run finds is a killed run's, never one under way, and what one checks
+/// of the folder is still so when it moves a skill in.
+fn locked(skills: &Path) -> Result<fs::File, String> {
+    let folder =
+        fs::File::open(skills).map_err(|error| format!("{}: {error}", skills.display()))?;
+    folder
+        .lock()
+        .map_err(|error| format!("{}: not locked: {error}", skills.display()))?;
+    Ok(folder)
+}
+
+/// Whether `name` is what [`hidden_place`] names: `.install-NAME-PID` or
+/// `.removed-NAME-PID`, a skill's name and a number, and nothing else.
+fn left_by_a_run(name: &str) -> bool {
+    [".install-", ".removed-"].iter().any(|what| {
+        name.strip_prefix(what)
+            .and_then(|rest| rest.rsplit_once('-'))
+            .is_some_and(|(skill, pid)| {
+                skill_name_ok(skill)
+                    && (1..=10).contains(&pid.len())
+                    && pid.bytes().all(|byte| byte.is_ascii_digit())
+            })
+    })
+}
+
+/// Deletes what a killed install or remove left in `skills` (called with
+/// the folder [`locked`], so nothing under way), and names it: a folder
+/// directly in `skills` whose name [`left_by_a_run`]. A link, a file, or a
+/// folder of any other name is left as it is.
+fn swept(skills: &Path) -> Vec<String> {
+    let mut swept: Vec<String> = fs::read_dir(skills)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| left_by_a_run(name))
+        .filter(|name| {
+            let place = skills.join(name);
+            fs::symlink_metadata(&place).is_ok_and(|meta| meta.is_dir())
+                && fs::remove_dir_all(&place).is_ok()
+        })
+        .collect();
+    swept.sort();
+    swept
+}
+
+/// The skill in `skills`, other than `name`, whose tool is `tool`, and its
+/// kind, by each folder's `skill.toml` alone: a skill that does not load
+/// just now keeps its function's name all the same.
+fn tool_holder(skills: &Path, name: &str, tool: &str) -> Option<(String, SkillKind)> {
+    let mut folders: Vec<(String, PathBuf)> = fs::read_dir(skills)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| Some((entry.file_name().into_string().ok()?, entry.path())))
+        .filter(|(folder, path)| !folder.starts_with('.') && folder != name && path.is_dir())
+        .collect();
+    folders.sort();
+    folders.into_iter().find_map(|(folder, path)| {
+        let toml = toml_of(&path)?;
+        (toml.get("tool").and_then(toml::Value::as_str) == Some(tool))
+            .then(|| (folder, kind_of(&path)))
+    })
+}
+
+/// What the loaded `skills` give the model: their functions, and what a
+/// session does past its room (`docs/tools.md`).
+fn functions_said(skills: &[Skill]) -> String {
+    let tools: Vec<&str> = skills
+        .iter()
+        .filter_map(|skill| skill.tool.as_deref())
+        .collect();
+    if tools.is_empty() {
+        return "The skills here give the model no function.".into();
+    }
+    format!(
+        "The skills here give the model {} function{} ({}). A session takes {SESSION_FUNCTIONS}, \
+         the voice's own and the actions part's first (30 on a product lamp), and past \
+         {SESSION_FUNCTIONS} the last are dropped unless the voice runs with LAMP_USE_SKILL=on \
+         (every skill through one function, use_skill).",
+        tools.len(),
+        if tools.len() == 1 { "" } else { "s" },
+        tools.join(", ")
+    )
+}
+
 /// Installs the skill at `from`, a folder or a package (`.tar`), in the
 /// skills folder `skills`, and says what was done. It is put together
 /// beside the live skills where the running program does not look, loaded
 /// there with every check a load makes (its permissions among them), and
 /// only then moved in whole: the running program never sees half a skill,
 /// and one that does not load is never live. A core skill is refused, and
-/// so is one whose name a core skill on the lamp has.
+/// so is one whose name a core skill on the lamp has, or whose tool's name
+/// another skill there has. What a killed install or remove left is
+/// deleted first ([`swept`]).
 pub fn install(skills: &Path, from: &Path) -> Result<String, String> {
     if !fs::metadata(skills).is_ok_and(|meta| meta.is_dir()) {
         return Err(format!("no skills folder at {}", skills.display()));
     }
+    let _held = locked(skills)?;
+    let swept = swept(skills);
     let meta = fs::metadata(from).map_err(|error| format!("{}: {error}", from.display()))?;
     let (name, files, package) = if meta.is_dir() {
         let from =
@@ -473,7 +616,16 @@ pub fn install(skills: &Path, from: &Path) -> Result<String, String> {
         moved_in(skills, &name, &folder, files.len(), package.as_ref())
     })();
     let _ = fs::remove_dir_all(&staged);
-    made
+    if swept.is_empty() {
+        made
+    } else {
+        made.map(|said| {
+            format!(
+                "{said} Deleted what a killed install or remove left: {}.",
+                swept.join(", ")
+            )
+        })
+    }
 }
 
 /// The skill put together in `folder` loaded, checked against what it
@@ -520,6 +672,17 @@ fn moved_in(
         }
         Ok(_) => Some(version_of(&target)),
     };
+    // A function is one skill's: one that takes another's name would take
+    // it from the model, a core skill's first ([`load_each`]).
+    if let Some(tool) = &skill.tool
+        && let Some((holder, kind)) = tool_holder(skills, name, tool)
+    {
+        return Err(format!(
+            "not installed: {name}'s tool {tool:?} is the {} skill {holder}'s on this lamp: \
+             a function the model calls is one skill's",
+            kind.name()
+        ));
+    }
     let failed = |error: io::Error| format!("not installed: {}: {error}", target.display());
     match &replaced {
         None => fs::rename(folder, &target).map_err(failed)?,
@@ -557,9 +720,11 @@ fn moved_in(
             }
         ),
     };
+    let (loaded, _) = super::load_all(skills);
     Ok(format!(
-        "{what} {from}. It may use: {}. A running lamp-skills loads it within 2 s.",
-        skill.permissions.said()
+        "{what} {from}. It may use: {}. A running lamp-skills loads it within 2 s. {}",
+        skill.permissions.said(),
+        functions_said(&loaded)
     ))
 }
 
@@ -585,6 +750,7 @@ pub fn remove(skills: &Path, name: &str) -> Result<String, String> {
         }
         Err(error) => return Err(format!("{}: {error}", target.display())),
     }
+    let _held = locked(skills)?;
     if kind_of(&target) == SkillKind::Core {
         return Err(format!(
             "{name} is a core skill: it comes with the lamp and can't be removed"
@@ -609,34 +775,33 @@ pub fn remove(skills: &Path, name: &str) -> Result<String, String> {
 }
 
 /// The skills in `skills`, a line each: name, kind, version and what it
-/// may use, or why it does not load.
+/// may use, or why it does not load, as the running program loads them
+/// ([`load_each`]); then the functions they give the model.
 pub fn list(skills: &Path) -> Result<String, String> {
-    let mut folders: Vec<PathBuf> = fs::read_dir(skills)
-        .map_err(|error| format!("{}: {error}", skills.display()))?
-        .flatten()
-        .filter(|entry| !entry.file_name().to_string_lossy().starts_with('.'))
-        .map(|entry| entry.path())
-        .filter(|path| path.is_dir())
-        .collect();
-    folders.sort();
+    fs::read_dir(skills).map_err(|error| format!("{}: {error}", skills.display()))?;
+    let mut loaded = Vec::new();
     let mut rows = vec![[
         "NAME".to_owned(),
         "KIND".to_owned(),
         "VERSION".to_owned(),
         "MAY USE".to_owned(),
     ]];
-    for folder in folders {
+    for (folder, skill) in load_each(skills) {
         let name = folder
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_default();
-        rows.push(match load(&folder) {
-            Ok(skill) => [
-                skill.name,
-                skill.kind.name().to_owned(),
-                skill.version.unwrap_or_else(|| "-".into()),
-                skill.permissions.said(),
-            ],
+        rows.push(match skill {
+            Ok(skill) => {
+                let row = [
+                    skill.name.clone(),
+                    skill.kind.name().to_owned(),
+                    skill.version.clone().unwrap_or_else(|| "-".into()),
+                    skill.permissions.said(),
+                ];
+                loaded.push(skill);
+                row
+            }
             Err(why) => [
                 name,
                 kind_of(&folder).name().to_owned(),
@@ -648,7 +813,7 @@ pub fn list(skills: &Path) -> Result<String, String> {
     let widths: Vec<usize> = (0..3)
         .map(|column| rows.iter().map(|row| row[column].len()).max().unwrap_or(0))
         .collect();
-    Ok(rows
+    let mut listed: String = rows
         .iter()
         .map(|row| {
             format!(
@@ -662,5 +827,79 @@ pub fn list(skills: &Path) -> Result<String, String> {
                 w2 = widths[2]
             )
         })
-        .collect())
+        .collect();
+    listed.push_str(&functions_said(&loaded));
+    listed.push('\n');
+    Ok(listed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A file swapped after its folder was listed, for a link (to a file
+    /// only root may read, run as root), another file or a fifo, is refused
+    /// as it is opened and never read; the fifo at once, not waited on
+    /// (the reviewer on #1698, 08:39).
+    #[test]
+    fn a_file_swapped_after_its_folder_was_listed_is_not_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("SKILL.md");
+        let secret = dir.path().join("secret");
+        fs::write(&secret, b"root's alone").unwrap();
+        fs::write(&path, b"a skill").unwrap();
+        let listed = fs::symlink_metadata(&path).unwrap();
+        let mut read = String::new();
+        open_plain(&path, &listed)
+            .unwrap()
+            .read_to_string(&mut read)
+            .unwrap();
+        assert_eq!(read, "a skill");
+        fs::remove_file(&path).unwrap();
+        std::os::unix::fs::symlink(&secret, &path).unwrap();
+        let why = open_plain(&path, &listed).unwrap_err();
+        assert_eq!(why, "a link: a skill is plain files and folders");
+        // Another plain file in its place: the same name, not the same file.
+        fs::remove_file(&path).unwrap();
+        fs::hard_link(&secret, &path).unwrap();
+        let why = open_plain(&path, &listed).unwrap_err();
+        assert!(why.starts_with("changed while it was read"), "{why}");
+        fs::remove_file(&path).unwrap();
+        let made = std::process::Command::new("mkfifo")
+            .arg(&path)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let why = open_plain(&path, &listed).unwrap_err();
+        assert_eq!(why, "not a plain file");
+    }
+
+    /// Only what an install or a remove names its own folders is taken for
+    /// one a killed run left.
+    #[test]
+    fn only_a_runs_own_folder_names_are_taken_for_what_it_left() {
+        for name in [
+            ".install-desk-tutor-4242",
+            ".removed-desk-tutor-1",
+            ".install-a-0",
+        ] {
+            assert!(left_by_a_run(name), "{name}");
+        }
+        for name in [
+            "desk-tutor",
+            "install-desk-tutor-4242",
+            ".install-desk-tutor",
+            ".install-desk-tutor-",
+            ".install--4242",
+            ".install-Desk-4242",
+            ".install-desk_tutor-4242",
+            ".install-desk-tutor-42a",
+            ".install-desk-tutor-12345678901",
+            ".installer-desk-tutor-4242",
+            ".removed-../x-1",
+            ".lamp-skills.lock",
+        ] {
+            assert!(!left_by_a_run(name), "{name}");
+        }
+    }
 }

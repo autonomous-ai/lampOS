@@ -79,7 +79,7 @@ sees the list (`lamp-skills list`), and so will the Store.
 
 | Key | Gives |
 |---|---|
-| `topics` | The topics it reads: each one a trigger or a `[[while]]` names, `humans/faces/tracked` for `body = { look_at = "face" }`, and `voice/heard` for a tool's `[again]` |
+| `topics` | The topics it reads: each one a trigger or a `[[while]]` names, `humans/faces/tracked` for `body = { look_at = "face" }`, `voice/heard` for a tool's `[again]`, `schedule/due` for `say = { from = "schedule" }` and `tasks/status` for `say = { from = "tasks" }` |
 | `speak` | `say` (a note or `{ from = ... }`) and `sound` |
 | `light` | `light` steps |
 | `body` | `look_at`, `gesture`, `move`, `mood` |
@@ -144,6 +144,8 @@ say = "Tutor: a hint or a question, never the answer."
 
 - The `SKILL.md` description is what the model reads to decide when to call
   it: say **when to call**, in the person's words, at most 1,024 bytes.
+- The `tool` name is the skill's alone on the lamp: one another skill
+  already has (`dance`, `check_my_work`, `show_verdict`) is refused.
 - No trigger, no `[ask]`. Its `[[while]]` conditions still hold it back.
 - **A tool takes no arguments.** "Focus for 25 minutes" cannot pass the 25:
   a number the person says is for the voice's own tools (a timer is the

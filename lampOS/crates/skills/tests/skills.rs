@@ -492,6 +492,121 @@ fn a_skill_reads_and_does_only_what_its_permissions_declare() {
     assert_eq!(engine.topics(), ["humans/faces/tracked", "voice/state"]);
 }
 
+/// A skill that has the voice say the person's reminder or the news of
+/// their work reads those words, so it declares their topic: a skill
+/// started by the air could otherwise say the person's reminders at its own
+/// moment (the reviewer on #1698, 08:39). It reads them through the voice,
+/// so the program does not listen to the topic for it.
+#[test]
+fn a_say_of_the_persons_reminder_or_task_news_reads_its_topic() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |topics: &str, from: &str| {
+        format!(
+            "[permissions]\ntopics = [{topics}]\nspeak = true\n\
+             [trigger]\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\n\
+             [ask]\npolicy = \"reminder\"\n\
+             [[do]]\nsay = {{ from = \"{from}\" }}\n"
+        )
+    };
+    for (from, topic) in [("schedule", "schedule/due"), ("tasks", "tasks/status")] {
+        let skill = skill_with(
+            &dir.path().join(from),
+            "stuffy-says",
+            &toml("\"air/state\"", from),
+        );
+        let error = load(&skill).unwrap_err();
+        assert_eq!(
+            error,
+            format!(
+                "not permitted: a say from {from} reads {topic}, and {topic} is not in [permissions] topics"
+            )
+        );
+        let skill = skill_with(
+            &dir.path().join(format!("{from}-declared")),
+            "stuffy-says",
+            &toml(&format!("\"air/state\", \"{topic}\""), from),
+        );
+        let engine = Engine::new(vec![load(&skill).unwrap()], true);
+        assert_eq!(engine.topics(), ["air/state"]);
+    }
+    // Reminders and Task news say those words, and declare them.
+    for name in ["reminders", "task-news"] {
+        load(&skills_root().join(name)).unwrap();
+    }
+}
+
+/// A function the model calls is one skill's. The reviewer's probe on
+/// #1698 (08:39): an installable `a-dance` with `tool = "dance"`, first by
+/// folder, took core Dance's function from the model without a word. Core
+/// skills take their tools' names first, then the installable ones by
+/// folder, and a skill whose tool's name is taken is not loaded, with why.
+#[test]
+fn a_tool_is_one_skills_a_core_skills_first() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    copy(&skills_root().join("dance"), &skills.join("dance"));
+    let installable = |name: &str, tool: &str| {
+        skill_with(
+            &skills,
+            name,
+            &format!(
+                "tool = \"{tool}\"\n[permissions]\nspeak = true\n[[do]]\nsay = \"Say you will.\"\n"
+            ),
+        )
+    };
+    installable("a-dance", "dance");
+    installable("b-wiggle", "wiggle");
+    installable("c-wiggle", "wiggle");
+    let (loaded, errors) = load_all(&skills);
+    let names: Vec<&str> = loaded.iter().map(|skill| skill.name.as_str()).collect();
+    assert_eq!(names, ["b-wiggle", "dance"]);
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert!(
+        errors[0].ends_with(
+            "a-dance: its tool \"dance\" is the core skill dance's: a function the model calls is one skill's, \
+             a core skill's first"
+        ),
+        "{errors:?}"
+    );
+    assert!(
+        errors[1].ends_with("c-wiggle: its tool \"wiggle\" is the installable skill b-wiggle's: a function the model calls is one skill's, a core skill's first"),
+        "{errors:?}"
+    );
+    let tools = tools_file(&loaded);
+    let dance: Vec<&serde_json::Value> = tools["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|tool| tool["name"] == "dance")
+        .collect();
+    assert_eq!(dance.len(), 1);
+    assert!(
+        dance[0]["description"]
+            .as_str()
+            .unwrap()
+            .starts_with("When someone asks the lamp to dance"),
+        "{tools}"
+    );
+    let mut engine = Engine::new(loaded, true);
+    assert_eq!(
+        engine
+            .tool("dance", &serde_json::Value::Null, 0)
+            .unwrap()
+            .skill,
+        "dance"
+    );
+    // The list says so too, as the program loads them.
+    let listed = lamp_skills::package::list(&skills).unwrap();
+    let line = listed
+        .lines()
+        .find(|line| line.starts_with("a-dance "))
+        .unwrap();
+    assert!(
+        line.contains("not loaded: its tool \"dance\" is the core skill dance's"),
+        "{listed}"
+    );
+}
+
 /// The gate itself, as the program asks it where each call leaves: the
 /// body, the light, the voice and the look each need their permission, and
 /// the actions part's functions are the light's with `light`, any other only
@@ -2294,8 +2409,18 @@ fn an_installable_skill_goes_on_and_off_a_running_lamp_with_nothing_restarted() 
     settled(&["dance", "check_my_work"]);
     let (code, listed, _) = command(&["list".as_ref(), "--dir".as_ref(), skills.as_os_str()]);
     assert_eq!(code, Some(0));
-    let listed: Vec<Vec<&str>> = listed
-        .lines()
+    let mut lines: Vec<&str> = listed.lines().collect();
+    // Last, what the skills give the model, against a session's room.
+    let functions = lines.pop().unwrap_or_default();
+    assert!(
+        functions.starts_with(
+            "The skills here give the model 2 functions (dance, check_my_work). A session takes 32"
+        ),
+        "{listed}"
+    );
+    assert!(said.contains(functions), "{said}");
+    let listed: Vec<Vec<&str>> = lines
+        .iter()
         .map(|line| line.split_whitespace().take(3).collect())
         .collect();
     assert_eq!(

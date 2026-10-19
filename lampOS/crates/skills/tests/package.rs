@@ -236,6 +236,16 @@ fn a_package_installs_whole_its_files_checked_and_open_to_the_parts() {
         said.contains("It may use: speak, light, body, look."),
         "{said}"
     );
+    // What its function costs a session is said, not left to be found.
+    assert!(
+        said.ends_with(
+            "A running lamp-skills loads it within 2 s. The skills here give the model 1 function \
+             (check_my_work). A session takes 32, the voice's own and the actions part's first \
+             (30 on a product lamp), and past 32 the last are dropped unless the voice runs with \
+             LAMP_USE_SKILL=on (every skill through one function, use_skill)."
+        ),
+        "{said}"
+    );
     // Only the skill: nothing put together or set aside is left beside it.
     assert_eq!(left(&skills), ["desk-tutor"]);
     let installed = skills.join("desk-tutor");
@@ -544,6 +554,142 @@ fn a_core_skill_is_never_installed_replaced_or_removed() {
     assert_eq!(read_folder(&skills.join("welcome-back")).unwrap(), before);
 }
 
+/// The reviewer's probe on #1698 (08:39): an installable `a-dance` with
+/// `tool = "dance"` installed beside core Dance and took its function.
+/// A function the model calls is one skill's: an install whose tool's name
+/// another skill on the lamp has is refused, a core one's or not; the same
+/// skill's next version keeps its own.
+#[test]
+fn a_skill_whose_tool_another_skill_has_is_not_installed() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    copy(&skills_root().join("dance"), &skills.join("dance"));
+    let skill_of = |name: &str, tool: &str| {
+        let skill = dir.path().join("src").join(name);
+        fs::create_dir_all(&skill).unwrap();
+        fs::write(
+            skill.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: When they ask for it.\n---\n"),
+        )
+        .unwrap();
+        fs::write(
+            skill.join("skill.toml"),
+            format!(
+                "tool = \"{tool}\"\n[permissions]\nspeak = true\n[[do]]\nsay = \"Say you will.\"\n"
+            ),
+        )
+        .unwrap();
+        skill
+    };
+    let why = package::install(&skills, &skill_of("a-dance", "dance")).unwrap_err();
+    assert_eq!(
+        why,
+        "not installed: a-dance's tool \"dance\" is the core skill dance's on this lamp: \
+         a function the model calls is one skill's"
+    );
+    assert_eq!(left(&skills), ["dance"]);
+    let said = package::install(&skills, &tutor(&dir.path().join("one"), "1.0.0")).unwrap();
+    assert!(
+        said.ends_with(
+            "The skills here give the model 2 functions (dance, check_my_work). A session takes 32, \
+             the voice's own and the actions part's first (30 on a product lamp), and past 32 the \
+             last are dropped unless the voice runs with LAMP_USE_SKILL=on (every skill through \
+             one function, use_skill)."
+        ),
+        "{said}"
+    );
+    let why = package::install(&skills, &skill_of("tutor-two", "check_my_work")).unwrap_err();
+    assert!(
+        why.contains("tool \"check_my_work\" is the installable skill desk-tutor's on this lamp"),
+        "{why}"
+    );
+    assert_eq!(left(&skills), ["dance", "desk-tutor"]);
+    let said = package::install(&skills, &tutor(&dir.path().join("two"), "1.1.0")).unwrap();
+    assert!(
+        said.starts_with("replaced desk-tutor 1.0.0 with 1.1.0"),
+        "{said}"
+    );
+}
+
+/// A killed install or remove leaves its `.install-NAME-PID` or
+/// `.removed-NAME-PID` (a whole skill), which no later run of another PID
+/// would delete (the reviewer on #1698, 08:39). The next install deletes
+/// them and says so; nothing else in the folder of a name like them is
+/// touched, and a link of that name is not followed.
+#[test]
+fn what_a_killed_install_or_remove_left_is_deleted_by_the_next_install() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    let staged = skills.join(".install-desk-tutor-99999");
+    tutor(&staged, "1.0.0");
+    let aside = skills.join(".removed-old-skill-12");
+    fs::create_dir_all(aside.join("tests")).unwrap();
+    fs::write(aside.join("SKILL.md"), b"an old skill").unwrap();
+    let elsewhere = dir.path().join("elsewhere");
+    fs::create_dir(&elsewhere).unwrap();
+    fs::write(elsewhere.join("keep.txt"), b"not the skills'").unwrap();
+    std::os::unix::fs::symlink(&elsewhere, skills.join(".removed-x-12")).unwrap();
+    fs::write(skills.join(".install-y-7"), b"a file").unwrap();
+    for kept in [".install-notes", ".installer-x-1", ".install-z-1a"] {
+        fs::create_dir(skills.join(kept)).unwrap();
+    }
+    let said = package::install(&skills, &tutor(&dir.path().join("src"), "1.0.0")).unwrap();
+    assert!(
+        said.ends_with(
+            "Deleted what a killed install or remove left: .install-desk-tutor-99999, .removed-old-skill-12."
+        ),
+        "{said}"
+    );
+    let mut kept = vec![
+        ".install-notes",
+        ".install-y-7",
+        ".install-z-1a",
+        ".installer-x-1",
+        ".removed-x-12",
+        "desk-tutor",
+    ];
+    kept.sort();
+    assert_eq!(left(&skills), kept);
+    assert_eq!(
+        fs::read(elsewhere.join("keep.txt")).unwrap(),
+        b"not the skills'"
+    );
+    // Nothing left this time, and nothing said of it.
+    let said = package::install(&skills, &tutor(&dir.path().join("next"), "1.1.0")).unwrap();
+    assert!(!said.contains("Deleted"), "{said}");
+}
+
+/// An install holds the skills folder for its whole run, so another
+/// install or remove waits for it, and what an install takes for a killed
+/// run's is never one under way.
+#[test]
+fn an_install_waits_while_another_run_holds_the_skills_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir(&skills).unwrap();
+    let source = tutor(&dir.path().join("src"), "1.0.0");
+    let held = fs::File::open(&skills).unwrap();
+    held.lock().unwrap();
+    let (done, finished) = std::sync::mpsc::channel();
+    let installing = {
+        let skills = skills.clone();
+        std::thread::spawn(move || done.send(package::install(&skills, &source)).unwrap())
+    };
+    assert!(
+        finished
+            .recv_timeout(std::time::Duration::from_millis(300))
+            .is_err()
+    );
+    assert!(left(&skills).is_empty());
+    held.unlock().unwrap();
+    let said = finished
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap()
+        .unwrap();
+    assert!(said.starts_with("installed desk-tutor 1.0.0"), "{said}");
+    installing.join().unwrap();
+}
+
 #[test]
 fn a_folder_with_a_link_or_nowhere_to_go_is_not_installed() {
     let dir = tempfile::tempdir().unwrap();
@@ -577,7 +723,16 @@ fn a_list_says_each_skills_name_kind_version_and_what_it_may_use() {
     fs::create_dir(skills.join(".install-x-1")).unwrap();
     let listed = package::list(&skills).unwrap();
     let lines: Vec<&str> = listed.lines().collect();
-    assert_eq!(lines.len(), 4, "{listed}");
+    assert_eq!(lines.len(), 5, "{listed}");
+    // Then what the skills that loaded give the model, against a session's room.
+    assert!(
+        lines[4].starts_with(
+            "The skills here give the model 1 function (check_my_work). A session takes 32, \
+             the voice's own and the actions part's first (30 on a product lamp), and past 32 \
+             the last are dropped unless the voice runs with LAMP_USE_SKILL=on"
+        ),
+        "{listed}"
+    );
     // Name, kind and version are single words; what it may use is the rest.
     let columns = |line: &str| {
         let mut words = line.split_whitespace();

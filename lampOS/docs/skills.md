@@ -583,8 +583,13 @@ answered at once while the still takes up to 2.5 s. If no still with
 this ask's id comes within `STILL_WAIT` (2.6 s), the look's turn goes with
 no picture and tells the model that it could not see and must say so,
 never guess (`NO_LOOK_NOTE`). Without `LAMP_LOOK_FULL=on` nothing of this
-happens and, as before, the model's own words are the look. A name two
-skills give is the first's, by folder. Without `--tools-dir`, or with no
+happens and, as before, the model's own words are the look. A tool's name is one
+skill's: the core skills take their names first, then the installable ones
+in their folders' order, and a skill whose tool's name is taken is not
+loaded, the journal saying whose it is (`lamp-skills: not loaded:
+…/a-dance: its tool "dance" is the core skill dance's: …`), so an installed
+skill never takes a core skill's function from the model; `install` refuses
+one before it goes in (below). Without `--tools-dir`, or with no
 skill that has a tool, nothing changes.
 
 A call is refused, in words the lamp can say, and nothing is done, when the
@@ -671,7 +676,8 @@ A core skill comes with the lamp: `lamp-update install` writes it (on
 skill's file taken away by hand is written again at the next install. `lamp-skills remove`
 refuses it, and `lamp-skills install` refuses a folder or a package that
 says it is core, or that would take the place of a core skill on the lamp.
-`kind` changes nothing else the program does.
+A core skill also keeps its tool's name: the program loads no other skill
+with it. `kind` changes nothing else the program does.
 
 **On a running lamp.** Four commands, each run on the lamp, as root (the
 product's skills folder is root's; the part itself only reads it, under
@@ -690,26 +696,52 @@ it does not know).
 
 - **`install`** takes a skill's folder or its package. The files are read
   first (plain files and folders only: a link refuses it; hidden files are
-  left out), then written into `DIR/.install-NAME-PID/NAME`, which the
+  left out; each file is opened without following a link, `O_NOFOLLOW`, and
+  checked as opened to be the plain file its folder listed, by device and
+  inode, so one swapped for a link or another file while it is read is
+  refused, never copied; a folder in it swapped for a link while it is read
+  is not caught, so install from a folder only root can write, or from a
+  package, one file), then written into `DIR/.install-NAME-PID/NAME`, which the
   running program passes over (its name begins with a dot), folders 0755
   and files 0644 whatever the umask of who ran it, so the parts' user can
   read them. There it is loaded with every check a load makes, its
   permissions among them, and only then renamed into `DIR/NAME`: the running
   program never sees half a skill, and one that does not load is never live.
-  A skill already there is replaced only if it is installable: it is renamed
+  A skill whose tool's name another skill in `DIR` has is refused (`not
+  installed: a-dance's tool "dance" is the core skill dance's on this lamp:
+  a function the model calls is one skill's`), read from each folder's
+  `skill.toml`, so a skill that does not load just then keeps its name.
+  A skill already there is replaced only if it is installable, by any
+  version, higher, lower or none: the two are not compared (`replaced
+  desk-tutor 1.2.0 with 1.0.0`). The old one is renamed
   to `DIR/.removed-NAME-PID`, the new one renamed into its place, and the
   old deleted. Between the two renames the program may see neither, for
   microseconds, against a look every 2 s *(chosen: a swap of two folders in
-  one step is Linux's alone)*. Nothing is left beside the skills, whether
-  it installed or not.
+  one step is Linux's alone)*. Each `install` and `remove` holds `DIR` for
+  its whole run (a lock on the folder itself, given back however the run
+  ends), so two never interleave. Nothing is left beside the skills, whether
+  it installed or not; a run killed partway may leave its
+  `.install-NAME-PID` or `.removed-NAME-PID`, and the next install deletes
+  every folder of exactly that shape directly in `DIR` (a skill's name and a
+  number; a link or a file of such a name is left as it is) and says so.
 - **`remove`** renames an installable skill's folder aside, so it is gone
   at once for the program, then deletes it.
 - **`list`** says, a line each, every skill folder's name, kind, version
-  (`-` for none) and what it may use, or why it does not load:
+  (`-` for none) and what it may use, or why it does not load, as the
+  running program loads them (a tool's name taken among them), then the
+  functions they give the model:
 
       NAME          KIND         VERSION  MAY USE
       desk-tutor    installable  1.0.0    speak, light, body, look
       welcome-back  core         1.0.0    reads humans/faces/tracked, voice/state; speak, light, body
+      The skills here give the model 1 function (check_my_work). A session takes 32, …
+
+- **A session's 32 functions.** `install` and `list` end with the functions
+  the skills give the model, because a session takes 32, the voice's own
+  and the actions part's first (30 on a product lamp), and past 32 the last
+  skills' are dropped unless the voice runs with `LAMP_USE_SKILL=on` (#1696),
+  which gives every skill through one function, `use_skill`
+  ([tools.md](tools.md), "Many skills").
 
 - **`pack`** makes a package of an installable skill folder, below.
 
@@ -738,14 +770,19 @@ actions = []    # the actions part's functions it may call by name
 
 - **At load.** Every topic the skill reads must be in `topics`: those its
   triggers and `[[while]]` conditions name, `humans/faces/tracked` for a
-  look at a face, and `voice/heard` for a tool's `[again]` (what a person
-  said). Each step needs its key: a `body` step `body`, a `light` step
+  look at a face, `voice/heard` for a tool's `[again]` (what a person
+  said), and `schedule/due` for a `say = { from = "schedule" }` or
+  `tasks/status` for a `say = { from = "tasks" }` (the person's reminder,
+  the news of their work: a skill started by anything else could otherwise
+  have them said at its own moment). Each step needs its key: a `body` step `body`, a `light` step
   `light`, a `say` or a `sound` `speak`, and `look = true` `look`. A skill
   that reads or does anything more is not loaded, and the journal says
   what it lacks: `lamp-skills: not loaded: /var/lib/lampOS/skills/x: not
   permitted: a [[while]] reads voice/state, and voice/state is not in
   [permissions] topics`. Declaring more than it reads is allowed; the
-  program subscribes only to what a skill reads and lists. What the program
+  program subscribes only to what a skill's triggers, conditions, look at
+  a face and `[again]` read and it lists (a say's words come from the
+  voice, so their topic is not subscribed to for it). What the program
   reads to make a step safely (the light shown, the voice's state for a
   step after the say, the body's clips, a hand, the pause) is its own, not
   the skill's.
@@ -801,7 +838,8 @@ download); the signature's check and the key it would be checked with; the
 app's "My skills" page (`list` is text for a person); turning a skill off
 without removing it, core ones among them; a test that #1667's
 `PRODUCT_SKILLS` are exactly the core skills, once both are on `lamp-voice`.
-A skill's functions past a session's 32 are #1668's.
+A skill's functions past a session's 32 are #1668's (`LAMP_USE_SKILL=on`,
+#1696): `install` and `list` say the count, and nothing here changes it.
 
 ### Reflexes stay in the body and Expression
 

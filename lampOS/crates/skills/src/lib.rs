@@ -411,8 +411,9 @@ const MOST_PERMITTED: usize = 32;
 #[serde(deny_unknown_fields)]
 pub struct Permissions {
     /// The topics it reads: those its triggers and `[[while]]` conditions
-    /// name, `humans/faces/tracked` for a look at a face, and `voice/heard`
-    /// for a tool's `[again]` ([`Skill::reads`]).
+    /// name, `humans/faces/tracked` for a look at a face, `voice/heard`
+    /// for a tool's `[again]`, and `schedule/due` or `tasks/status` for a
+    /// say from the voice's reminder or task news ([`Skill::reads`]).
     #[serde(default)]
     pub topics: Vec<String>,
     /// The actions part's functions it may call by name, beyond the
@@ -598,14 +599,36 @@ pub struct Skill {
 }
 
 impl Skill {
-    /// Every topic the skill reads, once each, and what reads it: its
-    /// triggers, its `[[while]]` conditions, a look at a face (the faces the
-    /// eyes see), and a tool's `[again]` (what was heard). These are what
-    /// the program subscribes to for it ([`Engine::topics`]); what the
-    /// program reads to make a step safely (the light shown, the voice's
-    /// state, the body's clips, a hand, the pause) is its own, not the
-    /// skill's.
+    /// Every topic the skill reads, once each, and what reads it: what the
+    /// program listens to for it ([`Skill::listens`]), and the topic of what
+    /// a `say = { from = … }` has the voice say, `schedule/due` for the
+    /// person's reminder and `tasks/status` for the news of their work
+    /// ([`Source::topic`]). A skill may have the person's own words said at
+    /// its moment only if it declares them. What the program reads to make a
+    /// step safely (the light shown, the voice's state, the body's clips, a
+    /// hand, the pause) is its own, not the skill's.
     pub fn reads(&self) -> Vec<(String, &'static str)> {
+        let mut reads = self.listens();
+        for (_, step) in &self.steps {
+            if let Step::Call(Call::SayFrom(source, _)) = step
+                && !reads.iter().any(|(topic, _)| topic == source.topic())
+            {
+                let by = match source {
+                    Source::Schedule => "a say from schedule",
+                    Source::Tasks => "a say from tasks",
+                };
+                reads.push((source.topic().to_owned(), by));
+            }
+        }
+        reads
+    }
+
+    /// The topics the program subscribes to for the skill ([`Engine::topics`]),
+    /// once each, and what reads it: its triggers, its `[[while]]`
+    /// conditions, a look at a face (the faces the eyes see), and a tool's
+    /// `[again]` (what was heard). A say's words come from the voice, so
+    /// their topic is read ([`Skill::reads`]) and not listened to.
+    fn listens(&self) -> Vec<(String, &'static str)> {
         let looks = self
             .steps
             .iter()
@@ -813,6 +836,16 @@ impl Source {
         match self {
             Self::Schedule => "schedule",
             Self::Tasks => "tasks",
+        }
+    }
+
+    /// The topic its words are of, which a skill having the voice say them
+    /// reads ([`Skill::reads`]): the person's reminder due, or the news of
+    /// their work.
+    pub fn topic(self) -> &'static str {
+        match self {
+            Self::Schedule => lamp_msgs::ScheduleDue::TOPIC,
+            Self::Tasks => lamp_msgs::TaskStatus::TOPIC,
         }
     }
 
@@ -1720,6 +1753,24 @@ fn pattern_of(file: PatternFile, level: Option<u8>) -> Result<LightPattern, Stri
 /// Every skill folder under `root` but those whose name begins with a dot,
 /// and why each other one did not load.
 pub fn load_all(root: &Path) -> (Vec<Skill>, Vec<String>) {
+    let (mut skills, mut errors) = (Vec::new(), Vec::new());
+    for (folder, loaded) in load_each(root) {
+        match loaded {
+            Ok(skill) => skills.push(skill),
+            Err(why) => errors.push(format!("{}: {why}", folder.display())),
+        }
+    }
+    (skills, errors)
+}
+
+/// Every skill folder under `root` but those whose name begins with a dot,
+/// in the folders' order, each loaded or why not. A tool's name is one
+/// skill's: the core skills take theirs first, then the installable ones,
+/// each in the folders' order, and a skill whose tool's name is taken is not
+/// loaded. So an installable skill never takes a core skill's function from
+/// the model, and no second skill of a name is passed over without a word
+/// ([`tools_file`] and [`Engine::tool`] would give the name to the first).
+pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
     let mut folders: Vec<PathBuf> = fs::read_dir(root)
         .into_iter()
         .flatten()
@@ -1729,14 +1780,36 @@ pub fn load_all(root: &Path) -> (Vec<Skill>, Vec<String>) {
         .filter(|path| path.is_dir())
         .collect();
     folders.sort();
-    let (mut skills, mut errors) = (Vec::new(), Vec::new());
-    for folder in folders {
-        match load(&folder) {
-            Ok(skill) => skills.push(skill),
-            Err(why) => errors.push(format!("{}: {why}", folder.display())),
+    let mut loaded: Vec<(PathBuf, Result<Skill, String>)> = folders
+        .into_iter()
+        .map(|folder| {
+            let skill = load(&folder);
+            (folder, skill)
+        })
+        .collect();
+    // Each tool's name, and the skill that has it.
+    let mut taken: BTreeMap<String, (String, SkillKind)> = BTreeMap::new();
+    for kind in [SkillKind::Core, SkillKind::Installable] {
+        for (_, result) in &mut loaded {
+            let Ok(skill) = result else { continue };
+            let Some(tool) = skill.tool.clone().filter(|_| skill.kind == kind) else {
+                continue;
+            };
+            match taken.get(&tool) {
+                Some((owner, owner_kind)) => {
+                    *result = Err(format!(
+                        "its tool {tool:?} is the {} skill {owner}'s: a function the model calls is one skill's, \
+                         a core skill's first",
+                        owner_kind.name()
+                    ));
+                }
+                None => {
+                    taken.insert(tool, (skill.name.clone(), kind));
+                }
+            }
         }
     }
-    (skills, errors)
+    loaded
 }
 
 #[derive(Default)]
@@ -1989,14 +2062,14 @@ impl Engine {
 
     /// Every topic a trigger or a condition names, the faces a look at a
     /// face reads, and what was heard if a skill has `[again]`, once each
-    /// ([`Skill::reads`]), and only those its `[permissions]` lists.
+    /// ([`Skill::listens`]), and only those its `[permissions]` lists.
     pub fn topics(&self) -> Vec<String> {
         let mut topics: Vec<String> = self
             .skills
             .iter()
             .flat_map(|skill| {
                 skill
-                    .reads()
+                    .listens()
                     .into_iter()
                     .map(|(topic, _)| topic)
                     .filter(|topic| skill.permissions.refuses_reading(topic).is_none())
@@ -2628,7 +2701,8 @@ fn calls(
 }
 
 /// The tools file the voice reads beside the actions part's `tools.json`:
-/// each skill's tool, described with the skill's description. A name an
+/// each skill's tool, described with the skill's description. Skills from
+/// [`load_all`] have a name each ([`load_each`]); in any other list a name an
 /// earlier skill took is left out, as [`Engine::tool`] runs the first.
 pub fn tools_file(skills: &[Skill]) -> Value {
     let mut tools: Vec<Value> = Vec::new();
@@ -3034,7 +3108,8 @@ mod tests {
             std::fs::write(
                 skill.join("skill.toml"),
                 format!(
-                    "[permissions]\ntopics = [\"schedule/due\"]\nspeak = true\n\
+                    // A say of either kind reads its words' topic.
+                    "[permissions]\ntopics = [\"schedule/due\", \"tasks/status\"]\nspeak = true\n\
                      [trigger]\ntopic = \"schedule/due\"\nfield = \"pending\"\nabove = 0.5\n\
                      [ask]\npolicy = \"moment\"\n[[do]]\nsay = {{ from = \"{from}\" }}\n"
                 ),
