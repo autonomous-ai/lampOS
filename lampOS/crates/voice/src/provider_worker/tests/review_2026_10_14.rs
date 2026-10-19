@@ -347,10 +347,12 @@ impl Drop for HeardAsOn {
 }
 
 /// A request heard as "Hey Mom, …" whose name lamp-name heard as it began:
-/// what the service is given as text beside it, up to its end.
+/// what the service is given as text beside it, up to its end. Its caller
+/// takes its turn ([`one_at_a_time`]) before it sets the name's switches,
+/// which every test here reads (Sixth on #705: set before the turn, they
+/// reached the tests then running).
 async fn told_beside_hey_mom() -> Vec<String> {
     let _clock = logical_clock();
-    let _turn = one_at_a_time().await;
     let root = Root::new();
     let mut rig = LiveRig::start_with(quick_policy(), in_a_busy_room());
     let mut dial = rig.ready().await;
@@ -399,6 +401,7 @@ async fn told_beside_hey_mom() -> Vec<String> {
 /// is as before.
 #[tokio::test(start_paused = true)]
 async fn review_sound_with_the_heard_as_line_the_name_note_says_it_may_sound_like_another_word() {
+    let _turn = one_at_a_time().await;
     let _note = NameNoteOn::set();
     {
         let _heard_as = HeardAsOn::set();
