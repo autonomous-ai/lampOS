@@ -42,38 +42,40 @@ pub struct Line {
     pub answer: &'static str,
 }
 
-/// `followups.sh`'s lines on lamp-4ace (the first builder at 20:22), the
-/// fifth and the answers ours.
+/// `followups.sh`'s five lines on lamp-4ace, exactly as played (the first
+/// builder on #1722, 20:37). The fifth checks that the note doesn't push a
+/// light line onto the volume. The journal keeps no words, so the lamp's
+/// answers are ours, short, the same in every arm.
 pub const LINES: [Line; 5] = [
     Line {
-        said: "Make your light a little dimmer.",
+        said: "Hey Lamp, make your light a little dimmer.",
         right: Some("light_dimmer"),
         done: "My light is a step dimmer.",
-        answer: "Done.",
+        answer: "A little dimmer now.",
     },
     Line {
-        said: "A little dimmer still.",
+        said: "Thanks. And a little dimmer still, please.",
         right: Some("light_dimmer"),
         done: "My light is a step dimmer.",
-        answer: "There.",
+        answer: "Dimmer still.",
     },
     Line {
         said: "Hey Lamp, turn yourself down a bit.",
         right: Some("volume_down"),
         done: "My voice is a step quieter.",
-        answer: "Quieter now.",
+        answer: "A little quieter now.",
     },
     Line {
-        said: "Turn yourself back up a little.",
+        said: "Thanks. Now turn yourself back up a little, please.",
         right: Some("volume_up"),
         done: "My voice is a step louder.",
-        answer: "Better?",
+        answer: "A little louder now.",
     },
     Line {
-        said: "That's better, thanks.",
-        right: None,
-        done: "",
-        answer: "Glad to help.",
+        said: "Hey Lamp, make your light a little brighter.",
+        right: Some("light_brighter"),
+        done: "My light is a step brighter.",
+        answer: "A little brighter now.",
     },
 ];
 
@@ -309,17 +311,17 @@ mod tests {
         );
         assert_eq!(third[3].role, "tool");
         assert!(text(&third[3]).contains("My light is a step dimmer."));
-        assert_eq!(third[4], Message::assistant("Done."));
+        assert_eq!(third[4], Message::assistant("A little dimmer now."));
         assert_eq!(third.last().unwrap(), &Message::user(LINES[2].said));
         // The first line has no history.
         assert_eq!(Arm::Today.messages("C", 0).len(), 2);
         // Only `note` carries the note, and few asks as today.
         assert!(text(&Arm::Note.messages("C", 2)[0]).ends_with(NOTE));
         assert_eq!(Arm::Few.messages("CHARACTER", 2), third);
-        // The fifth line follows a call and its answer, and wants none.
+        // The fifth line, a light one, follows four calls and their answers.
         let fifth = Arm::Today.messages("C", 4);
         assert_eq!(fifth.len(), 1 + 4 * 4 + 1);
-        assert_eq!(LINES[4].right, None);
+        assert_eq!(LINES[4].right, Some("light_brighter"));
     }
 
     /// The actions part's catalog as it writes it, in a folder of its own.
@@ -400,7 +402,9 @@ mod tests {
             ),
             "{lines:?}"
         );
-        assert!(lines.contains(&"tools arm=note line=5 right=3/3 (none): none=3".to_owned()));
+        assert!(lines.contains(
+            &"tools arm=note line=5 right=3/3 (light_brighter): light_brighter=3".to_owned()
+        ));
         assert_eq!(
             lines.last().unwrap(),
             "tools verdict: right every time on every line: few, note"

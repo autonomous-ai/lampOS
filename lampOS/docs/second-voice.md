@@ -1557,8 +1557,10 @@ dimmer still", DeepSeek answered "Hey Lamp, turn yourself down a bit." with
 `light_dimmer`, then "turn yourself back up a little" with `volume_up`: the
 lamp ended 20 steps louder. Live calls `volume_down`, then `volume_up`.
 
-- **The conversation:** the character and a turn's changing part, then five
-  lines (`LINES`): the four above and "That's better, thanks." (no call).
+- **The conversation:** the character and a turn's changing part, then
+  `followups.sh`'s five lines as played (`LINES`): the four above and "Hey
+  Lamp, make your light a little brighter." (`light_brighter`), which checks
+  that the note doesn't push a light line onto the volume.
   Each line is asked with the lines before it as right history: the right
   call, the actions part's short answer to it (`LAMP_SHORT_DONE=on`, as on
   the lamps), and a word or two. So each line is judged on its own.
