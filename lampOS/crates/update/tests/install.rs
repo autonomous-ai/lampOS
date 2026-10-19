@@ -105,6 +105,43 @@ impl Host for FakeHost {
         Ok(())
     }
 
+    fn harness_on(&mut self, user: &str, home: &str) -> Result<(), String> {
+        self.calls.push(format!("harness-on {user} {home}"));
+        // The real steps, each through stand-ins; the link is what `ln`
+        // leaves, a file at HARNESS here.
+        let (steps, failing, root) = (
+            &mut self.steps,
+            self.failing_step.clone(),
+            self.root.clone(),
+        );
+        install::harness_on_with(
+            &mut |argv: &[String]| {
+                let line = argv.join(" ");
+                steps.push(line.clone());
+                if failing.as_deref().is_some_and(|step| line.contains(step)) {
+                    return Err(format!("{line}: refused"));
+                }
+                match argv[0].as_str() {
+                    "id" => Ok("999\n".into()),
+                    "ln" => {
+                        let link = root.join(argv[3].trim_start_matches('/'));
+                        fs::create_dir_all(link.parent().unwrap()).unwrap();
+                        fs::write(link, "#!/bin/sh\n").unwrap();
+                        Ok(String::new())
+                    }
+                    _ => Ok(String::new()),
+                }
+            },
+            user,
+            home,
+        )
+    }
+
+    fn restart(&mut self, unit: &str) -> Result<(), String> {
+        self.calls.push(format!("restart {unit}"));
+        Ok(())
+    }
+
     fn harness_off(&mut self, user: &str, home: &str) -> Result<Vec<String>, String> {
         self.calls.push(format!("harness-off {user} {home}"));
         // The real steps, each through stand-ins for `id`, `runuser … harness`,
@@ -2008,6 +2045,20 @@ impl Lamp {
         ]
     }
 
+    fn harness_on(&mut self) -> Result<Vec<String>, String> {
+        let said = &mut self.said;
+        install::harness_on(
+            &self.root,
+            &self.config.records,
+            &mut self.host,
+            &mut |line: &str| said.push(line.to_owned()),
+        )
+    }
+
+    fn called(&self, call: &str) -> usize {
+        self.host.calls.iter().filter(|c| *c == call).count()
+    }
+
     fn harness_offs(&self) -> usize {
         self.host
             .calls
@@ -2644,4 +2695,104 @@ fn a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence(
             "{name} asks the internet with no second route for the voice"
         );
     }
+}
+
+/// #1676 B5: `harness-on` on an installed lamp with no Harness runs Harness's
+/// own installer as `lampos`, with its `HOME`, its runtime folder, a plain
+/// `PATH` and `SHELL=/bin/sh`, checks the launcher, links it at HARNESS, sets
+/// Harness at boot with install's record, and starts the tasks part again.
+/// Run again, it changes nothing and starts nothing.
+#[test]
+fn harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    assert!(!lamp.on(install::HARNESS).exists());
+    assert_eq!(lamp.harness_left_on(), [false, false, false]);
+    let changed = lamp.harness_on().unwrap();
+    assert_eq!(
+        changed,
+        [
+            "Harness installed for lampos by its own installer, at /usr/local/bin/harness",
+            "Harness starts at boot as lampos",
+            "lamp-tasks.service started again",
+        ]
+    );
+    assert_eq!(
+        lamp.host.steps,
+        [
+            "id -u lampos".to_owned(),
+            "install -d -o lampos -g lampos -m 0700 /var/lib/lampos-tasks".to_owned(),
+            format!(
+                "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 PATH=/usr/local/bin:/usr/bin:/bin SHELL=/bin/sh sh -c curl -fsSL --proto =https --tlsv1.2 {} | sh",
+                install::HARNESS_INSTALLER
+            ),
+            "test -x /var/lib/lampos-tasks/.local/bin/harness".to_owned(),
+            "ln -sfn /var/lib/lampos-tasks/.local/bin/harness /usr/local/bin/harness".to_owned(),
+        ]
+    );
+    assert!(lamp.on(install::HARNESS).exists());
+    assert_eq!(lamp.harness_left_on(), [true, true, true]);
+    assert_eq!(lamp.called("restart lamp-tasks.service"), 1);
+
+    let before = tree(&lamp.root);
+    assert_eq!(lamp.harness_on().unwrap(), Vec::<String>::new());
+    assert_eq!(tree(&lamp.root), before);
+    assert_eq!(lamp.called("harness-on lampos /var/lib/lampos-tasks"), 1);
+    assert_eq!(lamp.called("restart lamp-tasks.service"), 1);
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("already at /usr/local/bin/harness"))
+    );
+}
+
+/// A Harness already at HARNESS (put there by hand, or by an older run) is
+/// kept as it is: nothing is installed over it, and only what is missing,
+/// Harness at boot, is set.
+#[test]
+fn harness_on_keeps_a_harness_already_there() {
+    let mut lamp = Lamp::with_harness();
+    lamp.install().unwrap();
+    fs::remove_file(lamp.on("var/lib/lampos-update/harness-at-boot")).unwrap();
+    let changed = lamp.harness_on().unwrap();
+    assert_eq!(
+        changed,
+        [
+            "Harness starts at boot as lampos",
+            "lamp-tasks.service started again"
+        ]
+    );
+    assert_eq!(lamp.called("harness-on lampos /var/lib/lampos-tasks"), 0);
+    assert!(lamp.host.steps.is_empty());
+}
+
+/// A step that fails stops there: no link to nothing, nothing recorded, the
+/// tasks part not started again, and a later run tries again from the start.
+/// Without lampOS installed, it refuses before asking anything.
+#[test]
+fn harness_on_stops_at_a_failing_step_and_leaves_no_link() {
+    let mut lamp = Lamp::new(188, &[]);
+    assert!(
+        lamp.harness_on()
+            .unwrap_err()
+            .contains("lampOS is not installed")
+    );
+    assert!(lamp.host.calls.is_empty());
+    lamp.install().unwrap();
+    for step in ["curl", "test -x"] {
+        lamp.host.steps.clear();
+        lamp.host.failing_step = Some(step.into());
+        let error = lamp.harness_on().unwrap_err();
+        assert!(error.contains("refused"), "{error}");
+        assert!(!lamp.on(install::HARNESS).exists(), "{step}");
+        assert_eq!(lamp.harness_left_on(), [false, false, false], "{step}");
+        assert_eq!(lamp.called("restart lamp-tasks.service"), 0);
+        assert!(
+            !lamp.host.steps.iter().any(|s| s.starts_with("ln ")),
+            "{step}"
+        );
+    }
+    lamp.host.failing_step = None;
+    lamp.harness_on().unwrap();
+    assert!(lamp.on(install::HARNESS).exists());
 }

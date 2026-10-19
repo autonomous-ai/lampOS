@@ -567,6 +567,43 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    records nothing, so the next install asks again, and is said; it is taken to the Harness team, not worked around. How a
    home lamp's Harness signs in is theirs too.
 
+   **Put on by `lamp-update harness-on`** (as root, #1676 B5; the first
+   builder and the lead, 19 Oct 10:41: Harness's own installer). On a lamp
+   lampOS is installed on (it refuses without `/var/lib/lampos-update`),
+   with no Harness at `/usr/local/bin/harness`, these steps, in order:
+   `id -u lampos`; `/var/lib/lampos-tasks` made `lampos`'s own (0700);
+   Harness's installer as `lampos` with `HOME=/var/lib/lampos-tasks`,
+   `XDG_RUNTIME_DIR`, `PATH=/usr/local/bin:/usr/bin:/bin` and
+   `SHELL=/bin/sh`: `curl -fsSL --proto =https --tlsv1.2
+   https://cdn.autonomous.ai/harness/cli/install.sh | sh`, the address its
+   header names. Then `test -x` of the launcher it writes,
+   `/var/lib/lampos-tasks/.local/bin/harness`, then `ln -sfn` of it at
+   `/usr/local/bin/harness`.
+   - **What the installer does** (read from `cli/scripts/install.sh`, not
+     ours): per user, with no root and no question. Node, tmux and the CLI
+     go under `~/.harness`, each checked against Harness's sha256 metadata.
+     The launcher is a two-line script that runs `~/.harness/cli/cli.js`,
+     so Harness's own updates change `cli.js` and never the launcher that
+     `lamp-tasks` checks (its executable identity). With `SHELL=/bin/sh` its
+     one PATH line goes into `~/.profile` in that home.
+   - **Then:** Harness at boot as above, with its record, unless already
+     recorded; then `systemctl restart lamp-tasks.service`, only when
+     something changed.
+   - **Safe to repeat:** a Harness already at `/usr/local/bin/harness`, put
+     there by hand or by an earlier run, is kept as it is and never
+     installed over. Run again, it changes nothing and restarts nothing.
+   - **A failing step stops there,** before the link, so a lamp is never
+     left with a link to nothing. Nothing is recorded, and the next run
+     starts again.
+   - **Signing in is the person's,** not done here. Harness's box ticket
+     (`harness login --ticket`) is the way for a lamp, once the app hands it
+     one (openharness#1410).
+   - **Shown only in tests** (`crates/update/tests/install.rs`): the steps
+     in their order through stand-ins; a Harness already there kept; each
+     failing step leaving no link and no record; run again, nothing. Its
+     lamp check needs a person's `sudo` on a lamp without Harness
+     (lamp-75c9).
+
    **Undone by `lamp-update harness-off`** (as root, #811; the first
    builder's yes on #705, 18 Oct): with that record, as `lampos` with the
    same `HOME` and `XDG_RUNTIME_DIR`, the Harness CLI's own `harness service

@@ -326,13 +326,15 @@ lamp-update check|once|serve --channel-url URL [--channel NAME] [--key-file PATH
                              [--keep-free-mb N] [--root DIR] [--bus-root DIR]
 lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setup on|off]
 lamp-update harness-off
+lamp-update harness-on
 lamp-update check-units --cat FILE [--product DIR]
 lamp-update manifest --binaries DIR --deploy DIR --channel NAME --sequence N --commit SHA --files-url URL
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
 lamp-update public-key --key-file PRIVATE
 ```
 
-`harness-off` undoes install's Harness at boot, and only that, and
+`harness-on` puts Harness on the lamp with Harness's own installer and sets
+it at boot (#1676), `harness-off` undoes install's Harness at boot, and only that, and
 `check-units` says whether a lamp runs exactly the product's units: both
 in `docs/install.md` (step 9, and "Checking a lamp runs the product's
 units").

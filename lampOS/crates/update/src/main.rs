@@ -23,6 +23,7 @@ lamp-update check|once|serve --channel-url URL [--channel NAME] [--key-file PATH
                              [--keep-free-mb N] [--root DIR] [--bus-root DIR]
 lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setup on|off]
 lamp-update harness-off
+lamp-update harness-on
 lamp-update check-units --cat FILE [--product DIR]
 lamp-update manifest --binaries DIR --deploy DIR --channel NAME --sequence N --commit SHA --files-url URL
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
@@ -45,6 +46,11 @@ harness-off undoes install's Harness at boot, and only that: as lampos, the Harn
         lampos`, then install's record of it. Harness itself, its sign-in and the
         lampos user stay; what Harness still has is said, never stopped. Without the
         record it changes nothing. As root, on the lamp itself.
+harness-on puts Harness on a lamp lampOS is installed on: without Harness at
+        /usr/local/bin/harness, Harness's own installer run as lampos (HOME
+        /var/lib/lampos-tasks) and linked there; then Harness at boot as install sets
+        it; then lamp-tasks started again. Signing in is the person's. Run again, it
+        changes nothing. As root, on the lamp itself.
 
   --channel-url   the channel's folder, https://.../ or file:///.../, ending in /
   --channel       the channel followed (lamp-voice)
@@ -99,6 +105,7 @@ fn main() -> ExitCode {
         "check" | "once" | "serve" => return on_the_lamp(command, &options),
         "install" => install(&options),
         "harness-off" => harness_off(&options),
+        "harness-on" => harness_on(&options),
         "check-units" => return check_units(&options),
         "manifest" => make_manifest(&options),
         "sign" => sign(&options),
@@ -271,6 +278,25 @@ fn harness_off(options: &BTreeMap<String, String>) -> Result<(), String> {
         println!(
             "Harness does not start at boot as lampos; {} left, said above, is Harness's own to stop",
             left.len()
+        );
+    }
+    Ok(())
+}
+
+fn harness_on(options: &BTreeMap<String, String>) -> Result<(), String> {
+    known(options, &[])?;
+    let mut say = |line: &str| eprintln!("lamp-update: {line}");
+    let changed = install::harness_on(
+        Path::new("/"),
+        lamp_update::install::RECORDS,
+        &mut System,
+        &mut say,
+    )?;
+    if changed.is_empty() {
+        println!("Harness was already on and starts at boot as lampos: nothing changed");
+    } else {
+        println!(
+            "Harness is on and starts at boot as lampos; it is not signed in until the person signs it in"
         );
     }
     Ok(())
