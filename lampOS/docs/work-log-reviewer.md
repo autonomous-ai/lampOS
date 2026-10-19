@@ -1,9 +1,28 @@
 # Reviewer work log
 
-## 2026-10-17 (the same Claude session, after midnight)
+## 2026-10-20 (the same Claude session, after midnight)
 
-Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
+Newest first. Times from `date` (+07).
 
+- 01:36 told El the stack conflicts only in reports.rs after #2009; rebase keeping slices
+- 01:35 #2009 merged as 1c98eddd4 (UNITS/PARTS slices); no issue
+- 01:35 #2010 merged as 553ce5d86 (trials Smoky/Dusty air); no issue
+- 01:34 #2011 read: two P2s (LAMP_MAKE_SKILL never reaches the second worker's text news, so a made skill's files go to the phone; made-skills not in the reset plan), P3s
+- 01:33 #2006 merged as fa8b42054 (trials.sh examples, my #1999 P3); no issue
+- 01:29 #2013 merged as 70a01ef2c (eyes' start line); noted on #1722, no issue of its own
+- 01:28 #1967 #1986 read: no finding, for the first builder to merge
+- 01:28 #2001 read: no blocking finding; a second pass's privacy question checked by hand, a mute retires the turn and aborts the wait; P3 test
+- 01:22 first read of #2014 (El: a round won't switch lamp-skills onto checks the folders fail): guard right; P2 field lamps would stop updating, since rounds place no skills; first builder's
+- 01:18 read #2013 (Nine: the eyes' start line names their bus topics): no finding; merge on green
+- 01:17 read #2007 (Third: the second route told to call remember/forget/recall): no P1/P2; P3 'forget it' as never-mind; first builder's
+- 01:15 read #2010 (Nine: trial rows for the air skills, PAUSE): no finding; merge on green
+- 01:14 read #2009 (El: UNITS and the parts lists as slices): no finding, ends the count trap; merge on green
+- 01:13 #2003: the observation one-step rule added; no finding left; first builder's
+- 01:09 read #2002 (Fourth: a speech-to-text socket kept ready, onto #1712): no finding, privacy checked; first builder's
+- 01:02 merged #2000 (Tests: lamp-voice's integration tests as one binary) as 782e6ef34
+- 01:01 merged #1999 (Tests: trials.sh FIRST/THEN for light-out) as 35e1b62f1; P3 FIRSTEX wording
+- 01:01 #1759: my tap-parsing P2 fixed; fold; first builder's
+- 00:52 read #2003 (Twelve: forget a kept thing with its conversation, onto #1712): no over/under-reach found; the observation one-step rule not in it; first builder's
 - 00:36 #1995: both P3s taken (sandbox, the gate said); first builder's after the lamp check
 - 00:25 #1940: P1 fixed (the round and the voice both place second.json); first builder's into #1712
 - 00:23 update stack: #1913's three P2s and #1945's P2 fixed (mutations caught); P2 UNITS will break on today's lamp-voice (25): #1788-1879 must say 26, #1913/#1945 27
@@ -12,6 +31,11 @@ Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped
 - 00:09 #1940 (the lamps' voice is the second route): P1 an update round writes the second-route unit but never second.json, so the voice can't start, the round puts back and product lamps stop updating
 - 00:04 first read of #1995 (El: Wi-Fi changed from the app, a root helper): no P1/P2; P3 the helper has no sandbox; P3 the socket is the gate; first builder's
 - 00:03 #1699: P2 fixed (the ring starts through worker_command, LAMP_UNPLUG to ring only) and both P3s; first builder's after the lamp trial
+
+## 2026-10-17 to 2026-10-19 (the same Claude session)
+
+Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
+
 - 23:59 read #1988 (Twelve: observe-dry, onto #1712): no P1/P2; two P3s (a failed copy left, byte slicing); first builder's
 - 23:57 #1759: my P2 (tap lines parsed as one JSON value) still stands and now covers the new --levels-only rows
 - 23:53 #1989 (#1790 rebuilt by Nine): range-diff and gate fine; SKILL.md shared-desk line still asked; first builder's
