@@ -4,12 +4,35 @@ use crate::process::RingStartup;
 
 const STOP_GRACE_US: u64 = 300_000;
 const CLEANUP_EVENT_BUDGET: usize = 16;
+/// A ring that faults is started again at most this many times a session
+/// (#1620). Past that it stays off, and the voice's health says so.
+pub(super) const RING_RESTARTS: u32 = 3;
+/// A restart comes no sooner than this after the fault it follows, so
+/// restarts are at least this far apart.
+pub(super) const RESTART_SPACING_US: u64 = 2_000_000;
 
 pub(super) struct OptionalRing {
     worker: Option<Worker>,
     degraded: Option<Degraded>,
     startup_events: Vec<Value>,
     startup_events_dropped: u64,
+    /// How a ring that started is started again; none for a ring that never
+    /// started, or a test's fixture.
+    restart: Option<Restart>,
+}
+
+/// The ring's own startup ([`Worker::spawn_optional_ring_with_tick`]), run
+/// again on a thread of its own so the coordinator's loop never waits on it.
+struct Restart {
+    executable: PathBuf,
+    directory: PathBuf,
+    parent: BootId,
+    extra: Vec<String>,
+    /// Restarts begun this session.
+    begun: u32,
+    pending: Option<std::thread::JoinHandle<io::Result<RingStartup>>>,
+    /// The ring was said to stay off.
+    off_said: bool,
 }
 
 struct Degraded {
@@ -30,6 +53,7 @@ impl From<Option<Worker>> for OptionalRing {
             degraded: None,
             startup_events: Vec::new(),
             startup_events_dropped: 0,
+            restart: None,
         }
     }
 }
@@ -44,7 +68,19 @@ impl OptionalRing {
     ) -> io::Result<Self> {
         match Worker::spawn_optional_ring_with_tick(executable, directory, parent, extra, on_wait)?
         {
-            RingStartup::Ready(worker) => Ok(Self::from(Some(*worker))),
+            RingStartup::Ready(worker) => {
+                let mut ring = Self::from(Some(*worker));
+                ring.restart = Some(Restart {
+                    executable: executable.to_owned(),
+                    directory: directory.to_owned(),
+                    parent,
+                    extra: extra.iter().map(|&argument| argument.to_owned()).collect(),
+                    begun: 0,
+                    pending: None,
+                    off_said: false,
+                });
+                Ok(ring)
+            }
             RingStartup::Unavailable { worker, error } => {
                 let mut ring = Self::from(worker.map(|worker| *worker));
                 ring.latch_disabled(format!("ring startup failed: {error}"));
@@ -142,6 +178,156 @@ impl OptionalRing {
         {
             self.disable(error);
         }
+    }
+
+    /// A ring that faulted and will not be started again this session: it
+    /// stays off, and the voice's health says so.
+    pub(super) fn off_for_good(&self) -> bool {
+        self.degraded.is_some()
+            && self
+                .restart
+                .as_ref()
+                .is_none_or(|restart| restart.begun >= RING_RESTARTS && restart.pending.is_none())
+    }
+
+    /// Starts a faulted ring again, at most [`RING_RESTARTS`] times a
+    /// session and [`RESTART_SPACING_US`] after its fault, once its process
+    /// has exited, so two never write to the ring at once. The startup runs
+    /// on a thread: this only looks at it, and never waits. True when a
+    /// restarted ring has just become the active one: it wrote its black
+    /// first, and takes the current authority with the next publish.
+    pub(super) fn restart_tick(&mut self, trace: &mut SessionState) -> Result<bool> {
+        self.restart_tick_with_clock(|event| record(trace, event), monotonic_us)
+    }
+
+    pub(super) fn restart_tick_with_clock(
+        &mut self,
+        mut emit: impl FnMut(Value) -> Result<()>,
+        mut clock: impl FnMut() -> u64,
+    ) -> Result<bool> {
+        let Some(restart) = self.restart.as_mut() else {
+            return Ok(false);
+        };
+        if let Some(pending) = &restart.pending {
+            if !pending.is_finished() {
+                return Ok(false);
+            }
+            return self.adopt(&mut emit, clock());
+        }
+        let Some(state) = &self.degraded else {
+            return Ok(false);
+        };
+        let exited = state.exit_observed || self.worker.is_none();
+        let at_us = clock();
+        if restart.begun >= RING_RESTARTS {
+            if !restart.off_said {
+                restart.off_said = true;
+                eprintln!(
+                    "lamp-voice: the ring faulted again after {RING_RESTARTS} restarts ({}); it stays off this session",
+                    state.cause
+                );
+                emit(
+                    json!({"kind":"ring_off", "at_us":at_us, "restarts":restart.begun,
+                    "reason":state.cause}),
+                )?;
+            }
+            return Ok(false);
+        }
+        if !exited || at_us < state.at_us.saturating_add(RESTART_SPACING_US) {
+            return Ok(false);
+        }
+        restart.begun += 1;
+        let attempt = restart.begun;
+        eprintln!(
+            "lamp-voice: the ring faulted ({}); starting it again, {attempt} of {RING_RESTARTS}",
+            state.cause
+        );
+        emit(
+            json!({"kind":"ring_restart", "at_us":at_us, "attempt":attempt,
+            "of":RING_RESTARTS, "after_fault_ms":at_us.saturating_sub(state.at_us) / 1_000,
+            "reason":state.cause}),
+        )?;
+        // Its exit was observed: dropping it removes its namespace, which
+        // the restart then makes afresh. What its cleanup could not confirm
+        // was recorded; the restarted ring's own stop is what a stop checks.
+        self.worker = None;
+        self.degraded = None;
+        let (executable, directory, parent, extra) = (
+            restart.executable.clone(),
+            restart.directory.clone(),
+            restart.parent,
+            restart.extra.clone(),
+        );
+        restart.pending = Some(std::thread::spawn(move || {
+            let extra: Vec<&str> = extra.iter().map(String::as_str).collect();
+            Worker::spawn_optional_ring_with_tick(
+                &executable,
+                &directory,
+                parent,
+                &extra,
+                || Ok(()),
+            )
+        }));
+        Ok(false)
+    }
+
+    /// Takes a finished restart: the active ring if it started, a disabled
+    /// one otherwise, to be tried again after the spacing.
+    fn adopt(&mut self, emit: &mut impl FnMut(Value) -> Result<()>, at_us: u64) -> Result<bool> {
+        let restart = self.restart.as_mut().expect("restart");
+        let attempt = restart.begun;
+        let started = restart
+            .pending
+            .take()
+            .expect("pending restart")
+            .join()
+            .unwrap_or_else(|_| Err(io::Error::other("ring restart thread panicked")));
+        match started {
+            Ok(RingStartup::Ready(worker)) => {
+                self.worker = Some(*worker);
+                self.degraded = None;
+                eprintln!("lamp-voice: the ring is back ({attempt} of {RING_RESTARTS} restarts)");
+                emit(
+                    json!({"kind":"ring_restarted", "at_us":at_us, "attempt":attempt,
+                    "worker_boot":self.worker.as_ref().map(|worker| worker.boot)}),
+                )?;
+                Ok(true)
+            }
+            Ok(RingStartup::Unavailable { worker, error }) => {
+                self.worker = worker.map(|worker| *worker);
+                self.latch_disabled(format!("ring restart failed: {error}"));
+                Ok(false)
+            }
+            Err(error) => {
+                self.worker = None;
+                self.latch_disabled(format!("ring restart failed: {error}"));
+                Ok(false)
+            }
+        }
+    }
+
+    /// A restart's startup thread is still running.
+    #[cfg(test)]
+    pub(super) fn restart_pending(&self) -> bool {
+        self.restart
+            .as_ref()
+            .is_some_and(|restart| restart.pending.is_some())
+    }
+
+    /// Before a stop: a restart under way is waited for (its startup is
+    /// bounded), so a ring it started is stopped and writes its black like
+    /// any other, and none is left behind.
+    pub(super) fn settle_restart(&mut self, trace: &mut SessionState) -> Result<()> {
+        if let Some(restart) = self.restart.as_mut()
+            && let Some(pending) = restart.pending.take()
+        {
+            while !pending.is_finished() {
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            restart.pending = Some(pending);
+            self.adopt(&mut |event| record(trace, event), monotonic_us())?;
+        }
+        Ok(())
     }
 
     /// Pre-readiness ring observations have a separate fixed allowance. Optional
@@ -528,6 +714,77 @@ mod tests {
             ring.poll_cleanup(&mut trace).unwrap();
             assert_eq!(trace.len(), flushed, "old lifecycle events must not repeat");
         }
+    }
+
+    /// #1620: past its third restart a faulted ring stays off, says so once,
+    /// and the voice's health is told; a restart that cannot start counts.
+    #[test]
+    fn a_ring_past_its_restarts_stays_off_and_says_so_once() {
+        let directory = SessionDirectory::create().unwrap();
+        let restart = |begun| Restart {
+            executable: directory.path.join("absent"),
+            directory: directory.path.clone(),
+            parent: new_boot().unwrap(),
+            extra: Vec::new(),
+            begun,
+            pending: None,
+            off_said: false,
+        };
+        // The third restart: its startup fails, and that is the last.
+        let (worker, _peer, input) = Worker::cooperative_fixture(&directory.path, "ring");
+        let mut ring = OptionalRing::from(Some(worker));
+        ring.restart = Some(restart(RING_RESTARTS - 1));
+        drop(input);
+        ring.disable("ring output fault: SPI write returned after 15000 us; budget is 10000 us, late for 2000 ms");
+        assert!(!ring.off_for_good());
+        let mut trace = SessionState::default();
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !ring.degraded.as_ref().unwrap().exit_observed {
+            assert!(std::time::Instant::now() < deadline, "fixture never exited");
+            ring.poll_cleanup(&mut trace).unwrap();
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        let later = || u64::MAX / 2;
+        let tick = |ring: &mut OptionalRing, trace: &mut SessionState| {
+            ring.restart_tick_with_clock(|event| record(trace, event), later)
+                .unwrap()
+        };
+        assert!(!tick(&mut ring, &mut trace));
+        assert_eq!(ring.restart.as_ref().unwrap().begun, RING_RESTARTS);
+        while ring.restart.as_ref().unwrap().pending.is_some() {
+            assert!(!tick(&mut ring, &mut trace));
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        assert!(ring.off_for_good());
+        assert!(!ring.is_active());
+        // A fourth fault starts nothing, and is said once.
+        for _ in 0..3 {
+            assert!(!tick(&mut ring, &mut trace));
+        }
+        assert!(ring.restart.as_ref().unwrap().pending.is_none());
+        let kinds = |kind: &str| trace.iter().filter(|e| e["kind"] == kind).count();
+        assert_eq!(kinds("ring_restart"), 1);
+        assert_eq!(kinds("ring_off"), 1);
+        assert!(ring.off_for_good());
+        // A fourth fault of a live ring: off for good, and its observed exit
+        // is dated before a later stop (#1961).
+        let own = SessionDirectory::create().unwrap();
+        let (worker, _peer, input) = Worker::cooperative_fixture(&own.path, "ring");
+        let mut fourth = OptionalRing::from(Some(worker));
+        fourth.restart = Some(restart(RING_RESTARTS));
+        drop(input);
+        fourth.disable("ring output fault: SPI write returned after 15000 us; budget is 10000 us, late for 2000 ms");
+        while !fourth.exit_observed() {
+            assert!(std::time::Instant::now() < deadline, "fixture never exited");
+            fourth.poll_cleanup(&mut trace).unwrap();
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        assert!(!tick(&mut fourth, &mut trace));
+        assert!(fourth.off_for_good() && fourth.exit_observed());
+        // A ring that never started is off for good too, with no restart.
+        let mut never = OptionalRing::from(None);
+        never.latch_disabled("ring startup failed: no device");
+        assert!(never.off_for_good());
     }
 
     #[test]

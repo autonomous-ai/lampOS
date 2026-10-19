@@ -9,11 +9,15 @@ pub(crate) struct ChildFixture {
 }
 impl ChildFixture {
     pub fn new() -> Self {
+        Self::with_command("exec /bin/sleep 60")
+    }
+    /// The fake ring writes its identity, then runs `command`.
+    pub fn with_command(command: &str) -> Self {
         let directory = SessionDirectory::create().unwrap();
         let executable = directory.path.join("fake-ring");
         let identity = directory.path.join("identity");
         fs::write(&executable, format!(
-            "#!/bin/sh\nif [ \"$1\" = --fixture-preflight ]; then exit 0; fi\nprintf '%s\\n%s\\n%s\\n' \"$4\" \"$5\" \"$$\" > '{}'\nexec /bin/sleep 60\n",
+            "#!/bin/sh\nif [ \"$1\" = --fixture-preflight ]; then exit 0; fi\nprintf '%s\\n%s\\n%s\\n' \"$4\" \"$5\" \"$$\" > '{}'\n{command}\n",
             identity.display()
         )).unwrap();
         fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();

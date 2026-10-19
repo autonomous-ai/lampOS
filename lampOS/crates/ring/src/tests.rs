@@ -329,10 +329,43 @@ fn one_late_write_is_a_late_frame_not_a_fault() {
     paint(&mut ring, light).unwrap();
     assert!(!ring.is_faulted());
     assert_eq!(ring.late_writes(), 1);
+    assert_eq!(
+        ring.last_late(),
+        Some(LateWrite {
+            elapsed_us: 15_197,
+            run_us: 15_197
+        })
+    );
     ring.sink.delay_us = 0;
     paint(&mut ring, light).unwrap();
     assert!(!ring.is_faulted());
     assert_eq!(ring.late_writes(), 1);
+}
+
+#[test]
+fn an_sd_mmc_retune_of_late_writes_is_kept_not_a_fault() {
+    // #1620: lamp-4ace's SD/MMC host re-tunes about hourly and holds the bus
+    // 0.3 s: fifteen late writes of 20 ms in a row, then one on time.
+    let (mut ring, _, _, _) = setup();
+    ring.sink.delay_us = 20_000;
+    let frame = EncodedFrame::black();
+    for _ in 0..15 {
+        ring.transfer(&frame, clock()).unwrap();
+    }
+    assert_eq!(
+        ring.last_late(),
+        Some(LateWrite {
+            elapsed_us: 20_000,
+            run_us: 300_000
+        })
+    );
+    ring.sink.delay_us = 0;
+    ring.transfer(&frame, clock()).unwrap();
+    // Or one write blocked for most of it.
+    ring.sink.delay_us = 290_000;
+    ring.transfer(&frame, clock()).unwrap();
+    assert!(!ring.is_faulted());
+    assert_eq!(ring.late_writes(), 16);
 }
 
 #[test]
@@ -347,10 +380,35 @@ fn late_writes_lasting_the_late_run_are_an_observed_fault_not_a_claimed_timeout(
             Err(failure) => break failure,
         }
     };
-    assert!(matches!(failure, WriteFailure::OverBudget { .. }));
+    // The run is every late write so far: the first to reach 2 s ends it.
+    assert!(matches!(
+        failure,
+        WriteFailure::OverBudget {
+            elapsed_us: 15_000,
+            run_us: 2_010_000
+        }
+    ));
+    assert_eq!(
+        failure.to_string(),
+        "SPI write returned after 15000 us; budget is 10000 us, late for 2010 ms"
+    );
     // About two seconds of late writes were kept as frames first.
     assert_eq!(kept, LATE_RUN_US / 15_000);
     assert_eq!(ring.late_writes(), kept);
+}
+
+#[test]
+fn an_on_time_write_ends_a_run_of_late_ones() {
+    let (mut ring, _, _, _) = setup();
+    let frame = EncodedFrame::black();
+    for _ in 0..200 {
+        ring.sink.delay_us = 15_000;
+        ring.transfer(&frame, clock()).unwrap();
+        ring.sink.delay_us = 0;
+        ring.transfer(&frame, clock()).unwrap();
+    }
+    assert!(!ring.is_faulted());
+    assert_eq!(ring.late_writes(), 200);
 }
 
 #[test]

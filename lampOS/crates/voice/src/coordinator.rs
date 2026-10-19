@@ -1276,6 +1276,8 @@ impl Rig {
         Ok(())
     }
     fn shutdown(&mut self, trace: &mut SessionState) -> io::Result<()> {
+        // A ring being started again is stopped like any other (#1620).
+        let _ = self.ring.settle_restart(trace);
         let grace = if self.diagnostic_directory.is_some() {
             DIAGNOSTIC_SHUTDOWN_GRACE
         } else {
@@ -7636,6 +7638,7 @@ fn conversation_with_gate(
                 clock,
             );
             bus.set_could_not_start(controls.as_ref().map_or(0, HandControls::could_not_start));
+            bus.set_ring_off(rig.ring.off_for_good());
             bus.report(cloud.available(), clock, trace.mic_at_start);
         }
         if let Some(mic) = mic_out.as_mut() {
@@ -10659,7 +10662,8 @@ fn early_end_json(sent: &early_end::Sent, at_us: u64) -> Value {
 }
 
 /// Presentation failure disables only the optional ring. Cleanup is observed
-/// in bounded slices; no wait, restart or hardware write runs on this path.
+/// in bounded slices; no wait or hardware write runs on this path, and a
+/// restart after a fault runs on a thread of its own (#1620).
 fn service_optional_ring(
     rig: &mut Rig,
     choreography: &mut Option<RingChoreographer>,
@@ -10682,7 +10686,17 @@ fn service_optional_ring(
     if !rig.ring.is_active() {
         *choreography = None;
     }
-    rig.ring.poll_cleanup(trace)
+    rig.ring.poll_cleanup(trace)?;
+    // A ring started again after a fault (#1620) begins afresh: a new
+    // choreography, and no request of the old one outstanding.
+    if rig.ring.restart_tick(trace)? {
+        *choreography = rig
+            .ring_channel_ceiling
+            .map(RingChoreographer::new)
+            .transpose()?;
+        *ring_trace = RingTrace::default();
+    }
+    Ok(())
 }
 
 /// After a ring fault: whether the choreography started afresh. A late write

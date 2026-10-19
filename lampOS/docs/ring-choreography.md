@@ -299,8 +299,9 @@ The worker checks every 2 ms, drains priority control before and after bus I/O,
 and blanks on missing, stale, open, wrong-boot or invalid evidence. Controller
 loss or reader failure blanks and ends that worker. An observation that expires
 during a write is checked again on return and blanked. The existing 10 ms
-observed write budget and bounded cleanup attempts remain in force; Linux SPI
-syscalls have no hard userspace deadline.
+observed write budget (with the late-write rule below, #1620) and bounded
+cleanup attempts remain in force; Linux SPI syscalls have no hard userspace
+deadline.
 
 SPI and bus work stay outside the physical sampler and Voice owner loop.
 Indicator failure cannot reopen a microphone, start audio or bypass privacy
@@ -914,12 +915,84 @@ ring event cannot create listening readiness or revive its presentation policy.
 
 The live loop observes at most 16 cleanup messages and one nonblocking child
 status per pass. After 300 ms without observed exit, it requests termination
-once, without waiting. The child remains owned until reaped; there is no restart
-or replacement writer in this path. The latency target is zero added wait from
+once, without waiting. The child remains owned until reaped; no replacement
+writer starts before its exit is observed. The latency target is zero added wait from
 observed ring fault to the next audio/control work, within the existing 2 ms
 cooperative tick target. Kernel signal/status calls have no hard userspace
 execution deadline. Host channel tests establish ordering and bounded work,
 not loaded-device timing.
+
+### Slow SPI writes and the ring's restart (#1620)
+
+On lamp-52e6 the ring worker ended mid-session on `ring output fault: SPI
+write returned after 13180 us; budget is 10000 us` (the last write of a
+late run; the message did not say how long the run had lasted). The voice went
+on without the ring, and every later stop of that service failed verified
+cleanup, since a ring that faulted never writes the stop's black. Now:
+
+- **Late writes are not a fault until they have lasted 2 s** (#911, kept).
+  A write over the 10 ms budget (`WRITE_BUDGET_US`) is a late frame: the
+  frame did go out. The writer faults only when a run of late writes has
+  lasted 2 s (`LATE_RUN_US`); no single write, however slow, is a fault on
+  its own beyond that. An on-time write, or more than 100 ms with no write
+  (`LATE_GAP_US`), ends a run (`GuardedRing::transfer`,
+  `crates/ring/src/lib.rs`). lamp-4ace's SD/MMC host re-tunes about once an
+  hour and holds the bus for 0.3 s, about fifteen late writes in a row at
+  50 Hz or one write blocked for most of it: kept, never a fault. The fault
+  says how long the run lasted: `…; budget is 10000 us, late for 2010 ms` (2 s or more).
+  Each late write kept is said in the journal at most once a minute, the
+  newest, with how long its run has lasted and how many went unsaid since
+  (`ring_worker::LateSaid`):
+  `lamp-voice ring: SPI write 13180 us, over 10000 us, late for 340 ms (2 more since the last line)`.
+- **A ring that faults comes back.** Once the faulted worker's exit is
+  observed, and no sooner than 2 s after the fault (`RESTART_SPACING_US`), the
+  voice starts it again with the same startup
+  (`Worker::spawn_optional_ring_with_tick`, the same arguments), on a thread of
+  its own: the coordinator's loop only looks at that thread each pass
+  (`OptionalRing::restart_tick`) and never waits on it. The new worker writes
+  its black before it says Ready, gets the current authority with the next
+  20 ms publish (a closed privacy switch keeps it dark, and nothing stale is
+  shown), takes the person's light from the bus as at the start, and gets a
+  fresh choreography. The old worker's unconfirmed cleanup was recorded; the
+  restarted ring's own stop is what a later stop checks, so that stop writes
+  its black and is clean. A stop while a restart is under way waits for that
+  bounded startup (`settle_restart`, at most the 3 s worker startup), then
+  stops the ring it started like any other.
+- **At most three a session** (`RING_RESTARTS`). A fourth fault leaves the
+  ring off for the rest of the voice's run, said once in the journal and in
+  the trace (`ring_off`), and the voice's report on `diagnostics`, which
+  `lamp/health` reads, is a warning with the fact `ring` = `off`: `the light
+  ring faulted and stays off until the voice starts again`. A ring that never
+  started is not restarted, and is reported off the same way.
+
+Journal lines: `lamp-voice: the ring faulted (…); starting it again, 1 of 3`,
+`lamp-voice: the ring is back (1 of 3 restarts)`, and past the third
+`lamp-voice: the ring faulted again after 3 restarts (…); it stays off this
+session`. Trace kinds: `ring_restart` (attempt, of, after_fault_ms, reason),
+`ring_restarted` (attempt, worker_boot), `ring_off` (restarts, reason). A
+restart that fails to start is a degraded ring like any other, tried again
+after the spacing while restarts remain.
+
+Tests (host, fake SPI): `crates/ring/src/tests.rs`
+`one_late_write_is_a_late_frame_not_a_fault`,
+`an_sd_mmc_retune_of_late_writes_is_kept_not_a_fault`,
+`late_writes_lasting_the_late_run_are_an_observed_fault_not_a_claimed_timeout`,
+`an_on_time_write_ends_a_run_of_late_ones`;
+`crates/voice/tests/ring_worker.rs`
+`an_sd_mmc_retune_of_late_writes_is_kept_and_the_ring_goes_on`,
+`a_late_run_past_two_seconds_faults_and_a_ring_started_again_writes_black_then_the_light`
+(the fake sink's write time is injected through `FrameSink::simulated_elapsed_us`,
+a test seam real sinks leave at `None`);
+`ring_worker::late_said_tests`; `optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean`
+(each restart tick under 50 ms, the 2 s spacing, the current authority, a
+clean stop with the restarted ring's black-write receipt);
+`optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean`
+(a stop while the restart's startup is still running: Ok, with the
+restarted ring's receipt);
+`optional_ring::tests::a_ring_past_its_restarts_stays_off_and_says_so_once`;
+`bus_out::tests::a_ring_off_for_good_is_a_warning_with_its_fact_and_the_rest_after`.
+Not yet seen on a lamp; see
+[verification/ring-slow-write-host-20261019](verification/ring-slow-write-host-20261019/README.md).
 
 `ring_degraded` records unavailability and an initially unconfirmed cleanup.
 `ring_degraded_blank` retains validated SPI completion, and
@@ -946,7 +1019,8 @@ SPI I/O remains in the child. Linux cannot promise a userspace deadline for a
 stalled kernel SPI write; the existing 10 ms write budget is checked on return.
 A crashed/killed writer cannot itself blank a latched physical ring. Software
 unavailability therefore does not claim darkness or another visible state.
-There is no automatic replacement. An unavailable executable or failed startup
+A faulted ring is replaced only as above, after its exit, at most three times
+a session; a ring that never started is not. An unavailable executable or failed startup
 handshake disables only the ring; an already-created unready child remains owned
 through the same bounded cleanup path. Required-worker and termination errors
 during that wait stay terminal. Startup has a separate 16-event optional evidence
