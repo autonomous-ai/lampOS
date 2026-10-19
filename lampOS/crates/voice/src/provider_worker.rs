@@ -245,6 +245,9 @@ pub struct Files {
     pub provider_patience: bool,
     /// Whether a holding-only answer is reported for one continuation.
     pub holding_answer: bool,
+    /// Whether a line goes only into a session opened for the person it was
+    /// admitted for (`--live-scoped-session`, [`crate::scoped_session`]).
+    pub scoped_session: bool,
 }
 
 /// The bus's root for this worker, if it publishes.
@@ -326,6 +329,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (misheard_hum, flags) = crate::misheard_hum::take(flags);
     let (holding_answer, flags) = crate::holding_answer::take(flags);
     let (messages, flags) = crate::messages::take(flags);
+    let (scoped_session, flags) = crate::scoped_session::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -373,6 +377,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         misheard_hum,
         holding_answer,
         messages,
+        scoped_session,
     };
     Ok((continuation, sight, files, visual))
 }
@@ -928,6 +933,8 @@ pub(crate) struct Options {
     pub(crate) remarks: bool,
     /// A spoken cut-in over the lamp's answer is told ([`crate::cut_in_told`]).
     pub(crate) cut_in_told: bool,
+    /// A line goes only into its admitted person's session ([`crate::scoped_session`]).
+    pub(crate) scoped_session: bool,
     /// A misheard cut-in's next request is told so ([`crate::misheard_hum`]).
     pub(crate) misheard_hum: bool,
     /// The bus the Policy's decisions are read from when, in a busy room, a
@@ -987,6 +994,7 @@ impl Options {
             remarks: false,
             going_on_asks: None,
             cut_in_told: false,
+            scoped_session: false,
             misheard_hum: false,
             policy_holds: None,
             follows_run: false,
@@ -1270,6 +1278,7 @@ pub async fn run_with_continuation(
         follows_run: files.policy_holds && files.follows_run,
         remarks: files.attention && files.remarks,
         cut_in_told: files.cut_in_told,
+        scoped_session: files.scoped_session,
         misheard_hum: files.attention && files.ask_unclear && files.misheard_hum,
         going_on_asks: match (files.attention && files.going_on_asks, &files.bus_root) {
             (true, Some(root)) => Some(root.clone()),
@@ -1367,6 +1376,7 @@ async fn serve_with_visual<C: Connect>(
     intake.handoff.resend = provider.resends_lost_lines();
     intake.handoff.reminders.enabled = options.tools.schedule_speak;
     intake.handoff.cut_in_told = options.cut_in_told;
+    intake.handoff.scoped_session = options.scoped_session;
     intake.handoff.misheard_hum = options.misheard_hum;
     // The same-voice check (#829), only beside the rule that plays only for
     // a lamp spoken to.
@@ -4331,6 +4341,9 @@ struct InputHandoff {
     /// model has been told so.
     cut_in_told: bool,
     cut_in: Option<RequestId>,
+    /// A line goes only into its admitted person's session
+    /// ([`crate::scoped_session`]).
+    scoped_session: bool,
     /// Whether a misheard cut-in's next request is told so
     /// ([`crate::misheard_hum`]); when the newest such cut-in was held; and
     /// the request to tell, until the model has been told.
@@ -4642,6 +4655,9 @@ impl InputHandoff {
                 .is_some_and(|old| old.camera_generation() != state.camera_generation())
         {
             self.memory_face.invalidate();
+            if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                thread.admitted_unknown();
+            }
             if let Some(kept) = self
                 .kept
                 .as_mut()
@@ -5125,6 +5141,27 @@ impl InputHandoff {
                     return Err(io::Error::other("provider input already started").into());
                 }
                 let expected = SessionId::new(session)?;
+                // Read before the line is sent, so it is bound to the face
+                // the eyes named as it began, never a later one.
+                let memory_snapshot = self.memory_face.snapshot(Instant::now());
+                // Someone known in another known person's session: not sent,
+                // and that session is opened again for them between turns
+                // (`crate::scoped_session`). A refusal is reported only
+                // where an outage is.
+                if self.scoped_session
+                    && self.tolerate_outage
+                    && self.memory_worker.is_some()
+                    && let Some(person) = memory_snapshot.person()
+                    && crate::thread::THREAD
+                        .lock()
+                        .is_ok_and(|mut thread| thread.admitted(person, Instant::now()))
+                {
+                    eprintln!(
+                        "lamp-voice provider: a line was said by someone the session is not for; it is not sent, and a new session is opened for them between turns"
+                    );
+                    return self
+                        .refused_start(request, StartRefusal::SessionMismatch { live: expected });
+                }
                 if let Err(refusal) = input.start(expected, request) {
                     return self.refused_start(request, refusal);
                 }
@@ -5150,7 +5187,6 @@ impl InputHandoff {
                 if let Some(voices) = self.voices.as_mut() {
                     voices.began(request.get(), !over_the_lamps_voice);
                 }
-                let memory_snapshot = self.memory_face.snapshot(Instant::now());
                 self.bind_memory(request, expected, memory_snapshot.clone());
                 self.submitted = Some(SubmittedInput {
                     request,
@@ -6276,6 +6312,58 @@ mod tests {
         handoff.fail(request);
         assert!(!first.is_current());
         assert!(handoff.memory_lease(lineage).is_none());
+    }
+
+    /// #1675's Live part: with `LAMP_LIVE_SCOPED_SESSION`, a line admitted
+    /// for B is not sent into a session opened for A; it fails as not
+    /// delivered and the session is due again, for B. Without the switch it
+    /// is sent, as before.
+    #[test]
+    fn a_line_for_someone_else_known_is_not_sent_into_their_session() {
+        let a = crate::remember::person_id("ScopedAnn");
+        let b = crate::remember::person_id("ScopedBob");
+        for scoped in [false, true] {
+            let mut owner = controller();
+            let mut handoff = memory_handoff();
+            handoff.tolerate_outage = true;
+            handoff.scoped_session = scoped;
+            let sink = RecordingSink::default();
+            let request = authorize(&mut owner, &mut handoff);
+            {
+                let mut thread = crate::thread::THREAD.lock().unwrap();
+                thread.admitted_unknown();
+                thread.at_lamp(Some(a.clone()));
+                thread.opening(Instant::now());
+            }
+            cache_face(&handoff, "ScopedBob");
+            handoff
+                .submit(start(request, &handoff), NOW, &sink)
+                .unwrap();
+            let sent = sink.calls.borrow().contains(&Call::Start(request));
+            let due = crate::thread::THREAD
+                .lock()
+                .unwrap()
+                .switch_due(Instant::now());
+            if scoped {
+                assert!(!sent);
+                assert_eq!(handoff.undelivered, Some(request));
+                assert!(due, "the session is opened again for B");
+                assert!(
+                    crate::thread::THREAD
+                        .lock()
+                        .unwrap()
+                        .opening(Instant::now())
+                );
+                assert_eq!(
+                    crate::thread::THREAD.lock().unwrap().opened_for(),
+                    Some(b.as_str())
+                );
+            } else {
+                assert!(sent);
+                assert_eq!(handoff.undelivered, None);
+            }
+            crate::thread::THREAD.lock().unwrap().admitted_unknown();
+        }
     }
 
     #[test]
@@ -8832,6 +8920,7 @@ mod tests {
             remarks: false,
             going_on_asks: None,
             cut_in_told: false,
+            scoped_session: false,
             misheard_hum: false,
             policy_holds: None,
             follows_run: false,
@@ -8863,6 +8952,7 @@ mod tests {
                 remarks: false,
                 going_on_asks: None,
                 cut_in_told: false,
+                scoped_session: false,
                 misheard_hum: false,
                 policy_holds: None,
                 follows_run: false,
@@ -8919,6 +9009,7 @@ mod tests {
                 remarks: false,
                 going_on_asks: None,
                 cut_in_told: false,
+                scoped_session: false,
                 misheard_hum: false,
                 policy_holds: None,
                 follows_run: false,
@@ -9915,6 +10006,7 @@ mod tests {
                 remarks: false,
                 going_on_asks: None,
                 cut_in_told: false,
+                scoped_session: false,
                 misheard_hum: false,
                 policy_holds: None,
                 follows_run: false,
@@ -13451,6 +13543,7 @@ mod tests {
                     remarks: false,
                     going_on_asks: None,
                     cut_in_told: false,
+                    scoped_session: false,
                     misheard_hum: false,
                     policy_holds: None,
                     follows_run: false,
@@ -13527,6 +13620,7 @@ mod tests {
                     remarks: false,
                     going_on_asks: None,
                     cut_in_told: false,
+                    scoped_session: false,
                     misheard_hum: false,
                     policy_holds: None,
                     follows_run: false,
