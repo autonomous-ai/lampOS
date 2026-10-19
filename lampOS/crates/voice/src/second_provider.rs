@@ -129,8 +129,14 @@ const SENTENCE_PACKETS: usize = crate::provider_flow::MAX_REPLY_SAMPLES / PACKET
 /// Live route (`tools::run_call`).
 pub type ToolRunner =
     Arc<dyn Fn(u64, bool, String, Value) -> BoxFuture<'static, Value> + Send + Sync>;
-/// The system message for a turn, built when the turn's chat begins, and
-/// whose turn it is.
+/// A tool runner carrying the admitted request's immutable memory authority.
+pub type ScopedToolRunner = Arc<
+    dyn Fn(u64, bool, String, Value, crate::memory_scope::ScopeLease) -> BoxFuture<'static, Value>
+        + Send
+        + Sync,
+>;
+
+/// The system message for a turn, built when the turn's chat begins.
 pub type System = Arc<dyn Fn() -> Told + Send + Sync>;
 
 /// What a turn's chat is told: the system message, and the exchanges just
@@ -177,6 +183,7 @@ pub type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
 struct Shared {
     services: Arc<dyn Services>,
     tools: ToolRunner,
+    scoped_tools: Option<ScopedToolRunner>,
     system: System,
     clock: Clock,
     /// When answer audio was last sent.
@@ -363,10 +370,12 @@ struct Turn {
     /// When its first and last packets were read from the microphone.
     said: Arc<Mutex<(u64, u64)>>,
     task: JoinHandle<()>,
+    memory_scope: Option<crate::memory_scope::RequestScope>,
 }
 impl Drop for Turn {
     /// A turn given up stops its chat and speech at once.
     fn drop(&mut self) {
+        self.memory_scope.take();
         self.task.abort();
     }
 }
@@ -387,6 +396,9 @@ pub struct Engine {
     sounds_checked: bool,
     /// The eye a look reads, when the eyes keep a look file.
     look: Option<Look>,
+    memory: Option<(lamp_turn_owner::BootId, Arc<crate::memory_scope::FaceCache>)>,
+    memory_camera_allowed: bool,
+    memory_camera_generation: Option<u64>,
 }
 
 impl Engine {
@@ -411,6 +423,7 @@ impl Engine {
             shared: Arc::new(Shared {
                 services,
                 tools,
+                scoped_tools: None,
                 system,
                 clock,
                 answered_at: Mutex::new(None),
@@ -431,7 +444,72 @@ impl Engine {
             begun_last: None,
             sounds_checked: false,
             look: None,
+            memory: None,
+            memory_camera_allowed: false,
+            memory_camera_generation: None,
         }
+    }
+
+    /// Bind tools to the observation at admission, independent of later face changes.
+    pub fn with_memory_scope(
+        mut self,
+        boot: lamp_turn_owner::BootId,
+        cache: Arc<crate::memory_scope::FaceCache>,
+        runner: ScopedToolRunner,
+    ) -> Self {
+        Arc::get_mut(&mut self.shared)
+            .expect("configured before admission")
+            .scoped_tools = Some(runner);
+        self.memory = Some((boot, cache));
+        self
+    }
+
+    fn memory_camera(&mut self, allowed: bool, generation: u64) {
+        let changed = self
+            .memory_camera_generation
+            .is_some_and(|old| old != generation);
+        self.memory_camera_generation = Some(generation);
+        if (self.memory_camera_allowed != allowed || changed)
+            && let Some((_, cache)) = &self.memory
+        {
+            cache.invalidate();
+        }
+        self.memory_camera_allowed = allowed;
+        if (!allowed || changed)
+            && let Some(scope) = self
+                .turn
+                .as_ref()
+                .and_then(|turn| turn.memory_scope.as_ref())
+            && scope
+                .lease()
+                .scope()
+                .is_some_and(|scope| scope.person().is_some())
+        {
+            scope.revoke();
+        }
+    }
+
+    fn memory_scope(
+        &self,
+        request: u64,
+        session: u64,
+        heard: bool,
+    ) -> Option<crate::memory_scope::RequestScope> {
+        self.memory.as_ref().map(|(worker, cache)| {
+            let scope = if heard && self.memory_camera_allowed {
+                cache.snapshot(std::time::Instant::now())
+            } else {
+                crate::memory_scope::ScopeSnapshot::room()
+            };
+            crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: *worker,
+                    session,
+                    request,
+                },
+                scope,
+            )
+        })
     }
 
     /// Short sounds let through are checked (`--sounds-checked`, #800).
@@ -569,9 +647,11 @@ impl Engine {
                 let sound = Arc::new(AtomicBool::new(false));
                 let checked = self.sounds_checked.then(|| sound.clone());
                 let said = Arc::new(Mutex::new((0, 0)));
+                let memory_scope = self.memory_scope(request, session, true);
+                let lease = memory_scope.as_ref().map(|scope| scope.lease());
                 let task = tokio::spawn(spoken(
                     self.shared.clone(),
-                    request,
+                    (request, lease),
                     heard,
                     checked,
                     said.clone(),
@@ -588,6 +668,7 @@ impl Engine {
                     sound,
                     said,
                     task,
+                    memory_scope,
                 });
             }
             ProviderInput::Audio {
@@ -679,9 +760,20 @@ impl Engine {
                 // look all the same, with its 5 s and its line (the reviewer
                 // on #1154).
                 let looking = look || text == crate::speak_up::NO_LOOK_NOTE;
+                let memory_scope = self.memory_scope(request, session, false);
+                let lease = memory_scope.as_ref().map(|scope| scope.lease());
                 let shared = self.shared.clone();
                 let task = tokio::spawn(async move {
-                    answer(&shared, request, text, false, looking, picture, None).await
+                    answer(
+                        &shared,
+                        (request, lease),
+                        text,
+                        false,
+                        looking,
+                        picture,
+                        None,
+                    )
+                    .await
                 });
                 self.turn = Some(Turn {
                     request,
@@ -689,6 +781,7 @@ impl Engine {
                     sound: Arc::default(),
                     said: Arc::default(),
                     task,
+                    memory_scope,
                 });
             }
             ProviderInput::Reminder {
@@ -829,13 +922,14 @@ impl Shared {
 /// judges not said to the lamp are not either.
 async fn spoken(
     shared: Arc<Shared>,
-    request: u64,
+    context: (u64, Option<crate::memory_scope::ScopeLease>),
     mut heard: mpsc::Receiver<Vec<i16>>,
     checked: Option<Arc<AtomicBool>>,
     said: Arc<Mutex<(u64, u64)>>,
     before: Option<String>,
     continues_from: Option<u64>,
 ) {
+    let (request, scope) = context;
     let listener = match shared.services.listen().await {
         Ok(listener) => listener,
         Err(error) => return shared.fail(request, FailedStage::InputOpen, &error).await,
@@ -937,7 +1031,7 @@ async fn spoken(
         stop.asked = true;
         Some(crate::provider_worker::STOPPED_NOTE)
     });
-    answer(&shared, request, text, true, false, None, note).await;
+    answer(&shared, (request, scope), text, true, false, None, note).await;
 }
 
 /// How an answer stopped short.
@@ -974,13 +1068,14 @@ async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> 
 /// never into the thread or a later turn's history.
 async fn answer(
     shared: &Shared,
-    request: u64,
+    context: (u64, Option<crate::memory_scope::ScopeLease>),
     said: String,
     heard: bool,
     looking: bool,
     picture: Option<Vec<u8>>,
     note: Option<&'static str>,
 ) {
+    let (request, scope) = context;
     // Started now, with the chat request, so it is ready first.
     let mut speech = JoinSet::new();
     let announcement = (shared.announce && shared.announcement_due())
@@ -1009,6 +1104,9 @@ async fn answer(
         None => Message::user(said),
     };
     let writing = async move {
+        if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+            return Err(Stop::Gone);
+        }
         let told = (shared.system)();
         let mut messages = vec![Message::system(told.text)];
         messages.extend(told.history);
@@ -1019,6 +1117,9 @@ async fn answer(
         let asked_at = messages.len() - 1;
         let mut round = 0;
         while round < MAX_ROUNDS {
+            if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                return Err(Stop::Gone);
+            }
             round += 1;
             let mut refused = false;
             let mut stream = shared.services.chat(messages.clone());
@@ -1170,8 +1271,25 @@ async fn answer(
             }
             messages.push(Message::assistant_calls(Some(text), &calls));
             for call in &calls {
-                let result =
-                    (shared.tools)(request, heard, call.name.clone(), call.args.clone()).await;
+                let result = match (&shared.scoped_tools, &scope) {
+                    (Some(run), Some(scope)) => {
+                        run(
+                            request,
+                            heard,
+                            call.name.clone(),
+                            call.args.clone(),
+                            scope.clone(),
+                        )
+                        .await
+                    }
+                    (Some(_), None) => crate::tools::unavailable(),
+                    (None, _) => {
+                        (shared.tools)(request, heard, call.name.clone(), call.args.clone()).await
+                    }
+                };
+                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                    return Err(Stop::Gone);
+                }
                 messages.push(Message::tool(call.id.clone(), result.to_string()));
             }
         }

@@ -2444,7 +2444,7 @@ pub(crate) mod tests {
     }
 
     /// Seventh's peer review on #1427: through the real routes. The Live worker's
-    /// asking thread (`provider_worker::answered`) takes the key out of what
+    /// asking thread (`provider_worker::answered_scoped`) takes the key out of what
     /// its model is told and keeps it; the second voice (`tools::answer`)
     /// takes it out too, and keeps nothing.
     #[test]
@@ -2460,7 +2460,16 @@ pub(crate) mod tests {
         };
         let (place, _seen) = serving(&directory, "idle", "Lumi, Sunny and Archie.", false);
         let route = crate::tools::Route::Tasks(place);
-        let (_, told, answered, news) = crate::provider_worker::answered(&route, &call, 1, true);
+        let scope = crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+                session: 1,
+                request: 1,
+            },
+            crate::memory_scope::ScopeSnapshot::room(),
+        );
+        let (_, told, answered, news) =
+            crate::provider_worker::answered_scoped(&route, &call, 1, true, &scope.lease());
         assert!(answered, "{told}");
         assert_eq!(news.as_deref(), Some("s1:2:4"));
         assert!(told.get(NEWS_KEY).is_none(), "{told}");

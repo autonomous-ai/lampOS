@@ -230,6 +230,31 @@ pub fn run(socket: &Path, call: &ToolCall, deadline: Duration) -> (Value, bool) 
     run_for(socket, call, deadline, person_now().as_deref())
 }
 
+fn scope_current(lease: Option<&crate::memory_scope::ScopeLease>) -> bool {
+    lease.is_none_or(crate::memory_scope::ScopeLease::is_current)
+}
+
+/// Uses only the admitted request's immutable scope. Revoked is never room.
+/// Revocation suppresses undispatched work and late results; it cannot undo a
+/// write the memory already accepted. Such uncertain writes retain the existing
+/// conservative journal fence.
+pub fn run_scoped(
+    socket: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+) -> (Value, bool) {
+    let Some(snapshot) = lease.scope() else {
+        return (gone(), false);
+    };
+    let result = run_for_guarded(socket, call, deadline, snapshot.person(), Some(lease));
+    if lease.is_current() {
+        result
+    } else {
+        (gone(), false)
+    }
+}
+
 /// [`run`] for this person's memory ([`person_id`]), `None` for the room's.
 pub fn run_for(
     socket: &Path,
@@ -237,6 +262,19 @@ pub fn run_for(
     deadline: Duration,
     person: Option<&str>,
 ) -> (Value, bool) {
+    run_for_guarded(socket, call, deadline, person, None)
+}
+
+fn run_for_guarded(
+    socket: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    person: Option<&str>,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> (Value, bool) {
+    if !scope_current(lease) {
+        return (gone(), false);
+    }
     if DAYS_MODE.get() == Some(&true) {
         if crate::rules::on() && crate::rules::is_tool(&call.name) {
             return DAYS
@@ -245,7 +283,7 @@ pub fn run_for(
                 .filter(|client| client.socket == socket)
                 .map_or_else(
                     || (gone(), false),
-                    |client| client.rule_for(call, deadline, person),
+                    |client| client.rule_for_guarded(call, deadline, person, lease),
                 );
         }
         let forgets = matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING);
@@ -260,7 +298,7 @@ pub fn run_for(
             .filter(|client| client.socket == socket)
             .map_or_else(
                 || (gone(), false),
-                |client| client.run_for(call, deadline, person),
+                |client| client.run_for_guarded(call, deadline, person, lease),
             );
         if forgets {
             FORGET_THREAD.store(true, Ordering::Release);
@@ -281,15 +319,15 @@ pub fn run_for(
     let answer = match person {
         Some(person) if call.name == RECALL => {
             recall_both(&request, person, deadline, |line, left| {
-                crate::tools::exchange(socket, line, left)
+                legacy_exchange(socket, line, left, lease)
             })
             .map(|(theirs, room)| merged(theirs, room))
         }
         Some(person) => {
             request["person"] = json!(person);
-            crate::tools::exchange(socket, &request, deadline)
+            legacy_exchange(socket, &request, deadline, lease)
         }
-        None => crate::tools::exchange(socket, &request, deadline),
+        None => legacy_exchange(socket, &request, deadline, lease),
     };
     let Some(answer) = answer else {
         return (gone(), false);
@@ -1146,6 +1184,19 @@ impl DaysClient {
         deadline: Duration,
         person: Option<&str>,
     ) -> (Value, bool) {
+        self.run_for_guarded(call, deadline, person, None)
+    }
+
+    fn run_for_guarded(
+        &self,
+        call: &ToolCall,
+        deadline: Duration,
+        person: Option<&str>,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+    ) -> (Value, bool) {
+        if !scope_current(lease) {
+            return (gone(), false);
+        }
         let started = Instant::now();
         let deadline = deadline.min(crate::tools::ASK_DEADLINE);
         let now = unix_ms();
@@ -1153,7 +1204,10 @@ impl DaysClient {
         let Some(left) = deadline.checked_sub(started.elapsed()) else {
             return (gone(), false);
         };
-        self.run_at(call, left, now, offset, person)
+        match lease {
+            Some(_) => self.run_at_guarded(call, left, (now, offset), person, lease),
+            None => self.run_at(call, left, now, offset, person),
+        }
     }
 
     fn run_at(
@@ -1164,6 +1218,21 @@ impl DaysClient {
         offset: i32,
         person: Option<&str>,
     ) -> (Value, bool) {
+        self.run_at_guarded(call, deadline, (now, offset), person, None)
+    }
+
+    fn run_at_guarded(
+        &self,
+        call: &ToolCall,
+        deadline: Duration,
+        time: (u64, i32),
+        person: Option<&str>,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+    ) -> (Value, bool) {
+        let (now, offset) = time;
+        if !scope_current(lease) {
+            return (gone(), false);
+        }
         let started = Instant::now();
         let deadline = deadline.min(crate::tools::ASK_DEADLINE);
         // #1693: something recall gave, by its id, in the scope it was
@@ -1224,14 +1293,14 @@ impl DaysClient {
         let (told, ids) = if call.name == RECALL {
             let Some(result) = deadline
                 .checked_sub(started.elapsed())
-                .and_then(|left| self.recall(&request, person, left, now, offset))
+                .and_then(|left| self.recall(&request, person, left, now, offset, lease))
             else {
                 return (gone(), false);
             };
             result
         } else {
             let answer = deadline.checked_sub(started.elapsed()).and_then(|left| {
-                bounded_exchange(&self.socket, &for_person(request, person), left)
+                bounded_exchange_scoped(&self.socket, &for_person(request, person), left, lease)
             });
             let Some(answer) = answer else {
                 return (gone(), false);
@@ -1245,7 +1314,7 @@ impl DaysClient {
                 let rules = json!({"op":"forget_all","person":crate::rules::scope(person)});
                 if deadline
                     .checked_sub(started.elapsed())
-                    .and_then(|left| bounded_exchange(&self.socket, &rules, left))
+                    .and_then(|left| bounded_exchange_scoped(&self.socket, &rules, left, lease))
                     .is_none_or(|answer| answer["ok"] != true)
                 {
                     return (gone(), false);
@@ -1264,7 +1333,8 @@ impl DaysClient {
             };
             (told, ids)
         };
-        if !crate::tools::sendable(&told) || started.elapsed() >= deadline {
+        if !scope_current(lease) || !crate::tools::sendable(&told) || started.elapsed() >= deadline
+        {
             return (gone(), false);
         }
         let Ok(mut context) = self.context.try_lock() else {
@@ -1294,14 +1364,15 @@ impl DaysClient {
         deadline: Duration,
         now: u64,
         offset: i32,
+        lease: Option<&crate::memory_scope::ScopeLease>,
     ) -> Option<(Value, Vec<(Option<String>, u64)>)> {
         let Some(person) = person else {
-            let answer = bounded_exchange(&self.socket, request, deadline)?;
+            let answer = bounded_exchange_scoped(&self.socket, request, deadline, lease)?;
             let (told, ids) = days_answer(&answer, now, offset)?;
             return Some((told, ids.into_iter().map(|id| (None, id)).collect()));
         };
         let (theirs, room) = recall_both(request, person, deadline, |line, left| {
-            bounded_exchange(&self.socket, line, left)
+            bounded_exchange_scoped(&self.socket, line, left, lease)
         })?;
         let (theirs, their_ids) = days_answer(&theirs, now, offset)?;
         let mut found = theirs["found"].as_array()?.clone();
@@ -1385,6 +1456,19 @@ impl DaysClient {
         deadline: Duration,
         person: Option<&str>,
     ) -> (Value, bool) {
+        self.rule_for_guarded(call, deadline, person, None)
+    }
+
+    fn rule_for_guarded(
+        &self,
+        call: &ToolCall,
+        deadline: Duration,
+        person: Option<&str>,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+    ) -> (Value, bool) {
+        if !scope_current(lease) {
+            return (gone(), false);
+        }
         let until = Instant::now() + deadline.min(crate::tools::ASK_DEADLINE);
         let now = unix_ms();
         let scope = crate::rules::scope(person);
@@ -1408,7 +1492,12 @@ impl DaysClient {
             let kept = until
                 .checked_duration_since(Instant::now())
                 .and_then(|left| {
-                    bounded_exchange(&self.socket, &crate::rules::read_request(&scope), left)
+                    bounded_exchange_scoped(
+                        &self.socket,
+                        &crate::rules::read_request(&scope),
+                        left,
+                        lease,
+                    )
                 })
                 .and_then(|answer| crate::rules::rules(&answer));
             match kept.map(|kept| crate::rules::admit(&kept)) {
@@ -1436,10 +1525,13 @@ impl DaysClient {
         }
         let Some(answer) = until
             .checked_duration_since(Instant::now())
-            .and_then(|left| bounded_exchange(&self.socket, &line, left))
+            .and_then(|left| bounded_exchange_scoped(&self.socket, &line, left, lease))
         else {
             return (gone(), false);
         };
+        if !scope_current(lease) {
+            return (gone(), false);
+        }
         let told = crate::rules::answer_for(&call.name, &answer, |at| {
             when(local_day(now, offset) - local_day(at, offset))
         });
@@ -1483,7 +1575,7 @@ impl DaysClient {
                     clear_forgotten_thread(&mut thread);
                 }
             }
-            self.tell_policy(person, until);
+            self.tell_policy_guarded(person, until, lease);
         }
         (told, true)
     }
@@ -1496,11 +1588,24 @@ impl DaysClient {
         person: Option<&str>,
         until: Instant,
     ) -> Option<(Vec<crate::rules::Rule>, Option<Vec<crate::rules::Rule>>)> {
+        self.tell_policy_guarded(person, until, None)
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn tell_policy_guarded(
+        &self,
+        person: Option<&str>,
+        until: Instant,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+    ) -> Option<(Vec<crate::rules::Rule>, Option<Vec<crate::rules::Rule>>)> {
         let read = crate::rules::read(
-            |line, left| bounded_exchange(&self.socket, line, left),
+            |line, left| bounded_exchange_scoped(&self.socket, line, left, lease),
             person,
             until,
         )?;
+        if !scope_current(lease) {
+            return None;
+        }
         crate::rules::publish(&crate::rules::facts(
             person,
             &read.0,
@@ -1771,7 +1876,31 @@ fn days_writer(
 /// read_until with a per-read timeout, backlog saturation and a peer sending
 /// one byte at a time cannot extend this budget. Rustix's net/event features
 /// are already part of Voice's required lamp-ipc dependency.
+fn legacy_exchange(
+    socket: &Path,
+    line: &Value,
+    budget: Duration,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<Value> {
+    match lease {
+        Some(_) => bounded_exchange_scoped(socket, line, budget, lease),
+        None => crate::tools::exchange(socket, line, budget),
+    }
+}
+
 fn bounded_exchange(socket: &Path, line: &Value, budget: Duration) -> Option<Value> {
+    bounded_exchange_scoped(socket, line, budget, None)
+}
+
+fn bounded_exchange_scoped(
+    socket: &Path,
+    line: &Value,
+    budget: Duration,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<Value> {
+    if !scope_current(lease) {
+        return None;
+    }
     use rustix::{
         event::{PollFd, PollFlags, Timespec, poll},
         net::{SocketAddrUnix, connect},
@@ -1779,18 +1908,30 @@ fn bounded_exchange(socket: &Path, line: &Value, budget: Duration) -> Option<Val
     let until = Instant::now().checked_add(budget)?;
     let address = SocketAddrUnix::new(socket).ok()?;
     let stream = unconnected()?;
+    if !scope_current(lease) {
+        return None;
+    }
     let connected = connect(&stream, &address);
     let wait = |interest| -> Option<()> {
         loop {
+            if !scope_current(lease) {
+                return None;
+            }
             let left = until
                 .checked_duration_since(Instant::now())
                 .filter(|left| !left.is_zero())?;
+            let left = if lease.is_some() {
+                left.min(Duration::from_millis(20))
+            } else {
+                left
+            };
             let timeout = Timespec {
                 tv_sec: left.as_secs().try_into().ok()?,
                 tv_nsec: left.subsec_nanos().into(),
             };
             let mut fds = [PollFd::new(&stream, interest)];
             match poll(&mut fds, Some(&timeout)) {
+                Ok(0) if lease.is_some() => continue,
                 Ok(0) => return None,
                 Ok(_)
                     if fds[0]
@@ -1824,6 +1965,9 @@ fn bounded_exchange(socket: &Path, line: &Value, budget: Duration) -> Option<Val
     bytes.push(b'\n');
     let mut sent = 0;
     while sent < bytes.len() {
+        if !scope_current(lease) {
+            return None;
+        }
         until.checked_duration_since(Instant::now())?;
         match (&stream).write(&bytes[sent..]) {
             Ok(0) => return None,
@@ -1836,6 +1980,9 @@ fn bounded_exchange(socket: &Path, line: &Value, budget: Duration) -> Option<Val
     let mut answer = Vec::with_capacity(1_024);
     let mut chunk = [0u8; 1_024];
     loop {
+        if !scope_current(lease) {
+            return None;
+        }
         until.checked_duration_since(Instant::now())?;
         let room = ANSWER_BYTES
             .checked_sub(answer.len())
@@ -1847,8 +1994,11 @@ fn bounded_exchange(socket: &Path, line: &Value, budget: Duration) -> Option<Val
                 if let Some(end) = chunk[..n].iter().position(|byte| *byte == b'\n') {
                     answer.extend_from_slice(&chunk[..=end]);
                     let value = serde_json::from_slice(&answer).ok()?;
+                    if !scope_current(lease) {
+                        return None;
+                    }
                     until.checked_duration_since(Instant::now())?;
-                    return Some(value);
+                    return scope_current(lease).then_some(value);
                 }
                 answer.extend_from_slice(&chunk[..n]);
             }
@@ -1980,6 +2130,138 @@ mod tests {
         io::{BufRead, BufReader, Write},
         os::unix::net::UnixListener,
     };
+
+    fn scoped_request(name: Option<&str>, request: u64) -> crate::memory_scope::RequestScope {
+        let cache = crate::memory_scope::FaceCache::default();
+        if let Some(name) = name {
+            let path = PathBuf::from(format!("/tmp/lms-face-{}-{request}", std::process::id()));
+            std::fs::write(&path, name).unwrap();
+            let refresh = cache.begin_refresh();
+            cache.replace(refresh, crate::known_faces::FaceObservation::read(&path));
+            std::fs::remove_file(path).unwrap();
+        }
+        crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            cache.snapshot(Instant::now()),
+        )
+    }
+
+    #[test]
+    fn revoked_scoped_memory_call_never_connects_or_falls_back_to_room() {
+        let socket = PathBuf::from(format!("/tmp/lms-cancel-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let request = scoped_request(Some("Ann"), 710);
+        let lease = request.lease();
+        request.revoke();
+        let call = call(REMEMBER, json!({"text":"private"}));
+        assert_eq!(
+            run_scoped(&socket, &call, FIRST_READ, &lease),
+            (gone(), false)
+        );
+        let client = DaysClient::new(socket.clone()).unwrap();
+        assert_eq!(
+            client.run_for_guarded(&call, FIRST_READ, Some("must-not-write"), Some(&lease)),
+            (gone(), false)
+        );
+        assert!(listener.accept().is_err());
+        drop(client);
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    #[test]
+    fn scoped_legacy_and_days_suppress_a_private_reply_revoked_after_dispatch() {
+        for days in [false, true] {
+            let socket = PathBuf::from(format!("/tmp/lms-late-{}-{days}.sock", std::process::id()));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let request = scoped_request(Some("Ann"), 711 + u64::from(days));
+            let lease = request.lease();
+            let served = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                assert_eq!(asked["person"], person_id("Ann"));
+                request.revoke();
+                let _ = stream.write_all(b"{\"ok\":true,\"entries\":[{\"kind\":\"kept\",\"id\":1,\"at_unix_ms\":1,\"text\":\"private-secret\"}]}\n");
+            });
+            let call = call(RECALL, json!({}));
+            let person = lease.scope().unwrap().person();
+            let result = if days {
+                let client = DaysClient::new(socket.clone()).unwrap();
+                client.run_for_guarded(&call, Duration::from_secs(2), person, Some(&lease))
+            } else {
+                run_for_guarded(&socket, &call, Duration::from_secs(2), person, Some(&lease))
+            };
+            assert!(!result.1);
+            assert!(!result.0.to_string().contains("private-secret"));
+            served.join().unwrap();
+            std::fs::remove_file(socket).unwrap();
+        }
+    }
+
+    #[test]
+    fn admitted_identity_stays_ann_when_the_face_cache_moves_to_bob() {
+        for days in [false, true] {
+            let cache = crate::memory_scope::FaceCache::default();
+            let file = PathBuf::from(format!("/tmp/lms-current-{}-{days}", std::process::id()));
+            std::fs::write(&file, "Ann").unwrap();
+            let refresh = cache.begin_refresh();
+            cache.replace(refresh, crate::known_faces::FaceObservation::read(&file));
+            let owner = crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+                    session: 1,
+                    request: 720,
+                },
+                cache.snapshot(Instant::now()),
+            );
+            let lease = owner.lease();
+            std::fs::write(&file, "Bob").unwrap();
+            let refresh = cache.begin_refresh();
+            cache.replace(refresh, crate::known_faces::FaceObservation::read(&file));
+            assert_eq!(
+                cache.snapshot(Instant::now()).person(),
+                Some(person_id("Bob").as_str())
+            );
+            let socket = PathBuf::from(format!(
+                "/tmp/lms-stable-{}-{days}.sock",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let served = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                let request: Value = serde_json::from_str(&line).unwrap();
+                stream.write_all(b"{\"ok\":true,\"id\":1}\n").unwrap();
+                vec![request]
+            });
+            let call = call(REMEMBER, json!({"text":"Ann's preference"}));
+            let person = lease.scope().unwrap().person();
+            let result = if days {
+                let client = DaysClient::new(socket.clone()).unwrap();
+                client.run_for_guarded(&call, Duration::from_secs(2), person, Some(&lease))
+            } else {
+                run_for_guarded(&socket, &call, Duration::from_secs(2), person, Some(&lease))
+            };
+            assert!(result.1);
+            assert_eq!(served.join().unwrap()[0]["person"], person_id("Ann"));
+            std::fs::remove_file(file).unwrap();
+            std::fs::remove_file(socket).unwrap();
+        }
+    }
 
     // 2026-10-13 22:30 in Ho Chi Minh City, seven hours east of UTC.
     const NOW: u64 = 1_791_905_400_000;
