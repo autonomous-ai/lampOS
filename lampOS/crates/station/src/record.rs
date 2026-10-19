@@ -5,17 +5,20 @@
 //! - an input that does not fit the matrix is refused and nothing is
 //!   recorded: an unknown check id, a self-test part given as a station step
 //!   or the other way round, a check given twice, a qualification check in a
-//!   routine run or a retest, a time outside the run;
+//!   routine run or a retest, a time outside the run, a self-test report
+//!   that names another lamp than `--device`;
 //! - any fail makes the run `fail`: a check that failed, a measurement
 //!   outside its limit, or `not_fitted` on a revision that must have the part;
 //! - otherwise a mandatory check that is missing, skipped, interrupted or
-//!   `not_checked` makes it `incomplete`, never `pass`;
+//!   `not_checked` makes it `incomplete`, never `pass`, and so does a
+//!   self-test report that names no lamp, unless the matrix's
+//!   `selftest_without_lamp` says such a report is refused;
 //! - otherwise it is `pass`.
 use crate::{
     CLOCK_SLACK_MS, Refused, Utc, commit,
     inputs::{Answered, Answers, Measurement, Reading, Repair, Step},
     line,
-    matrix::{Check, Kind, Limit, Matrix, Method},
+    matrix::{Check, Kind, Limit, Matrix, Method, WithoutLamp},
     plain, refuse,
 };
 use lamp_msgs::{Occasion as SelfTestOccasion, PartResult, SelfTest, Verdict};
@@ -134,6 +137,10 @@ pub struct SelfTestUsed {
     pub verdict: Verdict,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build: Option<String>,
+    /// The lamp the report names; absent from a report made before reports
+    /// named their lamp.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lamp: Option<String>,
 }
 
 /// One check in the record.
@@ -305,6 +312,8 @@ pub fn make(given: Given<'_>) -> Result<Record, Refused> {
     }
 
     let mut found: BTreeMap<&str, Found<'_>> = BTreeMap::new();
+    // A report that does not name its lamp, when the matrix records it.
+    let mut unmatched = None;
     let selftest = match given.selftest {
         None => None,
         Some(test) => {
@@ -317,6 +326,23 @@ pub fn make(given: Given<'_>) -> Result<Record, Refused> {
                 refuse!(
                     "the self-test started at {at}, outside this run ({started} to {ended}): run it again and copy its newest report"
                 );
+            }
+            match &test.lamp {
+                Some(lamp) if *lamp != device.id => refuse!(
+                    "the self-test report is {lamp}'s, not {}'s: copy the report off the lamp under test",
+                    device.id
+                ),
+                Some(_) => {}
+                None => {
+                    let why = format!(
+                        "the self-test report does not name its lamp: it is from a build before reports did, and cannot be matched to {}",
+                        device.id
+                    );
+                    match matrix.rules.selftest_without_lamp {
+                        WithoutLamp::Refused => refuse!("{why}"),
+                        WithoutLamp::Incomplete => unmatched = Some(why),
+                    }
+                }
             }
             for part in &test.parts {
                 let Some(check) = matrix.check(&part.part) else {
@@ -344,6 +370,7 @@ pub fn make(given: Given<'_>) -> Result<Record, Refused> {
                 took: test.took,
                 verdict: test.verdict,
                 build: test.build.clone(),
+                lamp: test.lamp.clone(),
             })
         }
     };
@@ -453,6 +480,18 @@ pub fn make(given: Given<'_>) -> Result<Record, Refused> {
         }
         judge(check, revision, &mut entry, &mut failures, &mut incomplete);
         checks.push(entry);
+    }
+    // Whose report it is cannot be shown: never a pass. Its parts are
+    // judged as given, so a fail in it still fails the run.
+    if let Some(reason) = unmatched {
+        incomplete.insert(
+            0,
+            Unfinished {
+                check: "selftest".into(),
+                verdict: Outcome::NotChecked,
+                reason,
+            },
+        );
     }
 
     let verdict = if !failures.is_empty() {
@@ -676,6 +715,7 @@ mod tests {
             verdict: SelfTest::verdict_of(&parts),
             parts,
             build: None,
+            lamp: Some("lamp-4ace".into()),
         }
     }
 
@@ -1201,6 +1241,66 @@ mod tests {
         let mut run = Run::good();
         run.answers.ended = at("2026-10-20T08:30:00Z");
         assert!(run.refused().contains("after now"));
+    }
+
+    /// The report names the lamp that ran it, and it must be the lamp the
+    /// station identified.
+    #[test]
+    fn a_self_test_report_of_another_lamp_is_refused() {
+        let record = Run::good().make().unwrap();
+        assert_eq!(
+            record.selftest.as_ref().unwrap().lamp.as_deref(),
+            Some("lamp-4ace")
+        );
+        let mut run = Run::good();
+        run.selftest.as_mut().unwrap().lamp = Some("lamp-52e6".into());
+        let why = run.refused();
+        assert!(why.contains("lamp-52e6's, not lamp-4ace's"), "{why}");
+        // Refused whatever the matrix says of a report without a name.
+        run.matrix.rules.selftest_without_lamp = WithoutLamp::Incomplete;
+        assert!(run.make().is_err());
+    }
+
+    /// A report from a build before reports named their lamp cannot be
+    /// matched: `incomplete` by default, never `pass`, and refused where the
+    /// matrix says so.
+    #[test]
+    fn a_self_test_report_without_its_lamp_is_incomplete_unless_the_matrix_refuses_it() {
+        let mut run = Run::good();
+        run.selftest.as_mut().unwrap().lamp = None;
+        let record = run.make().unwrap();
+        assert_eq!(record.verdict, RunVerdict::Incomplete);
+        assert_eq!(record.incomplete.len(), 1);
+        let unfinished = &record.incomplete[0];
+        assert_eq!(
+            (unfinished.check.as_str(), unfinished.verdict),
+            ("selftest", Outcome::NotChecked)
+        );
+        assert!(
+            unfinished.reason.contains("cannot be matched to lamp-4ace"),
+            "{}",
+            unfinished.reason
+        );
+        assert!(record.failures.is_empty());
+        assert_eq!(record.selftest.as_ref().unwrap().lamp, None);
+        // Its parts are still judged: a fail in it fails the run.
+        run.selftest.as_mut().unwrap().parts[0] = part("ring", Verdict::Fail);
+        let test = run.selftest.as_mut().unwrap();
+        test.verdict = SelfTest::verdict_of(&test.parts);
+        let record = run.make().unwrap();
+        assert_eq!(record.verdict, RunVerdict::Fail);
+        assert_eq!(record.incomplete[0].check, "selftest");
+        // Where the hardware lead says so, no record is made.
+        let mut run = Run::good();
+        run.selftest.as_mut().unwrap().lamp = None;
+        run.matrix.rules.selftest_without_lamp = WithoutLamp::Refused;
+        let why = run.refused();
+        assert!(why.contains("does not name its lamp"), "{why}");
+        // No report at all is the missing checks', not this rule's.
+        let mut run = Run::new(None, good_steps());
+        run.matrix.rules.selftest_without_lamp = WithoutLamp::Refused;
+        let record = run.make().unwrap();
+        assert!(record.incomplete.iter().all(|u| u.check != "selftest"));
     }
 
     #[test]

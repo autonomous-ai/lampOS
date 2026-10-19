@@ -63,6 +63,21 @@ pub fn build_of(program: &std::path::Path) -> Option<String> {
     .then(|| build.to_owned())
 }
 
+/// Where the kernel keeps the lamp's host name, as `lamp-cloud`'s `info`
+/// reads it (`crates/cloud/src/lamp.rs`, `Real::hostname`).
+pub const HOSTNAME: &str = "/proc/sys/kernel/hostname";
+
+/// The lamp's name for its report, from the kernel's host name at `path`
+/// ([`HOSTNAME`]): `lamp-` and the last four of its serial or Ethernet
+/// address, which the image's hotspot script gives it at the first boot.
+/// None when it cannot be read or is not a host name, so a run is never
+/// refused for it.
+pub fn lamp_of(path: &std::path::Path) -> Option<String> {
+    let name = std::fs::read_to_string(path).ok()?;
+    let name = name.trim();
+    SelfTest::is_lamp_name(name).then(|| name.to_owned())
+}
+
 /// Runs every check in order. A check that starts after the budget is spent
 /// is not run and says so; one that overruns its deadline keeps its result.
 pub fn run(occasion: Occasion, checks: &mut [Box<dyn Check + '_>], budget: Duration) -> SelfTest {
@@ -98,6 +113,8 @@ pub fn run(occasion: Occasion, checks: &mut [Box<dyn Check + '_>], budget: Durat
         parts,
         // The program's own build (#1399).
         build: std::env::current_exe().ok().as_deref().and_then(build_of),
+        // The lamp it ran on, so a test station can match it.
+        lamp: lamp_of(std::path::Path::new(HOSTNAME)),
     }
 }
 
@@ -285,5 +302,39 @@ mod tests {
         ] {
             assert_eq!(build_of(Path::new(other)), None, "{other}");
         }
+    }
+
+    /// The report names its lamp by the kernel's host name, read as
+    /// `lamp-cloud` reads it; one that cannot be read, or is not a host
+    /// name, is no name, and a run checked again keeps its first one.
+    #[test]
+    fn a_run_names_the_lamp_by_its_host_name() {
+        let dir = std::env::temp_dir().join(format!("lamp-selftest-lamp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("hostname");
+        std::fs::write(&file, "lamp-4ace\n").unwrap();
+        assert_eq!(lamp_of(&file).as_deref(), Some("lamp-4ace"));
+        for refused in ["", "\n", "lamp 4ace\n", "two\nlines\n"] {
+            std::fs::write(&file, refused).unwrap();
+            assert_eq!(lamp_of(&file), None, "{refused:?}");
+        }
+        assert_eq!(lamp_of(&dir.join("missing")), None);
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        let mut first = run(
+            Occasion::Factory,
+            &mut [Fake::boxed("ring", Verdict::Fail, Duration::ZERO)],
+            BUDGET,
+        );
+        assert_eq!(first.lamp, lamp_of(std::path::Path::new(HOSTNAME)));
+        assert_eq!(first.check(), Ok(()));
+        first.lamp = Some("lamp-4ace".into());
+        let checked = again(
+            first,
+            &mut [Fake::boxed("ring", Verdict::Pass, Duration::ZERO)],
+            BUDGET,
+        );
+        assert_eq!(checked.lamp.as_deref(), Some("lamp-4ace"));
     }
 }

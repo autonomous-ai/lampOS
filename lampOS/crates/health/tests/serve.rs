@@ -1126,6 +1126,7 @@ fn selftest(parts: &[(&str, Verdict, &str)]) -> SelfTest {
         verdict: SelfTest::verdict_of(&parts),
         parts,
         build: None,
+        lamp: None,
     }
 }
 

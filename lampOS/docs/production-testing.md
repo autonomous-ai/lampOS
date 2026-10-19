@@ -68,6 +68,9 @@ kept its version shows.
 
 - `[suite]`: `version`, and `approved` (false until the hardware lead
   approves this version).
+- `[rules]`: `selftest_without_lamp`, what a run is whose self-test report
+  does not name its lamp (below, "Whose report it is"): `incomplete` (the
+  default, and version 0's) or `refused`. The hardware lead's to set.
 - `[[revision]]`: the hardware revisions the matrix knows, each with an
   `id` and a line saying `what` it has. Version 0's two are placeholders the
   hardware lead names: `draft-a` (every part fitted, the air sensor among
@@ -115,7 +118,7 @@ Only the air checks may be `not_fitted`, and only on `draft-a-no-air`.
   `not_checked` or missing, so the run is `incomplete`. Read strictly: a field
   `lamp_msgs::SelfTest` does not have is refused, and so is a report that
   fails its own check (a verdict that is not the worst of its parts, a fail
-  with no reason).
+  with no reason). The report names the lamp that ran it (`lamp`, below).
 - **The station's answers**, one JSON file for the run:
 
 ```json
@@ -141,8 +144,9 @@ Only the air checks may be `not_fitted`, and only on `draft-a-no-air`.
   `repairs` say what was done since the run it retests: each `at`, the
   `check` whose failure it answers, the `action` (`replaced`, `reseated`,
   `reworked` or `adjusted`) and a one-line `detail`.
-- **The lamp:** `--device` (its id, such as `lamp-4ace`), `--revision` (one
-  the matrix names) and `--batch`.
+- **The lamp:** `--device` (its host name, such as `lamp-4ace`: the name its
+  self-test report gives), `--revision` (one the matrix names) and
+  `--batch`.
 - **What judged it:** `--lampos-build` (the lampOS commit the lamp runs),
   `--suite <matrix version>+<tool commit>` (the station tool's commit; the
   version must be the matrix file's own) and `--station` (`station-<id>`).
@@ -152,6 +156,22 @@ Only the air checks may be `not_fitted`, and only on `draft-a-no-air`.
 - **For a retest**, `--retest-of`, the record of the run it retests.
 
 Times are UTC, written `2026-10-19T08:00:00Z`; any other offset is refused.
+
+### Whose report it is
+
+A self-test report names the lamp that ran it: `lamp`, its host name as the
+kernel has it, the name `lamp-cloud`'s `info` answers as `hostname`
+([selftest.md](selftest.md), "What a run gives"). The station's `--device`
+is that name.
+
+- A report that names **another lamp** is refused, and no record is made: it
+  was copied off the wrong lamp.
+- A report that names **no lamp** is from a build before reports named
+  theirs, and cannot be matched to `--device`. By the matrix's
+  `selftest_without_lamp`, the run is `incomplete` (the default: the record
+  is made, with `selftest` first in `incomplete`, `not_checked`, saying so)
+  or refused. Its parts are judged as given either way, so a fail in it
+  still fails the run.
 
 ### The command
 
@@ -188,10 +208,10 @@ written).
 | `operator` | `op-<digits>` |
 | `retest_of` | a retest's: the run id it retests (absent otherwise) |
 | `repairs` | a retest's repairs, as given (absent when none) |
-| `selftest` | the lamp's report the run used: its `occasion`, `started` (the lamp's clock, UTC), `took`, `verdict` and `build` (absent when none was given) |
+| `selftest` | the lamp's report the run used: its `occasion`, `started` (the lamp's clock, UTC), `took`, `verdict`, `build` and `lamp` (absent when none was given) |
 | `checks` | every check of the run, in the matrix's order (below) |
 | `failures` | each check that failed: `check`, `reason`, and `measured` and `limit` where there are |
-| `incomplete` | each mandatory check that did not finish: `check`, its `verdict` and `reason` |
+| `incomplete` | each mandatory check that did not finish: `check`, its `verdict` and `reason`; first, `selftest` when the report names no lamp |
 
 Each of `checks`:
 
@@ -222,7 +242,9 @@ In this order:
    that is not `op-<digits>`; a step outside the run's times, a run that ends
    before it starts or after now, or a self-test report that started more
    than 5 minutes outside the run (an old `latest.json`; the slack is for a
-   lamp's clock, which has no battery); a non-pass step with no reason; a
+   lamp's clock, which has no battery); a self-test report that names
+   another lamp than `--device`, or names none where the matrix's
+   `selftest_without_lamp` is `refused`; a non-pass step with no reason; a
    pass with no measurement on a check with a limit, or a measurement in
    another unit. For a retest: no earlier record, or one of another lamp,
    one that passed, a qualification run, or one that ended after this run
@@ -232,7 +254,8 @@ In this order:
    (mandatory or not), a measurement outside its limit, or `not_fitted` where
    the matrix does not allow it for the lamp's revision.
 3. **`incomplete`** otherwise, if any mandatory check of the run's kind is
-   missing, skipped, interrupted or `not_checked`. Never `pass`.
+   missing, skipped, interrupted or `not_checked`, or the self-test report
+   names no lamp (where the matrix does not refuse it). Never `pass`.
 4. **`pass`** otherwise, if at least one check passed. A run that would pass
    with no check passed (a matrix that asks nothing of it) is refused.
 
@@ -277,8 +300,13 @@ never committed to this repository; the tests' inputs are made up.
 - Every limit, duration and fixture, and which checks are mandatory.
 - The revisions' names (`draft-a` and `draft-a-no-air` are placeholders),
   and which parts each revision may lack.
-- What the device id is (the lamp's key such as `lamp-4ace`, or a serial
-  label), and how batches are named.
+- What the device id is, and how batches are named. Here it is the lamp's
+  host name, which its self-test report gives: `lamp-` and only the last
+  four hex digits of its serial or Ethernet address, so among 100 lamps two
+  may share one (about a 7% chance). Whether the record needs a longer id,
+  such as the whole serial, is open.
+- Whether a self-test report that names no lamp makes a run `incomplete`
+  (version 0) or is refused (`selftest_without_lamp`).
 - The operator id's form (`op-<digits>` here).
 - The 5 minutes allowed between the lamp's clock and the station's.
 - Proposed here: `not_fitted` on a revision that must have the part is a
@@ -287,10 +315,8 @@ never committed to this repository; the tests' inputs are made up.
 - Where the SD card's make and size are recorded.
 - Where the fleet record lives.
 
-The self-test's report does not name its lamp: the station copies it from
-the lamp it identified. A record that proves the report is that lamp's needs
-the self-test to say its own host name, a change to the self-test that is not
-made here.
+A lamp whose hotspot never came up keeps the image's own host name, and its
+report names that; the station's `--device` must then be the same name.
 
 ## What was not shown
 
