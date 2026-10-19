@@ -1,7 +1,8 @@
 # The first five minutes
 
-`crates/voice/src/onboarding.rs`, #841. Status on 2026-10-15: built behind
-a switch, host tests only. Not yet tried on a lamp or with a person.
+`crates/voice/src/onboarding.rs`, #841. The privacy batch remains behind
+the onboarding switch. Device qualification is outstanding; local evidence
+and rollout limitations are recorded with each PR.
 
 ## What it is for
 
@@ -25,14 +26,14 @@ ready, not paused) and a face is in front of it.
 | 2 | `who_you_are` | asks what to call them; after a clear yes, `remember_my_face` ([eyes.md](eyes.md)) | the model calls `setup_step` | the face in the eyes' people file |
 | 3 | `how_you_sound` | placeholder | — | — |
 | 4 | `touch` | placeholder | — | — |
-| 5 | `privacy` | placeholder | — | — |
+| 5 | `privacy` | led first, before step 1, whenever it is available (see "Physical privacy step" below); the core onboarding skill requests a short invitation naming the verified switch location | a delivered invitation, fresh physical close, the voice's verified microphone cleanup, then a fresh same-source open and normal readiness; the camera's close is not checked | bounded attempt evidence and completion identity |
 | 6 | `giving_way` | placeholder | — | — |
 | 7 | `preferences` | asks about quiet hours and whether it may say hello, one at a time; keeps each as a rule with `keep_rule` (#813) when the provider worker has both `LAMP_MEMORY_DAYS=on` and `LAMP_MEMORY_RULES=on` ([memory.md](memory.md), "What a person teaches and corrects"); without either, or with the legacy memory, there is no `keep_rule` and the model keeps them with `remember` if it has a memory at all and says that is everything | the model calls `setup_step` | the rules, in memory |
 
 A placeholder is the step of a part another builder owns: hearing (fourth,
-#753), head touch (third, #711), the privacy switch (third, #795), and
+#753), head touch (third, #711), and
 whether the body gives way (fifth, #780). It is recorded as `not_available`
-and passed over without a word: four "that isn't ready yet" in a row would
+and passed over without a word: repeated "that isn't ready yet" in a row would
 sound like a machine. Each is marked `PLACEHOLDER (#841)` in the code.
 
 A step the model leads ends with `setup_step {step, outcome}`, outcome
@@ -48,15 +49,13 @@ asked again when someone is back. The keeper's pause
 ([keeper.md](keeper.md)) stops it the same way: nothing is begun while
 paused, and the step being led is asked again afterwards.
 
-## The body says it too
+## Movement during onboarding
 
-A step that ends done asks the body for one move, by the path the answers'
-nods take (`LAMP_BODY_MOOD_SOCKET`, `{"gesture":…}`): a nod when it sees them
-well where they sit, a greeting when it knows their name and face, a nod
-for any later step. Skipped or failed: none. No body, or the keeper's
-pause: none, and none is kept for later (`body_gesture_asked` with
-`"why":"onboarding"` in the record). The body has no lean yet, so a
-greeting stands in for it.
+Onboarding does not request nods or gestures for placement, identity, privacy or
+preferences. Only a future qualified giving-way step may move the body while
+the person is at the arm. That step remains unavailable until the body owner
+supplies its yield/release evidence; ordinary safety and physical controls
+continue to own their existing reactions.
 
 ## A step that was not ready, offered later
 
@@ -118,3 +117,95 @@ step 1's guiding notes before the framing held and the face size and
 centre reached, whether every line was the model's and short, and the
 whole time. Whether the model calls `setup_step` reliably, and whether
 "turn me a little toward you" without a side is enough for a person.
+
+## Physical privacy step (#841)
+
+Privacy is an explicitly measured step, not a model-reported success. The
+`onboarding` core skill reads `onboarding/pending` and asks the existing say
+service for the exact invitation token. The runner retains the words, evidence
+and persistence; there is no second conversational runner and no automatic
+voice fallback when the skill is absent. Stale, skipped, redone or restarted
+attempts cannot borrow another invitation. This bridge adds no model tool and
+grants no microphone, camera or body authority.
+
+Privacy is led first, before step 1, whenever it is available, though its
+record keeps the table's place. It is available only with a verified switch
+location (below) and Controls' privacy receipts, `LAMP_PRIVACY_CONTROLS=on`
+(the `privacy_bus.rs` worker): the GPIO
+privacy worker sends no receipt, and without one no invitation could ever be
+offered, so the step is `not_available` and the walk goes on. The product's
+`lamp-voice.service` doesn't set `LAMP_PRIVACY_CONTROLS`.
+
+The runner gives the model a note to word the invitation itself, not fixed
+words: the hardware profile's verified switch location, that the switch closes
+the microphones and camera, to close it and open it again, and that the lamp
+can't hear or see them while it is closed. An invitation is delivered only on the
+voice turn's complete playback evidence; queue acceptance is insufficient.
+An interrupted invitation can be retried once, then skipped. Software mute,
+sleep, an initial open level, and model `setup_step done` are not evidence of
+physical close followed by open.
+
+Controls' existing fence provides the publisher, reader and acquisition
+identity through the same privacy worker channel. Close observation only
+captures bounded evidence in memory. The outer service persists a close only
+after the voice's own revocation and verified teardown. That proves the
+microphones closed, not the camera: the eyes are told nothing new on a mute
+(the permit link only stops saying yes) and close the camera on their own
+1.5 s permit timeout, which this step does not observe. Done's note to the
+model claims the microphones only. A close read just before the
+invitation's end is processed is the person acting early: the attempt is
+offered again (within the two-try budget), not failed. The normal no-audio
+privacy wait is unchanged. A later voice cycle can complete the step only
+with fresh, advancing evidence from the same physical source and its normal
+input-readiness gate. Source/clock changes, failed cleanup and missing evidence
+leave the step incomplete. An attempt expires after five minutes, evaluated
+on reopening; expiry never changes the switch or capture authority.
+
+The product reserves `/var/lib/lampOS/voice/onboarding/` as private state, with
+`progress.json` as the canonical progress path. Pending proof and bounded
+retry metadata stay beside it. Completion is saved by attempt identity before
+pending evidence is erased, so a crash does not repeat an acknowledgment.
+A new service invocation discards unfinished close proof, and any
+`privacy-pending.json.next-*` or `progress.storage-next` a crash left
+mid-write, before its first privacy wait; normal physical-mute cycles within that service retain it.
+Software mute or an unreadable source discards prior proof after cleanup. A
+failed discard disables onboarding proof for that service while leaving the
+normal privacy wait unchanged. Factory reset wipes all contents, including
+temporary/mailbox files, and preserves the installed core skill. There is no implicit import from arbitrary
+legacy environment paths.
+
+The step also needs `LAMP_ONBOARDING_HARDWARE_PROFILE` naming an absolute path
+to a hardware-owner supplied regular JSON file:
+
+```json
+{"privacy_switch_location":"<verified location on this hardware>"}
+```
+
+This is a schema example, not a location to deploy. No profile is supplied or
+guessed by default. The loader rejects symlink files, malformed/unknown fields,
+files above 4096 bytes, and empty/control-containing location phrases or
+phrases over 160 characters. Missing valid location evidence keeps privacy
+unavailable. Read the profile once in storage initialization, not on the interaction loop.
+The product path configuration does not enable `LAMP_ONBOARDING`.
+
+Immediate feedback remains independent of progress writes. A single storage
+worker belongs to the whole service, including its physical-mute cycles;
+progress, invitation budget, checkpoint and mailbox operations use its bounded
+ordered queue. The interaction loop only submits or polls without waiting.
+There is one operation in flight and bounded pending state, not one thread per
+write. Late completions cannot restore an invalidated attempt: an epoch fence
+hides old results immediately and a durable invalidation runs after any old
+write before the tutorial resumes. No worker completion grants capture
+authority. A slow or failed store can defer tutorial progress while normal
+voice and physical privacy keep running. A new invitation is not published
+before its budget commit, and Done is not acknowledged before its matching
+progress commit. The provider keeps appending its bounded mailbox messages in
+its separate process; the runner reads them only through the storage worker. The target is acknowledgment within
+500 ms after accepted proof. Full device latency, slow-storage responsiveness,
+and the physical close/open walkthrough remain unverified until measured on an
+exclusively leased lamp. Local tests do not establish those hardware results.
+
+Known limit: the say service trusts the skill name a process gives. A process
+in the `lampos` group that reads the invitation token from the bus could ask
+for the same invitation; it gets no data, only the lamp saying the invitation
+the runner already offered.

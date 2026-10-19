@@ -286,7 +286,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 27] = [
+const PERSON_STORES: [&str; 28] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -312,6 +312,7 @@ const PERSON_STORES: [&str; 27] = [
     "/var/lib/lampos-schedule/store",
     "/var/lib/lampos-policy",
     "/var/lib/lampOS/voice/sessions",
+    "/var/lib/lampOS/voice/onboarding",
     "/var/lib/lampOS/voice/schedule-delivery",
     "/var/lib/lampOS/voice/first-output",
     "/run/lampos-voice/thread.json",
@@ -399,6 +400,53 @@ fn a_reset_takes_harness_sign_in_and_pairings_and_keeps_harness_itself() {
     );
     for (file, kept) in files {
         assert_eq!(harness.join(file).exists(), kept, "{file}");
+    }
+}
+
+/// Reset covers the whole private onboarding directory, including unfinished
+/// writes and handoffs, while the installed core skill is software to keep.
+#[test]
+fn reset_wipes_all_onboarding_state_and_keeps_the_core_skill() {
+    let home = Path::new("/var/lib/lampOS/voice/onboarding");
+    let skill = Path::new("/var/lib/lampOS/skills/onboarding/skill.json");
+    for source in [
+        include_str!("../fixtures/reset-plan-product.json"),
+        include_str!("../fixtures/reset-plan-example.json"),
+    ] {
+        let plan: Plan = serde_json::from_str(source).unwrap();
+        plan.check().unwrap();
+        assert!(plan.wipe.iter().any(|path| path == home));
+        assert!(!plan.wipe.iter().any(|path| skill.starts_with(path)));
+        let root = Root::new();
+        let private = root.path(home.strip_prefix("/").unwrap().to_str().unwrap());
+        let package = root.path(skill.strip_prefix("/").unwrap().to_str().unwrap());
+        for file in [
+            "progress.json",
+            "privacy.json",
+            "progress.json.pending",
+            ".checkpoint.tmp",
+            "mailbox/receipt.json",
+        ] {
+            let path = private.join(file);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, b"private state").unwrap();
+        }
+        fs::set_permissions(&private, fs::Permissions::from_mode(0o700)).unwrap();
+        fs::create_dir_all(package.parent().unwrap()).unwrap();
+        fs::write(&package, b"core skill").unwrap();
+        // An interrupted writer's link cannot make reset erase the package.
+        symlink(&package, private.join("package-link")).unwrap();
+        for path in &plan.wipe {
+            let mapped = root.0.join(path.strip_prefix("/").unwrap());
+            reset::wipe(&mapped).unwrap();
+        }
+        assert!(private.is_dir(), "reset retains the private container");
+        assert_eq!(fs::read_dir(&private).unwrap().count(), 0);
+        assert_eq!(
+            fs::metadata(&private).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        assert_eq!(fs::read(&package).unwrap(), b"core skill");
     }
 }
 

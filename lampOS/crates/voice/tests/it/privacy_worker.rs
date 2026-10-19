@@ -277,6 +277,7 @@ impl Rig {
                 Some(WorkerEvent::Privacy {
                     acquired_at_us,
                     muted,
+                    ..
                 }) => {
                     if muted {
                         self.last_low_event = Some(acquired_at_us);

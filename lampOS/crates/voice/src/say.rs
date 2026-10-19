@@ -40,6 +40,11 @@
 //!   played less than [`SOUND_EVERY_US`] ago ([`may_play_sound`]).
 //!   `spoken` then means played whole, with no gap in its playback.
 //!
+//! Onboarding is also a source-owned request: only `skill: onboarding` with
+//! `from: onboarding` and a nonzero `invitation` can ask for it. The coordinator
+//! takes the exact invitation through [`Says::take_onboarding`]; no ID is a
+//! wildcard. It follows the same expiry cap as other source-owned requests.
+//!
 //! Nothing of what is said is logged: the skill's name, the priority and
 //! the outcome only.
 use serde::Deserialize;
@@ -192,6 +197,8 @@ pub enum Source {
     Schedule,
     /// The news of work handed over ([`crate::task_news`]).
     Tasks,
+    /// A single privacy invitation owned by the voice onboarding state machine.
+    Onboarding,
 }
 
 impl Source {
@@ -199,6 +206,7 @@ impl Source {
         match name {
             "schedule" => Some(Self::Schedule),
             "tasks" => Some(Self::Tasks),
+            "onboarding" => Some(Self::Onboarding),
             _ => None,
         }
     }
@@ -215,6 +223,8 @@ pub struct Request {
     /// given that task's news and no other, so that the skill's moves go
     /// with its own task (the reviewer on #1042). None: any news.
     pub task: Option<u64>,
+    /// Exact onboarding invitation; never a wildcard or a task identifier.
+    pub invitation: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -229,11 +239,20 @@ struct Wire {
     from: Option<String>,
     #[serde(default)]
     task: Option<u64>,
+    #[serde(default, deserialize_with = "invitation_id")]
+    invitation: Option<u64>,
     #[serde(default)]
     sound: Option<String>,
     #[serde(default)]
     priority: Option<u8>,
     expires_in_ms: u64,
+}
+
+// Missing is allowed for other sources, but an explicit null is not an ID.
+fn invitation_id<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error> {
+    u64::deserialize(deserializer).map(Some)
 }
 
 /// Read and check one request line. The reason, if refused, names the
@@ -253,9 +272,10 @@ pub fn parse(line: &str) -> Result<Request, String> {
     let words = match (wire.note, wire.text, wire.from, wire.sound) {
         (Some(note), None, None, None) => Words::Note(note),
         (None, Some(text), None, None) => Words::Text(text),
-        (None, None, Some(from), None) => {
-            Words::From(Source::named(&from).ok_or_else(|| "from is schedule or tasks".to_owned())?)
-        }
+        (None, None, Some(from), None) => Words::From(
+            Source::named(&from)
+                .ok_or_else(|| "from is schedule, tasks or onboarding".to_owned())?,
+        ),
         (None, None, None, Some(sound)) => {
             if !sound.starts_with('/') || sound.len() > 1_024 || sound.chars().any(char::is_control)
             {
@@ -277,6 +297,16 @@ pub fn parse(line: &str) -> Result<Request, String> {
     if wire.task.is_some() && words != Words::From(Source::Tasks) {
         return Err("task goes only with from tasks".into());
     }
+    if words == Words::From(Source::Onboarding) {
+        if skill != "onboarding" {
+            return Err("from onboarding requires skill onboarding".into());
+        }
+        if wire.invitation.is_none_or(|id| id == 0) {
+            return Err("from onboarding requires a nonzero invitation".into());
+        }
+    } else if wire.invitation.is_some() {
+        return Err("invitation goes only with from onboarding".into());
+    }
     let priority = wire.priority.unwrap_or(NORMAL_PRIORITY);
     if priority > 9 {
         return Err("priority is 0 to 9".into());
@@ -290,6 +320,7 @@ pub fn parse(line: &str) -> Result<Request, String> {
         priority,
         expires_in_ms: wire.expires_in_ms,
         task: wire.task,
+        invitation: wire.invitation,
     })
 }
 
@@ -466,6 +497,7 @@ impl Says {
                 priority: NORMAL_PRIORITY,
                 expires_in_ms: 60_000,
                 task,
+                invitation: None,
             },
             answer,
             expires_at_us,
@@ -488,6 +520,7 @@ impl Says {
                 priority: NORMAL_PRIORITY,
                 expires_in_ms: 60_000,
                 task: None,
+                invitation: None,
             },
             answer,
             expires_at_us: u64::MAX,
@@ -514,6 +547,7 @@ impl Says {
                 priority,
                 expires_in_ms: 60_000,
                 task: None,
+                invitation: None,
             },
             answer,
             expires_at_us: u64::MAX,
@@ -666,12 +700,35 @@ impl Says {
     /// Take the next ask for what `source` keeps, as its source begins to
     /// say it at `now_us`: its ticket. For news of `task`, an ask for that
     /// task or for none; an ask for another task waits for its own. Those
-    /// whose time ran out are answered `expired` first.
+    /// whose time ran out are answered `expired` first. Onboarding must use
+    /// [`Self::take_onboarding`] so it cannot bypass invitation matching.
     pub fn take_from(&mut self, source: Source, task: Option<u64>, now_us: u64) -> Option<Ticket> {
         self.expire(now_us);
+        if source == Source::Onboarding {
+            return None;
+        }
         let waiting = self.waiting.remove(self.next_of(|request| {
             request.words == Words::From(source)
                 && request.task.is_none_or(|asked| Some(asked) == task)
+        })?);
+        Some(Ticket {
+            skill: waiting.request.skill,
+            answer: Some(waiting.answer),
+        })
+    }
+
+    /// Take only the current onboarding invitation. No absent or zero ID is
+    /// a wildcard; other invitations remain queued until they expire.
+    pub fn take_onboarding(&mut self, invitation: u64, now_us: u64) -> Option<Ticket> {
+        self.expire(now_us);
+        if invitation == 0 {
+            return None;
+        }
+        let waiting = self.waiting.remove(self.next_of(|request| {
+            request.skill == "onboarding"
+                && request.words == Words::From(Source::Onboarding)
+                && request.invitation == Some(invitation)
+                && request.task.is_none()
         })?);
         Some(Ticket {
             skill: waiting.request.skill,
@@ -1325,6 +1382,7 @@ mod tests {
                     priority,
                     expires_in_ms: 60_000,
                     task: None,
+                    invitation: None,
                 },
                 answer,
                 expires_at_us,
@@ -1347,6 +1405,7 @@ mod tests {
                 priority: 8,
                 expires_in_ms: 120_000,
                 task: None,
+                invitation: None,
             }
         );
         let text =
@@ -1457,6 +1516,7 @@ mod tests {
                 priority: NORMAL_PRIORITY,
                 expires_in_ms: 30_000,
                 task: None,
+                invitation: None,
             }
         );
         assert_eq!(
@@ -1468,7 +1528,7 @@ mod tests {
         for (line, why) in [
             (
                 r#"{"skill":"x","from":"calendar","expires_in_ms":5}"#,
-                "from is schedule or tasks",
+                "from is schedule, tasks or onboarding",
             ),
             (
                 r#"{"skill":"x","from":"tasks","note":"n","expires_in_ms":5}"#,
@@ -1590,6 +1650,72 @@ mod tests {
         ask.send(any).unwrap();
         says.poll(1_000_000);
         assert!(says.take_from(Source::Tasks, Some(11), 1_000_000).is_some());
+    }
+
+    #[test]
+    fn onboarding_requires_its_skill_and_an_exclusive_nonzero_invitation() {
+        let valid = json!({"skill":"onboarding", "from":"onboarding",
+            "invitation":42, "priority":8, "expires_in_ms":30000});
+        let request = parse(&valid.to_string()).unwrap();
+        assert_eq!(request.words, Words::From(Source::Onboarding));
+        assert_eq!(request.invitation, Some(42));
+        assert_eq!(request.task, None);
+        for change in [
+            json!({"skill":"other"}),
+            json!({"invitation":null}),
+            json!({"invitation":0}),
+            json!({"invitation":-1}),
+            json!({"invitation":"42"}),
+            json!({"task":7}),
+            json!({"from":"tasks"}),
+            json!({"from":"schedule"}),
+            json!({"note":"extra"}),
+            json!({"unexpected":true}),
+        ] {
+            let mut invalid = valid.clone();
+            for (key, value) in change.as_object().unwrap() {
+                invalid[key] = value.clone();
+            }
+            assert!(parse(&invalid.to_string()).is_err(), "{invalid}");
+        }
+        assert!(
+            parse(r#"{"skill":"x","from":"tasks","invitation":null,"expires_in_ms":5}"#).is_err()
+        );
+        let mut missing = valid;
+        missing.as_object_mut().unwrap().remove("invitation");
+        assert!(parse(&missing.to_string()).is_err());
+        assert!(
+            parse(r#"{"skill":"onboarding","note":"hello","invitation":1,"expires_in_ms":5}"#)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn onboarding_takes_only_the_exact_invitation_before_expiry() {
+        let (mut says, ask) = Says::by_hand();
+        let invitation = |id, expires| {
+            let (mut one, answered) = asked("onboarding", NORMAL_PRIORITY, expires);
+            one.request.words = Words::From(Source::Onboarding);
+            one.request.invitation = Some(id);
+            (one, answered)
+        };
+        let (old, old_answer) = invitation(41, 2_000);
+        let (current, current_answer) = invitation(42, 4_000);
+        ask.send(old).unwrap();
+        ask.send(current).unwrap();
+        says.poll(0);
+        assert!(says.take(0).is_none());
+        assert!(says.take_from(Source::Onboarding, None, 0).is_none());
+        assert!(says.take_onboarding(0, 0).is_none());
+        assert!(says.take_onboarding(43, 0).is_none());
+        says.take_onboarding(42, 1_000)
+            .unwrap()
+            .answer(Outcome::Spoken);
+        assert_eq!(current_answer.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
+        assert!(old_answer.try_recv().is_err());
+        assert!(says.take_onboarding(41, 2_000).is_none());
+        assert_eq!(old_answer.try_recv(), Ok(Answer::Done(Outcome::Expired)));
+        assert_eq!(says.waiting(), 0);
     }
 
     /// The reviewer on #954: a say is never begun after its time, however

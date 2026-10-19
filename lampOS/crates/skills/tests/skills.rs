@@ -317,6 +317,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "light-scenes",
             "light-show",
             "not-feeling-well",
+            "onboarding",
             "point-light",
             "reminders",
             "smoky-air",
@@ -8899,4 +8900,114 @@ fn watch_you_leave_asked_of_the_policy_goes_ahead_only_while_a_side_is_chosen() 
             between.is_some()
         );
     }
+}
+
+/// A current onboarding invitation is not old task news: restart may deliver
+/// it once, and the runner still decides whether its exact token is current.
+#[test]
+fn onboarding_pending_snapshot_is_asked_once_and_retry_is_an_explicit_edge() {
+    let skill = load(&skills_root().join("onboarding")).unwrap();
+    let message = |id, ready| {
+        serde_json::json!({"invitations":[{
+            "invitation":id,"generation":7,"attempt":2,"step":"privacy","ready":ready
+        }]})
+        .to_string()
+    };
+    let mut engine = Engine::new(vec![skill.clone()], true);
+    let send = |engine: &mut Engine, at, text: String| {
+        engine
+            .observe(
+                lamp_msgs::OnboardingPending::TOPIC,
+                at,
+                text.as_bytes(),
+                None,
+            )
+            .into_iter()
+            .flat_map(|run| run.calls)
+            .collect::<Vec<_>>()
+    };
+    let expected = vec![Call::SayFrom(lamp_skills::Source::Onboarding, Some(81))];
+    assert_eq!(send(&mut engine, 1, message(81, true)), expected);
+    assert!(send(&mut engine, 2, message(81, true)).is_empty());
+    assert!(send(&mut engine, 2, "{\"invitations\":[{}]}".into()).is_empty());
+    assert!(send(&mut engine, 2, message(81, true)).is_empty());
+    // Reload with the same pending token is not another request.
+    engine.replace(vec![skill.clone()]);
+    assert!(send(&mut engine, 3, message(81, true)).is_empty());
+    // A refusal is retried only when the runner publishes another ready edge.
+    assert!(send(&mut engine, 4, message(81, false)).is_empty());
+    assert_eq!(send(&mut engine, 5, message(81, true)), expected);
+    assert!(send(&mut engine, 6, message(81, true)).is_empty());
+    // The restarted skill has no run in progress; its pending snapshot is read.
+    let mut restarted = Engine::new(vec![skill], true);
+    assert_eq!(send(&mut restarted, 7, message(81, true)), expected);
+    assert!(send(&mut restarted, 8, message(81, true)).is_empty());
+    assert_eq!(
+        send(&mut restarted, 9, message(82, true)),
+        vec![Call::SayFrom(lamp_skills::Source::Onboarding, Some(82))]
+    );
+}
+
+#[test]
+fn onboarding_refuses_wrong_kind_wrong_trigger_and_unbounded_pending_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    for (i, from, to) in [
+        (0, "kind = \"core\"", "kind = \"installable\""),
+        (1, "key = \"invitation\"", "key = \"generation\""),
+        (2, "field = \"ready\"", "field = \"other\""),
+    ] {
+        let folder = repo_skill_with(&dir.path().join(i.to_string()), "onboarding", from, to);
+        assert!(load(&folder).unwrap_err().contains("core onboarding"));
+    }
+    let renamed = dir.path().join("other-core");
+    copy(&skills_root().join("onboarding"), &renamed);
+    let front = fs::read_to_string(renamed.join("SKILL.md")).unwrap();
+    fs::write(
+        renamed.join("SKILL.md"),
+        front.replace("name: onboarding", "name: other-core"),
+    )
+    .unwrap();
+    assert!(load(&renamed).unwrap_err().contains("core onboarding"));
+    let skill = load(&skills_root().join("onboarding")).unwrap();
+    for bad in [
+        serde_json::json!({"invitations":[{"invitation":0,"generation":1,"attempt":1,"step":"privacy","ready":true}]}),
+        serde_json::json!({"invitations":[{"invitation":1,"generation":1,"attempt":1,"step":"unknown","ready":true}]}),
+        serde_json::json!({"invitations":[
+            {"invitation":1,"generation":1,"attempt":1,"step":"privacy","ready":true},
+            {"invitation":2,"generation":1,"attempt":1,"step":"privacy","ready":true}]}),
+    ] {
+        let mut engine = Engine::new(vec![skill.clone()], true);
+        assert!(
+            engine
+                .observe(
+                    lamp_msgs::OnboardingPending::TOPIC,
+                    1,
+                    bad.to_string().as_bytes(),
+                    None
+                )
+                .is_empty()
+        );
+    }
+}
+
+#[test]
+fn onboarding_request_names_invitation_and_has_no_extra_tool_or_authority() {
+    let skill = load(&skills_root().join("onboarding")).unwrap();
+    assert!(skill.tool.is_none());
+    assert_eq!(skill.kind, SkillKind::Core);
+    assert_eq!(
+        skill.permissions.topics,
+        [lamp_msgs::OnboardingPending::TOPIC]
+    );
+    assert!(skill.permissions.speak);
+    assert!(!skill.permissions.body && !skill.permissions.light && !skill.permissions.look);
+    assert!(skill.permissions.actions.is_empty());
+    let call = Call::SayFrom(lamp_skills::Source::Onboarding, Some(81));
+    assert_eq!(
+        call.named(),
+        (
+            "say",
+            serde_json::json!({"from":"onboarding","invitation":81})
+        )
+    );
 }
