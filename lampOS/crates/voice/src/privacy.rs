@@ -4,11 +4,14 @@ use lamp_turn_owner::MonoTime;
 
 pub const PRIVACY_FRESH_US: u64 = 50_000;
 pub const REOPEN_STABLE_US: u64 = 60_000;
-/// How long after its privacy worker starts a cycle that has not yet
-/// allowed the microphone waits past an observation read stale, keeping the
-/// gate closed, before a gate still without a fresh one ends it: the
-/// observation waited in the queue while the voice started its other
-/// workers (lamp-4ace, 19 Oct 01:19). The same second as the service
+/// How long after its conversation loop starts (once its workers are
+/// started) a cycle that has not yet allowed the microphone waits past an
+/// observation read stale, or any freshness lost, keeping the gate closed,
+/// before a gate still without a fresh one ends it: the observation waited
+/// in the queue while the voice started its other workers (lamp-4ace, 19 Oct
+/// 01:19). A worker that sends one fresh observation and then goes silent
+/// therefore ends the cycle at this, not at its 50 ms (the reviewer on
+/// #1666). The same second as the service
 /// wait's own (`service_privacy`'s `UNAVAILABLE_WAIT`) and the first control
 /// message's grace (`transport::FIRST_CONTROL_MAX_AGE_US`).
 pub const PRIVACY_START_STALE_US: u64 = 1_000_000;

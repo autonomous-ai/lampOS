@@ -388,15 +388,20 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   restart guard: the first observation the conversation read had waited
   past its 50 ms in the queue while the voice started its other workers.
   The same rule as in the wait above now holds there until the microphone
-  is first allowed, within the first second of the privacy worker
-  (`PRIVACY_START_STALE_US`): a stale observation closes the gate, is said
-  once (`a privacy observation N ms old was read as the voice started`,
-  traced as `privacy_stale_at_start`), and a fresh one behind it opens the
-  gate as usual, 60 ms stable. Nothing is heard meanwhile. Still ending the
-  run: an observation out of order; no fresh one by the end of that second
-  (`service privacy freshness lost before next observation`); a worker that
-  never says anything, at its 50 ms as before; and any stale observation
-  once the microphone has been allowed. 18 Oct's 08:34 exit (`service
+  is first allowed, within the first second of the conversation loop, whose
+  clock starts once the workers are started (`PRIVACY_START_STALE_US`): a
+  stale observation closes the gate, is said once (`a privacy observation N
+  ms old was read as the voice started`, traced as `privacy_stale_at_start`),
+  and a fresh one behind it opens the gate as usual, 60 ms stable. So is any
+  freshness lost in that second: a worker that sends one fresh observation
+  and then goes silent ends the run at 1 s, not at 50 ms. Nothing is heard
+  meanwhile; it fails closed, and it is bounded (the reviewer on #1666).
+  Still ending the run: a fresh observation out of order (a stale one is
+  waited past like any stale one, the gate closed and its high-water kept);
+  no fresh one by the end of that second (`service privacy freshness lost
+  before next observation`); a worker that never says anything, at its 50 ms
+  as before; and any stale observation once the microphone has been
+  allowed. 18 Oct's 08:34 exit (`service
   privacy freshness lost …`) is the same kind only if it came before the
   microphone was allowed; its journal does not say.
 
