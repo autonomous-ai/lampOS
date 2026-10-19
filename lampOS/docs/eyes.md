@@ -619,7 +619,10 @@ this room" until someone asks to be recognised.
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
   in a directory of mode 0700 and a file of mode 0600). Per person: the
   name, up to five prints and when they were added. At most 20 people. No
-  picture is kept, and no print leaves the lamp. **Read one release
+  picture is kept, and no print leaves the lamp. With `LAMP_ACTIVITY=on`
+  the sitter's prints (up to six, for telling the sitter from others) are
+  held in memory for the sitting only, never in this file
+  ([below](#what-the-person-at-the-desk-is-doing-lamp_activityon-1678)). **Read one release
   forward** (#1505, harm 3): a field a later build added, on the file or on
   a person, is read past, and the next save writes this build's fields.
   What this build cannot read is **set aside, never dropped or guessed
@@ -1051,14 +1054,37 @@ half) could not be seen from that place and were dropped; they come back
 only if a lamp in front of a person shows them. While a sitting with its
 baseline is followed the journal says every 2 s `lamp-eyes: sitter 1.04 as
 tall as sat, 0.03 of its height lower, pitch 0.52 (sat 0.50), AtDesk`, numbers
-only, for the next run. Someone else in the sitter's own place, at their
-distance, is still taken for them (the run's leave step). Standing up is
+only, for the next run. By place alone, someone else in the sitter's own
+place, at their distance, is taken for them (the run's leave step: faces
+side-on at 0.40 to 0.53 across, where the sitter had sat at 0.44).
+
+**Told by face, with the recogniser** (#1678's (d); the owner's yes, 19 Oct
+15:57, recorded on #1827; switched on on a lamp only after Third's privacy
+read, lamp-4ace first).
+When the eyes also have `--recogniser` (the pinned SFace), the sitter is
+told from others by face. In the sitting's first minutes one print of the
+sitter is taken every 20 s, up to six (about a second of SFace), and their
+mean is the sitter's. After that a print is taken only of a face back at
+the sitter's place after 2 s or more without them, at most one every 2 s:
+alike enough (`who::SAME_PERSON`, 0.363) it is the sitter, the same
+sitting; less, or a face that can't be printed (side-on), it is not, and
+`away` and `room/stood_up` go on as if nobody were there. Followed without
+such a gap the sitter is never printed again, so turning their head does
+not lose them. The sitter's prints are held in the eyes' memory for that
+sitting only and dropped when it ends (no sitter for two minutes, whether
+or not the eyes are looking) or when the camera closes (not permitted, a
+failure, or a reopen at the full size): never
+written, never published, never compared with `people.json` and never
+named. The journal says only what was decided, with a number: `lamp-eyes: a
+face at the sitter's place, likeness 0.21: not the sitter`. Without the
+recogniser it is by place alone, as above. Standing up is
 the face rising by half its height and shrinking to 0.85 of it within 2 s,
 then not seen for 2 s, said once. Nothing is said with no look for 5 s.
-States and counts only: no box, no picture, nobody's identity. Arithmetic on
-the looks the eyes already make: no model and no frame read is added. Its
-cost on a lamp is #1678's CPU run; how well the states are told apart is its
-scripted sitting.
+States and counts only on the bus: no box, no picture, nobody's identity.
+Arithmetic on the looks the eyes already make, and with the recogniser the
+few prints above, on frames the eyes already have: no model or frame is
+added. Its cost on a lamp is #1678's CPU run; how well the states are told
+apart is its scripted sitting.
 
 ### Whether a face is speaking (`LAMP_EYES_SPEAKING=on`, #720)
 

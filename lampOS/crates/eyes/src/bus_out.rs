@@ -317,6 +317,37 @@ impl BusOut {
         Ok(())
     }
 
+    /// With activity on, tell the sitter from others by face: the eyes'
+    /// recogniser gives the prints the judge asks for (#1678's (d)).
+    pub fn activity_by_face(&mut self) {
+        if let Some(activity) = self.activity.as_mut() {
+            activity.judge = Judge::with_prints();
+        }
+    }
+
+    /// The camera closed (not permitted, failed, or reopening): the
+    /// sitter's prints go with it.
+    pub fn activity_forget_prints(&mut self) {
+        if let Some(activity) = self.activity.as_mut() {
+            activity.judge.forget_prints();
+        }
+    }
+
+    /// Which face of the last look the judge wants printed, if any.
+    pub fn activity_wants_print(&mut self, now_us: u64) -> Option<usize> {
+        self.activity.as_mut()?.judge.wants_print(now_us)
+    }
+
+    /// The print asked for, or none if it could not be taken: in memory
+    /// only, and the journal says what it decided, a number only.
+    pub fn activity_printed(&mut self, now_us: u64, print: Option<&[f32]>) {
+        if let Some(activity) = self.activity.as_mut()
+            && let Some(line) = activity.judge.printed(now_us, print)
+        {
+            eprintln!("lamp-eyes: {line}");
+        }
+    }
+
     /// Also say whether anyone is at the lamp, on `room/presence`, from the
     /// faces of each look and the voice's lines on `voice/heard` (#1677).
     pub fn say_presence(&mut self, bus: &Bus) -> io::Result<()> {
