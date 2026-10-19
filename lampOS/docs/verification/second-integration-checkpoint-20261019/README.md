@@ -18,8 +18,12 @@ assertion belongs to this foundation.
 
 First's **19:36 UTC** request is to publish Rest/Say (B), scheduled Skills
 (C), and authored Bedtime (D) as stacked PRs now, without waiting for each
-predecessor to merge. C has completed its host gate; D is still running.
-The C result will be recorded separately.
+predecessor to merge. All four refreshed foundation host gates have passed.
+Scheduled Skills `f56f8c4cc` passed **4,935/0/20**, none filtered: non-Update
+**4,801/0/19** in **834.52 s**, full Update **134/0/1** in **96.32 s**, formatting
+**3.83 s**, strict workspace Clippy **121.14 s**, and workspace build **68.10 s**. All
+**1,596** source hashes match both copies. [Host record](routine-rebased-host.json),
+[consumer scan](routine-rebased-consumers.json).
 Publication and new automatic ARM64 runs remain pending.
 [Peer re-read](peer-fixes-reread.json)
 closes the speaking-face configuration P2 in actual merge `d99eee947` and
@@ -27,9 +31,23 @@ records #2020's fix and its already-known queued-writer limit. GitHub reads
 are available through the connector; writes and Git transport remain blocked
 by connectivity or connector permissions. No remote update is claimed.
 
+Authored Bedtime `0372194d1` passed **4,670/0/20**, none filtered: the ten-crate
+reverse-consumer gate passed **4,588/0/20**, and the additional grep-only Actions
+consumer passed **82/0/0** in **40.28 s**. Non-Update **4,453/0/19** took **805.26 s**;
+full Update **135/0/1** took **97.36 s**. Formatting **3.96 s**, strict workspace Clippy
+**124.00 s**, and workspace build **67.44 s** passed. All **1,599** hashes match both
+copies. [Host record](authored-rebased-host.json), [consumer
+scan](authored-rebased-consumers.json).
+
 Cleanup removed **21 completed target directories**, measured by `du` at
 **69,904,036 KiB**; `df` then reported **138 GiB free**. Sources, logs and
 evidence were retained, and active target directories were kept.
+
+The **20:06 UTC** [merged-source re-read](forget-queued-writer-reread.json) confirms
+#2020 still has a P2 queue race: an older successful append can restore deleted IDs
+after the foreground clear. A full queue drops End, and even an accepted End leaves a
+window before it is consumed. This is static evidence; the existing regression does not
+synchronize either interleaving. The prepared follow-up is not posted.
 
 Earlier checkpoint (18:56 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
 passed automatic ARM64: **7,684 nextest (1 leaky), 48 skipped**, plus

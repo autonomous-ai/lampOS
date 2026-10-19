@@ -15,8 +15,12 @@ log and nothing a lamp runs ([joining.md](joining.md),
 
 ## Current checkpoint: 2026-10-19
 
-Latest connector read, **19:31 UTC**: the connector read all **778 Queue comments**
-and all comments and review threads on the four own open PRs. #2005 has a
+Latest reads: all **805 Queue comments** at **20:07 UTC**, and all comments
+and review threads on the four own open PRs at **20:10 UTC**. No new own
+review comments or unresolved review threads were found. #2026 has merged;
+#1712 was observed at `db91c05d398751292936ad33c61a5b5f472f4ac8`.
+#1973 remains open, so the target remains `first/voice-cascade-gemini`.
+The earlier **19:31 UTC** read found: #2005 has a
 clean peer read; its existing upper timing bound is the reviewer's unchanged
 P3. #2007, #2008, #2016 and #2017 have merged into #1712; the observed tip
 is `2a2d1c5ec`. #1973 is still open, so the target remains #1712.
@@ -46,9 +50,26 @@ pending publication; earlier native results qualify only their recorded heads.
 
 First's **19:36 UTC** request is to publish Rest/Say (B), scheduled Skills
 (C), and authored Bedtime (D) as stacked PRs now, without waiting for each
-predecessor to merge. C has completed its host gate; D is still running.
-The C result will be recorded separately. Publication remains blocked,
+predecessor to merge. All four refreshed foundation host gates have passed.
+Scheduled Skills `f56f8c4cc` passed **4,935/0/20**, none filtered: non-Update
+**4,801/0/19** in **834.52 s**, full Update **134/0/1** in **96.32 s**, formatting
+**3.83 s**, strict workspace Clippy **121.14 s**, and workspace build **68.10 s**. All
+**1,596** source hashes match both copies. [Host
+record](verification/second-integration-checkpoint-20261019/routine-rebased-host.json),
+[consumer
+scan](verification/second-integration-checkpoint-20261019/routine-rebased-consumers.json).
+Publication remains blocked,
 and no push or comment is claimed.
+
+Authored Bedtime `0372194d1` passed **4,670/0/20**, none filtered: the ten-crate
+reverse-consumer gate passed **4,588/0/20**, and the additional grep-only Actions
+consumer passed **82/0/0** in **40.28 s**. Non-Update **4,453/0/19** took **805.26 s**;
+full Update **135/0/1** took **97.36 s**. Formatting **3.96 s**, strict workspace Clippy
+**124.00 s**, and workspace build **67.44 s** passed. All **1,599** hashes match both
+copies. [Host
+record](verification/second-integration-checkpoint-20261019/authored-rebased-host.json),
+[consumer
+scan](verification/second-integration-checkpoint-20261019/authored-rebased-consumers.json).
 
 Cleanup removed **21 completed target directories**, measured by `du` at
 **69,904,036 KiB**; `df` then reported **138 GiB free**. Sources, logs and
@@ -64,9 +85,16 @@ still fail intermittently at TLS; the connector can read but refuses comment
 writes. Prepared comments, local log commits and foundation publication remain
 unconfirmed remotely. No automatic approval rejection is involved.
 
+The **20:06 UTC** [merged-source
+re-read](verification/second-integration-checkpoint-20261019/forget-queued-writer-reread.json)
+confirms #2020 still has a P2 queue race: an older successful append can restore deleted
+IDs after the foreground clear. A full queue drops End, and even an accepted End leaves
+a window before it is consumed. This is static evidence; the existing regression does
+not synchronize either interleaving. The prepared follow-up is not posted.
+
 Ready for integration: no (#1996 clean rebase passed the complete host gate; publication and automatic ARM64 for the new head are pending)
 
-Ready for integration: no (#1732's earlier ARM64 is green; the split Rest/Say and C host gates passed, D is running, and publication plus new automatic ARM64 remain pending)
+Ready for integration: no (#1732's four refreshed foundation host gates passed; publication and new automatic ARM64 remain pending)
 
 Ready for integration: no (#1757 follows Bedtime; warm-listener rehearsal passed focused gates; final full and ARM64 gates remain)
 
