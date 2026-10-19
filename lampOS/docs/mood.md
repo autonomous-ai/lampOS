@@ -209,6 +209,24 @@ shape, age and ordering checks before the pure engine accepts an event.
 | `schedule/due` / `ScheduleDue` | `schedule` | 3 s | A user-created due-item token, not reminder text, delivery acknowledgement or speech permission. |
 | `humans/familiar` / `HumanFamiliar` | `eyes` | 5 s | The level of the remembered person recognised at the lamp, or none; no name (#1670, `lamp-eyes --visits on`). Held for its lease, never kept. |
 
+**On the second voice route** (`LAMP_VOICE_ROUTE=second`, the owner's rule
+of 19 Oct that a voice feature works there too). Only the first two inputs
+come from the voice, and neither depends on its route. `voice/state` is made
+from the coordinator's ring phase each tick, and `voice/heard` from a
+transcript with no request, which the second route's recogniser gives
+(`second_provider/worker.rs`). Both are said by the same coordinator code
+whichever route answers (`coordinator/second.rs`: every path written for
+`rig.provider` runs unchanged). The other eight come from the eyes, Controls,
+the ears, air, name and Schedule, which the voice's route doesn't touch. The
+voice's own readers of Mood work the same way: the ring's breath, and the
+hello's warmer sentence for someone who comes by often (a written turn,
+which the second route answers too). Tests: the second route alone gives
+what it heard to the heard path and passes through listening, waiting and
+speaking (`coordinator/tests/second_route.rs`,
+`the_second_route_alone_gives_mood_what_was_heard_and_the_voices_phases`).
+Its ring phases equal Gemini's (`the_second_route_alone_answers_a_spoken_request_and_no_gemini_worker_starts`).
+No input is Live-only.
+
 Legacy headers use a wall-clock timestamp without future grace. Typed
 `ClockStamp` values must match the host boot/clock and the current monotonic
 time. A supplied expiry must be positive and cannot extend the input's bound.
