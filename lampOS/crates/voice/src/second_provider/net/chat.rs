@@ -147,6 +147,13 @@ fn functions(tools: &[lamp_gemini::Tool]) -> Vec<Value> {
 /// so the executive's come and go with the executive.
 pub type Declare = Arc<dyn Fn() -> Vec<lamp_gemini::Tool> + Send + Sync>;
 
+/// Of the tools declared now, those a request with these messages is given
+/// ([`Chat::narrowing`]): with `LAMP_SECOND_FEW_TOOLS=on`, a spoken turn's
+/// few until the model asks for the rest (#1712, the first builder at
+/// 18:56).
+pub type Narrow =
+    Arc<dyn Fn(Vec<lamp_gemini::Tool>, &[Message]) -> Vec<lamp_gemini::Tool> + Send + Sync>;
+
 /// How much Gemini thinks before it answers through its OpenAI-compatible
 /// endpoint: the floor, as thinking cannot be turned off on Gemini 3 (the
 /// research of 19 Oct; 0.80 to 0.83 s to the first token, published).
@@ -170,9 +177,39 @@ pub struct Chat {
     /// The model takes a look's picture.
     sees: bool,
     declare: Declare,
+    /// Which of the declared tools a request is given, if not all.
+    narrow: std::sync::OnceLock<Narrow>,
     /// When the last request went, for the journal: a connection idle past
     /// the client's pool keep (`http_client`, 90 s) is made anew.
     last_sent: std::sync::Mutex<Option<std::time::Instant>>,
+    /// The last request's tools and first message, hashed, for the
+    /// journal: a service's prompt cache holds only a prefix that is the
+    /// same as before ([`Prefix`]).
+    last_prefix: std::sync::Mutex<Option<Prefix>>,
+}
+
+/// A request's tools and first message, hashed: what has to stay the same
+/// from one request to the next for a service's prompt cache to hold
+/// (#1712, the first builder at 18:56).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Prefix {
+    tools: u64,
+    first: u64,
+}
+
+impl Prefix {
+    fn of(body: &Value) -> Self {
+        let hash = |value: &Value| {
+            use std::hash::{Hash, Hasher};
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            value.to_string().hash(&mut hasher);
+            hasher.finish()
+        };
+        Self {
+            tools: hash(&body["tools"]),
+            first: hash(&body["messages"][0]),
+        }
+    }
 }
 
 impl Chat {
@@ -278,6 +315,10 @@ impl Chat {
             json!({"type": if thinking { "enabled" } else { "disabled" }}),
         );
         chat.sees = !crate::second_config::DEEPSEEK_TEXT_ONLY.contains(&model);
+        // The answer's last chunk says how much of the prompt its cache held
+        // (`prompt_cache_hit_tokens`, #1712, the first builder at 18:56).
+        chat.extra
+            .insert("stream_options".into(), json!({"include_usage": true}));
         Ok(chat)
     }
 
@@ -317,6 +358,13 @@ impl Chat {
         Some((status, began.elapsed()))
     }
 
+    /// Its requests are given only the tools `narrow` keeps of those
+    /// declared, for their messages. Set once: a second call changes
+    /// nothing.
+    pub fn narrowing(&self, narrow: Narrow) {
+        let _ = self.narrow.set(narrow);
+    }
+
     fn with(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
         Ok(Self {
             client: http_client()?,
@@ -326,14 +374,21 @@ impl Chat {
             extra: serde_json::Map::new(),
             sees: true,
             declare,
+            narrow: std::sync::OnceLock::new(),
             last_sent: std::sync::Mutex::new(None),
+            last_prefix: std::sync::Mutex::new(None),
         })
     }
 
-    /// The request's body, with the tools declared now.
+    /// The request's body, with the tools declared now, as narrowed for
+    /// its messages.
     fn body(&self, messages: &[Message]) -> Value {
         let mut body = json!({"model": self.model, "stream": true, "messages": messages});
-        let tools = functions(&(self.declare)());
+        let mut declared = (self.declare)();
+        if let Some(narrow) = self.narrow.get() {
+            declared = narrow(declared, messages);
+        }
+        let tools = functions(&declared);
         if !tools.is_empty() {
             body["tools"] = Value::Array(tools);
         }
@@ -354,6 +409,12 @@ impl Chat {
             .lock()
             .ok()
             .and_then(|mut last| last.replace(asked));
+        let prefix = Prefix::of(&body);
+        let prefix_before = self
+            .last_prefix
+            .lock()
+            .ok()
+            .and_then(|mut last| last.replace(prefix));
         let response = post(
             &self.client,
             &self.url,
@@ -370,7 +431,7 @@ impl Chat {
                 &body,
                 asked.elapsed(),
                 before.map(|at| asked.duration_since(at))
-            )
+            ) + &prefix_told(prefix, prefix_before)
         );
         Ok(ChatStream {
             response,
@@ -378,6 +439,8 @@ impl Chat {
             deltas: Deltas::default(),
             ready: Vec::new(),
             done: false,
+            asked,
+            first: None,
         })
     }
 }
@@ -404,6 +467,66 @@ fn asked_told(
     )
 }
 
+/// Whether a request's tools and first message are the last request's, for
+/// its journal line; nothing for a client's first request.
+fn prefix_told(now: Prefix, before: Option<Prefix>) -> String {
+    let Some(before) = before else {
+        return String::new();
+    };
+    match (now.tools == before.tools, now.first == before.first) {
+        (true, true) => "; its tools and first message as the last request's",
+        (true, false) => "; its tools as the last request's, its first message not",
+        (false, true) => "; its first message as the last request's, its tools not",
+        (false, false) => "; neither its tools nor its first message as the last request's",
+    }
+    .to_owned()
+}
+
+/// An answer in the journal's words, when it has ended (#1712, the first
+/// builder at 18:56): when its first words or call came and when it ended,
+/// after the request went, and the service's count of its tokens, with how
+/// many of the prompt's its cache held. DeepSeek says that as
+/// `prompt_cache_hit_tokens`, OpenAI's form as
+/// `prompt_tokens_details.cached_tokens`. Never its words.
+fn answer_told(
+    usage: Option<&Value>,
+    first: Option<std::time::Duration>,
+    ended: std::time::Duration,
+) -> String {
+    let first = first.map_or("no words or call".to_owned(), |first| {
+        format!("its first words or call {} ms", first.as_millis())
+    });
+    let tokens = match usage {
+        None => "no usage given".to_owned(),
+        Some(usage) => {
+            let count = |pointer: &str| usage.pointer(pointer).and_then(Value::as_u64);
+            let prompt = count("/prompt_tokens");
+            let cached = count("/prompt_cache_hit_tokens")
+                .or_else(|| count("/prompt_tokens_details/cached_tokens"));
+            let missed =
+                count("/prompt_cache_miss_tokens").or_else(|| prompt?.checked_sub(cached?));
+            let said = |count: Option<u64>| count.map_or("?".to_owned(), |n| n.to_string());
+            match cached {
+                Some(cached) => format!(
+                    "{} prompt tokens, {cached} from the cache, {} not; {} completion tokens",
+                    said(prompt),
+                    said(missed),
+                    said(count("/completion_tokens"))
+                ),
+                None => format!(
+                    "{} prompt tokens, the cache not said; {} completion tokens",
+                    said(prompt),
+                    said(count("/completion_tokens"))
+                ),
+            }
+        }
+    };
+    format!(
+        "chat answer: {first} and its end {} ms after it was asked; {tokens}",
+        ended.as_millis()
+    )
+}
+
 pub struct ChatStream {
     response: reqwest::Response,
     lines: Lines,
@@ -411,6 +534,10 @@ pub struct ChatStream {
     /// Decoded events not yet handed out, newest last.
     ready: Vec<ChatEvent>,
     done: bool,
+    /// When the request went, and how long after it the first words or
+    /// call came, for [`answer_told`].
+    asked: std::time::Instant,
+    first: Option<std::time::Duration>,
 }
 
 impl ChatStream {
@@ -435,7 +562,21 @@ impl ChatStream {
                 }
                 None => self.ready.extend(self.deltas.end()?),
             }
-            self.done |= self.ready.last() == Some(&ChatEvent::Done);
+            if self.first.is_none()
+                && self
+                    .ready
+                    .iter()
+                    .any(|event| matches!(event, ChatEvent::Text(_) | ChatEvent::ToolCalls(_)))
+            {
+                self.first = Some(self.asked.elapsed());
+            }
+            if self.ready.last() == Some(&ChatEvent::Done) {
+                self.done = true;
+                eprintln!(
+                    "lamp-voice second: {}",
+                    answer_told(self.deltas.usage.as_ref(), self.first, self.asked.elapsed())
+                );
+            }
         }
     }
 }
@@ -488,6 +629,9 @@ pub(crate) struct Deltas {
     reasoning: Vec<Value>,
     /// A chunk carried the web search's results.
     searched: bool,
+    /// The service's count of the answer's tokens (`usage`), from the chunk
+    /// that carried it: the last, with DeepSeek's `include_usage`.
+    usage: Option<Value>,
 }
 
 impl Deltas {
@@ -522,6 +666,9 @@ impl Deltas {
         self.finished |= chunk
             .pointer("/choices/0/finish_reason")
             .is_some_and(Value::is_string);
+        if let Some(usage) = chunk.get("usage").filter(|usage| usage.is_object()) {
+            self.usage = Some(usage.clone());
+        }
         let Some(delta) = chunk.pointer("/choices/0/delta") else {
             return Ok(out);
         };
@@ -686,6 +833,78 @@ mod tests {
                 .ends_with("the first request of this client")
         );
     }
+
+    /// #1712, the first builder at 18:56: a request's line says whether its
+    /// tools and first message are the last request's, which a prompt
+    /// cache needs; never its words.
+    #[test]
+    fn a_requests_line_says_whether_its_tools_and_first_message_are_the_last_ones() {
+        let body = |first: &str, tool: &str| {
+            json!({
+                "messages": [{"role": "system", "content": first}, {"role": "user", "content": "secret words"}],
+                "tools": [{"type": "function", "function": {"name": tool}}],
+            })
+        };
+        let before = Prefix::of(&body("You are Lamp.", "light_on"));
+        assert_eq!(prefix_told(before, None), "");
+        assert_eq!(
+            prefix_told(Prefix::of(&body("You are Lamp.", "light_on")), Some(before)),
+            "; its tools and first message as the last request's"
+        );
+        assert_eq!(
+            prefix_told(Prefix::of(&body("It is noon.", "light_on")), Some(before)),
+            "; its tools as the last request's, its first message not"
+        );
+        assert_eq!(
+            prefix_told(
+                Prefix::of(&body("You are Lamp.", "light_off")),
+                Some(before)
+            ),
+            "; its first message as the last request's, its tools not"
+        );
+        assert_eq!(
+            prefix_told(Prefix::of(&body("It is noon.", "light_off")), Some(before)),
+            "; neither its tools nor its first message as the last request's"
+        );
+        // Another user message changes neither.
+        let mut later = body("You are Lamp.", "light_on");
+        later["messages"][1]["content"] = json!("other words");
+        assert_eq!(Prefix::of(&later), before);
+    }
+
+    /// #1712, the first builder at 18:56: the answer's usage is kept from
+    /// the chunk that carries it, which has no choices, and told with the
+    /// cache's part, as DeepSeek or OpenAI's form says it.
+    #[test]
+    fn an_answers_usage_is_kept_and_told_with_the_caches_part() {
+        let mut deltas = Deltas::default();
+        let mut events = deltas
+            .data(r#"{"choices":[{"delta":{"content":"Hi."},"finish_reason":"stop"}]}"#)
+            .unwrap();
+        events.extend(
+            deltas
+                .data(r#"{"choices":[],"usage":{"prompt_tokens":8123,"completion_tokens":42,"prompt_cache_hit_tokens":7936,"prompt_cache_miss_tokens":187}}"#)
+                .unwrap(),
+        );
+        events.extend(deltas.data("[DONE]").unwrap());
+        assert_eq!(events, [ChatEvent::Text("Hi.".into()), ChatEvent::Done]);
+        let ms = std::time::Duration::from_millis;
+        assert_eq!(
+            answer_told(deltas.usage.as_ref(), Some(ms(812)), ms(1430)),
+            "chat answer: its first words or call 812 ms and its end 1430 ms after it was asked; 8123 prompt tokens, 7936 from the cache, 187 not; 42 completion tokens"
+        );
+        let openai = json!({"prompt_tokens": 900, "completion_tokens": 5, "prompt_tokens_details": {"cached_tokens": 768}});
+        assert!(
+            answer_told(Some(&openai), Some(ms(5)), ms(9))
+                .ends_with("; 900 prompt tokens, 768 from the cache, 132 not; 5 completion tokens")
+        );
+        assert!(
+            answer_told(Some(&json!({"prompt_tokens": 900})), None, ms(9)).ends_with(
+                "no words or call and its end 9 ms after it was asked; 900 prompt tokens, the cache not said; ? completion tokens"
+            )
+        );
+        assert!(answer_told(None, None, ms(9)).ends_with("; no usage given"));
+    }
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     /// Feed recorded bytes cut at every `|`.
@@ -782,6 +1001,44 @@ data: [DONE]
 
     /// An end without `[DONE]` is whole after a `finish_reason`, and cut
     /// before one.
+    /// #1712, the first builder at 18:56: a narrowed chat's request is
+    /// given the tools its narrow keeps for that request's messages.
+    #[test]
+    fn a_narrowed_chat_is_given_what_its_narrow_keeps_for_the_messages() {
+        let tool = |name: &str| lamp_gemini::Tool {
+            name: name.into(),
+            description: "A tool.".into(),
+            parameters: None,
+            silent: false,
+        };
+        let chat = Chat::with(
+            "http://127.0.0.1:9/v1/",
+            "m",
+            "k",
+            Arc::new(move || vec![tool("light_on"), tool("remember")]),
+        )
+        .unwrap();
+        let names = |body: Value| -> Vec<String> {
+            body["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|tool| tool["function"]["name"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let one = [Message::user("Lights on.")];
+        let two = [Message::user("Lights on."), Message::assistant("On.")];
+        assert_eq!(names(chat.body(&one)), ["light_on", "remember"]);
+        chat.narrowing(Arc::new(|declared, messages| {
+            declared.into_iter().take(messages.len()).collect()
+        }));
+        assert_eq!(names(chat.body(&one)), ["light_on"]);
+        assert_eq!(names(chat.body(&two)), ["light_on", "remember"]);
+        // Set once.
+        chat.narrowing(Arc::new(|_, _| Vec::new()));
+        assert_eq!(names(chat.body(&one)), ["light_on"]);
+    }
+
     #[test]
     fn a_stream_ended_without_done_is_whole_only_after_a_finish_reason() {
         let mut deltas = Deltas::default();
@@ -941,6 +1198,7 @@ data: [DONE]
         let body = off.body(&[Message::user("Hi.")]);
         assert_eq!(body["model"], "deepseek-flash");
         assert_eq!(body["thinking"], json!({"type": "disabled"}));
+        assert_eq!(body["stream_options"], json!({"include_usage": true}));
         assert!(off.sees());
         let on = Chat::deepseek("deepseek-v4-pro", "ds-key", Arc::new(Vec::new), true).unwrap();
         assert_eq!(on.body(&[])["thinking"], json!({"type": "enabled"}));

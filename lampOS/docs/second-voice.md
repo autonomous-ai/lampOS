@@ -394,6 +394,55 @@ order is kept. A written turn is the same from the chat on.
   headers. A gap over the client's 90 s pool keep means a new connection
   (the first builder at 18:26: the first event came in 0.9 to 1.9 s on
   lamp-4ace, 0.7 s from the probe).
+  After the first request, the line also says whether its tools and its
+  first message are the last request's, hashed: `; its tools and first
+  message as the last request's`, or which of the two is not. A service's
+  prompt cache holds only a prefix that is the same as before.
+  Each answer is journaled when it ends: `chat answer: its first words or
+  call F ms and its end E ms after it was asked; P prompt tokens, H from the
+  cache, M not; C completion tokens`. H is DeepSeek's
+  `prompt_cache_hit_tokens`, or `prompt_tokens_details.cached_tokens` in
+  OpenAI's form. DeepSeek is asked for the count
+  (`stream_options.include_usage`), and other services' is told when they
+  send it, else `no usage given` (#1712, the first builder at 18:56: the
+  request was 31 KB with 31 tools, and its first event came in 976 to
+  1296 ms).
+- **With `LAMP_SECOND_STEADY_FIRST=on` a spoken turn's request begins with
+  what stays** (off unless set; #1712, the first builder at 18:56). The
+  system message keeps only the character and the skills. The memory note,
+  the time, the room's facts and the thread go in a second system message
+  after the exchanges, before the turn's notes and words (`Told::after`).
+  So the request's prefix, the character, the tools and the exchanges, is
+  the same from one turn to the next while the person goes on, and the time
+  changes it only after them. Off, it's all in the one system message, the
+  time right after the character. A text's request is unchanged. Each turn's
+  journal says how much the cache held (above): the A/B is the played check
+  both ways, by H and by the first event's time.
+- **With `LAMP_SECOND_FEW_TOOLS=on` a spoken turn's chat is given its few
+  functions first** (off unless set; #1712, the first builder at 18:56:
+  "light, volume, timer, search, look, tasks"). The others are behind one,
+  `more_functions`, whose description names them (`worker::few_tools`).
+  - **Given at once** (`given_at_once`):
+    - the light's and the volume's;
+    - the timer's and the reminders';
+    - the tasks';
+    - the web search and its fetch;
+    - the look;
+    - the decline (`not_for_me`), which a busy room needs at every turn;
+    - `use_skill`, which the skills' lines in the instruction name;
+    - setup's walk (`setup_step`, `redo_setup`), which a setup talk calls at
+      every turn.
+  - **Behind `more_functions`:** the memory's (`remember`, `recall`,
+    `forget`, `forget_everything`), the faces', the time elsewhere
+    (`the_time`), a mark for review, the stop of reports, and any skill
+    function given on its own.
+  - **Once the model calls it in a turn**, the route answers it itself, with
+    nothing run ("Every function is given to you now…"), and that turn's
+    next round is given every function. A round costs about a second, only
+    for those.
+  - **The first request is smaller** and the same from turn to turn for a
+    prompt cache. The journal's `chat request … T tools` line shows the
+    count. A text's chat and the probe are given every function.
 - **With `LAMP_SECOND_CHAT_WARM=on` the chat's connection is opened as a
   line begins** (off unless set), as Gemini's voice is, when no request went
   in the last 60 s (`chat::WARM_AFTER`). It's a GET of the service's
@@ -1005,6 +1054,28 @@ after a take-over, but now for every turn:
     the journal says why, without words: `request N: no conversation going
     on: it was last heard saying words S s ago, it was last called C s ago,
     K lines left alone since it last spoke` ("it was never …" when never).
+  - **in a busy room, this route asks more than Live** (#1712, the first
+    builder at 18:57). In ten minutes of a busy office on lamp-4ace, 15
+    lines were let out as the conversation going on, and about 10 of the 15
+    answers went to office talk: DeepSeek declines far less than Gemini.
+    So in a busy room:
+    - a conversation goes on only 15 s from the end of the lamp's own last
+      words (`BUSY_GOING_ON_FOR`) or the person's call. The end is when the
+      words' audio, sent packet by packet, will have played, each packet
+      after the one before (`Did::Said`); the thread keeps only when the
+      answer began (the first builder at 19:21: "And what about tomorrow?"
+      came 18 s after the weather line, after a long answer, and was held);
+    - a line let out only as it going on must be a question, three words or
+      more, or an answer to the lamp's own question, such as the hand-over's
+      "yes" (`BUSY_SHORT`);
+    - a line let out only by someone turned to the lamp must ask it
+      something (`BUSY_TURNED`);
+    - its name, its words calling it, a tap, or being said close to it let
+      a line out as before.
+
+    In a quiet room it is as on Live. The journal's "no conversation going
+    on" line says when the lamp was "last heard saying words, to their end,"
+    and adds ", in a busy room, where it goes on 15 s".
   - **the journal names the sign that let a line out** (#1712, the first
     builder at 17:49). With `--spoken-to`, the rule's first reason can be
     one that lets nothing out by itself, the session trusted or the room
@@ -1085,10 +1156,20 @@ after a take-over, but now for every turn:
   the weather?" came as pieces of about 1.3 s, each a speech-to-text stream
   of its own, and the piece with the name got no words (lamp-4ace, 19 Oct,
   16:37 to 16:45: four such pieces around lamp-name's hits, `results 0
-  with words`). The engine keeps the last line's sound, at most 6 s
-  (`KEPT_SAMPLES`). A line in the same session that the coordinator says
-  continues it, or that begins within 1.5 s of its end when it was not
-  answered (`CARRY_AFTER_END`), has that sound sent into its stream first:
+  with words`). The engine keeps the last line's sound, its last 1.5 s
+  (`KEPT_SAMPLES`): carried whole, 2 to 4 s of it held each line's words
+  back 1 to 2.5 s while Deepgram worked through it (18:56). Only a piece
+  that came back with no words carries it, the name cut off on its own; one
+  whose words came back carries nothing. A line in the same session that
+  the coordinator says continues it, or that begins within 1.5 s of its end
+  when it was not answered (`CARRY_AFTER_END`), takes that piece's time,
+  so a name lamp-name heard in it counts for the line. Its sound is sent
+  again only when lamp-name heard no name there (`Engine::knowing_the_name_heard`,
+  `worker::Heeding::name_heard_since`, read from the bus's last hearing):
+  sent again, 1.5 s of it still held the words back about 2 s (the first
+  builder at 19:21). With the name heard, `request N goes on from request
+  M: the name heard in it counts; its sound is not sent again`; without,
+  that sound goes into the line's stream first:
   `request N goes on from request M: its <ms> ms of sound go first`. Its
   window then begins where the first piece's did, so a name lamp-name heard
   there counts for it, and the old words are not put before its own as well.

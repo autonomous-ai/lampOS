@@ -709,6 +709,12 @@ fn lone_words(heard: &str) -> bool {
 /// Told after [`SPOKEN_NOTE`] when the model looks by a call (#1712).
 pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look: it is how you look, and you will then be shown what you see.";
 
+/// Whether a hearing of the name at `at_us` with `score` is one since
+/// `from_us`, as the rule takes a hearing for a line.
+fn name_counts(score: f32, at_us: u64, from_us: u64) -> bool {
+    score >= crate::called::LEAST_SCORE && at_us.saturating_add(crate::called::BEFORE_US) >= from_us
+}
+
 /// Told beside a spoken line that its words or the lamp's name heard in its
 /// sound called the lamp for: answer it (the first builder on #1712, 18:09:
 /// at 17:56 DeepSeek declined "Lamp, what time is it?" and "Hey Lamp, tell
@@ -1045,6 +1051,19 @@ pub fn serve(
         credentials.as_deref(),
         spoken_declare,
     )?;
+    // A spoken turn's few functions, the rest behind one (#1712).
+    let net = if std::env::var(crate::second_provider::FEW_TOOLS_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+    {
+        eprintln!(
+            "lamp-voice second: a spoken turn's chat is given its few functions, and the rest once it calls {MORE} (LAMP_SECOND_FEW_TOOLS)"
+        );
+        net.narrowing(Arc::new(few_tools))
+    } else {
+        net
+    };
     let thread = files.thread;
     let file = thread.clone();
     let clock = tools.clock;
@@ -1095,6 +1114,16 @@ pub fn serve(
     .then(|| place.clone().or_else(crate::local_time::zone_place_here))
     .flatten();
     let weather_now = weather.clone();
+    // What stays first, and the rest after the exchanges (#1712).
+    let steady_first = std::env::var(crate::second_provider::STEADY_FIRST_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if steady_first {
+        eprintln!(
+            "lamp-voice second: a spoken turn's request begins with the character and the skills, and the memory, the time, the room and the thread go after the exchanges (LAMP_SECOND_STEADY_FIRST)"
+        );
+    }
     let system = move || {
         let now = Instant::now();
         let Ok(mut sessions) = sessions.lock() else {
@@ -1131,12 +1160,22 @@ pub fn serve(
                 Instant::now(),
             ),
         );
-        system_message(
-            &character,
-            crate::agent_tasks::noted(time, tasks.as_ref()).as_deref(),
-            &(memory + &facts(session_fact && !going_on, room) + &skills),
-            file.as_deref(),
-        )
+        let time = crate::agent_tasks::noted(time, tasks.as_ref());
+        let facts = facts(session_fact && !going_on, room);
+        if steady_first {
+            steady_first_message(
+                format!("{character}{skills}"),
+                &format!("{memory}{}{facts}", time.as_deref().unwrap_or_default()),
+                file.as_deref(),
+            )
+        } else {
+            system_message(
+                &character,
+                time.as_deref(),
+                &(memory + &facts + &skills),
+                file.as_deref(),
+            )
+        }
     };
     let staff = tools
         .tasks
@@ -1265,6 +1304,16 @@ pub fn serve(
             let heeding = heeding.clone();
             engine = engine.noting_the_name(Arc::new(move |request| {
                 heeding.lock().ok()?.name_note_for(request)
+            }));
+        }
+        // The name heard in a wordless piece counts for the line going on from
+        // it without its sound sent again (#1712).
+        {
+            let heeding = heeding.clone();
+            engine = engine.knowing_the_name_heard(Arc::new(move |from_us| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.name_heard_since(from_us))
             }));
         }
         // Said by name, or perhaps not for the lamp: its note (#1712).
@@ -1426,6 +1475,76 @@ pub(crate) fn scoped_tool_runner(
     })
 }
 
+/// The function a spoken turn calls for the rest of its functions, with
+/// `LAMP_SECOND_FEW_TOOLS=on` ([`few_tools`]).
+pub(crate) const MORE: &str = "more_functions";
+
+/// What a call of [`MORE`] is answered: the next round has them all.
+pub(crate) const MORE_GIVEN: &str =
+    "Every function is given to you now. Call the one this needs, as you would have.";
+
+/// Whether a spoken turn is given `name` at once with
+/// `LAMP_SECOND_FEW_TOOLS=on` (#1712, the first builder at 18:56: "light,
+/// volume, timer, search, look, tasks"): the light's and the volume's, the
+/// timer's and the reminders', the tasks', the web search's and its fetch,
+/// the look's, and the decline, the skills' one function and setup's walk,
+/// which a busy room, the skills' lines and a setup talk need at every turn.
+pub(crate) fn given_at_once(name: &str) -> bool {
+    name.starts_with("light_")
+        || name.starts_with("volume_")
+        || crate::tools::is_schedule_tool(name)
+        || crate::agent_tasks::is_tool(name)
+        || [
+            crate::tools::NOT_FOR_ME,
+            crate::use_skill::NAME,
+            crate::onboarding::STEP,
+            crate::onboarding::REDO,
+            crate::second_provider::net::search::NAME,
+            crate::second_provider::net::search::FETCH,
+            crate::second_provider::LOOK_CALL,
+        ]
+        .contains(&name)
+}
+
+/// The functions a spoken turn's request is given with
+/// `LAMP_SECOND_FEW_TOOLS=on` ([`crate::second_provider::net::Narrow`]):
+/// those [`given_at_once`], and [`MORE`], which names the rest; once the
+/// model has called [`MORE`] in the turn, every one. The first request is
+/// then smaller, and the same from turn to turn for a prompt cache; what
+/// it costs is a round for the rest (the memory's, the faces', the time
+/// elsewhere, a mark, a stop of reports).
+pub(crate) fn few_tools(
+    declared: Vec<lamp_gemini::Tool>,
+    messages: &[Message],
+) -> Vec<lamp_gemini::Tool> {
+    let asked = messages.iter().any(|message| {
+        message.tool_calls.iter().any(|call| {
+            call.pointer("/function/name")
+                .and_then(|name| name.as_str())
+                == Some(MORE)
+        })
+    });
+    if asked {
+        return declared;
+    }
+    let (mut given, rest): (Vec<_>, Vec<_>) = declared
+        .into_iter()
+        .partition(|tool| given_at_once(&tool.name));
+    if !rest.is_empty() {
+        let names: Vec<&str> = rest.iter().map(|tool| tool.name.as_str()).collect();
+        given.push(lamp_gemini::Tool {
+            name: MORE.into(),
+            description: format!(
+                "Your other functions, not given to you yet: {}. Call this first when what someone asks needs one of them, such as remembering or forgetting something; you are then given every function, and call the one it needs. Never for what the functions you have do.",
+                names.join(", ")
+            ),
+            parameters: None,
+            silent: false,
+        });
+    }
+    given
+}
+
 /// One call of the model's, as both runners run it.
 async fn run_call(
     settings: crate::tools::Settings,
@@ -1436,6 +1555,12 @@ async fn run_call(
     args: serde_json::Value,
     scope: Option<crate::memory_scope::ScopeLease>,
 ) -> serde_json::Value {
+    if name == MORE {
+        eprintln!(
+            "lamp-voice second: request {request} called {MORE}: its next round is given every function"
+        );
+        return serde_json::json!({"ok": true, "result": MORE_GIVEN});
+    }
     if let Some(search) = search.filter(|search| search.answers(&name)) {
         // The request's first search takes the one begun from its
         // words, if any (#1712).
@@ -1671,6 +1796,9 @@ pub(crate) struct Heeding {
     /// for [`CALL_CARRIES_FOR`], whether or not its answer was said before
     /// the person spoke again.
     called_at: Option<Instant>,
+    /// When the lamp's words sent will have been played
+    /// ([`crate::second_provider::Did::Said`]), on the monotonic clock.
+    said_until_us: Option<u64>,
 }
 
 /// What let a line out, as the journal says it: the sign itself where the
@@ -1684,6 +1812,89 @@ fn shown(why: &'static str, sign: Option<&'static str>) -> &'static str {
         Some(sign) if weak => sign,
         _ => why,
     }
+}
+
+/// In a busy room a conversation goes on, on this route, only this long
+/// from the lamp's own last words (#1712, the first builder at 18:57: in
+/// ten minutes of a busy office on lamp-4ace, 15 lines were let out as the
+/// conversation going on, and about 10 of the 15 answers went to office
+/// talk; DeepSeek declines far less than Gemini). In a quiet room it goes
+/// on [`crate::thread::GOING_ON_FOR`], as on Live.
+pub(crate) const BUSY_GOING_ON_FOR: Duration = Duration::from_secs(15);
+/// Held in a busy room: let out only as the conversation going on, and
+/// neither a question, nor three words, nor an answer to the lamp's own
+/// question ("yes" to "Shall I start it?").
+pub(crate) const BUSY_SHORT: &str = "a busy room: a conversation going on carries only a question, three words or more, or an answer to the lamp's own question";
+/// Held in a busy room: let out only by someone turned to the lamp, and
+/// asking it nothing.
+pub(crate) const BUSY_TURNED: &str =
+    "a busy room: someone is turned to the lamp, but asks it nothing";
+
+/// Why a line let out in a busy room for `why` is held after all, if it is
+/// (#1712, the first builder at 18:57): one let out only as the
+/// conversation going on needs to be a question, or three words or more,
+/// or an answer to the lamp's own question (`lamp_asked`); one let out only
+/// by a face turned to the lamp needs to be a question. A line called by its
+/// name, its words, a tap, or said close to the lamp is let out as before.
+fn busy_bar(why: &str, heard: &str, lamp_asked: bool) -> Option<&'static str> {
+    let question = heard.trim_end().ends_with('?');
+    if why == crate::attention::GOING_ON {
+        (!(question || heard.split_whitespace().count() >= 3 || lamp_asked)).then_some(BUSY_SHORT)
+    } else if why == crate::attention::TURNED {
+        (!question).then_some(BUSY_TURNED)
+    } else {
+        None
+    }
+}
+
+/// How long ago the lamp last said words, counted to their end: the
+/// thread's `said_ago` is from when its answer began, `ended_ago` from when
+/// the words it sent were played to their end, if it sent any. Nothing
+/// when the thread has no words of it, as after it forgot them.
+fn to_the_end(said_ago: Option<Duration>, ended_ago: Option<Duration>) -> Option<Duration> {
+    said_ago.map(|ago| ended_ago.map_or(ago, |ended| ended.min(ago)))
+}
+
+/// `signs` as the turn is judged with them: in a busy room a conversation
+/// goes on only [`BUSY_GOING_ON_FOR`] from the end of the lamp's last words
+/// (`said_ago`)
+/// or [`CALL_CARRIES_FOR`] from the person's call (`called_ago`). When none
+/// is going on, the journal says why, without words (#1712, the first
+/// builder at 16:16: which of these had held the owner's lines was not
+/// told).
+fn went_on_told(
+    request: u64,
+    mut signs: Signs,
+    said_ago: Option<Duration>,
+    called_ago: Option<Duration>,
+    left_alone: Option<usize>,
+) -> Signs {
+    let busy = signs.room == crate::room_told::Room::Busy;
+    if busy {
+        signs.going_on &= said_ago.is_some_and(|ago| ago <= BUSY_GOING_ON_FOR)
+            || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR);
+    }
+    if !signs.going_on {
+        let ago = |ago: Option<Duration>, what: &str| {
+            ago.map_or(format!("it was never {what}"), |ago| {
+                format!("it was last {what} {} s ago", ago.as_secs())
+            })
+        };
+        eprintln!(
+            "lamp-voice second: request {request}: no conversation going on: {}, {}{}{}",
+            ago(said_ago, "heard saying words, to their end,"),
+            ago(called_ago, "called"),
+            left_alone.map_or(String::new(), |left| format!(
+                ", {left} lines left alone since it last spoke"
+            )),
+            if busy {
+                ", in a busy room, where it goes on 15 s"
+            } else {
+                ""
+            }
+        );
+    }
+    signs
 }
 
 /// How long a call let out carries the person's next lines when the lamp
@@ -1778,6 +1989,7 @@ impl Heeding {
             held_run: 0,
             renewed_at: None,
             called_at: None,
+            said_until_us: None,
         }
     }
 
@@ -1797,7 +2009,17 @@ impl Heeding {
         match did {
             crate::second_provider::Did::Worked(at_us) => self.attention.worked(at_us),
             crate::second_provider::Did::Spoke(at_us) => self.attention.news_told(at_us),
+            crate::second_provider::Did::Said(until_us) => {
+                self.said_until_us = self.said_until_us.max(Some(until_us));
+            }
         }
+    }
+
+    /// How long ago the lamp's words sent were played to their end
+    /// ([`crate::second_provider::Did::Said`]), zero while they still play.
+    fn said_ended_ago(&self, now_us: u64) -> Option<Duration> {
+        self.said_until_us
+            .map(|until| Duration::from_micros(now_us.saturating_sub(until)))
     }
 
     /// The note `request` earned when it was judged, if any.
@@ -1948,6 +2170,11 @@ impl Heeding {
         // conversation).
         let called_ago = self.called_at.map(|at| now.saturating_duration_since(at));
         let going_on = said_going_on || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR);
+        // From the end of what the lamp said, not from when its answer began,
+        // which the thread keeps (#1712, the first builder at 19:21: "And what
+        // about tomorrow?" 18 s after the weather line, a long answer, was
+        // held in a busy room).
+        let said_ago = to_the_end(said_ago, self.said_ended_ago(monotonic_us()));
         let mut left_alone = None;
         let mut signs = Signs {
             room: crate::room_told::Room::Unknown,
@@ -1976,26 +2203,9 @@ impl Heeding {
             left_alone = Some(room.left_alone_since_spoke());
             signs.going_on &= !room.talked_past_the_lamp();
         }
-        // Why no conversation is going on, without words (#1712, the first
-        // builder at 16:16: which of these had held the owner's lines was
-        // not told).
-        if !signs.going_on {
-            let ago = |ago: Option<Duration>, what: &str| {
-                ago.map_or(format!("it was never {what}"), |ago| {
-                    format!("it was last {what} {} s ago", ago.as_secs())
-                })
-            };
-            eprintln!(
-                "lamp-voice second: request {request}: no conversation going on: {}, {}{}",
-                ago(said_ago, "heard saying words"),
-                ago(called_ago, "called"),
-                left_alone.map_or(String::new(), |left| format!(
-                    ", {left} lines left alone since it last spoke"
-                ))
-            );
-        }
+        let ended = |signs: Signs| went_on_told(request, signs, said_ago, called_ago, left_alone);
         let Some((bus, names)) = &mut self.bus else {
-            return signs;
+            return ended(signs);
         };
         if !self.keeps_room {
             signs.room = crate::bus_out::room_now(bus);
@@ -2017,7 +2227,7 @@ impl Heeding {
                     .push((now_us.saturating_sub(ago_ms * 1_000), name.score));
             }
         }
-        signs
+        ended(signs)
     }
 
     /// The rule's verdict on a spoken turn: why it is not answered, or
@@ -2065,6 +2275,7 @@ impl Heeding {
         }
         attention.heard(heard);
         attention.lamp_asked(signs.lamp_asked);
+        let (busy, lamp_asked) = (signs.room == crate::room_told::Room::Busy, signs.lamp_asked);
         attention.set_near(signs.near);
         let turned = signs.turned.filter(|_| self.strict);
         let mut verdict =
@@ -2072,6 +2283,11 @@ impl Heeding {
         let alone = attention.played_on_the_conversation_alone();
         if alone && lone_words(heard) {
             verdict = Some(crate::attention::Verdict::Hold(LONE_WORDS));
+        }
+        if busy && let Some(crate::attention::Verdict::Play(why)) = verdict {
+            verdict = busy_bar(why, heard, lamp_asked)
+                .map(crate::attention::Verdict::Hold)
+                .or(verdict);
         }
         let played = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
         let called = played && (attention.called_for_itself() || turned == Some(true));
@@ -2131,6 +2347,26 @@ impl Heeding {
     /// holds the schedule's (#1522, #1712).
     pub(crate) fn holds_call(&self, request: u64, name: &str) -> bool {
         self.alone == Some(request) && crate::policy_holds::SCHEDULE_HELD.contains(&name)
+    }
+
+    /// Whether the lamp's name was heard (`name/heard`, at
+    /// `called::LEAST_SCORE` or more) since `from_us`, less
+    /// `called::BEFORE_US`, by this process's clock. Read from the bus's last
+    /// hearing, so the rule's own queue of hearings keeps it.
+    pub(crate) fn name_heard_since(&self, from_us: u64) -> bool {
+        let Some((bus, _)) = &self.bus else {
+            return false;
+        };
+        let Ok(Some(message)) = bus.latest(lamp_msgs::NameHeard::TOPIC) else {
+            return false;
+        };
+        let Ok(name) = message.parse::<lamp_msgs::NameHeard>() else {
+            return false;
+        };
+        let now_ms = unix_ms(SystemTime::now());
+        let ago_ms = now_ms.saturating_sub(message.header.at_unix_ms) + u64::from(name.ago_ms);
+        let at_us = monotonic_us().saturating_sub(ago_ms * 1_000);
+        name_counts(name.score, at_us, from_us)
     }
 
     /// The note for `request` judged: [`BY_NAME_NOTE`] if its words or the
@@ -2208,7 +2444,35 @@ pub(crate) fn system_message(
     file: Option<&Path>,
 ) -> Told {
     let told = format!("{character}{}{memory}", time.unwrap_or_default());
-    let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(told.len());
+    let (thread, history) = thread_and_history(told.len(), file);
+    Told {
+        text: told + &thread,
+        after: None,
+        history,
+    }
+}
+
+/// [`system_message`] with what stays told first, as
+/// `LAMP_SECOND_STEADY_FIRST=on` asks (#1712, the first builder at 18:56):
+/// `steady`, the character and the skills, as the system message, and
+/// `changing`, the memory note, the time and the room's facts, with the
+/// thread, after the exchanges ([`Told::after`]). A service's prompt cache
+/// then holds the character, the tools and the exchanges from one request
+/// to the next; the time alone changes every minute.
+pub(crate) fn steady_first_message(steady: String, changing: &str, file: Option<&Path>) -> Told {
+    let (thread, history) = thread_and_history(steady.len() + changing.len(), file);
+    let after = format!("{changing}{thread}").trim_start().to_owned();
+    Told {
+        text: steady,
+        after: (!after.is_empty()).then_some(after),
+        history,
+    }
+}
+
+/// The thread in the room `used` bytes of the system message leave it,
+/// and the exchanges as messages, both under the thread's one lock.
+fn thread_and_history(used: usize, file: Option<&Path>) -> (String, Vec<Message>) {
+    let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
     let (thread, recent) = crate::thread::current(file, |thread| {
         (
@@ -2217,10 +2481,10 @@ pub(crate) fn system_message(
         )
     })
     .unwrap_or_default();
-    Told {
-        text: told + &thread.unwrap_or_default(),
-        history: recent.into_iter().flat_map(messages).collect(),
-    }
+    (
+        thread.unwrap_or_default(),
+        recent.into_iter().flat_map(messages).collect(),
+    )
 }
 
 /// What a text's answer (#1673) is told, and how its functions run. It is
@@ -2298,6 +2562,7 @@ pub(crate) fn texts_task(
 pub(crate) fn texts_system_message(character: &str, time: Option<&str>, memory: &str) -> Told {
     Told {
         text: format!("{character}{}{memory}", time.unwrap_or_default()),
+        after: None,
         history: Vec::new(),
     }
 }
@@ -2511,6 +2776,98 @@ mod tests {
             assert!(strict.judge(request, said, "And then?", busy()).is_some());
         }
         assert_eq!(strict.session, 2);
+    }
+
+    /// #1712, the first builder at 18:57: in a busy room, a line let out
+    /// only as the conversation going on is a question, three words or more,
+    /// or an answer to the lamp's own question; one let out only by a face
+    /// turned to the lamp asks something. Other signs let a line out as
+    /// before.
+    #[test]
+    fn a_busy_room_asks_more_of_a_line_going_on_or_a_turned_face() {
+        use crate::attention::{GOING_ON, TURNED};
+        assert_eq!(super::busy_bar(GOING_ON, "Yes.", false), Some(BUSY_SHORT));
+        assert_eq!(
+            super::busy_bar(GOING_ON, "Yes.", true),
+            None,
+            "the hand-over's yes"
+        );
+        assert_eq!(super::busy_bar(GOING_ON, "Okay?", false), None);
+        assert_eq!(super::busy_bar(GOING_ON, "Book the car.", false), None);
+        assert_eq!(
+            super::busy_bar(GOING_ON, "Okay sure.", false),
+            Some(BUSY_SHORT)
+        );
+        assert_eq!(
+            super::busy_bar(TURNED, "Okay sure, fine.", false),
+            Some(BUSY_TURNED)
+        );
+        assert_eq!(super::busy_bar(TURNED, "Is it raining?", false), None);
+        let named = "its name was heard plainly in the room's sound";
+        assert_eq!(super::busy_bar(named, "Okay.", false), None);
+    }
+
+    /// #1712, the first builder at 18:57: in a busy room a conversation goes
+    /// on 15 s from the lamp's last words; in a quiet one, Live's 45 s.
+    /// #1712, the first builder at 19:21: "And what about tomorrow?" came
+    /// 18 s after the weather line, after a long answer, and was held in a
+    /// busy room. The 15 s count from the end of the lamp's words.
+    #[test]
+    fn a_busy_rooms_fifteen_seconds_count_from_the_end_of_the_lamps_words() {
+        let s = Duration::from_secs;
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        assert_eq!(heeding.said_ended_ago(100_000_000), None);
+        heeding.lamp_did(crate::second_provider::Did::Said(105_000_000));
+        // Still playing, then over.
+        assert_eq!(heeding.said_ended_ago(100_000_000), Some(Duration::ZERO));
+        assert_eq!(heeding.said_ended_ago(114_000_000), Some(s(9)));
+        // An earlier end told late moves nothing back.
+        heeding.lamp_did(crate::second_provider::Did::Said(101_000_000));
+        assert_eq!(heeding.said_ended_ago(114_000_000), Some(s(9)));
+        // The answer began 18 s ago and ended 9 s ago: it goes on.
+        let said_ago = to_the_end(Some(s(18)), heeding.said_ended_ago(114_000_000));
+        assert_eq!(said_ago, Some(s(9)));
+        let busy = || Signs {
+            room: crate::room_told::Room::Busy,
+            going_on: true,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        assert!(went_on_told(5, busy(), said_ago, None, None).going_on);
+        assert!(!went_on_told(5, busy(), Some(s(18)), None, None).going_on);
+        // No words in the thread: none, whatever was played.
+        assert_eq!(to_the_end(None, Some(s(1))), None);
+        assert_eq!(to_the_end(Some(s(30)), None), Some(s(30)));
+    }
+
+    #[test]
+    fn a_busy_rooms_conversation_goes_on_fifteen_seconds() {
+        use crate::room_told::Room;
+        let signs = |room| Signs {
+            room,
+            going_on: true,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let s = Duration::from_secs;
+        let went = |room, said: u64, called: Option<u64>| {
+            super::went_on_told(1, signs(room), Some(s(said)), called.map(s), None).going_on
+        };
+        assert!(went(Room::Busy, 10, None));
+        assert!(!went(Room::Busy, 20, None));
+        assert!(!went(Room::Busy, 44, None));
+        assert!(
+            went(Room::Busy, 30, Some(10)),
+            "the person's call, 10 s ago"
+        );
+        assert!(went(Room::Quiet, 30, None));
+        assert!(went(Room::Unknown, 44, None));
     }
 
     /// #1712, the first builder at 17:49: the journal names the sign that
@@ -2828,6 +3185,93 @@ mod tests {
 
     use super::*;
     use crate::second_provider::{Listener, Services, net};
+
+    /// #1712, the first builder at 18:56: with `LAMP_SECOND_FEW_TOOLS=on` a
+    /// spoken turn's request is given its few functions and one that names
+    /// the rest; once the model has called it, every function.
+    #[test]
+    fn a_spoken_turn_is_given_its_few_functions_and_the_rest_behind_one() {
+        let tool = |name: &str| lamp_gemini::Tool {
+            name: name.into(),
+            description: "A function.".into(),
+            parameters: None,
+            silent: false,
+        };
+        let declared: Vec<_> = [
+            "not_for_me",
+            "the_time",
+            "remember",
+            "light_on",
+            "volume_up",
+            "set_timer",
+            "start_agent_task",
+            "remember_my_face",
+            "use_skill",
+            "web_search",
+            "take_a_look",
+        ]
+        .map(tool)
+        .into();
+        let names = |tools: &[lamp_gemini::Tool]| -> Vec<String> {
+            tools.iter().map(|tool| tool.name.clone()).collect()
+        };
+        let asked = [
+            Message::system("You are a lamp."),
+            Message::user("Lights on."),
+        ];
+        let given = few_tools(declared.clone(), &asked);
+        assert_eq!(
+            names(&given),
+            [
+                "not_for_me",
+                "light_on",
+                "volume_up",
+                "set_timer",
+                "start_agent_task",
+                "use_skill",
+                "web_search",
+                "take_a_look",
+                MORE
+            ]
+        );
+        assert!(
+            given[8].description.starts_with(
+                "Your other functions, not given to you yet: the_time, remember, remember_my_face. "
+            ),
+            "{}",
+            given[8].description
+        );
+        // Called: the next round has every one, as declared.
+        let mut after = asked.to_vec();
+        after.push(Message::assistant_calls(
+            None,
+            &[net::ToolCall {
+                id: "c1".into(),
+                name: MORE.into(),
+                args: serde_json::json!({}),
+                extra: None,
+            }],
+        ));
+        after.push(Message::tool("c1", MORE_GIVEN));
+        assert_eq!(few_tools(declared.clone(), &after), declared);
+        // Nothing to put behind it: no such function.
+        let few: Vec<_> = declared
+            .iter()
+            .filter(|tool| given_at_once(&tool.name))
+            .cloned()
+            .collect();
+        assert_eq!(few_tools(few.clone(), &asked), few);
+    }
+
+    /// Its call is answered by the route itself, with nothing run.
+    #[tokio::test]
+    async fn the_call_for_the_rest_is_answered_by_the_route() {
+        let runner = tool_runner(crate::tools::Settings::default(), None, None);
+        assert_eq!(
+            runner(1, true, MORE.into(), serde_json::json!({})).await,
+            serde_json::json!({"ok": true, "result": MORE_GIVEN})
+        );
+    }
     use futures_util::{
         future::BoxFuture,
         stream::{self, BoxStream},
@@ -3130,6 +3574,20 @@ mod tests {
                 Message::assistant("Try some tea. It is calm.")
             ]
         );
+        // With what stays first (#1712, the first builder at 18:56): the
+        // character alone first; the memory, the time and the thread after
+        // the exchanges, which are the same.
+        let steady = steady_first_message(
+            "You are a lamp.".into(),
+            &format!("{} It is noon.", crate::remember::told()),
+            Some(&file),
+        );
+        assert_eq!(steady.text, "You are a lamp.");
+        let after = steady.after.clone().unwrap_or_default();
+        assert!(after.starts_with("Your memory\n"), "{after}");
+        assert!(after.contains("- coffee black\n") && after.contains(" It is noon."));
+        assert!(after.contains("Person: What should I drink?\nYou: Try some tea. It is calm.\n"));
+        assert_eq!(steady.history, told.history);
         // Forgotten, then another person's turn, then back: nothing of it
         // is told or given again (first builder's reviewer on #778).
         crate::thread::THREAD.lock().unwrap().forget();
@@ -3141,6 +3599,11 @@ mod tests {
         let told = system_message("You are a lamp.", None, "", Some(&file));
         assert!(told.history.is_empty(), "{:?}", told.history);
         assert!(!told.text.contains("Try some tea"), "{}", told.text);
+        // Nothing changing and no thread: no message after the exchanges.
+        assert_eq!(
+            steady_first_message("You are a lamp.".into(), "", Some(&file)).after,
+            None
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -3756,6 +4219,26 @@ mod tests {
         assert!(super::BY_NAME_NOTE.contains("answer it"));
         assert!(!super::BY_NAME_NOTE.contains("not_for_me"));
         assert!(super::DECLINE_NOTE.contains("call not_for_me and say nothing"));
+    }
+
+    /// #1712: a hearing of the name counts for a piece begun at `from` when
+    /// it is sure enough and no earlier than the rule's own allowance before.
+    #[test]
+    fn a_name_hearing_counts_from_its_time_and_score() {
+        let from = 10_000_000;
+        let sure = crate::called::LEAST_SCORE;
+        assert!(super::name_counts(sure, from + 200_000, from));
+        assert!(super::name_counts(
+            sure,
+            from - crate::called::BEFORE_US,
+            from
+        ));
+        assert!(!super::name_counts(
+            sure,
+            from - crate::called::BEFORE_US - 1,
+            from
+        ));
+        assert!(!super::name_counts(sure - 0.01, from + 200_000, from));
     }
 
     /// #1712: the weather is told while fresh, never once stale.

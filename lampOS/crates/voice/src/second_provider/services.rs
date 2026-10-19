@@ -104,6 +104,14 @@ impl Net {
         self
     }
 
+    /// The chat's requests are given only the tools `narrow` keeps
+    /// ([`net::Chat::narrowing`]). Called after the chat is chosen: one
+    /// chosen later is given every tool.
+    pub fn narrowing(self, narrow: net::Narrow) -> Self {
+        self.chat.narrowing(narrow);
+        self
+    }
+
     /// The text model is Gemini, called directly (`LAMP_SECOND_CHAT=gemini`),
     /// in place of the configured chat.
     pub fn chatting_with_gemini(mut self, gemini: &GeminiCall<'_>) -> net::Result<Self> {

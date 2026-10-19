@@ -101,9 +101,11 @@ pub const COULD_NOT_LOOK: &str = "I couldn't get a good look.";
 /// are answered in the next line's place when that line is held, within
 /// this ([`Shared::cut`], #1712).
 pub const CARRY_WITHIN: Duration = Duration::from_secs(30);
-/// The most of the last line's sound kept for the next: the audio queue's
-/// six seconds, at 16 kHz.
-pub const KEPT_SAMPLES: usize = 6 * 16_000;
+/// The most of the last line's sound kept for the next: its last 1.5 s at
+/// 16 kHz, enough for "Lamp," and a pause. Carried whole, 2 to 4 s of it
+/// held each line's words back 1 to 2.5 s while Deepgram worked through it
+/// (the first builder on lamp-4ace on 19 Oct at 18:56).
+pub const KEPT_SAMPLES: usize = 16_000 * 3 / 2;
 /// A line beginning this soon after the last one ended, that one not
 /// answered, goes on from it: its sound goes first ([`KeptSound`]).
 pub const CARRY_AFTER_END: Duration = Duration::from_millis(1_500);
@@ -188,6 +190,11 @@ pub type System = Arc<dyn Fn() -> Told + Send + Sync>;
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Told {
     pub text: String,
+    /// With `LAMP_SECOND_STEADY_FIRST=on` ([`STEADY_FIRST_ENVIRONMENT`]),
+    /// what changes from one turn to the next (the memory note, the time,
+    /// the room's facts and the thread), told as a system message after
+    /// the exchanges, so `text` keeps only what stays. `None`: all in `text`.
+    pub after: Option<String>,
     pub history: Vec<Message>,
 }
 impl From<String> for Told {
@@ -195,10 +202,36 @@ impl From<String> for Told {
     fn from(text: String) -> Self {
         Self {
             text,
+            after: None,
             history: Vec::new(),
         }
     }
 }
+impl Told {
+    /// The chat's messages before a turn's notes and words: the system
+    /// message, the exchanges, then [`Self::after`]. What stays from one
+    /// request to the next comes first, as a service's prompt cache holds
+    /// only a prefix that is the same as before (#1712, the first builder
+    /// at 18:56: DeepSeek's `prompt_cache_hit_tokens`).
+    pub fn messages(self) -> Vec<Message> {
+        let mut messages = vec![Message::system(self.text)];
+        messages.extend(self.history);
+        messages.extend(self.after.map(Message::system));
+        messages
+    }
+}
+
+/// Where the worker reads whether a spoken turn's system message keeps only
+/// what stays (the character and the skills) and tells the rest after the
+/// exchanges ([`Told::after`]): `on`, and nothing else (#1712, the first
+/// builder at 18:56).
+pub const STEADY_FIRST_ENVIRONMENT: &str = "LAMP_SECOND_STEADY_FIRST";
+
+/// Where the worker reads whether a spoken turn's chat is given only the
+/// functions a spoken turn mostly needs, and the rest behind one call
+/// (`worker::few_tools`): `on`, and nothing else (#1712, the first builder
+/// at 18:56).
+pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 /// Whether a spoken turn's words were said to the lamp, judged before they
 /// are answered: `(request, (began_us, ended_us), heard)` to why it is not
 /// answered, or nothing. The window is the microphone's read time of the
@@ -242,9 +275,17 @@ pub enum Did {
     /// Its own turn (news, a reminder) began to be heard at this time: a
     /// reply to it is for it (`attention::news_told`).
     Spoke(u64),
+    /// Its words sent so far will have been played by this time, as if the
+    /// audio plays as it is sent, each packet after the one before: a
+    /// conversation goes on from the end of what it said, not from when its
+    /// answer began (#1712, the first builder at 19:21).
+    Said(u64),
 }
 /// Where the engine says what the lamp did.
 pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
+/// Whether the lamp's name was heard since a time, by this process's clock
+/// ([`Engine::knowing_the_name_heard`]).
+pub type NameSounded = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 /// The note a spoken request gets on whether it called the lamp by name
 /// ([`Engine::noting_whether_called`]): with its request and words.
 pub type CallNote = Arc<dyn Fn(u64, &str) -> Option<&'static str> + Send + Sync>;
@@ -264,6 +305,8 @@ struct Shared {
     clock: Clock,
     /// When answer audio was last sent.
     answered_at: Mutex<Option<Instant>>,
+    /// When the words sent so far will have been played ([`Did::Said`]).
+    said_until_us: AtomicU64,
     /// Audio packets sent by this process.
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
@@ -289,6 +332,8 @@ struct Shared {
     conversation_alone: Option<NameNote>,
     /// The note on whether a line called the lamp by name.
     call_note: Option<CallNote>,
+    /// Whether the lamp's name was heard since a time.
+    name_sounded: Option<NameSounded>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
@@ -581,6 +626,7 @@ impl Engine {
                 system,
                 clock,
                 answered_at: Mutex::new(None),
+                said_until_us: AtomicU64::new(0),
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
@@ -594,6 +640,7 @@ impl Engine {
                 name_note: None,
                 conversation_alone: None,
                 call_note: None,
+                name_sounded: None,
                 task_waiting: None,
                 did: None,
                 hold: None,
@@ -763,6 +810,18 @@ impl Engine {
     pub fn telling_what_it_did(mut self, did: LampDid) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.did = Some(did);
+        }
+        self
+    }
+
+    /// `heard` says whether the lamp's name was heard since a time: a line
+    /// going on from a wordless piece whose name was heard takes that
+    /// piece's time, so the name counts for it, and not its sound, which
+    /// held the words back about 2 s (#1712, the first builder at 19:21).
+    /// Before any turn only.
+    pub fn knowing_the_name_heard(mut self, heard: NameSounded) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.name_sounded = Some(heard);
         }
         self
     }
@@ -952,9 +1011,17 @@ impl Engine {
                     .and_then(|last| *last);
                 let carried = self.kept.take().filter(|kept| {
                     let since = kept.ended.map(|end| now.saturating_duration_since(end));
+                    // Only the piece that came back with no words, the name
+                    // cut off on its own: one whose words came back carries
+                    // nothing (#1712, 18:56).
+                    let words_back = last
+                        .as_ref()
+                        .filter(|(of, _)| *of == kept.request)
+                        .map(|(_, words)| !words.trim().is_empty());
                     kept.session == session
                         && kept.request < request
                         && !kept.samples.is_empty()
+                        && words_back != Some(true)
                         && since.is_none_or(|since| since <= KEEP_AFTER_END)
                         && (continues
                             || since.is_some_and(|since| since <= CARRY_AFTER_END)
@@ -999,12 +1066,27 @@ impl Engine {
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
                     Some(kept) => {
-                        eprintln!(
-                            "lamp-voice second: request {request} goes on from request {}: its {} ms of sound go first",
-                            kept.request,
-                            kept.samples.len() / 16
-                        );
-                        let _ = audio.try_send(kept.samples.iter().copied().collect());
+                        // The name heard in the piece counts by its time
+                        // alone; its sound goes again only when the name was
+                        // not heard, for speech to text to find it.
+                        let name_heard = self
+                            .shared
+                            .name_sounded
+                            .as_ref()
+                            .is_some_and(|heard| heard(kept.said_from));
+                        if name_heard {
+                            eprintln!(
+                                "lamp-voice second: request {request} goes on from request {}: the name heard in it counts; its sound is not sent again",
+                                kept.request
+                            );
+                        } else {
+                            eprintln!(
+                                "lamp-voice second: request {request} goes on from request {}: its {} ms of sound go first",
+                                kept.request,
+                                kept.samples.len() / 16
+                            );
+                            let _ = audio.try_send(kept.samples.iter().copied().collect());
+                        }
                         // The line began with the sound carried: the name
                         // heard in it is this line's.
                         if let Ok(mut said) = said.lock() {
@@ -1405,6 +1487,20 @@ impl Shared {
         .await;
     }
 
+    /// When `samples` more of the lamp's words sent at `now_us` will have
+    /// been played, after those sent before them ([`Did::Said`]).
+    fn said_through(&self, samples: usize, now_us: u64) -> u64 {
+        let length_us = samples as u64 * 1_000_000 / u64::from(net::TTS_SAMPLE_RATE);
+        let mut until = 0;
+        let _ = self
+            .said_until_us
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |before| {
+                until = before.max(now_us) + length_us;
+                Some(until)
+            });
+        until
+    }
+
     fn announcement_due(&self) -> bool {
         let now = (self.clock)();
         self.answered_at
@@ -1710,9 +1806,7 @@ impl Prepared {
     /// The chat asked on `words`, as round 1 would be asked: the turn's
     /// system message and history, then the words.
     fn begin(shared: &Shared, words: String) -> Self {
-        let told = (shared.system)();
-        let mut messages = vec![Message::system(told.text)];
-        messages.extend(told.history);
+        let mut messages = (shared.system)().messages();
         messages.push(Message::user(words.clone()));
         let mut chat = shared.services.chat(messages.clone());
         let (kept, events) = mpsc::unbounded_channel();
@@ -1984,9 +2078,7 @@ async fn answer(
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
         }
-        let told = (shared.system)();
-        let mut messages = vec![Message::system(told.text)];
-        messages.extend(told.history);
+        let mut messages = (shared.system)().messages();
         // A chat begun on the early words stands for round 1 if it fits.
         let mut prepared = prepared_for.and_then(|(prepared, said)| {
             match prepared.misfit(&messages, &notes, &said) {
@@ -2356,6 +2448,13 @@ async fn answer(
                     if let Ok(mut at) = shared.answered_at.lock() {
                         *at = Some((shared.clock)());
                     }
+                }
+                // Each packet's words, as long as it plays, after the one
+                // before it or from now.
+                if answering && let Some(did) = &shared.did {
+                    did(Did::Said(
+                        shared.said_through(samples.len(), monotonic_us()),
+                    ));
                 }
             }
         }
