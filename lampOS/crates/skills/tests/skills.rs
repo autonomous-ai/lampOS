@@ -326,7 +326,7 @@ fn every_skill_folder_says_its_kind_and_version() {
     );
     assert_eq!(
         named(SkillKind::Installable),
-        ["desk-tutor", "desk-tutor-marks"]
+        ["desk-tutor", "desk-tutor-marks", "look-for-things"]
     );
     for skill in &skills {
         assert_eq!(skill.version.as_deref(), Some("1.0.0"), "{}", skill.name);
@@ -627,6 +627,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
                 mood: "reading".into(),
                 lasting_us: 1_000_000,
                 toward: None,
+                until_spoken: false,
             },
             "body",
         ),
@@ -6618,6 +6619,279 @@ fn a_step_for_some_choices_is_made_only_for_them_and_the_default_stands_in() {
         );
         assert_eq!(relax[1].1["colour"], "warm");
     }
+}
+
+/// A search of three looks (#1685), the desk first.
+const SEARCH: &str = r#"
+tool = "look_for"
+[choice]
+name = "place"
+about = "Where."
+one_of = ["desk", "left", "right"]
+default = "desk"
+[search]
+looks = 3
+give_up = "Say kindly you can't see it from here."
+[[do]]
+body = { mood = "reading", for = "10s" }
+light = { colour = "white", for = "10s" }
+look = true
+say = "Say what you see."
+[[do]]
+if_choice = ["left"]
+body = { mood = "reading", for = "10s", toward = -0.5 }
+[[do]]
+if_choice = ["right"]
+body = { mood = "reading", for = "10s", toward = 0.5 }
+"#;
+
+/// #1685: a search's first look is at the desk when the call names no
+/// place, each look after it where it is asked, and none past its looks:
+/// the model is told to give up kindly and nothing more moves. (A first
+/// look that names a place is made there: below, after someone speaks.)
+#[test]
+fn a_search_looks_at_the_desk_first_then_where_asked_and_no_more_than_its_looks() {
+    let program = ToolProgram::with("look", SEARCH, &[]);
+    let plain = r#"{"level":0,"mood":"reading"}"#;
+    let left = r#"{"level":0,"mood":"reading","toward":-0.5}"#;
+    let right = r#"{"level":0,"mood":"reading","toward":0.5}"#;
+    // No place named: the desk.
+    let first = program.call("look_for", "{}");
+    assert_eq!(first["ok"], true, "{first}");
+    assert_eq!(first["result"]["look"], true, "{first}");
+    assert_eq!(program.colours(1), ["white"]);
+    let desk = program.poses(Duration::from_secs(1));
+    assert!(
+        !desk.is_empty() && desk.iter().all(|pose| pose == plain),
+        "{desk:?}"
+    );
+    assert_eq!(program.call("look_for", r#"{"place":"left"}"#)["ok"], true);
+    assert!(program.said().iter().any(|pose| pose == left));
+    assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
+    assert!(program.said().iter().any(|pose| pose == right));
+    // The fourth look is past its three: refused, the model told to give
+    // up, and the head left where it was, on the right.
+    let fourth = program.call("look_for", r#"{"place":"left"}"#);
+    assert_eq!(fourth["ok"], false, "{fourth}");
+    assert_eq!(fourth["error"], "Say kindly you can't see it from here.");
+    let after = program.poses(Duration::from_secs(2));
+    assert!(
+        !after.is_empty() && after.iter().all(|pose| pose == right),
+        "{after:?}"
+    );
+    // The light was made once, by the first look.
+    assert_eq!(program.colours(0), Vec::<String>::new());
+}
+
+/// #1685: someone speaking ends a search within a fifth of a second: its
+/// pose let go, so the head comes back up, and the light given back. The
+/// next ask is a new search, its first look where it is asked: "try the
+/// left" mid-search looks to the left, not at the desk again (the peer
+/// read on #1766).
+#[test]
+fn someone_speaking_ends_a_search_its_pose_and_its_light() {
+    let mut program = ToolProgram::with("look", SEARCH, &[]);
+    assert_eq!(program.call("look_for", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
+    let held = program.poses(Duration::from_secs(1));
+    assert!(!held.is_empty(), "{held:?}");
+    program
+        .voice
+        .publish_json(
+            1,
+            &VoiceState {
+                state: lamp_msgs::Voice::Listening,
+            },
+        )
+        .unwrap();
+    program.clock.skip(Duration::from_millis(300));
+    // Given back well before the search's ten seconds.
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        ["blue"]
+    );
+    let _before = program.said();
+    assert_eq!(program.poses(Duration::from_secs(3)), Vec::<String>::new());
+    // The voice resting again, "try the left": a new search, on the left.
+    program
+        .voice
+        .publish_json(
+            1,
+            &VoiceState {
+                state: lamp_msgs::Voice::Resting,
+            },
+        )
+        .unwrap();
+    // The ended run said done to the program's loop meanwhile.
+    std::thread::sleep(Duration::from_millis(300));
+    assert_eq!(program.call("look_for", r#"{"place":"left"}"#)["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    // Its steps' poses in order, the turned one last, which the body
+    // keeps: never the desk alone.
+    let again = program.said();
+    assert_eq!(
+        again.last().map(String::as_str),
+        Some(r#"{"level":0,"mood":"reading","toward":-0.5}"#),
+        "{again:?}"
+    );
+}
+
+/// #1685: the lamp paused ends a search as someone speaking does: its pose
+/// let go within a fifth of a second and its light given back, well before
+/// its ten seconds (the peer read on #1766).
+#[test]
+fn a_pause_ends_a_search_its_pose_and_its_light() {
+    let program = ToolProgram::with("look", SEARCH, &[]);
+    assert_eq!(program.call("look_for", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
+    let held = program.poses(Duration::from_secs(1));
+    assert!(!held.is_empty(), "{held:?}");
+    let bus = Bus::new(program._dir.path().join("bus")).unwrap();
+    let mut pause = bus
+        .publisher_declared(
+            lamp_msgs::Pause::TOPIC,
+            &lamp_msgs::Pause::declaration(),
+            "voice",
+        )
+        .unwrap();
+    pause
+        .publish_json(1, &lamp_msgs::Pause { paused: true })
+        .unwrap();
+    program.clock.skip(Duration::from_millis(300));
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        ["blue"]
+    );
+    let _before = program.said();
+    assert_eq!(program.poses(Duration::from_secs(3)), Vec::<String>::new());
+}
+
+/// #1685: a search's looks as the loader holds them: in a skill a person
+/// starts by its tool, with a look and a choice with a default; a few looks
+/// and words to give up with. Its next look's arguments: as asked, the
+/// default first when none is named, then none.
+#[test]
+fn a_search_is_held_to_its_rules_and_its_looks_are_counted() {
+    let dir = tempfile::tempdir().unwrap();
+    let search = load(&skill_with(dir.path(), "look", SEARCH)).unwrap();
+    let left = serde_json::json!({"place": "left"});
+    // A place named is looked at, even first; none named, the desk.
+    assert_eq!(search.search_look(&left, 0).unwrap(), left);
+    assert_eq!(
+        search.search_look(&serde_json::json!({}), 0).unwrap(),
+        serde_json::json!({"place": "desk"})
+    );
+    assert_eq!(search.search_look(&left, 1).unwrap(), left);
+    assert_eq!(search.search_look(&left, 2).unwrap(), left);
+    assert_eq!(
+        search.search_look(&left, 3).unwrap_err(),
+        "Say kindly you can't see it from here."
+    );
+    // Its poses end when someone speaks; another skill's do not.
+    let poses = |skill: &lamp_skills::Skill| -> Vec<serde_json::Value> {
+        let mut engine = Engine::new(vec![skill.clone()], true);
+        engine
+            .tool(skill.tool.as_deref().unwrap(), &left, 1_000_000)
+            .unwrap()
+            .calls
+            .iter()
+            .map(Call::named)
+            .filter(|(name, _)| *name == "body.mood")
+            .map(|(_, args)| args)
+            .collect()
+    };
+    assert!(
+        poses(&search)
+            .iter()
+            .all(|args| args["until_spoken"] == true)
+    );
+    let point = load(&skill_with(
+        dir.path(),
+        "point",
+        &SEARCH.replace(
+            "[search]\nlooks = 3\ngive_up = \"Say kindly you can't see it from here.\"\n",
+            "",
+        ),
+    ))
+    .unwrap();
+    assert!(
+        poses(&point)
+            .iter()
+            .all(|args| args.get("until_spoken").is_none())
+    );
+    assert_eq!(point.search_look(&left, 9).unwrap(), left);
+    for (number, (from, to, why)) in [
+        ("tool = \"look_for\"", "tool = \"look_for\"\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n[ask]\npolicy = \"hello\"", "started by its tool alone"),
+        ("look = true\n", "", "with look = true"),
+        ("default = \"desk\"\n", "", "with a default"),
+        ("looks = 3", "looks = 0", "1 to 8"),
+        ("looks = 3", "looks = 9", "1 to 8"),
+        ("give_up = \"Say kindly you can't see it from here.\"", "give_up = \" \"", "at most 256 bytes"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let toml = SEARCH.replace(from, to);
+        assert_ne!(toml, SEARCH, "{from}");
+        let error = load(&skill_with(dir.path(), &format!("bad{number}"), &toml)).unwrap_err();
+        assert!(error.contains(why), "{to}: {error}");
+    }
+}
+
+/// #1685: a look made late in a search holds its pose past the run's own
+/// end; someone speaking then still lets it go within a fifth of a second,
+/// by the pose's own look at the voice.
+#[test]
+fn a_searchs_pose_held_past_its_run_still_ends_when_someone_speaks() {
+    a_searchs_pose_held_past_its_run_ends(false);
+}
+
+/// The same with the lamp paused (the peer read on #1766).
+#[test]
+fn a_searchs_pose_held_past_its_run_still_ends_when_the_lamp_is_paused() {
+    a_searchs_pose_held_past_its_run_ends(true);
+}
+
+fn a_searchs_pose_held_past_its_run_ends(paused: bool) {
+    let mut program = ToolProgram::with("look", SEARCH, &[]);
+    let right = r#"{"level":0,"mood":"reading","toward":0.5}"#;
+    assert_eq!(program.call("look_for", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    let _desk = program.poses(Duration::from_secs(8));
+    assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
+    // The run's ten seconds end: its light given back, the right still held.
+    let held = program.poses(Duration::from_secs(3));
+    assert_eq!(program.colours(1), ["blue"]);
+    assert!(
+        held.iter().filter(|pose| *pose == right).count() >= 2,
+        "{held:?}"
+    );
+    if paused {
+        let bus = Bus::new(program._dir.path().join("bus")).unwrap();
+        bus.publisher_declared(
+            lamp_msgs::Pause::TOPIC,
+            &lamp_msgs::Pause::declaration(),
+            "voice",
+        )
+        .unwrap()
+        .publish_json(1, &lamp_msgs::Pause { paused: true })
+        .unwrap();
+    } else {
+        program
+            .voice
+            .publish_json(
+                1,
+                &VoiceState {
+                    state: lamp_msgs::Voice::Listening,
+                },
+            )
+            .unwrap();
+    }
+    program.clock.skip(Duration::from_millis(300));
+    let _before = program.said();
+    assert_eq!(program.poses(Duration::from_secs(3)), Vec::<String>::new());
 }
 
 /// The first tier of #1684's design as a trigger: PM2.5 up at least 100
