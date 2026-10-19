@@ -192,9 +192,17 @@ pub(crate) fn audio_of(data: &str) -> Result<Vec<u8>> {
                 continue;
             };
             let mime = inline["mimeType"].as_str().unwrap_or("");
-            // No type said is taken as the documented 24 kHz PCM.
-            let pcm_24k = mime.starts_with("audio/L16") && mime.contains("rate=24000");
+            // No type said is taken as the documented 24 kHz PCM. A type is
+            // read without case: through the relay it is `audio/l16;
+            // rate=24000; channels=1`, refused until 19 Oct 16:09 on
+            // lamp-4ace, so most answers fell back to ElevenLabs (#1712).
+            let lower = mime.to_ascii_lowercase();
+            let pcm_24k = lower.starts_with("audio/l16") && lower.contains("rate=24000");
             if !(mime.is_empty() || pcm_24k) {
+                eprintln!(
+                    "lamp-voice second: Gemini's speech came as {:?}, not 24 kHz 16-bit PCM",
+                    mime.chars().take(80).collect::<String>()
+                );
                 return Err(Error::Protocol("speech audio format"));
             }
             let data = inline["data"]
@@ -286,6 +294,29 @@ mod tests {
             {"inlineData": {"mimeType": "audio/L16;codec=pcm;rate=24000", "data": STANDARD.encode(bytes)}}
         ]}}]})
         .to_string()
+    }
+
+    /// #1712: the relay's type, in lowercase with its channels, is the
+    /// 24 kHz PCM it says; another rate is still refused.
+    #[test]
+    fn the_relays_lowercase_type_is_taken() {
+        let part = |mime: &str| {
+            json!({"candidates": [{"content": {"parts": [
+                {"inlineData": {"mimeType": mime, "data": STANDARD.encode([1u8, 0, 254, 255])}}
+            ]}}]})
+            .to_string()
+        };
+        for mime in [
+            "audio/l16; rate=24000; channels=1",
+            "audio/L16;codec=pcm;rate=24000",
+            "AUDIO/L16; RATE=24000",
+        ] {
+            assert_eq!(audio_of(&part(mime)).unwrap(), [1, 0, 254, 255], "{mime}");
+        }
+        assert_eq!(
+            audio_of(&part("audio/l16; rate=16000; channels=1")).unwrap_err(),
+            Error::Protocol("speech audio format")
+        );
     }
 
     #[test]

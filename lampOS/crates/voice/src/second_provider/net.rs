@@ -12,6 +12,7 @@ pub mod search;
 mod sentences;
 mod stt;
 mod tts;
+pub mod weather;
 
 pub use chat::{Chat, ChatEvent, ChatStream, Declare, GEMINI_REASONING, Message, ToolCall};
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
@@ -124,8 +125,21 @@ async fn post(
 /// A JSON `GET` with the key in `authorization` (a service's model list),
 /// bounded as a request and at 1 MiB.
 pub async fn get_json(url: &str, authorization: &str) -> Result<serde_json::Value> {
+    fetch_json(url, Some(authorization)).await
+}
+
+/// A JSON `GET` of a service that takes no key (Open-Meteo), bounded as
+/// [`get_json`] is.
+pub(crate) async fn get_public_json(url: &str) -> Result<serde_json::Value> {
+    fetch_json(url, None).await
+}
+
+async fn fetch_json(url: &str, authorization: Option<&str>) -> Result<serde_json::Value> {
     let client = http_client()?;
-    let request = client.get(url).header("authorization", authorization);
+    let mut request = client.get(url);
+    if let Some(authorization) = authorization {
+        request = request.header("authorization", authorization);
+    }
     let mut response = tokio::time::timeout(CONNECT + STALL, request.send())
         .await
         .map_err(|_| Error::Timeout("request"))?

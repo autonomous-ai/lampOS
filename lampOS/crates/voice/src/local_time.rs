@@ -452,6 +452,12 @@ pub fn place_told(place: Option<&str>) -> Option<String> {
     })
 }
 
+/// The place the lamp's own zone names ("Ho Chi Minh"), or `None` when it
+/// names none ([`own_place`]).
+pub fn zone_place_here() -> Option<String> {
+    zone_here().as_deref().and_then(own_place)
+}
+
 /// The month and year where the lamp stands ("October 2026"), for a search
 /// of what is new (#1712); `None` when the clock is not set or not known.
 pub fn month_and_year_here() -> Option<String> {

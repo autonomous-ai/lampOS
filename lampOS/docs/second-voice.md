@@ -1054,6 +1054,22 @@ the model's first round does, which took 0.74 to 0.92 s to its first
 event on lamp-4ace on 19 Oct; the search test's first audio was 2.6 to
 4.4 s.
 
+**The weather, asked ahead** (`LAMP_SECOND_WEATHER=on`, off unless set;
+the first builder on #1712, 15:18). The lamp's place (`LAMP_PLACE`, or else
+the place its zone names) is looked up once by its first part at
+Open-Meteo's geocoding (`geocoding-api.open-meteo.com`), then the weather
+now, today and tomorrow is asked of `api.open-meteo.com` every 15 minutes,
+with no key (`net::weather`). While it is under an hour old the model is
+told it beside the time: "The weather where you are, as of N minutes ago:
+In Hanoi now: 31°C, partly cloudy, feels like 36°C, humidity 70%. Today
+26 to 33°C, … Use it when someone asks about the weather here; never bring
+it up unasked." So "what's the weather" needs no search. Only the place's
+name and its coordinates leave the lamp. The journal: `the weather in
+Hanoi, Vietnam is asked of Open-Meteo every 15 minutes`, `the weather in
+… came in N ms` on the first and after a failure, and a failure once until
+the next success. It reaches the second route's worker alone
+(`process.rs`).
+
 **A dated search.** The search function's description (`net::search::DESCRIPTION`)
 asks for the month and year the model was told in a query for news,
 results and prices: on lamp-4ace on 19 Oct "Who won the last Formula One
