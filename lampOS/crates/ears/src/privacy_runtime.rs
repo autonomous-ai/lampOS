@@ -10,7 +10,9 @@ use lamp_ears::{
     BLOCK, RATE, Settings,
     privacy::{Capture, CaptureOwner, Emission, LeaseGate, PublicationGate},
 };
-use lamp_msgs::{Diagnostic, Level, MicrophonePrivacy, RoomSound, SuddenSound, Voice, VoiceState};
+use lamp_msgs::{
+    Audio, Diagnostic, Level, MicrophonePrivacy, RoomSound, SuddenSound, Voice, VoiceState,
+};
 use std::{
     io,
     sync::{
@@ -104,11 +106,28 @@ enum Output {
     },
 }
 
-#[derive(Default)]
 struct Shared {
+    export: bool,
+    pcm: lamp_ears::pcm::SharedMailbox,
     publication: PublicationGate,
     speaking: AtomicBool,
     stop: AtomicBool,
+}
+
+impl Shared {
+    fn new(export: bool) -> Self {
+        Self {
+            export,
+            pcm: lamp_ears::pcm::SharedMailbox::new(export),
+            publication: PublicationGate::default(),
+            speaking: AtomicBool::new(false),
+            stop: AtomicBool::new(false),
+        }
+    }
+    fn revoke(&self) {
+        self.publication.fence();
+        self.pcm.invalidate();
+    }
 }
 
 fn unix_ms() -> u64 {
@@ -140,7 +159,7 @@ fn input(
     );
     if before != after {
         gate.close();
-        shared.publication.fence();
+        shared.revoke();
     }
     if subscriber
         .notices()
@@ -148,7 +167,7 @@ fn input(
         .any(|notice| matches!(notice, Notice::SourceGone | Notice::Late))
     {
         gate.close();
-        shared.publication.fence();
+        shared.revoke();
     }
     let Some(message) = message else {
         return Ok(false);
@@ -158,7 +177,7 @@ fn input(
         .observe(&message, lamp_ipc::monotonic_us(), unix_ms())
         .is_ok();
     if !valid || previous != gate.epoch() || message.publisher_restarted {
-        shared.publication.fence();
+        shared.revoke();
     }
     if !valid {
         return Ok(true);
@@ -168,7 +187,7 @@ fn input(
         Ok(()) => {}
         Err(TrySendError::Full(_)) => {
             gate.close();
-            shared.publication.fence();
+            shared.revoke();
         }
         Err(TrySendError::Disconnected(_)) => return Err(io::Error::other("capture owner ended")),
     }
@@ -192,21 +211,95 @@ fn connected(
     let mut sudden =
         bus.publisher_declared(SuddenSound::TOPIC, &SuddenSound::declaration(), NAME)?;
     let mut health = bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), NAME)?;
+    let mut audio = None;
+    let mut audio_retry = lamp_ears::pcm::ExportRetry::default();
     let mut looked = 0;
     loop {
         if shared.stop.load(Ordering::Acquire) {
             return Ok(());
         }
-        let mut drained = false;
-        for _ in 0..BATCH {
-            if !input(&mut privacy, gate, sender, shared)? {
-                drained = true;
-                break;
-            }
-        }
+        let drained = lamp_ears::pcm::drain_privacy(|| input(&mut privacy, gate, sender, shared))?;
         if !drained {
             gate.close();
-            shared.publication.fence();
+            shared.revoke();
+        }
+        // Optional export faults must not tear down healthy metadata/capture.
+        // Filesystem work precedes PCM access, followed by another bounded
+        // privacy drain: a mute queued during slow preparation wins.
+        if shared.export && drained && audio_retry.ready(lamp_ipc::monotonic_us()) {
+            let prepared = (|| {
+                if audio.is_none() {
+                    shared.pcm.invalidate(); // No replay across publisher recovery.
+                    audio = Some(lamp_ears::pcm::audio_publisher(bus, NAME)?);
+                }
+                audio.as_mut().expect("created").prepare_guarded_event()
+            })();
+            let publication = match prepared {
+                Err(error) => Err(error),
+                Ok(()) => {
+                    let drained = lamp_ears::pcm::drain_privacy(|| {
+                        input(&mut privacy, gate, sender, shared)
+                    })?;
+                    if !drained {
+                        gate.close();
+                        shared.revoke();
+                        Ok(())
+                    } else {
+                        (|| {
+                            if let Some(pcm) = shared
+                                .pcm
+                                .take(&shared.publication, lamp_ipc::monotonic_us())
+                            {
+                                let at_us = pcm.captured_at_us();
+                                if let Some(packet) =
+                                    pcm.pack(&shared.publication, lamp_ipc::monotonic_us())?
+                                    && let Some(bytes) = packet.bytes_if_allowed(
+                                        &shared.publication,
+                                        lamp_ipc::monotonic_us(),
+                                    )
+                                {
+                                    match audio.as_mut().expect("prepared").publish_bytes_guarded(
+                                        at_us,
+                                        Audio::ENCODING,
+                                        bytes,
+                                        || {
+                                            packet.allows(
+                                                &shared.publication,
+                                                lamp_ipc::monotonic_us(),
+                                            )
+                                        },
+                                    ) {
+                                        Ok(_) => {}
+                                        // Never retry a possibly partially delivered block.
+                                        Err(error)
+                                            if error.kind() == io::ErrorKind::PermissionDenied => {}
+                                        Err(error) => return Err(error),
+                                    }
+                                }
+                            }
+                            Ok(())
+                        })()
+                    }
+                }
+            };
+            match publication {
+                Ok(()) => {
+                    if audio_retry.recovered() {
+                        log("optional mic1 audio export recovered");
+                    }
+                }
+                Err(_) => {
+                    audio = None;
+                    shared.pcm.invalidate();
+                    if audio_retry.failed(lamp_ipc::monotonic_us()) {
+                        log(
+                            "optional mic1 audio export unavailable; metadata continues; retry in 2 s",
+                        );
+                    }
+                }
+            }
+        } else if shared.export {
+            shared.pcm.invalidate();
         }
         // Only bounded metadata is queued, never PCM. A blocked publication
         // stops lease delivery; the independent owner then closes on expiry.
@@ -286,9 +379,9 @@ fn pump(
     let mut gate = LeaseGate::new(clock_id.clone());
     while !shared.stop.load(Ordering::Acquire) {
         gate.close();
-        shared.publication.fence();
+        shared.revoke();
         let _ = connected(&bus, &clock_id, &mut gate, &sender, &output, &shared);
-        shared.publication.fence();
+        shared.revoke();
         shared.speaking.store(false, Ordering::Release);
         if !shared.stop.load(Ordering::Acquire) {
             thread::park_timeout(Duration::from_millis(250));
@@ -314,7 +407,20 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
             ..Settings::default()
         },
     );
-    let shared = Arc::new(Shared::default());
+    let export = lamp_ears::pcm::export_enabled(
+        std::env::var("LAMP_BUS_AUDIO").ok().as_deref(),
+        std::env::var("LAMP_PRIVACY_CONTROLS").ok().as_deref(),
+    )?;
+    let shared = Arc::new(Shared::new(export));
+    let revoke_before_close = shared.clone();
+    owner.before_close(move || {
+        // This also covers discard performed inside read/observe failures:
+        // the pump must lose authority before a driver can block teardown.
+        revoke_before_close
+            .publication
+            .update(None, revoke_before_close.publication.generation());
+        revoke_before_close.pcm.invalidate();
+    });
     let (send_input, input) = mpsc::sync_channel(CAPACITY);
     let (output, receive_output) = mpsc::sync_channel(CAPACITY);
     let pump_shared = shared.clone();
@@ -322,6 +428,11 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
         .name("ears-privacy-bus".into())
         .spawn(move || pump(bus, clock_id, send_input, receive_output, pump_shared))?;
     log("privacy controls on; microphone waits for Voice's fresh permission");
+    if export {
+        log(
+            "LAMP_BUS_AUDIO=on: raw mic1/audio export enabled under original privacy leases; bus recorders may retain PCM",
+        );
+    }
     let result = (|| {
         let mut seen_fence = shared.publication.generation();
         let mut failures = 0u64;
@@ -331,6 +442,7 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
             let fence = shared.publication.generation();
             if fence != seen_fence || fence == u64::MAX {
                 owner.invalidate()?;
+                shared.pcm.invalidate();
                 seen_fence = fence;
             }
             let mut drained = false;
@@ -345,10 +457,13 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
                         {
                             shared.publication.update(None, seen_fence);
                             owner.invalidate()?;
+                            shared.pcm.invalidate();
                         }
                     }
                     Ok(_) => {
+                        shared.publication.update(None, seen_fence);
                         owner.invalidate()?;
+                        shared.pcm.invalidate();
                     }
                     Err(TryRecvError::Empty) => {
                         drained = true;
@@ -360,16 +475,34 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
                 }
             }
             if !drained || seen_fence != shared.publication.generation() {
+                shared.publication.update(None, seen_fence);
                 owner.invalidate()?;
+                shared.pcm.invalidate();
             }
             let permit = owner.maintain(lamp_ipc::monotonic_us())?;
             shared.publication.update(permit, seen_fence);
+            shared
+                .pcm
+                .discard_invalid(&shared.publication, lamp_ipc::monotonic_us());
             if lamp_ipc::monotonic_us() >= retry_at {
-                match owner.tick_while(
+                match owner.tick_export_while(
                     lamp_ipc::monotonic_us,
                     || Device::open(&arguments.device),
                     shared.speaking.load(Ordering::Acquire),
                     || seen_fence == shared.publication.generation(),
+                    |samples, permit, sequence, captured_at_us| {
+                        shared.pcm.offer(
+                            samples,
+                            &shared.publication,
+                            lamp_ears::pcm::CaptureStamp {
+                                permit,
+                                fence: seen_fence,
+                                sequence,
+                                captured_at_us,
+                            },
+                            lamp_ipc::monotonic_us(),
+                        );
+                    },
                 ) {
                     Ok(Some(emission)) => {
                         let permit = owner.maintain(lamp_ipc::monotonic_us())?;
@@ -390,8 +523,9 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
                     Err(_) => {
                         failures = failures.saturating_add(1);
                         retry_at = lamp_ipc::monotonic_us().saturating_add(RETRY_US);
-                        owner.invalidate()?;
                         shared.publication.update(None, seen_fence);
+                        owner.invalidate()?;
+                        shared.pcm.invalidate();
                     }
                 }
             }
@@ -406,7 +540,7 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
             thread::park_timeout(TICK);
         }
     })();
-    shared.publication.fence();
+    shared.revoke();
     let close = owner.invalidate();
     shared.stop.store(true, Ordering::Release);
     worker.thread().unpark();
