@@ -696,7 +696,7 @@ this room" until someone asks to be recognised.
   removed when nobody is near.
 - **Their face.** With `LAMP_EYES_SPEAKING=on` and `LAMP_BUS=on` too,
   `known-face` beside the known file (mode 0600) holds the passing id
-  their face has on `humans/faces/tracked` (`f3`), written just before the
+  their face has on `humans/faces/tracked` (`f3`), written just after the
   name and removed with it (`who::keep_known`). Only that id: no picture,
   print or name. It is what lets the voice tell whether the face seen
   speaking is the known person's ([memory.md](memory.md#how-the-voice-uses-it)).

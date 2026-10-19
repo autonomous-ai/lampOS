@@ -2243,23 +2243,28 @@ fn to_the_end(said_ago: Option<Duration>, ended_ago: Option<Duration>) -> Option
 }
 
 /// `signs` as the turn is judged with them: in a busy room a conversation
-/// goes on only [`BUSY_GOING_ON_FOR`] from the end of the lamp's last words
-/// (`said_ago`)
-/// or [`CALL_CARRIES_FOR`] from the person's call (`called_ago`). When none
-/// is going on, the journal says why, without words (#1712, the first
-/// builder at 16:16: which of these had held the owner's lines was not
-/// told).
+/// goes on only by the thread's window or the person's call
+/// (`thread_or_call`), and then only [`BUSY_GOING_ON_FOR`] from the end of
+/// the lamp's last words (`said_ago`) or [`CALL_CARRIES_FOR`] from the
+/// call (`called_ago`). The quiet room's [`AFTER_THE_LAMPS_WORDS`]
+/// ([`going_on_from`]) never counts there: after an answer of 30 s or more
+/// it let office talk out in the 15 s after the words (the first builder's
+/// agent on #2032, 03:09). When none is going on, the journal says why,
+/// without words (#1712, the first builder at 16:16: which of these had
+/// held the owner's lines was not told).
 fn went_on_told(
     request: u64,
     mut signs: Signs,
     said_ago: Option<Duration>,
     called_ago: Option<Duration>,
     left_alone: Option<usize>,
+    thread_or_call: bool,
 ) -> Signs {
     let busy = signs.room == crate::room_told::Room::Busy;
     if busy {
-        signs.going_on &= said_ago.is_some_and(|ago| ago <= BUSY_GOING_ON_FOR)
-            || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR);
+        signs.going_on &= thread_or_call
+            && (said_ago.is_some_and(|ago| ago <= BUSY_GOING_ON_FOR)
+                || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR));
     }
     if !signs.going_on {
         let ago = |ago: Option<Duration>, what: &str| {
@@ -2282,6 +2287,32 @@ fn went_on_told(
         );
     }
     signs
+}
+
+/// How long after the end of the lamp's own words a line is in a
+/// conversation going on, whenever its answer began: as long as one may
+/// follow on from them ([`crate::follows_on::WITHIN_US`]).
+pub(crate) const AFTER_THE_LAMPS_WORDS: Duration =
+    Duration::from_micros(crate::follows_on::WITHIN_US);
+
+/// Whether a conversation with the lamp is going on: the thread's, 45 s from
+/// an answer's start ([`crate::thread::GOING_ON_FOR`]); or within
+/// [`AFTER_THE_LAMPS_WORDS`] of the end of the lamp's words (`said_ago`); or
+/// [`CALL_CARRIES_FOR`] from the person's call (`called_ago`). A story told
+/// for 40 s or more outlives the thread's window while it is told: on
+/// lamp-4ace on 20 Oct at 01:47 and 01:49, two hand-overs said as stories
+/// ended ("Hey Lamp, ask Claude Code to write a two-line poem…", "… ask
+/// Codex to write a haiku…") lost "Hey Lamp" to the lamp's own voice and
+/// were held as no conversation, "it was last heard saying words, to their
+/// end, 0 s ago" (the first builder at 01:50 and 02:04 on #1712).
+fn going_on_from(
+    said_going_on: bool,
+    said_ago: Option<Duration>,
+    called_ago: Option<Duration>,
+) -> bool {
+    said_going_on
+        || said_ago.is_some_and(|ago| ago <= AFTER_THE_LAMPS_WORDS)
+        || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR)
 }
 
 /// How long a call let out carries the person's next lines when the lamp
@@ -2605,12 +2636,15 @@ impl Heeding {
         // before the lamp's answers were said, and were held as no
         // conversation).
         let called_ago = self.called_at.map(|at| now.saturating_duration_since(at));
-        let going_on = said_going_on || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR);
         // From the end of what the lamp said, not from when its answer began,
         // which the thread keeps (#1712, the first builder at 19:21: "And what
         // about tomorrow?" 18 s after the weather line, a long answer, was
         // held in a busy room).
         let said_ago = to_the_end(said_ago, self.said_ended_ago(monotonic_us()));
+        let going_on = going_on_from(said_going_on, said_ago, called_ago);
+        // What a busy room goes on by: the thread's window or the call,
+        // never the quiet room's 20 s after the words (`went_on_told`).
+        let thread_or_call = said_going_on || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR);
         let mut left_alone = None;
         let mut signs = Signs {
             room: crate::room_told::Room::Unknown,
@@ -2639,7 +2673,16 @@ impl Heeding {
             left_alone = Some(room.left_alone_since_spoke());
             signs.going_on &= !room.talked_past_the_lamp();
         }
-        let ended = |signs: Signs| went_on_told(request, signs, said_ago, called_ago, left_alone);
+        let ended = |signs: Signs| {
+            went_on_told(
+                request,
+                signs,
+                said_ago,
+                called_ago,
+                left_alone,
+                thread_or_call,
+            )
+        };
         let Some((bus, names)) = &mut self.bus else {
             return ended(signs);
         };
@@ -3512,11 +3555,28 @@ mod tests {
             near: false,
             continues_from: None,
         };
-        assert!(went_on_told(5, busy(), said_ago, None, None).going_on);
-        assert!(!went_on_told(5, busy(), Some(s(18)), None, None).going_on);
+        assert!(went_on_told(5, busy(), said_ago, None, None, true).going_on);
+        assert!(!went_on_told(5, busy(), Some(s(18)), None, None, true).going_on);
         // No words in the thread: none, whatever was played.
         assert_eq!(to_the_end(None, Some(s(1))), None);
         assert_eq!(to_the_end(Some(s(30)), None), Some(s(30)));
+    }
+
+    /// #1712 (the first builder at 01:50 and 02:04): a line said as a long
+    /// story ends is in a conversation going on, though the thread's 45 s
+    /// from the story's start have passed; 20 s after the lamp's words it
+    /// isn't; a call carries as before.
+    #[test]
+    fn a_line_just_after_a_long_answer_is_in_a_conversation_going_on() {
+        let s = Duration::from_secs;
+        // The thread's window passed, the lamp's words ended just now.
+        assert!(super::going_on_from(false, Some(s(0)), None));
+        assert!(super::going_on_from(false, Some(s(20)), None));
+        assert!(!super::going_on_from(false, Some(s(21)), None));
+        // No words in the thread, no call: none.
+        assert!(!super::going_on_from(false, None, None));
+        assert!(super::going_on_from(false, None, Some(s(10))));
+        assert!(super::going_on_from(true, Some(s(44)), None));
     }
 
     /// #1712, the first builder at 18:57: in a busy room a conversation goes
@@ -3535,7 +3595,7 @@ mod tests {
         };
         let s = Duration::from_secs;
         let went = |room, said: u64, called: Option<u64>| {
-            super::went_on_told(1, signs(room), Some(s(said)), called.map(s), None).going_on
+            super::went_on_told(1, signs(room), Some(s(said)), called.map(s), None, true).going_on
         };
         assert!(went(Room::Busy, 10, None));
         assert!(!went(Room::Busy, 20, None));
@@ -3546,6 +3606,14 @@ mod tests {
         );
         assert!(went(Room::Quiet, 30, None));
         assert!(went(Room::Unknown, 44, None));
+        // The first builder's agent on #2032 (03:09): after a 40 s answer
+        // the thread's window has passed, and 10 s after the words the
+        // quiet room's 20 s count; a busy room's don't.
+        let after_words =
+            |room| super::went_on_told(1, signs(room), Some(s(10)), None, None, false).going_on;
+        assert!(!after_words(Room::Busy));
+        assert!(after_words(Room::Quiet));
+        assert!(after_words(Room::Unknown));
     }
 
     /// #1712, the first builder at 17:49: the journal names the sign that

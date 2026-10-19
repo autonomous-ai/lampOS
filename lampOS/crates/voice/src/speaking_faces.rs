@@ -29,6 +29,10 @@ pub const KEPT: Duration = Duration::from_secs(30);
 const MOST_LOOKS: usize = 600;
 /// Fewer looks than this over a line is too little to say who spoke it.
 pub const FEWEST_LOOKS: usize = 3;
+/// About how often the eyes publish their faces (every 250 to 600 ms): with
+/// nothing fresh from them, one empty look is counted this often, as one of
+/// theirs would be.
+pub const EYES_EVERY: Duration = Duration::from_millis(500);
 
 pub fn from_environment() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
@@ -44,19 +48,54 @@ struct Look {
     speaking: Vec<String>,
 }
 
+#[derive(Default)]
+struct Looks {
+    kept: VecDeque<Look>,
+    /// The last frame counted, by its publisher's boot and sequence.
+    frame: Option<(String, u64)>,
+}
+
 /// The last [`KEPT`] of looks, fed by one reader and judged at each line's
-/// end.
+/// end. Each of the eyes' frames counts once, however often it is read (the
+/// reviewer on #2008), so a short line can't pass the bar on one frame.
 #[derive(Default)]
 pub struct SpeakingFaces {
-    looks: Mutex<VecDeque<Look>>,
+    looks: Mutex<Looks>,
 }
 
 impl SpeakingFaces {
-    /// One look at the eyes' `humans/faces/tracked`; `None` when they said
-    /// nothing fresh, which counts as no face speaking.
-    pub fn look(&self, at: Instant, faces: Option<&Faces>) {
-        let speaking = faces
-            .map(|faces| {
+    /// One read of the eyes' `humans/faces/tracked`: their frame, by its
+    /// publisher's boot and sequence, counted only if it is new; `None` when
+    /// they said nothing fresh, counted as no face speaking at most once each
+    /// [`EYES_EVERY`].
+    pub fn look(&self, at: Instant, frame: Option<((&str, u64), &Faces)>) {
+        let Ok(mut looks) = self.looks.lock() else {
+            return;
+        };
+        match frame {
+            Some(((boot, seq), _))
+                if looks
+                    .frame
+                    .as_ref()
+                    .is_some_and(|(last, at)| last == boot && *at == seq) =>
+            {
+                return;
+            }
+            Some(((boot, seq), _)) => looks.frame = Some((boot.to_owned(), seq)),
+            None => {
+                if looks.frame.is_none()
+                    && looks
+                        .kept
+                        .back()
+                        .is_some_and(|last| at.saturating_duration_since(last.at) < EYES_EVERY)
+                {
+                    return;
+                }
+                looks.frame = None;
+            }
+        }
+        let speaking = frame
+            .map(|(_, faces)| {
                 faces
                     .faces
                     .iter()
@@ -69,17 +108,15 @@ impl SpeakingFaces {
                     .collect()
             })
             .unwrap_or_default();
-        let Ok(mut looks) = self.looks.lock() else {
-            return;
-        };
-        while looks
+        let kept = &mut looks.kept;
+        while kept
             .front()
             .is_some_and(|look| at.saturating_duration_since(look.at) > KEPT)
-            || looks.len() >= MOST_LOOKS
+            || kept.len() >= MOST_LOOKS
         {
-            looks.pop_front();
+            kept.pop_front();
         }
-        looks.push_back(Look { at, speaking });
+        kept.push_back(Look { at, speaking });
     }
 
     /// The faces that read speaking in at least half of the looks from
@@ -89,6 +126,7 @@ impl SpeakingFaces {
             return Speakers::new();
         };
         let during: Vec<&Look> = looks
+            .kept
             .iter()
             .filter(|look| look.at >= from && look.at <= to)
             .collect();
@@ -136,13 +174,21 @@ pub fn read_from(eyes: std::sync::Arc<SpeakingFaces>, root: &Path) -> Option<Rea
         .spawn(move || {
             while !stopped.load(std::sync::atomic::Ordering::Acquire) {
                 std::thread::sleep(EVERY);
-                let faces = bus
+                let frame = bus
                     .latest(Faces::TOPIC)
                     .ok()
                     .flatten()
                     .filter(|message| !message.expired)
-                    .and_then(|message| message.parse::<Faces>().ok());
-                eyes.look(Instant::now(), faces.as_ref());
+                    .and_then(|message| {
+                        let faces = message.parse::<Faces>().ok()?;
+                        Some((message.header.boot, message.header.seq, faces))
+                    });
+                eyes.look(
+                    Instant::now(),
+                    frame
+                        .as_ref()
+                        .map(|(boot, seq, faces)| ((boot.as_str(), *seq), faces)),
+                );
             }
         })
         .ok()?;
@@ -232,7 +278,10 @@ mod tests {
         let eyes = SpeakingFaces::default();
         let from = Instant::now();
         for (index, look) in looks.iter().enumerate() {
-            eyes.look(from + EVERY * index as u32, Some(&faces(look)));
+            eyes.look(
+                from + EVERY * index as u32,
+                Some((("b", index as u64), &faces(look))),
+            );
         }
         (eyes, from, from + EVERY * looks.len() as u32)
     }
@@ -269,17 +318,48 @@ mod tests {
     fn only_the_lines_own_looks_count_and_old_ones_go() {
         let eyes = SpeakingFaces::default();
         let start = Instant::now();
+        let looked = |index: u32| start + EYES_EVERY * index;
         for index in 0..4u32 {
-            eyes.look(start + EVERY * index, Some(&faces(&[("f1", Yes)])));
+            eyes.look(
+                looked(index),
+                Some((("b", index.into()), &faces(&[("f1", Yes)]))),
+            );
         }
-        let line = start + EVERY * 10;
-        for index in 0..4u32 {
-            eyes.look(line + EVERY * index, None);
+        for index in 10..14u32 {
+            eyes.look(looked(index), None);
         }
-        assert!(eyes.speakers(line, line + EVERY * 4).is_empty());
-        assert_eq!(eyes.speakers(start, start + EVERY * 4), ["f1"]);
-        eyes.look(start + KEPT + EVERY * 5, None);
-        assert!(eyes.speakers(start, start + EVERY * 4).is_empty());
+        assert!(eyes.speakers(looked(10), looked(14)).is_empty());
+        assert_eq!(eyes.speakers(start, looked(4)), ["f1"]);
+        eyes.look(start + KEPT + EYES_EVERY * 5, None);
+        assert!(eyes.speakers(start, looked(4)).is_empty());
+    }
+
+    /// The reviewer on #2008: the eyes' one frame, read six times, is one
+    /// look, too few to say who spoke; their silence read every 100 ms is
+    /// one look each 500 ms. Three frames of the same face are enough.
+    #[test]
+    fn each_of_the_eyes_frames_counts_once() {
+        let eyes = SpeakingFaces::default();
+        let start = Instant::now();
+        let speaking = faces(&[("f2", Yes)]);
+        for read in 0..6u32 {
+            eyes.look(start + EVERY * read, Some((("b", 7), &speaking)));
+        }
+        assert!(eyes.speakers(start, start + EVERY * 6).is_empty());
+        let quiet = start + EVERY * 10;
+        for read in 0..10u32 {
+            eyes.look(quiet + EVERY * read, None);
+        }
+        assert!(eyes.speakers(quiet, quiet + EVERY * 4).is_empty());
+        assert!(eyes.speakers(quiet, quiet + EVERY * 9).is_empty());
+        let later = start + EVERY * 30;
+        for frame in 8..11u64 {
+            for read in 0..3u32 {
+                let at = later + EYES_EVERY * (frame - 8) as u32 + EVERY * read;
+                eyes.look(at, Some((("b", frame), &speaking)));
+            }
+        }
+        assert_eq!(eyes.speakers(later, later + EYES_EVERY * 3), ["f2"]);
     }
 
     /// The rows of the rule: the known face alone speaking keeps the line

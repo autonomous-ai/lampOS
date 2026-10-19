@@ -1,0 +1,9 @@
+# Laughter at 10 s, again at 14 s (the same burst) and at 60 s (inside the
+# five-minute cooldown): one glance, about 11 s.
+clock = "10:00"
+
+[[expect]]
+at = "11s"
+within = "1s"
+call = "body.gaze"
+args = { look_at = "face" }

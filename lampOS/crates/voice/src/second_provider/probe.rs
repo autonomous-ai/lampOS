@@ -1,4 +1,4 @@
-//! `lamp-voice probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG]`:
+//! `lamp-voice probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG | --wire]`:
 //! the second route's candidate services timed from where it runs, for the
 //! A/B against Gemini Live (the owner, 19 Oct). Each run asks every
 //! candidate in turn:
@@ -31,10 +31,14 @@
 //! first event (text or a call), to the first clause or sentence the route
 //! would say, and to the end; for speech, to the first audio and to the end,
 //! with the audio's length. Then the median and the 90th percentile of each.
+//!
+//! With `--wire`, only where a chat request's time goes between the lamp
+//! and DeepSeek, through the relay and on its own API ([`wire`]).
 use super::net::{self, Chat, ChatEvent, GeminiTts, Message, Sentences, Tts, search::Search};
 
 pub mod cache;
 pub mod tools;
+pub mod wire;
 use crate::second_config::{
     CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, DEEPSEEK_TEXT_ONLY, OPENROUTER_CREDENTIAL,
     OPENROUTER_MODEL, OPENROUTER_SECOND_MODEL, least_effort, unit_credential,
