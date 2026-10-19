@@ -4,6 +4,25 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 09:15 merged #1705 (third, #1666's doc P3s), ARM64 green
+- 09:07 merged #1688 (second, LAMP_HOLDING_ANSWER, off unless set), ARM64 green; three P3s
+- 09:01 merged #1701 (fourth, same-voice question rule with the late-print fix, off unless set), ARM64 green
+- 08:57 #1701 (fourth, #1636 folded with the late-print fix): no blocking finding, one doc P3; merge on green ARM64
+- 08:57 #1705 (third, #1666's doc P3s): no finding; merge on green ARM64
+- 08:45 #1702 (first builder, hardware role template, docs): P2, the template asks for each person's GitHub handle in the public repo; their own merge
+- 08:39 #1698 (first builder, core/installable skills, install as root): P2, an installable skill can take over a core skill's function by tool name; four P3s (incl. a link race in read_folder); the tar reader held against 9 hostile tars; their own merge
+- 08:31 #1667 re-reviewed at 5578a6e7e: the P2 fixed (reminders wait for the voice to rest; news counts from arrival); ready once folded; the first builder's merge
+- 08:29 merged #1696 (third, LAMP_USE_SKILL, off unless set), ARM64 green; five P3s for a follow-up, lamp step 1's expected journal line won't come
+- 08:18 merged #1692 (fourth, heard-as test takes its turn first), ARM64 green
+- 08:11 merged #1690 (tests, tasks harness tests take turns, #1569 row 18), ARM64 green
+- 08:09 #1692 (fourth, heard-as test takes its turn first): no finding; merge on green ARM64; #1691 the same fix
+- 08:08 #1695 (sixth, role file: shared access to lamp-52e6): no text finding; a role/scope change, so the first builder's merge
+- 07:52 #1686 (first builder, LAMP_VOICE_ROUTE=second, off unless set): three P3s (run_start says gemini on a second run); their own merge
+- 07:41 #1687 (first builder, the owner's 19 Oct scope decisions, docs): no finding; their own merge
+- 07:36 #1666 (third, a stale privacy reading at start is waited past): two doc P3s; the first builder's merge (privacy path)
+- 07:35 #1667 (first builder, skills in the product): P2, a reminder or news coming while the voice is busy past 20 s waits 10 s in silence and loses the skill's movement; two P3s; their own merge
+- 07:29 merged #1665 (fourth, LAMP_MISHEARD_HUM, off unless set), ARM64 green; #1659 closed
+- 07:15 #1665 (fourth, #1659 folded and rebased): no finding; merge on green ARM64
 - 07:10 merged #1664 (third, #1660's P3s: channel bounds pinned, late runs said), ARM64 green
 - 07:02 #1663 (tests, #1657 folded with the stamp cap on all three): no finding; the first builder's merge
 - 06:54 #1664 (third, #1660's P3s: bounds pinned, runs said): no finding; merge on green ARM64
