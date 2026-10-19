@@ -2567,7 +2567,7 @@ async fn done_though_held(
         if gone() {
             return None;
         }
-        let mut messages = (shared.system)().messages();
+        let mut messages = told(shared, scope).messages();
         if gone() {
             return None;
         }

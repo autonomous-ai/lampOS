@@ -913,6 +913,10 @@ exchanges for that person, the room's for a room request, never the sticky
 session owner's or those of whoever is in view when the chat begins. The Days
 note is asked for that scope and asked again when the scope differs from the
 previous turn's. A request revoked while its context was built is not asked.
+A held line's one round for `reports_stop` (with `LAMP_REPORTS=on`) is told
+for its admitted scope in the same way (`told`), never for the sticky session
+owner (Second's P2 on #1925). The unscoped builder is used only for a request
+with no lease, or with this switch off.
 The lamp's answer is kept under the same scope (`Thread::lamp_for`), and a
 written request's note is kept as the room's, as it is admitted. The context is
 still built on the turn's task, so a slow memory service delays that turn's

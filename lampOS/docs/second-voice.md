@@ -773,7 +773,10 @@ When the coordinator switches (below):
   (`attention::DONE_THOUGH_HELD`, today `reports_stop`), with a note that
   nothing said now is heard (`HELD_NOTE`), as the Live route's model hears
   every line and its `reports_stop` is done though held (the first builder
-  on #1722, 16:44). Only those calls are run, with no round after; any
+  on #1722, 16:44). With `LAMP_SECOND_SCOPED_CONTEXT=on` that round is
+  told for the line's admitted person or room alone, as every other turn
+  is, never for the session's sticky person
+  ([memory.md](memory.md#second-route-context-scope)). Only those calls are run, with no round after; any
   words are dropped and nothing is played. The turn ends when that round
   does, given up after `HELD_WITHIN` (6 s); a line begun meanwhile replaces
   it, and words carried from a line it cut short are answered beside it.
