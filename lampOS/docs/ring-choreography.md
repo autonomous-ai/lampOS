@@ -196,6 +196,51 @@ for frame beside it, and again only after 3 s without a face; with the eye off
 it changes nothing. Not yet seen on a lamp: it is for the owner's face and the
 iMac's camera on 16 Oct.
 
+### The lamp's one breath (#1670)
+
+The ring's resting breath and the head's (Expression's idle layer,
+[alive.md](alive.md)) are one breath: on the boot clock over 5.2 s, as
+always, and where Mood runs (`LAMP_MOOD=on`, [mood.md](mood.md)), at the
+phase Mood keeps in `mood/state`'s `breath`. There is no switch of the
+ring's own: without Mood, or with no fresh state, every frame is what it
+was. The ring worker reads `mood/state` four times a second
+(`crates/voice/src/ring_mood.rs`), Expression's service its own copy as
+often, and both take the phase through the one function
+(`lamp_msgs::MoodState::breath_in`): from `mood` only, checked, no older
+than its 2.5 s, moved on from its stamp to now at its pace. So the head and
+the ring breathe together at any pace, as [creature.md](creature.md) has it
+("mood shows only as pace and warmth"). Listening, thinking, speaking and
+muted keep their own faces.
+
+| Mood says | Pace | One breath | Blinks (with the eye) |
+|---|---:|---:|---:|
+| Calm (energy 0.30), awake 0.40 or more: the day and the evening | 1 | 5.2 s | every 7 to 16 s |
+| Energy up to 0.70 (a bang's) | up to 1.25 | down to 4.2 s | every 5.6 to 12.8 s |
+| Awake under 0.40, dozing | down to 0.7 at 0 | up to 7.4 s | up to every 10 to 23 s |
+| Asleep | 0.7 | 7.4 s | every 10 to 23 s |
+
+Energy and dozing add; the pace stays from 0.7 to 1.25 (`lamp_msgs::mood_pace`).
+Mood begins the breath where the plain one is and moves it on at the pace
+whenever its time does, so a change of pace changes the tempo from where the
+breath is: it never jumps. When Mood starts or stops, both the ring and the
+head go from one clock to the other at once (the head eases, as it always
+has at the hour's turn). A blink itself stays 150 ms. Expression's sleeping
+breath (9 s) is its own and keeps the boot clock, as before. These are
+authored starting values, small on purpose (CLAUDE.md rule 8), not fitted to
+a lamp.
+
+Tests: Mood's breath begins at the plain phase, goes on at the pace, keeps
+its place at a bang, and a reader moving the last state on lands where Mood
+does (`crates/mood/tests/engine.rs`); with no breath the face is as before,
+frame for frame; the ring breathes at the phase given, 11 to 12 breaths a
+minute at the plain pace, 14 to 15 at the quickest and 8 to 9 at the
+slowest; blinks follow the pace; the ring's reader takes the breath from
+Mood's fresh, valid state on a real bus and nothing else; Expression's head
+holds the phase it is given and goes back to the plain breath without a
+leap (`alive_engine.rs`); and the ring's and the head's breath are the same
+at every phase and with none (`crates/voice-eval/tests/one_breath.rs`). Not
+yet seen on a lamp.
+
 Which way the ring counts was measured on lamp-4ace on 2026-10-14 at 19:54:
 with the voice stopped, `crates/ring/examples/pixel_map.rs` lit pixel 0 red,
 1 and 2 orange and yellow, 8 green, 16 blue and 24 white, and a photograph

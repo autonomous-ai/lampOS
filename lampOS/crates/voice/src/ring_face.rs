@@ -252,6 +252,9 @@ pub struct Face {
     /// into its light as after a tap ([`SETTLE_EASE_US`] for
     /// [`SETTLE_US`]), waking rather than snapping on.
     woke_us: Option<u64>,
+    /// The lamp's one breath from its inner state, its phase and pace now
+    /// ([`Face::breath`]): none, and it breathes on the boot clock.
+    breath: Option<(f64, f32)>,
 }
 
 impl Default for Face {
@@ -285,6 +288,7 @@ impl Face {
             pattern: None,
             fade_us: None,
             woke_us: None,
+            breath: None,
         }
     }
 
@@ -327,6 +331,15 @@ impl Face {
         self.accent_at_us = at_us;
     }
 
+    /// The lamp's one breath, from its inner state (#1670,
+    /// [`crate::ring_mood`]): its phase now, from 0 to 1, and its pace; or
+    /// `None` for the plain breath on the boot clock, as before. The resting
+    /// breath takes its phase, so it breathes with the head; with the eye,
+    /// blinks come as much sooner or later as the pace says.
+    pub fn breath(&mut self, breath: Option<(f64, f32)>) {
+        self.breath = breath;
+    }
+
     /// Switch the eye on or off ([`Face::eye`]'s field says what it does).
     pub fn eye(&mut self, on: bool) {
         self.eye = on;
@@ -349,10 +362,12 @@ impl Face {
             self.next_blink_us = None;
             return 1.0;
         }
+        let pace = self.breath.map_or(1.0, |(_, pace)| pace);
         let spacing = |count: u64| {
             let spread = (count.wrapping_add(1).wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 40)
                 % BLINK_EVERY_US.1;
-            BLINK_EVERY_US.0 + spread
+            // At a pace, blinks come as much sooner or later.
+            ((BLINK_EVERY_US.0 + spread) as f32 / pace) as u64
         };
         let next = *self
             .next_blink_us
@@ -502,6 +517,9 @@ impl Face {
         });
         let open = open * blink * (1.0 - (1.0 - COUNTDOWN_LOW) * countdown);
         let seconds = (now_us % 3_600_000_000) as f32 / 1_000_000.0;
+        // The resting breath, from 0 to 1: the lamp's one breath where its
+        // inner state keeps it, else the plain one on the boot clock.
+        let breath = resting_breath(self.breath, now_us);
         // At rest on its own light: slowly into a light asked to fade in
         // (#1677), and back with a tap's settle once it is let go.
         let own = mood == Mood::Resting && !settling && since_let_go.is_none();
@@ -537,7 +555,9 @@ impl Face {
             };
             let wanted = match motion.filter(moves) {
                 Some(motion) => moving(self.lit, motion, pixel),
-                None => look(mood, self.level, seconds, angle, self.lit, ceiling, look_to),
+                None => look(
+                    mood, self.level, seconds, breath, angle, self.lit, ceiling, look_to,
+                ),
             };
             let scale = accent_t.map_or([1.0; 3], |t| accent_scale(self.accent, t, angle));
             for ((channel, target), scale) in shown.iter_mut().zip(wanted).zip(scale) {
@@ -558,6 +578,18 @@ impl Face {
             *out = Rgb::new(step(shown[0], 0), step(shown[1], 11), step(shown[2], 21));
         }
         frame
+    }
+}
+
+/// How far in the resting breath is at `now_us`, from 0 (out) to 1 (in):
+/// at the lamp's one breath's phase where Mood keeps it (#1670,
+/// [`Face::breath`]), else the boot clock's seconds within the hour over
+/// 5.2 s, as it always was. Expression's head takes the same
+/// (`lamp_expression::Breath::share_at`), so the two breathe as one.
+pub fn resting_breath(breath: Option<(f64, f32)>, now_us: u64) -> f32 {
+    match breath {
+        Some((phase, _)) => 0.5 - 0.5 * (TAU * phase as f32).cos(),
+        None => wave((now_us % 3_600_000_000) as f32 / 1_000_000.0, 5.2, 0.0, 0.0),
     }
 }
 
@@ -695,11 +727,14 @@ const PULSE_RISE: f32 = 1.35;
 
 /// The wanted colour of one pixel, each channel as a share of the ceiling.
 /// `look_to`: the eye's look, as the angle around the ring toward the
-/// person and how much the far side dims, from 0 to 1.
+/// person and how much the far side dims, from 0 to 1. `breath`: where the
+/// resting breath is, from 0 to 1 ([`Face::breath`]).
+#[allow(clippy::too_many_arguments)]
 fn look(
     mood: Mood,
     level: f32,
     seconds: f32,
+    breath: f32,
     angle: f32,
     lit: Lit,
     ceiling: u8,
@@ -712,7 +747,6 @@ fn look(
             // look the same. Its lowest level is low on purpose: on this
             // ring a few steps of 255 are already a clear glow, and V1
             // rested at one. A light that is off is an ember of the same.
-            let breath = wave(seconds, 5.2, 0.0, 0.0);
             let patch = wave(seconds, 23.0, 1.0, angle).powi(4);
             if lit.on {
                 let (glow, breathes) = LEVEL_GLOW[usize::from(lit.level.clamp(1, LEVELS)) - 1];
@@ -1781,5 +1815,134 @@ mod tests {
         assert!(right > 0.3 && up.abs() < 0.01);
         let [right, up] = toward(0.4, 0.0, 0.6, 0.2);
         assert!(right.abs() < 0.01 && up > 0.3);
+    }
+
+    /// #1670: with no breath from Mood the resting breath is the old code's,
+    /// `wave(seconds, 5.2, 0.0, 0.0)` on the boot clock's seconds within the
+    /// hour, at every moment of an hour and across its turn; and a face never
+    /// told is the face told `None`, frame for frame, at rest and with the
+    /// eye.
+    #[test]
+    fn with_no_breath_from_mood_the_face_is_as_before() {
+        for step in 0..200_000u64 {
+            let now_us = 3_500_000_000 + step * 1_013;
+            let old = {
+                let seconds = (now_us % 3_600_000_000) as f32 / 1_000_000.0;
+                0.5 - 0.5 * (TAU * seconds / 5.2).cos()
+            };
+            assert_eq!(resting_breath(None, now_us), old, "{now_us}");
+        }
+        let mut before = Face::new();
+        let mut now = Face::new();
+        for face in [&mut before, &mut now] {
+            face.light(Lit::of(true, "white", 3).unwrap());
+            face.eye(true);
+        }
+        for frame in 0..1_500u64 {
+            let at = 1_000 + frame * 20_000;
+            now.breath(None);
+            assert_eq!(
+                before.render(Mood::Resting, 0, at, 48),
+                now.render(Mood::Resting, 0, at, 48),
+                "{frame}"
+            );
+        }
+    }
+
+    /// Breaths in `frames` resting frames of a face given the lamp's one
+    /// breath at `pace` from phase 0 (none: no breath given), each a rise
+    /// through the middle of its light, counted once.
+    fn breaths(pace: Option<f32>, frames: u64) -> usize {
+        let mut face = Face::new();
+        face.light(Lit::of(true, "white", 3).unwrap());
+        let lights: Vec<u32> = (0..frames)
+            .map(|frame| {
+                let at = 1_000 + frame * 20_000;
+                face.breath(pace.map(|pace| {
+                    let turns = at as f64 / lamp_msgs::MOOD_BREATH_US as f64 * f64::from(pace);
+                    (turns.fract(), pace)
+                }));
+                brightness(&face.render(Mood::Resting, 0, at, 48))
+            })
+            .skip(50)
+            .collect();
+        let (low, high) = (*lights.iter().min().unwrap(), *lights.iter().max().unwrap());
+        let (under, over) = (low + (high - low) / 3, high - (high - low) / 3);
+        let mut below = false;
+        let mut rises = 0;
+        for light in lights {
+            if light <= under {
+                below = true;
+            } else if light >= over && below {
+                below = false;
+                rises += 1;
+            }
+        }
+        rises
+    }
+
+    /// #1670: at rest the ring breathes the lamp's one breath: about one in
+    /// 5.2 s at the plain pace, the same as with none given, about one in
+    /// 4.2 s at the quickest and one in 7.4 s at the slowest.
+    #[test]
+    fn at_rest_the_ring_breathes_the_lamps_one_breath() {
+        // A minute at fifty frames a second, after the first second.
+        let frames = 3_050;
+        let unset = breaths(None, frames);
+        assert!((11..=12).contains(&unset), "{unset}");
+        assert_eq!(breaths(Some(1.0), frames), unset);
+        let quick = breaths(Some(lamp_msgs::MOOD_PACE_QUICKEST), frames);
+        assert!((14..=15).contains(&quick), "{quick}");
+        let slow = breaths(Some(lamp_msgs::MOOD_PACE_SLOWEST), frames);
+        assert!((8..=9).contains(&slow), "{slow}");
+    }
+
+    /// #1670: the resting breath is where the given phase says: out at 0,
+    /// in at a half, whatever the clock.
+    #[test]
+    fn the_resting_breath_is_at_the_phase_it_is_given() {
+        let held = |phase: f64| {
+            let mut face = Face::new();
+            face.light(Lit::of(true, "white", 3).unwrap());
+            face.breath(Some((phase, 1.0)));
+            // Long enough to ease in; the clock goes on, the phase stays.
+            let frames = play(&mut face, Mood::Resting, 0, 1_000, 200);
+            brightness(frames.last().unwrap())
+        };
+        let (out, half_in, full_in) = (held(0.0), held(0.25), held(0.5));
+        assert!(
+            out < half_in && half_in < full_in,
+            "{out} {half_in} {full_in}"
+        );
+        assert_eq!(held(1.0 - 1e-9), out);
+    }
+
+    /// Blinks in a minute and a half at rest with the eye, at `pace`.
+    fn blinks(pace: f32) -> usize {
+        let mut face = Face::new();
+        face.light(Lit::of(true, "white", 3).unwrap());
+        face.eye(true);
+        face.breath(Some((0.0, pace)));
+        let lights: Vec<u32> = play(&mut face, Mood::Resting, 0, 1_000, 4_550)[50..]
+            .iter()
+            .map(brightness)
+            .collect();
+        let mut sorted = lights.clone();
+        sorted.sort_unstable();
+        let usual = sorted[sorted.len() / 2];
+        let dim: Vec<bool> = lights.iter().map(|light| *light * 10 < usual * 7).collect();
+        dim.windows(2).filter(|pair| !pair[0] && pair[1]).count()
+    }
+
+    /// #1670: the eye's blinks at rest come sooner at a quicker pace and
+    /// later at a slower one, and stay brief: a blink is not slowed.
+    #[test]
+    fn at_rest_the_eye_blinks_at_the_lamps_pace() {
+        let (slow, plain, quick) = (
+            blinks(lamp_msgs::MOOD_PACE_SLOWEST),
+            blinks(1.0),
+            blinks(lamp_msgs::MOOD_PACE_QUICKEST),
+        );
+        assert!(slow < plain && plain < quick, "{slow} {plain} {quick}");
     }
 }

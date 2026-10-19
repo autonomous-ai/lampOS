@@ -461,6 +461,28 @@ mod sleep_name {
         assert_eq!(got, value);
     }
 
+    /// #1670, through the service and its bus: with Mood's state saying the
+    /// lamp's one breath is fully in, the head holds at the top of a breath,
+    /// where the plain clock's breath goes on rising and falling.
+    #[test]
+    fn the_service_breathes_the_head_with_moods_breath_from_the_bus() {
+        let (mut plain, mut mood) = (SleepingService::new(), SleepingService::with_mood(0.5));
+        // In, past the layer's blend and the breath's catch-up.
+        for _ in 0..30 {
+            plain.step();
+            mood.step();
+        }
+        let (mut low, mut high) = (f64::MAX, f64::MIN);
+        for _ in 0..30 {
+            let held = mood.pitch();
+            assert!((held - -0.03).abs() < 1e-3, "{held}");
+            let pitch = plain.pitch();
+            low = low.min(pitch);
+            high = high.max(pitch);
+        }
+        assert!(high - low > 0.01, "{low} {high}");
+    }
+
     struct SleepingService {
         service: runtime::Service,
         voice: Publisher,
@@ -471,6 +493,9 @@ mod sleep_name {
         activity: Publisher,
         /// With `serve --head-touch`: the head's requests and `voice/privacy`.
         head: Option<(Publisher, Publisher)>,
+        /// With the lamp's one breath read (#1670): Mood's state, said each
+        /// step at this phase.
+        mood: Option<(Publisher, f32)>,
         now_us: u64,
         state: Voice,
         _root: Root,
@@ -487,6 +512,20 @@ mod sleep_name {
 
         /// As [`Self::with`], and with `serve --head-touch` when `head`.
         fn with_head(change: fn(runtime::Service) -> runtime::Service, head: bool) -> Self {
+            Self::build(change, head, None)
+        }
+
+        /// A service that reads the lamp's one breath, and Mood saying it at
+        /// `phase` each step (#1670).
+        fn with_mood(phase: f32) -> Self {
+            Self::build(|service| service, false, Some(phase))
+        }
+
+        fn build(
+            change: fn(runtime::Service) -> runtime::Service,
+            head: bool,
+            mood: Option<f32>,
+        ) -> Self {
             let root = Root::new();
             let bus = Bus::new(&root.0).unwrap();
             let mut catalogue =
@@ -503,6 +542,9 @@ mod sleep_name {
                 .with_local_time(offset);
             if head {
                 service = service.with_head_touch(&bus).unwrap();
+            }
+            if mood.is_some() {
+                service = service.with_mood_breath(&bus);
             }
             let service = change(service);
             bus.publisher_declared(Light::TOPICS[0], &Light::declaration(), "actions")
@@ -551,6 +593,17 @@ mod sleep_name {
                             "voice",
                         )
                         .unwrap(),
+                    )
+                }),
+                mood: mood.map(|phase| {
+                    (
+                        bus.publisher_declared(
+                            lamp_msgs::MoodState::TOPIC,
+                            &lamp_msgs::MoodState::declaration(),
+                            "mood",
+                        )
+                        .unwrap(),
+                        phase,
                     )
                 }),
                 now_us: START_US,
@@ -626,6 +679,28 @@ mod sleep_name {
             timing.state = self.state;
             // No envelope published below is older than this.
             let publishing = runtime::unix_ms();
+            if let Some((mood, phase)) = self.mood.as_mut() {
+                let state = lamp_msgs::MoodState {
+                    stamp: ClockStamp {
+                        clock_id: "test".into(),
+                        at_us: self.now_us,
+                        sequence: self.now_us,
+                    },
+                    session_id: "mood-session".into(),
+                    awake: 0.7,
+                    energy: 0.3,
+                    warmth: 0.6,
+                    asleep: false,
+                    attention: None,
+                    familiarity: lamp_msgs::Familiarity::Unknown,
+                    familiar: None,
+                    breath: Some(lamp_msgs::MoodBreath {
+                        phase: *phase,
+                        pace: 1.0,
+                    }),
+                };
+                mood.publish_json(987_654_321, &state).unwrap();
+            }
             // Loosest limit first, strictest last (#912): the room (2 s),
             // the voice and the faces (500 ms), the joints (300 ms).
             self.room
@@ -669,6 +744,11 @@ mod sleep_name {
             assert_eq!(self.service.counts.refused, 0);
             assert_eq!(self.service.counts.input_errors, 0);
             output
+        }
+
+        /// The head's pitch the service asks for at the next step.
+        fn pitch(&mut self) -> f64 {
+            self.step().body.map_or(0.0, |body| body.offsets.head_pitch)
         }
 
         fn sleep(&mut self) {

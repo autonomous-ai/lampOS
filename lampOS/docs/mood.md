@@ -2,9 +2,14 @@
 
 `lamp-mood` (`crates/mood`) is the small, deterministic inner state described
 in [Creature](creature.md), task 35 / [#713](https://github.com/autonomous-ai/lampOS/issues/713).
-It publishes metadata for future consumers. It does not command the body,
+It publishes metadata for its readers. It does not command the body,
 ring, working light or speakers, change a microphone's state, or select a
-voice reply. Existing actuator and Voice consumers are unchanged.
+voice reply. Its first readers are the lamp's one breath, the ring's at
+rest and the head's in Expression's idle layer, which take its phase while
+Mood runs (#1670,
+[ring-choreography.md](ring-choreography.md#the-lamps-one-breath-1670)); they
+shape only the resting face and the idle head, and never decide whether the
+ring may show anything or the body may move.
 
 The component is off unless explicitly enabled. There is no model, transcript
 classification, word storage, face history, familiarity learning (the eyes keep how often a
@@ -122,10 +127,21 @@ actuator owner still checks privacy, freshness, cancellation and safety.
 `mood`, with a one-second promised period and a 2.5-second lifespan. It carries
 `stamp` (clock identity, monotonic microseconds and positive sequence), the
 publisher's `session_id`, `awake`, `energy`, `warmth`, `asleep`, optional
-`attention`, `familiarity: unknown`, and optional `familiar` (#1670): the level
+`attention`, `familiarity: unknown`, optional `familiar` (#1670): the level
 (`new`, `regular`, `close`) of the remembered person the eyes recognise at the
 lamp, from `humans/familiar`, held only for that message's five-second lease and
-dropped when the eyes say nobody remembered. No name. Face attention carries only the
+dropped when the eyes say nobody remembered (no name), and optional `breath` (#1670): the lamp's
+one breath, its `phase` from 0 to 1 at the stamp and its `pace` from 0.7 to
+1.25 (`lamp_msgs::mood_pace` of awake, energy and asleep). Mood begins it at
+the plain breath's phase on the boot clock (5.2 s, `MOOD_BREATH_US`) and
+moves it on at the pace whenever its time moves, so it never jumps; a reader
+moves it on from the stamp to its own now at that pace
+(`MoodState::breath_at`, `breath_in`). When Mood stops, or its state goes
+past its 2.5 s, both readers go back to the plain breath together, so they
+stay in step, but the breath moves once from Mood's phase to the plain one:
+the ring eases there in about a fifth of a second (its 70 ms ease), and the
+head at no more than twice its breath's speed. Starting never jumps: Mood
+begins its phase where the plain breath is. Face attention carries only the
 publisher's 16-character lowercase-hex boot token and a passing ID bounded
 to 128 bytes; sound and touch add no invented geometry.
 
@@ -134,7 +150,9 @@ receipt. A future consumer must check the payload clock, session, sequence
 and age as well as the topic's lifespan, and apply its own output authority.
 A newly written bus value containing an old payload does not make that state
 fresh. A stopped or blocked publisher is optional; it must not keep a consumer
-acting on expired state. Existing consumers do not use this topic yet.
+acting on expired state. The ring's reader takes only a checked state from
+source `mood` whose stamp is no later than now and no older than the 2.5 s
+lifespan, on the ring's own monotonic clock; anything else is the plain pace.
 
 ## Pure engine and clocks
 
@@ -250,12 +268,20 @@ lamp-mood serve --enable --zone Asia/Ho_Chi_Minh --bus-root /run/lampos-bus
 ```
 
 `--zone` is required when enabled and resolves an IANA timezone through Jiff's
-bundled rules. `--run-for-ms N` bounds an observational run from 1 to 86,400,000 ms.
+bundled rules, or `system`: the lamp's own zone (`/etc/localtime`), followed
+as it changes ([local-time](../crates/local-time/src/lib.rs), as Schedule and
+Skills take it). `--run-for-ms N` bounds an observational run from 1 to 86,400,000 ms.
 `--clock-id ID` is a test-only clock identity override. Duplicate and unknown
-options are rejected. Without `--enable`, startup exits before clock lookup,
-timezone resolution, bus access, signal setup or threads. No service or
-deployment file is changed by this task. CLI source has been inspected;
-execution evidence remains pending.
+options are rejected. `LAMP_MOOD=on` in the environment is `--enable`; any
+other value is not. Without either, startup exits before clock lookup,
+timezone resolution, bus access, signal setup or threads.
+
+The product unit, `deploy/product/lamp-mood.service` (#1670), runs
+`lamp-mood serve --zone system --bus-root /run/lampos-bus` as `lampos`, after
+setup, and is off unless a drop-in sets `Environment=LAMP_MOOD=on`. Off, it
+prints its disabled result, exits 0 and stays inactive, with nothing on the
+bus touched. A test runs the binary with each value of the switch, and on
+Linux with `--zone system`.
 
 The runtime separates one state owner from one bus worker. Both use a 5 ms
 loop; the worker drains at most four messages per topic per poll and at most
@@ -411,7 +437,9 @@ These are authored tuning hypotheses, not faults established by a lamp trial.
 No real recorded day, device execution, deployment, sensor-to-state latency,
 physical touch-to-feedback or acoustic timing is established. Host evidence
 and code inspection do not establish that these constants feel natural to a
-person beside the lamp. Thanks/laughter, a confirmed Controls sleep outcome,
-familiarity and any expression driven by Mood remain unavailable. The state
+person beside the lamp. Thanks/laughter, a confirmed Controls sleep outcome
+and familiarity remain unavailable. The only expression driven by Mood is the
+lamp's one breath, the ring's and the head's at rest, tested on the host and
+not yet seen on a lamp; the product unit has not run on one either. The state
 does not prove that the lamp is listening, can accept input, has spoken,
 has recognized a person, or has changed a physical output.

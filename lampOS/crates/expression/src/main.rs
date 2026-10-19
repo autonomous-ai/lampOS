@@ -330,6 +330,9 @@ fn run(args: Arguments) -> Result<(), Box<dyn std::error::Error>> {
     if args.offline_face {
         service = service.with_offline_face(&bus);
     }
+    // The lamp's one breath, where Mood keeps it (#1670); Mood is off unless
+    // `LAMP_MOOD=on`, and with no fresh mood the breath is as before.
+    service = service.with_mood_breath(&bus);
     eprintln!(
         "lamp-expression: started mode={} clock_id={} root={}{}{}",
         if args.enabled { "enabled" } else { "shadow" },
