@@ -78,11 +78,18 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
     }
 }
 
-/// Every function the actions part and the product skills offer reaches a
-/// product lamp's sessions, none left out by order or by the link, and the
-/// count is [`PRODUCT_FUNCTIONS`], within `lamp_gemini::MAX_TOOLS`.
-#[test]
-fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
+/// What the product voice declares, run in a process of its own with the
+/// product voice unit's environment and `extra` on top: the actions part's
+/// whole catalog, the product skills' tools, and the names given and left
+/// out by the link.
+struct Product {
+    executive: Vec<lamp_actions::Function>,
+    skill_tools: Vec<String>,
+    declared: Vec<String>,
+    left_out: Vec<String>,
+}
+
+fn product_with(extra: &[(&str, &str)]) -> Product {
     let folder = tempfile::tempdir().unwrap();
     // The actions part's catalog with all it offers: sound and light, both
     // there, and Schedule's (the product's LAMP_SCHEDULE_TOOLS=on).
@@ -120,6 +127,9 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
             command.env(name, value);
         }
     }
+    for (name, value) in extra {
+        command.env(name, value);
+    }
     let output = command.env(CATALOGS, folder.path()).output().unwrap();
     let said = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -127,27 +137,41 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
         "{said}{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let declared: Vec<&str> = said
-        .lines()
-        .filter_map(|line| line.split_once(DECLARED).map(|(_, name)| name))
-        .collect();
-    let left_out: Vec<&str> = said
-        .lines()
-        .filter_map(|line| line.split_once(LEFT_OUT).map(|(_, why)| why))
-        .collect();
-    assert!(left_out.is_empty(), "left out by the link: {left_out:?}");
+    let found = |mark: &str| -> Vec<String> {
+        said.lines()
+            .filter_map(|line| line.split_once(mark).map(|(_, rest)| rest.to_owned()))
+            .collect()
+    };
+    Product {
+        executive,
+        skill_tools: skills
+            .iter()
+            .filter_map(|skill| skill.tool.clone())
+            .collect(),
+        declared: found(DECLARED),
+        left_out: found(LEFT_OUT),
+    }
+}
 
-    let skill_tools: Vec<&str> = skills
-        .iter()
-        .filter_map(|skill| skill.tool.as_deref())
-        .collect();
+/// Every function the actions part and the product skills offer reaches a
+/// product lamp's sessions, none left out by order or by the link, and the
+/// count is [`PRODUCT_FUNCTIONS`], within `lamp_gemini::MAX_TOOLS`.
+#[test]
+fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
+    let Product {
+        executive,
+        skill_tools,
+        declared,
+        left_out,
+    } = product_with(&[]);
+    assert!(left_out.is_empty(), "left out by the link: {left_out:?}");
     for name in executive
         .iter()
         .map(|function| function.name)
-        .chain(skill_tools.iter().copied())
+        .chain(skill_tools.iter().map(String::as_str))
     {
         assert!(
-            declared.contains(&name),
+            declared.iter().any(|told| told == name),
             "{name} is left out of a product lamp's sessions, past {}: {declared:?}",
             lamp_gemini::MAX_TOOLS
         );
@@ -163,4 +187,42 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
     );
     assert!(declared.len() <= lamp_gemini::MAX_TOOLS);
     assert_eq!(declared.len(), PRODUCT_FUNCTIONS, "{declared:?}");
+    assert!(
+        !declared
+            .iter()
+            .any(|name| name == lamp_voice::reports_stop::NAME
+                || name == lamp_voice::reports_stop::STATE_NAME)
+    );
+}
+
+/// The reviewer's P3 on #1906: with `LAMP_REPORTS=on` the product voice
+/// declares its two reports functions too, `reports_stop` and
+/// `reports_state`, before the actions part's and the skills'. The voice's
+/// own 15 and the actions part's 17 are the 32, so Dance's, the one
+/// product skill's function, is the one cut, and the link leaves out nothing.
+#[test]
+fn with_reports_on_a_product_lamp_is_at_32_and_dance_is_cut() {
+    let Product {
+        executive,
+        skill_tools,
+        declared,
+        left_out,
+    } = product_with(&[(lamp_voice::reports_stop::ENVIRONMENT, "on")]);
+    assert!(left_out.is_empty(), "left out by the link: {left_out:?}");
+    assert_eq!(declared.len(), lamp_gemini::MAX_TOOLS, "{declared:?}");
+    assert_eq!(declared.len(), PRODUCT_FUNCTIONS + 1, "{declared:?}");
+    for name in [
+        lamp_voice::reports_stop::NAME,
+        lamp_voice::reports_stop::STATE_NAME,
+    ]
+    .into_iter()
+    .chain(executive.iter().map(|function| function.name))
+    {
+        assert!(
+            declared.iter().any(|told| told == name),
+            "{name}: {declared:?}"
+        );
+    }
+    assert_eq!(skill_tools, ["dance"]);
+    assert!(!declared.iter().any(|told| told == "dance"), "{declared:?}");
 }
