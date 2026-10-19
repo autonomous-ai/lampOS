@@ -456,6 +456,40 @@ async fn a_turn_the_heed_holds_is_told_held_back() {
     );
 }
 
+/// Second on #1782: the verdict is told before the turn's words leave the
+/// engine. When it is told, the turn's start, its words and its end are all
+/// still waiting to be taken, so the policy can hear the verdict before the
+/// words, and keeps it for them (`lamp_policy::hello::Hello::verdict`).
+#[tokio::test]
+async fn a_held_verdict_is_told_before_its_words_are_taken() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Me.".to_owned())].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let (said, told) = tokio::sync::oneshot::channel();
+    let said = Mutex::new(Some(said));
+    let mut engine = engine
+        .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
+        .telling_verdicts(Arc::new(move |request, verdict| {
+            if let Some(said) = said.lock().unwrap().take() {
+                let _ = said.send((request, verdict));
+            }
+        }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let verdict = tokio::time::timeout(Duration::from_secs(2), told)
+        .await
+        .expect("the verdict is told with nothing taken")
+        .unwrap();
+    assert_eq!(verdict, (1, lamp_msgs::TurnVerdict::HeldBack));
+    assert_eq!(
+        turn(&mut engine).await,
+        ["started:1", "heard:Me.", "complete"]
+    );
+}
+
 /// #1155: a turn the heed lets out is told answered. With nothing that
 /// judges turns, as on a route with the rule off, no verdict is told, nor
 /// for a turn with nothing heard: the hello then counts the turn, as it

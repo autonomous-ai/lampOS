@@ -1815,11 +1815,16 @@ lamp or by it:
 - **Held back.** The turn's talk is taken back from the quiet: it counts
   again from the talk before the turn began, and nothing more heard,
   listened to or thought about in that turn counts. The verdict may come
-  while the voice thinks or once it rests. One for another request than
-  the turn's, or said before any of its words were heard, is not this
-  turn's, and the turn counts. Once the lamp has spoken in a turn, as when
-  it asks again what was unclear, the turn is talk by it: it counts until
-  the lamp stops, and no verdict takes it back.
+  while the voice thinks or once it rests, and before its words: the second
+  route says it before the words it judged go out, so a verdict for a
+  request not heard yet is kept for its words, and taken up when they come
+  (the judged turn's words, not a new turn). One for an earlier request
+  than the turn's is not this turn's, and a kept one is let go when words
+  of a later request come instead. A new request heard in a turn held back,
+  the voice listening again before it rests, counts until it is judged.
+  Once the lamp has spoken in a turn, as when it asks again what was
+  unclear, the turn is talk by it: it counts until the lamp stops, and no
+  verdict takes it back.
 - **What stays.** Never while the voice listens, thinks or speaks: a turn
   is counted from its first word until its verdict comes, so a hello never
   comes over someone talking. Only the hello's own hold changes: the model

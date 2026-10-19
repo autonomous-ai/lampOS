@@ -429,6 +429,11 @@ pub struct Hello {
     /// topics, and the loop may take a word first. Its listening, when
     /// seen, is the same turn.
     turn_by_words: bool,
+    /// A verdict said before its request's words reached the policy, kept
+    /// for them: the voice's words and its verdicts come on two topics, and
+    /// the second route says a verdict before its words go out (Second on
+    /// #1782). Let go when words of a later request come instead.
+    pending_verdict: Option<(u64, TurnVerdict)>,
     totals: Totals,
 }
 
@@ -477,6 +482,7 @@ impl Hello {
             turn_held: false,
             turn_request: None,
             turn_by_words: false,
+            pending_verdict: None,
             totals: Totals::default(),
         })
     }
@@ -768,6 +774,7 @@ impl Hello {
         self.turn_held = false;
         self.turn_request = None;
         self.turn_by_words = false;
+        self.pending_verdict = None;
     }
 
     /// A turn begins, counted from the talk before it.
@@ -789,18 +796,41 @@ impl Hello {
     /// talk that goes on, listened to again before the voice rests, is
     /// judged by its newest request.
     pub fn heard(&mut self, now: Instant, request: Option<u64>) {
+        // The verdict said already for these words, if one was.
+        let judged = match (request, self.pending_verdict) {
+            (Some(heard), Some((said, verdict))) if heard == said => {
+                self.pending_verdict = None;
+                Some(verdict)
+            }
+            (Some(heard), Some((said, _))) if heard > said => {
+                self.pending_verdict = None;
+                None
+            }
+            _ => None,
+        };
         // Words of a new request while the voice is not seen listening or
         // thinking begin their turn; a late piece of the turn's own request
-        // does not.
+        // does not, nor words whose turn was judged before they came.
         if request.is_some()
             && request != self.turn_request
+            && judged.is_none()
             && !matches!(self.voice, Some(Voice::Listening | Voice::Thinking))
         {
             self.begin_turn();
             self.turn_by_words = true;
         }
+        // A new request in the turn is not judged yet: one held back before
+        // it no longer holds back what comes now (Second on #1782: the voice
+        // can take a new request while a held answer waits, thinking to
+        // listening with no rest between).
         if self.turn_floor.is_some() && request.is_some() {
+            if request != self.turn_request {
+                self.turn_held = false;
+            }
             self.turn_request = request;
+            if let Some(verdict) = judged {
+                self.judged(verdict);
+            }
         }
         self.talked(now);
     }
@@ -813,13 +843,23 @@ impl Hello {
     /// voice thinks or once it rests. A verdict for a turn the lamp has
     /// spoken in changes nothing.
     pub fn verdict(&mut self, request: u64, verdict: TurnVerdict) {
-        if !self.options.quiet_to_the_lamp
-            || verdict != TurnVerdict::HeldBack
-            || self.turn_request != Some(request)
-        {
+        if !self.options.quiet_to_the_lamp {
             return;
         }
-        if let Some(floor) = self.turn_floor {
+        match self.turn_request {
+            Some(turn) if turn == request => self.judged(verdict),
+            // For an earlier request than the turn's: not this turn's.
+            Some(turn) if request < turn => {}
+            // Its words have not come yet: kept for them.
+            _ => self.pending_verdict = Some((request, verdict)),
+        }
+    }
+
+    /// The turn under way is judged: held back, its talk is taken back.
+    fn judged(&mut self, verdict: TurnVerdict) {
+        if verdict == TurnVerdict::HeldBack
+            && let Some(floor) = self.turn_floor
+        {
             self.turn_held = true;
             self.lamp_talk = floor;
         }
@@ -1480,6 +1520,110 @@ mod tests {
         assert_eq!(
             hello.hold(&arrived(), next + 2 * second, 0, Room::Busy),
             None
+        );
+    }
+
+    /// Second on #1782: a turn held back, and then a new request in it, the
+    /// voice listening again with no rest between, as when it takes a new
+    /// request while a held answer waits. The new request's talk counts
+    /// until it is judged: answered, or with no verdict at all, it holds
+    /// the whole quiet; held back too, the turn is taken back again.
+    #[test]
+    fn a_new_request_in_a_turn_held_back_counts_until_it_is_judged() {
+        for second_verdict in [
+            None,
+            Some(TurnVerdict::Answered),
+            Some(TurnVerdict::HeldBack),
+        ] {
+            let (mut hello, started) = to_the_lamp(true);
+            let quiet = hello.options.quiet_for;
+            let second = Duration::from_secs(1);
+            let begun = started + quiet + second;
+            hello.voice(Voice::Listening, begun);
+            hello.heard(begun + second / 2, Some(5));
+            hello.voice(Voice::Thinking, begun + second);
+            hello.verdict(5, TurnVerdict::HeldBack);
+            hello.voice(Voice::Listening, begun + 2 * second);
+            hello.heard(begun + 2 * second + second / 2, Some(6));
+            hello.voice(Voice::Thinking, begun + 3 * second);
+            if let Some(verdict) = second_verdict {
+                hello.verdict(6, verdict);
+            }
+            let rested = begun + 4 * second;
+            hello.voice(Voice::Resting, rested);
+            let held = hello.hold(&arrived(), rested, 0, Room::Busy);
+            match second_verdict {
+                Some(TurnVerdict::HeldBack) => assert_eq!(held, None),
+                _ => {
+                    assert_eq!(held, Some(Hold::Talking), "{second_verdict:?}");
+                    assert_eq!(
+                        hello.hold(&arrived(), rested + quiet, 0, Room::Busy),
+                        None,
+                        "{second_verdict:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Second on #1782: the second route says its verdict before the words
+    /// it judged go out, so the policy can take the verdict first. It is
+    /// kept for its words, whether they come while the voice still thinks
+    /// or once it rests, and they are the judged turn's, not a new one.
+    #[test]
+    fn a_verdict_said_before_its_words_is_kept_for_them() {
+        for words_after_rest in [false, true] {
+            let (mut hello, started) = to_the_lamp(true);
+            let quiet = hello.options.quiet_for;
+            let second = Duration::from_secs(1);
+            let begun = started + quiet + second;
+            hello.voice(Voice::Listening, begun);
+            hello.voice(Voice::Thinking, begun + second);
+            hello.verdict(1, TurnVerdict::HeldBack);
+            let rested = begun + 2 * second;
+            if words_after_rest {
+                hello.voice(Voice::Resting, rested);
+                hello.heard(rested, Some(1));
+            } else {
+                hello.heard(begun + second, Some(1));
+                hello.voice(Voice::Resting, rested);
+            }
+            assert_eq!(
+                hello.hold(&arrived(), rested, 0, Room::Busy),
+                None,
+                "words after the rest: {words_after_rest}"
+            );
+        }
+    }
+
+    /// A verdict kept for words that never come does not take back a later
+    /// request's talk, and one for an earlier request than the turn's is
+    /// still not this turn's.
+    #[test]
+    fn a_kept_verdict_is_only_for_its_own_words() {
+        let (mut hello, started) = to_the_lamp(true);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        let begun = started + quiet + second;
+        hello.voice(Voice::Listening, begun);
+        hello.voice(Voice::Thinking, begun + second);
+        hello.verdict(1, TurnVerdict::HeldBack);
+        // Its words never come; the next request's do.
+        hello.voice(Voice::Listening, begun + 2 * second);
+        hello.heard(begun + 2 * second, Some(2));
+        hello.voice(Voice::Thinking, begun + 3 * second);
+        let rested = begun + 4 * second;
+        hello.voice(Voice::Resting, rested);
+        assert_eq!(
+            hello.hold(&arrived(), rested, 0, Room::Busy),
+            Some(Hold::Talking)
+        );
+        // A late verdict for request 1 now is for an earlier request.
+        hello.verdict(1, TurnVerdict::HeldBack);
+        hello.heard(rested, Some(1));
+        assert_eq!(
+            hello.hold(&arrived(), rested, 0, Room::Busy),
+            Some(Hold::Talking)
         );
     }
 

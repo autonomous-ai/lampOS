@@ -602,7 +602,17 @@ fn office(name: &str, to_the_lamp: bool) -> (Rig, Decision) {
     thread::sleep(ms(100));
     rig.state(Voice::Resting);
     thread::sleep(ms(150));
-    rig.room_talks(4);
+    // The last turn as the second route says it: its verdict before its
+    // words (Second on #1782), 50 ms apart, so that the policy, which looks
+    // every 20 ms, takes them in that order.
+    rig.state(Voice::Listening);
+    thread::sleep(ms(50));
+    rig.state(Voice::Thinking);
+    rig.turn(4, TurnVerdict::HeldBack);
+    thread::sleep(ms(50));
+    rig.hears(4);
+    thread::sleep(ms(100));
+    rig.state(Voice::Resting);
     // The lull, 100 ms on.
     thread::sleep(ms(100));
     rig.arrive(9_000_002, None);
