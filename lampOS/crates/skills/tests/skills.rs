@@ -3997,7 +3997,9 @@ fn the_dance_asking(
     let mut line = String::new();
     BufReader::new(&stream).read_line(&mut line).unwrap();
     assert!(line.contains("Say you will."), "{line}");
-    std::thread::sleep(Duration::from_millis(200));
+    // At once: the program takes the voice's latest state when it looks
+    // (`said_lately`), so `speaking` said before it begins to wait is seen
+    // all the same (#1806).
     voice
         .publish_json(1, &serde_json::json!({"state": "speaking"}))
         .unwrap();
@@ -4130,8 +4132,9 @@ fn a_clip_the_body_said_dropped_is_followed_by_nothing() {
 }
 
 /// #940: under arbitration the body names whose a drop was, why and who
-/// holds the body; the run says so, and takes no other skill's drop of the
-/// same clip as its own.
+/// holds the body; the run says so. The next three tests are the same
+/// dance's other cases, one each so that each runs beside the others
+/// (#1806: together they took 4.4 s).
 #[test]
 fn a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body() {
     let (_, played, _, done, reached) = the_dance_asking(false, Line::Said, Says::Busy, true);
@@ -4145,7 +4148,12 @@ fn a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body() {
         "{}",
         done.why
     );
-    // The run's last clip has no next to wait on it: said at the run's end.
+}
+
+/// #940: the run's last clip has no next to wait on it: its drop is said at
+/// the run's end.
+#[test]
+fn a_last_clip_dropped_for_another_skill_is_said_at_the_runs_end() {
     let (_, played, _, done, reached) = the_dance_asking(false, Line::Said, Says::LastBusy, true);
     assert_eq!((played.len(), reached), (1, 2), "{}", done.why);
     assert!(
@@ -4154,13 +4162,21 @@ fn a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body() {
         "{}",
         done.why
     );
-    // Without the skill's switch (and so on a product lamp, the body's off
-    // too), the run says nothing new of a last clip dropped (the reviewer
-    // on #1473).
+}
+
+/// Without the skill's switch (and so on a product lamp, the body's off
+/// too), the run says nothing new of a last clip dropped (the reviewer on
+/// #1473).
+#[test]
+fn without_body_requests_a_last_clip_dropped_is_not_said() {
     let (_, played, _, done, _) = the_dance_asking(false, Line::Said, Says::LastBusy, false);
     assert_eq!(played.len(), 1, "{}", done.why);
     assert!(!done.why.contains("the body dropped"), "{}", done.why);
-    // Another skill's nod dropped is not this run's: both are played.
+}
+
+/// #940: another skill's nod dropped is not this run's: both are played.
+#[test]
+fn another_skills_dropped_clip_is_not_the_runs_own() {
     let (_, played, _, done, reached) =
         the_dance_asking(false, Line::Said, Says::AnothersFirst, true);
     assert_eq!((played.len(), reached), (2, 2), "{}", done.why);
