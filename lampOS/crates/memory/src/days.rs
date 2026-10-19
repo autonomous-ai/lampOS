@@ -910,6 +910,31 @@ impl Days {
         Ok(())
     }
 
+    /// Every journal exchange, oldest first: whose, its id and when. For
+    /// the observation pass's dry run on a copy of a lamp's store
+    /// (`lamp-voice-eval observe-dry`, #1693 (4)), which cuts the journal
+    /// into conversations as the voice does. Ids and times only.
+    pub fn exchanges(&self) -> Result<Vec<(Person, u64, u64)>> {
+        let mut statement = self.db.prepare(
+            "SELECT person,id,at_unix_ms FROM entries WHERE kind='exchange' ORDER BY at_unix_ms,id",
+        )?;
+        let rows = statement.query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, u64>(1)?,
+                r.get::<_, u64>(2)?,
+            ))
+        })?;
+        let mut found = vec![];
+        for row in rows {
+            let (person, id, at) = row?;
+            if let Some(person) = Person::new(&person) {
+                found.push((person, id, at));
+            }
+        }
+        Ok(found)
+    }
+
     pub fn conversation_end_with(
         &mut self,
         person: &Person,
