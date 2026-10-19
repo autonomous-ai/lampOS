@@ -309,6 +309,61 @@ fn claude_and_explicit_folder_are_preserved_without_shell_expansion() {
 /// others. Only a receipt that says auto mode binds the task; one that does
 /// not (what a real OpenCode receipt says is not yet seen) leaves it
 /// uncertain, never sent again.
+/// #1854: Devin, the terminal program on the computer, is asked for by name
+/// with no `--mode` (it has none: Harness leaves it out and refuses one), and
+/// its receipt is taken with no mode and no bypass, or a mode that does not
+/// approve on its own; never one claiming `auto` or `full`, or a bypass.
+#[test]
+fn devin_is_asked_for_by_name_with_no_mode_and_its_receipt_claims_none() {
+    let rig = Rig::new();
+    let mut request = launch();
+    request.target.engine = EngineKind::Devin;
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let args = rig.calls()[1]["args"].as_array().unwrap().clone();
+    assert_eq!(args[1], "devin");
+    assert!(!args.iter().any(|arg| arg == "--mode"), "{args:?}");
+    assert_eq!(args[7], "--json");
+    let receipt = |mode: Value, bypass: Option<Value>| {
+        let mut agent = json!({"id":AGENT,"name":"lamp-task-001","engine":"devin"});
+        if !mode.is_null() {
+            agent["permissionMode"] = mode;
+        }
+        if let Some(bypass) = bypass {
+            agent["bypassPermission"] = bypass;
+        }
+        json!({"ok":true,"machineId":MACHINE,"agent":agent})
+    };
+    for (mode, bypass) in [
+        (Value::Null, None),
+        (Value::Null, Some(json!(false))),
+        (Value::Null, Some(Value::Null)),
+        (json!("default"), Some(json!(false))),
+    ] {
+        rig.new_step(step(receipt(mode.clone(), bypass.clone())));
+        assert!(
+            matches!(rig.cli().launch(&request), LaunchOutcome::Created { .. }),
+            "{mode} {bypass:?}"
+        );
+    }
+    for (mode, bypass) in [
+        (json!("auto"), Some(json!(true))),
+        (json!("full"), Some(json!(false))),
+        (Value::Null, Some(json!(true))),
+    ] {
+        rig.new_step(step(receipt(mode.clone(), bypass.clone())));
+        assert_eq!(
+            rig.cli().launch(&request),
+            uncertain("invalid_reply"),
+            "{mode} {bypass:?}"
+        );
+    }
+}
+
 #[test]
 fn opencode_is_asked_for_by_name_in_auto_mode_and_bound_only_by_its_own_receipt() {
     let rig = Rig::new();
