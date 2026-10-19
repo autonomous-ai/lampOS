@@ -21,19 +21,50 @@ pub const NAME: &str = "use_skill";
 pub const ENVIRONMENT: &str = "LAMP_USE_SKILL";
 /// The provider worker's flag for it.
 pub const FLAG: &str = "--use-skill";
+
+/// The worker's flag for what the environment says: `on` only.
+pub fn arguments(value: Option<&str>) -> Vec<String> {
+    if value == Some("on") {
+        vec![FLAG.to_owned()]
+    } else {
+        Vec::new()
+    }
+}
 /// The most the skills' lines may take of the instruction: one past it is
 /// listed by its name alone, and one past even that is left out of the
 /// lines (it can still be named, if the model knows it).
 pub const SECTION_MOST_BYTES: usize = 4_096;
 
-/// `use_skill`, for `skills` (the skills' own functions, as their tools file
-/// says them), or none when there is no skill.
-pub fn function(skills: &[Tool]) -> Option<Tool> {
-    if skills.is_empty() {
-        return None;
+/// Of `skills`, those `use_skill` offers: as many as its parameters can
+/// name within the link's bound (`lamp_gemini::MAX_TOOL_JSON_BYTES`), so a
+/// lamp with more never loses the function, and every skill with it (the
+/// reviewer on #1696). The rest are counted on the setup line.
+pub fn offered(skills: &[Tool]) -> &[Tool] {
+    let fits = |count: usize| {
+        built(&skills[..count])
+            .parameters
+            .is_some_and(|parameters| {
+                parameters.to_string().len() <= lamp_gemini::MAX_TOOL_JSON_BYTES
+            })
+    };
+    let mut count = skills.len();
+    while count > 0 && !fits(count) {
+        count -= 1;
     }
+    &skills[..count]
+}
+
+/// `use_skill`, for `skills` (the skills' own functions, as their tools file
+/// says them), naming those it can ([`offered`]), or none when there is no
+/// skill.
+pub fn function(skills: &[Tool]) -> Option<Tool> {
+    let offered = offered(skills);
+    (!offered.is_empty()).then(|| built(offered))
+}
+
+fn built(skills: &[Tool]) -> Tool {
     let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
-    Some(Tool {
+    Tool {
         name: NAME.to_owned(),
         description: "Use one of your skills, listed under \"Your skills\" in your instructions, each with when to use it. Call this when what someone asks is what a skill's line says: give the skill's name, and its choice and its yes-or-no only when its line names them. Then do what its answer tells you.".to_owned(),
         parameters: Some(json!({
@@ -56,15 +87,28 @@ pub fn function(skills: &[Tool]) -> Option<Tool> {
             "required": ["skill"]
         })),
         silent: false,
-    })
+    }
 }
 
 /// The instruction's lines for `skills`: one each, its name, when to use it,
 /// and its choice and yes-or-no, within [`SECTION_MOST_BYTES`]. Empty when
 /// there is no skill.
 pub fn section(skills: &[Tool]) -> String {
+    lines(skills).0
+}
+
+/// Of `skills`' lines ([`section`]), the skills named alone and those left
+/// out, past [`SECTION_MOST_BYTES`]: for the setup line (the reviewer on
+/// #1696).
+pub fn cut(skills: &[Tool]) -> (Vec<String>, Vec<String>) {
+    let (_, named, left) = lines(skills);
+    (named, left)
+}
+
+fn lines(skills: &[Tool]) -> (String, Vec<String>, Vec<String>) {
+    let (mut named_alone, mut left_out) = (Vec::new(), Vec::new());
     if skills.is_empty() {
-        return String::new();
+        return (String::new(), named_alone, left_out);
     }
     let mut told = String::from(
         "\n\nYour skills\nEach is used through use_skill, by its name, when what someone asks is what its line says:\n",
@@ -76,9 +120,12 @@ pub fn section(skills: &[Tool]) -> String {
             told.push_str(&whole);
         } else if told.len() + named.len() <= SECTION_MOST_BYTES {
             told.push_str(&named);
+            named_alone.push(skill.name.clone());
+        } else {
+            left_out.push(skill.name.clone());
         }
     }
-    told
+    (told, named_alone, left_out)
 }
 
 /// One skill's line: its name and description, then its choice and its
@@ -166,8 +213,50 @@ pub fn translate(call: &ToolCall, skills: &[Tool]) -> Result<ToolCall, Value> {
             )
         }));
     };
+    let choice_of = choice(skill);
+    let flag_of = flag(skill);
+    // The skill's own parameters' names are taken too, as its line says
+    // them ("Its choice is style"); any other key is told, never dropped
+    // (the reviewer on #1696).
+    let known = |key: &str| {
+        matches!(key, "skill" | "choice" | "flag")
+            || choice_of.as_ref().is_some_and(|(name, _, _)| *name == key)
+            || flag_of.as_ref().is_some_and(|(name, _)| *name == key)
+    };
+    if let Some(stray) = call
+        .args
+        .as_object()
+        .and_then(|args| args.keys().find(|key| !known(key)))
+    {
+        return Err(json!({
+            "error": format!(
+                "use_skill takes skill, choice and flag, not {stray}: give {}'s choice as choice and its yes-or-no as flag.",
+                skill.name
+            )
+        }));
+    }
+    let given_choice = call.args.get("choice").or_else(|| {
+        choice_of
+            .as_ref()
+            .and_then(|(name, _, _)| call.args.get(*name))
+    });
+    let given_flag = call
+        .args
+        .get("flag")
+        .or_else(|| flag_of.as_ref().and_then(|(name, _)| call.args.get(*name)))
+        .and_then(Value::as_bool);
+    if choice_of.is_none()
+        && given_choice
+            .and_then(Value::as_str)
+            .is_some_and(|word| !word.is_empty())
+    {
+        return Err(json!({"error": format!("{} takes no choice.", skill.name)}));
+    }
+    if flag_of.is_none() && given_flag == Some(true) {
+        return Err(json!({"error": format!("{} takes no yes-or-no.", skill.name)}));
+    }
     let mut args = serde_json::Map::new();
-    if let (Some(given), Some((name, words, _))) = (call.args.get("choice"), choice(skill)) {
+    if let (Some(given), Some((name, words, _))) = (given_choice, choice_of) {
         match given.as_str().filter(|given| words.contains(given)) {
             Some(word) => {
                 args.insert(name.to_owned(), json!(word));
@@ -183,9 +272,7 @@ pub fn translate(call: &ToolCall, skills: &[Tool]) -> Result<ToolCall, Value> {
             }
         }
     }
-    if let (Some(given), Some((name, _))) =
-        (call.args.get("flag").and_then(Value::as_bool), flag(skill))
-    {
+    if let (Some(given), Some((name, _))) = (given_flag, flag_of) {
         args.insert(name.to_owned(), json!(given));
     }
     Ok(ToolCall {
@@ -328,12 +415,7 @@ mod tests {
         assert_eq!(dance.id, "c1");
         assert_eq!(dance.name, "dance");
         assert_eq!(dance.args, json!({"style":"jazz","long":true}));
-        // What the skill does not take is left out.
-        let check = translate(
-            &call(json!({"skill":"check_my_work","choice":"jazz","flag":false})),
-            &skills,
-        )
-        .unwrap();
+        let check = translate(&call(json!({"skill":"check_my_work"})), &skills).unwrap();
         assert_eq!(
             (check.name.as_str(), check.args),
             ("check_my_work", json!({}))
@@ -344,6 +426,81 @@ mod tests {
         )
         .unwrap();
         assert_eq!(verdict.args, json!({"verdict":"wrong"}));
+    }
+
+    /// The reviewer on #1696: the switch is read as `on` only.
+    #[test]
+    fn the_switch_is_on_only_for_on() {
+        assert!(arguments(None).is_empty());
+        assert!(arguments(Some("yes")).is_empty());
+        assert!(arguments(Some("off")).is_empty());
+        assert_eq!(arguments(Some("on")), [FLAG]);
+    }
+
+    /// The reviewer on #1696: the skill's own parameters' names are taken
+    /// as `choice` and `flag` are, and anything else, or a choice or a yes
+    /// to a skill that takes none, is told, not dropped.
+    #[test]
+    fn a_skills_own_parameter_names_are_taken_and_anything_else_is_told() {
+        let skills = installed();
+        let dance = translate(
+            &call(json!({"skill":"dance","style":"jazz","long":true})),
+            &skills,
+        )
+        .unwrap();
+        assert_eq!(dance.args, json!({"style":"jazz","long":true}));
+        let stray = translate(&call(json!({"skill":"dance","mood":"jazz"})), &skills).unwrap_err();
+        assert_eq!(
+            stray["error"],
+            "use_skill takes skill, choice and flag, not mood: give dance's choice as choice and its yes-or-no as flag."
+        );
+        let no_choice = translate(
+            &call(json!({"skill":"check_my_work","choice":"jazz"})),
+            &skills,
+        )
+        .unwrap_err();
+        assert_eq!(no_choice["error"], "check_my_work takes no choice.");
+        let no_flag = translate(
+            &call(json!({"skill":"show_verdict","choice":"right","flag":true})),
+            &skills,
+        )
+        .unwrap_err();
+        assert_eq!(no_flag["error"], "show_verdict takes no yes-or-no.");
+        // An empty choice or a "no" to a skill that takes none is nothing.
+        let check = translate(
+            &call(json!({"skill":"check_my_work","choice":"","flag":false})),
+            &skills,
+        )
+        .unwrap();
+        assert_eq!(check.args, json!({}));
+    }
+
+    /// The reviewer on #1696: past the link's bound `use_skill` names as
+    /// many skills as fit, and keeps its place; the lines say which are
+    /// named alone and which are left out.
+    #[test]
+    fn past_its_bounds_use_skill_keeps_what_fits_and_says_what_it_cut() {
+        let many: Vec<Tool> = (0..120)
+            .map(|n| skill(&format!("{n:0>48}").replacen('0', "a", 1), "A skill.", None))
+            .collect();
+        let offered = offered(&many);
+        assert!(
+            offered.len() > 60 && offered.len() < 120,
+            "{}",
+            offered.len()
+        );
+        let told = function(&many).unwrap();
+        assert!(told.validate().is_ok());
+        assert_eq!(reached(&told).len(), offered.len());
+        let long = "x".repeat(1_000);
+        let wordy: Vec<Tool> = (0..400)
+            .map(|n| skill(&format!("skill_{n}"), &long, None))
+            .collect();
+        let (named, left) = cut(&wordy);
+        assert_eq!(named.first().map(String::as_str), Some("skill_3"));
+        assert!(left.contains(&"skill_399".to_owned()));
+        assert_eq!(named.len() + left.len() + 3, 400);
+        assert_eq!(cut(&installed()), (Vec::new(), Vec::new()));
     }
 
     #[test]

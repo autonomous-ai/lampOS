@@ -373,7 +373,9 @@ pub fn serve(
             .unwrap_or_default();
         let room = room_bus.as_ref().map(crate::bus_out::room_now);
         let skills = if skills_told.use_skill {
-            crate::use_skill::section(&crate::tools::skill_tools(&skills_told))
+            crate::use_skill::section(crate::use_skill::offered(&crate::tools::skill_tools(
+                &skills_told,
+            )))
         } else {
             String::new()
         };

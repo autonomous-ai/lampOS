@@ -204,31 +204,43 @@ No file, and nothing changes. Host test:
 **Many skills: `use_skill`** (#1668, `LAMP_USE_SKILL=on`, the worker's
 `--use-skill`; off unless set). A session may be given 32 functions; the
 voice's own and the executive's are 30 on a product lamp, so a third skill's
-function was dropped, with a journal line but not a word to the model. With
+function is cut without a word to the model: `declared` keeps only the room
+left. The setup line names what it cut (`; skills not given: show_verdict
+(past 32: LAMP_USE_SKILL=on reaches them)`, the reviewer on #1696). With
 the switch a session is given one function for every skill, `use_skill`,
 and none of the skills' own (`crate::use_skill`):
 
 - **`use_skill`'s arguments:** `skill`, one of the installed skills' names
   (an enum); `choice`, a word from the skill's choice; `flag`, its
   yes-or-no. A skill takes at most one of each (`tools_file` in
-  `lamp-skills`).
+  `lamp-skills`). The enum names as many skills as fit the link's 4 KB for
+  parameters (`use_skill::offered`, about 67 with the longest names), so a
+  lamp with more keeps the function; the setup line names the rest (`;
+  skills not given: … (past use_skill's bound)`).
 - **What the session is told:** after the rest of its instruction, "Your
   skills": one line each, its name, its description, and its choice's name
   and words and its yes-or-no's name, each with what its parameter says.
-  At most 4,096 bytes (`SECTION_MOST_BYTES`): one past that is named alone,
-  and one past even that is left out of the lines. The Live route keeps that
+  At most 4,096 bytes (`SECTION_MOST_BYTES`): skills past that are named
+  alone while their names fit, then left out of the lines; the setup line
+  counts both (`; use_skill's lines: N named alone, M left out`). The Live route keeps that
   room from the thread as it keeps the room for what it can't do right now;
   the cascade (`LAMP_VOICE_ROUTE=second`) tells it in each turn's system
   message.
 - **A call:** routed as `Route::UseSkill` and made the skill's own call
   when it runs (`use_skill::translate`). The choice and the yes-or-no go
-  under the skill's own parameters' names; one the skill doesn't take is
-  left out, as the skill would refuse it. So the skill's socket sees the
+  under the skill's own parameters' names. The skill's own names are taken
+  as well (`{"skill":"dance","style":"jazz"}`), as its line says them. Only
+  the skills' socket is ever asked. So the skill's socket sees the
   same line as when it is called itself, and its answer goes to the model
   under `use_skill`.
-  - **Told instead:** a skill name that isn't installed ("There is no skill
-    named juggle. Your skills are …"), or a word not in its choice ("dance's
-    choice is one of calm, upbeat, jazz.").
+  - **Told instead, never dropped** (the reviewer on #1696):
+    - a skill that isn't installed ("There is no skill named juggle. Your
+      skills are …");
+    - a word not in its choice ("dance's choice is one of calm, upbeat,
+      jazz.");
+    - any other key ("use_skill takes skill, choice and flag, not mood: …");
+    - a choice or a yes for a skill that takes none ("check_my_work takes no
+      choice."). An empty choice or a "no" there is nothing.
   - **As a skill's call in every other way:** it waits for the Policy's hold,
     it never runs on a reply, its answer may ask for a look, and the request
     counts as one in which the lamp acted.
@@ -236,6 +248,8 @@ and none of the skills' own (`crate::use_skill`):
   `use_skill` reaches is counted as `use_skill:<skill>` against what the
   session was given, and the session is renewed for it as for any change.
   The journal's setup line says `; N skills through use_skill`.
+- **`use_skill` is the voice's own name, with the switch or not:** a
+  catalog's function of that name is never told.
 - **The cost on the host:** a call through it took 0.40 ms against 0.22 ms
   made itself (`use_skill_cost`, debug build, medians of 300). It reads the
   catalogs again. The model's own time for a turn through it is not measured
