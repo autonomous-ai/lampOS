@@ -2429,7 +2429,9 @@ fn the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken() {
         "../../../../../deploy/product/settings/expression.json"
     ))
     .unwrap();
-    catalogue.timing.body_lag_us = Some(0);
+    // The catalogue's own body lag (300 ms), past the 200 ms the voice
+    // says its sound ahead: the speaking motion takes the farthest piece
+    // said (#1759, 20 Oct). At 0 here, it once hid that no lamp nodded.
     if catalogue.speaking.is_none() {
         catalogue.speaking = lamp_expression::Catalogue::from_json(include_str!(
             "../../../../expression/alive-behaviours.json"

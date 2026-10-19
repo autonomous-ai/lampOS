@@ -221,7 +221,17 @@ degree.
 A catalogue with a `speaking` section (`crates/expression/src/speaking.rs`;
 in `alive-behaviours.json` since #933) adds three things from the lamp's own
 sound, as the body meets it: the playout said ahead, sampled at
-`body_lag_us`. All are head only, within the catalogue's limits, in any room
+`body_lag_us`, or, when the voice has not said that far, the farthest piece
+it has said that is still to end. The voice says its sound 200 ms ahead
+(`FORETELL_US`) and the catalogues' lag is 300 ms, so until 20 Oct no piece
+was ever at the lag: the speaking motion took level 0, and a story on
+lamp-4ace nodded and swayed never and only settled (#1759; the coordinator
+test, which set the lag to 0, hid it). Now a move lands at most 100 ms early,
+under one nod's 360 ms. Tests: `speaking_engine.rs`'s
+`an_answer_said_200_ms_ahead_nods_and_sways_at_the_catalogues_own_lag` (0
+nods without it), and the second route's coordinator test at the
+catalogue's own lag. The old playout clip still takes the level at the lag
+only. All are head only, within the catalogue's limits, in any room
 (it is the lamp's own speech). None runs while the body is held, while
 concentrating, asleep, or once someone has cut in, and nothing is owed after.
 - **A nod on a stressed word.** A dip of `nod` (0.035 rad of head pitch, about

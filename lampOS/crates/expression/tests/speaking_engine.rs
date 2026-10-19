@@ -111,13 +111,18 @@ impl Lamp {
 
     /// One 20 ms piece of the answer's sound, said as it plays.
     fn piece(&mut self, at: u64, level: f32) {
+        self.piece_from(at, at, level);
+    }
+
+    /// One 20 ms piece that plays from `start`, said at `at`.
+    fn piece_from(&mut self, at: u64, start: u64, level: f32) {
         let playout = VoicePlayout {
             stamp: self.stamp(at),
             session_id: "voice-one".into(),
             turn: 1,
             request: 11,
-            start_us: at,
-            end_us: at + TICK,
+            start_us: start,
+            end_us: start + TICK,
             level,
         };
         self.send(
@@ -337,6 +342,50 @@ fn a_hiss_is_no_speech_however_quiet_the_voice() {
     for name in ["nodding on a stressed word", "swaying between sentences"] {
         assert_eq!(starts(&outputs, name), 0, "{name}");
     }
+}
+
+/// #1759, 20 Oct: the voice says its sound 200 ms ahead (`FORETELL_US`),
+/// and the alive catalogue's body lag is 300 ms (as the product's and
+/// lamp-4ace's). With no piece at the lag, the speaking motion took level
+/// 0: on lamp-4ace a story nodded and swayed never, and only settled. It
+/// now takes the farthest piece said, so the same answer nods and sways.
+#[test]
+fn an_answer_said_200_ms_ahead_nods_and_sways_at_the_catalogues_own_lag() {
+    let mut catalogue = Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+    assert_eq!(catalogue.timing.body_lag_us, Some(300_000));
+    catalogue.timing.body_lag_us = Some(300_000);
+    let mut lamp = Lamp::new(catalogue, Room::Quiet);
+    let mut outputs = Vec::new();
+    let mut at = 0;
+    let end = 9_000_000;
+    while at < end + 1_500_000 {
+        let speaking = (1_000_000..end).contains(&at);
+        if at % 100_000 == 0 {
+            lamp.parts(
+                at,
+                if speaking {
+                    Voice::Speaking
+                } else {
+                    Voice::Resting
+                },
+            );
+        }
+        // Each tick of the turn, the piece that plays 200 ms on is said.
+        let start = at + 200_000;
+        if speaking && start < end {
+            lamp.piece_from(at, start, level(start - 1_000_000));
+        }
+        outputs.push((at, lamp.engine.tick(at)));
+        at += TICK;
+    }
+    let nods = starts(&outputs, "nodding on a stressed word");
+    assert!((5..=8).contains(&nods), "{nods} nods");
+    assert!(starts(&outputs, "swaying between sentences") >= 1);
+    assert!(
+        outputs
+            .iter()
+            .any(|(_, output)| named(output, "settling as it finishes"))
+    );
 }
 
 #[test]
