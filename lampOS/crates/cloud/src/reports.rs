@@ -1570,6 +1570,7 @@ pub(crate) mod tests {
                         },
                     ],
                     missing: vec!["s3cret".into(), "eyes".into()],
+                    quiet_ms: 0,
                 },
                 false,
             )),

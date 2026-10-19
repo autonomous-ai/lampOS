@@ -1,0 +1,19 @@
+# From 10:00, every part well; the body says error from 60.6 s and its last
+# report is at 119.6 s: it erred and then stopped. lamp/health every 5 s;
+# the first with the error is at 65 s. The error's half minute comes at
+# 95 s: one droop and a dim. The body keeps its error while quiet, so it
+# is never in quiet_ms, and 5 minutes of its silence (420 s) bring nothing
+# more: one failure, one droop.
+clock = "10:00"
+
+[[expect]]
+at = "95s"
+within = "1s"
+call = "body.gesture"
+args = { gesture = "sleepy" }
+
+[[expect]]
+at = "95s"
+within = "1s"
+call = "light"
+args = { dim = 1, until = "ends" }

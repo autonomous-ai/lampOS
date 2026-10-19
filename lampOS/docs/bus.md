@@ -428,7 +428,7 @@ that owns it:
 | `light/reached` | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | nothing yet; `lamp-skills`, to wait for a skill's light before its look (#1146) |
 | `light/outranked` | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | `lamp-skills`, a run's own subscription: the run says what was over its light in its journal and at its give-back ([skills.md](skills.md)) |
 | `diagnostics` | every part that says how it is: the voice, the eyes, the body, the policy, and the board through the health program | the health program |
-| `lamp/health`, `board/state` | the health program ([health.md](health.md)) | `lamp-health`, the command; `lamp-skills` (Not feeling well reads `lamp/health`, not in the product yet, [skills.md](skills.md)) |
+| `lamp/health`, `board/state` | the health program ([health.md](health.md)) | `lamp-health`, the command; `lamp-skills` (Not feeling well reads `lamp/health`'s `level` and `quiet_ms`, not in the product yet, [skills.md](skills.md)) |
 
 The policy also reads `voice/heard`, `voice/said`, `voice/state` and
 `humans/faces/tracked`.
