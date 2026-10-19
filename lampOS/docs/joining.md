@@ -472,6 +472,21 @@ was busy. Since then:
    listed in `.github/workflows/lampos-arm64.yml`, and every skill's
    `SKILL.md` still run, and every push to `lamp-voice` still builds the
    binaries lamps install.
+7. **A long issue is cut and continued** (the project lead, 19 Oct 2026).
+   Issues had reached 219 comments with no clear end, and a builder
+   joining one had to read all of it. When an issue other than a queue
+   passes **30 comments or 3 days open**:
+   - its builder posts one **checkpoint** comment: what is delivered
+     (merged PRs), what is not, and what "done" means for the rest;
+   - the first builder closes it on what was delivered, with that
+     comment as the record;
+   - the first builder opens a **new issue for the rest**. It starts
+     with the checkpoint's summary and a link to the old issue, so nobody
+     needs to read the old thread. **Its title says what it blocks**
+     ("a short Stop is heard 7 of 7 times before it is on for a
+     customer's lamp"), not "continue #828";
+   - a rest that needs a scope or priority call (narrow it, park it or
+     drop it) goes to the lead on #1711 with the checkpoint.
 
 **Moved on 2026-10-14.** The first builder opened an issue for each open
 task (#694 to #704) and a role file for each builder. work-split.md keeps

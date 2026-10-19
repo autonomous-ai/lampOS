@@ -32,6 +32,9 @@ Every ready pull request into `lamp-voice` (not a draft), oldest first.
    when **all** of these hold:
    - It is **off unless set**: without its switch nothing changes, and a
      test shows that by comparing what the code does with and without it.
+     **Or** it is on by default, its builder posted evidence from its own
+     lamp, and none of item 4's cases holds (the first builder, 19 Oct
+     2026, agreed by the project lead on #1711).
    - Its ARM64 run on the head is green. One that failed only in a test
      that has an open issue for being flaky may be re-run once.
    - **A PR that changes only docs no build reads** (the docs' and the role
@@ -63,7 +66,13 @@ Every ready pull request into `lamp-voice` (not a draft), oldest first.
    - it can only be shown on **lamp-4ace** (its Codex targets, its touch
      strip, its own settings), or its builder asks for lamp-4ace;
    - it **changes or removes** a field or meaning in `crates/msgs`,
-     `crates/bus` or `crates/ipc` that another part already reads.
+     `crates/bus` or `crates/ipc` that another part already reads. A
+     **new** field or topic that older readers skip (as #1747's, #1763's
+     and #1771's fields were) is yours to merge;
+   - it is **on by default** and touches the **safety** bounds, the
+     **update** path (`lamp-update`, the install, a build's manifest) or
+     the **body's motion**;
+   - it changes **lamp-4ace's own** units or settings.
 
    **Everything else is yours to merge** on your review, a green ARM64 run
    and, for behaviour on real hardware, the builder's evidence from its own
