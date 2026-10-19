@@ -5,6 +5,32 @@ list and the answers belong to the first builder (Queue #1722, continued from
 #705). Sixth shares lamp-52e6 through Fifth, with a scoped loan and exact
 restoration; every hardware result below names its lamp. Newest first.
 
+## 2026-10-19 — request-scope draft; mic1 retargeted
+
+Ready for lamp-voice: no for #1794 and the new #1748 head; native CI pending.
+
+- First merged #1768 (`08a90ec99`) and #1707 (`5ea36b2ae`). The latter's
+  squashed head `81e2595e6` passed ARM64 `39212794308` with no contract finding.
+- #1748 retargeted to lamp-voice and rebased as one commit `c5f1e27f6` on
+  `cc540fd54`. Host fmt, strict Bus/Ears all-target Clippy, complete tests
+  (162 passed, 0 failed, 1 ignored), and workspace build pass. New native
+  run `39216134192` is pending; older artifact receipts are not this head.
+- #1794 (`b9c77f6a8`) implements immutable request memory scope and revocation
+  in both voice routes, including parked/detached calls, legacy/Days/rules
+  transport, source-expiry cache and camera privacy generation. Late results
+  are checked before another model round. Final fmt, strict Voice/Turn-owner
+  all-target Clippy, complete tests (2,336 passed, 0 failed, 12 ignored) and
+  workspace build pass. Standalone source-only build passes with 1,346 source
+  hashes matching. Native `39216318595` pending. Verification notes are in
+  `docs/verification/memory-request-scope-host-20261019/README.md` on the PR.
+- #1675 is not complete: session history/snapshots still need isolation;
+  voice matching remains diagnostic and device latency is not measured.
+- At 14:00 +07 requested a five-minute read-only preflight through the historic
+  `~/loans.txt` on lamp-52e6. No Fifth grant yet; only this coordination file
+  was read/appended. No service, recording, camera, playback or motion changed.
+- #1694 queued behind #1748; #1442/#779 remain parked behind #1675.
+
+
 ## 2026-10-19 — journal ready; mic1 privacy review fixed
 
 Ready for lamp-voice: yes (#1768, journal-attribution slice only).
