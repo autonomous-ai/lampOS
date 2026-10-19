@@ -8,7 +8,7 @@ use std::{
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     if args.next().as_deref() != Some("serve") {
-        return Err("usage: lamp-schedule serve --dir ABS --socket ABS --zone IANA [--bus-root ABS] [--boot-id ID] [--trust-clock] [--kernel-clock] [--run-for-ms N] [--enable]".into());
+        return Err("usage: lamp-schedule serve --dir ABS --socket ABS --zone IANA|system [--bus-root ABS] [--boot-id ID] [--trust-clock] [--kernel-clock] [--run-for-ms N] [--enable]".into());
     }
     let mut dir = None;
     let mut socket = None;

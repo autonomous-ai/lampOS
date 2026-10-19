@@ -2059,8 +2059,10 @@ version = "0.1.0"
 dependencies = [
  "getrandom 0.4.3",
  "jiff",
+ "jiff-tzdb",
  "lamp-bus",
  "lamp-ipc",
+ "lamp-local-time",
  "lamp-msgs",
  "rusqlite",
  "rustix",

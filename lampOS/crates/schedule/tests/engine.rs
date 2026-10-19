@@ -936,3 +936,82 @@ fn a_store_from_a_later_build_is_read() {
     disk.0.lock().unwrap().bytes = Some(serde_json::to_vec(&later).unwrap());
     assert_eq!(open(disk, &now(2)).revision(), revision);
 }
+
+/// What setup does: a new link to the zone renamed over `localtime`.
+fn point(root: &std::path::Path, name: &str) {
+    let file = root.join("zoneinfo").join(name);
+    if !file.exists() {
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, jiff_tzdb::get(name).unwrap().1).unwrap();
+    }
+    let link = root.join("localtime.new");
+    let _ = std::fs::remove_file(&link);
+    std::os::unix::fs::symlink(&file, &link).unwrap();
+    std::fs::rename(&link, root.join("localtime")).unwrap();
+}
+
+/// #820: with `--zone system`, a reminder is set in the zone setup last
+/// pointed the lamp at, without a restart: a daily 7:00 set in Ho Chi Minh
+/// City, then one set after a re-setup to New York, each at its own 7:00.
+/// The first keeps the zone it was set in.
+#[test]
+fn with_the_system_zone_a_new_reminder_follows_a_re_setup_and_an_old_one_keeps_its_own() {
+    let root = tempfile::tempdir().unwrap();
+    point(root.path(), "Asia/Ho_Chi_Minh");
+    let system = lamp_local_time::LocalTime::System(
+        lamp_local_time::SystemZone::open(
+            root.path().join("localtime"),
+            root.path().join("timezone"),
+        )
+        .unwrap(),
+    );
+    let at = now(0);
+    let mut engine = Engine::open_following(Disk::default(), system, &at, STORE).unwrap();
+    let status =
+        |engine: &mut Engine<Disk>| engine.answer(Request::Status {}, &at).unwrap()["zone"].clone();
+    assert_eq!(status(&mut engine), "Asia/Ho_Chi_Minh");
+    let daily = || When::Daily {
+        time: "07:00".into(),
+        zone: None,
+    };
+    let saigon = create(&mut engine, &at, daily());
+    assert!(
+        saigon["local"]
+            .as_str()
+            .unwrap()
+            .contains("T07:00:00+07:00[Asia/Ho_Chi_Minh]"),
+        "{saigon}"
+    );
+
+    point(root.path(), "America/New_York");
+    assert_eq!(status(&mut engine), "America/New_York");
+    let new_york = create(&mut engine, &at, daily());
+    let local = new_york["local"].as_str().unwrap();
+    assert!(
+        local.contains("T07:00:00-0") && local.ends_with("[America/New_York]"),
+        "{new_york}"
+    );
+    let first = get(&mut engine, &at, saigon["id"].as_u64().unwrap());
+    assert!(first.to_string().contains("Asia/Ho_Chi_Minh"), "{first}");
+}
+
+/// A system zone that names no zone this build knows is refused at start,
+/// as an unknown named one is.
+#[test]
+fn a_system_zone_with_no_known_name_is_refused_at_start() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(
+        root.path().join("localtime"),
+        jiff_tzdb::get("Asia/Ho_Chi_Minh").unwrap().1,
+    )
+    .unwrap();
+    let system = lamp_local_time::LocalTime::System(
+        lamp_local_time::SystemZone::open(
+            root.path().join("localtime"),
+            root.path().join("timezone"),
+        )
+        .unwrap(),
+    );
+    assert!(Engine::open_following(Disk::default(), system, &now(0), STORE).is_err());
+    assert!(Engine::open(Disk::default(), "Middle_Earth/Rivendell", &now(0), STORE).is_err());
+}

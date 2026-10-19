@@ -10,7 +10,10 @@
 //! new zone counts from the next reading, without a restart. `TZ` is not read;
 //! the lamp's units do not set it, and the file is what setup writes.
 
-use jiff::{Timestamp, tz::TimeZone};
+use jiff::{
+    Timestamp,
+    tz::{TimeZone, TimeZoneDatabase},
+};
 use std::{
     fs::{self, File},
     io::{self, Read},
@@ -64,6 +67,17 @@ impl LocalTime {
             Self::Offset(minutes) => *minutes,
             Self::Zone(zone) => zoned(zone),
             Self::System(system) => zoned(&system.current()),
+        }
+    }
+
+    /// The zone's IANA name, for a part that keeps a zone by name (Schedule,
+    /// #820): a named zone's own, or the system's as it is now. Nothing for a
+    /// fixed offset, or a system zone that names none.
+    pub fn name(&self) -> Option<String> {
+        match self {
+            Self::Offset(_) => None,
+            Self::Zone(zone) => zone.iana_name().map(str::to_owned),
+            Self::System(system) => system.name(),
         }
     }
 
@@ -199,6 +213,21 @@ impl SystemZone {
             timezone,
             state: Box::new(Mutex::new(State { seen, zone })),
         })
+    }
+
+    /// The zone's IANA name as the files are now: where the link points, or,
+    /// when the zone file is no link into a zone folder, the name file's
+    /// text. Only a name the bundled zones know: a system's own zone folder
+    /// has names such as `localtime` that are no zone (ARM64 on #1825).
+    pub fn name(&self) -> Option<String> {
+        let known = |name: &str| TimeZoneDatabase::bundled().get(name).is_ok();
+        name_of_link(&self.localtime)
+            .filter(|name| known(name))
+            .or_else(|| {
+                let named = fs::read_to_string(&self.timezone).ok()?;
+                let named = named.trim();
+                known(named).then(|| named.to_owned())
+            })
     }
 
     /// The zone as the files are now. Read again only when they changed; a

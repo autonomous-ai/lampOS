@@ -85,7 +85,8 @@ pub enum Input {
     },
     /// The local time of day, in minutes since local midnight, at `stamp`.
     /// Not a bus topic: the live service makes it from the wall clock and
-    /// its `--utc-offset-minutes`, and an import from the recording's.
+    /// its local time (`--zone`, or `--utc-offset-minutes`; #820), and an
+    /// import from the recording's.
     DayTime {
         stamp: ClockStamp,
         minute: u16,
