@@ -29,6 +29,20 @@ ready, not paused) and a face is in front of it.
 | 6 | `giving_way` | placeholder | — | — |
 | 7 | `preferences` | asks about quiet hours and whether it may say hello, one at a time; keeps each as a rule with `keep_rule` (#813) when the provider worker has both `LAMP_MEMORY_DAYS=on` and `LAMP_MEMORY_RULES=on` ([memory.md](memory.md), "What a person teaches and corrects"); without either, or with the legacy memory, there is no `keep_rule` and the model keeps them with `remember` if it has a memory at all and says that is everything | the model calls `setup_step` | the rules, in memory |
 
+With the separate `LAMP_VOICE_PERSON=shadow` diagnostic enabled, the
+`remember_my_face` tool can also enroll a voice print during `who_you_are`.
+It requires explicit permission to remember **both face and voice** and
+`voice:true`; naming themselves or agreeing to a face alone never grants voice
+permission. A usable print must belong to that same sufficiently long spoken
+request, so a short "yes" does not reuse the introduction's print. Face-only
+success remains valid and the model must report that the voice was not enrolled
+when `voice_enrolled:false` is returned. See [voice-person.md](voice-person.md).
+With the shadow switch and both configured paths, the name step asks permission
+for both and explains that voice measurement needs their name in a sufficiently
+long consenting sentence. Face-only consent remains valid. The default
+first-meeting prompt and ordering are unchanged; `how_you_sound`
+remains an unimplemented placeholder, not a completed speaker calibration.
+
 A placeholder is the step of a part another builder owns: hearing (fourth,
 #753), head touch (third, #711), the privacy switch (third, #795), and
 whether the body gives way (fifth, #780). It is recorded as `not_available`

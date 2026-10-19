@@ -333,6 +333,18 @@ fn main() -> std::process::ExitCode {
     }
 }
 
+/// Forget revokes every pending enrollment before any persistent deletion.
+/// Taking the job first prevents a completed capture from saving it again.
+#[cfg(any(target_os = "linux", test))]
+fn cancel_enrollment(
+    pending: &mut Option<(lamp_eyes::who::Taking, std::os::unix::net::UnixStream)>,
+) {
+    use std::io::Write;
+    if let Some((_, mut stream)) = pending.take() {
+        let _ = writeln!(stream, "{}", serde_json::json!({"error": "cancelled"}));
+    }
+}
+
 #[cfg(not(target_os = "linux"))]
 fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _ = arguments;
@@ -669,10 +681,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 let _ = stream.set_nonblocking(false);
                 let _ = stream.set_read_timeout(Some(Duration::from_millis(200)));
                 let _ = stream.set_write_timeout(Some(Duration::from_millis(200)));
-                // One line, up to its newline or the caller's end.
+                // One bounded line, including an optional 512-float voice print,
+                // up to its newline or the caller's end.
                 let mut line = Vec::new();
                 let _ = std::io::BufRead::read_until(
-                    &mut std::io::BufReader::new((&mut stream).take(1024)),
+                    &mut std::io::BufReader::new((&mut stream).take(32768)),
                     b'\n',
                     &mut line,
                 );
@@ -687,33 +700,58 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         }
                         None => serde_json::json!({"who": null}),
                     },
-                    Some(Ask::List) => serde_json::json!({"people": who.people.names()}),
-                    Some(Ask::Forget(name)) => match who.people.forget(&name) {
-                        // Set-aside files it could not search: said, with the
-                        // forget waiting for them (#1586).
-                        Ok(lamp_eyes::who::Forgot { forgot, unsearched }) if unsearched > 0 => {
-                            eprintln!(
-                                "lamp-eyes: asked to forget a face; forgotten: {forgot}; {unsearched} set-aside files could not be searched, and the forget waits for them"
-                            );
-                            who.known = None;
-                            serde_json::json!({"forgot": forgot, "unsearched": unsearched})
-                        }
-                        Ok(lamp_eyes::who::Forgot { forgot, .. }) => {
-                            eprintln!("lamp-eyes: asked to forget a face; forgotten: {forgot}");
-                            who.known = None;
-                            serde_json::json!({"forgot": forgot})
-                        }
-                        Err(error) => {
-                            eprintln!("lamp-eyes: could not forget a face: {error}");
-                            serde_json::json!({"error": "storage"})
-                        }
+                    Some(Ask::VoiceMatch(print)) => match who.people.voice_match(print) {
+                        Some(result) => serde_json::to_value(result).expect("finite voice scores"),
+                        None => serde_json::json!({"error": "invalid_voice_print"}),
                     },
-                    Some(Ask::Remember(_) | Ask::RememberOne { .. }) if who.taking.is_some() => {
+                    Some(Ask::List) => serde_json::json!({"people": who.people.names()}),
+                    Some(Ask::Forget(name)) => {
+                        cancel_enrollment(&mut who.taking);
+                        match who.people.forget(&name) {
+                            // Set-aside files it could not search: said, with the
+                            // forget waiting for them (#1586).
+                            Ok(lamp_eyes::who::Forgot { forgot, unsearched }) if unsearched > 0 => {
+                                eprintln!(
+                                    "lamp-eyes: asked to forget a face; forgotten: {forgot}; {unsearched} set-aside files could not be searched, and the forget waits for them"
+                                );
+                                who.known = None;
+                                serde_json::json!({"forgot": forgot, "unsearched": unsearched})
+                            }
+                            Ok(lamp_eyes::who::Forgot { forgot, .. }) => {
+                                eprintln!("lamp-eyes: asked to forget a face; forgotten: {forgot}");
+                                who.known = None;
+                                serde_json::json!({"forgot": forgot})
+                            }
+                            Err(error) => {
+                                eprintln!("lamp-eyes: could not forget a face: {error}");
+                                serde_json::json!({"error": "storage"})
+                            }
+                        }
+                    }
+                    Some(
+                        Ask::Remember(_) | Ask::RememberOne { .. } | Ask::RememberVoice { .. },
+                    ) if who.taking.is_some() => {
                         serde_json::json!({"error": "busy"})
                     }
-                    Some(Ask::Remember(_) | Ask::RememberOne { .. }) if port.is_none() => {
+                    Some(
+                        Ask::Remember(_) | Ask::RememberOne { .. } | Ask::RememberVoice { .. },
+                    ) if port.is_none() => {
                         serde_json::json!({"error": "eyes_shut"})
                     }
+                    Some(Ask::RememberVoice {
+                        name,
+                        replace,
+                        voice_print,
+                    }) => match plain_name(&name) {
+                        Some(name) => {
+                            let mut taking = Taking::new(name, lamp_ipc::monotonic_us());
+                            taking.one_face = replace;
+                            taking.voice_print = Some(voice_print);
+                            who.taking = Some((taking, stream));
+                            continue;
+                        }
+                        None => serde_json::json!({"error": "not_a_name"}),
+                    },
                     Some(Ask::Remember(name)) => match plain_name(&name) {
                         Some(name) => {
                             eprintln!("lamp-eyes: asked to remember a face");
@@ -746,15 +784,24 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     let now_unix_s = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .map_or(0, |since| since.as_secs());
+                    let voice_enrolled = taking.voice_print.is_some();
                     let kept = match taking.one_face {
                         None => who
                             .people
-                            .remember(&taking.name, prints, now_unix_s)
+                            .remember_with_voice(
+                                &taking.name,
+                                prints,
+                                now_unix_s,
+                                taking.voice_print.take(),
+                            )
                             .map_err(|error| who::Refused::Store(error.to_string())),
-                        Some(replace) => {
-                            who.people
-                                .remember_one(&taking.name, prints, now_unix_s, replace)
-                        }
+                        Some(replace) => who.people.remember_one_with_voice(
+                            &taking.name,
+                            prints,
+                            now_unix_s,
+                            replace,
+                            taking.voice_print.take(),
+                        ),
                     };
                     let reply = match kept {
                         Ok(name) => {
@@ -765,9 +812,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             // With visits counted, the voice tells them so in
                             // one line (the first builder on #1670, 12:19).
                             if who.visits {
-                                serde_json::json!({"remembered": name, "visits": true})
+                                serde_json::json!({"remembered": name, "visits": true, "voice_enrolled": voice_enrolled})
                             } else {
-                                serde_json::json!({"remembered": name})
+                                serde_json::json!({"remembered": name, "voice_enrolled": voice_enrolled})
                             }
                         }
                         // The face is known by another name: the voice asks
@@ -1292,6 +1339,36 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn forget_cancels_even_a_complete_pending_enrollment_and_answers_its_caller() {
+        use lamp_eyes::who::{MOST_PRINTS, PRINT, Taking, VOICE_PRINT};
+        use std::io::Read;
+        use std::os::unix::net::UnixStream;
+        let (socket, mut caller) = UnixStream::pair().unwrap();
+        caller
+            .set_read_timeout(Some(std::time::Duration::from_secs(1)))
+            .unwrap();
+        let mut taking = Taking::new("Ann".into(), 0);
+        taking.voice_print = Some(vec![1.0; VOICE_PRINT]);
+        for _ in 0..MOST_PRINTS {
+            taking.look(&[0.2], Some(vec![1.0; PRINT]));
+        }
+        let mut pending = Some((taking, socket));
+        cancel_enrollment(&mut pending);
+        assert!(
+            pending.is_none(),
+            "completed face and voice can no longer be saved"
+        );
+        let mut reply = String::new();
+        caller.read_to_string(&mut reply).unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&reply).unwrap(),
+            serde_json::json!({"error":"cancelled"})
+        );
+        cancel_enrollment(&mut pending);
+        assert!(pending.is_none());
+    }
 
     fn args(values: &[&str]) -> Vec<OsString> {
         values.iter().map(OsString::from).collect()

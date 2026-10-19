@@ -189,6 +189,27 @@ pub fn ordinary_priority() -> io::Result<()> {
     Ok(())
 }
 
+const PINNED_MODEL_BYTES: u64 = 29_596_978;
+const PINNED_MODEL_SHA256: &str =
+    "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b";
+
+/// Read a bounded snapshot, then verify exactly the bytes the parser receives.
+fn pinned_bytes(input: impl Read, length: u64, digest: &str) -> Result<Vec<u8>, String> {
+    use sha2::{Digest, Sha256};
+    let mut bytes = Vec::new();
+    input
+        .take(length + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    if bytes.len() as u64 != length {
+        return Err("pinned CAM++ model has an unexpected size".into());
+    }
+    if format!("{:x}", Sha256::digest(&bytes)) != digest {
+        return Err("pinned CAM++ model does not match SHA256".into());
+    }
+    Ok(bytes)
+}
+
 /// The speaker model, ready to run on any number of frames.
 pub struct Voice {
     plan: Arc<TypedRunnableModel>,
@@ -203,6 +224,27 @@ impl Voice {
             .with_ignore_output_shapes(true)
             .model_for_path(path)
             .map_err(said)?;
+        Self::from_model(model, path)
+    }
+
+    /// Identity prints require these exact bytes, checked on every child start.
+    pub fn load_pinned(path: &Path) -> Result<Self, String> {
+        let file =
+            std::fs::File::open(path).map_err(|error| format!("{}: {error}", path.display()))?;
+        if file.metadata().map_err(|error| error.to_string())?.len() != PINNED_MODEL_BYTES {
+            return Err("pinned CAM++ model has an unexpected size".into());
+        }
+        let bytes = pinned_bytes(file, PINNED_MODEL_BYTES, PINNED_MODEL_SHA256)?;
+        let model = tract_onnx::onnx()
+            .with_ignore_value_info(true)
+            .with_ignore_output_shapes(true)
+            .model_for_read(&mut bytes.as_slice())
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+        Self::from_model(model, path)
+    }
+
+    fn from_model(model: InferenceModel, path: &Path) -> Result<Self, String> {
+        let said = |error: TractError| format!("{}: {error}", path.display());
         let frames = model.symbols.sym("T");
         let shape = [1.to_dim(), frames.to_dim(), (BINS as i64).to_dim()];
         let plan = model
@@ -361,6 +403,33 @@ pub fn read_wav(path: &Path) -> Result<Vec<f32>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pinned_model_snapshot_rejects_size_and_digest_changes_before_parsing() {
+        use sha2::{Digest, Sha256};
+        let bytes = b"fixture model";
+        let digest = format!("{:x}", Sha256::digest(bytes));
+        assert_eq!(
+            pinned_bytes(&bytes[..], bytes.len() as u64, &digest).unwrap(),
+            bytes
+        );
+        for length in [bytes.len() as u64 - 1, bytes.len() as u64 + 1] {
+            assert!(
+                pinned_bytes(&bytes[..], length, &digest)
+                    .unwrap_err()
+                    .contains("size")
+            );
+        }
+        assert!(
+            pinned_bytes(&bytes[..], bytes.len() as u64, "wrong")
+                .unwrap_err()
+                .contains("SHA256")
+        );
+        let path = std::env::temp_dir().join(format!("lamp-pinned-model-{}", std::process::id()));
+        std::fs::write(&path, bytes).unwrap();
+        assert!(Voice::load_pinned(&path).err().unwrap().contains("size"));
+        std::fs::remove_file(path).unwrap();
+    }
 
     #[test]
     fn a_frame_is_25_ms_every_10_ms_and_each_band_is_centred() {

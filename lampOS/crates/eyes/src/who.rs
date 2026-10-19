@@ -39,8 +39,9 @@ pub const MOST_PEOPLE: usize = 20;
 pub const MOST_PRINTS: usize = 5;
 /// The longest name kept, in characters.
 const MOST_NAME_CHARS: usize = 40;
-/// The kept file is never read past this.
-const MOST_FILE_BYTES: u64 = 256 * 1024;
+/// Bounded room for twenty people, each with five face and three voice
+/// prints, including JSON float formatting. Never read past this limit.
+const MOST_FILE_BYTES: u64 = 1024 * 1024;
 /// Beside the people file: where records it could not read are kept, never
 /// dropped (#1505). The folder is 0700, each file 0600, and the product
 /// reset empties it, since these are face prints.
@@ -180,8 +181,12 @@ pub fn likeness(a: &[f32], b: &[f32]) -> f32 {
 }
 
 fn unit(values: Vec<f32>) -> Option<Vec<f32>> {
+    normalized(values, PRINT)
+}
+
+fn normalized(values: Vec<f32>, dimensions: usize) -> Option<Vec<f32>> {
     let length = values.iter().map(|v| v * v).sum::<f32>().sqrt();
-    (values.len() == PRINT && length.is_finite() && length > 1e-6)
+    (values.len() == dimensions && length.is_finite() && length > 1e-6)
         .then(|| values.into_iter().map(|v| v / length).collect())
 }
 
@@ -231,6 +236,28 @@ impl Recogniser {
     }
 }
 
+/// The existing CAM++ speaker embedding, pinned independently of face prints.
+/// Confirmed from inference with the pinned model, not its family name.
+pub const VOICE_PRINT: usize = 512;
+pub const VOICE_MODEL: &str =
+    "cam++:357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b";
+pub const MOST_VOICE_PRINTS: usize = 3;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VoicePrints {
+    pub model: String,
+    pub prints: Vec<Vec<f32>>,
+}
+
+/// Provisional measurement only: never an identity grant for memory.
+#[derive(Debug, Serialize)]
+pub struct VoiceMatch {
+    pub candidate: Option<String>,
+    pub cosine: Option<f32>,
+    pub runner_up: Option<f32>,
+    pub shadow: bool,
+}
+
 /// Read one release forward (#1505): a field a later build added is not
 /// this build's to refuse; the next save writes this build's fields only.
 ///
@@ -253,6 +280,8 @@ pub struct Person {
     /// that only adds, so the file keeps its version (the rule above).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub familiar: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voice: Option<VoicePrints>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -470,6 +499,26 @@ impl People {
         prints: Vec<Vec<f32>>,
         now_unix_s: u64,
     ) -> Result<String> {
+        self.remember_with_voice(name, prints, now_unix_s, None)
+    }
+
+    pub fn remember_with_voice(
+        &mut self,
+        name: &str,
+        prints: Vec<Vec<f32>>,
+        now_unix_s: u64,
+        voice_print: Option<Vec<f32>>,
+    ) -> Result<String> {
+        let voice = voice_print
+            .map(|print| {
+                normalized(print, VOICE_PRINT)
+                    .map(|print| VoicePrints {
+                        model: VOICE_MODEL.into(),
+                        prints: vec![print],
+                    })
+                    .ok_or("invalid voice print")
+            })
+            .transpose()?;
         let name = plain_name(name).ok_or("that is not a name the lamp keeps")?;
         if prints.is_empty()
             || prints.len() > MOST_PRINTS
@@ -487,6 +536,7 @@ impl People {
             prints,
             added_unix_s: now_unix_s,
             familiar: None,
+            voice,
         });
         self.save(&next)?;
         self.people = next;
@@ -508,6 +558,17 @@ impl People {
         now_unix_s: u64,
         replace: bool,
     ) -> std::result::Result<String, Refused> {
+        self.remember_one_with_voice(name, prints, now_unix_s, replace, None)
+    }
+
+    pub fn remember_one_with_voice(
+        &mut self,
+        name: &str,
+        prints: Vec<Vec<f32>>,
+        now_unix_s: u64,
+        replace: bool,
+        voice_print: Option<Vec<f32>>,
+    ) -> std::result::Result<String, Refused> {
         let kept = plain_name(name).ok_or(Refused::NotAName)?;
         // Whoever else these prints are, by the same likeness that
         // recognises a face.
@@ -517,18 +578,58 @@ impl People {
                 known.push(other);
             }
         }
-        if !known.is_empty() {
-            if !replace {
-                return Err(Refused::KnownAs(known.join(" and ")));
-            }
-            let mut next = self.people.clone();
-            next.retain(|person| !known.iter().any(|other| same_name(other, &person.name)));
-            self.save(&next)
-                .map_err(|error| Refused::Store(error.to_string()))?;
-            self.people = next;
+        if !known.is_empty() && !replace {
+            return Err(Refused::KnownAs(known.join(" and ")));
         }
-        self.remember(&kept, prints, now_unix_s)
-            .map_err(|error| Refused::Store(error.to_string()))
+        // Stage removal and enrollment together; failure preserves the old record.
+        let mut staged = Self {
+            path: self.path.clone(),
+            people: self.people.clone(),
+            scored_at: self.scored_at,
+            counted: self.counted.clone(),
+            unscored: self.unscored.clone(),
+        };
+        staged
+            .people
+            .retain(|person| !known.iter().any(|other| same_name(other, &person.name)));
+        let name = staged
+            .remember_with_voice(&kept, prints, now_unix_s, voice_print)
+            .map_err(|error| Refused::Store(error.to_string()))?;
+        *self = staged;
+        Ok(name)
+    }
+
+    /// Compare only compatible stored prints. Scores are shadow diagnostics.
+    pub fn voice_match(&self, print: Vec<f32>) -> Option<VoiceMatch> {
+        let print = normalized(print, VOICE_PRINT)?;
+        let mut ranked: Vec<(&str, f32)> = self
+            .people
+            .iter()
+            .filter_map(|person| {
+                let voice = person.voice.as_ref()?;
+                if voice.model != VOICE_MODEL {
+                    return None;
+                }
+                let best = voice
+                    .prints
+                    .iter()
+                    .map(|kept| likeness(kept, &print).clamp(-1.0, 1.0))
+                    .max_by(f32::total_cmp)?;
+                Some((person.name.as_str(), best))
+            })
+            .collect();
+        ranked.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let best = ranked.first();
+        let runner_up = ranked.get(1).map(|p| p.1);
+        let candidate = best
+            .filter(|p| p.1 >= 0.75 && runner_up.is_none_or(|second| p.1 - second >= 0.15))
+            .map(|p| p.0.to_owned());
+        Some(VoiceMatch {
+            candidate,
+            cosine: best.map(|p| p.1),
+            runner_up,
+            shadow: true,
+        })
     }
 
     /// Forgets this name's prints, and writes the file before it answers.
@@ -732,16 +833,53 @@ impl People {
 /// (`LAMP_NAMES=checked`), `{"remember":"A","one_face":true}`, and
 /// `"replace":true` once the person said yes to the new name. Anything else
 /// is nothing.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Ask {
+    RememberVoice {
+        name: String,
+        replace: Option<bool>,
+        voice_print: Vec<f32>,
+    },
+    VoiceMatch(Vec<f32>),
     Remember(String),
-    RememberOne { name: String, replace: bool },
+    RememberOne {
+        name: String,
+        replace: bool,
+    },
     Forget(String),
     List,
     Who,
 }
 
 pub fn ask_of(line: &[u8]) -> Option<Ask> {
+    let mut value: serde_json::Value = serde_json::from_slice(line).ok()?;
+    let fields = value.as_object_mut()?;
+    if let Some(print) = fields.remove("voice_match") {
+        if !fields.is_empty() {
+            return None;
+        }
+        return Some(Ask::VoiceMatch(normalized(
+            serde_json::from_value(print).ok()?,
+            VOICE_PRINT,
+        )?));
+    }
+    if let Some(print) = fields.remove("voice_print") {
+        let voice_print = normalized(serde_json::from_value(print).ok()?, VOICE_PRINT)?;
+        return match ask_of(&serde_json::to_vec(&value).ok()?)? {
+            Ask::Remember(name) => Some(Ask::RememberVoice {
+                name,
+                replace: None,
+                voice_print,
+            }),
+            Ask::RememberOne { name, replace } => Some(Ask::RememberVoice {
+                name,
+                replace: Some(replace),
+                voice_print,
+            }),
+            _ => None,
+        };
+    }
+
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     struct Line {
@@ -821,6 +959,7 @@ pub struct Taking {
     /// One name for one face, and whether to replace another name for it
     /// (`Ask::RememberOne`); `None`: as asked plainly.
     pub one_face: Option<bool>,
+    pub voice_print: Option<Vec<f32>>,
     prints: Vec<Vec<f32>>,
     started_us: u64,
     saw_any: bool,
@@ -861,6 +1000,7 @@ impl Taking {
         Self {
             name,
             one_face: None,
+            voice_print: None,
             prints: Vec::new(),
             started_us: now_us,
             saw_any: false,
@@ -1194,6 +1334,15 @@ fn valid(people: &[Person]) -> bool {
                 && person.prints.iter().all(|print| {
                     print.len() == PRINT && print.iter().all(|value| value.is_finite())
                 })
+                && person.voice.as_ref().is_none_or(|voice| {
+                    voice.model == VOICE_MODEL
+                        && (1..=MOST_VOICE_PRINTS).contains(&voice.prints.len())
+                        && voice.prints.iter().all(|print| {
+                            print.len() == VOICE_PRINT
+                                && print.iter().all(|v| v.is_finite())
+                                && (likeness(print, print) - 1.0).abs() < 1e-3
+                        })
+                })
                 && !people[..index]
                     .iter()
                     .any(|other| same_name(&other.name, &person.name))
@@ -1272,6 +1421,157 @@ mod tests {
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
         directory.join("people.json")
+    }
+
+    fn voice_print(axis: usize) -> Vec<f32> {
+        let mut print = vec![0.0; VOICE_PRINT];
+        print[axis] = 1.0;
+        print
+    }
+
+    #[test]
+    fn voice_prints_are_optional_private_and_removed_with_the_face() {
+        let path = file("voice-record");
+        let mut people = People::open(path.clone()).unwrap();
+        people.remember("Ann", vec![print(0.3)], 1).unwrap();
+        let saved = std::fs::read_to_string(&path).unwrap();
+        assert!(!saved.contains("voice"));
+        assert!(
+            People::open(path.clone()).unwrap().people[0]
+                .voice
+                .is_none()
+        );
+        people
+            .remember_with_voice("Ann", vec![print(0.3)], 2, Some(voice_print(0)))
+            .unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(people.people[0].voice.as_ref().unwrap().model, VOICE_MODEL);
+        assert_eq!(
+            people
+                .voice_match(voice_print(0))
+                .unwrap()
+                .candidate
+                .as_deref(),
+            Some("Ann")
+        );
+        // A failed replacement must neither drop the old name nor its print.
+        assert!(
+            people
+                .remember_one_with_voice(
+                    "Bo",
+                    vec![print(0.3)],
+                    3,
+                    true,
+                    Some(vec![0.0; VOICE_PRINT])
+                )
+                .is_err()
+        );
+        assert_eq!(People::open(path.clone()).unwrap().names(), ["Ann"]);
+        people
+            .remember_one("Bo", vec![print(0.3)], 3, true)
+            .unwrap();
+        assert!(
+            people
+                .voice_match(voice_print(0))
+                .unwrap()
+                .candidate
+                .is_none()
+        );
+        assert!(people.people[0].voice.is_none());
+        people
+            .remember_with_voice("Bo", vec![print(0.3)], 4, Some(voice_print(0)))
+            .unwrap();
+        assert!(people.forget("Bo").unwrap().forgot);
+        assert!(People::open(path).unwrap().people.is_empty());
+    }
+
+    #[test]
+    fn voice_match_is_shadow_and_abstains_for_unknown_and_ambiguous_people() {
+        let mut people = People::open(file("voice-match")).unwrap();
+        assert!(
+            people
+                .voice_match(voice_print(0))
+                .unwrap()
+                .candidate
+                .is_none()
+        );
+        people
+            .remember_with_voice("Ann", vec![print(0.3)], 1, Some(voice_print(0)))
+            .unwrap();
+        let found = people.voice_match(voice_print(0)).unwrap();
+        assert!(found.shadow);
+        assert_eq!(found.candidate.as_deref(), Some("Ann"));
+        assert_eq!(found.cosine, Some(1.0));
+        assert_eq!(found.runner_up, None);
+        assert!(
+            people
+                .voice_match(voice_print(1))
+                .unwrap()
+                .candidate
+                .is_none()
+        );
+        people
+            .remember_with_voice("Bo", vec![print(1.7)], 1, Some(voice_print(0)))
+            .unwrap();
+        let ambiguous = people.voice_match(voice_print(0)).unwrap();
+        assert!(ambiguous.candidate.is_none());
+        assert_eq!(ambiguous.runner_up, Some(1.0));
+    }
+
+    #[test]
+    fn malformed_voice_prints_and_standalone_enrollment_are_refused() {
+        let mut people = People::open(file("voice-invalid")).unwrap();
+        for bad in [
+            vec![],
+            vec![1.0; VOICE_PRINT - 1],
+            vec![1.0; 192],
+            vec![0.0; VOICE_PRINT],
+            vec![f32::NAN; VOICE_PRINT],
+            vec![f32::INFINITY; VOICE_PRINT],
+        ] {
+            assert!(people.voice_match(bad.clone()).is_none());
+            assert!(
+                people
+                    .remember_with_voice("Ann", vec![print(0.3)], 1, Some(bad))
+                    .is_err()
+            );
+        }
+        let print = voice_print(0);
+        let request = serde_json::json!({"remember":"Ann", "one_face":true, "voice_print":print});
+        assert!(matches!(
+            ask_of(&serde_json::to_vec(&request).unwrap()),
+            Some(Ask::RememberVoice {
+                replace: Some(false),
+                ..
+            })
+        ));
+        for request in [
+            serde_json::json!({"voice_print":print}),
+            serde_json::json!({"forget":"Ann", "voice_print":print}),
+            serde_json::json!({"voice_match":vec![0; VOICE_PRINT]}),
+            serde_json::json!({"voice_match":print, "who":true}),
+        ] {
+            assert!(ask_of(&serde_json::to_vec(&request).unwrap()).is_none());
+        }
+        assert!(matches!(
+            ask_of(&serde_json::to_vec(&serde_json::json!({"voice_match": print})).unwrap()),
+            Some(Ask::VoiceMatch(_))
+        ));
+        people
+            .remember_with_voice(
+                "Ann",
+                vec![self::print(0.3)],
+                1,
+                Some(vec![2.0; VOICE_PRINT]),
+            )
+            .unwrap();
+        assert!(valid(&people.people));
+        let mut bad = people.people.clone();
+        bad[0].voice.as_mut().unwrap().prints = vec![voice_print(0); MOST_VOICE_PRINTS + 1];
+        assert!(!valid(&bad));
+        bad[0].voice.as_mut().unwrap().prints = vec![voice_print(0)];
+        bad[0].voice.as_mut().unwrap().model = "other-model".into();
+        assert!(!valid(&bad));
     }
 
     /// #1505: the people file as a later build writes it, with a field this

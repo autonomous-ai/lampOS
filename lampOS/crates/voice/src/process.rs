@@ -875,6 +875,10 @@ fn worker_command(
             role,
             var("LAMP_MEMORY_DAYS").as_deref(),
         ))
+        .envs(voice_person_worker_environment(
+            role,
+            var("LAMP_VOICE_PERSON").as_deref(),
+        ))
         .envs(memory_rules_worker_environment(
             role,
             var(crate::rules::ENVIRONMENT).as_deref(),
@@ -930,6 +934,15 @@ fn memory_days_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some(("LAMP_MEMORY_DAYS", "on"))
+}
+
+// Speaker identity is measured only: never forward a trust-enabling value.
+fn voice_person_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("shadow")))
+        .then_some(("LAMP_VOICE_PERSON", "shadow"))
 }
 
 // The rules' switch (#813), passed the same narrow way: the exact `on`, to
@@ -1039,6 +1052,44 @@ fn person_name_worker_environment(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn voice_person_shadow_reaches_only_the_two_voice_routes() {
+        use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+        for role in [
+            "provider", "second", "capture", "speaker", "denoise", "echo", "unknown",
+        ] {
+            for value in [
+                None,
+                Some(OsString::from("shadow")),
+                Some(OsString::from("on")),
+                Some(OsString::from("SHADOW")),
+                Some(OsString::from("shadow ")),
+                Some(OsString::from_vec(vec![0xff])),
+            ] {
+                let command = worker_command(
+                    Path::new("/bin/true"),
+                    Path::new("/tmp"),
+                    role,
+                    (BootId::new([1; 16]).unwrap(), BootId::new([2; 16]).unwrap()),
+                    &[],
+                    |name| {
+                        (name == "LAMP_VOICE_PERSON")
+                            .then(|| value.clone())
+                            .flatten()
+                    },
+                );
+                let actual = command
+                    .get_envs()
+                    .find(|(name, _)| *name == "LAMP_VOICE_PERSON")
+                    .and_then(|(_, value)| value);
+                let expected = (matches!(role, "provider" | "second")
+                    && value.as_deref() == Some(std::ffi::OsStr::new("shadow")))
+                .then_some(std::ffi::OsStr::new("shadow"));
+                assert_eq!(actual, expected, "role {role}, value {value:?}");
+            }
+        }
+    }
 
     #[test]
     fn cleared_worker_environment_passes_only_the_exact_voice_route_opt_in() {

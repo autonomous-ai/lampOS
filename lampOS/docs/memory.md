@@ -422,8 +422,15 @@ then use that person's scope:
   now goes on, when the lamp has a memory: what they ask to keep and say is
   theirs, and what recall marks "theirs" they told it themselves, so with
   them it may say "you told me" about that and never about the rest.
-- **"Forget my face"** forgets the face only: what they said stays theirs.
-  Forgetting everything (`forget_all`) is as before.
+- **"Forget my face"** forgets the face and any attached voice prints
+  (#1675), including matching set-aside records and pending enrollment.
+  What they said stays theirs. Forgetting conversation memory with
+  `forget_all` is as before.
+- **Voice identity is shadow-only** ([voice-person.md](voice-person.md)).
+  A voice candidate does not select a person, change a provider session,
+  authorize a recall or route a journal entry. With no known face, the
+  existing identity and presence rules still apply. Real-office measurement
+  and safe request-bound routing remain outstanding on #1675.
 - **With nobody known**, or without eyes, every line to the memory is
   exactly what it was: no `person` field, the same limits, the same note
   (`remember::tests::with_nobody_known_every_line_to_the_memory_is_as_before`

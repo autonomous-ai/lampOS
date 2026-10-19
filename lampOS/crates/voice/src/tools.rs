@@ -995,9 +995,10 @@ fn run_call_with_scope(
         // may keep or forget one, never a request the lamp wrote or a text
         // from the app (the reviewer on #1713), as for marks.
         Route::Faces(..) if !heard => ("the eyes", (json!({"error": FACES_IN_PERSON}), false)),
-        Route::Faces(socket, checked) => {
-            ("the eyes", crate::known_faces::run(socket, call, *checked))
-        }
+        Route::Faces(socket, checked) => (
+            "the eyes",
+            crate::known_faces::run_for_request(socket, call, *checked, request, heard),
+        ),
         Route::Mark(session) => ("the marks", crate::marked::run(session, call, heard)),
         Route::Onboarding(file) => ("the onboarding", crate::onboarding::run(file, call)),
         Route::ReportsStop => (

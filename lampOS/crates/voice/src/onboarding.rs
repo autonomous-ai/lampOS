@@ -113,9 +113,10 @@ impl Step {
     }
 
     /// What the model is given to begin the step.
-    fn note(self) -> &'static str {
+    fn note(self, voice_shadow: bool) -> &'static str {
         match self {
             Step::WhereYouSit => SIT_NOTE,
+            Step::WhoYouAre if voice_shadow => WHO_VOICE_NOTE,
             Step::WhoYouAre => WHO_NOTE,
             Step::Preferences => PREFERENCES_NOTE,
             // PLACEHOLDER (#841): each owner words its own step's note,
@@ -148,6 +149,9 @@ pub const SIT_DONE: &str =
     "(Now you can see them well where they sit. Tell them so in a few words.)";
 pub const SIT_FAILED: &str = "(You still cannot see them well where they sit. Tell them in a few light words that it is fine: they can turn you toward their seat later, or ask you to redo the setup.)";
 pub const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Then call setup_step with step \"who_you_are\": done, skipped if they would rather not, or failed if it could not be done, and then tell them in a few words what they can try later.)";
+/// The same name step, with explicit consent for optional voice measurement.
+pub const WHO_VOICE_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. Say that name back and ask whether you may remember both their face and voice on this lamp. A no is fine; face-only permission is not voice permission. Only after a clear yes to both, call remember_my_face with their name and voice true. Use voice false for face-only permission. For voice registration, ask them to include their name in a quiet consenting sentence of at least a few seconds; do not reuse earlier audio for a short yes. If the tool reports voice_enrolled false, say only the face was remembered and they can try the voice later. This is measurement only: never claim you can already recognize them by voice. Then call setup_step with step \"who_you_are\": done for a remembered face, skipped if they would rather not, or failed if it could not be done.)";
+
 pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask them two short things, one at a time: whether there are hours when you should keep quiet, and whether you may say hello when they sit down. Keep each answer as a rule if you can. Then call setup_step with step \"preferences\", and tell them in a few words that is everything, and that they can ask you to redo the setup any time.)";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -211,6 +215,7 @@ struct Led {
 }
 
 pub struct Onboarding {
+    voice_shadow: bool,
     file: PathBuf,
     kept: Progress,
     led: Option<Led>,
@@ -292,6 +297,13 @@ impl Onboarding {
             std::env::var(FILE_ENVIRONMENT).ok().as_deref(),
         )?;
         let mut walk = Self::at(file);
+        walk.voice_shadow = crate::voice_person::enabled()
+            && [
+                crate::same_voice::ENVIRONMENT,
+                crate::known_faces::ENVIRONMENT,
+            ]
+            .iter()
+            .all(|name| std::env::var_os(name).is_some_and(|path| Path::new(&path).is_absolute()));
         walk.eyes = lamp_bus::Bus::from_environment().ok();
         Some(walk)
     }
@@ -303,6 +315,7 @@ impl Onboarding {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .unwrap_or_default();
         Self {
+            voice_shadow: false,
             file,
             kept,
             led: None,
@@ -502,7 +515,7 @@ impl Onboarding {
                 if again.is_some() {
                     self.save();
                 }
-                return Some(step.note());
+                return Some(step.note(self.voice_shadow));
             }
             return None;
         };
@@ -934,6 +947,27 @@ mod tests {
             switched_on(Some("on"), Some("/a")),
             Some(PathBuf::from("/a"))
         );
+    }
+
+    #[test]
+    fn the_name_step_offers_voice_only_in_shadow_and_keeps_face_only_consent() {
+        for shadow in [false, true] {
+            let mut room = Room::new(if shadow {
+                "voice-consent"
+            } else {
+                "face-consent"
+            });
+            room.walk.voice_shadow = shadow;
+            let notes = room.wait(30 * S, Some(NEAR_MIDDLE));
+            let expected = if shadow { WHO_VOICE_NOTE } else { WHO_NOTE };
+            assert!(notes.contains(&expected), "{notes:?}");
+            assert!(!notes.contains(&if shadow { WHO_NOTE } else { WHO_VOICE_NOTE }));
+            if shadow {
+                assert!(expected.contains("Only after a clear yes to both"));
+                assert!(expected.contains("voice false for face-only permission"));
+                assert!(expected.contains("never claim you can already recognize them by voice"));
+            }
+        }
     }
 
     #[test]

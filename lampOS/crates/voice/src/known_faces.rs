@@ -540,7 +540,15 @@ pub fn tools() -> Vec<Tool> {
 
 /// The same, with names checked or not.
 pub fn tools_checked(checked: bool) -> Vec<Tool> {
-    vec![
+    tools_with_voice(checked, voice_shadow())
+}
+
+fn voice_shadow() -> bool {
+    std::env::var("LAMP_VOICE_PERSON").as_deref() == Ok("shadow")
+}
+
+fn tools_with_voice(checked: bool, voice: bool) -> Vec<Tool> {
+    let mut tools = vec![
         Tool {
             name: REMEMBER.into(),
             description: if checked {
@@ -587,7 +595,21 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
             })),
             silent: false,
         },
-    ]
+    ];
+    if voice {
+        tools[0].description.push_str(
+            " To remember their voice too, first ask explicit permission to remember BOTH their face and voice. \
+             Only after they clearly agree, set voice to true. A name or permission to remember only a face \
+             is never permission to remember a voice. Report voice enrollment only if voice_enrolled is true."
+        );
+        if let Some(parameters) = tools[0].parameters.as_mut() {
+            parameters["properties"]["voice"] = json!({
+                "type": "boolean",
+                "description": "True only after explicit permission to remember both their face and voice."
+            });
+        }
+    }
+    tools
 }
 
 /// Whether the voice routes this function to the eyes.
@@ -611,7 +633,53 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
     run_with(socket, call, checked, &said)
 }
 
+/// Attach only this admitted spoken request's local print, after explicit
+/// voice consent. Model-supplied vectors are never trusted.
+pub fn run_for_request(
+    socket: &Path,
+    call: &ToolCall,
+    checked: bool,
+    request: u64,
+    heard: bool,
+) -> (Value, bool) {
+    let said = if checked {
+        crate::thread::THREAD
+            .lock()
+            .map(|thread| thread.names_window(SAID_EXCHANGES))
+            .unwrap_or_default()
+    } else {
+        Said::default()
+    };
+    let voice_requested = wants_voice(call, voice_shadow());
+    let print = voice_requested
+        .then(|| crate::voice_person::enrollment(request, heard))
+        .flatten();
+    run_with_voice(
+        socket,
+        call,
+        checked,
+        &said,
+        voice_requested,
+        print.as_deref(),
+    )
+}
+
+fn wants_voice(call: &ToolCall, shadow: bool) -> bool {
+    shadow && call.name == REMEMBER && call.args.get("voice").and_then(Value::as_bool) == Some(true)
+}
+
 fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Value, bool) {
+    run_with_voice(socket, call, checked, said, false, None)
+}
+
+fn run_with_voice(
+    socket: &Path,
+    call: &ToolCall,
+    checked: bool,
+    said: &Said,
+    voice_requested: bool,
+    print: Option<&[f32]>,
+) -> (Value, bool) {
     let Some(name) = call
         .args
         .get("name")
@@ -634,14 +702,36 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
     if checked && call.name == REMEMBER && replace && !agreed_to(name, said) {
         return (json!({"error": NOT_AGREED}), true);
     }
-    let line = match call.name.as_str() {
+    if call.name == FORGET {
+        crate::voice_person::clear();
+    }
+    let mut line = match call.name.as_str() {
         REMEMBER if checked => json!({"remember": name, "one_face": true, "replace": replace}),
         REMEMBER => json!({"remember": name}),
         FORGET => json!({"forget": name}),
         _ => return (crate::tools::unavailable(), false),
     };
+    if voice_requested
+        && call.name == REMEMBER
+        && let Some(print) = print
+    {
+        line["voice_print"] = json!(print);
+    }
     match crate::tools::exchange(socket, &line, DEADLINE) {
-        Some(answer) => (told(&answer), true),
+        Some(answer) => {
+            let mut result = told(&answer);
+            if voice_requested && result.get("ok") == Some(&json!(true)) {
+                let enrolled = print.is_some()
+                    && answer.get("voice_enrolled").and_then(Value::as_bool) == Some(true);
+                result["voice_enrolled"] = json!(enrolled);
+                if !enrolled {
+                    result["voice_reason"] = json!(
+                        "Only the face was remembered. No valid quiet voice sample was enrolled; ask them to try again."
+                    );
+                }
+            }
+            (result, true)
+        }
         None => (
             json!({"error": "My eye is not answering right now, so I could not do that."}),
             false,
@@ -663,16 +753,16 @@ pub const VISITS_LINE: &str = "Also say, in one short sentence, that you'll noti
 /// What the eyes said, in words the model can say.
 fn told(answer: &Value) -> Value {
     if let Some(name) = answer.get("remembered").and_then(Value::as_str) {
+        let mut result = json!({"ok": true, "remembered": name});
         // With visits counted (`lamp-eyes --visits on`), the person is told so
         // in one line, as they are remembered (the first builder on #1670).
         if answer.get("visits").and_then(Value::as_bool) == Some(true) {
-            return json!({
-                "ok": true,
-                "remembered": name,
-                "also_say": VISITS_LINE,
-            });
+            result["also_say"] = json!(VISITS_LINE);
         }
-        return json!({"ok": true, "remembered": name});
+        if let Some(enrolled) = answer.get("voice_enrolled").and_then(Value::as_bool) {
+            result["voice_enrolled"] = json!(enrolled);
+        }
+        return result;
     }
     // Set-aside files the eyes couldn't search: the forget waits for them,
     // and the person is told what was forgotten and what wasn't (#1586),
@@ -902,6 +992,90 @@ mod tests {
         for invalid in ["", "Ann\nBob"] {
             assert!(FaceObservation::from_source(invalid, wall, wall, monotonic).is_none());
         }
+    }
+
+    #[test]
+    fn voice_enrollment_is_declared_only_in_shadow_and_requires_explicit_permission() {
+        for checked in [false, true] {
+            let ordinary = tools_with_voice(checked, false);
+            assert!(ordinary[0].parameters.as_ref().unwrap()["properties"]["voice"].is_null());
+            let shadow = tools_with_voice(checked, true);
+            assert_eq!(
+                shadow[0].parameters.as_ref().unwrap()["properties"]["voice"]["type"],
+                "boolean"
+            );
+            assert!(shadow[0].description.contains("BOTH their face and voice"));
+            assert!(
+                shadow[0]
+                    .description
+                    .contains("is never permission to remember a voice")
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_consented_local_print_reaches_eyes_and_missing_print_is_not_success() {
+        let call = ToolCall {
+            id: "voice-consent".into(),
+            name: REMEMBER.into(),
+            args: json!({"name":"Jim", "voice":true, "voice_print":[999.0]}),
+        };
+        assert!(wants_voice(&call, true));
+        assert!(!wants_voice(&call, false));
+        for consent in [Value::Null, json!(false), json!("true"), json!(1)] {
+            let mut unconsented = call.clone();
+            unconsented.args["voice"] = consent;
+            assert!(!wants_voice(&unconsented, true));
+        }
+        let mut forget = call.clone();
+        forget.name = FORGET.into();
+        assert!(!wants_voice(&forget, true));
+        let (socket, asked) = eyes(vec![
+            json!({"remembered":"Jim"}),
+            json!({"remembered":"Jim"}),
+            json!({"remembered":"Jim", "voice_enrolled":true}),
+            json!({"remembered":"Jim"}),
+            json!({"remembered":"Jim", "voice_enrolled":false}),
+        ]);
+        let said = Said::now("My name is Jim.");
+        // Off: even an invented model vector never goes to the eyes.
+        let (off, _) = run_with(&socket, &call, true, &said);
+        assert!(off.get("voice_enrolled").is_none());
+        let (missing, _) = run_with_voice(&socket, &call, true, &said, true, None);
+        assert_eq!(missing["voice_enrolled"], false);
+        assert!(
+            missing["voice_reason"]
+                .as_str()
+                .unwrap()
+                .contains("Only the face")
+        );
+        let print = [0.1_f32, 0.2];
+        let (enrolled, _) = run_with_voice(&socket, &call, true, &said, true, Some(&print));
+        assert_eq!(enrolled["voice_enrolled"], true);
+        // A provider that does not confirm enrollment cannot be reported as success.
+        let (old_eyes, _) = run_with_voice(&socket, &call, true, &said, true, Some(&print));
+        assert_eq!(old_eyes["voice_enrolled"], false);
+        let (refused, _) = run_with_voice(&socket, &call, true, &said, true, Some(&print));
+        assert_eq!(refused["voice_enrolled"], false);
+        // Name safeguards still precede any enrollment RPC.
+        let (bad_name, _) = run_with_voice(
+            &socket,
+            &call,
+            true,
+            &Said::now("Hello"),
+            true,
+            Some(&print),
+        );
+        assert!(bad_name["error"].is_string());
+        let sent = asked.join().unwrap();
+        assert_eq!(sent.len(), 5);
+        assert!(sent[0].get("voice_print").is_none());
+        assert!(sent[1].get("voice_print").is_none());
+        for line in &sent[2..] {
+            assert_eq!(line["voice_print"], json!(print));
+            assert_eq!(line["one_face"], true);
+        }
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
 
     #[test]

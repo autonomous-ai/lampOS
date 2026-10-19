@@ -11,6 +11,11 @@ conversation was going on had nobody facing, all in one live exchange
 ([#829, 21:23](https://github.com/autonomous-ai/lampOS/issues/829); its
 evidence is with pull request #864, `docs/verification/two-people-20261015/`).
 
+[Voice identity shadow measurement](voice-person.md) (#1675) reuses this
+pinned model in a separate child for explicitly consented face-linked voice
+prints. It is off by default and does not change this attention policy or
+select anyone's memory.
+
 ## What exists
 
 `crates/same-voice` (`lamp-same-voice`), built by the fourth builder on 15

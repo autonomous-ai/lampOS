@@ -2050,6 +2050,7 @@ dependencies = [
  "hound",
  "libc",
  "rustfft",
+ "sha2",
  "tract-onnx",
 ]
 

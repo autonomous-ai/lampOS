@@ -129,6 +129,7 @@ mod turn_taking;
 pub mod turn_times;
 pub mod use_skill;
 pub mod visual_context;
+pub mod voice_person;
 pub mod wait_words;
 pub mod wire;
 

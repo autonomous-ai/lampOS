@@ -8,14 +8,14 @@
 use lamp_same_voice::{RATE, Voice, cosine, read_wav};
 use std::{path::Path, process::ExitCode, time::Instant};
 
-const USAGE: &str =
-    "usage: lamp-same-voice pairs MODEL.onnx LIST.tsv\n       lamp-same-voice serve MODEL.onnx";
+const USAGE: &str = "usage: lamp-same-voice pairs MODEL.onnx LIST.tsv\n       lamp-same-voice serve MODEL.onnx\n       lamp-same-voice serve-pinned MODEL.onnx";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let done = match args.as_slice() {
         [command, model, list] if command == "pairs" => pairs(Path::new(model), Path::new(list)),
-        [command, model] if command == "serve" => serve(Path::new(model)),
+        [command, model] if command == "serve" => serve(Path::new(model), false),
+        [command, model] if command == "serve-pinned" => serve(Path::new(model), true),
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::FAILURE;
@@ -32,13 +32,17 @@ fn main() -> ExitCode {
 
 /// The model loaded, then each request answered until the voice closes
 /// standard input.
-fn serve(model: &Path) -> Result<(), String> {
+fn serve(model: &Path, pinned: bool) -> Result<(), String> {
     // Before the model loads: never at the voice's real-time priority
     // (#1445). A child that cannot leave it ends, and the check is off.
     lamp_same_voice::ordinary_priority()
         .map_err(|error| format!("the ordinary priority could not be taken: {error}"))?;
     let loaded = Instant::now();
-    let voice = Voice::load(model)?;
+    let voice = if pinned {
+        Voice::load_pinned(model)?
+    } else {
+        Voice::load(model)?
+    };
     let loaded_ms = loaded.elapsed().as_millis();
     lamp_same_voice::serve(
         &mut std::io::stdin().lock(),

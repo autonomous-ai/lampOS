@@ -1308,3 +1308,27 @@ ember, never dark. Drop: the announcement. The signal is one topic,
 `room/presence`, said by the eyes for every reader (the light and #1673's
 Messages), never "nobody" while the eyes are not looking. Off unless
 `LAMP_PRESENCE=on`; not run on a lamp. See [presence.md](presence.md).
+
+## Voice identity enrollment and shadow measurement (#1675, 2026-10-19)
+
+Read V1's `hal/routes/speaker.py::speaker_enroll`,
+`hal/drivers/voice/speaker_recognizer/speaker_recognizer.py::recognize`, and
+`hal/app_state.py::{set_voice_user,clear_voice_user,voice_user}`. Keep explicit
+speaker enrollment, normalized embeddings, an unknown outcome, bounded sample
+sizes, and invalidation of current evidence. V1's matching and automatic sample
+extension use different gates: this implementation does not copy their numeric
+thresholds or claim equivalent accuracy.
+
+Reuse V2's supervised CAM++ child and the eyes' existing consented person store,
+name checks, replacement and forgetting. Change persistence to an optional
+model-tagged voice print in the same face record, so removal cannot leave a
+separate biometric identity behind. Inference and matching stay off the input
+loop. The shadow worker verifies the exact model bytes before using them.
+
+Do not port V1's embedding API calls, stored WAVs, stranger clustering,
+automatically extended voice samples, or last-speaker presence cache. A late
+voice result must not relabel a current or previous conversation. This stage
+therefore reports shadow candidates only and does not route private memory;
+[voice-person.md](voice-person.md) names the real-office measurements and the
+request/session isolation work required before recognition is trusted. It is
+identity infrastructure, not an autonomous skill or a new greeting.

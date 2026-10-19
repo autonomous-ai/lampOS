@@ -110,6 +110,7 @@ impl Gate {
         } else {
             self.retired_through = self.retired_through.max(self.highest_seen);
         }
+        crate::voice_person::retire_through(self.retired_through);
         engine.retire_through(self.retired_through);
         Ok(())
     }
@@ -122,6 +123,7 @@ impl Gate {
                 || (state.owner().is_some()
                     && !state.listening_ready(MonoTime::from_micros(now_us))))
         {
+            crate::voice_person::clear();
             return Err(invalid("second route privacy or input lease expired"));
         }
         Ok(())
@@ -169,6 +171,7 @@ impl Gate {
             || !state.listening_ready(MonoTime::from_micros(now_us))
             || privacy != state.microphone_generation()
         {
+            crate::voice_person::clear();
             return Err(invalid(
                 "second route input lost privacy or retention authority",
             ));
@@ -203,7 +206,10 @@ impl Gate {
         let mut drained = Drain::Deferred;
         for _ in 0..CONTROL_SLICE {
             match control.receive()? {
-                Some(Control::Stop) => return Ok(Drain::Stopped),
+                Some(Control::Stop) => {
+                    crate::voice_person::clear();
+                    return Ok(Drain::Stopped);
+                }
                 Some(Control::Authority { snapshot }) => {
                     self.install(monotonic_us(), snapshot, engine)?
                 }
@@ -319,6 +325,8 @@ pub fn serve(
     let character = crate::config::ProviderConfig::load(provider_config)?.instruction(false)?;
     let config = crate::second_config::load_from_path(second_config)?;
     let checked = checks_sounds(&files);
+    let _voice_person =
+        crate::voice_person::start(files.same_voice.as_deref(), files.tools.who.as_deref());
     let tools = files.tools;
     if let Some(socket) = &tools.memory {
         // As the Live route starts it: each known person's memory apart.

@@ -638,6 +638,16 @@ this room" until someone asks to be recognised.
   record set aside again after a crash is kept once; an existing
   `set-aside` is set to 0700 and a link there is refused; a file moved there
   is linked and then unlinked, never replacing one, and set to 0600.
+- **Optional voice prints** (#1675, [voice-person.md](voice-person.md)): a
+  person may also have a model-tagged voice field, containing at most three
+  normalized 512-number CAM++ prints. Current enrollment writes one print
+  atomically with successful single-face enrollment, only after explicit
+  face-and-voice permission. The private people file is now bounded at 1 MiB;
+  old face-only records remain readable. Rename/replacement drops the old
+  linked voice prints, forgetting removes both biometric types (including
+  set-aside records) and cancels pending enrollment, and reset clears both.
+  No raw audio is persisted. Voice matching is diagnostic only and never
+  changes the known-person file.
 - **The rule for the next field** (the reviewer on #1558, as #1512's for
   tasks): an optional field that only adds to what is known may come
   without a bump. A field that narrows what the lamp may do with a face (an
@@ -684,6 +694,18 @@ this room" until someone asks to be recognised.
     crash left there (`….json.new`) is neither searched nor counted, and a
     `set-aside` that is a link is never followed (`forget` refuses with
     `{"error":"storage"}`, health counts it as one).
+  - Requests are bounded at 32 KiB. `remember` may include `voice_print`,
+    a finite nonzero 512-number array from the trusted voice worker; it is
+    persisted only if the face enrollment succeeds. Success reports
+    `voice_enrolled:true` with it, `voice_enrolled:false` without it.
+    Standalone voice enrollment and voice prints on other request shapes
+    are refused.
+  - `{"voice_match":[…]}` compares a compatible voice print, returning
+    `candidate`, `cosine`, `runner_up` and `shadow:true`. A provisional
+    candidate requires cosine >= 0.75 and a runner-up gap >= 0.15. These
+    thresholds are uncalibrated, convey no identity authority, and affect
+    neither memory nor greetings. See the measurement plan in
+    [voice-person.md](voice-person.md).
   - `{"list":true}` answers the names.
   - `{"who":true}` answers who is at the lamp now, or `null`.
   - Remembering someone already known replaces their prints.
@@ -709,7 +731,8 @@ this room" until someone asks to be recognised.
   - With a memory, what a known person asks it to keep and what they say
     goes to their own scope, and a recall asks theirs first, then the
     room's (#764, [memory.md](memory.md#each-persons-own-764)). Forgetting
-    a face does not forget what that person said.
+    a face also removes any attached voice prints, but does not forget
+    what that person said. Shadow voice matches do not change this scope.
   - With a memory, each provider session is one person's: when the known
     person changes (someone else known after 10 s with the one before
     unseen, or at once when the one before was last seen 30 s ago; nobody

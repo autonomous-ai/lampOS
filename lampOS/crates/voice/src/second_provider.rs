@@ -606,6 +606,7 @@ impl Engine {
                 session,
                 continues,
                 continues_cut_off,
+                over_the_lamps_voice,
                 after_stop,
                 ..
             } => {
@@ -613,6 +614,7 @@ impl Engine {
                 if !self.begin(request, session) {
                     return;
                 }
+                crate::voice_person::began(request, !over_the_lamps_voice);
                 // Going on from a request whose end went early and was given
                 // up when the person spoke again: its words begin this one,
                 // as Gemini, which heard them, is told (`CUT_OFF_NOTE`). Only
@@ -705,11 +707,23 @@ impl Engine {
                     }
                     said.1 = read_completed_at_us;
                 }
-                match audio.try_send(samples) {
+                let sent = match audio.try_reserve() {
+                    Ok(slot) => {
+                        crate::voice_person::heard(request, &samples);
+                        slot.send(samples);
+                        Ok(())
+                    }
+                    Err(error) => Err(error),
+                };
+                match sent {
                     Ok(()) => {}
                     // The task already failed the turn itself.
-                    Err(mpsc::error::TrySendError::Closed(_)) => turn.audio = None,
+                    Err(mpsc::error::TrySendError::Closed(_)) => {
+                        crate::voice_person::retire_through(request);
+                        turn.audio = None;
+                    }
                     Err(mpsc::error::TrySendError::Full(_)) => {
+                        crate::voice_person::retire_through(request);
                         self.turn = None;
                         self.urgent.push_back(ProviderOutput::TurnFailed {
                             request,
@@ -723,6 +737,9 @@ impl Engine {
             ProviderInput::Called { .. } => {}
             ProviderInput::End { request, sound, .. } => {
                 if let Some(turn) = self.turn.as_mut().filter(|turn| turn.request == request) {
+                    if turn.audio.is_some() {
+                        crate::voice_person::ended(request, sound);
+                    }
                     turn.sound.store(sound, Ordering::Release);
                     // Closing the queue is the end of input for the task.
                     turn.audio = None;

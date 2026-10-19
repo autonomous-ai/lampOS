@@ -110,12 +110,14 @@ pub const ANSWER_WITHIN: Duration = Duration::from_secs(2);
 /// The child's timings, apart for the tests.
 #[derive(Clone, Copy)]
 struct Timing {
+    pinned: bool,
     restart_after: Duration,
     ready_within: Duration,
     answer_within: Duration,
 }
 
 const TIMING: Timing = Timing {
+    pinned: false,
     restart_after: RESTART_AFTER,
     ready_within: READY_WITHIN,
     answer_within: ANSWER_WITHIN,
@@ -225,6 +227,19 @@ impl Prints {
     }
 
     /// The child installed beside the running executable.
+    /// Identity mode verifies the model snapshot inside each child, including restarts.
+    pub fn beside_voice_pinned(model: PathBuf) -> io::Result<Self> {
+        let program = std::env::current_exe()?.with_file_name(EXECUTABLE);
+        Ok(Self::timed(
+            program,
+            model,
+            Timing {
+                pinned: true,
+                ..TIMING
+            },
+        ))
+    }
+
     pub fn beside_voice(model: PathBuf) -> io::Result<Self> {
         let program = std::env::current_exe()?.with_file_name(EXECUTABLE);
         Ok(Self::start(program, model))
@@ -328,7 +343,11 @@ fn child(
     journal: &Journal,
 ) -> Ended {
     let started = Command::new(program)
-        .arg("serve")
+        .arg(if timing.pinned {
+            "serve-pinned"
+        } else {
+            "serve"
+        })
         .arg(model)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -1010,10 +1029,40 @@ mod tests {
     }
 
     const QUICK: Timing = Timing {
+        pinned: false,
         restart_after: Duration::from_millis(20),
         ready_within: Duration::from_secs(2),
         answer_within: Duration::from_millis(200),
     };
+
+    #[test]
+    fn identity_child_uses_pinned_loading_on_every_restart() {
+        let (path, starts_file) = program(
+            "pinned-restarts",
+            "printf '%s\\n' \"$1\" >> \"$0.modes\"\nexit 1",
+        );
+        let modes = path.with_file_name(format!("{EXECUTABLE}.modes"));
+        let mut prints = Prints::timed(
+            path,
+            "model".into(),
+            Timing {
+                pinned: true,
+                ..QUICK
+            },
+        );
+        ask_until(&mut prints, |answer| {
+            answer
+                .as_ref()
+                .is_err_and(|error| error.contains("check is off"))
+        });
+        assert_eq!(starts(&starts_file), MOST_UNREADY as usize);
+        let modes = std::fs::read_to_string(modes).unwrap();
+        assert_eq!(
+            modes.lines().collect::<Vec<_>>(),
+            vec!["serve-pinned"; MOST_UNREADY as usize]
+        );
+        drop(prints);
+    }
 
     /// A line asked for every 5 ms until an answer `wanted` comes, within 5 s.
     fn ask_until(prints: &mut Prints, wanted: impl Fn(&Result<Vec<f32>, String>) -> bool) {

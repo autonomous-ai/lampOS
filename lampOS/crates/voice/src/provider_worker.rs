@@ -1178,6 +1178,8 @@ pub async fn run_with_continuation(
     if let Some(directory) = files.first_output.clone() {
         let _ = FIRST_OUTPUT.set(directory);
     }
+    let _voice_person =
+        crate::voice_person::start(files.same_voice.as_deref(), files.tools.who.as_deref());
     // What it remembers from other days, if this lamp has a memory: each
     // known person's apart when it has eyes that know faces.
     if let Some(socket) = &files.tools.memory {
@@ -4090,6 +4092,7 @@ impl ProviderIntake {
     }
 
     fn stop(&mut self) {
+        crate::voice_person::clear();
         self.stopped = true;
         self.handoff.memory_scope = None;
         self.retained = None;
@@ -4658,6 +4661,7 @@ impl InputHandoff {
                 self.memory_scope = None;
             }
         }
+        crate::voice_person::retire_through(self.retired_through);
         self.authority = Some(state);
         Ok(())
     }
@@ -4963,6 +4967,7 @@ impl InputHandoff {
     /// The provider will not serve this request. Nothing further of it is
     /// submitted, and it is never treated as open again.
     fn fail(&mut self, request: u64) {
+        crate::voice_person::retire_through(request);
         self.failed_through = self.failed_through.max(request);
         if self
             .memory_scope
@@ -5128,6 +5133,7 @@ impl InputHandoff {
                 if let Err(refusal) = input.start(expected, request) {
                     return self.refused_start(request, refusal);
                 }
+                crate::voice_person::began(request.get(), !over_the_lamps_voice);
                 if continues {
                     self.continued = Some(request.get());
                 }
@@ -5208,6 +5214,7 @@ impl InputHandoff {
                 if let Some(kept) = self.kept.as_mut().filter(|kept| kept.request == request) {
                     kept.keep(sequence, &samples);
                     if kept.waiting() {
+                        crate::voice_person::retire_through(request.get());
                         return Ok(());
                     }
                 }
@@ -5236,11 +5243,13 @@ impl InputHandoff {
                     submitted.captured = Some((read_completed_at_us, captured));
                 }
                 if let Err(error) = input.audio(request, sequence, captured, &samples) {
+                    crate::voice_person::retire_through(request.get());
                     if self.keeps_through_outage(request, error, input) {
                         return Ok(());
                     }
                     return self.refused(request, error, input);
                 }
+                crate::voice_person::heard(request.get(), &samples);
                 if let Some(voices) = self.voices.as_mut() {
                     voices.heard(request.get(), &samples);
                 }
@@ -5276,11 +5285,21 @@ impl InputHandoff {
                         kept.ended_us = Some(now_us);
                         kept.waiting()
                     });
-                if !waiting
-                    && let Err(error) = input.end(request)
-                    && !self.keeps_through_outage(request, error, input)
-                {
-                    return self.refused(request, error, input);
+                let accepted = if waiting {
+                    false
+                } else {
+                    match input.end(request) {
+                        Ok(()) => true,
+                        Err(error) if self.keeps_through_outage(request, error, input) => false,
+                        Err(error) => return self.refused(request, error, input),
+                    }
+                };
+                // A replay or refused input may lack accepted audio; it cannot
+                // enroll from a partial shadow observation.
+                if accepted {
+                    crate::voice_person::ended(request.get(), sound);
+                } else {
+                    crate::voice_person::retire_through(request.get());
                 }
                 if let Some(voices) = self.voices.as_mut() {
                     voices.ended(request.get());
