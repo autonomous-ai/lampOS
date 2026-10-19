@@ -2742,6 +2742,9 @@ pub async fn run(
 }
 
 #[cfg(test)]
+mod route_checks;
+
+#[cfg(test)]
 mod tests {
     /// #1712, the first builder at 16:43: the route's lines are judged as
     /// one session's, as a Live session's, so in a busy room one past the
