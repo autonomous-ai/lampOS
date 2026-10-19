@@ -398,8 +398,8 @@ fn an_answer_said_200_ms_ahead_nods_and_sways_at_the_catalogues_own_lag() {
 /// said 200 ms ahead at the catalogue's own lag: a handful of nods, never
 /// two in a sentence, and its sways.
 /// The story above, through the alive catalogue changed by `tune`: its
-/// nods and sway starts.
-fn loud_story(tune: impl FnOnce(&mut Catalogue)) -> (usize, usize) {
+/// nods, sway starts and settles.
+fn loud_story(tune: impl FnOnce(&mut Catalogue)) -> (usize, usize, usize) {
     let spread = [0.46, 0.55, 0.67, 0.74, 0.80, 0.84, 0.88, 0.91, 0.94, 1.0];
     let mut seed: u64 = 0x2030;
     let mut draw = move || {
@@ -445,12 +445,13 @@ fn loud_story(tune: impl FnOnce(&mut Catalogue)) -> (usize, usize) {
     (
         starts(&outputs, "nodding on a stressed word"),
         starts(&outputs, "swaying between sentences"),
+        starts(&outputs, "settling as it finishes"),
     )
 }
 
 #[test]
 fn a_loud_story_nods_a_handful_of_times_not_every_two_seconds() {
-    let (nods, sways) = loud_story(|_| {});
+    let (nods, sways, _) = loud_story(|_| {});
     assert!((3..=13).contains(&nods), "{nods} nods in 150 s");
     // A sway holds the head over to the next pause, so the name stays on
     // across sentences: at least one.
@@ -462,14 +463,30 @@ fn a_loud_story_nods_a_handful_of_times_not_every_two_seconds() {
 /// no step and no spacing, nods as before the limits, many times more.
 #[test]
 fn the_catalogue_can_turn_the_nod_limits_off_for_a_dense_arm() {
-    let (dense, _) = loud_story(|catalogue| {
+    let (dense, _, _) = loud_story(|catalogue| {
         let speaking = catalogue.speaking.as_mut().unwrap();
         speaking.sentence_nods = Some(0);
         speaking.stress_step = Some(0.0);
         speaking.nod_spacing_us = Some(0);
     });
-    let (sparse, _) = loud_story(|_| {});
+    let (sparse, _, _) = loud_story(|_| {});
     assert!(dense >= 5 * sparse, "dense {dense}, sparse {sparse}");
+}
+
+/// The first builder on #2030, 03:40: no settle on lamp-4ace in either arm
+/// of `cb4453618`. A loud story that ends as it should (Speaking, then
+/// rest) settles once, with the nod limits and without them.
+#[test]
+fn a_storys_end_settles_once() {
+    let (_, _, settles) = loud_story(|_| {});
+    assert_eq!(settles, 1);
+    let (_, _, dense) = loud_story(|catalogue| {
+        let speaking = catalogue.speaking.as_mut().unwrap();
+        speaking.sentence_nods = Some(0);
+        speaking.stress_step = Some(0.0);
+        speaking.nod_spacing_us = Some(0);
+    });
+    assert_eq!(dense, 1);
 }
 
 #[test]
