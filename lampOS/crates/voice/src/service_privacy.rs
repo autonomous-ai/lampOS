@@ -657,32 +657,51 @@ pub(crate) mod tests {
         fs::remove_dir(&directory.path).unwrap();
     }
 
+    /// Unknown, stale, invalid or failed GPIO never provides unmute
+    /// authority: one test for each, so that each runs beside the others
+    /// (#1806: the five one after another took 3.1 s on ARM64).
+    fn never_provides_unmute_authority(script: Script) {
+        let directory = SessionDirectory::create().unwrap();
+        let (worker, peer) = mock(&directory.path, script, Arc::new(AtomicBool::new(false)));
+        let mut allowed = false;
+        let error = wait_worker(
+            worker,
+            new_boot().unwrap(),
+            &Termination::inactive(),
+            |state, _, _| {
+                allowed |= state == PrivacyState::Allowed;
+                Ok(())
+            },
+        )
+        .unwrap_err();
+        assert!(error.downcast_ref::<PhysicalMute>().is_none());
+        assert!(!allowed);
+        assert!(peer.join().unwrap().received_stop);
+    }
+
     #[test]
-    fn unknown_stale_invalid_or_failed_gpio_never_provides_unmute_authority() {
-        for script in [
-            Script::Missing,
-            Script::Gap,
-            Script::Stale,
-            Script::Fault,
-            Script::Invalid,
-        ] {
-            let directory = SessionDirectory::create().unwrap();
-            let (worker, peer) = mock(&directory.path, script, Arc::new(AtomicBool::new(false)));
-            let mut allowed = false;
-            let error = wait_worker(
-                worker,
-                new_boot().unwrap(),
-                &Termination::inactive(),
-                |state, _, _| {
-                    allowed |= state == PrivacyState::Allowed;
-                    Ok(())
-                },
-            )
-            .unwrap_err();
-            assert!(error.downcast_ref::<PhysicalMute>().is_none());
-            assert!(!allowed);
-            assert!(peer.join().unwrap().received_stop);
-        }
+    fn missing_gpio_never_provides_unmute_authority() {
+        never_provides_unmute_authority(Script::Missing);
+    }
+
+    #[test]
+    fn a_gap_in_gpio_never_provides_unmute_authority() {
+        never_provides_unmute_authority(Script::Gap);
+    }
+
+    #[test]
+    fn stale_gpio_never_provides_unmute_authority() {
+        never_provides_unmute_authority(Script::Stale);
+    }
+
+    #[test]
+    fn failed_gpio_never_provides_unmute_authority() {
+        never_provides_unmute_authority(Script::Fault);
+    }
+
+    #[test]
+    fn invalid_gpio_never_provides_unmute_authority() {
+        never_provides_unmute_authority(Script::Invalid);
     }
 
     #[test]
