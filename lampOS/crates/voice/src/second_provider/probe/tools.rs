@@ -296,10 +296,14 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
 /// `remember` and `forget`. Between the first and the rest, after a
 /// question the lamp couldn't answer, two that must not call `forget`
 /// while the umbrella is kept: "forget it" about the talk would delete it
-/// (the reviewer and the first builder on #2007, 01:17 and 01:18). The
-/// café question and the last line are right in words or a `recall` that
-/// finds nothing, so they are counted, not judged.
-pub const MEMORY_LINES: [MemoryLine; 7] = [
+/// (the reviewer and the first builder on #2007, 01:17 and 01:18). And two
+/// that must: the trial's own "Hey Lamp, please forget that." after the
+/// recall, which a note worded only against "forget it" left in words on
+/// lamp-4ace (the first builder at 02:05), and "forget what I just told
+/// you" straight after a remember. The café question and the umbrella
+/// asked after are right in words or a `recall` that finds nothing, so they
+/// are counted, not judged.
+pub const MEMORY_LINES: [MemoryLine; 9] = [
     MemoryLine {
         said: "Hey Lamp, remember my violet umbrella is in the car.",
         right: Some("remember"),
@@ -317,7 +321,7 @@ pub const MEMORY_LINES: [MemoryLine; 7] = [
         answer: "I don't have that one, sorry.",
     },
     MemoryLine {
-        said: "Oh, forget it, it doesn't matter.",
+        said: "Oh, forget it, never mind.",
         right: None,
         not: Some("forget"),
         args: "{}",
@@ -341,7 +345,7 @@ pub const MEMORY_LINES: [MemoryLine; 7] = [
         answer: "Your violet umbrella is in the car.",
     },
     MemoryLine {
-        said: "Lamp, forget that.",
+        said: "Hey Lamp, please forget that.",
         right: Some("forget"),
         not: None,
         args: "{}",
@@ -354,7 +358,23 @@ pub const MEMORY_LINES: [MemoryLine; 7] = [
         not: None,
         args: "{}",
         result: "{}",
-        answer: "",
+        answer: "I don't have anything about your umbrella now.",
+    },
+    MemoryLine {
+        said: "Remember my keys are on the hook by the door.",
+        right: Some("remember"),
+        not: None,
+        args: r#"{"text":"My keys are on the hook by the door."}"#,
+        result: r#"{"ok":true,"result":{"kept":"My keys are on the hook by the door."}}"#,
+        answer: "Got it: your keys are on the hook by the door.",
+    },
+    MemoryLine {
+        said: "Actually, forget what I just told you.",
+        right: Some("forget"),
+        not: None,
+        args: "{}",
+        result: r#"{"ok":true,"result":{"forgotten":true}}"#,
+        answer: "Done, it's gone.",
     },
 ];
 
@@ -526,8 +546,8 @@ mod tests {
     /// remember, forget and recall too.
     #[test]
     fn each_memory_line_is_asked_with_the_ones_before_it_and_note_names_the_calls() {
-        // "Lamp, forget that.", the sixth: after the remember, the café
-        // question, the two "forget it" lines and the recall.
+        // "Hey Lamp, please forget that.", the sixth: after the remember,
+        // the café question, the two "forget it" lines and the recall.
         let sixth = MemoryArm::Today.messages("CHARACTER", 5);
         assert_eq!(sixth.len(), 1 + 4 + 2 + 2 + 2 + 4 + 1);
         let system = text(&sixth[0]);
@@ -541,10 +561,13 @@ mod tests {
         assert_eq!(sixth[3].role, "tool");
         assert!(text(&sixth[3]).contains("violet umbrella"));
         // The "forget it" lines had no call: words only.
-        assert_eq!(sixth[7], Message::user("Oh, forget it, it doesn't matter."));
+        assert_eq!(sixth[7], Message::user("Oh, forget it, never mind."));
         assert_eq!(sixth[8], Message::assistant("Okay."));
         assert_eq!(sixth[12].tool_calls[0]["function"]["name"], json!("recall"));
-        assert_eq!(sixth.last().unwrap(), &Message::user("Lamp, forget that."));
+        assert_eq!(
+            sixth.last().unwrap(),
+            &Message::user("Hey Lamp, please forget that.")
+        );
         // The first "forget it" is asked while the umbrella is kept.
         let casual = MemoryArm::Note.messages("CHARACTER", 2);
         assert_eq!(
@@ -553,7 +576,18 @@ mod tests {
         );
         assert_eq!(
             casual.last().unwrap(),
-            &Message::user("Oh, forget it, it doesn't matter.")
+            &Message::user("Oh, forget it, never mind.")
+        );
+        // "Forget what I just told you", the ninth, comes straight after a
+        // remember.
+        let ninth = MemoryArm::Note.messages("CHARACTER", 8);
+        assert_eq!(
+            ninth[ninth.len() - 4].tool_calls[0]["function"]["name"],
+            json!("remember")
+        );
+        assert_eq!(
+            ninth.last().unwrap(),
+            &Message::user("Actually, forget what I just told you.")
         );
         let noted = text(&MemoryArm::Note.messages("CHARACTER", 0)[0]);
         assert!(noted.contains(super::super::super::worker::MEMORY_CALLS_NOTE));
@@ -561,7 +595,8 @@ mod tests {
             "call remember",
             "call forget",
             "call recall",
-            "'Forget it' or 'never mind'",
+            "please forget that",
+            "never mind",
         ] {
             assert!(noted.contains(call), "{call}");
         }

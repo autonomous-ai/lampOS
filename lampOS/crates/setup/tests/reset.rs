@@ -318,6 +318,10 @@ const PERSON_STORES: [&str; 26] = [
     // The voice's default for the task news it has told (reviewer, #817):
     // `DEFAULT_TOLD` in crates/voice/src/task_news.rs.
     "/var/lib/lampOS/voice/tasks-told",
+    // Skills made by voice, kept unconfirmed (`LAMP_MAKE_SKILL`, #2011): their
+    // names and words come from the person's requests (the reviewer's P2-2
+    // on #2011), `made_skill::DIRECTORY` in crates/voice/src/made_skill.rs.
+    "/var/lib/lampOS/voice/made-skills",
     // The person's light the ring keeps with `LAMP_LIGHT_KEEP=on` (#1468):
     // the folder, so a `person.json.new` a power cut left goes too.
     "/var/lib/lampOS/light",

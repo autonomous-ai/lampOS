@@ -244,9 +244,14 @@ fn written(request: u64, words: &str) -> ProviderInput {
 /// run of audio packets is one `audio:<sample>` label. Packets are checked
 /// against the coordinator's bound on the way.
 async fn turn(engine: &mut Engine) -> Vec<String> {
+    turn_within(engine, Duration::from_secs(2)).await
+}
+
+/// [`turn`], each event awaited at most `wait`.
+async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
     let mut labels: Vec<String> = Vec::new();
     loop {
-        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+        let event = tokio::time::timeout(wait, engine.next())
             .await
             .expect("the turn ends");
         let (label, last) = match event {
@@ -465,6 +470,7 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
         staff_note: true,
         accounts: false,
         machine_names: false,
+        make_skill: false,
     };
     let settings = crate::tools::Settings {
         tasks: Some(place.clone()),
@@ -837,6 +843,285 @@ async fn a_holding_only_answer_is_told_so_the_route_is_asked_to_go_on() {
     assert!(
         !holding,
         "a look by its call is a call: no HoldingAnswer beside it"
+    );
+}
+
+/// A link whose hosts answer again `after` from its first ask, on the
+/// runtime's clock, and how many times it was asked.
+fn link_back_after(after: Duration) -> (LinkBack, Arc<AtomicU64>) {
+    let first: Arc<Mutex<Option<tokio::time::Instant>>> = Arc::default();
+    let asks = Arc::new(AtomicU64::new(0));
+    let counted = asks.clone();
+    let back: LinkBack = Arc::new(move || {
+        counted.fetch_add(1, Ordering::Relaxed);
+        let at = *first
+            .lock()
+            .unwrap()
+            .get_or_insert_with(tokio::time::Instant::now);
+        Box::pin(async move { at.elapsed() >= after })
+    });
+    (back, asks)
+}
+
+/// `LAMP_RESEND_LOST_LINE` on the second route (the first builder's 00:02
+/// on #1722), on the paused clock: a spoken line whose chat was lost on the
+/// network before any word is asked once more when the link is back at
+/// 2 s, and answered; back only at 6 s, past `resend::RESEND_WITHIN_US`, it
+/// fails as before. Never twice: lost again after its ask again, it fails.
+#[tokio::test(start_paused = true)]
+async fn a_line_lost_on_the_network_is_asked_once_more_when_the_link_is_back() {
+    let lost = || vec![Err(net::Error::Transport("chat connect"))];
+    let answered = || vec![text("It's sunny."), Ok(ChatEvent::Done)];
+    let cases = [
+        (
+            "back at 2 s",
+            Duration::from_secs(2),
+            vec![lost(), answered()],
+            true,
+            2,
+        ),
+        (
+            "back at 6 s",
+            Duration::from_secs(6),
+            vec![lost(), answered()],
+            false,
+            1,
+        ),
+        (
+            "lost twice",
+            Duration::from_secs(1),
+            vec![lost(), lost(), answered()],
+            false,
+            2,
+        ),
+    ];
+    for (case, after, chats, answers, asked) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What's the weather like?".to_owned())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let (back, _) = link_back_after(after);
+        let mut engine = engine.announcing(false).resending(back);
+        let began = tokio::time::Instant::now();
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+        let last = labels.last().unwrap().as_str();
+        if answers {
+            assert!(
+                labels.contains(&"said:It's sunny.".to_owned()),
+                "{case}: {labels:?}"
+            );
+            assert_eq!(last, "complete", "{case}");
+            assert!(began.elapsed() >= after, "{case}: asked again once back");
+        } else {
+            assert_eq!(
+                last, "failed:AwaitingResponse:Transport",
+                "{case}: {labels:?}"
+            );
+            // Nothing said while it waited and gave up: no second sorry
+            // (the peer read's P3 on #2001).
+            assert!(
+                !labels
+                    .iter()
+                    .any(|label| label.starts_with("said:") || label.starts_with("audio:")),
+                "{case}: {labels:?}"
+            );
+            assert!(
+                began.elapsed()
+                    <= Duration::from_micros(crate::resend::RESEND_WITHIN_US)
+                        + Duration::from_secs(1),
+                "{case}: given up by 5 s"
+            );
+        }
+        assert_eq!(script.asked.lock().unwrap().len(), asked, "{case}");
+    }
+}
+
+/// Not asked again: after any word was said, after a call ran (it may have
+/// done something), for a refusal (a status is no network loss), for the
+/// lamp's own written turn, without the switch, or once a newer line began.
+#[tokio::test(start_paused = true)]
+async fn a_line_is_not_asked_again_after_words_a_call_a_refusal_or_a_newer_line() {
+    /// Each chat round's events.
+    type Rounds = Vec<Vec<net::Result<ChatEvent>>>;
+    let timer = call("c1", "set_timer", json!({"minutes": 5}));
+    let lost = || Err(net::Error::Transport("chat read"));
+    let cases: [(&str, Rounds, bool, bool, &str); 5] = [
+        (
+            "a word said",
+            vec![vec![text("Well, "), lost()]],
+            true,
+            false,
+            "failed:AwaitingResponse:Transport",
+        ),
+        (
+            "a call ran",
+            vec![
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![timer.clone()])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![lost()],
+            ],
+            true,
+            false,
+            "failed:AwaitingResponse:Transport",
+        ),
+        (
+            "a refusal",
+            vec![vec![Err(net::Error::Status(429))]],
+            true,
+            false,
+            "failed:AwaitingResponse:RateLimited",
+        ),
+        (
+            "written",
+            vec![vec![lost()]],
+            true,
+            true,
+            "failed:AwaitingResponse:Transport",
+        ),
+        (
+            "switch off",
+            vec![vec![lost()]],
+            false,
+            false,
+            "failed:AwaitingResponse:Transport",
+        ),
+    ];
+    for (case, chats, on, written_turn, ends) in cases {
+        let rounds = chats.len();
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Set a timer, please.".to_owned())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let (back, asks) = link_back_after(Duration::ZERO);
+        let mut engine = engine.announcing(false);
+        if on {
+            engine = engine.resending(back);
+        }
+        if written_turn {
+            engine.submit(written(1, "Tell them the time."));
+        } else {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+        }
+        let labels = turn(&mut engine).await;
+        assert_eq!(labels.last().unwrap(), ends, "{case}: {labels:?}");
+        assert_eq!(
+            script.asked.lock().unwrap().len(),
+            rounds,
+            "{case}: no ask again"
+        );
+        assert_eq!(
+            asks.load(Ordering::Relaxed),
+            0,
+            "{case}: the link not even asked"
+        );
+    }
+
+    // A newer line begun while the lost one waits for the link: it replaces
+    // the lost one's turn (`Engine::begin`), which is never asked again on
+    // its own; the newer line is answered at once, not once the link is back.
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("What's the weather like?".to_owned()),
+                Ok("Never mind.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![Err(net::Error::Transport("chat connect"))],
+                vec![text("Okay."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let (back, _) = link_back_after(Duration::from_secs(3));
+    let mut engine = engine.announcing(false).resending(back);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let started = tokio::time::Instant::now();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let mut seen = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(10), engine.next())
+            .await
+            .expect("the newer line is answered");
+        match event {
+            ProviderOutput::TurnComplete { request: 2, .. } => break,
+            ProviderOutput::TurnComplete { request, .. }
+            | ProviderOutput::TurnFailed { request, .. } => seen.push(request),
+            _ => {}
+        }
+    }
+    assert!(seen.is_empty(), "request 1 ended on its own: {seen:?}");
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "answered as it came, not once the link was back"
+    );
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        2,
+        "the lost line and the newer one, nothing asked again"
+    );
+
+    // A mute (a privacy close) 1 s into the wait: the coordinator retires the
+    // turn, as for any mute (`retire_through`), which ends its task with the
+    // wait in it; the link back at 2 s asks nothing (the peer read's P3 on
+    // #2001; Live's resend holds this by the privacy generation).
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What's the weather like?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![Err(net::Error::Transport("chat connect"))],
+                vec![text("It's sunny."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let (back, _) = link_back_after(Duration::from_secs(2));
+    let mut engine = engine.announcing(false).resending(back);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let started = tokio::time::Instant::now();
+    while started.elapsed() < Duration::from_secs(1) {
+        let _ = tokio::time::timeout(Duration::from_millis(100), engine.next()).await;
+    }
+    engine.retire_through(1);
+    while started.elapsed() < Duration::from_secs(4) {
+        if let Ok(event) = tokio::time::timeout(Duration::from_millis(100), engine.next()).await {
+            assert!(
+                !matches!(
+                    event,
+                    ProviderOutput::Audio { .. } | ProviderOutput::TurnComplete { .. }
+                ),
+                "nothing of the retired turn: {event:?}"
+            );
+        }
+    }
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        1,
+        "the link came back after the mute, and nothing was asked again"
     );
 }
 
@@ -3085,6 +3370,7 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
         staff_note: false,
         accounts: false,
         machine_names: false,
+        make_skill: false,
     };
     let settings = crate::tools::Settings {
         tasks: Some(place),

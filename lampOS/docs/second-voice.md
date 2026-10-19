@@ -1258,6 +1258,33 @@ record is written.
   with nothing called, sends `HoldingAnswer` before it completes, and the
   coordinator asks the route once to go on
   ([holding-answer.md](holding-answer.md), "On the second route").
+- **A line lost on the network is asked once more** (`LAMP_RESEND_LOST_LINE=on`,
+  as on Live; the first builder's 00:02 on #1722), as the lamp's only voice.
+  - **When:** a spoken line whose round-1 chat failed before its first
+    event (no word said, nothing called), with a fault `link::lost` counts:
+    `Transport` or `ConnectTimeout`, the faults the link's own check runs
+    for, less `ResponseTimeout`, which Live's `resend::mendable` holds
+    would only stay silent again.
+  - **How:** the turn waits for the link, asking every 250 ms whether any
+    service host takes a bare connection, as the link's check does
+    (`link::any_answers`). If one does within `resend::RESEND_WITHIN_US`
+    (5 s) of the failure, the same messages are asked once more, round 1's
+    bounds running from then.
+  - **Otherwise** it fails as before, and the link's check and down line
+    follow. The turn's `TurnFailed`, which starts that check, waits only
+    those 5 s, so the two never act on one failure at once.
+  - **Never:** twice, after a word or a call, for a status (a refusal is no
+    network loss), for the lamp's own written turn, or once a newer line has
+    begun. That line replaces the turn (`Engine::begin`).
+  - **No second "sorry":** the down line is said only for a refusal or a chat
+    not begun in time, never for these.
+  - Journal: `lamp-voice second: request N lost on the network (…): the link
+    is back, asked once more`, or why it is not asked again.
+  - Tests: `second_provider`'s
+    `a_line_lost_on_the_network_is_asked_once_more_when_the_link_is_back`
+    and `a_line_is_not_asked_again_after_words_a_call_a_refusal_or_a_newer_line`
+    (paused clock), and `link`'s
+    `a_line_is_lost_only_on_the_network_and_never_for_a_silent_answer`.
 - **Its input is taken late**, in order and from the parent's boot, as the
   Live worker's is since 40de19327 (`WorkerChannels::taking_late_input`): its
   input is checked against fresh authority when used, and its end would end
@@ -1366,10 +1393,14 @@ after a take-over, but now for every turn:
   lines. A text is typed, not heard, and is not told it. With a memory
   (`LAMP_MEMORY_SOCKET`), `worker::MEMORY_CALLS_NOTE` follows: to remember
   call `remember` ("saying you will is not keeping it"), to forget
-  something remembered for them call `forget` ("'Forget it' or 'never mind'
-  about the conversation is not that": it would delete what they asked the
-  lamp to keep; the reviewer and the first builder on #2007, 01:17 and
-  01:18), and for an earlier conversation call `recall`. The memory note
+  something they told it call `forget`, with both sides as examples in one
+  line: "please forget that" or "forget what I just told you" is a forget,
+  "forget it, it doesn't matter" or "never mind" about the conversation is
+  not (the reviewer and the first builder on #2007, 01:17 and 01:18: a
+  wrong forget deletes what they asked the lamp to keep). Worded only
+  against "forget it", the note left "Hey Lamp, please forget that." in
+  words on lamp-4ace, nothing forgotten (the first builder at 02:05). For
+  an earlier conversation, call `recall`. The memory note
   itself names only `recall`, and on lamp-4ace on 20 Oct DeepSeek answered
   "remember …" and "forget that" in words (#1722, 00:34).
 - **The time, as it is asked** (`local_time::told_asked_here`, spoken
@@ -1867,18 +1898,20 @@ It prints, for each arm and line, how many requests called each function
 first (`none` for an answer in words) and how many were right. Then it names
 the arms that were right every time on every line. Counts only, no words.
 
-**Then the memory's seven lines** (`MEMORY_LINES`: `trials.sh forget`'s
+**Then the memory's nine lines** (`MEMORY_LINES`: `trials.sh forget`'s
 four, the first builder on #1722, 00:34: on lamp-4ace "remember my violet
 umbrella is in the car" and "forget that" were answered in words, with
 every function given, while Live called `remember` and `forget`). In order:
 - "Hey Lamp, remember my violet umbrella is in the car." (`remember`);
 - "What was the name of that café I mentioned last week?" (counted);
-- "Oh, forget it, it doesn't matter." and "Never mind, forget I asked.",
+- "Oh, forget it, never mind." and "Never mind, forget I asked.",
   each right when it does **not** call `forget`, asked while the umbrella is
   kept (the reviewer and the first builder on #2007);
 - "What do you remember about my umbrella?" (`recall`);
-- "Lamp, forget that." (`forget`);
-- "What about my umbrella?" (counted).
+- "Hey Lamp, please forget that." (`forget`), the trial's own line;
+- "What about my umbrella?" (counted);
+- "Remember my keys are on the hook by the door." (`remember`);
+- "Actually, forget what I just told you." (`forget`), straight after it.
 
 The counted lines are right in words or a `recall` that finds nothing. Each
 is asked with the ones before as right history, with every function, in

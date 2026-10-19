@@ -63,6 +63,7 @@ pub(crate) mod holding_answer;
 pub mod known_faces;
 pub mod listen_gaps;
 pub mod local_time;
+pub mod made_skill;
 pub mod marked;
 pub mod memory_scope;
 pub mod messages;

@@ -878,8 +878,11 @@ pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look:
 /// forgotten; the memory note names only recall). Live called both.
 /// "Forget it" about the talk itself is not a forget: it would delete what
 /// they asked the lamp to keep (the reviewer and the first builder on
-/// #2007, 01:17 and 01:18).
-pub(crate) const MEMORY_CALLS_NOTE: &str = " When someone asks you to remember something, call remember: saying you will is not keeping it. When they ask you to forget something you remembered for them, call forget. 'Forget it' or 'never mind' about the conversation is not that. For something from an earlier conversation, call recall.";
+/// #2007, 01:17 and 01:18). But "please forget that" about something kept
+/// is: worded only against "forget it", it was answered in words on
+/// lamp-4ace, nothing forgotten (the first builder at 02:05 on #2007). So
+/// both, as examples, in one line.
+pub(crate) const MEMORY_CALLS_NOTE: &str = " When someone asks you to remember something, call remember: saying you will is not keeping it. When they ask you to forget something they told you, such as \"please forget that\" or \"forget what I just told you\", call forget; \"forget it, it doesn't matter\" or \"never mind\" about the conversation is not that. For something from an earlier conversation, call recall.";
 
 /// Whether a hearing of the name at `at_us` with `score` is one since
 /// `from_us`, as the rule takes a hearing for a line.
@@ -1547,6 +1550,16 @@ pub fn serve(
     // A holding-only answer is asked to go on, as on Live
     // (`LAMP_HOLDING_ANSWER=on`; the first builder's 22:54 on #1722).
     engine = engine.holding_answers(files.holding_answer);
+    // A line lost on the network is asked once more when a service host
+    // answers again, the link's own check (`LAMP_RESEND_LOST_LINE=on`; the
+    // first builder's 00:02 on #1722). As the only voice, with its hosts.
+    if files.resend_lost_line
+        && let Some(targets) = probe_targets.clone()
+    {
+        engine = engine.resending(Arc::new(move || {
+            Box::pin(super::link::any_answers(targets.clone()))
+        }));
+    }
     // As the lamp's only voice this route keeps the room itself (#1712).
     if route.only_voice {
         engine = engine.keeping_room(keeping_room(
@@ -3097,7 +3110,7 @@ pub(crate) fn texts_task(
     let news: Box<dyn crate::messages::Untold> = match tools
         .tasks
         .as_ref()
-        .and_then(|place| crate::task_news::ForTexts::for_tasks(&place.directory))
+        .and_then(crate::task_news::ForTexts::for_tasks)
     {
         Some(news) => Box::new(news),
         None => Box::new(crate::messages::NoNews),
@@ -5261,7 +5274,8 @@ mod tests {
             "call remember",
             "call forget",
             "call recall",
-            "'Forget it' or 'never mind' about the conversation is not that",
+            "\"please forget that\" or \"forget what I just told you\", call forget",
+            "\"forget it, it doesn't matter\" or \"never mind\" about the conversation is not that",
         ] {
             assert!(remembers.contains(call), "{call}");
         }

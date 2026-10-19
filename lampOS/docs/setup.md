@@ -111,6 +111,8 @@ targets), schedule `/var/lib/lampos-schedule/store`, voice sessions
 `/var/lib/lampOS/voice/tasks-told` (its default, `LAMP_TASKS_TOLD`), the
 near rule's bar measured at setup `/var/lib/lampOS/voice/near-call.json`
 (#753), the
+skills made by voice and kept unconfirmed `/var/lib/lampOS/voice/made-skills`
+(`LAMP_MAKE_SKILL`, #2011), the
 person's light kept across a restart `/var/lib/lampOS/light` (emptied)
 (`LAMP_LIGHT_KEEP`), the
 policy's log `/var/lib/lampos-policy`, the person's parts of Harness under
