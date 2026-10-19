@@ -19,6 +19,8 @@ What it says and when:
   at most, never while you read or write head down (with the eyes' activity on),
   and never in the middle of a conversation, before 10:00, after
   17:00 or at night.
+- With the eyes' activity on, the sitting is yours: someone else sitting down in
+  your chair begins it again, so it is never theirs at your 90 minutes.
 - At most one of the wellbeing nudges (this, Rest your eyes, Stand up and
   Wind down) an hour between them.
 - If it does it twice and you neither look at it nor move nor say

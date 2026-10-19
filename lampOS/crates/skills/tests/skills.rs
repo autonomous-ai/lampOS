@@ -8372,12 +8372,43 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
 
 /// The eyes' `room/activity`, as they say it while someone sits at the desk.
 fn activity(engine: &mut Engine, at_ms: u64, state: &str) {
+    activity_with(engine, at_ms, state, true);
+}
+
+/// The same, with or without the sitting's baseline in.
+fn activity_with(engine: &mut Engine, at_ms: u64, state: &str, baseline: bool) {
     engine.observe(
         "room/activity",
         at_ms * 1_000,
-        format!(r#"{{"state":"{state}","for_s":0,"sitting_s":600,"baseline":true}}"#).as_bytes(),
+        format!(r#"{{"state":"{state}","for_s":0,"sitting_s":600,"baseline":{baseline}}}"#)
+            .as_bytes(),
         Some(3_000),
     );
+}
+
+/// The reviewer's P3 on #1938: a run begun before the sitting's baseline
+/// was in (`at_desk`, `baseline` false) is not noticed by the baseline
+/// coming in and saying `head_down`: the person did nothing. Standing up
+/// still notices it.
+#[test]
+fn a_baseline_coming_in_mid_run_is_no_noticing() {
+    let dir = tempfile::tempdir().unwrap();
+    for (stood, noticed) in [(false, false), (true, true)] {
+        let mut engine = Engine::new(vec![resting_skill(dir.path(), 1)], true);
+        faces(&mut engine, 0, &seated(false));
+        activity_with(&mut engine, 0, "at_desk", false);
+        assert_eq!(stuffy(&mut engine, 0).len(), 1);
+        activity_with(&mut engine, 3_000, "head_down", true);
+        if stood {
+            engine.observe("room/stood_up", 5_000_000, br#"{"sitting_s":600}"#, None);
+        }
+        engine.tick(10_001_000);
+        assert_eq!(
+            engine.resting_until("sip", 11_000_000).is_none(),
+            noticed,
+            "stood up: {stood}"
+        );
+    }
 }
 
 /// #1685, the eyes' word (#1678): a run is noticed by the person standing up

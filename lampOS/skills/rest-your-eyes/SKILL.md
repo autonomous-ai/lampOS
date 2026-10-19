@@ -19,6 +19,8 @@ What it says and when:
 - It says nothing, ever.
 - Once an hour at most while you stay, four times a day at most, never while you read or write head down
   (with the eyes' activity on), and never in the middle of a conversation, before 09:00, after 20:00 or at night.
+- With the eyes' activity on, the sitting is yours: someone else sitting down in
+  your chair begins it again, so it is never theirs at your 45 minutes.
 - At most one of the wellbeing nudges (this, A sip of water, Stand up and
   Wind down) an hour between them.
 - If it does it twice and you neither look at it nor move nor say

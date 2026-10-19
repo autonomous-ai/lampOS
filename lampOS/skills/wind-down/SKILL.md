@@ -21,6 +21,8 @@ What it says and when:
 - Once an evening, never while you read or write head down (with the
   eyes' activity on), never in the middle of a conversation, and never from
   bedtime to the morning.
+- With the eyes' activity on, the sitting is yours: someone else sitting down in
+  your chair begins it again, so it is never theirs at your 20 minutes.
 - With Bedtime and Morning on the lamp, the night is Bedtime and Morning's:
   Wind down never starts from bedtime on, and gives its light back as you
   leave the desk, when Bedtime and Morning's night begins.
