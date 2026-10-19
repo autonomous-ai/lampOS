@@ -1,0 +1,68 @@
+# Look for things (#1685): "where are my keys", "can you find my glasses",
+# "look for my phone". Started by its tool alone: no trigger and no [ask],
+# since a person asked, and a search a person asks for may look at several
+# places (CLAUDE.md's rule 8: the exhaustive is for when someone asks). Each
+# call is one look: the head down over the desk (#1011's reading pose),
+# turned toward the place (lamp-body's toward), the voice's look for the
+# model, which says what it sees and calls again for the next place only
+# while the thing is not yet seen. The eyes find faces only, so the finding
+# is the model's.
+needs = ["eyes", "voice", "light", "body"]
+# Its owner puts it on and takes it off (docs/skills.md, "Core and
+# installable skills").
+kind = "installable"
+version = "1.0.0"
+tool = "look_for"
+
+# What it may use, and nothing more: its line, the light, the reading pose
+# and its turn, and the look's picture for the model. It reads no topic: the
+# voice's state, which ends the search when someone speaks, is the
+# program's own to read.
+[permissions]
+speak = true
+light = true
+body = true
+look = true
+
+[choice]
+name = "place"
+about = "Where to look: desk the first time; then left, right, far_left, far_right, one at a time, only while the thing is not yet seen."
+one_of = ["desk", "left", "right", "far_left", "far_right"]
+default = "desk"
+
+# One search: its first look at the desk whatever the call names, five
+# looks at most (the desk and two places either side), then the model is
+# told to let it go kindly. Someone speaking ends it within a fifth of a
+# second: the pose let go and the light given back.
+[search]
+looks = 5
+give_up = "That was the last look. Say kindly, in a few words, that you can't see it from here, and do not look again."
+
+# Every look: the head down over the desk, held two minutes or until
+# someone speaks (a look again holds it again); the desk lit white for as
+# long, then given back; the look's picture for the model.
+[[do]]
+body = { mood = "reading", for = "2m" }
+light = { colour = "white", level = 4, for = "2m" }
+look = true
+say = "Say in a few words what you see as you go, as \"Not on the desk...\". If you see what they are looking for, say where it is by something near it, as \"there, by the mug\", and stop: you stay looking at it. If not, call look_for once more with the next place: left, then right, then far_left, then far_right. Never look toward a person."
+
+# A place to one side: the same pose, its base turned toward it, a quarter
+# of the picture across, or the whole half-picture (lamp-body turns 70% of
+# it, within its gaze's reach). The later pose takes the place of the one
+# above.
+[[do]]
+if_choice = ["left"]
+body = { mood = "reading", for = "2m", toward = -0.5 }
+
+[[do]]
+if_choice = ["right"]
+body = { mood = "reading", for = "2m", toward = 0.5 }
+
+[[do]]
+if_choice = ["far_left"]
+body = { mood = "reading", for = "2m", toward = -1.0 }
+
+[[do]]
+if_choice = ["far_right"]
+body = { mood = "reading", for = "2m", toward = 1.0 }
