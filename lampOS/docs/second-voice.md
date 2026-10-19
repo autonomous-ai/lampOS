@@ -176,7 +176,14 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   text giving the words is given up and the turn ends unanswered, nothing
   said (`BEGIN_WITHIN`; journal: `chat round 1 had not begun in … ms`): on
   lamp-4ace on 2026-10-16 first events came 1.6 to 20.5 s after the words,
-  and an answer 12 s late is worse than none. A round after a tool ran is
+  and an answer 12 s late is worse than none. A line given up so is no
+  talk the lamp left alone: it was said to the lamp, so the room holds it
+  as it holds the rule's holds, and it ends no conversation. Only a line
+  the model answers with nothing (`not_for_me`) counts toward the two that
+  end one (#1712, the first builder at 16:04). When the thread has a
+  conversation going on and the room's count ends it, the journal says so,
+  without words: `request N: no conversation going on: K lines left alone
+  since the lamp last spoke`. A round after a tool ran is
   not bounded: what was done (a timer set, the light changed) has to be
   said, or it is asked for and done again.
   A look's first round may take 5 s (`LOOK_BEGIN_WITHIN`): a picture is

@@ -1678,6 +1678,15 @@ impl Heeding {
             && let Ok(mut room) = crate::room_told::room().lock()
         {
             signs.room = room.at(monotonic_us());
+            // Said when the thread has a conversation going on and the room
+            // ends it, without words (#1712, the first builder at 16:16:
+            // which of the two had held the owner's lines was not told).
+            if signs.going_on && room.talked_past_the_lamp() {
+                eprintln!(
+                    "lamp-voice second: request {request}: no conversation going on: {} lines left alone since the lamp last spoke",
+                    room.left_alone_since_spoke()
+                );
+            }
             signs.going_on &= !room.talked_past_the_lamp();
         }
         let Some((bus, names)) = &mut self.bus else {

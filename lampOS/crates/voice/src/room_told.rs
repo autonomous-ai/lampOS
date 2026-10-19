@@ -445,6 +445,12 @@ impl RoomTold {
         self.talk_only && self.talk_since_spoke >= TALK_ENDS_CONVERSATION
     }
 
+    /// How many lines were left unanswered as talk since the lamp last
+    /// spoke, as [`Self::talked_past_the_lamp`] counts them: for the journal.
+    pub fn left_alone_since_spoke(&self) -> usize {
+        self.talk_since_spoke
+    }
+
     /// Whether the conversation is over only because lines were held as
     /// another voice since the lamp last spoke ([`Self::another_voice_held`]),
     /// with no talk left unanswered. The same-voice check then lets a

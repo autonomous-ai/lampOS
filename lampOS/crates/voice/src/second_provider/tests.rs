@@ -597,6 +597,71 @@ async fn a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered() {
     assert!(calls.lock().unwrap().is_empty());
 }
 
+/// #1712, the first builder at 16:04: a spoken line whose chat the route
+/// gave up, not begun within `BEGIN_WITHIN`, is no talk the lamp left
+/// alone. Two of them don't end the conversation, and the person's next
+/// line without the name is still carried in a busy room. Two lines the
+/// model leaves alone (`not_for_me`) still end it.
+#[tokio::test(start_paused = true)]
+async fn lines_the_route_gave_up_are_no_talk_past_the_lamp() {
+    let silent = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                NOT_FOR_ME,
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    for (given_up, past) in [(true, false), (false, true)] {
+        crate::room_told::room()
+            .lock()
+            .unwrap()
+            .count_only_talk(true);
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("Hey Lamp, what's the weather in Hanoi today?".to_owned()),
+                    Ok("And what's the price of gold?".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(if given_up {
+                [vec![], vec![]].into()
+            } else {
+                [silent(), silent()].into()
+            }),
+            hold_chat: given_up,
+            ..Script::default()
+        });
+        let (mut engine, _, _) = scripted(script);
+        for request in 1..=2 {
+            engine.submit(start(request));
+            engine.submit(audio(request, 1));
+            engine.submit(end(request));
+            // Past `BEGIN_WITHIN`, which `turn`'s own wait would not see.
+            loop {
+                let event = tokio::time::timeout(BEGIN_WITHIN * 2, engine.next())
+                    .await
+                    .expect("the turn ends");
+                assert!(
+                    !matches!(event, ProviderOutput::Audio { .. }),
+                    "nothing is said"
+                );
+                if matches!(event, ProviderOutput::TurnComplete { .. }) {
+                    break;
+                }
+            }
+        }
+        let room = crate::room_told::room();
+        let mut room = room.lock().unwrap();
+        assert_eq!(room.talked_past_the_lamp(), past, "given up: {given_up}");
+        assert_eq!(room.left_alone_since_spoke(), if past { 2 } else { 0 });
+        *room = crate::room_told::RoomTold::new();
+    }
+}
+
 /// A round after a tool ran is not given up: the timer is set, so the
 /// turn is not ended in silence, and the tool runs once (Second on #1049).
 #[tokio::test(start_paused = true)]
