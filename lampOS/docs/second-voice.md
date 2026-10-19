@@ -1360,7 +1360,11 @@ after a take-over, but now for every turn:
     In a quiet room it is as on Live, and one more thing: a conversation is
     also going on for 20 s after the end of the lamp's words
     (`AFTER_THE_LAMPS_WORDS`, follows-on's `WITHIN_US`), whenever the answer
-    began (`worker::going_on_from`). The thread's 45 s count from an
+    began (`worker::going_on_from`). In a quiet room only: a busy room still
+    goes on only by the thread's window or the call, and then 15 s after
+    the words (`went_on_told`). With the 20 s there too, an answer of 30 s
+    or more let office talk out in the 15 s after it (the first builder's
+    agent on #2032, 03:09). The thread's 45 s count from an
     answer's start, so a story told for 40 s or more used them up while it
     was told. On lamp-4ace on 20 Oct at 01:47 and 01:49, two hand-overs said
     as stories ended ("Hey Lamp, ask Claude Code to write a two-line
