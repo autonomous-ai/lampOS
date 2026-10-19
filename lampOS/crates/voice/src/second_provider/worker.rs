@@ -677,7 +677,7 @@ pub fn with_search(
 /// "what is the weather like in Hanoi" heard as "Hannover" or answered with
 /// "You asking what the weather's like here?"; "Night!" at 1 pm, the
 /// character's example; a poem of two lines).
-pub(crate) const SPOKEN_NOTE: &str = "\n\nYou read what people say as words, and your ears turn some words into others, names and places most of all. When a question is plainly about the weather, a price, a time or a place, answer it for the likeliest meaning, here first, and search if you need to; ask back only when you cannot guess at all. Greet and say goodbye for the time of day it is now. A poem you are asked for has at least four lines.";
+pub(crate) const SPOKEN_NOTE: &str = "\n\nYou read what people say as words, and your ears turn some words into others, names and places most of all. Much of what reaches you is not said to you: when a line is plainly people talking to each other, a remark to the room, someone on a call, a video or a noise, call not_for_me and say nothing; leaving it alone is right, not rude, and a person who wants you says so. When a question is plainly about the weather, a price, a time or a place, answer it for the likeliest meaning, here first, and search if you need to; ask back only when you cannot guess at all. Greet and say goodbye for the time of day it is now. A poem you are asked for has at least four lines.";
 
 /// Why a line of a word or two is held ([`lone_words`]).
 pub(crate) const LONE_WORDS: &str = "a word or two in a conversation, no question and no short word said to the lamp, and nothing shows it was said to the lamp: no name, nobody turned to it";
@@ -3526,6 +3526,8 @@ mod tests {
         assert!(!told.contains("take_a_look"));
         assert!(super::spoken_character("CHARACTER", true).ends_with(super::LOOK_CALL_NOTE));
         assert!(told.contains("answer it for the likeliest meaning, here first"));
+        assert!(told.contains("call not_for_me and say nothing"));
+        assert!(told.contains("leaving it alone is right, not rude"));
         assert!(told.contains("ask back only when you cannot guess at all"));
         assert!(told.contains("for the time of day it is now"));
         assert!(told.contains("at least four lines"));

@@ -202,12 +202,12 @@ fn in_one_voice(voice: Voice, text: String) -> BoxStream<'static, net::Result<Ve
             Ok(speech) => Ok(speech),
             Err(error) => {
                 eprintln!(
-                    "lamp-voice second: {}'s speech failed ({error}); asked once more",
+                    "lamp-voice second: {} failed to start a sentence ({error}); asked once more",
                     voice.name()
                 );
                 voice.first(&text).await.inspect_err(|again| {
                     eprintln!(
-                        "lamp-voice second: {}'s speech failed again ({again}); the sentence is not said",
+                        "lamp-voice second: {} failed again ({again}); the sentence is not said",
                         voice.name()
                     );
                 })

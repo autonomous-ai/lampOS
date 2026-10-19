@@ -991,7 +991,12 @@ after a take-over, but now for every turn:
   battery on lamp-4ace is its check.
 - **How to take what it heard** (`worker::SPOKEN_NOTE`, spoken turns
   only, after the character): the ears turn some words into others, names
-  and places most of all; a question plainly about the weather, a price, a
+  and places most of all; much of what reaches it is not said to it, and a
+  line plainly people talking to each other, a remark to the room, a call,
+  a video or a noise is left alone with `not_for_me`, which is right, not
+  rude (the first builder on #1712, 17:26: DeepSeek answered what the rule
+  let out where Gemini declined, 5 of 12; the count is `called not_for_me`
+  against `first answer audio`); a question plainly about the weather, a price, a
   time or a place is answered for the likeliest meaning, here first, with
   a search if needed, and asked back only when it cannot be guessed; greet
   and say goodbye for the time of day; a poem has at least four lines. From
@@ -1168,9 +1173,9 @@ configured one takes its own default voice, since `tts_voice` names one of
 the configured provider's, and the chosen voice's model is
 `LAMP_SECOND_SPEECH_MODEL`'s. No sentence goes to another voice: one the
 voice fails to start (a refusal, a quota, a broken connection, or an answer
-with no sound) is asked of it once more, `lamp-voice second: <voice>'s
-speech failed (…); asked once more`; failing again it is not said, `…
-failed again (…); the sentence is not said`, and the turn goes on as for
+with no sound) is asked of it once more, `lamp-voice second: <voice> failed
+to start a sentence (…); asked once more`; failing again it is not said,
+`<voice> failed again (…); the sentence is not said`, and the turn goes on as for
 any speech that never rendered. A sentence begun and then lost fails as
 any does. The journal at start names the voice: `the voice is ElevenLabs,
 model eleven_v4_turbo, the lamp's one voice`.
