@@ -568,6 +568,10 @@ numbers, not in kind.
 Hardware staff test lamps before they ship, each with their own agent. The
 production testing plan and its deliverables are
 [#1700](https://github.com/autonomous-ai/lampOS/issues/1700).
+How the hardware side works, start to finish, is
+[hardware-process.md](hardware-process.md), and its tasks are ordered on the
+Hardware Queue, [#1764](https://github.com/autonomous-ai/lampOS/issues/1764),
+kept by `hw-first` ([builders/hw-first.md](../builders/hw-first.md)).
 
 - **Their own GitHub account.** Each hardware member joins with their own
   account, which a repository admin grants (read the queue, comment, push
