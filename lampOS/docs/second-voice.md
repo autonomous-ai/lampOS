@@ -198,7 +198,11 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   text giving the words is given up and the turn ends unanswered, nothing
   said (`BEGIN_WITHIN`; journal: `chat round 1 had not begun in … ms`): on
   lamp-4ace on 2026-10-16 first events came 1.6 to 20.5 s after the words,
-  and an answer 12 s late is worse than none. A round after a tool ran is
+  and an answer 12 s late is worse than none. A line given up so is no
+  talk the lamp left alone: it was said to the lamp, so the room holds it
+  as it holds the rule's holds, and it ends no conversation. Only a line
+  the model answers with nothing (`not_for_me`) counts toward the two that
+  end one (#1712, the first builder at 16:04). A round after a tool ran is
   not bounded: what was done (a timer set, the light changed) has to be
   said, or it is asked for and done again.
   A look's first round may take 5 s (`LOOK_BEGIN_WITHIN`): a picture is
@@ -869,6 +873,23 @@ after a take-over, but now for every turn:
   - **told and kept:** `room/state` on the bus at each tick, and the room's
     file (`LAMP_ROOM_FILE`) kept about once a second and taken back at the
     start, as on the Live route.
+  - **one session, as Live's** (#1712, the first builder at 16:43): the
+    rule judges the route's lines as one session's, not each as a session's
+    first, so a line past the session's first two is trusted as on Live. A
+    new one begins as Live renews its own: for a new person at the lamp,
+    and after 8 lines held in a row, at most every 15 minutes.
+  - **a conversation goes on from a call** (#1712): a line that called the
+    lamp for itself (its name, its words, a face turned to it), let out,
+    carries the person's next lines for 45 s as the lamp's own words do,
+    and ends the count of talk past the lamp before it (`RoomTold::called`).
+    On lamp-4ace on 19 Oct the owner said a line every 6 s, and 5 of the 10
+    let out never got their first word out before the next line's Start.
+    So the lamp never "spoke", the office's talk before still counted, and
+    the owner's lines without the name were held as no conversation. Two
+    lines left alone after the call still end it. When none is going on,
+    the journal says why, without words: `request N: no conversation going
+    on: it was last heard saying words S s ago, it was last called C s ago,
+    K lines left alone since it last spoke` ("it was never …" when never).
 
   Not here, as they have no part on this route: the Policy's hold of a line
   going on (`LAMP_GOING_ON_ASKS`, which also ends a busy room sooner once

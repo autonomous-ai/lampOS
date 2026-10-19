@@ -597,6 +597,152 @@ async fn a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered() {
     assert!(calls.lock().unwrap().is_empty());
 }
 
+/// #1712, the first builder at 16:04: a spoken line whose chat the route
+/// gave up, not begun within `BEGIN_WITHIN`, is no talk the lamp left
+/// alone. Two of them don't end the conversation, and the person's next
+/// line without the name is still carried in a busy room. Two lines the
+/// model leaves alone (`not_for_me`) still end it.
+#[tokio::test(start_paused = true)]
+async fn lines_the_route_gave_up_are_no_talk_past_the_lamp() {
+    let silent = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                NOT_FOR_ME,
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    for (given_up, past) in [(true, false), (false, true)] {
+        crate::room_told::room()
+            .lock()
+            .unwrap()
+            .count_only_talk(true);
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("Hey Lamp, what's the weather in Hanoi today?".to_owned()),
+                    Ok("And what's the price of gold?".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(if given_up {
+                [vec![], vec![]].into()
+            } else {
+                [silent(), silent()].into()
+            }),
+            hold_chat: given_up,
+            ..Script::default()
+        });
+        let (mut engine, _, _) = scripted(script);
+        for request in 1..=2 {
+            engine.submit(start(request));
+            engine.submit(audio(request, 1));
+            engine.submit(end(request));
+            // Past `BEGIN_WITHIN`, which `turn`'s own wait would not see.
+            loop {
+                let event = tokio::time::timeout(BEGIN_WITHIN * 2, engine.next())
+                    .await
+                    .expect("the turn ends");
+                assert!(
+                    !matches!(event, ProviderOutput::Audio { .. }),
+                    "nothing is said"
+                );
+                if matches!(event, ProviderOutput::TurnComplete { .. }) {
+                    break;
+                }
+            }
+        }
+        let room = crate::room_told::room();
+        let mut room = room.lock().unwrap();
+        assert_eq!(room.talked_past_the_lamp(), past, "given up: {given_up}");
+        assert_eq!(room.left_alone_since_spoke(), if past { 2 } else { 0 });
+        *room = crate::room_told::RoomTold::new();
+    }
+}
+
+/// #1712, the first builder at 16:43: the owner's ten lines at the desk on
+/// lamp-4ace (15:56), as heard, five with the lamp's name and five without,
+/// each said before the lamp's answer to the one before was out. In a busy
+/// room every one is let out: the five without the name as the
+/// conversation going on from the owner's last call, though the lamp never
+/// got a word out. On the lamp, four of the five were held.
+#[tokio::test(start_paused = true)]
+async fn the_owners_ten_lines_are_let_out_though_each_answer_was_cut_by_the_next() {
+    let lines = [
+        "Lamp, what time is this?",
+        "Hey, Lamp. Watch the weather in Hanoi today.",
+        "Set a timer for five minutes.",
+        "What's the price of gold?",
+        "Lamp, make the lights a bit warmer.",
+        "Tell me a short joke.",
+        "Lamp, who won the last Formula one race.",
+        "Remind me to call the bank as 4.",
+        "Lamp. How are you today?",
+        "Thank you. Lynn.",
+    ];
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    {
+        let mut room = crate::room_told::room().lock().unwrap();
+        *room = crate::room_told::RoomTold::new();
+        room.count_only_talk(true);
+        // Three lines of the room's talk left alone a moment ago: busy.
+        for request in 201..=203 {
+            room.unanswered(request, lamp_ipc::monotonic_us());
+        }
+        assert_eq!(
+            room.at(lamp_ipc::monotonic_us()),
+            crate::room_told::Room::Busy
+        );
+    }
+    let script = Arc::new(Script {
+        heard: Mutex::new(lines.iter().map(|line| Ok(line.to_string())).collect()),
+        // Every answer still to come when the next line begins.
+        chats: Mutex::new(lines.iter().map(|_| vec![]).collect()),
+        hold_chat: true,
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let heeding = Arc::new(Mutex::new(super::worker::Heeding::new(
+        true, true, None, None,
+    )));
+    heeding
+        .lock()
+        .unwrap()
+        .as_the_only_voice(false, true, false);
+    type Verdicts = Arc<Mutex<Vec<(u64, Option<&'static str>)>>>;
+    let verdicts: Verdicts = Arc::default();
+    let (judge, kept) = (heeding.clone(), verdicts.clone());
+    let mut engine = engine.heeding(Arc::new(move |request, said, heard, from| {
+        let verdict = judge
+            .lock()
+            .ok()
+            .and_then(|mut heeding| heeding.heed(request, said, heard, from));
+        kept.lock().unwrap().push((request, verdict));
+        verdict
+    }));
+    for request in 207..207 + lines.len() as u64 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        // A second on: its words are judged, and its answer has not begun.
+        while let Ok(event) = tokio::time::timeout(Duration::from_secs(1), engine.next()).await {
+            super::worker::keep(&event, None);
+            assert!(
+                !matches!(event, ProviderOutput::Audio { .. }),
+                "nothing is said"
+            );
+        }
+    }
+    let verdicts = verdicts.lock().unwrap();
+    assert_eq!(verdicts.len(), lines.len());
+    for (request, verdict) in verdicts.iter() {
+        assert_eq!(*verdict, None, "request {request} was held");
+    }
+    *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+}
+
 /// A round after a tool ran is not given up: the timer is set, so the
 /// turn is not ended in silence, and the tool runs once (Second on #1049).
 #[tokio::test(start_paused = true)]

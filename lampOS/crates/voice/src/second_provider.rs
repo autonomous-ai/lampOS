@@ -1552,6 +1552,10 @@ impl Shared {
 enum Stop {
     /// `not_for_me`: nothing more is said.
     Silent,
+    /// The first round had not begun within its bound ([`BEGIN_WITHIN`]):
+    /// the route gave the turn up, not the model. It ends as a silent turn,
+    /// but what was said is no talk the lamp left alone.
+    GaveUp,
     Failed(Fault),
     /// The engine is gone.
     Gone,
@@ -1710,7 +1714,7 @@ async fn answer(
                                     "lamp-voice second: request {request} said it can't think right now"
                                 );
                             }
-                            return Err(Stop::Silent);
+                            return Err(Stop::GaveUp);
                         }
                     }
                 } else {
@@ -1990,7 +1994,9 @@ async fn answer(
         }
         Ok(())
     };
-    let last = match tokio::try_join!(writing, saying) {
+    let ended = tokio::try_join!(writing, saying);
+    let gave_up = matches!(ended, Err(Stop::GaveUp));
+    let last = match ended {
         Ok(_) => {
             if !shared
                 .emit(ProviderOutput::GenerationComplete { request })
@@ -2003,7 +2009,7 @@ async fn answer(
                 idle: true,
             }
         }
-        Err(Stop::Silent) => ProviderOutput::TurnComplete {
+        Err(Stop::Silent | Stop::GaveUp) => ProviderOutput::TurnComplete {
             request,
             idle: true,
         },
@@ -2023,12 +2029,19 @@ async fn answer(
         in_flight.take_if(|carried| carried.request == request);
     }
     // A spoken line the turn ended without answering: what the model left
-    // alone, the busy room's talk.
+    // alone, the busy room's talk. Not one the route gave up itself, its
+    // chat not begun in time: that was said to the lamp, and held as the
+    // rule's holds are (#1712, the first builder at 16:04: on lamp-4ace on
+    // 19 October the owner's lines without the name, just after the lamp
+    // had answered them, were held in the busy room as no conversation).
     if asked == Asker::Spoken
         && matches!(last, ProviderOutput::TurnComplete { .. })
         && !answered.load(Ordering::Relaxed)
     {
         room(|room| {
+            if gave_up {
+                room.held(request);
+            }
             room.unanswered(request, monotonic_us());
         });
     }

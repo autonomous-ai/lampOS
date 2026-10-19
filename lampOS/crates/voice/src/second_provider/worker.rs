@@ -1538,7 +1538,28 @@ pub(crate) struct Heeding {
     noted: Option<(u64, Option<&'static str>)>,
     /// The request last let out only as the conversation going on.
     alone: Option<u64>,
+    /// The rule's session, as a Live session is one (#1712, the first
+    /// builder at 16:43): the route's turns are judged as one session's, so
+    /// one past its first [`crate::attention::FRESH_REQUESTS`] is trusted as
+    /// on Live. A new one begins as Live renews its own: for a new person at
+    /// the lamp, and after [`RENEW_AFTER_HELD`] lines held in a row, at most
+    /// every [`RENEW_AT_MOST_EVERY`].
+    session: u64,
+    session_for: Option<Option<String>>,
+    held_run: u32,
+    renewed_at: Option<Instant>,
+    /// When a line that called the lamp for itself (its name, its words,
+    /// a face turned to it) was let out: the conversation goes on from it as
+    /// from the lamp's own words ([`crate::thread::GOING_ON_FOR`]), whether
+    /// or not its answer was said before the person spoke again.
+    called_at: Option<Instant>,
 }
+
+/// Lines held in a row before the rule's session is renewed, as Live renews
+/// its own after eight unanswered (`provider_worker`).
+pub(crate) const RENEW_AFTER_HELD: u32 = 8;
+/// At most this often.
+pub(crate) const RENEW_AT_MOST_EVERY: Duration = Duration::from_secs(900);
 
 /// The room microphone's rise over its quiet, dB, by when it was sampled.
 type Levels = Arc<Mutex<std::collections::VecDeque<(u64, f32)>>>;
@@ -1613,6 +1634,11 @@ impl Heeding {
             name_note: None,
             noted: None,
             alone: None,
+            session: 1,
+            session_for: None,
+            held_run: 0,
+            renewed_at: None,
+            called_at: None,
         }
     }
 
@@ -1742,7 +1768,7 @@ impl Heeding {
         }
     }
 
-    fn heed(
+    pub(crate) fn heed(
         &mut self,
         request: u64,
         said: (u64, u64),
@@ -1759,10 +1785,32 @@ impl Heeding {
 
     /// What the bus and the thread say now of a line said in `began..=ended`.
     fn signs(&mut self, request: u64, (began, ended): (u64, u64)) -> Signs {
-        let (going_on, lamp_asked) = crate::thread::current(self.thread.as_deref(), |thread| {
-            (thread.going_on(Instant::now()), thread.lamp_asked(request))
-        })
-        .unwrap_or_default();
+        let now = Instant::now();
+        let (said_going_on, lamp_asked, said_ago, person) =
+            crate::thread::current(self.thread.as_deref(), |thread| {
+                (
+                    thread.going_on(now),
+                    thread.lamp_asked(request),
+                    thread.said_last_ago(now),
+                    thread.opened_for().map(str::to_owned),
+                )
+            })
+            .unwrap_or_default();
+        // A new person at the lamp begins a new session, as on Live.
+        if self.session_for.as_ref() != Some(&person) {
+            if self.session_for.is_some() {
+                self.session += 1;
+            }
+            self.session_for = Some(person);
+        }
+        // Going on from the lamp's own words, or from the person's last call
+        // let out (#1712: on lamp-4ace on 19 Oct the owner's next lines came
+        // before the lamp's answers were said, and were held as no
+        // conversation).
+        let called_ago = self.called_at.map(|at| now.saturating_duration_since(at));
+        let going_on =
+            said_going_on || called_ago.is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
+        let mut left_alone = None;
         let mut signs = Signs {
             room: crate::room_told::Room::Unknown,
             going_on,
@@ -1787,7 +1835,26 @@ impl Heeding {
             && let Ok(mut room) = crate::room_told::room().lock()
         {
             signs.room = room.at(monotonic_us());
+            left_alone = Some(room.left_alone_since_spoke());
             signs.going_on &= !room.talked_past_the_lamp();
+        }
+        // Why no conversation is going on, without words (#1712, the first
+        // builder at 16:16: which of these had held the owner's lines was
+        // not told).
+        if !signs.going_on {
+            let ago = |ago: Option<Duration>, what: &str| {
+                ago.map_or(format!("it was never {what}"), |ago| {
+                    format!("it was last {what} {} s ago", ago.as_secs())
+                })
+            };
+            eprintln!(
+                "lamp-voice second: request {request}: no conversation going on: {}, {}{}",
+                ago(said_ago, "heard saying words"),
+                ago(called_ago, "called"),
+                left_alone.map_or(String::new(), |left| format!(
+                    ", {left} lines left alone since it last spoke"
+                ))
+            );
         }
         let Some((bus, names)) = &mut self.bus else {
             return signs;
@@ -1849,8 +1916,8 @@ impl Heeding {
                 (*session, own)
             }
             None => {
-                attention.began_at(request, request, began_us);
-                (request, heard)
+                attention.began_at(request, self.session, began_us);
+                (self.session, heard)
             }
         };
         self.judged = Some((request, session, heard.to_owned()));
@@ -1868,12 +1935,37 @@ impl Heeding {
         if alone && lone_words(heard) {
             verdict = Some(crate::attention::Verdict::Hold(LONE_WORDS));
         }
-        // The verdict for the room this route keeps (`super::room`).
+        let played = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
+        let called = played && (attention.called_for_itself() || turned == Some(true));
+        // The verdict for the room this route keeps (`super::room`), and a
+        // call let out, which ends the count of talk past the lamp.
         if let Ok(mut room) = crate::room_told::room().lock() {
             room.judged(request, verdict, false);
+            if called {
+                room.called(request);
+            }
         }
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
+        // A call let out: the conversation goes on from it.
+        if called {
+            self.called_at = Some(Instant::now());
+        }
+        // Held in a row, as Live counts its unanswered: a new session.
+        self.held_run = if played {
+            0
+        } else {
+            self.held_run.saturating_add(1)
+        };
+        if self.held_run >= RENEW_AFTER_HELD
+            && self
+                .renewed_at
+                .is_none_or(|at| at.elapsed() >= RENEW_AT_MOST_EVERY)
+        {
+            self.session += 1;
+            self.renewed_at = Some(Instant::now());
+            self.held_run = 0;
+        }
         match verdict {
             Some(crate::attention::Verdict::Hold(why)) => Some(why),
             // Said, as each hold is by the route (#829, 17:21).
@@ -2239,6 +2331,77 @@ pub async fn run(
 
 #[cfg(test)]
 mod tests {
+    /// #1712, the first builder at 16:43: the route's lines are judged as
+    /// one session's, as a Live session's, so in a busy room one past the
+    /// session's first two is trusted when the rule is not strict. Before,
+    /// each line was a session's first. Eight held in a row begin a new one.
+    #[test]
+    fn the_routes_lines_are_one_sessions_and_eight_held_renew_it() {
+        use crate::room_told::Room;
+        let busy = || Signs {
+            room: Room::Busy,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let said = (10_000_000, 11_000_000);
+        let mut heeding = Heeding::new(false, true, None, None);
+        for request in [300, 301] {
+            assert!(heeding.judge(request, said, "And then?", busy()).is_some());
+        }
+        assert_eq!(heeding.judge(302, said, "And then?", busy()), None);
+        assert_eq!(heeding.session, 1);
+        let mut strict = Heeding::new(true, true, None, None);
+        for request in 400..400 + u64::from(RENEW_AFTER_HELD) {
+            assert!(strict.judge(request, said, "And then?", busy()).is_some());
+        }
+        assert_eq!(strict.session, 2);
+        // At most every quarter of an hour.
+        for request in 500..500 + u64::from(RENEW_AFTER_HELD) {
+            assert!(strict.judge(request, said, "And then?", busy()).is_some());
+        }
+        assert_eq!(strict.session, 2);
+    }
+
+    /// #1712: a line that called the lamp, let out, carries the person's
+    /// next line without the name as the conversation going on, though the
+    /// lamp has said no word yet; two lines left alone since still end it.
+    #[test]
+    fn a_call_let_out_carries_the_next_line_though_the_lamp_said_nothing() {
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        {
+            let mut room = crate::room_told::room().lock().unwrap();
+            *room = crate::room_told::RoomTold::new();
+            room.count_only_talk(true);
+        }
+        let said = (10_000_000, 11_000_000);
+        let mut heeding = Heeding::new(true, true, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.heed(207, said, "Lamp, what time is this?", None),
+            None
+        );
+        assert_eq!(
+            heeding.heed(209, said, "Set a timer for five minutes.", None),
+            None
+        );
+        {
+            let mut room = crate::room_told::room().lock().unwrap();
+            for request in [210, 211] {
+                room.unanswered(request, lamp_ipc::monotonic_us());
+            }
+        }
+        assert!(
+            heeding
+                .heed(212, said, "What's the price of gold?", None)
+                .is_some()
+        );
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
     /// What the engine is told for a checked sound (17 October): the lamp's
     /// own last line a question, in a conversation going on. A line that
     /// asks nothing, or the same question past the conversation, is not.
