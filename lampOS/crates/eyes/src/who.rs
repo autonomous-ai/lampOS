@@ -45,6 +45,53 @@ const MOST_FILE_BYTES: u64 = 256 * 1024;
 /// dropped (#1505). The folder is 0700, each file 0600, and the product
 /// reset empties it, since these are face prints.
 pub const SET_ASIDE: &str = "set-aside";
+
+/// Beside `--known-file`, while speaking is judged: the passing id
+/// (`humans/faces/tracked`'s `f3`) of the known person's face, one line, and
+/// no file whenever there is no name. Only an id that lasts while the face
+/// stays in view: no picture, print or name.
+pub fn known_face_of(known: &Path) -> PathBuf {
+    let mut beside = known.as_os_str().to_owned();
+    beside.push("-face");
+    PathBuf::from(beside)
+}
+
+/// The name of the one known at the lamp (`--known-file`), replaced whole,
+/// or no file; and while speaking is judged, their face's passing id in
+/// [`known_face_of`], which goes with the name.
+pub fn keep_known(path: &Path, name: Option<&str>, face: Option<&str>) {
+    let beside = known_face_of(path);
+    let Some(name) = name else {
+        let _ = std::fs::remove_file(&beside);
+        let _ = std::fs::remove_file(path);
+        return;
+    };
+    // The face first, so a new name is never read beside an older face.
+    match face {
+        Some(face) => replace_line(&beside, face),
+        None => {
+            let _ = std::fs::remove_file(&beside);
+        }
+    }
+    replace_line(path, name);
+}
+
+fn replace_line(path: &Path, line: &str) {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut temporary = path.as_os_str().to_owned();
+    temporary.push(".new");
+    let written = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&temporary)
+        .and_then(|mut file| writeln!(file, "{line}"));
+    if written.is_ok() {
+        let _ = std::fs::rename(&temporary, path);
+    }
+}
 /// How quickly a remembered person's familiarity fades (#1670): it halves
 /// in fourteen days without them.
 pub const FAMILIAR_HALF_LIFE_S: u64 = 14 * 86_400;
@@ -1272,6 +1319,32 @@ mod tests {
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
         directory.join("people.json")
+    }
+
+    /// The known name, and while speaking is judged its face's passing id
+    /// beside it: both 0600, the face gone with no face, both gone with no
+    /// name.
+    #[test]
+    fn the_known_face_is_kept_beside_the_known_name_and_goes_with_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let known = file("known-face").with_file_name("known");
+        let beside = known_face_of(&known);
+        assert_eq!(beside.file_name().unwrap(), "known-face");
+        keep_known(&known, Some("Lan"), Some("f3"));
+        assert_eq!(std::fs::read_to_string(&known).unwrap(), "Lan\n");
+        assert_eq!(std::fs::read_to_string(&beside).unwrap(), "f3\n");
+        for path in [&known, &beside] {
+            let mode = std::fs::metadata(path).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
+        // Speaking not judged: the name only, and no older face beside it.
+        keep_known(&known, Some("Minh"), None);
+        assert_eq!(std::fs::read_to_string(&known).unwrap(), "Minh\n");
+        assert!(!beside.exists());
+        keep_known(&known, Some("Minh"), Some("f4"));
+        keep_known(&known, None, Some("f4"));
+        assert!(!known.exists() && !beside.exists());
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
     }
 
     /// #1505: the people file as a later build writes it, with a field this
