@@ -82,6 +82,7 @@ face the lamp knows.
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Read only. Without the switch, V1's "not on this lamp" |
+| `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder); the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules. `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
@@ -288,18 +289,19 @@ words then pass through the broker to the app, where before they left the
 lamp only to the voice's model. Tests: `app_contract.rs`'s
 `schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without`.
 
-## The skills page (#1722, `skills.list`)
+## The skills page (#1722, `skills.list`, `skills.remove`)
 
 The Autonomous app's Lamp 2 skills page (mobile's design on #1722, the
 first builder's yes at 17:21 on 19 Oct): the lamp's skills as a phone's
-home screen of apps. `skills.list` is the first of four kinds; `remove`
-comes next, then `catalog` and `install` once the update channel carries
-skills. Only `skills.list` is built, and it is read only.
+home screen of apps. Two of its four kinds are built: `skills.list`, read
+only, and `skills.remove` ("Removing a skill" below); `catalog` and
+`install` come once the update channel carries skills, and are refused as
+kinds this lamp lacks until then.
 
 **The switch.** `LAMP_SKILLS_PAGE=on`, with `LAMP_CLOUD=on`; off unless
 set. Without it the kind is answered as any this lamp lacks, `not on this
-lamp: skills.list`, and the app shows no Skills row. Its envelope is V1's,
-as `reports.*`'s.
+lamp: skills.list` (and `not on this lamp: skills.remove`), and the app
+shows no Skills row. Its envelope is V1's, as `reports.*`'s.
 
 **Where it reads.** `lamp-skills`' own folder, `/var/lib/lampOS/skills`
 (the product unit's `--dir`), with `lamp-skills`' own loader
@@ -388,6 +390,81 @@ build; not yet timed on a lamp). A folder that can't be read is answered
 `tests/skills_contract.rs` pins the reply's fields by name and type, in
 V1's envelope through JSON, from `Real` over `lampOS/skills/`, and the
 refusal's exact words without the switch.
+
+### Removing a skill (`skills.remove`)
+
+`{"name": "desk-tutor"}`, sent by the app when the person taps Remove on
+an added skill's sheet and confirms. Only the person's tap removes a skill:
+the voice has no function for it and the model can't ask for it (the
+cloud's kinds come only from the app, over the broker). Whether the voice
+should ever remove one is a separate decision, not taken.
+
+- **Who may be removed.** An `installed` or `made_here` skill, whether it
+  loads or not. A `core` skill is refused, `dance is a core skill: it comes
+  with the lamp, so it can't be removed`, and `lamp-skills` refuses it
+  again under its lock. A `name` that is not a skill's, 1 to 64 lowercase
+  letters, digits and hyphens (`lamp_skills::package::skill_name_ok`), is
+  refused before anything is read, `name must be a skill's name: 1 to 64
+  lowercase letters, digits and hyphens`, and is not said back: `..`, `/`,
+  NUL, a hidden `.NAME`, an upper-case letter, a `_`, over 64 bytes, a
+  number, null or no `name` at all. A name the folder does not hold is `no
+  skill NAME on this lamp`. A link named as a skill is `lamp-skills`' to
+  refuse (`… is not a skill's folder: left as it is`), and what it points at
+  is never touched.
+- **Who removes it: root's manage helper, never `lamp-cloud`** (the first
+  builder, 18:33 on #1722). `lamp-cloud` talks to the network, and with
+  `install` next, a part there that could write the skills folder would let
+  a network message put code on the lamp. So `lamp-cloud` stays `lampos`
+  under `ProtectSystem=strict` with no new writable path, and asks
+  `{"remove": NAME}` over a local socket,
+  `/run/lampos-skills-manage/manage.sock`, one line each way, waiting at
+  most 5 s for the answer ([skills.md](skills.md), "The manage helper").
+  The helper checks the request again itself, whoever connects, and runs
+  `lamp-skills`' own remove (`lamp_skills::package::remove`, what
+  `lamp-skills remove NAME` runs): no path of its own. Connecting to a
+  socket is not a write to its file system, so the read-only `/run` of
+  `lamp-cloud`'s unit lets it connect.
+- **What the remove does.** Under the folder's lock (so never across an
+  install), the skill's folder is renamed aside to `.removed-NAME-PID`, so
+  it is gone at once and whole for the running program, then deleted.
+  `lamp-skills` keeps no data per skill on `lamp-voice` (a held dim is given
+  back at its reload, and #1837's off file, once merged, is one line a
+  skill), so nothing else is set aside: the folder is the skill. A remove
+  killed between the two steps leaves `.removed-NAME-PID`, which the running
+  program passes over and the next install deletes.
+- **What the running lamp does.** Nothing is restarted. `lamp-skills`
+  looks at its folder every 2 s, loads the rest again, gives back what the
+  removed skill held, stops its triggers and writes its tools for the voice
+  again (`/run/lampos-skills/tools.json`) without its function. The voice
+  sees the catalog change within its next 2 s look and opens a new session
+  without that function between turns, once the conversation has ended and
+  at most once in 30 s ([tools.md](tools.md); a function taken away is not
+  a "came back" change, so it waits for the conversation). Until then a
+  call to it gets `lamp-skills`' "No skill of mine does that just now."
+- **The reply** is `skills.list`'s, the folder read again just after the
+  remove: the page shows the list as the lamp now has it in one round trip,
+  which is mobile's design ("Remove, confirm, then the list as the lamp now
+  has it"), with nothing for the app to work out and no second kind to
+  parse. It is chosen over `{"removed": NAME}` because that would be the
+  app's guess of the page, not the lamp's. The running `lamp-skills` lets
+  the skill go within 2 s of the reply.
+- **A refusal from the helper** is its own words on one line (at most 300
+  bytes), and the skill stays whole; the journal says it in full
+  (`lamp-cloud: skills.remove NAME from the app refused: …`), and a remove
+  done says `lamp-cloud: skills.remove from the app: removed NAME: …`, and
+  the helper's own journal line (`lamp-skills: asked: …`). A helper that
+  can't be reached, or answers nothing a helper would, is `the lamp's
+  skills can't be changed now`, with the error in the journal; nothing is
+  then removed, and `lamp-cloud` never falls back to the folder.
+- **On a product lamp** the helper's two units are in `deploy/product/`
+  (`lamp-skills-manage.socket` and `lamp-skills-manage@.service`) but not
+  yet in `lamp-update`'s install list: they go there after their lamp
+  check. Until a lamp has them, the remove is answered `the lamp's skills
+  can't be changed now`.
+- **How long.** A read of the folder before and after, a connection and
+  the start of the helper (one process, started by systemd), two renames
+  and a delete; it waits for the folder's lock while an install by hand
+  runs (a package of at most 16 MB), at most 5 s. Not yet timed on a lamp.
 
 ## Health and crash reports (#1683, step 1)
 
@@ -833,8 +910,18 @@ The skills page (#1722): the reply's shape; a core skill never removable
 and an installed one removable; a skill made here in its own group; each
 permission's line and the privacy switch's; a skill that does not load, with
 why; `[stop]` and the off file; the bounds; a folder that can't be read; the
-switch's two gates and the refusal's exact words. `tests/skills_contract.rs`
-pins the fields as sent.
+switch's two gates and the refusal's exact words. `skills.remove`: a core
+skill refused and left whole; a made-here skill removed, the reply the page
+as it now is, and asked again, not there; an installed skill removed, and
+one that does not load; an unknown name; every path trick (`..`, `/`, NUL,
+a hidden name, 65 bytes, not a string) refused with the folder and the
+folder beside it untouched; a link left as it is; a folder that can't be
+changed leaving the skill whole; no helper, or one answering nonsense,
+removing nothing; and off, `not on this lamp: skills.remove`. Each remove
+goes through the manage helper's own code on a real Unix socket on a short
+`/tmp` path. `tests/skills_contract.rs` pins the fields as sent, and
+removes Desk tutor from a copy of `lampOS/skills/` through `Real`, the
+socket and the envelope.
 
 Changes after setup (#1959): the switch's two words; each kind refused as
 one this lamp lacks without it, `device.rename` included; each kind's line for

@@ -1795,17 +1795,28 @@ mod tests {
     #[test]
     fn the_parts_are_the_products_units() {
         let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
-        let mut units: Vec<String> = fs::read_dir(product)
+        let mut units: Vec<String> = fs::read_dir(&product)
             .unwrap()
             .filter_map(|entry| {
                 let name = entry.unwrap().file_name().to_string_lossy().into_owned();
-                // A template's journal tag is its name without the `@`
+                // A template's journal tag is its `SyslogIdentifier=` when it
+                // sets one (`lamp-skills-manage@.service` journals as
+                // `lamp-skills`), else its name without the `@`
                 // (`lamp-setup-change@.service` says `lamp-setup-change`).
-                name.strip_suffix(".service")
-                    .map(|unit| unit.trim_end_matches('@').to_owned())
+                let unit = name.strip_suffix(".service")?;
+                let Some(template) = unit.strip_suffix('@') else {
+                    return Some(unit.to_owned());
+                };
+                let text = fs::read_to_string(product.join(&name)).unwrap();
+                let tag = text
+                    .lines()
+                    .find_map(|line| line.strip_prefix("SyslogIdentifier="))
+                    .unwrap_or(template);
+                Some(tag.trim().to_owned())
             })
             .collect();
         units.sort();
+        units.dedup();
         let mut parts: Vec<String> = PARTS.iter().map(|part| (*part).to_owned()).collect();
         parts.sort();
         assert_eq!(parts, units);

@@ -17,7 +17,7 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs, io,
-    io::Read,
+    io::{BufRead, Read},
     os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
 };
@@ -779,6 +779,55 @@ pub fn remove(skills: &Path, name: &str) -> Result<String, String> {
     Ok(format!(
         "removed {name}: a running lamp-skills lets it go within 2 s"
     ))
+}
+
+/// Where the manage helper listens on a product lamp
+/// (`deploy/product/lamp-skills-manage.socket`): root's socket, which only
+/// the group `lampos` may connect to. systemd holds it and starts
+/// `lamp-skills asked` as root for each connection, with the connection as
+/// its standard input and output ([`asked`]).
+pub const MANAGE_SOCKET: &str = "/run/lampos-skills-manage/manage.sock";
+
+/// The most bytes of a request to [`asked`].
+pub const ASKED_MOST: u64 = 4_096;
+
+/// One request to the manage helper, read from `input`, done in `skills`,
+/// and answered on `output` in one line: `{"done": WHAT}` or
+/// `{"refused": WHY}`; true when it was done. The one request taken is
+/// `{"remove": NAME}`, a skill taken off by [`remove`], which checks it
+/// itself, whoever asked: a name that is not a skill's and a core skill are
+/// refused here, not only by the asker (`lamp-cloud`'s `skills.remove`,
+/// #1722). `install` is not taken: it will be, for a package from the update
+/// channel under its key's signature alone, once the channel carries skills.
+pub fn asked(skills: &Path, input: impl Read, mut output: impl io::Write) -> io::Result<bool> {
+    let mut line = String::new();
+    // A request past its bound, or not UTF-8, is no request.
+    let _ = io::BufReader::new(input.take(ASKED_MOST)).read_line(&mut line);
+    let request: Option<serde_json::Value> = serde_json::from_str(line.trim_end()).ok();
+    let only = |key: &str| {
+        request
+            .as_ref()
+            .and_then(serde_json::Value::as_object)
+            .filter(|asked| asked.len() == 1)
+            .and_then(|asked| asked.get(key))
+    };
+    let done = match (only("remove"), only("install")) {
+        (Some(serde_json::Value::String(name)), _) => remove(skills, name),
+        (_, Some(_)) => Err(
+            "install is not taken here yet: only a package from the update channel, under its key's \
+             signature, will be"
+                .to_owned(),
+        ),
+        _ => Err("a request is one line, {\"remove\": NAME}".to_owned()),
+    };
+    let answer = match &done {
+        Ok(said) => serde_json::json!({ "done": said }),
+        Err(why) => serde_json::json!({ "refused": why }),
+    };
+    eprintln!("lamp-skills: asked: {answer}");
+    writeln!(output, "{answer}")?;
+    output.flush()?;
+    Ok(done.is_ok())
 }
 
 /// The skills in `skills`, a line each: name, kind, version and what it

@@ -931,6 +931,64 @@ it does not know).
   number; a link or a file of such a name is left as it is) and says so.
 - **`remove`** renames an installable skill's folder aside, so it is gone
   at once for the program, then deletes it.
+  The app's skills page removes a skill the same way, through the manage
+  helper below.
+- **`asked`** is the manage helper ("The manage helper", below): one
+  request read from the standard input, its answer on the standard output.
+
+**The manage helper** (#1722, the first builder's 18:33). The one way a
+part that is not root changes the skills folder. `lamp-cloud`'s
+`skills.remove`, for the app's skills page ([cloud.md](cloud.md),
+"Removing a skill"), asks it instead of writing the folder: `lamp-cloud`
+talks to the network, and with `install` coming, write access there would
+let a network message put code on the lamp. So the folder stays root's,
+0755, and `lamp-cloud` stays `ProtectSystem=strict` with no writable path
+for it.
+
+- **What it is.** systemd holds a socket,
+  `/run/lampos-skills-manage/manage.sock` (`deploy/product/lamp-skills-manage.socket`:
+  root's, 0660, group `lampos`, `Accept=yes`, at most 4 connections), and for
+  each connection starts `lamp-skills asked --dir /var/lib/lampOS/skills`
+  as root (`lamp-skills-manage@.service`), the connection its standard
+  input and output. It reads one line of at most 4 KiB, answers one line,
+  `{"done": WHAT}` or `{"refused": WHY}`, and exits. Its unit has only the
+  skills folder writable, no network (`PrivateNetwork=yes`, Unix sockets
+  only), no capabilities, `NoNewPrivileges` and 60 s at most.
+- **It checks each request itself,** whoever connected: the only request
+  taken is `{"remove": NAME}`, exactly that one key with a string, and it
+  runs `remove` above, which refuses a name that is not a skill's (1 to 64
+  lowercase letters, digits and hyphens: no `/`, `..`, NUL, hidden name or
+  more) and a core skill, under the folder's lock. Anything else is
+  refused, `a request is one line, {"remove": NAME}`. `install` is refused
+  (`install is not taken here yet: …`): it will be taken only for a package
+  from the update channel under its key's signature, once the channel
+  carries skills.
+- **Why this and not the others** (the least new surface):
+  - **Not the running `lamp-skills`.** It runs as `lampos`, the same user
+    as `lamp-cloud`, reading the folder under `ProtectSystem=strict`.
+    Removing through it would make the folder writable by `lampos`, which
+    is what is ruled out, and give the long-running program that runs
+    skills a listener that changes them.
+  - **Not `lamp-update serve`.** It is root and long-running, and fetches
+    from the network. It has no listener today, and its unit cannot write
+    the skills folder; giving it both widens a root daemon.
+  - **A root one-shot started per connection** adds no daemon and no
+    listener code: systemd owns the socket, its mode and its group, and the
+    code that runs is `lamp-skills`' own `remove`, what `lamp-skills remove`
+    runs by hand as root. What is new is one line-reading function,
+    `lamp_skills::package::asked`, and two units.
+- **Who may connect:** root and the group `lampos`, so any part running as
+  `lampos` may ask for a remove, never of a core skill. A group of
+  `lamp-cloud`'s own would narrow that; it needs `lamp-update install` to
+  make the group, and is not done here.
+- **Not on a lamp yet.** The two units are in `deploy/product/` but not in
+  `lamp-update`'s install list (`install::PRODUCT`); they go there after
+  their lamp check. Tested on a Mac only: `tests/package.rs` runs the real
+  program on a Unix socket and refuses a core skill and bad names on its
+  own; `lamp-cloud`'s tests go through the helper's code on a real socket.
+- **The voice can't remove a skill:** no function does, and whether one
+  should is a separate decision.
+
 - **`list`** says, a line each, every skill folder's name, kind, version
   (`-` for none) and what it may use, or why it does not load, as the
   running program loads them (a tool's name taken among them), then the
