@@ -185,6 +185,59 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   covering finals, `CloseStream` and up to 15 s in all for its final
   words, as before. `CloseStream` is sent in
   every case to close the socket, but waited on only in that fallback.
+
+  **Flux on trial (`LAMP_SECOND_FLUX=on`, off unless set; the hearing half
+  of #1712's plan, `net/stt/flux.rs`).** The same lines go to Deepgram's
+  Flux, `wss://api.deepgram.com/v2/listen?model=flux-general-en&encoding=linear16&sample_rate=16000`,
+  with the same `keyterm`s: the name, the unit's words and the names the
+  lamp knows. Through the Autonomous proxy it's the proxy's own path,
+  `…/ws/audio/transcriptions`, with Flux's query. The proxy passes
+  `model=flux-general-en` on to Deepgram's `/v2/listen`: on lamp-4ace on
+  19 Oct, with the lamp's own key, its handshake, `Connected` and
+  `TurnInfo` came back, and a clean line was heard whole (the first
+  builder, 15:54). Its `/v2/listen` paths are 404s. Flux hears English
+  only: with an `stt_language` other than `en` or `en-*`, Nova-3 hears the
+  lines and the journal says why once.
+
+  Flux tells turns itself. Each `TurnInfo` carries one turn's words so
+  far, and `EndOfTurn` ends the turn: by Flux's own model (`trigger`
+  `model`), by `ForceEndTurn` (`manual`), or after 5 s of quiet
+  (`timeout`). The coordinator still ends the line. Audio goes in 80 ms
+  messages, as Deepgram advises. Flux's reference names no `KeepAlive`,
+  so an idle socket is kept with 80 ms of quiet.
+
+  At the end of the line:
+  - **Settled:** the latest turn has ended and Flux's windows cover all
+    the audio sent. Its words are the transcript at once.
+  - **Otherwise `ForceEndTurn`,** waited for up to 1 s as `Finalize` is.
+    Its `EndOfTurn` ends the wait, and so does the warning that no turn is
+    open (`FORCE_END_TURN_NO_ACTIVE_TURN`).
+  - **Unanswered:** `CloseStream`, which ends no turn, and each turn's
+    latest words are the transcript.
+
+  The stop words' and wait words' streams stay on Nova-3, since the switch
+  reaches only the second route's worker. A flush on a Flux stream is a
+  `ForceEndTurn` too, and its answer is never taken for the line's.
+
+  The journal's line is Nova-3's, with Flux's account in place of the
+  finals': "request N at the line's end: flux: turns=K, <no turn|the
+  latest turn open|the latest turn ended by model|manual|timeout>, <the
+  model ended no turn|the model ended turn I T ms before End>,
+  settled=<bool>, heard to H of S ms sent[, force_end answered in A ms (end
+  of turn|no turn)|, force_end unanswered], words
+  from=<settled|force_end|close_stream>". T is how far ahead of the
+  coordinator's end Flux's own end of turn came. That, beside the words,
+  is what the trial is for.
+
+  `lamp-voice stt-check` reads the unit's switches now. So
+  `LAMP_SECOND_FLUX=on lamp-voice stt-check CONFIG WAV` hears a recorded
+  line with Flux, and without the switch with Nova-3: the same line by
+  both.
+
+  Host tests on the paused clock: 0 ms to the words with the turn ended
+  over all the audio, 100 ms with `ForceEndTurn` answered 100 ms later, and
+  1 s + 800 ms when it isn't answered. Not yet run against Deepgram or on a
+  lamp.
 - **Text model** (`net/chat.rs`): `POST <base>/chat/completions`,
   `Authorization: Bearer <key>`, `"stream": true`, with `tools` when any are
   declared. They are declared as they stand at each request, as a Live
@@ -331,7 +384,10 @@ order is kept. A written turn is the same from the chat on.
   under 2.0 s). Speech to text tells the turn the words it has before they
   are final (`net::Early`). With Nova-3 that's at the line's end, the
   finals and the last interim's words while `Finalize`'s answer is still to
-  come. Round 1 of the chat is asked on them at once (`Prepared`), its
+  come. With Flux (`LAMP_SECOND_FLUX=on`) it's before the line's end: Flux
+  is asked for its eager turn ends (`eager_eot_threshold=0.5`), each
+  `EagerEndOfTurn`'s words are early words, and `TurnResumed` takes them
+  back, dropping what was begun. Round 1 of the chat is asked on them at once (`Prepared`), its
   events kept, with nothing said and no tool run. When the words are final
   it's kept only if all three hold:
   - the words are the early ones, as letters, digits and spaces in any case;

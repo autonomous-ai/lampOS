@@ -132,6 +132,11 @@ pub const KEY_TERMS_ENV: &str = "LAMP_SECOND_KEY_TERMS";
 /// At most this many, each at most [`KEY_TERM_BYTES`].
 pub const MOST_KEY_TERMS: usize = 20;
 pub const KEY_TERM_BYTES: usize = 40;
+/// `on`: the route's lines go to Deepgram's Flux in place of Nova-3, when
+/// they are in English, straight to Deepgram or through the Autonomous
+/// proxy (`net::stt::flux`, on trial for #1712's hearing half); anything
+/// else, or unset, Nova-3.
+pub const FLUX_ENV: &str = "LAMP_SECOND_FLUX";
 /// Fields of the chat request that `llm_extra` may not replace.
 const OWN_FIELDS: [&str; 5] = ["model", "messages", "stream", "tools", "tool_choice"];
 
@@ -185,6 +190,8 @@ pub struct SecondConfig {
     /// Words speech to text is told to expect beside the lamp's name
     /// ([`KEY_TERMS_ENV`]); none unless set.
     pub stt_key_terms: Vec<String>,
+    /// Lines go to Flux ([`FLUX_ENV`]); off unless set.
+    pub stt_flux: bool,
     pub tts_base_url: String,
     pub tts_key: Key,
     pub tts_provider: TtsProvider,
@@ -346,6 +353,7 @@ pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
         stt,
         stt_language: given(raw.stt_language),
         stt_key_terms: Vec::new(),
+        stt_flux: false,
         tts_base_url: checked_url(tts_base_url)?,
         tts_key: key(&tts_file)?,
         tts_provider,
@@ -474,7 +482,7 @@ impl SecondConfig {
     /// With [`GEMINI_BASE_URL_ENV`], [`SPEECH_MODEL_ENV`] and
     /// [`KEY_TERMS_ENV`] as `var` gives them, over the file's; unset or
     /// empty, the file's stay. Refused as the file's fields are, naming the
-    /// variable.
+    /// variable. [`FLUX_ENV`] is on for `on` alone.
     pub fn with_environment(mut self, var: impl Fn(&str) -> Option<OsString>) -> io::Result<Self> {
         let given = |name: &str| -> io::Result<Option<String>> {
             var(name)
@@ -506,6 +514,7 @@ impl SecondConfig {
         if let Some(terms) = given(KEY_TERMS_ENV)? {
             self.stt_key_terms = key_terms(&terms).map_err(named(KEY_TERMS_ENV))?;
         }
+        self.stt_flux = var(FLUX_ENV).is_some_and(|value| value == "on");
         Ok(self)
     }
 }
@@ -725,6 +734,17 @@ mod tests {
             places.stt_key_terms,
             ["Hanoi", "Ho Chi Minh City", "Đà Nẵng"]
         );
+        assert!(!places.stt_flux && !set.stt_flux);
+        let flux = |value: &str| {
+            route()
+                .with_environment(|name| (name == FLUX_ENV).then(|| value.into()))
+                .unwrap()
+                .stt_flux
+        };
+        assert!(flux("on"));
+        for off in ["", "off", "ON", "yes"] {
+            assert!(!flux(off), "{off:?}");
+        }
         let many = vec!["Hanoi"; MOST_KEY_TERMS + 1].join(",");
         for (name, value) in [
             (GEMINI_BASE_URL_ENV, "http://plain.example.invalid"),
