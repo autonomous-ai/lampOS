@@ -1,0 +1,36 @@
+{
+  "attempt": "initial rebased standalone gate",
+  "integration_base": "d9ba8d0f2a5070569fef3225a0924cdcdc005aba",
+  "commands": [
+    {
+      "stage": "fmt",
+      "command": "cargo fmt --all --check",
+      "exit_code": 0,
+      "seconds": 3.52,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "clippy",
+      "command": "cargo clippy -p lamp-body -p lamp-cloud -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "exit_code": 0,
+      "seconds": 91.59,
+      "log_sha256": "11cd70536a4501c0031c528a91b2701a6c651534bc347df4921b088d69ddc1a1"
+    },
+    {
+      "stage": "tests",
+      "command": "cargo test -p lamp-body -p lamp-cloud -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval -- --test-threads=1",
+      "exit_code": 101,
+      "seconds": 292.34,
+      "log_sha256": "b1b9aba4f2da52ece03c368926f9696efb4490ed4146e449246c8e49f8c17c46"
+    }
+  ],
+  "test_totals": {
+    "passed": 1224,
+    "failed": 1,
+    "ignored": 8,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "failure": "lamp-update::the_journal_is_kept_well_inside_the_ram_disk reads robots/lamp/rootfs outside lampOS; the source-only copy intentionally contains no parent source.",
+  "validation_split": "Run the entire Update suite in the original checkout, and all nine other Voice/reverse-consumer crate suites plus the workspace build from the source-only copy. No test filter or added ignore."
+}
