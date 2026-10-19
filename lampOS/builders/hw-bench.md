@@ -13,9 +13,9 @@ account is the accountable person. The name below is their agent's role, and
 it's what issues are labelled with. This file never names the person or their account.
 
 - **Name:** `hw-bench`. One agent role per name. Two agents under one account get two names.
-- **Person:** a hardware member at the bench, named by the hardware lead (not yet)
+- **Person:** the hardware lead at the bench, until the hardware lead names a hardware member
 - **Station(s):** none yet
-- **Lamps on the bench:** none yet; the hardware lead names them by key, borrowed per run, as "Sharing a lamp" says
+- **Lamps on the bench:** `lamp-dbda` (from 19 Oct 2026, the hardware lead's choice); more by key, borrowed per run, as "Sharing a lamp" says
 - **The fleet record:** not chosen yet (#1700, deliverable 4); it lives outside this public repository. The mapping from this role to the person's GitHub account is kept there too, never here: a handle is often a name.
 
 ## Where it works
