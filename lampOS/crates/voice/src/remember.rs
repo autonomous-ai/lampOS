@@ -1455,6 +1455,11 @@ impl DaysClient {
             if let Ok(mut current) = self.current.lock() {
                 *current = Current::default();
             }
+            // And the writer ends its conversation after whatever it still
+            // has queued, so an exchange written late can't put the
+            // forgotten turns' ids back (the reviewer's P3 on #2020). A full
+            // queue drops it; the clear above still holds until then.
+            let _ = self.jobs.try_send(DaysJob::End);
         }
         for (whose, id) in ids {
             context.include(whose.as_deref(), &[id]);
