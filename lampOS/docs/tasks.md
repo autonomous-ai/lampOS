@@ -1310,6 +1310,26 @@ an ask over (the owner, 19 Oct 07:1x, "via hand-overs").
 Tests: `agent_tasks::tests::with_accounts_the_persons_calendar_and_email_are_handed_over_and_no_office_is_named`,
 `agent_tasks::tests::the_accounts_switch_is_on_only_with_asked_and_taken_after_it`.
 
+### A skill made by voice (#1685, off unless `LAMP_MAKE_SKILL=on`)
+
+The worker's `--tasks-make-skill`, after `--tasks-needs`, gives the model
+`make_skill(request)` ([skills.md](skills.md#made-by-voice-1685-off-unless-lamp_make_skillon)).
+- **The prepare.** It goes as `start_agent_task`'s does: `prepare`, then
+  `confirm_agent_task` on the person's yes, within 120 s, as the same
+  pending work. Its `text` is the brief and the request (at most 180 bytes)
+  within the tasks part's 1,000 bytes. The brief begins "Write one lamp
+  skill (lampOS lamp-skills)", which is how the voice knows the task again.
+- **The model's answer.** It is told `"skill": <the request>`, never the
+  brief, and `next` asks it to say the request back.
+- **When it settles.** Task news (`task_news::read_once_with`) quotes the
+  request as such a task's words, in every state. Settled `idle` with an
+  answer, the answer is taken as the skill's two files, kept as skills.md
+  says, and told alone (never with other news, never read out).
+- **Without the switch,** such a task's news is any task's, the request
+  quoted.
+- **The journal** says `a skill made by voice is kept, NAME VERSION, sha256
+  …` or why not, never the files.
+
 ### Asked of the staff, done by the lamp (#854, off unless `LAMP_TASKS_ASKED=on`)
 
 On lamp-4ace on 2026-10-15 at 20:15 and 20:16 (one session, synthetic

@@ -135,6 +135,8 @@ pub const NAMES_FLAG: &str = "--tasks-machine-names";
 /// not running. Unset, always the latter.
 pub const NEEDS_ENVIRONMENT: &str = "LAMP_TASKS_NEEDS";
 pub const NEEDS_FLAG: &str = "--tasks-needs";
+/// A skill may be made by voice (`crate::made_skill`, `LAMP_MAKE_SKILL=on`).
+pub const MAKE_SKILL_FLAG: &str = "--tasks-make-skill";
 pub const DEFAULT_TARGET: &str = "office";
 /// The model's two functions.
 pub const START: &str = "start_agent_task";
@@ -365,7 +367,7 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
             }),
         )
     };
-    vec![
+    let mut tools = vec![
         Tool {
             name: START.into(),
             description: start_description,
@@ -423,7 +425,11 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
             }),
             silent: false,
         },
-    ]
+    ];
+    if place.make_skill {
+        tools.push(crate::made_skill::tool(default));
+    }
+    tools
 }
 
 /// What the model is told after `start_agent_task` prepared the work.
@@ -1007,7 +1013,7 @@ fn read_staff(socket: &Path, target: &str, deadline: Duration, who: bool) {
 }
 
 pub fn is_tool(name: &str) -> bool {
-    name == START || name == CONFIRM || name == CHECK
+    name == START || name == CONFIRM || name == CHECK || name == crate::made_skill::MAKE
 }
 
 /// What the tasks part is reached by.
@@ -1034,6 +1040,9 @@ pub struct Place {
     /// ([`crate::staff_note`]), and `start_agent_task` says what that note
     /// asks. Set by the provider worker from its own flag.
     pub staff_note: bool,
+    /// The model may ask for a skill to be made ([`MAKE_SKILL_FLAG`],
+    /// `crate::made_skill`).
+    pub make_skill: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -1047,6 +1056,9 @@ pub fn arguments_from_environment() -> Vec<String> {
         std::env::var(ACCOUNTS_ENVIRONMENT).ok().as_deref(),
         std::env::var(NAMES_ENVIRONMENT).ok().as_deref(),
         std::env::var(NEEDS_ENVIRONMENT).ok().as_deref(),
+        std::env::var(crate::made_skill::ENVIRONMENT)
+            .ok()
+            .as_deref(),
     )
 }
 
@@ -1061,6 +1073,7 @@ fn arguments(
     accounts: Option<&str>,
     names: Option<&str>,
     needs: Option<&str>,
+    make_skill: Option<&str>,
 ) -> Vec<String> {
     let Some(directory) = directory.filter(|path| Path::new(path).is_absolute()) else {
         return Vec::new();
@@ -1090,6 +1103,9 @@ fn arguments(
         arguments.push(NEEDS_FLAG.to_owned());
         arguments.push(needs.to_owned());
     }
+    if make_skill == Some("on") {
+        arguments.push(MAKE_SKILL_FLAG.to_owned());
+    }
     arguments
 }
 
@@ -1102,7 +1118,7 @@ fn alias(text: &str) -> bool {
 
 /// Take a leading `--tasks-dir DIR [--tasks-target ALIAS] [--tasks-who]
 /// [--tasks-lead-in] [--tasks-asked [--tasks-accounts]] [--tasks-machine-names]
-/// [--tasks-needs PATH]`
+/// [--tasks-needs PATH] [--tasks-make-skill]`
 /// off the flags.
 pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
     let [flag, rest @ ..] = flags else {
@@ -1155,6 +1171,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
         }
         _ => (None, rest),
     };
+    let (make_skill, rest) = match rest {
+        [flag, rest @ ..] if flag == MAKE_SKILL_FLAG => (true, rest),
+        _ => (false, rest),
+    };
     Ok((
         Some(Place {
             directory: PathBuf::from(directory),
@@ -1166,6 +1186,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
             machine_names,
             needs,
             staff_note: false,
+            make_skill,
         }),
         rest,
     ))
@@ -1241,15 +1262,33 @@ fn run_for(
     let started = Instant::now();
     let left = || deadline.saturating_sub(started.elapsed());
     match call.name.as_str() {
-        START => {
-            let Some(task) = call
-                .args
-                .get("task")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|task| !task.is_empty())
-            else {
-                return (json!({"error": "Say what the work is."}), true);
+        START | crate::made_skill::MAKE => {
+            // A skill to make (`crate::made_skill`): the brief, with the
+            // person's request and nothing else, handed over as any work.
+            let making = call.name == crate::made_skill::MAKE;
+            let brief;
+            let task = if making {
+                let request = call
+                    .args
+                    .get("request")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                brief = match crate::made_skill::brief(request) {
+                    Ok(brief) => brief,
+                    Err(told) => return (json!({ "error": told }), true),
+                };
+                brief.as_str()
+            } else {
+                let Some(task) = call
+                    .args
+                    .get("task")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|task| !task.is_empty())
+                else {
+                    return (json!({"error": "Say what the work is."}), true);
+                };
+                task
             };
             if task.len() > MOST_TASK_BYTES || task.starts_with("--") {
                 return (
@@ -1328,12 +1367,26 @@ fn run_for(
                             who,
                         });
                     }
+                    let place_said = format!("{who} on {}", where_done(place, &sent_to));
+                    // A skill's brief is never said back: only what the
+                    // person asked for.
+                    if making {
+                        return (
+                            json!({
+                                "prepared": true,
+                                "skill": crate::made_skill::request_of(task),
+                                "where": place_said,
+                                "next": crate::made_skill::prepared_next(who)
+                            }),
+                            true,
+                        );
+                    }
                     let next = prepared_next(place.lead_in, choosing(place, staff), who);
                     (
                         json!({
                             "prepared": true,
                             "task": task,
-                            "where": format!("{who} on {}", where_done(place, &sent_to)),
+                            "where": place_said,
                             "next": next
                         }),
                         true,
@@ -1680,6 +1733,7 @@ pub(crate) mod tests {
             machine_names: false,
             needs: needs.map(PathBuf::from),
             staff_note: false,
+            make_skill: false,
         };
         let told = |place: &Place, name: &str, args: Value| {
             let call = ToolCall {
@@ -1789,16 +1843,40 @@ pub(crate) mod tests {
 
     #[test]
     fn the_switch_is_an_absolute_directory_and_an_alias_and_is_taken_from_the_front() {
-        assert!(arguments(None, None, None, None, None, None, None, None).is_empty());
-        assert!(arguments(Some("relative"), None, None, None, None, None, None, None).is_empty());
+        assert!(arguments(None, None, None, None, None, None, None, None, None).is_empty());
+        assert!(
+            arguments(
+                Some("relative"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None
+            )
+            .is_empty()
+        );
         assert_eq!(
-            arguments(Some("/run/t"), None, None, None, None, None, None, None),
+            arguments(
+                Some("/run/t"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None
+            ),
             [FLAG, "/run/t"]
         );
         assert_eq!(
             arguments(
                 Some("/run/t"),
                 Some("m2"),
+                None,
                 None,
                 None,
                 None,
@@ -1817,6 +1895,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t"]
@@ -1830,7 +1909,8 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
-                Some("/usr/local/bin/harness")
+                Some("/usr/local/bin/harness"),
+                None
             ),
             [FLAG, "/run/t", NEEDS_FLAG, "/usr/local/bin/harness"]
         );
@@ -1843,7 +1923,8 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
-                Some("relative")
+                Some("relative"),
+                None
             ),
             [FLAG, "/run/t"]
         );
@@ -1877,6 +1958,7 @@ pub(crate) mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: false,
+                make_skill: false,
             })
         );
         assert_eq!(rest, &flags[2..]);
@@ -2023,6 +2105,7 @@ pub(crate) mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         };
         let not_set_up = "Claude Code isn't set up for the lamp yet, so this can't be handed over. \
                           Say so plainly in a few words: it needs setting up on the computer first.";
@@ -2207,6 +2290,7 @@ pub(crate) mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -2285,6 +2369,7 @@ pub(crate) mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -2371,6 +2456,7 @@ pub(crate) mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -2422,6 +2508,7 @@ pub(crate) mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         };
         let call = |task: &str| ToolCall {
             id: "c".into(),
@@ -2475,6 +2562,7 @@ pub(crate) mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         };
         let task = json!({"ok":true,"text":"Suggest three names","target":{"engine":"claude"},
             "observations":[{"id":4,"state":"idle"}]});
@@ -2550,6 +2638,7 @@ pub(crate) mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         };
         let seen = tasks_part(
             directory,
@@ -2870,6 +2959,127 @@ pub(crate) mod tests {
         assert!(named_in_words(&alone, "ask Codex for a poem").is_empty());
     }
 
+    /// #1685, a skill made by voice (`LAMP_MAKE_SKILL=on`): the model's
+    /// `make_skill` is given only with the switch. It prepares the brief
+    /// (`made_skill::brief`, the skill format and what a made skill may
+    /// use) with the person's request and nothing else, and a yes hands it
+    /// over as any work. The model is told the request back, never the
+    /// brief.
+    #[test]
+    fn a_skill_to_make_is_handed_over_as_its_brief_and_said_back_as_its_request() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory = std::env::temp_dir().join(format!("agent-make-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let without = place(&directory, false);
+        let names = |place: &Place| -> Vec<String> {
+            declared(place, &[])
+                .into_iter()
+                .map(|tool| tool.name)
+                .collect()
+        };
+        assert!(!names(&without).contains(&crate::made_skill::MAKE.to_owned()));
+        let making = Place {
+            make_skill: true,
+            ..without.clone()
+        };
+        assert!(names(&making).contains(&crate::made_skill::MAKE.to_owned()));
+        assert!(is_tool(crate::made_skill::MAKE));
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+                ),
+                ("request.sock", status(1)),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":7,"queued":true,"revision":2}),
+                ),
+            ],
+        );
+        let request = "make me a skill that dims the light at 10 pm";
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args,
+        };
+        let (told, _) = run(
+            &making,
+            &call(crate::made_skill::MAKE, json!({ "request": request })),
+            3,
+            true,
+            PEER_WAIT,
+        );
+        assert_eq!(told["prepared"], true);
+        assert_eq!(told["skill"], request);
+        assert!(told.get("task").is_none(), "the brief is never said back");
+        assert!(
+            told["next"]
+                .as_str()
+                .unwrap()
+                .contains("Claude Code will make it")
+        );
+        let (started, _) = run(&making, &call(CONFIRM, json!({})), 4, true, PEER_WAIT);
+        assert_eq!(started["handing_over"], true);
+        let sent: Vec<Value> = (0..4)
+            .map(|_| seen.recv_timeout(PEER_WAIT).unwrap())
+            .collect();
+        assert_eq!(sent[1]["op"], "prepare");
+        assert_eq!(
+            sent[1]["text"],
+            json!(crate::made_skill::brief(request).unwrap())
+        );
+        assert_eq!(sent[3]["op"], "confirm");
+        // Too long a request is refused, never cut, and nothing is asked.
+        let (refused, _) = run(
+            &making,
+            &call(
+                crate::made_skill::MAKE,
+                json!({ "request": "x".repeat(crate::made_skill::MOST_REQUEST_BYTES + 1) }),
+            ),
+            5,
+            true,
+            PEER_WAIT,
+        );
+        assert!(refused["error"].as_str().unwrap().contains("too long"));
+        let _ = std::fs::remove_dir_all(&directory);
+        // The switch reaches the worker as its flag, after the others.
+        let flags = arguments(
+            Some("/run/t"),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("on"),
+        );
+        assert_eq!(flags, [FLAG, "/run/t", MAKE_SKILL_FLAG]);
+        let (taken, rest) = take(&flags).unwrap();
+        assert!(taken.unwrap().make_skill && rest.is_empty());
+        assert_eq!(
+            arguments(
+                Some("/run/t"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some("yes")
+            ),
+            [FLAG, "/run/t"]
+        );
+    }
+
     fn place(directory: &Path, who: bool) -> Place {
         Place {
             directory: directory.into(),
@@ -2881,6 +3091,7 @@ pub(crate) mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         }
     }
 
@@ -3045,6 +3256,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 Some("on"),
+                None,
                 None
             ),
             flags(&[FLAG, "/run/t", NAMES_FLAG])
@@ -3058,6 +3270,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 Some("yes"),
+                None,
                 None
             ),
             flags(&[FLAG, "/run/t"])
@@ -3116,6 +3329,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", LEAD_IN_FLAG]
@@ -3129,17 +3343,28 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", TARGET_FLAG, "m2", WHO_FLAG, LEAD_IN_FLAG]
         );
         for not_on in [None, Some("yes"), Some("ON"), Some("1")] {
             assert_eq!(
-                arguments(Some("/run/t"), None, None, not_on, None, None, None, None),
+                arguments(
+                    Some("/run/t"),
+                    None,
+                    None,
+                    not_on,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None
+                ),
                 [FLAG, "/run/t"]
             );
         }
-        assert!(arguments(None, None, None, Some("on"), None, None, None, None).is_empty());
+        assert!(arguments(None, None, None, Some("on"), None, None, None, None, None).is_empty());
         let flags: Vec<String> = [FLAG, "/run/t", WHO_FLAG, LEAD_IN_FLAG, "--other"]
             .map(String::from)
             .into();
@@ -3270,6 +3495,7 @@ pub(crate) mod tests {
                 Some("on"),
                 Some("on"),
                 None,
+                None,
                 None
             ),
             flags(&[FLAG, "/run/t", ASKED_FLAG, ACCOUNTS_FLAG])
@@ -3284,6 +3510,7 @@ pub(crate) mod tests {
                     not_asked,
                     Some("on"),
                     None,
+                    None,
                     None
                 ),
                 flags(&[FLAG, "/run/t"])
@@ -3297,6 +3524,7 @@ pub(crate) mod tests {
                 None,
                 Some("on"),
                 Some("yes"),
+                None,
                 None,
                 None
             ),
@@ -3574,6 +3802,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", TARGET_FLAG, "office-claude", WHO_FLAG]
@@ -3583,6 +3812,7 @@ pub(crate) mod tests {
                 Some("/run/t"),
                 None,
                 Some("on"),
+                None,
                 None,
                 None,
                 None,
@@ -3600,11 +3830,12 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t"]
         );
-        assert!(arguments(None, None, Some("on"), None, None, None, None, None).is_empty());
+        assert!(arguments(None, None, Some("on"), None, None, None, None, None, None).is_empty());
         let flags: Vec<String> = [
             FLAG,
             "/run/t",
@@ -3628,6 +3859,7 @@ pub(crate) mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: false,
+                make_skill: false,
             })
         );
         assert_eq!(rest, ["--other"]);
@@ -3827,13 +4059,24 @@ pub(crate) mod tests {
                 Some("on"),
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", WHO_FLAG, LEAD_IN_FLAG, ASKED_FLAG]
         );
         for not_on in [None, Some("yes"), Some("ON"), Some("1")] {
             assert_eq!(
-                arguments(Some("/run/t"), None, None, None, not_on, None, None, None),
+                arguments(
+                    Some("/run/t"),
+                    None,
+                    None,
+                    None,
+                    not_on,
+                    None,
+                    None,
+                    None,
+                    None
+                ),
                 [FLAG, "/run/t"]
             );
         }

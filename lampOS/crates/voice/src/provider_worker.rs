@@ -9067,6 +9067,7 @@ mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: noted,
+                make_skill: false,
             }),
             ..Default::default()
         });
@@ -9211,6 +9212,7 @@ mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: true,
+                make_skill: false,
             }),
             ..Default::default()
         });

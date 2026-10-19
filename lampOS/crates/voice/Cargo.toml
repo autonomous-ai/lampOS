@@ -42,6 +42,9 @@ rustix = { version = "=1.1.5", features = ["fs", "process", "net", "pipe", "stdi
 sonora-agc2 = "=0.2.0"
 sonora-simd = "=0.2.0"
 signal-hook = { version = "=0.4.4", default-features = false }
+# A skill made by voice is held to what a made skill may use (`made_skill`,
+# #1685), as `lamp-skills` reads `skill.toml`: the same version and features.
+toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # A thread's own page faults and switches over one pass (`stalls`, #1178;

@@ -510,10 +510,16 @@ impl ForTexts {
             std::thread::Builder::new()
                 .name("lamp-voice-text-news".into())
                 .spawn(move || {
+                    let made = crate::made_skill::Keeping::from_environment();
                     while !stopping.load(Ordering::Relaxed) {
                         if let Some(now) = clock() {
-                            let news =
-                                read_once(&socket, &now, &read_told(&file), &BTreeSet::new());
+                            let news = read_once_with(
+                                &socket,
+                                &now,
+                                &read_told(&file),
+                                &BTreeSet::new(),
+                                made.as_ref(),
+                            );
                             if let Ok(mut read) = read.lock() {
                                 *read = news;
                             }
@@ -897,6 +903,7 @@ fn read_forever(
 ) {
     let socket = directory.join("request.sock");
     let mut offered = BTreeSet::new();
+    let made = crate::made_skill::Keeping::from_environment();
     loop {
         // A settled task's wake waiting here is answered by the read just
         // below.
@@ -912,7 +919,7 @@ fn read_forever(
             shared.clone_from(&told_keys);
         }
         if let Some(now) = clock() {
-            for news in read_once(&socket, &now, &told_keys, &offered) {
+            for news in read_once_with(&socket, &now, &told_keys, &offered, made.as_ref()) {
                 offered.insert(news.key.clone());
                 if offer.send(news).is_err() {
                     return;
@@ -1012,11 +1019,24 @@ fn ask(socket: &Path, line: &Value) -> Option<Value> {
 }
 
 /// Every piece of news there is now that has not been told or offered.
+#[cfg(test)]
 fn read_once(
     socket: &Path,
     now: &BootClock,
     told: &BTreeSet<String>,
     offered: &BTreeSet<String>,
+) -> Vec<News> {
+    read_once_with(socket, now, told, offered, None)
+}
+
+/// [`read_once`], with a skill made by voice kept and told (`made`,
+/// `crate::made_skill`): its answer is its files, never read out.
+fn read_once_with(
+    socket: &Path,
+    now: &BootClock,
+    told: &BTreeSet<String>,
+    offered: &BTreeSet<String>,
+    made: Option<&crate::made_skill::Keeping>,
 ) -> Vec<News> {
     let mut news = Vec::new();
     let mut after = 0;
@@ -1084,13 +1104,33 @@ fn read_once(
             ) {
                 data["answer"] = json!(rest);
             }
-            if let Some(note) = note(&task, &data, age_ms) {
+            // A skill made by voice: its brief is never said back, only the
+            // person's request; done, its files are kept and it is told
+            // what it would do, alone, never with other news.
+            let making = crate::made_skill::is_brief(task["text"].as_str().unwrap_or_default());
+            let task = if making {
+                let mut asked = task.clone();
+                asked["text"] = json!(crate::made_skill::request_of(
+                    task["text"].as_str().unwrap_or_default()
+                ));
+                asked
+            } else {
+                task
+            };
+            let made_note = made
+                .filter(|_| making)
+                .and_then(|keeping| made_note(&task, &data, age_ms, &key, keeping));
+            let (note, finished) = match made_note {
+                Some(note) => (Some(note), None),
+                None => (note(&task, &data, age_ms), finished(&task, &data, age_ms)),
+            };
+            if let Some(note) = note {
                 news.push(News {
                     key,
                     note,
                     until: None,
                     progress: None,
-                    finished: finished(&task, &data, age_ms),
+                    finished,
                     also: Vec::new(),
                 });
             }
@@ -1176,6 +1216,42 @@ fn note_failed(task: &Value, unsure: bool) -> Option<String> {
     Some(format!(
         "(Nobody has spoken. The work the person asked you to hand over, \"{asked}\", {what}. \
          Tell them in one plain, light sentence, with no technical words, and offer to try again.)"
+    ))
+}
+
+/// The news of a skill made by voice that came back done: kept, or why
+/// not, as [`crate::made_skill::note`] tells it.
+fn made_note(
+    task: &Value,
+    data: &Value,
+    age_ms: u64,
+    key: &str,
+    keeping: &crate::made_skill::Keeping,
+) -> Option<String> {
+    let answer = data["answer"]
+        .as_str()
+        .filter(|answer| !answer.is_empty())?;
+    if data["state"] != "idle" {
+        return None;
+    }
+    let made = crate::made_skill::keep(answer, data["truncated"] == json!(true), key, keeping);
+    match &made {
+        Ok(made) => eprintln!(
+            "lamp-voice: a skill made by voice is kept, {} {}, sha256 {}",
+            made.name, made.version, made.sha256
+        ),
+        Err(why) => eprintln!("lamp-voice: a skill made by voice is not kept: {}", why.0),
+    }
+    let when = if age_ms <= JUST_MS {
+        "just"
+    } else {
+        "a while ago, and you have not told them yet:"
+    };
+    Some(crate::made_skill::note(
+        who(task),
+        when,
+        &their_computer(task),
+        &made,
     ))
 }
 
@@ -2027,6 +2103,101 @@ mod tests {
             "{asking}"
         );
         assert!(!asking.contains("gist"), "{asking}");
+    }
+
+    /// #1685, a skill made by voice: the hand-over of a brief, back done,
+    /// is told as the skill kept (what it would do, what it would use and
+    /// "putting it on needs a yes from the team first"), alone, never its
+    /// files; its request is what is quoted of it, never the brief; and
+    /// read again it is the kept one, not checked again. Without the switch
+    /// its news is any task's, the request quoted. Here the checker is a
+    /// stand-in that writes the package; `crates/skills/tests/skills.rs`
+    /// runs the real one.
+    #[test]
+    fn a_skill_made_by_voice_is_told_as_kept_and_never_read_out() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("task-made-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        // `lamp-skills pack --out OUT FOLDER`, as a stand-in: the package,
+        // and a line for each time it ran.
+        let program = root.join("pack");
+        let runs = root.join("runs");
+        std::fs::write(
+            &program,
+            format!(
+                "#!/bin/sh\necho run >> '{}'\nname=$(basename \"$4\")\nprintf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
+                runs.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let request = "make me a skill that dims the light at 10 pm";
+        let brief = crate::made_skill::brief(request).unwrap();
+        let answer = "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\ntopics = [\"voice/state\"]\nlight = true\n```\n```SKILL.md\n---\nname: evening-dim\ndescription: Dims the light a shade at 10 pm.\n---\n# Evening dim\n```\n";
+        let socket = root.join("request.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let task_line = json!({"ok":true,"text":brief,
+            "target":{"engine":"claude","machine_id":"c533fbfda3de5f8f1fdb6619ae2e30b5","project":"lamp-tasks"},
+            "observations":[seen(1, "idle", "boot-a", NOW - 1_000)]});
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                let reply = match asked["op"].as_str().unwrap() {
+                    "list" => {
+                        json!({"ok":true,"store_id":"s1","items":[{"id":1,"observations":1}]})
+                    }
+                    "get_task" => task_line.clone(),
+                    "get_observation" => {
+                        json!({"ok":true,"data":{"state":"idle","answer":answer,"truncated":false}})
+                    }
+                    _ => json!({"ok":false}),
+                };
+                writeln!(stream, "{reply}").unwrap();
+            }
+        });
+        let keeping = crate::made_skill::Keeping {
+            directory: root.join("made"),
+            program,
+        };
+        let none = BTreeSet::new();
+        let news = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        assert_eq!(news.len(), 1);
+        let told = &news[0].note;
+        assert!(told.contains("Claude Code just made the skill they asked for, \"evening-dim\": Dims the light a shade at 10 pm."), "{told}");
+        assert!(
+            told.contains("It would use its light and whether it is talking."),
+            "{told}"
+        );
+        assert!(told.contains(crate::made_skill::NEEDS_A_YES), "{told}");
+        assert!(
+            !told.contains("skill.toml") && !told.contains("[permissions]"),
+            "{told}"
+        );
+        assert!(news[0].finished.is_none(), "told alone");
+        let kept: Vec<_> = std::fs::read_dir(root.join("made"))
+            .unwrap()
+            .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+            .filter(|name| name.ends_with(".tar"))
+            .collect();
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert!(kept[0].starts_with("evening-dim-1.0.0-"), "{kept:?}");
+        // Read again: the kept one, not checked again.
+        let again = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        assert_eq!(again[0].note, *told);
+        assert_eq!(std::fs::read_to_string(&runs).unwrap().lines().count(), 1);
+        // Without the switch, any task's news, its request quoted.
+        let plain = read_once(&socket, &now(), &none, &none);
+        assert!(
+            plain[0].note.contains(&format!("\"{request}\"")),
+            "{}",
+            plain[0].note
+        );
+        assert!(!plain[0].note.contains(crate::made_skill::BRIEF_HEAD));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

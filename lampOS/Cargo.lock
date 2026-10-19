@@ -2279,6 +2279,7 @@ dependencies = [
  "thread-priority",
  "tokio",
  "tokio-tungstenite",
+ "toml",
  "webpki-roots 1.0.9",
 ]
 
