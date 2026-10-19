@@ -50,11 +50,19 @@ only for a comparison the first builder names on #1712.
 - A run on the second route without `LAMP_VOICE_SECOND_CONFIG` is refused on
   the Mac before anything starts on the lamp. lamp-voice would refuse it at
   start too. A fixture run refuses both fields.
-- **Keys:** the second route reads DeepSeek's key (`deepseek.key`) from the
-  voice unit's systemd credentials (`CREDENTIALS_DIRECTORY`). A `lamp-session`
-  started over plain SSH doesn't have them, so the `lamp_command` must start it
-  where they are. No physical run on the second route has been made yet; the
-  first one settles how (#1712).
+- **Keys** (the first builder, #1722, 20:08): the second route reads its keys
+  from the voice unit's systemd credentials (`CREDENTIALS_DIRECTORY`), so a
+  `lamp-session` started over plain SSH has none.
+  - Once the attended pilot unit (`lamp-voice-pilot@.service`) is on the second
+    route (step 2 on #1712), a run uses that unit: it carries the voice unit's
+    `LoadCredential` lines, and that's the way to keep.
+  - Until then, the `lamp_command` starts `lamp-session` in a transient unit
+    with the same lines, as the first builder's probes run:
+    `systemd-run --wait --pipe --collect -p LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key -p LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key … lamp-session …`.
+  - Never copy a key, pass one in the environment or on the command line, or
+    read one into a file the run keeps.
+
+  No physical run on the second route has been made yet.
 
 `fixtures/voice-eval-serve-pilot-config.example.json` holds the installed
 pilot's settings, the kept-start candidate, the second route's settings and
