@@ -1240,6 +1240,12 @@ record is written.
   `an_empty_sorry_in_the_loop_hums_with_the_switch_and_only_then` and
   `with_the_switch_a_misheard_cut_in_hums_and_sends_no_model_turn`, each run
   on Live and on the second route alone.
+- **A holding-only answer is asked to go on**, as on Live
+  (`LAMP_HOLDING_ANSWER=on`; the first builder's 22:54 on #1722). A spoken
+  turn whose whole answer only asks the person to wait ("One moment."),
+  with nothing called, sends `HoldingAnswer` before it completes, and the
+  coordinator asks the route once to go on
+  ([holding-answer.md](holding-answer.md), "On the second route").
 - **Its input is taken late**, in order and from the parent's boot, as the
   Live worker's is since 40de19327 (`WorkerChannels::taking_late_input`): its
   input is checked against fresh authority when used, and its end would end

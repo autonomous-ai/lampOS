@@ -298,6 +298,9 @@ async fn turn(engine: &mut Engine) -> Vec<String> {
                 why,
                 cut_in,
             } => (format!("unclear:{request}:{why}:{cut_in}"), false),
+            ProviderOutput::HoldingAnswer { request, session } => {
+                (format!("holding:{request}:{session}"), false)
+            }
             ProviderOutput::NewsAnswered { request, key } => {
                 (format!("news:{request}:{key}"), false)
             }
@@ -714,6 +717,129 @@ async fn not_for_me_ends_the_turn_in_silence() {
 /// Words the heed judges not said to the lamp end the turn after them,
 /// with no chat asked; it is given the microphone's times of the line's
 /// first and last packets (#1014).
+/// The first builder's 22:54 on #1722, the holding answers on the second
+/// route (`LAMP_HOLDING_ANSWER=on`): a spoken turn answered only "One
+/// moment." sends `HoldingAnswer` for its request and session before its
+/// idle `TurnComplete`, as the Live worker does, so the coordinator asks it
+/// to go on. Not with more words, not after any call, not for the lamp's own
+/// written turn, and never without the switch.
+#[tokio::test]
+async fn a_holding_only_answer_is_told_so_the_route_is_asked_to_go_on() {
+    let timer = call("c1", "set_timer", json!({"minutes": 5}));
+    /// Each chat round's events.
+    type Rounds = Vec<Vec<net::Result<ChatEvent>>>;
+    let cases: [(&str, bool, Rounds, bool); 5] = [
+        (
+            "holding",
+            true,
+            vec![vec![text("One moment."), Ok(ChatEvent::Done)]],
+            true,
+        ),
+        (
+            "more words",
+            true,
+            vec![vec![text("One moment. It's sunny."), Ok(ChatEvent::Done)]],
+            false,
+        ),
+        (
+            "after a call",
+            true,
+            vec![
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![timer.clone()])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Just a moment."), Ok(ChatEvent::Done)],
+            ],
+            false,
+        ),
+        (
+            "written",
+            true,
+            vec![vec![text("One moment."), Ok(ChatEvent::Done)]],
+            false,
+        ),
+        (
+            "switch off",
+            false,
+            vec![vec![text("One moment."), Ok(ChatEvent::Done)]],
+            false,
+        ),
+    ];
+    for (case, on, chats, holds) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What's the weather like?".to_owned())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.announcing(false).holding_answers(on);
+        if case == "written" {
+            engine.submit(written(1, "Tell them the weather."));
+        } else {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+        }
+        let labels = turn(&mut engine).await;
+        let held: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("holding:"))
+            .collect();
+        if holds {
+            assert_eq!(held, ["holding:1:1"], "{case}: {labels:?}");
+            assert_eq!(
+                labels[labels.len() - 2..],
+                ["holding:1:1", "complete"],
+                "{case}: just before its completion"
+            );
+        } else {
+            assert!(held.is_empty(), "{case}: {labels:?}");
+        }
+    }
+
+    // "One moment." and a look by its call (the peer read's P2 on #1986): the
+    // look is a call, so the coordinator takes the look and is never also
+    // asked to go on; two answers to one question otherwise.
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Lamp, what do you see?".to_owned())].into()),
+        chats: Mutex::new(
+            [vec![
+                text("One moment."),
+                Ok(ChatEvent::ToolCalls(vec![call("c1", LOOK_CALL, json!({}))])),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine
+        .announcing(false)
+        .holding_answers(true)
+        .looking_by_call();
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let (mut looked, mut holding) = (false, false);
+    loop {
+        match tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the turn ends")
+        {
+            ProviderOutput::LookAsked { dropped: None, .. } => looked = true,
+            ProviderOutput::HoldingAnswer { .. } => holding = true,
+            ProviderOutput::TurnComplete { .. } => break,
+            _ => {}
+        }
+    }
+    assert!(looked, "the look is asked");
+    assert!(
+        !holding,
+        "a look by its call is a call: no HoldingAnswer beside it"
+    );
+}
+
 #[tokio::test]
 async fn words_the_heed_holds_end_the_turn_unanswered() {
     let script = Arc::new(Script {
