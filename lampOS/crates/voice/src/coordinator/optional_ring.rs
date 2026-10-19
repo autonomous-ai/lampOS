@@ -73,6 +73,12 @@ impl OptionalRing {
         self.worker.is_some() && self.degraded.is_none()
     }
 
+    /// Disabled, and its process seen ended before now: a later look at the
+    /// same (cached) exit status is not a new exit.
+    pub(super) fn exit_observed(&self) -> bool {
+        self.degraded.as_ref().is_some_and(|d| d.exit_observed)
+    }
+
     pub(super) fn blank_confirmed(&self) -> bool {
         self.worker.is_none() || self.degraded.as_ref().is_some_and(|d| d.blank_confirmed)
     }
