@@ -81,6 +81,11 @@ profile's exclusion:
   and 3.6 s on ARM64. The reading pose's checks of a skill's definition,
   which need no clock, are a test of their own outside the group,
   `a_reading_pose_needs_a_known_mood_and_a_for_of_at_most_two_minutes`;
+- one more of `lamp-skills::skills`, named exactly,
+  `asking_the_policy_a_hello_made_and_not_noticed_rests` (#1829, the
+  reviewer's P3 on 2026-10-19): it skips the program's clock for the run
+  itself, but waits up to 20 s of real time for the program to start and
+  subscribe, and once missed that under a load of about 30;
 - tests with a real-clock bound that a loaded runner misses: none now. A
   test goes here only until it gets its own time; the bound the lamp runs
   with is never raised for it. `lamp-voice`'s `coordinator::motor::tests::native_head`
