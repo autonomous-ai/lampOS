@@ -315,3 +315,14 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   its withdrawn design comment is marked on #1693.
 - twelve-P1, #1720 (proposal): the Queue #705 is at GitHub's 2,500-comment
   limit, and nobody can post there; reports go on PRs until a new queue.
+- #1723 merged: "forget everything" for a known person only, after the
+  reviewer's P2 (it used to empty the room's memory with nobody known).
+- #1733 merged: #1693 (3), one open thread a day asked about once, behind
+  `LAMP_MEMORY_THREADS`.
+- #1730 merged (#1679, built by the first builder's agent): rebased as one
+  commit. From my peer read: `toward`'s sign pinned by a test, a pose held
+  again let go by a later scene, and a kept light that can't be mixed with
+  one given back.
+- #1693 (4): the scenes and the person's checklist (5, 7) are on #1693, with
+  `memory_counts_twelve.py`. The first builder runs 1, 2, 4 and 6 tonight
+  and 3 at 07:00. (2) waits on #1712.
