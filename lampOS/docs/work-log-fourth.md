@@ -4784,6 +4784,17 @@ A usage limit paused me from about 00:40 to 06:2x.
   - **#1896:** the chat's warm connection, still waiting.
 - **Next:** findings on #1910 and #1911. Then the next task the first builder gives on #1712, or the Queue's.
 
+## 2026-10-19, 20:35 ICT: #1910, #1911, #1914 and #1896 merged into #1712; landing #1712 on lamp-voice taken
+
+- **Merged into #1712:** #1910 (the busy room's 15 s from the end of the lamp's words), #1911 (`LAMP_SECOND_FEW_TOOLS`), #1914 (`lamp-voice probe-cache`) and #1896 (`LAMP_SECOND_CHAT_WARM`, which I merged the route's tip into first).
+- **On lamp-4ace (the first builder):**
+  - 5 of 5 check lines answered on `6cd4eec47`, and the follow-up 18 s after a long answer now goes on.
+  - The probe: DeepSeek's cache holds the functions with `STEADY_FIRST`, 3,968 of 4,279 tokens, but the first event isn't faster. The functions' size is what costs time, so the speed is in `FEW_TOOLS`.
+- **Taken, 19:39 (the first builder): #1712 onto `lamp-voice`.**
+  - **Step 1:** the merge of `lamp-voice` into #1712 is `8d3bd1f42` on `fourth/route-meets-lamp-voice`. All 21 conflict blocks are kept from both sides, and three comment slips are fixed. `Stop::Silent` went to `Declined`. A scoped turn drops the early round (a known slowness; the note is ready). The workspace gate is running: fmt and Clippy passed, and the tests have no failures so far.
+  - **Step 2:** the product, lamp-52e6, repo lamp-4ace and attended pilot units go on the second route, using lamp-4ace's lines. It adds a `second.json` template and names each key file. The script is ready and runs after the gate.
+- **Next, after #1712 lands (the first builder, 20:15):** item 5 on the second route, the hums and the holding answer, and resending a lost line.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
