@@ -29,7 +29,7 @@ lamp-update harness-on
 lamp-update back
 lamp-update check-units --cat FILE [--product DIR]
 lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --sequence N --commit SHA --files-url URL
-                     [--min-updater N]
+                     [--min-updater N] [--models FILE]
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
 lamp-update public-key --key-file PRIVATE
 lamp-update --help
@@ -89,6 +89,8 @@ manifest  writes DIR/manifest.json for the binaries in --binaries, the units of
           lamp-product-skills.
           --min-updater N: the oldest updater that can apply the build (left out:
           any). It must carry lamp-update, and N is at most this program's updater.
+          --models FILE: the models in FILE (deploy/product/models.json's form) are
+          carried, and N is then at least 2.
 sign      writes the signed envelope (lampos-manifest.json) for a manifest, with a
           private key: an unencrypted PKCS#8 Ed25519 key in base64.
 public-key prints the public key of a private key, in base64: what a lamp is given.
@@ -209,8 +211,16 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
             "commit",
             "files-url",
             "min-updater",
+            "models",
         ],
     )?;
+    let models = match options.get("models") {
+        None => Vec::new(),
+        Some(path) => {
+            let text = std::fs::read_to_string(path).map_err(|error| format!("{path}: {error}"))?;
+            lamp_update::install::models_from(&text).map_err(|error| format!("{path}: {error}"))?
+        }
+    };
     let min_updater = match options.get("min-updater") {
         None => None,
         Some(value) => Some(
@@ -233,14 +243,16 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
         wanted(options, "commit")?,
         wanted(options, "files-url")?,
         min_updater,
+        models,
     )
     .map_err(|error| error.to_string())?;
     println!(
-        "manifest of build {} of {}: {} binaries, {} units",
+        "manifest of build {} of {}: {} binaries, {} units, {} models",
         made.sequence,
         made.channel,
         made.files.len(),
-        made.units.len()
+        made.units.len(),
+        made.models.len()
     );
     Ok(())
 }
@@ -497,6 +509,7 @@ fn config(
         self_switch: own::on(std::env::var(own::SWITCH).ok().as_deref()),
         running,
         updater: manifest::UPDATER,
+        models: lamp_update::models::on(std::env::var(lamp_update::models::SWITCH).ok().as_deref()),
     };
     Ok((
         config,
@@ -524,7 +537,10 @@ fn status(outcome: &Outcome) -> u8 {
         | Outcome::NothingPublished => 0,
         Outcome::Unreachable(_) => 3,
         Outcome::NotQuiet(_) => 4,
-        Outcome::Refused(_) | Outcome::RolledBack { .. } | Outcome::Failed(_) => 1,
+        Outcome::Refused(_)
+        | Outcome::WaitsForModels(_)
+        | Outcome::RolledBack { .. }
+        | Outcome::Failed(_) => 1,
     }
 }
 

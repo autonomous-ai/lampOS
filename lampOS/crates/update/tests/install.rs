@@ -263,6 +263,7 @@ impl Lamp {
             files,
             units: Vec::new(),
             min_updater: None,
+            models: Vec::new(),
         };
         let bytes = serde_json::to_vec(&manifest).unwrap();
         channel.files.insert(

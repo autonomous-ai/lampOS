@@ -28,8 +28,18 @@ pub const FORMAT: &str = "lampos-update/1";
 pub const SCHEMA: u32 = 1;
 /// This updater's own level: raised whenever the updater learns to apply
 /// something an older one cannot. A manifest whose `min_updater` is above
-/// it is refused whole, before anything is fetched or written.
-pub const UPDATER: u64 = 1;
+/// it is refused whole, before anything is fetched or written. 2: the
+/// build's `models` (#1680).
+pub const UPDATER: u64 = 2;
+/// The level a build that carries models needs: an updater below it does
+/// not read the field.
+pub const MODELS_UPDATER: u64 = 2;
+/// At most this many models in one build.
+pub const MOST_MODELS: usize = 64;
+/// Where models live: their paths are under it, and its `models/` is the
+/// store, each model named by its SHA-256.
+pub const MODELS_ROOT: &str = "/opt/lampOS/";
+pub const STORE: &str = "/opt/lampOS/models/";
 /// The envelope's name in a channel's folder.
 pub const ENVELOPE: &str = "lampos-manifest.json";
 /// The largest envelope read: a manifest of every binary and every lamp's
@@ -96,6 +106,43 @@ pub struct Manifest {
     /// byte what an updater before the field reads.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min_updater: Option<u64>,
+    /// The models the build's parts read, which no binary carries (#1680):
+    /// fetched from their own URL, checked, and switched with the parts.
+    /// Left out when there are none, and not written: the manifest is then
+    /// byte for byte what an updater before the field reads.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<Model>,
+}
+
+/// A model a part reads: where it goes on the lamp, where it is fetched
+/// from, and its size and SHA-256 (`deploy/product/models.json`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Model {
+    pub path: String,
+    pub url: String,
+    pub bytes: u64,
+    pub sha256: String,
+    /// The file is one member of a gzipped tar at `url`, itself pinned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archive: Option<Archive>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Archive {
+    pub bytes: u64,
+    pub sha256: String,
+    pub member: String,
+}
+
+impl Model {
+    /// What fetching it costs on the disk: the model, and its archive
+    /// beside it while it is taken out.
+    pub fn fetch_bytes(&self) -> u64 {
+        self.bytes
+            .saturating_add(self.archive.as_ref().map_or(0, |archive| archive.bytes))
+    }
 }
 
 /// The little of a manifest read before the rest, leniently: what a newer
@@ -408,7 +455,90 @@ fn check(manifest: &Manifest) -> Result<(), Refused> {
         }
         check_hash_and_size(&unit.file_name(), &unit.sha256, unit.size, MOST_UNIT_BYTES)?;
     }
+    check_models(manifest)
+}
+
+fn check_models(manifest: &Manifest) -> Result<(), Refused> {
+    if manifest.models.is_empty() {
+        return Ok(());
+    }
+    if manifest.models.len() > MOST_MODELS {
+        return Err(refused(format!("more than {MOST_MODELS} models")));
+    }
+    if manifest.min_updater.unwrap_or(1) < MODELS_UPDATER {
+        return Err(refused(format!(
+            "a build with models needs min_updater {MODELS_UPDATER} or more"
+        )));
+    }
+    let mut paths = std::collections::BTreeSet::new();
+    for model in &manifest.models {
+        if !is_model_path(&model.path) {
+            return Err(refused(format!(
+                "{:?} is not a model's path under {MODELS_ROOT}",
+                model.path
+            )));
+        }
+        if !paths.insert(model.path.as_str()) {
+            return Err(refused(format!("{} is listed twice", model.path)));
+        }
+        if !is_file_url(&model.url) {
+            return Err(refused(format!(
+                "{}'s URL is not an https:// or file:/// URL",
+                model.path
+            )));
+        }
+        check_hash_and_size(&model.path, &model.sha256, model.bytes, MOST_FILE_BYTES)?;
+        if let Some(archive) = &model.archive {
+            check_hash_and_size(&model.url, &archive.sha256, archive.bytes, MOST_FILE_BYTES)?;
+            if archive.member.is_empty()
+                || archive.member.starts_with(['/', '-'])
+                || archive.member.split('/').any(|part| part == "..")
+            {
+                return Err(refused(format!(
+                    "{}'s archive member is not a plain path",
+                    model.path
+                )));
+            }
+        }
+    }
     Ok(())
+}
+
+/// A model's path: absolute, under [`MODELS_ROOT`], neither the store nor
+/// in it, nor in a build's folder (a part with a build's 64-hex name) nor a
+/// `current` link itself; plain parts, a file's name at the end.
+pub fn is_model_path(path: &str) -> bool {
+    let Some(rest) = path.strip_prefix(MODELS_ROOT) else {
+        return false;
+    };
+    path.len() < 512
+        && !path.starts_with(STORE)
+        && path != STORE.trim_end_matches('/')
+        && !rest.is_empty()
+        && !path.ends_with('/')
+        && rest.rsplit('/').next() != Some(crate::unit::CURRENT)
+        && rest.split('/').all(|part| {
+            !part.is_empty()
+                && part != "."
+                && part != ".."
+                && !part.starts_with('.')
+                && !(part.len() == 64 && is_lower_hex(part))
+                && part
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte))
+        })
+}
+
+fn is_file_url(url: &str) -> bool {
+    let rest = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("file:///"));
+    rest.is_some_and(|rest| {
+        !url.ends_with('/')
+            && !rest.contains("..")
+            && !rest.contains(['?', '#', '\\', ' ', '@'])
+            && rest.len() < 1024
+    })
 }
 
 fn check_hash_and_size(name: &str, sha256: &str, size: u64, most: u64) -> Result<(), Refused> {
@@ -499,6 +629,7 @@ mod tests {
                 size: 10,
             }],
             min_updater: None,
+            models: Vec::new(),
         }
     }
 
@@ -542,6 +673,48 @@ mod tests {
             .unwrap_err()
             .0;
         assert_eq!(why, "the signature does not match the manifest");
+    }
+
+    #[test]
+    fn models_are_read_only_with_the_updater_they_need_and_plain_paths() {
+        // None: not written, the manifest as before the field.
+        let bytes = serde_json::to_vec(&manifest()).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("models"));
+        let model = Model {
+            path: "/opt/lampOS/eyes/models/face.onnx".into(),
+            url: "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/face.onnx"
+                .into(),
+            bytes: 4,
+            sha256: sha256_hex(b"face"),
+            archive: None,
+        };
+        let mut with = manifest();
+        with.models = vec![model.clone()];
+        let why = parse(&serde_json::to_vec(&with).unwrap()).unwrap_err().0;
+        assert!(why.contains("min_updater 2"), "{why}");
+        with.min_updater = Some(MODELS_UPDATER);
+        let bytes = serde_json::to_vec(&with).unwrap();
+        assert_eq!(parse(&bytes).unwrap(), with);
+        // An updater before the field climbs instead of reading it.
+        assert!(too_old(&bytes, 1).is_some());
+        let in_a_build = format!("/opt/lampOS/eyes/{}/face.onnx", "a".repeat(64));
+        for path in [
+            "/etc/passwd",
+            "/opt/lampOS/models/abc",
+            "/opt/lampOS/models",
+            in_a_build.as_str(),
+            "/opt/lampOS/eyes/current",
+            "/opt/lampOS/eyes/../../etc/passwd",
+            "/opt/lampOS/eyes/models/",
+            "opt/lampOS/eyes/face.onnx",
+        ] {
+            let mut bad = with.clone();
+            bad.models[0].path = path.into();
+            assert!(parse(&serde_json::to_vec(&bad).unwrap()).is_err(), "{path}");
+        }
+        let mut twice = with.clone();
+        twice.models.push(model);
+        assert!(parse(&serde_json::to_vec(&twice).unwrap()).is_err());
     }
 
     #[test]

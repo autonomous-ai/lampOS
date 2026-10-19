@@ -8,7 +8,7 @@
 //! what is published.
 use crate::{
     install,
-    manifest::{self, File, Manifest, SCHEMA, Unit},
+    manifest::{self, File, Manifest, Model, SCHEMA, Unit},
     product_skills, unit,
 };
 use std::{fs, io, path::Path};
@@ -25,6 +25,11 @@ fn invalid(why: String) -> io::Error {
 /// climb to it: so the build must carry `lamp-update`, and the level is
 /// this program's own ([`manifest::UPDATER`]), which is the carried one's
 /// when the manifest is made by the build's own `lamp-update`, as it is.
+///
+/// `models`, when there are any, are carried in the manifest (#1680), and
+/// `min_updater` is then at least [`manifest::MODELS_UPDATER`], so that an
+/// older updater climbs before it reads them.
+#[allow(clippy::too_many_arguments)]
 pub fn make(
     binaries: &Path,
     deploy: &Path,
@@ -34,7 +39,13 @@ pub fn make(
     commit: &str,
     files_url: &str,
     min_updater: Option<u64>,
+    models: Vec<Model>,
 ) -> io::Result<Manifest> {
+    let min_updater = if models.is_empty() {
+        min_updater
+    } else {
+        Some(min_updater.unwrap_or(1).max(manifest::MODELS_UPDATER))
+    };
     let mut files = Vec::new();
     let sums = fs::read_to_string(binaries.join("SHA256SUMS")).ok();
     for entry in fs::read_dir(binaries)? {
@@ -124,6 +135,7 @@ pub fn make(
         files,
         units,
         min_updater,
+        models,
     };
     let mut bytes = serde_json::to_vec_pretty(&made).map_err(io::Error::other)?;
     bytes.push(b'\n');
@@ -180,6 +192,7 @@ mod tests {
             &"c".repeat(40),
             url,
             None,
+            Vec::new(),
         )
         .unwrap();
         let names: Vec<&str> = made.files.iter().map(|file| file.name.as_str()).collect();
@@ -205,6 +218,7 @@ mod tests {
             &"c".repeat(40),
             url,
             None,
+            Vec::new(),
         )
         .unwrap();
         assert_eq!(again, made);
@@ -226,7 +240,8 @@ mod tests {
                 7,
                 &"c".repeat(40),
                 url,
-                None
+                None,
+                Vec::new()
             )
             .is_err()
         );
@@ -245,6 +260,7 @@ mod tests {
             &commit,
             url,
             Some(level),
+            Vec::new(),
         )
         .unwrap_err();
         assert!(why.to_string().contains("carries no lamp-update"), "{why}");
@@ -260,6 +276,7 @@ mod tests {
             &commit,
             url,
             Some(level),
+            Vec::new(),
         )
         .unwrap();
         assert_eq!(made.min_updater, Some(level));
@@ -275,6 +292,7 @@ mod tests {
             &commit,
             url,
             Some(level + 1),
+            Vec::new(),
         )
         .unwrap_err();
         assert!(why.to_string().contains("above the updater"), "{why}");
@@ -289,9 +307,56 @@ mod tests {
                 7,
                 &commit,
                 url,
-                Some(0)
+                Some(0),
+                Vec::new()
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn models_are_carried_with_the_updater_they_need() {
+        let folder = tempfile::tempdir().unwrap();
+        let out = folder.path().join("out");
+        let deploy = folder.path().join("deploy");
+        fs::create_dir_all(&out).unwrap();
+        fs::create_dir_all(&deploy).unwrap();
+        fs::write(out.join("lamp-eyes"), b"eyes").unwrap();
+        fs::write(out.join("lamp-update"), b"update").unwrap();
+        let models = crate::install::models().unwrap();
+        let url = "https://channel.test/build-7/";
+        let commit = "c".repeat(40);
+        let skills = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+        let made = make(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            7,
+            &commit,
+            url,
+            None,
+            models.clone(),
+        )
+        .unwrap();
+        assert_eq!(made.models, models);
+        assert_eq!(made.min_updater, Some(manifest::MODELS_UPDATER));
+        let written = fs::read(out.join("manifest.json")).unwrap();
+        assert_eq!(manifest::parse(&written).unwrap(), made);
+        // Without lamp-update the build could strand a lamp: refused.
+        fs::remove_file(out.join("lamp-update")).unwrap();
+        let why = make(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            7,
+            &commit,
+            url,
+            None,
+            models,
+        )
+        .unwrap_err();
+        assert!(why.to_string().contains("carries no lamp-update"), "{why}");
     }
 }

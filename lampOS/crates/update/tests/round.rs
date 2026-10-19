@@ -11,7 +11,7 @@ use lamp_update::{
     Config, Outcome, World,
     fetch::{Channel, Fetch},
     judge::UnitState,
-    manifest::{self, File, Manifest, Unit, sha256_hex},
+    manifest::{self, File, Manifest, Model, Unit, sha256_hex},
     own,
     quiet::Heard,
     round, unit,
@@ -43,6 +43,8 @@ fn throwaway() -> Ed25519KeyPair {
 struct FakeChannel {
     files: HashMap<String, Vec<u8>>,
     offline: bool,
+    /// URLs under this one are out of reach, the rest answered.
+    unreachable_under: Option<String>,
     /// Every URL asked for, in order.
     fetched: Vec<String>,
 }
@@ -50,7 +52,12 @@ struct FakeChannel {
 impl Channel for FakeChannel {
     fn fetch(&mut self, url: &str, most: u64, out: &mut dyn Write) -> Result<u64, Fetch> {
         self.fetched.push(url.to_owned());
-        if self.offline {
+        if self.offline
+            || self
+                .unreachable_under
+                .as_ref()
+                .is_some_and(|under| url.starts_with(under.as_str()))
+        {
             return Err(Fetch::Unreachable("no network".into()));
         }
         let bytes = self.files.get(url).ok_or(Fetch::Missing)?;
@@ -408,6 +415,7 @@ impl Lamp {
             self_switch: false,
             running: None,
             updater: manifest::UPDATER,
+            models: false,
         };
         Self {
             _folder: folder,
@@ -482,6 +490,7 @@ impl Lamp {
             files,
             units: carried,
             min_updater: None,
+            models: Vec::new(),
         }
     }
 
@@ -2901,4 +2910,582 @@ fn an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carr
     assert!(lamp.calls().is_empty());
     assert!(lamp.pending().is_none());
     assert_eq!(lamp.own_build(), old);
+}
+
+// Models carried in the manifest (#1680, step 3): with LAMP_UPDATE_MODELS=on.
+
+const FACE: &str = "/opt/lampOS/eyes/models/face.onnx";
+const TURN: &str = "/opt/lampOS/releases/current/smart-turn.onnx";
+
+/// The eyes as the product runs them: started through their link, reading
+/// a model at a path of its own.
+fn eyes_reading_a_model() -> String {
+    format!(
+        "[Unit]\nDescription=lampOS eyes\n\n[Service]\nExecStart=/opt/lampOS/eyes/current/lamp-eyes --device /dev/video0 --model {FACE}\nRestart=on-failure\n"
+    )
+}
+
+impl Lamp {
+    /// lamp-4ace with linked eyes running `eyes 1` and the face model
+    /// `face 1` that install placed (its SHA-256 recorded), the switch on.
+    fn with_models(self) -> Self {
+        let mut lamp = self.with_linked_eyes("eyes 1");
+        let at = lamp.root.join(FACE.trim_start_matches('/'));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(&at, "face 1").unwrap();
+        fs::write(
+            lamp.root.join("etc/systemd/system/lamp-eyes.service"),
+            eyes_reading_a_model(),
+        )
+        .unwrap();
+        let records = lamp.root.join("var/lib/lampos-update");
+        fs::create_dir_all(&records).unwrap();
+        fs::write(
+            records.join("state.json"),
+            format!(
+                "{{\"installed\":null,\"previous\":null,\"refused\":[],\"made\":[],\"settings\":{{\"{FACE}\":\"{}\"}}}}",
+                sha("face 1")
+            ),
+        )
+        .unwrap();
+        lamp.config.models = true;
+        lamp
+    }
+
+    /// A model the channel serves as `text` at its own URL.
+    fn model(&mut self, path: &str, text: &str) -> Model {
+        let url = format!("https://models.test/{}", sha(text));
+        self.channel
+            .files
+            .insert(url.clone(), text.as_bytes().to_vec());
+        Model {
+            path: path.into(),
+            url,
+            bytes: text.len() as u64,
+            sha256: sha(text),
+            archive: None,
+        }
+    }
+
+    /// Build `sequence` with these eyes and these models, signed.
+    fn publish_with_models(&mut self, sequence: u64, eyes: &str, models: Vec<Model>) {
+        let mut manifest = self.manifest(
+            sequence,
+            &[
+                ("lamp-voice", "voice 1"),
+                ("lamp-turn-end", "turn-end 1"),
+                ("lamp-body", "body 1"),
+                ("lamp-controls", "controls 1"),
+                ("lamp-eyes", eyes),
+            ],
+            &[],
+        );
+        manifest.min_updater = Some(manifest::MODELS_UPDATER);
+        manifest.models = models;
+        let bytes = serde_json::to_vec(&manifest).unwrap();
+        let envelope = manifest::seal(&bytes, &self.key).unwrap();
+        self.channel
+            .files
+            .insert(format!("{CHANNEL}{}", manifest::ENVELOPE), envelope);
+    }
+
+    fn is_link(&self, path: &str) -> bool {
+        fs::symlink_metadata(self.root.join(path.trim_start_matches('/')))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    }
+
+    fn stored(&self) -> Vec<String> {
+        let mut found: Vec<String> = fs::read_dir(self.root.join("opt/lampOS/models"))
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                    .collect()
+            })
+            .unwrap_or_default();
+        found.sort();
+        found
+    }
+
+    fn fetched_models(&self) -> Vec<String> {
+        self.channel
+            .fetched
+            .iter()
+            .filter(|url| url.starts_with("https://models.test/"))
+            .cloned()
+            .collect()
+    }
+}
+
+fn sorted(mut names: Vec<String>) -> Vec<String> {
+    names.sort();
+    names
+}
+
+#[test]
+fn a_changed_model_is_fetched_checked_and_switched_with_its_part() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 2");
+    let turn = lamp.model(TURN, "turn model 2");
+    lamp.publish_with_models(2, "eyes 2", vec![face, turn]);
+    let outcome = lamp.round();
+    assert_eq!(outcome, Outcome::Switched(2), "{:?}", lamp.said);
+
+    // The face model's path is now a link into the store, with the eyes.
+    assert!(lamp.is_link(FACE));
+    assert_eq!(lamp.read(FACE), "face 2");
+    assert_eq!(lamp.eyes_link(), sha("eyes 2"));
+    // install's file is kept in the store by its bytes, for the way back.
+    assert_eq!(lamp.stored(), sorted(vec![sha("face 1"), sha("face 2")]));
+    // The voice's own model goes beside its binary, in a new folder named
+    // by its files, though the binary is the same.
+    let voice = lamp.read("/etc/systemd/system/lamp-voice.service");
+    assert_ne!(voice, voice_unit(&sha("voice 1")));
+    let program = unit::program(&voice).unwrap();
+    let folder = program.folder();
+    assert_eq!(
+        lamp.read(&format!("{folder}smart-turn.onnx")),
+        "turn model 2"
+    );
+    assert_eq!(lamp.read(&format!("{folder}lamp-voice")), "voice 1");
+    // Each model fetched once.
+    assert_eq!(lamp.fetched_models().len(), 2, "{:?}", lamp.channel.fetched);
+    assert!(
+        lamp.calls()
+            .contains(&"restart lamp-eyes.service".to_owned()),
+        "{:?}",
+        lamp.calls()
+    );
+}
+
+#[test]
+fn an_unchanged_model_is_not_fetched_and_its_file_stays() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 1");
+    let turn = lamp.model(TURN, "a model");
+    lamp.publish_with_models(2, "eyes 2", vec![face, turn]);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(
+        lamp.fetched_models().is_empty(),
+        "{:?}",
+        lamp.channel.fetched
+    );
+    assert!(!lamp.is_link(FACE));
+    assert_eq!(lamp.read(FACE), "face 1");
+    assert!(lamp.stored().is_empty());
+    // The voice changes nothing.
+    assert_eq!(
+        lamp.read("/etc/systemd/system/lamp-voice.service"),
+        voice_unit(&sha("voice 1"))
+    );
+}
+
+#[test]
+fn a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 2");
+    // What the URL serves is not what the build pins.
+    lamp.channel
+        .files
+        .insert(face.url.clone(), b"face 2, damaged".to_vec());
+    lamp.publish_with_models(2, "eyes 2", vec![face]);
+    let before = lamp.lamp_files();
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Refused(why) if why.contains(FACE)),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert_eq!(lamp.eyes_link(), sha("eyes 1"));
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+}
+
+#[test]
+fn a_model_switch_whose_part_dies_puts_the_model_back() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 2");
+    lamp.publish_with_models(2, "eyes 2, which crashes", vec![face]);
+    let before = lamp.lamp_files();
+    let outcome = lamp.round();
+    assert!(
+        matches!(
+            &outcome,
+            Outcome::RolledBack {
+                sequence: 2,
+                after: Ok(()),
+                ..
+            }
+        ),
+        "{outcome:?}"
+    );
+    // install's file again, as a file; the store gone with nothing to keep.
+    assert!(!lamp.is_link(FACE));
+    assert_eq!(lamp.read(FACE), "face 1");
+    assert_eq!(lamp.lamp_files(), before);
+}
+
+impl Lamp {
+    /// A store entry of `text`'s bytes.
+    fn in_store(&self, text: &str) {
+        let store = self.root.join("opt/lampOS/models");
+        fs::create_dir_all(&store).unwrap();
+        fs::write(store.join(sha(text)), text).unwrap();
+    }
+
+    /// `path` a link into the store, to `text`'s entry, as a switch leaves it.
+    fn linked_to(&self, path: &str, text: &str) {
+        let at = self.root.join(path.trim_start_matches('/'));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        let _ = fs::remove_file(&at);
+        std::os::unix::fs::symlink(lamp_update::models::target(path, &sha(text)), &at).unwrap();
+    }
+
+    /// A switch to build 2 cut short after its models moved: the eyes' unit
+    /// and link as they were, the model paths as `models` (the journal's
+    /// JSON) says they were.
+    fn cut_short_after_models(&self, models: &str) {
+        let records = self.root.join("var/lib/lampos-update");
+        fs::create_dir_all(records.join("previous")).unwrap();
+        fs::write(
+            records.join("previous/lamp-eyes.service"),
+            eyes_reading_a_model(),
+        )
+        .unwrap();
+        fs::write(
+            records.join("journal.json"),
+            format!(
+                "{{\"build\":{{\"sequence\":2,\"commit\":\"{}\"}},\"units\":[{{\"unit\":\"lamp-eyes.service\",\"was_active\":true,\"link\":{{\"path\":\"/opt/lampOS/eyes/current\",\"build\":\"{}\"}}}}],\"models\":{models}}}",
+                "2".repeat(40),
+                sha("eyes 1")
+            ),
+        )
+        .unwrap();
+    }
+}
+
+/// A model path of its own a unit reads as a folder, as the name does.
+const NAME: &str = "/opt/lampOS/name/models/name.onnx";
+
+#[test]
+fn a_model_switch_cut_short_is_put_back_at_the_next_start() {
+    let mut lamp = Lamp::new().with_models();
+    // As a switch to build 2 leaves it when the power goes after the face
+    // model's link moved: install's file in the store, the path a link.
+    lamp.in_store("face 1");
+    lamp.in_store("face 2");
+    lamp.linked_to(FACE, "face 2");
+    lamp.cut_short_after_models(&format!(
+        "[{{\"path\":\"{FACE}\",\"sha256\":\"{}\",\"file\":true}}]",
+        sha("face 1")
+    ));
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, .. } if why.contains("cut short")),
+        "{outcome:?}"
+    );
+    assert!(!lamp.is_link(FACE));
+    assert_eq!(lamp.read(FACE), "face 1");
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+    // No kept build names either: the store is emptied, and goes.
+    assert!(lamp.stored().is_empty());
+}
+
+/// The reviewer on #1879: a switch whose only change was a model, cut
+/// short, restarts the part that reads it on the model put back. Its unit
+/// and link never changed, but it may have started on the new model.
+#[test]
+fn a_model_only_switch_cut_short_restarts_the_part_that_reads_it() {
+    let mut lamp = Lamp::new().with_models();
+    lamp.in_store("face 1");
+    lamp.in_store("face 2");
+    lamp.linked_to(FACE, "face 2");
+    lamp.cut_short_after_models(&format!(
+        "[{{\"path\":\"{FACE}\",\"sha256\":\"{}\",\"file\":true}}]",
+        sha("face 1")
+    ));
+    let outcome = lamp.round();
+    assert!(
+        matches!(
+            &outcome,
+            Outcome::RolledBack {
+                sequence: 2,
+                after: Ok(()),
+                ..
+            }
+        ),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(FACE), "face 1");
+    assert!(
+        lamp.calls()
+            .contains(&"restart lamp-eyes.service".to_owned()),
+        "{:?}",
+        lamp.calls()
+    );
+}
+
+/// The reviewer on #1879: a model path that cannot be put back does not
+/// stop the others, and the journal stays for the next start, with no
+/// store entry a path links to removed.
+#[test]
+fn a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept() {
+    let mut lamp = Lamp::new().with_models();
+    // install's face file was kept in the store, and is gone from it now:
+    // it cannot come back. The name's link can.
+    lamp.in_store("face 2");
+    lamp.in_store("name 1");
+    lamp.in_store("name 2");
+    lamp.linked_to(FACE, "face 2");
+    lamp.linked_to(NAME, "name 2");
+    // Put back in reverse: the face first, then the name.
+    lamp.cut_short_after_models(&format!(
+        "[{{\"path\":\"{NAME}\",\"sha256\":\"{}\"}},{{\"path\":\"{FACE}\",\"sha256\":\"{}\",\"file\":true}}]",
+        sha("name 1"),
+        sha("face 1")
+    ));
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, after: Err(why), .. } if why.contains(FACE)),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(NAME), "name 1");
+    assert!(lamp.exists("/var/lib/lampos-update/journal.json"));
+    // What the face still links to is kept, and the name's entry too.
+    assert_eq!(lamp.read(FACE), "face 2");
+    assert!(
+        lamp.stored().contains(&sha("face 2")),
+        "{:?}",
+        lamp.stored()
+    );
+    assert!(
+        lamp.stored().contains(&sha("name 1")),
+        "{:?}",
+        lamp.stored()
+    );
+    // The next start tries again: the name stays put back, the face waits.
+    let again = lamp.round();
+    assert!(
+        matches!(&again, Outcome::RolledBack { after: Err(why), .. } if why.contains(FACE)),
+        "{again:?}"
+    );
+    assert_eq!(lamp.read(NAME), "name 1");
+    assert_eq!(lamp.read(FACE), "face 2");
+}
+
+/// The reviewer on #1879: with state.json set aside as unreadable, the
+/// next switch's prune keeps every store entry a model path links to now.
+#[test]
+fn prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 2");
+    lamp.publish_with_models(2, "eyes 1", vec![face.clone()]);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(lamp.is_link(FACE));
+    fs::write(lamp.root.join("var/lib/lampos-update/state.json"), "{").unwrap();
+    // The eyes change, the face model does not.
+    lamp.publish_with_models(3, "eyes 3", vec![face]);
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("could not be read")),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.read(FACE), "face 2");
+    assert!(
+        lamp.stored().contains(&sha("face 2")),
+        "{:?}",
+        lamp.stored()
+    );
+}
+
+/// The reviewer on #1879: a store fetch the network cuts is unreachable,
+/// as a build's file is, and tried again: not a refusal.
+#[test]
+fn a_model_fetch_cut_by_the_network_is_unreachable_not_refused() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 2");
+    lamp.publish_with_models(2, "eyes 2", vec![face]);
+    lamp.channel.unreachable_under = Some("https://models.test/".into());
+    let before = lamp.lamp_files();
+    let outcome = lamp.round();
+    assert!(matches!(&outcome, Outcome::Unreachable(_)), "{outcome:?}");
+    assert_eq!(lamp.lamp_files(), before);
+}
+
+#[test]
+fn prune_keeps_the_models_of_the_kept_builds() {
+    let mut lamp = Lamp::new().with_models();
+    for (sequence, face) in [(2, "face 2"), (3, "face 3"), (4, "face 4")] {
+        // Only the model changes: the eyes, which read it, restart with it.
+        let model = lamp.model(FACE, face);
+        lamp.publish_with_models(sequence, "eyes 1", vec![model]);
+        let restarts = lamp.calls().len();
+        assert_eq!(lamp.round(), Outcome::Switched(sequence), "{:?}", lamp.said);
+        let restarted: Vec<String> = lamp.calls()[restarts..]
+            .iter()
+            .filter(|call| call.starts_with("restart"))
+            .cloned()
+            .collect();
+        assert_eq!(restarted, ["restart lamp-eyes.service"]);
+        assert_eq!(lamp.read(FACE), face);
+    }
+    // The model of the build the lamp runs and of the one before it.
+    assert_eq!(lamp.stored(), sorted(vec![sha("face 3"), sha("face 4")]));
+}
+
+#[test]
+fn a_lamp_short_of_room_for_the_models_refuses_before_fetching() {
+    let mut lamp = Lamp::new().with_models();
+    let mut face = lamp.model(FACE, "face 2");
+    // Fifty MB, as the build says: refused before the URL is read.
+    face.bytes = 50_000_000;
+    lamp.publish_with_models(2, "eyes 2", vec![face]);
+    lamp.free = lamp.config.keep_free + 10_000_000;
+    let before = lamp.lamp_files();
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Refused(why) if why.contains("(50 MB of it models)")),
+        "{outcome:?}"
+    );
+    assert!(
+        lamp.fetched_models().is_empty(),
+        "{:?}",
+        lamp.channel.fetched
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    let log = lamp.read("/var/lib/lampos-update/log.jsonl");
+    assert!(log.contains("50 MB of it models"), "{log}");
+}
+
+#[test]
+fn with_the_switch_off_a_build_with_other_models_is_refused() {
+    let mut lamp = Lamp::new().with_models();
+    lamp.config.models = false;
+    let face = lamp.model(FACE, "face 2");
+    lamp.publish_with_models(2, "eyes 2", vec![face]);
+    let before = lamp.lamp_files();
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::WaitsForModels(why) if why.contains("LAMP_UPDATE_MODELS=on")),
+        "{outcome:?}"
+    );
+    assert!(
+        outcome
+            .to_string()
+            .starts_with("refused, nothing switched: ")
+    );
+    assert!(lamp.fetched_models().is_empty());
+    assert_eq!(lamp.lamp_files(), before);
+    let log = lamp.read("/var/lib/lampos-update/log.jsonl");
+    assert!(log.contains("LAMP_UPDATE_MODELS=on"), "{log}");
+    // The same models as the lamp's: taken as today, nothing fetched.
+    let face = lamp.model(FACE, "face 1");
+    lamp.publish_with_models(3, "eyes 2", vec![face]);
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    assert!(lamp.fetched_models().is_empty());
+    assert!(!lamp.is_link(FACE));
+}
+
+/// The reviewer on #1879: off agrees with on for a file at a model's path
+/// that install did not place. It is the lamp's own, kept and said, and
+/// the rest of the build is taken.
+#[test]
+fn with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on() {
+    for on in [true, false] {
+        let mut lamp = Lamp::new().with_models();
+        lamp.config.models = on;
+        // No record of install placing it.
+        fs::write(
+            lamp.root.join("var/lib/lampos-update/state.json"),
+            "{\"installed\":null,\"previous\":null,\"refused\":[],\"made\":[]}",
+        )
+        .unwrap();
+        let face = lamp.model(FACE, "face 2");
+        lamp.publish_with_models(2, "eyes 2", vec![face]);
+        assert_eq!(
+            lamp.round(),
+            Outcome::Switched(2),
+            "on {on}: {:?}",
+            lamp.said
+        );
+        assert_eq!(lamp.read(FACE), "face 1");
+        assert!(!lamp.is_link(FACE));
+        assert!(
+            lamp.said
+                .iter()
+                .any(|line| line == &format!("kept {FACE}: it is not the pinned model")),
+            "on {on}: {:?}",
+            lamp.said
+        );
+        assert_eq!(lamp.eyes_link(), sha("eyes 2"));
+    }
+}
+
+/// The reviewer on #1879, the dead end: with LAMP_UPDATE_SELF=on and
+/// LAMP_UPDATE_MODELS off, a build with models the lamp lacks. The new
+/// updater its climb takes confirms itself, since its dry round counts only
+/// what it is switched to apply, and then waits for the models switch with
+/// nothing of the parts written; no later round climbs again.
+#[test]
+fn with_models_off_a_new_updater_confirms_and_the_build_waits_for_models() {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    // A model install placed, its SHA-256 recorded.
+    let at = lamp.root.join(FACE.trim_start_matches('/'));
+    fs::create_dir_all(at.parent().unwrap()).unwrap();
+    fs::write(&at, "face 1").unwrap();
+    let mut state = lamp.state();
+    state["settings"][FACE] = sha("face 1").into();
+    fs::write(
+        lamp.records().join("state.json"),
+        serde_json::to_vec(&state).unwrap(),
+    )
+    .unwrap();
+    let old = lamp.own_build();
+    let parts = parts_files(&lamp);
+    let mut build = product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    build.models = vec![lamp.model(FACE, "face 2")];
+    needing(&mut lamp, build, manifest::MODELS_UPDATER);
+    let new = sha("lamp-update 2");
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 2,
+            needed: 2,
+            from: old,
+            to: new.clone()
+        },
+        "{:?}",
+        lamp.said
+    );
+
+    lamp.config.updater = 2;
+    assert_eq!(lamp.confirm(&new), own::Confirm::Confirmed);
+    assert!(lamp.pending().is_none());
+    // The fallback leaves it.
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), u64::MAX),
+        own::Back::Nothing
+    );
+    for _ in 0..2 {
+        let outcome = lamp.round();
+        assert!(
+            matches!(&outcome, Outcome::WaitsForModels(why) if why.contains("LAMP_UPDATE_MODELS=on")),
+            "{outcome:?}"
+        );
+        assert_eq!(lamp.own_build(), new);
+        assert_eq!(parts_files(&lamp), parts);
+        assert!(lamp.pending().is_none());
+    }
+    assert!(lamp.fetched_models().is_empty());
+
+    // The models switch on: the build is taken, its model with it.
+    lamp.config.models = true;
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(FACE), "face 2");
+    assert_eq!(lamp.own_build(), new);
 }

@@ -72,6 +72,13 @@ pub struct State {
     /// tells it, though nothing else has changed.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub systemd_owed: bool,
+    /// Each model path a round linked into the store, and the SHA-256 it
+    /// names now; and as they were before the last switch. A store entry
+    /// either names is kept (#1680). Absent from a state written before.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub models: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub models_before: BTreeMap<String, String>,
 }
 
 impl State {
@@ -123,6 +130,10 @@ pub const LINK_SUFFIX: &str = ".link";
 pub struct Journal {
     pub build: Build,
     pub units: Vec<Switching>,
+    /// Each model path the switch moves, as it was (#1680): put back in
+    /// the reverse order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<crate::models::ModelBack>,
     /// The product skills' files the switch writes, as they were before
     /// (#2014's P2): put back with the units. Absent from a journal written
     /// before.
@@ -453,6 +464,7 @@ mod tests {
                 wrote: "c".repeat(64),
                 made: vec!["/var/lib/lampOS/skills/dance".into()],
             }],
+            models: Vec::new(),
         };
         records.save_journal(&journal).unwrap();
         assert_eq!(records.journal().unwrap(), Some(journal));

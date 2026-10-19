@@ -103,7 +103,7 @@ that is the channel's head.**
 - The sequence is the workflow's run number, which only goes up. A lamp
   takes a build only if its sequence is greater than the one it runs.
 - `min_updater` (#1680), when set, is the oldest updater that can apply the
-  build. It's a level, `manifest::UPDATER` in `lamp-update` (1 now), raised
+  build. It's a level, `manifest::UPDATER` in `lamp-update` (2 now: 2 reads `models`), raised
   whenever the updater learns to apply something an older one can't. It
   isn't the sequence, because a binary doesn't know its CI run number. It
   sits in the manifest's signed bytes like every other field. Left out
@@ -620,6 +620,81 @@ does three things only: the link, the refusal and the restart. The deadline
 is on the wall clock: on a lamp without a battery clock, a switch made
 before NTP set the time may be put back early, or late, once it is set.
 
+### Models in the manifest (`LAMP_UPDATE_MODELS`, off)
+
+A build can carry the models its parts read (`models.rs`, #1680): a
+`models` list in the signed manifest, each entry in
+`deploy/product/models.json`'s form (`path`, `url`, `bytes`, `sha256`, and
+an optional `archive` for a file inside a pinned `.tgz`).
+`lamp-update manifest --models deploy/product/models.json` writes it and
+raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
+before the field climbs first. `UPDATER` is 2. A manifest without models
+doesn't write the field and is byte for byte what it was. A model's path
+must be under `/opt/lampOS/`, neither the store nor in it, nor in a
+build's folder (a part with a 64-hex name) nor a `current` link itself, in
+plain parts.
+
+With `LAMP_UPDATE_MODELS=on` in `lamp-update.service`'s environment:
+
+- **Two kinds of path.** A path with a `current` part
+  (`/opt/lampOS/voice/current/smart-turn-v3.2-gpu.onnx`) belongs in that
+  part's folder beside its binary. It is one of the new folder's files, so
+  the part's link (or its unit) switches it. A folder whose binary is the
+  same but whose model changed gets a new folder, named by its list, model
+  lines included. Any other path (`/opt/lampOS/eyes/models/...`, the name's
+  `/opt/lampOS/name/models/`) becomes a relative link into the store,
+  `/opt/lampOS/models/<sha256>`. No part or unit changes for that: the eyes
+  and the name open the same paths as before.
+- **Only what changed is fetched.** A model whose file is already there
+  with its SHA-256 (in the old folder, or at its path) isn't fetched, and a
+  file install placed stays a file. A store entry already there and whole
+  isn't fetched again. A file at the path that isn't install's pin (no
+  record of it in `state.json`) is the lamp's own: it is kept, and said.
+- **Room first.** Step 5 counts each new store entry (with its archive) on
+  top of the new folders, before anything is fetched: `... needs M MB beside
+  the old one (K MB of it models) ...`, refused and kept in `log.jsonl`.
+- **Checked, all or none.** At step 6 each store entry is fetched under a
+  temporary name and checked by size and SHA-256 before it gets its name. A
+  mismatch removes what this round fetched and refuses the build, with
+  nothing switched. A channel out of reach mid-fetch is `unreachable`, as
+  for a build's file, and tried again next round.
+- **Switched with the parts.** At the quiet moment, after the units and
+  links, each changed path is pointed at its store entry, replaced whole. A
+  file install placed is first kept in the store by its bytes. The journal
+  holds each path as it was: put back in reverse after the parts' links on
+  a failed switch, and at the next start after a cut. A file comes back as
+  a file. Every path is tried even when one fails; then the parts are still
+  restarted on the old build, but the journal is kept, nothing is pruned,
+  and the next start tries again. A part whose unit names the path, or its
+  folder as a folder, is restarted and watched with it, even when its own
+  binary didn't change, and after a cut too when a path it reads isn't as
+  it was.
+- **Prune.** A store entry stays while the build the lamp runs or the one
+  before it names it (`state.json`'s `models` and `models_before`), or a
+  model path under `/opt/lampOS/` links to it now, so a `state.json` set
+  aside as unreadable leaves no link pointing at nothing. The others go,
+  and an empty store goes too.
+
+Off, or absent: a build whose models are the lamp's is taken as today, its
+models ignored. A file at a model's path that install didn't place is the
+lamp's own, kept and said, as with the switch on. A build with any other
+model whose file on the lamp has another SHA-256 is refused
+(`... and LAMP_UPDATE_MODELS=on is not set`, `refused` in `log.jsonl`),
+with nothing fetched or written, since its parts may need that model: the
+rest isn't taken without it, which is what `min_updater` 2 is for. The
+build waits for the switch. A new lamp-update's dry round counts only what
+it is switched to apply, so on a lamp that switches itself it confirms on
+such a build (`Outcome::WaitsForModels`), stays, and no later round climbs
+again.
+
+What the release lists today (`models-2026-10-16`, unpacked): the voice's
+57.5 MB (turn-end model 32.4, ONNX Runtime 25.1, from a 10.3 MB `.tgz`),
+the eyes' 38.9 MB (0.2 and 38.7) and the name's 3.0 MB (1.1, 1.3 and 0.6):
+99.5 MB in all. With two builds kept, only a model that changed costs a
+second copy. If every model changed at once, that would be 99.5 MB beside
+the old ones, plus the archive while it is unpacked, plus
+`--keep-free-mb`.
+
 ## What was measured, and where
 
 On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
@@ -662,6 +737,33 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   a blank lamp given build 1 by `lamp-update install`, then a round that
   switches to build 2, keeps `update/current` naming a folder that is there.
   Without the fix the round removes that folder and the test fails.
+- Models in the manifest (#1680, `tests/round.rs`, `LAMP_UPDATE_MODELS`
+  on unless said): a changed eyes model is fetched once, checked, and its
+  path linked into the store with the eyes switched, install's file kept
+  in the store; a changed voice model goes into a new voice folder though
+  the binary is the same; unchanged models aren't fetched and install's
+  file stays a file; a model whose bytes don't match refuses the build
+  with the lamp byte for byte the same and nothing restarted; a part that
+  dies puts the model back as install's file; a switch cut short puts it
+  back at the next start; only a model changing restarts the eyes, and
+  after three builds the store keeps the last two builds' models; 50 MB of
+  models on a disk with 10 MB to spare is refused before any model URL is
+  read, the number in `log.jsonl`; with the switch off a build with another
+  model is refused and one with the lamp's models is taken as today. From
+  the review of #1879: a model path that can't be put back leaves the
+  others put back and the journal kept, a store entry still linked kept
+  (`a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept`);
+  a model-only switch cut short restarts the eyes
+  (`a_model_only_switch_cut_short_restarts_the_part_that_reads_it`); a
+  `state.json` set aside keeps the linked entries
+  (`prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside`);
+  a model fetch cut by the network is unreachable
+  (`a_model_fetch_cut_by_the_network_is_unreachable_not_refused`); off and
+  on both keep a lamp's own model
+  (`with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on`); and with
+  `self_switch` on and models off, the new updater confirms, the build waits
+  with nothing written, and no round climbs again
+  (`with_models_off_a_new_updater_confirms_and_the_build_waits_for_models`).
 - lamp-update switching itself (#1680, `tests/round.rs`, on a lamp given
   build 1 by `install`, with `self_switch` on unless said): a new updater
   that confirms keeps its switch, and a later failure or the deadline leaves
@@ -831,6 +933,9 @@ committed, never the owner's real key). `L` is the runbook's SSH alias.
   once run for real and lamp-update-back called as its unit would call it.
   The `exec`, `OnFailure=`, the timer and the `systemctl` calls haven't run
   under systemd. The rehearsal on lamp-4ace is the first builder's.
+- Models in the manifest (`LAMP_UPDATE_MODELS`): tested on the Mac only
+  (`tests/round.rs`). A download cut short starts again from nothing; it
+  isn't resumed. No published build carries models yet.
 - The keeper,
   `lampos.target`, timers, models and libraries a build does not carry,
   configuration under `/etc/lampOS` (but for `second.json`, above), and a

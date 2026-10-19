@@ -380,32 +380,19 @@ struct Models {
     models: Vec<Model>,
 }
 
-/// One model of [`MODELS`].
-#[derive(Clone, Debug, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Model {
-    pub path: String,
-    pub url: String,
-    pub bytes: u64,
-    pub sha256: String,
-    /// The file is one member of a gzipped tar at `url`, itself pinned.
-    #[serde(default)]
-    pub archive: Option<Archive>,
-}
-
-#[derive(Clone, Debug, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Archive {
-    pub bytes: u64,
-    pub sha256: String,
-    pub member: String,
-}
+/// One model of [`MODELS`]: the manifest's own, which a build may carry.
+pub use crate::manifest::{Archive, Model};
 
 /// The models of [`MODELS`].
 pub fn models() -> Result<Vec<Model>, String> {
-    serde_json::from_str::<Models>(MODELS)
+    models_from(MODELS).map_err(|error| format!("deploy/product/models.json: {error}"))
+}
+
+/// The models of a file in `models.json`'s form.
+pub fn models_from(text: &str) -> Result<Vec<Model>, String> {
+    serde_json::from_str::<Models>(text)
         .map(|list| list.models)
-        .map_err(|error| format!("deploy/product/models.json: {error}"))
+        .map_err(|error| error.to_string())
 }
 
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
@@ -1655,14 +1642,25 @@ fn place_models(
     Ok(())
 }
 
-fn fetch_model(channel: &mut dyn Channel, model: &Model, at: &Path) -> Result<(), String> {
-    let parent = at.parent().ok_or("no folder")?;
+/// A model fetched and checked to `at`, whole or not at all. A channel out
+/// of reach is said as [`Fetch::Unreachable`], so a round tries again; any
+/// other failure is [`Fetch::Failed`].
+pub(crate) fn fetch_model(
+    channel: &mut dyn Channel,
+    model: &Model,
+    at: &Path,
+) -> Result<(), Fetch> {
+    let failed = |why: String| Fetch::Failed(why);
+    let parent = at.parent().ok_or_else(|| failed("no folder".into()))?;
     fs::DirBuilder::new()
         .recursive(true)
         .mode(0o755)
         .create(parent)
-        .map_err(|error| error.to_string())?;
-    let name = at.file_name().ok_or("no name")?.to_string_lossy();
+        .map_err(|error| failed(error.to_string()))?;
+    let name = at
+        .file_name()
+        .ok_or_else(|| failed("no name".into()))?
+        .to_string_lossy();
     let temporary = parent.join(format!(".{name}.fetching"));
     let archive = parent.join(format!(".{name}.archive"));
     let result = (|| {
@@ -1670,23 +1668,27 @@ fn fetch_model(channel: &mut dyn Channel, model: &Model, at: &Path) -> Result<()
             None => fetch_checked(channel, &model.url, model.bytes, &model.sha256, &temporary)?,
             Some(pinned) => {
                 fetch_checked(channel, &model.url, pinned.bytes, &pinned.sha256, &archive)?;
-                let out = fs::File::create(&temporary).map_err(|error| error.to_string())?;
+                let out =
+                    fs::File::create(&temporary).map_err(|error| failed(error.to_string()))?;
                 let status = Command::new("tar")
                     .arg("-xzOf")
                     .arg(&archive)
                     .arg(&pinned.member)
                     .stdout(out)
                     .status()
-                    .map_err(|error| format!("tar: {error}"))?;
+                    .map_err(|error| failed(format!("tar: {error}")))?;
                 if !status.success() {
-                    return Err(format!("tar could not take {} out", pinned.member));
+                    return Err(failed(format!("tar could not take {} out", pinned.member)));
                 }
-                let sha = file_sha256(&temporary).map_err(|error| error.to_string())?;
+                let sha = file_sha256(&temporary).map_err(|error| failed(error.to_string()))?;
                 let size = fs::metadata(&temporary)
-                    .map_err(|error| error.to_string())?
+                    .map_err(|error| failed(error.to_string()))?
                     .len();
                 if size != model.bytes || sha != model.sha256 {
-                    return Err(format!("{} does not match its SHA-256", pinned.member));
+                    return Err(failed(format!(
+                        "{} does not match its SHA-256",
+                        pinned.member
+                    )));
                 }
             }
         }
@@ -1694,7 +1696,7 @@ fn fetch_model(channel: &mut dyn Channel, model: &Model, at: &Path) -> Result<()
             .and_then(|()| fs::File::open(&temporary)?.sync_all())
             .and_then(|()| fs::rename(&temporary, at))
             .and_then(|()| sync_parent(at))
-            .map_err(|error| error.to_string())
+            .map_err(|error| failed(error.to_string()))
     })();
     let _ = fs::remove_file(&archive);
     if result.is_err() {
@@ -1710,8 +1712,8 @@ fn fetch_checked(
     bytes: u64,
     sha256: &str,
     to: &Path,
-) -> Result<(), String> {
-    let mut out = fs::File::create(to).map_err(|error| error.to_string())?;
+) -> Result<(), Fetch> {
+    let mut out = fs::File::create(to).map_err(|error| Fetch::Failed(error.to_string()))?;
     let mut hashing = Hashing {
         file: &mut out,
         context: digest::Context::new(&digest::SHA256),
@@ -1720,9 +1722,10 @@ fn fetch_checked(
     let sha = manifest::hex(hashing.context.finish().as_ref());
     match fetched {
         Ok(size) if size == bytes && sha == sha256 => Ok(()),
-        Ok(_) => Err("it does not match its SHA-256".into()),
-        Err(Fetch::Missing) => Err(format!("{url} is not there")),
-        Err(error) => Err(format!("{error:?}")),
+        Ok(_) => Err(Fetch::Failed("it does not match its SHA-256".into())),
+        Err(Fetch::Missing) => Err(Fetch::Failed(format!("{url} is not there"))),
+        Err(Fetch::Unreachable(why)) => Err(Fetch::Unreachable(why)),
+        Err(error) => Err(Fetch::Failed(format!("{error:?}"))),
     }
 }
 

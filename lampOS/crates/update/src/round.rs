@@ -30,7 +30,8 @@
 use crate::{
     fetch::{Channel, Fetch},
     judge::{Before, UnitState, Watch, part_of},
-    manifest::{self, Manifest, Opened, TooOld},
+    manifest::{self, Manifest, Model, Opened, TooOld},
+    models::{self, ModelBack, Need},
     own,
     product_skills::{self, Bundle},
     quiet::{BETWEEN_TURNS, QUIET, Quiet},
@@ -95,6 +96,9 @@ pub struct Config {
     /// `min_updater` is above it is refused, all but the newer lamp-update
     /// it carries (#1680).
     pub updater: u64,
+    /// `LAMP_UPDATE_MODELS=on`: the models a build carries are fetched,
+    /// checked and switched with the parts (crate::models, #1680).
+    pub models: bool,
 }
 
 impl Config {
@@ -125,6 +129,12 @@ pub enum Outcome {
     UpToDate(u64),
     /// Refused before anything was installed or switched.
     Refused(String),
+    /// Refused as [`Outcome::Refused`] is, only because the build's models
+    /// differ from the lamp's and `LAMP_UPDATE_MODELS` is not on: the
+    /// manifest was read and its signature checked, and this updater is
+    /// not switched to apply models. Its own switch confirms on it
+    /// (crate::own); the build waits for the models switch.
+    WaitsForModels(String),
     /// Without `apply`: what would be done.
     Would(Vec<String>),
     /// Installed beside the old build, or not even that, and not switched:
@@ -203,7 +213,7 @@ impl Outcome {
             Self::Unreachable(_) => "unreachable",
             Self::NothingPublished => "nothing-published",
             Self::UpToDate(_) => "up-to-date",
-            Self::Refused(_) => "refused",
+            Self::Refused(_) | Self::WaitsForModels(_) => "refused",
             Self::Would(_) => "would",
             Self::NotQuiet(_) => "not-quiet",
             Self::Switched(_) => "switched",
@@ -222,7 +232,9 @@ impl std::fmt::Display for Outcome {
                 f.write_str("nothing changed: the channel has published no build")
             }
             Self::UpToDate(sequence) => write!(f, "up to date: build {sequence}"),
-            Self::Refused(why) => write!(f, "refused, nothing switched: {why}"),
+            Self::Refused(why) | Self::WaitsForModels(why) => {
+                write!(f, "refused, nothing switched: {why}")
+            }
             Self::Would(lines) => {
                 f.write_str("would update (nothing written; --apply on to act):")?;
                 lines.iter().try_for_each(|line| write!(f, "\n  {line}"))
@@ -285,6 +297,9 @@ enum Source {
     /// The old folder: a model or a setting beside the binary, which a
     /// build does not carry. Linked, or copied.
     Kept(PathBuf),
+    /// A model the build carries: from the old folder when it is already
+    /// there with its SHA-256 (`from`), else from the store.
+    Model { model: Model, from: Option<PathBuf> },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -356,18 +371,27 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         skills_back: Vec::new(),
         seen: None,
         climb: None,
+        placings: Vec::new(),
+        fetching: Vec::new(),
+        model_backs: Vec::new(),
     };
     if !config.apply {
         let state = run.records.peek_state();
         return match run.look(&state) {
             Ok((manifest, changes, placing))
-                if changes.is_empty() && !placing.as_ref().is_some_and(Placing::writes) =>
+                if changes.is_empty()
+                    && run.placings.is_empty()
+                    && !placing.as_ref().is_some_and(Placing::writes) =>
             {
                 Outcome::UpToDate(manifest.sequence)
             }
-            Ok((manifest, changes, placing)) => {
-                Outcome::Would(describe(&manifest, &changes, placing.as_ref()))
-            }
+            Ok((manifest, changes, placing)) => Outcome::Would(describe(
+                &manifest,
+                &changes,
+                placing.as_ref(),
+                &run.placings,
+                &run.fetching,
+            )),
             Err(outcome) => outcome,
         };
     }
@@ -414,6 +438,12 @@ struct Run<'r, 'w> {
     seen: Option<Manifest>,
     /// A build for a newer updater whose lamp-update this round may take.
     climb: Option<TooOld>,
+    /// The models at paths of their own the build switches, and every
+    /// model to fetch into the store first (crate::models).
+    placings: Vec<models::Placing>,
+    fetching: Vec<Model>,
+    /// The model paths a switch moved, as they were: put back in reverse.
+    model_backs: Vec<ModelBack>,
 }
 
 /// A unit as it is to be put back.
@@ -474,7 +504,7 @@ impl Run<'_, '_> {
                 product_skills::FOLDER
             ));
         }
-        if changes.is_empty() && !writes {
+        if changes.is_empty() && !writes && self.placings.is_empty() {
             // Nothing of this build is this lamp's to change: it runs it.
             if let Some(placing) = &placing {
                 record_skills(&mut state, &placing.steps);
@@ -502,7 +532,7 @@ impl Run<'_, '_> {
         if let Err(outcome) = self.skills_still_load(&manifest, &changes, placing.as_ref()) {
             return outcome;
         }
-        if changes.is_empty() {
+        if changes.is_empty() && self.placings.is_empty() {
             // Only the product skills change: lamp-skills reloads its
             // folder by itself, so nothing is restarted.
             return self.place_alone(&mut state, build, placing);
@@ -615,8 +645,22 @@ impl Run<'_, '_> {
         let installed = installed_units(self.config)
             .map_err(|error| Outcome::Failed(format!("the units cannot be read: {error}")))?;
         let carried = self.carried_units(&manifest, &installed)?;
-        let changes =
-            plan(self.config, &manifest, &installed, &carried).map_err(Outcome::Refused)?;
+        let taken = self.models_of(&manifest, state, &installed)?;
+        let touched: Vec<String> = self
+            .placings
+            .iter()
+            .map(|placing| placing.model.path.clone())
+            .collect();
+        let changes = plan(
+            self.config,
+            &manifest,
+            &installed,
+            &carried,
+            &taken,
+            &touched,
+        )
+        .map_err(Outcome::Refused)?;
+        self.fetching = to_fetch(self.config, &changes, &self.placings);
         self.room(&changes)?;
         let placing = self.product_skills(state, &manifest, &installed, &carried)?;
         Ok((manifest, changes, placing))
@@ -683,6 +727,84 @@ impl Run<'_, '_> {
         Ok(Some(Placing { bundle, steps }))
     }
 
+    /// The models of the build this round takes, and those at paths of
+    /// their own it switches ([`Run::placings`]). With the switch off, none;
+    /// and a build whose models are not the lamp's is refused, since its
+    /// parts may need them.
+    fn models_of(
+        &mut self,
+        manifest: &Manifest,
+        state: &State,
+        installed: &[Installed],
+    ) -> Result<Vec<Model>, Outcome> {
+        self.placings.clear();
+        self.fetching.clear();
+        if manifest.models.is_empty() {
+            return Ok(Vec::new());
+        }
+        let builds: Vec<&str> = installed
+            .iter()
+            .map(|part| part.program.builds.as_str())
+            .collect();
+        if !self.config.models {
+            // What a lamp's own file is follows the rule of the switch on:
+            // kept, and said. Any other model that differs waits for it.
+            let mut differs = None;
+            for model in &manifest.models {
+                let at = if models::in_a_part(&model.path) {
+                    builds.iter().find_map(|builds| {
+                        let name = models::name_in(model, builds)?;
+                        let part = installed
+                            .iter()
+                            .find(|part| part.program.builds == *builds)?;
+                        Some(self.config.on(&part.program.folder()).join(name))
+                    })
+                } else {
+                    match models::need(self.config, model, state.settings.get(&model.path)) {
+                        Need::LampsOwn => {
+                            self.say(&format!("kept {}: it is not the pinned model", model.path));
+                            None
+                        }
+                        // Not there at all: ignored, as before the field.
+                        Need::Switch(placing) if placing.back.sha256.is_none() => None,
+                        Need::There | Need::Switch(_) => Some(self.config.on(&model.path)),
+                    }
+                };
+                if differs.is_none()
+                    && at
+                        .and_then(|at| file_sha256(&at).ok())
+                        .is_some_and(|sha| sha != model.sha256)
+                {
+                    differs = Some(model);
+                }
+            }
+            if let Some(model) = differs {
+                return Err(Outcome::WaitsForModels(format!(
+                    "build {} carries another {} than this lamp's, and {}=on is not set",
+                    manifest.sequence,
+                    model.path,
+                    models::SWITCH
+                )));
+            }
+            return Ok(Vec::new());
+        }
+        let mut taken = Vec::new();
+        for model in &manifest.models {
+            if models::in_a_part(&model.path) {
+                taken.push(model.clone());
+                continue;
+            }
+            match models::need(self.config, model, state.settings.get(&model.path)) {
+                Need::There => {}
+                Need::Switch(placing) => self.placings.push(placing),
+                Need::LampsOwn => {
+                    self.say(&format!("kept {}: it is not the pinned model", model.path));
+                }
+            }
+        }
+        Ok(taken)
+    }
+
     /// The build's units for this lamp's parts, fetched and checked. Small:
     /// read even when nothing is applied, to show what would change.
     fn carried_units(
@@ -720,12 +842,15 @@ impl Run<'_, '_> {
 
     /// Step 5: room for a second copy of everything that changed, before
     /// anything is written. Counted whole, as if no file could be linked.
+    /// The store's new entries are counted too, before any is fetched.
     fn room(&self, changes: &[Change]) -> Result<(), Outcome> {
+        let stored: u64 = self.fetching.iter().map(Model::fetch_bytes).sum();
         let needed: u64 = changes
             .iter()
             .flat_map(|change| change.make.iter().flatten())
             .map(|want| want.size)
-            .sum();
+            .sum::<u64>()
+            + stored;
         if needed == 0 {
             return Ok(());
         }
@@ -738,9 +863,14 @@ impl Run<'_, '_> {
             })?;
         if free < needed.saturating_add(self.config.keep_free) {
             return Err(Outcome::Refused(format!(
-                "the disk has {} MB free; the new build needs {} MB beside the old one, and {} MB are kept free",
+                "the disk has {} MB free; the new build needs {} MB beside the old one{}, and {} MB are kept free",
                 free / 1_000_000,
                 needed.div_ceil(1_000_000),
+                if stored > 0 {
+                    format!(" ({} MB of it models)", stored.div_ceil(1_000_000))
+                } else {
+                    String::new()
+                },
                 self.config.keep_free / 1_000_000
             )));
         }
@@ -754,6 +884,7 @@ impl Run<'_, '_> {
         manifest: &Manifest,
         changes: &[Change],
     ) -> Result<(), Outcome> {
+        self.store()?;
         let making: Vec<(&Change, &Vec<Want>)> = changes
             .iter()
             .filter_map(|change| change.make.as_ref().map(|wants| (change, wants)))
@@ -795,6 +926,42 @@ impl Run<'_, '_> {
         self.records
             .save_state(state)
             .map_err(|error| Outcome::Failed(format!("the state cannot be written: {error}")))
+    }
+
+    /// Every model the build needs and the store lacks, fetched and
+    /// checked. All or none: one that fails leaves none of this round's.
+    fn store(&mut self) -> Result<(), Outcome> {
+        if self.fetching.is_empty() {
+            return Ok(());
+        }
+        models::make_store(self.config)
+            .map_err(|error| Outcome::Failed(format!("{}: {error}", manifest::STORE)))?;
+        let mut fetched = Vec::new();
+        for model in self.fetching.clone() {
+            let at = self.config.on(&models::store_path(&model.sha256));
+            match crate::install::fetch_model(self.world.channel, &model, &at) {
+                Ok(()) => {
+                    self.say(&format!(
+                        "fetched {} into {}",
+                        model.path,
+                        models::store_path(&model.sha256)
+                    ));
+                    fetched.push(at);
+                }
+                Err(why) => {
+                    for at in &fetched {
+                        let _ = fs::remove_file(at);
+                    }
+                    // Made for this round and empty: gone too.
+                    let _ = fs::remove_dir(self.config.on(manifest::STORE));
+                    return Err(match why {
+                        Fetch::Unreachable(why) => Outcome::Unreachable(why),
+                        why => Outcome::Refused(format!("{}: {why}", model.path)),
+                    });
+                }
+            }
+        }
+        Ok(())
     }
 
     /// One new folder, under its temporary name.
@@ -839,6 +1006,17 @@ impl Run<'_, '_> {
                     out.set_permissions(fs::Permissions::from_mode(0o755))
                         .and_then(|()| out.sync_all())
                         .map_err(failed)?;
+                }
+                Source::Model { model, from } => {
+                    let from = from
+                        .clone()
+                        .unwrap_or_else(|| self.config.on(&models::store_path(&model.sha256)));
+                    if fs::hard_link(&from, &path).is_err() {
+                        fs::copy(&from, &path).map_err(failed)?;
+                        fs::File::open(&path)
+                            .and_then(|file| file.sync_all())
+                            .map_err(failed)?;
+                    }
                 }
                 Source::Kept(from) => {
                     // The same disk: a link costs nothing. Otherwise a copy.
@@ -1099,18 +1277,47 @@ impl Run<'_, '_> {
     }
 
     /// Every unit as it was, then every moved link back to the build it
-    /// named. A linked unit the switch did not change is written again with
-    /// the same bytes.
+    /// named, then every model path in reverse. A linked unit the switch did
+    /// not change is written again with the same bytes. One that fails does
+    /// not stop the others: each is tried, and what failed is said.
     fn put_units_and_links_back(&mut self, backs: &[Back]) -> Result<(), String> {
-        self.write_units(
+        let mut troubles = Vec::new();
+        if let Err(why) = self.write_units(
             backs
                 .iter()
                 .map(|back| (back.unit.as_str(), back.text.as_str())),
-        )?;
-        self.set_links(backs.iter().filter_map(|back| {
+        ) {
+            troubles.push(why);
+        }
+        if let Err(why) = self.set_links(backs.iter().filter_map(|back| {
             let link = back.link.as_ref()?;
             Some((link.path.as_str(), link.build.as_str()))
-        }))
+        })) {
+            troubles.push(why);
+        }
+        for back in self.model_backs.clone().iter().rev() {
+            if let Err(error) = models::put_back(self.config, back) {
+                troubles.push(format!("{} cannot be put back: {error}", back.path));
+            }
+        }
+        if troubles.is_empty() {
+            Ok(())
+        } else {
+            Err(troubles.join("; "))
+        }
+    }
+
+    /// Each model at a path of its own pointed at its new model.
+    fn switch_models(&mut self) -> Result<(), String> {
+        for placing in self.placings.clone() {
+            models::switch(self.config, &placing).map_err(|error| {
+                format!(
+                    "{} cannot be pointed at its model: {error}",
+                    placing.model.path
+                )
+            })?;
+        }
+        Ok(())
     }
 
     /// Steps 7 and 8.
@@ -1177,6 +1384,11 @@ impl Run<'_, '_> {
                 format!("{} {}\n", link.path, link.build),
             ))
         }));
+        self.model_backs = self
+            .placings
+            .iter()
+            .map(|placing| placing.back.clone())
+            .collect();
         let journal = Journal {
             build: build.clone(),
             units: backs
@@ -1187,6 +1399,7 @@ impl Run<'_, '_> {
                     link: back.link.clone(),
                 })
                 .collect(),
+            models: self.model_backs.clone(),
             skills: skills.clone(),
         };
         if let Err(error) = self
@@ -1210,7 +1423,8 @@ impl Run<'_, '_> {
                     let link = change.link.as_ref()?;
                     Some((link.path.as_str(), link.new.as_str()))
                 }))
-            });
+            })
+            .and_then(|()| self.switch_models());
         if let Err(why) = written {
             return self.put_back(state, &build, &backs, None, why, String::new());
         }
@@ -1268,6 +1482,19 @@ impl Run<'_, '_> {
         }
         record_skills(state, &steps);
         state.previous = state.installed.replace(build.clone());
+        if !self.placings.is_empty() {
+            let mut before = state.models.clone();
+            for placing in &self.placings {
+                match &placing.back.sha256 {
+                    Some(sha) => before.insert(placing.model.path.clone(), sha.clone()),
+                    None => before.remove(&placing.model.path),
+                };
+                state
+                    .models
+                    .insert(placing.model.path.clone(), placing.model.sha256.clone());
+            }
+            state.models_before = before;
+        }
         if let Err(error) = self
             .records
             .save_state(state)
@@ -1341,7 +1568,17 @@ impl Run<'_, '_> {
             "putting build {} back: {why}{told}",
             build.sequence
         ));
-        let (after, old) = self.restore(backs, failed);
+        let (after, old, files_back) = self.restore(backs, failed);
+        if !files_back {
+            // Not all is as it was: the journal stays, for the next start
+            // to try again, and nothing is pruned that a path still names.
+            return Outcome::RolledBack {
+                sequence: build.sequence,
+                why,
+                after,
+                told: Told { new: told, old },
+            };
+        }
         state.refuse(build, &why);
         if let Err(error) = self
             .records
@@ -1394,24 +1631,31 @@ impl Run<'_, '_> {
     /// The units written back, then those restarted on the new build
     /// restarted again, in the reverse order of a switch: the voice last,
     /// and between two turns unless the voice itself is what failed. Then
-    /// watched. Every unit is tried, whatever happens to one.
-    /// With what the first unit found not well said of itself ([`Told`]).
-    fn restore(&mut self, backs: &[Back], failed: Option<&str>) -> (Result<(), String>, String) {
+    /// watched. Every unit is tried, whatever happens to one, and the parts
+    /// are restarted even when a file could not be put back.
+    /// With what the first unit found not well said of itself ([`Told`]),
+    /// and whether every file is as it was.
+    fn restore(
+        &mut self,
+        backs: &[Back],
+        failed: Option<&str>,
+    ) -> (Result<(), String>, String, bool) {
         // The product skills' files first, before lamp-skills is started
         // again on the old build.
         let skills = std::mem::take(&mut self.skills_back);
         let skills = product_skills::restore(&self.config.root, &skills, self.world.say);
-        if let Err(why) = self.put_units_and_links_back(backs) {
-            let why = match skills {
-                Ok(()) => why,
-                Err(also) => format!("{why}; {also}"),
-            };
-            return (Err(why), String::new());
-        }
+        let mut troubles = Vec::new();
+        let files_back = match self.put_units_and_links_back(backs) {
+            Ok(()) => true,
+            Err(why) => {
+                troubles.push(why);
+                false
+            }
+        };
+        troubles.extend(skills.err());
         let mut again: Vec<&Back> = backs.iter().filter(|back| back.restarted).collect();
         again.sort_by(|a, b| order(&b.unit).cmp(&order(&a.unit)));
         let mut watches = Vec::new();
-        let mut troubles: Vec<String> = skills.err().into_iter().collect();
         for back in again {
             if back.unit == VOICE_UNIT && failed != Some(VOICE_UNIT) {
                 // A voice that is well is not cut off mid-sentence.
@@ -1433,9 +1677,9 @@ impl Run<'_, '_> {
             troubles.push(why);
         }
         if troubles.is_empty() {
-            (Ok(()), told)
+            (Ok(()), told, files_back)
         } else {
-            (Err(troubles.join("; ")), told)
+            (Err(troubles.join("; ")), told, files_back)
         }
     }
 
@@ -1447,6 +1691,7 @@ impl Run<'_, '_> {
             "putting build {} back: {why}",
             journal.build.sequence
         ));
+        self.model_backs = journal.models.clone();
         let mut backs = Vec::new();
         for switching in &journal.units {
             let text = match self.records.previous(&switching.unit) {
@@ -1458,14 +1703,19 @@ impl Run<'_, '_> {
                     ));
                 }
             };
-            // A unit still as it was, with its link as it was, was never
-            // switched, nor restarted.
+            // A unit still as it was, with its link as it was and every
+            // model it reads as it was, was never switched, nor restarted.
             let now = fs::read_to_string(self.config.on(&self.config.units).join(&switching.unit));
             let link_as_was = switching.link.as_ref().is_none_or(|link| {
                 fs::read_link(self.config.on(&link.path))
                     .is_ok_and(|now| now == Path::new(&link.build))
             });
-            if now.is_ok_and(|now| now == text) && link_as_was {
+            let models_as_were = journal
+                .models
+                .iter()
+                .filter(|back| models::reads(&text, &back.path))
+                .all(|back| models::is_back(self.config, back));
+            if now.is_ok_and(|now| now == text) && link_as_was && models_as_were {
                 continue;
             }
             backs.push(Back {
@@ -1547,6 +1797,7 @@ impl Run<'_, '_> {
             files: vec![carried],
             units: Vec::new(),
             min_updater: None,
+            models: Vec::new(),
         };
         match self.own_switch(&only_the_updater) {
             Ok(Some(Outcome::SelfSwitched { from, to, .. })) => Some(Outcome::Climbs {
@@ -1725,6 +1976,21 @@ impl Run<'_, '_> {
             }
         }
         state.made = left;
+        // And whatever a model path links to now: state.json set aside as
+        // unreadable names nothing, and a live link is never left dangling.
+        let mut kept: BTreeSet<String> = state
+            .models
+            .values()
+            .chain(state.models_before.values())
+            .cloned()
+            .collect();
+        kept.extend(models::linked_now(self.config));
+        for removed in models::prune(self.config, &kept) {
+            match removed {
+                Ok(path) => self.say(&format!("removed {path}, which no kept build names")),
+                Err(why) => self.say(&why),
+            }
+        }
         if let Err(error) = self.records.save_state(state) {
             self.say(&format!("the state cannot be written: {error}"));
         }
@@ -1733,7 +1999,13 @@ impl Run<'_, '_> {
 
 /// What a person reads before applying: each unit, what changes, and the
 /// lines of its unit file that would change.
-fn describe(manifest: &Manifest, changes: &[Change], placing: Option<&Placing>) -> Vec<String> {
+fn describe(
+    manifest: &Manifest,
+    changes: &[Change],
+    placing: Option<&Placing>,
+    placings: &[models::Placing],
+    fetching: &[Model],
+) -> Vec<String> {
     let mut lines = vec![format!(
         "build {} of {} (commit {})",
         manifest.sequence,
@@ -1745,7 +2017,12 @@ fn describe(manifest: &Manifest, changes: &[Change], placing: Option<&Placing>) 
             .make
             .iter()
             .flatten()
-            .filter(|want| matches!(want.source, Source::Build(_)))
+            .filter(|want| {
+                matches!(
+                    want.source,
+                    Source::Build(_) | Source::Model { from: None, .. }
+                )
+            })
             .map(|want| want.size)
             .sum();
         let folder = if change.old_folder == change.new_folder {
@@ -1784,6 +2061,20 @@ fn describe(manifest: &Manifest, changes: &[Change], placing: Option<&Placing>) 
             }
             product_skills::Act::Record => {}
         }
+    }
+    for placing in placings {
+        lines.push(format!(
+            "{}: -> {} (model)",
+            placing.model.path,
+            models::store_path(&placing.model.sha256)
+        ));
+    }
+    for model in fetching {
+        lines.push(format!(
+            "fetch {} ({:.1} MB) into the store",
+            model.path,
+            model.fetch_bytes() as f64 / 1e6
+        ));
     }
     lines.push("switched at a quiet moment: nobody heard or answered for 45 s".into());
     lines
@@ -1850,6 +2141,7 @@ fn holds(folder: &Path, wants: &[Want]) -> bool {
         let path = folder.join(&want.name);
         match &want.source {
             Source::Build(file) => file_sha256(&path).is_ok_and(|sha| sha == file.sha256),
+            Source::Model { model, .. } => file_sha256(&path).is_ok_and(|sha| sha == model.sha256),
             Source::Kept(_) => path.is_file(),
         }
     })
@@ -1863,6 +2155,7 @@ fn list_sha256(wants: &[Want]) -> String {
         .iter()
         .filter_map(|want| match &want.source {
             Source::Build(file) => Some(format!("{}  {}\n", file.sha256, file.name)),
+            Source::Model { model, .. } => Some(format!("{}  {}\n", model.sha256, want.name)),
             Source::Kept(_) => None,
         })
         .collect();
@@ -1877,10 +2170,12 @@ fn list_sha256(wants: &[Want]) -> String {
 fn wants_of(
     config: &Config,
     files: &BTreeMap<&str, &manifest::File>,
+    models: &BTreeMap<&str, &Model>,
     program: &Program,
 ) -> Result<Vec<Want>, String> {
     let old_folder = program.folder();
     let mut names = BTreeSet::from([program.binary.clone()]);
+    names.extend(models.keys().map(|name| (*name).to_owned()));
     if let Ok(entries) = fs::read_dir(config.on(&old_folder)) {
         for entry in entries {
             let entry = entry.map_err(|error| format!("{old_folder}: {error}"))?;
@@ -1898,24 +2193,40 @@ fn wants_of(
     }
     names
         .into_iter()
-        .map(|name| match files.get(name.as_str()) {
-            Some(file) => Ok(Want {
-                name,
-                source: Source::Build((*file).clone()),
-                size: file.size,
-            }),
-            None => {
-                let path = config.on(&old_folder).join(&name);
-                let size = fs::metadata(&path)
-                    .map_err(|error| format!("{}: {error}", path.display()))?
-                    .len();
-                Ok(Want {
+        .map(
+            |name| match (files.get(name.as_str()), models.get(name.as_str())) {
+                (None, Some(model)) => {
+                    let path = config.on(&old_folder).join(&name);
+                    let from = file_sha256(&path)
+                        .is_ok_and(|sha| sha == model.sha256)
+                        .then_some(path);
+                    Ok(Want {
+                        name,
+                        source: Source::Model {
+                            model: (*model).clone(),
+                            from,
+                        },
+                        size: model.bytes,
+                    })
+                }
+                (Some(file), _) => Ok(Want {
                     name,
-                    source: Source::Kept(path),
-                    size,
-                })
-            }
-        })
+                    source: Source::Build((*file).clone()),
+                    size: file.size,
+                }),
+                (None, None) => {
+                    let path = config.on(&old_folder).join(&name);
+                    let size = fs::metadata(&path)
+                        .map_err(|error| format!("{}: {error}", path.display()))?
+                        .len();
+                    Ok(Want {
+                        name,
+                        source: Source::Kept(path),
+                        size,
+                    })
+                }
+            },
+        )
         .collect()
 }
 
@@ -1925,6 +2236,8 @@ fn plan(
     manifest: &Manifest,
     installed: &[Installed],
     carried: &BTreeMap<String, String>,
+    models: &[Model],
+    touched: &[String],
 ) -> Result<Vec<Change>, String> {
     let files: BTreeMap<&str, &manifest::File> = manifest
         .files
@@ -1967,7 +2280,11 @@ fn plan(
                 part.unit, target.binary, part.program.binary
             ));
         }
-        let wants = wants_of(config, &files, &part.program)?;
+        let ours: BTreeMap<&str, &Model> = models
+            .iter()
+            .filter_map(|model| Some((models::name_in(model, &part.program.builds)?, model)))
+            .collect();
+        let wants = wants_of(config, &files, &ours, &part.program)?;
         // The folder is named by its binary's SHA-256, unless a folder of
         // that name holds other versions of the binaries beside it.
         let mut name = binary.sha256.clone();
@@ -1995,7 +2312,9 @@ fn plan(
             new: name.clone(),
         });
         let old_folder = part.program.folder();
-        if new_folder == old_folder && unit::same(&after, &part.text) {
+        // A part that reads a model a switch moves is restarted with it.
+        let reads_moved = touched.iter().any(|path| models::reads(&part.text, path));
+        if new_folder == old_folder && unit::same(&after, &part.text) && !reads_moved {
             continue;
         }
         // Two units of one folder (a part started two ways) make it once.
@@ -2139,4 +2458,26 @@ pub(crate) fn filling(final_path: &Path) -> PathBuf {
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
     final_path.with_file_name(format!(".{name}.lamp-update"))
+}
+
+/// Every model a round needs in the store and it lacks, once each: those
+/// for paths of their own, and those for a part's new folder not already
+/// in its old one.
+fn to_fetch(config: &Config, changes: &[Change], placings: &[models::Placing]) -> Vec<Model> {
+    let mut seen = BTreeSet::new();
+    let folder_models = changes
+        .iter()
+        .flat_map(|change| change.make.iter().flatten())
+        .filter_map(|want| match &want.source {
+            Source::Model { model, from: None } => Some(model),
+            _ => None,
+        });
+    placings
+        .iter()
+        .map(|placing| &placing.model)
+        .chain(folder_models)
+        .filter(|model| !models::stored(config, &model.sha256))
+        .filter(|model| seen.insert(model.sha256.clone()))
+        .cloned()
+        .collect()
 }

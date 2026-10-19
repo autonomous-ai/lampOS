@@ -148,8 +148,10 @@ pub fn confirm(
         apply: false,
         ..config.clone()
     };
+    // Only what this updater is switched to apply counts: a build that
+    // waits for the models switch was read and checked all the same.
     match round(&dry, world) {
-        Outcome::UpToDate(_) | Outcome::Would(_) => {}
+        Outcome::UpToDate(_) | Outcome::Would(_) | Outcome::WaitsForModels(_) => {}
         other => return Ok(Confirm::NotProven(other.to_string())),
     }
     let records = Records::new(folder.clone());
