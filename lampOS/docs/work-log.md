@@ -15,6 +15,8 @@ log and nothing a lamp runs ([joining.md](joining.md),
 
 ## Current checkpoint: 2026-10-19
 
+Ready for integration: no (#1996 output caps is published; automatic ARM64 pending and inherited host motion failure disclosed)
+
 Ready for integration: no (#1732 ARM64 is green; the authored skill is being split from shared foundations)
 
 Ready for integration: no (#1757 follows Bedtime; latest host attempt failed inherited motion test)
@@ -168,7 +170,7 @@ merged into #1712; this frozen source predates it. This is a failed gate,
 not a completed passing workspace run. No unchanged-source rerun is planned.
 
 First approved the four-part Bedtime sequence at 16:32 UTC and moved the
-lamp trial to after its actual landing. Four local, unpushed commits now
+lamp trial to after its actual landing. Four one-commit changes now
 form the sequence: output caps `e1fdc20374f638899e612ef0967d3d414c29708a`
 on `df722db2d0`; bounded rest/Say `0bbbe5234d0df0d7b3cc99ab8c6a8195a638485f`;
 scheduled Skills `fd31d9c98e283089253b063d6181010846da2741`; and authored
@@ -195,16 +197,36 @@ source hash matches in both the checkout and source-only copy. These
 results preserve the original failure. First's 16:57 UTC direction is to
 publish the four parts with that inherited failure disclosed. The motion
 owner's test-only #1990 is open; its native gate and actual landing remain
-pending. Caps publication proceeds on that basis, with automatic ARM64 still
-required before it is ready to merge.
+pending. Caps is now [#1996](https://github.com/autonomous-ai/lampOS/pull/1996),
+head `e1fdc20374`, draft into `first/voice-cascade-gemini`. Its automatic
+[ARM64 run 39290958460](https://github.com/autonomous-ai/lampOS/actions/runs/39290958460)
+is in progress. The other three split heads remain local and unpushed.
+
+The four-part composition at `7f4cc5c267` passed formatting **3.87 s**,
+strict workspace/all-target Clippy **59.56 s**, all five foundation crates
+(Expression, Msgs, Schedule, Skills, Setup) **927/0/0**, none filtered,
+**157.01 s**, and Say **37/0/0** (2,485 filtered across all targets),
+**51.12 s**. Each of the four second-route Say/hum/expiry cases passed
+**1/0/0**, 2,278 filtered. These selected cases are not a full consumer gate.
+
+The [first installer attempt](verification/second-integration-checkpoint-20261019/split-composition-initial.json)
+failed compilation: Cargo treated shared Msgs and Schedule artifacts as
+fresh although their compiled interfaces lacked the exports present in
+both source copies. The [unchanged-source isolated checks](verification/second-integration-checkpoint-20261019/split-composition-isolated.json)
+passed with separate fresh target directories: complete Update **132/0/1**,
+none filtered, **107.68 s**, and source-only workspace build **143.71 s**.
+All **1,593** frozen source hashes match. The failed cache attempt stays
+recorded. Subsequent per-head gates use fresh, separate checkout and
+source-only targets. Rest/Say's full 27-crate gate and scheduled Skills'
+13-crate gate are running on their own frozen commits.
 
 Music is committed privately as `c82c04d6df` above the four split commits, preserving
 ScopedSystem, notes-aware preparation, bounded TTS and shutdown. Independent
 review of the other 47 changed files found no P1/P2; the two documentation
 links it identified are corrected. Additional cross-cases cover scoped
 identity, revocation after preparation, empty speech and Stop through the
-real worker with the Music runner. They are source preparation, not yet
-runtime-qualified. The final three-file review also found no P1/P2 and verified
+real worker with the Music runner. Their focused preflight is running in a fresh isolated target; no passing
+runtime result is claimed yet. The final three-file review also found no P1/P2 and verified
 all parent tests remain. Music remains queued behind actual Bedtime landing.
 
 Bedtime and Tasks have only their original automatic PR ARM64 run,

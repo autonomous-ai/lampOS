@@ -1,0 +1,66 @@
+{
+  "head": "7f4cc5c2674afcd0b9cdacd2e93ec0eb42bec733",
+  "integration_base": "df722db2d0ee6cb9cd46640e8fc2554065333d13",
+  "source_tree_sha256": "80e8eb969b7149f02fe636b212236f4bbd80c5cb4e9892f0d5b06fb755a68dfa",
+  "source_file_count": 1593,
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "reason": "The preceding checkout compile treated Msgs and Schedule artifacts as Fresh while their required interfaces were absent. Current checkout and source-only files match. This rerun isolates build artifacts in fresh, separate target directories and preserves the failed attempt.",
+  "stages": [
+    {
+      "stage": "checkout_tests",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-update",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 107.68,
+      "log_sha256": "a85e02ff3a69e0f7c9ffef35ab5035f7902c7728c44068016570f4d2e89bb223",
+      "summaries": [
+        "test result: ok. 43 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.94s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 39.80s",
+        "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.46s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "fresh_isolated_target": true,
+      "summary_totals": {
+        "passed": 132,
+        "failed": 0,
+        "ignored": 1,
+        "filtered": 0
+      }
+    },
+    {
+      "stage": "build",
+      "command": [
+        "cargo",
+        "build",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "seconds": 143.71,
+      "log_sha256": "0e6400e994ab9681a51e5822945022a472fe13b1720cc294c6834bb7c825d85f",
+      "summaries": [],
+      "fresh_isolated_target": true,
+      "summary_totals": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      }
+    }
+  ],
+  "all_frozen_source_hashes_match": true
+}
