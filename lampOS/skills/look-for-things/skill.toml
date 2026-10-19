@@ -26,7 +26,7 @@ look = true
 
 [choice]
 name = "place"
-about = "Where to look: desk the first time; then left, right, far_left, far_right, one at a time, only while the thing is not yet seen."
+about = "Where to look: desk the first time, unless they named a place; then left, right, far_left, far_right, one at a time, only while the thing is not yet seen."
 one_of = ["desk", "left", "right", "far_left", "far_right"]
 default = "desk"
 

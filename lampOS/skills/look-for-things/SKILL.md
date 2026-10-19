@@ -1,6 +1,6 @@
 ---
 name: look-for-things
-description: Call when someone asks the lamp to find something on or near the desk - "where are my keys", "can you find my glasses", "look for my phone". The lamp looks at the desk first, then a few places to either side, saying what it sees as it goes, and stays on the thing when it sees it. Give place = desk the first time; after each look, only if the thing is not yet seen, call once more with the next place: left, right, far_left, far_right. Only when asked.
+description: Call when someone asks the lamp to find something on or near the desk - "where are my keys", "can you find my glasses", "look for my phone". The lamp looks at the desk first, then a few places to either side, saying what it sees as it goes, and stays on the thing when it sees it. Give place = desk the first time, unless they named a place; after each look, only if the thing is not yet seen, call once more with the next place: left, right, far_left, far_right. Only when asked.
 ---
 
 # Look for things
@@ -12,8 +12,10 @@ right, and a little farther each way, five looks at most. It says what it
 sees as it goes ("not on the desk... not here either"), and when it sees
 them it says where, by something near them ("there, by the mug"), and stays
 looking at them, its light on them. If they are nowhere it can see, it says
-so kindly ("I can't see them from here") and stops. Talk to it while it
-looks and it stops at once and listens.
+so kindly ("I can't see them from here") and stops. Ask it to look
+somewhere ("on the right") and it looks there. Talk to it while it looks,
+or pause it, and it stops: its pose is let go within a fifth of a second
+and its head is back up within about two.
 
 What it can and cannot do:
 

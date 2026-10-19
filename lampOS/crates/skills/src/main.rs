@@ -1887,9 +1887,11 @@ fn wait_out(skill: &str, calls: &[Call], bus: &Bus, lasting_us: u64, said: &mut 
     }
     let until = clock::now() + Duration::from_micros(lasting_us);
     while clock::now() < until {
-        if voice_listening(bus) {
+        // Someone speaking, the lamp paused or the body pushed ends it, as
+        // a show's frames end (the peer read on #1766).
+        if let Some(why) = show_stopped(bus) {
             end_hold(skill);
-            said.push("someone spoke: the search ended".into());
+            said.push(format!("{why}: the search ended"));
             return;
         }
         clock::sleep(SHOW_LOOKS.min(until.saturating_duration_since(clock::now())));
@@ -2242,8 +2244,9 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             };
             let first = tell(&what, text.clone(), &path);
             let until = clock::now() + Duration::from_micros(*lasting_us);
-            // A search's pose looks at the voice every fifth of a second and
-            // is let go once someone speaks (#1685); any other, each second.
+            // A search's pose looks every fifth of a second and is let go
+            // once someone speaks, the lamp is paused or the body pushed
+            // (#1685); any other, each second.
             let (until_spoken, bus) = (*until_spoken, bus.clone());
             let looks = if until_spoken { SHOW_LOOKS } else { MOOD_EVERY };
             std::thread::spawn(move || {
@@ -2253,7 +2256,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
                     if !holding(&skill, number) {
                         break;
                     }
-                    if until_spoken && voice_listening(&bus) {
+                    if until_spoken && show_stopped(&bus).is_some() {
                         end_hold(&skill);
                         break;
                     }

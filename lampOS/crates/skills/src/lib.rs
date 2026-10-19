@@ -837,10 +837,11 @@ impl Skill {
     }
 
     /// The arguments a search's next look is made with, after `looked` of
-    /// its looks (#1685): the first at the choice's default (the desk, where
-    /// a thing is looked for first), whatever the call names; each after it
-    /// as asked; none past `looks`, the model told `give_up` instead. A
-    /// skill with no search takes every call as asked.
+    /// its looks (#1685): each as asked, the first at the choice's default
+    /// (the desk, where a thing is looked for first) only when the call
+    /// names no place, so a place the person named is where the lamp looks
+    /// (the peer read on #1766); none past `looks`, the model told
+    /// `give_up` instead. A skill with no search takes every call as asked.
     pub fn search_look(&self, args: &Value, looked: u32) -> Result<Value, String> {
         let Some(search) = &self.search else {
             return Ok(args.clone());
@@ -852,6 +853,7 @@ impl Skill {
         if looked == 0
             && let Some(choice) = &self.choice
             && let Some(default) = &choice.default
+            && args.get(&choice.name).is_none()
         {
             if !args.is_object() {
                 args = json!({});
