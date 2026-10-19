@@ -90,7 +90,7 @@ fn add_heard(to: &mut String, text: &str, most: usize) {
 
 /// The whole words of `text`, lowercase: what is between characters that
 /// are not letters or digits.
-fn words(text: &str) -> Vec<String> {
+pub(crate) fn words(text: &str) -> Vec<String> {
     text.to_lowercase()
         .split(|c: char| !c.is_alphanumeric())
         .filter(|word| !word.is_empty())
@@ -4847,11 +4847,22 @@ pub fn replay_watch(
     let mut known_now: Option<&str> = None;
     for (at, _, event) in events {
         let outs = match event {
-            Event::Message(message) => watches
-                .observe(&message.header.topic, &message.payload, at, minute(at))
-                .into_iter()
-                .map(|(_, out)| out)
-                .collect(),
+            // What the ring says of the mark, as the program takes it.
+            Event::Message(message) => match ring_said(message) {
+                Some((source, shown, by)) => match source.strip_prefix("skill:") {
+                    Some(name) if name == skill.name => watches
+                        .ring_said(name, shown, by.as_deref(), at)
+                        .into_iter()
+                        .map(|(_, out)| out)
+                        .collect(),
+                    _ => Vec::new(),
+                },
+                None => watches
+                    .observe(&message.header.topic, &message.payload, at, minute(at))
+                    .into_iter()
+                    .map(|(_, out)| out)
+                    .collect(),
+            },
             Event::Known(name) => {
                 known_now = name;
                 Vec::new()
@@ -4877,6 +4888,24 @@ pub fn replay_watch(
         );
     }
     Ok(made)
+}
+
+/// What a recorded message of the ring says of a request's light: its
+/// claim's source, whether it is shown (`light/reached`) or not
+/// (`light/outranked`), and by what.
+fn ring_said(message: &Recorded) -> Option<(String, bool, Option<String>)> {
+    match message.header.topic.as_str() {
+        lamp_msgs::LightReached::TOPIC => {
+            let reached: lamp_msgs::LightReached = serde_json::from_slice(&message.payload).ok()?;
+            Some((reached.source, true, None))
+        }
+        lamp_msgs::LightOutranked::TOPIC => {
+            let outranked: lamp_msgs::LightOutranked =
+                serde_json::from_slice(&message.payload).ok()?;
+            Some((outranked.source, false, Some(outranked.by)))
+        }
+        _ => None,
+    }
 }
 
 #[derive(Deserialize)]

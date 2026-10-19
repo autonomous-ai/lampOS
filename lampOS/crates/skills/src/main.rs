@@ -4,8 +4,8 @@
 //! actions part and the voice's say service.
 use lamp_bus::{Bus, Declaration, Kind, Publisher, Subscriber};
 use lamp_msgs::{
-    BodyGesture, Decision, GestureState, Hand, Light, LightRequest, MessageOut, Pause, SkillEvent,
-    SkillStage, Speech, Voice, VoiceState,
+    BodyGesture, Decision, GestureState, Hand, Light, LightOutranked, LightReached, LightRequest,
+    MessageOut, Pause, SkillEvent, SkillStage, Speech, Voice, VoiceState,
 };
 use lamp_skills::glow::{GLOW_EVERY, Glow, Glows, REQUESTS_ENVIRONMENT};
 use lamp_skills::watch::{self, Out, Outs, Watches};
@@ -622,6 +622,8 @@ fn serve(
             marks: HashMap::new(),
             texts: None,
             known_file: options.known_file.clone(),
+            signs: None,
+            retaken: HashMap::new(),
         }),
     };
     let (ask, asks) = mpsc::channel::<ToolAsk>();
@@ -989,7 +991,17 @@ struct Watching {
     /// `messages/out`, made when the first text goes.
     texts: Option<Publisher>,
     known_file: Option<PathBuf>,
+    /// The ring's word on the marks: `light/outranked` and `light/reached`,
+    /// subscribed to before the first mark is asked, so no answer is missed.
+    signs: Option<(Option<Subscriber>, Option<Subscriber>)>,
+    /// When each mark was last asked for again with a new claim.
+    retaken: HashMap<String, Instant>,
 }
+
+/// A mark the ring says is not shown is asked for again with a new claim at
+/// most this often: one a stronger light hides is left hidden, the watch not
+/// counting, rather than asked for in a loop.
+const MARK_AGAIN: Duration = Duration::from_secs(30);
 
 /// The eyes renew their known file every 2 s while the known person is at
 /// the lamp and remove it when nobody is near: older than this, it says
@@ -1057,6 +1069,21 @@ fn watched(outs: Outs, watching: &mut Watching, out: &mut Publisher, runner: &Ru
                 };
                 if let Some(old) = watching.marks.remove(&skill) {
                     old.give_back();
+                }
+                if watching.signs.is_none() {
+                    let subscribe = |topic: &str, kind: &str| {
+                        runner
+                            .bus
+                            .subscribe_typed(topic, "skills_watch", kind)
+                            .map_err(|error| {
+                                eprintln!("lamp-skills: {topic} not subscribed to: {error}")
+                            })
+                            .ok()
+                    };
+                    watching.signs = Some((
+                        subscribe(LightOutranked::TOPIC, LightOutranked::TYPE),
+                        subscribe(LightReached::TOPIC, LightReached::TYPE),
+                    ));
                 }
                 let mut glow = Glow::new(glows, &skill, light_now(&runner.bus));
                 let how = glow.ask(&call);
@@ -1154,20 +1181,92 @@ fn watch_call((name, args, reply, admission): ToolAsk, out: &mut Publisher, runn
     }
 }
 
-/// While a watch is on: the known face at the lamp and the privacy switch,
-/// looked at.
+/// While a watch is on: the ring's word on its mark, its time limit, the
+/// known face at the lamp and the privacy switch, looked at.
 fn watch_look(out: &mut Publisher, runner: &Runner) {
     let mut watching = runner.watching.borrow_mut();
     if !watching.watches.any_on() {
         return;
     }
     let (now_us, minute) = (clock::now_us(), local_minute(runner));
+    let mut outs = mark_signs(&mut watching, out, now_us);
+    outs.extend(watching.watches.tick(now_us));
     let known = watching.known_file.as_deref().and_then(known_now);
-    let mut outs = watching.watches.known(known.as_deref(), now_us, minute);
+    outs.extend(watching.watches.known(known.as_deref(), now_us, minute));
     let closed = said_lately::<serde_json::Value>(&runner.bus, watch::PRIVACY)
         .is_some_and(|privacy| privacy["physical_muted"] == json!(true));
-    outs.extend(watching.watches.privacy(closed));
+    outs.extend(watching.watches.privacy(closed, now_us));
     watched(outs, &mut watching, out, runner);
+}
+
+/// What the ring said of the marks since the last look (the peer read on
+/// #1807): shown (`light/reached`), the watch counts; not shown
+/// (`light/outranked`), it counts nothing. By another program's light, its
+/// mark is asked for again with a new claim, which the ring hears over an
+/// older one of the same priority, at most once each `MARK_AGAIN`; by the
+/// person's own light, never: the watch pauses until they ask again. Each
+/// word is taken at `now_us`: a mark the ring has not said shows for 30 s
+/// counts nothing ([`watch::CONFIRMED_WITHIN_US`], Third's privacy read on
+/// #1963).
+fn mark_signs(watching: &mut Watching, out: &mut Publisher, now_us: u64) -> Outs {
+    let mut said: Vec<(String, bool, Option<String>)> = Vec::new();
+    if let Some((outranked, reached)) = &mut watching.signs {
+        if let Some(outranked) = outranked {
+            while let Ok(Some(message)) = outranked.recv(Duration::ZERO) {
+                if let Ok(told) = message.parse::<LightOutranked>() {
+                    said.push((told.source, false, Some(told.by)));
+                }
+            }
+        }
+        if let Some(reached) = reached {
+            while let Ok(Some(message)) = reached.recv(Duration::ZERO) {
+                if let Ok(drawn) = message.parse::<LightReached>() {
+                    said.push((drawn.source, true, None));
+                }
+            }
+        }
+    }
+    let mut outs = Vec::new();
+    for (source, shown, by) in said {
+        let Some(skill) = source.strip_prefix("skill:").map(str::to_owned) else {
+            continue;
+        };
+        if !watching.marks.contains_key(&skill) {
+            continue;
+        }
+        outs.extend(
+            watching
+                .watches
+                .ring_said(&skill, shown, by.as_deref(), now_us),
+        );
+        // The person's own light is never asked over (the first builder's
+        // ruling on #1937): the watch pauses until they ask again.
+        if shown || by.as_deref() == Some(LightOutranked::PERSON) {
+            continue;
+        }
+        let now = clock::now();
+        let again = watching
+            .retaken
+            .get(&skill)
+            .is_none_or(|at| now.saturating_duration_since(*at) >= MARK_AGAIN);
+        if let (true, Some(mark)) = (again, watching.watches.mark_of(&skill)) {
+            watching.retaken.insert(skill.clone(), now);
+            outs.push((skill.clone(), Out::Mark(mark)));
+            publish(
+                out,
+                SkillEvent {
+                    skill,
+                    stage: SkillStage::Done,
+                    why: format!(
+                        "mark: outranked by {}: asked for again with a new claim",
+                        by.as_deref().unwrap_or("something")
+                    ),
+                    allowed: None,
+                },
+            );
+        }
+    }
+    outs
 }
 
 impl Runner {
@@ -2757,6 +2856,8 @@ mod tests {
                 marks: HashMap::new(),
                 texts: None,
                 known_file: None,
+                signs: None,
+                retaken: HashMap::new(),
             }),
         };
         let dance = runner.sockets_for("dance");
