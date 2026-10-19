@@ -89,3 +89,33 @@ Ready for lamp-voice: yes (`deploy/lamp-0c89/LAMP.md` only)
 - Build for it: `lamp-voice` `89bd0e65f`, ARM64 run 39201225155, 44 files
   matching `SHA256SUMS` on the office Mac. It goes over as a `file:///`
   channel, as lamp-06c1's did.
+
+## 2026-10-19 — lamp-0c89 — V2 installed, set up from the app, phone test
+
+Ready for lamp-voice: yes (`deploy/lamp-0c89/LAMP.md` only)
+
+- Backup, copy only: `~/mobile-backup-20261019/` on the lamp (units, `/etc`
+  network, nginx and sudoers files, `/root/config`, `/usr/local/bin`).
+- Put on the office network by V1's own setup from the app (the hotspot was
+  too slow to copy over). Channel made and signed on the lamp with its own
+  `lamp-update` (no Rust on the office Mac); the test key removed after.
+- V1's `os-server`, `hal`, `bootstrap`, `openclaw`, `hermes-gateway`,
+  `led-boot` disabled and stopped, kept. `lamp-update install --channel-url
+  file:///var/tmp/lampos-channel/ --setup on`: build 3058, 94 changes.
+  `models-2026-10-16` is a draft, so the voice's two files could not be
+  fetched; they and the eyes' and name's five were placed by hand, each
+  matching `models.json`.
+- Setup from the app (ecm-sds-mobile#3's build on an iPhone): about 30 s,
+  V1's about 2 min; setup status `"generation": "lamp-v2"`. `cloud-on.sh`:
+  `lamp-cloud` online; the app shows the Lamp 2 page online. Volume
+  (`volume_level` 26–78 ms) and the light work. Posted on #1396 (15:2x).
+- Found (on #1396): until `lamp-cloud` is on, the app shows the lamp as
+  "Setup was never finished"; with the privacy switch closed, the light row
+  fails ("the lamp's light is not running": `light/state` comes from the
+  voice); a refusal at the ack showed only as a toast.
+- The toast is mobile's: `ef75561a` keeps a failed turn's error on its
+  reply bubble. With `ce7695a6`, draft ecm-sds-mobile#4, stacked on #3.
+  `flutter analyze` the same 28 as `v3`; `flutter test` +682 −1 (`v3`'s
+  own failure). `ef75561a` not yet on a phone.
+- Not shown: the body (no `lamp.env`); a Lamp 2 answering a text
+  (`LAMP_MESSAGES` off).
