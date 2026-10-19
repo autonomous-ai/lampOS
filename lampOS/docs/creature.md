@@ -173,7 +173,11 @@ One part, read by every behaviour (to build):
 4. **Resting reactions**: a resting lamp lifts its head (#710).
 5. **The air**: the SEN63C is read (`lamp-air`, running); the quiet droop and the remark.
 6. **Familiarity**: who it knows (eyes and memory).
-7. **Joys**: music sway, laughing, the stretch as an invitation.
+7. **Joys**: music sway, laughing, the stretch as an invitation. Their bars
+   are measured on a lamp with nothing moving by `tools/joys-scores.sh
+   laugh|music` (#1669): an empty room, a track and a line over it, scored
+   against each bar, and the glances or sways the skill would have asked
+   for, replayed offline from the bus.
 
 ## What the best companions teach (research, 2026-10-14)
 
