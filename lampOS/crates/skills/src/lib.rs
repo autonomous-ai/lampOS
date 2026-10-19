@@ -2914,7 +2914,9 @@ struct Nudge {
     /// its height, as shares of the picture.
     face: Option<[f32; 3]>,
     /// What the eyes said the person at the desk was doing as the run
-    /// began (`room/activity`, #1678), if they said it.
+    /// began (`room/activity`, #1678), if they said it with the sitting's
+    /// baseline in: before it, a baseline coming in mid-run could say
+    /// `head_down` of someone who did nothing (the reviewer's P3 on #1938).
     activity: Option<Activity>,
     noticed: bool,
     /// The newest faces in its while showed nobody: they got up.
@@ -2955,6 +2957,7 @@ fn nudged(
     let face = Engine::fresh(latest, Faces::TOPIC, now_us).and_then(largest_face);
     let activity = Engine::fresh(latest, RoomActivity::TOPIC, now_us)
         .and_then(|value| serde_json::from_value::<RoomActivity>(value.clone()).ok())
+        .filter(|activity| activity.baseline)
         .map(|activity| activity.state);
     let nudge = nudges.entry(skill.name.clone()).or_default();
     *nudge = Nudge {

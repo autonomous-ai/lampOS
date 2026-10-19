@@ -40,6 +40,12 @@ field = "state"           # (LAMP_ACTIVITY off) the topic says nothing and it ru
 not_equals = "head_down"
 unknown = "holds"
 
+[[while]]                 # the sitting is the sitter's own (#1678): the eyes' sitting_s, which
+topic = "room/activity"   # begins again when someone else sits down, has lasted 100 minutes
+field = "sitting_s"       # too, not only a face in the chair. Without the eyes' room/activity
+above = 5999           # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
+unknown = "holds"
+
 [active]                  # in the day
 from = "08:00"
 to = "20:00"

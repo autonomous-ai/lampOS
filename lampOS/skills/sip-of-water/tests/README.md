@@ -24,4 +24,6 @@ wellbeing skills, which a case of one skill cannot show, is
 | `rests-after-two-nobody-noticed` | 10:00, three sittings, the face never moving | Pass: At 90 and 195, then nothing (`[rest]`) |
 | `quiet-when-short-sitting` | 10:00, 80 minutes, then away | Pass: Nothing |
 | `quiet-after-its-hours` | 17:00, 100 minutes | Pass: Nothing (`[active]` 10:00 to 17:00) |
+| `a-sip-when-the-eyes-say-the-same-sitting` | As `a-sip-after-90-minutes`, with the eyes' `room/activity` 100 ms before each face, its `sitting_s` the sitting's | Pass: At 90 minutes, as there |
+| `not-when-someone-else-sat-down` | 10:00, a face at the desk 100 minutes, but `room/activity`'s `sitting_s` begins again at 60 minutes: someone else sat down | Pass: Nothing: that sitter has sat 30 minutes at 90 |
 | `off-when-asked` | 10:00, `wellbeing_nudges(how = "off")` at a minute, 100 minutes | Pass: Nothing (`[stop]`) |
