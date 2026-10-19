@@ -161,6 +161,8 @@ impl Worker {
                 ring_resources: Some(resources),
                 #[cfg(test)]
                 on_stop: None,
+                #[cfg(test)]
+                after_terminate: None,
             }));
             worker
                 .as_mut()

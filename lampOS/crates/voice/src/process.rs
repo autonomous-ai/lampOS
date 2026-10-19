@@ -111,6 +111,10 @@ pub struct Worker {
     /// fixture miss the 300 ms in `shutdown` (#1232).
     #[cfg(test)]
     on_stop: Option<Box<dyn FnOnce() -> io::Result<()> + Send>>,
+    /// One-shot test barrier after native termination/reaping, before returning
+    /// to the coordinator. It never replaces the real child cleanup.
+    #[cfg(test)]
+    after_terminate: Option<Box<dyn FnOnce() + Send>>,
 }
 
 /// The voice starts a worker only in a role on its list, the one the records
@@ -169,6 +173,8 @@ impl Worker {
                 ring_resources: None,
                 #[cfg(test)]
                 on_stop: None,
+                #[cfg(test)]
+                after_terminate: None,
             },
             peer,
         )
@@ -231,6 +237,11 @@ impl Worker {
     #[cfg(test)]
     pub(crate) fn on_stop(&mut self, end: impl FnOnce() -> io::Result<()> + Send + 'static) {
         self.on_stop = Some(Box::new(end));
+    }
+
+    #[cfg(test)]
+    pub(crate) fn after_terminate(&mut self, observe: impl FnOnce() + Send + 'static) {
+        self.after_terminate = Some(Box::new(observe));
     }
 
     /// Closes a cooperative fixture's input as its Stop is sent, on the
@@ -305,6 +316,8 @@ impl Worker {
                 ring_resources: None,
                 #[cfg(test)]
                 on_stop: None,
+                #[cfg(test)]
+                after_terminate: None,
             },
             peer,
             input,
@@ -367,6 +380,8 @@ impl Worker {
             ring_resources: None,
             #[cfg(test)]
             on_stop: None,
+            #[cfg(test)]
+            after_terminate: None,
         };
         worker.wait_until_ready(directory, &mut on_wait)?;
         Ok(worker)
@@ -514,6 +529,10 @@ impl Worker {
                 }
             }
             Err(error) => message.push_str(&format!("; reap failed: {error}")),
+        }
+        #[cfg(test)]
+        if let Some(observe) = self.after_terminate.take() {
+            observe();
         }
         io::Error::new(kind, message)
     }
@@ -1269,6 +1288,8 @@ mod tests {
             ring_resources: None,
             #[cfg(test)]
             on_stop: None,
+            #[cfg(test)]
+            after_terminate: None,
         }
     }
 
