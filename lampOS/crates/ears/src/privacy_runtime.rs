@@ -8,10 +8,12 @@ use alsa::{
 use lamp_bus::{Bus, Message, Notice, Subscriber};
 use lamp_ears::{
     BLOCK, RATE, Settings,
+    classes::Classified,
     privacy::{Capture, CaptureOwner, Emission, LeaseGate, PublicationGate},
 };
 use lamp_msgs::{
-    Audio, Diagnostic, Level, MicrophonePrivacy, RoomSound, SuddenSound, Voice, VoiceState,
+    Audio, Diagnostic, Level, MicrophonePrivacy, RoomSound, SoundClasses, SuddenSound, Voice,
+    VoiceState,
 };
 use std::{
     io,
@@ -200,6 +202,7 @@ fn connected(
     gate: &mut LeaseGate,
     sender: &SyncSender<Input>,
     output: &Receiver<Output>,
+    classes: Option<&Receiver<Classified>>,
     shared: &Shared,
 ) -> io::Result<()> {
     let mut privacy = bus.subscribe_typed(
@@ -211,6 +214,13 @@ fn connected(
     let mut sudden =
         bus.publisher_declared(SuddenSound::TOPIC, &SuddenSound::declaration(), NAME)?;
     let mut health = bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), NAME)?;
+    let mut classes = match classes {
+        Some(receiver) => Some((
+            receiver,
+            bus.publisher_declared(SoundClasses::TOPIC, &SoundClasses::declaration(), NAME)?,
+        )),
+        None => None,
+    };
     let mut audio = None;
     let mut audio_retry = lamp_ears::pcm::ExportRetry::default();
     let mut looked = 0;
@@ -352,6 +362,23 @@ fn connected(
                 Err(TryRecvError::Disconnected) => return Ok(()),
             }
         }
+        // Scores leave only while their capture era still holds authority
+        // now; the header keeps the audio's end, never the publish time.
+        if let Some((receiver, publisher)) = classes.as_mut() {
+            for _ in 0..BATCH {
+                let Ok(classified) = receiver.try_recv() else {
+                    break;
+                };
+                let now = lamp_ipc::monotonic_us();
+                if classified.publishable(&shared.publication, now) {
+                    let at_us = match &classified.classes {
+                        SoundClasses::Scored { window, .. } => window.end_us,
+                        SoundClasses::Unavailable { .. } => now,
+                    };
+                    publisher.publish_json(at_us, &classified.classes)?;
+                }
+            }
+        }
         let now = lamp_ipc::monotonic_us();
         if now.saturating_sub(looked) >= 100_000 {
             looked = now;
@@ -374,18 +401,104 @@ fn pump(
     clock_id: String,
     sender: SyncSender<Input>,
     output: Receiver<Output>,
+    classes: Option<Receiver<Classified>>,
     shared: Arc<Shared>,
 ) {
     let mut gate = LeaseGate::new(clock_id.clone());
     while !shared.stop.load(Ordering::Acquire) {
         gate.close();
         shared.revoke();
-        let _ = connected(&bus, &clock_id, &mut gate, &sender, &output, &shared);
+        let _ = connected(
+            &bus,
+            &clock_id,
+            &mut gate,
+            &sender,
+            &output,
+            classes.as_ref(),
+            &shared,
+        );
         shared.revoke();
         shared.speaking.store(false, Ordering::Release);
         if !shared.stop.load(Ordering::Acquire) {
             thread::park_timeout(Duration::from_millis(250));
         }
+    }
+}
+
+/// Room sound classes (#1669): model loading and inference run on their own
+/// thread, never on capture or the pump; capture only offers blocks. Off
+/// unless `LAMP_EARS_CLASSES` is exactly `on`: then no thread, no model, no
+/// handoff for capture and no publisher for the pump.
+fn start_classes(
+    switch: Option<&str>,
+    model: Option<String>,
+    shared: &Arc<Shared>,
+) -> io::Result<(
+    Option<lamp_ears::classes::Handoff>,
+    Option<Receiver<Classified>>,
+)> {
+    if !lamp_ears::classes::enabled(switch) {
+        return Ok((None, None));
+    }
+    let (handoff, intake) = lamp_ears::classes::handoff();
+    let (send_classes, receive_classes) = mpsc::sync_channel(4);
+    let worker_shared = shared.clone();
+    thread::Builder::new()
+        .name("ears-classes".into())
+        .spawn(move || {
+            let model = lamp_ears::classes::model_from(model.as_deref())
+                .inspect_err(|error| log(&format!("ears/classes says invalid_model: {error}")))
+                .ok();
+            lamp_ears::classes::serve(
+                intake,
+                &worker_shared.publication,
+                &worker_shared.stop,
+                lamp_ipc::monotonic_us,
+                model
+                    .as_ref()
+                    .map(|model| |features: &[f32]| model.score(features)),
+                |classified| {
+                    // A stalled pump drops results; they would go stale.
+                    let _ = send_classes.try_send(classified);
+                },
+            );
+        })?;
+    log(
+        "LAMP_EARS_CLASSES=on: ears/classes scores mic1 locally; at most one patch of one capture era (under 2 s) is held in memory, none written",
+    );
+    Ok((Some(handoff), Some(receive_classes)))
+}
+
+/// How long the route may go with no permission from Voice before it is
+/// said, once.
+const NO_PERMISSION_SAID_AFTER_US: u64 = 10_000_000;
+
+/// The once-only line for a route that never opens (Third's yes on #1722,
+/// 04:37): with no lease from Voice for 10 s since the start or the last
+/// one, it is said once in the process's life, so a lamp whose Controls has
+/// no privacy source (no slide in its pins) says why it hears nothing,
+/// instead of waiting silently.
+#[derive(Default)]
+struct Unpermitted {
+    since_us: Option<u64>,
+    said: bool,
+}
+
+impl Unpermitted {
+    fn note(&mut self, permitted: bool, now_us: u64) -> Option<&'static str> {
+        if permitted {
+            self.since_us = None;
+            return None;
+        }
+        let since = *self.since_us.get_or_insert(now_us);
+        if self.said || now_us.saturating_sub(since) < NO_PERMISSION_SAID_AFTER_US {
+            return None;
+        }
+        self.said = true;
+        Some(
+            "no permission from Voice for 10 s: the microphone stays closed until one comes (muted, \
+             or Controls has no privacy source, as with no privacy slide in its pins)",
+        )
     }
 }
 
@@ -423,10 +536,24 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
     });
     let (send_input, input) = mpsc::sync_channel(CAPACITY);
     let (output, receive_output) = mpsc::sync_channel(CAPACITY);
+    let (classes, receive_classes) = start_classes(
+        std::env::var("LAMP_EARS_CLASSES").ok().as_deref(),
+        std::env::var("LAMP_EARS_CLASSES_MODEL").ok(),
+        &shared,
+    )?;
     let pump_shared = shared.clone();
     let worker = thread::Builder::new()
         .name("ears-privacy-bus".into())
-        .spawn(move || pump(bus, clock_id, send_input, receive_output, pump_shared))?;
+        .spawn(move || {
+            pump(
+                bus,
+                clock_id,
+                send_input,
+                receive_output,
+                receive_classes,
+                pump_shared,
+            )
+        })?;
     log("privacy controls on; microphone waits for Voice's fresh permission");
     if export {
         log(
@@ -438,6 +565,7 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
         let mut failures = 0u64;
         let mut retry_at = 0u64;
         let mut reported = 0u64;
+        let mut unpermitted = Unpermitted::default();
         loop {
             let fence = shared.publication.generation();
             if fence != seen_fence || fence == u64::MAX {
@@ -480,6 +608,9 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
                 shared.pcm.invalidate();
             }
             let permit = owner.maintain(lamp_ipc::monotonic_us())?;
+            if let Some(line) = unpermitted.note(permit.is_some(), lamp_ipc::monotonic_us()) {
+                log(line);
+            }
             shared.publication.update(permit, seen_fence);
             shared
                 .pcm
@@ -491,17 +622,26 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
                     shared.speaking.load(Ordering::Acquire),
                     || seen_fence == shared.publication.generation(),
                     |samples, permit, sequence, captured_at_us| {
+                        let stamp = lamp_ears::pcm::CaptureStamp {
+                            permit,
+                            fence: seen_fence,
+                            sequence,
+                            captured_at_us,
+                        };
                         shared.pcm.offer(
                             samples,
                             &shared.publication,
-                            lamp_ears::pcm::CaptureStamp {
-                                permit,
-                                fence: seen_fence,
-                                sequence,
-                                captured_at_us,
-                            },
+                            stamp,
                             lamp_ipc::monotonic_us(),
                         );
+                        if let Some(classes) = &classes {
+                            classes.offer(
+                                samples,
+                                &shared.publication,
+                                stamp,
+                                lamp_ipc::monotonic_us(),
+                            );
+                        }
                     },
                 ) {
                     Ok(Some(emission)) => {
@@ -550,4 +690,51 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
         let _ = worker.join();
     }
     close.and(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The reviewer on #1923 (P3): with the switch anything but exactly
+    /// `on`, no classifier thread, no handoff for capture and no publisher
+    /// for the pump.
+    #[test]
+    fn classes_start_nothing_unless_the_switch_is_on() {
+        let shared = Arc::new(Shared::new(false));
+        for switch in [None, Some(""), Some("off"), Some("ON"), Some("on ")] {
+            let (handoff, receiver) = start_classes(switch, None, &shared).unwrap();
+            assert!(handoff.is_none() && receiver.is_none(), "{switch:?}");
+        }
+        assert_eq!(
+            Arc::strong_count(&shared),
+            1,
+            "no thread holds the shared state"
+        );
+    }
+
+    /// Third's yes (04:37): said once, after 10 s with no permission, and
+    /// never again in the process's life; a permission in between starts the
+    /// 10 s again.
+    #[test]
+    fn no_permission_is_said_once_after_ten_seconds() {
+        let mut unpermitted = Unpermitted::default();
+        let s = |seconds: u64| seconds * 1_000_000;
+        assert_eq!(unpermitted.note(false, s(0)), None);
+        assert_eq!(unpermitted.note(true, s(9)), None);
+        assert_eq!(unpermitted.note(false, s(10)), None, "permitted at 9 s");
+        assert_eq!(unpermitted.note(false, s(19)), None);
+        assert!(
+            unpermitted
+                .note(false, s(20))
+                .is_some_and(|line| line.contains("no permission from Voice"))
+        );
+        assert_eq!(unpermitted.note(false, s(60)), None, "once only");
+        assert_eq!(unpermitted.note(true, s(61)), None);
+        assert_eq!(
+            unpermitted.note(false, s(200)),
+            None,
+            "once in the process's life"
+        );
+    }
 }

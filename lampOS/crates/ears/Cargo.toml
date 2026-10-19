@@ -11,6 +11,11 @@ serde_json.workspace = true
 hound.workspace = true
 lamp-msgs = { path = "../msgs" }
 lamp-bus = { path = "../bus" }
+# The optional room sound classes (`src/classes.rs`, #1669), pinned as in
+# lamp-turn-end and lamp-same-voice.
+tract-onnx = { version = "=0.23.8", default-features = false }
+rustfft = "=6.4.1"
+sha2.workspace = true
 
 # The room microphone's reader (`src/main.rs`).
 [target.'cfg(target_os = "linux")'.dependencies]
