@@ -649,15 +649,31 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
     }
 }
 
+/// A face forgotten while old face records the eyes couldn't read are kept
+/// apart (#1586): what the person is told, plainly.
+pub const FORGOTTEN_SOME_KEPT_APART: &str = "Forgotten. Tell them so, and that a few old face records you could not read are kept apart: if those ever come back, their face is forgotten in them too, and a factory reset clears them.";
+/// No face of that name where the eyes could look, while old face records
+/// they couldn't read are kept apart (#1586).
+pub const NOT_KNOWN_SOME_KEPT_APART: &str = "You did not know a face by that name. A few old face records you could not read are kept apart: if one is theirs, it is forgotten if they ever come back, and a factory reset clears them.";
+
 /// What the eyes said, in words the model can say.
 fn told(answer: &Value) -> Value {
     if let Some(name) = answer.get("remembered").and_then(Value::as_str) {
         return json!({"ok": true, "remembered": name});
     }
-    match answer.get("forgot").and_then(Value::as_bool) {
-        Some(true) => return json!({"ok": true}),
-        Some(false) => return json!({"error": "I did not know a face by that name."}),
-        None => {}
+    // Set-aside files the eyes couldn't search: the forget waits for them,
+    // and the person is told what was forgotten and what wasn't (#1586),
+    // not that the eye failed.
+    let unsearched = answer
+        .get("unsearched")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    match (answer.get("forgot").and_then(Value::as_bool), unsearched) {
+        (Some(true), 0) => return json!({"ok": true}),
+        (Some(false), 0) => return json!({"error": "I did not know a face by that name."}),
+        (Some(true), _) => return json!({"ok": true, "note": FORGOTTEN_SOME_KEPT_APART}),
+        (Some(false), _) => return json!({"error": NOT_KNOWN_SOME_KEPT_APART}),
+        (None, _) => {}
     }
     if answer.get("error").and_then(Value::as_str) == Some("known_as")
         && let Some(known) = answer.get("known_as").and_then(Value::as_str)
@@ -808,6 +824,22 @@ mod tests {
         );
         assert_eq!(told(&json!({"forgot":true})), json!({"ok":true}));
         assert!(told(&json!({"forgot":false}))["error"].is_string());
+        // #1586: some set-aside records couldn't be searched. What was
+        // forgotten is said, and what is kept apart, never "My eye could not
+        // do that".
+        assert_eq!(
+            told(&json!({"forgot":true,"unsearched":1})),
+            json!({"ok":true,"note":FORGOTTEN_SOME_KEPT_APART})
+        );
+        assert_eq!(
+            told(&json!({"forgot":false,"unsearched":2})),
+            json!({"error":NOT_KNOWN_SOME_KEPT_APART})
+        );
+        // A real fault is still the eye's.
+        assert_eq!(
+            told(&json!({"error":"storage"})),
+            json!({"error":"My eye could not do that just now."})
+        );
         for code in [
             "no_face",
             "too_far",
