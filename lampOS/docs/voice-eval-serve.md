@@ -34,8 +34,31 @@ Runtime policy is forwarded typed and validated. The fields are
 - An omitted field passes nothing, so the default child argv is unchanged.
   Fixture runs refuse these fields.
 
+**The voice route.** A `serve` or `directed` run starts the voice on the
+second route (Deepgram, DeepSeek, ElevenLabs) unless it names Gemini Live:
+the owner, 19 Oct 19:3x, every voice test runs on the second route, and Live
+only for a comparison the first builder names on #1712.
+
+- `voice_route` is `"second"` (the default) or `"live"` (`--voice-route` to
+  `lamp-session`). The relay sets `LAMP_VOICE_ROUTE` (`second`, or `gemini`
+  for live) in the runtime's environment, not its argv.
+- `runtime_env` holds the `LAMP_*` settings the voice reads, copied from the
+  lamp's voice unit (`--runtime-env NAME=VALUE`, each name once). The second
+  route needs `LAMP_VOICE_SECOND_CONFIG`, and takes its switches
+  (`LAMP_SECOND_CHAT`, `LAMP_SECOND_SEARCH`, `LAMP_SECOND_SPEECH`, ...) from
+  here. `LAMP_VOICE_ROUTE` itself is set only by `voice_route`.
+- A run on the second route without `LAMP_VOICE_SECOND_CONFIG` is refused on
+  the Mac before anything starts on the lamp. lamp-voice would refuse it at
+  start too. A fixture run refuses both fields.
+- **Keys:** the second route reads DeepSeek's key (`deepseek.key`) from the
+  voice unit's systemd credentials (`CREDENTIALS_DIRECTORY`). A `lamp-session`
+  started over plain SSH doesn't have them, so the `lamp_command` must start it
+  where they are. No physical run on the second route has been made yet; the
+  first one settles how (#1712).
+
 `fixtures/voice-eval-serve-pilot-config.example.json` holds the installed
-pilot's settings, the kept-start candidate and an external room recorder:
+pilot's settings, the kept-start candidate, the second route's settings and
+an external room recorder:
 
 - noise suppression off;
 - `duplex`; the installed template uses `v1-baseline`;

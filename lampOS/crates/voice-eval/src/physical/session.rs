@@ -70,10 +70,60 @@ pub enum SessionMode {
     },
 }
 
+/// Which voice route a `directed` or `serve` runtime starts on, as
+/// `LAMP_VOICE_ROUTE` in its environment. The second route (Deepgram,
+/// DeepSeek, ElevenLabs) unless a run names Gemini Live: the owner, 19 Oct
+/// 19:3x, every voice test runs on the second route, and Live only for a
+/// comparison the first builder names on #1712.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum VoiceRoute {
+    #[default]
+    Second,
+    Live,
+}
+
+impl VoiceRoute {
+    pub const FLAG: &str = "--voice-route";
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Second => "second",
+            Self::Live => "live",
+        }
+    }
+
+    /// The value lamp-voice reads (`coordinator/second.rs`, `ROUTE_ENV`).
+    pub fn environment_value(self) -> &'static str {
+        match self {
+            Self::Second => "second",
+            Self::Live => "gemini",
+        }
+    }
+}
+
+impl std::str::FromStr for VoiceRoute {
+    type Err = ();
+    fn from_str(value: &str) -> std::result::Result<Self, ()> {
+        match value {
+            "second" => Ok(Self::Second),
+            "live" => Ok(Self::Live),
+            _ => Err(()),
+        }
+    }
+}
+
+/// The environment variable lamp-voice reads its route from.
+pub const ROUTE_ENVIRONMENT: &str = "LAMP_VOICE_ROUTE";
+/// The second route's configuration, which lamp-voice needs with
+/// `LAMP_VOICE_ROUTE=second`.
+pub const SECOND_CONFIG_ENVIRONMENT: &str = "LAMP_VOICE_SECOND_CONFIG";
+
 /// lamp-voice runtime policy the relay forwards to `directed` and `serve`,
 /// typed with lamp-voice's own option types. An omitted flag is not passed,
 /// so the runtime keeps its own default and the child argv is unchanged.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// The route and the `LAMP_*` settings go in the runtime's environment, not
+/// its argv.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct RuntimeFlags {
     pub microphone: Option<Microphone>,
     pub turn_taking: Option<TurnTaking>,
@@ -83,6 +133,12 @@ pub struct RuntimeFlags {
     pub provider_continuation: Option<Continuation>,
     /// Opt-in end-of-turn experiment; absent keeps lamp-voice's default.
     pub endpoint: Option<Endpoint>,
+    /// The voice route; absent is the second route.
+    pub voice_route: Option<VoiceRoute>,
+    /// `LAMP_*` settings for the runtime's environment, as the lamp's voice
+    /// unit sets them (the second route's configuration and its switches),
+    /// in the order given, each name once.
+    pub environment: Vec<(String, String)>,
 }
 
 impl RuntimeFlags {
@@ -131,6 +187,43 @@ impl RuntimeFlags {
                 flag,
             )?,
             "--endpoint" => set(&mut self.endpoint, value.parse().map_err(|_| bad())?, flag)?,
+            VoiceRoute::FLAG => set(
+                &mut self.voice_route,
+                value
+                    .parse()
+                    .map_err(|_| invalid(&format!("{flag} is second or live, not {value:?}")))?,
+                flag,
+            )?,
+            "--runtime-env" => {
+                let (name, setting) = value
+                    .split_once('=')
+                    .ok_or_else(|| invalid(&format!("{flag} is NAME=VALUE, not {value:?}")))?;
+                let named = name.len() > "LAMP_".len()
+                    && name.starts_with("LAMP_")
+                    && name.bytes().all(|byte| {
+                        byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_'
+                    });
+                if !named {
+                    return Err(invalid(&format!(
+                        "{flag} sets only LAMP_ settings in capitals, not {name:?}"
+                    )));
+                }
+                if name == ROUTE_ENVIRONMENT {
+                    return Err(invalid(&format!(
+                        "{ROUTE_ENVIRONMENT} is set by {}, not {flag}",
+                        VoiceRoute::FLAG
+                    )));
+                }
+                if setting.contains(['\0', '\n']) {
+                    return Err(invalid(&format!(
+                        "{flag} {name}'s value has a NUL or newline"
+                    )));
+                }
+                if self.environment.iter().any(|(given, _)| given == name) {
+                    return Err(invalid(&format!("{flag} {name} given more than once")));
+                }
+                self.environment.push((name.to_owned(), setting.to_owned()));
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -138,6 +231,53 @@ impl RuntimeFlags {
 
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
+    }
+
+    /// The route the runtime starts on: the second unless Live is named.
+    pub fn route(&self) -> VoiceRoute {
+        self.voice_route.unwrap_or_default()
+    }
+
+    /// The runtime's environment from these: its route, then the settings.
+    pub fn runtime_environment(&self) -> Vec<(String, String)> {
+        let mut environment = vec![(
+            ROUTE_ENVIRONMENT.to_owned(),
+            self.route().environment_value().to_owned(),
+        )];
+        environment.extend(self.environment.iter().cloned());
+        environment
+    }
+
+    /// These as `lamp-session`'s own options, for the runner to pass to the
+    /// relay: lamp-voice's flags, then the route and the settings.
+    pub fn relay_argv(&self) -> Vec<String> {
+        let mut argv = self.argv();
+        if let Some(route) = self.voice_route {
+            argv.extend([VoiceRoute::FLAG.to_owned(), route.as_str().to_owned()]);
+        }
+        for (name, value) in &self.environment {
+            argv.extend(["--runtime-env".to_owned(), format!("{name}={value}")]);
+        }
+        argv
+    }
+
+    /// The second route without its configuration: lamp-voice would refuse
+    /// to start (`LAMP_VOICE_ROUTE=second needs LAMP_VOICE_SECOND_CONFIG`),
+    /// so a run's config says so before anything starts on the lamp.
+    pub fn validate_route(&self) -> Result<()> {
+        let configured = self
+            .environment
+            .iter()
+            .any(|(name, value)| name == SECOND_CONFIG_ENVIRONMENT && !value.is_empty());
+        if self.route() == VoiceRoute::Second && !configured {
+            return Err(invalid(&format!(
+                "the voice runs on the second route unless a run names live, and the second \
+                 route needs its configuration: give runtime_env {SECOND_CONFIG_ENVIRONMENT} \
+                 (and the lamp voice unit's LAMP_SECOND_ settings), or voice_route \"live\" \
+                 for a comparison named on #1712"
+            )));
+        }
+        Ok(())
     }
 
     /// The set flags, in the installed pilot template's order.
@@ -383,6 +523,24 @@ impl SessionOptions {
         }
         argv
     }
+}
+
+/// The runtime's command: its argv, and for `directed` and `serve` its route
+/// and the run's `LAMP_*` settings in its environment, over the relay's own.
+/// A fixture has no provider, so no route.
+fn runtime_command(options: &SessionOptions, argv: &[String]) -> Command {
+    let mut command = Command::new(&argv[0]);
+    command
+        .args(&argv[1..])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        // Workers inherit this group, so one signal reaches all of them.
+        .process_group(0);
+    if !matches!(options.mode, SessionMode::Fixture { .. }) {
+        command.envs(options.runtime_flags.runtime_environment());
+    }
+    command
 }
 
 /// Encode one relay line, refusing anything the runner's framing would reject.
@@ -1095,16 +1253,9 @@ fn run_engine<R: Read + Send + 'static>(
             runtime_argv: argv.clone(),
         },
     )?;
-    let child = cleanup.child.insert(
-        Command::new(&argv[0])
-            .args(&argv[1..])
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            // Workers inherit this group, so one signal reaches all of them.
-            .process_group(0)
-            .spawn()?,
-    );
+    let child = cleanup
+        .child
+        .insert(runtime_command(options, &argv).spawn()?);
     let stdout = line_reader(
         child
             .stdout
@@ -1837,5 +1988,157 @@ mod runtime_flag_tests {
             let error = parse(&extra).unwrap_err().to_string();
             assert!(error.contains(expected), "{extra:?}: {error}");
         }
+    }
+
+    /// The runtime's environment as the relay starts it.
+    fn environment(extra: &[&str]) -> Vec<(String, String)> {
+        let options = parse(extra).unwrap();
+        let argv = options.argv();
+        runtime_command(&options, &argv)
+            .get_envs()
+            .map(|(name, value)| {
+                (
+                    name.to_string_lossy().into_owned(),
+                    value.unwrap_or_default().to_string_lossy().into_owned(),
+                )
+            })
+            .collect()
+    }
+
+    /// The owner, 19 Oct 19:3x: every voice test runs on the second route,
+    /// and Live only for a comparison named on #1712. So a `serve` or
+    /// `directed` runtime starts with `LAMP_VOICE_ROUTE=second` unless the
+    /// run names live, with the run's `LAMP_*` settings beside it; a fixture
+    /// has no provider and no route.
+    #[test]
+    fn the_runtime_starts_on_the_second_route_unless_live_is_named() {
+        let route = |pairs: &[(String, String)]| {
+            pairs
+                .iter()
+                .find(|(name, _)| name == ROUTE_ENVIRONMENT)
+                .map(|(_, value)| value.clone())
+        };
+        let serve = ["--serve-config", "/p.json"];
+        assert_eq!(route(&environment(&serve)).as_deref(), Some("second"));
+        let directed = ["--provider-config", "/p.json"];
+        assert_eq!(route(&environment(&directed)).as_deref(), Some("second"));
+        let live = ["--serve-config", "/p.json", "--voice-route", "live"];
+        assert_eq!(route(&environment(&live)).as_deref(), Some("gemini"));
+        let configured = [
+            "--serve-config",
+            "/p.json",
+            "--runtime-env",
+            "LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json",
+            "--runtime-env",
+            "LAMP_SECOND_CHAT=deepseek",
+        ];
+        // `Command` keeps its environment sorted by name.
+        assert_eq!(
+            environment(&configured),
+            [
+                ("LAMP_SECOND_CHAT".to_owned(), "deepseek".to_owned()),
+                (ROUTE_ENVIRONMENT.to_owned(), "second".to_owned()),
+                (
+                    SECOND_CONFIG_ENVIRONMENT.to_owned(),
+                    "/etc/lampOS/voice/second.json".to_owned()
+                ),
+            ]
+        );
+        // Not lamp-voice's options: its argv is the same either way.
+        assert_eq!(argv(&configured), argv(&serve));
+        let fixture = ["--fixture-reply", "/r.wav", "--fixture-sha256", "abc"];
+        assert!(environment(&fixture).is_empty());
+    }
+
+    #[test]
+    fn a_route_or_setting_lamp_voice_would_not_take_is_refused() {
+        for (extra, expected) in [
+            (&["--voice-route", "gemini"][..], "second or live"),
+            (&["--runtime-env", "PATH=/tmp"][..], "only LAMP_ settings"),
+            (
+                &["--runtime-env", "lamp_second_chat=deepseek"][..],
+                "only LAMP_ settings",
+            ),
+            (&["--runtime-env", "LAMP_="][..], "only LAMP_ settings"),
+            (&["--runtime-env", "LAMP_SECOND_CHAT"][..], "NAME=VALUE"),
+            (
+                &["--runtime-env", "LAMP_VOICE_ROUTE=second"][..],
+                "set by --voice-route",
+            ),
+            (
+                &[
+                    "--runtime-env",
+                    "LAMP_SECOND_CHAT=a",
+                    "--runtime-env",
+                    "LAMP_SECOND_CHAT=b",
+                ][..],
+                "more than once",
+            ),
+            (
+                &["--voice-route", "live", "--voice-route", "live"][..],
+                "more than once",
+            ),
+        ] {
+            let mut arguments = vec!["--serve-config", "/p.json"];
+            arguments.extend(extra);
+            let error = parse(&arguments).unwrap_err().to_string();
+            assert!(error.contains(expected), "{extra:?}: {error}");
+        }
+        // A fixture has no provider: a route or setting for it is refused.
+        let error = parse(&[
+            "--fixture-reply",
+            "/r.wav",
+            "--fixture-sha256",
+            "abc",
+            "--voice-route",
+            "live",
+        ])
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("need --provider-config"), "{error}");
+    }
+
+    /// What the runner passes to the relay is what the relay takes back:
+    /// the route and the settings survive the hop, and lamp-voice's own
+    /// argv carries neither.
+    #[test]
+    fn the_route_and_settings_cross_from_runner_to_relay_unchanged() {
+        let mut flags = RuntimeFlags::default();
+        for (flag, value) in [
+            ("--turn-taking", "duplex"),
+            (VoiceRoute::FLAG, "live"),
+            (
+                "--runtime-env",
+                "LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json",
+            ),
+            ("--runtime-env", "LAMP_SECOND_SPEECH=elevenlabs"),
+        ] {
+            assert!(flags.take(flag, value).unwrap());
+        }
+        let relay = flags.relay_argv();
+        let mut taken = RuntimeFlags::default();
+        for pair in relay.chunks(2) {
+            assert!(taken.take(&pair[0], &pair[1]).unwrap(), "{pair:?}");
+        }
+        assert_eq!(taken, flags);
+        assert_eq!(flags.argv(), ["--turn-taking", "duplex"]);
+        assert_eq!(flags.route(), VoiceRoute::Live);
+    }
+
+    #[test]
+    fn the_second_route_without_its_configuration_is_refused_before_a_run() {
+        let mut flags = RuntimeFlags::default();
+        let error = flags.validate_route().unwrap_err().to_string();
+        assert!(error.contains(SECOND_CONFIG_ENVIRONMENT), "{error}");
+        flags
+            .take(
+                "--runtime-env",
+                "LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json",
+            )
+            .unwrap();
+        flags.validate_route().unwrap();
+        let mut live = RuntimeFlags::default();
+        live.take(VoiceRoute::FLAG, "live").unwrap();
+        live.validate_route().unwrap();
     }
 }
