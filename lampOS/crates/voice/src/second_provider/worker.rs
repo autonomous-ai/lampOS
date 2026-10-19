@@ -1536,6 +1536,9 @@ pub fn serve(
             crate::sight::fresh_up_to(&path, SystemTime::now(), within, most).map(|(jpeg, _)| jpeg)
         }));
     }
+    // A holding-only answer is asked to go on, as on Live
+    // (`LAMP_HOLDING_ANSWER=on`; the first builder's 22:54 on #1722).
+    engine = engine.holding_answers(files.holding_answer);
     // As the lamp's only voice this route keeps the room itself (#1712).
     if route.only_voice {
         engine = engine.keeping_room(keeping_room(

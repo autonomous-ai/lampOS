@@ -339,6 +339,9 @@ struct Shared {
     /// first request asked within `misheard_hum::NOTE_WITHIN_US` of it is
     /// told so ([`crate::misheard_hum::NOTE`]), once.
     misheard_at_us: Mutex<Option<u64>>,
+    /// [`Engine::holding_answers`]: a spoken turn answered only with a
+    /// holding phrase sends `HoldingAnswer`.
+    holding_answer: bool,
     asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
@@ -746,6 +749,7 @@ impl Engine {
                 heed: None,
                 ask_again: None,
                 misheard_at_us: Mutex::new(None),
+                holding_answer: false,
                 asked: None,
                 cues: None,
                 down: None,
@@ -982,6 +986,19 @@ impl Engine {
 
     /// A spoken turn's words are judged with `heed` before they are answered.
     /// Before any turn only: the turns share it.
+    /// `LAMP_HOLDING_ANSWER=on` (`--holding-answer`), as on Live: a spoken
+    /// turn whose whole answer only asks the person to wait ("One moment.",
+    /// `holding_answer::holding_only`), with nothing called in any round,
+    /// sends `ProviderOutput::HoldingAnswer` before its idle `TurnComplete`,
+    /// and the coordinator asks the route once to go on
+    /// (`holding_answer::NOTE`). Before any turn only.
+    pub fn holding_answers(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.holding_answer = on;
+        }
+        self
+    }
+
     pub fn heeding(mut self, heed: Heed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.heed = Some(heed);
@@ -2725,6 +2742,9 @@ async fn answer(
         None => Message::user(said),
     };
     let writing_times = times.clone();
+    // Whether the model called anything in the turn, any round.
+    let called_any = AtomicBool::new(false);
+    let called = &called_any;
     let writing = async move {
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
@@ -2914,6 +2934,11 @@ async fn answer(
                     names.join(", ")
                 );
             }
+            // A turn that called anything, a look by its call included, is no
+            // holding answer (#1712; the peer read on #1986).
+            if !calls.is_empty() {
+                called.store(true, Ordering::Relaxed);
+            }
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                 return Err(Stop::Silent);
             }
@@ -3031,6 +3056,8 @@ async fn answer(
     };
     let saying = async {
         let mut after = false;
+        // The answer's words, for a holding answer's check.
+        let mut whole = String::new();
         while let Some((text, mut packets)) = queued.recv().await {
             // The announcement is heard, not written: the coordinator reads
             // an answer's opening words for its look ("Let me look.") and
@@ -3040,6 +3067,8 @@ async fn answer(
             // space, so the lamp's words read "just now. Hmm," (#1014).
             let answering = text != ANNOUNCEMENT;
             if answering {
+                whole.push(' ');
+                whole.push_str(&text);
                 let words = ProviderOutput::Transcript {
                     request: Some(request),
                     text: if std::mem::replace(&mut after, true) {
@@ -3126,9 +3155,17 @@ async fn answer(
                 return Err(Stop::Gone);
             }
         }
-        Ok(())
+        Ok(whole)
     };
     let ended = tokio::try_join!(writing, saying);
+    // Only asking the person to wait ("One moment."), with nothing called:
+    // the coordinator asks this route to go on, as it asks Gemini
+    // (`LAMP_HOLDING_ANSWER`, `crate::holding_answer`; the first builder's
+    // 22:54 on #1722). Only for someone who spoke.
+    let holding = shared.holding_answer
+        && asked == Asker::Spoken
+        && !called.load(Ordering::Relaxed)
+        && matches!(&ended, Ok((_, whole)) if crate::holding_answer::holding_only(whole));
     // The voice's line on the turn's pieces (#1712).
     shared.services.spoken(request);
     let gave_up = matches!(ended, Err(Stop::GaveUp));
@@ -3183,6 +3220,28 @@ async fn answer(
     }
     if !shared.stages(request, &times).await {
         return;
+    }
+    // Before its idle `TurnComplete`, as the Live worker sends it, for the
+    // session the turn was begun in.
+    if holding
+        && matches!(last, ProviderOutput::TurnComplete { idle: true, .. })
+        && let Some(session) = shared
+            .begun
+            .lock()
+            .ok()
+            .and_then(|begun| *begun)
+            .filter(|(of, _)| *of == request)
+            .map(|(_, session)| session)
+    {
+        eprintln!(
+            "lamp-voice second: request {request} was answered only with a holding phrase: the coordinator may ask it to go on"
+        );
+        if !shared
+            .emit(ProviderOutput::HoldingAnswer { request, session })
+            .await
+        {
+            return;
+        }
     }
     shared.emit(last).await;
     // Rendered after a turn is out, never beside its chat and speech on a

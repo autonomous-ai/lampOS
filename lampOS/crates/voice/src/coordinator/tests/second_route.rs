@@ -68,6 +68,9 @@ enum Live {
     /// A skill's tool answered with a look, then as `FailThenLate`: the
     /// second route takes the turn.
     LookFail(Fault, usize),
+    /// `packets` of a holding phrase ("One moment."), then `HoldingAnswer`
+    /// for session 1 before completion (`LAMP_HOLDING_ANSWER`).
+    Holding(usize),
 }
 
 /// How the Live route answers a turn the lamp wrote itself (a "Sorry?").
@@ -743,6 +746,26 @@ impl Peers {
                             });
                         continue;
                     }
+                    // Alone, a holding phrase is answered as the second worker
+                    // answers one (the holding answers, #1722).
+                    if !live
+                        && self.script.only
+                        && let Some(Live::Holding(packets)) = self
+                            .live_requests
+                            .iter()
+                            .position(|&r| r == request)
+                            .and_then(|p| self.script.live.get(p).copied())
+                    {
+                        self.audio(index, request, packets, SECOND);
+                        self.peers[index]
+                            .queued
+                            .push_back(ProviderOutput::HoldingAnswer {
+                                request,
+                                session: 1,
+                            });
+                        self.finish(index, request);
+                        continue;
+                    }
                     if !live {
                         // Alone, a line the script makes unclear is held
                         // as the second worker holds one (the hums, #828).
@@ -823,6 +846,16 @@ impl Peers {
                                     dropped: None,
                                 });
                             self.audio(index, request, packets, LIVE);
+                            self.finish(index, request);
+                        }
+                        Live::Holding(packets) => {
+                            self.audio(index, request, packets, LIVE);
+                            self.peers[index]
+                                .queued
+                                .push_back(ProviderOutput::HoldingAnswer {
+                                    request,
+                                    session: 1,
+                                });
                             self.finish(index, request);
                         }
                         Live::Unclear | Live::UnclearCutIn => {
@@ -2046,6 +2079,68 @@ fn a_skills_say_is_said_and_answered_spoken_on_the_second_route_as_on_live() {
         if only {
             assert!(run.seen.live.is_empty(), "{:?}", run.seen.live);
         }
+    }
+}
+
+/// The holding answers on the second route (the first builder's 22:54 on
+/// #1722), as on Live: with `LAMP_HOLDING_ANSWER=on`, an answer that only
+/// asked the person to wait is followed, once the room is quiet, by one
+/// written turn of `holding_answer::NOTE` to the same voice, which says it.
+/// Without the switch, nothing follows.
+#[test]
+fn a_holding_answer_is_asked_to_go_on_once_on_the_second_route_as_on_live() {
+    let _one = super::pilot_faults::one_session();
+    let with = |on: bool, only: bool| {
+        TEST_HOLDING_ANSWER.with(|holding| holding.set(on));
+        let run = run(Script {
+            second: false,
+            only,
+            written: Written::Said(12),
+            mute_at_frame: Some(900),
+            ..Script::question(Live::Holding(12))
+        });
+        TEST_HOLDING_ANSWER.with(|holding| holding.set(false));
+        run
+    };
+    for (only, voice) in [(false, LIVE), (true, SECOND)] {
+        let run = with(true, only);
+        run.assert_clean();
+        let sent = if only {
+            &run.seen.second
+        } else {
+            &run.seen.live
+        };
+        let notes: Vec<u64> = sent
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Written { request, text, .. }
+                    if text == crate::holding_answer::NOTE =>
+                {
+                    Some(*request)
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(notes.len(), 1, "only {only}: {}", run.summary());
+        assert_eq!(run.events("holding_answer_nudged").len(), 1, "only {only}");
+        assert_eq!(run.played(1), vec![voice; 48], "only {only}");
+        assert_eq!(run.played(notes[0]), vec![voice; 48], "only {only}");
+        assert_eq!(run.seen.live.is_empty(), only, "only {only}");
+
+        let off = with(false, only);
+        off.assert_clean();
+        let sent = if only {
+            &off.seen.second
+        } else {
+            &off.seen.live
+        };
+        assert!(
+            !sent
+                .iter()
+                .any(|input| matches!(input, ProviderInput::Written { .. })),
+            "only {only}: nothing follows without the switch"
+        );
+        assert!(off.events("holding_answer_nudged").is_empty());
     }
 }
 
