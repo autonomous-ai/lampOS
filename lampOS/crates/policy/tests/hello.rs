@@ -4,8 +4,8 @@
 //! real model is asked.
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_msgs::{
-    Decision, Diagnostic, Face, Faces, Room, RoomState, Rules, SkillAsk, Unprompted, Voice,
-    VoiceArrival, VoiceState,
+    Decision, Diagnostic, Face, Faces, Room, RoomState, Rules, SkillAsk, Speech, TurnVerdict,
+    Unprompted, Voice, VoiceArrival, VoiceState, VoiceTurn,
 };
 use lamp_policy::{
     attention,
@@ -103,6 +103,10 @@ struct Rig {
     skills: Publisher,
     rules: Publisher,
     voice: Publisher,
+    /// Each turn's verdict, as the voice says it (#1155).
+    turns: Publisher,
+    /// What the voice heard, numbered by its request.
+    heard: Publisher,
     decisions: Subscriber,
     shown: mpsc::Receiver<Value>,
     replies: mpsc::Sender<Result<Asked, Failed>>,
@@ -124,6 +128,30 @@ impl Rig {
     /// With `rules` too, as `lamp-policy --rules`: the people's rules about
     /// speaking first are obeyed.
     fn all(name: &str, act: bool, gate: bool, rules: bool) -> Self {
+        Self::every(name, act, gate, rules, false)
+    }
+
+    /// Acting, with `to_the_lamp` as `lamp-policy --hello-quiet
+    /// to-the-lamp`: the quiet counts only talk to the lamp (#1155).
+    fn to_the_lamp(name: &str, to_the_lamp: bool) -> Self {
+        Self::every(name, true, false, false, to_the_lamp)
+    }
+
+    fn every(name: &str, act: bool, gate: bool, rules: bool, to_the_lamp: bool) -> Self {
+        Self::leased(name, act, gate, rules, to_the_lamp, None)
+    }
+
+    /// With `lease`, the policy's own bus says a topic's source gone after
+    /// that long without a word from it, not 3 s. The test's publishers
+    /// keep the bus's lease, all but the verdicts'.
+    fn leased(
+        name: &str,
+        act: bool,
+        gate: bool,
+        rules: bool,
+        to_the_lamp: bool,
+        lease: Option<Duration>,
+    ) -> Self {
         let root = PathBuf::from(format!("/tmp/lph-{name}-{}", std::process::id()));
         let log_dir =
             std::env::temp_dir().join(format!("lamp-policy-hello-{name}-{}", std::process::id()));
@@ -149,6 +177,14 @@ impl Rig {
             skills: declared(SkillAsk::TOPIC, SkillAsk::declaration(), "skills"),
             rules: declared(Rules::TOPIC, Rules::declaration(), "voice"),
             voice: declared(VoiceState::TOPIC, VoiceState::declaration(), "voice"),
+            // A lease of 150 ms, not 3 s, so that a source said gone and
+            // back between turns would show within a test.
+            turns: Bus::new(&root)
+                .unwrap()
+                .lease(ms(150))
+                .publisher_declared(VoiceTurn::TOPIC, &VoiceTurn::declaration(), "voice")
+                .unwrap(),
+            heard: declared(Speech::TOPICS[0], Speech::declaration(), "voice"),
             stop: Arc::new(AtomicBool::new(false)),
             running: None,
             saying,
@@ -175,6 +211,7 @@ impl Rig {
             act,
             gate,
             rules,
+            quiet_to_the_lamp: to_the_lamp,
             // No hour: the rule's answer must not hang on the time of day
             // the test is run at.
             ..hello::Options::new(Duration::from_secs(3), None)
@@ -184,7 +221,14 @@ impl Rig {
             replies: replied,
             moment: false,
         };
-        let (bus, stop) = (rig.bus.clone(), Arc::clone(&rig.stop));
+        let bus = match lease {
+            Some(lease) => Bus::new(&rig.root)
+                .unwrap()
+                .rescan_every(ms(20))
+                .lease(lease),
+            None => rig.bus.clone(),
+        };
+        let stop = Arc::clone(&rig.stop);
         rig.running = Some(thread::spawn(move || {
             let hello = Hello::start(judge, hello)?;
             let hello = if gate {
@@ -251,6 +295,36 @@ impl Rig {
 
     fn state(&mut self, state: Voice) {
         self.voice.publish_json(0, &VoiceState { state }).unwrap();
+    }
+
+    /// The voice's verdict on turn `request` (#1155).
+    fn turn(&mut self, request: u64, verdict: TurnVerdict) {
+        self.turns
+            .publish_json(0, &VoiceTurn { request, verdict })
+            .unwrap();
+    }
+
+    /// Someone's words, heard in `request`.
+    fn hears(&mut self, request: u64) {
+        let words = Speech {
+            text: "Did you see the build?".into(),
+            finished: true,
+            locale: None,
+            request: Some(request),
+        };
+        self.heard.publish_json(0, &words).unwrap();
+    }
+
+    /// A turn of the room's talk, its answer held back as not said to the
+    /// lamp: listened to, heard, thought about, resting again.
+    fn room_talks(&mut self, request: u64) {
+        self.state(Voice::Listening);
+        self.hears(request);
+        thread::sleep(ms(100));
+        self.state(Voice::Thinking);
+        self.turn(request, TurnVerdict::HeldBack);
+        thread::sleep(ms(100));
+        self.state(Voice::Resting);
     }
 
     /// A skill asks whether the lamp may do `act`, as ask `number`.
@@ -502,6 +576,102 @@ fn never_while_anyone_is_talking_to_the_lamp() {
             ..
         }
     )));
+}
+
+/// #1155: an office keeps the voice busy every few seconds with talk not
+/// for the lamp; here at the rig's scale, a quiet of 400 ms and a turn held
+/// back about every 350 ms. Someone comes back while the room talks, then
+/// again at a lull 100 ms after its last turn, 300 ms after that turn's
+/// first word: well inside the quiet, unless the turn is taken back.
+fn office(name: &str, to_the_lamp: bool) -> (Rig, Decision) {
+    let mut rig = Rig::to_the_lamp(name, to_the_lamp);
+    for request in 1..=2 {
+        rig.room_talks(request);
+        thread::sleep(ms(150));
+    }
+    // Someone comes back while the room talks: never over it.
+    rig.state(Voice::Listening);
+    rig.hears(3);
+    thread::sleep(ms(100));
+    rig.arrive(9_000_001, None);
+    let over = rig.decision();
+    assert_eq!((over.choice.as_str(), over.by.as_str()), ("wait", "rule"));
+    rig.not_asked();
+    rig.state(Voice::Thinking);
+    rig.turn(3, TurnVerdict::HeldBack);
+    thread::sleep(ms(100));
+    rig.state(Voice::Resting);
+    thread::sleep(ms(150));
+    // The last turn as the second route says it: its verdict before its
+    // words (Second on #1782), 50 ms apart, so that the policy, which looks
+    // every 20 ms, takes them in that order.
+    rig.state(Voice::Listening);
+    thread::sleep(ms(50));
+    rig.state(Voice::Thinking);
+    rig.turn(4, TurnVerdict::HeldBack);
+    thread::sleep(ms(50));
+    rig.hears(4);
+    thread::sleep(ms(100));
+    rig.state(Voice::Resting);
+    // The lull, 100 ms on.
+    thread::sleep(ms(100));
+    rig.arrive(9_000_002, None);
+    (rig, over)
+}
+
+/// With `--hello-quiet to-the-lamp`, the hello held at the lull is asked of
+/// the model and said; the one held while someone talked was waited by the
+/// rule, never said over them.
+#[test]
+fn in_a_busy_office_a_hello_comes_at_a_lull_and_never_over_talk() {
+    let (mut rig, _) = office("office", true);
+    let state = rig.shown();
+    assert_eq!(state["arrival"]["minutes_away"], 42, "{state}");
+    rig.answer([0.9, 0.1]);
+    let lull = rig.decision();
+    assert_eq!(
+        (lull.choice.as_str(), lull.arrival),
+        ("say_now", Some(9_000_002))
+    );
+    let log = rig.log(2);
+    assert_eq!(log[0]["guard"], "talking", "{log:?}");
+    assert_eq!(log[1]["guard"], Value::Null, "{log:?}");
+    rig.stop();
+}
+
+/// #1155: `voice/turn` is said once a turn and is silent between, for
+/// longer than the bus's lease. The policy does not say its source gone and
+/// back around each turn, as it said the voice's words' on 14 October.
+#[test]
+fn the_verdicts_silence_between_turns_is_not_said() {
+    let mut rig = Rig::leased("silent", true, false, false, true, Some(ms(150)));
+    for request in 1..=2 {
+        rig.room_talks(request);
+        thread::sleep(ms(300));
+    }
+    let about_turns: Vec<Note> = rig
+        .stop()
+        .into_iter()
+        .filter(|note| {
+            matches!(note, Note::SourceGone { topic, .. } | Note::SourceBack { topic } if *topic == VoiceTurn::TOPIC)
+        })
+        .collect();
+    assert!(about_turns.is_empty(), "{about_turns:?}");
+}
+
+/// Without the switch all talk counts, as before: the lull is inside the
+/// quiet, and the rule waits.
+#[test]
+fn without_the_quiet_to_the_lamp_a_busy_offices_lull_is_still_inside_the_quiet() {
+    let (mut rig, _) = office("office-all", false);
+    let lull = rig.decision();
+    assert_eq!(
+        (lull.choice.as_str(), lull.by.as_str(), lull.arrival),
+        ("wait", "rule", Some(9_000_002))
+    );
+    rig.not_asked();
+    assert_eq!(rig.log(2)[1]["guard"], "talking");
+    rig.stop();
 }
 
 #[test]

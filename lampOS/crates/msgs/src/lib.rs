@@ -543,6 +543,44 @@ impl RoomState {
     }
 }
 
+/// What the voice made of a turn: answered, or its answer held back as not
+/// said to the lamp.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TurnVerdict {
+    /// Judged said to the lamp: its answer is let out.
+    Answered,
+    /// Judged not said to the lamp (the journal's "its answer is held
+    /// back"): someone in the room talking, not to it.
+    HeldBack,
+}
+
+/// The voice's verdict on a turn (`voice/turn`, #1155), once a turn, as it
+/// is reached: whether the lamp answers it or holds its answer back. The
+/// Policy's hello counts only turns to the lamp toward its quiet.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VoiceTurn {
+    /// The turn's request, as `voice/heard` and `voice/said` number it.
+    pub request: u64,
+    pub verdict: TurnVerdict,
+}
+
+impl VoiceTurn {
+    pub const TYPE: &str = "lamp_msgs/VoiceTurn";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "voice/turn";
+
+    /// One a turn, as its verdict is reached: no period is promised.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
+/// The voice's turns' verdicts (#1155), apart from the first topics.
+pub fn turn_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(VoiceTurn::TOPIC, VoiceTurn::declaration())]
+}
+
 /// The lamp's own light: what is asked for (`light/command`) and what is
 /// shown (`light/state`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1312,6 +1350,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(skills_topics())
         .chain(online_topics())
         .chain(arrival_topics())
+        .chain(turn_topics())
         .chain(skill_ask_topics())
         .chain(privacy_topics())
         .chain(chat_topics())
@@ -1618,6 +1657,41 @@ mod tests {
             round_trip(&RoomState { state }, &format!("{{\"state\":\"{word}\"}}"));
         }
         assert!(serde_json::from_str::<RoomState>("{\"state\":\"loud\"}").is_err());
+    }
+
+    /// #1155: a turn's verdict, as the Policy's hello reads it.
+    #[test]
+    fn a_turn_is_answered_or_held_back() {
+        for (verdict, word) in [
+            (TurnVerdict::Answered, "answered"),
+            (TurnVerdict::HeldBack, "held_back"),
+        ] {
+            round_trip(
+                &VoiceTurn {
+                    request: 7,
+                    verdict,
+                },
+                &format!("{{\"request\":7,\"verdict\":\"{word}\"}}"),
+            );
+        }
+        assert!(
+            serde_json::from_str::<VoiceTurn>("{\"request\":7,\"verdict\":\"ignored\"}").is_err()
+        );
+        assert_eq!(VoiceTurn::declaration().kind, Kind::Event);
+        // Its own topic, apart from the first, and known by name.
+        assert_eq!(
+            turn_topics(),
+            [(VoiceTurn::TOPIC, VoiceTurn::declaration())]
+        );
+        assert!(
+            first_topics()
+                .iter()
+                .all(|(topic, _)| *topic != VoiceTurn::TOPIC)
+        );
+        assert_eq!(
+            declaration_of(VoiceTurn::TOPIC),
+            Some(VoiceTurn::declaration())
+        );
     }
 
     #[test]

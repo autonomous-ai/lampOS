@@ -162,6 +162,9 @@ impl From<String> for Told {
 /// begun just before it, in the same session.
 pub type Heed =
     Arc<dyn Fn(u64, (u64, u64), &str, Option<u64>) -> Option<&'static str> + Send + Sync>;
+/// Where a spoken turn's verdict is said (`voice/turn`, #1155): its
+/// request, and whether it is answered or its answer held back.
+pub type Verdicts = Arc<dyn Fn(u64, lamp_msgs::TurnVerdict) + Send + Sync>;
 /// Whether the lamp's own last line before `request` was a question, in a
 /// conversation going on (`worker::lamp_just_asked`): then a checked sound
 /// with a word in it is the person's answer, as on the Live route.
@@ -185,6 +188,8 @@ struct Shared {
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
     heed: Option<Heed>,
+    /// Where each judged turn's verdict is said, when it is.
+    verdicts: Option<Verdicts>,
     asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
@@ -417,6 +422,7 @@ impl Engine {
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
+                verdicts: None,
                 asked: None,
                 cues: None,
                 down: None,
@@ -454,6 +460,15 @@ impl Engine {
     pub fn heeding(mut self, heed: Heed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.heed = Some(heed);
+        }
+        self
+    }
+
+    /// Each judged turn's verdict is said with `told` (#1155): held back,
+    /// or answered when it was judged and let out. Before any turn only.
+    pub fn telling_verdicts(mut self, told: Verdicts) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.verdicts = Some(told);
         }
         self
     }
@@ -917,6 +932,15 @@ async fn spoken(
     };
     if let Some(why) = heeded {
         eprintln!("lamp-voice second: request {request}: its answer is held back: {why}");
+    }
+    // The turn's verdict, as the journal says it above (#1155): only for a
+    // turn something judged, and never for one with nothing heard.
+    if let Some(told) = shared.verdicts.as_ref().filter(|_| !empty) {
+        if held || heeded.is_some() {
+            told(request, lamp_msgs::TurnVerdict::HeldBack);
+        } else if shared.heed.is_some() || marked {
+            told(request, lamp_msgs::TurnVerdict::Answered);
+        }
     }
     if empty || held || heeded.is_some() {
         shared
