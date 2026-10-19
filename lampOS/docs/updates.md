@@ -1197,7 +1197,7 @@ test does (#1512):
    aside, not deleted.
 6. **update**: `self.json` it can't read is set aside and the rounds go
    on; so is `journal.json`, with a line.
-7. **controls**, **expression** (done: #1680, Thirteen), **records**, **body**: read their files
+7. **controls**, **expression** (#2065), **records**, **body**: read their files
    one release forward (one PR each).
 8. The medium rows after: **cloud** (reports deleted and `state.json`
    reset silently), **eyes** (`forgets-pending`), **skills** (`off`).
