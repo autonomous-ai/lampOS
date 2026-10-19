@@ -919,6 +919,23 @@ fn air_is_a_finite_optional_reading_with_a_fifteen_second_lease() {
     );
 }
 
+/// #1670: the eyes' familiar level becomes one event, good for five
+/// seconds, from the eyes only; nobody remembered is an event too.
+#[test]
+fn the_familiar_level_comes_from_the_eyes_with_a_five_second_lease() {
+    use lamp_msgs::{FamiliarLevel, HumanFamiliar};
+    for level in [None, Some(FamiliarLevel::New), Some(FamiliarLevel::Close)] {
+        let events = adapter()
+            .ingest(&message(9, &HumanFamiliar { level }), NOW, WALL)
+            .unwrap();
+        assert_eq!(events[0].kind, EventKind::Familiar(level));
+        assert_eq!(events[0].valid_until_us, NOW + 5_000_000);
+    }
+    let mut other = message(9, &HumanFamiliar { level: None });
+    other.header.source = "replay".into();
+    assert!(adapter().ingest(&other, NOW, WALL).is_err());
+}
+
 #[test]
 fn reminder_identity_survives_heartbeat_and_publisher_restart() {
     let mut input = adapter();
