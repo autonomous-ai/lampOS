@@ -73,6 +73,15 @@ at most 24 behaviors and 64 keyframes per behavior; catalogues are at most
 128 KiB. A repeating clip is allowed only on playout evidence: a committed
 interval, or the explicitly enabled bounded recent level described below.
 
+A catalogue reads one release forward (#1680): a field this build does not
+know, at any depth, is read past, and `lamp-expression` names it once at
+start ("fields this build does not read, ignored: speaking.sway_yaw"), so a
+roll back after a newer build wrote the catalogue never stops it. A known
+field with a bad value, an unknown value of a known field (a new trigger)
+or a `version` other than 1 is still refused. A missing field the build
+writes only when set (an empty list, `false`, none) is not named. Tests:
+`crates/expression/tests/forward.rs`.
+
 | Initial behavior | Built-in plan |
 |---|---|
 | Look away and back | A small thinking glance develops over 250 ms. A committed first-audio schedule causes return over up to 250 ms, reaching the planned speaking posture 40 ms before that schedule. A measured body lag can be supplied; the default is unknown |

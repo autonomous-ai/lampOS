@@ -1114,7 +1114,6 @@ the file is never read back.
 | memory | memory across days, `/var/lib/lampos-memory/memory-days.sqlite3` | SQLite | `user_version` ≤ 1 | columns read by name; `CREATE … IF NOT EXISTS` | n/a | **refuses to start** on a higher `user_version`: "written by a newer version" (`memory/src/days.rs:178-184`, through `application.rs:189-197`). No set-aside at all |
 | update | lamp-update's own switch, `/var/lib/lampos-update/self.json` | JSON | `version` 1, never checked | read, dropped | n/a | `serve` confirms it before any round (`update/src/main.rs:668-705`). One it can't parse (`own.rs:71`) is "not confirmed" every 30 s for ever (`main.rs:698`): **no round ever runs**, the service stays active, `OnFailure=` never fires. `lamp-update-back back` exits 1 on the same file every timer run. Only with `LAMP_UPDATE_SELF=on` |
 | controls | `/etc/lampOS/controls/controls.json`, `controls-pins.json` (update's settings write them, `install.rs:339`) | JSON | none | refused (`controls/src/engine.rs:24`, `touch_pins.rs:74`, `pins.rs:45`) | refused | **refuses to start** (`main.rs:269-276`, `597`, `822-826`). Softened: apply restores the files with the build on going back (`update/src/apply.rs:14-20`); a person's own edit is kept and not restored |
-| expression | `/etc/lampOS/expression/expression.json` (update's settings, `install.rs:335`) | JSON | `version` must be 1 (`catalogue.rs:199-206`) | refused (`expression/src/catalogue.rs:27-158`) | refused (`Trigger`, `catalogue.rs:13`) | **refuses to start** (`main.rs:281`, `401-403`). Softened as controls |
 | records | retention config (install writes it), `/etc/lampOS/records.json` | JSON | `schema_version` must be 1 (`records/src/config.rs:98`) | refused (`config.rs:11,22`) | refused (`Kind`, `config.rs:33`) | **every run fails** (`application.rs:277`): the timer's one-shot fails and no session is ever pruned |
 | records | last cleanup report, `/run/lamp-records/last.json` | JSON | `schema_version`; higher is **set aside** as `.newer-N-T` (`json_file.rs:186-241`) | read (`lib.rs:301`) | `mode` must be `apply` or `dry_run` (`lib.rs:241`) | a new `mode` at the same schema: "not a recognized cleanup result" (`application.rs:305`), every run refused until someone removes it. tmpfs, so a boot clears it |
 | body | poses `lamp-body-measure` writes once, `/etc/lampOS/body/lamp.env` (`BODY_POSES`, passed as arguments) | env | none | a flag it doesn't know is refused (`body/src/bin/lamp-body.rs:391`) | an unknown on/off value refused (`lamp-body.rs:270-359`) | **refuses to start** (`lamp-body.rs:781-795`, `StartLimitBurst=3`), if a newer measure's flag meets an older body |
@@ -1166,6 +1165,7 @@ the file is never read back.
 | keeper, bus | `keeper.json`; kept logs `logs.*.jsonl` | JSON / JSONL | none | read | n/a | not ready by default (`keeper/src/package.rs:259`); logs only listed by name |
 | settings | snapshot, `--dir/settings.json` | JSON | `version` must be 1 | refused (`settings/src/engine.rs:47,57`) | refused | refuses to start (`main.rs:156`; `#[should_panic]` test `engine.rs:331`). No unit runs lamp-settings |
 | station | a run's record, `--out/<run>.json` | JSON | `format` 1 | refused | refused | only as `--retest-of`, which refuses that run (`station/src/main.rs:117`). A bench tool, not on the lamp |
+| expression | `/etc/lampOS/expression/expression.json` (update's settings, `install.rs:335`) | JSON | `version` must be 1; another is refused | **read**, named once in the journal by path (`catalogue.rs`, `Catalogue::from_json_naming`; `main.rs`, #1680) | refused (`Trigger`, `catalogue.rs:13`) | a newer catalogue's unknown fields, at any depth, are read past and named ("fields this build does not read, ignored: …"); a bad known value, a new trigger or another `version` still refuses to start. Tests: `crates/expression/tests/forward.rs` |
 
 No store: health, mood, air, name (it reads only its models), actions,
 turn-end, observer, ears, camera, audio, ring, environment, lean,
@@ -1197,7 +1197,7 @@ test does (#1512):
    aside, not deleted.
 6. **update**: `self.json` it can't read is set aside and the rounds go
    on; so is `journal.json`, with a line.
-7. **controls**, **expression**, **records**, **body**: read their files
+7. **controls**, **expression** (done: #1680, Thirteen), **records**, **body**: read their files
    one release forward (one PR each).
 8. The medium rows after: **cloud** (reports deleted and `state.json`
    reset silently), **eyes** (`forgets-pending`), **skills** (`off`).
