@@ -22,6 +22,8 @@ use lamp_voice_eval::{
     stimulus::{AssetIndex, StimulusCatalog},
 };
 use serde::Deserialize;
+
+mod observe_dry;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
@@ -31,6 +33,8 @@ use std::{
 };
 
 const USAGE: &str = "usage:
+  lamp-voice-eval observe-dry --store FILE --out NEW_DIR --key-file FILE [--base URL] [--model NAME]
+      [--gap-seconds N] [--limit N]
   lamp-voice-eval list | validate | self-test [--plan FILE]
   lamp-voice-eval fake-run --out NEW_DIR [--profile ID] [--scenario ID]... [--repetitions N]
       [--seed N] [--no-shuffle] [--attempt-seed N] [--cache DIR --manifest FILE...] [--plan FILE]
@@ -190,6 +194,7 @@ fn run() -> Result<i32> {
             let stdout = std::io::stdout();
             return session::run(&options, std::io::stdin(), &mut stdout.lock());
         }
+        "observe-dry" => return observe_dry::run(&all),
         "fake-lamp-voice" => return fake_lamp::run(&all),
         "fake-clock-lamp-voice" => return fixture_commands::runtime(all),
         "fake-clock-session" => return fixture_commands::relay(all),

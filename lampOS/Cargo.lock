@@ -2290,6 +2290,7 @@ dependencies = [
  "lamp-audio",
  "lamp-ipc",
  "lamp-local-time",
+ "lamp-memory",
  "lamp-observer",
  "lamp-policy",
  "lamp-skills",

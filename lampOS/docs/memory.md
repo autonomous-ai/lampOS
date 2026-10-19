@@ -391,8 +391,29 @@ the unchanged legacy client, used unless the new Days client is selected.
     `remember::tests::the_observation_pass_reads_only_the_models_one_json_object`;
     `second_provider::worker::memory_observer` (DeepSeek asked without
     thinking, a streamed answer read).
-  - **Before it's on:** the dry run on recorded conversations, against the
-    first builder's bar (under 1 in 10 kept wrongly, none intrusive).
+  - **Before it's on: the dry run** (#1693 (4)), against the first builder's
+    bar (under 1 in 10 kept wrongly, none intrusive). It's run on the Mac
+    doing the labelling, on a copy of a lamp's store, with the person's yes:
+    ```sh
+    lamp-voice-eval observe-dry --store memory-days.sqlite3 --out NEW_DIR --key-file deepseek.key
+    ```
+    - **The copy:** it copies the store (with its `-wal` and `-shm`) into
+      `NEW_DIR/store`, never opening the given one for writing.
+    - **The conversations:** it cuts the journal as the voice does (45 s
+      apart, another person, or 64 sources). Each goes through the lamp's own
+      path: the store's `conversation_end`, the pass's prompt and DeepSeek
+      client (`second_provider::worker::observer_at`), and the store's
+      `tidy_apply`, which keeps or refuses as on the lamp.
+    - **What it prints:** counts (conversations, proposed, kept by category,
+      refused by code, the model giving nothing) and the model's median and
+      p90 ms. It prints no words.
+    - **The labels:** what was said and proposed goes only to
+      `NEW_DIR/labels.jsonl` (0600), one line per conversation, each proposal
+      with `"mark": "right | wrong | intrusive"` for a person to fill in.
+    - **Afterwards:** the copy is removed at the end.
+    - **Tests:** `observe_dry::tests`: the cut, a whole run on a seeded copy
+      with a scripted model, kept and nothing, and the given store byte for
+      byte unchanged.
 
 - **Once, at a natural moment** (#1693 (3), `LAMP_MEMORY_THREADS=on`,
   with the Days client only; off unless set; both voice routes since

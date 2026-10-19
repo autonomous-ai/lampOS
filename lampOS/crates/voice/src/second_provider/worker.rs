@@ -554,14 +554,16 @@ fn memory_observer(
         .deepseek_base_url
         .clone()
         .unwrap_or_else(|| crate::second_config::DEEPSEEK_BASE_URL.to_owned());
-    let chat = crate::second_provider::net::Chat::deepseek_at(
-        &base,
-        &config.hosted.deepseek_model,
-        key.expose(),
-        Arc::new(Vec::new),
-        false,
-    )
-    .map_err(|error| io::Error::other(error.to_string()))?;
+    observer_at(&base, &config.hosted.deepseek_model, key.expose())
+}
+
+/// [`memory_observer`]'s model at `base` (DeepSeek's API, or the relay's),
+/// for the pass and for its dry run (`lamp-voice-eval observe-dry`, #1693
+/// (4)), so the dry run asks exactly as the lamp will.
+pub fn observer_at(base: &str, model: &str, key: &str) -> io::Result<crate::remember::Observer> {
+    let chat =
+        crate::second_provider::net::Chat::deepseek_at(base, model, key, Arc::new(Vec::new), false)
+            .map_err(|error| io::Error::other(error.to_string()))?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
