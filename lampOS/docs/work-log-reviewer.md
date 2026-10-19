@@ -4,6 +4,26 @@
 
 Newest first. Times from `date` (+07).
 
+- 03:38 #2029 merged as 90bc03ee7 (trials thread row); no issue
+- 03:38 #2024 6bb608669: P2 and P3s fixed; two commits to fold; first builder's
+- 03:37 #2038 read (Nine: trials settings row): P2 put-back prints the person's real name (sent line and reply); P2 python3 on the lamp
+- 03:28 #2036 read (Third: #2032's busy-room fix): P2 fixed, busy room as before #2032 (whole path traced); P3 test injects thread_or_call; first builder's
+- 03:25 #1973 read since cae37bca6: merges keep both sides (remerge-diff, fn sets), two fixes right; #2032 rightly out; first builder's
+- 03:21 #2022 merged as 77fd75cc6 (watch you leave P3s); noted on #1669
+- 03:21 #2021 9b4ff73ff: P3 fixed (passes renamed, missed_of_worth); three commits to fold; first builder's
+- 03:16 #2029 folded 683d9aa2a but conflicts with #2028's trials.sh row; asked Twelve to rebase
+- 03:11 #2032 correction: first builder's agent right, busy room changed after long answers; my 02:51 read missed it (test injects going_on); Third's fix needed
+- 03:08 #2021 read (Twelve: observe-dry over 20 made-up conversations): no P1/P2; P3 passes ignores missed; two commits to fold; first builder's
+- 03:05 #2029 d8dde7795: P2 fixed (283/283 twice); asked Twelve to fold two commits
+- 03:05 #2033 read (El: wifi_lost recording): P2 the render tool runs Python (only lampOS/training/ may); P3s; with #1995
+- 02:57 first look #2033 (El: no-Wi-Fi line as a recording, stacked on #1995): reading its own commit
+- 02:55 #2028 merged as 228e4d7d9 (trials light-show row); no issue of its own
+- 02:54 #2030 read (Thirteen: speaking motion takes the farthest piece said): no finding; first builder's after speaking-ab
+- 02:54 #2024 read (Fourth: probe-cascade --wire): P2 the doc command leaves out the relay base (systemd-run drops the unit's env), P3s; first builder's
+- 02:53 #2026 re-read (Ten: #2008's P3s): all three fixed; first builder's
+- 02:51 #2032 read (Third: 20 s after the lamp's words is going on): no finding; busy room capped at 15 s, talk past clears; first builder's
+- 02:50 #2025 read (Third: forget-that note both sides): no finding; first builder's
+- 02:47 #2022 conflicts in skills.rs tests after #1997/#2027; asked Sixth to rebase
 - 02:44 #2029 read (Thirteen: trials thread row): Tests' P2 confirmed (known-file check timed, fails 3/3 here; polling passes); rest right; merge on fixed green
 - 02:38 #2027 full read: no P1/P2; four P3s (journal-holds-skills untested, guard judges an earlier plan, person's skill turned product mixes, links followed); first builder's
 - 02:36 #2028 read (Nine: trials light-show row): no finding; merge on green
