@@ -13,6 +13,13 @@ fn product_setup() -> Config {
     serde_json::from_str(include_str!("../../setup/fixtures/serve-own-page.json")).unwrap()
 }
 
+/// The lamp says the same generation on the hotspot, in setup's status, as
+/// on the broker, in every reply (#1396).
+#[test]
+fn the_generation_on_every_reply_is_the_one_setups_status_says() {
+    assert_eq!(lamp_cloud::wire::GENERATION, lamp_setup::serve::GENERATION);
+}
+
 #[test]
 fn the_unit_reads_the_account_where_the_products_setup_writes_it() {
     let setup = product_setup();
