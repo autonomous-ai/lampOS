@@ -97,6 +97,30 @@ fn secure(url: reqwest::Url) -> Result<reqwest::Url> {
 /// cover it: a 20 ms frame and a little rounding.
 const COVERED: f64 = 0.05;
 
+/// A 20 ms block whose level is over this RMS (about -45 dBFS) is the
+/// line's sound, not its quiet: between sounds the canceller's audio is
+/// near -75 dBFS, and talk near the lamp -21 to -31 dBFS
+/// (`second_hearing`).
+const SOUND_RMS: f64 = 184.0;
+/// Whether a block of little-endian 16-bit samples is the line's sound
+/// ([`SOUND_RMS`]).
+fn loud(bytes: &[u8]) -> bool {
+    let samples = bytes.len() / 2;
+    if samples == 0 {
+        return false;
+    }
+    let energy: f64 = bytes
+        .chunks_exact(2)
+        .map(|pair| f64::from(i16::from_le_bytes([pair[0], pair[1]])).powi(2))
+        .sum();
+    (energy / samples as f64).sqrt() > SOUND_RMS
+}
+
+/// How far the line's sound may run past the finals and still be taken as
+/// heard: the end of a word and its tail, under a short word ("on" in
+/// "Hang on." is about 0.29 s, #828).
+const SOUND_PAST: f64 = 0.15;
+
 /// One `Results` message: the best alternative's words (empty for
 /// silence), and where in the audio the segment ends, in seconds.
 #[derive(Debug, PartialEq)]
@@ -222,6 +246,20 @@ impl Transcript {
             && self
                 .covered
                 .is_some_and(|covered| covered + COVERED >= sent)
+    }
+
+    /// Whether the finals cover the line's sound, `sound_to` seconds in
+    /// (the end of its last block over [`SOUND_RMS`]), with nothing pending:
+    /// what is not covered is the line's quiet end. On lamp-4ace on 19 Oct
+    /// `Finalize`'s answer reached about 0.48 s short of the audio sent on
+    /// 114 of 131 lines, so their words waited for `CloseStream`, 652 ms
+    /// after the line's end against 280 ms (#1712, the first builder at
+    /// 23:46).
+    pub fn covers_the_sound(&self, sound_to: f64) -> bool {
+        self.pending.is_none()
+            && self
+                .covered
+                .is_some_and(|covered| covered + SOUND_PAST >= sound_to)
     }
     /// What [`Self::settled`] decided on for `sent` seconds, in ms and
     /// without words: the journal's account of the end of the line (#779).
@@ -742,6 +780,9 @@ where
     let mut transcript = Transcript::default();
     let mut last_sent = Instant::now();
     let mut samples_sent = 0usize;
+    // Where the line's sound ends, in seconds of the audio sent: the end of
+    // its last block over [`SOUND_RMS`].
+    let mut sound_to = 0.0f64;
     // Set at the end of the line, when `Finalize` went: until when its
     // final words are waited for.
     let mut finalize_by: Option<Instant> = None;
@@ -788,6 +829,9 @@ where
             frame = queued.recv(), if finalize_by.is_none() && !closing => {
                 match frame {
                     Some(Outgoing::Audio(bytes)) => {
+                        if loud(&bytes) {
+                            sound_to = (samples_sent + bytes.len() / 2) as f64 / 16_000.0;
+                        }
                         samples_sent += bytes.len() / 2;
                         write
                             .send(Message::binary(bytes))
@@ -880,6 +924,21 @@ where
                                 // Closes the socket; its answer is not waited for.
                                 let _ = write.send(close_stream()).await;
                                 return Ok(ending(&transcript, &at_end, Some(answered), "finalize"));
+                            }
+                            if finalized && transcript.covers_the_sound(sound_to) {
+                                // Short of the audio sent, but what is left is
+                                // the line's quiet end: its words are these.
+                                let _ = write.send(close_stream()).await;
+                                let (words, told) = ending(&transcript, &at_end, Some(answered), "finalize");
+                                return Ok((
+                                    words,
+                                    told.map(|told| {
+                                        format!(
+                                            "{told}, the rest quiet: sound to {} ms",
+                                            (sound_to * 1000.0).round() as i64
+                                        )
+                                    }),
+                                ));
                             }
                             if finalized {
                                 // `Finalize`'s answer short of the audio sent:
@@ -1139,11 +1198,11 @@ mod tests {
             SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
         // One second of audio, then its results have time to arrive.
         for _ in 0..50 {
-            stream.send(&[0; 320]).unwrap();
+            stream.send(&[SOUND; 320]).unwrap();
         }
         tokio::time::sleep(Duration::from_millis(300)).await;
         for _ in 0..more {
-            stream.send(&[0; 320]).unwrap();
+            stream.send(&[SOUND; 320]).unwrap();
         }
         let began = Instant::now();
         let (words, at_end) = stream.finish_told().await.unwrap();
@@ -1153,6 +1212,99 @@ mod tests {
     }
 
     const INTERIM: &str = r#"{"type":"Results","is_final":false,"speech_final":false,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hello"}]}}"#;
+
+    /// A sample of a line's sound: well over [`SOUND_RMS`].
+    const SOUND: i16 = 3_000;
+
+    /// `sounding` 20 ms blocks of sound and then `quiet` of silence, an
+    /// interim, then `Finalize` answered with `finalized` at once and
+    /// `CloseStream` 800 ms later with "from close". Returns the words, the
+    /// journal's account and how long `finish` took.
+    async fn finish_sounding(
+        sounding: usize,
+        quiet: usize,
+        finalized: &'static str,
+    ) -> (String, String, Duration) {
+        use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
+        let (near, far) = tokio::io::duplex(1 << 16);
+        let server = tokio::spawn(async move {
+            let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+            let mut told = false;
+            while let Some(Ok(message)) = socket.next().await {
+                match message {
+                    Message::Binary(_) if !told => {
+                        told = true;
+                        socket.send(Message::text(INTERIM)).await.unwrap();
+                    }
+                    Message::Text(text) if text.contains("Finalize") => {
+                        socket.send(Message::text(finalized)).await.unwrap();
+                    }
+                    Message::Text(text) if text.contains("CloseStream") => break,
+                    _ => {}
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(800)).await;
+            let last = r#"{"type":"Results","is_final":true,"speech_final":true,"start":0.5,"duration":0.5,"channel":{"alternatives":[{"transcript":"from close"}]}}"#;
+            let _ = socket.send(Message::text(last)).await;
+            let _ = socket.close(None).await;
+        });
+        let stream =
+            SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+        for _ in 0..sounding {
+            stream.send(&[SOUND; 320]).unwrap();
+        }
+        for _ in 0..quiet {
+            stream.send(&[0; 320]).unwrap();
+        }
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let began = Instant::now();
+        let (words, at_end) = stream.finish_told().await.unwrap();
+        let took = began.elapsed();
+        server.abort();
+        (words, at_end.unwrap(), took)
+    }
+
+    /// #1712, lamp-4ace 19 Oct (the first builder at 23:46): on 114 of 131
+    /// lines `Finalize`'s answer reached about 0.48 s short of the audio
+    /// sent, and the words waited for `CloseStream`, 652 ms after the
+    /// line's end. When what is left is the line's quiet end, the answer's
+    /// words are the line's at once; when sound is left past the answer,
+    /// as "Hang" for "Hang on." (#828), `CloseStream` still flushes it.
+    #[tokio::test(start_paused = true)]
+    async fn a_finalize_answer_short_of_only_the_quiet_end_is_the_lines_words_at_once() {
+        const ANSWERED: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hello lamp"}]}}"#;
+        // 0.6 s of sound, then 0.4 s of quiet: the answer covers the sound.
+        let (words, at_end, took) = finish_sounding(30, 20, ANSWERED).await;
+        assert_eq!(words, "hello lamp");
+        assert_eq!(took, Duration::ZERO, "no wait for CloseStream");
+        assert!(
+            at_end.ends_with(", words from=finalize, the rest quiet: sound to 600 ms"),
+            "{at_end}"
+        );
+        // Sound 0.2 s past the answer: a word may be there, so it is flushed.
+        let (words, at_end, took) = finish_sounding(40, 10, ANSWERED).await;
+        assert_eq!(words, "hello lamp from close");
+        assert_eq!(took, Duration::from_millis(800));
+        assert!(at_end.ends_with(", words from=close_stream"), "{at_end}");
+        // Within 0.15 s of the answer's end, the word's tail: taken.
+        let (words, _, took) = finish_sounding(37, 13, ANSWERED).await;
+        assert_eq!((words.as_str(), took), ("hello lamp", Duration::ZERO));
+    }
+
+    #[test]
+    fn a_blocks_sound_is_told_from_its_quiet_by_its_level() {
+        let block = |sample: i16| -> Vec<u8> {
+            std::iter::repeat_n(sample.to_le_bytes(), 320)
+                .flatten()
+                .collect()
+        };
+        assert!(loud(&block(SOUND)));
+        assert!(loud(&block(-SOUND)));
+        // About -50 dBFS, under the bar, and silence.
+        assert!(!loud(&block(100)));
+        assert!(!loud(&block(0)));
+        assert!(!loud(&[]));
+    }
 
     /// #1712, request 329 on lamp-4ace: finals with words covering most of
     /// the line came before its end; `Finalize` went unanswered and the
@@ -1267,13 +1419,13 @@ mod tests {
             SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
         let first_words = stream.first_words();
         let began = Instant::now();
-        stream.send(&[0; 320]).unwrap();
+        stream.send(&[SOUND; 320]).unwrap();
         tokio::time::sleep(Duration::from_millis(100)).await;
         assert!(
             first_words.get().is_none(),
             "a result with no words is not words"
         );
-        stream.send(&[0; 320]).unwrap();
+        stream.send(&[SOUND; 320]).unwrap();
         tokio::time::sleep(Duration::from_millis(500)).await;
         let at = *first_words.get().expect("the words never came");
         let after = at - began;
@@ -1318,7 +1470,7 @@ mod tests {
             replies.told(),
             "0 results with words, 0 without, 0 speech starts, 0 other messages"
         );
-        stream.send(&[0; 320]).unwrap();
+        stream.send(&[SOUND; 320]).unwrap();
         tokio::time::sleep(Duration::from_millis(100)).await;
         assert_eq!(
             replies.told(),
@@ -1514,7 +1666,7 @@ mod tests {
             let mut early = stream.take_early().unwrap();
             assert!(stream.take_early().is_none(), "one taker");
             for _ in 0..50 {
-                stream.send(&[0; 320]).unwrap();
+                stream.send(&[SOUND; 320]).unwrap();
             }
             tokio::time::sleep(Duration::from_millis(300)).await;
             let began = Instant::now();

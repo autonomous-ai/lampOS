@@ -193,9 +193,22 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   held burst, got such an answer: "Hang" for "Hang on." (0.30 of 0.59 s)
   and "Lamp," for "Lamp, stop."; with `CloseStream` after it, 16 of 16
   rounds had the whole phrase, its segment starting where the answer
-  ended, about 0.25 s later than the answer. If 1 s passes with no
-  covering finals, `CloseStream` and up to 15 s in all for its final
-  words, as before. `CloseStream` is sent in
+  ended, about 0.25 s later than the answer. **Unless what the answer
+  leaves is the line's quiet end** (#1712, the first builder at 23:46):
+  on lamp-4ace on 19 Oct, `Finalize` answered in about 280 ms on 131
+  lines, but on 114 its answer reached about 0.48 s short of the audio
+  sent, so the words waited for `CloseStream`: 652 ms after the line's
+  end at the median, 1.7 s at p90, against 280 ms when it covered. The
+  stream knows where the line's sound ends: the end of its last 20 ms
+  block over about -45 dBFS (`SOUND_RMS`). When the finals cover it to
+  within 0.15 s (`SOUND_PAST`, under a short word's 0.29 s), with nothing
+  pending, the answer's words are the line's at once. The journal adds
+  `, the rest quiet: sound to S ms` to `words from=finalize`. Sound left
+  past the answer, as "Hang on."'s "on", still waits for `CloseStream`.
+  With `LAMP_SECOND_STT_SOURCE=raw` a noisy room's level can stay over
+  the bar, and then it waits as before. If 1 s passes with no covering
+  finals, `CloseStream` and up to 15 s in all for its final words, as
+  before. `CloseStream` is sent in
   every case to close the socket, but waited on only in that fallback.
 
   **Flux on trial (`LAMP_SECOND_FLUX=on`, off unless set; the hearing half
