@@ -119,3 +119,23 @@ Ready for lamp-voice: yes (`deploy/lamp-0c89/LAMP.md` only)
   own failure). `ef75561a` not yet on a phone.
 - Not shown: the body (no `lamp.env`); a Lamp 2 answering a text
   (`LAMP_MESSAGES` off).
+
+## 2026-10-19 — #1396 and #1673, the app side — in `v3`
+
+Ready for lamp-voice: no (the work is in the app's repository)
+
+- ecm-sds-mobile#3 (the Lamp 2 page) merged 15:17; #4 (#1673: an error
+  shown once, no attach button, a failed turn kept on its reply bubble)
+  merged 16:0x, tried on the phone against lamp-0c89: the refusal stays in
+  the thread and after leaving the chat; #5 (the page's remaining V1 calls,
+  the first builder's 15:28) merged 16:1x, not yet on a phone. `v3` at
+  `dbd27db0` has all four commits.
+- #5's read, every call the page sends against `lamp-cloud` at build 3058:
+  `environment.status` hidden; `device.soft_reset` replaced by the reset
+  button's 5 s hold; `device.rename` and `led.resting.preview` left as
+  logged downlinks, put to the lamp side on #1396 (16:1x). Nothing on the
+  backend is V1-only for the page.
+- Gate on `v3` plus each PR: `flutter analyze` the same 28 as `v3`;
+  `flutter test` +685 −1 (`v3`'s own failure).
+- Next on the list: #1683's app side (the backend's store is live, 14:57),
+  then the skills page's design.
