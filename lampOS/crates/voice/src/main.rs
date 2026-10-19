@@ -222,7 +222,7 @@ fn run() -> Result<()> {
             let lead_in=std::env::var(lamp_voice::agent_tasks::LEAD_IN_ENVIRONMENT).as_deref()==Ok("on");
             // LAMP_TASKS_ASKED=on: the functions as with work asked of the staff handed over every time (#854).
             let asked=std::env::var(lamp_voice::agent_tasks::ASKED_ENVIRONMENT).as_deref()==Ok("on");
-            let place=lamp_voice::agent_tasks::Place{directory:"/nonexistent".into(),target:lamp_voice::agent_tasks::DEFAULT_TARGET.into(),who:false,lead_in,asked,accounts:false,needs:None,staff_note:false};
+            let place=lamp_voice::agent_tasks::Place{directory:"/nonexistent".into(),target:lamp_voice::agent_tasks::DEFAULT_TARGET.into(),who:false,lead_in,asked,accounts:false,machine_names:false,needs:None,staff_note:false};
             // With the switch, each session is told after the persona what a lamp's would be (#854).
             let note=lamp_voice::agent_tasks::session_note(&place).unwrap_or_default();
             let colour=lamp_gemini::Tool{name:"light_colour".into(),description:"Set the colour of your own light when you are asked to.".into(),parameters:Some(serde_json::json!({"type":"object","properties":{"colour":{"type":"string","enum":["white","warm","red","green","blue","purple"]}},"required":["colour"]})),silent:false};

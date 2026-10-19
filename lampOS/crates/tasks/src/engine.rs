@@ -939,6 +939,9 @@ pub struct Engine<P: Persistence> {
     /// every hand-over is refused, with why.
     no_harness: bool,
     targets: BTreeMap<String, Target>,
+    /// The computers' own names, by alias (`targets.names.json`, #1676):
+    /// a label told with the targets, never part of a task.
+    names: BTreeMap<String, String>,
     state: State,
     last_clock: Clock,
     failed: bool,
@@ -1124,6 +1127,7 @@ impl<P: Persistence> Engine<P> {
             set_aside,
             targets_newer: None,
             no_harness: false,
+            names: BTreeMap::new(),
         })
     }
 
@@ -1152,6 +1156,12 @@ impl<P: Persistence> Engine<P> {
         self.targets = targets;
         self.targets_newer = None;
         Ok(())
+    }
+
+    /// The computers' own names, by alias, as last read: told with the
+    /// targets that have one (`serve --set-up-later`, #1676).
+    pub fn set_names(&mut self, names: BTreeMap<String, String>) {
+        self.names = names;
     }
 
     /// There is no Harness program to hand over with: every hand-over is
@@ -1294,8 +1304,12 @@ impl<P: Persistence> Engine<P> {
                 })}),
             ),
             // In alias order, as loaded. The machine and project stay here.
+            // A name only where it has one (#1676).
             Request::Targets {} => Some(json!({"targets":self.targets.iter()
-                .map(|(alias, target)| json!({"alias":alias,"engine":target.engine}))
+                .map(|(alias, target)| match self.names.get(alias) {
+                    Some(name) => json!({"alias":alias,"engine":target.engine,"name":name}),
+                    None => json!({"alias":alias,"engine":target.engine}),
+                })
                 .collect::<Vec<_>>()})),
             Request::List { after_id, limit } => {
                 if !(1..=MAX_PAGE_SIZE).contains(limit) {
