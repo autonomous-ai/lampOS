@@ -63,6 +63,9 @@ pub struct Senses {
     pub sight: Option<RingSight>,
     /// A hand kept on the head, for its countdown ([`crate::ring_head`]).
     pub head: Option<crate::ring_head::RingHead>,
+    /// The lamp's inner state, for the eye's pace at rest
+    /// ([`crate::ring_mood`]).
+    pub mood: Option<crate::ring_mood::RingMood>,
 }
 
 /// Startup Ready is emitted only after the sink accepted its initial black frame.
@@ -133,7 +136,8 @@ pub struct RingOptions<'a> {
 /// face is the eye ([`crate::ring_face`]), and looks where the eyes on the
 /// same bus see a person ([`crate::ring_sight`]). With `head_touch`, a hand
 /// kept on the head dims it, a countdown to sleep ([`crate::ring_head`]).
-/// With `light_requests`, lights asked for that lapse are shown over the
+/// With a bus, the face at rest breathes the lamp's one breath where Mood
+/// keeps it on that bus ([`crate::ring_mood`]). With `light_requests`, lights asked for that lapse are shown over the
 /// person's ([`crate::ring_requests`], #940). With `light_keep`, the
 /// person's light is kept there across a restart ([`crate::ring_light`]).
 #[cfg(target_os = "linux")]
@@ -185,12 +189,22 @@ pub fn run_continuous(
                 }
             }
         });
+    // No switch of its own: Mood is off unless `LAMP_MOOD=on`, and with no
+    // fresh mood the face breathes as before.
+    let mood = bus_root.and_then(|root| match crate::ring_mood::RingMood::on(root) {
+        Ok(mood) => Some(mood),
+        Err(error) => {
+            eprintln!("lamp-voice ring: the lamp's inner state cannot be read: {error}");
+            None
+        }
+    });
     let senses = Senses {
         light,
         eye,
         eye_strong,
         sight,
         head,
+        mood,
     };
     let resting = match resting.map(ChannelCeiling::new).transpose() {
         Ok(resting) => resting,
@@ -478,6 +492,7 @@ fn service(
         eye_strong,
         mut sight,
         mut head,
+        mut mood,
     } = senses;
     let mut light = light.map(|(light, begins)| {
         face.light(begins);
@@ -635,6 +650,9 @@ fn service(
             }
             face.pattern(light.pattern());
             face.fade(light.fade(), at);
+        }
+        if let Some(mood) = mood.as_mut() {
+            face.breath(mood.tick(at));
         }
         if let Some(ceiling) = resting
             && pending.is_none()

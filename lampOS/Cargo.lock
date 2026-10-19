@@ -1950,6 +1950,7 @@ version = "0.1.0"
 dependencies = [
  "jiff",
  "lamp-bus",
+ "lamp-local-time",
  "lamp-msgs",
  "rustix",
  "serde",
@@ -2316,8 +2317,10 @@ version = "0.1.0"
 dependencies = [
  "hound",
  "lamp-audio",
+ "lamp-expression",
  "lamp-ipc",
  "lamp-local-time",
+ "lamp-msgs",
  "lamp-observer",
  "lamp-policy",
  "lamp-skills",

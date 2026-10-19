@@ -110,6 +110,7 @@ pub const UNITS: [&str; 23] = [
     "lamp-eyes.service",
     "lamp-health.service",
     "lamp-memory.service",
+    "lamp-mood.service",
     "lamp-name.service",
     "lamp-policy.service",
     "lamp-records.service",

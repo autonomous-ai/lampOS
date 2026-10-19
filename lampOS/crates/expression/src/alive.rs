@@ -211,12 +211,24 @@ impl Breath {
         Ok(())
     }
 
-    /// Where the breath is at `now_us`, as the ring's: the boot clock's
-    /// seconds within the hour, over the period.
-    fn at(&self, now_us: u64, size: f64) -> BodyOffsets {
-        let seconds = (now_us % RING_HOUR_US) as f64 / 1e6;
-        let share = 0.5 - 0.5 * (2.0 * PI * seconds / (self.period_us as f64 / 1e6)).cos();
-        add(BodyOffsets::ZERO, self.inhale, share * size)
+    /// How far in the breath is at `now_us`, from 0 (out) to 1 (in), as the
+    /// ring's: at the lamp's one breath's phase where Mood keeps it (#1670,
+    /// `mood`), else the boot clock's seconds within the hour, over the period.
+    pub fn share_at(&self, now_us: u64, mood: Option<f64>) -> f64 {
+        let turns = mood.unwrap_or_else(|| {
+            let seconds = (now_us % RING_HOUR_US) as f64 / 1e6;
+            seconds / (self.period_us as f64 / 1e6)
+        });
+        0.5 - 0.5 * (2.0 * PI * turns).cos()
+    }
+
+    /// Where the breath is at `now_us`, as [`Self::share_at`] says.
+    fn at(&self, now_us: u64, size: f64, mood: Option<f64>) -> BodyOffsets {
+        add(
+            BodyOffsets::ZERO,
+            self.inhale,
+            self.share_at(now_us, mood) * size,
+        )
     }
 
     /// The fastest the breath moves on any axis, radians a second.
@@ -621,6 +633,8 @@ pub(crate) struct Life {
     /// once the voice says it is open (the seventh on #1282).
     voice_muted: bool,
     privacy_muted: bool,
+    /// The lamp's one breath's phase now, where Mood keeps it (#1670).
+    mood_breath: Option<f64>,
     tapped_muted_us: Option<u64>,
     /// The body seen moving (its own shift at rest, #933, a gesture, or
     /// this layer's look up at a tap falling back): the goals it last said
@@ -699,6 +713,7 @@ impl Life {
             voice_slept: false,
             voice_muted: false,
             privacy_muted: false,
+            mood_breath: None,
             tapped_muted_us: None,
             body_goals: None,
             body_fast_since: None,
@@ -938,6 +953,11 @@ impl Life {
     /// head (`voice/privacy`, read then).
     pub(crate) fn set_privacy_muted(&mut self, muted: bool) {
         self.privacy_muted = muted;
+    }
+
+    /// The lamp's one breath's phase now, where Mood keeps it (#1670).
+    pub(crate) fn set_mood_breath(&mut self, phase: Option<f64>) {
+        self.mood_breath = phase;
     }
 
     /// Muted for privacy: the switch last said closed, or the voice's own
@@ -1233,7 +1253,7 @@ impl Life {
         // The breath, as the ring's. Its phase jumps once an hour where the
         // ring's does; the body's breath is let catch up at twice its own
         // fastest speed rather than leap.
-        let wanted = self.alive.breath.at(now_us, size);
+        let wanted = self.alive.breath.at(now_us, size, self.mood_breath);
         let most = 2.0 * self.alive.breath.speed(size) * step as f64 / 1e6;
         let breath = match self.breath {
             Some(last) => {
@@ -1288,7 +1308,9 @@ impl Life {
             return (BodyOffsets::ZERO, 0.0);
         };
         let settled = ease(now_us.saturating_sub(since) as f64 / sleep.settle_us as f64);
-        let pose = add(sleep.pose, sleep.breath.at(now_us, 1.0), 1.0);
+        // The sleeping breath is its own (9 s in the catalogue), never the
+        // ring's: it keeps the boot clock.
+        let pose = add(sleep.pose, sleep.breath.at(now_us, 1.0, None), 1.0);
         (add(BodyOffsets::ZERO, pose, settled), settled)
     }
 }

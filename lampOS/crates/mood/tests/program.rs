@@ -158,3 +158,80 @@ fn finite_enabled_run_reports_counts_and_can_be_restarted_without_private_state(
     assert!(!root.path().join("mood.json").exists());
     assert!(!root.path().join("memory").exists());
 }
+
+/// #1670: the product unit's switch. Only `LAMP_MOOD=on` starts Mood as
+/// `--enable` does; any other value leaves the bus untouched.
+#[test]
+fn only_lamp_mood_on_starts_it_as_enable_does() {
+    for value in ["", "off", "ON", "1", "true"] {
+        let root = tempfile::Builder::new()
+            .prefix("mos")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let output = command()
+            .env("LAMP_MOOD", value)
+            // Bounded, so a run wrongly started ends and fails here.
+            .args([
+                "--zone",
+                "UTC",
+                "--clock-id",
+                "test-host",
+                "--run-for-ms",
+                "600",
+            ])
+            .arg("--bus-root")
+            .arg(root.path())
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{value:?}");
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("\"enabled\":false"),
+            "{value:?}"
+        );
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0, "{value:?}");
+    }
+    // On: it runs, says its state on the bus, and ends when its time is up.
+    // The lamp's own zone (`system`) is how the product unit runs it.
+    let zones: &[&str] = if cfg!(target_os = "linux") {
+        &["UTC", "system"]
+    } else {
+        &["UTC"]
+    };
+    for zone in zones {
+        let root = tempfile::Builder::new()
+            .prefix("mon")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let output = command()
+            .env("LAMP_MOOD", "on")
+            .args([
+                "--zone",
+                zone,
+                "--clock-id",
+                "test-host",
+                "--run-for-ms",
+                "600",
+            ])
+            .arg("--bus-root")
+            .arg(root.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{zone}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("\"enabled\":true"),
+            "{zone}"
+        );
+        let state: MoodState = Bus::new(root.path())
+            .unwrap()
+            .latest(MoodState::TOPIC)
+            .unwrap()
+            .expect("a state said")
+            .parse()
+            .unwrap();
+        assert!(state.check().is_ok(), "{zone}");
+    }
+}

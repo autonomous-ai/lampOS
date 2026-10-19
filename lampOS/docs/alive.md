@@ -66,7 +66,7 @@ changed):
 
 | | When | What the body is asked |
 |---|---|---|
-| Breath | The voice resting, the body free (no hold, no concentration, fresh joints), and nobody working under the light | The head lifts and settles with the ring's breath: 0 to 0.03 rad (about 20 counts, 1.7 degrees) over 5.2 s |
+| Breath | The voice resting, the body free (no hold, no concentration, fresh joints), and nobody working under the light | The head lifts and settles with the ring's breath: 0 to 0.03 rad (about 20 counts, 1.7 degrees) over 5.2 s; while Mood runs, at the lamp's one breath Mood keeps, the ring's too (#1670, [ring-choreography.md](ring-choreography.md#the-lamps-one-breath-1670)) |
 | Drift | As the breath | Every 30 to 90 s (not on a beat), the head eases over 3 s to a new small lift (0 to 0.035 rad, about 23 counts) and tilt (up to 0.02 rad either way), and stays there until the next |
 | Coming in and going out | When the breath may begin or must stop | Over 0.35 s (the catalogue's `blend_us`); over the 4 s of settling when it falls asleep |
 | Still for work | A face of at least 0.04 of the picture (about a fifth of it each way) whose middle has stayed within 0.05 of the picture for 5 s; held 30 s after (a head bent over work is often no face) | Nothing from this layer: the body moves plainly and little |

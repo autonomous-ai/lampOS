@@ -90,6 +90,7 @@ differs. Folders are what the unit makes or names.
 | air | `lamp-air` | orangepi, `/dev/i2c-0` | none | none | the bus |
 | air's bus clock | `lamp-air limit-clock --bus-number 0` (a oneshot, before air and controls) | root | none | none | I2C bus 0's `device/freq` |
 | tasks | `lamp-tasks serve` | orangepi | `/var/lib/lampos-tasks/` (0700); `/run/lampos-tasks/` (0700) | `targets.json` in its state folder; the Harness program in the user's home | `request.sock`, `voice.sock` |
+| mood | `lamp-mood serve --zone system` (off unless `LAMP_MOOD=on`, `mood.md`) | lampos | none | the lamp's zone, `/etc/localtime` | the bus (`mood/state`) |
 | cloud | `lamp-cloud --bus-root /run/lampos-bus` (off unless `LAMP_CLOUD=on`, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
 | records | `lamp-records check` (a timer, hourly) | root | `/run/lamp-records/` | `/etc/lampOS/records.json`, which install places (`deploy/product/settings/records.json`; it does nothing without it) | `last.json` |
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
@@ -125,7 +126,7 @@ eleven parts; the four it does not name are placed by what they serve
 |---|---|---|
 | 1 | memory, actions, health; **schedule, tasks** | The voice calls each of their sockets from its first turn (`LAMP_SCHEDULE_SOCKET`, `LAMP_TASKS_DIR`), as it does memory's |
 | 2 | voice | |
-| 3 | body, name, controls, policy; **ears, air** | Ears and air only publish on the bus, as name does |
+| 3 | body, name, controls, policy; **ears, air, mood** | Ears, air and mood only publish on the bus, as name does |
 | 4 | eyes, expression | |
 
 Outside `lampos.target`, each started by `multi-user.target` on its own:

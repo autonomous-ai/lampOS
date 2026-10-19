@@ -208,6 +208,11 @@ drift that waits after a tap is meant. It is seen on `body/joint_states`, which 
 service already reads: a joint's goal going 0.04 rad/s or faster for 0.3 s
 (the breath and the drift go under 0.02, a shift 0.06 to 0.09; a goal that
 leaps once is not a move). The body keeps the same 30 s after a drift.
+The breath is the ring's: the boot clock over 5.2 s, and where Mood runs, the
+phase of the lamp's one breath in `mood/state`, which the service reads
+four times a second from the bus it already has; no switch of its own, and
+with no fresh mood nothing changes (#1670,
+[ring-choreography.md](ring-choreography.md#the-lamps-one-breath-1670)).
 
 ## Optional speaking: the lamp's own speech in its head (#933)
 

@@ -1,6 +1,9 @@
 //! A deterministic, temporary inner state. Time and observations are supplied
 //! by the caller; this module performs no I/O and owns no output permission.
-use lamp_msgs::{AttentionTarget, ClockStamp, FamiliarLevel, Familiarity, MoodState};
+use lamp_msgs::{
+    AttentionTarget, ClockStamp, FamiliarLevel, Familiarity, MOOD_BREATH_US, MoodBreath, MoodState,
+    mood_pace, plain_breath_phase,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -200,6 +203,9 @@ pub struct Engine {
     last_observed: [Option<u64>; EVENT_STREAMS],
     last_sudden_us: Option<u64>,
     last_warmth_us: Option<u64>,
+    /// The lamp's one breath, from 0 to 1 (#1670): begun where the plain
+    /// breath is, moved on at the pace whenever time does, never jumped.
+    breath_phase: f64,
 }
 
 impl Engine {
@@ -233,6 +239,7 @@ impl Engine {
             last_observed: [None; EVENT_STREAMS],
             last_sudden_us: None,
             last_warmth_us: None,
+            breath_phase: plain_breath_phase(now_us),
         })
     }
 
@@ -310,6 +317,11 @@ impl Engine {
             attention: self.attention.as_ref().map(|focus| focus.target.clone()),
             familiarity: Familiarity::Unknown,
             familiar: self.familiar_at(now_us),
+            breath: Some(MoodBreath {
+                // A phase that rounds up to 1 as f32 is 0.
+                phase: (self.breath_phase as f32).min(1.0 - f32::EPSILON),
+                pace: self.pace(),
+            }),
         };
         state.check().map_err(|_| Reject::InvalidSnapshot)?;
         Ok(state)
@@ -328,6 +340,14 @@ impl Engine {
         self.familiar
             .filter(|(_, until_us)| now_us < *until_us)
             .map(|(level, _)| level)
+    }
+
+    fn pace(&self) -> f32 {
+        mood_pace(
+            self.awake.clamp(0.0, 1.0) as f32,
+            self.energy() as f32,
+            self.asleep,
+        )
     }
 
     fn energy(&self) -> f64 {
@@ -564,6 +584,12 @@ impl Engine {
     }
 
     fn advance_inner(&mut self, now_us: u64) {
+        // The breath goes on at the pace the lamp had over this interval:
+        // its state at the interval's start, as every reader extrapolates
+        // from the last state said.
+        let elapsed = now_us.saturating_sub(self.now_us) as f64;
+        self.breath_phase =
+            (self.breath_phase + elapsed / MOOD_BREATH_US as f64 * f64::from(self.pace())).fract();
         // At most twelve boundaries, independent of elapsed time. These are
         // changes in a finite lease or in the piecewise-linear awake target,
         // never one iteration per missed tick.
