@@ -12,7 +12,9 @@ ConditionHost=lamp-4ace
 Type=oneshot
 User=orangepi
 Group=orangepi
-ExecStart=/opt/lampOS/selftest/a429b26e69d48cae11303db249cf34c9183ab017ec8789247b9d9aa7c87f6ab5/lamp-selftest --occasion on-demand --bus-root /run/lampos-bus --dir /var/lib/lamp-selftest
+ExecStart=/opt/lampOS/selftest/39364926cf2670315d6264539ccee2c13a4cd6d7a6b59cf0fd47db8a0ca733f7/lamp-selftest --occasion on-demand --bus-root /run/lampos-bus --dir /var/lib/lamp-selftest
+# Exit 3 is "some items not checked" (lampOS/docs/selftest.md), not a failure, as in deploy/product/lamp-selftest.service.
+SuccessExitStatus=3
 AmbientCapabilities=CAP_SYSLOG
 CapabilityBoundingSet=CAP_SYSLOG
 NoNewPrivileges=yes

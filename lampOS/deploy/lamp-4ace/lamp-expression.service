@@ -1,5 +1,5 @@
 # lampOS expression: plans what the lamp shows (posture, glances, nods, the light) from what the voice says of its own
-# timing, on one clock (lampOS/docs/expression.md). Watching only: without --enable it asks nothing of the body or the
+# timing, on one clock (lampOS/docs/expression.md). Watching only: without --enable --head-touch it asks nothing of the body or the
 # light and says on expression/state what it would have planned. Its own process and unit: with it stopped the lamp
 # moves and lights as before.
 [Unit]
@@ -12,7 +12,7 @@ User=orangepi
 Group=orangepi
 # Since 2026-10-14 23:07: the always-alive catalogue (task 36, #714, pull request #729): a breath and a slow drift at rest,
 # sleep at night with nobody about, a waking stretch (lampOS/docs/expression.md). UTC+7 for the night.
-ExecStart=/opt/lampOS/expression/f857ada685d171202f299aefa9d1b097f28492e1a05be1619c747a1fcfaff4a8/lamp-expression serve --enable --bus-root /run/lampos-bus --catalogue /opt/lampOS/expression/catalogues/expression-alive-name-speech-lamp-4ace.json --utc-offset-minutes 420
+ExecStart=/opt/lampOS/expression/6cf80d7bc8817f3333b7f2d08aab349417eec90017572fa9c6ef13cd2b058f5a/lamp-expression serve --enable --head-touch --bus-root /run/lampos-bus --catalogue /opt/lampOS/expression/catalogues/expression-speaking2-lamp-4ace.json --zone system
 Restart=on-failure
 RestartSec=5s
 SyslogIdentifier=lamp-expression

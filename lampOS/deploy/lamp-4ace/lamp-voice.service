@@ -21,7 +21,7 @@ Group=root
 Slice=system.slice
 WorkingDirectory=/
 UMask=0077
-ExecStart=/opt/lampOS/releases/73f341ee375112eaa36e837dc2c155040f8fe4326c9e29cac4bc945400497bf9/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery off --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast
+ExecStart=/opt/lampOS/releases/1cc25cbb5ad0139efb84eba47e8a1d73da66f5d9f9c947e2d2b8f14cb1fbcdd4/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery bounded --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast --call-wait-ms 2000 --controls-mute /var/lib/lampOS/voice/controls/mute.json
 # The microphone and speaker workers may not wait behind other work on the lamp: a read held up
 # for 10 ms, or a reference 20 ms late, ends the service (by design: the echo canceller's timing
 # is then unknown). With every core busy for 40 s (2026-10-13, twelve busy loops) the service
@@ -48,6 +48,17 @@ RuntimeDirectory=lampos-voice
 RuntimeDirectoryMode=0700
 RuntimeDirectoryPreserve=yes
 Environment=LAMP_THREAD_FILE=/run/lampos-voice/thread.json
+Environment=LAMP_SAY=on
+Environment=LAMP_SAY_GROUP=orangepi
+Environment=LAMP_FIRST_WORDS=kept
+Environment=LAMP_OTHER_LANGUAGE=sorry
+Environment=LAMP_START_OFFLINE=on
+Environment=LAMP_HEAD_TOUCH=on
+Environment=LAMP_NAME_IN_PASSING=ignored
+Environment=LAMP_SELFTEST_SPEAKER=on
+Environment=LAMP_POLICY_HOLDS_ACTIONS=on
+Environment=LAMP_LOOK_FULL=on
+Environment=LAMP_EYES_FULL_LOOK_FILE=/run/lampos-eyes/look.jpg
 # Since 2026-10-14: in a busy room every answer needs a sign it was meant for the lamp (docs/attention.md).
 Environment=LAMP_ATTENTION=busy-near
 # Since 2026-10-14 18:46 (the build of 41d09542f): busy-near is busy, and a name heard at 0.95 or more
@@ -56,12 +67,77 @@ Environment=LAMP_ATTENTION=busy-near
 Environment=LAMP_AIR_FACTS=on
 # The ring as the lamp's eye (task 34, #712; lampOS/docs/ring-choreography.md, "The eye"): listening, it looks toward the
 # nearest face the eyes see; at rest it blinks now and then. Take this line out and the ring is as before.
-Environment=LAMP_RING_EYE=on
+# The strong eye (2026-10-16): leans sooner and further, notices a person who arrives (docs/ring-choreography.md).
+Environment=LAMP_RING_EYE=strong
+# The asleep face while muted or asleep (#712, #1025, first builder 16 Oct 12:30): a faint warm breath at the bottom of the ring.
+Environment=LAMP_RING_ASLEEP=on
+# Stop words heard all the while the lamp speaks end its answer (#970, #1047 heard-always, fourth; first builder 16 Oct 13:56, to test over its voice).
+Environment=LAMP_STOP_WORDS=heard-always
+# The last 10 s of each reply's stop-word stream audio, as sent, for stt-check (#1047, 16 Oct 21:1x; mine to delete).
+Environment=LAMP_STOP_WORDS_AUDIO=/run/lampos-voice/stop-words-audio.wav
+# Each reply's stop-word counts (blocks sent, pauses asked, results, what was heard), so a cut-in run can read
+# whether "Lamp, stop." reached the speech-to-text (17 Oct 13:0x: it never stopped the lamp today).
+Environment=LAMP_STOP_WORDS_COUNTS=/run/lampos-voice/stop-words-counts.json
+# The stop-word stream hears mic2 before the canceller (#1047, 17 Oct 00:02): the canceller removes a person's
+# word said over the lamp along with the echo (crates/audio/src/duplex.rs).
+Environment=LAMP_STOP_WORDS_SOURCE=raw
+Environment=LAMP_TURN_END_PRIORITY=10
+Environment=LAMP_TURN_END_NO_SPIN=on
+Environment=LAMP_CUT_IN_TOLD=on
+Environment=LAMP_TIME_PLACES=on
+Environment=LAMP_ROOM_FILE=/run/lampos-voice/room.json
+Environment=LAMP_FOLLOWS_RUN=on
+Environment=LAMP_SPOKEN_TO=on
+# Each stall of 50 ms or more in the voice's loops, with what held it, in /run/lampos-voice (#1179, eighth; first builder 17 Oct 07:3x, for #1178's midnight).
+Environment=LAMP_STALLS=on
+# Switch group 1, 17 Oct 07:5x (the owner: build 100% / quality 90% by Monday; merged features switched on and measured
+# group by group, the battery before and after): conversation and attention.
+Environment=LAMP_TOOL_LEAD_IN=on
+Environment=LAMP_WAIT_KEEPS_ANSWER=on
+Environment=LAMP_STOP_TOLD=on
+# LAMP_ADDRESSED stays off: Ten's census (#1238) says "most likely wrong on lamp-4ace" (it sits sideways to the desk).
+# LAMP_ASKER_FIRST records first, to set its 6 dB margin from lamp-4ace (group-talk.md).
+Environment=LAMP_ASKER_FIRST=record
+Environment=LAMP_NAMES=checked
+Environment=LAMP_STAFF_NOTE=on
+Environment=LAMP_MARK_WEIRD=on
+Environment=LAMP_TASK_NEWS_AT_PAUSE=on
+Environment=LAMP_MEMORY_RULES=on
+# Switch group 2, 17 Oct 08:2x: when things go wrong. A skill's light request (#993), the backup voice's line when
+# its chat fails and its sound while it is slow (#754, #1195), and the voice's link on the bus (#830).
+Environment=LAMP_LIGHT_REQUESTS=on
+Environment=LAMP_SECOND_DOWN_LINE=on
+Environment=LAMP_SECOND_WAIT_CUE=on
+Environment=LAMP_VOICE_LINK=on
+# The coordinator passes every 5 ms rather than 2 while nothing is going on (#1261, eighth; for heat: the quiet
+# voice took ~44% of a core on lamp-4ace on 17 Oct 09:56, coordinator 18.0%).
+Environment=LAMP_QUIET_PACE=on
+# A mute left by the restart guard after a crash is woken by a head tap, as sleep is (#960, #997, nine; first builder 16 Oct 13:08).
+Environment=LAMP_RESTORED_MUTE=on
 # A short utterance in a room that is not busy goes to the model to judge, where the noise gate would drop it
 # (lampOS/docs/not-speech.md; on 2026-10-14 the gate dropped 13 of 36 short words such as "Hi.").
-Environment=LAMP_SHORT_SOUNDS=quiet-room
+# Checked since 2026-10-15 23:07 (#818, #800): a request whose end was marked a short sound is answered only when it is a short
+# word said to the lamp, said close, by someone turned to it, or the lamp began the turn.
+Environment=LAMP_SHORT_SOUNDS=quiet-room-checked
 # Work for Claude Code on the office computer through lamp-tasks.service (lampOS/docs/tasks.md, "The voice's side").
 Environment=LAMP_TASKS_DIR=/run/lampos-tasks
+# Who gets the work (#733, #769): the person names Claude Code or Codex; nobody named is office-claude. On since 2026-10-15 at the owner's word.
+Environment=LAMP_TASKS_WHO=on
+Environment=LAMP_TASKS_TARGET=office-claude
+# Work asked of the staff is handed over every time; a name not made out is asked about (#854, #859). Tried from 2026-10-15 21:30.
+Environment=LAMP_TASKS_ASKED=on
+# The hello waits up to 2 s for the Policy's say_now or wait (#856, #883); watching only while lamp-policy has no --act hello.
+Environment=LAMP_HELLO_ASKS_POLICY=on
+# A bare call ("Hey Lamp," and a pause) waits up to 2 s for the rest, on lamp-name's early name/rising, and the name
+# carries across a cut (#782, #853; lamp-4ace 2026-10-16 00:27: busy room 3 of 3, from 0 of 3). With --call-wait-ms 2000 above.
+Environment=LAMP_CUT_KEEPS_NAME=on
+# News of a task while it runs (#752/#793), from the policy's progress decisions (lamp-policy --act progress), under the voice's
+# own gates (lampOS/docs/tasks.md, "The voice's side of progress news"). On since 2026-10-15 20:07 on lamp-4ace.
+Environment=LAMP_PROGRESS_NEWS=on
+# The backup voice (#778, lampOS/docs/second-voice.md): a second route on the company relay (gpt-4.1-mini, its speech to text,
+# ElevenLabs), standing by while Gemini is ready and taking over when it is not. Keys copied from this lamp's V1 settings
+# into root-only files beside it. On since 2026-10-15 21:00.
+Environment=LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json
 # Whom it answered: one line per first output the rule judged, private to root on the lamp, never published
 # (lampOS/docs/attention.md, "The record of whom it answered"). Take this line out and nothing is written.
 Environment=LAMP_FIRST_OUTPUT=/var/lib/lampOS/voice/first-output
@@ -84,12 +160,6 @@ Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock
 Environment=LAMP_MEMORY_DAYS=on
 Environment=LAMP_FAINT_HOLD_MS=400
 Environment=LAMP_BUS=on
-# No internet: the offline line once and the amber breath, said only on lamp-health's probe, so a relay
-# outage, with the internet up, is the backup voice's (LAMP_VOICE_SECOND_CONFIG, in this lamp's drop-in)
-# and not "no internet" (lampOS/docs/offline.md; #830). The line is silent until recordings are given
-# (--failure-notice-dir). Shown with the Wi-Fi off on Monday (#830).
-Environment=LAMP_OFFLINE_VOICE=on
-Environment=LAMP_REACH_PROBE=on
 # What the microphone hears also goes on the bus (mic2/audio), for the part that hears the lamp's name
 # (lampOS/docs/name.md). The one topic that carries sound; nothing on the lamp writes it down.
 Environment=LAMP_BUS_AUDIO=on
@@ -108,14 +178,7 @@ Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
 # Remembering a face when asked, a hello by name, and the name told with what a known person says
 # (lampOS/docs/eyes.md, "Who is there"); the eyes' known file is beside this socket.
 Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
-# The hello is Welcome back's now (lamp-skills.service here, #938): the voice's own is off, so only
-# one greets, and its moments are still recorded. Put the line back to have the voice greet again,
-# and stop lamp-skills.service.
-# Environment=LAMP_SPEAK_FIRST=on
-# The say service, for lamp-skills to have the lamp speak (#954, lampOS/docs/speaking-first.md):
-# its socket's group is orangepi, the user lamp-skills runs as. A voice without #954 ignores both.
-Environment=LAMP_SAY=on
-Environment=LAMP_SAY_GROUP=orangepi
+#Environment=LAMP_SPEAK_FIRST=on (off since 16 Oct 10:15: Welcome back, a skill, greets instead, #967)
 # Let the lamp take a look when it says "Let me look" (lampOS/docs/speaking-first.md): the eyes'
 # newest frame goes to the model with that one request and with no other.
 Environment=LAMP_EYES_LOOK_FILE=/run/lampos-eyes/sight.jpg

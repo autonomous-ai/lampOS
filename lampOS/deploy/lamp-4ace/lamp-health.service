@@ -12,10 +12,7 @@ Group=orangepi
 # The parts that say how they are today. A part named here that never reports makes the lamp "stale".
 # Of the board's thermal zones, the processors' and the skin's limits are judged: the graphics zone names a
 # limit of 60 C and reads 64 at rest, and the lamp does not use it.
-# `--online on`: lamp/online from the voice's link; `--reach-probe on`: while that link is down, a bare
-# TCP handshake to 1.1.1.1:443 and 8.8.8.8:443 (nothing sent), so a relay outage is not said as no
-# internet (lampOS/docs/offline.md, "The relay is not the internet"; #830, the first builder, 12:00).
-ExecStart=/opt/lampOS/health/adcbb5df81bad58a700323bc5addd40aec3f89b5ef2a7640dabadad7f489d996/lamp-health serve --bus-root /run/lampos-bus --expect board --expect voice --expect eyes --expect body --expect policy --expect name --expect controls --expect expression --expect actions --expect ears --expect memory --expect schedule --expect air --judge-zone cpu --judge-zone skin --online on --reach-probe on
+ExecStart=/opt/lampOS/health/d2208403b0bac9ea5a8aa6d04b4949a01ec7122a719654767ae3365ce9afd68b/lamp-health serve --bus-root /run/lampos-bus --expect board --expect voice --expect eyes --expect body --expect policy --expect name --expect controls --expect expression --expect actions --expect ears --expect memory --expect schedule --expect air --judge-zone cpu --judge-zone skin
 Restart=on-failure
 RestartSec=5s
 SyslogIdentifier=lamp-health

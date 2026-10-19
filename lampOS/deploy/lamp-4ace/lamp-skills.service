@@ -16,7 +16,7 @@ User=orangepi
 Group=orangepi
 Environment=LAMP_SKILLS_ASK=skip
 # The SHA-256 is the ARM64 run's lamp-skills (PR for #938), installed under /opt/lampOS/skills/.
-ExecStart=/opt/lampOS/skills/@SKILLS_SHA256@/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock
+ExecStart=/opt/lampOS/skills/79be32ac0bbf7d9646f0b343cc748d67e57e3d8e96b69ff097d28a54f966ef27/lamp-skills --dir /var/lib/lamp-skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-actions/skills
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=yes

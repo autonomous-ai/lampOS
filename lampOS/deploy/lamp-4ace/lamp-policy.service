@@ -14,9 +14,11 @@ User=orangepi
 Group=orangepi
 StateDirectory=lampos-policy
 StateDirectoryMode=0700
+# --act progress (first builder, 2026-10-15 20:07, #752/#793): its progress decisions alone are not shadow; the voice's
+# task news says them (LAMP_PROGRESS_NEWS=on in lamp-voice.service). Every other question stays shadow.
 # The key stays readable by root alone; systemd hands this service its own copy.
 LoadCredential=jev.key:/etc/lampOS/policy/jev.key
-ExecStart=/opt/lampOS/policy/2f422ad160b0c5bf81932f786c4675bff251819734101729ba59d9d5cee0b433/lamp-policy --key-file %d/jev.key --log-dir /var/lib/lampos-policy
+ExecStart=/opt/lampOS/policy/aef70157b022d155794f9396da27e6606d839aeab690f6fffb1d51a84f8e9dd4/lamp-policy --progress --act progress --act attention --hello --act hello --images typesafe/jev-1.14 --sight-file /run/lampos-eyes/sight.jpg --utc-offset-minutes 420 --key-file %d/jev.key --log-dir /var/lib/lampos-policy
 Restart=on-failure
 RestartSec=5s
 SyslogIdentifier=lamp-policy

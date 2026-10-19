@@ -15,7 +15,9 @@ RuntimeDirectoryMode=0755
 # Reminders and timers by voice (#709, #747).
 Environment=LAMP_SCHEDULE_TOOLS=on
 Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
-ExecStart=/opt/lampOS/actions/2c4aad6713b74ccccf55e5c2b6138f88ec8af9b5dc8d898b34138c320e6e4588/lamp-actions --dir /run/lampos-actions --mixer-card allwinnerhdmi --mixer-control Speaker --volume-ceiling 100 --bus-root /run/lampos-bus
+# #1520 (18 Oct 18:0x on lamp-4ace): a word or two after a light or volume change; lamp-4ace only, off in the product.
+Environment=LAMP_SHORT_DONE=on
+ExecStart=/opt/lampOS/actions/ae03ebf3c49c97f84a04f42b95f9ac0c5793bd9401437f565a2ee980c02e4643/lamp-actions --dir /run/lampos-actions --mixer-card allwinnerhdmi --mixer-control Speaker --volume-ceiling 100 --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=2s
 SyslogIdentifier=lamp-actions
