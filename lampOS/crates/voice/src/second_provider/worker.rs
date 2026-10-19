@@ -744,6 +744,7 @@ pub fn serve(
         .filter(|_| files.staff_note)
         .map(staff_noting);
     let has_tasks = tools.tasks.is_some();
+    let declines = tools.decline;
     let runner = tool_runner(tools, search);
     let system: crate::second_provider::System = Arc::new(system);
     let mut engine = Engine::new(
@@ -809,6 +810,15 @@ pub fn serve(
             let heeding = heeding.clone();
             engine = engine.noting_the_name(Arc::new(move |request| {
                 heeding.lock().ok()?.name_note_for(request)
+            }));
+        }
+        // A line let out only as the conversation going on: the model, which
+        // reads only words, is told it may be people's talk, with the tool
+        // it leaves such talk alone with (#1712).
+        if declines {
+            let heeding = heeding.clone();
+            engine = engine.noting_the_conversation_alone(Arc::new(move |request| {
+                heeding.lock().ok()?.conversation_note_for(request)
             }));
         }
         {
@@ -1075,10 +1085,20 @@ pub(crate) struct Heeding {
     name_note: Option<(bool, bool)>,
     /// The request judged last, and the note it earned, if any.
     noted: Option<(u64, Option<&'static str>)>,
+    /// The request last let out only as the conversation going on.
+    alone: Option<u64>,
 }
 
 /// The room microphone's rise over its quiet, dB, by when it was sampled.
 type Levels = Arc<Mutex<std::collections::VecDeque<(u64, f32)>>>;
+
+/// Told beside a line the rule let out only as the conversation going on
+/// (`attention::Attention::played_on_the_conversation_alone`), with
+/// `not_for_me` offered. Gemini Live hears who is talking to whom; this
+/// route's model reads one line of words, and on lamp-4ace on 19 Oct it
+/// answered colleagues' talk after a named request six times ("Sounds like
+/// a big saving."), where Live answered it once (#1712).
+pub(crate) const CONVERSATION_ALONE: &str = "(For you to know, not to answer: nobody said your name or turned to you. This reached you only because you were just talking with someone, and people near you may be talking to each other. If it is plainly said to someone else, or a remark to the room, call not_for_me and say nothing. A follow-up to what you were just talking about is for you.)";
 
 /// What the bus and the thread say as a spoken turn is judged.
 pub(crate) struct Signs {
@@ -1141,6 +1161,7 @@ impl Heeding {
             keeps_room: false,
             name_note: None,
             noted: None,
+            alone: None,
         }
     }
 
@@ -1396,15 +1417,31 @@ impl Heeding {
         if let Ok(mut room) = crate::room_told::room().lock() {
             room.judged(request, verdict, false);
         }
+        self.alone = attention
+            .played_on_the_conversation_alone()
+            .then_some(request);
         match verdict {
             Some(crate::attention::Verdict::Hold(why)) => Some(why),
             // Said, as each hold is by the route (#829, 17:21).
             Some(crate::attention::Verdict::Play(why)) => {
-                eprintln!("lamp-voice second: request {request}: its answer is played: {why}");
+                let alone = if self.alone.is_some() {
+                    ", only as the conversation going on: the model is told so"
+                } else {
+                    ""
+                };
+                eprintln!(
+                    "lamp-voice second: request {request}: its answer is played: {why}{alone}"
+                );
                 None
             }
             None => None,
         }
+    }
+
+    /// The note for `request` if the rule let it out only as the
+    /// conversation going on ([`CONVERSATION_ALONE`]).
+    pub(crate) fn conversation_note_for(&self, request: u64) -> Option<&'static str> {
+        (self.alone == Some(request)).then_some(CONVERSATION_ALONE)
     }
 }
 
@@ -2596,6 +2633,60 @@ mod tests {
             Some(crate::attention::NOT_SPOKEN_TO)
         );
         assert_eq!(judged(Some(Did::Spoke(at(0))), "What time is it?"), None);
+    }
+
+    /// #1712, lamp-4ace's busy room: colleagues' talk just after a named
+    /// request was let out only as the conversation going on, and this
+    /// route's model answered it. With `--spoken-to`, such a line earns the
+    /// note; a line that calls the lamp, answers its question, or is judged
+    /// without the switch, does not; nor does one with no conversation going
+    /// on, which is held.
+    #[test]
+    fn a_line_let_out_only_as_the_conversation_going_on_earns_the_note() {
+        let signs = |going_on: bool, lamp_asked: bool| super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on,
+            lamp_asked,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let noted = |spoken_to: bool, heard: &str, signs: super::Signs| {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, spoken_to, false);
+            let held = heeding.judge(9, line, heard, signs);
+            (
+                held,
+                heeding.conversation_note_for(9),
+                heeding.conversation_note_for(8),
+            )
+        };
+        let talk = "I saved a hundred dollars on the flight.";
+        assert_eq!(
+            noted(true, talk, signs(true, false)),
+            (None, Some(super::CONVERSATION_ALONE), None)
+        );
+        assert_eq!(
+            noted(true, "Lamp, what about tomorrow?", signs(true, false)),
+            (None, None, None)
+        );
+        assert_eq!(noted(true, talk, signs(true, true)), (None, None, None));
+        assert_eq!(noted(false, talk, signs(true, false)), (None, None, None));
+        assert_eq!(
+            noted(true, talk, signs(false, false)),
+            (Some(crate::attention::NOT_SPOKEN_TO), None, None)
+        );
+        // The next line, let out as the first thing said after the lamp's
+        // news, does not keep the note of the line before.
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(heeding.judge(9, line, talk, signs(true, false)), None);
+        heeding.lamp_did(crate::second_provider::Did::Spoke(1_002_000_000));
+        let next = (1_003_000_000, 1_004_000_000);
+        assert_eq!(heeding.judge(10, next, talk, signs(true, false)), None);
+        assert_eq!(heeding.conversation_note_for(10), None);
     }
 
     /// #1712: the room this route keeps is told on the bus (`room/state`)

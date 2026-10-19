@@ -2216,3 +2216,57 @@ async fn the_lamps_work_and_its_own_turns_are_told_to_the_rule() {
     assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
     assert_eq!(*did.lock().unwrap(), ["worked", "spoke"]);
 }
+
+/// #1712: a line the rule let out only as the conversation going on is
+/// asked with the note that it may be people's talk, beside its words; the
+/// next line, not let out so, with none.
+#[tokio::test]
+async fn a_line_let_out_only_as_the_conversation_is_asked_with_its_note() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("I saved a hundred dollars on the flight.".to_owned()),
+                Ok("What time is it?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        NOT_FOR_ME,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Noon."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.noting_the_conversation_alone(Arc::new(|request| {
+        (request == 1).then_some(worker::CONVERSATION_ALONE)
+    }));
+    for request in 1..=2 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    }
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(
+        asked[0],
+        [
+            Message::system("SYSTEM"),
+            Message::system(worker::CONVERSATION_ALONE),
+            Message::user("I saved a hundred dollars on the flight."),
+        ]
+    );
+    assert_eq!(
+        asked[1],
+        [Message::system("SYSTEM"), Message::user("What time is it?")]
+    );
+}

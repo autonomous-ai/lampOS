@@ -838,6 +838,19 @@ after a take-over, but now for every turn:
   going on (`LAMP_GOING_ON_ASKS`, which also ends a busy room sooner once
   answered) and another voice's line (the same-voice check). The busy-room
   battery on lamp-4ace is its check.
+- **A line let out only as the conversation going on** (with
+  `LAMP_SPOKEN_TO` and `not_for_me` offered, `LAMP_TOOLS=on`): no name,
+  nobody turned to the lamp, not said close to it, no answer to its own
+  question (`attention::Attention::played_on_the_conversation_alone`). It is
+  asked with `worker::CONVERSATION_ALONE` beside its words: it may be
+  people's talk, and if it is plainly said to someone else or a remark to
+  the room, the model calls `not_for_me`; a follow-up is the model's. The
+  journal adds `, only as the conversation going on: the model is told so`
+  to `its answer is played`. Gemini Live hears who is talking to whom; this
+  route's model reads one line of words, and on lamp-4ace on 19 Oct it
+  answered colleagues' talk after a named request six times, where Live
+  answered it once. Each answer kept the conversation going, and with no
+  line left unanswered the room never became busy.
 - **The name note** (`LAMP_NAME_NOTE`) is given as on the Live route
   (`worker::Heeding::telling_the_name`): a line the lamp's name began, heard
   by `lamp-name` at `called::LEAST_SCORE` or more no more than

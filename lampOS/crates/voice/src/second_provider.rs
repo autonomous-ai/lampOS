@@ -228,6 +228,8 @@ struct Shared {
     staff: Option<StaffNote>,
     /// With `LAMP_NAME_NOTE=on`: the note for a line the lamp's name began.
     name_note: Option<NameNote>,
+    /// The note for a line let out only as the conversation going on.
+    conversation_alone: Option<NameNote>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
@@ -476,6 +478,7 @@ impl Engine {
                 stop_untold: Mutex::new(None),
                 staff: None,
                 name_note: None,
+                conversation_alone: None,
                 task_waiting: None,
                 did: None,
             }),
@@ -560,6 +563,18 @@ impl Engine {
     pub fn telling_what_it_did(mut self, did: LampDid) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.did = Some(did);
+        }
+        self
+    }
+
+    /// A line the rule let out only as the conversation going on is asked
+    /// with `note`'s words beside it (`worker::CONVERSATION_ALONE`): this
+    /// route's model reads one line of words, not who said it to whom
+    /// (#1712). Asked after the request is judged, with its request. Before
+    /// any turn only.
+    pub fn noting_the_conversation_alone(mut self, note: NameNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.conversation_alone = Some(note);
         }
         self
     }
@@ -1179,10 +1194,17 @@ async fn spoken(
     // words of its last exchanges, not its calls, so the model is told, or a
     // yes is taken as a new hand-over (#1712).
     let waiting = shared.task_waiting.as_ref().and_then(|note| note(request));
+    // Let out only as the conversation going on: it may be people's talk.
+    let alone = shared
+        .conversation_alone
+        .as_ref()
+        .and_then(|note| note(request))
+        .map(str::to_owned);
     let notes = stopped
         .into_iter()
         .chain(staff)
         .chain(named)
+        .chain(alone)
         .chain(waiting)
         .collect();
     answer(&shared, request, text, Asker::Spoken, None, notes, times).await;

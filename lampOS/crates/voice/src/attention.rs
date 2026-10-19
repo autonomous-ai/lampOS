@@ -792,6 +792,9 @@ pub struct Attention {
     /// It is night where the lamp stands ([`crate::local_time::night_here`]),
     /// as the caller read it before judging. Read only with `by_day`.
     night: bool,
+    /// With `spoken_to`: the request in hand was let out only as the
+    /// conversation going on ([`Self::played_on_the_conversation_alone`]).
+    conversation_alone: bool,
 }
 
 /// The most text kept for one request.
@@ -1268,6 +1271,7 @@ impl Attention {
         }
         let own = own_request().load(Ordering::Acquire) == request;
         self.judged_own = own;
+        self.conversation_alone = false;
         let fresh = self.begun <= FRESH_REQUESTS;
         let another = self.another(room, own);
         let answering_another = another.is_some();
@@ -1429,6 +1433,16 @@ impl Attention {
                 || turned == Some(true)
                 || self.addressed
         };
+        self.conversation_alone = self.spoken_to
+            && !answering_another
+            && going_on
+            && !(own
+                || called_in_text
+                || self.named
+                || self.named_sure
+                || turned == Some(true)
+                || self.addressed
+                || self.lamp_asked);
         let verdict = match verdict {
             Verdict::Play(_) if self.spoken_to && !spoken_to => {
                 Verdict::Hold(if let Some(why) = another {
@@ -1513,6 +1527,17 @@ impl Attention {
             text: self.heard.clone(),
             facing: turned,
         }
+    }
+
+    /// Whether, with the switch, the answer to the request in hand was let
+    /// out only as the conversation going on: no name, nobody turned to the
+    /// lamp, not said close to it, no answer to its own question. A route
+    /// whose model reads only words is told so (`second_provider`, #1712:
+    /// on lamp-4ace on 19 Oct, colleagues' talk after a named request was
+    /// answered six times, each answer keeping the conversation going,
+    /// where Gemini Live leaves such talk alone).
+    pub fn played_on_the_conversation_alone(&self) -> bool {
+        self.conversation_alone && matches!(self.verdict, Some(Verdict::Play(_)))
     }
 
     /// Whether the answer to the request in hand was let out because the
