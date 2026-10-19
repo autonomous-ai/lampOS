@@ -256,7 +256,17 @@ fn verdict_carries_identity_and_one_request_at_a_time() {
     let outcome = answer(&mut classifier);
     assert_eq!(outcome.result.unwrap().features_us, WINDOW_SAMPLES as u64);
     let pid = classifier.report().pid.unwrap();
+    let monitor = classifier.monitor();
     drop(classifier);
+    assert_eq!(
+        monitor.wait_finished(Duration::from_secs(2)),
+        Teardown::Reaped
+    );
+    let report = monitor.report();
+    assert_eq!(report.native_reaped, Some(true));
+    assert!(report.native_exit_after_us.is_some());
+    assert!(report.reader_finished_after_us.is_some());
+    assert_eq!(report.kill_requested_after_us, None);
     // The closed input ends the worker without a kill.
     until(Duration::from_secs(2), "worker exit", || {
         (!exists(pid)).then_some(())
@@ -381,6 +391,11 @@ fn replaced(classifier: &mut ProcessClassifier, command: i16, expected: &str) {
     assert!(exists(std::process::id()), "this process reads as gone");
     assert!(!exists(old.pid.unwrap()), "old worker still exists");
     ready(classifier);
+    let replacement = classifier.report();
+    assert_eq!(replacement.native_reaped, None);
+    assert_eq!(replacement.native_exit_after_us, None);
+    assert_eq!(replacement.reader_finished_after_us, None);
+    assert_eq!(replacement.kill_requested_after_us, None);
     assert_eq!(
         submit(classifier, token(7), &script(ANSWER, 250, 0)),
         Submit::Accepted
@@ -490,7 +505,11 @@ fn close_during_inference_never_waits() {
         Teardown::Reaped
     );
     assert!(!exists(pid));
-    assert_eq!(classifier.report().kills, 1);
+    let report = classifier.report();
+    assert_eq!(report.kills, 1);
+    assert_eq!(report.native_reaped, Some(true));
+    assert!(report.native_exit_after_us.unwrap() >= report.kill_requested_after_us.unwrap());
+    assert!(report.reader_finished_after_us.is_some());
     assert!(classifier.poll().is_none());
 }
 
