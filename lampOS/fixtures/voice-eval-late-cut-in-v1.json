@@ -1,0 +1,92 @@
+{
+  "version": 2,
+  "id": "voice-eval-late-cut-in-v1",
+  "answer_deadline_ms": 15000,
+  "targets": {"answer_p50_ms": 2000, "answer_p95_ms": 4000, "yield_p95_ms": 200},
+  "fixed_reply": {
+    "text": "I'm doing well, thank you. I'm ready to chat or help with anything you need today.",
+    "frames": 107760,
+    "rate_hz": 24000,
+    "sha256": "d5bd0d6f880434b81846accf5181b9bf5ab28ac91479827aa9f73ddf8b52e144"
+  },
+  "profiles": {
+    "v2-directed-current": {
+      "description": "Mirrors the lamp-live directed policy at source 64529dee: every detected speech run is admitted and cancels any current reply. There is no addressee, acknowledgment or echo gate. Echo is cancelled perfectly in this profile.",
+      "startup_ms": 2000,
+      "first_audio_ms": 1300,
+      "first_audio_jitter_ms": 250,
+      "fixed_reply_first_audio_ms": 10,
+      "generation_speed_percent": 100,
+      "first_burst_ms": 120,
+      "speaker_dispatch_ms": 3,
+      "alsa_delay_ms": 20,
+      "cancel_tail_ms": 14,
+      "echo": {"kind": "none"},
+      "timing_speech_probability": 0.95,
+      "timing_silence_probability": 0.05,
+      "spoken_failure_notice": false,
+      "ring_cues": true
+    },
+    "v2-echo-leak-h4": {
+      "description": "Same policy with one injected residual-echo burst 846 ms after the first accepted reply write, the admission timing observed in physical trial h4jds57i. This is fault injection, not an echo model.",
+      "startup_ms": 2000,
+      "first_audio_ms": 1300,
+      "first_audio_jitter_ms": 250,
+      "fixed_reply_first_audio_ms": 10,
+      "generation_speed_percent": 100,
+      "first_burst_ms": 120,
+      "speaker_dispatch_ms": 3,
+      "alsa_delay_ms": 20,
+      "cancel_tail_ms": 14,
+      "echo": {"kind": "leak", "after_first_write_ms": 846, "duration_ms": 120, "every_reply": false},
+      "timing_speech_probability": 0.95,
+      "timing_silence_probability": 0.05,
+      "spoken_failure_notice": false,
+      "ring_cues": true
+    },
+    "v2-echo-loop": {
+      "description": "Same policy with a residual-echo burst 600 ms after every reply's first write, so each spurious turn's answer can trigger the next. Reproduces the self-sustaining admission chain seen in zejfwxq7 (four admissions from one question). Fault injection, not an echo model.",
+      "startup_ms": 2000,
+      "first_audio_ms": 1300,
+      "first_audio_jitter_ms": 250,
+      "fixed_reply_first_audio_ms": 10,
+      "generation_speed_percent": 100,
+      "first_burst_ms": 120,
+      "speaker_dispatch_ms": 3,
+      "alsa_delay_ms": 20,
+      "cancel_tail_ms": 14,
+      "echo": {"kind": "leak", "after_first_write_ms": 600, "duration_ms": 120, "every_reply": true},
+      "timing_speech_probability": 0.95,
+      "timing_silence_probability": 0.05,
+      "spoken_failure_notice": false,
+      "ring_cues": true
+    }
+  },
+  "scenarios": [
+    {
+      "id": "late-cut-in-after-fruitless-yields", "cohort": "repeated_interruption", "capability": "interruption",
+      "description": "Two asides early in a long story each yield and resume; a real request 25 s after the second must still cut in.",
+      "provider": "gemini", "physical": true, "session_seconds": 150, "observe_ms": 8000,
+      "steps": [
+        {"id": "story", "scene": "long-story-primer", "trigger": {"after": "listening_ready", "delay_ms": 500, "deadline_ms": 30000}, "expect": "answer", "reference": "Starts a story of about a minute; it is expected to be cut in on late."},
+        {"id": "late", "scene": "late-line-after-asides", "trigger": {"after": "speaker_first_write", "delay_ms": 3000, "deadline_ms": 30000, "require_lamp_speaking": true}, "expect": "interrupt_and_answer", "addressed": ["late-math"], "reference": "The asides yield and resume (two fruitless yields); 25 s on they are forgiven, so the story yields to the request and answers 56."}
+      ],
+      "fake_replies": [
+        {"text": "Once there was a lighthouse keeper who counted the ships that passed her rock every night.", "speech_ms": 60000},
+        {"text": "Seven times eight is fifty-six.", "speech_ms": 2200}
+      ]
+    },
+    {
+      "id": "late-line-too-soon-after-fruitless-yields", "cohort": "repeated_interruption", "capability": "interruption",
+      "description": "Two asides early in a long story each yield and resume; a real request 10 s after the second is inside the 20 s, so the story goes on.",
+      "provider": "gemini", "physical": true, "session_seconds": 150, "observe_ms": 8000,
+      "steps": [
+        {"id": "story", "scene": "long-story-primer", "trigger": {"after": "listening_ready", "delay_ms": 500, "deadline_ms": 30000}, "expect": "answer", "reference": "Tells the whole story of about a minute."},
+        {"id": "late", "scene": "late-line-too-soon", "trigger": {"after": "speaker_first_write", "delay_ms": 3000, "deadline_ms": 30000, "require_lamp_speaking": true}, "expect": "no_interrupt", "addressed": ["late-math"], "reference": "The asides yield and resume (two fruitless yields); 10 s on both still count, so the request is not a turn and the story goes on. The 20 s rule's near side: pass only with the two yields shown."}
+      ],
+      "fake_replies": [
+        {"text": "Once there was a lighthouse keeper who counted the ships that passed her rock every night.", "speech_ms": 60000}
+      ]
+    }
+  ]
+}
