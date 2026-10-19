@@ -385,6 +385,43 @@ reads itself:
   `lamp-setup.service` does not start (its conditions), so a lamp does not
   enter setup.
 
+## At the factory, once per lamp
+
+Three things are this lamp's own and no image can carry them (#1682). They
+are done once, in this order, before the lamp leaves, each with the lamp's
+units stopped:
+
+1. **The body's poses**, `/etc/lampOS/body/lamp.env` (the body does not
+   start without it). With the body stopped and the lamp at rest, its arm
+   folded and its head down as it lies when switched off:
+
+   ```sh
+   lamp-body-measure --device /dev/ttyACM0 --unit-id <this lamp> \
+     --lock-directory <the body's motor-lock folder> \
+     --write /etc/lampOS/body/lamp.env
+   ```
+
+   It reads the five joints once at rest with torque off
+   (`lamp-body-inspect`'s read-only plan: no register writes, no torque, no
+   motion), prints the file and writes it, never over one already there. It
+   holds `--home` and `--folded-arm` as found, `--stand` as lamp-4ace's
+   with this lamp's roll and yaw, the default `--pitch-window` checked to
+   hold the rest pitch and to lie inside the pitch servo's own limits, and
+   `--torque on`. It refuses, with why, where the body would refuse the
+   poses, and when any joint has torque on (the lamp is then held, not at
+   rest). `--gaze` is not in it: it is measured with a face and the camera
+   ([body.md](body.md)), and the body runs without it until then. Without
+   `--write` it only prints, so a lamp can be read first and written later.
+2. **The touch calibration**, `/etc/lampOS/controls/controls-pins.json`,
+   with a person at the lamp: `lamp-controls calibrate-touch` (controls.md, "Run without a lamp,
+   then qualify on one": First's on-lamp sequence), its output installed there. `install`
+   keeps a pins file changed on the lamp.
+3. **The update key**, `/etc/lampOS/update/key.pub`: the public half of the
+   owner's signing key ([updates.md](updates.md)). `install` refuses to run
+   without it (step 1 below), and setup never writes it.
+
+Then `lamp-selftest --occasion factory` ([selftest.md](selftest.md)).
+
 ## Setup at first boot, without the keeper
 
 The keeper honours `--setup-marker` only when it runs as the old updater's
