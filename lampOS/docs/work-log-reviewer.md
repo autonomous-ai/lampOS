@@ -4,6 +4,33 @@
 
 Newest first. Times from `date` (+07).
 
+- 06:33 #2074 read (trials-test thread flake): no finding, 434/0; merge after rebase and green ARM64
+- 06:31 #2060: corrected my P3 line (the product has LAMP_SAY=on; silent only offline)
+- 06:31 #2060 re-read (El: reset plan by the agreed rule): my P2 fixed, no new P1/P2; gate 116/0, two mutations caught; first builder's
+- 06:30 #2075 and #2076 (#1680 update and controls stores) sent to a second pass
+- 06:27 merged #2042 (trials.sh mood) as `d371290ae`, on its green ARM64, Jarvis's P2 fixed. Its body names only #1722, so no issue to close.
+- 06:26 #2070 (eyes' waiting forgets): P2, one start moves a later build's forgets to a name no build reads (a scratch test showed it). #2071 (body poses): no P1 or P2, fold to one commit. Both for the first builder.
+- 06:24 #2072 (#1759's tools alone): no P1 or P2; needs one commit and a docs paragraph before I merge it.
+- 06:22 #2067 (memory one version ahead): P2, a forget leaves the set-aside database on disk (El's own question; yes to El's fix); P3s. For the first builder.
+- 06:17 #2066 (schedule one version ahead): P2, a zone this build doesn't know falls back to UTC, so a new reminder rings hours off; two P3s. For the first builder.
+- 06:13 #1927 `7a0a2057a`, #2053 `01f52837e`, #2064 `a6663bda7`: rebases onto #1712's head only, the patches line for line the same; my reads stand.
+- 06:09 #2068 read (probe: #2054's day lines): no finding; P3 add a talk line with remember/forget
+- 06:09 #2057: set-aside inside the wiped store folder (reset reaches it)
+- 06:08 #2065 read (Thirteen: Expression catalogue one forward): no P1/P2; P3 new restrictions read past; fold 2; first builder's
+- 06:07 #2042 9de6c5e07: Jarvis's P2 fixed (traced NaN in due); merge on green; invited Jarvis re-read
+- 06:06 #2064 (=#1960 onto #1712): read stands, same patch
+- 06:03 #2063 read (memory quality arms): no finding
+- 06:01 #2062 read (duplex forgiven trace and count): no finding
+- 05:58 #1923 f65afb792: P3s fixed (buffers zeroed, off test, switches row)
+- 05:58 #2055 merged as cf82a865e (closed_early journal line)
+- 05:51 #2060 read: P2 confirmed (unknown wipe entry skipped, reset completes); proposed wipe-as-strings, keep-back top-level, unknown kind refuses
+- 05:50 #2057 read (El: tasks store one version ahead): no P1/P2; P3s (WAL refused first, set-asides pile up, unread never evicted); first builder's
+- 05:49 #2061 read (El: voice config one version ahead): no P1/P2; P3 serde error may quote a value; first builder's
+- 05:47 first look #2057 #2060 (El: stores one version ahead): update path -> first builder's; reads running
+- 05:47 #1067 6884e95fc: P2 answered (second commit dropped, sway patch unchanged + one test)
+- 05:44 #2059 read (Nine: drop dead keep_known): no finding
+- 05:42 posted the 05:05 list summary on #1722
+- 05:42 #1923 read (Sixth: ears classes): no P1/P2; P3s (log-mel not zeroed, off path untested, switches row); fold; first builder's
 - 05:38 #2050 merged as 99e6232fb (trials three nudges)
 - 05:38 #2042 conflicts after #2050; asked Ten to rebase
 - 05:37 #2055 read (Nine: closed_early journal): no finding; merge on green
