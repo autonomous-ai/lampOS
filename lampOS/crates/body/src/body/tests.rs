@@ -999,10 +999,16 @@ fn a_wider_reach_and_speed_can_be_chosen_only_inside_their_caps() {
     };
     let glanced = farthest(&lamp, Joint::BaseYaw, 2_015);
     assert!((30..=50).contains(&glanced), "{glanced}");
-    // Six seconds of thinking: all the way.
+    // Six seconds of thinking: the head all the way, the base still at its
+    // glance (#1722, 20 Oct: a base turning on in a slow answer was heard
+    // as someone speaking).
     let lamp = turned(9_000, 14);
     let farthest = |joint: Joint, home: u16| farthest(&lamp, joint, home);
-    assert!(farthest(Joint::BaseYaw, 2_015) >= 150 && farthest(Joint::BaseYaw, 2_015) <= 200);
+    assert!(
+        (30..=50).contains(&farthest(Joint::BaseYaw, 2_015)),
+        "{}",
+        farthest(Joint::BaseYaw, 2_015)
+    );
     assert!(farthest(Joint::WristPitch, 1_950) >= 90);
     let mut previous = [1_950, 2_044, 2_015];
     for write in &lamp.goals {

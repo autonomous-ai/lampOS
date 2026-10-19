@@ -53,6 +53,13 @@ const LONGEST_STEP_US: u64 = 100_000;
 /// began, its base was 8 to 12 degrees round by then, and it was back and
 /// still 0.7 to 1.2 s later: it spent each answer turning back to the
 /// person it was answering.
+///
+/// Only the head goes on: the base holds the glance. On lamp-4ace on 20 Oct
+/// a slow first answer (3.5 s) let the base turn 82 counts more from about
+/// 2 s in, and the microphone took the servo for someone speaking (the
+/// first builder on #1722, 04:36). A person thinking a while looks away
+/// with the eyes and the head, not the whole body, and the base is the
+/// lamp's loud joint (Fourth and Thirteen, #1722 05:1x).
 const GLANCE_US: f32 = 800_000.0;
 const DEEPEN_US: f32 = 4_000_000.0;
 /// The whole look away, as a share of the turn the engine allows.
@@ -139,7 +146,8 @@ impl Gestures {
             Mood::Thinking => {
                 // How far into the whole look away it is: the glance for
                 // the length of a glance, then all of it, eased at both
-                // ends. The lift and the tilt go with the turn.
+                // ends. The lift and the tilt go on; the base's turn stays
+                // the glance.
                 let thought_us = now_us.saturating_sub(self.since_us) as f32;
                 let share = ((thought_us - GLANCE_US) / DEEPEN_US).clamp(0.0, 1.0);
                 let eased = share * share * (3.0 - 2.0 * share);
@@ -148,7 +156,7 @@ impl Gestures {
                 Pose {
                     pitch: LISTENING_PITCH - 0.3 * deep,
                     roll: (LISTENING_ROLL - 1.25 * deep) * side,
-                    yaw: AWAY * deep * side,
+                    yaw: self.glance * side,
                 }
             }
             Mood::Speaking => {
@@ -250,28 +258,35 @@ mod tests {
         for ms in [100, 400, 800] {
             assert_eq!(at(&mut gestures, ms), glance, "{ms}");
         }
-        // Then further round, a little at first and never back.
+        // Then the head goes further, a little at first and never back,
+        // while the base holds the glance: on lamp-4ace a base turning on
+        // from 2 s into a slow answer was heard as someone speaking.
         let mut before = glance;
         for ms in [1_000, 1_400, 2_000, 2_800, 3_600, 4_400, 4_800] {
             let now = at(&mut gestures, ms);
-            assert!(now.yaw.abs() > before.yaw.abs(), "{ms} {now:?}");
+            assert_eq!(now.yaw, glance.yaw, "{ms} {now:?}");
             assert!(now.pitch < before.pitch, "{ms} {now:?}");
-            assert_eq!(now.yaw.signum(), glance.yaw.signum());
+            // The tilt goes on over to the other side.
+            let side = listening.roll.signum();
+            assert!(now.roll * side < before.roll * side, "{ms} {now:?}");
             before = now;
         }
-        // At 1.2 s, when an ordinary answer has begun, it is under a
-        // quarter of the turn: a base that turns at 120 counts a second
-        // within a reach of 250 is back from there in half a second.
-        assert!(at(&mut gestures, 1_200).yaw.abs() < 0.25);
-        // After 4.8 s it is all the way, and stays.
+        // After 4.8 s the head is all the way, and stays; the base is where
+        // its glance put it.
         let whole = at(&mut gestures, 4_800);
-        assert!((whole.yaw.abs() - 0.9).abs() < 1e-6, "{whole:?}");
+        assert_eq!(whole.yaw, glance.yaw, "{whole:?}");
         assert!((whole.pitch + 0.7).abs() < 1e-6, "{whole:?}");
         assert!((whole.roll.abs() - 0.4).abs() < 1e-6 && whole.roll * glance.roll < 0.0);
         assert_eq!(at(&mut gestures, 30_000), whole);
-        // A glance is never more than the whole look away.
+        // A glance is never more than the whole look away, which a lamp
+        // told nothing of a glance makes at once.
         let wide = Gestures::new().glancing(7.0).target(Mood::Thinking, 0, 1);
         assert!((wide.yaw.abs() - 0.9).abs() < 1e-6, "{wide:?}");
+        let whole_at_once = Gestures::new().target(Mood::Thinking, 0, 1);
+        assert!(
+            (whole_at_once.yaw.abs() - 0.9).abs() < 1e-6,
+            "{whole_at_once:?}"
+        );
         // The next time it thinks, it begins with a glance again, to the
         // other side.
         gestures.target(Mood::Speaking, 0, start + 31_000_000);

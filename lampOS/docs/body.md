@@ -503,12 +503,27 @@ look away for as long as it takes.
 - At once: the base turns 36 counts, a little over three degrees, and
   the lift and the tilt go the same share of their way.
 - For the first 0.8 s it stays there.
-- If the lamp is still thinking, it goes the rest of the way to the whole
-  look away over the next 4 s, eased at both ends.
+- If the lamp is still thinking, the head goes the rest of the way (the
+  lift and the tilt) over the next 4 s, eased at both ends. **The base
+  holds the glance:** it turns no further while the lamp thinks.
 
 Within the folded reach (yaw 40) the glance is the whole look away, so a
 lamp started without `--reach` moves exactly as it did. With lamp-4ace's
-yaw reach of 250 the whole look away is 225 counts, near 20 degrees.
+yaw reach of 250 the base stops at the glance's 36 counts; until 20 Oct it
+went on to the whole look away, 225 counts, near 20 degrees.
+
+**Why the base holds** (#1722, 20 Oct): on lamp-4ace a slow first answer
+(3.5 s, a cold connection) let the base turn 82 counts more from about 2 s
+into the wait, and the microphone took the servo for someone speaking: a
+line of 0 words held the answer 1.9 s, and once 6 words were answered in
+place of the request. A person thinking a while looks away with the eyes
+and the head, not the whole body, and the base is the lamp's loud joint
+(Thirteen and Fourth; the first builder's yes, 05:21). Tests:
+`gesture.rs`'s `the_look_away_is_a_glance_that_deepens_only_while_the_thinking_goes_on`
+(the base's yaw stays the glance through 4.8 s, the head goes on) and
+`body/tests.rs`'s `a_wider_reach_and_speed_can_be_chosen_only_inside_their_caps`
+(six seconds of thinking at a reach of 200: the base 30 to 50 counts, the
+head 90 or more).
 
 It was changed on what the joints showed. On lamp-4ace on 2026-10-14,
 with `body/joint_states` recorded through three short played exchanges
