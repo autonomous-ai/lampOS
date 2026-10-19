@@ -995,6 +995,23 @@ after a take-over, but now for every turn:
     the journal says why, without words: `request N: no conversation going
     on: it was last heard saying words S s ago, it was last called C s ago,
     K lines left alone since it last spoke` ("it was never …" when never).
+  - **in a busy room, this route asks more than Live** (#1712, the first
+    builder at 18:57). In ten minutes of a busy office on lamp-4ace, 15
+    lines were let out as the conversation going on, and about 10 of the 15
+    answers went to office talk: DeepSeek declines far less than Gemini.
+    So in a busy room:
+    - a conversation goes on only 15 s from the lamp's own last words
+      (`BUSY_GOING_ON_FOR`) or the person's call;
+    - a line let out only as it going on must be a question, three words or
+      more, or an answer to the lamp's own question, such as the hand-over's
+      "yes" (`BUSY_SHORT`);
+    - a line let out only by someone turned to the lamp must ask it
+      something (`BUSY_TURNED`);
+    - its name, its words calling it, a tap, or being said close to it let
+      a line out as before.
+
+    In a quiet room it is as on Live. The journal's "no conversation going
+    on" line adds ", in a busy room, where it goes on 15 s".
   - **the journal names the sign that let a line out** (#1712, the first
     builder at 17:49). With `--spoken-to`, the rule's first reason can be
     one that lets nothing out by itself, the session trusted or the room
