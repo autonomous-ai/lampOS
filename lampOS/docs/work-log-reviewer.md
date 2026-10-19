@@ -4,6 +4,13 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 20:24 Re-read nine PRs whose heads had moved since my last note: #1067 (fix reads right, gate and a mutation), #1115, #1340, #1788 (rebases fine; on #1788, warned that #1919 and it make the same 23→24 change, so the next rebase must say 25), #1792 (Third's two P2s and three P3s fixed), #1867 (the fold matches), #1900 (El's P2 fixed). Asked for folds where a PR has more than one commit.
+- 20:24 #1759: one P2 in tools/speaking-ab.sh. lamp-bus tap prints a header then the payload, so jq's fromjson? drops every line, and the sound and offsets rows always read 0 on a lamp (and VoiceSound flattens playout).
+- 20:14 lamp-voice 521b12eb2 (#1728's squash) doesn't compile: UNITS lists 24 names but is declared 23. The first builder opened #1919 at 20:13; I checked that its 24 names match deploy/product. Reviewer-two found a second break (a MoodState test missing breath).
+- 20:11 #1899: not merged, Jarvis's three P2s (wrong numbers in the table) stand; my 19:25 read missed them
+- 20:08 read #1918 (Ten's mood inputs on the second route, test and docs): no finding; merge on green ARM64
+- 20:01 range-diffs of #1728 (lamp-mood unit now in the install, off exits 0) and #1749 (familiar field only): read right; first builder's merges
+- 19:55 merged #1908 (Tests' endpoint fixtures end on Stop, tests only, #1806) as 2338fbe91
 - 19:51 merged #1906 (Jarvis's held stop made visible) as 6c4683048; #1683 stays open
 - 19:50 read #1913 (El's settings in the manifest): no P1, off unchanged; three P2s when on (a missing apply sticks the lamp, lampos.conf never updated, a retried put-back loses records); first builder's merge
 - 19:40 #1909's P2 fixed (ExecStartPre, shown on lamp-c0a4); one P3, needs a fold; first builder's merge
@@ -720,7 +727,7 @@ Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped
 - 23:47 merged #1411 (the setup light's retry-window test holds the fast clock across the marker)
 - 23:46 #1411 reviewed at 1e47726ed: no finding (the light test holds the fast clock across the marker; my #1402 P3); merge on green ARM64
 - 23:44 #1397 re-checked at 63162f447: P2 fixed (the early read only with patient writes; unset unchanged, pinned); off unless set; merge on green ARM64
-- 23:40 #1394 re-checked at 8f17d0e3f: P2s and P3s fixed (cb94's 313 first outputs all within 2.41 s); needs a rebase as one commit (conflicts with #926 in policy_holds.rs; a merge commit on the branch); then the first builder merges with his lamp-4ace run
+- 23:40 #1394 re-checked at 8f17d0e3f: P2s and P3s fixed (cb94's 313 first outputs all within 2.41 s); needs a rebase as one commit (conflicts with #926 in policy_holds.rs; a merge commit on the branch); then the first builder merges with their lamp-4ace run
 - 23:37 merged #1410 (a product lamp with no link says so once and keeps going; option A of #830)
 - 23:31 merged #1409 (a null or a number in setup's link fields never fails setup)
 - 23:24 #1410 reviewed at e488c4289: no finding (the product's offline line and lamp/online, the first builder's option A); merge on green ARM64
@@ -3502,7 +3509,7 @@ Reviewer: [P2] Bound replay by actual downstream capacity at `lampOS/crates/voic
 
 Use downstream credit or a bounded retry/handoff that preserves order and ownership without turning temporary queue fullness into a dead session. Add a real stalled-transport regression. This proof exercises the actual Gemini boundary at the configured rate; it is not a complete coordinator/worker process or lamp/cloud measurement.
 
-Fresh exact-head Voice gate is **1,405/0/8**, fmt/strict Clippy pass; native [38815993201](https://github.com/autonomous-ai/lampOS/actions/runs/38815993201) passed **4,937 unique tests / 130 skipped**, plus four doctests and twelve own-harness checks. First's four successful restart scenes are recorded, with his stated limit that the hold was not shown to engage. Sixth's later lamp-52e6 evidence also records four 0.4 s restart scenes on this head, all with confirmed 1,171–1,320 ms holds, no link loss, and successful Gemini answers; that physical evidence is accepted within those measured scenes. The independent stalled-transport source reproduction above remains a blocker.
+Fresh exact-head Voice gate is **1,405/0/8**, fmt/strict Clippy pass; native [38815993201](https://github.com/autonomous-ai/lampOS/actions/runs/38815993201) passed **4,937 unique tests / 130 skipped**, plus four doctests and twelve own-harness checks. First's four successful restart scenes are recorded, with their stated limit that the hold was not shown to engage. Sixth's later lamp-52e6 evidence also records four 0.4 s restart scenes on this head, all with confirmed 1,171–1,320 ms holds, no link loss, and successful Gemini answers; that physical evidence is accepted within those measured scenes. The independent stalled-transport source reproduction above remains a blocker.
 
 Checked at 2026-10-16 05:52 +0700.
 
