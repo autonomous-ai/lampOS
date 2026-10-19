@@ -5,6 +5,26 @@ list and the answers belong to the first builder (Queue #1722, continued from
 #705). Sixth shares lamp-52e6 through Fifth, with a scoped loan and exact
 restoration; every hardware result below names its lamp. Newest first.
 
+## 2026-10-19 — mic1 export and request scope ready
+
+Ready for review: #1748 at `c5f1e27f6` and #1794 at `b9c77f6a8`.
+Both are mergeable; First owns their privacy/default-change checks and merge.
+
+- Exact-head ARM64 runs `39216134192` and `39216318595` passed. #1748's Go,
+  Web and Python checks also passed. No local gates were rerun unnecessarily.
+- Independent #1794 read found no concrete P1/P2. Its remaining session/history
+  isolation is explicit; the next design is on #1675, comment `6262465575`.
+  Second can build context from the admitted scope independently. Live needs
+  a real fresh session, without silently relabeling coordinator-owned Start;
+  a fail-closed first slice may lose one turn at identity change, for First's
+  scope decision before implementation.
+- Fifth has not granted the read-only preflight requested in the lamp's
+  loans file. No installation, capture, recording or service change occurred.
+- First closed #779 on checkpoint `6262152959`; its remaining latency target
+  belongs to Third's #1712. #1442 stays parked behind #1675 and is revived only
+  if #1712's measurements identify connection cost.
+
+
 ## 2026-10-19 — request-scope draft; mic1 retargeted
 
 Ready for lamp-voice: no for #1794 and the new #1748 head; native CI pending.
