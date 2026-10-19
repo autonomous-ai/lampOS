@@ -2264,6 +2264,7 @@ dependencies = [
  "lamp-ears",
  "lamp-expression",
  "lamp-gemini",
+ "lamp-health",
  "lamp-ipc",
  "lamp-local-time",
  "lamp-msgs",

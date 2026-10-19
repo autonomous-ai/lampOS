@@ -2915,6 +2915,7 @@ fn provider_arguments(
     arguments.extend(crate::session_fact::arguments_from_environment());
     arguments.extend(crate::room_told::arguments_from_environment());
     arguments.extend(crate::air_told::arguments_from_environment());
+    arguments.extend(crate::health_told::arguments_from_environment());
     if keep_link {
         arguments.push(crate::provider_worker::KEEP_LINK_FLAG.to_owned());
     }

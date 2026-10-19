@@ -383,6 +383,14 @@ pub fn serve(
         .as_deref()
         .filter(|_| files.room_facts)
         .and_then(|root| lamp_bus::Bus::new(root).ok());
+    // With `--health-facts`, an unwell part, kept up from the bus by a
+    // thread of its own; a turn reads only what it keeps (#1681).
+    let health = files
+        .bus_root
+        .as_deref()
+        .filter(|_| files.health_facts)
+        .and_then(|root| lamp_bus::Bus::new(root).ok())
+        .map(|bus| crate::health_told::watch(bus, crate::health_told::READ_EVERY));
     // What the texts' task is built from, kept before the spoken turns take
     // their own (`texts_task`).
     let texts_from = (character.clone(), tools.clone());
@@ -427,7 +435,10 @@ pub fn serve(
             &character,
             crate::agent_tasks::noted(crate::local_time::told_here(clock, places), tasks.as_ref())
                 .as_deref(),
-            &(memory + &facts(session_fact && !going_on, room) + &skills),
+            &(memory
+                + &facts(session_fact && !going_on, room)
+                + &health_fact(health.as_deref())
+                + &skills),
             file.as_deref(),
             person.as_deref(),
         )
@@ -601,6 +612,18 @@ pub(crate) fn facts(session: bool, room: Option<crate::room_told::Room>) -> Stri
         .chain(room)
         .map(|fact| format!("\n\n{fact}"))
         .collect()
+}
+
+/// Which parts are unwell, with `--health-facts`, for this turn's system
+/// message (`crate::health_told`): from what the watch keeps, every turn
+/// while it lasts, since each chat starts with nothing; empty when all is
+/// well, nothing fresh is known, or the switch is off.
+pub(crate) fn health_fact(
+    health: Option<&std::sync::Mutex<crate::health_told::HealthTold<()>>>,
+) -> String {
+    health
+        .and_then(|health| health.lock().ok()?.now())
+        .map_or(String::new(), |line| format!("\n\n{line}"))
 }
 
 /// The Live route's rule for whom it answers (`crate::attention`, given
@@ -1603,6 +1626,13 @@ mod tests {
     }
 
     #[test]
+    fn the_health_fact_is_empty_with_the_switch_off_and_when_nothing_is_known() {
+        assert_eq!(health_fact(None), "");
+        let kept = std::sync::Mutex::new(crate::health_told::HealthTold::<()>::default());
+        assert_eq!(health_fact(Some(&kept)), "");
+    }
+
+    #[test]
     fn the_second_worker_takes_the_live_workers_flags_but_keep_link() {
         let dir = Path::new("/run/lamp-voice");
         let flags = strings(&[
@@ -1613,6 +1643,7 @@ mod tests {
             "--session-fact",
             "--room-facts",
             "--air-facts",
+            "--health-facts",
             "--tools",
             "--actions-dir",
             "/run/lamp-exec",
