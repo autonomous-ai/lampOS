@@ -80,15 +80,33 @@ impl RoomActivity {
 pub struct StoodUp {
     /// How long the sitting they left had lasted, in whole seconds.
     pub sitting_s: u32,
+    /// The side of the camera's picture they left by, from where their face
+    /// was last seen; none when it was near the middle (added 2026-10-20,
+    /// optional, for watching them go). A turn toward it is the turn the
+    /// gaze would make to a face seen there (`docs/body.md`, `toward`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub side: Option<Side>,
+}
+
+/// A side of the camera's picture, as it is filled: left is its left edge.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Side {
+    Left,
+    Right,
 }
 
 impl StoodUp {
     pub const TYPE: &str = "lamp_msgs/StoodUp";
     pub const VERSION: u32 = 1;
     pub const TOPIC: &str = "room/stood_up";
+    /// A departure means nothing this long after it: a reader that keeps the
+    /// newest value (lamp-skills' triggers) lets it go, so the next
+    /// departure starts anew.
+    pub const LASTS: Duration = Duration::from_secs(5);
 
     pub fn declaration() -> Declaration {
-        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event).lasting(Self::LASTS)
     }
 }
 

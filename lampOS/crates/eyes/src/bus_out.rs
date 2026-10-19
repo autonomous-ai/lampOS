@@ -988,6 +988,11 @@ mod tests {
         }
         let up = stood.recv(Duration::ZERO).unwrap().expect("stood up");
         assert_eq!(up.parse::<StoodUp>().unwrap().sitting_s, 30);
+        assert_eq!(
+            up.header.expires_ms,
+            Some(5_000),
+            "a departure's short life"
+        );
         assert!(stood.recv(Duration::ZERO).unwrap().is_none(), "once");
         std::fs::remove_dir_all(&root).unwrap();
     }
