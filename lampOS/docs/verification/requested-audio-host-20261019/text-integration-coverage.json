@@ -1,0 +1,160 @@
+{
+  "previous_complete_workspace_source_sha256": "5d0f2646b1a9977e713634fc2842c31f39390a848ac26def79ca215397960c95",
+  "integration_source_sha256": "681bfc558f3624a1574a95c5466085c5ae392fef3a8a06cac0d4ef370e43853c",
+  "previous_workspace_crates": [
+    "lamp-actions",
+    "lamp-air",
+    "lamp-audio",
+    "lamp-body",
+    "lamp-bus",
+    "lamp-camera",
+    "lamp-cloud",
+    "lamp-controls",
+    "lamp-ears",
+    "lamp-environment",
+    "lamp-expression",
+    "lamp-eyes",
+    "lamp-gemini",
+    "lamp-health",
+    "lamp-ipc",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-local-time",
+    "lamp-memory",
+    "lamp-mood",
+    "lamp-msgs",
+    "lamp-name",
+    "lamp-observer",
+    "lamp-policy",
+    "lamp-records",
+    "lamp-ring",
+    "lamp-same-voice",
+    "lamp-schedule",
+    "lamp-selftest",
+    "lamp-settings",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-sound-fixtures",
+    "lamp-surround",
+    "lamp-tasks",
+    "lamp-turn-end",
+    "lamp-turn-end-wire",
+    "lamp-turn-owner",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval",
+    "lamp-voice-processes"
+  ],
+  "changed_crates_since_full_gate": [
+    "lamp-memory",
+    "lamp-skills",
+    "lamp-voice"
+  ],
+  "reverse_dependency_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "integration_test_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "changed_source_files": [
+    {
+      "path": "lampOS/crates/memory/tests/voice_forget.rs",
+      "before_sha256": null,
+      "after_sha256": "06f56b63ac5521e7378caa2a4cac43a4d8afcedebcba5276586d1f5c27176c96",
+      "crate": "lamp-memory"
+    },
+    {
+      "path": "lampOS/crates/skills/src/lib.rs",
+      "before_sha256": "2f65b0fb6c651443d316cdaf853a7b49f243d3b22ec90580361a01e332971f6c",
+      "after_sha256": "f6824cfed4fcca7104f79eacfcccda7dc892347c16a8c090346cb13b88958c45",
+      "crate": "lamp-skills"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/requested_audio.rs",
+      "before_sha256": "74148ff35dfe8e4943e71f9a0438f19f2d20132734b7efc658f3a8e8c77bc6ef",
+      "after_sha256": "a03752521cce6da455be99ae343f202b48f97f517a2a0fd87cf203e866166962",
+      "crate": "lamp-skills"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/skills.rs",
+      "before_sha256": "8bcca579d2291006a00aa0d27bc825fc6dd030b47a8cdfd1d8f340cf262b1a74",
+      "after_sha256": "402e00c78ef0512841c12d0d07ec48db89fb2c95f0ac2b6494678059b2aedc8a",
+      "crate": "lamp-skills"
+    },
+    {
+      "path": "lampOS/crates/voice/src/agent_tasks.rs",
+      "before_sha256": "0032cfab55285c40d66e28ff54a04e9147e2a83c7dc11c883acee0048be3f48d",
+      "after_sha256": "587c9a9fda479325d19a80f3224d6ef98b8544b173e1bb02c7c63050dfb66343",
+      "crate": "lamp-voice"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/termination.rs",
+      "before_sha256": "99600822b70757987456c23772aa2791ceb8f6171e03b67c6ff2ca4c9526b253",
+      "after_sha256": "0524b42bd84bf72a7e53a7baf0c2c59e4193ed26f9ee4c4e47f19c4b70288793",
+      "crate": "lamp-voice"
+    },
+    {
+      "path": "lampOS/crates/voice/src/messages.rs",
+      "before_sha256": "96215c18eef71c23e26fe421537f558ebc603b4efb08379d058325f22a57e4f1",
+      "after_sha256": "2967682d3df09cd486dcb86ce9122b40aebb8a0d414c23a585fbd8beddb9807d",
+      "crate": "lamp-voice"
+    },
+    {
+      "path": "lampOS/crates/voice/src/process.rs",
+      "before_sha256": "ec08d2ed3455bd4ed6cf0f12250ebf82d8b00658f60bfb049bcd7273c78beb57",
+      "after_sha256": "5b80bd6a53dfbcd6ea5c27d8c4b55b664eea4b0184d7fccf62f27afa05596df3",
+      "crate": "lamp-voice"
+    },
+    {
+      "path": "lampOS/crates/voice/src/remember.rs",
+      "before_sha256": "12aa3fce17a5df04dbbf052dc66ec139ece788d4a4a8a067755a9e57b96d10ee",
+      "after_sha256": "b65faee622f8c940c04357e4308928586ccf1e093464ece787de262d236778ca",
+      "crate": "lamp-voice"
+    },
+    {
+      "path": "lampOS/crates/voice/src/task_news.rs",
+      "before_sha256": "36e8d79517a8a21c49a0d8d34132b8bc97c33d13a7aa14c52ca067e2de124e70",
+      "after_sha256": "8f381435c4b54b01f00114b61e3eadb366a5d8b51ea269d6d8e282dd9c313975",
+      "crate": "lamp-voice"
+    },
+    {
+      "path": "lampOS/crates/voice/src/tools.rs",
+      "before_sha256": "b888bae2cbbfb261c81e61cff70fb0b8297f1442f0c306c2528345bff6b25727",
+      "after_sha256": "e221cd04b25547f3318aaf8633700784769fac56449f1be499e430642a249e79",
+      "crate": "lamp-voice"
+    }
+  ],
+  "changed_builder_documents": [
+    {
+      "path": "lampOS/builders/HARDWARE-TEMPLATE.md",
+      "before_sha256": "3a7f4439cd0621695ae50ba2c9daed806110baedc448ddea595ce5d41511148d",
+      "after_sha256": "15b674f7c11f0e86887b0ae3f21b62767e1a52027d957cf4087ebab56d6d1a5d"
+    },
+    {
+      "path": "lampOS/builders/hw-first.md",
+      "before_sha256": null,
+      "after_sha256": "0dd6091e47732bc527c90ac215cb02611621c40408baf253420d58e7537f86b5"
+    }
+  ],
+  "all_code_changes_covered_by_complete_consumer_suites": true,
+  "all_other_non_document_source_hashes_match": true,
+  "explanation": "The prior complete workspace gate covers all unchanged code. Every changed crate and every reverse consumer receives its complete suite again, with no test filter. Workspace formatting, strict all-target Clippy and build are rerun. Complete Update tests remain in the checkout for the inherited parent image fixture; other tests and build run from a source-only copy. Gate results are recorded separately."
+}

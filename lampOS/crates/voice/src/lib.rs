@@ -90,6 +90,7 @@ pub mod reference;
 pub mod remarks;
 pub mod remember;
 pub mod reminders;
+pub mod requested_audio;
 pub mod resend;
 pub mod ring_asleep;
 pub mod ring_caps;

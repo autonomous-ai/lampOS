@@ -29,6 +29,7 @@ pub mod light;
 pub mod schedule;
 pub mod server;
 pub mod sound;
+pub mod speaker_state;
 
 use serde_json::{Value, json};
 

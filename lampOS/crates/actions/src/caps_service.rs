@@ -4,7 +4,7 @@
 
 use crate::{
     caps,
-    sound::{Mixer, Volume},
+    sound::{Mixer, Observation, Volume},
 };
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{ClockStamp, OutputCap, OutputCaps};
@@ -204,6 +204,34 @@ impl Service {
         !self.failed && self.published && (!self.volume_required || self.volume_confirmed)
     }
 
+    /// Only the applicable mixer restriction gates requested audio. A light
+    /// snapshot's delivery is not an additional sound permission dependency.
+    pub(crate) fn volume_permitted(&self) -> bool {
+        !self.volume_required || self.volume_confirmed
+    }
+
+    /// A fresh actual read within the accepted ceiling establishes compliance
+    /// without another mixer call. Unknown/out-of-limit observations invalidate
+    /// it and leave retry to the existing bounded cap cadence.
+    pub(crate) fn observe_volume(&mut self, observation: Option<Observation>) {
+        if !self.volume_required {
+            return;
+        }
+        let confirmed = observation.is_some_and(|observation| {
+            observation.revocation.is_some()
+                && observation.sequence.is_some_and(|sequence| sequence > 0)
+                && observation
+                    .raw
+                    .is_some_and(|raw| self.applied.flatten().is_some_and(|limit| raw <= limit))
+        });
+        self.volume_confirmed = confirmed;
+        self.volume = if confirmed {
+            json!({"required":true,"confirmed":true})
+        } else {
+            json!({"required":true,"confirmed":false,"error":"volume was not confirmed after the last observation"})
+        };
+    }
+
     /// Preserve a known fatal failure even when shutdown skips the next tick.
     /// This only reads the recorded state; it performs no disk or output work.
     pub(crate) fn check(&self) -> io::Result<()> {
@@ -219,6 +247,7 @@ impl Service {
         wanted: Option<u8>,
         sound: &mut Option<Volume<M>>,
         now: u64,
+        before_restriction: &mut impl FnMut(),
     ) {
         self.volume_required = wanted.is_some();
         // With no restriction at a fresh start, there is no hardware change
@@ -234,6 +263,14 @@ impl Service {
                 .is_none_or(|at| now.saturating_sub(at) >= EVERY_US);
         if self.applied == Some(wanted) && !retry {
             return;
+        }
+        if wanted.is_some_and(|limit| {
+            !self.volume_confirmed || self.applied.flatten().is_none_or(|old| limit < old)
+        }) {
+            // Durable acceptance already happened. Withdraw old audible
+            // evidence before a tighter or unconfirmed restriction can block
+            // in mixer I/O; unrelated light updates never reach this hook.
+            before_restriction();
         }
         self.applied = Some(wanted);
         let result = sound.as_mut().map(|volume| volume.set_limit(wanted));
@@ -304,11 +341,17 @@ impl Service {
         Ok(())
     }
 
-    fn sync<M: Mixer>(&mut self, snapshot: caps::Snapshot, sound: &mut Option<Volume<M>>) {
+    fn sync<M: Mixer>(
+        &mut self,
+        snapshot: caps::Snapshot,
+        sound: &mut Option<Volume<M>>,
+        before_restriction: &mut impl FnMut(),
+    ) {
         self.apply_volume(
             snapshot.effective.volume_raw_max,
             sound,
             (self.clock)().at_us,
+            before_restriction,
         );
         let was = self.published;
         self.published = self.publish(&snapshot).is_ok();
@@ -328,6 +371,14 @@ impl Service {
     /// at most once per second, never on each 50 ms idle pass. A storage error
     /// stops service before a looser snapshot or a success can be published.
     pub fn tick<M: Mixer>(&mut self, sound: &mut Option<Volume<M>>) -> io::Result<()> {
+        self.tick_guarded(sound, &mut || {})
+    }
+
+    pub(crate) fn tick_guarded<M: Mixer>(
+        &mut self,
+        sound: &mut Option<Volume<M>>,
+        before_restriction: &mut impl FnMut(),
+    ) -> io::Result<()> {
         self.check()?;
         let now = (self.clock)();
         if self.looked_at.is_some_and(|at| now.at_us < at) {
@@ -342,7 +393,7 @@ impl Service {
             self.failed = true;
             io::Error::other(error)
         })?;
-        self.sync(snapshot, sound);
+        self.sync(snapshot, sound, before_restriction);
         self.looked_at = Some((self.clock)().at_us);
         Ok(())
     }
@@ -350,6 +401,15 @@ impl Service {
     /// Original request bytes are decoded directly: a Value round trip would
     /// hide duplicate fields. The server bounds the complete line to 8192 bytes.
     pub fn answer<M: Mixer>(&mut self, line: &[u8], sound: &mut Option<Volume<M>>) -> Value {
+        self.answer_guarded(line, sound, &mut || {})
+    }
+
+    pub(crate) fn answer_guarded<M: Mixer>(
+        &mut self,
+        line: &[u8],
+        sound: &mut Option<Volume<M>>,
+        before_restriction: &mut impl FnMut(),
+    ) -> Value {
         if self.failed {
             return failure(caps::Error::RecoveryRequired);
         }
@@ -388,7 +448,7 @@ impl Service {
                         return failure(error);
                     }
                 };
-                self.sync(snapshot, sound);
+                self.sync(snapshot, sound, before_restriction);
                 json!({"ok":true,"accepted":true,"active":accepted.active,"revision":accepted.revision,
                     "effective":effective(accepted.effective),"volume":self.volume,
                     "ring":{"published":self.published,"confirmed":false}})
@@ -405,7 +465,8 @@ impl Service {
         }
     }
 
-    /// A failed ordinary volume operation invalidates the last confirmation.
+    /// After actual mixer work, a failed ordinary volume operation invalidates
+    /// the last confirmation. Rejections before I/O do not call this method.
     /// Retry stays on the bounded tick cadence; its software ceiling remains.
     pub fn observe_volume_result(&mut self, name: &str, response: &Value) {
         if self.volume_required && name.starts_with("volume_") {

@@ -115,6 +115,7 @@ impl Harness {
             final_chunk: None,
             playback_gaps: 0,
             notice: Default::default(),
+            media: Default::default(),
             local_only: None,
             reminder: None,
             say: None,

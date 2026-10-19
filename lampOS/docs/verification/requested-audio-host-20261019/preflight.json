@@ -1,0 +1,169 @@
+{
+  "platform": "aarch64-apple-darwin",
+  "preflight": [
+    {
+      "stage": "initial_actions_messages",
+      "status": "historical preflight; final revision covered by separate complete gate",
+      "log_sha256": "4110544206f57daca10c154abe20e95a7f21e306261d516dba29c8365c0fad80",
+      "totals": {
+        "passed": 183,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 0
+      },
+      "output_summaries": [
+        "test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.81s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.47s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.80s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.11s",
+        "test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "handoff_output": []
+    },
+    {
+      "stage": "voice",
+      "status": "historical preflight; final revision covered by separate complete gate",
+      "log_sha256": "69077f0b8ab02dc26d898bd8ec46bae706f5bc26cc34c11d5512975dfe5e5b89",
+      "totals": {
+        "passed": 34,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 2038
+      },
+      "output_summaries": [
+        "test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 2038 filtered out; finished in 1.53s"
+      ],
+      "handoff_output": [
+        "test coordinator::tests::requested_audio::prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement ... requested audio prepared host handoff: first=483us repeated=592us; target<=250000us; authored speaker IPC acceptance, acoustic onset unmeasured"
+      ]
+    },
+    {
+      "stage": "skills",
+      "status": "historical preflight; final revision covered by separate complete gate",
+      "log_sha256": "3404cc271fd99526db3b3f03e2846ef9e4888599120aad15ce65c7c13329f811",
+      "totals": {
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 0
+      },
+      "output_summaries": [
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.18s"
+      ],
+      "handoff_output": []
+    },
+    {
+      "stage": "renderer",
+      "status": "historical preflight; final revision covered by separate complete gate",
+      "log_sha256": "6299187593138065a95b68016a45ea3da3061eb21b24b4627f26864c1e1896d5",
+      "totals": {
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 0
+      },
+      "output_summaries": [
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s"
+      ],
+      "handoff_output": []
+    }
+  ],
+  "package_round_trip": [
+    {
+      "stage": "render",
+      "exit_code": 0,
+      "seconds": 1.71,
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "lamp-skills",
+        "--example",
+        "render_relaxing_music"
+      ],
+      "log_sha256": "b8075e99984bd6aeefd22ef0bdb0d4176d575323430ad1a5880b4a6301bdf9d9",
+      "output": "artifacts/skills/relaxing-music/staged/relaxing-music/relaxing.wav: rate=24000 frames=1152000 duration_ms=48000 bytes=2304044 peak=900 largest_240_frame_sum_squares=35536612 fnv1a64=233064453c3934b7"
+    },
+    {
+      "stage": "pack",
+      "exit_code": 0,
+      "seconds": 0.91,
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "lamp-skills",
+        "--bin",
+        "lamp-skills",
+        "--",
+        "pack",
+        "--out",
+        "artifacts/skills/relaxing-music/packages",
+        "artifacts/skills/relaxing-music/staged/relaxing-music"
+      ],
+      "log_sha256": "2c6cdb5cea0510a82cefc0e447ff85cfb5cb1775acc4284d9c4092f73bbcb296",
+      "output": "packed artifacts/skills/relaxing-music/packages/relaxing-music-1.0.0.tar"
+    },
+    {
+      "stage": "install",
+      "exit_code": 0,
+      "seconds": 1.1,
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "lamp-skills",
+        "--bin",
+        "lamp-skills",
+        "--",
+        "install",
+        "--dir",
+        "artifacts/skills/relaxing-music/installed",
+        "artifacts/skills/relaxing-music/packages/relaxing-music-1.0.0.tar"
+      ],
+      "log_sha256": "3939999617f76c679162fd9e369cf91216f08b32d6b29c013c9f963350c7e1c1",
+      "output": "installed relaxing-music 1.0.0 (installable) from its package, 7 files, each one's size and sha256 as lamp-skill.json says; it carries no signature, and none is checked yet: signing is not built. It may use: speak. A running lamp-skills loads it within 2 s. The skills here give the model 1 function (play_relaxing_music). A session takes 32, the voice's own and the actions part's first (30 on a product lamp), and past 32 the last are dropped unless the voice runs with LAMP_USE_SKILL=on (every skill through one function, use_skill)."
+    }
+  ],
+  "installed_files_match_staged": true,
+  "generated_wav_sha256": "134362ab72a19c143c627dbd438f3d17ceabe9c6923bad6f1ea3f7d5fb9579fa",
+  "earlier_attempts": [
+    {
+      "stage": "voice compilation",
+      "result": "exit 101; fixture ProviderOutput exhaustive match missing RequestedAudio; corrected before tests ran"
+    },
+    {
+      "stage": "focused voice attempt2",
+      "result": "32 passed; 2 failed; 0 ignored; 2036 filtered out",
+      "cause": "Written fixture used the default NotConnected method; Live script omitted the separate function-call completion. Both fixtures corrected without timeout increases or production guard changes."
+    },
+    {
+      "stage": "package install attempt1",
+      "result": "exit 1: no skills folder at the disposable destination",
+      "cause": "The installer requires an existing root. Added mkdir -p to the example instructions; preserved first generated output and repeated the complete render/pack/install successfully."
+    }
+  ],
+  "limits": [
+    "Authored host speaker IPC acceptance and retirement, not acoustic measurement.",
+    "The cancellation matrix calls the coordinator cancellation helper; it does not establish whole main-loop event routing.",
+    "The complete workspace gate and native ARM64 result are separate evidence."
+  ]
+}

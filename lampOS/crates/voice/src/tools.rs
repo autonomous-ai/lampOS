@@ -144,6 +144,8 @@ pub struct Settings {
     /// The skills are reached through one function, `use_skill`
     /// ([`crate::use_skill`], `LAMP_USE_SKILL=on`), not one each.
     pub use_skill: bool,
+    /// Typed local recording offers for an explicitly spoken request.
+    pub requested_audio: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -188,6 +190,7 @@ pub fn arguments_from_environment() -> Vec<String> {
     flags.extend(crate::use_skill::arguments(
         std::env::var(crate::use_skill::ENVIRONMENT).ok().as_deref(),
     ));
+    flags.extend(crate::requested_audio::arguments_from_environment());
     flags
 }
 
@@ -359,6 +362,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         && flag == crate::use_skill::FLAG
     {
         settings.use_skill = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::requested_audio::FLAG
+    {
+        settings.requested_audio = true;
         flags = rest;
     }
     Ok((settings, flags))
@@ -749,21 +758,57 @@ pub fn keeps_out(route: &Route, name: &str) -> bool {
 /// [`run_call`]. Blocking: for a thread of its own. `not_for_me` itself is
 /// the route's to act on before this.
 pub fn answer(settings: &Settings, call: &ToolCall, request: u64, heard: bool) -> Value {
+    answer_inner(settings, call, request, heard, None).told
+}
+
+/// A local recording offer is private transport data, never model context.
+pub(crate) struct ToolAnswer {
+    pub told: Value,
+    pub requested_audio: Option<lamp_msgs::RequestedAudioOffer>,
+}
+
+impl ToolAnswer {
+    pub(crate) fn plain(told: Value) -> Self {
+        Self {
+            told,
+            requested_audio: None,
+        }
+    }
+}
+
+/// Only a provider's accepted microphone turn supplies this context. The
+/// legacy `answer` path, including Messages, cannot request a recording offer.
+pub(crate) fn answer_spoken(
+    settings: &Settings,
+    call: &ToolCall,
+    context: &lamp_msgs::RequestedAudioContext,
+) -> ToolAnswer {
+    answer_inner(settings, call, context.request, true, Some(context))
+}
+
+fn answer_inner(
+    settings: &Settings,
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    context: Option<&lamp_msgs::RequestedAudioContext>,
+) -> ToolAnswer {
     match route(settings, &call.name) {
-        Route::Clock => time_now_for(settings.places, &call.args),
-        Route::Decline => declined(),
-        Route::Nobody => unavailable(),
+        Route::Clock => ToolAnswer::plain(time_now_for(settings.places, &call.args)),
+        Route::Decline => ToolAnswer::plain(declined()),
+        Route::Nobody => ToolAnswer::plain(unavailable()),
         route => {
             if keeps_out(&route, &call.name) {
                 crate::remember::keep_out(request);
             }
             let began = std::time::Instant::now();
-            let (whom, (mut told, answered)) = run_call(&route, call, request, heard);
+            let (whom, mut answer, answered) =
+                run_spoken_call(settings, &route, call, request, heard, context);
             // The second voice puts no news on its turns, so news asked about
             // there leaves its harness open (#1390); the key is never the
             // model's either way.
             if matches!(route, Route::Tasks(_)) {
-                let _ = crate::agent_tasks::take_news_key(&mut told);
+                let _ = crate::agent_tasks::take_news_key(&mut answer.told);
             }
             // Worded as the Live route's line, which is read on the lamp.
             eprintln!(
@@ -776,7 +821,7 @@ pub fn answer(settings: &Settings, call: &ToolCall, request: u64, heard: bool) -
                 },
                 began.elapsed().as_millis()
             );
-            told
+            answer
         }
     }
 }
@@ -868,6 +913,48 @@ pub fn moving_skills(settings: &Settings) -> std::collections::BTreeSet<String> 
     moving
 }
 
+/// The context is forwarded only through a verified Skills socket. Translating
+/// `use_skill` preserves the original call identity and its original deadline.
+pub(crate) fn run_spoken_call(
+    settings: &Settings,
+    route: &Route,
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    context: Option<&lamp_msgs::RequestedAudioContext>,
+) -> (&'static str, ToolAnswer, bool) {
+    let context = context.filter(|context| {
+        settings.requested_audio
+            && heard
+            && context.request == request
+            && context.call_id == call.id
+            && context.check().is_ok()
+    });
+    if let Route::UseSkill(settings) = route {
+        let skills = skill_tools(settings);
+        return match crate::use_skill::translate(call, crate::use_skill::offered(&skills)) {
+            Ok(skill) => match self::route(settings, &skill.name) {
+                found @ Route::Executive(_) if is_skills(settings, &found) => {
+                    run_spoken_call(settings, &found, &skill, request, heard, context)
+                }
+                _ => ("nobody", ToolAnswer::plain(unavailable()), false),
+            },
+            Err(told) => (crate::use_skill::NAME, ToolAnswer::plain(told), true),
+        };
+    }
+    if let Route::Executive(directory) = route
+        && is_skills(settings, route)
+    {
+        let (answer, answered) = ask_with_context(directory, call, ASK_DEADLINE, context);
+        return ("the executive", answer, answered);
+    }
+    let (whom, (mut told, answered)) = run_call(route, call, request, heard);
+    // A similarly named field from another service is never authority and
+    // must not leak its private path or ticket into the model's conversation.
+    take_requested_audio(&mut told, None);
+    (whom, ToolAnswer::plain(told), answered)
+}
+
 /// What the model is told when a call could not be run: words it can say.
 pub fn unavailable() -> Value {
     json!({"error": "That part of me is not running right now, so I could not do it."})
@@ -941,7 +1028,20 @@ pub fn run_call(
 /// back: `{"ok":true,"result":{...}}`, whose result goes to the model as it
 /// is, or `{"ok":false,"error":"..."}`, whose words do.
 pub fn ask(directory: &Path, call: &ToolCall, deadline: Duration) -> (Value, bool) {
-    let line = json!({"op":"call","name":call.name,"args":call.args});
+    let (answer, answered) = ask_with_context(directory, call, deadline, None);
+    (answer.told, answered)
+}
+
+fn ask_with_context(
+    directory: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    context: Option<&lamp_msgs::RequestedAudioContext>,
+) -> (ToolAnswer, bool) {
+    let mut line = json!({"op":"call","name":call.name,"args":call.args});
+    if let Some(context) = context {
+        line["requested_audio_context"] = json!(context);
+    }
     let told = exchange(&directory.join(CALL_SOCKET), &line, deadline).and_then(|answer| {
         match answer.get("ok").and_then(Value::as_bool)? {
             true => Some(answer.get("result").cloned().unwrap_or_else(|| json!({}))),
@@ -951,9 +1051,32 @@ pub fn ask(directory: &Path, call: &ToolCall, deadline: Duration) -> (Value, boo
     match told {
         // What the link would refuse to send is never offered to it: an
         // answer that is not sent leaves the service waiting on the call.
-        Some(told) if sendable(&told) => (told, true),
-        _ => (unavailable(), false),
+        Some(mut told) => {
+            let requested_audio = take_requested_audio(&mut told, context);
+            if sendable(&told) {
+                (
+                    ToolAnswer {
+                        told,
+                        requested_audio,
+                    },
+                    true,
+                )
+            } else {
+                (ToolAnswer::plain(unavailable()), false)
+            }
+        }
+        None => (ToolAnswer::plain(unavailable()), false),
     }
+}
+
+fn take_requested_audio(
+    told: &mut Value,
+    context: Option<&lamp_msgs::RequestedAudioContext>,
+) -> Option<lamp_msgs::RequestedAudioOffer> {
+    let private = told.as_object_mut()?.remove("requested_audio")?;
+    let expected = context?;
+    let offer: lamp_msgs::RequestedAudioOffer = serde_json::from_value(private).ok()?;
+    (offer.check().is_ok() && &offer.context == expected).then_some(offer)
 }
 
 /// Only the new Schedule tools use this exchange. A lost or malformed reply
@@ -1237,6 +1360,7 @@ mod tests {
         let settings = Settings {
             decline: true,
             use_skill: false,
+            requested_audio: true,
             exec: None,
             skills: None,
             memory: Some("/run/lampos-memory/memory.sock".into()),
@@ -1487,6 +1611,7 @@ mod tests {
             Settings {
                 decline: true,
                 use_skill: false,
+                requested_audio: false,
                 exec: Some(dir.clone()),
                 skills: None,
                 memory: Some("/run/lampos-memory/memory.sock".into()),
@@ -1714,6 +1839,228 @@ mod tests {
         served.join().unwrap();
         std::fs::remove_dir_all(dir).unwrap();
     }
+    #[test]
+    fn requested_audio_flag_is_opt_in_and_leaves_later_flags_untouched() {
+        let untouched = ["--session".to_owned(), "7".to_owned()];
+        let (off, rest) = take(&untouched).unwrap();
+        assert!(!off.requested_audio);
+        assert_eq!(rest, untouched);
+        let on = [
+            crate::use_skill::FLAG.to_owned(),
+            crate::requested_audio::FLAG.to_owned(),
+            "--session".to_owned(),
+            "7".to_owned(),
+        ];
+        let (on, rest) = take(&on).unwrap();
+        assert!(on.use_skill && on.requested_audio);
+        assert_eq!(rest, untouched);
+    }
+
+    fn audio_context() -> lamp_msgs::RequestedAudioContext {
+        lamp_msgs::RequestedAudioContext {
+            worker_boot: "a".repeat(32),
+            provider_session: 3,
+            request: 7,
+            privacy_generation: 5,
+            call_id: "c1".into(),
+            issued_us: 1_000_000,
+        }
+    }
+
+    fn audio_offer(context: lamp_msgs::RequestedAudioContext) -> lamp_msgs::RequestedAudioOffer {
+        lamp_msgs::RequestedAudioOffer {
+            skills_boot: "skills-test".into(),
+            definition_generation: 2,
+            offer_id: 1,
+            skill: "relaxing-music".into(),
+            asset: "/local/relaxing.wav".into(),
+            sha256: "a".repeat(64),
+            frames: 24_000,
+            issued_us: context.issued_us,
+            start_before_us: context.issued_us + lamp_msgs::REQUESTED_AUDIO_START_US,
+            finish_before_us: context.issued_us + lamp_msgs::REQUESTED_AUDIO_START_US + 1_000_000,
+            context,
+        }
+    }
+
+    fn audio_socket(directory: &Path, offer: Value) -> std::thread::JoinHandle<Value> {
+        let listener = UnixListener::bind(directory.join(CALL_SOCKET)).unwrap();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            writeln!(
+                stream,
+                "{}",
+                json!({"ok":true,"result":{
+                    "next":"Say one short confirmation.","requested_audio":offer,
+                }})
+            )
+            .unwrap();
+            serde_json::from_str(&line).unwrap()
+        })
+    }
+
+    #[test]
+    fn requested_audio_uses_the_skills_socket_directly_and_through_use_skill() {
+        for wrapped in [false, true] {
+            let dir = schedule_directory(if wrapped {
+                "audio-wrapped"
+            } else {
+                "audio-direct"
+            });
+            std::fs::write(
+                dir.join(CATALOG_FILE),
+                json!({"tools":[
+                    {"name":"play_relaxing_music", "description":"An explicitly requested recording."},
+                    {"name":"dance", "description":"Dance."}
+                ],"body":["dance"]})
+                .to_string(),
+            )
+            .unwrap();
+            let settings = Settings {
+                skills: Some(dir.clone()),
+                requested_audio: true,
+                use_skill: wrapped,
+                ..Default::default()
+            };
+            let call = ToolCall {
+                id: "c1".into(),
+                name: if wrapped {
+                    crate::use_skill::NAME
+                } else {
+                    "play_relaxing_music"
+                }
+                .into(),
+                args: if wrapped {
+                    json!({"skill":"play_relaxing_music"})
+                } else {
+                    json!({})
+                },
+            };
+            let context = audio_context();
+            let offer = audio_offer(context.clone());
+            let server = audio_socket(&dir, json!(&offer));
+            let answer = answer_spoken(&settings, &call, &context);
+            assert_eq!(answer.requested_audio, Some(offer));
+            assert_eq!(answer.told, json!({"next":"Say one short confirmation."}));
+            assert_eq!(
+                server.join().unwrap(),
+                json!({"op":"call","name":"play_relaxing_music",
+                "args":{},"requested_audio_context":context})
+            );
+            std::fs::remove_dir_all(dir).unwrap();
+        }
+    }
+
+    #[test]
+    fn requested_audio_is_private_and_unavailable_to_legacy_off_and_non_skills_routes() {
+        for mode in [
+            "legacy-heard",
+            "legacy-written",
+            "typed",
+            "typed-wrapped",
+            "off",
+            "executive",
+            "wrong-call",
+        ] {
+            let dir = schedule_directory(&format!("audio-{mode}"));
+            std::fs::write(
+                dir.join(CATALOG_FILE),
+                json!({"tools":[
+                    {"name":"play_relaxing_music","description":"A recording."},
+                    {"name":"dance","description":"Dance."}
+                ],"body":["dance"]})
+                .to_string(),
+            )
+            .unwrap();
+            let mut settings = Settings {
+                requested_audio: mode != "off",
+                use_skill: mode == "typed-wrapped",
+                ..Default::default()
+            };
+            if mode == "executive" {
+                settings.exec = Some(dir.clone());
+            } else {
+                settings.skills = Some(dir.clone());
+            }
+            let mut context = audio_context();
+            if matches!(mode, "typed" | "typed-wrapped") {
+                context.request = crate::messages::REQUESTS_FROM + 1;
+            }
+            let server = audio_socket(&dir, json!(audio_offer(context.clone())));
+            if mode == "wrong-call" {
+                context.call_id = "different-call".into();
+            }
+            let call = if mode == "typed-wrapped" {
+                ToolCall {
+                    id: "c1".into(),
+                    name: crate::use_skill::NAME.into(),
+                    args: json!({"skill":"play_relaxing_music"}),
+                }
+            } else {
+                ToolCall {
+                    id: "c1".into(),
+                    name: "play_relaxing_music".into(),
+                    args: json!({}),
+                }
+            };
+            let answer = match mode {
+                "legacy-heard" | "legacy-written" => {
+                    ToolAnswer::plain(answer(&settings, &call, 7, mode == "legacy-heard"))
+                }
+                "typed" | "typed-wrapped" => {
+                    ToolAnswer::plain(answer_typed(&settings, &call, context.request))
+                }
+                _ => answer_spoken(&settings, &call, &context),
+            };
+            assert!(answer.requested_audio.is_none(), "{mode}");
+            assert_eq!(answer.told, json!({"next":"Say one short confirmation."}));
+            assert!(
+                server
+                    .join()
+                    .unwrap()
+                    .get("requested_audio_context")
+                    .is_none(),
+                "{mode}"
+            );
+            std::fs::remove_dir_all(dir).unwrap();
+        }
+    }
+
+    #[test]
+    fn requested_audio_rejects_changed_binding_and_unknown_offer_fields() {
+        let context = audio_context();
+        let offer = audio_offer(context.clone());
+        for field in [
+            "worker_boot",
+            "provider_session",
+            "request",
+            "privacy_generation",
+            "call_id",
+            "issued_us",
+        ] {
+            let mut changed = json!(&offer);
+            changed["context"][field] = match field {
+                "worker_boot" | "call_id" => json!("another"),
+                _ => json!(99),
+            };
+            let mut told = json!({"next":"Confirm.","requested_audio":changed});
+            assert!(
+                take_requested_audio(&mut told, Some(&context)).is_none(),
+                "{field}"
+            );
+            assert_eq!(told, json!({"next":"Confirm."}));
+        }
+        let mut private = json!(offer);
+        private["future_permission"] = json!(true);
+        let mut told = json!({"requested_audio":private});
+        assert!(take_requested_audio(&mut told, Some(&context)).is_none());
+        assert_eq!(told, json!({}));
+    }
+
     fn call(name: &str) -> ToolCall {
         ToolCall {
             id: "c1".into(),
@@ -2484,73 +2831,90 @@ mod tests {
     /// #1673 (the first builder, 19 Oct): a text never runs a skill that asks
     /// for the body, by its own name or through `use_skill`, and its socket
     /// is never asked. A text runs one that doesn't, and a spoken call runs
-    /// the moving one as before.
+    /// the moving one as before, with requested audio switched off or on.
     #[test]
     fn a_text_never_runs_a_skill_that_moves_the_body() {
-        // Short names: a socket's whole path has to fit in 103 bytes.
-        let dir = directory("mv");
-        let own = dir.join("own");
-        std::fs::create_dir_all(&own).unwrap();
-        std::fs::write(
-            own.join(CATALOG_FILE),
-            r#"{"tools":[{"name":"dance","description":"Dance."},
+        for requested_audio in [false, true] {
+            // Short names: a socket's whole path has to fit in 103 bytes.
+            let dir = directory("mv");
+            let own = dir.join("own");
+            std::fs::create_dir_all(&own).unwrap();
+            std::fs::write(
+                own.join(CATALOG_FILE),
+                r#"{"tools":[{"name":"dance","description":"Dance."},
             {"name":"glow","description":"Glow."}],"body":["dance"]}"#,
-        )
-        .unwrap();
-        let mut settings = Settings {
-            skills: Some(own.clone()),
-            ..Default::default()
-        };
-        assert_eq!(
-            moving_skills(&settings),
-            std::collections::BTreeSet::from(["dance".to_owned()])
-        );
-        let named = |name: &str| ToolCall {
-            id: "c".into(),
-            name: name.into(),
-            args: json!({}),
-        };
-        let text = crate::messages::REQUESTS_FROM + 1;
-        let refused = json!({"error": MOVES_ONLY_AT_THE_LAMP});
-        // The skills' socket answers one call: the first that reaches it.
-        let served = executive(
-            &own,
-            b"{\"ok\":true,\"result\":{\"next\":\"Done.\"}}\n",
-            Duration::ZERO,
-        );
-        assert_eq!(answer_typed(&settings, &named("dance"), text), refused);
-        assert_eq!(
-            answer_typed(&settings, &named("glow"), text),
-            json!({"next":"Done."})
-        );
-        assert_eq!(served.join().unwrap()["name"], "glow");
-        settings.use_skill = true;
-        let through = ToolCall {
-            id: "c".into(),
-            name: crate::use_skill::NAME.into(),
-            args: json!({"skill":"dance"}),
-        };
-        assert_eq!(answer_typed(&settings, &through, text), refused);
-        // Said at the lamp, it dances.
-        std::fs::remove_file(own.join(CALL_SOCKET)).unwrap();
-        let served = executive(
-            &own,
-            b"{\"ok\":true,\"result\":{\"next\":\"Done.\"}}\n",
-            Duration::ZERO,
-        );
-        assert_eq!(
-            answer(&settings, &through, 9, true),
-            json!({"next":"Done."})
-        );
-        assert_eq!(served.join().unwrap()["name"], "dance");
-        // An older tools file names none.
-        std::fs::write(
-            own.join(CATALOG_FILE),
-            r#"{"tools":[{"name":"dance","description":"Dance."}]}"#,
-        )
-        .unwrap();
-        assert!(moving_skills(&settings).is_empty());
-        std::fs::remove_dir_all(dir).unwrap();
+            )
+            .unwrap();
+            let mut settings = Settings {
+                skills: Some(own.clone()),
+                requested_audio,
+                ..Default::default()
+            };
+            assert_eq!(
+                moving_skills(&settings),
+                std::collections::BTreeSet::from(["dance".to_owned()])
+            );
+            let named = |name: &str| ToolCall {
+                id: "c".into(),
+                name: name.into(),
+                args: json!({}),
+            };
+            let text = crate::messages::REQUESTS_FROM + 1;
+            let refused = json!({"error": MOVES_ONLY_AT_THE_LAMP});
+            // The skills' socket answers one call: the first that reaches it.
+            let served = executive(
+                &own,
+                b"{\"ok\":true,\"result\":{\"next\":\"Done.\"}}\n",
+                Duration::ZERO,
+            );
+            assert_eq!(answer_typed(&settings, &named("dance"), text), refused);
+            assert_eq!(
+                answer_typed(&settings, &named("glow"), text),
+                json!({"next":"Done."})
+            );
+            assert_eq!(served.join().unwrap()["name"], "glow");
+            settings.use_skill = true;
+            let through = ToolCall {
+                id: "c".into(),
+                name: crate::use_skill::NAME.into(),
+                args: json!({"skill":"dance"}),
+            };
+            // Keep the same live peer for the wrapped refusal and subsequent
+            // spoken call: only the latter may consume its one socket request.
+            std::fs::remove_file(own.join(CALL_SOCKET)).unwrap();
+            let served = executive(
+                &own,
+                b"{\"ok\":true,\"result\":{\"next\":\"Done.\"}}\n",
+                Duration::ZERO,
+            );
+            assert_eq!(answer_typed(&settings, &through, text), refused);
+            let mut context = audio_context();
+            context.call_id = through.id.clone();
+            if requested_audio {
+                let answer = answer_spoken(&settings, &through, &context);
+                assert_eq!(answer.told, json!({"next":"Done."}));
+                assert!(answer.requested_audio.is_none());
+            } else {
+                assert_eq!(
+                    answer(&settings, &through, 9, true),
+                    json!({"next":"Done."})
+                );
+            }
+            let asked = served.join().unwrap();
+            assert_eq!(asked["name"], "dance");
+            assert_eq!(
+                asked.get("requested_audio_context"),
+                requested_audio.then(|| json!(&context)).as_ref()
+            );
+            // An older tools file names none.
+            std::fs::write(
+                own.join(CATALOG_FILE),
+                r#"{"tools":[{"name":"dance","description":"Dance."}]}"#,
+            )
+            .unwrap();
+            assert!(moving_skills(&settings).is_empty());
+            std::fs::remove_dir_all(dir).unwrap();
+        }
     }
 
     /// #1696 with #1656: a `use_skill` call to a skill in the skills' own

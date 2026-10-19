@@ -401,6 +401,24 @@ pub fn serve(
             file.as_deref(),
         )
     };
+    let audio_runner = tools.requested_audio.then(|| {
+        let settings = tools.clone();
+        Arc::new(
+            move |context: lamp_msgs::RequestedAudioContext, call: lamp_gemini::ToolCall| {
+                let settings = settings.clone();
+                Box::pin(async move {
+                    tokio::task::spawn_blocking(move || {
+                        crate::tools::answer_spoken(&settings, &call, &context)
+                    })
+                    .await
+                    .unwrap_or_else(|_| {
+                        crate::tools::ToolAnswer::plain(crate::tools::unavailable())
+                    })
+                })
+                    as futures_util::future::BoxFuture<'static, crate::tools::ToolAnswer>
+            },
+        ) as super::RequestedAudioRunner
+    });
     let runner: ToolRunner = Arc::new(move |request, heard, name, args| {
         let settings = tools.clone();
         Box::pin(async move {
@@ -429,6 +447,9 @@ pub fn serve(
     .waiting_with_a_sound(wait_cue)
     .saying_when_down(down_line)
     .announcing(!only_voice);
+    if let Some(runner) = audio_runner {
+        engine = engine.requesting_audio(boot, runner);
+    }
     // A look reads the eyes' look file with the Live route's bounds: a full
     // look's still may be older and larger (#836, #941).
     if let Some(path) = files.look.clone() {

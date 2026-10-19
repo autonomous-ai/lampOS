@@ -1,0 +1,922 @@
+{
+  "base": "65ffb51c77636f4d5359d5593083aa8170c3bb3b",
+  "platform": "aarch64-apple-darwin",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "commands": [
+    {
+      "stage": "fmt",
+      "command": "cargo fmt --all --check",
+      "exit_code": 0,
+      "seconds": 3.62,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "clippy",
+      "command": "cargo clippy --workspace --all-targets -- -D warnings",
+      "exit_code": 0,
+      "seconds": 55.69,
+      "log_sha256": "163b1e5b9af776d9867e7d896987d256375a037cf3380ca9c692f81f8e8a1446"
+    },
+    {
+      "stage": "tests",
+      "command": "cargo test -p lamp-body -p lamp-cloud -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-skills -p lamp-voice -p lamp-voice-eval -- --test-threads=1",
+      "exit_code": 0,
+      "seconds": 728.52,
+      "log_sha256": "efd0a58854a44e045cfcc49dceb688df2461217163604859007dbf64a6a514e2"
+    },
+    {
+      "stage": "checkout_tests",
+      "command": "cargo test -p lamp-update -- --test-threads=1",
+      "exit_code": 0,
+      "seconds": 61.81,
+      "log_sha256": "248a6d690c54135c1df264359092cb2a06c1d73ab89b5e743714f4cfa3531077"
+    },
+    {
+      "stage": "build",
+      "command": "cargo build --workspace",
+      "exit_code": 0,
+      "seconds": 34.01,
+      "log_sha256": "5d4512a4ac0cac3d43bee6096226fb914d65306fc48fd41242a857312ae7073b"
+    }
+  ],
+  "totals": {
+    "passed": 4288,
+    "failed": 0,
+    "ignored": 20,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "crates": {
+    "lamp-body": {
+      "passed": 463,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "lamp-cloud": {
+      "passed": 48,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "lamp-expression": {
+      "passed": 298,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "lamp-keeper": {
+      "passed": 24,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "lamp-lean": {
+      "passed": 61,
+      "failed": 0,
+      "ignored": 2,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "lamp-memory": {
+      "passed": 213,
+      "failed": 0,
+      "ignored": 5,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "lamp-skills": {
+      "passed": 194,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "lamp-update": {
+      "passed": 125,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "lamp-voice": {
+      "passed": 2322,
+      "failed": 0,
+      "ignored": 12,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "lamp-voice-eval": {
+      "passed": 540,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    }
+  },
+  "test_output_summaries": [
+    {
+      "crate": "lamp-body",
+      "suite": "Running unittests src/lib.rs",
+      "output": "test result: ok. 308 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.23s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running unittests src/bin/lamp-body.rs",
+      "output": "test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running unittests src/bin/lamp-body-inspect.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running unittests src/bin/lamp-body-measure.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running unittests src/bin/lamp-body-worker.rs",
+      "output": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running tests/calibration.rs",
+      "output": "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running tests/control.rs",
+      "output": "test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running tests/head_qualification.rs",
+      "output": "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running tests/protocol.rs",
+      "output": "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running tests/readback.rs",
+      "output": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running tests/selection.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running tests/worker.rs",
+      "output": "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Running tests/worker_config.rs",
+      "output": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-cloud",
+      "suite": "Running unittests src/lib.rs",
+      "output": "test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.70s"
+    },
+    {
+      "crate": "lamp-cloud",
+      "suite": "Running unittests src/main.rs",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-cloud",
+      "suite": "Running tests/app_contract.rs",
+      "output": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-cloud",
+      "suite": "Running tests/ring.rs",
+      "output": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s"
+    },
+    {
+      "crate": "lamp-cloud",
+      "suite": "Running tests/setup.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-cloud",
+      "suite": "Running tests/switch.rs",
+      "output": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.54s"
+    },
+    {
+      "crate": "lamp-cloud",
+      "suite": "Running tests/texts.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running unittests src/lib.rs",
+      "output": "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running unittests src/main.rs",
+      "output": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/alive_engine.rs",
+      "output": "test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.82s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/alive_replay.rs",
+      "output": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.08s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/catalogue_playout.rs",
+      "output": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/catalogue_rest.rs",
+      "output": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/engine.rs",
+      "output": "test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/local_time.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/program.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/recent_playout.rs",
+      "output": "test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/recent_playout_replay.rs",
+      "output": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/recent_playout_runtime.rs",
+      "output": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/replay.rs",
+      "output": "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/rest_engine.rs",
+      "output": "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/rest_replay.rs",
+      "output": "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.45s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/rest_requests.rs",
+      "output": "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/runtime.rs",
+      "output": "test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.97s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/speaking_engine.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Running tests/sudden_engine.rs",
+      "output": "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-keeper",
+      "suite": "Running unittests src/lib.rs",
+      "output": "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-keeper",
+      "suite": "Running unittests src/main.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+    },
+    {
+      "crate": "lamp-lean",
+      "suite": "Running unittests src/lib.rs",
+      "output": "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-lean",
+      "suite": "Running tests/catalogue.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-lean",
+      "suite": "Running tests/cost.rs",
+      "output": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-lean",
+      "suite": "Running tests/first_software.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-lean",
+      "suite": "Running tests/paths.rs",
+      "output": "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s"
+    },
+    {
+      "crate": "lamp-lean",
+      "suite": "Running tests/poses.rs",
+      "output": "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running unittests src/lib.rs",
+      "output": "test result: ok. 80 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 8.23s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running unittests src/main.rs",
+      "output": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running unittests src/bin/lamp-memory-eval.rs",
+      "output": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/binary.rs",
+      "output": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.16s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/days.rs",
+      "output": "test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.76s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/days_timing.rs",
+      "output": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/fixture_child.rs",
+      "output": "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/health.rs",
+      "output": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.86s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/health_control.rs",
+      "output": "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/health_timing.rs",
+      "output": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/retrieval.rs",
+      "output": "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/server.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.61s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/timing.rs",
+      "output": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/voice.rs",
+      "output": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.12s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/voice_forget.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/voice_people.rs",
+      "output": "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/voice_submit.rs",
+      "output": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.92s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Running tests/voice_timing.rs",
+      "output": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-skills",
+      "suite": "Running unittests src/lib.rs",
+      "output": "test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.28s"
+    },
+    {
+      "crate": "lamp-skills",
+      "suite": "Running unittests src/main.rs",
+      "output": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+    },
+    {
+      "crate": "lamp-skills",
+      "suite": "Running tests/daily_engine.rs",
+      "output": "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s"
+    },
+    {
+      "crate": "lamp-skills",
+      "suite": "Running tests/package.rs",
+      "output": "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s"
+    },
+    {
+      "crate": "lamp-skills",
+      "suite": "Running tests/requested_audio.rs",
+      "output": "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s"
+    },
+    {
+      "crate": "lamp-skills",
+      "suite": "Running tests/routine_service.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.62s"
+    },
+    {
+      "crate": "lamp-skills",
+      "suite": "Running tests/skills.rs",
+      "output": "test result: ok. 96 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 49.56s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running unittests src/lib.rs",
+      "output": "test result: ok. 2079 passed; 0 failed; 12 ignored; 0 measured; 0 filtered out; finished in 310.93s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running unittests src/main.rs",
+      "output": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/admission.rs",
+      "output": "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/call_wait.rs",
+      "output": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/camera_config.rs",
+      "output": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/camera_runtime.rs",
+      "output": "test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/capture_hold_worker.rs",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/core.rs",
+      "output": "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/diagnostics.rs",
+      "output": "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/end_silence.rs",
+      "output": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/endpoint_confirmation.rs",
+      "output": "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/expression_out.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/first_control_message.rs",
+      "output": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/first_words.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/fixture_provider.rs",
+      "output": "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.09s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/hello_asks.rs",
+      "output": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/news_told.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.79s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/privacy_controls.rs",
+      "output": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/privacy_pipeline.rs",
+      "output": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/privacy_state.rs",
+      "output": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/privacy_worker.rs",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/process.rs",
+      "output": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/progress_news.rs",
+      "output": "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.77s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/provider_config.rs",
+      "output": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/reference_link.rs",
+      "output": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/reference_prime.rs",
+      "output": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/review_2026_10_14.rs",
+      "output": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/ring_worker.rs",
+      "output": "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.05s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/speaker_lapse_worker.rs",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/typed_memory.rs",
+      "output": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Running tests/visual_options.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running unittests src/lib.rs",
+      "output": "test result: ok. 323 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.89s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running unittests src/main.rs",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/acceptance_boundaries.rs",
+      "output": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/answer_review.rs",
+      "output": "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/audit_final_dispatch.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/audit_importer.rs",
+      "output": "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/audit_runner_dispatch.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/canary_plan.rs",
+      "output": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/evaluator.rs",
+      "output": "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/fake_runtime.rs",
+      "output": "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.57s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/final_dispatch.rs",
+      "output": "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.10s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/next_turn_ready.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/physical_loopback.rs",
+      "output": "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.19s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/pinned_copies.rs",
+      "output": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/playback_occurrences.rs",
+      "output": "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/provider_failed.rs",
+      "output": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/recording_evidence.rs",
+      "output": "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/recording_import.rs",
+      "output": "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/relay_clock.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/relay_hardening.rs",
+      "output": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/report_validity.rs",
+      "output": "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/serve_plan.rs",
+      "output": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.46s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/serve_relay.rs",
+      "output": "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/serve_session.rs",
+      "output": "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.28s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/switches.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Running tests/target_audio.rs",
+      "output": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s"
+    },
+    {
+      "crate": "lamp-body",
+      "suite": "Doc-tests lamp_body",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-cloud",
+      "suite": "Doc-tests lamp_cloud",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-expression",
+      "suite": "Doc-tests lamp_expression",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-keeper",
+      "suite": "Doc-tests lamp_keeper",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-lean",
+      "suite": "Doc-tests lamp_lean",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-memory",
+      "suite": "Doc-tests lamp_memory",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-skills",
+      "suite": "Doc-tests lamp_skills",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice",
+      "suite": "Doc-tests lamp_voice",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-voice-eval",
+      "suite": "Doc-tests lamp_voice_eval",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-update",
+      "suite": "Running unittests src/lib.rs",
+      "output": "test result: ok. 43 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.00s"
+    },
+    {
+      "crate": "lamp-update",
+      "suite": "Running unittests src/main.rs",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-update",
+      "suite": "Running tests/functions.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+    },
+    {
+      "crate": "lamp-update",
+      "suite": "Running tests/image_journal.rs",
+      "output": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "crate": "lamp-update",
+      "suite": "Running tests/install.rs",
+      "output": "test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 38.96s"
+    },
+    {
+      "crate": "lamp-update",
+      "suite": "Running tests/round.rs",
+      "output": "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.21s"
+    },
+    {
+      "crate": "lamp-update",
+      "suite": "Doc-tests lamp_update",
+      "output": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    }
+  ],
+  "source_sha256": {
+    "lampOS/crates/actions/src/caps_service.rs": "a234c895537fc1aa838f0a97df71ecdb698063a37b46cde22e280cb0144fde82",
+    "lampOS/crates/actions/src/lib.rs": "6e0b199b0c7cce369a0414c286514c9279b2202583b0afd71d5dc2e5bd6d4e95",
+    "lampOS/crates/actions/src/main.rs": "7302f299c8afc56a56334bd60039fb5771d082516b48c9a6a6350630a57034ca",
+    "lampOS/crates/actions/src/server.rs": "2429abbeca08aaedaba685cb17bee4fba14ed4c7af0132bec76474234658001e",
+    "lampOS/crates/actions/src/sound.rs": "8251258895bb5dce813569bfd3f07d629b8419161f5e52b5b9f3318d9347e089",
+    "lampOS/crates/actions/src/speaker_state.rs": "13f017aa44f2abc817be76365b5b2fcba9d579417f7daab4e79f078c600cbd72",
+    "lampOS/crates/actions/tests/speaker_state.rs": "8406f85cdb9c76be58e462b6e9b12f715c12d71bbc7b221c0d6d7cd154a74445",
+    "lampOS/crates/msgs/src/lib.rs": "2635c135fcce38ab8c59422c1b2aca6020ff21e6d8894126fd68bb623e474b61",
+    "lampOS/crates/msgs/src/requested_audio.rs": "289bb4ee3bea350a23dd9bf1ebb32c81199e602ba3e8f02018eaacbdadb61c80",
+    "lampOS/crates/msgs/src/speaker_state.rs": "1012463d9e90e2b099281e165b937a5d2e55fbb465cdadf105a60b1a86533986",
+    "lampOS/crates/skills/examples/render_relaxing_music.rs": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b",
+    "lampOS/crates/skills/src/lib.rs": "f6824cfed4fcca7104f79eacfcccda7dc892347c16a8c090346cb13b88958c45",
+    "lampOS/crates/skills/src/main.rs": "a8d2d2dbde4bb7b7f9d51e9aae245ace7df884bbe3d246f6ad15d99eb0f7cdda",
+    "lampOS/crates/skills/src/requested_audio.rs": "26630b2dcbf8d54de8d1d4e52efd56793f2d743fb7c42347e3c83e431530621e",
+    "lampOS/crates/skills/tests/requested_audio.rs": "a03752521cce6da455be99ae343f202b48f97f517a2a0fd87cf203e866166962",
+    "lampOS/crates/voice-eval/src/export.rs": "f2cbb8737c5846895f678ec159996ce465803afcb5334de5425fa989522cdbe5",
+    "lampOS/crates/voice/src/coordinator.rs": "23806bd7ff9d5c3e747f0111a107b044a42f08422093023a752c0ab7644870e6",
+    "lampOS/crates/voice/src/coordinator/cloud.rs": "e5137cefd6a712b58e73807ffa4d72499183b3fe34090c32109dce0271071046",
+    "lampOS/crates/voice/src/coordinator/hand.rs": "0cbdc5bdeb49abbac85ee65c0bdc0639cb72ba8871e121fbbbed442bed46b020",
+    "lampOS/crates/voice/src/coordinator/notices.rs": "6e96a7fd5d65d02db4de9fccc0086302e276cb0c0ac8d951091c7b458b119160",
+    "lampOS/crates/voice/src/coordinator/requested_media.rs": "2ca1dca818da78a65f2b2804a600b5e4e5350029ebad60cb668c70836d3b56d9",
+    "lampOS/crates/voice/src/coordinator/second.rs": "756732946d4e9c45dc2ec56ce8b887454f953f7f51037c319d4e0bcdbd073bc9",
+    "lampOS/crates/voice/src/coordinator/speaker_tone.rs": "a805e6fd30388d43257ef5ded04f6bcb635e6dba48785b5ae0abca6b834c33ee",
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "00f016fe891be903e13c00a024b216dcefd28bd857efac4b9cb83603b32cb48f",
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "58fa301fd2581c0b64c3a8dd445a1c76a514df4c88ae16e6d33d4a6ccad0205c",
+    "lampOS/crates/voice/src/fixture_provider.rs": "3413e0d417119ec9e9c2f0d232b03a312317f6009fe7a29f624104cf2f10e817",
+    "lampOS/crates/voice/src/lib.rs": "2ff82f4dad1990eb7c7ffefac75d853137ab3fbe3847201883b6e99be0a82441",
+    "lampOS/crates/voice/src/provider_worker.rs": "e5bec1f3638d664669e75c948af4f280600ab7c16b8fd27660054b80d67cfe8f",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "2274afd9fcbfa6fca8547ddafb6f0f4e26a063330a98d8098be90c7ec5cbb1d5",
+    "lampOS/crates/voice/src/requested_audio.rs": "d3f7da187e6209773daa5faf270b5b9175aa5598092fbc71af3f7fd4b7fa4f20",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "fd67cf4872a24bc3551cc0d0aadd32edd8ba360b1110008999a77d544291bae1",
+    "lampOS/crates/voice/src/say.rs": "0f189088da789232ad2d5f83e83575331c6f928b9b498d128f1d47049e891d6e",
+    "lampOS/crates/voice/src/second_provider.rs": "60eeef52f1b7b6dc6044712911722426b4095ac900046ad143f95e0bfab7eca8",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "8d0415e10381567a04cce282341c5350f1f56e7599a291a3bede14e636a2e7e9",
+    "lampOS/crates/voice/src/tools.rs": "e221cd04b25547f3318aaf8633700784769fac56449f1be499e430642a249e79",
+    "lampOS/examples/relaxing-music/LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "lampOS/examples/relaxing-music/PROVENANCE.md": "7510ee01ce0a28d3f62c2e5185b16d1bdb9fd937eede66b71e7f4417d6514a54",
+    "lampOS/examples/relaxing-music/README.md": "b8b58c617c7c60b444f80dc5236d0d5f1d50e3cfb74e815a909755740180ed1e",
+    "lampOS/examples/relaxing-music/SKILL.md": "e861f46fc135c2c593c3aa7396b37ce380f689d5277780049ac07333b9b6358c",
+    "lampOS/examples/relaxing-music/score.rs": "d0bcc0f5553b61b2b46697fb8ee33d5f657e423d78f55a8fb66a59afc5249ad9",
+    "lampOS/examples/relaxing-music/skill.toml": "17217242610421b8d6bd9b37c477386d26673ee61daf768b44bd56664984921b"
+  },
+  "limitations": [
+    "Host fixtures; no physical lamp or cloud conversation used.",
+    "Native Linux ARM64 CI must pass on the published PR head separately."
+  ],
+  "integration_base": "65ffb51c77636f4d5359d5593083aa8170c3bb3b",
+  "source_only": true,
+  "source_tree_sha256": "681bfc558f3624a1574a95c5466085c5ae392fef3a8a06cac0d4ef370e43853c",
+  "source_file_count": 1558,
+  "selected_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "test_roots": {
+    "tests": "source-only copy; every selected crate except lamp-update",
+    "checkout_tests": "original checkout; all lamp-update tests, including its parent image fixture"
+  },
+  "portability_limitation": "lamp-update tests/image_journal.rs reads robots/lamp/rootfs outside lampOS; that complete crate is tested in the checkout without filtering any test. The workspace build and all other selected tests run from the source-only copy."
+}
