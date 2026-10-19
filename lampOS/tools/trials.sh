@@ -15,7 +15,9 @@
 #     zz-trial.conf, named to apply after the lamp's own and gone at a
 #     reboot: environment settings, and arguments added to the unit's own
 #     command line. Each unit is restarted, and its running process is
-#     checked to carry each one.
+#     checked to carry each one. The build each runs is said: its program's
+#     path and the start of its SHA-256, read from the process itself, to
+#     set beside the build's SHA256SUMS.
 #  3. The behaviour is caused: a bus message (lamp-bus pub), one kept up
 #     every second, a command, or a line printed as "PLAY: ..." for whoever
 #     runs the trial to play from the Mac's speaker.
@@ -329,6 +331,22 @@ since_mark() { # MARK UNIT...
 
 main_pid() { systemctl show "$1" -p MainPID --value 2>/dev/null || echo 0; }
 
+# The build the unit's running process is: its program's path and the first
+# 12 hex digits of its SHA-256, read through /proc/PID/exe, so a binary
+# replaced since the start is still the one measured.
+build_of() { # UNIT
+  local pid path sum
+  pid=$(main_pid "$1")
+  [[ -n $pid && $pid != 0 ]] || { echo "no running process"; return; }
+  path=$($SUDO readlink "$PROC/$pid/exe" 2>/dev/null || echo "?")
+  if command -v sha256sum >/dev/null; then
+    sum=$($SUDO sha256sum "$PROC/$pid/exe" 2>/dev/null | cut -c1-12)
+  else
+    sum=$($SUDO shasum -a 256 "$PROC/$pid/exe" 2>/dev/null | cut -c1-12)
+  fi
+  echo "$path (sha256 ${sum:-?})"
+}
+
 # Whether the unit's running process carries a switch: NAME=value in its
 # environment, or +ARG... in its command line.
 carries() { # UNIT SWITCH
@@ -576,6 +594,9 @@ trial() { # ROW [--dry]
       exit 1
     fi
   done < <(lines "$SWITCHES")
+  for unit in $(units_of_switches); do
+    say "build: $unit runs $(build_of "$unit")"
+  done
 
   while IFS= read -r line; do
     act cause "$line" || exit 1

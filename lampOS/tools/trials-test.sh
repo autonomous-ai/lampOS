@@ -46,6 +46,10 @@ case $1 in
     echo "$pid" >"$FAKE/pids/$2"
     echo active >"$FAKE/state/$2"
     mkdir -p "$FAKE/proc/$pid"
+    # The program it runs: $FAKE/builds/<unit>, made on its first start.
+    mkdir -p "$FAKE/builds"
+    [[ -e $FAKE/builds/$2 ]] || echo "the $2 build" >"$FAKE/builds/$2"
+    ln -sf "$FAKE/builds/$2" "$FAKE/proc/$pid/exe"
     : >"$FAKE/proc/$pid/environ"
     if [[ ! -e $FAKE/env-ignored ]]; then
       for conf in "$TRIALS_UNIT_DIR/$2.d"/*.conf; do
@@ -261,7 +265,9 @@ reset
 mkdir -p "$T/skills/light-out"
 echo "the lamp's own" >"$T/skills/light-out/skill.toml"
 cp "$T/skills/light-out/skill.toml" "$T/before.toml"
-(sleep 2; printf '%s\t%s\n' lamp-skills.service "$(field light-out "first example")" >>"$T/journal") &
+# Triggered once nobody_s has been said twice, whatever the setup took.
+(for _ in $(seq 1 100); do [[ $(grep -c 'someone":false' "$T/calls" 2>/dev/null) -ge 2 ]] && break; sleep 0.1; done
+ printf '%s\t%s\n' lamp-skills.service "$(field light-out "first example")" >>"$T/journal") &
 printf '%s\t%s\t%s\n' '"someone":true' lamp-skills.service "$(field light-out example)" >"$T/answer2"
 TRIALS_WAIT=10 "$SCRIPT" light-out >"$T/out" 2>&1; check "light-out with an earlier copy" 0 $?
 wait
@@ -295,7 +301,9 @@ hasnt "light-out: no then-step without Triggered" "$T/out" "then: "
 
 # The copy the trial ran: no [quiet], its trigger as the build's; gone after.
 reset
-(sleep 1; cp "$T/skills/light-out/skill.toml" "$T/trial.toml") &
+# Read once the trial says a switch is on, after its setup is done.
+(for _ in $(seq 1 100); do grep -q '^.* on: ' "$T/out" 2>/dev/null && break; sleep 0.05; done
+ cp "$T/skills/light-out/skill.toml" "$T/trial.toml") &
 TRIALS_WAIT=2 "$SCRIPT" light-out >"$T/out" 2>&1
 wait
 if [[ -e $T/trial.toml ]]; then
@@ -312,10 +320,20 @@ TRIALS_WAIT=1 "$SCRIPT" light-out >"$T/out" 2>&1
 has "light-out: an existing --zone kept" "$T/out" "doesn't carry +--zone system"
 mv "$T/argv.bak" "$T/argv"
 
+# The build each switched unit runs is said, from its process: the program's
+# path and its SHA-256's first 12 hex digits.
+reset
+answer scenes
+"$SCRIPT" scenes >"$T/out" 2>&1; check "scenes with its build said" 0 $?
+wait
+want=$( (command -v sha256sum >/dev/null && sha256sum "$T/builds/lamp-skills.service" || shasum -a 256 "$T/builds/lamp-skills.service") | cut -c1-12)
+has "the build said, path and sha256" "$T/out" "build: lamp-skills.service runs $T/builds/lamp-skills.service (sha256 $want)"
+
 # nudges: the trial's copy of rest-your-eyes waits 30 s and has no hours;
 # a near face kept up, then none said after; gone after.
 reset
-(sleep 1; cp "$T/skills/rest-your-eyes/skill.toml" "$T/nudge.toml") &
+(for _ in $(seq 1 100); do grep -q '^.* on: ' "$T/out" 2>/dev/null && break; sleep 0.05; done
+ cp "$T/skills/rest-your-eyes/skill.toml" "$T/nudge.toml") &
 TRIALS_WAIT=2 "$SCRIPT" nudges >"$T/out" 2>&1
 wait
 if [[ -e $T/nudge.toml ]]; then
