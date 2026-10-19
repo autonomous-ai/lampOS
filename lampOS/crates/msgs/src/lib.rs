@@ -793,6 +793,21 @@ pub struct Health {
     pub items: Vec<HealthItem>,
     /// Parts that are expected and have never reported.
     pub missing: Vec<String>,
+    /// How long, in milliseconds, the longest-quiet part has gone
+    /// unheard (its item's `age_ms`), counting only a part that has said
+    /// `ok` at least once since whoever writes this started and is now
+    /// past the stale time: a part that came up well and then stopped,
+    /// not one that never came up (#1681). A part whose last word was
+    /// `error` is left out: it keeps that level while quiet, and `level`
+    /// says it already. 0 when there is none, and then
+    /// left out, so a lamp with no such part sends what it sent before and
+    /// a reader that does not know the field is untouched.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub quiet_ms: u64,
+}
+
+fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 
 impl Health {
@@ -1827,6 +1842,7 @@ mod tests {
                 item("memory", Level::Ok, "", 610),
             ],
             missing: vec!["board".into()],
+            quiet_ms: 0,
         };
         let text = "{\"level\":\"error\",\"message\":\"voice: the link to the service is down\",\
                     \"items\":[{\"name\":\"voice\",\"level\":\"error\",\
@@ -1855,6 +1871,7 @@ mod tests {
             message: String::new(),
             items: vec![item("voice", Level::Ok, "", 100)],
             missing: vec![],
+            quiet_ms: 0,
         };
         assert_eq!(well.check(), Ok(()));
         well.missing.push("eyes".into());
@@ -1864,6 +1881,36 @@ mod tests {
         let declared = Health::declaration();
         assert_eq!(declared.period(), Some(Duration::from_secs(5)));
         assert_eq!(declared.lifespan(), Some(Duration::from_secs(15)));
+    }
+
+    /// `quiet_ms` (#1681) is left out at 0, read as 0 when absent, and
+    /// written when a part that was well has gone quiet.
+    #[test]
+    fn the_lamps_health_says_how_long_a_part_that_was_well_has_been_quiet() {
+        let well = "{\"level\":\"ok\",\"message\":\"\",\"items\":[],\"missing\":[]}";
+        let read: Health = serde_json::from_str(well).unwrap();
+        assert_eq!(read.quiet_ms, 0);
+        round_trip(&read, well);
+        let quiet = Health {
+            level: Level::Stale,
+            message: "eyes: not heard from for 312 s".into(),
+            items: vec![HealthItem {
+                name: "eyes".into(),
+                level: Level::Stale,
+                message: "not heard from for 312 s".into(),
+                age_ms: 312_400,
+            }],
+            missing: vec![],
+            quiet_ms: 312_400,
+        };
+        round_trip(
+            &quiet,
+            "{\"level\":\"stale\",\"message\":\"eyes: not heard from for 312 s\",\
+             \"items\":[{\"name\":\"eyes\",\"level\":\"stale\",\
+             \"message\":\"not heard from for 312 s\",\"age_ms\":312400}],\
+             \"missing\":[],\"quiet_ms\":312400}",
+        );
+        assert_eq!(quiet.check(), Ok(()));
     }
 
     #[test]

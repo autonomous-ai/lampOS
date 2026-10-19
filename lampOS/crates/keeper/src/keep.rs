@@ -271,6 +271,7 @@ mod tests {
                 })
                 .collect(),
             missing: Vec::new(),
+            quiet_ms: 0,
         }
     }
 
