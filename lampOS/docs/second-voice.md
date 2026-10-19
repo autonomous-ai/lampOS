@@ -1420,12 +1420,15 @@ that voice's alone (`services::in_one_voice`). A provider chosen over the
 configured one takes its own default voice, since `tts_voice` names one of
 the configured provider's, and the chosen voice's model is
 `LAMP_SECOND_SPEECH_MODEL`'s. No sentence goes to another voice: one the
-voice fails to start (a refusal, a quota, a broken connection, or an answer
-with no sound) is asked of it once more, `lamp-voice second: <voice> failed
-to start a sentence (…); asked once more`; failing again it is not said,
-`<voice> failed again (…); the sentence is not said`, and the turn goes on as for
-any speech that never rendered. A sentence begun and then lost fails as
-any does. The journal at start names the voice: `the voice is ElevenLabs,
+voice fails to start (a refusal, a quota, a broken connection, an answer
+with no sound, or no first sound within 4 s, `START_WITHIN`) is asked of it
+once more, `lamp-voice second: <voice> failed to start a sentence (…);
+asked once more`; failing again it is not said, `<voice> failed again (…);
+the sentence is not said, and the turn goes on`, and the turn goes on with
+the next sentence. Before #1844's C the second failure failed the whole
+turn, against what this said, and a host that took the connection and never
+answered cost the connection's 10 s and its response's, twice: now at most
+8 s a sentence. A sentence begun and then lost fails as any does. The journal at start names the voice: `the voice is ElevenLabs,
 model eleven_v4_turbo, the lamp's one voice`.
 
 **The key.** The voice unit's credential `gemini.key`
