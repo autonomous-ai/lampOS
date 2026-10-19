@@ -509,6 +509,37 @@ gate G that keeps false calls at 0.98 under about 2 an hour while calls
 heard rise well above 35 of 99 goes forward; if none does, more near lines
 and more of the lamp's own answers as negatives, in another sitting.
 
+**A rescue model a home lamp can have** (#1546, after #1605's live check:
+28 of 32 calls in four voices neither model had heard, 21 of them
+rescued, 1 false in about 8 minutes). The rescue model is the office's and
+is never published. What it learned that the installed model did not is the
+lamp's channel, and that can be measured without a voice
+(`training/name/channel.py`):
+
+1. `channel.py make` writes three exponential sine sweeps and 20 s of pink
+   noise; `channel.py play` plays them from the Mac beside the lamp and
+   writes when each began, while `lamp-bus record DIR mic2/audio` records
+   the empty room.
+2. `channel.py analyse` gives the room's impulse response (each sweep
+   deconvolved by Farina's inverse filter and the three averaged, from the
+   direct sound to 0.5 s after), the gain in each third-octave band from the
+   pink noise, and the floor (the recording's quietest second, as a
+   spectrum). Numbers only: nothing anyone said.
+3. `channel.py apply` passes public speech (LibriTTS, CC BY 4.0, and the
+   open generated calls) through that response and adds the floor, so
+   `lamp.py`'s rules train on what mic2 would hear, with no person and no
+   office in it. The office's recordings stay a private test set: a model
+   from public speech goes forward only if it comes near the rescue's 51 of
+   99 calls with no false hearing at 0.98 on them.
+
+Shown on a simulated channel only (a 20 ms delay, a 300 ms tail, a tilt, a
+floor at -60 dBFS, the two clocks 0.4 s apart): the response found
+correlates 0.967 with the true one (the sweeps cover 40 Hz to 7.6 kHz),
+RT60 301 ms against 300, the band gains within 0.01 dB, the floor at
+-60.1 dBFS. Not yet measured on lamp-4ace; the canceller's residue while the
+lamp speaks is not in it (the gaps' negatives, the lamp's own answers, carry
+that).
+
 Not shown: a model fit to install. Played voices only, nothing of a
 person; recording people waits for the owner's yes.
 
