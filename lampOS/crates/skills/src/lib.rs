@@ -99,6 +99,12 @@ const MOST_CHOICES: usize = 16;
 pub const MOODS: [&str; 1] = ["reading"];
 /// How long a skill may hold a pose.
 pub const MOOD_AT_MOST_US: u64 = 120_000_000;
+/// A light show's frames (#1679): 2 to 30 of them, each shown 2 to 20 s,
+/// the whole show a minute at most. Slow enough to read as a light that
+/// changes, never a flicker: a lamp is not a machine.
+pub const SHOW_FRAMES: std::ops::RangeInclusive<usize> = 2..=30;
+pub const SHOW_FRAME_US: std::ops::RangeInclusive<u64> = 2_000_000..=20_000_000;
+pub const SHOW_AT_MOST_US: u64 = 60_000_000;
 /// The longest a held-back chance may wait for its conditions.
 const MOST_WAIT_US: u64 = 3_600_000_000;
 /// How long a face message counts when its header names no lifespan: the
@@ -175,6 +181,9 @@ struct ChoiceFile {
     name: String,
     about: String,
     one_of: Vec<String>,
+    /// The value a call that gives none is made as (#1679: a light show
+    /// asked with no hint is a party). Without it, such a call has none.
+    default: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -280,6 +289,46 @@ struct StepFile {
     after: Option<String>,
     /// The name of the trigger this step is made for; for every one without.
     on: Option<String>,
+    /// The values of the tool's `[choice]` this step is made for: only in a
+    /// call that chose one of them (#1679: a scene's own light and pose).
+    if_choice: Option<Vec<String>>,
+    /// A light show, `shows/NAME.toml`: its frames in turn (#1679).
+    show: Option<String>,
+}
+
+/// Which runs a step is made in, when not every one: those its trigger
+/// started (`on`), or a call that chose one of these values (`if_choice`).
+#[derive(Clone, Debug, PartialEq)]
+enum Only {
+    Trigger(String),
+    Choice(Vec<String>),
+}
+
+/// A show's file, `shows/NAME.toml`: its frames, each a light held a while.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ShowFile {
+    #[serde(rename = "light")]
+    frames: Vec<FrameFile>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FrameFile {
+    colour: String,
+    level: u8,
+    #[serde(rename = "for")]
+    lasting: String,
+    pattern: Option<PatternFile>,
+}
+
+/// One light of a show, held `lasting_us` before the next.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Frame {
+    pub colour: String,
+    pub level: u8,
+    pub pattern: Option<LightPattern>,
+    pub lasting_us: u64,
 }
 
 /// What a `say` asks of the voice: a note it phrases, or what it keeps.
@@ -319,6 +368,9 @@ struct BodyFile {
     mood: Option<String>,
     #[serde(rename = "for")]
     lasting: Option<String>,
+    /// With the reading pose: the base turned toward this place in the
+    /// camera's picture, -1 its left edge to 1 its right (#1679).
+    toward: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -347,6 +399,9 @@ struct LightFile {
     dim: Option<u8>,
     until: Option<String>,
     pattern: Option<PatternFile>,
+    /// The person's own light, set as they asked and never given back
+    /// (#1679: a scene). Only in a skill its tool alone starts.
+    keep: Option<bool>,
 }
 
 /// How a skill's light moves, as its file says it (#940 item 3):
@@ -443,7 +498,7 @@ impl Permissions {
             Call::Gaze { .. } | Call::Gesture(_) | Call::Move(_) | Call::Mood { .. } => {
                 ("body", self.body)
             }
-            Call::Light { .. } | Call::Dim { .. } => ("light", self.light),
+            Call::Light { .. } | Call::Dim { .. } | Call::Show { .. } => ("light", self.light),
             Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. } => ("speak", self.speak),
             Call::Look => ("look", self.look),
             Call::AfterSay | Call::Ends => return None,
@@ -594,8 +649,9 @@ pub struct Skill {
     still: String,
     /// Local minutes of the day, from and to, when it never starts itself.
     quiet: Option<(u16, u16)>,
-    /// Each step, and the name of the trigger it is made for, if only one.
-    steps: Vec<(Option<String>, Step)>,
+    /// Each step, and the runs it is made in when not every one: one
+    /// trigger's, or a call's that chose one of its values.
+    steps: Vec<(Option<Only>, Step)>,
 }
 
 impl Skill {
@@ -784,17 +840,29 @@ pub enum Call {
     /// a gesture.
     Move(lamp_body::moves::Move),
     /// A pose held on the body's mood socket for `lasting_us`, said again
-    /// every second; the body comes back when it is no longer said.
-    Mood { mood: String, lasting_us: u64 },
+    /// every second; the body comes back when it is no longer said. With
+    /// `toward`, the reading pose's base is turned toward that place in the
+    /// camera's picture (#1679).
+    Mood {
+        mood: String,
+        lasting_us: u64,
+        toward: Option<f32>,
+    },
     /// A colour, to the actions part's `light_colour`, then stepped to its
-    /// level; held for its while in a run with no say.
+    /// level; held for its while in a run with no say. With `keep`, it is
+    /// the person's light, set as they asked and never given back (#1679).
     Light {
         colour: String,
         level: Option<u8>,
         lasting: Option<String>,
         /// How it moves, asked of the ring with `LAMP_LIGHT_REQUESTS=on`.
         pattern: Option<LightPattern>,
+        keep: bool,
     },
+    /// A light show (`shows/NAME.toml`): each frame's light in turn, held
+    /// its while, then the light given back (#1679). Only in a skill its
+    /// tool alone starts: never on its own.
+    Show { name: String, frames: Vec<Frame> },
     /// Steps dimmer, to the actions part's `light_dimmer`; with
     /// `until_ends`, held until the trigger stops holding, then given back.
     Dim { steps: u8, until_ends: bool },
@@ -875,15 +943,23 @@ impl Call {
             }
             Self::Gesture(name) => ("body.gesture", json!({ "gesture": name })),
             Self::Move(clip) => ("body.move", json!({ "move": clip.name })),
-            Self::Mood { mood, lasting_us } => (
-                "body.mood",
-                json!({ "mood": mood, "for_ms": lasting_us / 1_000 }),
-            ),
+            Self::Mood {
+                mood,
+                lasting_us,
+                toward,
+            } => {
+                let mut args = json!({ "mood": mood, "for_ms": lasting_us / 1_000 });
+                if let Some(toward) = toward {
+                    args["toward"] = json!(toward);
+                }
+                ("body.mood", args)
+            }
             Self::Light {
                 colour,
                 level,
                 lasting,
                 pattern,
+                keep,
             } => {
                 let mut args = json!({ "colour": colour });
                 if let Some(level) = level {
@@ -895,7 +971,13 @@ impl Call {
                 if let Some(pattern) = pattern {
                     args["pattern"] = json!(pattern);
                 }
+                if *keep {
+                    args["keep"] = json!(true);
+                }
                 ("light", args)
+            }
+            Self::Show { name, frames } => {
+                ("show", json!({ "show": name, "frames": frames.len() }))
             }
             Self::Dim { steps, until_ends } => {
                 let mut args = json!({ "dim": steps });
@@ -1201,6 +1283,14 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 choice.name
             ));
         }
+        if let Some(default) = &choice.default
+            && !choice.one_of.contains(default)
+        {
+            return Err(format!(
+                "choice {:?}: its default {default:?} is one of {:?}",
+                choice.name, choice.one_of
+            ));
+        }
     }
     if let Some(flag) = &file.flag {
         argument(&flag.name, &flag.about)?;
@@ -1312,9 +1402,12 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         return Err("two triggers have one name".into());
     }
     let any_on = file.steps.iter().any(|step| step.on.is_some());
+    // A tool alone starts it: a person asked, so what it does may be kept
+    // or played as they asked, never on its own (#1679).
+    let asked_alone = file.tool.is_some() && triggers.is_empty();
     let mut steps = Vec::new();
-    // The trigger each step is for, beside it: one for each step made.
-    let mut ons: Vec<Option<String>> = Vec::new();
+    // The runs each step is for, beside it: one for each step made.
+    let mut ons: Vec<Option<Only>> = Vec::new();
     let mut said = false;
     let mut after_say = false;
     for step in file.steps {
@@ -1323,8 +1416,9 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             && step.say.is_none()
             && step.sound.is_none()
             && step.look.is_none()
+            && step.show.is_none()
         {
-            return Err("a [[do]] step names body, light, say, sound or look".into());
+            return Err("a [[do]] step names body, light, say, sound, look or show".into());
         }
         if let Some(on) = &step.on
             && !names.contains(&on)
@@ -1336,7 +1430,35 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         if any_on && step.after.is_some() {
             return Err("after = \"say\" in a skill whose steps name their trigger".into());
         }
-        let on = step.on.clone();
+        let on = match (step.on.clone(), &step.if_choice) {
+            (Some(_), Some(_)) => {
+                return Err(
+                    "a step names its trigger (on) or its choice (if_choice), not both".into(),
+                );
+            }
+            (Some(on), None) => Some(Only::Trigger(on)),
+            (None, Some(values)) => {
+                let Some(choice) = &file.choice else {
+                    return Err("if_choice needs a [choice]".into());
+                };
+                if values.is_empty()
+                    || values.iter().any(|value| !choice.one_of.contains(value))
+                    || (1..values.len()).any(|at| values[..at].contains(&values[at]))
+                {
+                    return Err(format!(
+                        "if_choice lists values of the choice, each once: {:?}",
+                        choice.one_of
+                    ));
+                }
+                // One note to the model a call: what it says is the same for
+                // every choice.
+                if step.say.is_some() || step.sound.is_some() || step.look.is_some() {
+                    return Err("a step for some choices only makes body, light or show".into());
+                }
+                Some(Only::Choice(values.clone()))
+            }
+            (None, None) => None,
+        };
         match step.after.as_deref() {
             None => {}
             Some("say") if after_say => {}
@@ -1344,6 +1466,9 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             Some("say") if (said || file.tool.is_some()) && step.say.is_none() => {
                 after_say = true;
                 steps.push(Step::Call(Call::AfterSay));
+                // The wait for the say is every run's, whatever this step's
+                // own choice: the steps after it wait in each (#1679).
+                ons.push(None);
             }
             Some("say") => {
                 return Err(
@@ -1417,6 +1542,11 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 steps.push(Step::Call(Call::Move(move_file(dir, &clip)?)));
             }
             match (body.mood, body.lasting) {
+                (None, None) if body.toward.is_some() => {
+                    return Err(
+                        "toward turns the reading pose: it goes with mood = \"reading\"".into(),
+                    );
+                }
                 (None, None) => {}
                 (Some(mood), Some(lasting)) => {
                     if !MOODS.contains(&mood.as_str()) {
@@ -1426,7 +1556,17 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                     if lasting_us == 0 || lasting_us > MOOD_AT_MOST_US {
                         return Err("a mood's for is more than 0 and at most 2m".into());
                     }
-                    steps.push(Step::Call(Call::Mood { mood, lasting_us }));
+                    if body
+                        .toward
+                        .is_some_and(|toward| !toward.is_finite() || toward.abs() > 1.0)
+                    {
+                        return Err("toward is a place across the picture, -1 to 1".into());
+                    }
+                    steps.push(Step::Call(Call::Mood {
+                        mood,
+                        lasting_us,
+                        toward: body.toward,
+                    }));
                 }
                 _ => return Err("a body mood goes with its for, and a for with a mood".into()),
             }
@@ -1444,9 +1584,29 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 }
                 LightStep::Inline(file) => (file, "a light step".into()),
             };
-            steps.push(Step::Call(
-                light_call(file).map_err(|why| format!("{place}: {why}"))?,
-            ));
+            let call = light_call(file).map_err(|why| format!("{place}: {why}"))?;
+            if matches!(call, Call::Light { keep: true, .. }) && !asked_alone {
+                return Err(format!(
+                    "{place}: keep = true, in a skill started by its tool alone: only a light a person asked for is theirs to keep"
+                ));
+            }
+            steps.push(Step::Call(call));
+        }
+        if let Some(show) = step.show {
+            if !asked_alone {
+                return Err(
+                    "show, in a skill started by its tool alone: a light show is played only when a person asks"
+                        .into(),
+                );
+            }
+            if !plain_name(&show) {
+                return Err(format!("show {show:?} is not a file name in shows/"));
+            }
+            let place = format!("shows/{show}.toml");
+            let file: ShowFile =
+                toml::from_str(&read(&place)?).map_err(|error| format!("{place}: {error}"))?;
+            let frames = show_frames(file).map_err(|why| format!("{place}: {why}"))?;
+            steps.push(Step::Call(Call::Show { name: show, frames }));
         }
         if let Some(say) = step.say {
             let call = say_step(say)?;
@@ -1481,8 +1641,9 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         }
         ons.resize(steps.len(), on);
     }
-    let steps: Vec<(Option<String>, Step)> = ons.into_iter().zip(steps).collect();
-    // One say or sound a run: for each trigger, its own steps and those for all.
+    let steps: Vec<(Option<Only>, Step)> = ons.into_iter().zip(steps).collect();
+    // One say or sound a run: for each trigger, its own steps and those for
+    // all. A step for some choices makes none.
     let says = |name: Option<&String>| {
         steps
             .iter()
@@ -1490,7 +1651,11 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 matches!(
                     step,
                     Step::Call(Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. })
-                ) && (on.is_none() || on.as_ref() == name)
+                ) && match on {
+                    None => true,
+                    Some(Only::Trigger(on)) => Some(on) == name,
+                    Some(Only::Choice(_)) => false,
+                }
             })
             .count()
     };
@@ -1689,6 +1854,14 @@ fn light_call(file: LightFile) -> Result<Call, String> {
             if until_ends {
                 return Err("until goes with dim".into());
             }
+            let keep = file.keep == Some(true);
+            // A kept light is the person's own, steady and for good: it has
+            // no while and no pattern, which are a skill's light's.
+            if keep && (file.lasting.is_some() || file.pattern.is_some()) {
+                return Err(
+                    "a kept light takes no for and no pattern: it is the person's own light".into(),
+                );
+            }
             let pattern = file
                 .pattern
                 .map(|pattern| pattern_of(pattern, file.level))
@@ -1698,11 +1871,15 @@ fn light_call(file: LightFile) -> Result<Call, String> {
                 level: file.level,
                 lasting: file.lasting,
                 pattern,
+                keep,
             })
         }
         (None, Some(steps)) if (1..=4).contains(&steps) => {
             if file.level.is_some() || file.lasting.is_some() {
                 return Err("dim takes no level and no for".into());
+            }
+            if file.keep.is_some() {
+                return Err("keep goes with a colour: a dim is given back".into());
             }
             if file.pattern.is_some() {
                 return Err("dim takes no pattern".into());
@@ -1711,6 +1888,55 @@ fn light_call(file: LightFile) -> Result<Call, String> {
         }
         _ => Err("a light is a colour (with a level and a for) or dim = 1 to 4".into()),
     }
+}
+
+/// A show's frames as its file says them (#1679): 2 to 30, each a colour,
+/// a level and a while of 2 to 20 s, with a pattern the ring plays if any,
+/// the whole show a minute at most.
+fn show_frames(file: ShowFile) -> Result<Vec<Frame>, String> {
+    if !SHOW_FRAMES.contains(&file.frames.len()) {
+        return Err(format!(
+            "a show has {} to {} [[light]] frames",
+            SHOW_FRAMES.start(),
+            SHOW_FRAMES.end()
+        ));
+    }
+    let mut frames = Vec::new();
+    for (at, frame) in file.frames.into_iter().enumerate() {
+        let number = at + 1;
+        if !Light::COLOURS.contains(&frame.colour.as_str()) {
+            return Err(format!(
+                "frame {number}: colour {:?} is not one of {:?}",
+                frame.colour,
+                Light::COLOURS
+            ));
+        }
+        if !(1..=5).contains(&frame.level) {
+            return Err(format!("frame {number}: level is 1 to 5"));
+        }
+        let lasting_us =
+            duration_us(&frame.lasting).map_err(|why| format!("frame {number}: {why}"))?;
+        if !SHOW_FRAME_US.contains(&lasting_us) {
+            return Err(format!(
+                "frame {number}: a frame is shown 2s to 20s: slow enough to read as a light, never a flicker"
+            ));
+        }
+        let pattern = frame
+            .pattern
+            .map(|pattern| pattern_of(pattern, Some(frame.level)))
+            .transpose()
+            .map_err(|why| format!("frame {number}: {why}"))?;
+        frames.push(Frame {
+            colour: frame.colour,
+            level: frame.level,
+            pattern,
+            lasting_us,
+        });
+    }
+    if frames.iter().map(|frame| frame.lasting_us).sum::<u64>() > SHOW_AT_MOST_US {
+        return Err("a show lasts a minute at most".into());
+    }
+    Ok(frames)
 }
 
 /// A light file's pattern for a light at `level` (#940 item 3): a kind the
@@ -2663,7 +2889,7 @@ fn calls(
     let chosen = skill
         .choice
         .as_ref()
-        .and_then(|choice| args[&choice.name].as_str());
+        .and_then(|choice| args[&choice.name].as_str().or(choice.default.as_deref()));
     let twice = skill
         .flag
         .as_ref()
@@ -2671,7 +2897,13 @@ fn calls(
     skill
         .steps
         .iter()
-        .filter(|(on, _)| on.is_none() || on.as_ref() == fired)
+        .filter(|(on, _)| match on {
+            None => true,
+            Some(Only::Trigger(on)) => Some(on) == fired,
+            Some(Only::Choice(values)) => {
+                chosen.is_some_and(|chosen| values.iter().any(|value| value == chosen))
+            }
+        })
         .flat_map(|(_, step)| match step {
             Step::Call(Call::Gaze { .. }) => face
                 .map(|face| Call::Gaze { face: Some(face) })

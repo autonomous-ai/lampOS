@@ -1052,6 +1052,24 @@ mood socket, and says it again at least once every 1.5 s
 - **Holds** it, and comes back to the voice's mood once the skill stops
   saying `reading`: the pose is followed back at the same speed.
 - **Stands up for it** if it is folded, as for any mood but rest.
+- **Turns toward a place, if asked** (#1679, "light my book"):
+  `{"mood":"reading","level":0,"toward":X}`, X from -1 (the picture's left
+  edge) to 1 (its right), turns the base as the gaze would turn it to a face
+  seen there: 70% of X times `--gaze`'s yaw for a half-picture, within
+  `--gaze-reach`'s yaw (`Gaze::toward`), added to the base's turn of the pose
+  and followed at `--speed` through the same window and rules as every pose.
+  Held while `reading` with it is said; a `reading` without it, or the pose
+  let go, takes it away at the same speed. Nothing without `--gaze`, which
+  alone says how far a place in the picture is, and nothing in any other
+  mood or paused. A `toward` past -1 to 1 turns nothing. The place is the
+  model's, from the voice's look at the desk (Point the light,
+  `skills/point-light`): the eyes find faces only. A body before this
+  refuses the whole datagram, `toward` and all, so the lamp's body and its
+  skills go on together. Against simulated servos
+  (`a_reading_lamp_turns_toward_the_place_it_is_asked_and_back`): X = -0.5
+  with a 342-count half-picture turns the base 120 counts from where plain
+  reading has it, at most 3 counts a step, and back after; nothing without
+  a gaze or listening; past a reach of 100, 100. Not run on a lamp.
 
 While a skill says `reading`, the voice's own moods on the same socket
 (`resting` between turns, sent every 40 ms) do not take the pose from it,

@@ -312,6 +312,9 @@ fn every_skill_folder_says_its_kind_and_version() {
         named(SkillKind::Core),
         [
             "dance",
+            "light-scenes",
+            "light-show",
+            "point-light",
             "reminders",
             "stretch-break",
             "stuffy-air",
@@ -621,6 +624,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
             Call::Mood {
                 mood: "reading".into(),
                 lasting_us: 1_000_000,
+                toward: None,
             },
             "body",
         ),
@@ -630,6 +634,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
                 level: None,
                 lasting: None,
                 pattern: None,
+                keep: false,
             },
             "light",
         ),
@@ -1658,6 +1663,7 @@ fn a_light_files_pattern_is_loaded_and_held_to_its_bounds() {
                 period_ms: LightPattern::BREATHE_DEFAULT_MS,
                 low: 1,
             }),
+            keep: false,
         }
     );
     let candle = with_light(
@@ -1729,6 +1735,7 @@ fn present_for_a_while_through_short_dropouts_once_a_sitting_and_only_while_rest
                 level: Some(2),
                 lasting: Some("4s".into()),
                 pattern: None,
+                keep: false,
             }
         ]
     );
@@ -5609,4 +5616,471 @@ fn the_tools_socket_lost_is_made_again_and_the_folder_gone_ends_lamp_skills() {
     std::io::Read::read_to_string(&mut child.stderr.take().unwrap(), &mut said).unwrap();
     assert!(said.contains("is gone; ending"), "{said}");
     assert!(!tools.exists(), "not made again by lamp-skills");
+}
+
+/// A program on a bus of its own whose skills a test calls by their tools,
+/// with the body's mood socket, the actions part (which says each colour on
+/// `light/state` at 3, as the real one shows it) and the voice's state
+/// stood in for, on a clock the test skips (#1679).
+struct ToolProgram {
+    _dir: tempfile::TempDir,
+    tools: PathBuf,
+    clock: Clock,
+    mood: UnixDatagram,
+    /// Each call to the actions part, in order.
+    lights: mpsc::Receiver<String>,
+    voice: lamp_bus::Publisher,
+    _running: Running,
+}
+
+impl ToolProgram {
+    /// With the skill `name` of `toml` and its `shows/`, the light shown
+    /// blue at 3, ready for a call.
+    fn with(name: &str, toml: &str, shows: &[(&str, &str)]) -> Self {
+        // Short: a socket's whole path has to fit in 103 bytes.
+        let dir = tempfile::Builder::new()
+            .prefix("tp")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let root = dir.path().to_owned();
+        fs::create_dir(root.join("skills")).unwrap();
+        let bus = Bus::new(root.join("bus")).unwrap();
+        let actions = UnixListener::bind(root.join("actions.sock")).unwrap();
+        let (called, lights) = mpsc::channel();
+        let shown = bus.clone();
+        std::thread::spawn(move || {
+            let mut shown = shown
+                .publisher_declared("light/state", &Light::declaration(), "ring")
+                .unwrap();
+            for stream in actions.incoming().flatten() {
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let call: serde_json::Value = serde_json::from_str(&line).unwrap();
+                if let Some(colour) = call["args"]["colour"].as_str() {
+                    shown
+                        .publish_json(1, &Light::new(true, colour, 3).unwrap())
+                        .unwrap();
+                }
+                // Kept before it is answered: a call answered was seen.
+                let _ = called.send(line);
+                (&stream)
+                    .write_all(b"{\"ok\":true,\"result\":{}}\n")
+                    .unwrap();
+            }
+        });
+        let mut ring = bus
+            .publisher_declared("light/state", &Light::declaration(), "ring")
+            .unwrap();
+        ring.publish_json(1, &Light::new(true, "blue", 3).unwrap())
+            .unwrap();
+        let voice = bus
+            .publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), "voice")
+            .unwrap();
+        let mood = UnixDatagram::bind(root.join("mood.sock")).unwrap();
+        mood.set_read_timeout(Some(Duration::from_millis(200)))
+            .unwrap();
+        let tools = root.join("tools");
+        let clock = Clock::at(&root);
+        let running = Running(
+            Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+                .args([
+                    "--dir".as_ref(),
+                    root.join("skills").as_os_str(),
+                    "--bus-root".as_ref(),
+                    root.join("bus").as_os_str(),
+                    "--mood-socket".as_ref(),
+                    root.join("mood.sock").as_os_str(),
+                    "--actions-socket".as_ref(),
+                    root.join("actions.sock").as_os_str(),
+                    "--tools-dir".as_ref(),
+                    tools.as_os_str(),
+                ])
+                .args(clock.args())
+                .spawn()
+                .unwrap(),
+        );
+        let skill = skill_with(&root.join("skills"), name, toml);
+        if !shows.is_empty() {
+            fs::create_dir(skill.join("shows")).unwrap();
+            for (show, text) in shows {
+                fs::write(skill.join("shows").join(format!("{show}.toml")), text).unwrap();
+            }
+        }
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !tools.join("tools.json").exists() {
+            assert!(Instant::now() < deadline, "no tools file");
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        Self {
+            _dir: dir,
+            tools,
+            clock,
+            mood,
+            lights,
+            voice,
+            _running: running,
+        }
+    }
+
+    /// The model's call of `name` with `args`, as the voice makes it.
+    fn call(&self, name: &str, args: &str) -> serde_json::Value {
+        let stream = UnixStream::connect(self.tools.join("call.sock")).unwrap();
+        writeln!(&stream, r#"{{"op":"call","name":"{name}","args":{args}}}"#).unwrap();
+        let mut line = String::new();
+        BufReader::new(&stream).read_line(&mut line).unwrap();
+        serde_json::from_str::<serde_json::Value>(&line).unwrap()
+    }
+
+    /// What the mood socket was told over `window` of the program's clock,
+    /// a second on at a time, each second's said waited for.
+    fn poses(&self, window: Duration) -> Vec<String> {
+        let until = self.clock.now() + window;
+        let mut said = self.said();
+        while self.clock.now() < until {
+            self.clock
+                .skip_to((self.clock.now() + Duration::from_secs(1)).min(until));
+            said.extend(self.said());
+        }
+        said
+    }
+
+    /// What the mood socket holds, once the program's threads have had a
+    /// moment to say what is due.
+    fn said(&self) -> Vec<String> {
+        std::thread::sleep(Duration::from_millis(100));
+        self.mood.set_nonblocking(true).unwrap();
+        let mut buffer = [0u8; 256];
+        let mut said = Vec::new();
+        while let Ok(length) = self.mood.recv(&mut buffer) {
+            said.push(String::from_utf8_lossy(&buffer[..length]).into_owned());
+        }
+        self.mood.set_nonblocking(false).unwrap();
+        said
+    }
+
+    /// The colours the actions part was asked for since the last look,
+    /// waiting up to five seconds for `least` of them.
+    fn colours(&self, least: usize) -> Vec<String> {
+        self.colours_within(least, Duration::from_secs(5))
+    }
+
+    /// The same, waiting at most `within`.
+    fn colours_within(&self, least: usize, within: Duration) -> Vec<String> {
+        let colour = |line: String| {
+            let call: serde_json::Value = serde_json::from_str(&line).ok()?;
+            call["args"]["colour"].as_str().map(str::to_owned)
+        };
+        let deadline = Instant::now() + within;
+        let mut colours = Vec::new();
+        while colours.len() < least && Instant::now() < deadline {
+            if let Ok(line) = self.lights.recv_timeout(Duration::from_millis(50)) {
+                colours.extend(colour(line));
+            }
+        }
+        // And whatever else came with them.
+        std::thread::sleep(Duration::from_millis(100));
+        colours.extend(self.lights.try_iter().filter_map(colour));
+        colours
+    }
+}
+
+/// Two scenes, the first with the reading pose (#1679).
+const SCENES: &str = r#"
+tool = "light_scene"
+[choice]
+name = "scene"
+about = "The scene."
+one_of = ["reading", "relax"]
+[[do]]
+say = "Say it is set."
+[[do]]
+if_choice = ["reading"]
+body = { mood = "reading", for = "5s" }
+light = { colour = "white", keep = true }
+[[do]]
+if_choice = ["relax"]
+light = { colour = "warm", keep = true }
+"#;
+
+/// #1679: a scene's light is the person's, kept: set through the actions
+/// part and never given back at the run's end. Another scene asked while
+/// the first's pose is held sets its light at once and lets the pose go,
+/// so the head comes back up rather than staying down over the desk.
+#[test]
+fn a_scene_keeps_the_persons_light_and_the_next_scene_lets_the_pose_go() {
+    let program = ToolProgram::with("scenes", SCENES, &[]);
+    let reading = program.call("light_scene", r#"{"scene":"reading"}"#);
+    assert_eq!(reading["ok"], true, "{reading}");
+    assert_eq!(reading["result"]["next"], "Say it is set.");
+    assert_eq!(program.colours(1), ["white"]);
+    let held = program.poses(Duration::from_secs(2));
+    assert!(
+        held.len() >= 2
+            && held
+                .iter()
+                .all(|pose| pose == r#"{"level":0,"mood":"reading"}"#),
+        "{held:?}"
+    );
+    let relax = program.call("light_scene", r#"{"scene":"relax"}"#);
+    assert_eq!(relax["ok"], true, "{relax}");
+    // The kept light is made after the hold is let go: once it is seen,
+    // what the hold said before that is all there is of it.
+    assert_eq!(program.colours(1), ["warm"]);
+    let _before = program.said();
+    // The pose let go: nothing more said, though its five seconds last.
+    assert_eq!(program.poses(Duration::from_secs(5)), Vec::<String>::new());
+    // Past the run's end, nothing given back: the warm light stays theirs.
+    program.clock.skip(Duration::from_secs(2));
+    assert_eq!(program.colours(0), Vec::<String>::new());
+}
+
+/// #1679: a call again that turns the pose toward another place takes the
+/// place of the hold under way: from then on only the turned pose is said,
+/// never the two in turn.
+#[test]
+fn a_turned_pose_takes_the_place_of_the_one_held() {
+    let point = r#"
+tool = "point_light"
+[choice]
+name = "toward"
+about = "Where."
+one_of = ["ahead", "left"]
+default = "ahead"
+[[do]]
+body = { mood = "reading", for = "10s" }
+say = "Say whether you can see it."
+[[do]]
+if_choice = ["left"]
+body = { mood = "reading", for = "10s", toward = -0.5 }
+"#;
+    let program = ToolProgram::with("point", point, &[]);
+    assert_eq!(program.call("point_light", "{}")["ok"], true);
+    let plain = r#"{"level":0,"mood":"reading"}"#;
+    let turned = r#"{"level":0,"mood":"reading","toward":-0.5}"#;
+    let before = program.poses(Duration::from_secs(2));
+    assert!(
+        before.len() >= 2 && before.iter().all(|pose| pose == plain),
+        "{before:?}"
+    );
+    assert_eq!(
+        program.call("point_light", r#"{"toward":"left"}"#)["ok"],
+        true
+    );
+    let after = program.poses(Duration::from_secs(4));
+    // The call again says each of its poses once (the plain one first),
+    // then only the turned one is held.
+    let held: Vec<&String> = after.iter().skip_while(|pose| *pose != turned).collect();
+    assert!(
+        held.len() >= 4 && held.iter().all(|pose| *pose == turned),
+        "{after:?}"
+    );
+}
+
+/// A short show for the program's tests: three frames of two seconds.
+const SHORT_SHOW: &str = r#"
+[[light]]
+colour = "purple"
+level = 3
+for = "2s"
+[[light]]
+colour = "pink"
+level = 3
+for = "2s"
+[[light]]
+colour = "green"
+level = 3
+for = "2s"
+"#;
+
+/// #1679: a light show plays its frames in turn, each its while, and gives
+/// the light back after; someone speaking (the voice listening) stops it
+/// within a fifth of a second, and the light is given back then.
+#[test]
+fn a_light_show_plays_its_frames_in_turn_and_stops_when_someone_speaks() {
+    let show = r#"
+tool = "light_show"
+[[do]]
+say = "Say the show is starting."
+[[do]]
+after = "say"
+show = "short"
+"#;
+    let mut program = ToolProgram::with("show", show, &[("short", SHORT_SHOW)]);
+    assert_eq!(program.call("light_show", "{}")["ok"], true);
+    // No voice state said: the steps after the line go on at once.
+    assert_eq!(program.colours(1), ["purple"]);
+    program.clock.skip(Duration::from_millis(2_100));
+    assert_eq!(program.colours(1), ["pink"]);
+    program.clock.skip(Duration::from_millis(2_100));
+    assert_eq!(program.colours(1), ["green"]);
+    program.clock.skip(Duration::from_millis(2_100));
+    // Given back as it was: blue.
+    assert_eq!(program.colours(1), ["blue"]);
+    // Again, and someone speaks during its first frame: the next frame is
+    // never shown, and the light is given back at once.
+    assert_eq!(program.call("light_show", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["purple"]);
+    program
+        .voice
+        .publish_json(
+            1,
+            &VoiceState {
+                state: lamp_msgs::Voice::Listening,
+            },
+        )
+        .unwrap();
+    program.clock.skip(Duration::from_millis(400));
+    // Within a fifth of a second of the program's clock, well before the
+    // frame's two seconds end: a look at the frame's end alone is too late.
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        ["blue"]
+    );
+    program.clock.skip(Duration::from_secs(5));
+    assert_eq!(program.colours(0), Vec::<String>::new());
+}
+
+/// #1679: the loader holds the new steps to what they are for: a kept
+/// light and a show only in a skill a person starts by its tool; a kept
+/// light steady and for good; a turn only of the reading pose, across the
+/// picture; a step for some choices only of the skill's own values, and no
+/// say in one; a show's frames within their counts and whiles; a choice's
+/// default one of its values.
+#[test]
+fn the_loader_holds_kept_lights_shows_turns_and_choices_to_their_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    const TOOL: &str =
+        "tool = \"t\"\n[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\", \"b\"]\n";
+    const TRIGGERED: &str = "[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n[ask]\npolicy = \"hello\"\n";
+    for (number, (toml, why)) in [
+        (
+            format!("{TRIGGERED}[[do]]\nlight = {{ colour = \"warm\", keep = true }}\n"),
+            "only a light a person asked for",
+        ),
+        (
+            format!("{TOOL}[[do]]\nlight = {{ colour = \"warm\", keep = true, for = \"5s\" }}\n"),
+            "no for and no pattern",
+        ),
+        (
+            format!("{TOOL}[[do]]\nlight = {{ dim = 1, keep = true }}\n"),
+            "keep goes with a colour",
+        ),
+        (
+            format!("{TOOL}[[do]]\nbody = {{ toward = 0.5 }}\n"),
+            "goes with mood = \"reading\"",
+        ),
+        (
+            format!("{TOOL}[[do]]\nbody = {{ mood = \"reading\", for = \"5s\", toward = 1.5 }}\n"),
+            "-1 to 1",
+        ),
+        (
+            format!("{TOOL}[[do]]\nif_choice = [\"z\"]\nlight = {{ colour = \"warm\" }}\n"),
+            "values of the choice",
+        ),
+        (
+            format!("{TOOL}[[do]]\nif_choice = [\"a\", \"a\"]\nlight = {{ colour = \"warm\" }}\n"),
+            "each once",
+        ),
+        (
+            format!("{TOOL}[[do]]\nif_choice = [\"a\"]\nsay = \"Hi.\"\n"),
+            "body, light or show",
+        ),
+        (
+            "tool = \"t\"\n[[do]]\nif_choice = [\"a\"]\nlight = { colour = \"warm\" }\n".into(),
+            "needs a [choice]",
+        ),
+        (
+            format!("{TRIGGERED}[[do]]\nshow = \"short\"\n"),
+            "only when a person asks",
+        ),
+        (
+            "tool = \"t\"\n[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\ndefault = \"z\"\n[[do]]\nsay = \"Hi.\"\n".into(),
+            "its default",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let error = load(&skill_with(dir.path(), &format!("bad{number}"), &toml)).unwrap_err();
+        assert!(error.contains(why), "{toml}: {error}");
+    }
+    // A show's frames: 2 to 30, each 2 s to 20 s, a minute at most, the
+    // ring's patterns only.
+    let frame = |colour: &str, lasting: &str| {
+        format!("[[light]]\ncolour = \"{colour}\"\nlevel = 3\nfor = \"{lasting}\"\n")
+    };
+    for (number, (show, why)) in [
+        (frame("pink", "2s"), "2 to 30"),
+        (frame("pink", "2s") + &frame("pink", "1s"), "2s to 20s"),
+        (frame("pink", "20s").repeat(4), "a minute at most"),
+        (frame("pink", "2s") + &frame("magenta", "2s"), "is not one of"),
+        (
+            frame("pink", "4s")
+                + "[[light]]\ncolour = \"pink\"\nlevel = 3\nfor = \"4s\"\npattern = { kind = \"strobe\" }\n",
+            "no blink, flash or rainbow",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let skill = skill_with(
+            dir.path(),
+            &format!("show{number}"),
+            "tool = \"t\"\n[[do]]\nshow = \"short\"\n",
+        );
+        fs::create_dir_all(skill.join("shows")).unwrap();
+        fs::write(skill.join("shows/short.toml"), show).unwrap();
+        let error = load(&skill).unwrap_err();
+        assert!(error.contains(why), "{error}");
+    }
+    let skill = skill_with(
+        dir.path(),
+        "good",
+        "tool = \"t\"\n[[do]]\nshow = \"short\"\n",
+    );
+    fs::create_dir_all(skill.join("shows")).unwrap();
+    fs::write(skill.join("shows/short.toml"), SHORT_SHOW).unwrap();
+    load(&skill).unwrap();
+}
+
+/// #1679: a step for some choices is made only in a call that chose one of
+/// them, and a choice's default stands for a call that gives none.
+#[test]
+fn a_step_for_some_choices_is_made_only_for_them_and_the_default_stands_in() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = load(&skill_with(
+        dir.path(),
+        "scenes",
+        &SCENES.replace(
+            "one_of = [\"reading\", \"relax\"]",
+            "one_of = [\"reading\", \"relax\"]\ndefault = \"relax\"",
+        ),
+    ))
+    .unwrap();
+    let mut engine = Engine::new(vec![skill], true);
+    let calls =
+        |engine: &mut Engine, args: serde_json::Value| -> Vec<(&'static str, serde_json::Value)> {
+            engine
+                .tool("light_scene", &args, 1_000_000)
+                .unwrap()
+                .calls
+                .iter()
+                .map(Call::named)
+                .collect()
+        };
+    let reading = calls(&mut engine, serde_json::json!({"scene": "reading"}));
+    assert_eq!(
+        reading.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+        ["say", "body.mood", "light"]
+    );
+    assert_eq!(reading[2].1["colour"], "white");
+    assert_eq!(reading[2].1["keep"], true);
+    for args in [serde_json::json!({"scene": "relax"}), serde_json::json!({})] {
+        let relax = calls(&mut engine, args);
+        assert_eq!(
+            relax.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+            ["say", "light"]
+        );
+        assert_eq!(relax[1].1["colour"], "warm");
+    }
 }

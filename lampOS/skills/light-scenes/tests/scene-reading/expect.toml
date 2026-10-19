@@ -1,0 +1,18 @@
+# "Lamp, reading light": white at 4, the person's, kept; the head down over
+# the desk for a minute.
+[[call_tool]]
+name = "light_scene"
+at = "0s"
+args = { scene = "reading" }
+
+[[expect]]
+call = "say"
+args = { note = "Say in a few words that the light is set for it, then stop. If they named no scene, ask which they would like: reading, focus, relax, movie, night or energise." }
+
+[[expect]]
+call = "body.mood"
+args = { mood = "reading", for_ms = 60000 }
+
+[[expect]]
+call = "light"
+args = { colour = "white", level = 4, keep = true }

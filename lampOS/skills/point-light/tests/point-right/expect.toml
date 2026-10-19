@@ -1,0 +1,21 @@
+# Off to the right: turned toward the right.
+[[call_tool]]
+name = "point_light"
+at = "0s"
+args = { toward = "right" }
+
+[[expect]]
+call = "look"
+
+[[expect]]
+call = "body.mood"
+
+[[expect]]
+call = "light"
+
+[[expect]]
+call = "say"
+
+[[expect]]
+call = "body.mood"
+args = { mood = "reading", toward = 0.5 }

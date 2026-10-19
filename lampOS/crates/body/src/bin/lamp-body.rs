@@ -486,14 +486,35 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
 /// One datagram from the voice service. Anything else is ignored.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
 fn mood_of(datagram: &[u8]) -> Option<(lamp_body::gesture::Mood, u8)> {
-    #[derive(serde::Deserialize)]
-    #[serde(deny_unknown_fields)]
-    struct Message {
-        mood: lamp_body::gesture::Mood,
-        level: u8,
-    }
-    let message: Message = serde_json::from_slice(datagram).ok()?;
-    Some((message.mood, message.level))
+    mood_message(datagram).map(|message| (message.mood, message.level))
+}
+
+/// A mood datagram: the mood, its level, and with `reading` the place
+/// across the picture a skill turns it toward (`toward`, #1679).
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MoodMessage {
+    mood: lamp_body::gesture::Mood,
+    level: u8,
+    #[serde(default)]
+    toward: Option<f32>,
+}
+
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn mood_message(datagram: &[u8]) -> Option<MoodMessage> {
+    serde_json::from_slice(datagram).ok()
+}
+
+/// Where a `reading` datagram turns the lamp, -1 to 1 across the picture:
+/// nothing for another mood, none given, or a place off the picture.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn toward_of(datagram: &[u8]) -> Option<f32> {
+    let message = mood_message(datagram)?;
+    message.toward.filter(|toward| {
+        message.mood == lamp_body::gesture::Mood::Reading
+            && toward.is_finite()
+            && toward.abs() <= 1.0
+    })
 }
 
 /// Which of the moods heard in one step counts, in the order they came,
@@ -891,6 +912,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let mut datagram = vec![0u8; lamp_body::moves::MOST_DATAGRAM];
     // When a skill last said `reading` (`of_this_step`).
     let mut reading_at: Option<std::time::Instant> = None;
+    // Where the newest `reading` turns the lamp, if anywhere (#1679).
+    let reading_toward: std::cell::Cell<Option<f32>> = std::cell::Cell::new(None);
     let news = || {
         paused.set(pause.as_mut().is_some_and(|pause| pause.paused()));
         // Everything waiting; which of it counts is `of_this_step`'s.
@@ -945,7 +968,12 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                                 *asked_by.borrow_mut() = source.map(|source| (clip.name, source));
                             }
                         }
-                        (Heard::Mood(mood, level), _) => moods_heard.push((mood, level)),
+                        (Heard::Mood(mood, level), _) => {
+                            if mood == lamp_body::gesture::Mood::Reading {
+                                reading_toward.set(toward_of(sent));
+                            }
+                            moods_heard.push((mood, level));
+                        }
                         // An unknown gesture, most often: said, as the
                         // body says what it does with every gesture.
                         (Heard::Dropped(why), _) => {
@@ -1309,6 +1337,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                     .as_ref()
                     .is_some_and(|asked| asked.holding(now_us)),
                 paused: false,
+                // Taken only while the pose is reading (`body.rs`).
+                toward: reading_toward.get(),
             };
             // Read all the same, so that nothing kept from before the pause
             // is acted on after it.
@@ -2233,5 +2263,27 @@ mod tests {
         ] {
             assert_eq!(mood_of(ignored), None);
         }
+    }
+
+    /// #1679: a reading pose may say where across the picture it turns,
+    /// and is still a reading pose; a place off the picture, or one beside
+    /// another mood, turns nothing.
+    #[test]
+    fn a_reading_pose_may_say_where_it_turns() {
+        let reading = br#"{"mood":"reading","level":0,"toward":-0.5}"#;
+        assert_eq!(mood_of(reading), Some((Mood::Reading, 0)));
+        assert_eq!(toward_of(reading), Some(-0.5));
+        assert_eq!(toward_of(br#"{"mood":"reading","level":0}"#), None);
+        for turns_nothing in [
+            &br#"{"mood":"reading","level":0,"toward":1.5}"#[..],
+            br#"{"mood":"listening","level":0,"toward":0.5}"#,
+            br#"{"mood":"reading","level":0,"toward":"left"}"#,
+        ] {
+            assert_eq!(toward_of(turns_nothing), None);
+        }
+        assert_eq!(
+            mood_of(br#"{"mood":"listening","level":0,"toward":0.5}"#),
+            Some((Mood::Listening, 0))
+        );
     }
 }

@@ -2127,6 +2127,7 @@ fn gesture_run(
             let due = !asked_once && time.get() >= ask_at;
             asked_once |= due;
             Asked {
+                toward: None,
                 seen: None,
                 gesture: due.then_some(clip),
                 expression: None,
@@ -2194,6 +2195,7 @@ fn expression_run_with(
         None,
         move || Some((mood, 60)),
         move || Asked {
+            toward: None,
             seen: None,
             gesture: None,
             expression: (time.get() >= from && time.get() < until).then_some(offsets),
@@ -2351,6 +2353,7 @@ fn speaking_run_with(
             })
         },
         move || Asked {
+            toward: None,
             seen: None,
             gesture: None,
             expression: (time.get() >= from && time.get() < until).then_some(offsets),
@@ -2796,6 +2799,104 @@ fn a_reading_lamp_looks_down_at_the_desk_holds_it_and_comes_back() {
     }
 }
 
+/// A lamp in `mood` from six seconds to twelve, listening before and after,
+/// asked to turn `toward` a place across the picture all the while, with
+/// `looking` as its gaze. Each step: when, and the glimpse.
+fn toward_run(
+    mood: Mood,
+    looking: Option<Looking>,
+    toward: Option<f32>,
+) -> (BodyReport, Vec<(Duration, Glimpse)>) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(18));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits::folded_with(Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 120,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .unwrap();
+    let mood_at = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut seen = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        looking,
+        move || {
+            let at = mood_at.get().as_millis();
+            Some(if (6_000..12_000).contains(&at) {
+                (mood, 60)
+            } else {
+                (Mood::Listening, 60)
+            })
+        },
+        move || Asked {
+            toward,
+            ..Asked::default()
+        },
+        |glimpse| seen.push((seen_at.get(), *glimpse)),
+    );
+    (report, seen)
+}
+
+/// #1679, "light my book": reading toward a place on the left of the
+/// picture, the base turns as it would to a face there (70% of the
+/// half-picture's 342 counts times a half: 120), at the pose's own speed,
+/// holds it while reading and comes back after. Not without a gaze, which
+/// alone knows how far a place in the picture is, nor in another mood; a
+/// place past the gaze's reach is turned to as far as the reach.
+#[test]
+fn a_reading_lamp_turns_toward_the_place_it_is_asked_and_back() {
+    let ms = Duration::from_millis;
+    let looking = Looking::new([342, 200], [250, 120]).unwrap();
+    let at = |seen: &[(Duration, Glimpse)], when: Duration| {
+        seen.iter().rfind(|step| step.0 < when).unwrap().1
+    };
+    let (report, seen) = toward_run(Mood::Reading, Some(looking), Some(-0.5));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let (_, plain) = toward_run(Mood::Reading, Some(looking), None);
+    for when in [9_000, 11_900] {
+        let (turned, straight) = (at(&seen, ms(when)), at(&plain, ms(when)));
+        let by = i32::from(turned.goals[2]) - i32::from(straight.goals[2]);
+        assert!((118..=121).contains(&by.abs()), "at {when}: {by}");
+        // The head still looks down at the desk as reading does.
+        assert_eq!(turned.goals[0], straight.goals[0], "at {when}");
+    }
+    let back = at(&seen, ms(15_900));
+    assert!(
+        back.goals[2].abs_diff(at(&plain, ms(15_900)).goals[2]) <= 6,
+        "{back:?}"
+    );
+    for pair in seen
+        .windows(2)
+        .filter(|pair| pair[0].0 >= ms(6_000) && pair[1].0 < ms(16_000))
+    {
+        assert!(
+            pair[1].1.goals[2].abs_diff(pair[0].1.goals[2]) <= 3,
+            "{pair:?}"
+        );
+    }
+    // Without a gaze, or listening: as if nothing were asked.
+    let (_, blind) = toward_run(Mood::Reading, None, Some(-0.5));
+    let (_, blind_plain) = toward_run(Mood::Reading, None, None);
+    assert_eq!(blind, blind_plain);
+    let (_, listening) = toward_run(Mood::Listening, Some(looking), Some(-0.5));
+    let (_, listening_plain) = toward_run(Mood::Listening, Some(looking), None);
+    assert_eq!(listening, listening_plain);
+    // Past the reach (1.0 would be 239 counts): as far as a reach of 100.
+    let near = Looking::new([342, 200], [100, 120]).unwrap();
+    let (_, far) = toward_run(Mood::Reading, Some(near), Some(1.0));
+    let (_, far_plain) = toward_run(Mood::Reading, Some(near), None);
+    let by =
+        i32::from(at(&far, ms(11_900)).goals[2]) - i32::from(at(&far_plain, ms(11_900)).goals[2]);
+    assert!((98..=101).contains(&by.abs()), "{by}");
+}
+
 /// Without `rest_glance`, a lamp at rest writes exactly what it writes
 /// when nothing is asked of it.
 #[test]
@@ -3012,6 +3113,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
         None,
         || Some((Mood::Speaking, 60)),
         || Asked {
+            toward: None,
             seen: None,
             gesture: None,
             expression: None,
@@ -3070,6 +3172,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
         None,
         || Some((Mood::Speaking, 60)),
         move || Asked {
+            toward: None,
             seen: None,
             gesture: (!std::mem::replace(&mut asked_once, true)).then_some(&crate::clips::NOD),
             expression: None,
@@ -3146,6 +3249,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
             let due = !asked_once && time.get() >= Duration::from_secs(8);
             asked_once |= due;
             Asked {
+                toward: None,
                 seen: None,
                 gesture: due.then_some(&crate::clips::STRETCHING),
                 expression: None,
@@ -3554,6 +3658,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                 last = now;
                 let there = (from..until).contains(&now.as_secs());
                 Asked {
+                    toward: None,
                     seen: Some(Seen {
                         face: there.then_some(crate::gaze::Sight {
                             x: 0.0,
@@ -3625,6 +3730,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 return Asked::PAUSED;
             }
             Asked {
+                toward: None,
                 seen: Some(Seen {
                     face: (now >= Duration::from_secs(2)).then_some(crate::gaze::Sight {
                         x: 0.0,
@@ -5355,6 +5461,7 @@ fn called_run(
                 last = now;
             }
             Asked {
+                toward: None,
                 seen: look.then(|| Seen {
                     face: face_from
                         .is_some_and(|from| now >= Duration::from_secs(from))

@@ -177,6 +177,18 @@ impl Gaze {
     fn forget(&mut self) {
         self.sights = 0;
     }
+
+    /// The base's turn toward a place `toward` across the picture (-1 its
+    /// left edge, 1 its right), in counts of yaw: what a face there would be
+    /// turned by, the same share of it and inside the same reach (#1679: a
+    /// reading lamp turned toward the book it was asked to light).
+    pub fn toward(&self, toward: f32) -> f32 {
+        if !toward.is_finite() {
+            return 0.0;
+        }
+        (self.looking.turn[0] * toward.clamp(-1.0, 1.0) * SHARE)
+            .clamp(-self.looking.reach[0], self.looking.reach[0])
+    }
 }
 
 #[cfg(test)]

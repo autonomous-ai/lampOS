@@ -1,0 +1,60 @@
+# Light scenes (#1679): a person asks for a light by what it is for
+# ("reading light", "movie light") and the lamp sets it. Started by its tool
+# alone: no trigger and no [ask], since a person asked. The light is the
+# person's, kept (keep = true): nothing is given back at the run's end, as
+# when they ask for a colour and a level themselves. Never the microphone,
+# the camera or the speaker (docs/v1-verdicts.md, HAL-4.20).
+needs = ["voice", "light", "body"]
+# Comes with the lamp (docs/skills.md, "Core and installable skills").
+kind = "core"
+version = "1.0.0"
+tool = "light_scene"
+
+# What it may use, and nothing more: its line, the light, the reading pose.
+# It reads no topic.
+[permissions]
+speak = true
+light = true
+body = true
+
+[choice]
+name = "scene"
+about = "The scene they asked for: reading, focus, relax, movie, night or energise."
+one_of = ["reading", "focus", "relax", "movie", "night", "energise"]
+
+# The model's line: the note is what it is told to say.
+[[do]]
+say = "Say in a few words that the light is set for it, then stop. If they named no scene, ask which they would like: reading, focus, relax, movie, night or energise."
+
+# V1's six scenes (hal/presets.py): their order of brightness kept on five
+# levels (energise 1.00, reading 0.80, focus 0.70, relax 0.40, movie 0.15,
+# night 0.05) and their warmth on the light's three (white about 4,000 K,
+# the amber warm, orange), so that no two look the same (V1's trap: three
+# scenes above its ceiling did, HAL-4.21).
+[[do]]
+if_choice = ["energise"]
+light = { colour = "white", level = 5, keep = true }
+
+# Reading and focus light the desk: the head comes down over it a minute,
+# then the lamp goes on as it would (folded at rest, it lights the desk too).
+[[do]]
+if_choice = ["reading"]
+body = { mood = "reading", for = "1m" }
+light = { colour = "white", level = 4, keep = true }
+
+[[do]]
+if_choice = ["focus"]
+body = { mood = "reading", for = "1m" }
+light = { colour = "white", level = 3, keep = true }
+
+[[do]]
+if_choice = ["relax"]
+light = { colour = "warm", level = 2, keep = true }
+
+[[do]]
+if_choice = ["movie"]
+light = { colour = "warm", level = 1, keep = true }
+
+[[do]]
+if_choice = ["night"]
+light = { colour = "orange", level = 1, keep = true }

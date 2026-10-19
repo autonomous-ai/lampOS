@@ -1,0 +1,12 @@
+# "Night light, please": orange at its lowest, kept; the head as it is.
+[[call_tool]]
+name = "light_scene"
+at = "0s"
+args = { scene = "night" }
+
+[[expect]]
+call = "say"
+
+[[expect]]
+call = "light"
+args = { colour = "orange", level = 1, keep = true }

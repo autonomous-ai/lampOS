@@ -1,0 +1,13 @@
+# "Do a party light show": the line, then the party's ten frames.
+[[call_tool]]
+name = "light_show"
+at = "0s"
+args = { show = "party" }
+
+[[expect]]
+call = "say"
+args = { note = "Say one short, happy line that the light show is starting, then stop talking while it plays." }
+
+[[expect]]
+call = "show"
+args = { show = "party", frames = 10 }

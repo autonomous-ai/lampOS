@@ -255,7 +255,8 @@ is judged before anything is carried over. For V1's intent component
 | Louder by a tenth of the range, quieter by half | Rebuilt | One "a bit quieter" took three or more "louder" to undo. Here both are one step of 20 points (about 6 dB), and quieter stops at a floor of 10; silence is mute's. The step is reasoned, not yet heard by a person |
 | The light as arithmetic on red, green and blue (halve; a quarter more; rounding that ends in black) | Rebuilt | A colour by name and one of five levels. The pixels are the ring's owner's, and "dimmer" can no longer round a light into darkness: off is asked for by name |
 | On is always warm white | Rebuilt | On is the light as it was left. A person who set it blue and switched it off expects blue back |
-| Seven scenes, following, music, "stop talking" | Not yet judged | Each when it is built |
+| Six scenes (the seventh of the count may be the command that turns one off) | Rebuilt as a skill | Light scenes (`skills/light-scenes`, #1679): V1's six names and their order of brightness on the five levels, set as the person's own light through `light_colour` and the level steps, kept; reading and focus bring the head over the desk. Never the microphone, the camera or the speaker. Not in the product yet |
+| Following, music, "stop talking" | Not yet judged | Each when it is built |
 
 ## Not shown
 
