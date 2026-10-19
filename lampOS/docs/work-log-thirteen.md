@@ -96,3 +96,7 @@ list".
   - 06:13Z: step 2 found 97/98 (97 active-low, 98 active-high), but Controls then read "touched" at rest, so the previous pins were restored. Line 97's idle level changes between readings: posted on #1362 and as Found by thirteen on #1764. lamp-controls hit its start limit; `reset-failed`.
 - **#1776**: `lamp-body --let-go-at-stop` (the first builder's yes, 13:14). A lamp asked to stop that got down is let go; one that didn't keeps holding. Tests on the fake bus; lamp-body 310/0.
 - #1744 folded to `e43d429f3`: stands pass `--let-go-at-stop on`, and a held lamp is let go first, after a yes. jq is checked. Tests 41/41. Step 1 on cb94 waits for #1776's build.
+- lamp-c0a4 replaces cb94 (the person's change). #1789 (role file) merged. #1776 merged (reviewer's P2: `LET_GO_NEAR` 20, the short-elbow test).
+- #1744 on c0a4, with the person at the arm: dry run passed; the dry run found that step 1 must refuse an `activating` lamp-body (fixed). Step 1 wrote `lamp.env` (this arm's stand 2626/2602; both stands let go at the stop, #1776's first lamp run). Head pads refused (three driven lines, idle level changes; Found by thirteen on #1764). Folded to `db05c999a`.
+- #933 A/B: `tools/speaking-ab.sh` on #1759's branch (10/10 tests; staging moved to `/var/lib`, since `/run` is noexec). Not run: c0a4's voice holds answers back (no name models).
+- **thirteen-P1** (on #1722): the product lamp-body unit can't start on a factory `lamp.env` (`--gaze-socket` without `--gaze`).
