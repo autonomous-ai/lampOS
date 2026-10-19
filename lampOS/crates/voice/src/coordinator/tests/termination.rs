@@ -203,6 +203,22 @@ fn isolated_signal_child() {
             json!({"kind":"run_start","at_us":monotonic_us(),"scope":"synthetic_service_signal"}),
         )
         .unwrap();
+        // The trace's writer, written once before the run is said ready. In
+        // this re-executed test binary, with the module's tests in parallel,
+        // its first write came late (563 ms in one run, its later ones in
+        // microseconds), and a stop soon after found the stop's 500 ms finish
+        // wait over with the run's rows still queued: the trace held only
+        // `run_start`, never `run_end`. 8 of 15 runs of `termination::`
+        // failed so, and none of 15 with this (#1569 row 30).
+        trace.flush(&mut None, monotonic_us());
+        let written_by = Instant::now() + Duration::from_secs(5);
+        while trace.written_events() == 0 {
+            assert!(
+                Instant::now() < written_by,
+                "the trace's writer never wrote"
+            );
+            thread::sleep(Duration::from_millis(1));
+        }
         if mode == "serve-muted" {
             return muted_signal_child(output, termination, trace);
         }
