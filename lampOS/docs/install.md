@@ -415,15 +415,50 @@ units stopped:
    rest). `--gaze` is not in it: it is measured with a face and the camera
    ([body.md](body.md)), and the body runs without it until then. Without
    `--write` it only prints, so a lamp can be read first and written later.
-2. **The touch calibration**, `/etc/lampOS/controls/controls-pins.json`,
-   with a person at the lamp: `lamp-controls calibrate-touch` (controls.md, "Run without a lamp,
-   then qualify on one": First's on-lamp sequence), its output installed there. `install`
-   keeps a pins file changed on the lamp.
+2. **The touch pads**, `/etc/lampOS/controls/controls-pins.json`, with a
+   person at the lamp. GPIO head pads differ by unit: the hardware team's test
+   reads four candidate lines (37, 96, 97, 98), and lamp-52e6's pads were on
+   97 and 98, driven high while touched (#1362). So `lamp-controls
+   discover-head --seconds 30`, with each pad touched twice, finds this unit's
+   pair and polarity, and they go into `head_pads`; the product's 37 and 96,
+   active-high, are only a default. On an MPR121 strip it is
+   `lamp-controls calibrate-touch` (controls.md, "Run without a lamp, then
+   qualify on one": First's on-lamp sequence), its output installed there.
+   `install` keeps a pins file changed on the lamp.
 3. **The update key**, `/etc/lampOS/update/key.pub`: the public half of the
    owner's signing key ([updates.md](updates.md)). `install` refuses to run
    without it (step 1 below), and setup never writes it.
 
 Then `lamp-selftest --occasion factory` ([selftest.md](selftest.md)).
+
+`deploy/factory/steps.sh --unit-id <this lamp> --update-key <key.pub>` runs
+the four in this order, as root on the lamp. Without `--write` every step is
+dry: it reads the body at rest into `/tmp`, says what it would write, and
+writes nothing to `/etc`. With `--write`, step 1 also takes this arm's own
+`--stand`: with a person's yes at the console and a hand by the arm, it runs
+the body by hand on a private mood socket (no voice, idle, wake or glances),
+tells it `listening` with `lamp-body-mood`, and asks it to stand at 30%,
+then at 100%, and writes where the arm stopped at 100% in place of
+lamp-4ace's. An arm that does not reach its full stand writes nothing.
+Ctrl-C during a stand sends the body SIGTERM, which eases the arm back, and
+stops the steps. Every body run passes `--let-go-at-stop on` (#1776), so the
+lamp is let go once it is down and step 1 can be done again: a lamp that has
+run `lamp-body` since power-on is otherwise held, torque on, and the rest
+read refuses it. Found held, a written step 1 asks, lets it go with a body
+run that only starts and stops, and reads it then; dry, it says so. Written, steps 2 and 4 also ask first; each is refused
+without a console. On GPIO head pads the touch step runs `discover-head`
+with `lamp-controls` stopped, and writes the two lines that each gave two
+touches, with their polarity (pull-up for active-low, pull-down for
+active-high, so a line with nothing on it reads as not touched), the rest of
+the pins file kept; anything but two such lines writes nothing. On an MPR121
+it calibrates. Either way `lamp-controls` is started again however the step
+ends, and dry it only says what it would run, without stopping
+`lamp-controls`. A key already in place is kept
+when it is the same and fails the step when it is not. A failed step stops
+the rest and says which; `--from N` goes on from it. It runs nothing but
+the lamp's own binaries and the shell. `deploy/factory/steps-test.sh` tests
+it with no lamp; run it by hand after a change (the ARM64 workflow does not
+run it).
 
 ## Setup at first boot, without the keeper
 
