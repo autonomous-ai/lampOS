@@ -2482,10 +2482,10 @@ fn the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken() {
     };
     let nods = starts("nodding on a stressed word");
     let sways = starts("swaying between sentences");
-    // A stressed word about every 1.1 s over 8 s, a nod for most of them:
-    // even a start that loses the first sentence nods more than a flat answer
-    // (`second_shape: None`), which nods once, at its onset, and never sways.
-    assert!(nods >= 3, "{nods} nods ({sounds} pieces, {lost} lost)");
+    // A stressed word about every 1.1 s over 8 s in three sentences: a nod
+    // on one in each, never two within 4 s (the first builder on #2030),
+    // so two; a flat answer (`second_shape: None`) never sways.
+    assert!(nods >= 2, "{nods} nods ({sounds} pieces, {lost} lost)");
     assert!(sways >= 1, "{sways} sways ({sounds} pieces, {lost} lost)");
 }
 

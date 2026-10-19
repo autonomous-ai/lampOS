@@ -251,9 +251,10 @@ fn while_it_speaks_its_head_nods_on_stressed_words_sways_between_sentences_and_s
             pitch_step < 0.007 && roll_step < 0.003,
             "{room:?} {pitch_step} {roll_step}"
         );
-        // A nod on most stressed words, never two within the gap.
+        // A nod on a stressed word in each of its three sentences, never
+        // two in one, never two within 4 s (the first builder on #2030).
         let nods = starts(&outputs, "nodding on a stressed word");
-        assert!((5..=8).contains(&nods), "{room:?} {nods}");
+        assert!((2..=3).contains(&nods), "{room:?} {nods}");
         assert!(
             starts(&outputs, "swaying between sentences") >= 1,
             "{room:?}"
@@ -280,7 +281,7 @@ fn a_quiet_voice_and_a_loud_one_nod_and_sway_alike() {
         let mut lamp = Lamp::new(catalogue(true), Room::Quiet);
         let outputs = answer_at(&mut lamp, 8, gain);
         let nods = starts(&outputs, "nodding on a stressed word");
-        assert!((5..=8).contains(&nods), "{gain} {nods}");
+        assert!((2..=3).contains(&nods), "{gain} {nods}");
         let sways = starts(&outputs, "swaying between sentences");
         assert!(sways >= 1, "{gain} {sways}");
         assert!(
@@ -293,14 +294,14 @@ fn a_quiet_voice_and_a_loud_one_nod_and_sway_alike() {
     }
 }
 
-/// Seventh on #1722, 22:25: the voice's meter stops at 1.0, and the second
-/// route's coordinator test reads 0.8 to 1.0 throughout (a mean of 0.96). A
-/// voice that fills the meter, its running level 1.0, would put the stress
-/// bar at 1.03, out of reach: never a nod, where the fixed bars nodded as
-/// each sentence began. The bar stops under the meter's top, so it still
-/// nods there: once for each of its three sentences.
+/// Seventh on #1722, 22:25: the voice's meter stops at 1.0, and a voice
+/// can fill it (the second route's coordinator test read 0.8 to 1.0, a mean
+/// of 0.96). The stress bar stops under the meter's top (0.9), so it is
+/// never out of reach. A voice at 1.0 through every sentence has no word
+/// that stands out of its sentence, so it nods at most once a sentence,
+/// never on every piece, and still sways between its sentences.
 #[test]
-fn a_voice_loud_enough_to_fill_the_meter_still_nods_as_each_sentence_begins() {
+fn a_voice_that_fills_the_meter_nods_at_most_once_a_sentence_and_still_sways() {
     let mut lamp = Lamp::new(catalogue(true), Room::Quiet);
     let mut outputs = Vec::new();
     let mut at = 0;
@@ -329,7 +330,7 @@ fn a_voice_loud_enough_to_fill_the_meter_still_nods_as_each_sentence_begins() {
         at += TICK;
     }
     let nods = starts(&outputs, "nodding on a stressed word");
-    assert!(nods >= 3, "{nods} nods");
+    assert!(nods <= 3, "{nods} nods");
     assert!(starts(&outputs, "swaying between sentences") >= 1);
 }
 
@@ -379,13 +380,73 @@ fn an_answer_said_200_ms_ahead_nods_and_sways_at_the_catalogues_own_lag() {
         at += TICK;
     }
     let nods = starts(&outputs, "nodding on a stressed word");
-    assert!((5..=8).contains(&nods), "{nods} nods");
+    assert!((2..=3).contains(&nods), "{nods} nods");
     assert!(starts(&outputs, "swaying between sentences") >= 1);
     assert!(
         outputs
             .iter()
             .any(|(_, output)| named(output, "settling as it finishes"))
     );
+}
+
+/// The first builder on #2030, 20 Oct 03:22: a 150 s story in the second
+/// route's ElevenLabs voice on lamp-4ace asked for 75 nods, one every 2 s.
+/// Its spread, from `sound-shape.sh` (#1759, 01:52): p10 0.46, p25 0.67,
+/// p50 0.80, p75 0.88, p90 0.94, a piece at 1.0 now and then, and 12 pauses
+/// of 350 ms or more, a fifth of its frames under 0.12 (the dips between
+/// words). Words drawn from that spread, the same each run,
+/// said 200 ms ahead at the catalogue's own lag: a handful of nods, never
+/// two in a sentence, and its sways.
+#[test]
+fn a_loud_story_nods_a_handful_of_times_not_every_two_seconds() {
+    let spread = [0.46, 0.55, 0.67, 0.74, 0.80, 0.84, 0.88, 0.91, 0.94, 1.0];
+    let mut seed: u64 = 0x2030;
+    let mut draw = move || {
+        seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+        spread[(seed >> 33) as usize % spread.len()]
+    };
+    let catalogue = Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+    let mut lamp = Lamp::new(catalogue, Room::Quiet);
+    let (from, end) = (1_000_000, 151_000_000);
+    let mut outputs = Vec::new();
+    let mut at = 0;
+    while at < end + 1_500_000 {
+        let speaking = (from..end).contains(&at);
+        if at % 100_000 == 0 {
+            lamp.parts(
+                at,
+                if speaking {
+                    Voice::Speaking
+                } else {
+                    Voice::Resting
+                },
+            );
+        }
+        let start = at + 200_000;
+        if speaking && start < end {
+            // Twelve sentences of 12 s, each ending in a 0.5 s pause; in
+            // them words of 240 ms with 80 ms between, nearly silent (a
+            // fifth of lamp-4ace's frames were under 0.12).
+            let into = (start - from) % 12_500_000;
+            let level = if into >= 12_000_000 {
+                0.0
+            } else if into % 320_000 >= 240_000 {
+                0.05
+            } else {
+                draw()
+            };
+            lamp.piece_from(at, start, level);
+        }
+        outputs.push((at, lamp.engine.tick(at)));
+        at += TICK;
+    }
+    let nods = starts(&outputs, "nodding on a stressed word");
+    let sways = starts(&outputs, "swaying between sentences");
+    eprintln!("a loud story: {nods} nods, {sways} sway starts in 150 s");
+    assert!((3..=13).contains(&nods), "{nods} nods in 150 s");
+    // A sway holds the head over to the next pause, so the name stays on
+    // across sentences: at least one.
+    assert!(sways >= 1, "{sways} sways");
 }
 
 #[test]
