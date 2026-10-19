@@ -223,7 +223,9 @@ the product doesn't run, and its marks, called only after its look; and
 Light out when you leave (#1677, [presence.md](presence.md)), which reads
 the eyes' `room/presence`, off in the product (`LAMP_PRESENCE`) until its
 lamp check; and Not feeling well (#1681), the droop and dim on
-`lamp/health`'s `error`, until its lamp check. A test
+`lamp/health`'s `error`, until its lamp check; and Smoky air and Dusty air
+(#1684), the air's sudden smoke and an hour of dust, until they are
+measured for false alarms on real traces. A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
 product lamp tells each session 31 functions of the 32 a session takes
 (`lamp_gemini::MAX_TOOLS`): the voice's own 13, the actions part's 17 and

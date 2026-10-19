@@ -1,0 +1,24 @@
+# PM2.5 at 80 ug/m3, then up to 400 in 90 s (300 to 390 s), held until 900 s
+# and back to 80 by 1,000. The rise is 100 above the 3 minutes before and
+# over 150 from 330 s, so after 30 s held, at 360 s, it lifts, breathes amber
+# and says the line exactly, once. Nothing more as the air stays high or
+# falls.
+clock = "10:00"
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "light"
+args = { colour = "warm", level = 2 }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "say"
+args = { text = "The air reads like smoke. If something's burning, please check it.", priority = 8, expires_ms = 120000 }

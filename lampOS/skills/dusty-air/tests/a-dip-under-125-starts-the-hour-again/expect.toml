@@ -1,0 +1,9 @@
+# 140 for 40 minutes, 110 for 5 (past the 2-minute gap), then 140: the hour
+# begins again at 45 minutes, so the line comes at 105 minutes (6,300 s).
+clock = "10:00"
+
+[[expect]]
+at = "6300s"
+within = "60s"
+call = "say"
+args = { text = "The air here has been very dusty for about an hour. I can't tell where it's coming from.", priority = 5, expires_ms = 30000 }

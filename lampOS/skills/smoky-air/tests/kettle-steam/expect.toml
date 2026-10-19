@@ -1,0 +1,8 @@
+# PLACEHOLDER, to be replaced by the real recording (#1684): no trace
+# has been recorded yet, so this case has no .jsonl and is counted, not run.
+# The event: A kettle boiled 50 cm from the base, then 2 m, three runs each.
+# Should it speak? No: steam is not smoke (the design's done line: the kettle at 2 m never; at 50 cm fine in at least 2 of 3 runs, or a steam rule goes in).
+# To make it: record `air/state` on a lamp with an air sensor (lamp-4ace or
+# lamp-52e6) while the event happens, put the recording here beside this
+# file, and set `clock` and the `at` of each call from it.
+none = true
