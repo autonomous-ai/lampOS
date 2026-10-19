@@ -795,8 +795,12 @@ returned after revocation. A write already accepted by Memory cannot be undone
 by canceling its caller. Typed conversations continue to use the room scope.
 
 This boundary fixes tool attribution and cancellation only. A visible face is
-not proof of the speaker. Voice matching remains diagnostic until provider
-context isolation and real-person qualification are complete (#1675).
+not proof of the speaker. Without `LAMP_SECOND_SCOPED_CONTEXT`, and on the Live
+route, provider context, snapshots and history still require their own session
+isolation: this does not establish that a session already containing one
+person's private context is safe for another person. Voice matching remains
+diagnostic until that isolation and real-person qualification are complete
+(#1675).
 
 ### Second route context scope
 
