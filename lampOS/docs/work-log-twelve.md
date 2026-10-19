@@ -378,3 +378,11 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #1974 merged into #1712. #1909 merged. (4)'s dry run is #1988 onto #1712:
   `lamp-voice-eval observe-dry` on a copy of a store, through the lamp's own
   path, with counts printed and words only in a 0600 labels file.
+
+## 2026-10-20 — #1988's P3s, the forget task
+
+- #1988: both P3s folded (a partial copy removed, `chars().take(6)`).
+- The forget task (the first builder, 23:57) is #2003: a kept thing goes with
+  its conversation's earlier turns. Found: forgetting an observation climbs
+  recursively through what sessions were shown and removes unrelated kept
+  things. Shown by a test; left for the first builder's call.
