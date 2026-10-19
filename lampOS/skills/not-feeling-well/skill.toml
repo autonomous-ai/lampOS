@@ -1,0 +1,44 @@
+# Not feeling well (#1681; the owner's scope, docs/v1-verdicts.md: "a face for
+# a failed part", GO-3.17). When the lamp's health has said `error` for half a
+# minute, it droops once, sleepily, and dims its light a shade until the error
+# ends: a creature that is a little unwell, never a status light. It never
+# speaks of it; what is wrong is `lamp/health`'s, for `lamp-health` and the
+# app. Written to lamp-skills' schema (docs/skills.md, "The schema, as
+# lamp-skills reads it").
+needs = ["body", "light"]
+# A core skill (docs/skills.md, "Core and installable skills"), held out of
+# the product's install until its lamp check (install::NOT_PRODUCT_SKILLS).
+kind = "core"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: the lamp's health, the voice's
+# state, the droop and a shade of dim. It never speaks.
+[permissions]
+topics = ["lamp/health", "voice/state"]
+light = true
+body = true
+
+[trigger]
+topic = "lamp/health"
+field = "level"
+equals = "error"          # a part failed (the self-test, the body, the eyes, ...); stale or a warning does nothing
+for = "30s"               # a part restarted at once by its keeper does nothing
+gap = "10s"               # one reading in between (lamp/health every 5 s) does not end it
+rearm = "ends"            # once each time; again only after the error ended
+wait = "1h"               # talking when the half minute comes: it droops once the talk ends
+
+[[while]]                 # never while someone is talking to the lamp
+topic = "voice/state"
+field = "state"
+equals = "resting"
+
+[quiet]                   # never at night, by the lamp's local time
+from = "22:00"
+to = "08:00"
+
+[ask]
+policy = "nudge"
+
+[[do]]
+body = { gesture = "sleepy" }          # a slow droop, once
+light = { dim = 1, until = "ends" }    # a shade dimmer, given back when the error ends or lamp/health goes silent

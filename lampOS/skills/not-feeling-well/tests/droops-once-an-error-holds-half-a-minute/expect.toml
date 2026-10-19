@@ -1,0 +1,22 @@
+# From 10:00, lamp/health error from 60 s to 300 s (every 5 s), ok before and
+# after. Half a minute of error comes at 90 s: it droops once and dims a
+# shade; the light is given back at 305 s, 10 s (the gap) after its last
+# error reading (295 s).
+clock = "10:00"
+
+[[expect]]
+at = "90s"
+within = "1s"
+call = "body.gesture"
+args = { gesture = "sleepy" }
+
+[[expect]]
+at = "90s"
+within = "1s"
+call = "light"
+args = { dim = 1, until = "ends" }
+
+[[expect]]
+at = "305s"
+within = "1s"
+call = "ends"

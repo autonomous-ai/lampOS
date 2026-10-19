@@ -20,9 +20,12 @@ same defaults. Here that is three things:
 3. One command, `lamp-health`, that prints how the lamp is and ends with a
    status a script can use.
 
-It is its own process. With it gone nothing else on the lamp changes:
-today no part reads what it publishes, and a part reports whether or not
-anybody listens.
+It is its own process. With it gone nothing else on the lamp changes, and
+a part reports whether or not anybody listens. The skill Not feeling well
+(#1681, [skills.md](skills.md)) reads `lamp/health`'s `level`: `error` for
+30 s, and the lamp droops once and dims a shade until it ends, or until
+`lamp/health` has said nothing for its 15 s. It is not in the product's
+install yet (`install::NOT_PRODUCT_SKILLS`).
 
 ## The commands
 

@@ -1,0 +1,4 @@
+# From 10:00, an error from 60 s to 80 s only: a part restarted within the
+# half minute does nothing.
+clock = "10:00"
+none = true

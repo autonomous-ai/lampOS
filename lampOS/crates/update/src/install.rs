@@ -191,6 +191,11 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          until the light going out and coming back has been seen on a lamp: someone reading face \
          down at the desk must never lose their light",
     ),
+    (
+        "not-feeling-well",
+        "not yet tried on a lamp (#1681): whether its droop and dim on `lamp/health`'s `error` \
+         read as a lamp a little unwell, not a status light, is for the lamp check",
+    ),
     // #1679's three core skills, built and not yet tried on a lamp: each
     // comes with the product once lamp-4ace has played it with a person.
     (
