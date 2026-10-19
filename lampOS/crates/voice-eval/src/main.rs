@@ -50,6 +50,9 @@ const USAGE: &str = "usage:
   lamp-voice-eval export --since HH:MM:SS --until HH:MM:SS --out NEW_DIR [--sessions DIR]
       [--journal JOURNAL_JSON] [--bus LAMP_BUS_RECORD]... [--date YYYY-MM-DD] [--zone system|ZONE]
       [--wall-offset-us N]
+  lamp-voice-eval waiting-cuts [--since 'YYYY-MM-DD HH:MM[:SS]'] [--until ...] [--sessions DIR] [--json]
+      < journal (`journalctl -u lamp-voice -o short-iso`); --since/--until filter its own stamps;
+      the counts need the session records too (DIR, default /var/lib/lampOS/voice/sessions, root's)
   lamp-voice-eval lamp-session --runtime LAMP_LIVE --work NEW_ABS_DIR --seconds N
       (--fixture-reply WAV --fixture-sha256 SHA | --provider-config FILE | --serve-config FILE)
       [--noise-suppression on|off] [--diagnostics] [--allowance-seconds N]";
@@ -225,6 +228,37 @@ fn run() -> Result<i32> {
             args.done()?;
             let summary = lamp_voice_eval::export::export(&options)?;
             println!("{summary}");
+        }
+        "waiting-cuts" => {
+            use lamp_voice_eval::waiting_cuts;
+            let bound = |text: Option<String>| {
+                text.map(|text| {
+                    waiting_cuts::wall_bound(&text)
+                        .ok_or_else(|| invalid("--since/--until: YYYY-MM-DD HH:MM[:SS]"))
+                })
+                .transpose()
+            };
+            let since = bound(args.take("--since")?)?;
+            let until = bound(args.take("--until")?)?;
+            let sessions = args
+                .take("--sessions")?
+                .unwrap_or_else(|| waiting_cuts::SESSIONS.into());
+            let as_json = args.take_flag("--json");
+            args.done()?;
+            let mut journal = String::new();
+            std::io::Read::read_to_string(&mut std::io::stdin(), &mut journal)?;
+            let runs = waiting_cuts::count(
+                &journal,
+                &waiting_cuts::find_sessions(Path::new(&sessions)),
+                since.as_deref(),
+                until.as_deref(),
+            );
+            let report = waiting_cuts::report(&runs, &sessions);
+            if as_json {
+                println!("{report:#}");
+            } else {
+                println!("{}", waiting_cuts::table(&report));
+            }
         }
         "list" | "validate" => {
             let (catalog, plan) = load(&mut args)?;
