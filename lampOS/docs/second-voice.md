@@ -289,7 +289,9 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   turn never makes one. On lamp-4ace on 2026-10-16, 9 of 10 backup turns
   waited past 1.5 s.
   With `LAMP_SECOND_DOWN_LINE=on`, a spoken turn whose first round has not
-  begun within its bound says "I can't think right now; give me a minute."
+  begun within its bound, or whose chat refuses it before any word (a
+  status: 401, 402, 429, a 5xx; #1844's B, then the turn fails as before),
+  says "I can't think right now; give me a minute."
   (`DOWN_LINE`) instead of nothing, at most once a minute
   (`DOWN_LINE_EVERY`; the journal: `said it can't think right now`). The
   line is said once by this route's own voice after the first turn is out,
