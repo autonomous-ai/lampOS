@@ -549,7 +549,7 @@ fn service(
     face.eye_strong(eye_strong);
     let mut rested_at = 0u64;
     // From zero, so a late startup black write in GuardedRing::new is said too.
-    let mut late_said = 0;
+    let mut late_said = LateSaid::default();
     let mut lapse = Lapse::default();
     let mut cap_ceiling = if caps.is_some() { 0 } else { 120 };
     // With LAMP_STALLS=on: a pass of this loop, or a gap between two, of
@@ -557,13 +557,10 @@ fn service(
     let mut stalls = crate::stalls::Stalls::from_environment("ring");
     loop {
         // A late SPI write (the SD/MMC host re-tuning holds the bus) is a
-        // late frame, said once each; only a run of them ends the ring (#911).
-        if ring.late_writes() != late_said {
-            late_said = ring.late_writes();
-            eprintln!(
-                "lamp-voice ring: an SPI write came back over its {} us budget; the frame was kept ({late_said} so far)",
-                lamp_ring::WRITE_BUDGET_US
-            );
+        // late frame; only a run of them lasting 2 s ends the ring (#911,
+        // #1620). Said at most once a minute, with how long the run has been.
+        if let Some(line) = late_said.line(ring.late_writes(), ring.last_late(), monotonic_us()) {
+            eprintln!("{line}");
         }
         let tick = monotonic_us();
         let stall_pass = stalls.begin();
@@ -731,6 +728,54 @@ fn service(
         if let Some(wait) = TICK_US.checked_sub(monotonic_us().saturating_sub(tick)) {
             std::thread::sleep(Duration::from_micros(wait));
         }
+    }
+}
+
+/// Late writes are said at most this often.
+const LATE_SAID_EVERY_US: u64 = 60_000_000;
+
+/// The journal of late SPI writes: the newest one, at most once a minute,
+/// with how many went unsaid since the last line.
+#[derive(Default)]
+struct LateSaid {
+    /// Late writes seen so far.
+    seen: u64,
+    /// Of them, the ones counted into a line.
+    said: u64,
+    at_us: Option<u64>,
+}
+
+impl LateSaid {
+    fn line(
+        &mut self,
+        late_writes: u64,
+        last: Option<lamp_ring::LateWrite>,
+        now_us: u64,
+    ) -> Option<String> {
+        if late_writes == self.seen {
+            return None;
+        }
+        self.seen = late_writes;
+        let last = last?;
+        if self
+            .at_us
+            .is_some_and(|at| now_us.saturating_sub(at) < LATE_SAID_EVERY_US)
+        {
+            return None;
+        }
+        let unsaid = late_writes - self.said - 1;
+        self.said = late_writes;
+        self.at_us = Some(now_us);
+        let mut line = format!(
+            "lamp-voice ring: SPI write {} us, over {} us, late for {} ms",
+            last.elapsed_us,
+            lamp_ring::WRITE_BUDGET_US,
+            last.run_us / 1_000
+        );
+        if unsaid > 0 {
+            line.push_str(&format!(" ({unsaid} more since the last line)"));
+        }
+        Some(line)
     }
 }
 
@@ -967,6 +1012,33 @@ mod drawn_tests {
             ("skill:desk-tutor", asked)
         );
         std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod late_said_tests {
+    use super::*;
+    use lamp_ring::LateWrite;
+
+    #[test]
+    fn late_writes_are_said_at_most_once_a_minute_with_the_unsaid_counted() {
+        let late = |elapsed_us, run_us| Some(LateWrite { elapsed_us, run_us });
+        let mut said = LateSaid::default();
+        assert_eq!(said.line(0, None, 1), None);
+        assert_eq!(
+            said.line(1, late(13_180, 340_000), 1_000).as_deref(),
+            Some("lamp-voice ring: SPI write 13180 us, over 10000 us, late for 340 ms")
+        );
+        // The same count again, and two more within the minute: nothing.
+        assert_eq!(said.line(1, late(13_180, 340_000), 2_000), None);
+        assert_eq!(said.line(2, late(14_000, 360_000), 3_000), None);
+        assert_eq!(said.line(3, late(12_000, 12_000), 59_000_999), None);
+        assert_eq!(
+            said.line(4, late(11_500, 11_500), 60_001_000).as_deref(),
+            Some(
+                "lamp-voice ring: SPI write 11500 us, over 10000 us, late for 11 ms (2 more since the last line)"
+            )
+        );
     }
 }
 

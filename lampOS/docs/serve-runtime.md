@@ -29,6 +29,12 @@ camera/privacy and phase-bound ring authority. The supervisor selects a private
 continuous ring-worker lifetime instead of its finite 630-second ceiling.
 Initial authority, parent transport, installed permission expiry and 100 ms
 frame age still apply. The lifetime option supplies no output permission.
+A ring worker that faults (SPI writes over 10 ms in a run lasting 2 s, #911)
+is started again by the voice, at most three times a run and 2 s after
+the fault, off the loop, so a stop after it finds a live ring that writes the
+stop's black; past the third the ring stays off and the voice's health says
+`ring` = `off` (#1620, [ring-choreography.md](ring-choreography.md), "Slow SPI
+writes and the ring's restart").
 
 `serve` rejects `--diagnostics` before startup. It does not silently keep
 pre/post-AEC or render PCM forever. Use a separate finite `directed` experiment

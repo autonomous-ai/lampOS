@@ -534,6 +534,29 @@ pub fn health(
     }
 }
 
+/// The voice's report with, while `off`, that the light ring faulted past
+/// its restarts and stays off this session (#1620): a warning, with the
+/// fact `ring` = `off`. The voice goes on; what else is said comes after.
+pub fn ring_off(report: lamp_msgs::Diagnostic, off: bool) -> lamp_msgs::Diagnostic {
+    use lamp_msgs::{Diagnostic, Level};
+    if !off {
+        return report;
+    }
+    let said = "the light ring faulted and stays off until the voice starts again";
+    let message = if report.message.is_empty() {
+        said.to_owned()
+    } else {
+        format!("{said}; {}", report.message)
+    };
+    let level = match report.level {
+        Level::Ok => Level::Warn,
+        level => level,
+    };
+    let mut out = Diagnostic::new(level, SOURCE, &message);
+    out.values = report.values;
+    out.with("ring", "off")
+}
+
 /// The voice's report with, while `runs` is above 0, that so many runs in a
 /// row failed before they heard anything (#1567): a warning, never that it
 /// is muted, since it is not, and the count as the fact `could_not_start`.
@@ -773,6 +796,8 @@ pub struct BusOut {
     /// Runs in a row that failed before they heard anything (#1567), said
     /// in the health until this run hears.
     could_not_start: u32,
+    /// The light ring faulted and stays off this session (#1620).
+    ring_off: bool,
 }
 
 impl BusOut {
@@ -822,6 +847,7 @@ impl BusOut {
             unsaid: None,
             calls: crate::not_speech::CallsLeftOut::new(),
             could_not_start: 0,
+            ring_off: false,
         })
     }
 
@@ -923,14 +949,23 @@ impl BusOut {
         let down_for = self
             .down_since_us
             .map_or(0, |since| now_us.saturating_sub(since));
-        let report = could_not_start(
-            health(link_up, down_for, mic_at_start),
-            self.could_not_start,
+        let report = ring_off(
+            could_not_start(
+                health(link_up, down_for, mic_at_start),
+                self.could_not_start,
+            ),
+            self.ring_off,
         );
         let _ = self.health.publish_json(now_us, &report);
         if let Some(link) = &mut self.link {
             let _ = link.publish_json(now_us, &link_state(link_up, down_for));
         }
+    }
+
+    /// Whether the light ring stays off this session (#1620): said with
+    /// each report while it does.
+    pub fn set_ring_off(&mut self, off: bool) {
+        self.ring_off = off;
     }
 
     /// How many runs in a row failed before they heard anything, as the
@@ -1153,6 +1188,33 @@ mod tests {
 
     /// #1567: runs that could not start are said as a warning beside what
     /// else is wrong, never as a mute, and not at all once one has heard.
+    #[test]
+    fn a_ring_off_for_good_is_a_warning_with_its_fact_and_the_rest_after() {
+        use lamp_msgs::Level;
+        let well = health(true, 0, None);
+        assert_eq!(ring_off(well.clone(), false), well);
+        let off = ring_off(well, true);
+        assert_eq!(off.level, Level::Warn);
+        assert_eq!(
+            off.message,
+            "the light ring faulted and stays off until the voice starts again"
+        );
+        let fact = |report: &lamp_msgs::Diagnostic, key: &str| {
+            report
+                .values
+                .iter()
+                .find(|fact| fact.key == key)
+                .map(|fact| fact.value.clone())
+        };
+        assert_eq!(fact(&off, "ring").as_deref(), Some("off"));
+        assert_eq!(fact(&off, "link").as_deref(), Some("ready"));
+        let down = ring_off(could_not_start(health(false, LINK_GRACE_US, None), 1), true);
+        assert_eq!(down.level, Level::Warn);
+        assert!(down.message.starts_with(
+            "the light ring faulted and stays off until the voice starts again; the voice could not start"
+        ));
+    }
+
     #[test]
     fn runs_that_could_not_start_are_a_warning_never_a_mute() {
         use lamp_msgs::Level;
