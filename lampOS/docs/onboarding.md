@@ -275,13 +275,15 @@ part has failed (`onboarding_near_call`, `failed`), and the rule keeps its
 asks the person to say a sentence from where they sit, in their own words: a
 prompt like the name's, with its own budget of two (`sentence_prompts`, its
 invitations numbered 6 and 7 after the name's five). Its window runs 15 s
-from the prompt's end. A line that ends in it is the sentence
-(`coordinator.rs`, `sentence_window`; `Onboarding::sentence_window`). Unlike a
-name in the near-call window, its End goes on to the provider, so the words
-come back, and its answer is held: the turn ends `onboarding_sentence` as its
-finished words arrive, which on the second route (`LAMP_VOICE_ROUTE=second`)
-is before any answer, or at the answer's first audio, which on Gemini Live may
-come first. Nothing of it is played. It is done only on the voice's own
+from the prompt's end. A line that begins in it is the sentence, and is
+measured if it ends in it too (`coordinator.rs`, `sentence_window`;
+`Onboarding::sentence_window`). Its Start is followed at once, before any of
+its sound, by `CountOnly` to the provider. Unlike a name in the near-call
+window, its End goes on, so the words come back, and its answer is held: the
+turn ends `onboarding_sentence` as its finished words arrive, or as the first
+of an answer shows, its words or its audio. The second route
+(`LAMP_VOICE_ROUTE=second`) never asks its model for a count-only line, so
+there is no answer; Gemini Live may begin one first. Nothing of it is played. It is done only on the voice's own
 evidence (`near.rs`, `sentence_judge`):
 
 - **heard with words**: its finished transcript has at least one word that
@@ -314,14 +316,27 @@ tries: the name part's bar is written again from them and the sentence part
 goes on with its prompts left (the second then only asks again: what fell
 short is not kept); with both spent and none judged, it has failed.
 
-**Nothing of the sentence is kept.** Neither its words nor its sound: the
-coordinator counts the words and passes only the count; it publishes none of
-them on the bus (`voice/heard`) and records no `transcript` for the line. The
-session record has `onboarding_sentence_line` (`speech_ms`, `said_close`),
+**Nothing of the sentence is kept.** Neither its words nor its sound, on
+either route. The coordinator gathers every piece of its words in memory
+(Gemini Live gives them in pieces) and passes only their count, once the
+last piece is in; it publishes none of them on `voice/heard`, none of the
+model's answer on `voice/said`, and records no `transcript` for either in
+the session record (the journal). In the provider's process, `CountOnly`
+(`thread::count_only`, cleared by the next Start) keeps every piece of what
+was heard, and the lamp's answer to it, out of the conversation thread: so
+out of its file, the memory's journal (`remember`), the next line's
+exchange and every later prompt and history built from the thread. The
+second route also never asks its model for it, and a line going on from it
+does not begin with its words. The session record has `onboarding_sentence_line` (`speech_ms`, `said_close`),
 `onboarding_sentence_words` (`words`, a count) and `onboarding_sentence_try`
 (`accepted`, `short`, the same numbers); `progress.json` keeps only
 `sentence_prompts`. Tests:
 `coordinator::tests::second_route::a_sentence_in_its_window_is_counted_and_not_answered_on_either_route`,
+`coordinator::tests::second_route::the_sentences_words_and_its_answer_are_counted_only_on_either_route`,
+`provider_worker::tests::the_sentence_after_count_only_never_reaches_the_live_thread`,
+`second_provider::tests::the_sentence_is_heard_for_its_count_and_never_asked_of_the_model`,
+`second_provider::worker::tests::the_sentence_is_kept_nowhere_and_the_next_line_carries_none_of_it`
+(each with a planted marker word),
 `onboarding::near_flow_tests` (the sentence tests at its end). Fourth's #1892 reads the bar
 (`LAMP_ATTENTION_NEAR_CALIBRATED`, off by default) and the factory reset
 removes the file; this step only writes it.

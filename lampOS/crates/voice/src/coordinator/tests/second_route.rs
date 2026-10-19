@@ -162,6 +162,10 @@ struct Script {
     near_window_ms: Option<(u64, u64)>,
     /// Its sentence window, likewise (#1803).
     sentence_window_ms: Option<(u64, u64)>,
+    /// What Gemini Live heard the person say, in pieces, the last one
+    /// finished, then what its answer says, before the answer's audio.
+    live_hears: &'static [&'static str],
+    live_says: Option<&'static str>,
 }
 
 impl Script {
@@ -195,6 +199,8 @@ impl Script {
             limit: LIMIT,
             near_window_ms: None,
             sentence_window_ms: None,
+            live_hears: &[],
+            live_says: None,
         }
     }
 }
@@ -318,6 +324,7 @@ fn request_of(input: &ProviderInput) -> u64 {
         | ProviderInput::Audio { request, .. }
         | ProviderInput::End { request, .. }
         | ProviderInput::Called { request, .. }
+        | ProviderInput::CountOnly { request, .. }
         | ProviderInput::Written { request, .. }
         | ProviderInput::Reminder { request, .. } => *request,
     }
@@ -830,6 +837,21 @@ impl Peers {
                         }
                         self.finish(index, request);
                         continue;
+                    }
+                    let queued = &mut self.peers[index].queued;
+                    for (at, piece) in self.script.live_hears.iter().enumerate() {
+                        queued.push_back(ProviderOutput::Transcript {
+                            request: None,
+                            text: (*piece).into(),
+                            finished: at + 1 == self.script.live_hears.len(),
+                        });
+                    }
+                    if let Some(text) = self.script.live_says {
+                        queued.push_back(ProviderOutput::Transcript {
+                            request: Some(request),
+                            text: text.into(),
+                            finished: false,
+                        });
                     }
                     let position = self.live_requests.iter().position(|&r| r == request);
                     // After the scripted ones, the Live route answers.
@@ -2933,5 +2955,60 @@ fn a_sentence_in_its_window_is_counted_and_not_answered_on_either_route() {
             "{only}"
         );
         assert!(after.events("onboarding_sentence_line").is_empty());
+    }
+}
+
+/// Jarvis on #2031 (#1803): a planted marker in the sentence never leaves
+/// the coordinator on either route. The provider is told the line is
+/// count-only right after its Start, before any of its sound; on Live every
+/// piece of its words is counted (ten words in three pieces, not the last
+/// piece's three), and neither those pieces nor the model's answer, which
+/// repeats the marker, is put in the trace (the journal), said on
+/// `voice/heard` or `voice/said` (the `transcript` record is that branch),
+/// or played.
+#[test]
+fn the_sentences_words_and_its_answer_are_counted_only_on_either_route() {
+    let _one = super::pilot_faults::one_session();
+    for only in [false, true] {
+        let held = run(Script {
+            second: false,
+            only,
+            sentence_window_ms: Some((0, 15_000)),
+            second_hears: Some("I usually sit at the zebrafinch desk by the window"),
+            second_says: Some("A zebrafinch desk, lovely."),
+            live_hears: &["I usually sit ", "at the zebrafinch desk ", "by the window"],
+            live_says: Some("A zebrafinch desk, lovely."),
+            mute_at_frame: Some(300),
+            ..Script::question(Live::Answer(12))
+        });
+        held.assert_clean();
+        assert!(held.played(1).is_empty(), "{only}: {}", held.summary());
+        assert_eq!(held.finished(1)["outcome"], "onboarding_sentence");
+        let words = held.events("onboarding_sentence_words");
+        assert_eq!(words.len(), 1, "{only}: {words:?}");
+        assert_eq!(words[0]["words"], 10, "{only}");
+        assert!(held.events("transcript").is_empty(), "{only}");
+        assert!(
+            !held
+                .trace
+                .iter()
+                .any(|event| event.to_string().contains("zebrafinch")),
+            "{only}"
+        );
+        // The provider was told right after the Start.
+        let inputs = if only {
+            &held.seen.second
+        } else {
+            &held.seen.live
+        };
+        let kinds: Vec<_> = inputs
+            .iter()
+            .map(|input| serde_json::to_value(input).unwrap()["kind"].clone())
+            .collect();
+        assert_eq!(
+            kinds[..2],
+            [json!("start"), json!("count_only")],
+            "{kinds:?}"
+        );
     }
 }

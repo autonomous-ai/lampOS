@@ -2785,6 +2785,64 @@ async fn a_full_look_without_its_still_still_says_it_could_not_look() {
     );
 }
 
+/// Jarvis on #2031 (#1803): onboarding's sentence is count-only. Its words
+/// go to the coordinator to be counted, and the model is never asked, so
+/// there is no answer to it; a line going on from it does not begin with
+/// them.
+#[tokio::test]
+async fn the_sentence_is_heard_for_its_count_and_never_asked_of_the_model() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("I sit by the zebrafinch window".to_owned()),
+                Ok("and the lamp".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script.clone());
+    engine.submit(start(1));
+    engine.submit(ProviderInput::CountOnly {
+        request: 1,
+        privacy_generation: 1,
+    });
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(
+        turn(&mut engine).await,
+        [
+            "started:1",
+            "heard:I sit by the zebrafinch window",
+            "complete"
+        ]
+    );
+    assert!(script.asked.lock().unwrap().is_empty());
+    engine.submit(ProviderInput::Start {
+        request: 2,
+        session: 1,
+        privacy_generation: 1,
+        continues: false,
+        continues_cut_off: true,
+        over_the_lamp: false,
+        after_stop: false,
+        follows_on: false,
+        over_the_lamps_voice: false,
+    });
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    turn(&mut engine).await;
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 1);
+    assert!(
+        asked[0]
+            .iter()
+            .all(|message| !format!("{message:?}").contains("zebrafinch")),
+        "{asked:?}"
+    );
+}
+
 /// A request that goes on from one given up after an early end is asked
 /// with that one's words before its own, as Gemini, which heard both, is
 /// told; what is told as heard is its own words only. A request that does

@@ -44,6 +44,40 @@ back (9 counted), the turn ends `onboarding_sentence` with nothing played, and
 no record holds any of its words; on Gemini Live it ends at the answer's first
 audio. Past the window the same line is answered on both.
 
+## Privacy review fixes (2026-10-20, Jarvis on #2031)
+
+A planted marker word (`zebrafinch`) never leaves the coordinator on either
+route:
+
+- **P1, thread and memory (both routes).** The coordinator sends
+  `ProviderInput::CountOnly` right after the sentence line's Start, before
+  any of its sound. In the provider's process `thread::count_only` keeps
+  every piece heard, and the lamp's answer to that request, out of the
+  thread, which is cleared by the next Start. So none of it reaches the
+  thread file, the memory's journal, the next exchange or a later
+  prompt/history. The second route also never asks its model for a
+  count-only line, and does not keep its words for a line going on from it.
+- **P1, Live pieces.** Every input piece while the sentence is in hand is
+  gathered in memory only, never published on `voice/heard` nor recorded.
+- **P2, the answer.** Its words are neither said on `voice/said` nor
+  recorded, and the reply is cancelled as soon as they show.
+- **P2, coverage.** Live's words are counted over all the pieces: 10 words
+  over three pieces, not the last piece's 3.
+
+Tests:
+`coordinator::tests::second_route::the_sentences_words_and_its_answer_are_counted_only_on_either_route`
+(no marker in the trace, no `transcript` record, `start` then `count_only`
+to the provider, 10 words on both routes),
+`provider_worker::tests::the_sentence_after_count_only_never_reaches_the_live_thread`,
+`second_provider::tests::the_sentence_is_heard_for_its_count_and_never_asked_of_the_model`,
+`second_provider::worker::tests::the_sentence_is_kept_nowhere_and_the_next_line_carries_none_of_it`
+(the thread file, the memory socket's requests, the next prompt and history,
+and the child's stdout/stderr have no marker; the next line is kept).
+
+Gates (cargo 1.96.0, `-j2`, `--test-threads=1`), all green: `fmt --all
+--check`; `clippy --workspace --all-targets -D warnings`; focused 142 passed;
+`test -p lamp-voice` 2209 + 1 + 240 passed, 12 ignored; `build --workspace`.
+
 ## Not shown
 
 A lamp run with a person; whether the 1 s-a-word coverage and the near
