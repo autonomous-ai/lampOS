@@ -177,6 +177,12 @@ struct Kind {
 /// The engines `lamp-tasks` takes. "Cloud" and "codecs" are what the issue
 /// (#733) expects the model to hear for Claude and Codex; none of these
 /// forms is close to another engine's.
+/// The agents the lamp hands work to, as the person calls them: what the
+/// second route's speech to text listens for (`second_provider::net::key_terms`).
+pub fn agent_names() -> [&'static str; 3] {
+    KINDS.map(|kind| kind.name)
+}
+
 const KINDS: [Kind; 3] = [
     Kind {
         engine: "claude",

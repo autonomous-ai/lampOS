@@ -682,6 +682,12 @@ pub fn serve(
             crate::second_config::KEY_TERMS_ENV
         );
     }
+    // The names the lamp knows, listened for beside the unit's words, with
+    // `LAMP_SECOND_KNOWN_NAMES=on` (#753): read beside the turns.
+    crate::second_provider::net::key_terms::start_from_environment(
+        files.tools.who.clone(),
+        files.tools.tasks.is_some(),
+    );
     let checked = checks_sounds(&files);
     let tools = files.tools;
     // As the Live route says them, when this route is the only voice.
