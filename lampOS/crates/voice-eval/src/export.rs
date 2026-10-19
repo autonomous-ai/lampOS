@@ -664,6 +664,7 @@ const BUS_TOPICS: &[&str] = &[
     "controls/touch",
     "controls/touch_state",
     "diagnostics",
+    "ears/classes",
     "ears/level",
     "ears/sudden",
     "expression/body",

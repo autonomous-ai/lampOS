@@ -6277,6 +6277,412 @@ fn a_step_for_some_choices_is_made_only_for_them_and_the_default_stands_in() {
     }
 }
 
+/// The first tier of #1684's design as a trigger: PM2.5 up at least 100
+/// within 3 minutes, to above 150, both for 30 s through a 10 s gap; once a
+/// spell, again only after 10 minutes under 150, and `cooldown` (30 minutes
+/// in the design) when given.
+fn smoky(dir: &Path, name: &str, cooldown: &str) -> PathBuf {
+    skill_with(
+        dir,
+        name,
+        &format!(
+            r#"
+needs = ["air", "voice"]
+[trigger]
+topic = "air/state"
+field = "pm2_5"
+above = 150
+rise = {{ by = 100, within = "3m" }}
+for = "30s"
+gap = "10s"
+rearm = {{ below = 150, for = "10m" }}
+{cooldown}
+[ask]
+policy = "nudge"
+[[do]]
+say = {{ text = "The air near me just got smoky. If something's burning, please check it.", priority = 8, expires = "2m" }}
+"#
+        ),
+    )
+}
+
+/// A reading of `air/state` every 5 s from `from` up to `to` seconds, its
+/// PM2.5 what `pm` gives at each second: a number, or `None` for a reading
+/// the sensor does not know (`null`, as `lamp-air` sends it).
+fn air_from(
+    from: u64,
+    to: u64,
+    pm: impl Fn(u64) -> Option<f64>,
+) -> Vec<(u64, &'static str, String)> {
+    (from..to)
+        .step_by(5)
+        .map(|at| {
+            let pm = pm(at).map_or("null".to_owned(), |pm| pm.to_string());
+            (
+                at,
+                "air/state",
+                format!(r#"{{"pm2_5":{pm},"feel":"fine"}}"#),
+            )
+        })
+        .collect()
+}
+
+/// The seconds at which `skill` ran on `readings`.
+fn air_runs(skill: &Path, readings: &[(u64, &'static str, String)]) -> Vec<u64> {
+    let messages: Vec<(u64, &str, &str)> = readings
+        .iter()
+        .map(|(at, topic, payload)| (*at, *topic, payload.as_str()))
+        .collect();
+    runs_at(skill, &messages)
+        .into_iter()
+        .map(|(at, _)| at)
+        .collect()
+}
+
+/// #1684 (a): a rise holds where a level alone can't tell smoke from a
+/// city's air. A sharp rise speaks once, after its hold; a slow climb to the
+/// same level never; noise around the level and a short puff never.
+#[test]
+fn a_rise_fires_on_a_sharp_climb_and_never_on_a_slow_one_or_noise() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = smoky(dir.path(), "smoky-air", "cooldown = \"30m\"");
+    // 80 for 5 minutes, then 400: the rise holds from 300 s, and its 30 s
+    // hold is over at 330 s. Once, though it stays smoky for 15 minutes.
+    let sharp = air_from(0, 1_200, |at| Some(if at < 300 { 80.0 } else { 400.0 }));
+    assert_eq!(air_runs(&skill, &sharp), [330]);
+    // The design's first lamp case: 80, then up to 400 within 90 s. It
+    // passes 180 (100 over 80) at 330 s, and its hold ends at 360 s.
+    let ramp = air_from(0, 900, |at| {
+        Some(match at {
+            ..300 => 80.0,
+            300..390 => 80.0 + 320.0 * (at - 300) as f64 / 90.0,
+            _ => 400.0,
+        })
+    });
+    assert_eq!(air_runs(&skill, &ramp), [360]);
+    // The design's slow case: 80 to 300 over 30 minutes is 22 in any 3
+    // minutes. It passes the level and stays there, and nothing is said.
+    let slow = air_from(0, 3_600, |at| {
+        Some(80.0 + 220.0 * (at.min(1_800)) as f64 / 1_800.0)
+    });
+    assert!(air_runs(&skill, &slow).is_empty());
+    // Haze already above the level, noisy by 40 between readings: no rise.
+    let noisy = air_from(0, 3_600, |at| {
+        Some(if at % 10 == 0 { 130.0 } else { 170.0 })
+    });
+    assert!(air_runs(&skill, &noisy).is_empty());
+    // A match struck by the base: 300 for 15 s in an office's 100, three
+    // times 5 minutes apart. Each rises past both lines, none for 30 s.
+    let puffs = air_from(0, 1_200, |at| {
+        Some(if at >= 300 && at % 300 < 15 {
+            300.0
+        } else {
+            100.0
+        })
+    });
+    assert!(air_runs(&skill, &puffs).is_empty());
+    // A rise of 100 that stays under the level, 40 to 140: no smoke.
+    let under = air_from(0, 900, |at| Some(if at < 300 { 40.0 } else { 140.0 }));
+    assert!(air_runs(&skill, &under).is_empty());
+}
+
+/// #1684 (a): a rise needs readings in the while before it. A sensor that
+/// was silent, or knew no PM2.5, for longer than the while gives nothing to
+/// compare its first readings with, so coming back high is no rise; a gap
+/// shorter than the while still is one.
+#[test]
+fn a_rise_after_a_gap_in_readings_or_a_dropout_is_not_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = smoky(dir.path(), "smoky-air", "cooldown = \"30m\"");
+    // 80, then nothing for 5 minutes, then 400 for 10.
+    let mut silent = air_from(0, 300, |_| Some(80.0));
+    silent.extend(air_from(600, 1_200, |_| Some(400.0)));
+    assert!(air_runs(&skill, &silent).is_empty());
+    // 80, then 5 minutes of readings with no PM2.5 (null), then 400.
+    let unknown = air_from(0, 1_200, |at| match at {
+        ..300 => Some(80.0),
+        300..600 => None,
+        _ => Some(400.0),
+    });
+    assert!(air_runs(&skill, &unknown).is_empty());
+    // A reading with no PM2.5 in the middle of a rise is passed over, and
+    // neither breaks its hold nor counts as one: the rise at 300 s still
+    // speaks at 330 s, its hold counted through the dropouts.
+    let dropouts = air_from(0, 900, |at| match at {
+        ..300 => Some(80.0),
+        310 | 320 => None,
+        _ => Some(400.0),
+    });
+    assert_eq!(air_runs(&skill, &dropouts), [330]);
+    // Silent for a minute, under the 3-minute while: 80 is still in it,
+    // and the rise is a rise.
+    let mut short = air_from(0, 300, |_| Some(80.0));
+    short.extend(air_from(360, 900, |_| Some(400.0)));
+    assert_eq!(air_runs(&skill, &short), [390]);
+}
+
+/// #1684 (a): once a spell. A second rise before the field has stayed under
+/// 150 for 10 minutes is not spoken, however sharp; one after is, unless
+/// the cooldown still holds.
+#[test]
+fn a_rise_rearms_only_after_its_line_and_its_cooldown() {
+    let dir = tempfile::tempdir().unwrap();
+    let pm = |at: u64| {
+        Some(match at {
+            ..300 => 80.0,
+            300..600 => 400.0,
+            // 5 minutes under 150: not enough.
+            600..900 => 100.0,
+            900..1_000 => 400.0,
+            // 11 minutes and more under 150: armed again at 1,600 s.
+            1_000..1_700 => 100.0,
+            _ => 400.0,
+        })
+    };
+    let readings = air_from(0, 2_400, pm);
+    let without = smoky(dir.path(), "smoky-air", "");
+    assert_eq!(air_runs(&without, &readings), [330, 1_730]);
+    // The design's 30 minutes from the first: the third rise is in them.
+    let cooled = smoky(
+        &dir.path().join("cooled"),
+        "smoky-air",
+        "cooldown = \"30m\"",
+    );
+    assert_eq!(air_runs(&cooled, &readings), [330]);
+    // The rise at 1,700 s, held back by the cooldown, is spent as one that
+    // ran: the line is waited for again, and the next rise after it speaks.
+    let later = air_from(0, 3_000, |at| match at {
+        ..1_800 => pm(at),
+        1_800..2_500 => Some(100.0),
+        _ => Some(400.0),
+    });
+    assert_eq!(air_runs(&cooled, &later), [330, 2_530]);
+}
+
+/// #1684 (a): the readings a rise compares with begin again at a reload,
+/// and the Policy's late answer finds the rise as its newest reading had it.
+#[test]
+fn a_rise_begins_again_at_a_reload_and_is_asked_again_as_it_was() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = smoky(dir.path(), "smoky-air", "cooldown = \"30m\"");
+    let air = |pm: f64| format!(r#"{{"pm2_5":{pm},"feel":"fine"}}"#);
+    let mut engine = Engine::new(vec![load(&skill).unwrap()], true);
+    for at in (0..300).step_by(5) {
+        assert!(
+            engine
+                .observe("air/state", at * 1_000_000, air(80.0).as_bytes(), None)
+                .is_empty()
+        );
+    }
+    assert!(engine.replace(vec![load(&skill).unwrap()]).is_empty());
+    for at in (300..900).step_by(5) {
+        let runs = engine.observe("air/state", at * 1_000_000, air(400.0).as_bytes(), None);
+        assert!(runs.is_empty(), "at {at} s: {runs:?}");
+    }
+    let mut engine = Engine::new(vec![load(&skill).unwrap()], false).asking_the_policy();
+    let mut asked = None;
+    for at in (0..335).step_by(5) {
+        let pm = if at < 300 { 80.0 } else { 400.0 };
+        asked = asked.or(engine
+            .observe("air/state", at * 1_000_000, air(pm).as_bytes(), None)
+            .pop());
+    }
+    let run = asked.expect("asked at 330 s");
+    assert!(run.ask.is_some());
+    assert!(engine.still(&run, 331_000_000).is_some());
+    // Three minutes of 400 later the rise is over, though the level holds:
+    // an answer that came only then would say nothing.
+    for at in (335..520).step_by(5) {
+        engine.observe("air/state", at * 1_000_000, air(400.0).as_bytes(), None);
+    }
+    assert_eq!(engine.still(&run, 520_000_000), None);
+}
+
+/// #1684 (b) and (c): a say written as a table is the skill's own words as
+/// written (`text`) or a note (`note`), at a priority up to 8 and spent after
+/// its `expires`; what it can't be is refused with why.
+#[test]
+fn a_say_table_is_exact_words_or_a_note_at_its_priority() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = smoky(dir.path(), "smoky-air", "");
+    let mut engine = Engine::new(vec![load(&skill).unwrap()], true);
+    let mut calls = Vec::new();
+    for at in (0..335).step_by(5) {
+        let pm = if at < 300 { 80 } else { 400 };
+        let payload = format!(r#"{{"pm2_5":{pm}}}"#);
+        for run in engine.observe("air/state", at * 1_000_000, payload.as_bytes(), None) {
+            calls.extend(run.calls);
+        }
+    }
+    assert_eq!(calls.len(), 1, "{calls:?}");
+    let (name, args) = calls[0].named();
+    assert_eq!(name, "say");
+    assert_eq!(
+        args,
+        serde_json::json!({
+            "text": "The air near me just got smoky. If something's burning, please check it.",
+            "priority": 8,
+            "expires_ms": 120_000,
+        })
+    );
+    // A note at its own priority, and the defaults: 5 and 30 s.
+    let note = skill_with(
+        dir.path(),
+        "noted",
+        "[trigger]\ntopic = \"humans/faces/tracked\"\nwhen = \"appears\"\n[ask]\npolicy = \"hello\"\n\
+         [[do]]\nsay = { note = \"Greet them.\" }\n",
+    );
+    let runs = runs_at(&note, &[(0, Faces::TOPIC, NOBODY), (5, Faces::TOPIC, FACE)]);
+    assert_eq!(
+        runs[0].1[0].named().1,
+        serde_json::json!({"note": "Greet them.", "priority": 5, "expires_ms": 30_000})
+    );
+    for (say, why) in [
+        (
+            "{ text = \"Smoke.\", priority = 9 }",
+            "0 to 8: 9 is the voice's own",
+        ),
+        ("{ text = \"Smoke.\", priority = -1 }", "0 to 8"),
+        (
+            "{ text = \"Smoke.\", note = \"Smoke.\" }",
+            "one of text or note",
+        ),
+        ("{ priority = 8 }", "one of text or note"),
+        (
+            "{ text = \"Smoke.\", loud = true }",
+            "say.loud is not known",
+        ),
+        ("{ text = \"\" }", "1 to 900 bytes"),
+        ("{ text = \"Smoke.\\nFire.\" }", "no control characters"),
+        ("{ text = 5 }", "1 to 900 bytes"),
+        ("{ text = \"Smoke.\", expires = \"500ms\" }", "1s to 1h"),
+        ("{ text = \"Smoke.\", expires = \"2h\" }", "1s to 1h"),
+        ("{ text = \"Smoke.\", expires = 120 }", "a duration"),
+        (
+            "{ from = \"schedule\", priority = 9 }",
+            "from and nothing else",
+        ),
+    ] {
+        let skill = skill_with(
+            dir.path(),
+            "refused",
+            &format!(
+                "[trigger]\ntopic = \"humans/faces/tracked\"\n[ask]\npolicy = \"hello\"\n[[do]]\nsay = {say}\n"
+            ),
+        );
+        let error = load(&skill).unwrap_err();
+        assert!(error.contains(why), "{say}: {error}");
+    }
+    let long = format!("{{ text = \"{}\" }}", "a".repeat(901));
+    let skill = skill_with(
+        dir.path(),
+        "refused",
+        &format!(
+            "[trigger]\ntopic = \"humans/faces/tracked\"\n[ask]\npolicy = \"hello\"\n[[do]]\nsay = {long}\n"
+        ),
+    );
+    assert!(load(&skill).unwrap_err().contains("1 to 900 bytes"));
+    // A tool's say is the note for the model's answer, in its own turn.
+    let tool = skill_with(
+        dir.path(),
+        "refused",
+        "tool = \"smoke\"\n[[do]]\nsay = { text = \"Smoke.\" }\n",
+    );
+    assert!(load(&tool).unwrap_err().contains("in a skill with a tool"));
+}
+
+/// #1684 (a): what a rise can't be is refused with why.
+#[test]
+fn the_loader_refuses_a_rise_it_cannot_judge() {
+    let dir = tempfile::tempdir().unwrap();
+    for (trigger, why) in [
+        ("rise = { by = 100, within = \"3m\" }", "rise is of a field"),
+        (
+            "field = \"pm2_5\"\nequals = 5\nrise = { by = 100, within = \"3m\" }",
+            "not with equals, below or each",
+        ),
+        (
+            "field = \"pm2_5\"\nbelow = 5\nrise = { by = 100, within = \"3m\" }",
+            "not with equals, below or each",
+        ),
+        (
+            "field = \"pm2_5\"\nrise = { by = 0, within = \"3m\" }",
+            "above 0",
+        ),
+        (
+            "field = \"pm2_5\"\nrise = { by = -5, within = \"3m\" }",
+            "above 0",
+        ),
+        (
+            "field = \"pm2_5\"\nrise = { by = 100, within = \"500ms\" }",
+            "1s to 1h",
+        ),
+        (
+            "field = \"pm2_5\"\nrise = { by = 100, within = \"2h\" }",
+            "1s to 1h",
+        ),
+        (
+            "field = \"pm2_5\"\nrise = { by = 100, within = \"3 min\" }",
+            "not a duration",
+        ),
+        ("field = \"pm2_5\"\nrise = { by = 100 }", "missing field"),
+        (
+            "field = \"pm2_5\"\nrise = { by = 100, within = \"3m\", from = 80 }",
+            "unknown field",
+        ),
+    ] {
+        let skill = skill_with(
+            dir.path(),
+            "risen",
+            &format!(
+                "[trigger]\ntopic = \"air/state\"\n{trigger}\n[ask]\npolicy = \"nudge\"\n[[do]]\nsay = \"Smoke.\"\n"
+            ),
+        );
+        let error = load(&skill).unwrap_err();
+        assert!(error.contains(why), "{trigger}: {error}");
+    }
+    // A rise alone, with no level of its own, holds on any number.
+    let skill = skill_with(
+        dir.path(),
+        "risen",
+        "[trigger]\ntopic = \"air/state\"\nfield = \"pm2_5\"\nrise = { by = 50, within = \"1m\" }\n\
+         [ask]\npolicy = \"nudge\"\n[[do]]\nsay = \"Smoke.\"\n",
+    );
+    let readings = air_from(0, 300, |at| Some(if at < 120 { 10.0 } else { 70.0 }));
+    assert_eq!(air_runs(&skill, &readings)[0], 120);
+}
+
+/// #1684 (b): exact words reach the voice's say service as they are written,
+/// as its `text`, byte for byte, with the say's priority and expiry; and
+/// what is made with them comes with its `begun`, as for a note.
+#[test]
+fn exact_words_reach_the_voice_unchanged_at_their_priority() {
+    const WORDS: &str = "The air near me just got smoky. If something's burning, please check it. \
+                         \u{201c}PM2.5\u{201d} 400 \u{b5}g/m\u{b3} \\ \"quoted\"";
+    let skill = format!(
+        "[trigger]\ntopic = \"humans/faces/tracked\"\nwhen = \"appears\"\n[ask]\npolicy = \"hello\"\n\
+         [[do]]\nlight = {{ colour = \"warm\" }}\nsay = {{ text = '''{WORDS}''', priority = 8, expires = \"2m\" }}\n"
+    );
+    let seen = the_program_with(
+        &skill,
+        true,
+        &[r#"{"event":"begun","at_us":5}"#, r#"{"outcome":"spoken"}"#],
+        3,
+        1,
+        4,
+    );
+    let asked: serde_json::Value = serde_json::from_str(seen.asked.as_deref().unwrap()).unwrap();
+    assert_eq!(asked["text"].as_str(), Some(WORDS));
+    assert_eq!(asked["priority"], 8);
+    assert_eq!(asked["expires_in_ms"], 120_000);
+    assert_eq!(asked["skill"], "hello");
+    assert!(asked.get("note").is_none(), "{asked}");
+    let done = &seen.events[3].why;
+    assert!(done.contains("light warm: done"), "{done}");
+    assert!(done.contains("say: spoken"), "{done}");
+    assert!(done.contains("light given back to on blue at 3"), "{done}");
+}
+
 /// Who was here (#1685), with its record of the last hour.
 const WHO: &str = r#"
 tool = "who_was_here"
