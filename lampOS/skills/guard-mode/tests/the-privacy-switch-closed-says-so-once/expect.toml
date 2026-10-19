@@ -1,0 +1,17 @@
+# On, the desk empty; the switch closed from 300 s for 30 s and again from
+# 600 s: one line, once, and quiet after.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[expect]]
+at = "4s"
+call = "light"
+
+[[expect]]
+at = "300250ms"
+call = "text"
+args = { text = "I can't see right now, the privacy switch is closed." }

@@ -1,0 +1,25 @@
+# On, the desk empty from 49 s; the switch closed from 380 s to 500 s while
+# room/presence still says someone at 400-470 s (a presence the eyes would
+# not give, reviewer-two's P3 on #1807): its one line, and no visit. Open
+# again, someone at 700-770 s: that visit is texted, once.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[expect]]
+at = "4s"
+call = "light"
+
+[[expect]]
+at = "380250ms"
+call = "text"
+args = { text = "I can't see right now, the privacy switch is closed." }
+
+[[expect]]
+at = "770s"
+within = "2s"
+call = "text"
+args = { text = "Someone was at your desk at 14:31, for about a minute." }

@@ -1,0 +1,18 @@
+# The person asks at 14:20:02 and leaves; someone comes at 14:31 and stays two
+# minutes, a face the lamp does not know; one text when they go.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[expect]]
+at = "4s"
+call = "light"
+args = { colour = "blue", level = 1 }
+
+[[expect]]
+at = "799s"
+call = "text"
+args = { text = "Someone I don't know was at your desk at 14:31, for about 2 minutes." }

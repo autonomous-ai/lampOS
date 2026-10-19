@@ -1,0 +1,23 @@
+# Visits at 14:31, 14:36 and 14:45, a minute each, only heard and seen as
+# someone (no face): texts for the first and the third; the second comes
+# within ten minutes of the first's text.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[expect]]
+at = "4s"
+call = "light"
+
+[[expect]]
+at = "739s"
+call = "text"
+args = { text = "Someone was at your desk at 14:31, for about a minute." }
+
+[[expect]]
+at = "1579s"
+call = "text"
+args = { text = "Someone was at your desk at 14:45, for about a minute." }
