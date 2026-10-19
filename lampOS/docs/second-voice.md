@@ -21,7 +21,8 @@ The route is a provider worker of its own, `lamp-voice worker second` (role
 `second`). It speaks the same `ProviderInput` / `ProviderOutput` wire as the
 Gemini worker and the fixture, so the coordinator treats it as one more
 provider. Off unless configured: with no second-route file, nothing about
-the voice service changes.
+the voice service changes. With `LAMP_VOICE_ROUTE=second` it is the lamp's
+only voice instead, and Gemini Live is not used ("Second only", below).
 
 ## The configuration
 
@@ -29,7 +30,9 @@ A private JSON file, named by `LAMP_VOICE_SECOND_CONFIG` in the voice
 service's environment (`SECOND_CONFIG_ENV`). Unset or empty: the route is
 off. The coordinator passes the path to the worker as
 `worker second DIR PARENT WORKER PROVIDER_CONFIG SECOND_CONFIG [flags]`,
-where the flags are the Gemini provider worker's, less `--keep-link`.
+where the flags are the Gemini provider worker's, less `--keep-link`,
+after this route's own `--wait-cue`, `--down-line` and `--only-voice`
+(each only when switched on, in that order).
 
 The field names are V1's (`system/domain/device.go`, `hal/models.py`), so
 whatever carries V1's settings over can copy them. The one change: each
@@ -335,7 +338,8 @@ When the coordinator switches (below):
   transcript of it goes to the coordinator, so an answer's opening words,
   which it reads for a look ("Let me look.") and for the body's gesture,
   are the model's. Each sentence after it is said after a
-  space, so the lamp's words read "just now. Hmm," (#1014).
+  space, so the lamp's words read "just now. Hmm," (#1014). Never said
+  when this route is the only voice ("Second only", below).
 - **As quiet as Gemini:** with `LAMP_ATTENTION` on, a spoken turn's words
   are judged by the Live route's own rule for whom it answers
   (`crate::attention`, [attention.md](attention.md)) before the chat is
@@ -603,6 +607,86 @@ and its authority kept fresh during the rest of startup.
   `voice_route_dropped` (`status`, `active`). An authority that cannot
   reach it is not an error either. A worker that dies inside the very
   tick that touches it still ends the voice, as before.
+
+## Second only
+
+The owner, 19 October: Gemini Live is expensive; this route is cheaper and
+slower; test it alone and compare the two routes' latency, an A/B on
+lamp-4ace. `LAMP_VOICE_ROUTE`, in the voice service's environment, picks the
+lamp's voice (`coordinator/second.rs`, `routes`):
+
+- **Unset, empty or `gemini`:** Gemini Live, with this route standing by
+  when `LAMP_VOICE_SECOND_CONFIG` is set: everything above, unchanged.
+- **`second`:** this route is the lamp's only voice from the first turn. It
+  needs `LAMP_VOICE_SECOND_CONFIG`.
+- **Anything else, or `second` without that configuration:** the voice does
+  not start. `run_serve` refuses before anything starts, never falling back
+  to Gemini, and the journal says why, either
+  `lamp-voice: LAMP_VOICE_ROUTE=second needs LAMP_VOICE_SECOND_CONFIG, the second route's configuration: the voice does not start, and does not fall back to Gemini Live`
+  or `lamp-voice: LAMP_VOICE_ROUTE is gemini or second, not "…": the voice does not start`.
+  A value is taken exactly: `Second` or ` second` is refused. A bounded run
+  (`lamp-voice directed`) has no second route, and refuses `second`.
+
+With `second`, the journal says once at start:
+`lamp-voice: the voice route is second only (LAMP_VOICE_ROUTE=second): speech to text, a text model and speech answer every turn; Gemini Live is not used`.
+
+**How.** The route starts in the state a take-over leaves, with no Gemini
+behind it. `spawn_rig` starts the `second` worker where Gemini's would be,
+in `rig.provider` (`Routes::workers`), with `second::arguments` (Gemini's
+worker's arguments and both configurations, less `--keep-link` and
+`--wait-for-room`) and `--only-voice`; `Rig::second` is `None`. No Gemini
+worker is started, so no Gemini session is opened. Its readiness is taken
+during startup as Gemini's is (`StartupEvents::poll`). Every turn, spoken
+requests, the lamp's own written turns, reminders, called and named turns
+and looks, then goes to it through the paths written for `rig.provider`, as
+after a take-over: authority, leases, cut-ins and duplex, the say service,
+notes, the tools declared, and the voice state, Expression and the ring on
+the bus. Nothing is held, replayed or switched, and no `voice_route_*`
+record is written.
+
+- **Its exit ends the voice**, as Gemini's does (`coordinator::mandatory`):
+  it is the only voice. A standby's exit is still dropped, and Gemini goes
+  on.
+- **No "My voice sounds a little different just now."** `--only-voice` turns
+  the announcement off (`Engine::announcing`): there is no other voice to
+  differ from, and it would be the first thing heard in every answer after
+  two quiet minutes, ahead of the model's words.
+- `LAMP_SECOND_WAIT_CUE` and `LAMP_SECOND_DOWN_LINE` work as with a standby.
+
+**What differs from Gemini Live**, for the A/B to watch. All of it is as
+after a take-over, but now for every turn:
+
+- **Latency** is this route's (Latency targets, above): speech to text's last
+  words, the chat's first words through the relay, then the first speech.
+  A turn leaves the same `turn_finished` record on both routes.
+- **A due reminder is not said.** This route defers it
+  (`ReminderDeferral::Disabled`); with no Gemini to say it later, the
+  schedule's consumer offers it again 5 s after each deferral
+  (`reminders::consumer`, `PACE_US`) for as long as it is due. By the code;
+  not run.
+- **Nothing judges the room.** `room/state` is published by Gemini's worker;
+  with no Gemini worker the room is unknown to this route's rule for whom it
+  answers (`LAMP_ATTENTION`) and to its room facts.
+- **Live route only, so not on this route:** a tool's look (`LookAsked`;
+  this route's looks come from its words, "Let me look."), the name note
+  (`Called` is not used), the same-voice check and the staff note,
+  `LAMP_CUT_IN_TOLD`, `LAMP_FOLLOWS_ON`, `LAMP_GOING_ON_ASKS`, the head tap
+  and `--addressed` for whom it answers, sight, camera and air facts, and
+  `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).
+- **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its
+  start: a relay outage shows only as failed turns.
+- With `--camera-config` the camera worker still starts for Gemini's picture
+  context, which nothing reads here. lamp-4ace's unit sets none.
+
+Host tests: `coordinator::second::tests` (the values, the refusals, the
+workers each value starts) and `coordinator::tests::second_route`
+(`the_second_route_alone_answers_a_spoken_request_and_no_gemini_worker_starts`:
+nothing reaches a Gemini worker, the second route is sent what Gemini would
+have been, and the speaker's authorities, the ring's phases and the kinds
+and fields of every record are a Gemini run's;
+`the_second_route_alone_exiting_ends_the_voice_as_gemini_does`), the startup
+poll (`startup_takes_the_second_route_alone_as_the_provider`) and the engine
+(`the_only_voice_never_says_it_sounds_different`). Not shown on a lamp.
 
 ## Not done
 

@@ -66,7 +66,8 @@ pub use services::{Listener, Net, Services};
 mod tests;
 
 /// Said once before the first answer after a quiet spell, so the person
-/// knows the different voice is the lamp's.
+/// knows the different voice is the lamp's. Never said when this route is
+/// the lamp's only voice ([`Engine::announcing`]).
 pub const ANNOUNCEMENT: &str = "My voice sounds a little different just now.";
 /// How long without an answer before the announcement is said again.
 pub const ANNOUNCE_AFTER: Duration = Duration::from_secs(120);
@@ -189,6 +190,9 @@ struct Shared {
     cues: Option<Arc<Cues>>,
     /// [`DOWN_LINE`], when switched on.
     down: Option<Arc<DownLine>>,
+    /// A turn after a quiet spell opens with [`ANNOUNCEMENT`]: not when
+    /// this route is the lamp's only voice (`LAMP_VOICE_ROUTE=second`).
+    announce: bool,
     /// The words last heard, with their request: a request that goes on
     /// from one given up after an early end begins with them.
     heard_last: Mutex<Option<(u64, String)>>,
@@ -416,6 +420,7 @@ impl Engine {
                 asked: None,
                 cues: None,
                 down: None,
+                announce: true,
                 heard_last: Mutex::new(None),
                 stop_untold: Mutex::new(None),
             }),
@@ -475,6 +480,19 @@ impl Engine {
             if let Some(shared) = shared {
                 shared.down = Some(Arc::default());
             }
+        }
+        self
+    }
+
+    /// Whether a turn after a quiet spell opens with [`ANNOUNCEMENT`], said
+    /// because this voice cannot be Gemini's: off when it is the lamp's only
+    /// voice (`LAMP_VOICE_ROUTE=second`, `--only-voice`), with no other voice
+    /// to differ from. Before any turn only.
+    pub fn announcing(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared);
+        debug_assert!(shared.is_some(), "the announcement is set before any turn");
+        if let Some(shared) = shared {
+            shared.announce = on;
         }
         self
     }
@@ -964,8 +982,7 @@ async fn answer(
 ) {
     // Started now, with the chat request, so it is ready first.
     let mut speech = JoinSet::new();
-    let announcement = shared
-        .announcement_due()
+    let announcement = (shared.announce && shared.announcement_due())
         .then(|| start_speech(shared, &mut speech, ANNOUNCEMENT.to_owned()));
     let (sentences, mut queued) = mpsc::channel(SENTENCES_AHEAD);
     let spoke = AtomicBool::new(false);

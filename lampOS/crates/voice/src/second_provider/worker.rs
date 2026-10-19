@@ -264,6 +264,19 @@ pub fn take_down_line(flags: &[String]) -> (bool, &[String]) {
     }
 }
 
+/// The worker's flag when this route is the lamp's only voice
+/// (`LAMP_VOICE_ROUTE=second`), after `--down-line` if that is given: it
+/// says no [`super::ANNOUNCEMENT`], as there is no other voice to differ from.
+pub const ONLY_VOICE_FLAG: &str = "--only-voice";
+
+/// Take a leading `--only-voice` off the worker's flags.
+pub fn take_only_voice(flags: &[String]) -> (bool, &[String]) {
+    match flags {
+        [flag, rest @ ..] if flag == ONLY_VOICE_FLAG => (true, rest),
+        _ => (false, flags),
+    }
+}
+
 /// Whether this route checks short sounds: as the Live route does, only
 /// with `--sounds-checked` and `--attention` together.
 pub fn checks_sounds(files: &crate::provider_worker::Files) -> bool {
@@ -286,7 +299,9 @@ pub fn parse_flags(dir: &Path, flags: &[String]) -> io::Result<crate::provider_w
 
 /// The second route's worker process until Stop. `files` are the Live
 /// provider worker's flags; this route uses the thread's file and the
-/// tools (the memory among them), and has no use yet for the rest.
+/// tools (the memory among them), and has no use yet for the rest. With
+/// `only_voice` (`--only-voice`) it is the lamp's only voice.
+#[allow(clippy::too_many_arguments)]
 pub fn serve(
     channels: WorkerChannels,
     boot: BootId,
@@ -295,6 +310,7 @@ pub fn serve(
     files: crate::provider_worker::Files,
     wait_cue: bool,
     down_line: bool,
+    only_voice: bool,
 ) -> io::Result<()> {
     let character = crate::config::ProviderConfig::load(provider_config)?.instruction(false)?;
     let config = crate::second_config::load_from_path(second_config)?;
@@ -379,7 +395,8 @@ pub fn serve(
     let mut engine = Engine::new(Arc::new(net), system, runner)
         .checking_sounds(checked)
         .waiting_with_a_sound(wait_cue)
-        .saying_when_down(down_line);
+        .saying_when_down(down_line)
+        .announcing(!only_voice);
     // A look reads the eyes' look file with the Live route's bounds: a full
     // look's still may be older and larger (#836, #941).
     if let Some(path) = files.look.clone() {

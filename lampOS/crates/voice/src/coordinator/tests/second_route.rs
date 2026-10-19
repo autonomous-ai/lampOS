@@ -88,6 +88,9 @@ enum When {
 #[derive(Clone)]
 struct Script {
     second: bool,
+    /// `LAMP_VOICE_ROUTE=second`: the second route alone, in `rig.provider`,
+    /// with no Gemini worker (`second` is then not read).
+    only: bool,
     live: Vec<Live>,
     /// Packets in each of the second route's answers.
     second_packets: usize,
@@ -130,6 +133,7 @@ impl Script {
     fn question(live: Live) -> Self {
         Self {
             second: true,
+            only: false,
             live: vec![live],
             second_packets: 12,
             second_says: None,
@@ -915,6 +919,17 @@ fn run(script: Script) -> Run {
         });
         worker
     };
+    // The workers are the ones the service's routes start (`spawn_rig`).
+    let routes = if script.only {
+        second::Routes::SecondOnly(PathBuf::from("/etc/second.json"))
+    } else {
+        second::Routes::Live {
+            standby: script.second.then(|| PathBuf::from("/etc/second.json")),
+        }
+    };
+    let workers = routes
+        .workers(vec!["/etc/provider.json".to_owned()], false, false)
+        .unwrap();
     let mut rig = Rig {
         second: None,
         call_wait_blocks: None,
@@ -928,7 +943,7 @@ fn run(script: Script) -> Run {
         faint_level: None,
         speaker: spawn("speaker"),
         capture: spawn("capture"),
-        provider: spawn("provider"),
+        provider: spawn(workers.role),
         privacy: spawn("privacy"),
         privacy_controls: false,
         ring: Some(spawn("ring")).into(),
@@ -942,7 +957,7 @@ fn run(script: Script) -> Run {
         fixture_at_ms: None,
         endpoint: None,
     };
-    if script.second {
+    if workers.standby.is_some() {
         let worker = spawn("second");
         rig.second = Some(second::Route::standing_by(worker, ready_link(1, 1)));
     }
@@ -1634,6 +1649,70 @@ fn geminis_worker_exiting_while_the_second_route_is_active_still_ends_the_voice(
         "{}",
         run.summary()
     );
+}
+
+/// `LAMP_VOICE_ROUTE=second` (the owner, 19 Oct: Gemini Live against the
+/// cheaper second route, an A/B on lamp-4ace): the second route is the only
+/// voice from the first turn. No Gemini worker is started and nothing is
+/// sent to one; the second route is sent what Gemini would have been sent,
+/// answers, and the rest of the lamp sees the turn as Gemini's: the same
+/// authorities at the speaker, the same ring phases, the same kinds and
+/// fields of every record, and no switch.
+#[test]
+fn the_second_route_alone_answers_a_spoken_request_and_no_gemini_worker_starts() {
+    let _one = super::pilot_faults::one_session();
+    let gemini = run(Script {
+        second: false,
+        ..Script::question(Live::Answer(12))
+    });
+    gemini.assert_clean();
+    let alone = run(Script {
+        second: false,
+        only: true,
+        ..Script::question(Live::Answer(12))
+    });
+    alone.assert_clean();
+    assert!(alone.seen.live.is_empty(), "{:?}", alone.seen.live);
+    assert!(
+        alone.exits.iter().all(|(role, _)| *role != "provider"),
+        "{:?}",
+        alone.exits
+    );
+    assert!(alone.exits.contains(&("second", true)), "{:?}", alone.exits);
+    whole_line(&alone.seen.second, 1);
+    assert_eq!(timeless(&gemini.seen.live), timeless(&alone.seen.second));
+    assert_eq!(alone.played(1), vec![SECOND; 48]);
+    assert_eq!(gemini.played(1), vec![LIVE; 48]);
+    for kind in [
+        "voice_route_switched",
+        "voice_route_held",
+        "voice_route_dropped",
+    ] {
+        assert!(alone.events(kind).is_empty(), "{kind}: {}", alone.summary());
+    }
+    assert_eq!(shape(&gemini), shape(&alone));
+    assert_eq!(gemini.finished(1)["outcome"], alone.finished(1)["outcome"]);
+    assert_eq!(dedup(&gemini.seen.installs), dedup(&alone.seen.installs));
+    assert_eq!(dedup(&gemini.seen.phases), dedup(&alone.seen.phases));
+    assert!(dedup(&alone.seen.phases).contains(&RingPhase::Speaking));
+}
+
+/// Alone, the second route's worker is the lamp's only voice: its exit
+/// ends the voice (and the service is restarted), as Gemini's does, where a
+/// standby's is dropped and the voice goes on with Gemini.
+#[test]
+fn the_second_route_alone_exiting_ends_the_voice_as_gemini_does() {
+    let _one = super::pilot_faults::one_session();
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_dies: Some(1),
+        ..Script::question(Live::Answer(12))
+    });
+    let error = run.result.as_ref().unwrap_err().to_string();
+    assert!(error.contains("second worker exited"), "{}", run.summary());
+    assert!(run.events("voice_route_dropped").is_empty());
+    assert!(run.seen.live.is_empty());
 }
 
 /// (p) #960, lamp-4ace (`server_go_away`): Gemini's link drops with no turn

@@ -1098,11 +1098,15 @@ fn tapped_face(ceiling: u16) -> Option<crate::ring_asleep::Asleep> {
 }
 
 /// Whether a worker's failure ends the voice. Only the second route's is
-/// optional, in whichever slot it is (`rig.provider` while it is the active
-/// route): one that exited is dropped by `second::dropped_if_gone` (#960).
-/// Gemini's worker stays mandatory when it waits in `Route::worker`.
-fn mandatory(worker: &Worker) -> bool {
-    worker.role != "second"
+/// optional, and only while it stands beside Gemini's (`standby`:
+/// `Rig::second` is set), in whichever slot it is (`rig.provider` while it
+/// is the active route): one that exited is dropped by
+/// `second::dropped_if_gone` (#960). Gemini's worker stays mandatory when
+/// it waits in `Route::worker`. The second route alone
+/// (`LAMP_VOICE_ROUTE=second`) is the lamp's only voice: its exit ends the
+/// voice, as Gemini's does.
+fn mandatory(worker: &Worker, standby: bool) -> bool {
+    worker.role != "second" || !standby
 }
 
 impl Rig {
@@ -1110,19 +1114,20 @@ impl Rig {
     /// to every remaining child even if one local channel has gone away.
     fn publish_hand_revocation(&mut self, snapshot: Snapshot) -> io::Result<()> {
         let mut failure = None;
+        let standby = self.second.is_some();
         for worker in [&mut self.capture, &mut self.privacy, &mut self.provider] {
             if let Err(error) = worker
                 .channels
                 .control
                 .send(Control::Authority { snapshot })
-                && mandatory(worker)
+                && mandatory(worker, standby)
             {
                 failure.get_or_insert(error);
             }
         }
         if let Some(route) = &mut self.second
             && let Err(error) = route.publish(snapshot)
-            && mandatory(route.worker_mut())
+            && mandatory(route.worker_mut(), standby)
         {
             failure.get_or_insert(error);
         }
@@ -1145,6 +1150,7 @@ impl Rig {
         if let Some(motor) = &mut self.motor {
             motor.publish(snapshot);
         }
+        let standby = self.second.is_some();
         for worker in [
             &mut self.speaker,
             &mut self.capture,
@@ -1155,14 +1161,14 @@ impl Rig {
                 .channels
                 .control
                 .send(Control::Authority { snapshot })
-                && mandatory(worker)
+                && mandatory(worker, standby)
             {
                 return Err(error);
             }
         }
         if let Some(route) = &mut self.second
             && let Err(error) = route.publish(snapshot)
-            && mandatory(route.worker_mut())
+            && mandatory(route.worker_mut(), standby)
         {
             return Err(error);
         }
@@ -1186,6 +1192,7 @@ impl Rig {
                 .check_running()
                 .map_err(service_privacy::unavailable_io)?;
         }
+        let standby = self.second.is_some();
         for worker in [
             &mut self.provider,
             &mut self.capture,
@@ -1195,7 +1202,7 @@ impl Rig {
         .into_iter()
         .chain(self.second.as_mut().map(second::Route::worker_mut))
         {
-            if mandatory(worker) {
+            if mandatory(worker, standby) {
                 worker.check_running()?;
             }
         }
@@ -1711,6 +1718,12 @@ const REFUSAL_WAIT: Duration = Duration::from_secs(120);
 
 pub fn run_serve(config: &Path, output: &Path, options: SessionOptions) -> Result<()> {
     options.validate_serve()?;
+    // Which route is the voice: refused here, before anything starts, when
+    // `LAMP_VOICE_ROUTE` is wrong or `second` lacks its configuration. Each
+    // run reads it again as it starts its workers (`spawn_rig`).
+    if let second::Routes::SecondOnly(_) = second::routes_from_environment(true)? {
+        eprintln!("{}", second::SECOND_ONLY_LINE);
+    }
     let termination = Termination::install()?;
     let cues = options
         .cue_socket
@@ -2669,13 +2682,18 @@ impl StartupEvents {
         self.events.push(event);
         Ok(())
     }
+    /// `role` is the worker's. In `rig.provider` that is Gemini's
+    /// (`provider`) or, with `LAMP_VOICE_ROUTE=second`, the second route's
+    /// (`second`), taken alike. A standby second route is never polled here:
+    /// it starts through `second::Route::startup_tick`.
     fn poll(&mut self, channels: &mut WorkerChannels, role: &str) -> io::Result<()> {
+        let provider = matches!(role, "provider" | "second");
         for _ in 0..16 {
             let Some(event) = channels.control.receive::<WorkerEvent>()? else {
                 break;
             };
             match (&event, role) {
-                (WorkerEvent::ProviderLink { link }, "provider") => {
+                (WorkerEvent::ProviderLink { link }, _) if provider => {
                     let at = monotonic_us();
                     self.cloud.observe(*link, at)?;
                     self.push(link_trace(*link, at))?;
@@ -2704,7 +2722,7 @@ impl StartupEvents {
         }
         for _ in 0..16 {
             match role {
-                "provider" => match channels.data.receive::<ProviderOutput>()? {
+                "provider" | "second" => match channels.data.receive::<ProviderOutput>()? {
                     // A provider can recover while later children are still
                     // starting. Count its repeated Ready against the original
                     // capacity sequence; it does not admit input by itself.
@@ -2742,7 +2760,7 @@ impl StartupEvents {
                 _ => return Err(io::Error::other("unexpected startup worker role")),
             }
         }
-        if role == "provider" {
+        if provider {
             self.output_flow.replenish(0, &mut channels.control)?;
         }
         Ok(())
@@ -2881,33 +2899,33 @@ fn spawn_rig(
         ProviderSource::Fixture { at_ms, .. } => at_ms,
         ProviderSource::Gemini(_) => None,
     };
-    // A service that runs all day may keep a second voice route standing by.
-    let second_config = second::configured(
-        std::env::var_os(crate::second_config::SECOND_CONFIG_ENV)
-            .filter(|_| lifetime.continuous() && matches!(source, ProviderSource::Gemini(_))),
-    );
+    // A service that runs all day may keep a second voice route standing
+    // by, or, with `LAMP_VOICE_ROUTE=second`, have it as its only voice in
+    // Gemini's place (`run_serve` refused a wrong value before any of this).
+    let routes = second::routes_from_environment(
+        lifetime.continuous() && matches!(source, ProviderSource::Gemini(_)),
+    )?;
     let arguments = provider_arguments(
         source,
         &options,
         lifetime,
         camera.as_ref(),
-        second_config.is_some(),
+        routes.standing_by(),
     )?;
-    let second_arguments = second_config
-        .map(|config| {
-            second::arguments(
-                &arguments,
-                &config,
-                crate::second_provider::worker::wait_cue_from_environment(),
-                crate::second_provider::worker::down_line_from_environment(),
-            )
-        })
-        .transpose()?;
+    let second::Workers {
+        role,
+        arguments,
+        standby: second_arguments,
+    } = routes.workers(
+        arguments,
+        crate::second_provider::worker::wait_cue_from_environment(),
+        crate::second_provider::worker::down_line_from_environment(),
+    )?;
     let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
     let mut provider = Worker::spawn_with_boot_and_tick(
         &executable,
         directory,
-        "provider",
+        role,
         boot,
         provider_boot,
         &arguments,
@@ -10919,6 +10937,40 @@ mod tests {
             })
             .unwrap();
         assert!(startup.poll(&mut parent, "provider").is_err());
+    }
+
+    /// With `LAMP_VOICE_ROUTE=second` the second route's worker starts in
+    /// `rig.provider`: its readiness is taken during startup as Gemini's is,
+    /// and output before input still refused.
+    #[test]
+    fn startup_takes_the_second_route_alone_as_the_provider() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut parent, mut second) = pair(&dir, "second");
+        second
+            .control
+            .send(WorkerEvent::ProviderLink {
+                link: ready_link(1, 1),
+            })
+            .unwrap();
+        let mut startup = StartupEvents::default();
+        startup.poll(&mut parent, "second").unwrap();
+        assert_eq!(startup.cloud.ready_session(), Some(1));
+        assert_eq!(startup.events[0]["kind"], "provider_ready");
+        // Its output is read as Gemini's is: a Ready counts against its credit.
+        second
+            .data
+            .send(ProviderOutput::Ready { setup_us: 7 })
+            .unwrap();
+        startup.poll(&mut parent, "second").unwrap();
+        assert_eq!(startup.events[1]["kind"], "provider_ready_data_ignored");
+        second
+            .data
+            .send(ProviderOutput::TurnComplete {
+                request: 1,
+                idle: true,
+            })
+            .unwrap();
+        assert!(startup.poll(&mut parent, "second").is_err());
     }
 
     /// #1567 (the reviewer on #1592): a frame the capture sends before its
