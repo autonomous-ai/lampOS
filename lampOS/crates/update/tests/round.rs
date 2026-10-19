@@ -124,6 +124,7 @@ impl Ears for FakeEars {
             message: String::new(),
             items,
             missing: Vec::new(),
+            quiet_ms: 0,
         })
     }
 }

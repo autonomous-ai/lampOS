@@ -35,7 +35,8 @@ pub fn run(
         Ok(watch) => watch,
         Err(error) => return startup_failure(&mut channels, error),
     };
-    let (ring, _) = match lamp_ring::linux::open(controller_boot) {
+    // The waking face lets go at once for it, with no fade (#1681).
+    let (ring, _) = match lamp_ring::linux::open_privacy(controller_boot) {
         Ok(opened) => opened,
         Err(error) => return startup_failure(&mut channels, error),
     };

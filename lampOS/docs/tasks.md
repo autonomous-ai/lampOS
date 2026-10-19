@@ -690,6 +690,43 @@ are off:
   computer again. The file is read back by the look above, at once, with
   the same strictness, and a task already handed over keeps its target.
   One journal line a change, with how many targets and never their names.
+- **The computers' own names** (#1676, the first builder at 14:12). Beside
+  the targets it writes, the part writes `targets.names.json`:
+  `{"version":1,"names":{ALIAS:NAME}}`, each name the machine's Harness
+  name (else hostname), control characters out, trimmed, at most 64 bytes.
+  None where nothing is left. A computer renamed keeps its alias and gets
+  its new name. With no computer the file goes with the targets, and
+  beside a file someone else wrote nothing is written.
+  - **Its own file,** not a field of `targets.json`: an older build never
+    reads it, so a rollback keeps its hand-overs, where a field it didn't
+    know would turn them off (#1505). Every store reads one release back
+    (El's #1680 rule), and a label shouldn't cost a lamp its hand-overs.
+  - **Read at each look,** as strictly as the targets: an owned 0600
+    file, version 1, nothing else in it, each alias of a target alias's
+    shape and once, each name as above. A missing or bad file is no names.
+    The journal says how many, never which.
+  - **Told:** `{"op":"targets"}` gives `name` beside `alias` and `engine`
+    for a target that has one.
+  - **Said, with `LAMP_TASKS_MACHINE_NAMES=on`** (off unless set): the
+    voice reads the targets (as with `LAMP_TASKS_WHO`) and keeps the names
+    by alias. The read-back's `where` names the computer the work was
+    prepared for, "Claude Code on your MacBook Air", and a single task's
+    news says the rest of its answer, or that its agent waits, is "on
+    their MacBook Air". With no name for that target, or without the
+    switch, both read as today ("the office computer", "their computer").
+    The descriptions and the session note are not changed: the longest
+    description is at 1,014 of the service's 1,024 bytes, and the computer
+    there isn't yet chosen. Nor are news of several tasks at once, which
+    may be on several computers, and `check_agent_task`'s.
+  - **Tests:** `runtime::tests::names_from_machines_are_clean_labels_by_alias`,
+    `runtime::tests::the_names_file_is_read_strictly`,
+    `runtime::tests::names_are_written_beside_the_parts_own_targets`,
+    `tests/runtime.rs`: `targets_from_machines_are_written_and_used_while_signed_in`
+    (the names told, and a rename), the voice's
+    `agent_tasks::tests::with_machine_names_each_computer_is_said_by_its_own_name`
+    (two computers, one with none, the switch off; a read-back that
+    ignores the names fails it) and
+    `agent_tasks::tests::the_machine_names_switch_is_taken_on_its_own`.
 
 Not yet: installing Harness (`lamp-update harness-on`, B5) and signing in a
 lamp with no screen (Harness's box ticket, `harness login --ticket`; #1410).

@@ -19,7 +19,10 @@ const HELP: &str = "Listens to the room microphone and says how loud the room is
 It publishes ears/level ten times a second (the last 100 ms against the room's quiet),
 ears/sudden when a sound rises suddenly out of the quiet, and how it is on diagnostics.
 While the voice says it is speaking, and half a second after, nothing is sudden.
-It keeps no sound and writes none down; only levels leave it.
+By default it keeps no sound and writes none down; only metadata leaves it.
+LAMP_BUS_AUDIO=on exports raw mic1/audio (16 kHz mono S16LE), only with
+LAMP_PRIVACY_CONTROLS=on. Missing privacy enablement refuses startup.
+Ears remains the only microphone reader; an explicit bus recorder may retain PCM.
 
 lamp-ears check FILE... runs the same listening over files of sound (16 kHz, one channel,
 16 bits, raw or WAV) and prints each sudden sound (seconds into the file, how loud, out of
@@ -190,6 +193,10 @@ mod serve {
 
     pub fn run(arguments: &Arguments) -> io::Result<()> {
         let privacy = std::env::var("LAMP_PRIVACY_CONTROLS").ok();
+        lamp_ears::pcm::export_enabled(
+            std::env::var("LAMP_BUS_AUDIO").ok().as_deref(),
+            privacy.as_deref(),
+        )?;
         if lamp_ears::privacy::enabled(privacy.as_deref()) {
             return crate::privacy_runtime::run(arguments);
         }

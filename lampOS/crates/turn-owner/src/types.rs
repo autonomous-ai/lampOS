@@ -287,6 +287,10 @@ impl Snapshot {
     pub fn microphone_generation(self) -> u64 {
         self.microphone_generation.get()
     }
+    /// Changes on every camera privacy transition, including a coalesced close/reopen.
+    pub fn camera_generation(self) -> u64 {
+        self.camera_generation.get()
+    }
     pub fn camera_permission(self) -> Permission {
         self.camera
     }

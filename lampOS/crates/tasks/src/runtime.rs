@@ -650,6 +650,7 @@ fn owner<C: Clock>(
     // file and the sign-in are next looked at. The first look is at once.
     let mut set_up = set_up_later.as_ref().map(|_| SetUp::default());
     let mut targets_seen = None;
+    let mut names_said = String::new();
     let mut targets_due = Instant::now();
     let mut sign_in_due = Instant::now();
     let mut machines_due = Instant::now();
@@ -666,6 +667,7 @@ fn owner<C: Clock>(
         {
             targets_due = Instant::now() + later.every;
             look_at_targets(&mut engine, &later.targets, &mut targets_seen, found);
+            look_at_names(&mut engine, &later.targets, &mut names_said);
         }
         // Something that may have changed which tasks are watched.
         let mut moved = false;
@@ -910,7 +912,38 @@ pub fn targets_from_machines(
     machines: &[AccountMachine],
     engine: EngineKind,
 ) -> BTreeMap<String, Target> {
+    from_machines(machines, engine).0
+}
+
+/// Each computer's own name by its alias, as [`targets_from_machines`]
+/// names them: its Harness name, else its hostname, as a label of at most
+/// [`MOST_NAME_BYTES`] with no control characters; none where nothing is
+/// left (#1676).
+pub fn names_from_machines(machines: &[AccountMachine]) -> BTreeMap<String, String> {
+    from_machines(machines, EngineKind::Claude).1
+}
+
+/// A machine's name as said to the person: control characters out, spaces
+/// at the ends trimmed, cut to [`MOST_NAME_BYTES`] on a character boundary.
+fn label_of(label: &str) -> Option<String> {
+    let clean: String = label.chars().filter(|c| !c.is_control()).collect();
+    let mut name = String::new();
+    for c in clean.trim().chars() {
+        if name.len() + c.len_utf8() > MOST_NAME_BYTES {
+            break;
+        }
+        name.push(c);
+    }
+    let name = name.trim_end().to_owned();
+    (!name.is_empty()).then_some(name)
+}
+
+fn from_machines(
+    machines: &[AccountMachine],
+    engine: EngineKind,
+) -> (BTreeMap<String, Target>, BTreeMap<String, String>) {
     let mut targets = BTreeMap::new();
+    let mut names = BTreeMap::new();
     for (index, machine) in machines.iter().filter(|m| !m.current).take(8).enumerate() {
         let base = if index == 0 {
             "office".to_owned()
@@ -923,6 +956,9 @@ pub fn targets_from_machines(
             alias = format!("{base}-{next}");
             next += 1;
         }
+        if let Some(name) = label_of(&machine.label) {
+            names.insert(alias.clone(), name);
+        }
         targets.insert(
             alias,
             Target {
@@ -932,7 +968,133 @@ pub fn targets_from_machines(
             },
         );
     }
-    targets
+    (targets, names)
+}
+
+/// The longest name a computer is told by (#1676).
+pub const MOST_NAME_BYTES: usize = 64;
+
+/// The computers' names beside a targets file: `targets.names.json` beside
+/// `targets.json` (#1676). A file of its own, so an older build, which never
+/// reads it, keeps its hand-overs on a rollback.
+pub fn names_path(targets: &Path) -> PathBuf {
+    targets.with_extension("names.json")
+}
+
+/// The computers' names, read as strictly as the targets: `{"version":1,
+/// "names":{ALIAS:NAME}}`, an owned 0600 file of at most 16384 bytes, each
+/// alias a target alias's shape and once, each name at most
+/// [`MOST_NAME_BYTES`], with no control characters and no spaces at the
+/// ends. Anything else is an error, and the voice then says what it says
+/// today.
+pub fn read_target_names(path: &Path) -> io::Result<BTreeMap<String, String>> {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Document {
+        version: u32,
+        names: serde_json::Map<String, Value>,
+    }
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags((rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK).bits() as i32)
+        .open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file()
+        || metadata.nlink() != 1
+        || metadata.uid() != rustix::process::geteuid().as_raw()
+        || metadata.mode() & 0o7777 != 0o600
+        || metadata.len() > 16_384
+    {
+        return Err(invalid(
+            "names must be an owned unlinked 0600 regular file at most 16384 bytes",
+        ));
+    }
+    let mut bytes = Vec::new();
+    file.take(16_385).read_to_end(&mut bytes)?;
+    let document: Document =
+        serde_json::from_slice(&bytes).map_err(|_| invalid("invalid names JSON"))?;
+    if document.version != 1 || document.names.len() > 32 {
+        return Err(invalid("names requires version 1 and at most 32"));
+    }
+    // A key twice is refused: the map read above keeps only the last.
+    if duplicate_key(&bytes) {
+        return Err(invalid("a name given twice"));
+    }
+    let mut names = BTreeMap::new();
+    for (alias, name) in document.names {
+        let Some(name) = name.as_str() else {
+            return Err(invalid("a name that is not text"));
+        };
+        if alias.is_empty()
+            || alias.len() > 40
+            || !alias
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+            || label_of(name).as_deref() != Some(name)
+        {
+            return Err(invalid("invalid name"));
+        }
+        names.insert(alias, name.to_owned());
+    }
+    Ok(names)
+}
+
+/// Whether `names` in a names file has a key twice, read from the bytes.
+fn duplicate_key(bytes: &[u8]) -> bool {
+    struct Keys;
+    impl<'de> serde::de::Visitor<'de> for Keys {
+        type Value = bool;
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("a map")
+        }
+        fn visit_map<M: serde::de::MapAccess<'de>>(self, mut access: M) -> Result<bool, M::Error> {
+            let mut seen = BTreeSet::new();
+            let mut twice = false;
+            while let Some(key) = access.next_key::<String>()? {
+                twice |= !seen.insert(key);
+                access.next_value::<serde::de::IgnoredAny>()?;
+            }
+            Ok(twice)
+        }
+    }
+    struct Names(bool);
+    impl<'de> Deserialize<'de> for Names {
+        fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            struct Top;
+            impl<'de> serde::de::Visitor<'de> for Top {
+                type Value = bool;
+                fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    f.write_str("a names file")
+                }
+                fn visit_map<M: serde::de::MapAccess<'de>>(
+                    self,
+                    mut access: M,
+                ) -> Result<bool, M::Error> {
+                    let mut twice = false;
+                    while let Some(key) = access.next_key::<String>()? {
+                        if key == "names" {
+                            twice |= access.next_value_seed(KeysSeed)?;
+                        } else {
+                            access.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                    Ok(twice)
+                }
+            }
+            deserializer.deserialize_map(Top).map(Names)
+        }
+    }
+    struct KeysSeed;
+    impl<'de> serde::de::DeserializeSeed<'de> for KeysSeed {
+        type Value = bool;
+        fn deserialize<D: serde::Deserializer<'de>>(
+            self,
+            deserializer: D,
+        ) -> Result<bool, D::Error> {
+            deserializer.deserialize_map(Keys)
+        }
+    }
+    serde_json::from_slice::<Names>(bytes).is_ok_and(|names| names.0)
 }
 
 /// A machine's name as a target alias: lower case letters and digits, one
@@ -1031,11 +1193,13 @@ pub fn write_targets_from_machines(
             "the targets file was not written from the machines; it is left as it is".into(),
         );
     }
-    let targets = targets_from_machines(machines, engine);
+    let (targets, names) = from_machines(machines, engine);
+    let names_file = names_path(path);
     if targets.is_empty() {
         if present.is_some() {
             fs::remove_file(path)?;
             let _ = fs::remove_file(&mark);
+            let _ = fs::remove_file(&names_file);
             return said(
                 true,
                 "no machine but the lamp: the task targets written before are removed".into(),
@@ -1047,27 +1211,77 @@ pub fn write_targets_from_machines(
         serde_json::to_vec(&json!({"version":1,"targets":targets})).map_err(io::Error::other)?;
     bytes.push(b'\n');
     let count = targets.len();
-    if present.as_deref() == Some(bytes.as_slice()) {
-        return said(
-            false,
-            format!("{count} task targets from the machines, unchanged"),
-        );
+    let targets_changed = present.as_deref() != Some(bytes.as_slice());
+    if targets_changed {
+        let new = sha256_hex(&bytes);
+        let lines = present
+            .as_deref()
+            .map(sha256_hex)
+            .into_iter()
+            .chain([new.clone()])
+            .collect::<Vec<_>>()
+            .join("\n");
+        write_atomically(&mark, format!("{lines}\n").as_bytes())?;
+        write_atomically(path, &bytes)?;
+        write_atomically(&mark, format!("{new}\n").as_bytes())?;
     }
-    let new = sha256_hex(&bytes);
-    let lines = present
-        .as_deref()
-        .map(sha256_hex)
-        .into_iter()
-        .chain([new.clone()])
-        .collect::<Vec<_>>()
-        .join("\n");
-    write_atomically(&mark, format!("{lines}\n").as_bytes())?;
+    // The names beside them, only where the targets are this part's own.
+    let names_changed = keep_names(&names_file, &names)?;
+    let said_now = match (targets_changed, names_changed) {
+        (true, _) => format!("{count} task targets written from the machines"),
+        (false, true) => format!("{count} task targets from the machines, their names written"),
+        (false, false) => format!("{count} task targets from the machines, unchanged"),
+    };
+    said(targets_changed || names_changed, said_now)
+}
+
+/// The names file as `names` says: written whole when it differs, removed
+/// when there are none. Whether it changed.
+fn keep_names(path: &Path, names: &BTreeMap<String, String>) -> io::Result<bool> {
+    let present = match fs::read(path) {
+        Ok(bytes) => Some(bytes),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error),
+    };
+    if names.is_empty() {
+        if present.is_some() {
+            fs::remove_file(path)?;
+            return Ok(true);
+        }
+        return Ok(false);
+    }
+    let mut bytes =
+        serde_json::to_vec(&json!({"version":1,"names":names})).map_err(io::Error::other)?;
+    bytes.push(b'\n');
+    if present.as_deref() == Some(bytes.as_slice()) {
+        return Ok(false);
+    }
     write_atomically(path, &bytes)?;
-    write_atomically(&mark, format!("{new}\n").as_bytes())?;
-    said(
-        true,
-        format!("{count} task targets written from the machines"),
-    )
+    Ok(true)
+}
+
+/// The computers' names read again (`serve --set-up-later`): a missing
+/// names file is none, and one that is not valid is none too, said once,
+/// so the voice says what it says today (#1676).
+fn look_at_names(engine: &mut Engine<Store>, targets: &Path, said: &mut String) {
+    let (names, now) = match read_target_names(&names_path(targets)) {
+        Ok(names) => {
+            let count = names.len();
+            (names, format!("{count} computer names"))
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            (BTreeMap::new(), "no computer names".to_owned())
+        }
+        Err(error) => (
+            BTreeMap::new(),
+            format!("computer names not valid ({error}); none are told"),
+        ),
+    };
+    engine.set_names(names);
+    if now != *said {
+        eprintln!("tasks: {now}");
+        *said = now;
+    }
 }
 
 /// What makes a targets file another one: written again in place, or
@@ -2429,5 +2643,100 @@ mod tests {
             assert!(!written.changed, "{written:?}");
             assert_eq!(fs::read(&path).unwrap(), theirs);
         }
+    }
+
+    /// #1676: each computer's own name, cleaned to a label of at most 64
+    /// bytes; none where nothing is left.
+    #[test]
+    fn names_from_machines_are_clean_labels_by_alias() {
+        let long = "Ä".repeat(40);
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "  Office iMac\n", false),
+            machine('c', "MacBook Air", false),
+            machine('d', "", false),
+            machine('e', &long, false),
+        ];
+        let names = names_from_machines(&listed);
+        assert_eq!(names["office"], "Office iMac");
+        assert_eq!(names["macbook-air"], "MacBook Air");
+        assert!(!names.contains_key("computer"));
+        let cut = names.values().find(|name| name.starts_with('Ä')).unwrap();
+        assert_eq!(cut.len(), 64);
+        assert_eq!(cut.chars().count(), 32);
+    }
+
+    /// #1676: the names file is read as strictly as the targets; anything
+    /// else is an error, so the voice says what it says today.
+    #[test]
+    fn the_names_file_is_read_strictly() {
+        let dir = tempfile::tempdir().unwrap();
+        let targets = dir.path().join("targets.json");
+        let path = names_path(&targets);
+        assert_eq!(path, dir.path().join("targets.names.json"));
+        let put = |text: &str, mode: u32| {
+            let _ = fs::remove_file(&path);
+            fs::write(&path, text).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+        };
+        put(
+            r#"{"version":1,"names":{"office":"Office iMac","macbook-air":"MacBook Air"}}"#,
+            0o600,
+        );
+        let names = read_target_names(&path).unwrap();
+        assert_eq!(names.len(), 2);
+        assert_eq!(names["office"], "Office iMac");
+        let long = "x".repeat(65);
+        for bad in [
+            r#"{"version":2,"names":{"office":"Office iMac"}}"#.to_owned(),
+            r#"{"version":1,"names":{"office":"Office iMac"},"more":1}"#.to_owned(),
+            r#"{"version":1,"names":{"office":"A","office":"B"}}"#.to_owned(),
+            r#"{"version":1,"names":{"office":7}}"#.to_owned(),
+            r#"{"version":1,"names":{"office":" Office"}}"#.to_owned(),
+            r#"{"version":1,"names":{"office":"Office\u0007"}}"#.to_owned(),
+            r#"{"version":1,"names":{"office":""}}"#.to_owned(),
+            r#"{"version":1,"names":{"the office":"Office"}}"#.to_owned(),
+            format!(r#"{{"version":1,"names":{{"office":"{long}"}}}}"#),
+            "not json".to_owned(),
+        ] {
+            put(&bad, 0o600);
+            assert!(read_target_names(&path).is_err(), "{bad}");
+        }
+        put(r#"{"version":1,"names":{"office":"Office iMac"}}"#, 0o644);
+        assert!(read_target_names(&path).is_err(), "a file others may read");
+    }
+
+    /// #1676: the names go beside the targets the part writes, change when a
+    /// computer is renamed though its alias stays, and go with them; beside a
+    /// file someone else wrote, nothing is written.
+    #[test]
+    fn names_are_written_beside_the_parts_own_targets() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("targets.json");
+        let names = names_path(&path);
+        let write = |listed: &[AccountMachine]| {
+            write_targets_from_machines(&path, listed, EngineKind::Claude).unwrap()
+        };
+        assert!(
+            write(&[
+                machine('a', "lamp", true),
+                machine('b', "Office iMac", false)
+            ])
+            .changed
+        );
+        assert_eq!(read_target_names(&names).unwrap()["office"], "Office iMac");
+        let renamed = write(&[machine('a', "lamp", true), machine('b', "Studio", false)]);
+        assert!(renamed.changed, "{renamed:?}");
+        assert!(renamed.said.contains("their names written"), "{renamed:?}");
+        assert_eq!(read_target_names(&names).unwrap()["office"], "Studio");
+        assert!(!write(&[machine('a', "lamp", true), machine('b', "Studio", false)]).changed);
+        assert!(write(&[machine('a', "lamp", true), machine('b', "", false)]).changed);
+        assert!(!names.exists(), "no name left: no file");
+        assert!(write(&[machine('a', "lamp", true)]).changed);
+        assert!(!path.exists() && !names.exists());
+        let theirs = br#"{"version":1,"targets":{"desk":{"machine_id":"cccccccccccccccccccccccccccccccc","project":"mine","engine":"codex"}}}"#;
+        fs::write(&path, theirs).unwrap();
+        assert!(!write(&[machine('b', "Office iMac", false)]).changed);
+        assert!(!names.exists());
     }
 }

@@ -27,7 +27,7 @@ service decides (`Arrival`). A hello is due when all of these hold:
 | someone is there | a face at least 0.14 of the picture's height, for three seconds without a break |
 | they were away | nobody for five minutes or more before that. A face lost for under twenty seconds is someone who looked away |
 | the lamp is at rest | nothing said to it or by it for half a minute, nothing being heard, a provider ready |
-| it has not just done this | no hello in the last twenty minutes |
+| it has not just done this | no hello in the last twenty minutes; for someone `close` (#1670, below), no hello in the hour before they arrived, so an arrival that began within the hour is not greeted at all |
 | it is not paused | the keeper has not said `{"paused": true}` on `lamp/pause` ([keeper.md](keeper.md), "Named states and the pause") |
 
 Someone already there when the service starts was never away and gets none.
@@ -74,7 +74,31 @@ By name when the lamp has one: the known face's at the lamp now
 (`LAMP_PERSON_NAME`, `person::hello`: "… most likely “Example Name”, whose
 lamp you are. Say hello … by name …", #806; quoted, so it reads as a name).
 A known face's name wins, since it is the one at the lamp now; with neither,
-the note above, with no name. The typed name is also told to the model after
+the note above, with no name.
+
+**Someone who comes by often** (#1670). Where Mood says how familiar the
+remembered person at the lamp is (`familiar` in `mood/state`, from the eyes'
+`lamp-eyes --visits on`, [mood.md](mood.md), [eyes.md](eyes.md)), the voice reads
+it with the eyes' presence file, four times a second, from source `mood` only
+and within its 2.5 s (`speak_up::familiar_in`). For `regular` and `close`, the
+hello's note gains one sentence, the same hello one beat warmer:
+"They come by often: greet them as you would someone you see most days,
+warmly and without fuss." (`person::OFTEN`). For `close`, an arrival that
+began within an hour of the last hello gets none: a friend wouldn't greet you
+twice (the first builder on #1670, 12:19). It is judged from when they
+arrived, so someone close is never greeted late while they sit there; a
+glance away under twenty seconds is the same arrival (Tests on #1775).
+Without a fresh level, or for `new`, the hello is as before. The level is
+read when the hello comes due, three seconds after they arrive: if the eyes
+have not recognised them by then, they are greeted as anyone. The hour counts
+any hello by the lamp, not one to this person, since Mood carries no identity:
+someone close who comes half an hour after a regular was greeted gets none. Tests: the
+level read from Mood only; `close` greeted at 0 and 78 minutes, not at 26 or
+52, where anyone else is greeted at each; someone close who glances away
+once the hour is up is not greeted mid-sitting (Tests' test); and the warmer sentence only for
+`regular` and `close`. The one line in `coordinator.rs` that passes the
+level into the hello's words has no test of its own: nothing tests the
+coordinator's hello. The typed name is also told to the model after
 its character, by the provider and second workers that build it (the voice
 passes them `LAMP_PERSON_NAME`), only as the name the person gave, never as
 who is at the lamp: "… gave their name as “Example Name”. Whoever is at the
@@ -491,6 +515,13 @@ nothing owed, a provider ready) is not said at once:
    An answer the lamp could not act on within 10 s (it was in a turn) is
    old, and the policy is asked again. Someone new arriving drops what was
    asked for the one before.
+
+The policy waits a hello while anyone talks to the lamp, and for 15 s
+after. With `lamp-policy --hello-quiet to-the-lamp` (#1155) those 15 s
+count only talk to the lamp or by it: the voice says each turn's verdict
+on `voice/turn`, and a turn whose answer it held back as not said to the
+lamp is taken back from the quiet
+([policy.md](policy.md#the-quiet-counts-talk-to-the-lamp-1155)).
 
 The session record gets one line for each answer acted on:
 `{"kind":"hello_policy","at_us":…,"arrival":…,"answer":"say_now|wait|shadow|none","waited_ms":…}`,

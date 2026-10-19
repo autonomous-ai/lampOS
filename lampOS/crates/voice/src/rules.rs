@@ -73,9 +73,12 @@ pub fn on() -> bool {
 }
 
 /// Where the typed fact is published: the bus's root, when the voice has a
-/// bus. Without it the rules still work; the policy is not told.
-pub fn bus_on(root: &Path) {
+/// bus. Without it the rules still work; the policy is not told. With the
+/// bus, the room's rules are read from the memory on `memory` and said at
+/// once (#1747): one call, so the start's fact is never left out.
+pub fn bus_on(root: &Path, memory: &Path) {
     let _ = BUS.set(root.to_owned());
+    crate::remember::tell_rules_at_start(memory.to_owned());
 }
 
 pub fn tools() -> Vec<Tool> {
@@ -100,8 +103,8 @@ pub fn tools() -> Vec<Tool> {
                     "rule": {"type": "string", "description": "The rule, in one short sentence."},
                     "speaking_up": {"type": "string", "enum": ["never_first", "not_first_in_mornings"],
                         "description": "Only for a rule about you speaking first, unprompted: never_first if they asked you never to, not_first_in_mornings if only in the mornings. Leave out otherwise."},
-                    "about": {"type": "string", "enum": ["greeting", "news", "both"],
-                        "description": "Only for a rule about one kind of thing you say unprompted: greeting when they arrive, news of work you were doing for them, or both. Give with it what they asked: never, not_before, not_from or not_while_talking. Leave out otherwise."},
+                    "about": {"type": "string", "enum": ["greeting", "news", "both", "light"],
+                        "description": "Only for a rule about one kind of thing you do unprompted: greeting when they arrive, news of work you were doing for them, or both; or light, your light going out by itself when nobody is there, which takes never only ('keep the light on'). Give with it what they asked: never, not_before, not_from or not_while_talking. Leave out otherwise. A light rule is the room's, whoever says it."},
                     "never": {"type": "boolean", "description": "With about: not at all."},
                     "not_before": {"type": "string", "description": "With about: not before this local time, as HH:MM in 24 hours, such as 09:00 for 'don't greet me before nine'."},
                     "not_from": {"type": "string", "description": "With about: not from this local time on, as HH:MM in 24 hours, such as 22:00 for 'no news after ten at night'."},
@@ -116,12 +119,16 @@ pub fn tools() -> Vec<Tool> {
             description: "Call this when the person takes back one of the rules they gave you, such as 'you can tell \
                           me the weather again' or 'forget that rule'. Give the number of the rule they take back, \
                           as numbered under 'How you were asked to behave' or by list_rules; if you are not sure \
-                          which one, call list_rules first. Then stop following it."
+                          which one, call list_rules first. Then stop following it. For 'you can turn your light \
+                          off again' give about: light instead of a number: it takes back keeping the light on, \
+                          whoever asked for it."
                 .into(),
             parameters: Some(json!({
                 "type": "object",
-                "properties": {"number": {"type": "integer", "description": "The number of the rule they take back."}},
-                "required": ["number"]
+                "properties": {
+                    "number": {"type": "integer", "description": "The number of the rule they take back."},
+                    "about": {"type": "string", "enum": ["light"], "description": "Instead of a number: light, to take back keeping the light on."}
+                }
             })),
             silent: false,
         },
@@ -219,9 +226,16 @@ fn typed_mark(args: &Value) -> Result<String, Value> {
     }
     let about = match args.get("about").and_then(Value::as_str) {
         Some(about @ ("greeting" | "news" | "both")) => about,
+        // #1677: the light going out when nobody is there, held or not.
+        Some("light") if never && !talking && before.is_none() && from.is_none() => "light",
+        Some("light") => {
+            return Err(
+                json!({"error": "For the light, give never only: keep the light on, or not."}),
+            );
+        }
         _ => {
             return Err(
-                json!({"error": "Say what that is about: about must be greeting, news or both."}),
+                json!({"error": "Say what that is about: about must be greeting, news, both or light."}),
             );
         }
     };
@@ -257,10 +271,11 @@ fn minute(time: &str) -> Option<u16> {
     (hours < 24 && minutes < 60).then_some(hours * 60 + minutes)
 }
 
-/// The limits a typed mark's words give, for the kinds it is about. An
-/// unknown word is left out: a newer voice's limit is not enforced by this
-/// one, rather than misread.
-fn limits(mark: &str) -> (lamp_msgs::Unprompted, bool, bool) {
+/// The limits a typed mark's words give, for the kinds it is about: the
+/// greeting, news, and whether the light is kept on (#1677). An unknown
+/// word is left out: a newer voice's limit is not enforced by this one,
+/// rather than misread.
+fn limits(mark: &str) -> (lamp_msgs::Unprompted, bool, bool, bool) {
     let mut words = mark.split(' ');
     let about = words.next().unwrap_or_default();
     let mut limits = lamp_msgs::Unprompted::default();
@@ -277,6 +292,7 @@ fn limits(mark: &str) -> (lamp_msgs::Unprompted, bool, bool) {
         limits,
         matches!(about, "greeting" | "both"),
         matches!(about, "news" | "both"),
+        about == "light" && limits.never,
     )
 }
 
@@ -311,6 +327,8 @@ pub struct Rule {
     /// Its limits on the greeting, and on news, said unprompted.
     pub hello: lamp_msgs::Unprompted,
     pub news: lamp_msgs::Unprompted,
+    /// Asked to keep the light on: light-out never starts (#1677).
+    pub keep_light_on: bool,
 }
 
 /// A record ID as the store gives them, 1 to `i64::MAX`; anything else is
@@ -338,16 +356,16 @@ pub fn rules(answer: &Value) -> Option<Vec<Rule>> {
                 (false, false, text)
             };
             let none = lamp_msgs::Unprompted::default();
-            let (text, hello, news) = match text
+            let (text, hello, news, keep_light_on) = match text
                 .strip_prefix(TYPED)
                 .and_then(|text| text.split_once("] "))
             {
                 Some((mark, text)) => {
-                    let (limits, hello, news) = limits(mark);
+                    let (limits, hello, news, light) = limits(mark);
                     let only = |about| if about { limits } else { none };
-                    (text, only(hello), only(news))
+                    (text, only(hello), only(news), light)
                 }
-                None => (text, none, none),
+                None => (text, none, none, false),
             };
             Some(Rule {
                 id: entry.get("id").and_then(valid_id)?,
@@ -357,6 +375,7 @@ pub fn rules(answer: &Value) -> Option<Vec<Rule>> {
                 quiet_mornings,
                 hello,
                 news,
+                keep_light_on,
             })
         })
         .collect()
@@ -513,7 +532,25 @@ pub fn facts(person: Option<&str>, room: &[Rule], theirs: &[Rule]) -> lamp_msgs:
         news: all()
             .map(|rule| rule.news)
             .fold(Default::default(), strictest),
+        // The room's (#1677): the light is one thing everyone at the lamp
+        // shares, and it goes out only when nobody is there.
+        keep_light_on: room.iter().any(|rule| rule.keep_light_on),
     }
+}
+
+/// Whether `call` keeps a rule about the light: kept in the room's scope,
+/// whoever says it (#1677, the first builder on 19 Oct).
+pub fn keeps_light(call: &ToolCall) -> bool {
+    call.name == KEEP_RULE && call.args.get("about").and_then(Value::as_str) == Some("light")
+}
+
+/// Whether `call` takes back keeping the light on: every such rule of the
+/// room's, without a number (the room's rules are not numbered for a known
+/// person).
+pub fn forgets_light(call: &ToolCall) -> bool {
+    call.name == FORGET_RULE
+        && call.args.get("number").is_none_or(Value::is_null)
+        && call.args.get("about").and_then(Value::as_str) == Some("light")
 }
 
 /// Say the fact on `memory/rules`, kept until the next, from a thread of its
@@ -523,6 +560,7 @@ pub fn facts(person: Option<&str>, room: &[Rule], theirs: &[Rule]) -> lamp_msgs:
 /// else.
 pub fn publish(facts: &lamp_msgs::Rules) {
     let Some(root) = BUS.get() else { return };
+    SAID.store(true, std::sync::atomic::Ordering::Release);
     // Held only to put or take one fact, never across the bus's work: a
     // newer fact must not be dropped because the publisher is taking one.
     match WAITING.lock() {
@@ -541,6 +579,24 @@ pub fn publish(facts: &lamp_msgs::Rules) {
         wake
     });
     let _ = wake.try_send(());
+}
+
+/// Whether any fact has been given to the publisher since this process
+/// started.
+static SAID: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether a fact has been said since the start.
+pub fn said() -> bool {
+    SAID.load(std::sync::atomic::Ordering::Acquire)
+}
+
+/// The room's fact read at the voice's start (#1747): said only if no
+/// session or rule has said one first, so a newer fact with a known
+/// person's limits is never replaced by the room's alone.
+pub fn publish_first(facts: &lamp_msgs::Rules) {
+    if !said() {
+        publish(facts);
+    }
 }
 
 /// The newest fact not yet said, and the publisher thread's wake-up.
@@ -652,10 +708,57 @@ mod tests {
         }
         let forget = &tools[1];
         assert!(forget.description.contains("list_rules"));
-        assert_eq!(
-            forget.parameters.as_ref().unwrap()["required"],
-            json!(["number"])
-        );
+        // A number, or about: light (#1677), so neither is required alone.
+        let parameters = forget.parameters.as_ref().unwrap();
+        assert_eq!(parameters["required"], Value::Null);
+        assert_eq!(parameters["properties"]["about"]["enum"], json!(["light"]));
+    }
+
+    /// #1677: "keep the light on" is a typed rule about the light, never
+    /// only; it is the room's, kept there whoever says it, and the fact says
+    /// it from the room's rules alone. "You can turn your light off again"
+    /// takes it back without a number.
+    #[test]
+    fn keep_the_light_on_is_the_rooms_rule_and_taken_back_without_a_number() {
+        let keep = |args| request(&call(KEEP_RULE, args), 7, "r-everyone");
+        let kept = keep(json!({"rule":"Keep the light on.","about":"light","never":true})).unwrap();
+        assert_eq!(kept["text"], "[unprompted light never] Keep the light on.");
+        assert!(keeps_light(&call(
+            KEEP_RULE,
+            json!({"rule":"x","about":"light","never":true})
+        )));
+        assert!(!keeps_light(&call(
+            KEEP_RULE,
+            json!({"rule":"x","about":"news","never":true})
+        )));
+        // Never only: a time or talking is refused with words to say.
+        for args in [
+            json!({"rule":"x","about":"light","never":true,"not_before":"09:00"}),
+            json!({"rule":"x","about":"light","not_from":"22:00"}),
+            json!({"rule":"x","about":"light","never":true,"not_while_talking":true}),
+        ] {
+            let told = keep(args.clone()).unwrap_err();
+            assert!(
+                told["error"].as_str().unwrap().contains("never only"),
+                "{args}"
+            );
+        }
+        // Read back: the room's rule sets the fact; the same rule among a
+        // person's (kept before this) does not, and greeting rules don't.
+        let light = rule(4, "[unprompted light never] Keep the light on.");
+        assert!(light.keep_light_on);
+        assert_eq!(light.text, "Keep the light on.");
+        assert!(!rule(5, "[unprompted greeting never] Don't greet me.").keep_light_on);
+        assert!(facts(Some("p-1"), std::slice::from_ref(&light), &[]).keep_light_on);
+        assert!(facts(None, std::slice::from_ref(&light), &[]).keep_light_on);
+        assert!(!facts(Some("p-1"), &[], std::slice::from_ref(&light)).keep_light_on);
+        // Taken back with about: light and no number; a number is as ever.
+        assert!(forgets_light(&call(FORGET_RULE, json!({"about":"light"}))));
+        assert!(!forgets_light(&call(
+            FORGET_RULE,
+            json!({"about":"light","number":3})
+        )));
+        assert!(!forgets_light(&call(FORGET_RULE, json!({"number":3}))));
     }
 
     #[test]
@@ -704,6 +807,7 @@ mod tests {
                 rules: 2,
                 hello: Default::default(),
                 news: Default::default(),
+                keep_light_on: false,
             }
         );
         let never = rule(3, "[quiet] Never speak first.");
@@ -845,7 +949,6 @@ mod tests {
         let root = PathBuf::from(format!("/tmp/lvr-rules-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
-        bus_on(&root);
         // A memory with one room rule and no session note, answering every
         // request: a failed open is closed by the client in the background.
         let socket = root.join("m.sock");
@@ -865,6 +968,25 @@ mod tests {
                 let _ = stream.write_all(format!("{answer}\n").as_bytes());
             }
         });
+        // The bus taken with the memory: the room's rules are said with no
+        // session at all (#1747), as after a reboot before anyone speaks.
+        bus_on(&root, &socket);
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let at_start = facts(None, &[rule(1, "[quiet] Never speak first.")], &[]);
+        let mut said_at_start = None;
+        for _ in 0..500 {
+            said_at_start = bus
+                .latest(lamp_msgs::Rules::TOPIC)
+                .ok()
+                .flatten()
+                .and_then(|message| message.parse::<lamp_msgs::Rules>().ok());
+            if said_at_start.is_some() {
+                break;
+            }
+            // A hang guard only: the start's thread publishes once.
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(said_at_start, Some(at_start));
         let client = crate::remember::DaysClient::new(socket).unwrap();
         let stalled = STALL.lock().unwrap();
         let before = handled();
@@ -884,7 +1006,6 @@ mod tests {
                 "[quiet_mornings] Do not speak first in the morning.",
             )],
         );
-        let bus = lamp_bus::Bus::new(&root).unwrap();
         // Each try waits for the publisher to handle a fact, not for the
         // clock; another test's fact can be the one handled, so a few tries.
         let mut kept = None;

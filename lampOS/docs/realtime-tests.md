@@ -72,6 +72,15 @@ profile's exclusion:
   (`lamp-actions::server`'s light test and `lamp-memory::health`'s
   `the_environment_alone_does_not_enable_reporting_or_create_bus_data` left
   on 2026-10-17, below);
+- two tests of `lamp-skills::skills`, named exactly, that run the real
+  program on the host's clock by design (#1806, Seventh's choice on
+  2026-10-19): `asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait`
+  (the production 2.5 s give-up, and the late answer after it passed over)
+  and `a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go`
+  (a real one-second re-publication during a 1.5 s hold). They took 4.5 s
+  and 3.6 s on ARM64. The reading pose's checks of a skill's definition,
+  which need no clock, are a test of their own outside the group,
+  `a_reading_pose_needs_a_known_mood_and_a_for_of_at_most_two_minutes`;
 - tests with a real-clock bound that a loaded runner misses: none now. A
   test goes here only until it gets its own time; the bound the lamp runs
   with is never raised for it. `lamp-voice`'s `coordinator::motor::tests::native_head`

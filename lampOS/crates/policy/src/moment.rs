@@ -968,6 +968,7 @@ mod tests {
             rules: 1,
             hello,
             news,
+            keep_light_on: false,
         };
         // No news before nine: with the lamp's time not known it holds all
         // day, news and anything else alike.
@@ -1018,6 +1019,7 @@ mod tests {
                 never: true,
                 ..lamp_msgs::Unprompted::default()
             },
+            keep_light_on: false,
         }
     }
 

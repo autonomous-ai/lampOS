@@ -7937,9 +7937,11 @@ fn conversation_with_gate(
             } else if arrival.speaks() {
                 // By name: someone who asked the lamp to know their face,
                 // else the name typed at setup (`LAMP_PERSON_NAME`, #806).
-                let by_name = crate::person::hello_for(
+                // One beat warmer for someone who comes by often (#1670).
+                let by_name = crate::person::hello_for_familiar(
                     crate::known_faces::known_from_environment().as_deref(),
                     crate::person::from_environment().as_deref(),
+                    arrival.familiar(),
                 );
                 snapshot = commit_written_turn(
                     owner,

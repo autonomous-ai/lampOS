@@ -779,6 +779,30 @@ pub fn keeps_out(route: &Route, name: &str) -> bool {
 /// [`run_call`]. Blocking: for a thread of its own. `not_for_me` itself is
 /// the route's to act on before this.
 pub fn answer(settings: &Settings, call: &ToolCall, request: u64, heard: bool) -> Value {
+    answer_with_scope(settings, call, request, heard, None)
+}
+
+/// A spoken request's immutable memory identity, never the current face.
+pub fn answer_scoped(
+    settings: &Settings,
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    lease: &crate::memory_scope::ScopeLease,
+) -> Value {
+    answer_with_scope(settings, call, request, heard, Some(lease))
+}
+
+fn answer_with_scope(
+    settings: &Settings,
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Value {
+    if !scope_current(lease, request) {
+        return unavailable();
+    }
     match route(settings, &call.name) {
         Route::Clock => time_now_for(settings.places, &call.args),
         Route::Decline => declined(),
@@ -788,7 +812,8 @@ pub fn answer(settings: &Settings, call: &ToolCall, request: u64, heard: bool) -
                 crate::remember::keep_out(request);
             }
             let began = std::time::Instant::now();
-            let (whom, (mut told, answered)) = run_call(&route, call, request, heard);
+            let (whom, (mut told, answered)) =
+                run_call_with_scope(&route, call, request, heard, lease);
             // The second voice puts no news on its turns, so news asked about
             // there leaves its harness open (#1390); the key is never the
             // model's either way.
@@ -921,9 +946,42 @@ pub fn run_call(
     request: u64,
     heard: bool,
 ) -> (&'static str, (Value, bool)) {
+    run_call_with_scope(route, call, request, heard, None)
+}
+
+pub fn run_call_scoped(
+    route: &Route,
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    lease: &crate::memory_scope::ScopeLease,
+) -> (&'static str, (Value, bool)) {
+    run_call_with_scope(route, call, request, heard, Some(lease))
+}
+
+fn scope_current(lease: Option<&crate::memory_scope::ScopeLease>, request: u64) -> bool {
+    lease.is_none_or(|lease| lease.key().request == request && lease.is_current())
+}
+
+fn run_call_with_scope(
+    route: &Route,
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> (&'static str, (Value, bool)) {
+    if !scope_current(lease, request) {
+        return ("nobody", (unavailable(), false));
+    }
     let deadline = ASK_DEADLINE;
-    match route {
-        Route::Memory(socket) => ("the memory", crate::remember::run(socket, call, deadline)),
+    let result = match route {
+        Route::Memory(socket) => (
+            "the memory",
+            match lease {
+                Some(lease) => crate::remember::run_scoped(socket, call, deadline, lease),
+                None => crate::remember::run(socket, call, deadline),
+            },
+        ),
         Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),
         Route::Tasks(place) => (
             "the tasks part",
@@ -957,7 +1015,7 @@ pub fn run_call(
                 // on #1696, #1656).
                 Ok(skill) => match crate::tools::route(settings, &skill.name) {
                     found @ Route::Executive(_) if is_skills(settings, &found) => {
-                        run_call(&found, &skill, request, heard)
+                        run_call_with_scope(&found, &skill, request, heard, lease)
                     }
                     _ => ("nobody", (unavailable(), false)),
                 },
@@ -967,6 +1025,11 @@ pub fn run_call(
             }
         }
         Route::Decline | Route::Clock | Route::Nobody => ("nobody", (unavailable(), false)),
+    };
+    if scope_current(lease, request) {
+        result
+    } else {
+        (result.0, (unavailable(), false))
     }
 }
 
@@ -1157,6 +1220,34 @@ fn fault(tool: &Tool) -> String {
 mod tests {
     use super::*;
 
+    #[test]
+    fn scoped_dispatch_rejects_wrong_request_and_revoked_scope_before_routing() {
+        let owner = crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([6; 16]).unwrap(),
+                session: 1,
+                request: 1,
+            },
+            crate::memory_scope::ScopeSnapshot::room(),
+        );
+        let lease = owner.lease();
+        let call = ToolCall {
+            id: "scope".into(),
+            name: crate::remember::RECALL.into(),
+            args: json!({}),
+        };
+        let route = Route::Memory(PathBuf::from("/missing-memory.sock"));
+        assert_eq!(
+            run_call_scoped(&route, &call, 2, true, &lease),
+            ("nobody", (unavailable(), false))
+        );
+        owner.revoke();
+        assert_eq!(
+            run_call_scoped(&route, &call, 1, true, &lease),
+            ("nobody", (unavailable(), false))
+        );
+    }
+
     /// The reviewer on #1713: a face is kept or forgotten only on words
     /// heard at the lamp. An unheard request, a text from the app or one the
     /// lamp wrote, never reaches the eyes; a heard one does.
@@ -1287,6 +1378,7 @@ mod tests {
                 lead_in: true,
                 asked: true,
                 accounts: false,
+                machine_names: false,
                 needs: None,
                 staff_note: false,
             }),
@@ -1518,6 +1610,7 @@ mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };
@@ -2043,6 +2136,7 @@ mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };

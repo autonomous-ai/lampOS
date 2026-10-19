@@ -293,10 +293,10 @@ profile, for 90 days, then deleted; not used for analytics, and report
 bodies stay out of the backend's logs. Support reaches them only with the
 lamp's id the person gives. `stopped` deletes that device's reports and
 nothing more is kept until reports start again; removing a device from its
-account deletes them too. **Until the backend says its store is up, a
-report sent to the company is dropped**, and the company broker's taking a
-publish on `/report` is still to be confirmed, so the trial is on a broker
-on the Mac.
+account deletes them too. **The store is up, in the test environment and in
+production (#1683, 19 Oct)**, and the company broker takes a publish on
+`/report`. What the backend reads from a report is in "What the backend
+reads", below.
 
 Not shown: no lamp has run it. The trial is on lamp-06c1 under a hold, with
 a broker on the Mac first and the company's only once the backend says its
@@ -335,7 +335,26 @@ updates this section in the same pull request.
   rides every reply, as `generation` does, is kept only from `info`, and a
   fact said only in a `data` reply reaches the app's page but never the
   device's record.
-- **Health and crash reports:** to come, see #1683.
+- **A health or crash report** (#1683), on `<fd_channel>/report` only; the
+  same message on `fd_channel` itself is not a report. The backend reads:
+  - `type` must be `"report"`, and `device` exactly `"lamp"`: anything else
+    on `/report` is dropped.
+  - `id` must be the device in the topic; a report without it, or for
+    another device, is dropped.
+  - `kind`: `health` and `crash` are kept; `stopped` deletes every kept
+    report of that device and is not kept itself.
+  - `seq` (a number, 0 or more) and `sent_at` (RFC 3339) are both needed:
+    a report already kept with the same `(device, seq, sent_at)` is
+    dropped as a duplicate.
+  - `schema` and `generation` are kept with the report.
+  - The whole report is kept as it came, at most 4 KiB; a larger one, or
+    one that isn't JSON, is dropped. The other fields of "What is sent",
+    above, are kept in it and not read one by one.
+
+  A report is kept for 90 days from its arrival and is never passed to the
+  app as a reply. Nothing is sent back to the lamp, so a report handed over
+  while the backend restarts can be lost after the broker has taken it;
+  that is why `stopped` is sent once more on the next connection.
 
 ## Not yet known, for the backend (#1396)
 

@@ -620,6 +620,7 @@ mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };

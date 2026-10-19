@@ -267,6 +267,8 @@ pub struct CaptureOwner<D: Capture> {
     samples: [i16; BLOCK],
     filled: usize,
     partial_permit: Option<Permit>,
+    sequence: u64,
+    before_close: Option<Box<dyn FnMut()>>,
 }
 
 impl<D: Capture> CaptureOwner<D> {
@@ -280,7 +282,15 @@ impl<D: Capture> CaptureOwner<D> {
             samples: [0; BLOCK],
             filled: 0,
             partial_permit: None,
+            sequence: 0,
+            before_close: None,
         }
+    }
+
+    /// A bounded, nonblocking revocation hook, called before driver discard on
+    /// every close path, including errors inside read/observe/maintain. No I/O.
+    pub fn before_close(&mut self, hook: impl FnMut() + 'static) {
+        self.before_close = Some(Box::new(hook));
     }
 
     pub fn is_open(&self) -> bool {
@@ -292,6 +302,17 @@ impl<D: Capture> CaptureOwner<D> {
     }
 
     fn close_handle(&mut self) -> io::Result<()> {
+        if let Some(revoke) = self.before_close.as_mut() {
+            revoke();
+        }
+        // Audio has no capture-epoch field. Reserve one missing sequence for
+        // every real discontinuity, even between complete blocks, so a short
+        // mute/reopen cannot look like contiguous PCM to a recorder.
+        let discontinuity = self.handle.is_some() || self.filled != 0;
+        let overflow = discontinuity && self.sequence == u64::MAX;
+        if discontinuity {
+            self.sequence = self.sequence.saturating_add(1);
+        }
         self.samples.fill(0);
         self.filled = 0;
         self.partial_permit = None;
@@ -300,6 +321,11 @@ impl<D: Capture> CaptureOwner<D> {
         self.handle
             .take()
             .map_or(Ok(()), |mut handle| handle.discard())
+            .and(if overflow {
+                Err(invalid("PCM sequence exhausted"))
+            } else {
+                Ok(())
+            })
     }
 
     pub fn invalidate(&mut self) -> io::Result<()> {
@@ -318,6 +344,10 @@ impl<D: Capture> CaptureOwner<D> {
 
     /// Must run on every bounded owner tick, including while there is no input.
     pub fn maintain(&mut self, now: u64) -> io::Result<Option<Permit>> {
+        if self.sequence == u64::MAX {
+            self.close_handle()?;
+            return Err(invalid("PCM sequence exhausted"));
+        }
         let permit = match self.gate.permit(now) {
             Ok(permit) => permit,
             Err(error) => {
@@ -349,10 +379,23 @@ impl<D: Capture> CaptureOwner<D> {
     /// Check that fence at each boundary as well as the original lease clock.
     pub fn tick_while(
         &mut self,
+        now: impl FnMut() -> u64,
+        open: impl FnMut() -> io::Result<D>,
+        lamp_speaking: bool,
+        current: impl FnMut() -> bool,
+    ) -> io::Result<Option<Emission>> {
+        self.tick_export_while(now, open, lamp_speaking, current, |_, _, _, _| {})
+    }
+
+    /// Optional borrowed PCM handoff, only after the complete read passed its
+    /// original lease and independent fence. The callback must not block or do I/O.
+    pub fn tick_export_while(
+        &mut self,
         mut now: impl FnMut() -> u64,
         mut open: impl FnMut() -> io::Result<D>,
         lamp_speaking: bool,
         mut current: impl FnMut() -> bool,
+        mut export: impl FnMut(&[i16; BLOCK], Permit, u64, u64),
     ) -> io::Result<Option<Emission>> {
         if !current() {
             self.invalidate()?;
@@ -400,6 +443,7 @@ impl<D: Capture> CaptureOwner<D> {
                 return Err(error);
             }
         };
+        let read_completed_us = now();
         if !current() {
             self.invalidate()?;
             return Ok(None);
@@ -415,16 +459,21 @@ impl<D: Capture> CaptureOwner<D> {
             return Ok(None);
         }
         let held = self.partial_permit.take().expect("block has a lease");
+        let permit = Permit {
+            epoch: current.epoch,
+            until_us: current.until_us.min(held.until_us),
+        };
+        let sequence = self.sequence;
+        let Some(next) = sequence.checked_add(1) else {
+            self.invalidate()?;
+            return Err(invalid("PCM sequence exhausted"));
+        };
+        self.sequence = next;
+        export(&self.samples, permit, sequence, read_completed_us);
         let heard = self.listener.block(&self.samples, lamp_speaking);
         self.samples.fill(0);
         self.filled = 0;
-        Ok(Some(Emission {
-            heard,
-            permit: Permit {
-                epoch: current.epoch,
-                until_us: current.until_us.min(held.until_us),
-            },
-        }))
+        Ok(Some(Emission { heard, permit }))
     }
 }
 

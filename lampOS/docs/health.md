@@ -131,6 +131,19 @@ time go in, a `Health` comes out):
   `NAME: LEVEL, and it does not say why` if that part gave no message.
   When only a missing part makes the lamp not ok, it is
   `NAME: has never reported`.
+- **`quiet_ms`** (#1681): how long, in milliseconds, the longest-quiet
+  part that has said `ok` at least once since `serve` started has gone
+  unheard (its `age_ms`), counting only a part past the stale time; 0 when
+  there is none, and then left out of the message, so a well lamp's
+  `lamp/health` is what it was before the field. A part never heard from
+  (missing at boot) or never `ok` does not count; nor does one whose last
+  word was `error`, which keeps that level while quiet and is said by the
+  lamp's `error` already. A part restarting for a few seconds is in it
+  only for those seconds. It is for a part that came up well and then
+  stopped: Not feeling well droops at 5 minutes of it
+  ([skills.md](skills.md)). It is an age, so it is no news on its own
+  (below). Forgotten when `serve` restarts: a part that stopped before
+  that, and never reports again, is not counted.
 
 Every result passes `Health::check()`; the tests ask that of each one.
 
