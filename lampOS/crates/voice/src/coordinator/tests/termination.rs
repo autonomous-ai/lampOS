@@ -445,7 +445,7 @@ fn late_peer(
     recorder: Option<(Recorder, DiagnosticStarted)>,
     late: Duration,
     input: Option<std::process::ChildStdin>,
-) -> thread::JoinHandle<()> {
+) -> thread::JoinHandle<WorkerChannels> {
     thread::spawn(move || {
         let mut channels = channels;
         let deadline = Instant::now() + Duration::from_secs(5);
@@ -453,7 +453,7 @@ fn late_peer(
             match channels.control.receive::<Control>() {
                 Ok(Some(Control::Stop)) => break,
                 Ok(_) => {}
-                Err(_) => return,
+                Err(_) => return channels,
             }
             assert!(Instant::now() < deadline);
             thread::sleep(Duration::from_millis(1));
@@ -477,6 +477,9 @@ fn late_peer(
             });
         }
         drop(input);
+        // Retain both sockets in the join result until shutdown has completed
+        // its final drain, independently of the fixture child's exit.
+        channels
     })
 }
 
@@ -486,14 +489,47 @@ fn late_peer(
 /// its recording 900 ms after its Stop, and the others at once.
 ///
 /// What the run says must name what held the stop, and the microphone must
-/// be closed after. Today the forced stop's reason is overwritten by the
-/// diagnostic finish that failed after it, so the run says only that the
-/// diagnostic finish failed: on lamp-4ace, "diagnostic finish was not valid
-/// and acknowledged" (2 of 5 takes on 18 Oct). Red until #1620's fix, which
-/// makes this a plain test.
+/// be closed after. The failed diagnostic finish must not replace the
+/// speaker's forced-stop reason.
 #[test]
-#[should_panic(expected = "diagnostic finish")]
 fn a_speaker_that_misses_the_finish_deadline_is_named_and_the_microphone_is_closed() {
+    let (said, forced) = speaker_finish_failure(true, false);
+    assert_eq!(forced, [json!("speaker")], "{forced:?}");
+    assert!(said.contains("speaker"), "{said}");
+    assert!(said.contains("shared 750 ms deadline"), "{said}");
+    assert!(said.contains("forced termination required"), "{said}");
+}
+
+#[test]
+fn missing_speaker_diagnostics_still_fail_after_clean_worker_exits() {
+    let (said, forced) = speaker_finish_failure(false, false);
+    assert!(forced.is_empty(), "{forced:?}");
+    assert!(said.contains("diagnostic finish"), "{said}");
+}
+
+#[test]
+fn both_late_audio_workers_keep_their_cleanup_causes() {
+    let (said, forced) = speaker_finish_failure(true, true);
+    assert_eq!(forced, [json!("speaker"), json!("capture")], "{forced:?}");
+    for worker in ["speaker", "capture"] {
+        assert!(
+            said.contains(&format!(
+                "{worker} worker did not stop within shared 750 ms deadline"
+            )),
+            "{said}"
+        );
+    }
+    assert_eq!(
+        said.matches("forced termination required").count(),
+        2,
+        "{said}"
+    );
+    assert!(said.contains("diagnostic finish"), "{said}");
+    assert!(said.contains("speaker Certification:"), "{said}");
+    assert!(said.contains("capture Certification:"), "{said}");
+}
+
+fn speaker_finish_failure(speaker_late: bool, capture_late: bool) -> (String, Vec<Value>) {
     use std::os::unix::fs::PermissionsExt;
     let output = std::env::temp_dir().join(format!("lv-1620-{}", monotonic_us()));
     fs::create_dir(&output).unwrap();
@@ -509,7 +545,6 @@ fn a_speaker_that_misses_the_finish_deadline_is_named_and_the_microphone_is_clos
         Worker::cooperative_fixture(&dir.path, "provider");
     let (mut privacy, privacy_peer, privacy_input) =
         Worker::cooperative_fixture(&dir.path, "privacy");
-    capture.end_on_stop(capture_input);
     provider.end_on_stop(provider_input);
     privacy.end_on_stop(privacy_input);
     let capture_recorder = synthetic_recorder(&output, boot, StreamKind::Capture);
@@ -530,13 +565,21 @@ fn a_speaker_that_misses_the_finish_deadline_is_named_and_the_microphone_is_clos
         late_peer(
             capture_peer,
             Some((capture_recorder, capture_start)),
-            Duration::ZERO,
-            None,
+            if capture_late {
+                Duration::from_millis(900)
+            } else {
+                Duration::ZERO
+            },
+            Some(capture_input),
         ),
         late_peer(
             speaker_peer,
-            Some((render_recorder, render_start)),
-            Duration::from_millis(900),
+            speaker_late.then_some((render_recorder, render_start)),
+            if speaker_late {
+                Duration::from_millis(900)
+            } else {
+                Duration::ZERO
+            },
             Some(speaker_input),
         ),
         late_peer(provider_peer, None, Duration::ZERO, None),
@@ -580,6 +623,16 @@ fn a_speaker_that_misses_the_finish_deadline_is_named_and_the_microphone_is_clos
     let result = finish_active_run(
         &mut rig, &mut owner, &mut reply, &mut trace, &mut None, stopped,
     );
+    // Check before joining peers or dropping the rig: shutdown itself owns
+    // reaping, including when a prior failure already occupies its result.
+    for worker in [
+        &mut rig.speaker,
+        &mut rig.capture,
+        &mut rig.provider,
+        &mut rig.privacy,
+    ] {
+        assert!(worker.try_exit().unwrap().is_some(), "{}", worker.role);
+    }
     for peer in peers {
         peer.join().unwrap();
     }
@@ -590,20 +643,25 @@ fn a_speaker_that_misses_the_finish_deadline_is_named_and_the_microphone_is_clos
         owner.snapshot(now()).unwrap().microphone_permission(),
         Permission::Denied
     );
-    // The speaker missed the shared deadline and was stopped by force: the
-    // trace says so, and only the speaker.
+    assert!(reply.is_none());
+    let certified: Vec<_> = trace
+        .iter()
+        .filter(|row| row["kind"] == "audio_diagnostics_certified")
+        .map(|row| (row["worker"].clone(), row["valid"].clone()))
+        .collect();
+    assert_eq!(
+        certified,
+        [
+            (json!("speaker"), json!(false)),
+            (json!("capture"), json!(!capture_late)),
+        ]
+    );
     let forced: Vec<_> = trace
         .iter()
         .filter(|row| row["kind"] == "worker_forced_shutdown")
         .map(|row| row["worker"].clone())
         .collect();
-    assert_eq!(forced, [json!("speaker")], "{forced:?}");
-    // The run says what held its stop: the speaker.
-    let said = result.unwrap_err().to_string();
-    assert!(
-        said.contains("speaker"),
-        "the run does not name the speaker: {said}"
-    );
+    (result.unwrap_err().to_string(), forced)
 }
 
 fn service_signal_child(output: PathBuf, termination: Termination, mut trace: SessionState) {
