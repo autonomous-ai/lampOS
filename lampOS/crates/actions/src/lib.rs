@@ -105,11 +105,11 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
         functions.extend([
             plain(
                 "volume_up",
-                "Make your own speaker louder by one step, when someone asks you to speak up or says you are too quiet.",
+                "Make your own speaker louder by one step, when someone asks you to speak up, to turn yourself up, or says you are too quiet.",
             ),
             plain(
                 "volume_down",
-                "Make your own speaker quieter, when someone asks you to keep it down or speak more quietly, or says you are too loud. Not for \"softer\" alone: that is your light (light_dimmer), unless they say it of your voice or sound.",
+                "Make your own speaker quieter, when someone asks you to keep it down, speak more quietly or turn yourself down, or says you are too loud. Not for \"softer\" alone: that is your light (light_dimmer), unless they say it of your voice or sound.",
             ),
             plain(
                 "volume_mute",
@@ -137,11 +137,11 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
             },
             plain(
                 "light_brighter",
-                "Make your own light a step brighter, keeping its colour. Not for white or whiter: white is a colour (light_colour, or light_cooler for a step).",
+                "Make your own light a step brighter, keeping its colour. Not for white or whiter: white is a colour (light_colour, or light_cooler for a step). Not for \"turn yourself up\": that is your voice (volume_up).",
             ),
             plain(
                 "light_dimmer",
-                "Make your own light a step dimmer, keeping its colour, when someone says it is too bright or harsh, or asks for it softer, a touch softer, gentler or lower. \"Softer\" with nothing said of your voice or sound is your light.",
+                "Make your own light a step dimmer, keeping its colour, when someone says it is too bright or harsh, or asks for it softer, a touch softer, gentler or lower. \"Softer\" with nothing said of your voice or sound is your light. Not for \"turn yourself down\": that is your voice (volume_down).",
             ),
             plain(
                 "light_warmer",
@@ -383,6 +383,23 @@ mod tests {
         assert!(said("light_dimmer").contains("a touch softer"));
         assert!(said("light_dimmer").contains("nothing said of your voice or sound is your light"));
         assert!(said("volume_down").contains("Not for \"softer\" alone: that is your light"));
+    }
+
+    /// #1712, lamp-4ace 19 Oct: "turn yourself down" and "turn yourself back
+    /// up" were taken for the light on the second route, both times; Live
+    /// took them for the voice. "Yourself" turned down or up is the voice.
+    #[test]
+    fn turning_yourself_down_or_up_is_the_voice_not_the_light() {
+        let all = catalog(true, true);
+        let said = |name: &str| all.iter().find(|f| f.name == name).unwrap().description;
+        assert!(said("volume_down").contains("turn yourself down"));
+        assert!(said("volume_up").contains("turn yourself up"));
+        assert!(
+            said("light_dimmer").contains("Not for \"turn yourself down\": that is your voice")
+        );
+        assert!(
+            said("light_brighter").contains("Not for \"turn yourself up\": that is your voice")
+        );
     }
 
     #[test]
