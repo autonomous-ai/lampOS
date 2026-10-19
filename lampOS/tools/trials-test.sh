@@ -234,6 +234,26 @@ for row in $ROWS; do
   has "$row: put back after a refused switch" "$T/out" "put back: drop-ins removed"
 done
 
+# smoky and dusty pause lamp-air, whose own readings would cross the
+# trial's, and start it again at the end; a lamp-air that wasn't running is
+# left stopped. The trial waits, then says one ordinary reading before the
+# smoke, so the rise has a reading to rise from.
+reset
+answer smoky
+"$SCRIPT" smoky >"$T/out" 2>&1; check "smoky pauses lamp-air" 0 $?
+wait
+has "smoky: lamp-air stopped" "$T/calls" "systemctl stop lamp-air.service"
+has "smoky: lamp-air started again" "$T/calls" "systemctl start lamp-air.service"
+has "smoky: said started again" "$T/out" "put back: lamp-air.service started again"
+[[ $(grep -n 'pm2_5":40.0' "$T/calls" | head -1 | cut -d: -f1) -lt $(grep -n 'pm2_5":300.0' "$T/calls" | head -1 | cut -d: -f1) ]] && ok ||
+  bad "smoky: the ordinary reading doesn't come before the smoke"
+reset
+echo inactive >"$T/state/lamp-air.service"
+TRIALS_WAIT=1 "$SCRIPT" dusty >"$T/out" 2>&1; check "dusty with lamp-air not running fails without its proof" 1 $?
+has "dusty: lamp-air left as it is" "$T/out" "pause: lamp-air.service (not running: left as it is)"
+hasnt "dusty: lamp-air not stopped" "$T/calls" "systemctl stop lamp-air.service"
+hasnt "dusty: lamp-air not started" "$T/calls" "systemctl start lamp-air.service"
+
 # light-out: --zone added to lamp-skills' own command line and carried,
 # nobody_s kept up every second until the end, then someone said back; an
 # earlier copy of the skill put back as it was.

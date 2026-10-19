@@ -69,6 +69,9 @@ DROPIN=zz-trial.conf
 #            exactly at the end: what the trial wrote there is removed, and a
 #            PATH that wasn't there is removed
 #   SETUP    optional: shell lines run as root after the set-aside
+#   PAUSE    optional: one unit a line, stopped for the trial if it is
+#            running (a sensor whose own readings would cross the cause's)
+#            and started again at the end; one that wasn't running is left
 #   SWITCHES one a line: "unit|NAME=value" for the unit's environment, or
 #            "unit|+ARG..." for arguments added to its command line (left
 #            out when the unit already has the first of them)
@@ -96,7 +99,7 @@ DROPIN=zz-trial.conf
 # are the running lamp-skills' --dir, user and group, @MEMORY_DIR@ is
 # lamp-memory's --dir, and @SRC@ is TRIALS_SKILLS_SRC.
 # ---------------------------------------------------------------------------
-ROWS="light-out scenes activity forget reports nudges"
+ROWS="light-out scenes activity forget reports nudges smoky dusty"
 # Rows not here, and why: printed by `list`.
 NOT_HERE="bedtime    Bedtime and Morning (#1732): a draft, not merged; three switches, --zone and its daily state, and it moves the body
 nudges     the other three nudges (#1957): sip-of-water, stand-up and wind-down are tried by hand, as rest-your-eyes is here
@@ -104,7 +107,7 @@ mood       Mood on: lampOS/tools/mood-minute.sh --clap (#1956), its own minute w
 updates    the update stack (#1680: #1788 to #1945, open): updates.md's rehearsal, a file channel and a test key, not a switch"
 
 define() {
-  ABOUT= NOTE= SETASIDE= SETUP= SWITCHES= CAUSE= AFTER= FIRST= THEN= FIRSTEX= PROOF= EXAMPLE= IN= WAIT=
+  ABOUT= NOTE= SETASIDE= SETUP= PAUSE= SWITCHES= CAUSE= AFTER= FIRST= THEN= FIRSTEX= PROOF= EXAMPLE= IN= WAIT=
   case $1 in
     light-out)
       # #1721 and #1747 (on lamp-voice and #1712). The skill's trigger is
@@ -209,6 +212,57 @@ chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/rest-your-eyes"
       EXAMPLE='lamp-skills: rest-your-eyes Done: gesture curious; light a shade softer'
       IN="lamp-skills.service"
       WAIT=90 ;;
+    smoky)
+      # #1836 (on lamp-voice, held out of the product): smoky-air's trigger
+      # is pm2_5 at 150 or more and 100 above the lowest of the 3 minutes
+      # before, held 30 s. lamp-air is paused so the office's own readings
+      # (about 100) don't end the hold; the trial waits for lamp-skills to
+      # listen, says one ordinary reading, then smoke every second. The
+      # trial's copy has a 1 m cooldown in place of 30 m, so it can be tried
+      # again. Its line: lamp-skills main.rs, the skill's Done.
+      ABOUT="smoky air: smoky-air says its line with a lift and an amber breath (#1836)"
+      NOTE="a build with #1836, the voice resting, and lamp-air paused by the trial (started again after). The lamp lifts its head a little, breathes amber and says \"The air reads like smoke. If something's burning, please check it.\" once"
+      SETASIDE="copy @SKILLS_DIR@/smoky-air"
+      SETUP="rm -rf @SKILLS_DIR@/smoky-air && cp -a @SRC@/smoky-air @SKILLS_DIR@/smoky-air
+sed -e 's/^cooldown = \"30m\"/cooldown = \"1m\"/' @SRC@/smoky-air/skill.toml >@SKILLS_DIR@/smoky-air/skill.toml
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/smoky-air"
+      PAUSE="lamp-air.service"
+      SWITCHES="lamp-skills.service|LAMP_LIGHT_REQUESTS=on"
+      CAUSE='wait 5
+pub air/state latest {"pm1_0":30.0,"pm2_5":40.0,"pm4_0":42.0,"pm10":45.0,"humidity":45.0,"temperature":30.0,"co2_ppm":700,"feel":"fresh"} lamp_msgs/AirState
+keep air/state latest {"pm1_0":280.0,"pm2_5":300.0,"pm4_0":310.0,"pm10":320.0,"humidity":45.0,"temperature":30.0,"co2_ppm":700,"feel":"fresh"} lamp_msgs/AirState'
+      AFTER='pub air/state latest {"pm1_0":30.0,"pm2_5":40.0,"pm4_0":42.0,"pm10":45.0,"humidity":45.0,"temperature":30.0,"co2_ppm":700,"feel":"fresh"} lamp_msgs/AirState'
+      PROOF='smoky-air Done'
+      # The why is its steps' own reports joined by "; " (lamp-skills
+      # main.rs): left out here rather than guessed.
+      EXAMPLE='lamp-skills: smoky-air Done: …'
+      IN="lamp-skills.service"
+      WAIT=150 ;;
+    dusty)
+      # #1836 (on lamp-voice, held out of the product): dusty-air's trigger
+      # is pm2_5 at 125 or more for an hour, while the voice rests and a
+      # face is in view. The trial's copy holds 30 s in place of an hour,
+      # has no [quiet] hours and a 1 m cooldown in place of a day, so it can
+      # be tried now and again; lamp-air is paused, and the trial says the
+      # dust and a face near the lamp itself. Its line: the skill's Done.
+      ABOUT="dusty air: dusty-air says its line after the air stays very dusty (#1836)"
+      NOTE="a build with #1836, the voice resting, nobody at the lamp (the trial says a face itself), and lamp-air paused by the trial (started again after). The lamp says \"The air here has been very dusty for about an hour. I can't tell where it's coming from.\" once"
+      SETASIDE="copy @SKILLS_DIR@/dusty-air"
+      SETUP="rm -rf @SKILLS_DIR@/dusty-air && cp -a @SRC@/dusty-air @SKILLS_DIR@/dusty-air
+sed -e 's/^for = \"60m\"/for = \"30s\"/' -e 's/^cooldown = \"24h\"/cooldown = \"1m\"/' -e '/^\[quiet\]/,/^to = /d' @SRC@/dusty-air/skill.toml >@SKILLS_DIR@/dusty-air/skill.toml
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/dusty-air"
+      PAUSE="lamp-air.service"
+      # No switch of its own: the marker restarts lamp-skills, which loads
+      # skills as it starts, and shows the trial's process is the one running.
+      SWITCHES="lamp-skills.service|LAMP_TRIAL=dusty"
+      CAUSE='keep humans/faces/tracked latest {"faces":[{"id":"trial","xmin":0.35,"ymin":0.2,"xmax":0.65,"ymax":0.6,"confidence":0.9}]} lamp_msgs/Faces
+keep air/state latest {"pm1_0":120.0,"pm2_5":140.0,"pm4_0":150.0,"pm10":200.0,"humidity":45.0,"temperature":30.0,"co2_ppm":700,"feel":"fresh"} lamp_msgs/AirState'
+      AFTER='pub air/state latest {"pm1_0":30.0,"pm2_5":40.0,"pm4_0":42.0,"pm10":45.0,"humidity":45.0,"temperature":30.0,"co2_ppm":700,"feel":"fresh"} lamp_msgs/AirState
+pub humans/faces/tracked latest {"faces":[]} lamp_msgs/Faces'
+      PROOF='dusty-air Done'
+      EXAMPLE='lamp-skills: dusty-air Done: …'
+      IN="lamp-skills.service"
+      WAIT=120 ;;
     *) return 1 ;;
   esac
 }
@@ -338,6 +392,12 @@ put_back() {
       restart "$unit" || { say "put back: $unit did not come back active"; failed=1; }
     fi
   done
+  while IFS= read -r unit; do
+    if aside_has "paused.$unit"; then
+      $SUDO systemctl start "$unit" && say "put back: $unit started again" ||
+        { say "put back: $unit did not start again"; failed=1; }
+    fi
+  done < <(lines "$PAUSE")
   if [[ $failed == 0 ]]; then
     say "put back: drop-ins removed, $(units_of_switches | tr '\n' ' ')as they were"
   else
@@ -441,6 +501,7 @@ trial() { # ROW [--dry]
     [[ -z $NOTE ]] || printf '  needs: %s\n' "$NOTE"
     lines "$SETASIDE" | sed 's/^/  set aside: /'
     lines "$SETUP" | sed 's/^/  setup: /'
+    lines "$PAUSE" | sed 's/^/  pause: /'
     lines "$SWITCHES" | sed 's/^/  switch: /'
     lines "$CAUSE" | sed 's/^/  cause: /'
     lines "$AFTER" | sed 's/^/  after: /'
@@ -483,6 +544,12 @@ trial() { # ROW [--dry]
     say "setup: $line"
     $SUDO bash -c "$line" || { say "the setup failed: $line"; exit 3; }
   done < <(lines "$SETUP")
+  while IFS= read -r unit; do
+    [[ $(systemctl is-active "$unit" 2>/dev/null) == active ]] || { say "pause: $unit (not running: left as it is)"; continue; }
+    aside_mark "paused.$unit"
+    $SUDO systemctl stop "$unit" || { say "could not pause $unit"; exit 3; }
+    say "pause: $unit stopped for the trial"
+  done < <(lines "$PAUSE")
 
   local mark
   mark=$(mark_now)
