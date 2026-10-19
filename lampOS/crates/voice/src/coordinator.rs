@@ -928,7 +928,7 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     ) -> Result<crate::service_privacy::WaitOutcome>,
 ) -> Result<crate::service_privacy::WaitOutcome> {
     muted_wait_pulsing(
-        trace, cues, controls, reminders, tap_face, health, None, wait,
+        trace, cues, controls, reminders, tap_face, health, None, None, wait,
     )
 }
 
@@ -938,6 +938,11 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
 /// the attempt, from the look that first finds it owed, so a pulse held
 /// back for a while neither restarts the half-hour nor comes at once when
 /// it may show again (Thirteen and the reviewer on #1581).
+///
+/// With `light` (`LAMP_LIGHT_WHILE_MUTED=on`, #1816), the person's light is
+/// said and taken at each look, with no session's ring worker to do it; it
+/// draws nothing, and is let go before this returns, so the next session's
+/// ring worker owns it again.
 ///
 /// [`Asleep::owed`]: crate::ring_asleep::Asleep::owed
 #[allow(clippy::too_many_arguments)]
@@ -949,6 +954,7 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     tap_face: Option<crate::ring_asleep::TapFace<F>>,
     mut health: Option<crate::bus_out::WaitHealth>,
     pulse: Option<std::sync::Arc<crate::ring_asleep::Owed>>,
+    light: Option<crate::ring_light::RingLight>,
     wait: impl FnOnce(
         &mut dyn FnMut(crate::privacy::PrivacyState, BootId, u64) -> Result<()>,
         &mut dyn FnMut() -> Result<bool>,
@@ -963,6 +969,7 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     let unread_since = std::cell::Cell::new(None::<u64>);
     let tap_face = RefCell::new(tap_face);
     let owed_since = std::cell::Cell::new(None::<Instant>);
+    let light = RefCell::new(light);
     let outcome = wait(
         &mut |state, boot, at_us| {
             slide.set(Some(state));
@@ -983,6 +990,10 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
         &mut || {
             if let Some(reminders) = reminders.borrow_mut().as_mut() {
                 reminders.poll(monotonic_us());
+            }
+            // The person's light, said and taken; nothing is drawn (#1816).
+            if let Some(light) = light.borrow_mut().as_mut() {
+                light.tick(monotonic_us());
             }
             let (allowed, asleep, restored) = match &mut *controls.borrow_mut() {
                 None => (true, false, false),
@@ -1047,6 +1058,8 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     if let Some(face) = tap_face.into_inner() {
         face.stop();
     }
+    // Let go before the next session's ring worker takes the light up.
+    drop(light.into_inner());
     // The wait ends on the look that read the switch open, with no look
     // after it: say the voice is opening, not still off, until the
     // session's own report (#1376).
@@ -2002,6 +2015,9 @@ fn run_source(
                         tap_face,
                         crate::bus_out::WaitHealth::from_environment(),
                         pulse,
+                        crate::ring_light::while_muted_from_environment(
+                            options.ring_channel_ceiling.is_some(),
+                        ),
                         |on_state, gate| {
                             crate::service_privacy_controls::wait_selected(
                                 &executable,

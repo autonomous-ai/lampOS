@@ -80,6 +80,10 @@ const REQUESTS_FLAG: &str = "--light-requests";
 /// `on`, and where it is kept (the reset wipes it).
 pub const KEEP_ENVIRONMENT: &str = "LAMP_LIGHT_KEEP";
 pub const KEEP_PATH: &str = "/var/lib/lampOS/light/person.json";
+/// The switch for the person's light while the voice waits out a mute or a
+/// closed privacy switch (#1816), off unless `on`: `light/state` said and
+/// `light/command` taken with no session, the ring left as the wait has it.
+pub const WHILE_MUTED_ENVIRONMENT: &str = "LAMP_LIGHT_WHILE_MUTED";
 const KEEP_FLAG: &str = "--light-keep";
 /// The kept light is written at most this often.
 pub const KEEP_EVERY_US: u64 = 1_000_000;
@@ -123,6 +127,42 @@ pub fn take_keep(flags: &[String]) -> (Option<&Path>, &[String]) {
     match flags {
         [flag, path, rest @ ..] if flag == KEEP_FLAG => (Some(Path::new(path)), rest),
         _ => (None, flags),
+    }
+}
+
+/// The person's light for the voice's muted wait (#1816), with
+/// [`WHILE_MUTED_ENVIRONMENT`] on, a ring (`ring`) and the bus on: the ring
+/// worker, which owns it in a session, does not run while the microphones
+/// are off, so the app's light row found the light not running. The same
+/// light as the ring worker's, kept on disk where [`KEEP_ENVIRONMENT`] says,
+/// with no requests; a self-test colour is read but, like everything here,
+/// never drawn. It draws nothing: whatever the wait shows on
+/// the ring (the privacy face, the asleep face, dark) stays. A bus that
+/// cannot be used is said once, and the wait goes on without it.
+pub fn while_muted_from_environment(ring: bool) -> Option<RingLight> {
+    let switch = std::env::var(WHILE_MUTED_ENVIRONMENT).ok();
+    let flags = crate::bus_out::worker_arguments_from_environment();
+    let root = crate::bus_out::take_root(&flags).ok()?.0;
+    let keep = std::env::var(KEEP_ENVIRONMENT).ok();
+    while_muted(switch.as_deref(), ring, root.as_deref(), keep.as_deref())
+}
+
+fn while_muted(
+    switch: Option<&str>,
+    ring: bool,
+    root: Option<&Path>,
+    keep: Option<&str>,
+) -> Option<RingLight> {
+    if switch != Some("on") || !ring {
+        return None;
+    }
+    let keep = (keep == Some("on")).then(|| Path::new(KEEP_PATH));
+    match RingLight::on_keeping(root?, keep) {
+        Ok((light, _)) => Some(light),
+        Err(error) => {
+            eprintln!("lamp-voice: the person's light is not said while muted: {error}");
+            None
+        }
     }
 }
 
@@ -692,6 +732,27 @@ mod tests {
             std::thread::sleep(Duration::from_millis(2));
         }
         None
+    }
+
+    /// #1816: the muted wait's light is opened only with the switch on, a
+    /// ring and a bus.
+    #[test]
+    fn the_light_while_muted_is_off_unless_on_with_a_ring_and_a_bus() {
+        let root = Root::new("light-while-muted");
+        for (switch, ring, bus) in [
+            (None, true, true),
+            (Some("yes"), true, true),
+            (Some("on"), false, true),
+            (Some("on"), true, false),
+        ] {
+            let root = bus.then_some(root.0.as_path());
+            assert!(
+                while_muted(switch, ring, root, None).is_none(),
+                "{switch:?} {ring} {bus}"
+            );
+        }
+        let light = while_muted(Some("on"), true, Some(&root.0), None).unwrap();
+        assert_eq!(light.now(), &first());
     }
 
     #[test]

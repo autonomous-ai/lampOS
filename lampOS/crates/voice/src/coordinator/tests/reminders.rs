@@ -1350,6 +1350,7 @@ fn told_the_face(
         None::<crate::ring_asleep::TapFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
         None,
         Some(owed.clone()),
+        None,
         |on_state, gate| {
             for look in 0..looks {
                 if let Some(switch) = between(fixture, look) {

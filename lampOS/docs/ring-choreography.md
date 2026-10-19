@@ -543,6 +543,33 @@ only after a change; its time on the lamp's disk is not yet measured
 (the lamp check reads the ring's stall lines). The reset empties
 `/var/lib/lampOS/light`, a file left beside it by a power cut included.
 
+**While the microphones are off** (#1816, `LAMP_LIGHT_WHILE_MUTED=on`,
+off unless set). The ring's light lives in the voice's ring worker, which
+runs only inside a session. While the voice waits out a mute or a closed
+privacy switch, no session runs, so nothing said `light/state` or took
+`light/command`, and the app's light row found "the lamp's light is not
+running" (mobile on lamp-0c89, #1396).
+- **With the switch on:** on a lamp with a ring and the bus on, the
+  muted wait opens the same light, with `LAMP_LIGHT_KEEP`'s file if that's
+  on. It ticks it at each look of the wait, about every 2 ms, and the
+  light looks for commands every 50 ms.
+- **What it says and takes:** the person's light is said once a second and
+  at each change, and a light asked for is taken, so the app can read and
+  set it. A command reaches `light/state` within the light's 50 ms look.
+- **Nothing is drawn:** the ring shows what the wait shows today, the
+  privacy face, the asleep face or dark, and nothing goes on
+  `light/drawn`. Requests (`light/request`) are not taken while muted. A
+  self-test colour is read, as the light reads one, but never drawn, and
+  `light/state` goes on saying the person's light (the reviewer on
+  #1842).
+- **When the switch opens:** the wait lets the light go before the next
+  session's ring worker opens. That worker begins with the bus's newest
+  command, so a light set from the app while muted is the one shown.
+
+Tests: `coordinator::tests::service_mute::the_persons_light_is_said_and_taken_while_the_switch_is_closed`
+(a wait that never ticks the light fails it) and
+`ring_light::tests::the_light_while_muted_is_off_unless_on_with_a_ring_and_a_bus`.
+
 **On lamp-4ace, 2026-10-14, about 03:00, nobody in the office.** Called
 directly on the actions program's socket, each change was answered in 15
 to 108 ms with the state read back, and a colour that does not exist was
