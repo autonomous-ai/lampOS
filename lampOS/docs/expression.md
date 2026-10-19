@@ -291,6 +291,27 @@ sways never. A voice that fills the meter (1.0 through every sentence) nods as
 each of its three sentences begins, where without the ceiling it nodded
 never.
 
+**Measuring it on a lamp** (`lampOS/tools/`, run from the computer beside
+the lamp; each needs sudo on the lamp, its password taken from
+`LAMP_SUDO_PASS` on stdin, never on a command line):
+
+- `speaking-ab.sh` says one story request (the Mac's `say`) with Expression's
+  catalogue without its speaking section, then with it (`--arms off,on`, or
+  one of them), each by a runtime drop-in that is removed on any exit. It
+  prints lamp-body's speaking steps, each speaking behaviour's starts (nod,
+  sway, settle), the voice's levels against the scaled bars, Expression's
+  offsets, and how the voice's turns ended (`ends=`, so a missing settle is
+  told from a cut turn). With `--levels-only` Expression runs in shadow
+  (its `--enable` left out), so it plans and names each move but nothing
+  moves, and lamp-body is not touched: for a night with nobody at the arm.
+  Its files stay in `/var/lib/thirteen-ab` on the lamp until removed by hand.
+- `sound-shape.sh FILE`, on a `voice/sound` tap the run left there: the
+  levels' spread, how many pieces each rise rule would take, the pauses
+  under each quiet line, and how far ahead each piece was said (against
+  `body_lag_us`: how #1759 found that the head never nodded on a lamp).
+
+Tests: `tools/speaking-ab-test.sh`, `tools/sound-shape-test.sh`.
+
 Not shown: how it looks on a lamp, and the body's own smoothing and speed
 limits on these offsets.
 
