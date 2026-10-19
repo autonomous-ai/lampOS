@@ -11698,7 +11698,10 @@ mod tests {
     async fn fast_provider_burst_is_held_by_flow_control_and_arrives_complete_in_order() {
         // Built before anything is on a real-time lease: encoding megabytes of
         // scripted audio must not be what makes this harness miss a heartbeat.
-        const MESSAGES: usize = 40;
+        // Twelve messages, 600 packets: past the 512-packet bound below, which
+        // 11 is the least to pass, with no more data than that needs (#1806:
+        // 40, 2,000 packets, took 3.2 s on ARM64).
+        const MESSAGES: usize = 12;
         const FRAMES: usize = lamp_gemini::MAX_OUTPUT_SAMPLES;
         let burst: Vec<_> = (0..MESSAGES)
             .map(|index| provider_audio(index as i16, FRAMES))
@@ -11706,8 +11709,8 @@ mod tests {
         let mut rig = LiveRig::start(quick_policy());
         let mut dial = rig.ready().await;
         let request = rig.speak(&mut dial, false, true).await;
-        // 80 s of speech offered at once: 40 provider messages of 2 s each,
-        // 2,000 IPC packets. The coordinator now grants at most two packets
+        // 24 s of speech offered at once: 12 provider messages of 2 s each,
+        // 600 IPC packets. The coordinator now grants at most two packets
         // in flight, so its backlog would pass the 512-packet bound that used to
         // end it. The IPC freshness rule means the coordinator side must keep
         // reading; it does, as fast as packets arrive.
@@ -11750,7 +11753,7 @@ mod tests {
         }
         assert_eq!((packets, frames), (MESSAGES * 50, MESSAGES * FRAMES));
         println!(
-            "MEASURED burst_80s_audio_2000_packets_delivered_ms={} (scripted service to local IPC reader, host)",
+            "MEASURED burst_24s_audio_600_packets_delivered_ms={} (scripted service to local IPC reader, host)",
             started.elapsed().as_millis()
         );
         let _service = script.await.unwrap();
