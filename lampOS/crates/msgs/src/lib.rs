@@ -84,6 +84,8 @@ mod privacy;
 pub use privacy::*;
 mod chat;
 pub use chat::*;
+mod presence;
+pub use presence::*;
 
 /// Why a message is not one its type allows, in words.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1313,6 +1315,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(skill_ask_topics())
         .chain(privacy_topics())
         .chain(chat_topics())
+        .chain(presence_topics())
         .find_map(|(name, declaration)| (name == topic).then_some(declaration))
 }
 

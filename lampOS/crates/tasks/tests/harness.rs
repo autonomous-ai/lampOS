@@ -2,7 +2,8 @@
 //! remote agent, credentials or provider is invoked by these tests.
 use lamp_tasks::harness::{
     Cli, CliConfig, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES,
-    MOST_LISTED, MOST_WAITED, PS_STDOUT_LIMIT, Target, iso_unix_ms, parse_ps, parse_wait,
+    MOST_LISTED, MOST_WAITED, PS_STDOUT_LIMIT, SignIn, Target, iso_unix_ms, parse_auth_status,
+    parse_ps, parse_wait,
 };
 use serde_json::{Value, json};
 use std::{
@@ -995,6 +996,42 @@ fn status_is_one_ps_of_the_full_machine_id_bounded_and_never_retried() {
     let rig = Rig::new();
     assert_eq!(rig.cli().status("office"), Err("invalid_machine".into()));
     assert!(rig.calls().is_empty());
+}
+
+/// #1676: the sign-in is one `auth status --json`, read as Harness gives it
+/// (openharness `authStatusCommand`): signed in, signed in and offline, or
+/// not, with the other fields passed over. A failed or unreadable reply is
+/// not taken as signed out.
+#[test]
+fn sign_in_is_one_auth_status_read_as_harness_gives_it() {
+    let rig = Rig::new();
+    rig.plan(json!({"auth":step(json!({"loggedIn":true,"computerId":"c","machineId":MACHINE,"method":"qr"}))}));
+    assert_eq!(rig.cli().signed_in(), Ok(SignIn::In));
+    let calls = rig.calls();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0]["args"], json!(["auth", "status", "--json"]));
+    for (reply, sign_in) in [
+        (json!({"loggedIn":true,"offline":true}), SignIn::Offline),
+        (json!({"loggedIn":false,"computerId":"c"}), SignIn::Out),
+        (json!({"loggedIn":true,"offline":false}), SignIn::In),
+    ] {
+        assert_eq!(parse_auth_status(reply.to_string().as_bytes()), Ok(sign_in));
+    }
+    for (step, code) in [
+        (
+            json!({"exit":1,"stdout":"{\"loggedIn\":false}"}),
+            "auth_status_failed",
+        ),
+        (
+            json!({"stdout":"{\"loggedIn\":\"no\"}"}),
+            "auth_status_invalid_reply",
+        ),
+        (json!({"stdout":"not json"}), "auth_status_invalid_reply"),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"auth":step}));
+        assert_eq!(rig.cli().signed_in(), Err(code.into()));
+    }
 }
 
 const OTHER: &str = "33333333-3333-4333-8333-333333333333";

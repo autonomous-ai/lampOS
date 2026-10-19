@@ -240,7 +240,7 @@ holds no check past its time, and three attempts in a row start one lookup.
 
 ## The setup server (built, off unless set)
 
-Its `GET /api/device/setup/status` answers V1's fields, plus one of its own: `"generation": "lamp-v2"`. The Autonomous app keeps V1's Lamp and this one as two products, as it does Intern's two, and stops before the setup `POST` when the lamp on the hotspot is not the product the person picked (#1396, decided 17 Oct).
+Its `GET /api/device/setup/status` answers V1's fields, plus one of its own: `"generation": "lamp-v2"`. The backend keeps one device type, `lamp`, for both generations, so the Autonomous app sets both up as one Lamp product and learns which Lamp it set up from this field; `lamp-cloud` says the same on every MQTT reply (#1396, decided 19 Oct, replacing the two products decided on 17 Oct).
 
 ```sh
 lamp-setup serve --config SERVE.json --plan PLAN.json --enable

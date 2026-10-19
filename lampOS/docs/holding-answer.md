@@ -40,10 +40,12 @@ whitespace. The complete text must be one of:
 
 - “let me think”, “let me think for a moment”, “let me think for a second”;
 - “one moment”, “just one moment”, “one second”, “just a second”, “just a moment”;
-- “give me a second”, “give me a moment”, “let me see”.
+- “give me a second”, “give me a moment”.
 
 A quotation, any added words, or a phrase followed by the answer does not
-match. No transcript is added to the coordinator's diagnostic record.
+match. “Let me see” is excluded even on its own: it can invite someone to
+show a drawing or object instead of promising an answer. No transcript is
+added to the coordinator's diagnostic record.
 
 ## When the continuation may start
 
@@ -82,7 +84,13 @@ phrases, substantive continuations, function calls, disabled behavior, the
 one-second boundary, stale capture, pending output/input, mute, session
 replacement, route changes and the one-attempt limit. The worker and owner
 checks use separate fixtures; they do not establish a complete process-level
-conversation round trip. The continuation adds no sleep or
+conversation round trip. A stepped production-loop fixture retires the
+holding reply through local speaker receipts, delivers a capture-gap event
+half a second later, reopens capture and keeps fresh quiet for another second.
+It reaches the loop's cancellation branch and checks that no continuation
+is queued or sent; the same fixture without the gap must queue exactly one.
+Pure argument tests also pin the worker flag to the exact `on` value.
+The continuation adds no sleep or
 timer: once its quiet and ownership conditions hold, it is queued in that
 coordinator pass. The local target is one normal pass after those conditions
 hold; the scripted check has zero added clock time at that boundary.

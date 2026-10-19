@@ -109,12 +109,17 @@ pub const LEAD_IN_ENVIRONMENT: &str = "LAMP_TOOL_LEAD_IN";
 /// Where it reads whether work asked of the staff is handed over every time
 /// (#854). `on` only.
 pub const ASKED_ENVIRONMENT: &str = "LAMP_TASKS_ASKED";
+/// Where it reads whether the person's own accounts (calendar, email) are
+/// asked of the computer's agent, and the computer is not called the
+/// office's (#1676). `on` only, and only with [`ASKED_ENVIRONMENT`].
+pub const ACCOUNTS_ENVIRONMENT: &str = "LAMP_TASKS_ACCOUNTS";
 /// The provider worker's flags for them.
 pub const FLAG: &str = "--tasks-dir";
 pub const TARGET_FLAG: &str = "--tasks-target";
 pub const WHO_FLAG: &str = "--tasks-who";
 pub const LEAD_IN_FLAG: &str = "--tasks-lead-in";
 pub const ASKED_FLAG: &str = "--tasks-asked";
+pub const ACCOUNTS_FLAG: &str = "--tasks-accounts";
 /// The file the tasks part needs to run at all (#811: on a home lamp, the
 /// Harness program its unit's condition names). While it is missing, a call
 /// that cannot reach the part is told it isn't set up; otherwise as a part
@@ -274,12 +279,13 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
         (
             if place.asked {
                 format!(
-                    "Hand a piece of work to one of the person's agents on their office computer \
+                    "Hand a piece of work to one of the person's agents on their {} \
                      ({all}). {} {} \
                      You can do this: if they ask you to start one of them, open a session or \
                      give it something, without saying what it should do, never say you cannot; \
                      ask in a few words what it should work on, and call this with their answer.",
-                    asked_of(&all, &examples(staff), place.staff_note),
+                    computer(place),
+                    asked_of(&all, &examples(staff), place.staff_note, computer(place)),
                     read_back(place.lead_in, ", with who will do it,")
                 )
             } else {
@@ -313,11 +319,17 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
         (
             if place.asked {
                 format!(
-                    "Hand a piece of work to {default} on the person's office computer. {} {} \
+                    "Hand a piece of work to {default} on the person's {}. {} {} \
                      You can do this: if they ask you to start {default}, open a session or \
                      give it something, without saying what it should do, never say you cannot; \
                      ask in a few words what it should work on, and call this with their answer.",
-                    asked_of(default, &examples_of(default), place.staff_note),
+                    computer(place),
+                    asked_of(
+                        default,
+                        &examples_of(default),
+                        place.staff_note,
+                        computer(place)
+                    ),
                     read_back(place.lead_in, "")
                 )
             } else {
@@ -426,15 +438,25 @@ pub fn handing_over_next(lead_in: bool, who: &str) -> String {
     }
 }
 
+/// Where the work is done: the person's computer, called the office's
+/// without [`ACCOUNTS_FLAG`] (a home has no office, #1676).
+fn computer(place: &Place) -> &'static str {
+    if place.accounts {
+        "computer"
+    } else {
+        "office computer"
+    }
+}
+
 /// When `start_agent_task` is called with [`ASKED_FLAG`]: whenever the
 /// person asks to have `whom` do something, whatever the work (#854).
-fn asked_of(whom: &str, examples: &str, noted: bool) -> String {
+fn asked_of(whom: &str, examples: &str, noted: bool, computer: &str) -> String {
     format!(
         "Call it whenever the person asks to have {whom} do something ({examples}), \
          whatever the work is: code, documents or files, and as much a story, a poem, a plan \
          or anything you could do yourself; and even in the middle of something else, a story \
          you are telling included. {} Call it too when they ask for work to be done on their \
-         office computer.",
+         {computer}.",
         if noted { CHOSE_NOTED } else { CHOSE }
     )
 }
@@ -484,14 +506,27 @@ pub fn session_note(place: &Place) -> Option<String> {
     } else {
         CLAUDE_CODE.to_owned()
     };
+    let computer = computer(place);
+    let accounts = if place.accounts {
+        format!(
+            " The person's own calendar, meetings, email and other accounts are on their \
+             computer, not with you: you have none, and your timers and reminders are not their \
+             calendar. When they ask about them (\"what's on my calendar today\", \"any email \
+             from …\", \"when is my next meeting\"), never answer from what you know or from \
+             your reminders: hand it to {whom} with start_agent_task, the ask in their words, \
+             and its answer is told to them when it comes."
+        )
+    } else {
+        String::new()
+    };
     Some(format!(
         "\nWhen the person asks to have {whom} do something, it is theirs to do, not yours: \
          hand it over with start_agent_task every time, whatever it is, a story or a poem as \
          much as code, even one you could tell yourself, and even in the middle of a story you \
          are telling. Never do it yourself instead. A name that comes to you garbled, such as \
-         \"Claude Co\" for Claude Code, still names them. Work on their office computer is \
-         theirs too, named or not. But a story, a poem or anything else they ask of you that \
-         names neither {whom} nor work on their office computer, however long, is yours: tell \
+         \"Claude Co\" for Claude Code, still names them. Work on their {computer} is \
+         theirs too, named or not.{accounts} But a story, a poem or anything else they ask of you that \
+         names neither {whom} nor work on their {computer}, however long, is yours: tell \
          it yourself, gladly, and never offer it to {whom} or ask whether {whom} should, even \
          after you handed something over earlier in this conversation."
     ))
@@ -897,6 +932,9 @@ pub struct Place {
     pub lead_in: bool,
     /// Work asked of the staff is handed over every time ([`ASKED_FLAG`]).
     pub asked: bool,
+    /// The person's own accounts are asked of the computer's agent, and the
+    /// computer is not called the office's ([`ACCOUNTS_FLAG`], #1676).
+    pub accounts: bool,
     /// The file the tasks part needs ([`NEEDS_FLAG`]).
     pub needs: Option<PathBuf>,
     /// A request whose words name one of the staff is told so
@@ -913,6 +951,7 @@ pub fn arguments_from_environment() -> Vec<String> {
         std::env::var(WHO_ENVIRONMENT).ok().as_deref(),
         std::env::var(LEAD_IN_ENVIRONMENT).ok().as_deref(),
         std::env::var(ASKED_ENVIRONMENT).ok().as_deref(),
+        std::env::var(ACCOUNTS_ENVIRONMENT).ok().as_deref(),
         std::env::var(NEEDS_ENVIRONMENT).ok().as_deref(),
     )
 }
@@ -923,6 +962,7 @@ fn arguments(
     who: Option<&str>,
     lead_in: Option<&str>,
     asked: Option<&str>,
+    accounts: Option<&str>,
     needs: Option<&str>,
 ) -> Vec<String> {
     let Some(directory) = directory.filter(|path| Path::new(path).is_absolute()) else {
@@ -941,6 +981,10 @@ fn arguments(
     }
     if asked == Some("on") {
         arguments.push(ASKED_FLAG.to_owned());
+        // Only with the hand-over asked every time: its note says it.
+        if accounts == Some("on") {
+            arguments.push(ACCOUNTS_FLAG.to_owned());
+        }
     }
     if let Some(needs) = needs.filter(|path| Path::new(path).is_absolute()) {
         arguments.push(NEEDS_FLAG.to_owned());
@@ -957,7 +1001,8 @@ fn alias(text: &str) -> bool {
 }
 
 /// Take a leading `--tasks-dir DIR [--tasks-target ALIAS] [--tasks-who]
-/// [--tasks-lead-in] [--tasks-asked] [--tasks-needs PATH]` off the flags.
+/// [--tasks-lead-in] [--tasks-asked [--tasks-accounts]] [--tasks-needs PATH]`
+/// off the flags.
 pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
     let [flag, rest @ ..] = flags else {
         return Ok((None, flags));
@@ -992,6 +1037,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
         [flag, rest @ ..] if flag == ASKED_FLAG => (true, rest),
         _ => (false, rest),
     };
+    let (accounts, rest) = match rest {
+        [flag, rest @ ..] if flag == ACCOUNTS_FLAG && asked => (true, rest),
+        _ => (false, rest),
+    };
     let (needs, rest) = match rest {
         [flag, path, rest @ ..] if flag == NEEDS_FLAG => {
             if !Path::new(path).is_absolute() {
@@ -1008,6 +1057,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
             who,
             lead_in,
             asked,
+            accounts,
             needs,
             staff_note: false,
         }),
@@ -1157,7 +1207,7 @@ fn run_for(
                         json!({
                             "prepared": true,
                             "task": task,
-                            "where": format!("{who} on the office computer"),
+                            "where": format!("{who} on the {}", computer(place)),
                             "next": next
                         }),
                         true,
@@ -1493,6 +1543,7 @@ pub(crate) mod tests {
             who: false,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: needs.map(PathBuf::from),
             staff_note: false,
         };
@@ -1604,18 +1655,26 @@ pub(crate) mod tests {
 
     #[test]
     fn the_switch_is_an_absolute_directory_and_an_alias_and_is_taken_from_the_front() {
-        assert!(arguments(None, None, None, None, None, None).is_empty());
-        assert!(arguments(Some("relative"), None, None, None, None, None).is_empty());
+        assert!(arguments(None, None, None, None, None, None, None).is_empty());
+        assert!(arguments(Some("relative"), None, None, None, None, None, None).is_empty());
         assert_eq!(
-            arguments(Some("/run/t"), None, None, None, None, None),
+            arguments(Some("/run/t"), None, None, None, None, None, None),
             [FLAG, "/run/t"]
         );
         assert_eq!(
-            arguments(Some("/run/t"), Some("m2"), None, None, None, None),
+            arguments(Some("/run/t"), Some("m2"), None, None, None, None, None),
             [FLAG, "/run/t", TARGET_FLAG, "m2"]
         );
         assert_eq!(
-            arguments(Some("/run/t"), Some("no spaces"), None, None, None, None),
+            arguments(
+                Some("/run/t"),
+                Some("no spaces"),
+                None,
+                None,
+                None,
+                None,
+                None
+            ),
             [FLAG, "/run/t"]
         );
         assert_eq!(
@@ -1625,12 +1684,21 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 Some("/usr/local/bin/harness")
             ),
             [FLAG, "/run/t", NEEDS_FLAG, "/usr/local/bin/harness"]
         );
         assert_eq!(
-            arguments(Some("/run/t"), None, None, None, None, Some("relative")),
+            arguments(
+                Some("/run/t"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some("relative")
+            ),
             [FLAG, "/run/t"]
         );
         let needs: Vec<String> = [
@@ -1659,6 +1727,7 @@ pub(crate) mod tests {
                 who: false,
                 lead_in: false,
                 asked: false,
+                accounts: false,
                 needs: None,
                 staff_note: false,
             })
@@ -1800,6 +1869,7 @@ pub(crate) mod tests {
             who: false,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: None,
             staff_note: false,
         };
@@ -1982,6 +2052,7 @@ pub(crate) mod tests {
             who: false,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: None,
             staff_note: false,
         };
@@ -2066,6 +2137,7 @@ pub(crate) mod tests {
             who: false,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: None,
             staff_note: false,
         };
@@ -2115,6 +2187,7 @@ pub(crate) mod tests {
             who: false,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: None,
             staff_note: false,
         };
@@ -2166,6 +2239,7 @@ pub(crate) mod tests {
             who: false,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: None,
             staff_note: false,
         };
@@ -2239,6 +2313,7 @@ pub(crate) mod tests {
             who: false,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: None,
             staff_note: false,
         };
@@ -2547,6 +2622,7 @@ pub(crate) mod tests {
             who,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: None,
             staff_note: false,
         }
@@ -2640,7 +2716,7 @@ pub(crate) mod tests {
             "Tell them in a few natural words that you are handing it to Claude Code now and will let them know when it is done, the way a chief of staff would (\"Sure, I'm giving that to Claude Code. I'll tell you when it's done.\"). It has not been taken up yet: do not say it has."
         );
         assert_eq!(
-            arguments(Some("/run/t"), None, None, Some("on"), None, None),
+            arguments(Some("/run/t"), None, None, Some("on"), None, None, None),
             [FLAG, "/run/t", LEAD_IN_FLAG]
         );
         assert_eq!(
@@ -2650,17 +2726,18 @@ pub(crate) mod tests {
                 Some("on"),
                 Some("on"),
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", TARGET_FLAG, "m2", WHO_FLAG, LEAD_IN_FLAG]
         );
         for not_on in [None, Some("yes"), Some("ON"), Some("1")] {
             assert_eq!(
-                arguments(Some("/run/t"), None, None, not_on, None, None),
+                arguments(Some("/run/t"), None, None, not_on, None, None, None),
                 [FLAG, "/run/t"]
             );
         }
-        assert!(arguments(None, None, None, Some("on"), None, None).is_empty());
+        assert!(arguments(None, None, None, Some("on"), None, None, None).is_empty());
         let flags: Vec<String> = [FLAG, "/run/t", WHO_FLAG, LEAD_IN_FLAG, "--other"]
             .map(String::from)
             .into();
@@ -2736,6 +2813,114 @@ pub(crate) mod tests {
         );
     }
 
+    /// #1676: with `--tasks-accounts`, the person's calendar, email and
+    /// other accounts are asked of the computer's agent, and the lamp's own
+    /// reminders are said not to be their calendar. The computer is not
+    /// called the office's in the descriptions, the note or the read-back.
+    /// Without it, the note and the descriptions are as before.
+    #[test]
+    fn with_accounts_the_persons_calendar_and_email_are_handed_over_and_no_office_is_named() {
+        for staff in [Vec::new(), two()] {
+            let mut before = place(Path::new("/run/t"), !staff.is_empty());
+            before.asked = true;
+            let mut after = before.clone();
+            after.accounts = true;
+            let note = super::session_note(&before).unwrap();
+            assert!(!note.contains("calendar"), "{note}");
+            assert!(note.contains("office computer"), "{note}");
+            let note = super::session_note(&after).unwrap();
+            for said in [
+                "calendar, meetings, email and other accounts are on their computer",
+                "your timers and reminders are not their calendar",
+                "what's on my calendar today",
+                "hand it to",
+            ] {
+                assert!(note.contains(said), "{said}: {note}");
+            }
+            assert!(!note.contains("office"), "{note}");
+            for (tool, plain) in super::declared(&after, &staff)
+                .into_iter()
+                .zip(super::declared(&before, &staff))
+            {
+                assert!(!tool.description.contains("office"), "{}", tool.description);
+                // Only the office goes: the rest of each description is as before.
+                assert_eq!(
+                    tool.description,
+                    plain.description.replace("office computer", "computer")
+                );
+            }
+        }
+    }
+
+    /// `--tasks-accounts` is taken only right after `--tasks-asked`, and the
+    /// environment gives it only with `LAMP_TASKS_ASKED=on`: the note that
+    /// says it is only there with the hand-over asked every time.
+    #[test]
+    fn the_accounts_switch_is_on_only_with_asked_and_taken_after_it() {
+        let flags =
+            |list: &[&str]| -> Vec<String> { list.iter().map(|flag| (*flag).to_owned()).collect() };
+        assert_eq!(
+            arguments(
+                Some("/run/t"),
+                None,
+                None,
+                None,
+                Some("on"),
+                Some("on"),
+                None
+            ),
+            flags(&[FLAG, "/run/t", ASKED_FLAG, ACCOUNTS_FLAG])
+        );
+        for not_asked in [None, Some("yes")] {
+            assert_eq!(
+                arguments(
+                    Some("/run/t"),
+                    None,
+                    None,
+                    None,
+                    not_asked,
+                    Some("on"),
+                    None
+                ),
+                flags(&[FLAG, "/run/t"])
+            );
+        }
+        assert_eq!(
+            arguments(
+                Some("/run/t"),
+                None,
+                None,
+                None,
+                Some("on"),
+                Some("yes"),
+                None
+            ),
+            flags(&[FLAG, "/run/t", ASKED_FLAG])
+        );
+        let given = flags(&[
+            FLAG,
+            "/run/t",
+            ASKED_FLAG,
+            ACCOUNTS_FLAG,
+            NEEDS_FLAG,
+            "/usr/local/bin/harness",
+            "--next",
+        ]);
+        let (place, rest) = take(&given).unwrap();
+        let place = place.unwrap();
+        assert!(place.asked && place.accounts);
+        assert_eq!(
+            place.needs.as_deref(),
+            Some(Path::new("/usr/local/bin/harness"))
+        );
+        assert_eq!(rest, &given[6..]);
+        // Without `--tasks-asked` it is not taken, and is left for the next.
+        let given = flags(&[FLAG, "/run/t", ACCOUNTS_FLAG]);
+        let (place, rest) = take(&given).unwrap();
+        assert!(!place.unwrap().accounts);
+        assert_eq!(rest, &given[2..]);
+    }
+
     /// #799: one description the service would refuse leaves a session
     /// with no functions at all (`thread::equipped`). On lamp-4ace on
     /// 2026-10-16, with work asked of the staff, two of them to choose from
@@ -2751,19 +2936,21 @@ pub(crate) mod tests {
         ];
         let mut refused = Vec::new();
         for staff in [Vec::new(), two(), three] {
-            for ((asked, lead_in), noted) in
+            for (((asked, lead_in), noted), accounts) in
                 [(false, false), (false, true), (true, false), (true, true)]
                     .into_iter()
+                    .flat_map(|switches| [(switches, false), (switches, true)])
                     .flat_map(|switches| [(switches, false), (switches, true)])
             {
                 let mut switched = place(Path::new("/run/t"), !staff.is_empty());
                 switched.asked = asked;
                 switched.lead_in = lead_in;
                 switched.staff_note = noted;
+                switched.accounts = accounts && asked;
                 for tool in super::declared(&switched, &staff) {
                     if tool.validate().is_err() {
                         refused.push(format!(
-                            "{} with {} of the staff, asked {asked}, lead-in {lead_in}, noted {noted}: {} bytes",
+                            "{} with {} of the staff, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}: {} bytes",
                             tool.name,
                             staff.len(),
                             tool.description.len()
@@ -2980,19 +3167,20 @@ pub(crate) mod tests {
                 Some("on"),
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", TARGET_FLAG, "office-claude", WHO_FLAG]
         );
         assert_eq!(
-            arguments(Some("/run/t"), None, Some("on"), None, None, None),
+            arguments(Some("/run/t"), None, Some("on"), None, None, None, None),
             [FLAG, "/run/t", WHO_FLAG]
         );
         assert_eq!(
-            arguments(Some("/run/t"), None, Some("yes"), None, None, None),
+            arguments(Some("/run/t"), None, Some("yes"), None, None, None, None),
             [FLAG, "/run/t"]
         );
-        assert!(arguments(None, None, Some("on"), None, None, None).is_empty());
+        assert!(arguments(None, None, Some("on"), None, None, None, None).is_empty());
         let flags: Vec<String> = [
             FLAG,
             "/run/t",
@@ -3012,6 +3200,7 @@ pub(crate) mod tests {
                 who: true,
                 lead_in: false,
                 asked: false,
+                accounts: false,
                 needs: None,
                 staff_note: false,
             })
@@ -3211,13 +3400,14 @@ pub(crate) mod tests {
                 Some("on"),
                 Some("on"),
                 Some("on"),
+                None,
                 None
             ),
             [FLAG, "/run/t", WHO_FLAG, LEAD_IN_FLAG, ASKED_FLAG]
         );
         for not_on in [None, Some("yes"), Some("ON"), Some("1")] {
             assert_eq!(
-                arguments(Some("/run/t"), None, None, None, not_on, None),
+                arguments(Some("/run/t"), None, None, None, not_on, None, None),
                 [FLAG, "/run/t"]
             );
         }

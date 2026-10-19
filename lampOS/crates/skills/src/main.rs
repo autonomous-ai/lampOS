@@ -977,22 +977,11 @@ fn start(
     );
     let before = light_now(&bus);
     // A run that holds something until its trigger ends waits for the end.
-    let end = calls
-        .iter()
-        .any(|call| {
-            matches!(
-                call,
-                Call::Dim {
-                    until_ends: true,
-                    ..
-                }
-            )
-        })
-        .then(|| {
-            let (end, ended) = mpsc::channel();
-            runner.ends.borrow_mut().insert(skill.clone(), end);
-            ended
-        });
+    let end = calls.iter().any(Call::held_until_ends).then(|| {
+        let (end, ended) = mpsc::channel();
+        runner.ends.borrow_mut().insert(skill.clone(), end);
+        ended
+    });
     std::thread::spawn(move || {
         let why = perform(
             &skill,
@@ -1507,7 +1496,10 @@ fn perform(
     let is_light = |call: &Call| {
         matches!(
             call,
-            Call::Light { keep: false, .. } | Call::Dim { .. } | Call::Show { .. }
+            Call::Light { keep: false, .. }
+                | Call::Dim { .. }
+                | Call::Show { .. }
+                | Call::Out { .. }
         )
     };
     let mut said = Vec::new();
@@ -1740,6 +1732,9 @@ fn act(
                 );
             }
             Call::Dim { steps, .. } => changed.dimmed += steps,
+            // Only the ring puts the light out (#1677): what it holds is
+            // given back by asking again, as any light of the ring's.
+            Call::Out { .. } if glow.is_some() => changed.dimmed += 1,
             // The run lasts while the pose is held.
             Call::Mood { lasting_us, .. } => {
                 changed.lasting_us = changed.lasting_us.max(*lasting_us);
@@ -1780,7 +1775,12 @@ fn act(
             _ => {}
         }
         said.push(match glow {
-            Some(glow) if matches!(call, Call::Light { keep: false, .. } | Call::Dim { .. }) => {
+            Some(glow)
+                if matches!(
+                    call,
+                    Call::Light { keep: false, .. } | Call::Dim { .. } | Call::Out { .. }
+                ) =>
+            {
                 glow.ask(call)
             }
             _ => make(call, sockets, bus, asker),
@@ -2191,6 +2191,11 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             .map(|_| actions("dim", "light_dimmer", json!({})))
             .collect::<Vec<_>>()
             .join(", "),
+        // Through the actions part it would be the person's light turned
+        // off, and kept so across a restart: only the ring is asked (#1677).
+        Call::Out { .. } => format!(
+            "light out: left alone, since only the ring puts it out ({REQUESTS_ENVIRONMENT}=on)"
+        ),
         Call::Mood {
             mood,
             lasting_us,

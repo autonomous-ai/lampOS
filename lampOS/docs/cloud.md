@@ -23,10 +23,16 @@ against lamp-06c1.
   doubles from 1 s to a minute, and the journal hears of it once, not on
   every try.
 - **Answers on `fd_channel`, at QoS 1, in V1's shapes** (`mqtt.md`): every
-  reply carries `device` (`lamp`), `type`, `version` (the installed build,
-  `<sequence>+<commit>`), `id`, `mac` (the lamp's `lamp-XXXX` name), `time`,
-  `wakeword_enabled` and `voice_input_mode`, and `timezone` and `local_ip`
-  when known.
+  reply carries `device` (`lamp`), `generation` (`lamp-v2`), `type`, `version`
+  (the installed build, `<sequence>+<commit>`), `id`, `mac` (the lamp's
+  `lamp-XXXX` name), `time`, `wakeword_enabled` and `voice_input_mode`, and
+  `timezone` and `local_ip` when known.
+  - **`generation`** is how a Lamp 2 is told from V1's: the backend keeps one
+    device type, `lamp`, for both, and routes a lamp by `device`, so that
+    stays `lamp`. The backend keeps the `generation` of the unasked `info` on
+    the device's record, and the app picks the Lamp 2 page by it (#1396, the
+    first builder and the backend, 19 Oct). V1's readers pass over a field
+    they don't know. Setup's status says the same (`docs/setup.md`).
 - **Pings the backend every 15 s**, as V1's `status_reporter`: `POST
   {base}/ping`, where `base` is `llm_base_url` with a trailing `/v1` cut,
   `?mqtt=true` while no broker is kept, with the voice's key as the bearer
@@ -106,7 +112,6 @@ is the same light. Two differences from V1 the page should know:
 
 - Whether the backend's `connected` comes from MQTT, the ping, or both, and
   where the app's `lan_ip` comes from.
-- Whether a `lamp-v2` record's replies must say `"device": "lamp-v2"`.
 - Whether the issued port is plain MQTT (V1's `mqtt://`) or TLS, and v5 or
   3.1.1. The client is built with rustls, unused while the port is plain.
 - `version` is the build when `lamp-cloud` started: `state.json` is handed

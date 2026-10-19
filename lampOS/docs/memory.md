@@ -333,6 +333,25 @@ the unchanged legacy client, used unless the new Days client is selected.
   came from. The opt-in store supports those links and transitive deletion;
   the legacy client does not send them or use frozen snapshots.
 
+- **Once, at a natural moment** (#1693 (3), `LAMP_MEMORY_THREADS=on`,
+  with the Days client only; off unless set). A session opened for someone
+  known asks the memory `follow_up` within the note's 300 ms. The memory
+  gives at most one open `thread` or `promise` observation of theirs, at
+  least 6 hours old (not the same conversation) and at most 14 days old,
+  newest first, never one given before, and none if one was given to them
+  in the last 24 hours. It records the one it gives in the same transaction,
+  so it's given once even if the moment never comes. The session is told,
+  after its note, to ask about it once if it fits early on, in its own
+  words, as a friend would, never saying it was told, and to leave it if the
+  moment isn't right. Its id joins the session's sources, so an exchange
+  about it is linked to it and goes when it's forgotten. Nobody known: none
+  is asked for (the room's scope is refused), since a lamp that can't tell
+  who is there mustn't ask one person about another's week. With no
+  observations (until (2) is on), there's nothing to give. Tests:
+  `days::a_follow_up_is_one_open_thread_given_once_a_day_and_never_for_the_room`,
+  `days::the_follow_up_request_answers_for_a_person_and_refuses_the_room`,
+  `remember::tests::with_the_switch_a_known_person_s_session_is_told_one_thread_to_ask_about`.
+
 ### Each person's own (#764)
 
 When the voice has eyes that remember faces (`LAMP_EYES_WHO_SOCKET`, the
