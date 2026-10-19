@@ -31,6 +31,14 @@ agent's own words stay with the tasks part and the voice, never on the bus.
 Asked about it, the lamp says it tells you when work you handed to Claude
 Code or Codex comes back, once and briefly, and that it can be switched off.
 
-Off on a lamp until it has been tried there (5 of 5 on lamp-4ace with the
-voice's own task news switched off); until then the voice's built-in news
-(`crates/voice/src/task_news.rs`) tells it.
+On every lamp the product installs, with the voice's `LAMP_TASK_NEWS=skill`:
+the voice waits for this skill's ask until 10 s after it had the news, then
+tells it itself, so each piece is told once, with the sway or the droop when
+the skill asked. This skill asks the moment the work settles (an item's run
+cannot wait), and its ask is gone 20 s later: news that settled while
+nobody was there, or long before a talk ended, is told by the voice when it
+can be, at once, without the sway.
+News of work that stopped, or that asks something, has no trigger here: the
+voice tells it after those 10 s. The voice's own timing of the news
+(`crates/voice/src/task_news.rs`) is taken out once this has done 5 of 5 on
+lamp-4ace.

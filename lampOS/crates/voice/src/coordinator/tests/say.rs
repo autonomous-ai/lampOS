@@ -537,6 +537,114 @@ fn news_takes_only_an_ask_for_its_own_task() {
     assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
 }
 
+/// The reviewer's P2 on #1667: news waits for the Task news skill from when
+/// the voice had it, the moment the skill asks, and not from when it could
+/// first be told. Settled while nobody was there and first told 30 s later,
+/// when someone is back, the skill's ask is long gone: the voice tells it
+/// at once, not 10 s later still. Had 3 s before it can be told, it waits
+/// out the rest of the 10 s, from when it was had however often it is held
+/// again, and the skill's ask is taken when it comes. A reminder, nothing
+/// had for it, waits all 10 s from when it can be said.
+#[test]
+fn news_waits_for_its_skill_from_when_the_voice_had_it() {
+    use crate::say::{SKILL_WAITS_US, Says, Source};
+    let had = 1_000_000;
+    let mut idle = Says::idle_for_test();
+    let news = |says: &mut Says, key: &str, task, now_us, held: &mut Option<(String, u64)>| {
+        hold_from(held, key, Some(had));
+        for_skill(Some(says), Source::Tasks, true, key, task, held, now_us)
+    };
+    let mut held = None;
+    assert!(matches!(
+        news(&mut idle, "s:9:1", Some(9), had + 30_000_000, &mut held),
+        Some(None)
+    ));
+    assert_eq!(held, None);
+    assert!(news(&mut idle, "s:10:1", Some(10), had + 3_000_000, &mut held).is_none());
+    // Held again on later ticks, and had later by the caller's count: the
+    // wait keeps its start.
+    hold_from(&mut held, "s:10:1", Some(had + 5_000_000));
+    assert_eq!(held, Some(("s:10:1".to_owned(), had)));
+    assert!(
+        for_skill(
+            Some(&mut idle),
+            Source::Tasks,
+            true,
+            "s:10:1",
+            Some(10),
+            &mut held,
+            had + SKILL_WAITS_US - 1
+        )
+        .is_none()
+    );
+    assert!(matches!(
+        news(
+            &mut idle,
+            "s:10:1",
+            Some(10),
+            had + SKILL_WAITS_US,
+            &mut held
+        ),
+        Some(None)
+    ));
+    // Within its 10 s, the skill's ask for it is taken: the sway comes with
+    // the words.
+    let (mut says, answered) =
+        Says::asking_for_task_test(Source::Tasks, "task-news", Some(11), 60_000_000);
+    let ticket = news(&mut says, "s:11:1", Some(11), had + 5_000_000, &mut held)
+        .flatten()
+        .expect("11's ask, for 11's news");
+    ticket.answer(Outcome::Spoken);
+    assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
+    // Nothing had: held from when it can be said, as a reminder is.
+    hold_from(&mut held, "s/1/1", None);
+    assert_eq!(held, None);
+    let reminder = |held: &mut Option<(String, u64)>, now_us| {
+        for_skill(
+            Some(&mut Says::idle_for_test()),
+            Source::Schedule,
+            true,
+            "s/1/1",
+            None,
+            held,
+            now_us,
+        )
+    };
+    assert!(reminder(&mut held, had + 30_000_000).is_none());
+    assert!(reminder(&mut held, had + 30_000_000 + SKILL_WAITS_US - 1).is_none());
+    assert!(matches!(
+        reminder(&mut held, had + 30_000_000 + SKILL_WAITS_US),
+        Some(None)
+    ));
+}
+
+/// [`news_for_skill`] counts the wait from when the news came in
+/// (`TaskNews::found_at`): in 30 s ago, told at once; in 3 s ago, it waits.
+#[test]
+fn news_first_in_line_waits_from_when_it_came_in() {
+    use crate::say::Says;
+    use std::time::Duration;
+    let news = |task: u64| crate::task_news::News {
+        key: format!("s1:{task}:1"),
+        note: "(News from work you handed over.)".into(),
+        until: None,
+        progress: None,
+        finished: None,
+        also: Vec::new(),
+    };
+    let mut idle = Says::idle_for_test();
+    let mut held = None;
+    let mut long_ago =
+        crate::task_news::TaskNews::waiting_for_test(news(9), Duration::from_secs(30));
+    assert!(matches!(
+        news_for_skill(&mut long_ago, Some(&mut idle), true, &mut held),
+        Some(None)
+    ));
+    let mut lately = crate::task_news::TaskNews::waiting_for_test(news(10), Duration::from_secs(3));
+    assert!(news_for_skill(&mut lately, Some(&mut idle), true, &mut held).is_none());
+    assert!(held.is_some_and(|(key, _)| key == "s1:10:1"));
+}
+
 /// #938: an owner with nothing under way and listening ready, as at rest.
 fn resting_owner() -> Controller {
     let mut owner = Controller::new(new_boot().unwrap(), now());

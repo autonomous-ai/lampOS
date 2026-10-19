@@ -95,7 +95,7 @@ differs. Folders are what the unit makes or names.
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
 | update | `lamp-update serve` | root | `/var/lib/lampos-update/` (0700) | `/etc/lampOS/update/key.pub` | none |
 | keeper | `lamp-keeper serve` | root | its service data folder | none | `lampos.target.d/keeper.conf`; the bus root |
-| skills | `lamp-skills` | lampos (product unit, #811) | none | the skill folders, `/var/lib/lampOS/skills/` (Welcome back from install) | its tools, `/run/lampos-actions/skills/` |
+| skills | `lamp-skills` | lampos (product unit, #811) | none | the skill folders, `/var/lib/lampOS/skills/` (every product skill from install) | its tools, `/run/lampos-actions/skills/` |
 | surround | `lamp-surround serve` | `@SURROUND_USER@` | not read for this page | `/etc/lampos/surround.json` (lower case, unlike every other part) | not read |
 
 The bus root, `/run/lampos-bus`, is made by the keeper (root, the parts'
@@ -190,6 +190,48 @@ lamp-4ace becomes the product's default, so the product takes lamp-4ace's
 set, but for `LAMP_SPEAK_FIRST`: the product's hello is the Welcome back
 skill (`lamp-skills`, #811), spoken through the voice's say service, so the
 voice's own hello is off, as lamp-4ace now has it too.
+
+**19 October: every behaviour that has a skill runs as the skill** (the
+owner: "everything is a skill"). Install puts every product skill in
+`/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`):
+Welcome back, Reminders, Task news, Stretch break, Stuffy air and Dance,
+each folder whole but for its `tests/`. The voice's own paths for them give
+way in the product's `lamp-voice.service`: its hello stays off
+(`LAMP_SPEAK_FIRST` unset), and `LAMP_SCHEDULE_SPEAK=skill` and
+`LAMP_TASK_NEWS=skill` make a due reminder and the news of a task wait up
+to 10 s for the skill's ask (`from = "schedule"`, `from = "tasks"`). The
+voice still keeps the words: it says each once, with the skill's ticket
+when the skill asked, so the lamp looks up, sways or droops with them, or
+by itself when no ask came. Each skill asks once, and an ask is gone 20 s
+later (`say::FROM_LIVES_US`), so the two are timed to meet (the reviewer's
+P2 on #1667). Reminders asks only while the voice rests (`voice/state`),
+keeping a reminder due during a talk until the talk ends (`wait`), when
+the voice can say it too: said then, with the look. Task news asks the
+moment the work settles (its per-task trigger cannot wait), so the voice
+counts its 10 s from when it had the news, not from when it can first tell
+it: news that settled while nobody was there, or more than 20 s before a
+talk ended, is told at once when it can be, by the voice, without the sway.
+The voice says a reminder itself 10 s after it can when `lamp-skills` is
+down, or when the ask came too early: at a pause after which the talk went
+on for over 20 s, or while the voice rested but could not say it (paused
+or muted: what `voice/state` says then was not checked). It says news that
+stopped or asks something, which no skill takes, 10 s after it came in. Left out, with
+why (`install::NOT_PRODUCT_SKILLS`): Desk tutor, which reads handwriting
+from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`) that
+the product doesn't run, and its marks, called only after its look. A test
+fails on a folder in `lampOS/skills/` that is in neither list. With them a
+product lamp tells each session 31 functions of the 32 a session takes
+(`lamp_gemini::MAX_TOOLS`): the voice's own 13, the actions part's 17 and
+Dance's (`crates/update/tests/functions.rs`, which fails if one is left out
+or the count changes). The voice leaves out by order, without a word, what
+is past 32, so Desk tutor's two would push its marks' `show_verdict` out. lamp-4ace's
+own unit keeps `LAMP_SCHEDULE_SPEAK=on` and the voice's own news until the
+skills have run there; the voice's own code for them is removed after.
+Install only writes skills, never removes one: a skill later moved out of
+`PRODUCT_SKILLS`, or a file dropped from a skill's folder, stays on every
+lamp installed before and keeps running. Taking a skill out is the removal
+work's (`lamp-skills remove` and the core and installable kinds, on
+`first/skills-core-installable`), not install's.
 
 **17 October: lamp-4ace's switches of that day became the product's** (joining.md's rule), taken from lamp-4ace's unit as it ran that day; most were switched on there on 16 or 17 October, several only as part of the groups of #1238's census, so their lamp record is that day's running, not a run of their own. They're the switch groups (lead-in to a tool, a waited answer kept, the stop told, the asker first only recorded, names checked, the staff note, task news at a pause, memory rules), the light requests (the voice's ring and the skills' half, `lamp-skills.service`), the quiet pace, starting offline, the asleep ring, a sorry in another language, the lamp's name in passing ignored, first words kept, tasks asked and who asked, a cut keeping the name, the self-test's speaker, the stall recorder, the strong ring eye, and short sounds judged in a quiet room after a check. Not taken: those that need the second voice's configuration (stop words, its down-line and wait cue, the voice link), which a product lamp doesn't have; the office's own (its Harness target, its say group); head touch, which needs Controls' and Expression's flags as well (#711); those that need another part's flag the product doesn't pass (the Policy holding actions needs `lamp-policy --act attention`, its hello and progress news need `--hello` and `--progress`, the full look needs the eyes' `--full-look`, a restored mute needs `--controls-mute`); and "that was weird", a builder's review tool whose marks (`/var/lib/lampOS/voice/marked/`) the reset doesn't wipe. Expression's catalogue differs too (`expression-alive-name-speech` on
 lamp-4ace, `expression-alive` on lamp-52e6): the product takes lamp-4ace's.
@@ -388,9 +430,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    a link: a link is left as it is (#1293). A lamp's own setting found
    closed to other users is kept as it is and said: `PATH is closed to
    other users (600): the parts run as lampos cannot read it`. The product settings (Expression's catalogue, the
-   controls' two files, and the first skill, Welcome back, in
-   `/var/lib/lampOS/skills/welcome-back/`: its `skill.toml`, `SKILL.md` and
-   light, not its tests) are written only where one is missing or is still
+   controls' two files, and the product skills, each in
+   `/var/lib/lampOS/skills/<skill>/`: its `skill.toml`, `SKILL.md` and
+   lights, not its tests) are written only where one is missing or is still
    exactly what an install wrote before, by the SHA-256 kept for it in
    `state.json`, so a newer build's default reaches a lamp that never
    changed it. A setting changed on the lamp since, or there before any
@@ -669,8 +711,11 @@ lamp-update check-units --cat units.txt --product lampOS/deploy/product
   unit texts (lamp-4ace's names `/opt/lampOS/records/`, the crate's
   `/opt/lampOS/bin/`), while `deploy/units/README.md` says it has no unit on
   any lamp.
-- `lamp-skills` (#811, from lamp-06c1): installed with Welcome back and the
-  voice's say service (`LAMP_SAY=on`, its socket in the group `lampos`), the
-  voice's own hello (`LAMP_SPEAK_FIRST`) off so the lamp greets once, and
+- `lamp-skills` (#811, from lamp-06c1): installed with every product skill
+  (since 19 October) and the voice's say service (`LAMP_SAY=on`, its socket
+  in the group `lampos`), the voice's own hello (`LAMP_SPEAK_FIRST`) off so
+  the lamp greets once, its reminders and task news waiting for their
+  skills (`LAMP_SCHEDULE_SPEAK=skill`, `LAMP_TASK_NEWS=skill`), and
   `LAMP_SKILLS_ASK=skip` until the Policy's gate (#939). Only in tests: no
-  lamp has run the product unit yet.
+  lamp has run the product unit with them yet, and Reminders and Task news
+  have not run as skills on any lamp.

@@ -2219,8 +2219,12 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "httparse",
+ "lamp-actions",
  "lamp-bus",
+ "lamp-gemini",
  "lamp-msgs",
+ "lamp-skills",
+ "lamp-voice",
  "ring",
  "rustix",
  "rustls",
