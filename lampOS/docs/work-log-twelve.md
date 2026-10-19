@@ -397,3 +397,7 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   (20 made-up conversations, scored against the bar) is #2021; the real
   DeepSeek run waits on where its key comes from. The thread trial row is
   designed and waits on Tests' yes; its proof line is #2023.
+- #2020's P3 fixed (the writer ends its conversation behind its queue).
+  #2021's command posted for the first builder's run on lamp-4ace through the
+  relay. The thread trial row is #2029 on lamp-voice, with Tests' three
+  changes; trials-test 283/0.
