@@ -487,20 +487,48 @@ impl Drop for ForTexts {
 }
 
 impl ForTexts {
-    /// For the tasks part in `directory` (`agent_tasks::Place`), keeping
-    /// what is given in the voice's file of what was told; none if its
-    /// thread can't start.
-    pub fn for_tasks(directory: &Path) -> Option<Self> {
-        Self::start(directory, told_file(), typed_file(), boot_clock)
+    /// For the tasks part at `place`, keeping what is given in the voice's
+    /// file of what was told; none if its thread can't start. A skill made
+    /// by voice is kept and told with the place's own switch
+    /// (`Place::make_skill`, the worker's flag): a worker's environment is
+    /// cleared, so it is never read here (the reviewer on #2011).
+    pub fn for_tasks(place: &crate::agent_tasks::Place) -> Option<Self> {
+        Self::for_place(
+            place,
+            told_file(),
+            typed_file(),
+            boot_clock,
+            crate::made_skill::Keeping::when(true),
+        )
+    }
+
+    /// [`Self::for_tasks`], with its files, its clock and where a made skill
+    /// would be kept (`keeping`), used only with the place's switch.
+    pub fn for_place(
+        place: &crate::agent_tasks::Place,
+        told_file: PathBuf,
+        typed_file: PathBuf,
+        clock: fn() -> Option<BootClock>,
+        keeping: Option<crate::made_skill::Keeping>,
+    ) -> Option<Self> {
+        Self::start(
+            &place.directory,
+            told_file,
+            typed_file,
+            clock,
+            keeping.filter(|_| place.make_skill),
+        )
     }
 
     /// Read the tasks part in `directory`, keeping what is given in
-    /// `told_file`, on the clock `clock` reads.
+    /// `told_file`, on the clock `clock` reads, a skill made by voice kept
+    /// in `made`.
     pub fn start(
         directory: &Path,
         told_file: PathBuf,
         typed_file: PathBuf,
         clock: fn() -> Option<BootClock>,
+        made: Option<crate::made_skill::Keeping>,
     ) -> Option<Self> {
         let read = Arc::new(Mutex::new(Vec::new()));
         let stopping = Arc::new(AtomicBool::new(false));
@@ -510,7 +538,6 @@ impl ForTexts {
             std::thread::Builder::new()
                 .name("lamp-voice-text-news".into())
                 .spawn(move || {
-                    let made = crate::made_skill::Keeping::from_environment();
                     while !stopping.load(Ordering::Relaxed) {
                         if let Some(now) = clock() {
                             let news = read_once_with(
@@ -1237,8 +1264,8 @@ fn made_note(
     let made = crate::made_skill::keep(answer, data["truncated"] == json!(true), key, keeping);
     match &made {
         Ok(made) => eprintln!(
-            "lamp-voice: a skill made by voice is kept, {} {}, sha256 {}",
-            made.name, made.version, made.sha256
+            "lamp-voice: a skill made by voice is kept, version {}, sha256 {}",
+            made.version, made.sha256
         ),
         Err(why) => eprintln!("lamp-voice: a skill made by voice is not kept: {}", why.0),
     }
@@ -2258,6 +2285,105 @@ mod tests {
     /// #1673: the news for texts is read beside them, a typed answer is
     /// given it without the spoken opening, and once given it is kept as
     /// told: neither the texts nor the voice's own reader take it again.
+    /// The reviewer's P2-1 on #2011: a skill asked for by text is read by
+    /// the texts' own reader, in the second worker, whose environment is
+    /// cleared. Started as the worker starts it, with the place's switch
+    /// (`ForTexts::for_tasks`, `Keeping::when(place.make_skill)`), its news
+    /// is the skill kept, never its files; without the switch it is any
+    /// task's, its request quoted.
+    #[test]
+    fn a_skill_made_by_text_is_told_as_kept_by_the_texts_reader() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("task-made-texts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let program = root.join("pack");
+        std::fs::write(
+            &program,
+            "#!/bin/sh\nname=$(basename \"$4\")\nprintf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let request = "make me a skill that dims the light at 10 pm";
+        let brief = crate::made_skill::brief(request).unwrap();
+        let answer = "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\nlight = true\n```\n```SKILL.md\n---\nname: evening-dim\ndescription: Dims the light a shade at 10 pm.\n---\n```\n";
+        let socket = root.join("request.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let task_line = json!({"ok":true,"text":brief,"target":{"engine":"claude"},
+            "observations":[seen(1, "idle", "boot-a", NOW - 1_000)]});
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                let reply = match asked["op"].as_str().unwrap() {
+                    "list" => {
+                        json!({"ok":true,"store_id":"s1","items":[{"id":1,"observations":1}]})
+                    }
+                    "get_task" => task_line.clone(),
+                    "get_observation" => {
+                        json!({"ok":true,"data":{"state":"idle","answer":answer,"truncated":false}})
+                    }
+                    _ => json!({"ok":false}),
+                };
+                writeln!(stream, "{reply}").unwrap();
+            }
+        });
+        let typed = root.join("typed");
+        std::fs::write(&typed, "s1:1\n").unwrap();
+        let keeping = crate::made_skill::Keeping {
+            directory: root.join("made"),
+            program,
+        };
+        let read = |place: &crate::agent_tasks::Place| {
+            let texts = ForTexts::for_place(
+                place,
+                root.join("told"),
+                typed.clone(),
+                test_clock,
+                Some(keeping.clone()),
+            )
+            .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while texts.untold().is_empty() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            texts
+                .untold()
+                .first()
+                .map(|news| news.note.clone())
+                .unwrap()
+        };
+        let on = crate::agent_tasks::Place {
+            directory: root.clone(),
+            target: crate::agent_tasks::DEFAULT_TARGET.into(),
+            who: false,
+            lead_in: false,
+            asked: false,
+            accounts: false,
+            machine_names: false,
+            needs: None,
+            staff_note: false,
+            make_skill: true,
+        };
+        let kept = read(&on);
+        assert!(kept.contains(crate::made_skill::NEEDS_A_YES), "{kept}");
+        assert!(!kept.contains("skill.toml"), "{kept}");
+        let typed_note = crate::messages::typed(&kept);
+        assert!(
+            typed_note.contains(crate::made_skill::NEEDS_A_YES),
+            "{typed_note}"
+        );
+        let plain = read(&crate::agent_tasks::Place {
+            make_skill: false,
+            ..on.clone()
+        });
+        assert!(!plain.contains(crate::made_skill::NEEDS_A_YES), "{plain}");
+        assert!(plain.contains(&format!("\"{request}\"")), "{plain}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[test]
     fn news_for_texts_is_read_beside_them_and_kept_told_once_given() {
         let root = std::env::temp_dir().join(format!("task-news-texts-{}", std::process::id()));
@@ -2294,7 +2420,7 @@ mod tests {
         // 19 Oct).
         let typed = root.join("typed");
         std::fs::write(&typed, "s1:1\n").unwrap();
-        let texts = ForTexts::start(&root, told.clone(), typed.clone(), test_clock).unwrap();
+        let texts = ForTexts::start(&root, told.clone(), typed.clone(), test_clock, None).unwrap();
         let deadline = Instant::now() + Duration::from_secs(5);
         while texts.untold().is_empty() && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(20));

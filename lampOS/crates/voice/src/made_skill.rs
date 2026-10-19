@@ -22,7 +22,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
-    io::{self, Read, Write},
+    io::{self, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     time::{Duration, Instant, SystemTime},
@@ -256,6 +256,15 @@ pub fn capped(text: &str) -> Result<(String, Uses), Refused> {
     let Some(version) = table.get("version").and_then(|version| version.as_str()) else {
         return Err(Refused::new("it has no version"));
     };
+    // Asked of the Policy as a nudge, never as a hello, news or a reminder
+    // (the reviewer on #2011): the act `lamp-skills` passes on.
+    if let Some(ask) = table.get("ask")
+        && ask.get("policy").and_then(|policy| policy.as_str()) != Some("nudge")
+    {
+        return Err(Refused::new(
+            "it asks the Policy as something other than a nudge",
+        ));
+    }
     let mut uses = Uses::default();
     if let Some(permissions) = table.get("permissions") {
         let Some(permissions) = permissions.as_table() else {
@@ -335,9 +344,16 @@ pub struct Keeping {
 }
 
 impl Keeping {
-    /// The product's, with the switch on.
+    /// The product's, with the switch on in this process's environment:
+    /// the coordinator's, which systemd gives it. A worker's is cleared, so
+    /// a worker is told by its flag ([`Self::when`]).
     pub fn from_environment() -> Option<Self> {
-        (std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")).then(|| Self {
+        Self::when(std::env::var(ENVIRONMENT).ok().as_deref() == Some("on"))
+    }
+
+    /// The product's, if `on` (`agent_tasks::Place::make_skill`).
+    pub fn when(on: bool) -> Option<Self> {
+        on.then(|| Self {
             directory: PathBuf::from(DIRECTORY),
             program: PathBuf::from(PROGRAM),
         })
@@ -368,6 +384,7 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
         Refused::new("the lamp couldn't keep it")
     };
     ensure_private(&keeping.directory).map_err(unkept)?;
+    drop_unfinished(&keeping.directory);
     if let Some(made) = kept(&keeping.directory, from) {
         return Ok(made);
     }
@@ -399,7 +416,13 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
         let kept_as = keeping
             .directory
             .join(format!("{name}-{version}-{}.tar", &sha256[..12]));
-        fs::write(&kept_as, &bytes).map_err(unkept)?;
+        // Written whole beside it, and moved in only once the index names
+        // it: a crash leaves a `.new` the next keep deletes, never a
+        // package nothing names (the reviewer on #2011).
+        let new = keeping
+            .directory
+            .join(format!(".{name}-{version}-{}.tar.new", &sha256[..12]));
+        fs::write(&new, &bytes).map_err(unkept)?;
         let made = Made {
             name,
             version,
@@ -409,6 +432,7 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
             package: kept_as,
         };
         remember(&keeping.directory, from, &made).map_err(unkept)?;
+        fs::rename(&new, &made.package).map_err(unkept)?;
         Ok(made)
     });
     let _ = fs::remove_dir_all(&work);
@@ -425,7 +449,7 @@ fn pack(program: &Path, folder: &Path, out: &Path) -> Result<(), Refused> {
         .arg(folder)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|why| {
             eprintln!("lamp-voice: a made skill was not checked: {why}");
@@ -448,14 +472,13 @@ fn pack(program: &Path, folder: &Path, out: &Path) -> Result<(), Refused> {
     if status.success() {
         return Ok(());
     }
-    // Why, for the journal: lamp-skills' own words, never the skill's.
-    let mut why = String::new();
-    if let Some(mut stderr) = child.stderr.take() {
-        let _ = stderr.by_ref().take(2048).read_to_string(&mut why);
-    }
+    // Only its code: lamp-skills' words can quote the skill's, which come
+    // from the agent and the request (the reviewer on #2011).
     eprintln!(
-        "lamp-voice: a made skill did not pass lamp-skills' check: {}",
-        why.lines().next().unwrap_or("no reason given")
+        "lamp-voice: a made skill did not pass lamp-skills' check (exit {})",
+        status
+            .code()
+            .map_or("none".to_owned(), |code| code.to_string())
     );
     Err(Refused::new("it doesn't pass the lamp's check"))
 }
@@ -466,6 +489,22 @@ fn ensure_private(directory: &Path) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     fs::create_dir_all(directory)?;
     fs::set_permissions(directory, fs::Permissions::from_mode(0o700))
+}
+
+/// A package a crash left half moved in (`.NAME.tar.new`), deleted.
+fn drop_unfinished(directory: &Path) {
+    let Ok(entries) = fs::read_dir(directory) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        if name
+            .to_str()
+            .is_some_and(|name| name.starts_with('.') && name.ends_with(".tar.new"))
+        {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
 }
 
 /// What is kept, oldest first.
@@ -683,6 +722,13 @@ light = { dim = 1 }
         assert!(capped(&tool).unwrap_err().0.contains("function"));
         let core = TOML.replace("installable", "core");
         assert!(capped(&core).unwrap_err().0.contains("installable"));
+        let reminder = TOML.replace("policy = \"nudge\"", "policy = \"reminder\"");
+        assert!(
+            capped(&reminder)
+                .unwrap_err()
+                .0
+                .contains("other than a nudge")
+        );
         let unversioned = TOML.replace("version = \"1.0.0\"\n", "");
         assert!(capped(&unversioned).unwrap_err().0.contains("version"));
         assert!(capped("not toml [").is_err());
@@ -746,6 +792,20 @@ light = { dim = 1 }
         );
         assert!(refused.contains("can't keep it: it asks to read more"));
         assert!(!refused.contains(NEEDS_A_YES));
+    }
+
+    /// The keeping is the product's only with the switch: a worker's from
+    /// its place's flag (`when`), the coordinator's from its environment.
+    #[test]
+    fn the_keeping_is_the_products_only_with_the_switch() {
+        assert_eq!(
+            Keeping::when(true),
+            Some(Keeping {
+                directory: PathBuf::from(DIRECTORY),
+                program: PathBuf::from(PROGRAM),
+            })
+        );
+        assert_eq!(Keeping::when(false), None);
     }
 
     /// Without its program, nothing is kept and the lamp says it couldn't

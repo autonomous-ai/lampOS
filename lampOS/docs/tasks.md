@@ -1327,8 +1327,12 @@ The worker's `--tasks-make-skill`, after `--tasks-needs`, gives the model
   says, and told alone (never with other news, never read out).
 - **Without the switch,** such a task's news is any task's, the request
   quoted.
-- **The journal** says `a skill made by voice is kept, NAME VERSION, sha256
-  …` or why not, never the files.
+- **The journal** says `a skill made by voice is kept, version VERSION,
+  sha256 …` or why not, with `lamp-skills`' exit code only: never the files,
+  the name or `lamp-skills`' words, which can quote the agent's.
+- **The reset** wipes `/var/lib/lampOS/voice/made-skills` with the person's
+  other stores ([setup.md](setup.md)).
+- **Without the switch** a `make_skill` call does nothing.
 
 ### Asked of the staff, done by the lamp (#854, off unless `LAMP_TASKS_ASKED=on`)
 

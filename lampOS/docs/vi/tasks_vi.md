@@ -21,5 +21,9 @@ Cờ `--tasks-make-skill` của worker, sau `--tasks-needs`, cho mô hình hàm
   câu trả lời được lấy làm hai tệp của kỹ năng, được giữ như skills_vi.md
   nói, và được nói riêng (không bao giờ cùng tin khác, không bao giờ đọc ra).
 - **Khi tắt,** tin về việc như vậy giống mọi việc khác, có trích yêu cầu.
-- **Nhật ký** ghi `a skill made by voice is kept, NAME VERSION, sha256 …`
-  hoặc lý do không giữ, không bao giờ ghi các tệp.
+- **Nhật ký** ghi `a skill made by voice is kept, version VERSION, sha256 …`
+  hoặc lý do không giữ, chỉ kèm mã thoát của `lamp-skills`: không bao giờ ghi
+  các tệp, tên kỹ năng hay lời của `lamp-skills`, vốn có thể trích lời của tác tử.
+- **Khi đặt lại đèn,** `/var/lib/lampOS/voice/made-skills` bị xóa cùng các kho
+  khác của người dùng.
+- **Khi tắt,** một lời gọi `make_skill` không làm gì.

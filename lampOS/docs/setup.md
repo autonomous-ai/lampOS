@@ -109,6 +109,8 @@ targets), schedule `/var/lib/lampos-schedule/store`, voice sessions
 `/run/lampos-voice/thread.json`, the voice's first-output log
 `/var/lib/lampOS/voice/first-output`, what the voice has told of tasks
 `/var/lib/lampOS/voice/tasks-told` (its default, `LAMP_TASKS_TOLD`), the
+skills made by voice and kept unconfirmed `/var/lib/lampOS/voice/made-skills`
+(`LAMP_MAKE_SKILL`, #2011), the
 person's light kept across a restart `/var/lib/lampOS/light` (emptied)
 (`LAMP_LIGHT_KEEP`), the
 policy's log `/var/lib/lampos-policy`, the person's parts of Harness under

@@ -1266,6 +1266,11 @@ fn run_for(
             // A skill to make (`crate::made_skill`): the brief, with the
             // person's request and nothing else, handed over as any work.
             let making = call.name == crate::made_skill::MAKE;
+            // Never without its switch, whatever the model calls (the
+            // reviewer on #2011).
+            if making && !place.make_skill {
+                return (crate::tools::unavailable(), false);
+            }
             let brief;
             let task = if making {
                 let request = call
@@ -3009,6 +3014,16 @@ pub(crate) mod tests {
             name: name.into(),
             args,
         };
+        // Without the switch, a made-up call does nothing (the reviewer's
+        // P3 on #2011): nothing is asked of the tasks part.
+        let (off, _) = run(
+            &without,
+            &call(crate::made_skill::MAKE, json!({ "request": request })),
+            2,
+            true,
+            PEER_WAIT,
+        );
+        assert_eq!(off, crate::tools::unavailable());
         let (told, _) = run(
             &making,
             &call(crate::made_skill::MAKE, json!({ "request": request })),

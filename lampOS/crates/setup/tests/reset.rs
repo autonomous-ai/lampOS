@@ -286,7 +286,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 25] = [
+const PERSON_STORES: [&str; 26] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -315,6 +315,10 @@ const PERSON_STORES: [&str; 25] = [
     // The voice's default for the task news it has told (reviewer, #817):
     // `DEFAULT_TOLD` in crates/voice/src/task_news.rs.
     "/var/lib/lampOS/voice/tasks-told",
+    // Skills made by voice, kept unconfirmed (`LAMP_MAKE_SKILL`, #2011): their
+    // names and words come from the person's requests (the reviewer's P2-2
+    // on #2011), `made_skill::DIRECTORY` in crates/voice/src/made_skill.rs.
+    "/var/lib/lampOS/voice/made-skills",
     // The person's light the ring keeps with `LAMP_LIGHT_KEEP=on` (#1468):
     // the folder, so a `person.json.new` a power cut left goes too.
     "/var/lib/lampOS/light",

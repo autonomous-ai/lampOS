@@ -974,6 +974,7 @@ happens:
    - `[permissions]` with only `light`, `body`, and `topics` among
      `voice/state` and `room/presence`;
    - no function for the model (`tool`);
+   - `[ask] policy` only `nudge`, never a hello, news or a reminder;
    - speaking, messages, the look and any other topic are refused.
    Widening this is the lead's call.
 4. **Checked.** The card is marked `made: here` (`lamp-cloud`'s "Made on

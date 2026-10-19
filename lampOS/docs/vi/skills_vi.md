@@ -31,6 +31,7 @@ Diễn ra như sau:
    - `[permissions]` chỉ có `light`, `body`, và `topics` trong số
      `voice/state` và `room/presence`;
    - không có hàm cho mô hình (`tool`);
+   - `[ask] policy` chỉ là `nudge`, không bao giờ là lời chào, tin tức hay lời nhắc;
    - nói, tin nhắn, cái nhìn và mọi chủ đề khác đều bị từ chối.
    Mở rộng giới hạn này là quyết định của trưởng nhóm.
 4. **Kiểm tra.** Thẻ được đánh dấu `made: here` (nhóm "Tạo trên đèn này"
