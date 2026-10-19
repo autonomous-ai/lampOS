@@ -540,6 +540,22 @@ pub fn answers(function: &str) -> bool {
     function != HEARD_MY_NAME && function != crate::tools::NOT_FOR_ME
 }
 
+/// The calls that withdraw the person's consent, done even when the rule
+/// holds their line's answer (the first builder on #1722, 16:44; #1683):
+/// today only [`crate::reports_stop::NAME`]. Each one only reduces what
+/// leaves the lamp and never adds to it, so done for a colleague's line it
+/// costs one report not sent, while a person who asks to stop sharing and
+/// is not heard has to ask twice, the worse failure. A call that adds to
+/// what leaves the lamp, or changes the lamp, is never put here: it stays
+/// held with its answer. The answer itself stays held either way.
+pub const DONE_THOUGH_HELD: &[&str] = &[crate::reports_stop::NAME];
+
+/// Whether a call for this function is done though its line's answer is
+/// held ([`DONE_THOUGH_HELD`]).
+pub fn done_though_held(function: &str) -> bool {
+    DONE_THOUGH_HELD.contains(&function)
+}
+
 /// Whether an answer is played, and why, for the record.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Verdict {

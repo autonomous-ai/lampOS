@@ -2968,6 +2968,9 @@ struct Asked {
     took: Duration,
     /// When the call reached the worker.
     called_us: u64,
+    /// Done though its line's answer is held, as a call that withdraws
+    /// consent ([`crate::attention::DONE_THOUGH_HELD`]).
+    held: bool,
     /// The news key a `check_agent_task` answer held, taken out of what the
     /// model is told (#1390).
     news: Option<String>,
@@ -3063,6 +3066,18 @@ impl ToolDesk {
                 .is_ok();
             (sent, monotonic_us())
         };
+        // A call that withdraws consent is done though its line's answer
+        // is held: stopping what leaves the lamp never waits for the room
+        // (the first builder on #1722, 16:44). Its answer stays held: the
+        // model is told, and nothing it says is played.
+        if held
+            && crate::attention::done_though_held(&call.name)
+            && self.waiting < lamp_gemini::MAX_TOOL_CALLS
+            && let route @ Route::ReportsStop = crate::tools::route(&self.settings, &call.name)
+        {
+            self.run(provider, lineage, call, route, called_us, memory, true);
+            return;
+        }
         // A request whose answer is held back has nothing done for it
         // either: the call is answered, and not run.
         if held
@@ -3207,7 +3222,7 @@ impl ToolDesk {
             | Route::ReportsStop)
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
-                self.run(provider, lineage, call, route, called_us, memory);
+                self.run(provider, lineage, call, route, called_us, memory, false);
             }
             Route::Executive(_)
             | Route::UseSkill(_)
@@ -3247,6 +3262,7 @@ impl ToolDesk {
         route: crate::tools::Route,
         called_us: u64,
         memory: Option<crate::memory_scope::ScopeLease>,
+        held: bool,
     ) {
         use crate::tools::Route;
         let request = lineage.request.get();
@@ -3255,16 +3271,20 @@ impl ToolDesk {
         if crate::tools::keeps_out(&route, &call.name) {
             crate::remember::keep_out(request);
         }
-        if matches!(
-            route,
-            Route::Executive(_)
-                | Route::UseSkill(_)
-                | Route::Schedule(_)
-                | Route::Tasks(_)
-                | Route::Faces(..)
-                | Route::Mark(_)
-                | Route::ReportsStop
-        ) {
+        // A call done though its answer is held is not the lamp answering:
+        // the room is told nothing of it, as of any held line.
+        if !held
+            && matches!(
+                route,
+                Route::Executive(_)
+                    | Route::UseSkill(_)
+                    | Route::Schedule(_)
+                    | Route::Tasks(_)
+                    | Route::Faces(..)
+                    | Route::Mark(_)
+                    | Route::ReportsStop
+            )
+        {
             self.acted = Some(request);
             // Something done is the lamp answering, words or none (#829,
             // the sixth on #1029). A lookup, an action the Policy held and
@@ -3310,6 +3330,7 @@ impl ToolDesk {
                     took: started.elapsed(),
                     called_us,
                     news,
+                    held,
                 });
             });
         match spawned {
@@ -3441,6 +3462,7 @@ impl ToolDesk {
                             route,
                             parked.called_us,
                             parked.memory,
+                            false,
                         );
                     } else {
                         let sent = provider
@@ -3543,6 +3565,19 @@ impl ToolDesk {
                         "not sent: its connection has gone"
                     }
                 );
+                if done.held {
+                    if done.answered {
+                        eprintln!(
+                            "lamp-voice provider: request {}: {} done though the answer was held (consent withdrawn)",
+                            done.request, done.call.name
+                        );
+                    } else {
+                        eprintln!(
+                            "lamp-voice provider: request {}: {} asked though the answer was held (consent withdrawn); not shown done",
+                            done.request, done.call.name
+                        );
+                    }
+                }
             },
         );
     }
@@ -5755,6 +5790,7 @@ mod tests {
             took: Duration::from_millis(41),
             called_us: 1_000,
             news: None,
+            held: false,
         };
         desk.asked.send(asked(7, "start_agent_task", true)).unwrap();
         desk.asked
@@ -5823,6 +5859,7 @@ mod tests {
             took: Duration::from_millis(3),
             called_us: 1,
             news: None,
+            held: false,
         };
         let look = serde_json::json!({"next": "Say only \"Let me take a look.\"", "look": true});
         desk.asked.send(asked(7, look.clone(), true, true)).unwrap();
@@ -5875,6 +5912,7 @@ mod tests {
             took: Duration::from_millis(3),
             called_us: 1,
             news: news.map(str::to_owned),
+            held: false,
         };
         desk.asked.send(asked(7, Some("s1:2:4"))).unwrap();
         desk.asked.send(asked(8, Some("s1:3:5"))).unwrap();
@@ -5914,6 +5952,7 @@ mod tests {
                 took: Duration::from_millis(40),
                 called_us: 1,
                 news: None,
+                held: false,
             })
             .unwrap();
         desk.waiting = 1;
@@ -13949,6 +13988,9 @@ mod tests {
     /// A line going on in a busy room waits for the Policy (#1522): tests
     /// only.
     mod going_on_asks;
+    /// A held line's `reports_stop` is done, its answer kept held (the
+    /// first builder on #1722, #1683): tests only.
+    mod held_consent;
     /// A name told is a name kept (`LAMP_NAMES=checked`): tests only.
     mod names;
     /// The Policy holds the lamp's actions (#800): tests only.
