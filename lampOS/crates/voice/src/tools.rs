@@ -171,9 +171,9 @@ pub fn arguments_from_environment() -> Vec<String> {
         flags.push(crate::onboarding::FLAG.to_owned());
         flags.push(file.display().to_string());
     }
-    if std::env::var(crate::use_skill::ENVIRONMENT).ok().as_deref() == Some("on") {
-        flags.push(crate::use_skill::FLAG.to_owned());
-    }
+    flags.extend(crate::use_skill::arguments(
+        std::env::var(crate::use_skill::ENVIRONMENT).ok().as_deref(),
+    ));
     flags
 }
 
@@ -745,9 +745,13 @@ pub fn run_call(
         Route::Mark(session) => ("the marks", crate::marked::run(session, call, heard)),
         Route::Onboarding(file) => ("the onboarding", crate::onboarding::run(file, call)),
         Route::UseSkill(settings) => {
-            match crate::use_skill::translate(call, &skill_tools(settings)) {
+            let skills = skill_tools(settings);
+            match crate::use_skill::translate(call, crate::use_skill::offered(&skills)) {
+                // Only ever the skills' socket (the reviewer on #1696).
                 Ok(skill) => match crate::tools::route(settings, &skill.name) {
-                    found @ Route::Executive(_) => run_call(&found, &skill, request, heard),
+                    found @ Route::Executive(_) if matches!(&found, Route::Executive(dir) if dir.ends_with(SKILLS_DIR)) => {
+                        run_call(&found, &skill, request, heard)
+                    }
                     _ => ("nobody", (unavailable(), false)),
                 },
                 Err(told) => ("the skills", (told, false)),
@@ -1954,7 +1958,7 @@ mod tests {
     /// with Desk tutor installed (#1668).
     fn many_skills(name: &str) -> (PathBuf, Settings) {
         let dir = directory(name);
-        let executive: Vec<Value> = (0..17)
+        let executive: Vec<Value> = (0..25)
             .map(|n| json!({"name": format!("light_{n}"), "description": "A light."}))
             .collect();
         std::fs::write(
@@ -1977,7 +1981,8 @@ mod tests {
             .to_string(),
         )
         .unwrap();
-        // The voice's own thirteen: twelve stand-ins and not_for_me.
+        // Thirty before the skills, as on a product lamp: the voice's own
+        // five here, and the executive's twenty-five standing in for the rest.
         let settings = Settings {
             decline: true,
             exec: Some(dir.clone()),
@@ -1995,9 +2000,20 @@ mod tests {
     fn with_use_skill_every_skill_is_reached_through_one_function() {
         let (dir, mut settings) = many_skills("use-skill");
         let core = core_tools(&settings).len();
+        assert_eq!(core, 30);
+        // Without it, Desk tutor's verdict is cut, silently but for the
+        // setup line (the reviewer on #1696).
         let off = declared(&settings);
-        assert_eq!(off.len(), core + 3);
-        assert!(off.iter().any(|tool| tool.name == "dance"));
+        assert_eq!(off.len(), 32);
+        assert!(off.iter().any(|tool| tool.name == "check_my_work"));
+        assert!(!off.iter().any(|tool| tool.name == "show_verdict"));
+        let said = crate::session_tools::setup_line(&off, &settings);
+        assert!(
+            said.ends_with(
+                "; skills not given: show_verdict (past 32: LAMP_USE_SKILL=on reaches them)"
+            ),
+            "{said}"
+        );
         settings.use_skill = true;
         let on = declared(&settings);
         assert_eq!(on.len(), core + 1);
@@ -2011,6 +2027,8 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["dance", "check_my_work", "show_verdict"]
         );
+        let said = crate::session_tools::setup_line(&on, &settings);
+        assert!(said.ends_with("; 3 skills through use_skill"), "{said}");
         let (kept, left_out) = admitted(on);
         assert!(left_out.is_empty(), "{left_out:?}");
         assert_eq!(kept.len(), core + 1);
@@ -2019,13 +2037,40 @@ mod tests {
             Route::UseSkill(Box::new(settings.clone()))
         );
         // Without the switch, use_skill is nobody's, and a catalog's
-        // function of that name is never told.
+        // function of that name is never told: the name is the voice's,
+        // switch or not (the reviewer on #1696).
         settings.use_skill = false;
         assert_eq!(
             route(&settings, crate::use_skill::NAME),
             Route::Executive(dir.clone())
         );
+        let named: Vec<Value> = (0..25)
+            .map(|n| json!({"name": format!("light_{n}"), "description": "A light."}))
+            .chain([json!({"name": crate::use_skill::NAME, "description": "Not this."})])
+            .collect();
+        std::fs::write(dir.join(CATALOG_FILE), json!({"tools": named}).to_string()).unwrap();
+        assert!(
+            !declared(&settings)
+                .iter()
+                .any(|tool| tool.name == crate::use_skill::NAME)
+        );
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The reviewer on #1696: the worker's flag sets the switch, after the
+    /// rest of the tools' flags, and leaves what follows.
+    #[test]
+    fn the_use_skill_flag_sets_the_switch() {
+        let plain = ["rest".to_owned()];
+        let (settings, rest) = take(&plain).unwrap();
+        assert!(!settings.use_skill);
+        assert_eq!(rest, ["rest"]);
+        let mut flags = arguments(Some("on"), None, None, None, None);
+        flags.extend(crate::use_skill::arguments(Some("on")));
+        flags.push("rest".into());
+        let (settings, rest) = take(&flags).unwrap();
+        assert!(settings.decline && settings.use_skill);
+        assert_eq!(rest, ["rest"]);
     }
 
     /// A call of `use_skill` reaches the skill's own socket as the skill's

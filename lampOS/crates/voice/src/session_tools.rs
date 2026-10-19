@@ -380,8 +380,8 @@ pub fn not_ready(tools: &[Tool], settings: &Settings) -> Option<String> {
 pub fn told_after(tools: &[Tool], settings: &Settings) -> Option<String> {
     let mut told = not_ready(tools, settings).unwrap_or_default();
     if tools.iter().any(|tool| tool.name == crate::use_skill::NAME) {
-        told.push_str(&crate::use_skill::section(&crate::tools::skill_tools(
-            settings,
+        told.push_str(&crate::use_skill::section(crate::use_skill::offered(
+            &crate::tools::skill_tools(settings),
         )));
     }
     (!told.is_empty()).then_some(told)
@@ -457,6 +457,7 @@ pub fn setup_line(tools: &[Tool], settings: &Settings) -> String {
     };
     if !directory.join(CATALOG_FILE).exists() {
         line.push_str("; the executive's catalog is not there");
+        line.push_str(&skills_note(tools, settings));
         return line;
     }
     let executive = read_names(&directory.join(CATALOG_FILE));
@@ -481,16 +482,56 @@ pub fn setup_line(tools: &[Tool], settings: &Settings) -> String {
     if light == 0 {
         line.push_str("; no light functions: the ring is not up");
     }
-    if let Some(reach) = tools
+    line.push_str(&skills_note(tools, settings));
+    line
+}
+
+/// The setup line's word on the skills (#1668, the reviewer on #1696): how
+/// many `use_skill` reaches, the skills a session is not given (past the 32
+/// without it, or past its own bound with it), and those its lines name
+/// alone or leave out.
+fn skills_note(tools: &[Tool], settings: &Settings) -> String {
+    let mut note = String::new();
+    let given = names(tools);
+    let skills = crate::tools::skill_tools(settings);
+    let reach = tools
         .iter()
-        .find(|tool| tool.name == crate::use_skill::NAME)
-    {
-        line.push_str(&format!(
+        .find(|tool| tool.name == crate::use_skill::NAME);
+    if let Some(reach) = reach {
+        note.push_str(&format!(
             "; {} skills through use_skill",
             crate::use_skill::reached(reach).len()
         ));
     }
-    line
+    let not_given: Vec<&str> = skills
+        .iter()
+        .map(|skill| skill.name.as_str())
+        .filter(|name| {
+            !given.contains(*name) && !given.contains(&format!("{}:{name}", crate::use_skill::NAME))
+        })
+        .collect();
+    if !not_given.is_empty() {
+        note.push_str(&format!(
+            "; skills not given: {}{}",
+            not_given.join(", "),
+            if reach.is_some() {
+                " (past use_skill's bound)"
+            } else {
+                " (past 32: LAMP_USE_SKILL=on reaches them)"
+            }
+        ));
+    }
+    if reach.is_some() {
+        let (named, left) = crate::use_skill::cut(crate::use_skill::offered(&skills));
+        if !named.is_empty() || !left.is_empty() {
+            note.push_str(&format!(
+                "; use_skill's lines: {} named alone, {} left out",
+                named.len(),
+                left.len()
+            ));
+        }
+    }
+    note
 }
 
 /// The names in a catalog file, none if it cannot be read.
