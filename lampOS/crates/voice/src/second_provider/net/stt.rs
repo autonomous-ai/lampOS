@@ -1629,7 +1629,7 @@ mod tests {
             stream.send(&[0; 320]).unwrap();
         }
         tokio::time::sleep(Duration::from_millis(300)).await;
-        let (words, at_end) = stream.finish_told().await.unwrap();
+        let (words, at_end) = stream.finish_told(true).await.unwrap();
         server.abort();
         let at_end = at_end.unwrap();
         assert_eq!(words, "hey lamp");
