@@ -637,6 +637,23 @@ order is kept. A written turn is the same from the chat on.
     lamp said" (or "… in a busy room; the model is not told …"), "only
     the lamp's name was said, and the model is told so", and "… no words
     of it came back: asked as the name".
+- **In a busy room, a line going on waits for the Policy**
+  (`LAMP_GOING_ON_ASKS=on`, with the rule and the bus, #1522; #1712, item
+  4): a line the rule would let out only as a conversation going on, and
+  nothing else (no name, call, face, close voice, question of the lamp's
+  or remark), waits for the Policy's attention decision on it, as on the
+  Live route. It is played on `answer`, a `stay_quiet` said back to the
+  lamp or `look_up`, held on any other `stay_quiet`, and played with no
+  decision in `policy_holds::WAIT` (2 s), so a Policy that is down does not
+  make the lamp deaf. The rule says the line waits
+  (`second_provider::WAITS_FOR_POLICY`), and the turn asks it again every
+  50 ms (`Heeding::policy_now`), never blocking the worker's one thread; a
+  chat begun on the line's early words goes on meanwhile. A decision
+  already there is used at once, so most lines wait for nothing: the
+  Policy decides as the line's words end, and this route's words are final
+  about 0.6 s after. The journal says "its answer waits for the Policy's
+  decision", then "the Policy's decision came after N ms" or "no decision
+  of the Policy's came in N ms".
 - **The first request after a stop is told of it.** With
   `LAMP_STOP_TOLD=on`, the first request after a hand or the head stopped
   the lamp carries `after_stop`. Gemini is told so with `STOPPED_NOTE`. This
@@ -1360,7 +1377,7 @@ after a take-over, but now for every turn:
   #1712: a phrase rule is easy to trip.
 - **Live route only, so not on this route:** the same-voice
   check,
-  `LAMP_GOING_ON_ASKS`, the head tap
+  the head tap
   and `--addressed` for whom it answers, sight, camera and air facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).
 - **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its

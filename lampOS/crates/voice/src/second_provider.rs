@@ -338,6 +338,9 @@ struct Shared {
     /// Whether a request was judged in a busy room ([`Engine::judging_busy`]):
     /// a line that may follow on from the lamp is not told so there.
     busy: Option<Busy>,
+    /// The Policy's decision for a line that waits for it
+    /// ([`Engine::asking_the_policy`], [`WAITS_FOR_POLICY`]).
+    policy_now: Option<PolicyNow>,
     /// The note on whether a line called the lamp by name.
     call_note: Option<CallNote>,
     /// Whether the lamp's name was heard since a time.
@@ -565,6 +568,21 @@ struct Turn {
 /// Whether a request was judged in a busy room (`worker::Heeding`).
 pub type Busy = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 
+/// What the rule says of a line that waits for the Policy's decision
+/// (`LAMP_GOING_ON_ASKS`, #1522): in a busy room, a line it would let out
+/// only as a conversation going on. The turn then asks
+/// [`Engine::asking_the_policy`]'s hook every [`POLICY_POLL`] until it
+/// decides, as the Live worker keeps such a line's first output.
+pub(crate) const WAITS_FOR_POLICY: &str = "it waits for the Policy's decision";
+
+/// The Policy's decision for a line that waits for it: `None` while it may
+/// still come, then the line's verdict (`None` to play it, or why it is
+/// held).
+pub type PolicyNow = Arc<dyn Fn(u64) -> Option<Option<&'static str>> + Send + Sync>;
+
+/// How often a line that waits for the Policy asks again.
+const POLICY_POLL: Duration = Duration::from_millis(50);
+
 /// What a spoken line is told beside its words from the coordinator's
 /// marks, as the Live route tells them (#1712, item 4 of the first
 /// builder's 20:15: the second worker dropped `Called`, and told none of
@@ -695,6 +713,7 @@ impl Engine {
                 name_note: None,
                 conversation_alone: None,
                 busy: None,
+                policy_now: None,
                 call_note: None,
                 name_sounded: None,
                 task_waiting: None,
@@ -816,6 +835,15 @@ impl Engine {
     /// tells it.
     pub fn telling_cut_ins(mut self, on: bool) -> Self {
         self.cut_in_told = on;
+        self
+    }
+
+    /// The Policy's decision for a line the rule says waits for it
+    /// ([`WAITS_FOR_POLICY`], `LAMP_GOING_ON_ASKS`). Before any turn only.
+    pub fn asking_the_policy(mut self, policy: PolicyNow) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.policy_now = Some(policy);
+        }
         self
     }
 
@@ -1779,13 +1807,29 @@ async fn spoken(
             "lamp-voice second: request {request}: its answer is held back: a short sound, and nothing shows it was said to the lamp: not heard as a short word (this route has no ears or eyes)"
         );
     }
-    let heeded = match &shared.heed {
+    let mut heeded = match &shared.heed {
         Some(heed) if !empty && !held => {
             let window = said.lock().map_or((0, 0), |said| *said);
             heed(request, window, &text, continues_from)
         }
         _ => None,
     };
+    // In a busy room, a line going on waits for the Policy's decision
+    // (`LAMP_GOING_ON_ASKS`, #1522), as the Live worker keeps such a line's
+    // first output; a chat begun on its early words goes on meanwhile. The
+    // rule ends the wait at `policy_holds::WAIT`; past a little more, or
+    // with no hook, the line is played, as with no decision.
+    if heeded == Some(WAITS_FOR_POLICY) {
+        let bound = tokio::time::Instant::now() + crate::policy_holds::WAIT + POLICY_POLL * 4;
+        heeded = loop {
+            tokio::time::sleep(POLICY_POLL).await;
+            match shared.policy_now.as_ref().map(|now| now(request)) {
+                Some(Some(verdict)) => break verdict,
+                Some(None) if tokio::time::Instant::now() < bound => {}
+                _ => break None,
+            }
+        };
+    }
     if let Some(why) = heeded {
         eprintln!("lamp-voice second: request {request}: its answer is held back: {why}");
     }

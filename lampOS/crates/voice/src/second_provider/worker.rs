@@ -1567,6 +1567,19 @@ pub fn serve(
         {
             heeding.hear_levels(root);
         }
+        // In a busy room, a line going on waits for the Policy (#1522), as
+        // on the Live route: with the rule and the bus.
+        if files.going_on_asks
+            && let Some(root) = files.bus_root.as_deref()
+        {
+            if let Ok(mut held) = heeding.lock() {
+                held.asking_the_policy(root);
+            }
+            let heeding = heeding.clone();
+            engine = engine.asking_the_policy(Arc::new(move |request| {
+                heeding.lock().ok()?.policy_now(request)
+            }));
+        }
         if route.only_voice
             && let Ok(mut heeding) = heeding.lock()
         {
@@ -2005,6 +2018,11 @@ pub(crate) struct Heeding {
     alone: Option<u64>,
     /// The request last judged in a busy room ([`Self::judged_busy`]).
     busy: Option<u64>,
+    /// The Policy's attention decisions, with `LAMP_GOING_ON_ASKS`
+    /// ([`Self::asking_the_policy`]).
+    policy: Option<crate::policy_holds::Verdicts>,
+    /// The line that waits for the Policy's decision, and how it was seen.
+    waiting: Option<Waiting>,
     /// The request last let out because its words or the lamp's name heard
     /// in its sound called the lamp.
     by_name: Option<u64>,
@@ -2148,6 +2166,25 @@ type Levels = Arc<Mutex<std::collections::VecDeque<(u64, f32)>>>;
 /// a big saving."), where Live answered it once (#1712).
 pub(crate) const CONVERSATION_ALONE: &str = "(For you to know, not to answer: nobody said your name or turned to you. This reached you only because you were just talking with someone, and people near you may be talking to each other. If it is plainly said to someone else, or a remark to the room, call not_for_me and say nothing. A follow-up to what you were just talking about is for you.)";
 
+/// How the rule saw a line when it judged it, kept for a verdict given
+/// once the Policy decides ([`Heeding::policy_now`]).
+struct Seen {
+    room: crate::room_told::Room,
+    going_on: bool,
+    turned: Option<bool>,
+    busy: bool,
+    lamp_asked: bool,
+    heard: String,
+}
+
+/// A line that waits for the Policy's decision: its request, since when,
+/// and how the rule saw it.
+struct Waiting {
+    request: u64,
+    since: Instant,
+    seen: Seen,
+}
+
 /// What the bus and the thread say as a spoken turn is judged.
 pub(crate) struct Signs {
     pub room: crate::room_told::Room,
@@ -2212,6 +2249,8 @@ impl Heeding {
             noted: None,
             alone: None,
             busy: None,
+            policy: None,
+            waiting: None,
             by_name: None,
             session: 1,
             session_for: None,
@@ -2514,8 +2553,96 @@ impl Heeding {
             attention.set_night((self.night)());
         }
         let turned = signs.turned.filter(|_| self.strict);
+        let seen = Seen {
+            room: signs.room,
+            going_on: signs.going_on,
+            turned,
+            busy,
+            lamp_asked,
+            heard: heard.to_owned(),
+        };
+        // #1522 on this route (`LAMP_GOING_ON_ASKS`): what the Policy said of
+        // the line is given before it is judged, and in a busy room a line
+        // going on waits for it, as on the Live route.
+        if let Some(policy) = self.policy.as_mut() {
+            policy.take();
+            if let Some(says) = policy.says(request) {
+                attention.policy_said(request, Some(says));
+            } else if attention.waits_for_policy(request, signs.room, signs.going_on, turned) {
+                eprintln!(
+                    "lamp-voice second: request {request}: its answer waits for the Policy's decision: a conversation with the lamp is going on, in a busy room"
+                );
+                self.waiting = Some(Waiting {
+                    request,
+                    since: Instant::now(),
+                    seen,
+                });
+                return Some(crate::second_provider::WAITS_FOR_POLICY);
+            }
+        }
+        self.verdict(request, &seen)
+    }
+
+    /// The Policy's decision for the line that waits for it
+    /// ([`crate::second_provider::WAITS_FOR_POLICY`]): `None` while it may
+    /// still come, then the line's verdict, judged with it, or as with no
+    /// decision once [`crate::policy_holds::WAIT`] has passed, when the
+    /// line is played (a Policy that is down must not make the lamp deaf in
+    /// a conversation).
+    pub(crate) fn policy_now(&mut self, request: u64) -> Option<Option<&'static str>> {
+        let since = self
+            .waiting
+            .as_ref()
+            .filter(|waiting| waiting.request == request)?
+            .since;
+        let policy = self.policy.as_mut()?;
+        policy.take();
+        let says = policy.says(request);
+        let waited = since.elapsed();
+        if says.is_none() && waited < crate::policy_holds::WAIT {
+            return None;
+        }
+        let waiting = self.waiting.take()?;
+        if says.is_some() {
+            eprintln!(
+                "lamp-voice second: request {request}: the Policy's decision came after {} ms",
+                waited.as_millis()
+            );
+        } else {
+            eprintln!(
+                "lamp-voice second: request {request}: no decision of the Policy's came in {} ms",
+                waited.as_millis()
+            );
+        }
+        self.attention.policy_said(request, says);
+        Some(self.verdict(request, &waiting.seen))
+    }
+
+    /// Ask the Policy of a line it would let out only as a conversation
+    /// going on, in a busy room (`LAMP_GOING_ON_ASKS`, #1522): its attention
+    /// decisions from the bus at `root`.
+    pub(crate) fn asking_the_policy(&mut self, root: &Path) {
+        match crate::policy_holds::Verdicts::on(root) {
+            Ok(verdicts) => {
+                eprintln!(
+                    "lamp-voice second: in a busy room, a line let out only as a conversation going on waits for the Policy's decision (LAMP_GOING_ON_ASKS)"
+                );
+                self.policy = Some(verdicts);
+                self.attention.ask_policy_when_going_on(true);
+            }
+            Err(error) => eprintln!(
+                "lamp-voice second: the Policy's decisions can't be read ({error}); a line going on is judged without them"
+            ),
+        }
+    }
+
+    /// The verdict on `request`, seen as `seen`, said and kept.
+    fn verdict(&mut self, request: u64, seen: &Seen) -> Option<&'static str> {
+        let attention = &mut self.attention;
+        let (heard, busy, lamp_asked, turned) =
+            (seen.heard.as_str(), seen.busy, seen.lamp_asked, seen.turned);
         let mut verdict =
-            attention.first_output_busy(request, signs.room, signs.going_on, self.strict, turned);
+            attention.first_output_busy(request, seen.room, seen.going_on, self.strict, turned);
         let alone = attention.played_on_the_conversation_alone();
         if alone && lone_words(heard) {
             verdict = Some(crate::attention::Verdict::Hold(LONE_WORDS));
@@ -4565,6 +4692,98 @@ mod tests {
         };
         assert!(judged(true).is_some(), "by day, held");
         assert_eq!(judged(false), None, "with on alone, played");
+    }
+
+    /// #1712, item 4 (`LAMP_GOING_ON_ASKS`, #1522): in a busy room, a line
+    /// the rule would let out only as a conversation going on waits for the
+    /// Policy's decision, then is played on `answer` and held on
+    /// `stay_quiet`, as on the Live route; without the switch, or in a room
+    /// not busy, nothing waits. With no decision the line waits until
+    /// `policy_holds::WAIT` (here, no Policy's decision before the bound).
+    #[test]
+    fn in_a_busy_room_a_line_going_on_waits_for_the_policy_and_goes_as_it_says() {
+        use crate::room_told::Room;
+        let signs = |room| super::Signs {
+            room,
+            going_on: true,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        // Short: a socket's whole path must fit in 103 bytes.
+        let bus = PathBuf::from(format!("/tmp/lgo-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&bus);
+        std::fs::create_dir_all(&bus).unwrap();
+        let mut decisions = lamp_bus::Bus::new(&bus)
+            .unwrap()
+            .publisher_declared(
+                lamp_msgs::Decision::TOPIC,
+                &lamp_msgs::Decision::declaration(),
+                "policy",
+            )
+            .unwrap();
+        let mut decide = |request: u64, choice: &str| {
+            let decision = serde_json::json!({"about": "attention", "choice": choice,
+                "probability": 0.235, "answers": {}, "by": "typesafe/jev-1.13-20260917",
+                "took_ms": 540, "shadow": false, "request": request});
+            decisions.publish_json(0, &decision).unwrap();
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        heeding.asking_the_policy(&bus);
+        let said = "And what about tomorrow?";
+        assert_eq!(
+            heeding.judge(9, line, said, signs(Room::Busy)),
+            Some(crate::second_provider::WAITS_FOR_POLICY)
+        );
+        assert_eq!(heeding.policy_now(9), None, "nothing decided yet");
+        assert_eq!(heeding.policy_now(8), None, "not the line that waits");
+        decide(9, "answer");
+        assert_eq!(heeding.policy_now(9), Some(None), "played on answer");
+        assert_eq!(heeding.policy_now(9), None, "decided once");
+        assert_eq!(
+            heeding.judge(10, line, said, signs(Room::Busy)),
+            Some(crate::second_provider::WAITS_FOR_POLICY)
+        );
+        decide(10, "stay_quiet");
+        assert_eq!(
+            heeding.policy_now(10),
+            Some(Some(crate::going_on_asks::NOT_THE_LAMPS)),
+            "held on stay_quiet"
+        );
+        // A decision already there: judged at once, nothing waits.
+        decide(11, "stay_quiet");
+        assert_eq!(
+            heeding.judge(11, line, said, signs(Room::Busy)),
+            Some(crate::going_on_asks::NOT_THE_LAMPS)
+        );
+        // With no decision in `policy_holds::WAIT`, it is played.
+        assert_eq!(
+            heeding.judge(13, line, said, signs(Room::Busy)),
+            Some(crate::second_provider::WAITS_FOR_POLICY)
+        );
+        assert_eq!(heeding.policy_now(13), None);
+        let waiting = heeding.waiting.as_mut().unwrap();
+        waiting.since = waiting
+            .since
+            .checked_sub(crate::policy_holds::WAIT)
+            .unwrap();
+        assert_eq!(
+            heeding.policy_now(13),
+            Some(None),
+            "played with no decision"
+        );
+        // In a room not busy, nothing waits.
+        assert_eq!(heeding.judge(12, line, said, signs(Room::Quiet)), None);
+        // Without the switch, nothing waits.
+        let mut without = super::Heeding::new(true, false, None, None);
+        assert_ne!(
+            without.judge(9, line, said, signs(Room::Busy)),
+            Some(crate::second_provider::WAITS_FOR_POLICY)
+        );
+        let _ = std::fs::remove_dir_all(&bus);
     }
 
     /// #1712, item 4 (`LAMP_FOLLOWS_ON`): the rule knows which line it
