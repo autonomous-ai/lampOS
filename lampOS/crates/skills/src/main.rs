@@ -29,7 +29,7 @@ use std::{
 
 const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] \
                      [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] \
-                     [--tools-dir DIR] [--boot-id ID] [--clock-control PATH]\n       \
+                     [--tools-dir DIR] [--state-dir DIR] [--boot-id ID] [--clock-control PATH]\n       \
                      [--zone system|NAME | --utc-offset-minutes N]\n       \
                      lamp-skills test SKILL_DIR...\n       \
                      lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
@@ -153,6 +153,7 @@ fn main() -> ExitCode {
     let mut dir = PathBuf::from(SKILLS_DIR);
     let mut root = None;
     let mut tools = None;
+    let mut state = None;
     let mut boot_id = None;
     let mut clock_control = None;
     let mut offset = None;
@@ -209,6 +210,7 @@ fn main() -> ExitCode {
             "--actions-socket" => sockets.actions = value,
             "--say-socket" => sockets.say = value,
             "--tools-dir" => tools = Some(value),
+            "--state-dir" => state = Some(value),
             "--boot-id" => boot_id = value.to_str().map(str::to_owned),
             "--clock-control" => clock_control = Some(value),
             _ => {
@@ -237,6 +239,7 @@ fn main() -> ExitCode {
     let ask = std::env::var("LAMP_SKILLS_ASK").unwrap_or_default();
     let options = Options {
         tools,
+        state,
         ask,
         light_requests: std::env::var(REQUESTS_ENVIRONMENT).is_ok_and(|value| value == "on"),
         body_requests: std::env::var(BODY_REQUESTS_ENVIRONMENT).is_ok_and(|value| value == "on"),
@@ -396,6 +399,10 @@ fn said_lately<T: serde::de::DeserializeOwned>(bus: &Bus, topic: &str) -> Option
 /// How the program serves, beyond its sockets.
 struct Options {
     tools: Option<PathBuf>,
+    /// `--state-dir`: the part's own folder, where the skills a person
+    /// turned off are kept across a restart (#1685); without it, until the
+    /// program stops.
+    state: Option<PathBuf>,
     /// `LAMP_SKILLS_ASK`: `skip`, `policy`, or anything else for nothing done.
     ask: String,
     /// `LAMP_LIGHT_REQUESTS=on`: a skill's light is asked of the ring.
@@ -544,6 +551,15 @@ fn serve(
     };
     let (finished, done) = mpsc::channel::<SkillEvent>();
     let mut engine = Engine::new(Vec::new(), skip_ask);
+    if let Some(state) = &options.state {
+        match engine.keep_off_in(state) {
+            Ok(off) => eprintln!(
+                "lamp-skills: the skills a person turned off kept in {}: {off:?}",
+                state.display()
+            ),
+            Err(error) => eprintln!("lamp-skills: the skills turned off not read: {error}"),
+        }
+    }
     // The Policy's gate (#958): asks out on `skills/ask`, its answers in on
     // `policy/decisions`, by the ask's number. The ask's wire is #958's
     // `lamp_msgs::SkillAsk`, written here as JSON until it is on lamp-voice.
