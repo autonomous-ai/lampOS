@@ -4795,6 +4795,9 @@ fn conversation_with_gate(
                             }
                             PrivacyState::Muted => {
                                 let observed_at_us = monotonic_us();
+                                // The camera is told no first, before any
+                                // record (#1802).
+                                tell_eyes_no(eyes_link.as_mut(), "physical mute (privacy event)");
                                 record(
                                     trace,
                                     json!({"kind":"physical_mute", "at_us":observed_at_us,"acquired_at_us":acquired_at_us,"fresh_observation":true}),
@@ -4824,6 +4827,7 @@ fn conversation_with_gate(
             match privacy_state {
                 PrivacyState::Muted => {
                     let at_us = monotonic_us();
+                    tell_eyes_no(eyes_link.as_mut(), "physical mute (privacy gate)");
                     record(
                         trace,
                         json!({"kind":"physical_mute", "at_us":at_us,"fresh_observation":true}),
@@ -4991,6 +4995,16 @@ fn conversation_with_gate(
                 // No provider, optional presentation, filesystem or trace call
                 // precedes speaker revocation. Capture is next for mute.
                 let publish = rig.publish_hand_revocation(snapshot);
+                // The camera is next after the speaker and before any
+                // record (#1802).
+                if muted {
+                    let exit = if asleep {
+                        "head sleep"
+                    } else {
+                        "software mute"
+                    };
+                    tell_eyes_no(eyes_link.as_mut(), exit);
+                }
                 submission_draining = admission.draining();
                 look_wanted = None;
                 answer_opening = None;
@@ -9383,6 +9397,15 @@ fn record_look_intent(
         }
     }
     Ok(())
+}
+
+/// A mute ends the cycle: the eyes are told no at once rather than left to
+/// close on their 1.5 s without a yes (#1802), and the journal marks it.
+/// One datagram, never waited on; no eyes is nothing to tell.
+fn tell_eyes_no(eyes: Option<&mut crate::body_link::EyesLink>, exit: &str) {
+    if eyes.is_some_and(|eyes| eyes.close()) {
+        eprintln!("lamp-voice: the eyes are told no at once: {exit}");
+    }
 }
 
 /// The eyes asked for a full look's still, once a turn (#836): whether

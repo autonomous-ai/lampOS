@@ -351,8 +351,11 @@ const PERMIT_REPEAT_US: u64 = 500_000;
 
 /// Tells the lamp's eyes (`lamp-eyes`, a separate process that owns the
 /// camera) whether they may be open: they may exactly while the microphone
-/// is permitted. Yes is repeated; no is said once, at once. A service that
-/// stops says nothing more, and the eyes close.
+/// is permitted. Yes is repeated; no is said once, at once. A voice cycle
+/// that ends (a mute, a fault, the service's stop) says no as it goes
+/// ([`EyesLink::close`], also on drop), so the camera does not wait out the
+/// eyes' 1.5 s on a privacy close (#1802). A service killed outright says
+/// nothing more, and the eyes close on that 1.5 s.
 pub struct EyesLink {
     socket: UnixDatagram,
     path: PathBuf,
@@ -391,6 +394,17 @@ impl EyesLink {
         let _ = self.socket.send_to(message, &self.path);
     }
 
+    /// No, now, whatever was said last and when, unless no was the last
+    /// thing said: whether it was said now. One datagram, never waited on
+    /// (#1802).
+    pub fn close(&mut self) -> bool {
+        if self.last.is_some_and(|(told, _)| !told) {
+            return false;
+        }
+        self.permit(false, 0);
+        true
+    }
+
     /// Ask the eyes for one full look (#836), whose still comes marked with
     /// `id`, at its own longer side when one is given (#941). Eyes started
     /// without `--full-look` take it for nothing.
@@ -403,9 +417,63 @@ impl EyesLink {
     }
 }
 
+impl Drop for EyesLink {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every datagram the eyes have been sent so far.
+    fn told(eyes: &UnixDatagram) -> Vec<String> {
+        let mut datagram = [0u8; 64];
+        let mut told = Vec::new();
+        while let Ok(length) = eyes.recv(&mut datagram) {
+            told.push(String::from_utf8_lossy(&datagram[..length]).into_owned());
+        }
+        told
+    }
+
+    #[test]
+    fn a_closing_cycle_tells_the_eyes_no_at_once_and_only_once() {
+        let path = std::env::temp_dir().join(format!("lamp-eyes-close-{}", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let eyes = UnixDatagram::bind(&path).unwrap();
+        eyes.set_nonblocking(true).unwrap();
+        let mut link = EyesLink::to(path.clone()).unwrap();
+        link.permit(true, 0);
+        let started = std::time::Instant::now();
+        // Just after a yes: a close does not wait for a repeat to fall due.
+        assert!(link.close());
+        assert!(started.elapsed() < std::time::Duration::from_millis(50));
+        assert_eq!(told(&eyes), [r#"{"camera":true}"#, r#"{"camera":false}"#]);
+        // No is said once: a second close and a drop after it add nothing.
+        assert!(!link.close());
+        drop(link);
+        assert!(told(&eyes).is_empty());
+        // A cycle that ends while permitted (a mute's early return, a fault)
+        // says no as it goes.
+        let mut link = EyesLink::to(path.clone()).unwrap();
+        link.permit(true, 0);
+        drop(link);
+        assert_eq!(told(&eyes), [r#"{"camera":true}"#, r#"{"camera":false}"#]);
+        std::fs::remove_file(&path).unwrap();
+    }
+
+    #[test]
+    fn a_close_with_no_eyes_listening_neither_waits_nor_fails() {
+        let path = std::env::temp_dir().join(format!("lamp-eyes-absent-{}", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let mut link = EyesLink::to(path).unwrap();
+        link.permit(true, 0);
+        let started = std::time::Instant::now();
+        assert!(link.close());
+        drop(link);
+        assert!(started.elapsed() < std::time::Duration::from_millis(50));
+    }
 
     #[test]
     fn the_eyes_are_asked_for_a_full_look_in_one_exact_datagram() {
