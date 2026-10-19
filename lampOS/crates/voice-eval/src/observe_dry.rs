@@ -200,6 +200,17 @@ fn run_with(args: &Arguments, observer: &lamp_voice::remember::Observer) -> Resu
         let mut counts = BTreeMap::<String, u64>::new();
         let mut asked_ms = vec![];
         let cut = conversations(&days.exchanges()?, args.gap_ms);
+        // Scored one for one: the set's n-th conversation is the cut's n-th,
+        // so a gap or limit that joins or drops some is refused (the peer
+        // read's P3 on #2021).
+        if !expected.is_empty() && (cut.len() != expected.len() || args.limit < cut.len()) {
+            return Err(invalid(&format!(
+                "the made-up set has {} conversations and the cut {} (limit {}): leave --gap-seconds under 600 and --limit out",
+                expected.len(),
+                cut.len(),
+                args.limit.min(cut.len())
+            )));
+        }
         for (n, (person, ids)) in cut.iter().take(args.limit).enumerate() {
             *counts.entry("conversations".into()).or_default() += 1;
             let input = match days.conversation_end_with(person, &format!("dry-{n}"), ids, &[]) {
@@ -321,9 +332,10 @@ fn made_up_store(days: &mut Days, set: &str, now: u64) -> Result<Vec<MadeUp>> {
     Ok(set)
 }
 
-/// The first builder's bar, counted: kept rightly (it carries what it
-/// should), kept wrongly (anything else kept), missed, intrusive kept, and
-/// conversations rightly left with nothing.
+/// The first builder's bar, counted: things kept rightly (each carries the
+/// word it should, as a whole word), things kept wrongly (anything else
+/// kept), conversations missed, intrusive things kept, and conversations
+/// rightly left with nothing.
 #[derive(Default)]
 struct Score {
     kept_rightly: u64,
@@ -337,17 +349,20 @@ impl Score {
     fn add(&mut self, expect: &MadeUp, kept: &[&str]) {
         match &expect.keep {
             Some(word) => {
-                let word = word.to_lowercase();
-                let right = kept
-                    .iter()
-                    .filter(|text| text.to_lowercase().contains(&word))
-                    .count() as u64;
+                // A whole word, as lamp-skills' `if_heard` matches: "mum" is
+                // not in "minimum" (the peer read's P3 on #2021).
+                let carries = |text: &&&str| {
+                    text.split(|c: char| !c.is_alphanumeric())
+                        .any(|w| w.to_lowercase() == word.to_lowercase())
+                };
+                let right = kept.iter().filter(carries).count() as u64;
                 if right == 0 {
                     self.missed += 1;
-                } else {
-                    self.kept_rightly += 1;
                 }
-                self.kept_wrongly += kept.len() as u64 - right.min(1);
+                // Each thing kept counts once: right if it carries the word,
+                // wrong if not; two right ones are both right.
+                self.kept_rightly += right;
+                self.kept_wrongly += kept.len() as u64 - right;
             }
             None if kept.is_empty() => self.nothing_right += 1,
             None => {
@@ -589,6 +604,63 @@ mod tests {
                 .count(),
             20
         );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The peer read's P3s on #2021: a whole word counts, a part of one
+    /// doesn't, and two right things are both right.
+    #[test]
+    fn the_score_counts_whole_words_and_each_thing_once() {
+        let made_up = |keep: Option<&str>| MadeUp {
+            turns: vec![],
+            keep: keep.map(str::to_owned),
+            intrusive: false,
+        };
+        let mut score = Score::default();
+        score.add(&made_up(Some("mum")), &["Visiting mum on Sunday"]);
+        score.add(&made_up(Some("mum")), &["At least the minimum"]);
+        score.add(&made_up(Some("warm")), &["Warm light", "Warm, never blue"]);
+        assert_eq!(
+            (score.kept_rightly, score.kept_wrongly, score.missed),
+            (3, 1, 1)
+        );
+    }
+
+    /// A gap or a limit that doesn't give the made-up set back one for one
+    /// is refused, so the bar is never scored on a mismatch.
+    #[test]
+    fn a_cut_that_joins_or_drops_made_up_conversations_is_refused() {
+        const SET: &str = include_str!("../observe/synthetic-20.json");
+        let root =
+            std::env::temp_dir().join(format!("lamp-observe-made-up-cut-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        DirBuilder::new().mode(0o700).create(&root).unwrap();
+        let file = root.join("set.json");
+        fs::write(&file, SET).unwrap();
+        let observer: lamp_voice::remember::Observer =
+            Box::new(|_: &Value| Some(json!({"observations":[]})));
+        for (n, extra) in [["--gap-seconds", "900"], ["--limit", "5"]]
+            .iter()
+            .enumerate()
+        {
+            let out = root.join(format!("out{n}"));
+            let args = parse(
+                &[
+                    "--conversations",
+                    file.to_str().unwrap(),
+                    "--out",
+                    out.to_str().unwrap(),
+                    "--key-file",
+                    "unused",
+                    extra[0],
+                    extra[1],
+                ]
+                .map(str::to_owned),
+            )
+            .unwrap();
+            assert!(run_with(&args, &observer).is_err(), "{extra:?}");
+            assert!(!out.join("store").exists(), "{extra:?}");
+        }
         let _ = fs::remove_dir_all(&root);
     }
 

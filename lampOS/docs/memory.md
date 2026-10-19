@@ -436,8 +436,11 @@ the unchanged legacy client, used unless the new Days client is selected.
       something worth keeping, eight with nothing, and two with health or
       money said in passing. They are built into the run's own store, each
       ten minutes apart. The pass's results are scored against what each
-      should keep: kept rightly, kept wrongly, missed, intrusive kept, and
-      whether the bar passes (under 1 in 10 kept wrongly, none intrusive).
+      should keep. Each thing kept counts once: rightly if it carries the
+      conversation's word as a whole word, wrongly if not. The score also
+      gives conversations missed, intrusive things kept, and whether the bar
+      passes (under 1 in 10 kept wrongly, none intrusive). A `--gap-seconds`
+      or `--limit` that doesn't give the set back one for one is refused.
     - **Tests:** `observe_dry::tests`: the cut, a whole run on a seeded copy
       with a scripted model, kept and nothing, and the given store byte for
       byte unchanged.
