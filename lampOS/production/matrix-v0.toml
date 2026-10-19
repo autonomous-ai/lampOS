@@ -229,11 +229,14 @@ method = "manual"
 mandatory = false
 what = "a face found at 40 to 80 cm (no picture is kept)"
 
-# Touch pads and button.
+# The head's two pads and the button. The base's touch strip (the MPR121)
+# is off in V2, not used at the project lead's decision (19 Oct;
+# docs/controls.md, "The base strip is off"), so no check here is the
+# strip's: neither its calibration nor its electrodes.
 
 [[check]]
 id = "touch"
-part = "touch pads and button"
+part = "head pads and button"
 kind = "routine"
 method = "selftest"
 mandatory = true
@@ -241,19 +244,11 @@ what = "controls/touch_state ready, no fault, nothing held 10 s or more"
 
 [[check]]
 id = "touch_by_hand"
-part = "touch pads and button"
+part = "head pads and button"
 kind = "routine"
 method = "selftest"
 mandatory = true
-what = "the operator swipes the strip, touches the head and presses the button; each electrode felt is listed (a factory self-test only)"
-
-[[check]]
-id = "touch_calibration"
-part = "touch pads and button"
-kind = "routine"
-method = "manual"
-mandatory = true
-what = "the per-pad calibration is written (#1682)"
+what = "the operator touches each head pad and presses the button; each pad felt is listed (a factory self-test only)"
 
 # Privacy switch.
 

@@ -37,7 +37,7 @@ column is the checks' ids in `production/matrix-v0.toml`.
 | Servos 1–5 | `body/joint_states` fresh for all five; no warm joint and no resistance warning. `head_move` (pitch) at the factory | yes | each joint's full range within its limits; load at rest under X; temperature after N minutes of moves; that it gives way to a hand (#780) | routine + **qualification** (endurance) | `base_yaw`, `shoulder`, `elbow`, `head_roll`, `head_pitch`, `head_move`, `servo_range`, `servo_give_way`; qualification `servo_endurance` |
 | Ring (32 pixels) | each of 10 colours at level 3, seen on `light/drawn` | yes, at the factory | dead or stuck pixels: a camera or a person looks | routine, partly manual | `ring`, `ring_pixels` |
 | Camera | `humans/faces/tracked` within 2 s; health has no warning | yes | focus and exposure on a test card at desk distance; a face found at 40–80 cm (lamp-52e6's eyes trial on 19 Oct is why) | routine, partly manual | `camera`, `camera_test_card`, `camera_face_distance` |
-| Touch pads, button | ready, no fault, nothing held ≥ 10 s; `touch_by_hand` at the factory (swipe, head, press) | yes, at the factory | per-pad calibration written (#1682); faulty electrodes listed per lamp, as lamp-4ace's E4 and E8 | routine, manual | `touch`, `touch_by_hand`, `touch_calibration` |
+| Head pads, button | ready, no fault, nothing held ≥ 10 s; `touch_by_hand` at the factory (head, press) | yes, at the factory | nothing for the base's touch strip: it's off in V2, not used at the project lead's decision (19 Oct; [controls.md](controls.md), "The base strip is off"), so the draft's strip calibration (#1682) and its electrodes are out | routine, manual | `touch`, `touch_by_hand` |
 | Privacy switch | (not in the self-test) | no | the switch closes both microphones and the camera: a manual step | routine, manual | `privacy_switch` |
 | Air (SEN63C) | `air/state` fresh (15 s) and in range | yes | CO2 and PM2.5 against a reference, or a sealed-box test; a failed-read rate over 10 min | routine + qualification | `air`, `air_reference`; qualification `air_read_failures` |
 | Board | hottest < 85 °C, ≥ 3% disk free | yes | temperature under a fixed 10-minute load with both fans (17 Oct: 87 °C before the second fan) | routine | `board`, `board_load_temperature` |
@@ -91,7 +91,7 @@ names but the matrix does not, or a limit with min above max is refused.
 
 **Mandatory in version 0 (proposed):** every self-test part, and the manual
 steps that need no fixture: `assembly_inspection`, `speaker_buzz`,
-`ring_pixels`, `touch_calibration`, `privacy_switch`, `spoken_exchange`;
+`ring_pixels`, `privacy_switch`, `spoken_exchange`;
 in a qualification run, every qualification check. The station checks that
 need a fixture nobody has built yet (the tones, the speaker's level, the
 test card, the servos' range, the air reference, the board under load, the
