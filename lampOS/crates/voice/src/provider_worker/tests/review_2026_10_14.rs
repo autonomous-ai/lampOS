@@ -576,3 +576,539 @@ async fn a_line_the_model_declines_is_told_held_back() {
     );
     rig.stop().await;
 }
+
+/// The real Skills socket protocol, with a valid private offer if it is
+/// reached. Negative cases must avoid the dispatch itself, not merely hide
+/// its reply. The thread is joined even when a regression assertion fails.
+struct DeclineMusic {
+    home: crate::process::SessionDirectory,
+    asked: std::sync::mpsc::Receiver<serde_json::Value>,
+    stop: std::sync::Arc<AtomicBool>,
+    worker: Option<std::thread::JoinHandle<()>>,
+}
+
+impl DeclineMusic {
+    fn new() -> Self {
+        use std::io::{BufRead, Read, Write};
+        let home = crate::process::SessionDirectory::create().unwrap();
+        std::fs::write(
+            home.path.join(crate::tools::CATALOG_FILE),
+            r#"{"tools":[{"name":"play_relaxing_music","description":"A requested recording."}]}"#,
+        )
+        .unwrap();
+        let listener =
+            std::os::unix::net::UnixListener::bind(home.path.join(crate::tools::CALL_SOCKET))
+                .unwrap();
+        let (sent, asked) = std::sync::mpsc::channel();
+        let stop = std::sync::Arc::new(AtomicBool::new(false));
+        let ending = stop.clone();
+        let worker = std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                if ending.load(std::sync::atomic::Ordering::Acquire) {
+                    return;
+                }
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new((&stream).take(16_384))
+                    .read_line(&mut line)
+                    .unwrap();
+                let call: serde_json::Value = serde_json::from_str(&line).unwrap();
+                assert_eq!(call["name"], "play_relaxing_music");
+                let context: lamp_msgs::RequestedAudioContext =
+                    serde_json::from_value(call["requested_audio_context"].clone()).unwrap();
+                let offer = lamp_msgs::RequestedAudioOffer {
+                    skills_boot: "skills-test".into(),
+                    definition_generation: 2,
+                    offer_id: 3,
+                    skill: "relaxing-music".into(),
+                    asset: "/local/relaxing.wav".into(),
+                    sha256: "a".repeat(64),
+                    frames: 24_000,
+                    issued_us: context.issued_us,
+                    start_before_us: context.issued_us + lamp_msgs::REQUESTED_AUDIO_START_US,
+                    finish_before_us: context.issued_us
+                        + lamp_msgs::REQUESTED_AUDIO_START_US
+                        + 1_000_000,
+                    context,
+                };
+                offer.check().unwrap();
+                sent.send(call).unwrap();
+                // A cancelled request may close the socket before this
+                // response; receipt of the request still proves dispatch.
+                let _ = writeln!(
+                    stream,
+                    "{}",
+                    json!({"ok":true,"result":{
+                        "next":"Confirm.","requested_audio":offer,
+                    }})
+                );
+            }
+        });
+        Self {
+            home,
+            asked,
+            stop,
+            worker: Some(worker),
+        }
+    }
+
+    fn options(&self, wrapped: bool) -> Options {
+        typed_with(crate::tools::Settings {
+            decline: true,
+            skills: Some(self.home.path.clone()),
+            requested_audio: true,
+            use_skill: wrapped,
+            ..Default::default()
+        })
+    }
+}
+
+impl Drop for DeclineMusic {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::Release);
+        let _ =
+            std::os::unix::net::UnixStream::connect(self.home.path.join(crate::tools::CALL_SOCKET));
+        if let Some(worker) = self.worker.take() {
+            let result = worker.join();
+            if !std::thread::panicking() {
+                result.unwrap();
+            }
+        }
+        let _ = std::fs::remove_dir_all(&self.home.path);
+    }
+}
+
+fn music_function(wrapped: bool) -> serde_json::Value {
+    json!({
+        "id":"music-original",
+        "name":if wrapped { crate::use_skill::NAME } else { "play_relaxing_music" },
+        "args":if wrapped { json!({"skill":"play_relaxing_music"}) } else { json!({}) },
+    })
+}
+
+fn decline_function() -> serde_json::Value {
+    json!({"id":"decline","name":crate::tools::NOT_FOR_ME,"args":{}})
+}
+
+fn response_id(message: &serde_json::Value) -> &str {
+    let responses = message["toolResponse"]["functionResponses"]
+        .as_array()
+        .expect("the original tool call must still be answered");
+    assert_eq!(responses.len(), 1, "{message}");
+    assert!(
+        responses[0]["response"].get("requested_audio").is_none(),
+        "private offer leaked into the model response: {message}"
+    );
+    responses[0]["id"].as_str().unwrap()
+}
+
+async fn outputs_through_completion(rig: &mut LiveRig, request: u64) -> Vec<ProviderOutput> {
+    let mut outputs = Vec::new();
+    loop {
+        let output = rig.output().await;
+        let done =
+            matches!(output, ProviderOutput::TurnComplete { request: of, .. } if of == request);
+        outputs.push(output);
+        assert!(outputs.len() <= 16, "unexpected output loop: {outputs:?}");
+        if done {
+            return outputs;
+        }
+    }
+}
+
+/// The verdict is a positive boundary, not a delay assumed to mean that the
+/// worker has handled the decline. Keep the original authority fresh while
+/// waiting for its next tick to publish it.
+async fn wait_for_decline(rig: &mut LiveRig, turns: &mut lamp_bus::Subscriber, request: u64) {
+    let until = Instant::now() + Duration::from_millis(500);
+    loop {
+        while let Some(message) = turns.recv(Duration::ZERO).unwrap() {
+            let turn: VoiceTurn = message.parse().unwrap();
+            if turn.request == request && turn.verdict == TurnVerdict::HeldBack {
+                return;
+            }
+        }
+        assert!(
+            Instant::now() < until,
+            "the accepted decline was not published"
+        );
+        rig.publish();
+        rig.tick(Duration::from_millis(2)).await;
+    }
+}
+
+fn no_music_dispatched(skills: &DeclineMusic, outputs: &[ProviderOutput]) {
+    let asked: Vec<_> = skills.asked.try_iter().collect();
+    assert!(
+        asked.is_empty()
+            && !outputs
+                .iter()
+                .any(|output| matches!(output, ProviderOutput::RequestedAudio { .. })),
+        "an accepted unacted decline still dispatched music or handed on its offer: asked={asked:?}; outputs={outputs:?}"
+    );
+    assert!(
+        !outputs
+            .iter()
+            .any(|output| matches!(output, ProviderOutput::Audio { .. })),
+        "audio after the accepted decline escaped: {outputs:?}"
+    );
+}
+
+/// A preamble is already outside the worker when the model declines. Neither
+/// a later tool nor the next call in the same service message may turn that
+/// preamble into authority for a recording.
+#[tokio::test]
+async fn an_accepted_decline_blocks_later_and_mixed_music_calls() {
+    let _turn = one_at_a_time().await;
+    let root = Root::new();
+    for mixed in [false, true] {
+        for wrapped in [false, true] {
+            let skills = DeclineMusic::new();
+            let mut turns = turns(&root);
+            let mut rig = LiveRig::start_with(quick_policy(), skills.options(wrapped));
+            let mut dial = rig.ready().await;
+            let request = rig.speak(&mut dial, false, true).await;
+            dial.service.send(provider_audio(17, PACKET_SAMPLES)).await;
+            assert!(
+                matches!(rig.output().await, ProviderOutput::Audio { request: of, .. } if of == request)
+            );
+            while turns.recv(Duration::ZERO).unwrap().is_some() {}
+            if mixed {
+                dial.service
+                    .send(json!({"toolCall":{"functionCalls":[decline_function(),music_function(wrapped)]}}))
+                    .await;
+            } else {
+                dial.service
+                    .send(json!({"toolCall":{"functionCalls":[decline_function()]}}))
+                    .await;
+            }
+            let declined = rig.service_message(&mut dial).await;
+            assert_eq!(response_id(&declined), "decline");
+            wait_for_decline(&mut rig, &mut turns, request).await;
+            if !mixed {
+                dial.service
+                    .send(json!({"toolCall":{"functionCalls":[music_function(wrapped)]}}))
+                    .await;
+            }
+            // As for any non-silent function, the transport consumes the
+            // service's tool round completion before its reply round ends.
+            dial.service.send(idle_complete()).await;
+            let answered = rig.service_message(&mut dial).await;
+            assert_eq!(response_id(&answered), "music-original");
+            dial.service.send(provider_audio(29, PACKET_SAMPLES)).await;
+            dial.service.send(idle_complete()).await;
+            let outputs = outputs_through_completion(&mut rig, request).await;
+            rig.stop().await;
+            no_music_dispatched(&skills, &outputs);
+        }
+    }
+}
+
+/// The Skills call is parked first. The following decline is acknowledged
+/// before an explicit Policy `answer` arrives, so release must not revive it.
+#[tokio::test]
+async fn an_accepted_decline_does_not_release_a_parked_music_call() {
+    let _turn = one_at_a_time().await;
+    let root = Root::new();
+    for wrapped in [false, true] {
+        let skills = DeclineMusic::new();
+        let policy_root = skills.home.path.join("policy");
+        let mut decisions = lamp_bus::Bus::new(&policy_root)
+            .unwrap()
+            .publisher_declared(
+                lamp_msgs::Decision::TOPIC,
+                &lamp_msgs::Decision::declaration(),
+                "policy",
+            )
+            .unwrap();
+        let mut options = skills.options(wrapped);
+        options.policy_holds = Some(policy_root);
+        let mut turns = turns(&root);
+        let mut rig = LiveRig::start_with(quick_policy(), options);
+        let mut dial = rig.ready().await;
+        let request = rig.speak(&mut dial, false, true).await;
+        dial.service.send(provider_audio(17, PACKET_SAMPLES)).await;
+        assert!(
+            matches!(rig.output().await, ProviderOutput::Audio { request: of, .. } if of == request)
+        );
+        while turns.recv(Duration::ZERO).unwrap().is_some() {}
+        dial.service
+            .send(
+                json!({"toolCall":{"functionCalls":[music_function(wrapped),decline_function()]}}),
+            )
+            .await;
+        dial.service.send(idle_complete()).await;
+        let declined = rig.service_message(&mut dial).await;
+        assert_eq!(response_id(&declined), "decline");
+        // Ordered callbacks in the same provider message establish that
+        // the preceding music call reached the desk and was not dispatched.
+        assert!(skills.asked.try_recv().is_err(), "the call was not parked");
+        wait_for_decline(&mut rig, &mut turns, request).await;
+        let delivered = decisions
+            .publish_json(
+                monotonic_us(),
+                &json!({"about":"attention","choice":"answer","probability":0.9,
+                    "answers":{},"by":"test/policy","took_ms":1,"shadow":false,"request":request}),
+            )
+            .unwrap();
+        assert!(
+            delivered.delivered >= 1,
+            "the worker missed the Policy decision"
+        );
+        let answered = rig.service_message(&mut dial).await;
+        assert_eq!(response_id(&answered), "music-original");
+        dial.service.send(provider_audio(29, PACKET_SAMPLES)).await;
+        dial.service.send(idle_complete()).await;
+        let outputs = outputs_through_completion(&mut rig, request).await;
+        rig.stop().await;
+        no_music_dispatched(&skills, &outputs);
+    }
+}
+
+/// The opposite ordering is intentional: an action already dispatched owns
+/// its answer. A later decline does not retract its one offer or confirmation.
+#[tokio::test]
+async fn a_music_action_before_decline_keeps_its_single_offer_and_confirmation() {
+    let _turn = one_at_a_time().await;
+    let root = Root::new();
+    for wrapped in [false, true] {
+        let skills = DeclineMusic::new();
+        let mut turns = turns(&root);
+        let mut rig = LiveRig::start_with(quick_policy(), skills.options(wrapped));
+        let mut dial = rig.ready().await;
+        let request = rig.speak(&mut dial, false, true).await;
+        while turns.recv(Duration::ZERO).unwrap().is_some() {}
+        dial.service
+            .send(json!({"toolCall":{"functionCalls":[music_function(wrapped)]}}))
+            .await;
+        dial.service.send(idle_complete()).await;
+        let answered = rig.service_message(&mut dial).await;
+        assert_eq!(response_id(&answered), "music-original");
+        assert_eq!(
+            answered["toolResponse"]["functionResponses"][0]["response"],
+            json!({"next":"Confirm."})
+        );
+        let first = rig.output().await;
+        let ProviderOutput::RequestedAudio {
+            request: of,
+            session,
+            offer,
+        } = &first
+        else {
+            panic!("the accepted Skills reply did not hand on its offer: {first:?}");
+        };
+        assert_eq!((*of, *session), (request, dial.session.get()));
+        assert_eq!(offer.context.call_id, "music-original");
+        dial.service
+            .send(json!({"toolCall":{"functionCalls":[decline_function()]}}))
+            .await;
+        let declined = rig.service_message(&mut dial).await;
+        assert_eq!(response_id(&declined), "decline");
+        dial.service.send(provider_audio(21, PACKET_SAMPLES)).await;
+        dial.service.send(idle_complete()).await;
+        let mut outputs = vec![first];
+        outputs.extend(outputs_through_completion(&mut rig, request).await);
+        // Declines are published on the worker's 20 ms tick. Drive two
+        // ticks with heartbeats before checking the absence of a verdict.
+        rig.pump(Duration::from_millis(40)).await;
+        let mut verdicts = Vec::new();
+        while let Some(message) = turns.recv(Duration::ZERO).unwrap() {
+            let turn: VoiceTurn = message.parse().unwrap();
+            if turn.request == request {
+                verdicts.push(turn.verdict);
+            }
+        }
+        rig.stop().await;
+        assert!(verdicts.is_empty(), "an action was retracted: {verdicts:?}");
+        assert_eq!(skills.asked.try_iter().count(), 1, "the skill ran twice");
+        assert_eq!(
+            outputs
+                .iter()
+                .filter(|output| matches!(output, ProviderOutput::RequestedAudio { .. }))
+                .count(),
+            1,
+            "{outputs:?}"
+        );
+        assert_eq!(
+            outputs
+                .iter()
+                .filter(|output| matches!(output, ProviderOutput::Audio { .. }))
+                .count(),
+            1,
+            "confirmation audio was duplicated: {outputs:?}"
+        );
+        assert!(
+            outputs.iter().any(
+                |output| matches!(output, ProviderOutput::Audio { request: of, samples, .. }
+                if *of == request && *samples == vec![21; PACKET_SAMPLES])
+            ),
+            "the single confirmation was suppressed: {outputs:?}"
+        );
+    }
+}
+
+/// Declining a line closes its speech and action authority, but a later
+/// withdrawal of report consent still reaches the reports owner once.
+#[tokio::test]
+async fn an_accepted_decline_allows_reports_withdrawal_without_reviving_speech() {
+    use lamp_msgs::{ReportsRequest, ReportsState};
+
+    // ReportsStop reads LAMP_BUS_ROOT rather than the worker's BUS_ROOT test
+    // hook. Set it only on a child test process: changing the environment in
+    // this threaded test binary could redirect another test's bus traffic.
+    const CHILD: &str = "LAMP_TEST_DECLINED_REPORTS_CHILD";
+    const COMPLETED: &str = "declined ReportsStop completed both Policy cases";
+    if std::env::var_os(CHILD).is_none() {
+        let home = crate::process::SessionDirectory::create().unwrap();
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "provider_worker::tests::review_2026_10_14::an_accepted_decline_allows_reports_withdrawal_without_reviving_speech",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD, &home.path)
+            .env(lamp_bus::ROOT_VARIABLE, &home.path)
+            .output()
+            .unwrap();
+        let _ = std::fs::remove_dir_all(&home.path);
+        assert!(
+            output.status.success(),
+            "isolated reports regression failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(COMPLETED),
+            "the exact child test did not complete both cases"
+        );
+        return;
+    }
+
+    assert_eq!(
+        std::env::var_os(lamp_bus::ROOT_VARIABLE),
+        std::env::var_os(CHILD),
+        "the ReportsStop route must use only this test's private bus"
+    );
+    let _turn = one_at_a_time().await;
+    let root = Root::new();
+    let bus = lamp_bus::Bus::from_environment().unwrap();
+    // The fake owner has no uploader, settings writer or network client. It
+    // receives the actual production bus request and publishes only a state.
+    let mut requests = bus
+        .subscribe_typed(ReportsRequest::TOPIC, "cloud", ReportsRequest::TYPE)
+        .unwrap();
+    let mut states = bus
+        .publisher_declared(ReportsState::TOPIC, &ReportsState::declaration(), "cloud")
+        .unwrap();
+    for policy in [false, true] {
+        assert!(requests.recv(Duration::ZERO).unwrap().is_none());
+        states
+            .publish_json(
+                monotonic_us(),
+                &ReportsState {
+                    share: true,
+                    queued: 2,
+                },
+            )
+            .unwrap();
+        let mut options = typed_with(crate::tools::Settings {
+            decline: true,
+            reports_stop: true,
+            requested_audio: true,
+            ..Default::default()
+        });
+        // ReportsStop is excluded from Policy's parked-action set. Keep that
+        // real entry path: no fabricated Parked value or stay_quiet decision.
+        if policy {
+            options.policy_holds = Some(root.0.join("policy"));
+        }
+        let mut turns = turns(&root);
+        let mut rig = LiveRig::start_with(quick_policy(), options);
+        let mut dial = rig.ready().await;
+        let request = rig.speak(&mut dial, false, true).await;
+        dial.service.send(provider_audio(17, PACKET_SAMPLES)).await;
+        assert!(matches!(
+            rig.output().await,
+            ProviderOutput::Audio { request: of, .. } if of == request
+        ));
+        while turns.recv(Duration::ZERO).unwrap().is_some() {}
+        dial.service
+            .send(json!({"toolCall":{"functionCalls":[decline_function()]}}))
+            .await;
+        let declined = rig.service_message(&mut dial).await;
+        assert_eq!(response_id(&declined), "decline");
+        wait_for_decline(&mut rig, &mut turns, request).await;
+
+        dial.service
+            .send(json!({"toolCall":{"functionCalls":[{
+                "id":"withdraw-reports",
+                "name":crate::reports_stop::NAME,
+                "args":{},
+            }]}}))
+            .await;
+        dial.service.send(idle_complete()).await;
+        let until = Instant::now() + Duration::from_secs(1);
+        let asked = loop {
+            if let Some(message) = requests.recv(Duration::ZERO).unwrap() {
+                break message;
+            }
+            assert!(
+                Instant::now() < until,
+                "report consent withdrawal never reached the fake owner (policy={policy})"
+            );
+            rig.publish();
+            rig.tick(Duration::from_millis(2)).await;
+        };
+        assert_eq!(asked.header.source, "voice");
+        assert_eq!(
+            asked.parse::<ReportsRequest>().unwrap(),
+            ReportsRequest { share: false }
+        );
+        states
+            .publish_json(
+                monotonic_us(),
+                &ReportsState {
+                    share: false,
+                    queued: 0,
+                },
+            )
+            .unwrap();
+        let answered = rig.service_message(&mut dial).await;
+        assert_eq!(response_id(&answered), "withdraw-reports");
+        assert_eq!(
+            answered["toolResponse"]["functionResponses"][0]["response"],
+            json!({"ok":true,"say":crate::reports_stop::STOPPED})
+        );
+        dial.service
+            .send(json!({"serverContent":{"outputTranscription":{
+                "text":crate::reports_stop::STOPPED,
+                "finished":true,
+            }}}))
+            .await;
+        dial.service.send(provider_audio(29, PACKET_SAMPLES)).await;
+        dial.service.send(idle_complete()).await;
+        let outputs = outputs_through_completion(&mut rig, request).await;
+        rig.stop().await;
+        assert!(
+            requests.recv(Duration::ZERO).unwrap().is_none(),
+            "consent withdrawal was dispatched more than once (policy={policy})"
+        );
+        assert!(
+            !outputs.iter().any(|event| matches!(
+                event,
+                ProviderOutput::Audio { .. }
+                    | ProviderOutput::Transcript { .. }
+                    | ProviderOutput::RequestedAudio { .. }
+            )),
+            "withdrawal revived a declined answer (policy={policy}): {outputs:?}"
+        );
+    }
+    eprintln!("{COMPLETED}");
+}

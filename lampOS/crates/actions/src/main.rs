@@ -24,7 +24,8 @@ const HELP: &str = "The lamp's executive: carries out what the voice's model ask
   --caps-dir        private persistent storage for output caps; required with LAMP_OUTPUT_CAPS=on and --bus-root, never the runtime directory. Ignored when off; relative or dot-component paths are always refused\n\
   LAMP_OUTPUT_CAPS=on enables private caps_put/caps_remove/caps_get operations. Every other value leaves storage, hardware and bus behavior unchanged. No cap operations are model tools.\n\
   LAMP_SCHEDULE_TOOLS=on enables six reminder tools; LAMP_SCHEDULE_SOCKET is an absolute socket path (default /run/lampos-schedule/call.sock). Other switch values leave the old tool list unchanged.\n\
-  LAMP_SHORT_DONE=on tells the model to say only a word or two after a light or volume change it asked for.";
+  LAMP_SHORT_DONE=on tells the model to say only a word or two after a light or volume change it asked for.\n\
+  LAMP_REQUESTED_AUDIO=on publishes speaker mute generations and volume observations; requires --bus-root and the Linux host boot clock. Other values add no mixer polling or speaker topic.";
 
 #[derive(Debug, Default, Eq, PartialEq)]
 struct Arguments {
@@ -122,6 +123,14 @@ fn main() -> ExitCode {
     let sound = arguments
         .mixer
         .map(|(card, control)| Volume::new(Amixer { card, control }, arguments.ceiling));
+    let speaker =
+        match lamp_actions::speaker_state::Service::from_environment(arguments.bus.as_deref()) {
+            Ok(speaker) => speaker,
+            Err(error) => {
+                eprintln!("lamp-actions: invalid speaker observation configuration: {error}");
+                return ExitCode::from(2);
+            }
+        };
     // The lamp's health hears from this part on the same bus.
     let health = arguments.bus.as_ref().and_then(|root| {
         lamp_bus::Bus::new(root)
@@ -161,13 +170,14 @@ fn main() -> ExitCode {
         light,
         short,
     };
-    match lamp_actions::server::serve_reporting_with_caps(
+    match lamp_actions::server::serve_reporting_with_outputs(
         &arguments.dir,
         &mut executive,
         &AtomicBool::new(false),
         health,
         schedule.as_ref(),
         caps.as_ref(),
+        speaker,
     ) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {

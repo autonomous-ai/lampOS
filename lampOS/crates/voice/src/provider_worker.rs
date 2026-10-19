@@ -664,6 +664,13 @@ pub enum ProviderOutput {
         request: u64,
         session: u64,
     },
+    /// A verified Skills socket offered a recording for this spoken tool call.
+    /// The coordinator still owns confirmation playback and every final guard.
+    RequestedAudio {
+        request: u64,
+        session: u64,
+        offer: lamp_msgs::RequestedAudioOffer,
+    },
     /// What was heard for `request` made no sense in the conversation and
     /// its answer is held (#926): the coordinator asks again. Sent before
     /// the request's `TurnComplete`.
@@ -1029,12 +1036,35 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
             | ProviderOutput::Interrupted { request }
             | ProviderOutput::TurnComplete { request, .. }
             | ProviderOutput::HoldingAnswer { request, .. }
+            | ProviderOutput::RequestedAudio { request, .. }
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::NewsAnswered { request, .. } => Some(*request),
         };
         request.is_none_or(|request| request > retired_through)
     });
+}
+
+/// A queued private offer keeps no authority of its own. Recheck it on every
+/// attempt, including after credit or socket space returns. `true` consumes the
+/// queue entry, either sent or discarded; a discard spends no output credit.
+fn send_or_discard_output(
+    handoff: &InputHandoff,
+    flow: &mut OutputSender,
+    item: &Outbound,
+    now_us: u64,
+    send: impl FnOnce(&Outbound) -> io::Result<()>,
+) -> io::Result<bool> {
+    if let Outbound::Output(ProviderOutput::RequestedAudio {
+        request,
+        session,
+        offer,
+    }) = item
+        && !handoff.current_requested_audio(*request, *session, offer, now_us)
+    {
+        return Ok(true);
+    }
+    flow.try_send(|| send(item))
 }
 
 /// The single refused Start stays in intake until its outcome has reserved
@@ -1542,6 +1572,10 @@ async fn serve_with_visual<C: Connect>(
     // What was heard of the newest request, for the staff's note.
     let mut staff_heard = crate::staff_note::Heard::default();
     let mut desk = ToolDesk::new(options.tools.clone());
+    desk.worker_boot = options
+        .tools
+        .requested_audio
+        .then(|| crate::process::boot_text(boot));
     // The lamp's actions wait for the Policy's decision (#800).
     desk.verdicts = options.policy_holds.as_deref().and_then(|root| {
         crate::policy_holds::Verdicts::on(root)
@@ -1669,6 +1703,7 @@ async fn serve_with_visual<C: Connect>(
                 }
                 // The lamp's actions kept for the Policy's decision (#800),
                 // each let go if its turn was retired meanwhile.
+                desk.spoken = intake.handoff.requested_audio_origin(monotonic_us());
                 desk.release(&provider, |request| intake.handoff.retired(request));
                 // A turn that asked again for an action held ends as one
                 // interrupted: the coordinator lets it go and listens (#1465).
@@ -1677,6 +1712,9 @@ async fn serve_with_visual<C: Connect>(
                 }
                 // What the executive made of the calls it was asked.
                 desk.answer(&provider);
+                for offer in desk.take_requested_audio() {
+                    output.push_back(Outbound::Output(offer));
+                }
                 for (request, session, dropped) in desk.take_looks() {
                     // No session renewed under a look still owed: its
                     // written turn goes to the session that saw the call.
@@ -2212,7 +2250,7 @@ async fn serve_with_visual<C: Connect>(
                     // every other packet.
                     let queue = if urgent.is_empty() { &mut output } else { &mut urgent };
                     let Some(front)=queue.front() else {break;};
-                    if intake.output_flow.try_send(|| channels.data.send(front))? {
+                    if send_or_discard_output(&intake.handoff, &mut intake.output_flow, front, monotonic_us(), |item| channels.data.send(item))? {
                         // The lamp's own news is news once its sound has been
                         // handed on, owner-checked and credited (#829, #918):
                         // not when it was heard from the service, nor sound
@@ -2708,6 +2746,7 @@ async fn serve_with_visual<C: Connect>(
                                     && !attention.names_the_schedule()
                                     && !attention.answers_the_lamps_question(),
                             });
+                        desk.spoken = intake.handoff.requested_audio_origin(monotonic_us());
                         desk.called(&provider, lineage, call, held, turn, intake.handoff.memory_lease(lineage))
                     }
                     // Calls the service withdrew are not run if they still
@@ -2822,6 +2861,10 @@ fn reminder_notice<C: Connect>(
 /// nothing more for a request until its calls are.
 struct ToolDesk {
     settings: crate::tools::Settings,
+    worker_boot: Option<String>,
+    /// Accepted microphone input: request, provider session, privacy generation.
+    spoken: Option<(u64, u64, u64)>,
+    requested_audio: Vec<ProviderOutput>,
     /// The newest request the model said was not for it.
     declined: Option<u64>,
     /// Each request declined and not acted on since the worker last took
@@ -2934,12 +2977,16 @@ struct Asked {
     /// The news key a `check_agent_task` answer held, taken out of what the
     /// model is told (#1390).
     news: Option<String>,
+    requested_audio: Option<lamp_msgs::RequestedAudioOffer>,
 }
 impl ToolDesk {
     fn new(settings: crate::tools::Settings) -> Self {
         let (asked, answers) = std::sync::mpsc::channel();
         Self {
             settings,
+            worker_boot: None,
+            spoken: None,
+            requested_audio: Vec::new(),
             declined: None,
             declines: Vec::new(),
             acted: None,
@@ -3026,21 +3073,27 @@ impl ToolDesk {
                 .is_ok();
             (sent, monotonic_us())
         };
-        // A request whose answer is held back has nothing done for it
-        // either: the call is answered, and not run.
-        if held
-            && matches!(
+        // An accepted decline also closes later calls in this request.
+        // Withdrawing consent keeps its separate safe-direction rule.
+        // Every refused call is answered, without dispatching it.
+        if (self.declined == Some(request)
+            && !matches!(
                 crate::tools::route(&self.settings, &call.name),
-                Route::Executive(_)
-                    | Route::UseSkill(_)
-                    | Route::Schedule(_)
-                    | Route::Memory(_)
-                    | Route::Tasks(_)
-                    | Route::Faces(..)
-                    | Route::Mark(_)
-                    | Route::Onboarding(_)
-                    | Route::ReportsStop
-            )
+                Route::ReportsStop
+            ))
+            || (held
+                && matches!(
+                    crate::tools::route(&self.settings, &call.name),
+                    Route::Executive(_)
+                        | Route::UseSkill(_)
+                        | Route::Schedule(_)
+                        | Route::Memory(_)
+                        | Route::Tasks(_)
+                        | Route::Faces(..)
+                        | Route::Mark(_)
+                        | Route::Onboarding(_)
+                        | Route::ReportsStop
+                ))
         {
             let (sent, sent_us) = tell(&crate::tools::declined());
             self.line(
@@ -3247,15 +3300,50 @@ impl ToolDesk {
         let asked = self.asked.clone();
         let session = lineage.session;
         let work = call.clone();
+        let context = match (self.spoken, &self.worker_boot) {
+            (Some((spoken, session, privacy_generation)), Some(worker_boot))
+                if spoken == request && session == lineage.session.get() =>
+            {
+                Some(lamp_msgs::RequestedAudioContext {
+                    worker_boot: worker_boot.clone(),
+                    provider_session: session,
+                    request,
+                    privacy_generation,
+                    call_id: call.id.clone(),
+                    issued_us: called_us,
+                })
+            }
+            _ => None,
+        };
+        let settings = context.as_ref().map(|_| self.settings.clone());
         let spawned = std::thread::Builder::new()
             .name("lamp-voice-ask".into())
             .spawn(move || {
                 let started = Instant::now();
-                let (whom, told, answered, news) = match memory.as_ref() {
-                    Some(scope) => answered_scoped(&route, &work, request, heard, scope),
-                    None => (
+                let (whom, answer, answered, news) = match (memory.as_ref(), settings) {
+                    (Some(scope), Some(settings)) => {
+                        let (whom, mut answer, answered) = crate::tools::run_spoken_call_scoped(
+                            &settings,
+                            &route,
+                            &work,
+                            request,
+                            heard,
+                            context.as_ref(),
+                            scope,
+                        );
+                        let news = matches!(route, crate::tools::Route::Tasks(_))
+                            .then(|| crate::agent_tasks::take_news_key(&mut answer.told))
+                            .flatten();
+                        (whom, answer, answered, news)
+                    }
+                    (Some(scope), None) => {
+                        let (whom, told, answered, news) =
+                            answered_scoped(&route, &work, request, heard, scope);
+                        (whom, crate::tools::ToolAnswer::plain(told), answered, news)
+                    }
+                    (None, _) => (
                         "unavailable request",
-                        crate::tools::unavailable(),
+                        crate::tools::ToolAnswer::plain(crate::tools::unavailable()),
                         false,
                         None,
                     ),
@@ -3265,7 +3353,7 @@ impl ToolDesk {
                     session,
                     request,
                     call: work,
-                    told,
+                    told: answer.told,
                     whom,
                     skill,
                     heard,
@@ -3273,6 +3361,7 @@ impl ToolDesk {
                     took: started.elapsed(),
                     called_us,
                     news,
+                    requested_audio: answer.requested_audio,
                 });
             });
         match spawned {
@@ -3339,6 +3428,31 @@ impl ToolDesk {
                 eprintln!(
                     "lamp-voice provider: request {request} asked for {}; its turn ended while it waited for the Policy's decision; not run",
                     parked.call.name
+                );
+                continue;
+            }
+            if self.declined == Some(request)
+                && !matches!(
+                    crate::tools::route(&self.settings, &parked.call.name),
+                    crate::tools::Route::ReportsStop
+                )
+            {
+                let sent = provider
+                    .try_tool_response(
+                        parked.lineage.session,
+                        &parked.call.id,
+                        &parked.call.name,
+                        &crate::tools::declined(),
+                    )
+                    .is_ok();
+                self.line(
+                    parked.lineage.session,
+                    request,
+                    &parked.call.name,
+                    parked.called_us,
+                    monotonic_us(),
+                    true,
+                    sent,
                 );
                 continue;
             }
@@ -3484,7 +3598,7 @@ impl ToolDesk {
     fn answer<C: Connect>(&mut self, provider: &Supervisor<C>) {
         self.answer_with(
             |done| {
-                provider
+                !provider.call_withdrawn(done.session, &done.call.id) && provider
                     .try_tool_response(done.session, &done.call.id, &done.call.name, &done.told)
                     .is_ok()
             },
@@ -3520,8 +3634,44 @@ impl ToolDesk {
     ) {
         while let Ok(done) = self.answers.try_recv() {
             self.waiting = self.waiting.saturating_sub(1);
-            let taken = done.memory.as_ref().is_none_or(|scope| scope.is_current()) && send(&done);
+            let taken = done.memory.as_ref().is_none_or(|scope| {
+                scope.is_current()
+                    && scope.key().request == done.request
+                    && scope.key().session == done.session.get()
+                    && self
+                        .worker_boot
+                        .as_ref()
+                        .is_none_or(|boot| crate::process::boot_text(scope.key().worker) == *boot)
+            }) && send(&done);
             let sent_us = monotonic_us();
+            if taken
+                && self.declined != Some(done.request)
+                && done.heard
+                && done.skill
+                && done.memory.is_some()
+                && let Some(offer) = &done.requested_audio
+                && offer.check().is_ok()
+                && offer.context.request == done.request
+                && offer.context.provider_session == done.session.get()
+                && self.spoken
+                    == Some((
+                        done.request,
+                        done.session.get(),
+                        offer.context.privacy_generation,
+                    ))
+                && self.worker_boot.as_deref() == Some(offer.context.worker_boot.as_str())
+                && offer.context.call_id == done.call.id
+                && offer.context.issued_us == done.called_us
+                && sent_us >= offer.issued_us
+                && sent_us < offer.start_before_us
+                && self.requested_audio.len() < lamp_gemini::MAX_TOOL_CALLS
+            {
+                self.requested_audio.push(ProviderOutput::RequestedAudio {
+                    request: done.request,
+                    session: done.session.get(),
+                    offer: offer.clone(),
+                });
+            }
             // The look is the voice's, not the model's to remember (#941),
             // and only a skill's answer asks for it: no other part makes a
             // picture leave the lamp.
@@ -3593,6 +3743,9 @@ impl ToolDesk {
     /// The requests whose look was asked in a call's answer since the last take.
     fn take_looks(&mut self) -> Vec<(u64, u64, Option<String>)> {
         std::mem::take(&mut self.looks)
+    }
+    fn take_requested_audio(&mut self) -> Vec<ProviderOutput> {
+        std::mem::take(&mut self.requested_audio)
     }
     /// The news answered to the model since the last take, as the
     /// coordinator is told it (#1390).
@@ -4320,6 +4473,10 @@ struct InputHandoff {
     abandoned_through: u64,
     abandoned_sent_through: u64,
     submitted: Option<SubmittedInput>,
+    /// The generation on the original accepted microphone Start; never
+    /// inferred from a later authority renewal or a replayed connection.
+    spoken_privacy: Option<(u64, u64, u64)>,
+    spoken_audio_accepted: bool,
     /// A started request that goes on from one ended early and given up,
     /// until the model has been told so.
     cut_off: Option<RequestId>,
@@ -4435,6 +4592,51 @@ struct Unresent {
 }
 
 impl InputHandoff {
+    /// Written, reminder and empty-input turns have no microphone provenance.
+    /// Recheck the current authority after a tool's blocking socket exchange.
+    fn requested_audio_origin(&self, now_us: u64) -> Option<(u64, u64, u64)> {
+        let submitted = self.submitted?;
+        submitted.captured?;
+        let state = self.authority?;
+        let (request, session, generation) = self.spoken_privacy?;
+        (state.listening_ready(MonoTime::from_micros(now_us))
+            && self.spoken_audio_accepted
+            && request == submitted.request.get()
+            && session == submitted.session.get()
+            && generation == state.microphone_generation()
+            && !self.retired(submitted.request.get())
+            && state.owner().map(|owner| owner.turn()) == Some(submitted.request.get()))
+        .then_some((request, session, generation))
+    }
+
+    fn current_requested_audio(
+        &self,
+        request: u64,
+        session: u64,
+        offer: &lamp_msgs::RequestedAudioOffer,
+        now_us: u64,
+    ) -> bool {
+        let (Ok(request_id), Ok(session_id)) = (RequestId::new(request), SessionId::new(session))
+        else {
+            return false;
+        };
+        offer.check().is_ok()
+            && offer.context.request == request
+            && offer.context.provider_session == session
+            && now_us >= offer.issued_us
+            && now_us < offer.start_before_us
+            && self.requested_audio_origin(now_us)
+                == Some((request, session, offer.context.privacy_generation))
+            && self
+                .memory_lease(lamp_gemini::Lineage {
+                    request: request_id,
+                    session: session_id,
+                })
+                .is_some_and(|scope| {
+                    crate::process::boot_text(scope.key().worker) == offer.context.worker_boot
+                })
+    }
+
     /// The eyes' picture went with `request`: a kept line of it is not
     /// sent again ([`crate::resend::Refused::Attached`]).
     fn pictured(&mut self, request: RequestId) {
@@ -5159,6 +5361,8 @@ impl InputHandoff {
                     captured: None,
                 });
                 self.cut_off = continues_cut_off.then_some(request);
+                self.spoken_privacy = Some((request.get(), expected.get(), generation));
+                self.spoken_audio_accepted = false;
                 // Kept as it is offered, to be sent again once if its
                 // connection is lost before any output (#705, Step B).
                 if self.resend {
@@ -5241,6 +5445,7 @@ impl InputHandoff {
                     }
                     return self.refused(request, error, input);
                 }
+                self.spoken_audio_accepted |= !samples.is_empty();
                 if let Some(voices) = self.voices.as_mut() {
                     voices.heard(request.get(), &samples);
                 }
@@ -5695,6 +5900,195 @@ mod tests {
 
     const NOW: u64 = 10_000_000;
 
+    #[test]
+    fn requested_audio_requires_the_original_microphone_input_and_live_privacy() {
+        for written in [false, true] {
+            let mut owner = controller();
+            let mut handoff = InputHandoff::default();
+            let sink = RecordingSink::default();
+            let request = authorize(&mut owner, &mut handoff);
+            if written {
+                handoff
+                    .submit(
+                        ProviderInput::Written {
+                            request,
+                            session: 1,
+                            privacy_generation: generation(&handoff),
+                            text: "Please play a recording.".into(),
+                            look: false,
+                        },
+                        NOW,
+                        &sink,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    *sink.calls.borrow(),
+                    [Call::Start(request), Call::End(request)]
+                );
+                assert_eq!(handoff.requested_audio_origin(NOW), None);
+                continue;
+            }
+            handoff
+                .submit(start(request, &handoff), NOW, &sink)
+                .unwrap();
+            assert_eq!(handoff.requested_audio_origin(NOW), None);
+            handoff
+                .submit(audio(request, 1, 1, &handoff), NOW, &sink)
+                .unwrap();
+            handoff.submit(end(request, &handoff), NOW, &sink).unwrap();
+            let origin = Some((request, 1, generation(&handoff)));
+            assert_eq!(handoff.requested_audio_origin(NOW), origin);
+            // A replacement connection cannot rejuvenate the original binding.
+            handoff.submitted.as_mut().unwrap().session = SessionId::new(2).unwrap();
+            assert_eq!(handoff.requested_audio_origin(NOW), None);
+            handoff.submitted.as_mut().unwrap().session = SessionId::new(1).unwrap();
+            owner
+                .set_microphone_permission(time(), Permission::Denied)
+                .unwrap();
+            handoff
+                .observe_authority(owner.snapshot(time()).unwrap())
+                .unwrap();
+            assert_eq!(handoff.requested_audio_origin(NOW), None);
+        }
+    }
+
+    #[test]
+    fn requested_audio_is_emitted_only_after_a_current_spoken_skills_reply_is_taken() {
+        for refusal in [
+            "none",
+            "unsent",
+            "written",
+            "other-service",
+            "retired",
+            "new-session",
+            "new-privacy",
+            "new-boot",
+            "expired",
+            "missing-scope",
+            "revoked-scope",
+            "wrong-scope-request",
+            "wrong-scope-session",
+            "wrong-scope-worker",
+        ] {
+            let mut desk = ToolDesk::new(crate::tools::Settings::default());
+            desk.worker_boot = Some("a".repeat(32));
+            desk.spoken = Some((7, 2, 4));
+            let issued_us = if refusal == "expired" {
+                1
+            } else {
+                monotonic_us()
+            };
+            let offer = lamp_msgs::RequestedAudioOffer {
+                skills_boot: "skills-test".into(),
+                definition_generation: 1,
+                offer_id: 1,
+                context: lamp_msgs::RequestedAudioContext {
+                    worker_boot: "a".repeat(32),
+                    provider_session: 2,
+                    request: 7,
+                    privacy_generation: 4,
+                    call_id: "call-7".into(),
+                    issued_us,
+                },
+                skill: "relaxing-music".into(),
+                asset: "/local/relaxing.wav".into(),
+                sha256: "a".repeat(64),
+                frames: 24_000,
+                issued_us,
+                start_before_us: issued_us + lamp_msgs::REQUESTED_AUDIO_START_US,
+                finish_before_us: issued_us + lamp_msgs::REQUESTED_AUDIO_START_US + 1_000_000,
+            };
+            match refusal {
+                "retired" => desk.spoken = None,
+                "new-session" => desk.spoken = Some((7, 3, 4)),
+                "new-privacy" => desk.spoken = Some((7, 2, 5)),
+                "new-boot" => desk.worker_boot = Some("b".repeat(32)),
+                _ => (),
+            }
+            let scope = crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new(if refusal == "wrong-scope-worker" {
+                        [0xbb; 16]
+                    } else {
+                        [0xaa; 16]
+                    })
+                    .unwrap(),
+                    request: if refusal == "wrong-scope-request" {
+                        8
+                    } else {
+                        7
+                    },
+                    session: if refusal == "wrong-scope-session" {
+                        3
+                    } else {
+                        2
+                    },
+                },
+                crate::memory_scope::ScopeSnapshot::room(),
+            );
+            desk.asked
+                .send(Asked {
+                    memory: (refusal != "missing-scope").then(|| scope.lease()),
+                    session: SessionId::new(2).unwrap(),
+                    request: 7,
+                    call: lamp_gemini::ToolCall {
+                        id: "call-7".into(),
+                        name: "play_relaxing_music".into(),
+                        args: serde_json::json!({}),
+                    },
+                    told: serde_json::json!({"next":"Confirm."}),
+                    whom: "the executive",
+                    skill: refusal != "other-service",
+                    heard: refusal != "written",
+                    answered: true,
+                    took: Duration::ZERO,
+                    called_us: issued_us,
+                    news: None,
+                    requested_audio: Some(offer.clone()),
+                })
+                .unwrap();
+            if refusal == "revoked-scope" {
+                scope.revoke();
+            }
+            let mut sent = false;
+            desk.answer_with(
+                |done| {
+                    sent = true;
+                    assert!(done.told.get("requested_audio").is_none());
+                    refusal != "unsent"
+                },
+                |_, _| {},
+            );
+            assert_eq!(
+                sent,
+                !matches!(
+                    refusal,
+                    "revoked-scope"
+                        | "wrong-scope-request"
+                        | "wrong-scope-session"
+                        | "wrong-scope-worker"
+                        | "new-boot"
+                ),
+                "{refusal}",
+            );
+            let output = desk.take_requested_audio();
+            if refusal == "none" {
+                assert!(
+                    matches!(output.as_slice(), [ProviderOutput::RequestedAudio {
+                    request: 7, session: 2, offer: got,
+                }] if got == &offer)
+                );
+                let mut wire = serde_json::to_value(&output[0]).unwrap();
+                assert!(serde_json::from_value::<ProviderOutput>(wire.clone()).is_ok());
+                wire["new_authority"] = serde_json::json!(true);
+                assert!(serde_json::from_value::<ProviderOutput>(wire).is_err());
+            } else {
+                assert!(output.is_empty(), "{refusal}");
+            }
+            assert!(desk.take_requested_audio().is_empty());
+        }
+    }
+
     /// #799: each call answered is kept for the first-output record with
     /// when it came and when its answer was sent, whether the connection
     /// took it or not, and what is taken is not kept again.
@@ -5718,6 +6112,7 @@ mod tests {
             took: Duration::from_millis(41),
             called_us: 1_000,
             news: None,
+            requested_audio: None,
         };
         desk.asked.send(asked(7, "start_agent_task", true)).unwrap();
         desk.asked
@@ -5786,6 +6181,7 @@ mod tests {
             took: Duration::from_millis(3),
             called_us: 1,
             news: None,
+            requested_audio: None,
         };
         let look = serde_json::json!({"next": "Say only \"Let me take a look.\"", "look": true});
         desk.asked.send(asked(7, look.clone(), true, true)).unwrap();
@@ -5838,6 +6234,7 @@ mod tests {
             took: Duration::from_millis(3),
             called_us: 1,
             news: news.map(str::to_owned),
+            requested_audio: None,
         };
         desk.asked.send(asked(7, Some("s1:2:4"))).unwrap();
         desk.asked.send(asked(8, Some("s1:3:5"))).unwrap();
@@ -5877,6 +6274,7 @@ mod tests {
                 took: Duration::from_millis(40),
                 called_us: 1,
                 news: None,
+                requested_audio: None,
             })
             .unwrap();
         desk.waiting = 1;
@@ -6141,6 +6539,19 @@ mod tests {
             self.retired.set(self.retired.get().max(request.get()));
             self.calls.borrow_mut().push(Call::Retire(request.get()));
         }
+        fn written(
+            &self,
+            session: SessionId,
+            request: RequestId,
+            _text: &str,
+            picture: Option<&[u8]>,
+        ) -> std::result::Result<(), StartRefusal> {
+            assert!(picture.is_none());
+            // A whole written request is accepted and ended without PCM.
+            // Keep the same session, overlap and retirement checks as Start.
+            self.start(session, request)?;
+            self.end(request).map_err(StartRefusal::Refused)
+        }
         fn note(&self, request: RequestId, text: &str) -> lamp_gemini::Result<()> {
             self.calls
                 .borrow_mut()
@@ -6276,6 +6687,156 @@ mod tests {
         handoff.fail(request);
         assert!(!first.is_current());
         assert!(handoff.memory_lease(lineage).is_none());
+    }
+
+    #[test]
+    fn requested_audio_waiting_for_ipc_credit_rechecks_camera_scope() {
+        for change in ["none", "denied", "reopened"] {
+            let (_directory, mut parent, mut worker) = intake_channels();
+            let mut owner = controller();
+            owner
+                .set_camera_permission(time(), Permission::Allowed)
+                .unwrap();
+            let mut handoff = memory_handoff();
+            let sink = RecordingSink::default();
+            let request = authorize(&mut owner, &mut handoff);
+            cache_face(&handoff, "credit-fixture");
+            handoff
+                .submit(start(request, &handoff), NOW, &sink)
+                .unwrap();
+            handoff
+                .submit(audio(request, 1, 1, &handoff), NOW, &sink)
+                .unwrap();
+            handoff.submit(end(request, &handoff), NOW, &sink).unwrap();
+            let lease = handoff.memory_scope.as_ref().unwrap().lease();
+            assert!(lease.scope().unwrap().person().is_some());
+            let before = handoff.authority.unwrap();
+            let offer = lamp_msgs::RequestedAudioOffer {
+                skills_boot: "skills-test".into(),
+                definition_generation: 1,
+                offer_id: 1,
+                context: lamp_msgs::RequestedAudioContext {
+                    worker_boot: crate::process::boot_text(lease.key().worker),
+                    provider_session: 1,
+                    request,
+                    privacy_generation: before.microphone_generation(),
+                    call_id: "credit-call".into(),
+                    issued_us: NOW,
+                },
+                skill: "relaxing-music".into(),
+                asset: "/local/relaxing.wav".into(),
+                sha256: "a".repeat(64),
+                frames: 24_000,
+                issued_us: NOW,
+                start_before_us: NOW + lamp_msgs::REQUESTED_AUDIO_START_US,
+                finish_before_us: NOW + lamp_msgs::REQUESTED_AUDIO_START_US + 1_000_000,
+            };
+            let mut flow = OutputSender::default();
+            // Completion consumes the initial credit but does not retire the
+            // admitted owner or prevent a valid queued offer from following.
+            for event in [
+                ProviderOutput::GenerationComplete { request },
+                ProviderOutput::TurnComplete {
+                    request,
+                    idle: true,
+                },
+            ] {
+                assert!(
+                    send_or_discard_output(
+                        &handoff,
+                        &mut flow,
+                        &Outbound::Output(event),
+                        NOW,
+                        |item| worker.data.send_with(item, || NOW),
+                    )
+                    .unwrap()
+                );
+                assert!(
+                    parent
+                        .data
+                        .receive_with::<ProviderOutput>(|| NOW)
+                        .unwrap()
+                        .is_some()
+                );
+            }
+            assert!(lease.is_current());
+            let pending = Outbound::Output(ProviderOutput::RequestedAudio {
+                request,
+                session: 1,
+                offer,
+            });
+            assert!(
+                !send_or_discard_output(&handoff, &mut flow, &pending, NOW, |item| worker
+                    .data
+                    .send_with(item, || NOW),)
+                .unwrap()
+            );
+            assert!(
+                parent
+                    .data
+                    .receive_with::<ProviderOutput>(|| NOW)
+                    .unwrap()
+                    .is_none()
+            );
+            if change != "none" {
+                owner
+                    .set_camera_permission(time(), Permission::Denied)
+                    .unwrap();
+                if change == "reopened" {
+                    owner
+                        .set_camera_permission(time(), Permission::Allowed)
+                        .unwrap();
+                }
+                handoff
+                    .observe_authority(owner.snapshot(time()).unwrap())
+                    .unwrap();
+            }
+            let after = handoff.authority.unwrap();
+            assert_eq!(before.owner(), after.owner());
+            assert_eq!(
+                before.microphone_generation(),
+                after.microphone_generation()
+            );
+            assert!(!handoff.retired(request));
+            assert_eq!(lease.is_current(), change == "none");
+            flow.grant(3).unwrap();
+            assert!(
+                send_or_discard_output(&handoff, &mut flow, &pending, NOW, |item| worker
+                    .data
+                    .send_with(item, || NOW),)
+                .unwrap()
+            );
+            assert_eq!(
+                matches!(
+                    parent.data.receive_with::<ProviderOutput>(|| NOW).unwrap(),
+                    Some(ProviderOutput::RequestedAudio { .. })
+                ),
+                change == "none",
+                "{change}",
+            );
+            assert_eq!(
+                flow.can_send(),
+                change != "none",
+                "a discard spends no credit"
+            );
+            // Camera-only revocation neither ends the healthy voice nor drops
+            // ordinary lifecycle output from the unchanged microphone owner.
+            flow.grant(4).unwrap();
+            assert!(
+                send_or_discard_output(
+                    &handoff,
+                    &mut flow,
+                    &Outbound::Output(ProviderOutput::GenerationComplete { request }),
+                    NOW,
+                    |item| worker.data.send_with(item, || NOW),
+                )
+                .unwrap()
+            );
+            assert!(
+                matches!(parent.data.receive_with::<ProviderOutput>(|| NOW).unwrap(),
+                Some(ProviderOutput::GenerationComplete { request: got }) if got == request)
+            );
+        }
     }
 
     #[test]
@@ -9945,6 +10506,116 @@ mod tests {
         // sound is dropped is the busy-room test's above.)
         assert!(listener.accept().is_err());
         rig.stop().await;
+    }
+
+    #[tokio::test]
+    async fn requested_audio_crosses_the_live_worker_only_after_its_tool_reply() {
+        use std::io::{BufRead, Write};
+        for wrapped in [false, true] {
+            let home = crate::process::SessionDirectory::create().unwrap();
+            std::fs::write(home.path.join(crate::tools::CATALOG_FILE),
+                r#"{"tools":[{"name":"play_relaxing_music","description":"A requested recording."}]}"#).unwrap();
+            let listener =
+                std::os::unix::net::UnixListener::bind(home.path.join(crate::tools::CALL_SOCKET))
+                    .unwrap();
+            let skill = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                let call: serde_json::Value = serde_json::from_str(&line).unwrap();
+                assert_eq!(call["name"], "play_relaxing_music");
+                let context: lamp_msgs::RequestedAudioContext =
+                    serde_json::from_value(call["requested_audio_context"].clone()).unwrap();
+                let offer = lamp_msgs::RequestedAudioOffer {
+                    skills_boot: "skills-test".into(),
+                    definition_generation: 2,
+                    offer_id: 3,
+                    skill: "relaxing-music".into(),
+                    asset: "/local/relaxing.wav".into(),
+                    sha256: "a".repeat(64),
+                    frames: 24_000,
+                    issued_us: context.issued_us,
+                    start_before_us: context.issued_us + lamp_msgs::REQUESTED_AUDIO_START_US,
+                    finish_before_us: context.issued_us
+                        + lamp_msgs::REQUESTED_AUDIO_START_US
+                        + 1_000_000,
+                    context,
+                };
+                writeln!(
+                    stream,
+                    "{}",
+                    json!({"ok":true,"result":{
+                        "next":"Confirm.","requested_audio":&offer,
+                    }})
+                )
+                .unwrap();
+                offer
+            });
+            let mut rig = LiveRig::start_with(
+                quick_policy(),
+                typed_with(crate::tools::Settings {
+                    skills: Some(home.path.clone()),
+                    requested_audio: true,
+                    use_skill: wrapped,
+                    ..Default::default()
+                }),
+            );
+            let mut dial = rig.ready().await;
+            let request = rig.speak(&mut dial, false, true).await;
+            let name = if wrapped {
+                crate::use_skill::NAME
+            } else {
+                "play_relaxing_music"
+            };
+            dial.service
+                .send(json!({"toolCall":{"functionCalls":[{
+                    "id":"music-original", "name":name,
+                    "args":if wrapped { json!({"skill":"play_relaxing_music"}) } else { json!({}) },
+                }]}}))
+                .await;
+            // Gemini ends the turn that asked the function separately from
+            // the answer it gives after the reply. The first completion is
+            // deliberately consumed by the transport's calls_turn_open guard.
+            dial.service.send(idle_complete()).await;
+            assert_eq!(
+                rig.service_message(&mut dial).await,
+                json!({"toolResponse":{"functionResponses":[{
+                    "id":"music-original", "name":name, "response":{"next":"Confirm."}
+                }]}})
+            );
+            let offer = skill.join().unwrap();
+            assert_eq!(
+                offer.context.worker_boot,
+                crate::process::boot_text(BootId::new([9; 16]).unwrap())
+            );
+            assert_eq!(offer.context.request, request);
+            assert_eq!(offer.context.provider_session, dial.session.get());
+            assert_eq!(
+                offer.context.privacy_generation,
+                rig.snapshot.microphone_generation()
+            );
+            assert_eq!(offer.context.call_id, "music-original");
+            assert!(
+                matches!(rig.output().await, ProviderOutput::RequestedAudio {
+                request: got, session, offer: handed,
+            } if got == request && session == dial.session.get() && handed == offer)
+            );
+            // The confirmation remains ordinary provider audio for the same
+            // request; its completion is the second provider completion.
+            dial.service.send(provider_audio(21, PACKET_SAMPLES)).await;
+            assert!(matches!(
+                rig.output().await,
+                ProviderOutput::Audio { request: got, samples, .. }
+                    if got == request && samples == vec![21; PACKET_SAMPLES]
+            ));
+            dial.service.send(idle_complete()).await;
+            assert!(
+                matches!(rig.output().await, ProviderOutput::TurnComplete { request: got, .. } if got == request)
+            );
+            rig.stop().await;
+        }
     }
 
     /// #941, #1146: a skill's call answered with a look, through the

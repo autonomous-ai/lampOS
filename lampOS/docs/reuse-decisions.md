@@ -30,6 +30,40 @@ do not establish acoustic volume, optical brightness, applied motion, flash
 power-loss behavior or installed-system timing. The first builder owns the
 [lamp comparison](bedtime-morning.md).
 
+## Requested local music, #1685 (2026-10-19)
+
+The source comparison uses the V1 files retained in integration tree
+`dab3f1242`, not a measured lamp run. Keep explicit spoken requests and one
+short confirmation (`skills/music/SKILL.md`), mute refusal and terminal
+speaker stop (`hal/routes/music.py`), cancellation during preparation and
+playback (`hal/app_state.py::music_cancel_active`,
+`hal/drivers/button_actions.py::single_click_action`), and privacy closure
+before slow work (`hal/privacy.py`). V1's three-second cancel window becomes
+an exact, terminal owner/call identity: elapsed time or unmute cannot revive
+an earlier item. Its declared audio quiet-hours rule is not implemented by
+this first tool-only format; no parity or arbitrary replacement night
+window is claimed.
+
+V1's `hal/drivers/voice/music_service.py` waits for TTS with bounded polling
+and starts a separate player. Requested audio instead joins the existing
+Voice owner's actual final confirmation retirement, then uses its same
+speaker worker, 240-frame dispatch and final ownership/privacy permits.
+Reuse the installed `hound` WAV decoder, SHA-256, bounded Unix-socket client,
+Skills package/permission checks and local-recording cursor. No new decoder,
+player service, ALSA writer or runtime dependency is necessary for a fixed
+24 kHz PCM asset. Extend only the explicit-request reader to 60 seconds;
+autonomous cues retain their three-second bound.
+
+The example is an original 48-second score rendered from integer Rust source
+at build time, with Apache-2.0 provenance. Generated WAVs and packages are
+ignored artifacts. Do not port V1's media search/download, arbitrary file
+arguments, personal history, automatic volume restoration or movement.
+Actions supplies a passive speaker-state observation; Skills supplies short
+renewable leases. Neither can create a Voice owner. The exact cancellation,
+scan/freshness limits and separate host/device qualification boundaries are
+in [requested audio](requested-audio.md). Passing a host fixture does not
+establish acoustic onset, perceived musical quality or device interruption.
+
 ## Said to the lamp from close to it, task 49 (#753, 2026-10-15)
 
 Keep V1's gaze rule for the face (`hal/drivers/tracking/gaze.py`,

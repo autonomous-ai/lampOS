@@ -1,7 +1,7 @@
 # Switches
 
 Every setting that turns a behaviour on in `lamp-voice`, `lamp-body`, `lamp-eyes`,
-`lamp-expression`, `lamp-name`, `lamp-skills`, `lamp-tasks`, `lamp-controls` and `lamp-cloud`: what it does,
+`lamp-expression`, `lamp-name`, `lamp-skills`, `lamp-actions`, `lamp-tasks`, `lamp-controls` and `lamp-cloud`: what it does,
 what lamp-4ace and the product set, the pull request that added it with the lamp
 check it named, and the product default proposed for it. Made for the owner's
 question of 17 October, "why off?", and for switching lamp-4ace on group by
@@ -165,6 +165,7 @@ motion, since lamp-4ace's motors stay still until Monday: `LAMP_STAFF_NOTE`
 
 | Switch | Values and default | lamp-4ace (repo unit) | Product unit | Added by | Lamp check it named | Proposed product default | Why (one line) | Counted as |
 |---|---|---|---|---|---|---|---|---|
+| `LAMP_REQUESTED_AUDIO` (`lamp-voice`, `lamp-skills`, `lamp-actions`) | Exact `on`; off in all three processes. A spoken tool request may play one checked local recording after its confirmation retires, with Skills leases and optional `speaker/state`; [contract](requested-audio.md) | — (all three) | — (all three) | #1685 | Pending: first/repeated requests, Stop/interruption/privacy/capture loss, mute then unmute, stale/restarted Actions and Skills, asset/reload/deadline refusal, Written/Messages including speak=true refused, volume preserved; prepared confirmation-retirement to first accepted PCM target at most 250 ms, unmeasured | off until these host and authorized lamp checks | Same spoken owner, fixed deadlines and terminal cancellation; no runtime renderer or new player, no device result claimed | until |
 | LAMP_AIR_FACTS | `on`; off unless set. Tells the model, once per 3 h, that the air has been stuffy for 10 min | on | on | commit 56f25ed9d (direct) | none named in a PR; air.md: on lamp-4ace since 14 Oct 18:46, first told 19:45 with a window suggestion (shown) | on (already) | air.md records it shown on lamp-4ace 14 Oct; one quiet remark, only while a person is already talking | on |
 | LAMP_HELLO_ASKS_POLICY | `on`; off. A due voice hello waits up to 2 s for the Policy's `lamp-policy --hello` answer, then goes on without it | — | — | #883 | Shadow run on lamp-4ace: read `hello_due`/`hello_policy` waited_ms after the 11:00 and 16:00 sessions; speaking-first.md: no real person has yet made a hello due (not shown) | off | The product's hello is the Welcome back skill and the voice's own is off (install.md); without `--hello` in the policy unit it only makes a hello 2 s late | off |
 | LAMP_LIGHT_REQUESTS | `on`; off. Ring takes lapsing light requests from skills and `lamp-cloud`'s preview (#1464), the person's light returning by itself | — | on (#1332: the voice's unit and `lamp-skills`') | #993 | Publish a 10 s green `light/request`: ring eases green, back to the person's light, "make your light blue" ends it; no record of it shown | off until the #993 ring check is played (on both lamp-voice and lamp-skills) | Without it skills give the light back by hand (skills.md); #993 left the run to the first builder and no doc records it | until |

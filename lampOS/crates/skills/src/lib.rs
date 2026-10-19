@@ -24,6 +24,7 @@ pub mod daily;
 pub mod glow;
 pub mod limits;
 pub mod package;
+pub mod requested_audio;
 pub mod routine;
 
 /// Whether the body plays `name` on its mood socket: one of the clips in its
@@ -373,6 +374,8 @@ struct StepFile {
     cue: Option<String>,
     /// A leased rest intent, admitted by Expression's existing owner.
     rest: Option<routine::RestFile>,
+    /// A fixed local WAV for a spoken tool request, after its confirmation.
+    requested_audio: Option<String>,
     look: Option<bool>,
     /// `"say"`: this step and every one after it wait for the say to end.
     after: Option<String>,
@@ -670,9 +673,12 @@ impl Permissions {
             Call::Light { .. } | Call::Dim { .. } | Call::Out { .. } | Call::Show { .. } => {
                 ("light", self.light)
             }
-            Call::Say(_) | Call::Words(_) | Call::SayFrom(..) | Call::Sound { .. } | Call::Cue => {
-                ("speak", self.speak)
-            }
+            Call::Say(_)
+            | Call::Words(_)
+            | Call::SayFrom(..)
+            | Call::Sound { .. }
+            | Call::Cue
+            | Call::RequestedAudio(_) => ("speak", self.speak),
             Call::Look => ("look", self.look),
             Call::AfterSay | Call::Ends => return None,
         };
@@ -1181,6 +1187,8 @@ pub enum Call {
     },
     Cue,
     Rest(routine::Rest),
+    /// Only a private offer is returned to Voice. Skills never dispatches it.
+    RequestedAudio(requested_audio::Asset),
     /// The calls after this wait for the say to end: the skill's own say, or
     /// in a skill its tool starts, the line the model says after the call.
     AfterSay,
@@ -1366,6 +1374,7 @@ impl Call {
             Self::Sound { name, .. } => ("sound", json!({ "sound": name })),
             Self::Cue => ("sound", json!({ "cue": "hum" })),
             Self::Rest(rest) => ("rest", json!({ "op": rest.op })),
+            Self::RequestedAudio(_) => ("requested_audio", json!({})),
             Self::AfterSay => ("after_say", json!({})),
             Self::Ends => ("ends", json!({})),
         }
@@ -1614,7 +1623,8 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
 pub fn load(dir: &Path) -> Result<Skill, String> {
     let read =
         |file: &str| fs::read_to_string(dir.join(file)).map_err(|error| format!("{file}: {error}"));
-    let (name, description) = front_matter(&read("SKILL.md")?)?;
+    let description_text = read("SKILL.md")?;
+    let (name, description) = front_matter(&description_text)?;
     if dir.file_name().and_then(|folder| folder.to_str()) != Some(name.as_str()) {
         return Err(format!(
             "SKILL.md names {name:?}, which is not its folder's name"
@@ -1628,8 +1638,52 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
     if dir.join("run.py").exists() {
         return Err("run.py is not run yet: a skill with one is not loaded".into());
     }
+    let manifest_text = read("skill.toml")?;
     let file: SkillFile =
-        toml::from_str(&read("skill.toml")?).map_err(|error| format!("skill.toml: {error}"))?;
+        toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?;
+    if file.steps.iter().any(|step| step.requested_audio.is_some()) {
+        let only_say = |step: &StepFile| {
+            matches!(&step.say, Some(toml::Value::String(note)) if !note.trim().is_empty() && note.len() <= requested_audio::MOST_CONFIRMATION_BYTES && !note.chars().any(char::is_control))
+                && step.body.is_none()
+                && step.light.is_none()
+                && step.sound.is_none()
+                && step.cue.is_none()
+                && step.rest.is_none()
+                && step.look.is_none()
+                && step.requested_audio.is_none()
+                && step.after.is_none()
+                && step.on.is_none()
+                && step.if_choice.is_none()
+                && step.show.is_none()
+        };
+        let only_audio = |step: &StepFile| {
+            step.requested_audio.is_some()
+                && step.after.as_deref() == Some("say")
+                && step.body.is_none()
+                && step.light.is_none()
+                && step.sound.is_none()
+                && step.cue.is_none()
+                && step.rest.is_none()
+                && step.look.is_none()
+                && step.say.is_none()
+                && step.on.is_none()
+                && step.if_choice.is_none()
+                && step.show.is_none()
+        };
+        if file.tool.is_none()
+            || file.trigger.is_some()
+            || file.ask.is_some()
+            || !file.conditions.is_empty()
+            || file.choice.is_some()
+            || file.flag.is_some()
+            || file.limits.is_some()
+            || file.steps.len() != 2
+            || !only_say(&file.steps[0])
+            || !only_audio(&file.steps[1])
+        {
+            return Err("requested_audio needs a tool alone, one short say confirmation then one requested_audio with after = \"say\", and no other actions, limits, triggers, conditions or arguments".into());
+        }
+    }
     let triggers = match file.trigger {
         None => Vec::new(),
         Some(toml::Value::Array(many)) => many,
@@ -1923,11 +1977,13 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             && step.sound.is_none()
             && step.cue.is_none()
             && step.rest.is_none()
+            && step.requested_audio.is_none()
             && step.look.is_none()
             && step.show.is_none()
         {
             return Err(
-                "a [[do]] step names body, light, say, sound, cue, rest, look or show".into(),
+                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look or show"
+                    .into(),
             );
         }
         if let Some(on) = &step.on
@@ -1966,6 +2022,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                     || step.sound.is_some()
                     || step.cue.is_some()
                     || step.rest.is_some()
+                    || step.requested_audio.is_some()
                     || step.look.is_some()
                 {
                     return Err("a step for some choices only makes body, light or show".into());
@@ -2173,6 +2230,13 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 return Err("rest is only for automatic, non-item triggers".into());
             }
             steps.push(Step::Call(Call::Rest(rest.checked()?)));
+        }
+        if let Some(relative) = step.requested_audio {
+            let asset = requested_audio::Asset::load(dir, &relative)?;
+            if !asset.matches_definition(&description_text, &manifest_text) {
+                return Err("requested audio definition changed while loading".into());
+            }
+            steps.push(Step::Call(Call::RequestedAudio(asset)));
         }
         ons.resize(steps.len(), on);
     }
@@ -3773,11 +3837,26 @@ impl Engine {
     /// of the newest thing heard (its pieces joined, as the voice joins
     /// them) if it began after that run began; the model reads its `told`.
     pub fn tool(&mut self, name: &str, args: &Value, now_us: u64) -> Result<Run, String> {
+        self.tool_with_requested_audio(name, args, now_us, false)
+    }
+
+    /// The runtime's explicit opt-in; the private spoken context is still
+    /// required by the offer authority before the result can leave Skills.
+    pub fn tool_with_requested_audio(
+        &mut self,
+        name: &str,
+        args: &Value,
+        now_us: u64,
+        permitted: bool,
+    ) -> Result<Run, String> {
         let skill = self
             .skills
             .iter()
             .find(|skill| skill.tool.as_deref() == Some(name))
             .ok_or("No skill of mine does that just now.")?;
+        if skill.requested_audio().is_some() && !permitted {
+            return Err("Requested audio is disabled or has no spoken context.".into());
+        }
         arguments(skill, args)?;
         if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
             return Err("I can't do that just now.".into());
@@ -4062,9 +4141,20 @@ fn calls(
 /// not of each tool, which the voice's function declarations refuse.
 /// Both lists include enabled skills only, even when given the inventory.
 pub fn tools_file(skills: &[Skill]) -> Value {
+    tools_file_with_requested_audio(skills, requested_audio::from_environment())
+}
+
+/// Explicit switch form, including deterministic tests. Package validation
+/// uses the loader and does not grant execution or advertisement.
+/// Body metadata follows the same enabled/media filters and first emitted
+/// name as the tools; an omitted definition cannot add a body grant.
+pub fn tools_file_with_requested_audio(skills: &[Skill], enabled: bool) -> Value {
     let mut tools: Vec<Value> = Vec::new();
     let mut moving: Vec<&str> = Vec::new();
     for skill in skills.iter().filter(|skill| skill.enabled) {
+        if skill.requested_audio().is_some() && !enabled {
+            continue;
+        }
         if let Some(name) = &skill.tool
             && !tools.iter().any(|tool| tool["name"] == *name)
         {

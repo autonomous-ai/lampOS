@@ -1,0 +1,56 @@
+{
+  "source_commit": "067c05bbb7c6803bd38ba879b961a130f526006f",
+  "scope": "focused requested-audio preflight, separate from the complete gate",
+  "commands": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.59,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 25.46,
+      "log_sha256": "517ca4280831c75649ad96a77695804ba41120472aa95a0462f788963272c3e4"
+    },
+    {
+      "stage": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "requested_audio::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 35.4,
+      "log_sha256": "629916c965f3d9f4ff8f517966cffb40bc0e5ecc66b708166511d02e4d3f756b"
+    }
+  ],
+  "test_output_summaries": [
+    "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 2076 filtered out; finished in 1.49s"
+  ],
+  "source_sha256": {
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "fb50115cca8b54047ff69d62addeb572c6153a8a34775820bf330ba482534708"
+  }
+}

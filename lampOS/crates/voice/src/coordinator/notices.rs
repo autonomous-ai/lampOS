@@ -154,6 +154,8 @@ pub(super) enum SpeechOrigin {
     UnclearHum,
     /// A skill's own sound (`crate::say`, #938): local PCM, no answer.
     SkillSound,
+    /// A person's bounded recording, after its spoken confirmation retired.
+    RequestedAudio,
 }
 impl SpeechOrigin {
     /// Played from a recording held here, not from the provider.
@@ -173,6 +175,7 @@ impl SpeechOrigin {
             Self::HeadCue => "head_tap_cue",
             Self::UnclearHum => "unclear_hum",
             Self::SkillSound => "skill_sound",
+            Self::RequestedAudio => "requested_audio",
         }
     }
 }

@@ -1,0 +1,52 @@
+{
+  "kind": "Focused scoped-context integration compile failure; no tests ran",
+  "source": {
+    "head": "ea1aba77f70fe6bb3f83530254a5e85f4937bf4e",
+    "parent": "5e83af10210cb1a4bfbeb15887274d1e519fe4c8",
+    "source_file_count": 1634,
+    "source_tree_sha256": "bad474cf81df20ba34ee62e826b56475886392857865b4a0705ec935301fca76",
+    "test_root": "source-only copy",
+    "build_environment": {
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_BUILD_JOBS": "2"
+    },
+    "scope": "Focused preflight only; overlapping filters are not a complete crate or workspace gate."
+  },
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.63,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "seconds": 20.21,
+      "log_sha256": "d502b0010dce2040240ba5fdc3788aacff55a8a178467e55995c6ac826f642ed",
+      "test_summaries": []
+    }
+  ],
+  "error": "The runtime flavor multi_thread requires the rt-multi-thread feature. The new barrier-controlled test requested an unavailable Tokio runtime feature.",
+  "correction": "Use the existing current-thread runtime and a bounded OS thread to perform real camera revocation; no dependency or production change.",
+  "changed_test_sha256": "96ecd72bacc109c56817a51e2f5ef3a3bcf63ef9625d51230e8f52f1fe09c054"
+}

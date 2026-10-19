@@ -186,15 +186,34 @@ must not leave a step silently undone)*.
 | `do.sound` | no | A file in `sounds/`, written as its name: `sound = "ding"` plays `sounds/ding.wav` (#938). Checked at load by the voice's own check (`lamp_voice::say::read_sound`), and the skill refused with why: a regular file, not a link, of at most 148,140 bytes; a WAV of 16-bit mono PCM at 24 kHz (the speaker path's rate), 1 frame to 3 s; no 10 ms of it louder than -30 dBFS RMS (well under the lamp's speech) and no sample past -12 dBFS. Played by the voice, through its say service (`LAMP_SAY=on`) as `{"sound": PATH}`, the file's absolute path; the voice reads it again, only from under the skills folder, and plays it as a turn of its own, so it never overlaps speech ([speaking-first.md](speaking-first.md), the say service). A lamp not at rest as a say needs it (paused, muted, speaking, listening, owing an answer, a reminder due, within 15 s of its last turn) does not play it, nor a second sound within 30 s, and the voice refuses it at once, never later; the run's `done` says why (`sound: refused (the lamp is speaking)`). One say or sound a skill: the run's other steps are made when the voice begins it, as with a say. Refused in a skill with a `tool`: a tool is called while the voice answers |
 | `do.after` | no | `"say"`: this step and every one after it are made when the say ends, not as it begins: the skill's own say in an earlier step, which ends with its outcome, or in a skill with a `tool`, the line the model says after the call, which ends when `voice/state` is `resting` or `listening` again. A line that ends in `listening` was cut, the person speaking over it: then none of the steps after it is made, and the run's `done` says "the line was cut". `thinking` after `speaking` is still the line, since its sound plays on (lamp-06c1, 2026-10-16: 20 ms of `speaking`, then 15 s of `thinking`, through a line of about 2 s), so that wait ends at most 4 s after the speaking began. The run waits at most 5 s for the speaking to begin, and goes on at once if `voice/state` was not said within 3 s. Not after a say never begun. A light changed is then given back when the last clip ends |
 | `do.on` | no | A trigger's `name`: the step is made only in a run that trigger started (Task news: `happy` for done, `caring` and a dimmer light for failed). A step without it is made in every run. One say for each run: one among the steps without `on`, and one for each trigger with its own. Not with `after` in the same skill *(chosen, until a skill needs both)* (#1021) |
-| `do.if_choice` | no | Values of the `[choice]` (each once): the step is made only in a call that chose one of them, or whose `default` is one (#1679: a scene's own light and pose). Its body, light and show only: no say, sound or look, which are the same for every choice, and no automatic cue or rest step. Not with `on`. An `after = "say"` on it is every run's wait: the steps after it wait in each |
+| `do.if_choice` | no | Values of the `[choice]` (each once): the step is made only in a call that chose one of them, or whose `default` is one (#1679: a scene's own light and pose). Its body, light and show only: no say, sound or look, which are the same for every choice, and no automatic cue, rest or requested-audio step. Not with `on`. An `after = "say"` on it is every run's wait: the steps after it wait in each |
 | `do.look` | no | `true`: the voice's full look (#836). Only in a skill with a `tool` and no trigger: the call's answer carries `"look": true` and tells the model to say "Let me take a look."; lamp-skills makes the run's body and light before it answers, and the voice takes its full look for that turn itself as the answer's first audio plays, whatever the model says, its still in the model's next turn, or a note that it could not see if none comes (#941) |
+| `do.requested_audio` | no | A fixed relative `.wav` path, only in a tool-only skill with `permissions.speak = true`: exactly one short `say` confirmation, then one `requested_audio` step with `after = "say"`, and no other actions, triggers, conditions or choice/flag arguments. Voice plays at most 60 seconds of checked 24 kHz mono PCM16 under the same spoken owner after confirmed confirmation retirement. Advertisement and execution require exact `LAMP_REQUESTED_AUDIO=on`; pack/install may validate while off. See [requested audio](requested-audio.md) for private context, leases, revocation and asset bounds |
 
 A duration is a whole number and one of `ms`, `s`, `m` or `h` (`"5m"`).
 
-The ask is the only gate. The runtime adds no conditions of its own, such as
-the pause or someone speaking: per the design above, the Policy is the one
+For `requested_audio`, the `after = "say"` boundary is the matching speaker's
+confirmed retirement, not the ordinary `voice/state` wait described above.
+Skills returns a private offer to Voice and never sends the media to Say or
+plays it itself. Written/Messages calls, including Messages `speak=true`, lack
+the required spoken context and cannot start it. The existing autonomous
+`do.sound` limit remains three seconds. The [source example](../examples/relaxing-music/README.md)
+is rendered into ignored artifacts before packaging; it is not a live skill
+until installed, and installation grants no execution switch.
+Requested-audio definitions also refuse automatic `[limits]`, rest and cue
+actions, even when all corresponding permissions are granted. Their confirmation
+is a short plain string; automatic `text`/`note` tables, including their priority
+and expiry, cannot replace it. A fully granted `rise` trigger is still refused,
+whether or not the skill also exposes a tool. Disabled
+packages reserve their names and remain inventory without audio authority.
+
+For ordinary trigger-started skills, the ask is the only admission gate. The runtime
+adds no conditions of its own, such as the pause or someone speaking: per
+the design above, the Policy is the one
 gate for everything the lamp starts itself (#939). Until that gate exists, a
 skill that must keep quiet in those cases says so with a `[[while]]`.
+Routine skills additionally require their documented freshness, local-time
+and durable daily admission checks; see [Bedtime and Morning](bedtime-morning.md).
 
 **`moves/`** holds the skill's own moves, read only as `do.body.move` names
 them. The body plays one as it plays its own gestures: on a standing lamp
@@ -205,8 +224,9 @@ centre of gravity past 22 mm off the base's axis (the journal says
 journal, while the lamp is paused, held by a hand or slumped. A skill never
 writes an arm goal of its own. Whether a move may play from the pose the
 lamp is in is known only to the body, so a skill that loads may still have
-its move refused there. **`sounds/`** holds the files `do.sound` names;
-the others are not read. A **`run.py`** refuses the skill, because nothing
+its move refused there. Ordinary **`do.sound`** reads only the files it names
+in **`sounds/`**; `requested_audio` uses its fixed checked path described above.
+A **`run.py`** refuses the skill, because nothing
 runs it yet.
 
 **`tests/`** has one folder for each case. A case holds the `.jsonl` files
@@ -631,9 +651,12 @@ removed when no skill has a tool, and answers on `DIR/call.sock` the way
 the actions part does ([tools.md](tools.md#the-skills)). Beside `tools`,
 the file's `body` names the tools whose skill asks for the body
 (`[permissions] body`), when any does: a text from the Autonomous app never
-runs one (#1673, [messages.md](messages.md)). Disabled skills enter neither
-`tools` nor `body`; with no enabled body tool, `body` is omitted. It's a key of
-the file's own, not of each tool, which the voice's function declarations would refuse. It makes `DIR` and
+runs one (#1673, [messages.md](messages.md)). Disabled skills and requested-audio
+tools while their switch is off enter neither `tools` nor `body`. Both lists
+use the same first emitted definition for a tool name; an omitted duplicate
+cannot add a body grant. With no emitted body tool, `body` is omitted. It's a
+key of the file's own, not of each tool, which the voice's function declarations
+would refuse. It makes `DIR` and
 the socket at its start, and again, with the file, at a look (every 2 s)
 that finds the socket gone from a `DIR` still there, saying so. With `DIR`
 itself gone it ends, not zero, with a line: as its user, under its sandbox,

@@ -915,6 +915,12 @@ pub fn read_skill_sound(path: &Path, sounds: &Path) -> Result<Vec<i16>, String> 
 /// (`crates/skills`), so the two never differ. The reason never repeats
 /// the path.
 pub fn read_sound(path: &Path) -> Result<Vec<i16>, String> {
+    decode_sound(&read_sound_bytes(path, SOUND_MOST_BYTES)?)
+}
+
+/// One bounded immutable file image, shared by short cues and explicitly
+/// requested recordings. Neither caller follows a final link or waits on a FIFO.
+pub(crate) fn read_sound_bytes(path: &Path, most_bytes: u64) -> Result<Vec<u8>, String> {
     use std::os::unix::fs::OpenOptionsExt;
     let flags = rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK;
     let file = fs::OpenOptions::new()
@@ -935,23 +941,29 @@ pub fn read_sound(path: &Path) -> Result<Vec<i16>, String> {
     if !metadata.is_file() {
         return Err("not a regular file".into());
     }
-    if metadata.len() > SOUND_MOST_BYTES {
-        return Err(format!("more than {SOUND_MOST_BYTES} bytes"));
+    if metadata.len() > most_bytes {
+        return Err(format!("more than {most_bytes} bytes"));
     }
     let mut bytes = Vec::new();
-    file.take(SOUND_MOST_BYTES + 1)
+    file.take(most_bytes + 1)
         .read_to_end(&mut bytes)
         .map_err(|_| "not readable".to_owned())?;
-    if bytes.len() as u64 > SOUND_MOST_BYTES {
-        return Err(format!("more than {SOUND_MOST_BYTES} bytes"));
+    if bytes.len() as u64 > most_bytes {
+        return Err(format!("more than {most_bytes} bytes"));
     }
-    decode_sound(&bytes)
+    Ok(bytes)
 }
 
 /// [`read_sound`]'s checks of what the file holds: a WAV of 16-bit mono
 /// PCM at [`SOUND_RATE`], 1 to [`SOUND_MOST_FRAMES`] frames, no sample past
 /// [`SOUND_PEAK_DBFS`] and no 10 ms louder than [`SOUND_LOUDEST_DBFS`] RMS.
 pub fn decode_sound(bytes: &[u8]) -> Result<Vec<i16>, String> {
+    decode_sound_with_limit(bytes, SOUND_MOST_FRAMES)
+}
+
+/// The same format and amplitude checks with a caller-owned duration bound.
+/// Autonomous cues retain their three-second limit.
+pub(crate) fn decode_sound_with_limit(bytes: &[u8], most_frames: u32) -> Result<Vec<i16>, String> {
     let reader = hound::WavReader::new(Cursor::new(bytes)).map_err(|_| "not a WAV file")?;
     let spec = reader.spec();
     if spec.channels != 1
@@ -961,10 +973,10 @@ pub fn decode_sound(bytes: &[u8]) -> Result<Vec<i16>, String> {
     {
         return Err(format!("not 16-bit mono PCM at {SOUND_RATE} Hz"));
     }
-    if !(1..=SOUND_MOST_FRAMES).contains(&reader.duration()) {
+    if !(1..=most_frames).contains(&reader.duration()) {
         return Err(format!(
-            "not 1 to {SOUND_MOST_FRAMES} frames ({} s at most)",
-            SOUND_MOST_FRAMES / SOUND_RATE
+            "not 1 to {most_frames} frames ({} s at most)",
+            most_frames / SOUND_RATE
         ));
     }
     let samples = reader

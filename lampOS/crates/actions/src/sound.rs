@@ -30,6 +30,16 @@ pub trait Mixer {
     fn set(&mut self, level: u8) -> io::Result<()>;
 }
 
+/// Retained evidence from the sole mixer owner. A later successful read cannot
+/// erase an intervening zero or loss. Sequence distinguishes actual observation
+/// work from an unchanged cache; exhausted identities can never authorize audio.
+#[derive(Clone, Copy)]
+pub(crate) struct Observation {
+    pub raw: Option<u8>,
+    pub revocation: Option<u64>,
+    pub sequence: Option<u64>,
+}
+
 /// The rules, over whatever control there is.
 pub struct Volume<M> {
     mixer: M,
@@ -39,6 +49,10 @@ pub struct Volume<M> {
     limit: Option<u8>,
     /// Where it stood when it was muted.
     before_mute: Option<u8>,
+    observed: Option<u8>,
+    last_observed: Option<u8>,
+    observation_revocation: Option<u64>,
+    observation_sequence: Option<u64>,
 }
 
 const UNREAD: &str = "I could not read my speaker's volume.";
@@ -52,7 +66,63 @@ impl<M: Mixer> Volume<M> {
             product_ceiling: ceiling.clamp(1, 100),
             limit: None,
             before_mute: None,
+            observed: None,
+            last_observed: None,
+            observation_revocation: Some(0),
+            observation_sequence: Some(0),
         }
+    }
+
+    pub fn observed(&self) -> Option<u8> {
+        self.observed
+    }
+
+    pub(crate) fn observation(&self) -> Observation {
+        Observation {
+            raw: self.observed,
+            revocation: self.observation_revocation,
+            sequence: self.observation_sequence,
+        }
+    }
+
+    fn record_observation(&mut self, raw: Option<u8>) {
+        // Readback above an active accepted limit is known hardware state, but
+        // is not evidence that requested audio may play. level() still reports
+        // the real raw value to its caller; this cache is output permission.
+        let raw = raw.filter(|raw| *raw <= 100 && (self.limit.is_none() || *raw <= self.ceiling()));
+        if (raw.is_none() && self.last_observed.is_some())
+            || (raw == Some(0) && self.last_observed != Some(0))
+        {
+            self.observation_revocation = self
+                .observation_revocation
+                .and_then(|revision| revision.checked_add(1));
+        }
+        self.observation_sequence = self
+            .observation_sequence
+            .and_then(|sequence| sequence.checked_add(1));
+        self.last_observed = raw;
+        self.observed = self
+            .observation_revocation
+            .and(self.observation_sequence)
+            .and(raw);
+    }
+
+    fn read(&mut self) -> io::Result<u8> {
+        self.observed = None;
+        let result = self.mixer.get();
+        self.record_observation(result.as_ref().ok().copied());
+        result
+    }
+
+    fn write_raw(&mut self, raw: u8) -> io::Result<()> {
+        // Successful write-in-progress invalidation is not itself observation
+        // loss. The following real read or write failure settles its evidence.
+        self.observed = None;
+        let result = self.mixer.set(raw);
+        if result.is_err() {
+            self.record_observation(None);
+        }
+        result
     }
 
     fn ceiling(&self) -> u8 {
@@ -80,7 +150,7 @@ impl<M: Mixer> Volume<M> {
         if limit.is_some() {
             self.before_mute = self.before_mute.map(|level| level.min(ceiling));
         }
-        let current = self.mixer.get().map_err(|_| UNREAD.to_owned())?;
+        let current = self.read().map_err(|_| UNREAD.to_owned())?;
         let now = if limit.is_some() && current > ceiling {
             self.write(ceiling)?
         } else {
@@ -99,15 +169,18 @@ impl<M: Mixer> Volume<M> {
         } else {
             to
         };
-        self.mixer.set(to).map_err(|_| UNCHANGED.to_owned())?;
-        match self.mixer.get() {
+        self.write_raw(to).map_err(|_| UNCHANGED.to_owned())?;
+        match self.read() {
             Ok(now)
                 if now.abs_diff(to) <= 1
                     && (self.limit.is_none() || (now <= ceiling && (to != 0 || now == 0))) =>
             {
                 Ok(now)
             }
-            _ => Err(UNCONFIRMED.to_owned()),
+            _ => {
+                self.record_observation(None);
+                Err(UNCONFIRMED.to_owned())
+            }
         }
     }
 
@@ -116,13 +189,16 @@ impl<M: Mixer> Volume<M> {
     fn change(&mut self, from: u8, to: u8, said: impl Fn(u8) -> String) -> Outcome {
         match self.write(to) {
             Ok(now) if now != from || to == from => Outcome::Done(said(now)),
-            Ok(_) => Outcome::Failed(UNCONFIRMED.into()),
+            Ok(_) => {
+                self.record_observation(None);
+                Outcome::Failed(UNCONFIRMED.into())
+            }
             Err(why) => Outcome::Failed(why),
         }
     }
 
     pub fn up(&mut self) -> Outcome {
-        let Ok(current) = self.mixer.get() else {
+        let Ok(current) = self.read() else {
             return Outcome::Failed(UNREAD.into());
         };
         let ceiling = self.ceiling();
@@ -139,7 +215,7 @@ impl<M: Mixer> Volume<M> {
     }
 
     pub fn down(&mut self) -> Outcome {
-        let Ok(current) = self.mixer.get() else {
+        let Ok(current) = self.read() else {
             return Outcome::Failed(UNREAD.into());
         };
         if current == 0 {
@@ -158,7 +234,7 @@ impl<M: Mixer> Volume<M> {
     }
 
     pub fn mute(&mut self) -> Outcome {
-        let Ok(current) = self.mixer.get() else {
+        let Ok(current) = self.read() else {
             return Outcome::Failed(UNREAD.into());
         };
         if current == 0 {
@@ -176,7 +252,7 @@ impl<M: Mixer> Volume<M> {
     }
 
     pub fn unmute(&mut self) -> Outcome {
-        let Ok(current) = self.mixer.get() else {
+        let Ok(current) = self.read() else {
             return Outcome::Failed(UNREAD.into());
         };
         let ceiling = self.ceiling();
@@ -226,8 +302,7 @@ impl<M: Mixer> Volume<M> {
 
     /// The volume now, for the app's page (#1396).
     pub fn level(&mut self) -> Result<Level, String> {
-        self.mixer
-            .get()
+        self.read()
             .map(|raw| self.level_at(raw))
             .map_err(|_| UNREAD.to_owned())
     }
@@ -777,6 +852,58 @@ pub(crate) mod tests {
             said(volume.up()),
             "My volume is now 69 out of 100; it was 50."
         );
+    }
+
+    #[test]
+    fn observation_loss_survives_recovery_without_counting_successful_writes() {
+        let mut volume = at(50, 100);
+        volume.level().unwrap();
+        volume.mixer.unreadable = true;
+        assert!(volume.level().is_err());
+        let lost = volume.observation();
+        assert_eq!((lost.raw, lost.revocation), (None, Some(1)));
+        volume.mixer.unreadable = false;
+        said(volume.up());
+        said(volume.down());
+        let recovered = volume.observation();
+        assert_eq!((recovered.raw, recovered.revocation), (Some(50), Some(1)));
+        assert_eq!(volume.mixer.writes, [70, 50]);
+
+        volume.mixer.unwritable = true;
+        assert!(matches!(volume.up(), Outcome::Failed(_)));
+        assert_eq!(volume.observation().revocation, Some(2));
+        volume.mixer.unwritable = false;
+        said(volume.up());
+        assert_eq!(volume.observation().raw, Some(70));
+        assert_eq!(volume.observation().revocation, Some(2));
+    }
+
+    #[test]
+    fn an_exhausted_observation_identity_cannot_recover_into_audible_evidence() {
+        for sequence in [false, true] {
+            let mut volume = at(50, 100);
+            volume.level().unwrap();
+            if sequence {
+                volume.observation_sequence = Some(u64::MAX);
+            } else {
+                volume.observation_revocation = Some(u64::MAX);
+            }
+            volume.mixer.level = 0;
+            said(volume.up());
+            assert_eq!(volume.mixer.level, STEP);
+            assert_eq!(volume.observed(), None);
+            let identity = |volume: &Volume<Fake>| {
+                if sequence {
+                    volume.observation().sequence
+                } else {
+                    volume.observation().revocation
+                }
+            };
+            assert_eq!(identity(&volume), None);
+            said(volume.up());
+            assert_eq!(volume.observed(), None);
+            assert_eq!(identity(&volume), None);
+        }
     }
 
     #[test]

@@ -539,6 +539,223 @@ async fn a_line_declined_after_a_tool_ran_is_not_told_held_back() {
     );
 }
 
+/// The scoped audio runner is an actual dispatch too. A later model decline
+/// cannot relabel that request as held back or withdraw its already-made offer.
+#[tokio::test]
+async fn a_later_decline_keeps_an_executed_scoped_requested_audio_call() {
+    for declined in [
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "decline",
+            NOT_FOR_ME,
+            json!({}),
+        )])),
+        text("not_for_me{}"),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Please play a quiet recording.".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "music-original",
+                            "play_relaxing_music",
+                            json!({}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![declined, Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, legacy_calls, _) = scripted(script.clone());
+        let boot = lamp_turn_owner::BootId::new([13; 16]).unwrap();
+        let executed: Arc<Mutex<Vec<crate::memory_scope::ScopeLease>>> = Arc::default();
+        let seen = executed.clone();
+        let audio_runner: RequestedAudioRunner = Arc::new(move |context, call, scope| {
+            // Record execution here, not merely the order of requested calls.
+            assert_eq!(call.id, "music-original");
+            assert_eq!(call.name, "play_relaxing_music");
+            assert_eq!(call.args, json!({}));
+            assert_eq!(context.call_id, call.id);
+            assert!(audio_scope_current(&scope, &context));
+            seen.lock().unwrap().push(scope);
+            Box::pin(async move {
+                crate::tools::ToolAnswer {
+                    told: json!({"next":"Confirm."}),
+                    requested_audio: Some(lamp_msgs::RequestedAudioOffer {
+                        skills_boot: "skills-test".into(),
+                        definition_generation: 1,
+                        offer_id: 1,
+                        skill: "relaxing-music".into(),
+                        asset: "/local/relaxing.wav".into(),
+                        sha256: "a".repeat(64),
+                        frames: 24_000,
+                        issued_us: context.issued_us,
+                        start_before_us: context.issued_us + lamp_msgs::REQUESTED_AUDIO_START_US,
+                        finish_before_us: context.issued_us
+                            + lamp_msgs::REQUESTED_AUDIO_START_US
+                            + 1_000_000,
+                        context,
+                    }),
+                }
+            })
+        });
+        let scoped: ScopedToolRunner =
+            Arc::new(|_, _, _, _, _| panic!("the audio path keeps its full call"));
+        let (mut engine, told) = telling(
+            engine
+                .with_memory_scope(boot, Arc::default(), scoped, None)
+                .requesting_audio(boot, audio_runner)
+                .announcing(false),
+        );
+        engine.submit(start(1));
+        let admitted = engine
+            .turn
+            .as_ref()
+            .unwrap()
+            .memory_scope
+            .as_ref()
+            .unwrap()
+            .lease();
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let mut labels = Vec::new();
+        let mut offer = None;
+        loop {
+            match tokio::time::timeout(Duration::from_secs(2), engine.next())
+                .await
+                .unwrap()
+            {
+                ProviderOutput::Started {
+                    request: 1,
+                    session: 1,
+                    ..
+                } => labels.push("started"),
+                ProviderOutput::Transcript {
+                    request: None,
+                    text,
+                    finished: true,
+                } => {
+                    assert_eq!(text, "Please play a quiet recording.");
+                    labels.push("heard");
+                }
+                ProviderOutput::RequestedAudio {
+                    request: 1,
+                    session: 1,
+                    offer: got,
+                } => {
+                    assert!(offer.replace(got).is_none(), "exactly one offer");
+                    labels.push("offer");
+                }
+                ProviderOutput::TurnComplete {
+                    request: 1,
+                    idle: true,
+                } => {
+                    labels.push("complete");
+                    break;
+                }
+                other => panic!("unexpected output after the later decline: {other:?}"),
+            }
+        }
+        assert_eq!(labels, ["started", "heard", "offer", "complete"]);
+        assert!(
+            told.lock().unwrap().is_empty(),
+            "an executed call is never HeldBack"
+        );
+        assert!(legacy_calls.lock().unwrap().is_empty());
+        let offer = offer.unwrap();
+        offer.check().unwrap();
+        assert_eq!(offer.context.worker_boot, crate::process::boot_text(boot));
+        assert_eq!(
+            (
+                offer.context.request,
+                offer.context.provider_session,
+                offer.context.privacy_generation
+            ),
+            (1, 1, 1)
+        );
+        assert_eq!(offer.context.call_id, "music-original");
+        {
+            let asked = script.asked.lock().unwrap();
+            assert_eq!(
+                asked.len(),
+                2,
+                "the ordinary tool result starts the next round"
+            );
+            assert_eq!(
+                asked[1].last(),
+                Some(&Message::tool(
+                    "music-original",
+                    json!({"next":"Confirm."}).to_string()
+                ))
+            );
+            let model_text = serde_json::to_string(&asked[1]).unwrap();
+            assert!(
+                !model_text.contains("requested_audio") && !model_text.contains("relaxing.wav")
+            );
+        }
+        let scopes = executed.lock().unwrap();
+        assert_eq!(scopes.len(), 1, "one runner really executed");
+        assert_eq!(scopes[0].key(), admitted.key());
+        assert!(admitted.is_current() && scopes[0].is_current());
+        engine.retire_through(1);
+        assert!(!admitted.is_current() && !scopes[0].is_current());
+        assert!(engine.try_output().is_none());
+    }
+}
+
+/// A call listed beside a decline never ran, even when listed first. It
+/// cannot suppress the decline verdict or mint a private recording offer.
+#[tokio::test]
+async fn an_unacted_mixed_requested_audio_and_decline_is_held_back() {
+    for music_first in [false, true] {
+        let music = call("music-original", "play_relaxing_music", json!({}));
+        let decline = call("decline", NOT_FOR_ME, json!({}));
+        let calls = if music_first {
+            vec![music, decline]
+        } else {
+            vec![decline, music]
+        };
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Please play a quiet recording.".to_owned())].into()),
+            chats: Mutex::new([vec![Ok(ChatEvent::ToolCalls(calls)), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, legacy_calls, _) = scripted(script.clone());
+        let boot = lamp_turn_owner::BootId::new([14; 16]).unwrap();
+        let scoped: ScopedToolRunner =
+            Arc::new(|_, _, _, _, _| panic!("the mixed list dispatches no calls"));
+        let audio_runner: RequestedAudioRunner =
+            Arc::new(|_, _, _| panic!("the mixed list dispatches no audio call"));
+        let (mut engine, told) = telling(
+            engine
+                .with_memory_scope(boot, Arc::default(), scoped, None)
+                .requesting_audio(boot, audio_runner)
+                .announcing(false),
+        );
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        assert_eq!(
+            turn(&mut engine).await,
+            [
+                "started:1",
+                "heard:Please play a quiet recording.",
+                "complete"
+            ]
+        );
+        assert_eq!(
+            *told.lock().unwrap(),
+            [(1, lamp_msgs::TurnVerdict::HeldBack)]
+        );
+        assert!(legacy_calls.lock().unwrap().is_empty());
+        assert_eq!(script.asked.lock().unwrap().len(), 1);
+        assert!(engine.try_output().is_none());
+    }
+}
+
 /// Second on #1782: the verdict is told before the turn's words leave the
 /// engine. When it is told, the turn's start, its words and its end are all
 /// still waiting to be taken, so the policy can hear the verdict before the
@@ -552,9 +769,18 @@ async fn a_held_verdict_is_told_before_its_words_are_taken() {
     let (engine, _, _) = scripted(script);
     let (said, told) = tokio::sync::oneshot::channel();
     let said = Mutex::new(Some(said));
+    let boot = lamp_turn_owner::BootId::new([12; 16]).unwrap();
+    let scoped: ScopedToolRunner = Arc::new(|_, _, _, _, _| panic!("a held turn runs no tools"));
+    let audio_runner: RequestedAudioRunner =
+        Arc::new(|_, _, _| panic!("a held turn offers no audio"));
+    let verdicts = Arc::new(AtomicUsize::new(0));
+    let seen = verdicts.clone();
     let mut engine = engine
+        .with_memory_scope(boot, Arc::default(), scoped, None)
+        .requesting_audio(boot, audio_runner)
         .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
         .telling_verdicts(Arc::new(move |request, verdict| {
+            seen.fetch_add(1, Ordering::Relaxed);
             if let Some(said) = said.lock().unwrap().take() {
                 let _ = said.send((request, verdict));
             }
@@ -571,6 +797,7 @@ async fn a_held_verdict_is_told_before_its_words_are_taken() {
         turn(&mut engine).await,
         ["started:1", "heard:Me.", "complete"]
     );
+    assert_eq!(verdicts.load(Ordering::Relaxed), 1);
 }
 
 /// #1155: a turn the heed lets out is told answered. With nothing that
@@ -1996,4 +2223,109 @@ async fn scoped_system_is_built_for_the_admitted_scope_not_the_face_in_view() {
     );
     assert_eq!(asked[1][0], Message::system("for None"));
     std::fs::remove_file(path).unwrap();
+}
+
+/// Context construction can wait on memory I/O. Neither audio mode may
+/// start a model round with a result read before a camera revocation.
+#[tokio::test]
+async fn revocation_during_scoped_context_build_blocks_chat_with_requested_audio_off_or_on() {
+    for requested_audio in [false, true] {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let face = directory.path.join("face");
+        std::fs::write(&face, "admitted-face").unwrap();
+        let cache = Arc::new(crate::memory_scope::FaceCache::default());
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Please play relaxing music.".to_owned())].into()),
+            ..Script::default()
+        });
+        let (entered, building) = std::sync::mpsc::channel();
+        let (release, waiting) = std::sync::mpsc::channel();
+        let waiting = Mutex::new(waiting);
+        let system: ScopedSystem = Arc::new(move |lease| {
+            assert!(lease.is_current());
+            let person = lease.scope().unwrap().person().unwrap().to_owned();
+            entered.send(()).unwrap();
+            waiting
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(2))
+                .expect("the test releases the blocked context builder");
+            assert!(!lease.is_current());
+            // Deliberately return the completed read. The production check
+            // after construction must reject it before the first chat call.
+            Told {
+                text: format!("private context for {person}"),
+                history: vec![Message::user(format!("private history for {person}"))],
+            }
+        });
+        let boot = lamp_turn_owner::BootId::new([13; 16]).unwrap();
+        let mut engine = Engine::new(
+            script.clone(),
+            || panic!("a configured scope never falls back to the legacy context"),
+            Arc::new(|_, _, _, _| panic!("no unscoped tool may run")),
+        )
+        .with_memory_scope(
+            boot,
+            cache.clone(),
+            Arc::new(|_, _, _, _, _| panic!("no tool may run after context revocation")),
+            Some(system),
+        )
+        .announcing(false);
+        if requested_audio {
+            engine = engine.requesting_audio(
+                boot,
+                Arc::new(|_, _, _| panic!("no private audio offer may be requested")),
+            );
+        }
+        engine.memory_camera(true, 1);
+        assert!(cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&face)
+        ));
+        engine.submit(start(1));
+        let lease = engine.memory_lease().unwrap();
+        assert!(lease.scope().unwrap().person().is_some());
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        // The current-thread runtime drives the blocked context builder while
+        // this bounded control thread owns Engine and revokes the real camera
+        // scope. No extra Tokio runtime feature or timing sleep is required.
+        let (returned, rejoined) = tokio::sync::oneshot::channel();
+        let revoker = std::thread::spawn(move || {
+            building
+                .recv_timeout(Duration::from_secs(2))
+                .expect("the context builder reaches its barrier");
+            engine.memory_camera(false, 2);
+            release.send(()).unwrap();
+            assert!(returned.send(engine).is_ok());
+        });
+        let mut engine = tokio::time::timeout(Duration::from_secs(2), rejoined)
+            .await
+            .unwrap()
+            .unwrap();
+        revoker.join().unwrap();
+        assert!(!lease.is_current());
+        tokio::time::timeout(
+            Duration::from_secs(2),
+            &mut engine.turn.as_mut().unwrap().task,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert!(script.asked.lock().unwrap().is_empty());
+        while let Some(event) = engine.try_output() {
+            assert!(
+                !matches!(
+                    event,
+                    ProviderOutput::RequestedAudio { .. }
+                        | ProviderOutput::Audio { .. }
+                        | ProviderOutput::Transcript {
+                            request: Some(_),
+                            ..
+                        }
+                ),
+                "revoked context produced {event:?}; requested audio {requested_audio}"
+            );
+        }
+    }
 }
