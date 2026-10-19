@@ -131,6 +131,7 @@ fn the_skills_page_reads_the_agreed_reply_and_its_refusal() {
         folder,
         off: root.join("off"),
         manage: root.join("m.sock"),
+        store: false,
     }));
     let started = Instant::now();
     let on = sent(&mut real);
@@ -249,6 +250,7 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
             let _ = lamp_skills::package::asked(
                 &served,
                 lamp_skills::package::ASKED_LOCK_WAIT,
+                None,
                 &stream,
                 &stream,
             );
@@ -258,6 +260,7 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
         folder: folder.clone(),
         off: root.join("off"),
         manage,
+        store: false,
     }));
     let before = sent(&mut real)["data"]["skills"].as_array().unwrap().len();
 

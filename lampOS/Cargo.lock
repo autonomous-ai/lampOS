@@ -1781,8 +1781,10 @@ dependencies = [
  "lamp-schedule",
  "lamp-setup",
  "lamp-skills",
+ "lamp-update",
  "lamp-voice",
  "reqwest",
+ "ring",
  "rumqttc",
  "rustls",
  "serde",
@@ -2149,6 +2151,7 @@ dependencies = [
 name = "lamp-skills"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "hound",
  "lamp-body",
  "lamp-bus",
@@ -2156,8 +2159,10 @@ dependencies = [
  "lamp-local-time",
  "lamp-msgs",
  "lamp-schedule",
+ "lamp-update",
  "lamp-voice",
  "libc",
+ "ring",
  "serde",
  "serde_json",
  "sha2",

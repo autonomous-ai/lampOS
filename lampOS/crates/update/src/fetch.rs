@@ -72,6 +72,18 @@ pub struct Web {
 
 impl Web {
     pub fn new() -> io::Result<Self> {
+        Self::within(
+            Duration::from_secs(10),
+            Duration::from_secs(30),
+            Duration::from_secs(900),
+        )
+    }
+
+    /// The real channel with its own bounds: `connect` to one address,
+    /// `stall` for one read or write to make progress, `whole` for a whole
+    /// file. A skill's package from the Store is fetched within a shorter
+    /// whole than a build's binaries (`lamp_skills::package`).
+    pub fn within(connect: Duration, stall: Duration, whole: Duration) -> io::Result<Self> {
         let roots = rustls::RootCertStore {
             roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
         };
@@ -83,9 +95,9 @@ impl Web {
             .with_no_client_auth();
         Ok(Self {
             tls: Arc::new(tls),
-            connect: Duration::from_secs(10),
-            stall: Duration::from_secs(30),
-            whole: Duration::from_secs(900),
+            connect,
+            stall,
+            whole,
         })
     }
 
@@ -193,6 +205,23 @@ impl Channel for Web {
         let this = &*self;
         get(url, most, out, until, |url| this.open(url, until))
     }
+}
+
+/// One GET of the https `url` and the redirects it leads to (only to https,
+/// at most five), within `whole`, each exchange over a stream `open` makes
+/// for a host and a port: what [`Web`] does, with the connection the
+/// caller's. Another crate's tests speak plain HTTP to a local server
+/// through it, as this module's own tests do.
+pub fn get_over(
+    url: &str,
+    most: u64,
+    out: &mut dyn Write,
+    whole: Duration,
+    mut open: impl FnMut(&str, u16) -> Result<Box<dyn Stream>, Fetch>,
+) -> Result<u64, Fetch> {
+    get(url, most, out, Instant::now() + whole, |url| {
+        open(&url.host, url.port)
+    })
 }
 
 /// A file on the lamp itself.

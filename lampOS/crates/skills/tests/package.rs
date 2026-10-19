@@ -229,7 +229,7 @@ fn a_package_installs_whole_its_files_checked_and_open_to_the_parts() {
         "{said}"
     );
     assert!(
-        said.contains("it carries no signature, and none is checked yet"),
+        said.contains("it carries no signature: a package installed by hand from a file"),
         "{said}"
     );
     assert!(
@@ -482,7 +482,7 @@ fn a_packages_signature_is_carried_and_not_checked() {
     );
     let said = package::install(&skills, &path).unwrap();
     assert!(
-        said.contains("its signature not checked: signing is not built yet"),
+        said.contains("its signature not checked: a package installed by hand from a file"),
         "{said}"
     );
 }
@@ -961,6 +961,7 @@ fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
     let ok = package::asked(
         &skills,
         WAIT,
+        None,
         &b"{\"remove\": \"desk-tutor\"}\n"[..],
         &mut answer,
     )
@@ -1134,10 +1135,7 @@ fn the_manage_helper_refuses_core_skills_and_bad_names_on_its_own() {
     ] {
         let (answer, ok) = ask_helper(&skills, line);
         assert!(!ok);
-        assert_eq!(
-            answer["refused"],
-            "a request is one line, {\"remove\": NAME}"
-        );
+        assert_eq!(answer["refused"], package::NOT_A_REQUEST);
     }
     // Past its bound, the request is cut and taken for none.
     let big = format!(
@@ -1151,13 +1149,10 @@ fn the_manage_helper_refuses_core_skills_and_bad_names_on_its_own() {
             .unwrap()
             .starts_with("a request is")
     );
+    // An install is a URL in an object, nothing else.
     let (answer, ok) = ask_helper(&skills, b"{\"install\": \"/tmp/x.tar\"}\n");
-    assert!(
-        !ok && answer["refused"]
-            .as_str()
-            .unwrap()
-            .starts_with("install is not taken here yet")
-    );
+    assert!(!ok);
+    assert_eq!(answer["refused"], package::NOT_A_REQUEST);
     assert!(victim.exists());
     assert_eq!(left(&skills), ["dance", "desk-tutor"]);
 

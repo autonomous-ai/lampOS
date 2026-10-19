@@ -34,6 +34,11 @@ base64 = "=0.22.1"
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 
 [dev-dependencies]
+# The Skills Store's tests (src/skills.rs): a package signed with a key of
+# their own, fetched from a local server through lamp-update's HTTP code.
+lamp-update = { path = "../update" }
+ring = "0.17"
+base64 = "0.22"
 # Setup's own settings and writer, so the account is read where and as setup
 # writes it (tests/setup.rs).
 lamp-setup = { path = "../setup" }

@@ -3,8 +3,11 @@
 //! `lamp-skills` loads it, each with its group, whether it can be removed or
 //! turned off, and what it may use in plain words; and `skills.remove`, an
 //! installed or made-here skill taken off on the person's tap, through
-//! `lamp-skills`' own remove ([`remove`]), never a core one. Nothing here
-//! installs or changes a skill. Off unless `LAMP_SKILLS_PAGE=on`, with
+//! `lamp-skills`' own remove ([`remove`]), never a core one; and, with
+//! `LAMP_SKILLS_STORE=on` too, `skills.install`, a package from the Skills
+//! Store at a URL, which root's manage helper fetches, checks against the
+//! update channel's key and installs ([`install`]). Nothing here writes the
+//! skills folder. Off unless `LAMP_SKILLS_PAGE=on`, with
 //! `LAMP_CLOUD=on`; without it each kind is answered as any this lamp
 //! lacks, `not on this lamp: skills.list` (`docs/cloud.md`, "The skills
 //! page").
@@ -50,6 +53,30 @@ pub const MADE_HERE: &str = "here";
 /// use (the first builder's 17:21: "since that's what a person will ask").
 pub const PRIVACY: &str = "the privacy switch stops it";
 
+/// `on` answers `skills.install` too, with the page's two switches: a
+/// package from the Skills Store put on the lamp from a URL (#1722). A
+/// switch of its own, apart from the page's: listing and removing change
+/// nothing that was not already on the lamp, and an install puts new code
+/// there, so the page can be on while the Store, its server and its key
+/// are not.
+/// The manage helper checks the same switch in its own environment
+/// (`lamp-skills-manage@.service`), so this is not the only gate.
+pub const STORE_ENVIRONMENT: &str = lamp_skills::package::STORE_SWITCH;
+
+/// Whether the Store's switch is on, with the page's ([`gates`]).
+pub fn store_gates(cloud: Option<&str>, page: Option<&str>, store: Option<&str>) -> bool {
+    gates(cloud, page) && lamp_skills::package::store_switched_on(store)
+}
+
+/// [`store_gates`] as the environment says.
+pub fn store_on_from_environment() -> bool {
+    store_gates(
+        std::env::var("LAMP_CLOUD").ok().as_deref(),
+        std::env::var(ENVIRONMENT).ok().as_deref(),
+        std::env::var(STORE_ENVIRONMENT).ok().as_deref(),
+    )
+}
+
 /// Whether the switch is on: both `LAMP_CLOUD` and `LAMP_SKILLS_PAGE` are `on`.
 pub fn gates(cloud: Option<&str>, page: Option<&str>) -> bool {
     cloud == Some("on") && page == Some("on")
@@ -76,6 +103,8 @@ pub struct Places {
     /// page ([`lamp_skills::package::MANAGE_SOCKET`]): `lamp-cloud` never
     /// writes the folder itself.
     pub manage: PathBuf,
+    /// Whether `skills.install` is answered ([`STORE_ENVIRONMENT`]).
+    pub store: bool,
 }
 
 impl Places {
@@ -86,6 +115,7 @@ impl Places {
             folder: "/var/lib/lampOS/skills".into(),
             off: "/var/lib/lampos-skills-state/off".into(),
             manage: lamp_skills::package::MANAGE_SOCKET.into(),
+            store: store_on_from_environment(),
         }
     }
 }
@@ -273,7 +303,7 @@ pub fn remove(places: &Places, data: &Value) -> Result<Value, String> {
             "{name} is a core skill: it comes with the lamp, so it can't be removed"
         ));
     }
-    match ask_helper(&places.manage, name) {
+    match ask_helper(&places.manage, &json!({ "remove": name }), ASK_TIMEOUT) {
         Ok(said) => eprintln!("lamp-cloud: skills.remove from the app: {said}"),
         Err(Asked::Refused(why)) => {
             eprintln!("lamp-cloud: skills.remove {name} from the app refused: {why}");
@@ -301,7 +331,73 @@ pub const NOT_CHANGED: &str = lamp_skills::package::BUSY;
 pub const ASK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 const _: () = assert!(lamp_skills::package::ASKED_LOCK_WAIT.as_millis() < ASK_TIMEOUT.as_millis());
 
-/// Why the manage helper did not remove a skill.
+/// The longest `skills.install` waits for the manage helper's answer: its
+/// fetch's own bound ([`lamp_skills::package::FETCH_WITHIN`], 25 s), and
+/// time for the checks, the folder's lock (waited for at most
+/// [`lamp_skills::package::ASKED_LOCK_WAIT`], 4 s, then refused busy) and
+/// the install. `lamp-cloud`
+/// answers one command at a time, so its other commands wait as long; the
+/// broker's keepalive (60 s, a link lost at about 90 s) outlasts it.
+pub const INSTALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(40);
+const _: () = assert!(
+    lamp_skills::package::FETCH_WITHIN.as_millis()
+        + lamp_skills::package::ASKED_LOCK_WAIT.as_millis()
+        < INSTALL_TIMEOUT.as_millis()
+);
+
+/// What `skills.install` says when the Store's switch is off and the
+/// page's is on: the kind is one this lamp lacks.
+pub fn store_off() -> String {
+    lamp_skills::package::STORE_OFF.to_owned()
+}
+
+/// `skills.install {"url", "sha256", "name", "version"}` (#1722), all but
+/// `url` optional: the Skills Store catalogue's entry for a package (the
+/// first builder's 22:23), put on the lamp on the person's tap in the app.
+/// `lamp-cloud` checks the request's shape (an https URL, a SHA-256 as 64
+/// lowercase hex, a skill's name, `MAJOR.MINOR.PATCH`) so the app is told
+/// plainly, and passes it on: root's
+/// manage helper fetches the package itself, checks it again and installs
+/// it only when it is signed with the update channel's key, never a core
+/// skill or one with a core skill's name
+/// ([`lamp_skills::package::install_from_url`]). `lamp-cloud` writes nothing
+/// and fetches nothing. The reply is the page as it now is, [`list`]'s.
+pub fn install(places: &Places, data: &Value) -> Result<Value, String> {
+    if !places.store {
+        return Err(store_off());
+    }
+    let text = |key: &str| match data.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(text)) => Ok(Some(text.as_str())),
+        Some(_) => Err(format!("{key} must be a string")),
+    };
+    let asked = lamp_skills::package::Asked {
+        url: data
+            .get("url")
+            .and_then(Value::as_str)
+            .ok_or(lamp_skills::package::NOT_A_STORE_URL)?,
+        sha256: text("sha256")?,
+        name: text("name")?,
+        version: text("version")?,
+    };
+    if let Some(why) = asked.refused() {
+        return Err(why.to_owned());
+    }
+    match ask_helper(&places.manage, &asked.request(), INSTALL_TIMEOUT) {
+        Ok(said) => eprintln!("lamp-cloud: skills.install from the app: {said}"),
+        Err(Asked::Refused(why)) => {
+            eprintln!("lamp-cloud: skills.install from the app refused: {why}");
+            return Err(cut(&one_line(&why), WHY_MOST));
+        }
+        Err(Asked::Unanswered(error)) => {
+            eprintln!("lamp-cloud: skills.install: the manage helper did not answer: {error}");
+            return Err(NOT_CHANGED.to_owned());
+        }
+    }
+    list(places)
+}
+
+/// Why the manage helper did not remove or install a skill.
 enum Asked {
     /// It answered no, and why.
     Refused(String),
@@ -309,20 +405,23 @@ enum Asked {
     Unanswered(String),
 }
 
-/// `{"remove": NAME}` asked of the manage helper at `socket`, one line each
-/// way ([`lamp_skills::package::asked`]): what it did, or why not. The
-/// helper is root's and owns the folder; `lamp-cloud` writes nothing there.
-fn ask_helper(socket: &Path, name: &str) -> Result<String, Asked> {
+/// `request`, `{"remove": NAME}` or `{"install": {...}}`, asked of the
+/// manage helper at `socket`, one line each way, waiting at most `within`
+/// ([`lamp_skills::package::asked`]): what it did, or why not. The helper
+/// is root's and owns the folder; `lamp-cloud` writes nothing there.
+fn ask_helper(
+    socket: &Path,
+    request: &Value,
+    within: std::time::Duration,
+) -> Result<String, Asked> {
     use std::io::{BufRead, Write};
     let unanswered = |error: std::io::Error| Asked::Unanswered(error.to_string());
     let stream = std::os::unix::net::UnixStream::connect(socket).map_err(unanswered)?;
-    stream
-        .set_read_timeout(Some(ASK_TIMEOUT))
-        .map_err(unanswered)?;
+    stream.set_read_timeout(Some(within)).map_err(unanswered)?;
     stream
         .set_write_timeout(Some(ASK_TIMEOUT))
         .map_err(unanswered)?;
-    writeln!(&stream, "{}", json!({ "remove": name })).map_err(unanswered)?;
+    writeln!(&stream, "{request}").map_err(unanswered)?;
     let mut line = String::new();
     std::io::BufReader::new((&stream).take(lamp_skills::package::ASKED_MOST))
         .read_line(&mut line)
@@ -481,6 +580,7 @@ pub mod tests {
             folder: root.join("skills"),
             off: root.join("off"),
             manage: root.join("m.sock"),
+            store: true,
         }
     }
 
@@ -501,7 +601,7 @@ pub mod tests {
         let folder = places.folder.clone();
         std::thread::spawn(move || {
             for stream in listener.incoming().flatten() {
-                let _ = lamp_skills::package::asked(&folder, lock_wait, &stream, &stream);
+                let _ = lamp_skills::package::asked(&folder, lock_wait, None, &stream, &stream);
             }
         });
     }
@@ -1020,6 +1120,216 @@ pub mod tests {
             (Some("on"), Some("")),
         ] {
             assert!(!gates(cloud, page), "{cloud:?} {page:?}");
+        }
+    }
+
+    /// The Skills Store for `places`: a key of its own written where the
+    /// helper reads it, a local server giving each connection the next of
+    /// `answers`, and the manage helper answering with `lamp-skills asked`'s
+    /// code, fetching through `lamp-update`'s HTTP over plain TCP.
+    fn store(places: &Places, answers: Vec<Vec<u8>>) -> ring::signature::Ed25519KeyPair {
+        use base64::Engine;
+        use lamp_update::fetch::{Fetch, Stream, get_over};
+        use ring::signature::KeyPair;
+        use std::io::Write;
+        let key = ring::signature::Ed25519KeyPair::from_seed_unchecked(&[7; 32]).unwrap();
+        let key_file = places.folder.with_file_name("key.pub");
+        fs::write(
+            &key_file,
+            base64::engine::general_purpose::STANDARD.encode(key.public_key().as_ref()),
+        )
+        .unwrap();
+        let server = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = server.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for answer in answers {
+                let (mut socket, _) = server.accept().unwrap();
+                let mut request = Vec::new();
+                let mut byte = [0u8; 1];
+                while !request.ends_with(b"\r\n\r\n") {
+                    if socket.read_exact(&mut byte).is_err() {
+                        break;
+                    }
+                    request.push(byte[0]);
+                }
+                let _ = socket.write_all(&answer);
+            }
+        });
+        struct Local(u16);
+        impl lamp_update::fetch::Channel for Local {
+            fn fetch(&mut self, url: &str, most: u64, out: &mut dyn Write) -> Result<u64, Fetch> {
+                let port = self.0;
+                get_over(url, most, out, std::time::Duration::from_secs(5), |_, _| {
+                    std::net::TcpStream::connect(("127.0.0.1", port))
+                        .map(|socket| Box::new(socket) as Box<dyn Stream>)
+                        .map_err(|error| Fetch::Unreachable(error.to_string()))
+                })
+            }
+        }
+        let _ = fs::remove_file(&places.manage);
+        let listener = std::os::unix::net::UnixListener::bind(&places.manage).unwrap();
+        let folder = places.folder.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut channel = Local(port);
+                let store = lamp_skills::package::Store {
+                    key_file: key_file.clone(),
+                    channel: &mut channel,
+                };
+                let _ = lamp_skills::package::asked(
+                    &folder,
+                    lamp_skills::package::ASKED_LOCK_WAIT,
+                    Some(store),
+                    &stream,
+                    &stream,
+                );
+            }
+        });
+        key
+    }
+
+    /// A Desk tutor of `places`' own packed, signed with `key` or not.
+    fn tutor_package(places: &Places, key: Option<&ring::signature::Ed25519KeyPair>) -> Vec<u8> {
+        let source = places.folder.with_file_name("source").join("desk-tutor");
+        skill(
+            &Places {
+                folder: source.parent().unwrap().to_path_buf(),
+                ..places.clone()
+            },
+            "desk-tutor",
+            "Desk tutor",
+            "",
+            "kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\nbody = true",
+        );
+        let out = places
+            .folder
+            .with_file_name(format!("out-{}", key.is_some()));
+        let path = lamp_skills::package::pack_signed(&source, &out, key).unwrap();
+        fs::read(path).unwrap()
+    }
+
+    fn ok(body: &[u8]) -> Vec<u8> {
+        let mut answer =
+            format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len()).into_bytes();
+        answer.extend_from_slice(body);
+        answer
+    }
+
+    const URL: &str = "https://store.example/desk-tutor-1.0.0.tar";
+
+    /// #1722: `lamp-cloud` passes the catalogue's entry to the manage
+    /// helper, which fetches and installs the signed package; the reply is
+    /// the page with it.
+    #[test]
+    fn a_signed_package_from_the_store_is_installed_by_the_helper_and_listed() {
+        let places = places("install");
+        skill(
+            &places,
+            "dance",
+            "Dance",
+            "",
+            "kind = \"core\"\n[permissions]\nbody = true",
+        );
+        let probe = Places {
+            folder: places.folder.with_file_name("probe"),
+            ..places.clone()
+        };
+        fs::create_dir_all(&probe.folder).unwrap();
+        let key = ring::signature::Ed25519KeyPair::from_seed_unchecked(&[7; 32]).unwrap();
+        let bytes = tutor_package(&probe, Some(&key));
+        let unsigned = tutor_package(&probe, None);
+        store(&places, vec![ok(&unsigned), ok(&bytes)]);
+        // Unsigned: the helper's refusal, said to the app, nothing written.
+        let why = install(&places, &json!({"url": URL})).unwrap_err();
+        assert!(
+            why.starts_with("not installed: it carries no lamp-skill.sig"),
+            "{why}"
+        );
+        assert_eq!(names(&list(&places).unwrap()), ["dance"]);
+        let reply = install(
+            &places,
+            &json!({
+                "name": "desk-tutor",
+                "version": "1.0.0",
+                "sha256": lamp_skills::package::sha256_hex(&bytes),
+                "url": URL,
+            }),
+        )
+        .unwrap();
+        assert_eq!(names(&reply), ["dance", "desk-tutor"]);
+        assert_eq!(reply, list(&places).unwrap());
+        let row = &reply["skills"][1];
+        assert_eq!(
+            (&row["group"], &row["can_remove"]),
+            (&json!("installed"), &json!(true))
+        );
+    }
+
+    /// What the app sends is checked here before the helper is asked (no
+    /// helper listens, so a request that reached it would be "can't be
+    /// changed now"), and with the Store's switch off the kind is one this
+    /// lamp lacks.
+    #[test]
+    fn a_request_that_is_not_an_entry_is_refused_here_and_the_store_can_be_off() {
+        let mut places = places("install-shape");
+        for (data, why) in [
+            (json!({}), lamp_skills::package::NOT_A_STORE_URL.to_owned()),
+            (
+                json!({"url": "http://store.example/x.tar"}),
+                lamp_skills::package::NOT_A_STORE_URL.to_owned(),
+            ),
+            (
+                json!({"url": "file:///tmp/x.tar"}),
+                lamp_skills::package::NOT_A_STORE_URL.to_owned(),
+            ),
+            (
+                json!({"url": 7}),
+                lamp_skills::package::NOT_A_STORE_URL.to_owned(),
+            ),
+            (
+                json!({"url": URL, "sha256": "abc"}),
+                lamp_skills::package::NOT_A_SHA256.to_owned(),
+            ),
+            (
+                json!({"url": URL, "sha256": 7}),
+                "sha256 must be a string".to_owned(),
+            ),
+            (
+                json!({"url": URL, "name": "../dance"}),
+                lamp_skills::package::NOT_A_NAME.to_owned(),
+            ),
+            (
+                json!({"url": URL, "version": "one"}),
+                lamp_skills::package::NOT_A_VERSION.to_owned(),
+            ),
+        ] {
+            assert_eq!(install(&places, &data), Err(why), "{data}");
+        }
+        assert_eq!(
+            install(&places, &json!({"url": URL})),
+            Err(NOT_CHANGED.to_owned())
+        );
+        places.store = false;
+        assert_eq!(
+            install(&places, &json!({"url": URL})),
+            Err("not on this lamp: skills.install".to_owned())
+        );
+    }
+
+    #[test]
+    fn the_store_is_on_only_with_its_own_switch_and_the_pages() {
+        assert!(store_gates(Some("on"), Some("on"), Some("on")));
+        for (cloud, page, store) in [
+            (Some("on"), Some("on"), None),
+            (Some("on"), Some("on"), Some("off")),
+            (Some("on"), None, Some("on")),
+            (None, Some("on"), Some("on")),
+            (Some("on"), Some("on"), Some("ON")),
+        ] {
+            assert!(
+                !store_gates(cloud, page, store),
+                "{cloud:?} {page:?} {store:?}"
+            );
         }
     }
 }

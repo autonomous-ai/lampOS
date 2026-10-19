@@ -38,8 +38,8 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
                      lamp-skills remove [--dir DIR] NAME\n       \
                      lamp-skills list [--dir DIR]\n       \
-                     lamp-skills pack [--out DIR] SKILL_DIR\n       \
-                     lamp-skills asked [--dir DIR]";
+                     lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR\n       \
+                     lamp-skills asked [--dir DIR] [--key-file PATH]";
 /// The daily journal's file, as the product unit passes it; `--daily-state`
 /// wins when both are given.
 const DAILY_ENVIRONMENT: &str = "LAMP_SKILLS_DAILY_FILE";
@@ -317,12 +317,23 @@ fn test(dirs: &[String]) -> ExitCode {
 fn manage(command: &str, given: &[String]) -> ExitCode {
     let mut dir = PathBuf::from(SKILLS_DIR);
     let mut out = PathBuf::from(".");
+    // `asked`: the update channel's public key a Store package must be
+    // signed with. `pack`: the private key it is signed with, if any.
+    let mut key_file: Option<PathBuf> = None;
     let mut named = Vec::new();
     let mut given = given.iter();
     while let Some(word) = given.next() {
         let flag = match word.as_str() {
             "--dir" if command != "pack" => &mut dir,
             "--out" if command == "pack" => &mut out,
+            "--key-file" if matches!(command, "pack" | "asked") => {
+                let Some(value) = given.next() else {
+                    eprintln!("{USAGE}");
+                    return ExitCode::from(2);
+                };
+                key_file = Some(value.into());
+                continue;
+            }
             flag if flag.starts_with("--") => {
                 eprintln!("{USAGE}");
                 return ExitCode::from(2);
@@ -345,10 +356,41 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         // The manage helper (#1722): one request on the standard input, its
         // answer on the standard output, as systemd hands it a connection
         // to `lamp-skills-manage.socket`; the journal says what was done.
+        // `install` fetches the package itself, over HTTPS within
+        // `package::FETCH_WITHIN`, and takes it only signed with the update
+        // channel's key (`--key-file`, `package::STORE_KEY` by default),
+        // and only with the Store's switch on in its own environment
+        // (`package::STORE_SWITCH`): off, an install is refused as
+        // `lamp-cloud` refuses it, whoever asked, and a remove still runs.
         ("asked", []) => {
+            let store_on =
+                package::store_switched_on(std::env::var(package::STORE_SWITCH).ok().as_deref());
+            let mut web = match store_on
+                .then(|| {
+                    lamp_update::fetch::Web::within(
+                        Duration::from_secs(10),
+                        Duration::from_secs(10),
+                        package::FETCH_WITHIN,
+                    )
+                })
+                .transpose()
+            {
+                Ok(web) => web,
+                Err(error) => {
+                    eprintln!("lamp-skills: asked: no HTTPS client, so no install: {error}");
+                    None
+                }
+            };
+            let store = web.as_mut().map(|web| package::Store {
+                key_file: key_file
+                    .clone()
+                    .unwrap_or_else(|| package::STORE_KEY.into()),
+                channel: web,
+            });
             return match package::asked(
                 &dir,
                 package::ASKED_LOCK_WAIT,
+                store,
                 std::io::stdin(),
                 std::io::stdout(),
             ) {
@@ -360,9 +402,17 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
                 }
             };
         }
-        ("pack", [skill]) => {
-            package::pack(Path::new(skill), &out).map(|path| format!("packed {}", path.display()))
-        }
+        ("pack", [skill]) => match &key_file {
+            None => package::pack(Path::new(skill), &out)
+                .map(|path| format!("packed {}", path.display())),
+            Some(key_file) => std::fs::read_to_string(key_file)
+                .map_err(|error| format!("{}: {error}", key_file.display()))
+                .and_then(|text| {
+                    lamp_update::manifest::read_private_key(&text).map_err(|why| why.0)
+                })
+                .and_then(|key| package::pack_signed(Path::new(skill), &out, Some(&key)))
+                .map(|path| format!("packed and signed {}", path.display())),
+        },
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);

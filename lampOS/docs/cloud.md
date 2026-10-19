@@ -86,7 +86,8 @@ lamp says so.
 | `led.resting.preview` (`{"color": [r, g, b]}`) | asked on `light/request` at `conversation` priority (over a skill's glow, under the person's own light), on the host's boot clock, holding 10 s unless asked again, so an abandoned screen leaves nothing behind (V1's 10 s); a save gives it back first. A light asked for at the lamp ("make your light blue") ends it, and a drag that goes on stays given way until it pauses past its 10 s (the reviewer on #1464). Answered only when it fails, as V1, so a drag does not flood `fd_channel`. Refused where the ring takes no lights that lapse (`LAMP_LIGHT_REQUESTS`, on in the product) |
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
-| `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Read only. Without the switch, V1's "not on this lamp" |
+| `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
+| `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on` and `LAMP_SKILLS_STORE=on` ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the update channel's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without `LAMP_SKILLS_STORE`, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder); the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
@@ -307,19 +308,24 @@ words then pass through the broker to the app, where before they left the
 lamp only to the voice's model. Tests: `app_contract.rs`'s
 `schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without`.
 
-## The skills page (#1722, `skills.list`, `skills.remove`)
+## The skills page (#1722, `skills.list`, `skills.remove`, `skills.install`)
 
 The Autonomous app's Lamp 2 skills page (mobile's design on #1722, the
 first builder's yes at 17:21 on 19 Oct): the lamp's skills as a phone's
-home screen of apps. Two of its four kinds are built: `skills.list`, read
-only, and `skills.remove` ("Removing a skill" below); `catalog` and
-`install` come once the update channel carries skills, and are refused as
-kinds this lamp lacks until then.
+home screen of apps. Three of its four kinds are built: `skills.list`, read
+only, `skills.remove` ("Removing a skill" below) and, behind a switch of
+its own, `skills.install` ("Installing from the Skills Store" below);
+`catalog` comes with the Store's server, and is refused as a kind this lamp
+lacks until then.
 
 **The switch.** `LAMP_SKILLS_PAGE=on`, with `LAMP_CLOUD=on`; off unless
 set. Without it the kind is answered as any this lamp lacks, `not on this
 lamp: skills.list` (and `not on this lamp: skills.remove`), and the app
 shows no Skills row. Its envelope is V1's, as `reports.*`'s.
+`skills.install` needs `LAMP_SKILLS_STORE=on` as well; without it, `not on
+this lamp: skills.install`. The manage helper checks the same switch in
+its own environment and refuses with the same words ([skills.md](skills.md),
+"The manage helper").
 
 **Where it reads.** `lamp-skills`' own folder, `/var/lib/lampOS/skills`
 (the product unit's `--dir`), with `lamp-skills`' own loader
@@ -502,6 +508,66 @@ should ever remove one is a separate decision, not taken.
   and the next `lamp-update install` writes it back. Taking "core" from
   `lamp-update`'s list of shipped names instead would close it; not done
   here.
+
+### Installing from the Skills Store (`skills.install`)
+
+`{"name": "desk-tutor", "version": "1.0.0", "sha256": "…", "url":
+"https://…/desk-tutor-1.0.0.tar"}`, a Skills Store catalogue entry (the
+first builder's 22:23 on #1722), sent by the app when the person taps Add;
+`url` alone is taken too. Only with `LAMP_SKILLS_STORE=on` beside the
+page's two switches: listing and removing change nothing new on the lamp,
+and an install puts new code there, so the page can be on while the Store,
+its server and its key are not. Without it, `not on this lamp:
+skills.install`. `lamp-cloud` is not the only gate: root's manage helper
+reads `LAMP_SKILLS_STORE` in its own environment (its unit's drop-in,
+which also gives it the network for the fetch) and, off, refuses an
+install with the same words whoever asked, while a remove still runs.
+
+- **What `lamp-cloud` does: checks the shape and passes it on.** An
+  https URL (`url must be an https URL of at most 2048 characters, with no
+  spaces, no user and nothing but plain ASCII`), a SHA-256 as 64 lowercase
+  hex, a skill's name, `MAJOR.MINOR.PATCH`, each refused in plain words
+  before anything is asked, and nothing the app sent is said back. Then
+  `{"install": {...}}` goes to the manage helper over its socket, as a
+  remove does, and `lamp-cloud` waits at most 40 s. It writes nothing and
+  fetches nothing: a network message never puts code on the lamp through
+  it (the first builder, 18:33).
+- **What the helper does** ([skills.md](skills.md), "From the Skills
+  Store"): checks the request again; reads the update channel's key
+  (`/etc/lampOS/update/key.pub`); fetches the package itself over HTTPS
+  (redirects only to https, at most 18 MiB, within 25 s); checks the
+  entry's `sha256` against the bytes; checks `lamp-skill.sig` against the
+  key before the manifest is read; checks the package as any install does
+  (plain files, no `..`, no absolute path, no link, the size and file
+  bounds, each file's SHA-256), and its name and version against the
+  entry's; then installs it under the folder's lock (waited for at most 4
+  s, `ASKED_LOCK_WAIT`, as a remove's, then `the lamp's skills can't be
+  changed now` with nothing written), loaded first and
+  renamed into place, never core, never over a core skill and never older
+  than the version installed (the same is a reinstall; `not installed:
+  desk-tutor 1.10.0 is on this lamp, and this package is the older 1.2.3:
+  a skill is never put back to an older version`). Nothing is written
+  before that last step.
+- **The key: pending the first builder's word.** The update channel's own
+  key, as "only signed packages from the update channel" says, unless the
+  Store gets one of its own (asked on #1722 at 21:5x). One constant
+  (`lamp_skills::package::STORE_KEY`) and the helper unit's `--key-file`.
+- **The reply** is `skills.list`'s, read after the install, as a remove's.
+  A refusal is the helper's words on one line (at most 300 bytes), for
+  example `not installed: it carries no lamp-skill.sig: …` or `not
+  installed: lamp-skill.sig does not match lamp-skill.json: the package
+  was changed after it was signed`. A helper that can't be reached is `the
+  lamp's skills can't be changed now`.
+- **How long, and what waits.** The fetch's 25 s at most, then the checks,
+  the folder's lock (at most 4 s) and the install, under the 40 s
+  `lamp-cloud` waits (a constant assert holds 25 s + 4 s under it). An
+  install can't fit in a remove's 5 s, so it has its own wait. `lamp-cloud` answers one command at a time, so the
+  app's other commands wait behind an install; the broker's keepalive (60
+  s, a lost link noticed at about 90 s) outlasts it. An answer of
+  `starting` at once and `success` or `failure` after, as V1's
+  `timezone.set`, would free it, and is not built. Not yet timed on a lamp.
+- **Not built:** `skills.catalog` (the signed list the entries come from);
+  the voice installing a skill.
 
 ## Health and crash reports (#1683, step 1)
 

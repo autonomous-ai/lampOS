@@ -237,6 +237,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::remove(&places, data).map(Some)
         }
+        // A package from the Skills Store, from a URL (#1722), with
+        // `LAMP_SKILLS_STORE=on` too: root's manage helper fetches it and
+        // installs it only signed with the update channel's key.
+        "skills.install" if lamp.skills().is_some_and(|places| places.store) => {
+            let places = lamp.skills().ok_or_else(|| not_here(kind))?;
+            crate::skills::install(&places, data).map(Some)
+        }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -533,6 +540,26 @@ pub mod tests {
         let after = answer(&mut lamp, "skills.remove", &json!({"name": "tutor"}))
             .unwrap()
             .unwrap();
+        // The Store's switch off, with the page's on: an install is a kind
+        // this lamp lacks, and nothing is asked of the helper.
+        lamp.skills.as_mut().unwrap().store = false;
+        assert_eq!(
+            answer(
+                &mut lamp,
+                "skills.install",
+                &json!({"url": "https://store.example/x.tar"})
+            ),
+            Err("not on this lamp: skills.install".to_owned())
+        );
+        lamp.skills.as_mut().unwrap().store = true;
+        assert_eq!(
+            answer(
+                &mut lamp,
+                "skills.install",
+                &json!({"url": "http://x/y.tar"})
+            ),
+            Err(lamp_skills::package::NOT_A_STORE_URL.to_owned())
+        );
         assert_eq!(after["skills"].as_array().unwrap().len(), 1);
         assert_eq!(after["skills"][0]["name"], "dance");
         // Off, removing is refused as any kind this lamp lacks.
