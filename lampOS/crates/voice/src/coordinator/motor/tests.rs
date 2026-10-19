@@ -1151,6 +1151,7 @@ fn motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch() {
     let mut motor = OptionalMotor::new(controller.snapshot(time()).unwrap().boot(), Some(prepared));
     motor.start_before_capture(controller.snapshot(time()).unwrap(), false, true);
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
@@ -1583,6 +1584,7 @@ fn failed_reap_after_stopped_is_latched_and_reported_once() {
     let (provider, _) = Worker::sleeping_fixture(&dir.path, "provider");
     let (privacy, _) = Worker::sleeping_fixture(&dir.path, "privacy");
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,

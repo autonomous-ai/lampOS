@@ -36,6 +36,10 @@ tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "net", "sync"
 futures-util = { version = "=0.3.34", default-features = false, features = ["std", "sink"] }
 tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
 reqwest = { version = "0.13", default-features = false, features = ["stream", "rustls-no-provider"] }
+# Only to read which local socket a response came on (`HttpInfo`), so the
+# journal can say whether a speech request reused a connection; the version
+# and features `reqwest` already builds, so no new package.
+hyper-util = { version = "=0.1.21", default-features = false, features = ["client-legacy", "tokio"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 webpki-roots = "1"
 # A look's picture in a chat request (`second_provider`), as `lamp-gemini` pins it.

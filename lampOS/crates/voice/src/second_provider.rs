@@ -61,7 +61,7 @@ pub mod probe;
 mod services;
 pub mod worker;
 
-pub use services::{CHAT_WARM_ENVIRONMENT, Listener, Net, Services};
+pub use services::{CHAT_WARM_ENVIRONMENT, Listener, Net, SPEECH_WARM_ENVIRONMENT, Services};
 
 #[cfg(test)]
 mod tests;
@@ -2087,10 +2087,17 @@ async fn answer(
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
     let looking = asked == Asker::Written { looking: true };
+    let heard_at = Instant::now();
     // Started now, with the chat request, so it is ready first.
     let mut speech = JoinSet::new();
-    let announcement = (shared.announce && shared.announcement_due())
-        .then(|| start_speech(shared, &mut speech, ANNOUNCEMENT.to_owned()));
+    let announcement = (shared.announce && shared.announcement_due()).then(|| {
+        start_speech(
+            shared,
+            &mut speech,
+            ANNOUNCEMENT.to_owned(),
+            net::Turn { request, heard_at },
+        )
+    });
     let (sentences, mut queued) = mpsc::channel(SENTENCES_AHEAD);
     let spoke = AtomicBool::new(false);
     // The answer's own first audio went (not the announcement's).
@@ -2105,7 +2112,7 @@ async fn answer(
         sentences,
         started: false,
         request,
-        heard_at: Instant::now(),
+        heard_at,
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -2552,6 +2559,8 @@ async fn answer(
         Ok(())
     };
     let ended = tokio::try_join!(writing, saying);
+    // The voice's line on the turn's pieces (#1712).
+    shared.services.spoken(request);
     let gave_up = matches!(ended, Err(Stop::GaveUp));
     let last = match ended {
         Ok(_) => {
@@ -2631,9 +2640,14 @@ type Packets = mpsc::Receiver<net::Result<Vec<i16>>>;
 
 /// Speech of `text` downloading into its own queue, in the turn's set so
 /// that it stops with the turn.
-fn start_speech(shared: &Shared, speech: &mut JoinSet<()>, text: String) -> Packets {
+fn start_speech(
+    shared: &Shared,
+    speech: &mut JoinSet<()>,
+    text: String,
+    turn: net::Turn,
+) -> Packets {
     let (packets, queued) = mpsc::channel(SENTENCE_PACKETS);
-    let mut stream = shared.services.speak(text);
+    let mut stream = shared.services.speak_for(text, turn);
     speech.spawn(async move {
         while let Some(packet) = stream.next().await {
             let failed = packet.is_err();
@@ -2694,7 +2708,11 @@ impl Queue<'_> {
             );
         }
         self.started = true;
-        let packets = start_speech(self.shared, self.speech, text.clone());
+        let turn = net::Turn {
+            request: self.request,
+            heard_at: self.heard_at,
+        };
+        let packets = start_speech(self.shared, self.speech, text.clone(), turn);
         self.send(text, packets).await
     }
 

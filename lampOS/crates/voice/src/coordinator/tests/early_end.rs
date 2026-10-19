@@ -763,6 +763,7 @@ impl Setup {
             (worker, answering)
         });
         let mut rig = Rig {
+            expression_out: None,
             second: None,
             microphone: crate::options::Microphone::Mic2,
             end_silence_blocks: self.end_silence_blocks,

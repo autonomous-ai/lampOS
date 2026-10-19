@@ -10,6 +10,7 @@ fn cleanup_failure_cannot_leave_a_restartable_physical_mute() {
     let (provider, _provider_peer) = Worker::sleeping_fixture(&directory.path, "provider");
     let (privacy, _privacy_peer) = Worker::sleeping_fixture(&directory.path, "privacy");
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
@@ -210,6 +211,7 @@ fn active_mute(trace: &mut SessionState, invalid: bool) -> Result<()> {
         })
         .unwrap();
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
@@ -458,6 +460,7 @@ fn shutdown_after_unreadable(
         thread::sleep(Duration::from_millis(1_700));
     }
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,

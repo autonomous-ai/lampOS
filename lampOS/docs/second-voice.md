@@ -66,10 +66,22 @@ refused (unknown fields are refused).
 | `openrouter_model` | no | the slug `LAMP_SECOND_CHAT=openrouter` asks, from OpenRouter's public model list; absent: `deepseek/deepseek-v4.1-flash-1017` |
 | `openrouter_reasoning_effort` | no | `none`, `minimal`, `low`, `medium` or `high`; absent: `minimal` for a `google/` model, `none` for any other |
 | `deepseek_model` | no | the model `LAMP_SECOND_CHAT=deepseek` asks of DeepSeek's own API; absent: `deepseek-flash` (DeepSeek-V4.1-Flash-1017). DeepSeek's peak hours, 01:00–04:00 and 06:00–10:00 UTC on weekdays, cost double; no switch for them |
+| `deepseek_base_url` | no | the relay `LAMP_SECOND_CHAT=deepseek` and `LAMP_SECOND_SEARCH=deepseek` go through instead of DeepSeek's own API (#1934): `<base>/chat/completions`, `<base>/v1/tools/search` and `/v1/tools/fetch`, with the relay's credential (`llm_credential_file`) as the bearer, and no `deepseek.key`; absent: DeepSeek's own API with `deepseek.key`. `LAMP_SECOND_DEEPSEEK_BASE_URL` in the unit's environment goes over it |
 
 OpenRouter's and DeepSeek's keys are not in this file: they are the voice
 unit's systemd credentials, `openrouter.key` and `deepseek.key` in its
-`CREDENTIALS_DIRECTORY` ("OpenRouter and DeepSeek", below).
+`CREDENTIALS_DIRECTORY` ("OpenRouter and DeepSeek", below). With
+`deepseek_base_url`, DeepSeek's chat and search take the relay's credential
+instead, so a lamp with only its relay key runs them (#1934, the lead's
+task: lamps carry no provider keys). The journal then says DeepSeek is asked
+"through the relay with its credential", with no URL or key, and
+`probe-cascade` times `chat=deepseek-relay(…)` beside the direct one. The
+relay's base is `https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek`,
+with DeepSeek's own paths under it and the relay key as the bearer. It
+passes the bodies and streams through unchanged, and answers `GET
+<base>/models` for `LAMP_SECOND_CHAT_WARM`. A missing key is 401 and past
+the lamp's limit 429. Search and fetch are 5 calls a second for the whole
+relay (the backend on #1934, 21:0x).
 
 The fallback is V1's: an empty or absent STT or TTS URL or key is the LLM's.
 A Gemini model name is letters, digits, `-`, `.` and `_` only: it goes into
@@ -394,6 +406,21 @@ order is kept. A written turn is the same from the chat on.
   headers. A gap over the client's 90 s pool keep means a new connection
   (the first builder at 18:26: the first event came in 0.9 to 1.9 s on
   lamp-4ace, 0.7 s from the probe).
+  Each piece asked of the configured voice (OpenAI's or ElevenLabs) is
+  journaled at its first audio byte, without words: `request R ElevenLabs
+  piece K: C chars, sent S ms after the words were heard on a reused|new
+  connection; its first audio byte A ms after it went`. C counts the text
+  sent; A is from the request's going to the body's first byte. At the
+  turn's end, one line for its pieces: `request R ElevenLabs: B of N pieces
+  began, U on a reused connection, C chars; the first piece's first audio
+  byte A ms after it went, the slowest M ms` (`never came` when the first
+  never began). "Reused" is read, not guessed: the response's local socket
+  (hyper's `HttpInfo`) is one an earlier response or warming came on (the
+  last 8 kept). The client speaks HTTP/1.1 only, so pieces asked while one
+  still downloads each open their own connection. Gemini's voice is not
+  journaled this way (#1712, the first builder at 19:57: `eleven_v4_turbo`'s
+  first sound came about 690 ms after its first piece went on lamp-4ace,
+  request 2: 2185 to 2875 ms after the words; Flash 306 ms from the probe).
   After the first request, the line also says whether its tools and its
   first message are the last request's, hashed: `; its tools and first
   message as the last request's`, or which of the two is not. A service's
@@ -453,6 +480,23 @@ order is kept. A written turn is the same from the chat on.
   paid for the handshake (the first builder at 18:26: the chat's first
   event 0.9 to 1.9 s on lamp-4ace, 0.7 s from the probe). A warming that
   fails changes nothing; the chat connects as before.
+- **With `LAMP_SECOND_SPEECH_WARM=on` the configured voice's connection is
+  opened as a line begins** (off unless set, as the chat's switch is; its
+  own switch, since `LAMP_SECOND_CHAT_WARM` names the chat), when no piece
+  or warming went in the last 60 s (`tts::WARM_AFTER`, the chat's). Only
+  when the configured voice is the lamp's one voice; Gemini's is warmed
+  whenever it is. It's a GET of `<base>/models` with the key
+  (ElevenLabs: `<base>/elevenlabs/models` on the proxy, `/v1/models`
+  direct), read whole (at most 256 KiB), so the answer's first piece goes
+  on a connection already made. No text is sent, so no characters are
+  billed: ElevenLabs bills the text of speech requests, and `GET
+  /v1/models` lists models. The Autonomous proxy has no route for it (404,
+  `Cannot GET …`, read from the Mac on 19 Oct) and keeps the connection
+  open after it, so the warming still opens it. The journal says
+  `ElevenLabs: the speech connection opened ahead in T ms (HTTP S)`, and the
+  first piece's line says `reused`. A warming runs beside the line and
+  never holds a piece up: a piece asked while it is in flight opens its own
+  connection, and one that fails changes nothing.
 - **The answer's first piece goes after a few words** if no clause or
   sentence ended sooner: 4 with the configured voice
   (`CONFIGURED_FIRST_WORDS`; the first builder at 18:26: a 9-word first
@@ -1134,7 +1178,9 @@ after a take-over, but now for every turn:
   place's time (`worker::time_elsewhere`): with `LAMP_TIME_PLACES` it is
   told `worker::TIME_ELSEWHERE` and needs its place; without it, it is
   not given. Whether DeepSeek then answers with no call is not yet shown
-  on a lamp.
+  on a lamp. All this is with `LAMP_CLOCK` on; with it off, the request is
+  told the time as a Live session without it is, roughly
+  (`local_time::told`), as before (the first builder on #1921).
 - **The lamp's place** (`LAMP_PLACE`, "Hanoi, Vietnam"): told beside the
   time, "You are in Hanoi, Vietnam. When someone asks about the weather,
   the news or anything nearby without naming a place, they mean Hanoi,
@@ -1575,8 +1621,10 @@ dimmer still", DeepSeek answered "Hey Lamp, turn yourself down a bit." with
 `light_dimmer`, then "turn yourself back up a little" with `volume_up`: the
 lamp ended 20 steps louder. Live calls `volume_down`, then `volume_up`.
 
-- **The conversation:** the character and a turn's changing part, then five
-  lines (`LINES`): the four above and "That's better, thanks." (no call).
+- **The conversation:** the character and a turn's changing part, then
+  `followups.sh`'s five lines as played (`LINES`): the four above and "Hey
+  Lamp, make your light a little brighter." (`light_brighter`), which checks
+  that the note doesn't push a light line onto the volume.
   Each line is asked with the lines before it as right history: the right
   call, the actions part's short answer to it (`LAMP_SHORT_DONE=on`, as on
   the lamps), and a word or two. So each line is judged on its own.

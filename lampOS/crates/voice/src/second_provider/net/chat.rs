@@ -333,29 +333,17 @@ impl Chat {
     /// connection already made. Its status and how long it took; `None`
     /// when not due, or when it failed (the chat then connects as before).
     pub async fn warm(&self) -> Option<(u16, std::time::Duration)> {
-        let began = std::time::Instant::now();
-        {
-            let mut last = self.last_sent.lock().ok()?;
-            if last.is_some_and(|at| began.duration_since(at) < WARM_AFTER) {
-                return None;
-            }
-            *last = Some(began);
-        }
         let models = self.url.replacen("/chat/completions", "/models", 1);
-        let request = self.client.get(&models).header("authorization", &self.auth);
-        let mut response = tokio::time::timeout(super::CONNECT + super::STALL, request.send())
-            .await
-            .ok()?
-            .ok()?;
-        let status = response.status().as_u16();
-        let mut read = 0;
-        while read <= WARM_BYTES {
-            match tokio::time::timeout(super::STALL, response.chunk()).await {
-                Ok(Ok(Some(bytes))) => read += bytes.len(),
-                _ => break,
-            }
-        }
-        Some((status, began.elapsed()))
+        let (status, took, _) = super::warm_get(
+            &self.client,
+            &self.last_sent,
+            WARM_AFTER,
+            &models,
+            ("authorization", &self.auth),
+            WARM_BYTES,
+        )
+        .await?;
+        Some((status, took))
     }
 
     /// Its requests are given only the tools `narrow` keeps of those

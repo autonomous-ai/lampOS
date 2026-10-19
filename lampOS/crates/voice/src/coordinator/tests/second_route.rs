@@ -26,7 +26,7 @@ use std::{
     collections::BTreeSet,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
 };
 
@@ -36,6 +36,8 @@ const SECOND: i16 = 2_000;
 /// The second route's wait cue, played before its words.
 const CUE: i16 = 500;
 const LIMIT: Duration = Duration::from_secs(12);
+/// The clock the run's `ExpressionOut` stamps with (`Script::expression`).
+const EXPRESSION_CLOCK: &str = "second-route-boot";
 
 /// What the Live peer does with one request, by Start order.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -133,6 +135,12 @@ struct Script {
     /// Privacy reports muted at this capture frame, whatever has settled:
     /// for a run whose turns go on past the person's (the lamp's own).
     mute_at_frame: Option<u64>,
+    /// The second route's answer packet by packet: its sample value, so its
+    /// level rises and falls as speech does (#933). `None`: `SECOND`.
+    second_shape: Option<fn(usize) -> i16>,
+    /// Give the voice an `ExpressionOut` on a bus of the run's own, and keep
+    /// what it says for Expression (`voice/progress`, `voice/sound`).
+    expression: bool,
 }
 
 impl Script {
@@ -157,6 +165,8 @@ impl Script {
             turn_taking: TurnTaking::V1Baseline,
             written: Written::Ignore,
             mute_at_frame: None,
+            second_shape: None,
+            expression: false,
         }
     }
 }
@@ -184,6 +194,9 @@ struct Run {
     trace: Vec<Value>,
     seen: Seen,
     exits: Vec<(&'static str, bool)>,
+    /// What the voice said for Expression, as Expression takes it, in the
+    /// order it was said (`Script::expression`).
+    expression: Vec<lamp_expression::Input>,
 }
 
 fn dedup<T: PartialEq + Clone>(items: &[T]) -> Vec<T> {
@@ -710,7 +723,14 @@ impl Peers {
                                     finished: true,
                                 });
                         }
-                        self.audio(index, request, self.script.second_packets, SECOND);
+                        match self.script.second_shape {
+                            Some(shape) => {
+                                for packet in 0..self.script.second_packets {
+                                    self.audio(index, request, 1, shape(packet));
+                                }
+                            }
+                            None => self.audio(index, request, self.script.second_packets, SECOND),
+                        }
                         self.finish(index, request);
                         continue;
                     }
@@ -949,6 +969,7 @@ fn run(script: Script) -> Run {
         )
         .unwrap();
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         call_wait_blocks: None,
         cut_keeps_name: false,
@@ -979,6 +1000,49 @@ fn run(script: Script) -> Run {
         let worker = spawn("second");
         rig.second = Some(second::Route::standing_by(worker, ready_link(1, 1)));
     }
+    // What the voice says for Expression, on a bus of the run's own, kept by
+    // a thread as it comes so that no subscriber's queue fills.
+    let expression = script.expression.then(|| {
+        use lamp_msgs::{VoiceProgress, VoiceSound};
+        static RUNS: AtomicU64 = AtomicU64::new(0);
+        let root = PathBuf::from(format!(
+            "/tmp/lv-route-expr-{}-{}",
+            std::process::id(),
+            RUNS.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        rig.expression_out = Some(
+            crate::expression_out::ExpressionOut::on(&bus, EXPRESSION_CLOCK, "voice-route")
+                .unwrap(),
+        );
+        let mut progress = bus
+            .subscribe_typed(VoiceProgress::TOPIC, "test", VoiceProgress::TYPE)
+            .unwrap();
+        let mut sound = bus
+            .subscribe_typed(VoiceSound::TOPIC, "test", VoiceSound::TYPE)
+            .unwrap();
+        let done = Arc::new(AtomicBool::new(false));
+        let stop = done.clone();
+        let keeper = std::thread::spawn(move || {
+            let mut kept = Vec::new();
+            let mut drain = |kept: &mut Vec<lamp_expression::Input>| {
+                while let Ok(Some(message)) = progress.recv(Duration::from_millis(2)) {
+                    kept.push(lamp_expression::Input::Progress(message.parse().unwrap()));
+                }
+                while let Ok(Some(message)) = sound.recv(Duration::from_millis(2)) {
+                    kept.push(lamp_expression::Input::Sound(message.parse().unwrap()));
+                }
+            };
+            while !stop.load(Ordering::Acquire) {
+                drain(&mut kept);
+            }
+            drain(&mut kept);
+            kept
+        });
+        (root, done, keeper)
+    });
     // The clock starts once every child has crossed its startup barrier;
     // the coordinator and the peers share it from here.
     let clock_scope = crate::scenario_clock::Scope::enter(LIMIT * 2).unwrap();
@@ -1083,12 +1147,19 @@ fn run(script: Script) -> Run {
         exits.push((role, matches!(worker.try_exit(), Ok(Some(_)))));
     }
     drop(clock_scope);
+    let expression = expression.map_or_else(Vec::new, |(root, done, keeper)| {
+        done.store(true, Ordering::Release);
+        let kept = keeper.join().unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+        kept
+    });
     let seen = std::mem::take(&mut *seen.lock().unwrap());
     Run {
         result,
         trace: trace.iter().cloned().collect(),
         seen,
         exits,
+        expression,
     }
 }
 
@@ -2119,4 +2190,105 @@ fn with_the_switch_a_misheard_cut_in_hums_and_sends_no_model_turn() {
     assert_eq!(asked(&off), 1);
     assert!(rows(&off, "unclear_hum_owed").is_empty());
     assert!(rows(&off, "unclear_hum").is_empty());
+}
+
+/// #933 on the second route (the first builder, 19:48 on #1722): an answer
+/// spoken by the second route alone, its level rising on stressed words and
+/// falling between sentences, makes the head nod and sway. What the voice
+/// says for Expression (`voice/progress`, `voice/sound`) comes from the loop,
+/// whichever route answers, so this is the whole path: the second route's
+/// audio, the speaker, `expression_out`, and Expression's planner with the
+/// product's `speaking` section.
+#[test]
+fn the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken() {
+    let _one = super::pilot_faults::one_session();
+    // 40 ms packets: a stressed word about every 1.1 s, syllables between,
+    // and a half-second pause every 3 s.
+    fn shape(packet: usize) -> i16 {
+        let into = (packet * 40) % 3_000;
+        if into >= 2_500 {
+            0
+        } else if into % 1_100 < 120 {
+            26_000
+        } else if packet.is_multiple_of(3) {
+            3_000
+        } else {
+            11_000
+        }
+    }
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_packets: 200,
+        second_shape: Some(shape),
+        expression: true,
+        ..Script::question(Live::Answer(12))
+    });
+    run.assert_clean();
+    let sounds = run
+        .expression
+        .iter()
+        .filter(|input| matches!(input, lamp_expression::Input::Sound(_)))
+        .count();
+    assert!(sounds > 100, "{sounds} pieces of sound said for Expression");
+    // Through Expression's planner, with the product's speaking section.
+    let mut catalogue = lamp_expression::Catalogue::from_json(include_str!(
+        "../../../../../deploy/product/settings/expression.json"
+    ))
+    .unwrap();
+    catalogue.timing.body_lag_us = Some(0);
+    if catalogue.speaking.is_none() {
+        catalogue.speaking = lamp_expression::Catalogue::from_json(include_str!(
+            "../../../../expression/alive-behaviours.json"
+        ))
+        .unwrap()
+        .speaking;
+    }
+    let mut engine = lamp_expression::Engine::new(catalogue, true, EXPRESSION_CLOCK).unwrap();
+    let at_of = |input: &lamp_expression::Input| match input {
+        lamp_expression::Input::Progress(p) => p.timing.stamp.at_us,
+        lamp_expression::Input::Sound(s) => s.playout.stamp.at_us,
+        _ => 0,
+    };
+    let mut inputs = run.expression.clone();
+    inputs.sort_by_key(at_of);
+    let (first, last) = (at_of(&inputs[0]), at_of(inputs.last().unwrap()));
+    let mut behaviours: Vec<Vec<String>> = Vec::new();
+    let mut next = inputs.into_iter().peekable();
+    let mut sequence = 0;
+    let mut at = first;
+    while at <= last + 1_500_000 {
+        if at % 100_000 < 20_000 {
+            sequence += 1;
+            for context in [
+                serde_json::json!({"kind":"room","stamp":{"clock_id":EXPRESSION_CLOCK,"at_us":at,"sequence":sequence},"value":{"state":"quiet"}}),
+                serde_json::json!({"kind":"light","stamp":{"clock_id":EXPRESSION_CLOCK,"at_us":at,"sequence":sequence},"value":{"on":true,"colour":"warm","level":3}}),
+                serde_json::json!({"kind":"joints","stamp":{"clock_id":EXPRESSION_CLOCK,"at_us":at,"sequence":sequence},
+                    "value":{"name":["base_yaw","shoulder","elbow","head_roll","head_pitch"],"position":[0,0,0,0,0],"velocity":[],"effort":[],"commanded":[]}}),
+            ] {
+                engine
+                    .ingest(at, serde_json::from_value(context).unwrap())
+                    .unwrap();
+            }
+        }
+        while next.peek().is_some_and(|input| at_of(input) <= at) {
+            let input = next.next().unwrap();
+            // A piece the planner refuses (out of its turn) is not a fault here.
+            let _ = engine.ingest(at, input);
+        }
+        behaviours.push(engine.tick(at).state.behaviours);
+        at += 20_000;
+    }
+    let starts = |name: &str| {
+        behaviours
+            .windows(2)
+            .filter(|w| !w[0].iter().any(|b| b == name) && w[1].iter().any(|b| b == name))
+            .count()
+    };
+    let nods = starts("nodding on a stressed word");
+    let sways = starts("swaying between sentences");
+    // On the Mac, 19 Oct: 398 pieces of sound, 3 nods and 1 sway; a flat
+    // answer (`second_shape: None`) gave 1 nod (its onset) and no sway.
+    assert!(nods >= 2, "{nods} nods");
+    assert!(sways >= 1, "{sways} sways");
 }

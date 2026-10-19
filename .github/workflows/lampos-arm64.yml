@@ -48,8 +48,11 @@ on:
   # push to lamp-voice keeps every run: its artifact is what lamps install.
   # Such a PR merges without ARM64 once the reviewer has read it
   # (builders/reviewer.md).
+  # #1712's branch too while the second route is built on it: a pull request
+  # onto it gets its run on open and on each push (19 Oct 21:1x). Back to
+  # lamp-voice alone once #1712 lands.
   pull_request:
-    branches: ['lamp-voice']
+    branches: ['lamp-voice', 'first/voice-cascade-gemini']
     paths:
       - 'lampOS/**'
       - '!lampOS/docs/**/*.md'
