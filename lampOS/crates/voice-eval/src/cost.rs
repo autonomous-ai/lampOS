@@ -10,7 +10,10 @@
 //!   any Live `provider: request N` line; known by its process
 //!   (`lamp-voice[PID]`) and number, as in `score`;
 //! - **answered:** the second route's `first answer audio` for a request,
-//!   and Live's first sound for one not held back, as `score` counts them;
+//!   and Live's that began, less those held back: Live's first sound (said
+//!   only with `LAMP_NAME_SIGNAL`) or its answer judged played (`its answer
+//!   is played: …`, said whenever attention judges, as with
+//!   `LAMP_SPOKEN_TO`), so either switch counts them;
 //! - **DeepSeek:** each `chat answer: …; P prompt tokens, H from the cache,
 //!   M not; C completion tokens`;
 //! - **searches:** each `web_search` in a chat round's `called …` list, and
@@ -172,7 +175,9 @@ impl Usage {
         }
         if live && let Some(number) = request {
             self.requests.insert((false, process, number));
-            if line.contains(": first sound") {
+            // Live's answer began: its first sound (with the name signal), or
+            // its first output judged played (whenever attention judges).
+            if line.contains(": first sound") || line.contains("its answer is played: ") {
                 self.sounded.insert((false, process, number));
             }
             if line.contains("its answer is held back: ") {
@@ -576,6 +581,26 @@ mod tests {
         );
         // A line after every arm is in none.
         assert_eq!(table.lines().count(), 1 + 2 + 2 + 1);
+    }
+
+    /// Tonight's Live arm (19 Oct) had no first-sound lines: Live says them
+    /// only with `LAMP_NAME_SIGNAL`. Its answers judged played count, less
+    /// those held back, and a first sound and a played verdict for one
+    /// request count it once.
+    #[test]
+    fn live_answers_count_from_a_played_verdict_without_the_name_signal() {
+        let journal = "\
+2026-10-19T21:00:01+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 1: its answer is played: its name was heard close to the lamp
+2026-10-19T21:00:30+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 2: its answer is played: a conversation with the lamp is going on
+2026-10-19T21:01:00+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 3: its answer is held back: said to someone else
+2026-10-19T21:01:30+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 4: first sound, and the model has not said it heard its name
+2026-10-19T21:01:31+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 4: its answer is played: its name was heard close to the lamp
+2026-10-19T21:01:32+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: usage total=Some(100) prompt=Some(100) prompt_audio=None response=None response_audio=None thoughts=None cached=None
+";
+        let arm = [Arm::parse("live", "21:00", "21:15").unwrap()];
+        let table = cost(journal, &arm, &prices(), None).unwrap();
+        let live = row(&table, "live", "list");
+        assert_eq!(&live[2..4], ["4", "3"], "{table}");
     }
 
     #[test]

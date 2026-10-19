@@ -615,8 +615,12 @@ stretch of the journal by the lamp's time of day, `HH:MM` or `HH:MM:SS`, as
 - **Usage is read from the voice's own lines**, as counts only, never words
   (`src/cost.rs` names each line):
   - requests, by process and number;
-  - answered, as `score` counts them: the second route's `first answer audio`,
-    and Live's first sound not held back;
+  - answered: the second route's `first answer audio`, and Live's answers
+    that began, less those held back. Live's begin with its first sound, which
+    it says only with `LAMP_NAME_SIGNAL`, or its answer judged played (`its
+    answer is played: …`), which it says whenever attention judges, as with
+    `LAMP_SPOKEN_TO`. Either switch counts them; with neither, Live's answered
+    reads 0;
   - DeepSeek's prompt, cached and completion tokens from each `chat answer`.
     One with "the cache not said" is priced as all uncached, the dearer, and one
     with "no usage given" is counted, not priced;
