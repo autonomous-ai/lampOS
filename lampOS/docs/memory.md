@@ -430,6 +430,14 @@ the unchanged legacy client, used unless the new Days client is selected.
       `NEW_DIR/labels.jsonl` (0600), one line per conversation, each proposal
       with `"mark": "right | wrong | intrusive"` for a person to fill in.
     - **Afterwards:** the copy is removed at the end.
+    - **Made-up conversations** (the first builder's 01:36): run the tool
+      with `--conversations crates/voice-eval/observe/synthetic-20.json` in
+      place of `--store`. The 20 conversations are synthetic: ten with
+      something worth keeping, eight with nothing, and two with health or
+      money said in passing. They are built into the run's own store, each
+      ten minutes apart. The pass's results are scored against what each
+      should keep: kept rightly, kept wrongly, missed, intrusive kept, and
+      whether the bar passes (under 1 in 10 kept wrongly, none intrusive).
     - **Tests:** `observe_dry::tests`: the cut, a whole run on a seeded copy
       with a scripted model, kept and nothing, and the given store byte for
       byte unchanged.
