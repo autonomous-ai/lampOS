@@ -833,6 +833,47 @@ async fn a_chat_begun_on_the_early_words_is_kept_when_they_are_the_lines() {
     }
 }
 
+/// #1712: Flux's `TurnResumed` (`net::Early::Resumed`) takes the early words
+/// back: the chat begun on them is dropped, and round 1 is asked on the
+/// line's final words.
+#[tokio::test(start_paused = true)]
+async fn a_resumed_turn_drops_the_chat_begun_on_its_early_words() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What time is it?".to_owned())].into()),
+        early: Mutex::new(
+            [vec![
+                net::Early::Words("what time is it".to_owned()),
+                net::Early::Resumed,
+            ]]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("It's noon."), Ok(ChatEvent::Done)],
+                vec![text("It's noon."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.preparing(true);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert!(
+        turn(&mut engine)
+            .await
+            .contains(&"said:It's noon.".to_owned())
+    );
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 2, "begun early, dropped, asked again");
+    assert_eq!(
+        asked[1].last(),
+        Some(&Message::user("What time is it?".to_owned()))
+    );
+}
+
 /// When the early words stand for round 1 (`Prepared::misfit`): the same
 /// words whatever the case and punctuation, the same conversation, and no
 /// note but the name note on words that name the lamp.
