@@ -138,6 +138,9 @@ pub type ScopedToolRunner = Arc<
 
 /// The system message for a turn, built when the turn's chat begins.
 pub type System = Arc<dyn Fn() -> Told + Send + Sync>;
+/// The system message built for the admitted request's immutable scope, never
+/// for whoever is in view when the chat begins.
+pub type ScopedSystem = Arc<dyn Fn(&crate::memory_scope::ScopeLease) -> Told + Send + Sync>;
 
 /// What a turn's chat is told: the system message, and the exchanges just
 /// before it as messages (user, then assistant), oldest first. Both come
@@ -188,6 +191,7 @@ struct Shared {
     tools: ToolRunner,
     scoped_tools: Option<ScopedToolRunner>,
     system: System,
+    scoped_system: Option<ScopedSystem>,
     clock: Clock,
     /// When answer audio was last sent.
     answered_at: Mutex<Option<Instant>>,
@@ -430,6 +434,7 @@ impl Engine {
                 tools,
                 scoped_tools: None,
                 system,
+                scoped_system: None,
                 clock,
                 answered_at: Mutex::new(None),
                 sequence: AtomicU64::new(0),
@@ -462,10 +467,11 @@ impl Engine {
         boot: lamp_turn_owner::BootId,
         cache: Arc<crate::memory_scope::FaceCache>,
         runner: ScopedToolRunner,
+        system: Option<ScopedSystem>,
     ) -> Self {
-        Arc::get_mut(&mut self.shared)
-            .expect("configured before admission")
-            .scoped_tools = Some(runner);
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.scoped_tools = Some(runner);
+        shared.scoped_system = system;
         self.memory = Some((boot, cache));
         self
     }
@@ -493,6 +499,21 @@ impl Engine {
         {
             scope.revoke();
         }
+    }
+
+    /// Whether turns are told and kept for their admitted memory scope
+    /// (a [`ScopedSystem`] given to [`Self::with_memory_scope`]).
+    pub(crate) fn scopes_context(&self) -> bool {
+        self.shared.scoped_system.is_some()
+    }
+
+    /// Authority of the current admitted request, including its immutable scope.
+    pub(crate) fn memory_lease(&self) -> Option<crate::memory_scope::ScopeLease> {
+        self.turn
+            .as_ref()?
+            .memory_scope
+            .as_ref()
+            .map(|scope| scope.lease())
     }
 
     fn memory_scope(
@@ -1131,7 +1152,15 @@ async fn answer(
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
         }
-        let told = (shared.system)();
+        let told = match (&shared.scoped_system, &scope) {
+            (Some(system), Some(lease)) => system(lease),
+            _ => (shared.system)(),
+        };
+        // Building it can wait on the memory service: a request revoked
+        // meanwhile is not asked with what was read for it.
+        if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+            return Err(Stop::Gone);
+        }
         let mut messages = vec![Message::system(told.text)];
         messages.extend(told.history);
         // A note beside the request, never anyone's words (as on the Live

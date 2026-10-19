@@ -795,11 +795,27 @@ returned after revocation. A write already accepted by Memory cannot be undone
 by canceling its caller. Typed conversations continue to use the room scope.
 
 This boundary fixes tool attribution and cancellation only. A visible face is
-not proof of the speaker. Provider context, snapshots and history still require
-their own session isolation; this change does not establish that a session
-already containing one person's private context is safe for another person.
-Voice matching remains diagnostic until that isolation and real-person
-qualification are complete (#1675).
+not proof of the speaker. Voice matching remains diagnostic until provider
+context isolation and real-person qualification are complete (#1675).
+
+### Second route context scope
+
+With `LAMP_SECOND_SCOPED_CONTEXT=on` (off unless set), on the Second route the
+same admitted scope also decides what a turn's chat is told. Its system message, recalled thread and history messages are read for the
+request's scope alone (`Thread::recall_for`/`recent_for`): a person's
+exchanges for that person, the room's for a room request, never the sticky
+session owner's or those of whoever is in view when the chat begins. The Days
+note is asked for that scope and asked again when the scope differs from the
+previous turn's. A request revoked while its context was built is not asked.
+The lamp's answer is kept under the same scope (`Thread::lamp_for`), and a
+written request's note is kept as the room's, as it is admitted. The context is
+still built on the turn's task, so a slow memory service delays that turn's
+first round as before; nothing new is read on the input path.
+
+Off, a turn is told and kept as before, for the person the session was opened
+for. The Live route is not covered: its provider session already holds earlier
+history and tool results, and resetting it at an identity change is a separate
+change awaiting First's scope decision.
 
 The added admission work targets less than 100 microseconds: no filesystem or
 network I/O and no waiting for the cache mutex. Privacy invalidation is atomic

@@ -473,11 +473,17 @@ impl Thread {
     /// anyone said. An answer to any later request drops it unused (the
     /// request was retired or failed), and so does a forgetting.
     pub fn written(&mut self, request: u64, text: &str) {
+        let scope = self.whose.clone().or_else(|| self.opened_for.clone());
+        self.written_for(request, text, scope.as_deref());
+    }
+
+    /// Keep a written note under its admitted scope, including explicit room scope.
+    pub fn written_for(&mut self, request: u64, text: &str, scope: Option<&str>) {
         let mut note = String::new();
         add(&mut note, text, PERSON_BYTES);
         self.note = Some(Pending {
             request,
-            whose: self.whose.clone().or_else(|| self.opened_for.clone()),
+            whose: scope.map(str::to_owned),
             note,
         });
     }
@@ -499,6 +505,16 @@ impl Thread {
 
     /// A piece of what the lamp said in answer `request`.
     pub fn lamp(&mut self, request: u64, text: &str, now: Instant) {
+        let scope = self
+            .named
+            .clone()
+            .or_else(|| self.whose.clone())
+            .or_else(|| self.opened_for.clone());
+        self.lamp_for(request, text, now, scope.as_deref());
+    }
+
+    /// Attribute an answer to its admitted scope rather than a later face observation.
+    pub fn lamp_for(&mut self, request: u64, text: &str, now: Instant, scope: Option<&str>) {
         // The name of a function said where it should have been called is
         // not something the lamp said: neither that piece nor what follows
         // it in the same answer is kept, told again or taken for a
@@ -532,11 +548,7 @@ impl Thread {
             // eight are all there is. The person the eyes name now; nobody
             // named, the one counted; nobody known while a person's session
             // goes on: theirs.
-            let whose = self
-                .named
-                .clone()
-                .or_else(|| self.whose.clone())
-                .or_else(|| self.opened_for.clone());
+            let whose = scope.map(str::to_owned);
             let theirs = self.exchanges.iter().filter(|e| e.whose == whose);
             if theirs.count() == EXCHANGES {
                 if let Some(oldest) = self.exchanges.iter().position(|e| e.whose == whose) {
@@ -709,12 +721,24 @@ impl Thread {
     /// at most `most`, oldest first, as (what they said, what the lamp said):
     /// for a route that gives a model the conversation as messages.
     pub fn recent(&self, now: Instant, within: Duration, most: usize) -> Vec<Recent> {
+        self.recent_for(self.opened_for.as_deref(), now, within, most)
+    }
+
+    /// Read an explicit admitted scope without changing session ownership.
+    /// None selects only the room, never the person currently in view.
+    pub fn recent_for(
+        &self,
+        scope: Option<&str>,
+        now: Instant,
+        within: Duration,
+        most: usize,
+    ) -> Vec<Recent> {
         let mut recent: Vec<Recent> = self
             .exchanges
             .iter()
             .rev()
             .filter(|exchange| {
-                exchange.whose == self.opened_for
+                exchange.whose.as_deref() == scope
                     && now.saturating_duration_since(exchange.at) <= within
                     && exchange.lamp.chars().any(char::is_alphanumeric)
             })
@@ -733,10 +757,16 @@ impl Thread {
     /// `room` bytes: the latest exchanges that fit, in the order they went,
     /// of the person the session is opened for ([`Self::opening`]) only.
     pub fn recall(&self, now: Instant, room: usize) -> Option<String> {
+        self.recall_for(self.opened_for.as_deref(), now, room)
+    }
+
+    /// Read an explicit admitted scope without changing session ownership.
+    /// None selects only the room, never the person currently in view.
+    pub fn recall_for(&self, scope: Option<&str>, now: Instant, room: usize) -> Option<String> {
         // An answer with no word in it ("...") is the model keeping quiet
         // aloud. Told back to it, it is what it does next.
         let told = |exchange: &&Exchange| {
-            exchange.whose == self.opened_for
+            exchange.whose.as_deref() == scope
                 && now.saturating_duration_since(exchange.at) <= REMEMBERED_FOR
                 && exchange.lamp.chars().any(char::is_alphanumeric)
         };
@@ -2249,6 +2279,65 @@ mod tests {
         thread.lamp(3, "Okay, A.", now);
         assert_eq!(thread.names_window(2), window(&before));
         assert_eq!(thread.names_window(1), window(&before[1..]));
+    }
+
+    #[test]
+    fn scoped_answer_keeps_its_admitted_person_after_the_face_changes() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.at_lamp(Some(a.clone()));
+        thread.opening(now);
+        thread.person("A question", true, now);
+        thread.at_lamp(Some(b.clone()));
+        thread.lamp_for(1, "A private answer", now, Some(&a));
+        assert_eq!(thread.recent_for(Some(&a), now, REMEMBERED_FOR, 6).len(), 1);
+        assert!(
+            thread
+                .recent_for(Some(&b), now, REMEMBERED_FOR, 6)
+                .is_empty()
+        );
+        thread.written_for(2, "room note", None);
+        thread.lamp_for(2, "room answer", now, None);
+        let room = thread.recent_for(None, now, REMEMBERED_FOR, 6);
+        assert_eq!(room.len(), 1);
+        assert_eq!(room[0].written.as_deref(), Some("room note"));
+        assert!(
+            thread
+                .recent_for(Some(&b), now, REMEMBERED_FOR, 6)
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn explicit_history_scope_never_uses_the_sticky_session_owner() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.at_lamp(Some(a.clone()));
+        thread.opening(now);
+        thread.person("private marker A", true, now);
+        thread.lamp(1, "private reply A", now);
+        for scope in [Some(b.as_str()), None] {
+            assert!(thread.recent_for(scope, now, REMEMBERED_FOR, 6).is_empty());
+            assert!(thread.recall_for(scope, now, 4096).is_none());
+        }
+        assert!(
+            thread
+                .recall_for(Some(&a), now, 4096)
+                .unwrap()
+                .contains("private marker A")
+        );
+        assert_eq!(thread.opened_for(), Some(a.as_str()));
+        thread.forget();
+        assert!(
+            thread
+                .recent_for(Some(&a), now, REMEMBERED_FOR, 6)
+                .is_empty()
+        );
+        assert!(thread.recall_for(Some(&a), now, 4096).is_none());
     }
 
     /// The exchanges a route gives a model as messages: the person's only,
