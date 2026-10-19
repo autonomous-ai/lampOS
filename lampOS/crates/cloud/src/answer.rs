@@ -51,6 +51,25 @@ pub trait Lamp {
     /// again, without keeping it (`light/request`), until the person asks
     /// for a light at the lamp.
     fn preview_light(&mut self, light: &Light) -> Result<(), String>;
+    /// Whether texts from the app are taken (`LAMP_MESSAGES=on`,
+    /// `crate::chat`). Off unless a lamp says so.
+    fn texting(&self) -> bool {
+        false
+    }
+    /// A new run's name, at `now_ms`.
+    fn new_run(&mut self, now_ms: u64) -> String {
+        format!("run-{now_ms}")
+    }
+    /// Puts `text` on the bus for the voice to answer (`chat/in`), and waits
+    /// for its answer from `now_ms`.
+    fn send_text(&mut self, _text: &lamp_msgs::ChatIn, _now_ms: u64) -> Result<(), String> {
+        Err(not_here("chat.send"))
+    }
+    /// The `chat.event`s' `data` due at `now_ms`: pieces of answers from
+    /// `chat/out`, and runs that waited too long.
+    fn chat_events(&mut self, _now_ms: u64) -> Vec<Value> {
+        Vec::new()
+    }
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -103,6 +122,15 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let wanted = light::previewed(data, now.as_ref())?;
             lamp.preview_light(&wanted).map(|()| None)
         }
+        // A text from the app (#1673): acked with its run, and put on the
+        // bus for the voice; the answer goes back as `chat.event`.
+        "chat.send" if lamp.texting() => {
+            let now_ms = crate::chat::now_ms();
+            let run = lamp.new_run(now_ms);
+            let text = crate::chat::text_in(data, run)?;
+            lamp.send_text(&text, now_ms)?;
+            some(json!({"run_id": text.run_id, "session_id": text.session_id}))
+        }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -124,6 +152,11 @@ pub mod tests {
         pub shown: Option<Light>,
         pub lights: Vec<Light>,
         pub previews: Vec<Light>,
+        /// Texts (#1673): taken when `texting`; those sent; and the
+        /// `chat.event`s' `data` it gives once a text has been sent.
+        pub texting: bool,
+        pub texts: Vec<lamp_msgs::ChatIn>,
+        pub to_give: Vec<Value>,
     }
 
     impl Lamp for Fake {
@@ -171,6 +204,20 @@ pub mod tests {
         fn preview_light(&mut self, light: &Light) -> Result<(), String> {
             self.previews.push(light.clone());
             Ok(())
+        }
+        fn texting(&self) -> bool {
+            self.texting
+        }
+        fn send_text(&mut self, text: &lamp_msgs::ChatIn, _now_ms: u64) -> Result<(), String> {
+            self.texts.push(text.clone());
+            Ok(())
+        }
+        fn chat_events(&mut self, _now_ms: u64) -> Vec<Value> {
+            if self.texts.is_empty() {
+                Vec::new()
+            } else {
+                std::mem::take(&mut self.to_give)
+            }
         }
     }
 

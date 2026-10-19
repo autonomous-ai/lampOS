@@ -170,6 +170,10 @@ pub struct Files {
     /// turn, and the model is told with the next request (`--misheard-hum`,
     /// `LAMP_MISHEARD_HUM`, [`crate::misheard_hum`], #828).
     pub misheard_hum: bool,
+    /// Whether texts from the Autonomous app are answered in text, on the
+    /// second route's model (`--messages`, `LAMP_MESSAGES`,
+    /// [`crate::messages`], #1673). Only the second route's worker answers.
+    pub messages: bool,
     /// Whether an answer is played only when the lamp was spoken to
     /// (`--spoken-to`, #829).
     pub spoken_to: bool,
@@ -321,6 +325,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (cut_in_told, flags) = crate::cut_in_told::take(flags);
     let (misheard_hum, flags) = crate::misheard_hum::take(flags);
     let (holding_answer, flags) = crate::holding_answer::take(flags);
+    let (messages, flags) = crate::messages::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -367,6 +372,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         cut_in_told,
         misheard_hum,
         holding_answer,
+        messages,
     };
     Ok((continuation, sight, files, visual))
 }

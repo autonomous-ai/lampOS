@@ -327,8 +327,19 @@ pub fn serve(
     // With `use_skill` the skills' lines are told after the character, as
     // the Live route tells them (#1668).
     let skills_told = tools.clone();
-    let net = Net::new(config, Arc::new(move || crate::tools::declared(&declared)))
-        .map_err(io::Error::other)?;
+    let declare: crate::second_provider::net::Declare =
+        Arc::new(move || crate::tools::declared(&declared));
+    // Texts from the Autonomous app (#1673): a client of their own, on the
+    // same model, beside the spoken turns.
+    let texts = match (&files.bus_root, files.messages) {
+        (Some(root), true) => Some((
+            crate::second_provider::net::Chat::new(&config, declare.clone())
+                .map_err(io::Error::other)?,
+            root.clone(),
+        )),
+        _ => None,
+    };
+    let net = Net::new(config, declare).map_err(io::Error::other)?;
     let thread = files.thread;
     let file = thread.clone();
     let clock = tools.clock;
@@ -400,11 +411,19 @@ pub fn serve(
             .unwrap_or_else(|_| crate::tools::unavailable())
         })
     });
-    let mut engine = Engine::new(Arc::new(net), system, runner)
-        .checking_sounds(checked)
-        .waiting_with_a_sound(wait_cue)
-        .saying_when_down(down_line)
-        .announcing(!only_voice);
+    let system: crate::second_provider::System = Arc::new(system);
+    let mut engine = Engine::new(
+        Arc::new(net),
+        {
+            let system = system.clone();
+            move || system()
+        },
+        runner.clone(),
+    )
+    .checking_sounds(checked)
+    .waiting_with_a_sound(wait_cue)
+    .saying_when_down(down_line)
+    .announcing(!only_voice);
     // A look reads the eyes' look file with the Live route's bounds: a full
     // look's still may be older and larger (#836, #941).
     if let Some(path) = files.look.clone() {
@@ -445,10 +464,13 @@ pub fn serve(
             .unwrap_or_default()
         }));
     }
-    tokio::runtime::Builder::new_current_thread()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .build()?
-        .block_on(run(channels, boot, engine, thread))
+        .build()?;
+    if let Some((chat, root)) = texts {
+        runtime.spawn(crate::messages::serve(chat, system, runner, root));
+    }
+    runtime.block_on(run(channels, boot, engine, thread))
 }
 
 /// Whether a checked sound heard for `request` may be the person's answer

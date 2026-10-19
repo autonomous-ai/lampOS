@@ -6,7 +6,8 @@
 //! and the model is told to read it back and ask. [`CONFIRM`] starts it, and
 //! only the voice decides whether it may: the person must have said
 //! something to the lamp after the task was prepared (a request the lamp
-//! heard, not one it wrote itself), within [`CONFIRM_WITHIN`]. The model
+//! heard, not one it wrote itself, or a text typed in the same chat in the
+//! Autonomous app, `crate::messages`), within [`CONFIRM_WITHIN`]. The model
 //! hears the yes; the voice checks that there was one to hear. The
 //! confirmation goes on the tasks part's own socket for the voice, which
 //! nothing the model can name reaches.
@@ -1016,9 +1017,13 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
 
 /// Whether a yes in request `request` may start what was prepared: it came
 /// in a request after the one that prepared it, one the lamp heard rather
-/// than wrote, soon enough.
+/// than wrote, or one typed in the same chat as the request that prepared
+/// it (#1673, `crate::messages::same_chat`), soon enough. A spoken yes never
+/// starts a typed task, nor a typed yes a spoken one.
 fn may_confirm(pending: &Pending, request: u64, heard: bool, now: Instant) -> bool {
-    heard && request > pending.request && now.duration_since(pending.at) <= CONFIRM_WITHIN
+    (heard || crate::messages::same_chat(pending.request, request))
+        && request > pending.request
+        && now.duration_since(pending.at) <= CONFIRM_WITHIN
 }
 
 /// Run one call. Blocking, for a thread of its own. `heard`: the request the
@@ -1553,6 +1558,46 @@ pub(crate) mod tests {
             &pending,
             6,
             true,
+            at + CONFIRM_WITHIN + Duration::from_secs(1)
+        ));
+        // A typed yes never starts a spoken task (#1673).
+        let mut chats = crate::messages::Chats::default();
+        assert!(!may_confirm(&pending, chats.next_request("s1"), false, at));
+    }
+
+    /// #1673: a task asked for in a text is started by a "yes" typed in the
+    /// same chat, after it and soon; not by one from another chat, nor by a
+    /// spoken one.
+    #[test]
+    fn a_typed_yes_counts_only_in_the_chat_that_asked_and_soon() {
+        let mut chats = crate::messages::Chats::default();
+        let asked = chats.next_request("s1");
+        let other = chats.next_request("s2");
+        let yes = chats.next_request("s1");
+        let at = Instant::now();
+        let pending = Pending {
+            id: 1,
+            digest: "d".into(),
+            request: asked,
+            at,
+            who: CLAUDE_CODE,
+        };
+        assert!(may_confirm(
+            &pending,
+            yes,
+            false,
+            at + Duration::from_secs(10)
+        ));
+        assert!(
+            !may_confirm(&pending, asked, false, at),
+            "the text that asked"
+        );
+        assert!(!may_confirm(&pending, other, false, at), "another chat");
+        assert!(!may_confirm(&pending, 6, true, at), "a spoken yes");
+        assert!(!may_confirm(
+            &pending,
+            yes,
+            false,
             at + CONFIRM_WITHIN + Duration::from_secs(1)
         ));
     }

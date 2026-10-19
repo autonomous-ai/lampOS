@@ -178,6 +178,12 @@ impl Routes {
         matches!(self, Self::Live { standby: Some(_) })
     }
 
+    /// Whether a second route's worker runs at all, standing by or as the
+    /// only voice: the one that answers texts (`crate::messages`).
+    pub(super) fn has_second(&self) -> bool {
+        matches!(self, Self::Live { standby: Some(_) } | Self::SecondOnly(_))
+    }
+
     /// The workers, from the Live worker's arguments (`provider_arguments`).
     pub(super) fn workers(
         &self,
@@ -886,6 +892,21 @@ pub(super) fn flush(
 mod tests {
     use super::*;
     use crate::provider_worker::{FailedStage, Fault};
+
+    /// #1673: texts are answered where a second route's worker runs at all:
+    /// standing by or as the only voice, and not with Gemini alone.
+    #[test]
+    fn a_second_route_is_there_standing_by_or_alone_and_not_with_gemini_alone() {
+        let config = PathBuf::from("/etc/second.json");
+        assert!(
+            Routes::Live {
+                standby: Some(config.clone())
+            }
+            .has_second()
+        );
+        assert!(Routes::SecondOnly(config).has_second());
+        assert!(!Routes::Live { standby: None }.has_second());
+    }
 
     fn audio(request: u64, sequence: u64, samples: usize) -> ProviderInput {
         ProviderInput::Audio {

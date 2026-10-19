@@ -101,6 +101,10 @@ the trusted route exclusively to Voice's real confirmation and output owner.
 not the lamp saying “on it.” The private caller attests that fact; Tasks does
 not recognize speech or identify a speaker. It also cannot establish who is
 allowed to act on a nearby person's account. Those remain Voice/product rules.
+With `LAMP_MESSAGES=on` (#1673, [messages.md](messages.md)), a task asked for in
+a text from the Autonomous app is confirmed the same way, by a "yes" typed in
+that same chat within the same 120 s (`agent_tasks::may_confirm`): never by a
+spoken yes, and a typed yes never confirms a spoken task.
 
 ## Local state transitions
 
