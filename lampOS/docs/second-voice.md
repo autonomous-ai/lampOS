@@ -209,7 +209,19 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   `TurnInfo` came back, and a clean line was heard whole (the first
   builder, 15:54). Its `/v2/listen` paths are 404s. Flux hears English
   only: with an `stt_language` other than `en` or `en-*`, Nova-3 hears the
-  lines and the journal says why once.
+  lines and the journal says why once. So a Vietnamese lamp
+  (`stt_language` `vi`, the only Vietnamese code Nova-3 has) hears with
+  Nova-3 whatever `LAMP_SECOND_FLUX` says, since Flux has no Vietnamese
+  (`flux-general-en`, and `-multi`'s ten languages). Its key terms go with
+  it: Deepgram's keyterm prompting is for Nova-3 monolingual and
+  multilingual alike (Deepgram's docs, read 19 Oct). Whether English names
+  among them help a Vietnamese line is not measured. Host test
+  (`stt::tests::vietnamese_keeps_off_flux_and_reaches_the_stream_with_its_key_terms`,
+  a local server reading the stream's query): `vi` asks `nova-3-general`
+  with `language=vi` and the key terms, with Flux on or off; English or
+  unset with Flux on asks Flux. `LAMP_TRANSCRIPTION_LANGUAGE` is the Live
+  route's transcript hint only: this route's language is `stt_language`
+  (Fourth and the first builder on #1722, 22:52 and 22:54).
 
   Flux tells turns itself. Each `TurnInfo` carries one turn's words so
   far, and `EndOfTurn` ends the turn: by Flux's own model (`trigger`
