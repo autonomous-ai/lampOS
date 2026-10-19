@@ -3458,6 +3458,31 @@ mod tests {
         assert!(!place.accounts && !place.machine_names);
     }
 
+    /// Tests' map on #1712 (20:11), (2): `LAMP_MEMORY_DAYS` on the second
+    /// route. The voice hands it to this worker (`process.rs`, the table of
+    /// worker environments: `provider` and `second`). With it, the memory's
+    /// note is asked once a session, by that session's number, and kept for
+    /// the session's turns (`Sessions::frozen`), as a Live session is told
+    /// it once; a new session, or someone else at the lamp, asks again with
+    /// the next number. Without it every turn asks, as session 0, and
+    /// `frozen` is not used.
+    #[test]
+    fn with_memory_days_the_note_is_asked_once_a_session_and_kept_for_its_turns() {
+        let mut sessions = Sessions::default();
+        let mut asked = Vec::new();
+        let mut note = |changed: bool| {
+            sessions.frozen(changed, |session| {
+                asked.push(session);
+                format!("note {session}")
+            })
+        };
+        assert_eq!(note(false), "note 1", "the first turn asks");
+        assert_eq!(note(false), "note 1", "the same session keeps it");
+        assert_eq!(note(true), "note 2", "a new session asks again");
+        assert_eq!(note(false), "note 2");
+        assert_eq!(asked, [1, 2]);
+    }
+
     /// Tests' map on #1712 (20:11), (2): `LAMP_ROOM_FILE` on the second route
     /// as the only voice. The room this route keeps (`keeping_room`) goes to
     /// its file at the worker's tick, and the next worker in the same boot
