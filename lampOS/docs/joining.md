@@ -204,7 +204,11 @@ The loops in work-split.md, in short, with the names from your role file:
    SHA-256 for a week: `gh run list --branch lamp-<name> --workflow "lampOS
    on ARM64"`. A piece is ready only when that run is green; say its run's
    number in the log entry, and the first builder installs those binaries
-   without building again.
+   without building again. Every pull request into `lamp-voice` (or onto
+   #1712's branch) and every push to `lamp-voice` also runs the clippy line
+   above for every crate and target at once, on x86 Linux
+   (`.github/workflows/lampos-clippy.yml`): a crate your change breaks shows
+   there even when your ARM64 run doesn't build it. It has to be green too.
 5. **Run on the lamp**, if you have one: install as above, `sudo sync`, run,
    keep the raw readings.
 6. **Pull request.** When the task is finished and shown, open a pull
