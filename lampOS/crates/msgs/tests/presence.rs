@@ -1,6 +1,6 @@
 //! `room/presence` (#1677): someone at the lamp, or nobody for how long.
 use lamp_bus::Kind;
-use lamp_msgs::{RoomPresence, declaration_of, first_topics, presence_topics};
+use lamp_msgs::{RoomPresence, SeenBy, declaration_of, first_topics, presence_topics};
 use serde_json::{Value, json};
 use std::time::Duration;
 
@@ -9,6 +9,7 @@ fn presence_is_two_numbers_and_ignores_fields_added_later() {
     let away = RoomPresence {
         someone: false,
         nobody_s: 312,
+        by: None,
     };
     let text = serde_json::to_string(&away).unwrap();
     assert_eq!(text, r#"{"someone":false,"nobody_s":312}"#);
@@ -29,20 +30,48 @@ fn presence_is_two_numbers_and_ignores_fields_added_later() {
     RoomPresence {
         someone: false,
         nobody_s: 0,
+        by: None,
     }
     .check()
     .unwrap();
     RoomPresence {
         someone: true,
         nobody_s: 0,
+        by: None,
     }
     .check()
     .unwrap();
     let both = RoomPresence {
         someone: true,
         nobody_s: 4,
+        by: None,
     };
     assert!(both.check().unwrap_err().0.contains("0 while someone is"));
+    // What showed someone (#1677's lamp check): written only when known,
+    // never while nobody is there.
+    let face = RoomPresence {
+        someone: true,
+        nobody_s: 0,
+        by: Some(SeenBy::Face),
+    };
+    let text = serde_json::to_string(&face).unwrap();
+    assert_eq!(text, r#"{"someone":true,"nobody_s":0,"by":"face"}"#);
+    assert_eq!(serde_json::from_str::<RoomPresence>(&text).unwrap(), face);
+    face.check().unwrap();
+    assert_eq!(
+        serde_json::to_string(&RoomPresence {
+            by: Some(SeenBy::Voice),
+            ..face
+        })
+        .unwrap(),
+        r#"{"someone":true,"nobody_s":0,"by":"voice"}"#
+    );
+    let nobody_by = RoomPresence {
+        someone: false,
+        nobody_s: 9,
+        by: Some(SeenBy::Face),
+    };
+    assert!(nobody_by.check().is_err());
 }
 
 #[test]

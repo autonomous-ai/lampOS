@@ -893,7 +893,10 @@ and at once when `someone` changes, each good for 3 s
 `humans/faces/tracked`; a voice is any line on `voice/heard`, which the eyes
 subscribe to as `eyes_presence`, timed by when the voice heard it. With no
 look for 5 s nothing is said, so a closed camera never reads as nobody, and
-the count begins again when looks come back. It is the one signal the light
+the count begins again when looks come back. While someone is there it also
+says `by`, what last showed it (`face` or `voice`), and writes one journal
+line at each change to someone, with a face's height as a share of the
+picture. It is the one signal the light
 going out and Messages read ([presence.md](presence.md)). A presence switch
 whose subscription fails is said once in the journal, and the faces are
 published as before. Not run on a lamp: its cost there is part of
