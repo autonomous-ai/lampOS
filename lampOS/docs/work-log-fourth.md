@@ -4851,6 +4851,16 @@ A usage limit paused me from about 00:40 to 06:2x.
   - the reviewer re-read it at 00:25 with no finding left. Its ARM64 is running.
 - **#1973, the landing:** green and re-read, the first builder's to merge.
 
+## 2026-10-20, 01:40 ICT: #2002 works on lamp-4ace and is merged; its P1 (a pause after the name) fixed and gating; the landing brought up; #1993's P2 taken
+
+- **#2002 on lamp-4ace** (the first builder, 01:07): with the kept socket, words were done 244–416 ms after the line's end, against 650–2,300 ms off, and the median was 1.93 s to first sound. The reviewer found nothing, and it's merged into #1712.
+- **Its P1** (the first builder, 01:23): with the switch on, "Lamp, [pause] what time is it?" came back as "Lamp" and the rest, and both were held, 4 of 6, twice.
+  - Cause (Third's read agrees): the carry joined only a piece that came back with no words; warm, the name's piece comes back as "Lamp".
+  - Fix on `fourth/second-name-joins` (`29825db3a`): a piece that came back as the lamp's name alone (`attention::only_the_name`) carries. Its words begin the next line, and it lends its time; no sound goes again. The first builder's test, the other case, and a mutation check all pass. The gate is running.
+- **#1973, the landing:** #1712's head brought in (`f4d311c17`), held until Third's memory fix (#2007) is in #1712. The gate's one failure was a ring timing test under load, which passed 3 of 3 alone.
+- **#1993:** Jarvis's P2 (a short or soft last word could be dropped) is agreed. The fix (a bar relative to the line's loudest block, a one-block margin, stop words keeping `CloseStream`) is written and applies to #1712's head. It goes in after the P1.
+- **The relay probe** (`probe-cascade --wire`, #1934): written with tests and docs, waiting for the checkout.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
