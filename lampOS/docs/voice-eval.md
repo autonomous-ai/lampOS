@@ -678,7 +678,8 @@ a person said reach the table (`score::tests::no_words_said_reach_the_table`).
   or the day before when that time is later than the writing's. A scene
   folder keeps earlier days' files, and before `--date` one of the day
   before at the same hour was counted into tonight's arms (Jarvis on
-  #1899). A line under the table says how many files fell in an arm. From
+  #1899). A line under the table says how many files fell in an arm, and
+  an arm no file fell in prints "—" in the files' rows. From
   scenes: lines played (`PLAY`) and heard
   (`HEARD`), the lamp's turns and their end of speech to first sound (`[lamp
   starts speaking N s after that decision]`), how turns finished (`[turn
@@ -686,7 +687,9 @@ a person said reach the table (`score::tests::no_words_said_reach_the_table`).
   first builder on #1899, 21:01): the two-people rounds first (`== round
   R, N: …`, then a line `Speaker: words | answer` each), as lines naming
   the lamp and how many were answered, and lines between people and how
-  many were left alone; a round's words are read only for a word `lamp`.
+  many were left alone; a round's words are read only for a word `lamp`
+  set off as a name, not after `the`, `a`, `my`, `your`, `this` or the
+  like ("turn off the lamp" between people does not call it).
   Then each section, begun by its `-- <suite>` header (`-- day`,
   `-- follow-ups (#1465)`, `-- hand-overs`): lines played and answered, from
   its own `… answered: N of M` line where it has one, or else its `|`

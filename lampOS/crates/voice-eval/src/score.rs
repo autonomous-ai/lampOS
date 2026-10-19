@@ -245,9 +245,11 @@ type Request = (u64, u64);
 struct Tally {
     counts: BTreeMap<&'static str, u64>,
     times: BTreeMap<&'static str, Vec<u64>>,
-    /// Rows from the played test's own files, named as they come.
+    /// Rows from the played test's own files, named as they come, and how
+    /// many files fell in the arm.
     file_counts: BTreeMap<String, u64>,
     file_times: BTreeMap<String, Vec<u64>>,
+    files: u64,
     /// By request: when its words were done after the line's end, and when
     /// its first answer audio came after the words.
     words_done: BTreeMap<Request, u64>,
@@ -534,9 +536,25 @@ fn answered_of(line: &str) -> Option<(u64, u64)> {
 }
 
 /// Whether a played line calls the lamp by name: a word `lamp`, any case.
+///
+/// Not after a word that makes it a thing: "turn off the lamp", said
+/// between people, does not call it (Jarvis on #1899).
 fn names_the_lamp(said: &str) -> bool {
-    said.split(|c: char| !c.is_alphanumeric())
-        .any(|word| word.eq_ignore_ascii_case("lamp"))
+    const THING: [&str; 11] = [
+        "the", "a", "an", "my", "your", "this", "that", "our", "his", "her", "their",
+    ];
+    let words: Vec<&str> = said
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    words.iter().enumerate().any(|(at, word)| {
+        word.eq_ignore_ascii_case("lamp")
+            && at.checked_sub(1).is_none_or(|before| {
+                !THING
+                    .iter()
+                    .any(|thing| words[before].eq_ignore_ascii_case(thing))
+            })
+    })
 }
 
 /// The median and the 90th percentile of `values`, and how many. Each is
@@ -616,6 +634,7 @@ pub fn score_with(journal: &str, arms: &[Arm], files: &Files) -> String {
     for text in &files.scenes {
         if let Some(index) = arm_for(arms, files.day, scene_start(text, files.offset)) {
             tallies[index].scene(text);
+            tallies[index].files += 1;
             scenes_placed += 1;
         }
     }
@@ -623,6 +642,7 @@ pub fn score_with(journal: &str, arms: &[Arm], files: &Files) -> String {
     for (text, written) in &files.batteries {
         if let Some(index) = arm_for(arms, files.day, battery_start(text, *written, files.offset)) {
             tallies[index].battery(text);
+            tallies[index].files += 1;
             batteries_placed += 1;
         }
     }
@@ -668,11 +688,15 @@ pub fn score_with(journal: &str, arms: &[Arm], files: &Files) -> String {
         .collect();
     for row in rows {
         out.push_str(&format!("| {row} |"));
+        // An arm no file fell in has no count, not 0 (Jarvis on #1899).
         for tally in &tallies {
-            out.push_str(&format!(
-                " {} |",
-                tally.file_counts.get(row).copied().unwrap_or(0)
-            ));
+            let count = tally.file_counts.get(row).copied().unwrap_or(0);
+            let cell = if tally.files == 0 {
+                "—".to_owned()
+            } else {
+                count.to_string()
+            };
+            out.push_str(&format!(" {cell} |"));
         }
         out.push('\n');
     }
@@ -907,18 +931,18 @@ B: And the mail.                                   |
             day: day("2026-10-19"),
         };
         let table = score_with("", &arms, &files);
-        assert_eq!(row(&table, "scenes: lines played"), ["2", "0"]);
-        assert_eq!(row(&table, "scenes: lines heard"), ["1", "0"]);
-        assert_eq!(row(&table, "scenes: the lamp's turns"), ["1", "0"]);
+        assert_eq!(row(&table, "scenes: lines played"), ["2", "—"]);
+        assert_eq!(row(&table, "scenes: lines heard"), ["1", "—"]);
+        assert_eq!(row(&table, "scenes: the lamp's turns"), ["1", "—"]);
         assert_eq!(
             row(&table, "scenes: turn finished, audio_written_unscored"),
-            ["1", "0"]
+            ["1", "—"]
         );
         assert_eq!(
             row(&table, "scenes: turn finished, interrupted"),
-            ["1", "0"]
+            ["1", "—"]
         );
-        assert_eq!(row(&table, "scenes: yields"), ["1", "0"]);
+        assert_eq!(row(&table, "scenes: yields"), ["1", "—"]);
         assert_eq!(
             row(&table, "scenes: end of speech to first sound, ms"),
             ["2200 (2200), 1", "—"]
@@ -928,32 +952,32 @@ B: And the mail.                                   |
         // people and one of them was left alone.
         assert_eq!(
             row(&table, "battery rounds: lines naming the lamp"),
-            ["1", "0"]
+            ["1", "—"]
         );
         assert_eq!(
             row(&table, "battery rounds: lines naming the lamp, answered"),
-            ["1", "0"]
+            ["1", "—"]
         );
         assert_eq!(
             row(&table, "battery rounds: lines between people"),
-            ["2", "0"]
+            ["2", "—"]
         );
         assert_eq!(
             row(&table, "battery rounds: lines between people, left alone"),
-            ["1", "0"]
+            ["1", "—"]
         );
         // A section's own tally, where it has one; else its `|` lines.
-        assert_eq!(row(&table, "battery day: lines played"), ["2", "0"]);
-        assert_eq!(row(&table, "battery day: lines answered"), ["1", "0"]);
-        assert_eq!(row(&table, "battery follow-ups: lines played"), ["4", "0"]);
+        assert_eq!(row(&table, "battery day: lines played"), ["2", "—"]);
+        assert_eq!(row(&table, "battery day: lines answered"), ["1", "—"]);
+        assert_eq!(row(&table, "battery follow-ups: lines played"), ["4", "—"]);
         assert_eq!(
             row(&table, "battery follow-ups: lines answered"),
-            ["3", "0"]
+            ["3", "—"]
         );
-        assert_eq!(row(&table, "battery hand-overs: lines played"), ["2", "0"]);
+        assert_eq!(row(&table, "battery hand-overs: lines played"), ["2", "—"]);
         assert_eq!(
             row(&table, "battery hand-overs: lines answered"),
-            ["1", "0"]
+            ["1", "—"]
         );
         for said in [
             "what time",
@@ -973,6 +997,13 @@ B: And the mail.                                   |
             table.contains("1 of 1 scene files and 1 of 1 battery summaries fall in an arm"),
             "{table}"
         );
+        // An arm with a battery alone has its counts.
+        let batteries_only = Files {
+            scenes: Vec::new(),
+            ..files
+        };
+        let table = score_with("", &arms, &batteries_only);
+        assert_eq!(row(&table, "battery day: lines played"), ["2", "—"]);
     }
 
     /// Seconds since 1970 of a UTC date and time.
@@ -1027,6 +1058,23 @@ B: And the mail.                                   |
         let table = score_with("", &arms, &undated);
         assert!(!table.contains("scenes: lines played"), "{table}");
         assert!(table.contains("0 of 5 scene files and 0 of 4"), "{table}");
+    }
+
+    /// Jarvis on #1899: a word "lamp" calls the lamp when it is set off as
+    /// a name, not when a word before it makes it a thing.
+    #[test]
+    fn the_lamp_is_named_as_a_name_not_as_a_thing() {
+        for (said, named) in [
+            ("B: Hey Lamp, what's the weather?", true),
+            ("Lamp, what time is it?", true),
+            ("A: What do you think, Lamp?", true),
+            ("A: Turn off the lamp.", false),
+            ("B: Is that your lamp?", false),
+            ("A: The lamp's light is too bright.", false),
+            ("A: What time is it?", false),
+        ] {
+            assert_eq!(names_the_lamp(said), named, "{said}");
+        }
     }
 
     #[test]
