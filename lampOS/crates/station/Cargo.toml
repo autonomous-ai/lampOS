@@ -1,0 +1,33 @@
+[package]
+name = "lamp-station"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# A production test station's record of one run (#1700, deliverable 4;
+# docs/production-testing.md): the lamp's own self-test report, the
+# station's answers for its manual steps and the coverage matrix in, one
+# JSON record and the run's verdict out. It runs on the station, never on a
+# lamp, and opens no device.
+[[bin]]
+name = "lamp-station"
+path = "src/main.rs"
+
+[dependencies]
+# The self-test's verdicts and its own consistency check, so the station and
+# the lamp cannot each have their own idea of a report.
+lamp-msgs = { path = "../msgs" }
+serde.workspace = true
+serde_json.workspace = true
+# The matrix's hash in each record: an edited matrix that kept its version shows.
+sha2.workspace = true
+toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
+# UTC times, parsed and written as RFC 3339 with `Z`.
+jiff = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
