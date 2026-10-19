@@ -80,13 +80,17 @@ do this here?
   before installing.
 - **Numbers live in `skill.toml`**, never in the prose of a `say`: the runtime
   applies durations and cooldowns, the model never compares numbers.
+- **Least privilege.** A skill may read and use only what its
+  `[permissions]` lists, and without the table it may do nothing: the
+  runtime refuses one that reads a topic or makes a step it does not give.
+  Give exactly what it uses, and tell the owner what that is.
 
 ## 3. Write the skill folder
 
 ```
 <name>/
   SKILL.md      name, description, and how the lamp talks about it
-  skill.toml    needs, a trigger (or a tool), ask, do
+  skill.toml    needs, kind, version, permissions, a trigger (or a tool), ask, do
   tests/        recordings of the bus and what the skill should do in each
   moves/ lights/ sounds/   optional data
 ```

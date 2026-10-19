@@ -1,4 +1,16 @@
 needs = ["eyes", "voice", "body", "light"]
+# Comes with the lamp and is always there (docs/skills.md, "Core and
+# installable skills"): the hello when someone is back at their desk.
+kind = "core"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: the faces, the voice's state,
+# the look, the warm glow and the hello.
+[permissions]
+topics = ["humans/faces/tracked", "voice/state"]
+speak = true
+light = true
+body = true
 
 [[trigger]]
 topic = "humans/faces/tracked"

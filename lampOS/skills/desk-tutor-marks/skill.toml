@@ -5,7 +5,16 @@
 # by its tool alone, after someone asked for their work to be checked: no
 # trigger and no [ask].
 needs = ["voice", "body"]
+# Installable, as Desk tutor is: called only after Desk tutor's look.
+kind = "installable"
+version = "1.0.0"
 tool = "show_verdict"
+
+# What it may use, and nothing more: the nod or the tilt, and the note
+# that sends the model on to answer. It reads no topic.
+[permissions]
+speak = true
+body = true
 
 [choice]
 name = "verdict"

@@ -29,6 +29,10 @@ lamp-body = { path = "../body" }
 # so that what loads is what the voice plays.
 lamp-voice = { path = "../voice" }
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
+# A skill's package for the Skills Store (src/package.rs): a tar of its
+# folder and a manifest of each file's SHA-256, checked on install.
+sha2.workspace = true
+tar = { version = "0.4", default-features = false }
 
 [dev-dependencies]
 tempfile = "3"

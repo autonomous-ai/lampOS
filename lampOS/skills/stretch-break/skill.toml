@@ -3,6 +3,16 @@
 # invitation, never a lecture"). Written to lamp-skills' schema
 # (docs/skills.md, "The schema, as lamp-skills reads it", #938).
 needs = ["eyes", "body"]
+# Comes with the lamp and is always there (docs/skills.md, "Core and
+# installable skills"): wordless, eyes and body only.
+kind = "core"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: the faces, the voice's state,
+# and the body. It never speaks.
+[permissions]
+topics = ["humans/faces/tracked", "voice/state"]
+body = true
 
 [trigger]
 topic = "humans/faces/tracked"

@@ -22,15 +22,22 @@ by key, never by password:
 
 ```sh
 scp -r stretch-break orangepi@lamp-xxxx.local:/tmp/
-# Whole, beside the live folder, then swapped in: the runtime never sees half a skill.
+# Checked, loaded beside the live folder, then moved in whole: the runtime
+# never sees half a skill, and one that does not load is never live.
 ssh orangepi@lamp-xxxx.local '
-  sudo cp -r /tmp/stretch-break /var/lib/lampOS/skills/.stretch-break.new &&
-  sudo rm -rf /var/lib/lampOS/skills/stretch-break &&
-  sudo mv /var/lib/lampOS/skills/.stretch-break.new /var/lib/lampOS/skills/stretch-break &&
+  sudo /opt/lampOS/skills/current/lamp-skills install /tmp/stretch-break &&
   rm -r /tmp/stretch-break'
 ```
 
-(A folder whose name starts with a dot is not a skill: the runtime skips it.)
+`/opt/lampOS/skills/current/lamp-skills` is a product lamp's; a lamp set up
+by hand runs the one its unit names (`systemctl cat lamp-skills`).
+`install` says what it installed and what the skill may use, or why not
+(the skill does not load, says `kind = "core"`, or would take a core
+skill's place), and takes a package (`lamp-skills pack`) the same way.
+`lamp-skills list` shows every skill on the lamp, its kind, its version and
+what it may use. On a lamp whose `lamp-skills` has no `install` yet, copy
+the folder beside the live one under a name beginning with a dot (the
+runtime skips it), then move it in whole.
 
 From a Mac, never let it add its `._NAME` files: `scp -r` as above adds
 none, and a copy by `tar` needs `COPYFILE_DISABLE=1`:
@@ -62,7 +69,8 @@ Fix a refusal there, not by guessing. `skills/events` says what a skill did
 - Turning a skill off by voice ("Lamp, stop doing ...") is not built yet: the
   runtime has no off switch for one skill, so tell the owner to ask for it
   to be removed.
-- To remove it: `sudo rm -r /var/lib/lampOS/skills/<name>`.
+- To remove it: `sudo /opt/lampOS/skills/current/lamp-skills remove <name>`.
+  A core skill (one that comes with the lamp) can't be removed.
 
 ## Never
 

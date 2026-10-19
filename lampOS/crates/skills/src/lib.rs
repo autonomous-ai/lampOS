@@ -17,6 +17,7 @@ use std::{
 
 pub mod clock;
 pub mod glow;
+pub mod package;
 
 /// Whether the body plays `name` on its mood socket: one of the clips in its
 /// own table (`lamp_body::clips::ALL`), but `idle`, which is the body's own.
@@ -113,6 +114,14 @@ pub const SILENT_ENDS_US: u64 = 15 * 60 * 1_000_000;
 struct SkillFile {
     #[serde(default)]
     needs: Vec<String>,
+    /// `core` (comes with the lamp and is never removed) or `installable`
+    /// (put on and taken off by its owner); `installable` without it.
+    kind: Option<String>,
+    /// The skill's own version, `MAJOR.MINOR.PATCH`: what a package says.
+    version: Option<String>,
+    /// What the skill may read and use; nothing without it.
+    #[serde(default)]
+    permissions: Permissions,
     /// One `[trigger]` table, or `[[trigger]]` tables.
     trigger: Option<toml::Value>,
     #[serde(default, rename = "while")]
@@ -350,12 +359,227 @@ struct PatternFile {
     low: Option<u8>,
 }
 
+/// Whether a skill comes with the lamp or is its owner's to put on and take
+/// off: like a phone's own apps and the apps one installs.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SkillKind {
+    /// Ships with the product (`lamp-update install` writes it), always
+    /// there, and `lamp-skills remove` refuses it.
+    Core,
+    /// Installed and removed on a running lamp (`lamp-skills install`,
+    /// `lamp-skills remove`), from a folder or a package.
+    #[default]
+    Installable,
+}
+
+impl SkillKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Core => "core",
+            Self::Installable => "installable",
+        }
+    }
+
+    /// `kind` as `skill.toml` writes it; `installable` when it says none.
+    pub fn read(kind: Option<&str>) -> Result<Self, String> {
+        match kind {
+            Some("core") => Ok(Self::Core),
+            None | Some("installable") => Ok(Self::Installable),
+            Some(other) => Err(format!("kind = {other:?}: \"core\" or \"installable\"")),
+        }
+    }
+}
+
+/// The actions part's functions a skill's light steps call (a colour, a
+/// step brighter or dimmer) and its give-back (off again): what
+/// `light = true` lets it call.
+pub const LIGHT_ACTIONS: [&str; 4] = [
+    "light_colour",
+    "light_brighter",
+    "light_dimmer",
+    "light_off",
+];
+
+/// The most entries of each `[permissions]` list.
+const MOST_PERMITTED: usize = 32;
+
+/// `[permissions]`: what a skill may read and use, and nothing else (least
+/// privilege: a skill without the table may do nothing). Checked when it
+/// loads, a skill reading or doing anything undeclared being refused with
+/// why, and again where each call leaves the program ([`Permissions::refuses`]).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Permissions {
+    /// The topics it reads: those its triggers and `[[while]]` conditions
+    /// name, `humans/faces/tracked` for a look at a face, and `voice/heard`
+    /// for a tool's `[again]` ([`Skill::reads`]).
+    #[serde(default)]
+    pub topics: Vec<String>,
+    /// The actions part's functions it may call by name, beyond the
+    /// light's own, which `light` gives. No step names one yet: this is
+    /// the list such a step will be held to.
+    #[serde(default)]
+    pub actions: Vec<String>,
+    /// It may speak: a note or the voice's own words (`say`), or a sound.
+    #[serde(default)]
+    pub speak: bool,
+    /// It may change the light (`light`).
+    #[serde(default)]
+    pub light: bool,
+    /// It may move the body: look at a face, a gesture, a move, a pose.
+    #[serde(default)]
+    pub body: bool,
+    /// The model may see the voice's full look, the camera's picture of
+    /// what is in front of the lamp (`look`).
+    #[serde(default)]
+    pub look: bool,
+}
+
+impl Permissions {
+    /// Why a skill with these permissions may not make `call`, if not.
+    pub fn refuses(&self, call: &Call) -> Option<String> {
+        let (key, given) = match call {
+            Call::Gaze { .. } | Call::Gesture(_) | Call::Move(_) | Call::Mood { .. } => {
+                ("body", self.body)
+            }
+            Call::Light { .. } | Call::Dim { .. } => ("light", self.light),
+            Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. } => ("speak", self.speak),
+            Call::Look => ("look", self.look),
+            Call::AfterSay | Call::Ends => return None,
+        };
+        (!given).then(|| {
+            format!(
+                "{} needs {key} = true in [permissions], which it does not give",
+                call.named().0
+            )
+        })
+    }
+
+    /// Why a skill with these permissions may not read `topic`, if not.
+    pub fn refuses_reading(&self, topic: &str) -> Option<String> {
+        (!self.topics.iter().any(|given| given == topic))
+            .then(|| format!("{topic} is not in [permissions] topics"))
+    }
+
+    /// Why a skill with these permissions may not call the actions part's
+    /// function `name`, if not.
+    pub fn refuses_action(&self, name: &str) -> Option<String> {
+        let light = self.light && LIGHT_ACTIONS.contains(&name);
+        (!light && !self.actions.iter().any(|given| given == name)).then(|| {
+            if LIGHT_ACTIONS.contains(&name) {
+                format!("the actions part's {name} needs light = true in [permissions]")
+            } else {
+                format!("the actions part's {name} is not in [permissions] actions")
+            }
+        })
+    }
+
+    /// What they give, in words, for a list of skills: `nothing` for none.
+    pub fn said(&self) -> String {
+        let mut parts = Vec::new();
+        if !self.topics.is_empty() {
+            parts.push(format!("reads {}", self.topics.join(", ")));
+        }
+        let may: Vec<&str> = [
+            ("speak", self.speak),
+            ("light", self.light),
+            ("body", self.body),
+            ("look", self.look),
+        ]
+        .into_iter()
+        .filter_map(|(name, given)| given.then_some(name))
+        .collect();
+        if !may.is_empty() {
+            parts.push(may.join(", "));
+        }
+        if !self.actions.is_empty() {
+            parts.push(format!("actions {}", self.actions.join(", ")));
+        }
+        if parts.is_empty() {
+            "nothing".into()
+        } else {
+            parts.join("; ")
+        }
+    }
+
+    /// Each list's entries well formed, once each.
+    fn check(&self) -> Result<(), String> {
+        for (what, list, ok) in [
+            ("topics", &self.topics, topic_name as fn(&str) -> bool),
+            ("actions", &self.actions, function_name),
+        ] {
+            if list.len() > MOST_PERMITTED {
+                return Err(format!(
+                    "[permissions] {what} lists at most {MOST_PERMITTED}"
+                ));
+            }
+            if let Some(wrong) = list.iter().find(|entry| !ok(entry)) {
+                return Err(format!(
+                    "[permissions] {what}: {wrong:?} is not {}",
+                    if what == "topics" {
+                        "a topic: tokens of [a-z][a-z0-9_]{0,31} joined by /"
+                    } else {
+                        "a function: a lowercase letter, then at most 47 lowercase letters, digits and _"
+                    }
+                ));
+            }
+            if (1..list.len()).any(|at| list[..at].contains(&list[at])) {
+                return Err(format!("[permissions] {what} lists one twice"));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// A topic's name as the bus takes it (`lamp_bus`'s rule): tokens of
+/// `[a-z][a-z0-9_]{0,31}` joined by `/`, 96 bytes at most.
+fn topic_name(name: &str) -> bool {
+    name.len() <= lamp_bus::MOST_TOPIC_BYTES
+        && name.split('/').all(|token| {
+            (1..=32).contains(&token.len())
+                && token.as_bytes()[0].is_ascii_lowercase()
+                && token
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+        })
+}
+
+/// A function's name as the provider link takes it: a lowercase letter,
+/// then at most 47 lowercase letters, digits and `_`.
+fn function_name(name: &str) -> bool {
+    let mut letters = name.bytes();
+    letters
+        .next()
+        .is_some_and(|first| first.is_ascii_lowercase())
+        && name.len() <= 48
+        && letters.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+}
+
+/// `MAJOR.MINOR.PATCH`, each a whole number without a sign or a leading
+/// zero (`1.0.0`, `2.13.4`).
+pub fn version_ok(version: &str) -> bool {
+    let parts: Vec<&str> = version.split('.').collect();
+    parts.len() == 3
+        && parts.iter().all(|part| {
+            !part.is_empty()
+                && part.len() <= 9
+                && part.bytes().all(|byte| byte.is_ascii_digit())
+                && (*part == "0" || !part.starts_with('0'))
+        })
+}
+
 /// A skill as loaded: everything in it checked.
 #[derive(Clone, Debug)]
 pub struct Skill {
     pub name: String,
     pub description: String,
     pub needs: Vec<String>,
+    /// Core or installable.
+    pub kind: SkillKind,
+    /// Its version, if `skill.toml` says one.
+    pub version: Option<String>,
+    /// What it may read and use, every read and step within them.
+    pub permissions: Permissions,
     pub triggers: Vec<Trigger>,
     conditions: Vec<Condition>,
     /// The Policy's question; empty for a skill started by its tool alone.
@@ -374,6 +598,43 @@ pub struct Skill {
 }
 
 impl Skill {
+    /// Every topic the skill reads, once each, and what reads it: its
+    /// triggers, its `[[while]]` conditions, a look at a face (the faces the
+    /// eyes see), and a tool's `[again]` (what was heard). These are what
+    /// the program subscribes to for it ([`Engine::topics`]); what the
+    /// program reads to make a step safely (the light shown, the voice's
+    /// state, the body's clips, a hand, the pause) is its own, not the
+    /// skill's.
+    pub fn reads(&self) -> Vec<(String, &'static str)> {
+        let looks = self
+            .steps
+            .iter()
+            .any(|(_, step)| matches!(step, Step::Call(Call::Gaze { .. })));
+        let mut reads: Vec<(String, &'static str)> = self
+            .triggers
+            .iter()
+            .map(|trigger| (trigger.topic.clone(), "a trigger"))
+            .chain(
+                self.conditions
+                    .iter()
+                    .map(|test| (test.topic.clone(), "a [[while]]")),
+            )
+            .chain(looks.then(|| (Faces::TOPIC.to_owned(), "a look at a face")))
+            .chain(
+                self.again
+                    .is_some()
+                    .then(|| (Speech::TOPICS[0].to_owned(), "[again]")),
+            )
+            .collect();
+        let mut seen = Vec::new();
+        reads.retain(|(topic, _)| {
+            let new = !seen.contains(topic);
+            seen.push(topic.clone());
+            new
+        });
+        reads
+    }
+
     /// Whether a step holds something until its trigger stops holding.
     fn holds_until_ends(&self) -> bool {
         self.steps.iter().any(|(_, step)| {
@@ -1245,10 +1506,22 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             );
         }
     }
-    Ok(Skill {
+    let kind = SkillKind::read(file.kind.as_deref())?;
+    if let Some(version) = &file.version
+        && !version_ok(version)
+    {
+        return Err(format!(
+            "version = {version:?}: MAJOR.MINOR.PATCH, three whole numbers (\"1.0.0\")"
+        ));
+    }
+    file.permissions.check()?;
+    let skill = Skill {
         name,
         description,
         needs: file.needs,
+        kind,
+        version: file.version,
+        permissions: file.permissions,
         triggers,
         conditions,
         policy,
@@ -1259,7 +1532,25 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         still,
         quiet,
         steps,
-    })
+    };
+    // Least privilege: every read and every step within what it declares,
+    // or it is not loaded, and the journal says what it lacks.
+    for (topic, by) in skill.reads() {
+        if let Some(why) = skill.permissions.refuses_reading(&topic) {
+            return Err(format!("not permitted: {by} reads {topic}, and {why}"));
+        }
+    }
+    for (_, step) in &skill.steps {
+        // A gesture's clip is picked as it runs; any clip needs the body.
+        let call = match step {
+            Step::Call(call) => call.clone(),
+            Step::Gesture { .. } => Call::Gesture(String::new()),
+        };
+        if let Some(why) = skill.permissions.refuses(&call) {
+            return Err(format!("not permitted: {why}"));
+        }
+    }
+    Ok(skill)
 }
 
 /// Whether `path` is a sound the voice will play, by the voice's own check
@@ -1697,23 +1988,18 @@ impl Engine {
     }
 
     /// Every topic a trigger or a condition names, the faces a look at a
-    /// face reads, and what was heard if a skill has `[again]`, once each.
+    /// face reads, and what was heard if a skill has `[again]`, once each
+    /// ([`Skill::reads`]), and only those its `[permissions]` lists.
     pub fn topics(&self) -> Vec<String> {
         let mut topics: Vec<String> = self
             .skills
             .iter()
             .flat_map(|skill| {
-                let looks = skill
-                    .steps
-                    .iter()
-                    .any(|(_, step)| matches!(step, Step::Call(Call::Gaze { .. })));
                 skill
-                    .triggers
-                    .iter()
-                    .map(|trigger| trigger.topic.clone())
-                    .chain(skill.conditions.iter().map(|test| test.topic.clone()))
-                    .chain(looks.then(|| Faces::TOPIC.to_owned()))
-                    .chain(skill.again.is_some().then(|| Speech::TOPICS[0].to_owned()))
+                    .reads()
+                    .into_iter()
+                    .map(|(topic, _)| topic)
+                    .filter(|topic| skill.permissions.refuses_reading(topic).is_none())
             })
             .collect();
         topics.sort();
@@ -2748,7 +3034,8 @@ mod tests {
             std::fs::write(
                 skill.join("skill.toml"),
                 format!(
-                    "[trigger]\ntopic = \"schedule/due\"\nfield = \"pending\"\nabove = 0.5\n\
+                    "[permissions]\ntopics = [\"schedule/due\"]\nspeak = true\n\
+                     [trigger]\ntopic = \"schedule/due\"\nfield = \"pending\"\nabove = 0.5\n\
                      [ask]\npolicy = \"moment\"\n[[do]]\nsay = {{ from = \"{from}\" }}\n"
                 ),
             )

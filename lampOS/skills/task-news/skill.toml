@@ -7,6 +7,18 @@
 # task news (crates/voice/src/task_news.rs) switched off for the trial:
 # with both on, a done would be told twice.
 needs = ["eyes", "voice", "body", "light"]
+# Comes with the lamp and is always there (docs/skills.md, "Core and
+# installable skills"): the news of work the lamp handed over.
+kind = "core"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: the tasks, the faces to look
+# at, the gestures, a step of dim and the voice's news.
+[permissions]
+topics = ["tasks/status", "humans/faces/tracked"]
+speak = true
+light = true
+body = true
 
 # tasks/status keeps, for two minutes, each task whose agent settled, in
 # its `settled` list (#1048): `idle` (finished, with an answer) or `failed`,

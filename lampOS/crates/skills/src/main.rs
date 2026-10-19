@@ -9,8 +9,8 @@ use lamp_msgs::{
 };
 use lamp_skills::glow::{GLOW_EVERY, Glow, Glows, REQUESTS_ENVIRONMENT};
 use lamp_skills::{
-    Admission, BODY_REQUESTS_ENVIRONMENT, CLIP_GAP_US, Call, Engine, Run, body_ask, clip_us, clock,
-    duration_us, load_all, run_tests, told, tools_file,
+    Admission, BODY_REQUESTS_ENVIRONMENT, CLIP_GAP_US, Call, Engine, Permissions, Run, body_ask,
+    clip_us, clock, duration_us, load_all, package, run_tests, told, tools_file,
 };
 use serde_json::json;
 use std::{
@@ -31,7 +31,14 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] \
                      [--tools-dir DIR] [--boot-id ID] [--clock-control PATH]\n       \
                      [--zone system|NAME | --utc-offset-minutes N]\n       \
-                     lamp-skills test SKILL_DIR...";
+                     lamp-skills test SKILL_DIR...\n       \
+                     lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
+                     lamp-skills remove [--dir DIR] NAME\n       \
+                     lamp-skills list [--dir DIR]\n       \
+                     lamp-skills pack [--out DIR] SKILL_DIR";
+/// Where the product keeps its skills (`deploy/product/lamp-skills.service`):
+/// the core ones `lamp-update install` writes and the installable ones.
+const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
 /// How often the folder is looked at for a change.
 const RELOAD_EVERY: Duration = Duration::from_secs(2);
 const ACTIONS_TIMEOUT: Duration = Duration::from_secs(2);
@@ -71,14 +78,51 @@ struct Sockets {
     mood: PathBuf,
     actions: PathBuf,
     say: PathBuf,
+    /// Whose run these are for, and what that skill may use: checked where
+    /// each call is sent. The program's own, before a run, may use nothing.
+    may: May,
+}
+
+/// A run's skill and its `[permissions]`, checked where each call leaves
+/// the program: the body's sockets, the ring, the actions part, the say
+/// service and a tool's look. A skill that loaded makes only what it
+/// declared; this holds that whatever made the call.
+#[derive(Clone, Default)]
+struct May {
+    skill: String,
+    permissions: Permissions,
+}
+
+impl May {
+    /// Why `call` is not made, said in the journal too, if it is not.
+    fn refuses(&self, call: &Call) -> Option<String> {
+        let why = self.permissions.refuses(call)?;
+        Some(self.refused(call.named().0, why))
+    }
+
+    /// Why the actions part's `name` is not called, said in the journal
+    /// too, if it is not.
+    fn refuses_action(&self, name: &str) -> Option<String> {
+        let why = self.permissions.refuses_action(name)?;
+        Some(self.refused(name, why))
+    }
+
+    fn refused(&self, what: &str, why: String) -> String {
+        eprintln!("lamp-skills: skill:{}: refused {what}: {why}", self.skill);
+        format!("{what}: refused, {why}")
+    }
 }
 
 fn main() -> ExitCode {
     let given: Vec<String> = std::env::args().skip(1).collect();
-    if given.first().map(String::as_str) == Some("test") {
-        return test(&given[1..]);
+    match given.first().map(String::as_str) {
+        Some("test") => return test(&given[1..]),
+        Some(command @ ("install" | "remove" | "list" | "pack")) => {
+            return manage(command, &given[1..]);
+        }
+        _ => {}
     }
-    let mut dir = PathBuf::from("/var/lib/lampOS/skills");
+    let mut dir = PathBuf::from(SKILLS_DIR);
     let mut root = None;
     let mut tools = None;
     let mut boot_id = None;
@@ -90,6 +134,7 @@ fn main() -> ExitCode {
         mood: "/run/lampos-body/mood.sock".into(),
         actions: "/run/lampos-actions/call.sock".into(),
         say: "/run/lampos-say/say.sock".into(),
+        may: May::default(),
     };
     let mut pairs = given.chunks(2);
     for pair in &mut pairs {
@@ -201,6 +246,60 @@ fn test(dirs: &[String]) -> ExitCode {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
+    }
+}
+
+/// `install`, `remove`, `list` and `pack`: an installable skill put on or
+/// taken off this lamp's skills folder (`--dir`, the product's by default),
+/// which the running program loads or lets go within 2 s, with nothing
+/// restarted; the folder listed; a skill packed for the Store (`--out`, the
+/// working folder by default). What was done goes to the standard output,
+/// a refusal and why to the standard error.
+fn manage(command: &str, given: &[String]) -> ExitCode {
+    let mut dir = PathBuf::from(SKILLS_DIR);
+    let mut out = PathBuf::from(".");
+    let mut named = Vec::new();
+    let mut given = given.iter();
+    while let Some(word) = given.next() {
+        let flag = match word.as_str() {
+            "--dir" if command != "pack" => &mut dir,
+            "--out" if command == "pack" => &mut out,
+            flag if flag.starts_with("--") => {
+                eprintln!("{USAGE}");
+                return ExitCode::from(2);
+            }
+            word => {
+                named.push(word.to_owned());
+                continue;
+            }
+        };
+        let Some(value) = given.next() else {
+            eprintln!("{USAGE}");
+            return ExitCode::from(2);
+        };
+        *flag = value.into();
+    }
+    let done = match (command, named.as_slice()) {
+        ("install", [from]) => package::install(&dir, Path::new(from)),
+        ("remove", [name]) => package::remove(&dir, name),
+        ("list", []) => package::list(&dir).map(|listed| listed.trim_end().to_owned()),
+        ("pack", [skill]) => {
+            package::pack(Path::new(skill), &out).map(|path| format!("packed {}", path.display()))
+        }
+        _ => {
+            eprintln!("{USAGE}");
+            return ExitCode::from(2);
+        }
+    };
+    match done {
+        Ok(said) => {
+            println!("{said}");
+            ExitCode::SUCCESS
+        }
+        Err(why) => {
+            eprintln!("lamp-skills: {why}");
+            ExitCode::FAILURE
+        }
     }
 }
 
@@ -446,6 +545,7 @@ fn serve(
         body_requests: options.body_requests,
         ends: RefCell::new(HashMap::new()),
         local_time: options.local_time.clone(),
+        permissions: RefCell::new(HashMap::new()),
     };
     let (ask, asks) = mpsc::channel::<ToolAsk>();
     if let Some(tools) = tools {
@@ -513,6 +613,10 @@ fn serve(
                 }
                 let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
                 eprintln!("lamp-skills: loaded {names:?}");
+                *runner.permissions.borrow_mut() = skills
+                    .iter()
+                    .map(|skill| (skill.name.clone(), skill.permissions.clone()))
+                    .collect();
                 // A held dim whose skill or trigger is gone is given back.
                 for run in engine.replace(skills) {
                     handle(run, &mut runs, &mut out, &runner);
@@ -771,6 +875,26 @@ struct Runner {
     ends: RefCell<HashMap<String, mpsc::Sender<()>>>,
     /// The lamp's local time, for quiet hours.
     local_time: Option<Arc<lamp_local_time::LocalTime>>,
+    /// By skill, what each loaded skill may use, as of the last load: a
+    /// skill not loaded may use nothing.
+    permissions: RefCell<HashMap<String, Permissions>>,
+}
+
+impl Runner {
+    /// The sockets for a run of `skill`, held to what it may use.
+    fn sockets_for(&self, skill: &str) -> Sockets {
+        let mut sockets = self.sockets.clone();
+        sockets.may = May {
+            skill: skill.to_owned(),
+            permissions: self
+                .permissions
+                .borrow()
+                .get(skill)
+                .cloned()
+                .unwrap_or_default(),
+        };
+        sockets
+    }
 }
 
 /// Milliseconds since the Unix epoch, by the wall clock.
@@ -808,7 +932,7 @@ fn start(
     // thread, one a skill, so the skills go on listening.
     // ponytail: a skill removed meanwhile still finishes its run.
     let (sockets, finished, bus, glows, asks_body) = (
-        runner.sockets.clone(),
+        runner.sockets_for(&skill),
         runner.finished.clone(),
         runner.bus.clone(),
         runner.glows.clone(),
@@ -1009,13 +1133,17 @@ fn tool_call(
         eprintln!("lamp-skills: {name} with {args} not run: its run is under way");
         return refuse(still);
     }
-    let run = match engine.tool(&name, &args, clock::now_us()) {
+    let mut run = match engine.tool(&name, &args, clock::now_us()) {
         Ok(run) => run,
         Err(why) => {
             eprintln!("lamp-skills: {name} with {args} not run: {why}");
             return refuse(&why);
         }
     };
+    // The look's picture goes to the model only for a skill that may see it.
+    let sockets = runner.sockets_for(&run.skill);
+    run.calls
+        .retain(|call| *call != Call::Look || sockets.may.refuses(call).is_none());
     let made: Vec<Call> = run
         .calls
         .iter()
@@ -1053,7 +1181,9 @@ fn tool_call(
         // Each look comes with the head down over the page again: only the
         // run's poses are made again, never its light (#1051, Ten's P2).
         for call in made.iter().filter(|call| matches!(call, Call::Mood { .. })) {
-            make(call, &runner.sockets, &runner.bus, None);
+            if sockets.may.refuses(call).is_none() {
+                make(call, &sockets, &runner.bus, None);
+            }
         }
     }
     if nothing || under_way {
@@ -1308,6 +1438,16 @@ fn perform(
         Call::Sound { path, .. } => Some(("sound", json!({"sound": path, "priority": 5}))),
         _ => None,
     });
+    // A say or a sound the skill may not make is never asked, so it is
+    // never begun, and nothing it brings is made either.
+    if let Some(refused) = calls
+        .iter()
+        .filter(|call| matches!(call, Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. }))
+        .find_map(|call| sockets.may.refuses(call))
+    {
+        said.push(refused);
+        return said.join("; ");
+    }
     let mut changed = Changed::default();
     let mut played = Played::default();
     match asking {
@@ -1459,6 +1599,11 @@ fn act(
     said: &mut Vec<String>,
 ) {
     for call in calls {
+        // Not made, nor counted as made: nothing to wait on or give back.
+        if let Some(refused) = sockets.may.refuses(call) {
+            said.push(refused);
+            continue;
+        }
         match call {
             Call::Light { lasting, .. } => {
                 changed.coloured = true;
@@ -1645,7 +1790,7 @@ fn spoken(bus: &Bus) -> (String, bool) {
 /// its colour again and its level stepped back. With the light now not
 /// known, its colour only.
 fn give_back(before: &Light, now: Option<Light>, sockets: &Sockets) -> String {
-    let call = |name: &str, args: serde_json::Value| answer(action(&sockets.actions, name, args));
+    let call = |name: &str, args: serde_json::Value| answer(action(sockets, name, args));
     let mut done = Vec::new();
     if !before.on {
         if now.as_ref().is_none_or(|now| now.on) {
@@ -1685,7 +1830,7 @@ fn step(from: u8, to: u8, sockets: &Sockets) -> Vec<String> {
         ("light_dimmer", from - to)
     };
     (0..steps)
-        .map(|_| answer(action(&sockets.actions, name, json!({}))))
+        .map(|_| answer(action(sockets, name, json!({}))))
         .collect()
 }
 
@@ -1746,14 +1891,11 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             Err(error) => format!("{what}: the body was not reached ({error})"),
         }
     };
-    let actions = |what: &str, name: &str, args: serde_json::Value| match action(
-        &sockets.actions,
-        name,
-        args,
-    ) {
-        Ok(answer) => format!("{what}: {answer}"),
-        Err(error) => format!("{what}: the actions part was not reached ({error})"),
-    };
+    let actions =
+        |what: &str, name: &str, args: serde_json::Value| match action(sockets, name, args) {
+            Ok(answer) => format!("{what}: {answer}"),
+            Err(error) => format!("{what}: the actions part was not reached ({error})"),
+        };
     match call {
         Call::Gaze { face: None } => "look at the face: no face in view".into(),
         Call::Gaze {
@@ -1836,9 +1978,14 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
     }
 }
 
-/// One action on the actions part's socket: one line each way.
-fn action(path: &Path, name: &str, args: serde_json::Value) -> io::Result<String> {
-    let mut stream = UnixStream::connect(path)?;
+/// One action on the actions part's socket: one line each way. Only one the
+/// run's skill may call: the light's with `light = true`, any other only as
+/// its `[permissions]` actions name it.
+fn action(sockets: &Sockets, name: &str, args: serde_json::Value) -> io::Result<String> {
+    if let Some(refused) = sockets.may.refuses_action(name) {
+        return Ok(refused);
+    }
+    let mut stream = UnixStream::connect(&sockets.actions)?;
     stream.set_read_timeout(Some(ACTIONS_TIMEOUT))?;
     stream.set_write_timeout(Some(ACTIONS_TIMEOUT))?;
     let call = json!({"op": "call", "name": name, "args": args});
@@ -1852,4 +1999,178 @@ fn action(path: &Path, name: &str, args: serde_json::Value) -> io::Result<String
     } else {
         answer["error"].as_str().unwrap_or("refused").to_owned()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Sockets where nothing answers, for a run of a skill that may use
+    /// `permissions`: a call the gate lets through fails to connect.
+    fn nowhere(dir: &Path, permissions: Permissions) -> Sockets {
+        Sockets {
+            gaze: dir.join("gaze.sock"),
+            mood: dir.join("mood.sock"),
+            actions: dir.join("actions.sock"),
+            say: dir.join("say.sock"),
+            may: May {
+                skill: "test".into(),
+                permissions,
+            },
+        }
+    }
+
+    fn light(colour: &str) -> Call {
+        Call::Light {
+            colour: colour.into(),
+            level: None,
+            lasting: Some("4s".into()),
+            pattern: None,
+        }
+    }
+
+    /// The actions part is called only for what the skill may call: the
+    /// light's functions with `light`, any other only by name.
+    #[test]
+    fn the_actions_part_is_called_only_for_what_the_skill_may_call() {
+        let dir = tempfile::tempdir().unwrap();
+        let none = nowhere(dir.path(), Permissions::default());
+        let refused = action(&none, "light_colour", json!({})).unwrap();
+        assert!(refused.contains("light_colour: refused"), "{refused}");
+        let lit = nowhere(
+            dir.path(),
+            Permissions {
+                light: true,
+                ..Permissions::default()
+            },
+        );
+        // Let through, to an actions part that is not there.
+        assert!(action(&lit, "light_colour", json!({})).is_err());
+        let refused = action(&lit, "volume_up", json!({})).unwrap();
+        assert!(
+            refused.contains("not in [permissions] actions"),
+            "{refused}"
+        );
+    }
+
+    /// A step the skill may not make is not sent, and not counted as made:
+    /// no clip to wait on and no light to give back.
+    #[test]
+    fn a_step_the_skill_may_not_make_is_not_sent_nor_counted() {
+        let dir = tempfile::tempdir().unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let calls = [
+            Call::Gesture("nod".into()),
+            light("warm"),
+            Call::Dim {
+                steps: 1,
+                until_ends: false,
+            },
+            Call::Mood {
+                mood: "reading".into(),
+                lasting_us: 3_000_000,
+            },
+        ];
+        let (mut changed, mut played, mut glow, mut said) =
+            (Changed::default(), Played::default(), None, Vec::new());
+        let none = nowhere(dir.path(), Permissions::default());
+        act(
+            &calls,
+            &none,
+            &bus,
+            None,
+            &mut changed,
+            &mut played,
+            &mut glow,
+            &mut said,
+        );
+        assert_eq!(said.len(), 4, "{said:?}");
+        assert!(said.iter().all(|line| line.contains("refused")), "{said:?}");
+        assert!(!changed.coloured && changed.dimmed == 0 && changed.lasting_us == 0);
+        assert!(played.last.is_none());
+        // With the body given, the gesture goes (to a body that is not
+        // there) and the light is still refused.
+        let moved = nowhere(
+            dir.path(),
+            Permissions {
+                body: true,
+                ..Permissions::default()
+            },
+        );
+        let mut said = Vec::new();
+        act(
+            &calls[..2],
+            &moved,
+            &bus,
+            None,
+            &mut changed,
+            &mut played,
+            &mut glow,
+            &mut said,
+        );
+        assert!(
+            said[0].starts_with("gesture nod: the body was not reached"),
+            "{said:?}"
+        );
+        assert!(said[1].contains("light: refused"), "{said:?}");
+        assert!(!changed.coloured);
+    }
+
+    /// A say the skill may not make is never asked of the voice, so nothing
+    /// that comes with it is made either.
+    #[test]
+    fn a_say_the_skill_may_not_make_is_never_asked_and_nothing_comes_with_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let moved = nowhere(
+            dir.path(),
+            Permissions {
+                body: true,
+                ..Permissions::default()
+            },
+        );
+        let (made, told) = mpsc::channel();
+        let said = perform(
+            "test",
+            &[Call::Say("Hello.".into()), Call::Gesture("nod".into())],
+            &moved,
+            &bus,
+            None,
+            (None, false),
+            (made, None),
+        );
+        assert!(said.contains("say: refused"), "{said}");
+        assert!(!said.contains("gesture"), "{said}");
+        // Never told that its body was made: the sender is gone.
+        assert!(told.recv().is_err());
+    }
+
+    /// A run's sockets carry its own skill's permissions, as of the last
+    /// load; a skill not loaded may use nothing.
+    #[test]
+    fn a_runs_sockets_carry_its_skills_permissions_and_nothing_for_another() {
+        let dir = tempfile::tempdir().unwrap();
+        let (finished, _done) = mpsc::channel();
+        let runner = Runner {
+            sockets: nowhere(dir.path(), Permissions::default()),
+            finished,
+            bus: Bus::new(dir.path().join("bus")).unwrap(),
+            glows: None,
+            body_requests: false,
+            ends: RefCell::default(),
+            local_time: None,
+            permissions: RefCell::new(HashMap::from([(
+                "dance".to_owned(),
+                Permissions {
+                    body: true,
+                    ..Permissions::default()
+                },
+            )])),
+        };
+        let dance = runner.sockets_for("dance");
+        assert_eq!(dance.may.skill, "dance");
+        assert!(dance.may.permissions.body);
+        let other = runner.sockets_for("other");
+        assert_eq!(other.may.permissions, Permissions::default());
+    }
 }

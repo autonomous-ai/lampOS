@@ -135,7 +135,10 @@ must not leave a step silently undone)*.
 
 | Key | Required | What it is |
 |---|---|---|
-| `needs` | no | The parts it uses (`eyes`, `ears`, `air`, `voice`, `body`, `light`, ...). Kept, not checked yet |
+| `needs` | no | The parts it uses (`eyes`, `ears`, `air`, `voice`, `body`, `light`, ...): which bodies it suits, as V1's capabilities. Kept, not checked yet; what it may do is `[permissions]`, which is checked |
+| `kind` | no | `core` (comes with the lamp, always there, never removed) or `installable` (its owner puts it on and takes it off), `installable` without it (below, "Core and installable skills") |
+| `version` | no, but a package needs it | The skill's own version, `MAJOR.MINOR.PATCH`, three whole numbers without leading zeros (`"1.0.0"`) |
+| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, each `true` or left out. A key not listed refuses the skill, and so does a read or a step it does not give |
 | `[trigger]` or `[[trigger]]` | yes, unless it has a `tool` | When the skill runs: one table, or several, each checked on its own |
 | `tool` | no | A function the model may call, which runs the steps (below, "Tools for the model"). A lowercase letter, then at most 47 lowercase letters, digits and `_`. It is described to the model with `SKILL.md`'s description, which is then at most 1,024 bytes and says when to call it |
 | `[choice]` | no | The tool's one argument the model picks from named values: `name` (a lowercase letter, then at most 31 lowercase letters, digits and `_`), `about` (what it means, told to the model, at most 256 bytes) and `one_of` (1 to 16 different plain names). The model may leave it out. Only with a `tool` |
@@ -271,6 +274,13 @@ As built on 2026-10-16 (#938, `crates/skills`, not yet run on a lamp):
 
     lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] [--tools-dir DIR] [--clock-control PATH] [--zone system|NAME | --utc-offset-minutes N]
     lamp-skills test SKILL_DIR...
+    lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar
+    lamp-skills remove [--dir DIR] NAME
+    lamp-skills list [--dir DIR]
+    lamp-skills pack [--out DIR] SKILL_DIR
+
+(`install`, `remove`, `list` and `pack`: below, "Core and installable
+skills".)
 
 - `--zone` or `--utc-offset-minutes` is the lamp's local time, as the
   Policy, Expression and memory take it, read with the wall clock at each
@@ -630,6 +640,169 @@ the model's answer begins with those words. A `tools.json` left by a `lamp-skill
 killed stays until it starts again; a call then is answered as not
 running. The test uses a folder of Desk tutor's shape.
 
+### Core and installable skills
+
+The owner, 19 Oct 2026, 07:1x to 07:2x: "think in terms of skills all the
+time. that's the modular architecture design we do with skills, topics, and
+actions"; "the idea is to have a lot of skills and people can pick and
+choose"; "we should have core skills and installable skills. but we should
+try to build everything as skills. core skills like core apple apps right
+always installed on the phone and then installable skills like installable
+apps". Earlier: an owner can make a private skill, and choose to publish it
+to a Skills Store for others.
+
+As built on 2026-10-19 (`crates/skills/src/package.rs`; not yet run on a
+lamp):
+
+**The kind.** `skill.toml` says `kind = "core"` or `kind = "installable"`,
+and a skill that says neither is installable.
+
+| Skill | Kind | Why |
+|---|---|---|
+| Welcome back, Reminders, Task news, Stretch break, Stuffy air, Dance | core | What every lamp does: the hello, a reminder said when due, the news of work handed over, a wordless stretch, a droop in stuffy air, a dance when asked. Each costs nothing until its moment (Dance's function is one of a session's 32), and each is in the product's install (#1667) |
+| Desk tutor, Desk tutor's marks | installable | Desk tutor reads handwriting from the full look's still (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`), which a product lamp does not take: its working frame, 320 across, cannot read a page. With its marks, its two functions would also take a product session past its 32 (#1667's count). Its marks are called only after its look. Both become core once the full look is in the product and a session can take their functions (#1668) |
+
+Which of the skills to come are core and which installable is the owner's
+list in [v1-verdicts.md](v1-verdicts.md), "The owner's scope decisions,
+2026-10-19".
+
+A core skill comes with the lamp: `lamp-update install` writes it (on
+`lamp-voice` today, Welcome back alone; with #1667, all six), and a core
+skill's file taken away by hand is written again at the next install. `lamp-skills remove`
+refuses it, and `lamp-skills install` refuses a folder or a package that
+says it is core, or that would take the place of a core skill on the lamp.
+`kind` changes nothing else the program does.
+
+**On a running lamp.** Four commands, each run on the lamp, as root (the
+product's skills folder is root's; the part itself only reads it, under
+`ProtectSystem=strict`):
+
+    lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar
+    lamp-skills remove [--dir DIR] NAME
+    lamp-skills list [--dir DIR]
+    lamp-skills pack [--out DIR] SKILL_DIR
+
+`--dir` is `/var/lib/lampOS/skills` without it, the product unit's own
+`--dir` (`deploy/product/lamp-skills.service`): installable skills live
+beside the core ones. What was done is one line on the standard output; a
+refusal, and why, on the standard error with exit code 1 (2 for a command
+it does not know).
+
+- **`install`** takes a skill's folder or its package. The files are read
+  first (plain files and folders only: a link refuses it; hidden files are
+  left out), then written into `DIR/.install-NAME-PID/NAME`, which the
+  running program passes over (its name begins with a dot), folders 0755
+  and files 0644 whatever the umask of who ran it, so the parts' user can
+  read them. There it is loaded with every check a load makes, its
+  permissions among them, and only then renamed into `DIR/NAME`: the running
+  program never sees half a skill, and one that does not load is never live.
+  A skill already there is replaced only if it is installable: it is renamed
+  to `DIR/.removed-NAME-PID`, the new one renamed into its place, and the
+  old deleted. Between the two renames the program may see neither, for
+  microseconds, against a look every 2 s *(chosen: a swap of two folders in
+  one step is Linux's alone)*. Nothing is left beside the skills, whether
+  it installed or not.
+- **`remove`** renames an installable skill's folder aside, so it is gone
+  at once for the program, then deletes it.
+- **`list`** says, a line each, every skill folder's name, kind, version
+  (`-` for none) and what it may use, or why it does not load:
+
+      NAME          KIND         VERSION  MAY USE
+      desk-tutor    installable  1.0.0    speak, light, body, look
+      welcome-back  core         1.0.0    reads humans/faces/tracked, voice/state; speak, light, body
+
+- **`pack`** makes a package of an installable skill folder, below.
+
+Nothing else is restarted. The running `lamp-skills` looks at its folder
+every 2 s, loads every skill again when one changed (cooldowns kept), and
+writes the skills' functions for the voice again (`tools.json`): an
+installed skill's tool reaches the model at the voice's next session, and a
+removed skill's dim held `until = "ends"` is given back, as at any reload.
+`crates/skills/tests/skills.rs` packs Desk tutor, installs it beside Dance
+on a running program, sees `check_my_work` come into `tools.json` within
+one look, removes it, sees it go, and checks the program was never
+restarted and that Dance can't be removed.
+
+**Permissions.** `[permissions]` lists what the skill may read and use; a
+skill without the table may do nothing (least privilege):
+
+```toml
+[permissions]
+topics = ["humans/faces/tracked", "voice/state"]   # the topics it reads
+speak = true    # a note or the voice's own words (say), or a sound
+light = true    # the light steps
+body = true     # a look at a face, a gesture, a move, a pose
+look = true     # the full look's picture for the model (do.look)
+actions = []    # the actions part's functions it may call by name
+```
+
+- **At load.** Every topic the skill reads must be in `topics`: those its
+  triggers and `[[while]]` conditions name, `humans/faces/tracked` for a
+  look at a face, and `voice/heard` for a tool's `[again]` (what a person
+  said). Each step needs its key: a `body` step `body`, a `light` step
+  `light`, a `say` or a `sound` `speak`, and `look = true` `look`. A skill
+  that reads or does anything more is not loaded, and the journal says
+  what it lacks: `lamp-skills: not loaded: /var/lib/lampOS/skills/x: not
+  permitted: a [[while]] reads voice/state, and voice/state is not in
+  [permissions] topics`. Declaring more than it reads is allowed; the
+  program subscribes only to what a skill reads and lists. What the program
+  reads to make a step safely (the light shown, the voice's state for a
+  step after the say, the body's clips, a hand, the pause) is its own, not
+  the skill's.
+- **Where each call leaves the program.** A run carries its skill's
+  permissions as of the last load, and each call is checked again where it
+  is sent: the body's sockets, the ring's `light/request`, the actions
+  part, the say service and a tool's look. A call the skill may not make is
+  not sent, not counted as made (no clip waited on, no light given back),
+  and the journal says so: `lamp-skills: skill:x: refused body.gesture:
+  body.gesture needs body = true in [permissions], which it does not give`.
+  A say refused is never asked, so nothing that comes with it is made. The
+  actions part is called for the light's own functions (`light_colour`,
+  `light_brighter`, `light_dimmer`, `light_off`) only with `light`, and for
+  any other only when `actions` names it. No step names an action yet:
+  `actions` is the list such a step, or a `run.py`, will be held to. A
+  skill that loaded makes only what it declared; this check holds that
+  whatever made the call.
+
+**The package.** What the Skills Store will carry: `NAME-VERSION.tar`, a
+plain (ustar) tar written the same way every time (no time, no owner, files
+0644), so the same skill packs to the same bytes. Its first entry is the
+manifest, `lamp-skill.json`:
+
+```json
+{"format": 1, "name": "desk-tutor", "version": "1.0.0",
+ "files": [{"path": "SKILL.md", "size": 2414, "sha256": "…"}, …]}
+```
+
+and then every file of the skill's folder under `NAME/`, its tests among
+them, hidden files left out. `pack` makes one only of a skill that loads,
+says its version and is installable (a core skill comes with the lamp), and
+reads it back as an install would. An install of a package checks, before
+anything is written: a tar of plain files and folders (a link, a device or
+anything else refuses it), one skill's folder and nothing beside it but the
+manifest and the signature's place; the manifest's `format` 1, its `name` a
+skill's name and the folder's, its `version` `MAJOR.MINOR.PATCH` and the
+one `skill.toml` says; every file in the manifest with its size and
+SHA-256, and no file that is not; each path at most 4 parts of letters,
+digits, `-`, `_` and `.`, none beginning with a dot (no `..`, no
+`._NAME`); at most 512 files and 16 MiB. Then the skill is loaded and moved
+in as from a folder.
+
+**The signature: a place, not checked.** `lamp-skill.sig`, beside the
+manifest, is reserved for the Store's signature over the manifest's exact
+bytes, which name every file's SHA-256. Signing is in the backlog: a
+package may carry the file, nothing checks it, and every install says so
+(`its signature not checked: signing is not built yet`, or `it carries no
+signature, and none is checked yet`). There is no fetch from a network:
+`install` takes a local file.
+
+Not built yet: the Store itself (a catalogue, review, publishing, a
+download); the signature's check and the key it would be checked with; the
+app's "My skills" page (`list` is text for a person); turning a skill off
+without removing it, core ones among them; a test that #1667's
+`PRODUCT_SKILLS` are exactly the core skills, once both are on `lamp-voice`.
+A skill's functions past a session's 32 are #1668's.
+
 ### Reflexes stay in the body and Expression
 
 A tap on the head, a startle at a bang, giving way to a hand must answer in
@@ -781,6 +954,7 @@ five by 2026-10-19.
 
 ## Later
 
-Permissions per sensor and actuator for skills from other people, signing,
-review and the store: after the first skills work, before anything is
-published.
+Permissions are built (above, "Core and installable skills"): each skill
+declares what it reads and uses, and the program holds it to that. Signing
+and its check, review and the store: before anything is published. The
+package has the signature's place already (`lamp-skill.sig`), unchecked.
