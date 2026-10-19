@@ -269,6 +269,11 @@ pub enum Did {
     /// Its own turn (news, a reminder) began to be heard at this time: a
     /// reply to it is for it (`attention::news_told`).
     Spoke(u64),
+    /// Its words sent so far will have been played by this time, as if the
+    /// audio plays as it is sent, each packet after the one before: a
+    /// conversation goes on from the end of what it said, not from when its
+    /// answer began (#1712, the first builder at 19:21).
+    Said(u64),
 }
 /// Where the engine says what the lamp did.
 pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
@@ -294,6 +299,8 @@ struct Shared {
     clock: Clock,
     /// When answer audio was last sent.
     answered_at: Mutex<Option<Instant>>,
+    /// When the words sent so far will have been played ([`Did::Said`]).
+    said_until_us: AtomicU64,
     /// Audio packets sent by this process.
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
@@ -613,6 +620,7 @@ impl Engine {
                 system,
                 clock,
                 answered_at: Mutex::new(None),
+                said_until_us: AtomicU64::new(0),
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
@@ -1471,6 +1479,20 @@ impl Shared {
             reason: fault(error),
         })
         .await;
+    }
+
+    /// When `samples` more of the lamp's words sent at `now_us` will have
+    /// been played, after those sent before them ([`Did::Said`]).
+    fn said_through(&self, samples: usize, now_us: u64) -> u64 {
+        let length_us = samples as u64 * 1_000_000 / u64::from(net::TTS_SAMPLE_RATE);
+        let mut until = 0;
+        let _ = self
+            .said_until_us
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |before| {
+                until = before.max(now_us) + length_us;
+                Some(until)
+            });
+        until
     }
 
     fn announcement_due(&self) -> bool {
@@ -2420,6 +2442,13 @@ async fn answer(
                     if let Ok(mut at) = shared.answered_at.lock() {
                         *at = Some((shared.clock)());
                     }
+                }
+                // Each packet's words, as long as it plays, after the one
+                // before it or from now.
+                if answering && let Some(did) = &shared.did {
+                    did(Did::Said(
+                        shared.said_through(samples.len(), monotonic_us()),
+                    ));
                 }
             }
         }
