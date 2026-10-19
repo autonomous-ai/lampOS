@@ -3347,10 +3347,15 @@ async fn a_spoken_request_is_told_the_air_and_a_written_turn_is_not() {
     let asked_for = Arc::new(Mutex::new(Vec::new()));
     let (engine, _, _) = scripted(script.clone());
     let noted = asked_for.clone();
-    let mut engine = engine.noting_the_air(Arc::new(move |request| {
-        noted.lock().unwrap().push(request);
-        Some("AIR NOTE".to_owned())
-    }));
+    let heard_for = Arc::new(Mutex::new(Vec::new()));
+    let heard = heard_for.clone();
+    let mut engine = engine.noting_the_air(
+        Arc::new(move |request| {
+            noted.lock().unwrap().push(request);
+            Some("AIR NOTE".to_owned())
+        }),
+        Arc::new(move |request| heard.lock().unwrap().push(request)),
+    );
     engine.submit(start(1));
     engine.submit(audio(1, 1));
     engine.submit(end(1));
@@ -3374,6 +3379,13 @@ async fn a_spoken_request_is_told_the_air_and_a_written_turn_is_not() {
         *asked_for.lock().unwrap(),
         [1],
         "asked of the spoken one only"
+    );
+    // Each answer, once its first audio goes, is told as heard: the spoken
+    // one's spends its note (the reviewer's P3 on #1960).
+    assert!(
+        heard_for.lock().unwrap().contains(&1),
+        "{:?}",
+        heard_for.lock().unwrap()
     );
 }
 
