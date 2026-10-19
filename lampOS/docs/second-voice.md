@@ -930,6 +930,23 @@ configuration; a configuration that still names it is refused by name, so
 it is moved, not left behind. No key is written in a log, a test or this
 page.
 
+**Through the company relay.** The relay serves Gemini's speech at
+`https://campaign-api.autonomous.ai/api/v1/ai/v1/google-search/v1beta`
+(V1's path, `hal/drivers/voice/tts/gemini.py`), with the relay's key in
+`x-goog-api-key` as this route sends it: then `gemini.key` is the relay's
+key (on lamp-4ace `LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key`),
+never a Google key. From lamp-4ace on 19 October at 12:1x (the first
+builder, an 82-character sentence, 3 runs each, all HTTP 200 with
+`audio/l16; rate=24000`): `gemini-3.8-flash-lite-tts` first audio 840,
+571 and 793 ms, `gemini-3.8-flash-tts` 1443, 948 and 1212 ms.
+`LAMP_SECOND_GEMINI_BASE_URL` and `LAMP_SECOND_SPEECH_MODEL` in the voice
+service's environment go over `gemini_base_url` and
+`gemini_speech_model`, so a battery's unit sets them without touching
+`second.json` (unset or empty, the file's stay; refused at the worker's
+start as the file's are, naming the variable). They reach the second
+route's worker alone (`process.rs`), whose journal then says `lamp-voice
+second: Gemini at <url>, voice <model>`.
+
 **The bar**, measured on lamp-4ace on 19 October with Gemini Live, from the
 end-of-speech decision to the first sound: chat lines median 1.70 to
 1.81 s, tool turns 2.02 to 2.21 s, looks 1.1 to 1.3 s, all lines median

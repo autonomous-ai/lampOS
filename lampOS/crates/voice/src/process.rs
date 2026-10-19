@@ -919,6 +919,7 @@ fn worker_command(
             role,
             var(crate::second_config::CREDENTIALS_ENV).as_deref(),
         ))
+        .envs(gemini_worker_environment(role, &var))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1053,9 +1054,44 @@ fn credentials_worker_environment(
         .map(|path| (crate::second_config::CREDENTIALS_ENV, path.to_owned()))
 }
 
+// The second route's Gemini endpoint and voice (#1712), to its worker
+// only, as set: the worker checks them as `second.json`'s, and says so.
+fn gemini_worker_environment(
+    role: &str,
+    var: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> Vec<(&'static str, std::ffi::OsString)> {
+    [
+        crate::second_config::GEMINI_BASE_URL_ENV,
+        crate::second_config::SPEECH_MODEL_ENV,
+    ]
+    .into_iter()
+    .filter(|_| role == "second")
+    .filter_map(|name| var(name).map(|value| (name, value)))
+    .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #1712: the Gemini endpoint and voice go to the second route's worker
+    /// only.
+    #[test]
+    fn the_gemini_overrides_reach_only_the_second_route() {
+        let var = |name: &str| {
+            (name == crate::second_config::SPEECH_MODEL_ENV)
+                .then(|| std::ffi::OsString::from("gemini-3.8-flash-lite-tts"))
+        };
+        assert_eq!(
+            gemini_worker_environment("second", var),
+            [(
+                crate::second_config::SPEECH_MODEL_ENV,
+                std::ffi::OsString::from("gemini-3.8-flash-lite-tts")
+            )]
+        );
+        assert!(gemini_worker_environment("provider", var).is_empty());
+        assert!(gemini_worker_environment("second", |_| None).is_empty());
+    }
 
     /// The voice unit's credentials' directory goes to the second route's
     /// worker only, and only as an absolute path.
@@ -1266,6 +1302,10 @@ mod tests {
                     "/etc/lampOS/person/name"
                 } else if name == crate::second_config::CREDENTIALS_ENV {
                     "/run/credentials/lamp-voice.service"
+                } else if name == crate::second_config::GEMINI_BASE_URL_ENV {
+                    "https://relay.example.invalid/v1beta"
+                } else if name == crate::second_config::SPEECH_MODEL_ENV {
+                    "gemini-3.8-flash-lite-tts"
                 } else {
                     "a-secret"
                 },
@@ -1318,6 +1358,8 @@ mod tests {
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
+                    "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",
+                    "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
                 ],
             ),
             (

@@ -116,6 +116,12 @@ pub const GEMINI_CHAT_MODEL: &str = "gemini-3.6-flash";
 /// The voice `LAMP_SECOND_SPEECH=gemini` asks: half ElevenLabs Flash's
 /// price a minute of speech, rated above it (the research of 19 Oct).
 pub const GEMINI_SPEECH_MODEL: &str = "gemini-3.8-flash-lite-tts";
+/// The Gemini endpoint and voice from the voice unit's environment, over
+/// `second.json`'s (the first builder on #1712: the configuration file is
+/// the owner's, a unit's drop-in the battery's). Passed to the second
+/// route's worker alone (`process.rs`), checked as the file's are.
+pub const GEMINI_BASE_URL_ENV: &str = "LAMP_SECOND_GEMINI_BASE_URL";
+pub const SPEECH_MODEL_ENV: &str = "LAMP_SECOND_SPEECH_MODEL";
 /// Fields of the chat request that `llm_extra` may not replace.
 const OWN_FIELDS: [&str; 5] = ["model", "messages", "stream", "tools", "tool_choice"];
 
@@ -257,20 +263,8 @@ pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
             "llm_extra may add at most 16 fields, none of the request's own",
         ));
     }
-    let model = |name: Option<String>, default: &str| -> io::Result<String> {
-        let name = given(name).unwrap_or_else(|| default.to_owned());
-        // A path segment of the request's URL.
-        if name.len() > 128
-            || !name
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_'))
-        {
-            return Err(invalid(
-                io::ErrorKind::InvalidInput,
-                "a Gemini model name is letters, digits, '-', '.' and '_'",
-            ));
-        }
-        Ok(name)
+    let model = |name: Option<String>, default: &str| {
+        gemini_model(given(name).unwrap_or_else(|| default.to_owned()))
     };
     let gemini = Gemini {
         base_url: checked_url(
@@ -420,6 +414,52 @@ fn key(file: &str) -> io::Result<Key> {
 
 /// An explicit https URL. Authentication belongs only in the key; userinfo,
 /// queries and fragments are refused, as for the live endpoint.
+/// A Gemini model's name, a path segment of the request's URL.
+fn gemini_model(name: String) -> io::Result<String> {
+    if name.len() > 128
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_'))
+    {
+        return Err(invalid(
+            io::ErrorKind::InvalidInput,
+            "a Gemini model name is letters, digits, '-', '.' and '_'",
+        ));
+    }
+    Ok(name)
+}
+
+impl SecondConfig {
+    /// With [`GEMINI_BASE_URL_ENV`] and [`SPEECH_MODEL_ENV`] as `var` gives
+    /// them, over the file's; unset or empty, the file's stay. Refused as
+    /// the file's fields are, naming the variable.
+    pub fn with_gemini_from(mut self, var: impl Fn(&str) -> Option<OsString>) -> io::Result<Self> {
+        let given = |name: &str| -> io::Result<Option<String>> {
+            var(name)
+                .filter(|value| !value.is_empty())
+                .map(|value| {
+                    value.into_string().map_err(|_| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            format!("{name} is not Unicode"),
+                        )
+                    })
+                })
+                .transpose()
+        };
+        fn named(name: &'static str) -> impl Fn(io::Error) -> io::Error {
+            move |error| io::Error::new(error.kind(), format!("{name}: {error}"))
+        }
+        if let Some(url) = given(GEMINI_BASE_URL_ENV)? {
+            self.gemini.base_url = checked_url(url).map_err(named(GEMINI_BASE_URL_ENV))?;
+        }
+        if let Some(model) = given(SPEECH_MODEL_ENV)? {
+            self.gemini.speech_model = gemini_model(model).map_err(named(SPEECH_MODEL_ENV))?;
+        }
+        Ok(self)
+    }
+}
+
 fn checked_url(url: String) -> io::Result<String> {
     let host = url
         .strip_prefix("https://")
@@ -591,6 +631,39 @@ mod tests {
             serde_json::Value::Object(route.llm_extra.clone()),
             serde_json::json!({"thinking": {"type": "disabled"}})
         );
+    }
+
+    /// #1712: the unit's Gemini endpoint and voice are taken over the
+    /// file's, unset or empty leave the file's, and a bad one is refused
+    /// naming its variable, as the file's fields are.
+    #[test]
+    fn the_units_gemini_endpoint_and_voice_go_over_the_files() {
+        let (_, config) = written("gemini-env", "");
+        let route = || load_from_path(&config).unwrap();
+        let relay = "https://campaign-api.autonomous.ai/api/v1/ai/v1/google-search/v1beta";
+        let set = route()
+            .with_gemini_from(|name| match name {
+                GEMINI_BASE_URL_ENV => Some(relay.into()),
+                SPEECH_MODEL_ENV => Some("gemini-3.8-flash-tts".into()),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(set.gemini.base_url, relay);
+        assert_eq!(set.gemini.speech_model, "gemini-3.8-flash-tts");
+        assert_eq!(set.gemini.chat_model, GEMINI_CHAT_MODEL);
+        let unset = route().with_gemini_from(|_| Some("".into())).unwrap();
+        assert_eq!(unset.gemini, route().gemini);
+        for (name, value) in [
+            (GEMINI_BASE_URL_ENV, "http://plain.example.invalid"),
+            (GEMINI_BASE_URL_ENV, "https://relay.example.invalid/?key=1"),
+            (SPEECH_MODEL_ENV, "tts/../chat"),
+        ] {
+            let refused = route()
+                .with_gemini_from(|asked| (asked == name).then(|| value.into()))
+                .unwrap_err()
+                .to_string();
+            assert!(refused.starts_with(name), "{refused}");
+        }
     }
 
     /// OpenRouter's pinned DeepSeek snapshot and DeepSeek's own Flash by

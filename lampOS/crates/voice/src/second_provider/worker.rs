@@ -627,7 +627,15 @@ pub fn serve(
 ) -> io::Result<()> {
     let provider = crate::config::ProviderConfig::load(provider_config)?;
     let character = provider.instruction(false)?;
-    let config = crate::second_config::load_from_path(second_config)?;
+    // The unit's Gemini endpoint and voice over the file's (#1712).
+    let config = crate::second_config::load_from_path(second_config)?
+        .with_gemini_from(|name| std::env::var_os(name))?;
+    if config.gemini.base_url != crate::second_config::GEMINI_BASE_URL {
+        eprintln!(
+            "lamp-voice second: Gemini at {}, voice {}",
+            config.gemini.base_url, config.gemini.speech_model
+        );
+    }
     let checked = checks_sounds(&files);
     let tools = files.tools;
     // As the Live route says them, when this route is the only voice.
