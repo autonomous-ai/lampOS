@@ -15,10 +15,12 @@
 //!    some to spare, before anything is written.
 //! 6. Every new folder is filled beside the old one under a temporary name,
 //!    each file checked against its SHA-256, and only when all are whole
-//!    are they given their names. A file that fails leaves nothing.
+//!    are they given their names. A file that fails leaves nothing. The
+//!    build's product skills are staged with the lamp's skills folder, and
+//!    the build's lamp-skills must still load every skill that loads now.
 //! 7. At a quiet moment (nobody heard or answered for 45 s, the voice
-//!    resting) the units are written and the parts restarted, the voice
-//!    first.
+//!    resting) the units are written, the product skills' files placed,
+//!    and the parts restarted, the voice first.
 //! 8. For a minute each restarted part must stay up with one process and
 //!    not say it is worse; otherwise every part is put back, in the reverse
 //!    order, and the build is refused from then on.
@@ -29,10 +31,11 @@ use crate::{
     fetch::{Channel, Fetch},
     judge::{Before, UnitState, Watch, part_of},
     manifest::{self, Manifest},
+    product_skills::{self, Bundle},
     quiet::{BETWEEN_TURNS, QUIET, Quiet},
     records,
     records::{
-        Build, Journal, LinkBack, Records, State, Switching, replace_link, sync_folder,
+        Build, Journal, LinkBack, Records, SkillBack, State, Switching, replace_link, sync_folder,
         sync_parent, write_whole,
     },
     unit::{self, Program},
@@ -270,6 +273,20 @@ struct Link {
     new: String,
 }
 
+/// The build's product skills, for a lamp whose lamp-skills reads install's
+/// folder: the bundle, and what each of its files needs here.
+#[derive(Clone, Debug)]
+struct Placing {
+    bundle: Bundle,
+    steps: Vec<product_skills::Step>,
+}
+
+impl Placing {
+    fn writes(&self) -> bool {
+        product_skills::writes(&self.steps)
+    }
+}
+
 /// The order of a switch: the voice first, at the quiet moment itself;
 /// then the body; then the rest by name. Going back is the reverse.
 fn order(unit: &str) -> (u8, &str) {
@@ -289,12 +306,19 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         world,
         records,
         quiet,
+        skills_back: Vec::new(),
     };
     if !config.apply {
         let state = run.records.peek_state();
         return match run.look(&state) {
-            Ok((manifest, changes)) if changes.is_empty() => Outcome::UpToDate(manifest.sequence),
-            Ok((manifest, changes)) => Outcome::Would(describe(&manifest, &changes)),
+            Ok((manifest, changes, placing))
+                if changes.is_empty() && !placing.as_ref().is_some_and(Placing::writes) =>
+            {
+                Outcome::UpToDate(manifest.sequence)
+            }
+            Ok((manifest, changes, placing)) => {
+                Outcome::Would(describe(&manifest, &changes, placing.as_ref()))
+            }
             Err(outcome) => outcome,
         };
     }
@@ -312,6 +336,9 @@ struct Run<'r, 'w> {
     world: &'r mut World<'w>,
     records: Records,
     quiet: Quiet,
+    /// The product skills' files this round's switch wrote, or may have,
+    /// as they were: put back with the units.
+    skills_back: Vec<SkillBack>,
 }
 
 /// A unit as it is to be put back.
@@ -343,7 +370,7 @@ impl Run<'_, '_> {
             Ok(state) => state,
             Err(error) => return Outcome::Failed(format!("the state cannot be read: {error}")),
         };
-        let (manifest, mut changes) = match self.look(&state) {
+        let (manifest, mut changes, placing) = match self.look(&state) {
             Ok(found) => found,
             Err(outcome) => return outcome,
         };
@@ -351,8 +378,32 @@ impl Run<'_, '_> {
             sequence: manifest.sequence,
             commit: manifest.commit.clone(),
         };
-        if changes.is_empty() {
+        let writes = placing.as_ref().is_some_and(Placing::writes);
+        if let Some(placing) = &placing {
+            for step in &placing.steps {
+                if let product_skills::Act::Keep(why) = step.act {
+                    self.say(&format!(
+                        "kept {}: {why}; the build's is not written",
+                        step.path
+                    ));
+                }
+            }
+        }
+        if writes
+            && let Err(error) = product_skills::writable(&self.config.root, product_skills::FOLDER)
+        {
+            // Not the build's fault: it is not refused, and the next round
+            // tries again.
+            return Outcome::Failed(format!(
+                "{} cannot be written ({error}): lamp-update.service needs it in ReadWritePaths; nothing is switched",
+                product_skills::FOLDER
+            ));
+        }
+        if changes.is_empty() && !writes {
             // Nothing of this build is this lamp's to change: it runs it.
+            if let Some(placing) = &placing {
+                record_skills(&mut state, &placing.steps);
+            }
             state.installed = Some(build);
             return match self.records.save_state(&state) {
                 Ok(()) => Outcome::UpToDate(manifest.sequence),
@@ -373,15 +424,77 @@ impl Run<'_, '_> {
         if let Err(outcome) = self.install(&mut state, &manifest, &changes) {
             return outcome;
         }
-        if let Err(outcome) = self.skills_still_load(&manifest, &changes) {
+        if let Err(outcome) = self.skills_still_load(&manifest, &changes, placing.as_ref()) {
             return outcome;
         }
-        self.switch(&mut state, build, changes)
+        if changes.is_empty() {
+            // Only the product skills change: lamp-skills reloads its
+            // folder by itself, so nothing is restarted.
+            return self.place_alone(&mut state, build, placing);
+        }
+        self.switch(&mut state, build, changes, placing)
+    }
+
+    /// The product skills of a build that changes no part here: written
+    /// (each file as it was put back if one cannot be), recorded, and the
+    /// build is the lamp's.
+    fn place_alone(
+        &mut self,
+        state: &mut State,
+        build: Build,
+        placing: Option<Placing>,
+    ) -> Outcome {
+        let Some(placing) = placing else {
+            return Outcome::UpToDate(build.sequence);
+        };
+        let steps = match self.plan_skills(state, &placing) {
+            Ok(steps) => steps,
+            Err(why) => return Outcome::Failed(why),
+        };
+        let backs = match product_skills::backs(&self.config.root, &steps) {
+            Ok(backs) => backs,
+            Err(error) => return Outcome::Failed(format!("the product skills: {error}")),
+        };
+        if let Err(why) = product_skills::write(&self.config.root, &steps) {
+            let root = self.config.root.clone();
+            let restored = product_skills::restore(&root, &backs, self.world.say);
+            return Outcome::Failed(match restored {
+                Ok(()) => format!("{why}; the product skills were put back as they were"),
+                Err(also) => format!("{why}; and putting them back: {also}"),
+            });
+        }
+        self.say(&format!(
+            "placed {} files of the product skills",
+            backs.len()
+        ));
+        record_skills(state, &steps);
+        state.installed = Some(build.clone());
+        match self.records.save_state(state) {
+            Ok(()) => Outcome::UpToDate(build.sequence),
+            Err(error) => Outcome::Failed(format!("the state cannot be written: {error}")),
+        }
+    }
+
+    /// What each product skill's file needs now, as the state records them:
+    /// planned again at the switch, since the lamp may have changed one
+    /// while the round waited for a quiet moment.
+    fn plan_skills(
+        &self,
+        state: &State,
+        placing: &Placing,
+    ) -> Result<Vec<product_skills::Step>, String> {
+        product_skills::plan(
+            &self.config.root,
+            &placing.bundle,
+            &state.settings,
+            &state.settings_writing,
+        )
+        .map_err(|error| format!("the product skills cannot be read: {error}"))
     }
 
     /// Steps 2 to 5: what the newest build would change here, or why
     /// nothing will.
-    fn look(&mut self, state: &State) -> Result<(Manifest, Vec<Change>), Outcome> {
+    fn look(&mut self, state: &State) -> Result<(Manifest, Vec<Change>, Option<Placing>), Outcome> {
         let url = format!("{}{}", self.config.channel_url, manifest::ENVELOPE);
         let mut envelope = Vec::new();
         match self
@@ -424,7 +537,69 @@ impl Run<'_, '_> {
         let changes =
             plan(self.config, &manifest, &installed, &carried).map_err(Outcome::Refused)?;
         self.room(&changes)?;
-        Ok((manifest, changes))
+        let placing = self.product_skills(state, &manifest, &installed, &carried)?;
+        Ok((manifest, changes, placing))
+    }
+
+    /// The build's product skills (#2014's P2), fetched and checked, and
+    /// what each file needs here: for a lamp whose lamp-skills reads
+    /// install's folder, from a build that carries them. None otherwise:
+    /// a lamp without lamp-skills, one whose skills folder is its own
+    /// (lamp-4ace's), or a build from before them.
+    fn product_skills(
+        &mut self,
+        state: &State,
+        manifest: &Manifest,
+        installed: &[Installed],
+        carried: &BTreeMap<String, String>,
+    ) -> Result<Option<Placing>, Outcome> {
+        let Some(part) = installed
+            .iter()
+            .find(|part| part.program.binary == SKILLS_BINARY)
+        else {
+            return Ok(None);
+        };
+        let unit = carried.get(&part.unit).unwrap_or(&part.text);
+        if skills_dir(unit) != product_skills::FOLDER {
+            return Ok(None);
+        }
+        let Some(file) = manifest
+            .files
+            .iter()
+            .find(|file| file.name == product_skills::BUNDLE)
+        else {
+            return Ok(None);
+        };
+        if file.size > product_skills::MOST_BYTES {
+            return Err(Outcome::Refused(format!(
+                "{} is {} bytes, and at most {}",
+                file.name,
+                file.size,
+                product_skills::MOST_BYTES
+            )));
+        }
+        let url = format!("{}{}", manifest.files_url, file.name);
+        let mut bytes = Vec::new();
+        match self.world.channel.fetch(&url, file.size, &mut bytes) {
+            Ok(_) => {}
+            Err(Fetch::Unreachable(why)) => return Err(Outcome::Unreachable(why)),
+            Err(error) => return Err(Outcome::Refused(format!("{}: {error}", file.name))),
+        }
+        if bytes.len() as u64 != file.size || manifest::sha256_hex(&bytes) != file.sha256 {
+            return Err(Outcome::Refused(format!(
+                "{} does not match its SHA-256",
+                file.name
+            )));
+        }
+        let bundle = product_skills::parse(&bytes).map_err(Outcome::Refused)?;
+        let steps = product_skills::plan(
+            &self.config.root,
+            &bundle,
+            &state.settings,
+            &state.settings_writing,
+        )
+        .map_err(|error| Outcome::Failed(format!("the product skills cannot be read: {error}")))?;
+        Ok(Some(Placing { bundle, steps }))
     }
 
     /// The build's units for this lamp's parts, fetched and checked. Small:
@@ -599,31 +774,82 @@ impl Run<'_, '_> {
     }
 
     /// Step 6b: the skills the lamp's folder holds still load under the
-    /// build's lamp-skills (the first builder on #1722). A round places no
-    /// skill, so a lamp-skills with checks its folders fail (#1698's
-    /// `[permissions]`, on folders from before them) would run with every
-    /// skill refused, up and well. The build's own `lamp-skills list` and
-    /// the running one's are read on the unit's `--dir`: a skill that loads
-    /// now and would not under the build refuses the build, naming each,
-    /// with nothing switched. One both refuse holds nothing back.
+    /// build's lamp-skills (the first builder on #1722), the folder judged
+    /// as the round leaves it: a copy of it with the build's product skills
+    /// placed, staged in the records (#2014's P2). A lamp-skills with
+    /// checks its folders fail (#1698's `[permissions]`, on a lamp's own
+    /// folder from before them) would run with every such skill refused, up
+    /// and well. The build's own `lamp-skills list` on the staged folder
+    /// and the running one's on the lamp's are read: a skill that loads now
+    /// and would not after refuses the build, naming each, with nothing
+    /// switched. One both refuse holds nothing back. Run when lamp-skills
+    /// changes folder, or when product skills are written.
     fn skills_still_load(
         &mut self,
         manifest: &Manifest,
         changes: &[Change],
+        placing: Option<&Placing>,
     ) -> Result<(), Outcome> {
-        let Some(change) = changes
+        let placing = placing.filter(|placing| placing.writes());
+        let (old_folder, new_folder, unit) = match changes
             .iter()
             .find(|change| change.part == SKILLS_PART && change.new_folder != change.old_folder)
-        else {
-            return Ok(());
+        {
+            Some(change) => (
+                change.old_folder.clone(),
+                change.new_folder.clone(),
+                change.after.clone(),
+            ),
+            None if placing.is_some() => {
+                let installed = installed_units(self.config).map_err(|error| {
+                    Outcome::Failed(format!("the units cannot be read: {error}"))
+                })?;
+                let Some(part) = installed
+                    .into_iter()
+                    .find(|part| part.program.binary == SKILLS_BINARY)
+                else {
+                    return Ok(());
+                };
+                (part.program.folder(), part.program.folder(), part.text)
+            }
+            None => return Ok(()),
         };
-        let dir = skills_dir(&change.after);
+        let dir = skills_dir(&unit);
         let folder = self.config.on(&dir);
-        if !folder.is_dir() {
-            return Ok(());
+        let staged = self.records.folder().join(STAGED);
+        let judged = match placing {
+            Some(placing) => {
+                product_skills::stage(&self.config.root, &dir, &placing.steps, &staged).map_err(
+                    |error| {
+                        Outcome::Failed(format!("the product skills cannot be staged: {error}"))
+                    },
+                )?;
+                staged.clone()
+            }
+            None if folder.is_dir() => folder.clone(),
+            None => return Ok(()),
+        };
+        let judged_result =
+            self.skills_judged(manifest, &dir, &folder, &judged, &old_folder, &new_folder);
+        if placing.is_some() {
+            let _ = fs::remove_dir_all(&staged);
         }
+        judged_result
+    }
+
+    /// The build's lamp-skills on `judged` against the running one's on
+    /// `folder` ([`Run::skills_still_load`]).
+    fn skills_judged(
+        &self,
+        manifest: &Manifest,
+        dir: &str,
+        folder: &Path,
+        judged: &Path,
+        old_folder: &str,
+        new_folder: &str,
+    ) -> Result<(), Outcome> {
         let binary = |build: &str| self.config.on(build).join(SKILLS_BINARY);
-        let after = match list_skills(&binary(&change.new_folder), &folder) {
+        let after = match list_skills(&binary(new_folder), judged) {
             Ok(Some(refused)) => refused,
             // Older than `list`, so older than its checks (both came with
             // #1698): it refuses nothing for its permissions.
@@ -637,7 +863,7 @@ impl Run<'_, '_> {
         };
         // The running one's: one that cannot say (older than `list`, or
         // gone) loaded every folder.
-        let before = list_skills(&binary(&change.old_folder), &folder)
+        let before = list_skills(&binary(old_folder), folder)
             .ok()
             .flatten()
             .unwrap_or_default();
@@ -651,7 +877,8 @@ impl Run<'_, '_> {
         }
         Err(Outcome::Refused(format!(
             "build {}'s lamp-skills would not load these skills of {dir}, which load now: {}; \
-             nothing is switched until they load under it (`lamp-update install` places the build's own)",
+             nothing is switched until they load under it (a round places the build's product \
+             skills, but never over a file of the lamp's own)",
             manifest.sequence,
             stopping.join("; ")
         )))
@@ -755,10 +982,30 @@ impl Run<'_, '_> {
     }
 
     /// Steps 7 and 8.
-    fn switch(&mut self, state: &mut State, build: Build, changes: Vec<Change>) -> Outcome {
+    fn switch(
+        &mut self,
+        state: &mut State,
+        build: Build,
+        changes: Vec<Change>,
+        placing: Option<Placing>,
+    ) -> Outcome {
         if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false) {
             return Outcome::NotQuiet(why);
         }
+        // The product skills' files as they are now, and as they were: kept
+        // in the journal before anything is written.
+        let steps = match placing
+            .as_ref()
+            .map(|placing| self.plan_skills(state, placing))
+        {
+            Some(Ok(steps)) => steps,
+            Some(Err(why)) => return Outcome::Failed(why),
+            None => Vec::new(),
+        };
+        let skills = match product_skills::backs(&self.config.root, &steps) {
+            Ok(backs) => backs,
+            Err(error) => return Outcome::Failed(format!("the product skills: {error}")),
+        };
         // How each part says it is, just before: what it is held to after.
         let health = self.world.ears.health();
         let mut backs: Vec<Back> = changes
@@ -799,6 +1046,7 @@ impl Run<'_, '_> {
                     link: back.link.clone(),
                 })
                 .collect(),
+            skills: skills.clone(),
         };
         if let Err(error) = self
             .records
@@ -842,6 +1090,18 @@ impl Run<'_, '_> {
             }
             return Outcome::NotQuiet(format!("someone spoke as the switch began: {why}"));
         }
+        // The build's product skills, before any part is restarted: the new
+        // lamp-skills starts on them, and a put-back restores them.
+        if !skills.is_empty() {
+            self.skills_back = skills;
+            if let Err(why) = product_skills::write(&self.config.root, &steps) {
+                return self.put_back(state, &build, &backs, None, why, String::new());
+            }
+            self.say(&format!(
+                "placed {} files of the product skills",
+                self.skills_back.len()
+            ));
+        }
         self.say(&format!("switching to build {}", build.sequence));
         let mut watches = Vec::new();
         for at in 0..backs.len() {
@@ -865,6 +1125,7 @@ impl Run<'_, '_> {
             };
             return self.put_back(state, &build, &backs, Some(&unit), why, told);
         }
+        record_skills(state, &steps);
         state.previous = state.installed.replace(build.clone());
         if let Err(error) = self
             .records
@@ -995,13 +1256,21 @@ impl Run<'_, '_> {
     /// watched. Every unit is tried, whatever happens to one.
     /// With what the first unit found not well said of itself ([`Told`]).
     fn restore(&mut self, backs: &[Back], failed: Option<&str>) -> (Result<(), String>, String) {
+        // The product skills' files first, before lamp-skills is started
+        // again on the old build.
+        let skills = std::mem::take(&mut self.skills_back);
+        let skills = product_skills::restore(&self.config.root, &skills, self.world.say);
         if let Err(why) = self.put_units_and_links_back(backs) {
+            let why = match skills {
+                Ok(()) => why,
+                Err(also) => format!("{why}; {also}"),
+            };
             return (Err(why), String::new());
         }
         let mut again: Vec<&Back> = backs.iter().filter(|back| back.restarted).collect();
         again.sort_by(|a, b| order(&b.unit).cmp(&order(&a.unit)));
         let mut watches = Vec::new();
-        let mut troubles = Vec::new();
+        let mut troubles: Vec<String> = skills.err().into_iter().collect();
         for back in again {
             if back.unit == VOICE_UNIT && failed != Some(VOICE_UNIT) {
                 // A voice that is well is not cut off mid-sentence.
@@ -1072,6 +1341,7 @@ impl Run<'_, '_> {
                 link: switching.link.clone(),
             });
         }
+        self.skills_back = journal.skills;
         let mut state = match self.records.state(self.world.say) {
             Ok(state) => state,
             Err(error) => return Outcome::Failed(format!("the state cannot be read: {error}")),
@@ -1142,7 +1412,7 @@ impl Run<'_, '_> {
 
 /// What a person reads before applying: each unit, what changes, and the
 /// lines of its unit file that would change.
-fn describe(manifest: &Manifest, changes: &[Change]) -> Vec<String> {
+fn describe(manifest: &Manifest, changes: &[Change], placing: Option<&Placing>) -> Vec<String> {
     let mut lines = vec![format!(
         "build {} of {} (commit {})",
         manifest.sequence,
@@ -1180,8 +1450,37 @@ fn describe(manifest: &Manifest, changes: &[Change]) -> Vec<String> {
             lines.push(format!("    {line}"));
         }
     }
+    for step in placing
+        .map(|placing| placing.steps.as_slice())
+        .unwrap_or_default()
+    {
+        match step.act {
+            product_skills::Act::Write => {
+                lines.push(format!("product skills: write {}", step.path))
+            }
+            product_skills::Act::Keep(why) => {
+                lines.push(format!("product skills: keep {} ({why})", step.path));
+            }
+            product_skills::Act::Record => {}
+        }
+    }
     lines.push("switched at a quiet moment: nobody heard or answered for 45 s".into());
     lines
+}
+
+/// Each product skill's file written or found already the build's, as
+/// install records its own: the build's before at the next round.
+fn record_skills(state: &mut State, steps: &[product_skills::Step]) {
+    for step in steps {
+        if matches!(
+            step.act,
+            product_skills::Act::Write | product_skills::Act::Record
+        ) {
+            state
+                .settings
+                .insert(step.path.clone(), step.sha256.clone());
+        }
+    }
 }
 
 /// Every unit of a part installed by build, but this program's own.
@@ -1407,6 +1706,9 @@ const SKILLS_PART: &str = "skills";
 const SKILLS_BINARY: &str = "lamp-skills";
 /// Where lamp-skills reads its skills when its unit gives no `--dir`.
 const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
+/// The skills folder as a round would leave it, judged before anything is
+/// written: in the records, and removed after.
+const STAGED: &str = "skills-staged";
 /// How long `lamp-skills list` may take: killed after, and then it cannot say.
 const LIST_WITHIN: Duration = Duration::from_secs(30);
 

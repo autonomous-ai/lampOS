@@ -25,7 +25,8 @@ StandardInput=null
 SyslogIdentifier=lamp-update
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/opt/lampOS /etc/systemd/system -/run/lampos-bus
+# The product skills' folder: a round places the build's own there (lampOS/docs/updates.md).
+ReadWritePaths=/opt/lampOS /etc/systemd/system -/var/lib/lampOS/skills -/run/lampos-bus
 ProtectHome=yes
 PrivateTmp=yes
 StateDirectory=lampos-update

@@ -7,7 +7,8 @@
 //!   lamp's own and is kept).
 //! - `journal.json`: a switch under way. Written before any unit is
 //!   changed and removed once the switch is over, so a switch cut short by
-//!   a stop or a power cut is put back at the next start.
+//!   a stop or a power cut is put back at the next start: the units, the
+//!   links, and the product skills' files as they were.
 //! - `previous/`: the units as they were before the last switch.
 //! - `log.jsonl`: one line for each thing done or refused.
 //! - `lock`: one lamp-update at a time.
@@ -122,6 +123,28 @@ pub const LINK_SUFFIX: &str = ".link";
 pub struct Journal {
     pub build: Build,
     pub units: Vec<Switching>,
+    /// The product skills' files the switch writes, as they were before
+    /// (#2014's P2): put back with the units. Absent from a journal written
+    /// before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<SkillBack>,
+}
+
+/// A product skill's file as it was before a round wrote it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillBack {
+    /// As the lamp names it: `/var/lib/lampOS/skills/dance/skill.toml`.
+    pub path: String,
+    /// Its text, or none: it was not there.
+    #[serde(default)]
+    pub before: Option<String>,
+    /// The SHA-256 of what the round writes: a file that no longer holds
+    /// it was changed on the lamp since, and is left.
+    pub wrote: String,
+    /// The folders made for it, the deepest first: removed again, if still
+    /// empty, when it is put back as never there.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub made: Vec<String>,
 }
 
 pub fn unix_ms() -> u64 {
@@ -424,6 +447,12 @@ mod tests {
                     }),
                 },
             ],
+            skills: vec![SkillBack {
+                path: "/var/lib/lampOS/skills/dance/skill.toml".into(),
+                before: None,
+                wrote: "c".repeat(64),
+                made: vec!["/var/lib/lampOS/skills/dance".into()],
+            }],
         };
         records.save_journal(&journal).unwrap();
         assert_eq!(records.journal().unwrap(), Some(journal));

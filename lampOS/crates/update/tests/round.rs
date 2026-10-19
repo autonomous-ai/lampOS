@@ -1607,6 +1607,371 @@ fn only_a_skill_that_would_stop_loading_holds_lamp_skills_back() {
     assert_eq!(lamp.calls(), ["reload", "restart lamp-skills.service"]);
 }
 
+/// Install's product skills folder, as the round names its files.
+const PRODUCT_SKILLS: &str = "var/lib/lampOS/skills";
+
+impl Lamp {
+    /// Records these files as install wrote them: the build's before.
+    fn record_as_installs(&self, files: &[(&str, &str)]) {
+        let settings: serde_json::Map<String, serde_json::Value> = files
+            .iter()
+            .map(|(path, text)| (format!("/{PRODUCT_SKILLS}/{path}"), sha(text).into()))
+            .collect();
+        let state = serde_json::json!({
+            "installed": null, "previous": null, "refused": [], "made": [],
+            "settings": settings,
+        });
+        let at = self.root.join("var/lib/lampos-update/state.json");
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(at, serde_json::to_vec(&state).unwrap()).unwrap();
+    }
+
+    fn put_skill_file(&self, path: &str, text: &str) {
+        let at = self.root.join(format!("{PRODUCT_SKILLS}/{path}"));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(at, text).unwrap();
+    }
+
+    fn skill_file(&self, path: &str) -> Option<String> {
+        fs::read_to_string(self.root.join(format!("{PRODUCT_SKILLS}/{path}"))).ok()
+    }
+
+    /// What `lamp-skills list` of the running build says of the folder.
+    fn listed(&self) -> String {
+        let listed =
+            std::process::Command::new(self.root.join("opt/lampOS/skills/current/lamp-skills"))
+                .args(["list", "--dir"])
+                .arg(self.root.join(PRODUCT_SKILLS))
+                .output()
+                .unwrap();
+        String::from_utf8(listed.stdout).unwrap()
+    }
+}
+
+/// The product skills a build carries, as `lamp-update manifest` writes
+/// them.
+fn bundle(files: &[(&str, &str)]) -> String {
+    let mut skills: Vec<&str> = files
+        .iter()
+        .map(|(path, _)| path.split('/').next().unwrap())
+        .collect();
+    skills.sort_unstable();
+    skills.dedup();
+    let files: Vec<serde_json::Value> = files
+        .iter()
+        .map(|(path, text)| serde_json::json!({"path": path, "text": text}))
+        .collect();
+    serde_json::to_string(&serde_json::json!({
+        "format": "lampos-skills/1", "skills": skills, "files": files,
+    }))
+    .unwrap()
+}
+
+/// The build's dance and reminders, with #1698's `[permissions]`, and a new
+/// product skill with a file in a folder of its own.
+fn product_skills_of_build() -> String {
+    bundle(&[
+        ("dance/skill.toml", NEW_SKILL),
+        ("dance/SKILL.md", "Dance, the build's."),
+        ("reminders/skill.toml", NEW_SKILL),
+        ("reminders/SKILL.md", "Reminders, the build's."),
+        ("welcome-back/skill.toml", NEW_SKILL),
+        ("welcome-back/lights/warm_glow.toml", "glow"),
+    ])
+}
+
+fn build_with_product_skills(
+    lamp: &mut Lamp,
+    sequence: u64,
+    voice: &str,
+    skills: &str,
+    product: &str,
+) -> Manifest {
+    lamp.publish(
+        sequence,
+        &[
+            ("lamp-voice", voice),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+            ("lamp-skills", skills),
+            ("lamp-product-skills", product),
+        ],
+        &[],
+    )
+}
+
+/// A lamp with pre-#1698 product skill folders, as install wrote them, a
+/// file of one the lamp changed, and a skill the person installed.
+fn lamp_before_permissions() -> Lamp {
+    let lamp = Lamp::new().with_skills(
+        SKILLS_BEFORE_CHECKS,
+        &[
+            ("dance", OLD_SKILL),
+            ("reminders", OLD_SKILL),
+            ("mine", NEW_SKILL),
+        ],
+    );
+    lamp.put_skill_file("dance/SKILL.md", "Dance, install's.");
+    lamp.put_skill_file(
+        "reminders/SKILL.md",
+        "Reminders, as this lamp's person wrote them.",
+    );
+    lamp.put_skill_file("mine/SKILL.md", "Mine.");
+    lamp.record_as_installs(&[
+        ("dance/skill.toml", OLD_SKILL),
+        ("dance/SKILL.md", "Dance, install's."),
+        ("reminders/skill.toml", OLD_SKILL),
+        ("reminders/SKILL.md", "Reminders, install's."),
+    ]);
+    lamp
+}
+
+/// #2014's P2 (the reviewer, 01:22; the first builder, 01:29): a lamp
+/// whose product skills are from before #1698, given a round to a build
+/// with #1698's checks, gets the build's product skills from the channel
+/// and switches, every one loaded. The person's own skill is not touched,
+/// and a file of a product skill the lamp changed is kept.
+#[test]
+fn a_round_places_the_builds_product_skills_and_keeps_the_lamps_own() {
+    let mut lamp = lamp_before_permissions();
+    let checks = skills_with_checks("2", "");
+    build_with_product_skills(&mut lamp, 2, "voice 1", &checks, &product_skills_of_build());
+    let mine_before = (
+        lamp.skill_file("mine/skill.toml"),
+        lamp.skill_file("mine/SKILL.md"),
+    );
+
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skills_link(), sha(&checks));
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), NEW_SKILL);
+    assert_eq!(
+        lamp.skill_file("dance/SKILL.md").unwrap(),
+        "Dance, the build's."
+    );
+    assert_eq!(lamp.skill_file("reminders/skill.toml").unwrap(), NEW_SKILL);
+    assert_eq!(
+        lamp.skill_file("welcome-back/lights/warm_glow.toml")
+            .unwrap(),
+        "glow"
+    );
+    // The lamp's own file and the person's skill, as they were.
+    assert_eq!(
+        lamp.skill_file("reminders/SKILL.md").unwrap(),
+        "Reminders, as this lamp's person wrote them."
+    );
+    assert_eq!(
+        (
+            lamp.skill_file("mine/skill.toml"),
+            lamp.skill_file("mine/SKILL.md")
+        ),
+        mine_before
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line
+                .contains("kept /var/lib/lampOS/skills/reminders/SKILL.md: this lamp's own")),
+        "{:?}",
+        lamp.said
+    );
+    let listed = lamp.listed();
+    assert!(!listed.contains("not loaded"), "{listed}");
+    for name in ["dance", "reminders", "welcome-back", "mine"] {
+        assert!(listed.contains(name), "{name}: {listed}");
+    }
+    // Recorded as the build's: the next build's are written over them.
+    let state = lamp.state();
+    assert_eq!(
+        state["settings"]["/var/lib/lampOS/skills/dance/skill.toml"],
+        sha(NEW_SKILL)
+    );
+    assert!(state["settings"]["/var/lib/lampOS/skills/mine/skill.toml"].is_null());
+    assert!(!lamp.exists("/var/lib/lampos-update/skills-staged"));
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+}
+
+/// The guard stays the net: a skill of the person's that the new
+/// lamp-skills would not load refuses the build, judged on the folder as
+/// the round would leave it, and nothing of the lamp's is written.
+#[test]
+fn the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load() {
+    let mut lamp = lamp_before_permissions();
+    lamp.write_skill("mine", OLD_SKILL);
+    let checks = skills_with_checks("2", "");
+    build_with_product_skills(&mut lamp, 2, "voice 1", &checks, &product_skills_of_build());
+    // The skills, the units: what the lamp runs and reads.
+    let lamps = |lamp: &Lamp| -> BTreeMap<String, Vec<u8>> {
+        lamp.files()
+            .into_iter()
+            .filter(|(name, _)| name.starts_with("var/lib/lampOS/") || name.starts_with("etc/"))
+            .collect()
+    };
+    let before = lamps(&lamp);
+
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Refused(why)
+            if why.contains("mine (voice/heard is not in [permissions] topics)")
+                && !why.contains("dance")
+                && !why.contains("reminders")),
+        "{outcome:?}"
+    );
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    // Not a file of the lamp's written, and nothing staged left behind.
+    assert!(lamps(&lamp) == before, "a file of the lamp's was written");
+    assert!(!lamp.exists("/var/lib/lampos-update/skills-staged"));
+    assert_eq!(lamp.skills_link(), sha(SKILLS_BEFORE_CHECKS));
+}
+
+/// A build put back puts the product skills back too: each file as it was,
+/// a folder made for the build gone, the records as before.
+#[test]
+fn a_build_put_back_puts_the_product_skills_back() {
+    let mut lamp = lamp_before_permissions();
+    let checks = skills_with_checks("2", "");
+    build_with_product_skills(
+        &mut lamp,
+        2,
+        "voice 2, which crashes",
+        &checks,
+        &product_skills_of_build(),
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(
+            &outcome,
+            Outcome::RolledBack {
+                sequence: 2,
+                after: Ok(()),
+                ..
+            }
+        ),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), OLD_SKILL);
+    assert_eq!(
+        lamp.skill_file("dance/SKILL.md").unwrap(),
+        "Dance, install's."
+    );
+    assert_eq!(lamp.skill_file("reminders/skill.toml").unwrap(), OLD_SKILL);
+    assert!(!lamp.exists(&format!("/{PRODUCT_SKILLS}/welcome-back")));
+    assert_eq!(lamp.skills_link(), sha(SKILLS_BEFORE_CHECKS));
+    assert_eq!(
+        lamp.state()["settings"]["/var/lib/lampOS/skills/dance/skill.toml"],
+        sha(OLD_SKILL)
+    );
+}
+
+/// A switch cut short after the skills were written puts them back at the
+/// next start, from the journal: a file still as written goes back, a
+/// folder made for the build goes, and a file the lamp changed since stays.
+#[test]
+fn product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start() {
+    let mut lamp = lamp_before_permissions();
+    // As a switch to build 2 leaves it when the lamp loses power after the
+    // skills are written.
+    let back = |path: &str, before: Option<&str>, wrote: &str, made: &[&str]| {
+        serde_json::json!({
+            "path": format!("/{PRODUCT_SKILLS}/{path}"),
+            "before": before,
+            "wrote": sha(wrote),
+            "made": made.iter().map(|folder| format!("/{PRODUCT_SKILLS}/{folder}")).collect::<Vec<_>>(),
+        })
+    };
+    let journal = serde_json::json!({
+        "build": {"sequence": 2, "commit": "2".repeat(40)},
+        "units": [],
+        "skills": [
+            back("dance/skill.toml", Some(OLD_SKILL), NEW_SKILL, &[]),
+            back("dance/SKILL.md", Some("Dance, install's."), "Dance, the build's.", &[]),
+            back("welcome-back/skill.toml", None, NEW_SKILL, &["welcome-back"]),
+        ],
+    });
+    fs::write(
+        lamp.root.join("var/lib/lampos-update/journal.json"),
+        serde_json::to_vec(&journal).unwrap(),
+    )
+    .unwrap();
+    lamp.put_skill_file("dance/skill.toml", NEW_SKILL);
+    lamp.put_skill_file("dance/SKILL.md", "Dance, changed on the lamp after.");
+    lamp.put_skill_file("welcome-back/skill.toml", NEW_SKILL);
+
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, .. } if why.contains("cut short")),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), OLD_SKILL);
+    assert_eq!(
+        lamp.skill_file("dance/SKILL.md").unwrap(),
+        "Dance, changed on the lamp after."
+    );
+    assert!(!lamp.exists(&format!("/{PRODUCT_SKILLS}/welcome-back")));
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+}
+
+/// A build that changes only the product skills places them, restarting
+/// nothing: lamp-skills reloads its folder by itself.
+#[test]
+fn a_build_of_only_new_product_skills_places_them_and_restarts_nothing() {
+    let mut lamp = Lamp::new().with_skills(&skills_with_checks("1", ""), &[("dance", NEW_SKILL)]);
+    lamp.record_as_installs(&[("dance/skill.toml", NEW_SKILL)]);
+    let skills = skills_with_checks("1", "");
+    let newer = NEW_SKILL.replace("dance\"", "dance\"\nabout = \"newer\"");
+    build_with_product_skills(
+        &mut lamp,
+        2,
+        "voice 1",
+        &skills,
+        &bundle(&[("dance/skill.toml", &newer)]),
+    );
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), newer);
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    assert_eq!(lamp.state()["installed"]["sequence"], 2);
+}
+
+/// A lamp-skills reading a folder of the lamp's own (lamp-4ace's) is not
+/// given the product skills; and a round that cannot write install's folder
+/// (a lamp-update.service without it in `ReadWritePaths`) fails with
+/// nothing switched, and the build is not refused.
+#[test]
+fn product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut lamp = lamp_before_permissions();
+    let unit = lamp.read("/etc/systemd/system/lamp-skills.service");
+    fs::write(
+        lamp.root.join("etc/systemd/system/lamp-skills.service"),
+        unit.replace("--dir /var/lib/lampOS/skills", "--dir /var/lib/lamp-skills"),
+    )
+    .unwrap();
+    build_with_product_skills(
+        &mut lamp,
+        2,
+        "voice 1",
+        SKILLS_BEFORE_CHECKS,
+        &product_skills_of_build(),
+    );
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), OLD_SKILL);
+
+    let mut lamp = lamp_before_permissions();
+    let folder = lamp.root.join(PRODUCT_SKILLS);
+    fs::set_permissions(&folder, fs::Permissions::from_mode(0o555)).unwrap();
+    let checks = skills_with_checks("2", "");
+    build_with_product_skills(&mut lamp, 2, "voice 1", &checks, &product_skills_of_build());
+    let outcome = lamp.round();
+    fs::set_permissions(&folder, fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(
+        matches!(&outcome, Outcome::Failed(why) if why.contains("ReadWritePaths")),
+        "{outcome:?}"
+    );
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    assert!(lamp.state()["refused"].as_array().unwrap().is_empty());
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), OLD_SKILL);
+}
+
 /// The machine as `lamp-update install` asks it, for a lamp made of files:
 /// users go into the root's /etc/passwd, and nothing else is done.
 struct InstallHost(PathBuf);

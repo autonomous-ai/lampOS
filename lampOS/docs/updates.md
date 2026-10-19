@@ -85,10 +85,12 @@ that is the channel's head.**
 
 - After the ARM64 job has built and tested a push of `lamp-voice`, a second
   job makes a manifest of every `lamp-*` binary (with its SHA-256 and size,
-  checked against CI's `SHA256SUMS`) and every unit of every lamp's own
-  folder (`deploy/<lamp>/`, a folder with a `LAMP.md`), signs it, and
-  publishes the binaries, the units (as `<lamp>.<unit>`), the manifest and
-  the signed envelope as release `lampos-lamp-voice-<run number>`: a
+  checked against CI's `SHA256SUMS`), every unit of every lamp's own
+  folder (`deploy/<lamp>/`, a folder with a `LAMP.md`), and the product
+  skills (`--skills lampOS/skills`, below: "The product's skills"), signs it,
+  and publishes the binaries, the units (as `<lamp>.<unit>`), the product
+  skills (`lamp-product-skills`), the manifest and the signed envelope as
+  release `lampos-lamp-voice-<run number>`: a
   prerelease, never "Latest", which this repository's other releases use.
 - It then replaces the one asset of release `lampos-lamp-voice`, the
   channel's head: `lampos-manifest.json`, the signed envelope of that
@@ -136,7 +138,9 @@ this task):
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: lampOS/deploy
+          sparse-checkout: |
+            lampOS/deploy
+            lampOS/skills
       - uses: actions/download-artifact@v4
         with:
           name: lampos-arm64-${{ github.sha }}
@@ -144,7 +148,7 @@ this task):
       - name: manifest
         run: |
           chmod +x build/lamp-*
-          build/lamp-update manifest --binaries build --deploy lampOS/deploy \
+          build/lamp-update manifest --binaries build --deploy lampOS/deploy --skills lampOS/skills \
             --channel lamp-voice --sequence ${{ github.run_number }} --commit ${{ github.sha }} \
             --files-url "https://github.com/${{ github.repository }}/releases/download/lampos-lamp-voice-${{ github.run_number }}/"
       - name: sign
@@ -184,8 +188,8 @@ this task):
             xargs -r -n1 gh release delete --repo "$REPO" --cleanup-tag --yes
 ```
 
-`build/lamp-*` takes the binaries and the units together (each unit asset
-begins with its lamp's name). Artifacts lose the files' modes, hence the
+`build/lamp-*` takes the binaries, the units and the product skills together
+(each unit asset begins with its lamp's name). Artifacts lose the files' modes, hence the
 `chmod`. A re-run of the same run has the same run number, its tag exists
 and the job fails without moving the head.
 
@@ -259,21 +263,25 @@ and the job fails without moving the head.
    installed. The folders made are recorded. With `--apply off` the round
    stops before this step, and prints the plan with each unit's changed
    lines.
-   **The skills still load** (the first builder on #1722). A round places
-   no skill: `/var/lib/lampOS/skills/` stays as it was, and a lamp gets the
-   build's skills only from `lamp-update install`. So when the skills part
-   changes folder, the build's `lamp-skills list --dir DIR` (the unit's
-   `--dir`, else `/var/lib/lampOS/skills`) and the running one's are read
-   on that folder, each killed after 30 s. A skill that loads now and that
-   the build would not load (folders from before #1698's `[permissions]`
-   under a lamp-skills with its checks) refuses the build before the quiet
-   moment, nothing switched: `build N's lamp-skills would not load these
-   skills of DIR, which load now: dance (voice/heard is not in [permissions]
-   topics); ...`. Every round tries again, and switches once they load
-   (after `lamp-update install`). A skill both refuse holds nothing back. A
-   running lamp-skills older than `list` (status 2: `list` and the checks
-   came together) loaded every folder; a build's that cannot list the
-   folder fails the round, nothing switched. Not run with `--apply off`.
+   **The skills still load** (the first builder on #1722), judged on the
+   folder as the round will leave it. With the build's product skills to
+   write (below, "The product's skills"), the lamp's skills folder is
+   copied to `skills-staged/` in the records and the writes are made there
+   only; without, the folder itself is judged. When the skills part changes
+   folder or product skills are written, the build's `lamp-skills list --dir
+   DIR` on that folder (the unit's `--dir`, else `/var/lib/lampOS/skills`)
+   and the running one's on the lamp's folder are read, each killed after
+   30 s, and the staged copy is removed. A skill that loads now and that the
+   build would not load (a skill of the person's, or a file of the lamp's
+   own, from before #1698's `[permissions]`, under a lamp-skills with its
+   checks) refuses the build before the quiet moment, nothing written or
+   switched: `build N's lamp-skills would not load these skills of DIR,
+   which load now: mine (voice/heard is not in [permissions] topics); ...`.
+   Every round tries again, and switches once they load. A skill both
+   refuse holds nothing back. A running lamp-skills older than `list`
+   (status 2: `list` and the checks came together) loaded every folder; a
+   build's that cannot list the folder fails the round, nothing switched.
+   Not run with `--apply off`.
 7. **The quiet moment.** Before anything is switched: the voice says on
    the bus that it is resting (`voice/state`, said once a second, at most
    3 s old), nothing was heard or said (`voice/heard`, `voice/said`) and the
@@ -290,7 +298,9 @@ and the job fails without moving the head.
    product part's `current` replaced whole: a new link made beside as
    `.current.lamp-update`, renamed over it, the folder synced. Quiet is asked once more: if
    someone spoke meanwhile, the old units go back and nothing is restarted.
-   Then each changed unit that was running is restarted: the voice first,
+   Then the build's product skills are written (planned again first, as the
+   lamp may have changed a file while the round waited; each file's bytes
+   before are in the journal, written with it). Then each changed unit that was running is restarted: the voice first,
    at the quiet moment itself; the body; then the rest by name. A unit that
    was not running is switched without being started.
 9. **Watch.** Every second for `--watch-s` (60): each restarted unit must
@@ -301,7 +311,10 @@ and the job fails without moving the head.
    that never reported is judged by systemd alone.
 10. **Back.** A part not well: every changed unit is written back as it
     was, reloaded, every moved link named its old build again (replaced
-    whole, as at the switch), and those restarted are restarted again in the reverse
+    whole, as at the switch), each product skill's file the switch wrote put
+    back as it was (or removed, with any folder made for it if still empty;
+    a file the lamp changed since it was written is left, and said), and
+    those restarted are restarted again in the reverse
     order: the voice last, and, unless the voice is what failed, only
     between two turns (resting, nothing heard or said for 5 s; at once if
     its state cannot be seen). They are watched again, the outcome says how
@@ -333,6 +346,65 @@ and the job fails without moving the head.
     `update/current`) is kept too, since no round switches it (#1680). A
     folder it did not make (every one installed by hand) is never removed.
 
+### The product's skills
+
+A round places the build's product skill folders from the channel, on by
+default (#2014's P2, the first builder's 01:29 and 02:07 on #2014): the
+updater a lamp runs is the one install left, and its baked skills
+(`install::SETTINGS`) are that install's, so without this a lamp with
+folders from before #1698 would refuse every build with #1698's
+lamp-skills, for good. `crates/update/src/product_skills.rs`:
+
+- **Carried:** `lamp-update manifest --skills lampOS/skills` writes
+  `lamp-product-skills` beside the binaries: JSON (`lampos-skills/1`) of
+  every file of each `install::PRODUCT_SKILLS` folder but its `tests/` and
+  hidden files, each text, at most 1 MiB. It is listed in the manifest's
+  `files` with its SHA-256 and size, as a binary is, so it is signed with
+  the manifest. No field is added to the manifest: it denies unknown
+  fields, so a new one would make every older updater refuse every build.
+  An older updater fetches only its parts' binaries and passes this file
+  over. A test holds the bundle of the repository, file for file, to what
+  `install::SETTINGS` writes.
+- **For which lamp:** one with a lamp-skills unit whose `--dir` is
+  `/var/lib/lampOS/skills`, install's folder, from a build that carries the
+  file. A lamp-skills reading a folder of the lamp's own (lamp-4ace's
+  `/var/lib/lamp-skills`) is given nothing. The file is fetched in step 3's
+  checks (a SHA-256 that doesn't match refuses the build), also with
+  `--apply off`, which lists each file it would write or keep.
+- **File by file, as #1913 decides**, from three: the build's before (its
+  SHA-256 in `state.json`'s `settings`, the record install keeps, or one
+  install was about to write), the build's now, and the lamp's now. Written:
+  one still the build's before, and one never there and never recorded.
+  Recorded only: one already the build's now. Kept, and said (`kept PATH:
+  this lamp's own; the build's is not written`): one the lamp changed, and
+  one removed on the lamp after it was recorded. A folder the build's
+  bundle doesn't name (a skill the person installed) is never read or
+  written but by the guard's copy. A skill the build no longer carries is
+  left as it is.
+- **When:** judged staged before the quiet moment (step 6), written at the
+  switch after the units and links and before any restart (step 8), put
+  back with the units (step 10), and recorded in `settings` only once the
+  switch is well. A switch cut short puts them back at the next start from
+  the journal. A build that changes no part here but its product skills
+  writes them without a quiet moment or a restart (lamp-skills reloads its
+  folder by itself), putting back what it wrote if a file fails, and is the
+  lamp's build.
+- **The sandbox:** `lamp-update.service` has `-/var/lib/lampOS/skills` in
+  `ReadWritePaths`. A round with files to write first makes and removes
+  `.lamp-update-probe` there; one that can't (a unit from before) fails,
+  nothing switched and the build not refused, so the next round tries
+  again: `/var/lib/lampOS/skills cannot be written (...): lamp-update.service
+  needs it in ReadWritePaths; nothing is switched`.
+
+Tests (`crates/update/tests/round.rs`):
+`a_round_places_the_builds_product_skills_and_keeps_the_lamps_own`,
+`the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load`,
+`a_build_put_back_puts_the_product_skills_back`,
+`product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start`,
+`a_build_of_only_new_product_skills_places_them_and_restarts_nothing`,
+`product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written`;
+and `product_skills::tests`, `publish::tests`.
+
 ### The commands
 
 ```text
@@ -343,7 +415,7 @@ lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setu
 lamp-update harness-off
 lamp-update harness-on
 lamp-update check-units --cat FILE [--product DIR]
-lamp-update manifest --binaries DIR --deploy DIR --channel NAME --sequence N --commit SHA --files-url URL
+lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --sequence N --commit SHA --files-url URL
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
 lamp-update public-key --key-file PRIVATE
 ```
@@ -380,7 +452,9 @@ refused with why, the folders made, the SHA-256 of each product setting as
 `install` last wrote it and of each it is about to write, and whether
 systemd is still owed an install's `enable`), `journal.json` (only while a switch is
 under way; for a product part it holds the link and the build it named, so
-a switch cut short is put back by the link too), `previous/` (the units
+a switch cut short is put back by the link too, and each product skill's
+file the switch writes as it was before), `skills-staged/` (only while a
+round judges the skills folder as it would leave it), `previous/` (the units
 before the last switch, and for each product part `<unit>.link`, one line:
 the link and the build it named; the way back by hand), `log.jsonl` (one line per round that acted, past 1 MiB begun again
 with one old file kept) and `lock`. Every line it says also goes to its
@@ -499,7 +573,7 @@ committed, never the owner's real key). `L` is the runbook's SSH alias.
    umask 077; openssl genpkey -algorithm ed25519 -outform DER | base64 > ~/lampos-update-test.key
    cargo run -q -p lamp-update -- public-key --key-file ~/lampos-update-test.key > ~/lampos-update-test.pub
    gh run download B -R autonomous-ai/lampOS -n lampos-arm64-<sha of B> -D ~/lampos-channel
-   cargo run -q -p lamp-update -- manifest --binaries ~/lampos-channel --deploy deploy \
+   cargo run -q -p lamp-update -- manifest --binaries ~/lampos-channel --deploy deploy --skills skills \
      --channel lamp-voice --sequence <run number of B> --commit <sha of B> \
      --files-url file:///var/tmp/lampos-channel/
    cargo run -q -p lamp-update -- sign --key-file ~/lampos-update-test.key \
