@@ -1102,8 +1102,6 @@ the file is never read back.
 
 | Part | Store, path | Format | Version | Field | Variant | At start, on a record it can't read |
 |---|---|---|---|---|---|---|
-| voice | Live provider settings (install writes them), `/etc/lampOS/voice/provider.json` | JSON | none | refused (`voice/src/config.rs:14`) | refused (`Authentication`, `ReconnectContext`, `SilentResponse`, `config.rs:67-102`) | **refuses to start**: "invalid private provider configuration" (`config.rs:170-178`), the worker exits, `main.rs:23-24` exits 1, restarted until `StartLimitBurst`. The path from worker to exit is read through the `?`s, not run |
-| voice | second route's settings, `/etc/lampOS/voice/second.json` | JSON | none | refused (`second_config.rs:12`) | `tts_provider` is a string checked against a list (`second_config.rs:325-334`) | **refuses to start**, the same way (`second_config.rs:304-324`, called at `second_provider/worker.rs:1156`) |
 | tasks | the store's container, `/var/lib/lampos-tasks/store/tasks.sqlite3` | SQLite | `user_version`, must be 1 | an extra table, index or trigger is refused (`tasks/src/store.rs:180-189`) | n/a | **refuses to start** on any other `user_version` (`store.rs:164-168`, through `runtime.rs:1776` to exit 1). Only the JSON snapshot inside is set aside (below) |
 | tasks | task state in the same file (`state.snapshot`) | JSON | `schema` 2 (oldest 1); higher is **set aside** as `tasks.sqlite3.newer-<schema>-<s>`, with a journal and health line (`engine.rs:1008-1025`, `1948-2000`) | read on `State`, `Task`, `Dispatch` (#1512); **refused** on `Target`, `Launch`, `Observation`, `LaunchOutcome` (`harness.rs:108,119,127,183`) | **refused**: e.g. `dispatch.state: "later"` at the same schema | a newer `schema` is set aside (low). An unknown value, or a field on a strict type, **without** a schema bump **refuses to start** (`engine.rs:390`). The bump is a rule in a comment (`engine.rs:58-66`), not a check |
 | schedule | the store's container, `/var/lib/lampos-schedule/store/schedule.sqlite3` | SQLite | `user_version`, must be 1 | n/a | n/a | **refuses to start** (`schedule/src/store.rs:165-169`, `runtime.rs:477`, exit 1) |
@@ -1145,6 +1143,8 @@ the file is never read back.
 | eyes | known faces, `/var/lib/lampos-eyes/people.json` | JSON | `version` 1; higher sets the whole file aside in `set-aside/` (`eyes/src/who.rs:426-437`, `1153-1168`) | read, dropped on save (`who.rs:295`, `309`) | n/a | a person it can't read is set aside alone, one count-only line (`who.rs:441-478`). Nothing reads `set-aside/` back, so a version 2 leaves the lamp knowing nobody |
 | eyes | its own set-aside records, `set-aside/people-*.json` | JSON | — | `Value` | n/a | not loaded; counted on health (`who.rs:1222-1228`) |
 | skills | installed skills, `/var/lib/lampOS/skills/<name>/` (`skill.toml`, `SKILL.md`) | TOML + Markdown | the skill's own semver only | refused (`skills/src/lib.rs:125`, ~20 nested types) | refused (`lib.rs:663-664`) | that skill is "not loaded: …" and the rest load (`main.rs:687-690`, `lib.rs:2828-2836`). Its functions are gone, core skills included |
+| voice | Live provider settings (install writes them), `/etc/lampOS/voice/provider.json` | JSON | none | read past, named once in the journal: `lamp-voice: <file>: fields this build does not read, ignored: …` (`voice/src/config.rs:70`, `90`, #1680); a field named as a key's (`*_key`, `token`, `*_secret`, `*_password`) is refused by name, since the file never holds a key (`config.rs:80`) | refused: a known field's bad value is a broken config, not a newer one (`Authentication`, `ReconnectContext`, `SilentResponse`, `config.rs:120-153`) | a file that doesn't read, or a known field with a bad value, still **refuses to start**: the voice can't run without it. The line names the file and serde's reason (`config.rs:226`) |
+| voice | second route's settings, `/etc/lampOS/voice/second.json` | JSON | none | read past and named, as `provider.json` (`second_config.rs:79`, `319`; line `lamp-voice second: …`), a key's field refused by name | `tts_provider` is a string checked against a list (`second_config.rs:338-347`), still refused | as `provider.json`: unreadable or a bad known value refuses to start, naming the file (`second_config.rs:310-336`) |
 | voice | conversation thread, `/run/lampos-voice/thread.json` (kept across a restart) | JSON | none | refused (`thread.rs:153`) | n/a | set aside as `.unreadable-<ms>` with a line (`thread.rs:368-372`, `917-940`) |
 | voice | news told, tasks typed, `/var/lib/lampOS/voice/tasks-told`, `tasks-typed` | text lines | none | n/a | n/a | read as empty, no line (`task_news.rs:419-423`): news may be told again |
 | voice | relay key `/etc/lampOS/voice/credential`; person's name `/etc/lampOS/person/name` | text | n/a | n/a | n/a | key read raw (`config.rs:400`); an unfit name is no name, with a line (`person.rs`) |
@@ -1181,7 +1181,9 @@ release's record and fails without the change, as lamp-tasks' fixture
 test does (#1512):
 
 1. **voice**: `provider.json` and `second.json` read past an unknown field
-   and value; a file it can't read at all is the only refusal. Then the
+   and value; a file it can't read at all is the only refusal. Done for
+   fields (#1680); a new value of a known field is still refused, since
+   these are settings and running on a broken one is worse. Then the
    delivery consumer's child (with schedule, below).
 2. **setup**: `serve.json` and `reset-plan.json` read one release
    forward (`el/stores-setup`, the rule agreed on #2060). A next build
