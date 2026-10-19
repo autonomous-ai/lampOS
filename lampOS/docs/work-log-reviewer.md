@@ -4,6 +4,22 @@
 
 Newest first. Times from `date` (+07).
 
+- 05:38 #2050 merged as 99e6232fb (trials three nudges)
+- 05:38 #2042 conflicts after #2050; asked Ten to rebase
+- 05:37 #2055 read (Nine: closed_early journal): no finding; merge on green
+- 05:37 #1964 read (Seventh: how_you_sound): no P1/P2; P3s (hold drops any line, msgs variant); goes with #1792
+- 05:37 #1998 read (Seventh: giving way): no P1/P2; P3 budget in memory; goes with #1792
+- 05:35 #2056 read (fix #1712's compile after #1944 + #1984): right; merge first; my #1944 check predated #1984
+- 05:31 #2054 read (second route: schedule words set it, memory words lose the alone note): no P1/P2; P3 remember/forget too broad
+- 05:30 #1993 read (Fourth: Finalize's words end the line): no P1/P2; P3 Jarvis's click (#2046); fold 3 commits; first builder's
+- 05:30 #2042 4c4d0fe91: P2s fixed, Mac 427/0 twice; merge on green
+- 05:29 #1067: P2 second commit makes the product clip move the head on every lamp (vs #2030); first builder's call
+- 05:29 #1699: no new finding since 00:03; first builder's after row 1
+- 05:29 #2053 read (Thirteen: base holds the glance while thinking): no finding; first builder's
+- 05:28 #1996 read (Second: durable output caps): P2 product unit passes --caps-dir, older lamp-actions exits 2 and crash-loops; P2 reset count 27 on rebase; first builder's
+- 05:22 #2050 read (Nine: three nudge trial rows): no finding; merge on green; raised #2029's thread-case flake on #1722
+- 05:18 #2051 read (Fourth: #2044's P3s): all fixed; first builder's
+- 05:16 #1927 read (Sixth: music sway): no P1/P2; own_voice choice fine; P3 no hand guard; first builder's
 - 05:12 #2049 read (Twelve: Days session leak): no finding; first builder's
 - 05:11 #2048 read (Third: 20 s forgiveness of a fruitless yield): no finding; note row 3 rule 8
 - 05:11 #2047: corrected my P3 (clock from the yield's start, margin ~4 s, fine)
