@@ -893,15 +893,25 @@ pub(crate) fn texts_ends(
 /// The worker's texts (#1673) as [`serve`] runs them: `messages::serve` with
 /// a text's own system message and functions ([`texts_ends`]). Built here
 /// from the character and the settings alone, so the spoken turn's `system`
-/// can never be handed to it (the reviewer on #1726).
+/// can never be handed to it (the reviewer on #1726). With the tasks part,
+/// news not told aloud is given with the answer to the next text
+/// (`task_news::ForTexts`).
 pub(crate) fn texts_task(
     model: impl crate::messages::Model + Send + Sync + 'static,
     character: String,
     tools: crate::tools::Settings,
     bus_root: PathBuf,
 ) -> impl std::future::Future<Output = ()> {
+    let news: Box<dyn crate::messages::Untold> = match tools
+        .tasks
+        .as_ref()
+        .and_then(|place| crate::task_news::ForTexts::for_tasks(&place.directory))
+    {
+        Some(news) => Box::new(news),
+        None => Box::new(crate::messages::NoNews),
+    };
     let (system, runner) = texts_ends(character, tools);
-    crate::messages::serve(model, system, runner, bus_root)
+    crate::messages::serve(model, system, runner, news, bus_root)
 }
 
 /// The system message for a text's answer (#1673): the character, the time

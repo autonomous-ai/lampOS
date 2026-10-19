@@ -5,9 +5,10 @@
 //! are not touched. The same character, notes and memory as a spoken turn
 //! (the second route's system message), and the same functions, with a
 //! note that the conversation is typed. Each chat (the app's `session_id`)
-//! keeps its own few exchanges. Off unless `LAMP_MESSAGES=on`, and only
-//! where the second route's worker runs, which needs its config
-//! (`LAMP_VOICE_SECOND_CONFIG`).
+//! keeps its own few exchanges. News of work handed over that the person
+//! hasn't been told is given with the answer to their next text, once
+//! ([`Untold`]). Off unless `LAMP_MESSAGES=on`, and only where the second
+//! route's worker runs, which needs its config (`LAMP_VOICE_SECOND_CONFIG`).
 use crate::second_provider::net::{Chat, ChatEvent, Message, ToolCall};
 use crate::second_provider::{System, ToolRunner};
 use futures_util::future::BoxFuture;
@@ -22,6 +23,48 @@ pub const ENVIRONMENT: &str = "LAMP_MESSAGES";
 pub const FLAG: &str = "--messages";
 /// What the model is told beside the lamp's own system message.
 pub const NOTE: &str = "(For you to know, not to answer: this conversation is typed, in the Autonomous app on the person's phone, not spoken at the lamp. They may be in another room or away. Answer in text, briefly and as yourself; you can't see or hear them now, and nothing you write is said aloud.)";
+/// Given with a text's answer when news waits: the notes after it were
+/// written for a turn the lamp begins aloud ([`typed`]).
+pub const NEWS: &str = "(News you have not told the person yet, from work you handed over for them. Answer what they wrote first, then tell them the news in the same reply, in a sentence or two of plain text. The notes below were written for a turn you begin aloud; here it is typed.)";
+
+/// The news of work handed over that the person hasn't been told, for the
+/// answers to texts (#1673; `task_news::ForTexts` on the lamp).
+pub trait Untold: Send + Sync {
+    /// The news waiting now. Never waits.
+    fn untold(&self) -> Vec<crate::task_news::News>;
+    /// The news `keys`, given in a whole reply, so it is not given or told
+    /// again.
+    fn given(&self, keys: &[String]);
+}
+
+impl Untold for crate::task_news::ForTexts {
+    fn untold(&self) -> Vec<crate::task_news::News> {
+        crate::task_news::ForTexts::untold(self)
+    }
+    fn given(&self, keys: &[String]) {
+        crate::task_news::ForTexts::given(self, keys);
+    }
+}
+
+/// No tasks part: no news.
+pub struct NoNews;
+
+impl Untold for NoNews {
+    fn untold(&self) -> Vec<crate::task_news::News> {
+        Vec::new()
+    }
+    fn given(&self, _: &[String]) {}
+}
+
+/// A note written for a turn the lamp begins aloud, as a typed answer is
+/// given it: without its "Nobody has spoken." opening, which a text just
+/// written would make untrue.
+pub fn typed(note: &str) -> String {
+    note.strip_prefix("(Nobody has spoken. ")
+        .map(|rest| format!("({rest}"))
+        .unwrap_or_else(|| note.to_owned())
+}
+
 /// What the person reads when the model could not be reached.
 pub const NOT_NOW: &str = "Sorry, I can't answer just now. Please try again in a moment.";
 /// The most exchanges a chat keeps, as user and assistant messages.
@@ -155,6 +198,7 @@ pub async fn serve(
     model: impl Model + Send + Sync + 'static,
     system: System,
     tools: ToolRunner,
+    news: Box<dyn Untold>,
     bus_root: std::path::PathBuf,
 ) {
     let bus = lamp_bus::Bus::new(&bus_root);
@@ -191,6 +235,7 @@ pub async fn serve(
                 &model,
                 &system,
                 &tools,
+                news.as_ref(),
                 &mut chats,
                 &text,
                 request,
@@ -205,10 +250,14 @@ pub async fn serve(
 
 /// The answer to `text`, numbered `request` for the functions: its pieces
 /// passed to `say` as they come (words, then the whole reply, or a fault).
+/// The news waiting in `news` is given with it, and kept as given once the
+/// whole reply has gone, never after a fault.
+#[allow(clippy::too_many_arguments)]
 pub async fn answer(
     model: &impl Model,
     system: &System,
     tools: &ToolRunner,
+    news: &dyn Untold,
     chats: &mut Chats,
     text: &ChatIn,
     request: u64,
@@ -222,7 +271,17 @@ pub async fn answer(
         text: words.to_owned(),
     };
     let told = system();
-    let mut messages = vec![Message::system(format!("{}\n\n{NOTE}", told.text))];
+    let waiting = news.untold();
+    let mut note = format!("{}\n\n{NOTE}", told.text);
+    if !waiting.is_empty() {
+        note.push_str("\n\n");
+        note.push_str(NEWS);
+        for item in &waiting {
+            note.push('\n');
+            note.push_str(&typed(&item.note));
+        }
+    }
+    let mut messages = vec![Message::system(note)];
     messages.extend(chats.kept(&session, Instant::now()));
     messages.push(Message::user(&text.text));
     let mut reply = String::new();
@@ -272,6 +331,10 @@ pub async fn answer(
         return;
     }
     say(piece(ChatPart::Final, &reply));
+    if !waiting.is_empty() {
+        let keys: Vec<String> = waiting.into_iter().map(|item| item.key).collect();
+        news.given(&keys);
+    }
     chats.remember(&session, &text.text, &reply, Instant::now());
 }
 
@@ -357,6 +420,7 @@ mod tests {
             model,
             &system(),
             tools,
+            &NoNews,
             chats,
             said,
             REQUESTS_FROM + 1,
@@ -364,6 +428,101 @@ mod tests {
         )
         .await;
         out
+    }
+
+    /// News for the tests: what waits, and what was given.
+    #[derive(Default)]
+    struct Waiting {
+        news: Mutex<Vec<crate::task_news::News>>,
+        given: Mutex<Vec<String>>,
+    }
+
+    impl Untold for Waiting {
+        fn untold(&self) -> Vec<crate::task_news::News> {
+            self.news.lock().unwrap().clone()
+        }
+        fn given(&self, keys: &[String]) {
+            self.news
+                .lock()
+                .unwrap()
+                .retain(|news| !keys.contains(&news.key));
+            self.given.lock().unwrap().extend(keys.iter().cloned());
+        }
+    }
+
+    fn news(key: &str, note: &str) -> crate::task_news::News {
+        crate::task_news::News {
+            key: key.into(),
+            note: note.into(),
+            until: None,
+            progress: None,
+            finished: None,
+            also: Vec::new(),
+        }
+    }
+
+    /// #1673: news not told aloud is given with the answer to the next text,
+    /// typed, once: the next text has none, and a fault gives none.
+    #[tokio::test]
+    async fn news_waiting_is_given_with_the_next_texts_answer_once() {
+        let waiting = Waiting::default();
+        waiting.news.lock().unwrap().push(news(
+            "s1:1:1",
+            "(Nobody has spoken. News from work you handed over for the person. Claude Code just finished the names: \"Lumi, Sunny and Archie.\")",
+        ));
+        let model = scripted(vec![
+            (
+                vec!["It's six. Claude Code finished the names."],
+                Vec::new(),
+            ),
+            (vec!["Yes."], Vec::new()),
+        ]);
+        let mut chats = Chats::default();
+        for words in ["What time is it?", "Are you there?"] {
+            let request = chats.next_request("s1");
+            answer(
+                &model,
+                &system(),
+                &no_tools(),
+                &waiting,
+                &mut chats,
+                &text(words, Some("s1")),
+                request,
+                |_| {},
+            )
+            .await;
+        }
+        let (first, second) = {
+            let sent = model.sent.lock().unwrap();
+            (
+                serde_json::to_value(&sent[0][0]).unwrap(),
+                serde_json::to_value(&sent[1][0]).unwrap(),
+            )
+        };
+        let first = first["content"].as_str().unwrap();
+        assert!(first.contains(NEWS), "{first}");
+        assert!(first.contains("Lumi, Sunny and Archie."), "{first}");
+        assert!(!first.contains("Nobody has spoken"), "{first}");
+        assert!(!second["content"].as_str().unwrap().contains(NEWS));
+        assert_eq!(*waiting.given.lock().unwrap(), ["s1:1:1"]);
+
+        // A model that can't answer gives nothing: the news still waits.
+        let waiting = Waiting::default();
+        waiting.news.lock().unwrap().push(news("s1:2:1", "(News.)"));
+        let failing = scripted(Vec::new());
+        answer(
+            &failing,
+            &system(),
+            &no_tools(),
+            &waiting,
+            &mut Chats::default(),
+            &text("Hi", None),
+            REQUESTS_FROM + 1,
+            |_| {},
+        )
+        .await;
+        assert!(waiting.given.lock().unwrap().is_empty());
+        assert_eq!(waiting.untold().len(), 1);
     }
 
     #[test]
@@ -547,7 +706,13 @@ mod tests {
             .subscribe_typed(ChatOut::TOPIC, "test", ChatOut::TYPE)
             .unwrap();
         let model = scripted(vec![(vec!["Hello ", "there."], Vec::new())]);
-        let worker = tokio::spawn(serve(model, system(), no_tools(), root.clone()));
+        let worker = tokio::spawn(serve(
+            model,
+            system(),
+            no_tools(),
+            Box::new(NoNews),
+            root.clone(),
+        ));
         let mut sends = bus
             .publisher_declared(ChatIn::TOPIC, &ChatIn::declaration(), "cloud")
             .unwrap();
@@ -619,7 +784,13 @@ mod tests {
         let model = Slow {
             wait: Duration::from_millis(400),
         };
-        let worker = tokio::spawn(serve(model, system(), no_tools(), root.clone()));
+        let worker = tokio::spawn(serve(
+            model,
+            system(),
+            no_tools(),
+            Box::new(NoNews),
+            root.clone(),
+        ));
         let mut sends = bus
             .publisher_declared(ChatIn::TOPIC, &ChatIn::declaration(), "cloud")
             .unwrap();

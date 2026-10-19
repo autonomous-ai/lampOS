@@ -1150,6 +1150,13 @@ An ask that names its task (`"task":10`) is given that task's news only,
 so the skill's look and light go with its own task (the reviewer on #1042).
 Progress is the Policy's to time already and is told as before.
 
+### Given with a text (#1673, off unless `LAMP_MESSAGES=on`)
+
+News the lamp hasn't told aloud is given with the answer to the person's
+next text from the Autonomous app, once, and then kept in the same file of
+what was told, so the voice doesn't tell it aloud after
+([messages.md](messages.md#news-when-youre-away)).
+
 ### News too long for one written turn (2026-10-15, 02:31)
 
 During a two-breath test on lamp-4ace (#740's first try), the voice ended
