@@ -203,3 +203,35 @@ fn a_broken_link_moved_to_another_broken_one_with_a_new_name_is_taken_up() {
     replace(&timezone, "Asia/Ho_Chi_Minh\n");
     assert_eq!(local.offset_minutes_at(at), 420);
 }
+
+/// A zone file handed in: New York's, slim as the bundle keeps it, whose
+/// listed changes stop in 2007 and leave the rest to its closing rule, read
+/// across both 2026 changes; Ho Chi Minh's the same all year; no zone file,
+/// nothing.
+#[test]
+fn a_zone_file_handed_in_is_read_past_its_listed_changes() {
+    let new_york = jiff_tzdb::get("America/New_York").unwrap().1;
+    let saigon = jiff_tzdb::get("Asia/Ho_Chi_Minh").unwrap().1;
+    let at = |text: &str| i64::try_from(ms(text) / 1000).unwrap();
+    for (when, offset) in [
+        ("2026-03-08T06:59:59Z", -18_000),
+        ("2026-03-08T07:00:00Z", -14_400),
+        ("2026-11-01T05:59:59Z", -14_400),
+        ("2026-11-01T06:00:00Z", -18_000),
+        ("2061-07-01T12:00:00Z", -14_400),
+    ] {
+        assert_eq!(
+            lamp_local_time::offset_seconds_in(new_york, at(when)),
+            Some(offset),
+            "{when}"
+        );
+    }
+    for when in ["2026-01-15T12:00:00Z", "2026-07-15T12:00:00Z"] {
+        assert_eq!(
+            lamp_local_time::offset_seconds_in(saigon, at(when)),
+            Some(25_200)
+        );
+    }
+    assert_eq!(lamp_local_time::offset_seconds_in(b"", 0), None);
+    assert_eq!(lamp_local_time::offset_seconds_in(&saigon[..60], 0), None);
+}

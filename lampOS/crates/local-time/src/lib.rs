@@ -87,6 +87,18 @@ impl LocalTime {
     }
 }
 
+/// Seconds east of UTC at `unix_s` (seconds since 1970 UTC) in the zone of
+/// a compiled zone file (RFC 8536) already read: its listed changes, and
+/// past them its closing rule, so a slim file's summer time is worked out as
+/// a full one's. For a part that holds a zone's file itself, as the voice
+/// does for another place's time and to tell two zones apart (#820).
+/// Nothing for bytes that are no zone file.
+pub fn offset_seconds_in(tzif: &[u8], unix_s: i64) -> Option<i32> {
+    let zone = TimeZone::tzif("zone", tzif).ok()?;
+    let at = Timestamp::from_second(unix_s).ok()?;
+    Some(zone.to_offset(at).seconds())
+}
+
 /// The system's zone: the zone file at `localtime` (a link to one, as setup
 /// makes it, or a copy), and, when that cannot be read, the zone `timezone`
 /// names.

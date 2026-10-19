@@ -4,237 +4,15 @@
 //! The model has no clock. On lamp-4ace on 2026-10-13 it told two people who
 //! asked how it was, at eleven in the morning, that it was "enjoying the quiet
 //! evening on the desk". The zone comes from the system's own compiled zone
-//! file (`/etc/localtime`, RFC 8536); nothing is spawned and no zone database
-//! is carried here.
-//!
-//! A zone with summer time whose file stops listing its changes and leaves
-//! them to a rule is not worked out: for a moment past the listed changes of
-//! such a zone nothing is told, which is how the lamp was before.
-
-const HEADER: usize = 44;
-
-struct Block<'a> {
-    wide: bool,
-    times: &'a [u8],
-    kinds: &'a [u8],
-    infos: &'a [u8],
-    end: usize,
-}
-
-fn block(file: &[u8], at: usize, wide: bool) -> Option<Block<'_>> {
-    let head = file.get(at..at.checked_add(HEADER)?)?;
-    if &head[..4] != b"TZif" {
-        return None;
-    }
-    let count = |index: usize| {
-        let bytes = head[20 + 4 * index..24 + 4 * index].try_into().ok()?;
-        let count = u32::from_be_bytes(bytes) as usize;
-        (count <= 100_000).then_some(count)
-    };
-    let (utc, standard, leaps, times, kinds, letters) = (
-        count(0)?,
-        count(1)?,
-        count(2)?,
-        count(3)?,
-        count(4)?,
-        count(5)?,
-    );
-    let width = if wide { 8 } else { 4 };
-    let times_at = at + HEADER;
-    let kinds_at = times_at + times * width;
-    let infos_at = kinds_at + times;
-    let end = infos_at + kinds * 6 + letters + leaps * (width + 4) + standard + utc;
-    if end > file.len() {
-        return None;
-    }
-    Some(Block {
-        wide,
-        times: &file[times_at..kinds_at],
-        kinds: &file[kinds_at..infos_at],
-        infos: &file[infos_at..infos_at + kinds * 6],
-        end,
-    })
-}
-
-impl Block<'_> {
-    fn time(&self, index: usize) -> Option<i64> {
-        if self.wide {
-            let bytes = self.times.get(index * 8..index * 8 + 8)?;
-            Some(i64::from_be_bytes(bytes.try_into().ok()?))
-        } else {
-            let bytes = self.times.get(index * 4..index * 4 + 4)?;
-            Some(i64::from(i32::from_be_bytes(bytes.try_into().ok()?)))
-        }
-    }
-}
+//! file (`/etc/localtime`, RFC 8536), read by `lamp-local-time` as every
+//! other part reads it (#820): past the changes a zone file lists, its
+//! closing rule is worked out, so a slim file's summer time is right too.
 
 /// Seconds east of UTC in the zone of this compiled zone file at `now`
-/// (seconds since 1970 UTC). Past the listed changes of a zone with summer
-/// time, nothing, as the lamp has always taken its own zone.
+/// (seconds since 1970 UTC): the zone's listed changes, and past them its
+/// closing rule (`lamp-local-time`, #820). Nothing for what is no zone file.
 pub fn offset_at(file: &[u8], now: i64) -> Option<i32> {
-    offset_with(file, now, false)
-}
-
-/// [`offset_at`], and with `ruled`, past the listed changes of a zone with
-/// summer time, its closing rule worked out ([`rule_offset`]): for another
-/// place's time only (`LAMP_TIME_PLACES`, #1547), whose zone file may be a
-/// slim one.
-fn offset_with(file: &[u8], now: i64, ruled: bool) -> Option<i32> {
-    let first = block(file, 0, false)?;
-    let (table, rule) = if file.get(4).is_some_and(|version| *version >= b'2') {
-        let second = block(file, first.end, true)?;
-        let rule = file.get(second.end..)?;
-        (second, rule)
-    } else {
-        (first, &[][..])
-    };
-    let mut kind = 0usize;
-    let mut listed = false;
-    for index in 0..table.kinds.len() {
-        if table.time(index)? > now {
-            listed = true;
-            break;
-        }
-        kind = usize::from(table.kinds[index]);
-    }
-    // Past the listed changes a rule with a comma in it is summer time:
-    // worked out, with `ruled`, where it is written as most zones write it
-    // ([`rule_offset`]); nothing otherwise.
-    if !listed && rule.contains(&b',') {
-        return ruled.then(|| rule_offset(rule, now)).flatten();
-    }
-    let info = table.infos.get(kind * 6..kind * 6 + 4)?;
-    let offset = i32::from_be_bytes(info.try_into().ok()?);
-    (-86_400 < offset && offset < 86_400).then_some(offset)
-}
-
-/// The zone file's closing rule (RFC 8536 section 3.3, a POSIX TZ string
-/// between newlines), worked out at `now`: seconds east of UTC. Only the
-/// `Mm.w.d` form of the change dates, which every zone with summer time now
-/// uses; `Jn` and `n` give nothing.
-fn rule_offset(rule: &[u8], now: i64) -> Option<i32> {
-    let text = std::str::from_utf8(rule).ok()?.trim_matches('\n');
-    let (head, changes) = text.split_once(',')?;
-    let (start, end) = changes.split_once(',')?;
-    let (head, standard_west) = zone_offset(skip_name(head)?)?;
-    let head = skip_name(head)?;
-    let summer_west = if head.is_empty() {
-        standard_west - 3_600
-    } else {
-        let (rest, west) = zone_offset(head)?;
-        if !rest.is_empty() {
-            return None;
-        }
-        west
-    };
-    let (standard, summer) = (-standard_west, -summer_west);
-    // The change dates fall in the year of `now` where the lamp would be.
-    let year = civil((now + i64::from(standard)).div_euclid(86_400)).0;
-    let begins = change(start, year)? - i64::from(standard);
-    let ends = change(end, year)? - i64::from(summer);
-    let in_summer = if begins < ends {
-        begins <= now && now < ends
-    } else {
-        now >= begins || now < ends
-    };
-    let offset = if in_summer { summer } else { standard };
-    (-86_400 < offset && offset < 86_400).then_some(offset)
-}
-
-/// Past a zone's name in a POSIX TZ string: letters, or anything in `<>`.
-fn skip_name(text: &str) -> Option<&str> {
-    if let Some(rest) = text.strip_prefix('<') {
-        return rest.split_once('>').map(|(_, rest)| rest);
-    }
-    let letters = text.bytes().take_while(u8::is_ascii_alphabetic).count();
-    Some(&text[letters..])
-}
-
-/// A POSIX offset (`5`, `-3:30`, `+05:45:00`) at the start of `text`, in
-/// seconds west of UTC as POSIX writes it, and what follows it.
-fn zone_offset(text: &str) -> Option<(&str, i32)> {
-    let (sign, text) = match text.as_bytes().first()? {
-        b'-' => (-1, &text[1..]),
-        b'+' => (1, &text[1..]),
-        _ => (1, text),
-    };
-    let (rest, seconds) = clock(text)?;
-    Some((rest, sign * seconds))
-}
-
-/// `hh[:mm[:ss]]` at the start of `text`, in seconds, and what follows.
-fn clock(text: &str) -> Option<(&str, i32)> {
-    let mut rest = text;
-    let mut seconds = 0;
-    for (index, scale) in [3_600, 60, 1].into_iter().enumerate() {
-        if index > 0 {
-            match rest.strip_prefix(':') {
-                Some(after) => rest = after,
-                None => break,
-            }
-        }
-        let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
-        if digits == 0 || digits > 3 {
-            return None;
-        }
-        seconds += rest[..digits].parse::<i32>().ok()? * scale;
-        rest = &rest[digits..];
-    }
-    Some((rest, seconds))
-}
-
-/// When a change written `Mm.w.d[/time]` falls in `year`, in seconds since
-/// 1970 on the local clock it is written in. The time may be negative or
-/// past 24 hours (RFC 8536 section 3.3.1).
-fn change(text: &str, year: i64) -> Option<i64> {
-    let (date, time) = match text.split_once('/') {
-        Some((date, time)) => {
-            let (sign, time) = match time.strip_prefix('-') {
-                Some(time) => (-1, time),
-                None => (1, time.strip_prefix('+').unwrap_or(time)),
-            };
-            let (rest, seconds) = clock(time)?;
-            if !rest.is_empty() {
-                return None;
-            }
-            (date, sign * seconds)
-        }
-        None => (text, 7_200),
-    };
-    let mut parts = date.strip_prefix('M')?.split('.');
-    let month: i64 = parts.next()?.parse().ok()?;
-    let week: i64 = parts.next()?.parse().ok()?;
-    let weekday: i64 = parts.next()?.parse().ok()?;
-    if parts.next().is_some()
-        || !(1..=12).contains(&month)
-        || !(1..=5).contains(&week)
-        || !(0..=6).contains(&weekday)
-    {
-        return None;
-    }
-    let first = days_from_civil(year, month, 1);
-    // 1970-01-01 was a Thursday: 4, counting Sunday as 0.
-    let first_weekday = (first + 4).rem_euclid(7);
-    let mut day = 1 + (weekday - first_weekday).rem_euclid(7) + (week - 1) * 7;
-    let next_month = if month == 12 {
-        days_from_civil(year + 1, 1, 1)
-    } else {
-        days_from_civil(year, month + 1, 1)
-    };
-    while day > next_month - first {
-        day -= 7;
-    }
-    Some((first + day - 1) * 86_400 + i64::from(time))
-}
-
-/// Days since 1970-01-01 of a date (Howard Hinnant's `days_from_civil`).
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
-    let year = if month <= 2 { year - 1 } else { year };
-    let era = year.div_euclid(400);
-    let of_era = year - era * 400;
-    let of_year = (153 * (if month > 2 { month - 3 } else { month + 9 }) + 2) / 5 + day - 1;
-    let days = of_era * 365 + of_era / 4 - of_era / 100 + of_year;
-    era * 146_097 + days - 719_468
+    lamp_local_time::offset_seconds_in(file, now).filter(|offset| offset.abs() < 86_400)
 }
 
 /// Year, month and day of a count of days since 1970-01-01.
@@ -287,17 +65,7 @@ fn words(
     file: &[u8],
     now: i64,
 ) -> Option<(&'static str, i64, &'static str, i64, i64, i64, &'static str)> {
-    words_with(file, now, false)
-}
-
-/// [`words`], with the zone's closing rule worked out when `ruled`
-/// ([`offset_with`]).
-fn words_with(
-    file: &[u8],
-    now: i64,
-    ruled: bool,
-) -> Option<(&'static str, i64, &'static str, i64, i64, i64, &'static str)> {
-    let local = now.checked_add(i64::from(offset_with(file, now, ruled)?))?;
+    let local = now.checked_add(i64::from(offset_at(file, now)?))?;
     let (days, seconds) = (local.div_euclid(86_400), local.rem_euclid(86_400));
     let (year, month, day) = civil(days);
     let (hour, minute) = (seconds / 3_600, seconds % 3_600 / 60);
@@ -468,7 +236,7 @@ fn here_in(zone: &str) -> String {
 /// "what time is it in London" was answered with the lamp's own, in Ho
 /// Chi Minh City. `here` is the lamp's own zone's name and file, if known.
 pub fn said_in(zone: &str, there: &[u8], here: Option<(&str, &[u8])>, now: i64) -> Option<String> {
-    let (weekday, day, month, year, hour, minute, part) = words_with(there, now, true)?;
+    let (weekday, day, month, year, hour, minute, part) = words(there, now)?;
     let place = place_name(zone);
     let mut said = format!(
         "In {place} it is {hour}:{minute:02} {part}, {weekday} {day} {month} {year}. Said aloud: {} {part}.",
@@ -633,14 +401,26 @@ fn minute_words(minute: i64) -> String {
     }
 }
 
+/// The lamp's own zone as every part reads it (`lamp-local-time`'s
+/// `system`, #820): `/etc/localtime`, taken up again when setup changes it,
+/// or the zone `/etc/timezone` names. Opened at its first use, and at each
+/// later one until it opens; nothing while neither can be read.
+pub fn system() -> Option<&'static lamp_local_time::LocalTime> {
+    static SYSTEM: std::sync::OnceLock<lamp_local_time::LocalTime> = std::sync::OnceLock::new();
+    if let Some(zone) = SYSTEM.get() {
+        return Some(zone);
+    }
+    let zone = lamp_local_time::LocalTime::zone("system").ok()?;
+    Some(SYSTEM.get_or_init(|| zone))
+}
+
 /// How many seconds east of UTC this machine's local time is now.
 pub fn offset_here() -> Option<i32> {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .ok()?
-        .as_secs();
-    let file = std::fs::read("/etc/localtime").ok()?;
-    offset_at(&file, i64::try_from(now).ok()?)
+        .as_millis();
+    Some(system()?.offset_minutes_at(u64::try_from(now).ok()?) * 60)
 }
 
 /// `on` for the voice to ask the kernel whether the clock is set before it
@@ -834,21 +614,18 @@ mod tests {
             (&sydney, 1_782_864_000, 36_000),    // 1 Jul
             (&tokyo, 1_792_316_400, 32_400),
         ] {
-            assert_eq!(offset_with(file, at, true), Some(offset), "{at}");
+            assert_eq!(offset_at(file, at), Some(offset), "{at}");
         }
-        // A rule this does not work out gives nothing.
+        // A rule of the other forms POSIX writes is worked out too; one
+        // that is no rule gives nothing.
         assert_eq!(
-            offset_with(&ruled(0, "XXX0YYY,J60,J300"), 1_792_316_400, true),
-            None
+            offset_at(&ruled(0, "XXX0YYY,J60,J300"), 1_792_316_400),
+            Some(3_600)
         );
         assert_eq!(
-            offset_with(&ruled(0, "GMT0BST,M3.6.0,M10.5.0"), 1_792_316_400, true),
+            offset_at(&ruled(0, "GMT0BST,M3.6.0,M10.5.0"), 1_792_316_400),
             None
         );
-        // The lamp's own zone is taken as it always was: past the listed
-        // changes of a zone with summer time, nothing.
-        assert_eq!(offset_at(&london, 1_792_888_200), None);
-        assert_eq!(offset_at(&tokyo, 1_792_316_400), Some(32_400));
     }
 
     /// #1547: lamp-4ace on 18 October at 16:40, "what time is it in
@@ -1042,7 +819,9 @@ mod tests {
             b'2',
             &[(-2_004_073_600, 1), (171_820_800, 2)],
             &[25_590, 28_800, 25_200],
-            "<+07>-7",
+            // The rule names the zone as its last change does: a file
+            // whose two disagree is no zone file.
+            "LMT-7",
         );
         assert_eq!(offset_at(&saigon, NOW), Some(25_200));
         assert_eq!(offset_at(&saigon, 0), Some(28_800));
@@ -1053,15 +832,20 @@ mod tests {
             Some(3_600)
         );
         assert_eq!(offset_at(&zone(b'2', &[], &[0], "UTC0"), NOW), Some(0));
-        // Summer time: told from the listed changes, not from the rule.
+        // Summer time: told from the listed changes, and past them from the
+        // rule (#820). A file that lists New York's change of 8 March 2026
+        // and no later one: 1 November's change is worked out from its
+        // rule, where before the lamp's own time was nothing.
         let listed = zone(
             b'3',
-            &[(NOW - 10, 1), (NOW + 10, 0)],
+            &[(1_772_953_200, 1)],
             &[-18_000, -14_400],
-            "EST5EDT,M3.2.0,M11.1.0",
+            "LMT5LMT,M3.2.0,M11.1.0",
         );
+        assert_eq!(offset_at(&listed, 1_772_953_199), Some(-18_000));
         assert_eq!(offset_at(&listed, NOW), Some(-14_400));
-        assert_eq!(offset_at(&listed, NOW + 10), None);
+        assert_eq!(offset_at(&listed, 1_793_512_799), Some(-14_400));
+        assert_eq!(offset_at(&listed, 1_793_512_800), Some(-18_000));
         // Not a zone file, a cut one, an absurd one.
         assert_eq!(offset_at(b"", NOW), None);
         assert_eq!(offset_at(&saigon[..60], NOW), None);
@@ -1106,7 +890,7 @@ mod tests {
 
     #[test]
     fn it_tells_the_day_and_the_part_of_it() {
-        let zone_at = |offset: i32| zone(b'2', &[], &[offset], "X");
+        let zone_at = |offset: i32| zone(b'2', &[], &[offset], "");
         let said = |offset: i32, now: i64| told(&zone_at(offset), now).unwrap();
         assert!(
             said(25_200, NOW)
