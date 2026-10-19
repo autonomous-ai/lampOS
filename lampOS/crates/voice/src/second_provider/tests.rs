@@ -3897,3 +3897,58 @@ async fn a_chat_begun_on_a_cut_ins_early_words_carries_its_note() {
         assert!(chats.iter().all(|chat| chat.contains(&cut_in)), "{chats:?}");
     }
 }
+
+/// #1712, the first builder's map (1), item 6: a stuffy room is told on
+/// this route as on Live, beside what a person says to the lamp, and never
+/// in a busy room, where the note is not even asked for, so it waits.
+#[tokio::test]
+async fn a_stuffy_room_is_told_beside_a_line_and_never_in_a_busy_room() {
+    const AIR: &str = "(For you to know, not to answer: the air at this desk has been stuffy for about 12 minutes.)";
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("What's on my calendar?".to_owned()),
+                Ok("And after lunch?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("A meeting at ten."), Ok(ChatEvent::Done)],
+                vec![text("Nothing after lunch."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let asked_for: Arc<Mutex<Vec<u64>>> = Arc::default();
+    let counted = asked_for.clone();
+    let tools: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .judging_busy(Arc::new(|request| request == 1))
+    .noting_the_air(Arc::new(move |request| {
+        counted.lock().unwrap().push(request);
+        Some(AIR.to_owned())
+    }));
+    for request in 1..=2 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    }
+    let asked = script.asked.lock().unwrap();
+    let told = |messages: &[Message]| messages.contains(&Message::system(AIR));
+    assert!(!told(&asked[0]), "the busy room's line: {:?}", asked[0]);
+    assert!(told(&asked[1]), "{:?}", asked[1]);
+    assert_eq!(
+        *asked_for.lock().unwrap(),
+        [2],
+        "never asked in the busy room"
+    );
+}

@@ -1345,6 +1345,21 @@ pub fn serve(
         );
         engine = engine.preparing(true);
     }
+    // A stuffy room told beside what a person says to the lamp, as the Live
+    // route tells it (`--air-facts`, #1712).
+    if files.air_facts
+        && let Some(bus) = files
+            .bus_root
+            .as_deref()
+            .and_then(|root| lamp_bus::Bus::new(root).ok())
+    {
+        let air = watch_air(bus);
+        engine = engine.noting_the_air(Arc::new(move |request| {
+            let note = air_due(&air, monotonic_us())?;
+            eprintln!("lamp-voice second: request {request}: the model is told the air is stuffy");
+            Some(note)
+        }));
+    }
     // A hand-over waiting for its yes, with the tasks part (#1712).
     if has_tasks {
         engine = engine.noting_a_task_waiting(Arc::new(|request| {
@@ -1641,6 +1656,61 @@ pub(crate) fn few_tools(
         });
     }
     given
+}
+
+/// How often the air is read from the bus, as the Live worker reads it.
+const AIR_READ_EVERY: Duration = Duration::from_secs(5);
+
+/// Whether a reading is stuffy, and its carbon dioxide; none, or a stale
+/// one, is not stuffy (`crate::air_told::FRESH_FOR`).
+pub(crate) fn air_reading(air: Option<&lamp_msgs::AirState>) -> (bool, Option<u16>) {
+    let stuffy = air.is_some_and(|air| {
+        matches!(
+            air.feel,
+            lamp_msgs::AirFeel::Stuffy | lamp_msgs::AirFeel::VeryStuffy
+        )
+    });
+    (stuffy, air.and_then(|air| air.co2_ppm))
+}
+
+/// The air, read from `bus` every [`AIR_READ_EVERY`] on a thread of its
+/// own, so a turn reads only what it keeps.
+fn watch_air(bus: lamp_bus::Bus) -> Arc<Mutex<crate::air_told::AirTold>> {
+    let kept: Arc<Mutex<crate::air_told::AirTold>> = Arc::default();
+    let air = kept.clone();
+    let started = std::thread::Builder::new()
+        .name("lamp-voice-air".into())
+        .spawn(move || {
+            loop {
+                let fresh_ms = crate::air_told::FRESH_FOR.as_millis() as u64;
+                let now_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| since.as_millis() as u64);
+                let reading = bus
+                    .latest(lamp_msgs::AirState::TOPIC)
+                    .ok()
+                    .flatten()
+                    .filter(|message| now_ms.saturating_sub(message.header.at_unix_ms) < fresh_ms)
+                    .and_then(|message| message.parse::<lamp_msgs::AirState>().ok());
+                let (stuffy, ppm) = air_reading(reading.as_ref());
+                if let Ok(mut air) = air.lock() {
+                    air.seen(stuffy, ppm, monotonic_us());
+                }
+                std::thread::sleep(AIR_READ_EVERY);
+            }
+        });
+    if let Err(error) = started {
+        eprintln!("lamp-voice second: the air is not read: {error}");
+    }
+    kept
+}
+
+/// The air's note if one is due at `now_us`, marked told.
+fn air_due(air: &Mutex<crate::air_told::AirTold>, now_us: u64) -> Option<String> {
+    let mut air = air.lock().ok()?;
+    let note = air.due(now_us)?;
+    air.told(now_us);
+    Some(note)
 }
 
 /// One call of the model's, as both runners run it.
@@ -3335,6 +3405,37 @@ mod tests {
 
     use super::*;
     use crate::second_provider::{Listener, Services, net};
+
+    /// #1712, the map's item 6: the air read as the Live worker reads it,
+    /// stuffy only for stuffy or very stuffy air; its note due after ten
+    /// stuffy minutes, once, then not for three hours (`crate::air_told`).
+    #[test]
+    fn the_air_is_read_as_on_live_and_its_note_is_given_once() {
+        let state = |feel| lamp_msgs::AirState {
+            pm1_0: None,
+            pm2_5: None,
+            pm4_0: None,
+            pm10: None,
+            humidity: None,
+            temperature: None,
+            co2_ppm: Some(1_871),
+            feel,
+        };
+        assert_eq!(
+            air_reading(Some(&state(lamp_msgs::AirFeel::Stuffy))),
+            (true, Some(1_871))
+        );
+        assert!(air_reading(Some(&state(lamp_msgs::AirFeel::VeryStuffy))).0);
+        assert!(!air_reading(Some(&state(lamp_msgs::AirFeel::Fine))).0);
+        assert_eq!(air_reading(None), (false, None));
+        let minute = 60_000_000;
+        let air = Mutex::new(crate::air_told::AirTold::default());
+        air.lock().unwrap().seen(true, Some(1_871), 0);
+        assert_eq!(air_due(&air, 9 * minute), None);
+        let note = air_due(&air, 12 * minute).unwrap();
+        assert!(note.contains("about 12 minutes") && note.contains("carbon dioxide about 1900"));
+        assert_eq!(air_due(&air, 13 * minute), None, "told once");
+    }
 
     /// #1712, the first builder at 18:56: with `LAMP_SECOND_FEW_TOOLS=on` a
     /// spoken turn's request is given its few functions and one that names

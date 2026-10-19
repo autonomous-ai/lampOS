@@ -637,6 +637,14 @@ order is kept. A written turn is the same from the chat on.
     lamp said" (or "… in a busy room; the model is not told …"), "only
     the lamp's name was said, and the model is told so", and "… no words
     of it came back: asked as the name".
+- **A stuffy room is told as on the Live route** (`LAMP_AIR_FACTS=on`, the
+  worker's `--air-facts`; #1712, the first builder's map, item 6). The
+  worker reads `air/state` every 5 s on a thread of its own
+  (`worker::watch_air`, `crate::air_told::AirTold`). Once the air has
+  felt stuffy or very stuffy for ten minutes, a spoken line in a room that
+  is not busy is told `air_told::note` beside its words, once, then not
+  for three hours. In a busy room the note isn't asked for, so a due one
+  waits. The journal says "the model is told the air is stuffy" ([air.md](air.md)).
 - **The first request after a stop is told of it.** With
   `LAMP_STOP_TOLD=on`, the first request after a hand or the head stopped
   the lamp carries `after_stop`. Gemini is told so with `STOPPED_NOTE`. This

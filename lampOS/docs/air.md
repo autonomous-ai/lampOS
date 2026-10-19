@@ -157,7 +157,12 @@ it reads `air/state` every five seconds; once the air has felt stuffy (or
 very stuffy) for ten minutes, the model is told so beside the next thing a
 person says to the lamp, in a room that is not busy, with leave to suggest
 a window once if it fits; not again for three hours. A reading older than
-30 s counts as no reading. The quiet droop and the light a shade dimmer
+30 s counts as no reading. The second route tells it the same way (#1712,
+the first builder's map, item 6): its worker reads `air/state` every five
+seconds on a thread of its own (`worker::watch_air`), and a spoken line in
+a room that is not busy is told the note beside its words
+(`Engine::noting_the_air`); in a busy room the note is not asked for, so a
+due one waits. The quiet droop and the light a shade dimmer
 are the Stuffy air skill (`skills/stuffy-air`, #1021, `docs/skills.md`),
 off unless installed and not yet run on a lamp.
 

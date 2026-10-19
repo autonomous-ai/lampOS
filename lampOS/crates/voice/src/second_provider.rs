@@ -340,6 +340,8 @@ struct Shared {
     name_sounded: Option<NameSounded>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
+    /// A stuffy room's note, when one is due ([`Engine::noting_the_air`]).
+    air: Option<TaskNote>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
@@ -693,6 +695,7 @@ impl Engine {
                 call_note: None,
                 name_sounded: None,
                 task_waiting: None,
+                air: None,
                 did: None,
                 hold: None,
                 words_heard: None,
@@ -974,6 +977,19 @@ impl Engine {
     /// this route's history keeps the words of its last exchanges, not its
     /// calls, so without it a yes was taken as a new hand-over (#1712).
     /// Before any turn only.
+    /// A spoken request in a room that is not busy is told, beside its
+    /// words, that the air has been stuffy a while, when `note` says it is
+    /// due (`--air-facts`, `crate::air_told`), as the Live route tells it
+    /// (#1712, the first builder's map: Live only until now). Asked only
+    /// outside a busy room, so a due note waits for one. Before any turn
+    /// only.
+    pub fn noting_the_air(mut self, note: TaskNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.air = Some(note);
+        }
+        self
+    }
+
     pub fn noting_a_task_waiting(mut self, note: TaskNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.task_waiting = Some(note);
@@ -1844,6 +1860,13 @@ async fn spoken(
     // words of its last exchanges, not its calls, so the model is told, or a
     // yes is taken as a new hand-over (#1712).
     let waiting = shared.task_waiting.as_ref().and_then(|note| note(request));
+    // A stuffy room, beside what a person says to the lamp, never in a busy
+    // room (`crate::air_told`).
+    let air = shared
+        .air
+        .as_ref()
+        .filter(|_| !shared.busy(request))
+        .and_then(|note| note(request));
     // The coordinator's marks, told as the Live route tells them (#1712).
     if !cut_in.is_empty() {
         eprintln!(
@@ -1897,6 +1920,7 @@ async fn spoken(
         .chain(call)
         .chain(alone)
         .chain(waiting)
+        .chain(air)
         .chain(follows_on)
         .chain(called)
         .collect();
