@@ -2149,6 +2149,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-station"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "lamp-msgs",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
 name = "lamp-surround"
 version = "0.1.0"
 dependencies = [
