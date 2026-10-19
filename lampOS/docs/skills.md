@@ -141,7 +141,7 @@ must not leave a step silently undone)*.
 | `kind` | no | `core` (comes with the lamp, always there, never removed) or `installable` (its owner puts it on and takes it off), `installable` without it (below, "Core and installable skills") |
 | `version` | no, but a package needs it | The skill's own version, `MAJOR.MINOR.PATCH`, three whole numbers without leading zeros (`"1.0.0"`) |
 | `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `messages`, `known_faces`, each `true` or left out. A key not listed refuses the skill, and so does a read or a step it does not give |
-| `[watch]` | no | The skill is a watch (below, "A watch"): `every`, `asked_within` and `mark`. Then it has a `tool` whose `[choice]` is exactly `on` and `off` with no default, and no trigger, `[[do]]`, `[flag]`, `[again]`, `still`, `[quiet]`, `[[while]]` or `[ask]` |
+| `[watch]` | no | The skill is a watch (below, "A watch"): `every`, `asked_within`, `if_heard`, `most` and `mark`. Then it has a `tool` whose `[choice]` is exactly `on` and `off` with no default, and no trigger, `[[do]]`, `[flag]`, `[again]`, `still`, `[quiet]`, `[[while]]` or `[ask]` |
 | `[trigger]` or `[[trigger]]` | yes, unless it has a `tool` | When the skill runs: one table, or several, each checked on its own |
 | `tool` | no | A function the model may call, which runs the steps (below, "Tools for the model"). A lowercase letter, then at most 47 lowercase letters, digits and `_`. It is described to the model with `SKILL.md`'s description, which is then at most 1,024 bytes and says when to call it |
 | `[choice]` | no | The tool's one argument the model picks from named values: `name` (a lowercase letter, then at most 31 lowercase letters, digits and `_`), `about` (what it means, told to the model, at most 256 bytes) and `one_of` (1 to 16 different plain names), with an optional `default`, one of them: a call that gives none is made as that value (#1679: Light show's party, Point the light's ahead). The model may leave it out. Only with a `tool` |
@@ -752,19 +752,55 @@ out. It has no trigger and no steps; its `[watch]` says what it does:
 ```toml
 [watch]
 every = "10m"                           # at most one text this often (1m to 24h)
-asked_within = "30s"                    # on only when someone spoke this lately (5s to 2m)
+asked_within = "30s"                    # on only when someone spoke this lately (5s to 2m)...
+if_heard = ["keep an eye", "guard"]     # ...asking for it: 1 to 16 entries, each whole words
+most = "12h"                            # it ends by itself this long after it was asked (1h to 24h)
 mark = { colour = "blue", level = 1 }   # a faint light while on: level 1 or 2, steady
 ```
 
 - **Turned by its tool.** A call with `turn = "on"` turns it on only if
-  something was heard on `voice/heard` within `asked_within` of the call (a
-  typed request is not heard) and the ring takes `light/request` for its
-  mark; else the model is told why. `off` always turns it off. Nothing else
+  the newest thing heard on `voice/heard`, within `asked_within` of the
+  call, has one of `if_heard`'s entries among its whole words, any case (a
+  typed request is not heard; a call after talk of something else is
+  refused), and the ring takes `light/request` for its mark; else the model
+  is told why. `off` always turns it off. Nothing else
   turns it on: not a message, not a load, a reload or a restart, which
   leave it off. A reload that changes its `[watch]`, or removes it, turns it
   off and gives its mark back.
 - **The mark** is asked of the ring while it is on, as any skill's light
-  with `LAMP_LIGHT_REQUESTS=on`, and given back when it goes off.
+  with `LAMP_LIGHT_REQUESTS=on`, and given back when it goes off. **While
+  the ring doesn't show it, the watch takes nothing about the desk** (the
+  peer read on #1807): until `light/reached` says it is shown, no visit
+  begins, ends or is texted, and `skills/events` says so; from the moment
+  it is turned on too, so a ring that never answers never has anyone
+  watched without a sign (reviewer-two on #1937,
+  `nothing_is_taken_until_the_ring_first_shows_its_mark`). A case's
+  recording says the ring's word as `light_reached.jsonl` (and
+  `light_outranked.jsonl`), taken as the program takes it. The first
+  builder's four rules for when the ring says it is outranked
+  (`light/outranked`), each pinned by a test (#1937):
+  1. **The person's own light over it pauses the watch** ("turn the light
+     off" on the way out): no new claim is made over their light, nothing is
+     counted, and one text, "I've paused watching while your light is off."
+     (`the_persons_light_pauses_it_until_they_ask_again`,
+     `guard_mode_pauses_under_the_persons_light_until_they_ask_again`).
+  2. **Another program's light over it is asked over again:** the mark is
+     given back and asked for with a new claim, at most once every 30 s, so
+     a light that outranks even that stays on top and the watch stays paused
+     (`guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again`).
+  3. **Paused, it goes on only when asked again in words** (`if_heard`):
+     asking is the person's yes to the mark over their light. Its mark is
+     then asked for anew, and it counts once the ring shows it (the same two
+     tests).
+  4. **Their light going on alone doesn't resume it:** it stays paused until
+     they ask, or until its `most` ends it
+     (`guard_mode_pauses_under_the_persons_light_until_they_ask_again`,
+     `a_pause_lasts_until_asked_or_its_most`).
+
+  So the mark never replaces a light the person just chose unasked, and the
+  watch never watches unseen.
+- **Its most:** `most` after it was asked it ends by itself, its mark given
+  back, with one text, "I've stopped keeping an eye on things."
 - **Visits** count once `room/presence` has said nobody since it was asked.
   A visit runs from someone there (or a face at least 0.10 of the picture's
   height) until `room/presence` says nobody; its end is one line on
@@ -777,7 +813,8 @@ mark = { colour = "blue", level = 1 }   # a faint light while on: level 1 or 2, 
   face back after they left ends the watch, from anyone else.
 - **The privacy switch**, `voice/privacy`'s `physical_muted`, is looked at
   with the known file on each pass of the program's loop while a watch is
-  on: closed, one line, once while it is on.
+  on: closed, one line each closing, none within a minute of the last; and
+  while it is closed the watch takes nothing about the desk.
 - **Its permissions:** `light` (the mark), `messages` (the text) and
   `known_faces`, and `room/presence`, `humans/faces/tracked`, `voice/heard`
   and `voice/privacy` in `topics`; without any of them it is not loaded.
