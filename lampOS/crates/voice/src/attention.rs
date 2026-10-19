@@ -659,8 +659,9 @@ pub fn called_by_name_on(heard: &str, stand_alone_ins: bool) -> bool {
 
 /// Whether what was heard is the lamp's name alone, or a word written for
 /// it, with greetings at most: "Lamp.", "Hey Lamp,", "Hey, Lynn." A call cut
-/// off at a pause, the rest still to come ([`called_by_name`] reads it as a
-/// call).
+/// off at a pause, the rest still to come. For the second route's carry, so
+/// read as that route reads a call: [`called_by_name_on`] with the words
+/// written for the name standing alone (#1973).
 pub fn only_the_name(heard: &str) -> bool {
     let is = |word: &str, list: &[&str]| list.iter().any(|known| word.eq_ignore_ascii_case(known));
     let words: Vec<&str> = heard
@@ -674,7 +675,7 @@ pub fn only_the_name(heard: &str) -> bool {
                 || is(word, STAND_INS)
                 || is(word, STAND_ALONE_INS)
         })
-        && called_by_name(heard)
+        && called_by_name_on(heard, true)
 }
 
 /// What the service has written in the name's place, first or after a
