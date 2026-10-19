@@ -98,7 +98,7 @@ pub const SELFTEST_PARTS: [&str; 16] = [
 
 /// The units a report may name: the product's `lamp-*.service` files
 /// (`deploy/product/`). A test holds the two the same.
-pub const UNITS: [&str; 23] = [
+pub const UNITS: [&str; 24] = [
     "lamp-actions.service",
     "lamp-air-clock.service",
     "lamp-air.service",
