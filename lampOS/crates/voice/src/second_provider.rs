@@ -1458,6 +1458,24 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
 }
 
 /// The closest provider fault for a client error. No text is carried.
+/// The down line ("I can't think right now; give me a minute."), when it
+/// is switched on, due and kept: as audio only, so it is no answer in the
+/// thread. Only to someone who spoke: a lamp's own turn (a hello, a skill's
+/// say) never says it (the reviewer on #1195).
+async fn say_down(shared: &Shared, request: u64, heard: bool) -> Result<(), Stop> {
+    if let Some((down, clip)) = shared
+        .down
+        .as_ref()
+        .filter(|_| heard)
+        .and_then(|down| Some((down, down.due()?)))
+    {
+        cue(shared, request, clip).await?;
+        down.said();
+        eprintln!("lamp-voice second: request {request} said it can't think right now");
+    }
+    Ok(())
+}
+
 pub fn fault(error: &net::Error) -> Fault {
     match error {
         net::Error::Url => Fault::Local,
@@ -2169,23 +2187,7 @@ async fn answer(
                                 "lamp-voice second: request {request} chat round {round} had not begun in {} ms; the turn ends unanswered",
                                 began.elapsed().as_millis()
                             );
-                            // Not nothing, when switched on: the line, as
-                            // audio only, so it is no answer in the thread.
-                            // Only to someone who spoke: a lamp's own turn
-                            // (a hello, a skill's say) never says it (the
-                            // reviewer on #1195).
-                            if let Some((down, clip)) = shared
-                                .down
-                                .as_ref()
-                                .filter(|_| heard)
-                                .and_then(|down| Some((down, down.due()?)))
-                            {
-                                cue(shared, request, clip).await?;
-                                down.said();
-                                eprintln!(
-                                    "lamp-voice second: request {request} said it can't think right now"
-                                );
-                            }
+                            say_down(shared, request, heard).await?;
                             return Err(Stop::GaveUp);
                         }
                     }
@@ -2206,10 +2208,20 @@ async fn answer(
                         refused = true;
                         break;
                     }
-                    event => event.map_err(|error| {
-                        eprintln!("lamp-voice second: request {request} chat round {round} failed after {} ms: {error}", began.elapsed().as_millis());
-                        Stop::Failed(fault(&error))
-                    })?,
+                    Ok(event) => event,
+                    Err(error) => {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round} failed after {} ms: {error}",
+                            began.elapsed().as_millis()
+                        );
+                        // A chat that answers with a refusal before any word
+                        // (401, 429, a 5xx) is as down as one that never
+                        // begins: the line, not silence (#1844's B).
+                        if first && round == 1 && matches!(error, net::Error::Status(_)) {
+                            say_down(shared, request, heard).await?;
+                        }
+                        return Err(Stop::Failed(fault(&error)));
+                    }
                 };
                 if first {
                     first = false;

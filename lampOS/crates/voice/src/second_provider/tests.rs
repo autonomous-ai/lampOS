@@ -2260,6 +2260,69 @@ async fn a_chat_that_never_begins_says_the_down_line_at_most_once_a_minute() {
     assert!(off[1..].iter().all(|turn| turn == &["complete"]), "{off:?}");
 }
 
+/// #1844's B: a chat that refuses before any word (429, 401, a 5xx) says the
+/// down line as a chat that never begins does, at most once a minute, then
+/// fails the turn as before; a written turn never says it; with it off,
+/// nothing.
+#[tokio::test(start_paused = true)]
+async fn a_chat_refused_before_any_word_says_the_down_line_at_most_once_a_minute() {
+    async fn turns(on: bool) -> Vec<Vec<String>> {
+        let refused = |status| vec![Err(net::Error::Status(status))];
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                    .take(5)
+                    .collect(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![text("It is noon."), Ok(ChatEvent::Done)],
+                    refused(429),
+                    refused(401),
+                    refused(401),
+                    refused(503),
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.saying_when_down(on);
+        let mut heard = Vec::new();
+        for (request, wait, spoken) in [
+            (1, 0, true),
+            (2, 1, true),
+            (3, 1, false),
+            (4, 1, true),
+            (5, 61, true),
+        ] {
+            tokio::time::sleep(Duration::from_secs(wait)).await;
+            if spoken {
+                engine.submit(start(request));
+                engine.submit(audio(request, 1));
+                engine.submit(end(request));
+            } else {
+                engine.submit(written(request, "Say hello."));
+            }
+            heard.push(sent(&mut engine).await);
+        }
+        heard
+    }
+    let line = format!("audio:{}", DOWN_LINE.len());
+    let on = turns(true).await;
+    assert!(!on[0].contains(&line), "{on:?}");
+    assert!(on[1].contains(&line), "the first refusal: {on:?}");
+    assert!(
+        on[1].iter().any(|event| event == "failed"),
+        "still a failed turn: {on:?}"
+    );
+    assert!(!on[2].contains(&line), "a written turn: {on:?}");
+    assert!(!on[3].contains(&line), "within the minute: {on:?}");
+    assert!(on[4].contains(&line), "past the minute: {on:?}");
+    let off = turns(false).await;
+    assert!(off.iter().all(|turn| !turn.contains(&line)), "{off:?}");
+}
+
 /// The rule is told which request a turn goes on from (`continues`): the one
 /// begun just before it, in its session; in another session, none (the
 /// reviewer on #1226).
