@@ -655,10 +655,23 @@ pub const FORGOTTEN_SOME_KEPT_APART: &str = "Forgotten. Tell them so, and that a
 /// No face of that name where the eyes could look, while old face records
 /// they couldn't read are kept apart (#1586).
 pub const NOT_KNOWN_SOME_KEPT_APART: &str = "You did not know a face by that name. A few old face records you could not read are kept apart: if one is theirs, it is forgotten if they ever come back, and a factory reset clears them.";
+/// What the person who asked to be remembered is told when the lamp also
+/// counts how often they come by (#1670): one short line, in the lamp's
+/// own words.
+pub const VISITS_LINE: &str = "Also say, in one short sentence, that you'll notice how often they come by, so you can greet them more warmly.";
 
 /// What the eyes said, in words the model can say.
 fn told(answer: &Value) -> Value {
     if let Some(name) = answer.get("remembered").and_then(Value::as_str) {
+        // With visits counted (`lamp-eyes --visits on`), the person is told so
+        // in one line, as they are remembered (the first builder on #1670).
+        if answer.get("visits").and_then(Value::as_bool) == Some(true) {
+            return json!({
+                "ok": true,
+                "remembered": name,
+                "also_say": VISITS_LINE,
+            });
+        }
         return json!({"ok": true, "remembered": name});
     }
     // Set-aside files the eyes couldn't search: the forget waits for them,
@@ -820,6 +833,16 @@ mod tests {
     fn what_the_eyes_say_becomes_words_the_model_can_say() {
         assert_eq!(
             told(&json!({"remembered":"Minh"})),
+            json!({"ok":true,"remembered":"Minh"})
+        );
+        // #1670: with visits counted, the person is told so in one line;
+        // a `visits` that isn't true says nothing more.
+        assert_eq!(
+            told(&json!({"remembered":"Minh","visits":true})),
+            json!({"ok":true,"remembered":"Minh","also_say":VISITS_LINE})
+        );
+        assert_eq!(
+            told(&json!({"remembered":"Minh","visits":"yes"})),
             json!({"ok":true,"remembered":"Minh"})
         );
         assert_eq!(told(&json!({"forgot":true})), json!({"ok":true}));

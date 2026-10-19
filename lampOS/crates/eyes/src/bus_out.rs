@@ -17,7 +17,9 @@
 //! voice's lines on `voice/heard`, said once a second while the eyes look.
 use crate::{away::Away, faces, facing, speaking};
 use lamp_bus::{Bus, Publisher, Subscriber};
-use lamp_msgs::{Diagnostic, Face, Faces, Level, RoomPresence, Speech};
+use lamp_msgs::{
+    Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, Level, RoomPresence, Speech,
+};
 use std::{io, time::Duration};
 
 /// Where the eyes read whether to publish. `on` only.
@@ -25,6 +27,7 @@ pub const ENVIRONMENT: &str = "LAMP_BUS";
 /// Where the eyes read whether to say if anyone is at the lamp, with the
 /// bus on. `on` only.
 pub const PRESENCE_ENVIRONMENT: &str = "LAMP_PRESENCE";
+
 /// The name the eyes publish under.
 pub const SOURCE: &str = "eyes";
 /// How long a list of faces means anything.
@@ -203,6 +206,9 @@ pub struct BusOut {
     reported_at_us: Option<u64>,
     /// With `LAMP_PRESENCE=on`: whether anyone is at the lamp.
     presence: Option<Presence>,
+    /// With `lamp-eyes --visits on`: how familiar the remembered person at
+    /// the lamp is (#1670).
+    familiar: Option<Publisher>,
 }
 
 /// `room/presence`, what it is judged from, and the voice's lines.
@@ -216,8 +222,10 @@ struct Presence {
 
 impl BusOut {
     /// The publisher, if the environment says `on` and the bus can be used.
-    /// A bus that cannot is said once and the eyes go on without.
-    pub fn from_environment() -> Option<Self> {
+    /// A bus that cannot is said once and the eyes go on without. With
+    /// `familiar` (`--visits on`), how familiar the remembered person at the
+    /// lamp is is said too (#1670).
+    pub fn from_environment(familiar: bool) -> Option<Self> {
         if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on") {
             return None;
         }
@@ -238,6 +246,9 @@ impl BusOut {
         {
             eprintln!("lamp-eyes: whether anyone is at the lamp is not said: {error}");
         }
+        if familiar && let Err(error) = out.say_familiar(&bus) {
+            eprintln!("lamp-eyes: how familiar the person at the lamp is is not said: {error}");
+        }
         Some(out)
     }
 
@@ -256,6 +267,7 @@ impl BusOut {
             alive_at_us: 0,
             reported_at_us: None,
             presence: None,
+            familiar: None,
         })
     }
 
@@ -273,6 +285,25 @@ impl BusOut {
             said_someone: false,
         });
         Ok(())
+    }
+
+    /// Also say how familiar the remembered person at the lamp is, on
+    /// `humans/familiar` (#1670).
+    pub fn say_familiar(&mut self, bus: &Bus) -> io::Result<()> {
+        let mut out =
+            bus.publisher_declared(HumanFamiliar::TOPIC, &HumanFamiliar::declaration(), SOURCE)?;
+        out.expires_after(Some(HumanFamiliar::LASTS));
+        self.familiar = Some(out);
+        Ok(())
+    }
+
+    /// At each recognition: how familiar the remembered person at the lamp
+    /// is, or `None` for nobody near, someone not remembered or not
+    /// recognised. Nothing without [`Self::say_familiar`].
+    pub fn familiar(&mut self, level: Option<FamiliarLevel>, now_us: u64) {
+        if let Some(out) = self.familiar.as_mut() {
+            let _ = out.publish_json(now_us, &HumanFamiliar { level });
+        }
     }
 
     /// One look: what the detector found in it.
@@ -693,5 +724,35 @@ mod tests {
             let text = serde_json::to_string(&seen).unwrap();
             assert_eq!(text.matches("\"speaking\":").count(), 2, "{text}");
         }
+    }
+
+    /// #1670: with familiarity on, each recognition says the level of the
+    /// remembered person at the lamp, or none, from the eyes, good for five
+    /// seconds; without it, nothing is said. No name is in it.
+    #[test]
+    fn how_familiar_the_person_at_the_lamp_is_is_said_only_when_switched_on() {
+        let root = std::path::PathBuf::from(format!("/tmp/lef-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(HumanFamiliar::TOPIC, "test", HumanFamiliar::TYPE)
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        out.familiar(Some(FamiliarLevel::Close), 1_000_000);
+        assert!(hears.recv(Duration::ZERO).unwrap().is_none());
+        out.say_familiar(&bus).unwrap();
+        out.familiar(Some(FamiliarLevel::Regular), 2_000_000);
+        out.familiar(None, 4_000_000);
+        let mut said = Vec::new();
+        while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+            assert_eq!(message.header.source, "eyes");
+            assert_eq!(message.header.expires_ms, Some(5_000));
+            let text = String::from_utf8_lossy(&message.payload).into_owned();
+            assert!(!text.contains("name"), "{text}");
+            said.push(message.parse::<HumanFamiliar>().unwrap().level);
+        }
+        assert_eq!(said, [Some(FamiliarLevel::Regular), None]);
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

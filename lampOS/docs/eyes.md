@@ -910,6 +910,54 @@ same way: before 2026-10-14 it was not given while the camera was not
 permitted, so the eyes read as gone from the bus whenever they were not
 looking.
 
+### How familiar a remembered person is (`--visits on`, #1670)
+
+Off unless `lamp-eyes --visits on`, which needs the recogniser (`--recogniser`, `--people`, `--who-socket`). Only
+for someone who asked to be remembered. The first builder's ruling on #1670
+(12:19): keep less than a day-by-day record, and the owner decides whether
+it is on in the product.
+
+- **Kept:** one number per remembered person in `people.json`
+  (`familiar`), beside one time of scoring for the whole file
+  (`scored_at_unix_s`). A person is counted when recognised, at most once
+  in 16 hours, **in memory only**: nothing is written at a visit. The
+  counts reach the file once **03:00 at the lamp** has passed (the lamp's
+  zone, `/etc/localtime` through `lamp-local-time`, followed as it changes;
+  UTC if it can't be read, said once), at the eyes' next once-a-minute look
+  whoever is at the lamp: every number is faded to that 03:00, each count
+  since is added (one a counted day), and the file is written with that
+  03:00 as its time of scoring. So neither the file's fields nor the time
+  it was written say when anyone came, only that a night passed (the
+  reviewer on #1763; the first builder's 13:38 for the hour). The first
+  scoring waits for the next 03:00 too. Numbers halve every fourteen days
+  (`who.rs`, `People::seen`, `People::score`). A restart before the day
+  ends loses that day's counts, and one in the same day may count someone
+  twice. Both fields are optional and only add, so the file keeps version
+  1. "Forget my face" removes the number and any count not yet written,
+  and the product reset empties the file.
+- **Levels:** `new` under 2, `regular` from 2 (about once a week, kept
+  up), `close` from 8 (about three days a week). These are authored, and
+  get tuned from real scores after a week on the office lamps.
+- **Said:** with `LAMP_BUS=on`, at each recognition (every 2 s while a face
+  is near) the level of the remembered person at the lamp, or `null` for
+  nobody near, someone not remembered or not recognised, on
+  `humans/familiar` (`lamp_msgs::HumanFamiliar`, good for 5 s). No name is
+  in it.
+- **Told:** when someone asks to be remembered, the eyes' answer carries
+  `"visits": true`, and the voice tells the model to say in one short
+  sentence that the lamp will notice how often they come by, so it can
+  greet them more warmly (`known_faces.rs`, `VISITS_LINE`).
+
+Tests (a lamp at UTC+7): counted once in 16 hours with nothing written;
+written only once 03:00 local has passed, once, scored as of that 03:00; `regular` on the
+third day, before it is written, and `close` after two weeks of days;
+halved in fourteen days and back to `new`; read back from the file; only
+the number and the time of scoring are written, nothing for someone never
+seen; and forgetting takes the number and an unwritten count
+(`who.rs`). The level is said only with the switch, from the eyes, with no
+name (`bus_out.rs`). The voice's line comes only with `visits: true`. Not
+run on a lamp.
+
 ### Whether anyone is at the lamp (`LAMP_PRESENCE=on`, #1677)
 
 With `LAMP_PRESENCE=on` beside `LAMP_BUS=on`, the eyes also say on
