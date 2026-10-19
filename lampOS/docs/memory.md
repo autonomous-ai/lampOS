@@ -345,7 +345,8 @@ the unchanged legacy client, used unless the new Days client is selected.
     known person can't forget the room's for everyone. The store's
     `forget {id}` removes it with its replacement chain, everything linked
     from it (later exchanges in which it was shown, observations), and for
-    an observation its sources.
+    an observation the exchanges it was taken from: one step back, never
+    what those were shown (#2003).
   - `forget_everything {}`, asked once and said yes to, is for **someone
     known only**: it sends `forget_all` for their own scope (never `null`,
     which would be everyone's), and for their rules' scope (`r-<person>`)

@@ -605,18 +605,15 @@ impl Days {
         )?;
         versions(&tx)?;
         // Forgetting an extracted fact also removes its evidence, otherwise a
-        // later tidy pass could simply extract the same fact again. This can
-        // remove an entire exchange containing more than one subject.
-        if record.kind == "observation" {
-            // Only the person's own evidence: a rule the exchange followed,
-            // in the scope beside theirs, is not evidence of the fact.
-            tx.execute("WITH RECURSIVE roots(rid) AS (SELECT rid FROM doomed UNION SELECT s.parent FROM sources s JOIN roots r ON s.child=r.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1) INSERT OR IGNORE INTO doomed SELECT rid FROM roots",[person.as_str()])?;
-        }
-        // A kept thing goes with the conversation it came up in (#1693,
-        // `remember_from`): one step back, the person's own exchanges only.
-        // An exchange's own sources are what its session was shown, not
-        // where the thing came from, so they are not followed.
-        if record.kind == "kept" {
+        // later tidy pass could simply extract the same fact again; and a
+        // kept thing goes with the conversation it came up in (#1693,
+        // `remember_from`). This can remove an entire exchange containing
+        // more than one subject. One step back, the person's own exchanges
+        // only: an exchange's own sources are what its session was shown,
+        // not where the fact came from, so climbing them removed kept things
+        // that were only shown (#2003). A rule the exchange followed, in the
+        // scope beside theirs, is not evidence either.
+        if record.kind == "observation" || record.kind == "kept" {
             tx.execute("INSERT OR IGNORE INTO doomed SELECT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'",[person.as_str()])?;
         }
         descendants(&tx, true)?;
