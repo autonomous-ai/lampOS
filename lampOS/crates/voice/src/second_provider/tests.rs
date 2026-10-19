@@ -2296,3 +2296,53 @@ async fn the_voice_makes_ready_as_a_line_begins() {
     assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
     assert_eq!(script.warmed.load(Ordering::Relaxed), 1);
 }
+
+/// #1712: a call the hold names is not run; the model is told it was not
+/// done, as the Live route tells it, and says nothing more of it.
+#[tokio::test]
+async fn a_held_call_is_not_run_and_the_model_is_told_so() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Yes, give me five minutes.".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "set_timer",
+                        json!({"text": "timer", "seconds": 300}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let calls: Calls = Arc::default();
+    let seen = calls.clone();
+    let runner: ToolRunner = Arc::new(move |_, heard, name, args| {
+        seen.lock().unwrap().push((name, args, heard));
+        Box::pin(async { json!({"ok": true}) })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .holding_calls(Arc::new(|request, name| {
+        request == 1 && name == "set_timer"
+    }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert!(calls.lock().unwrap().is_empty(), "the timer was not set");
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(
+        asked[1].last().unwrap(),
+        &Message::tool("c1".to_owned(), crate::policy_holds::held().to_string())
+    );
+}

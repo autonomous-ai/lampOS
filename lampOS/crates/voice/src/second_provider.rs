@@ -198,6 +198,9 @@ pub enum Did {
 }
 /// Where the engine says what the lamp did.
 pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
+/// Whether a call, by its request and name, is held as not said to the
+/// lamp ([`Engine::holding_calls`]).
+pub type CallHold = Arc<dyn Fn(u64, &str) -> bool + Send + Sync>;
 
 /// What every turn task shares.
 struct Shared {
@@ -234,6 +237,8 @@ struct Shared {
     task_waiting: Option<TaskNote>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
     did: Option<LampDid>,
+    /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
+    hold: Option<CallHold>,
 }
 
 /// A stop to be told beside a request's chat ([`crate::provider_worker::STOPPED_NOTE`]).
@@ -481,6 +486,7 @@ impl Engine {
                 conversation_alone: None,
                 task_waiting: None,
                 did: None,
+                hold: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -575,6 +581,18 @@ impl Engine {
     pub fn noting_the_conversation_alone(mut self, note: NameNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.conversation_alone = Some(note);
+        }
+        self
+    }
+
+    /// A call `hold` says is not the lamp's is not run: the model is told
+    /// it was not done ([`crate::policy_holds::HELD`]), as the Live route
+    /// tells it of a call the Policy holds (#1712: on lamp-4ace on 19 Oct
+    /// "Yes, give me five minutes", said to someone else, set a timer).
+    /// Before any turn only.
+    pub fn holding_calls(mut self, hold: CallHold) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.hold = Some(hold);
         }
         self
     }
@@ -1530,6 +1548,21 @@ async fn answer(
                 reasoning.take(),
             ));
             for call in &calls {
+                if shared
+                    .hold
+                    .as_ref()
+                    .is_some_and(|hold| hold(request, &call.name))
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} asked for {}: held, nothing shows it was said to the lamp",
+                        call.name
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        crate::policy_holds::held().to_string(),
+                    ));
+                    continue;
+                }
                 // The lamp's own work, for a question about it later, as the
                 // Live worker marks it for any turn not held (#829).
                 if (crate::agent_tasks::is_tool(&call.name)

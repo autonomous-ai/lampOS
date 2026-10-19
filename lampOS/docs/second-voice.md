@@ -869,7 +869,14 @@ after a take-over, but now for every turn:
   route's model reads one line of words, and on lamp-4ace on 19 Oct it
   answered colleagues' talk after a named request six times, where Live
   answered it once. Each answer kept the conversation going, and with no
-  line left unanswered the room never became busy.
+  line left unanswered the room never became busy. In such a line the
+  schedule's `set_timer`, `set_reminder` and `cancel_reminder`
+  (`policy_holds::SCHEDULE_HELD`) are not run (`Engine::holding_calls`,
+  `worker::Heeding::holds_call`): the model is told `policy_holds::HELD`,
+  as the Live route tells it of a call the Policy holds, and the journal
+  says `request N asked for set_timer: held, nothing shows it was said to
+  the lamp`. At 13:03 on 19 Oct "Yes, give me five minutes", said to
+  someone else, set a five-minute timer.
 - **The name note** (`LAMP_NAME_NOTE`) is given as on the Live route
   (`worker::Heeding::telling_the_name`): a line the lamp's name began, heard
   by `lamp-name` at `called::LEAST_SCORE` or more no more than

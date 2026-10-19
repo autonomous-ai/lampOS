@@ -837,6 +837,15 @@ pub fn serve(
                 heeding.lock().ok()?.name_note_for(request)
             }));
         }
+        // In such a line, nothing set to come from people's talk (#1712).
+        {
+            let heeding = heeding.clone();
+            engine = engine.holding_calls(Arc::new(move |request, name| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.holds_call(request, name))
+            }));
+        }
         // A line let out only as the conversation going on: the model, which
         // reads only words, is told it may be people's talk, with the tool
         // it leaves such talk alone with (#1712).
@@ -1461,6 +1470,14 @@ impl Heeding {
             }
             None => None,
         }
+    }
+
+    /// Whether a call is held in `request`: one that sets something to come
+    /// or takes it away (`policy_holds::SCHEDULE_HELD`) in a request let out
+    /// only as the conversation going on, as the Live route's busy-room rule
+    /// holds the schedule's (#1522, #1712).
+    pub(crate) fn holds_call(&self, request: u64, name: &str) -> bool {
+        self.alone == Some(request) && crate::policy_holds::SCHEDULE_HELD.contains(&name)
     }
 
     /// The note for `request` if the rule let it out only as the
@@ -2727,6 +2744,23 @@ mod tests {
         let next = (1_003_000_000, 1_004_000_000);
         assert_eq!(heeding.judge(10, next, talk, signs(true, false)), None);
         assert_eq!(heeding.conversation_note_for(10), None);
+        // #1712, line 8 of the battery: in such a line, nothing set to come.
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.judge(9, line, "Yes, give me five minutes.", signs(true, false)),
+            None
+        );
+        assert!(heeding.holds_call(9, "set_timer"));
+        assert!(heeding.holds_call(9, "set_reminder"));
+        assert!(heeding.holds_call(9, "cancel_reminder"));
+        assert!(!heeding.holds_call(9, "the_time"));
+        assert!(!heeding.holds_call(8, "set_timer"), "another request");
+        assert_eq!(
+            heeding.judge(10, next, "Lamp, set a timer.", signs(true, false)),
+            None
+        );
+        assert!(!heeding.holds_call(10, "set_timer"), "called by name");
     }
 
     /// #1712: the lamp's place follows its time, or stands alone.
