@@ -1129,7 +1129,9 @@ after a take-over, but now for every turn:
   place's time (`worker::time_elsewhere`): with `LAMP_TIME_PLACES` it is
   told `worker::TIME_ELSEWHERE` and needs its place; without it, it is
   not given. Whether DeepSeek then answers with no call is not yet shown
-  on a lamp.
+  on a lamp. All this is with `LAMP_CLOCK` on; with it off, the request is
+  told the time as a Live session without it is, roughly
+  (`local_time::told`), as before (the first builder on #1921).
 - **The lamp's place** (`LAMP_PLACE`, "Hanoi, Vietnam"): told beside the
   time, "You are in Hanoi, Vietnam. When someone asks about the weather,
   the news or anything nearby without naming a place, they mean Hanoi,

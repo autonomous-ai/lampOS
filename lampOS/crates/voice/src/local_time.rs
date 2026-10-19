@@ -769,10 +769,15 @@ pub fn told_here(clock: bool, places: bool) -> Option<String> {
     }
 }
 
-/// [`told_asked`] for this machine, now; with `places`
-/// (`LAMP_TIME_PLACES`), whose time it is and to ask
-/// [`crate::tools::THE_TIME`] for anywhere else ([`told_place`]).
-pub fn told_asked_here(places: bool) -> Option<String> {
+/// [`told_asked`] for this machine, now, with `clock` (`LAMP_CLOCK`);
+/// with `places` (`LAMP_TIME_PLACES`), whose time it is and to ask
+/// [`crate::tools::THE_TIME`] for anywhere else ([`told_place`]). Without
+/// `clock`, what a session without it is told ([`told_here`]), as before
+/// (the first builder on #1921).
+pub fn told_asked_here(clock: bool, places: bool) -> Option<String> {
+    if !clock {
+        return told_here(false, false);
+    }
     if unset_here() {
         return Some(TOLD_UNSET.to_owned());
     }
