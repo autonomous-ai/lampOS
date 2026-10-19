@@ -1370,6 +1370,10 @@ struct Changed {
     coloured: bool,
     dimmed: u8,
     lasting_us: u64,
+    /// The light as the run's steps left it, from the light shown before
+    /// it: a light held until its trigger ends is given back only if it is
+    /// still this.
+    left: Option<Light>,
 }
 
 /// What the body was told in this run: until when its last clip plays, and
@@ -1544,7 +1548,10 @@ fn perform(
         said.push(refused);
         return said.join("; ");
     }
-    let mut changed = Changed::default();
+    let mut changed = Changed {
+        left: before.clone(),
+        ..Changed::default()
+    };
     let mut played = Played::default();
     match asking {
         Some((what, asking)) => {
@@ -1639,9 +1646,12 @@ fn perform(
             }
         }
     }
-    // A dim held until its trigger ends waits for that end, however long,
-    // the ring's request renewed meanwhile when it is asked of the ring.
-    let held = end.filter(|_| changed.dimmed > 0 && (glow.is_some() || before.is_some()));
+    // A light held until its trigger ends (a dim, or a colour such as a
+    // pale breath, #1681) waits for that end, however long, the ring's
+    // request renewed meanwhile when it is asked of the ring.
+    let held = end.filter(|_| {
+        (changed.dimmed > 0 || changed.coloured) && (glow.is_some() || before.is_some())
+    });
     let held_until_ends = held.is_some();
     if let Some(end) = held {
         let _ = end.recv();
@@ -1665,9 +1675,9 @@ fn perform(
                     light_now(bus)
                 };
                 let left = |now: &Light| {
-                    now.on
-                        && now.colour == before.colour
-                        && now.level == before.level.saturating_sub(changed.dimmed).max(1)
+                    changed.left.as_ref().is_some_and(|left| {
+                        now.on && now.colour == left.colour && now.level == left.level
+                    })
                 };
                 if held_until_ends && !now.as_ref().is_some_and(left) {
                     said.push("light: changed meanwhile or not known, so left as it is".into());
@@ -1711,6 +1721,7 @@ fn act(
                 continue;
             }
             Call::Light { lasting, .. } => {
+                changed.left = lamp_skills::glow::asked(call, changed.left.as_ref());
                 changed.coloured = true;
                 changed.lasting_us = changed.lasting_us.max(
                     lasting
@@ -1719,7 +1730,12 @@ fn act(
                         .unwrap_or(0),
                 );
             }
-            Call::Dim { steps, .. } => changed.dimmed += steps,
+            Call::Dim { steps, .. } => {
+                if let Some(dimmed) = lamp_skills::glow::asked(call, changed.left.as_ref()) {
+                    changed.left = Some(dimmed);
+                }
+                changed.dimmed += steps;
+            }
             // Only the ring puts the light out (#1677): what it holds is
             // given back by asking again, as any light of the ring's.
             Call::Out { .. } if glow.is_some() => changed.dimmed += 1,
@@ -1802,6 +1818,7 @@ fn show(
             lasting: None,
             pattern: frame.pattern,
             keep: false,
+            until_ends: false,
         };
         let made = match glow {
             Some(glow) => glow.ask(&light),
@@ -2245,6 +2262,7 @@ mod tests {
             lasting: Some("4s".into()),
             pattern: None,
             keep: false,
+            until_ends: false,
         }
     }
 
