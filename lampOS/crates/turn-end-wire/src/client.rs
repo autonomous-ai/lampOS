@@ -147,6 +147,16 @@ pub struct Report {
     pub lost: u64,
     pub kills: u64,
     pub last_exit: Option<String>,
+    /// Current worker only: microseconds from its spawn attempt to kill request.
+    pub kill_requested_after_us: Option<u64>,
+    /// Current worker only: microseconds from spawn attempt to native wait result,
+    /// published before waiting for the reader. A wait error is also a result.
+    pub native_exit_after_us: Option<u64>,
+    /// Whether that native wait confirmed exit; None means no result observed yet.
+    pub native_reaped: Option<bool>,
+    /// Current worker only: spawn attempt to reader return, including protocol
+    /// errors. Reader completion does not necessarily mean stdout EOF.
+    pub reader_finished_after_us: Option<u64>,
     pub last_failure: Option<String>,
 }
 
@@ -480,6 +490,9 @@ fn read_responses(
     read_until_stop(shared, worker, stdout, spawned_at, model_sha256);
     let mut state = shared.lock();
     state.drained = state.drained.max(worker);
+    if state.worker == worker {
+        state.report.reader_finished_after_us = Some(elapsed_us(spawned_at));
+    }
     shared.wake.notify_all();
 }
 
@@ -635,6 +648,7 @@ fn monitor(
             Ok(Some(status)) => return Exit::reaped(status.to_string()),
             Ok(None) => {}
             Err(error) => {
+                shared.lock().report.kill_requested_after_us = Some(elapsed_us(spawned_at));
                 let _ = child.kill();
                 return match child.wait() {
                     Ok(status) => Exit::reaped(format!("{status} after a status error: {error}")),
@@ -669,6 +683,7 @@ fn monitor(
         };
         if kill {
             state.report.kills += 1;
+            state.report.kill_requested_after_us = Some(elapsed_us(spawned_at));
             drop(state);
             let killed = child.kill();
             // The supervisor alone reaps, so this PID cannot have been reused.
@@ -743,6 +758,10 @@ fn supervise(shared: &Arc<Shared>, command: &WorkerCommand, limits: Limits) {
             state.report.worker = state.worker;
             state.report.spawned += 1;
             state.report.pid = Some(child.id());
+            state.report.kill_requested_after_us = None;
+            state.report.native_exit_after_us = None;
+            state.report.native_reaped = None;
+            state.report.reader_finished_after_us = None;
             state.worker
         };
         let io = match (child.stdin.take(), child.stdout.take()) {
@@ -761,12 +780,7 @@ fn supervise(shared: &Arc<Shared>, command: &WorkerCommand, limits: Limits) {
             state.fault(worker, format!("worker threads: {error}"), false, true);
         }
         let exit = monitor(shared, worker, &mut child, spawned_at, limits);
-        let mut state = shared.lock();
-        // Let the reader record a final error the worker wrote before exiting.
-        let drain_by = Instant::now() + limits.grace;
-        while state.drained < worker && Instant::now() < drain_by {
-            state = shared.wait_for(state, drain_by - Instant::now());
-        }
+        let mut state = observe_exit_and_drain(shared, worker, &exit, spawned_at, limits.grace);
         let Exit { text: exit, reaped } = exit;
         state.report.last_exit = Some(exit.clone());
         state.queued = None;
@@ -823,4 +837,84 @@ fn supervise(shared: &Arc<Shared>, command: &WorkerCommand, limits: Limits) {
     let mut state = shared.lock();
     state.finished = true;
     shared.wake.notify_all();
+}
+
+/// Publish the native wait receipt before reader completion can delay teardown.
+/// Neither receipt changes the supervisor's existing completion criteria.
+fn observe_exit_and_drain<'a>(
+    shared: &'a Shared,
+    worker: u64,
+    exit: &Exit,
+    spawned_at: Instant,
+    grace: Duration,
+) -> MutexGuard<'a, State> {
+    let mut state = shared.lock();
+    state.report.native_exit_after_us = Some(elapsed_us(spawned_at));
+    state.report.native_reaped = Some(exit.reaped);
+    shared.wake.notify_all();
+    // Let the reader record a final error the worker wrote before exiting.
+    let drain_by = Instant::now() + grace;
+    while state.drained < worker && Instant::now() < drain_by {
+        state = shared.wait_for(state, drain_by - Instant::now());
+    }
+    state
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_reap_is_visible_while_reader_and_teardown_are_pending() {
+        let shared = Arc::new(Shared {
+            state: Mutex::new(State {
+                phase: Phase::Closed,
+                worker: 1,
+                next_request: 0,
+                queued: None,
+                in_flight: None,
+                result: None,
+                fault: None,
+                closing: true,
+                finished: false,
+                unreaped: None,
+                drained: 0,
+                report: Report {
+                    worker: 1,
+                    ..Report::default()
+                },
+            }),
+            wake: Condvar::new(),
+        });
+        let supervisor = shared.clone();
+        let task = thread::spawn(move || {
+            let spawned_at = Instant::now();
+            let status = Command::new("sh").args(["-c", "exit 0"]).status().unwrap();
+            let exit = Exit::reaped(status.to_string());
+            let mut state =
+                observe_exit_and_drain(&supervisor, 1, &exit, spawned_at, Duration::from_secs(10));
+            assert_eq!(state.drained, 1, "reader must be released by the test");
+            state.finished = true;
+            supervisor.wake.notify_all();
+        });
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut state = shared.lock();
+        while state.report.native_reaped.is_none() {
+            let remaining = deadline
+                .checked_duration_since(Instant::now())
+                .expect("native wait receipt");
+            state = shared.wait_for(state, remaining);
+        }
+        assert_eq!(state.report.native_reaped, Some(true));
+        assert!(state.report.native_exit_after_us.is_some());
+        assert_eq!(state.report.reader_finished_after_us, None);
+        assert_eq!(state.report.last_exit, None);
+        drop(state);
+        assert_eq!(shared.wait_finished(Duration::ZERO), Teardown::Pending);
+        // Release the reader barrier only after inspecting the intermediate report.
+        shared.lock().drained = 1;
+        shared.wake.notify_all();
+        task.join().unwrap();
+        assert_eq!(shared.wait_finished(Duration::ZERO), Teardown::Reaped);
+    }
 }

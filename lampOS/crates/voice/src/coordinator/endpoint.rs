@@ -198,7 +198,10 @@ pub(super) fn report_json(report: &Report) -> Value {
         "load_us":report.load_us,"cold_us":report.cold_us,"ready_after_us":report.ready_after_us,
         "model_sha256":report.model_sha256,"requests":report.requests,"verdicts":report.verdicts,
         "errors":report.errors,"discarded":report.discarded,"lost":report.lost,"kills":report.kills,
-        "last_exit":report.last_exit,"last_failure":report.last_failure})
+        "last_exit":report.last_exit,"last_failure":report.last_failure,
+        "kill_requested_after_us":report.kill_requested_after_us,
+        "native_exit_after_us":report.native_exit_after_us,"native_reaped":report.native_reaped,
+        "reader_finished_after_us":report.reader_finished_after_us})
 }
 
 /// Records each change of classifier availability with the worker report.
@@ -281,6 +284,29 @@ mod tests {
         let fast =
             worker_command(Endpoint::SmartTurnFast, "w".into(), "m".into(), true, None).unwrap();
         assert!(fast.args.iter().any(|arg| arg == "--fast"));
+    }
+
+    #[test]
+    fn worker_report_keeps_native_reap_separate_from_reader_completion() {
+        let report = Report {
+            worker: 3,
+            kill_requested_after_us: Some(300_000),
+            native_exit_after_us: Some(301_000),
+            native_reaped: Some(true),
+            ..Report::default()
+        };
+        let value = report_json(&report);
+        assert_eq!(value["worker"], 3);
+        assert_eq!(value["kill_requested_after_us"], 300_000);
+        assert_eq!(value["native_exit_after_us"], 301_000);
+        assert_eq!(value["native_reaped"], true);
+        assert!(value["reader_finished_after_us"].is_null());
+        assert!(value["last_exit"].is_null());
+        let finished = report_json(&Report {
+            reader_finished_after_us: Some(302_000),
+            ..report
+        });
+        assert_eq!(finished["reader_finished_after_us"], 302_000);
     }
 
     /// #1608: the worker is lowered only with a priority from 1 to 99, for

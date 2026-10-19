@@ -224,7 +224,28 @@ Each `Activity::End` records an `EndpointDecision`:
   - `endpoint_worker`: each availability change, with the worker report;
   - `local_endpoint.endpoint`: the decision and its verdict provenance;
     `includes_silence_wait_ms` is the actual pause;
-  - `endpoint_worker_final`: counters, and whether the worker was reaped.
+  - `endpoint_worker_final`: counters and the complete teardown result. Its
+    top-level `reaped: false` can mean the supervisor is still waiting for the
+    reader, even after a native wait confirmed the child's exit.
+  - Both worker reports include current-incarnation teardown receipts:
+    `kill_requested_after_us`, `native_exit_after_us`, `native_reaped`, and
+    `reader_finished_after_us`. Durations are microseconds from the same spawn
+    attempt (before launching the process), not wall-clock timestamps. These
+    four fields reset when a replacement starts; `worker` identifies the
+    incarnation. Null means that receipt has not been observed. A kill request
+    does not prove signal delivery. `native_reaped: false` means the native
+    wait returned an error, not that the process is known to be alive.
+  - The native wait receipt is published before the reader drain. Thus
+    `native_reaped: true` with no reader receipt distinguishes confirmed exit
+    from pending reader completion. Reader completion includes protocol/error
+    returns and is not necessarily stdout EOF. Subtract the kill receipt from
+    the native-exit receipt to measure the observed kill-to-wait tail; when
+    reader completion follows it, their difference measures that later tail.
+    These include thread scheduling and do not identify kernel causes.
+    Existing `last_exit` remains published after drain; null there alone
+    cannot identify an unreaped child. Receipt collection changes no timeout,
+    privacy decision, or teardown success criterion. Lamp measurements are
+    still required before choosing a different bound.
 
 ## Evidence
 
