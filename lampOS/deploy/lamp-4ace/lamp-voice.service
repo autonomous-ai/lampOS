@@ -135,10 +135,27 @@ Environment=LAMP_CUT_KEEPS_NAME=on
 # News of a task while it runs (#752/#793), from the policy's progress decisions (lamp-policy --act progress), under the voice's
 # own gates (lampOS/docs/tasks.md, "The voice's side of progress news"). On since 2026-10-15 20:07 on lamp-4ace.
 Environment=LAMP_PROGRESS_NEWS=on
-# The backup voice (#778, lampOS/docs/second-voice.md): a second route on the company relay (gpt-4.1-mini, its speech to text,
-# ElevenLabs), standing by while Gemini is ready and taking over when it is not. Keys copied from this lamp's V1 settings
-# into root-only files beside it. On since 2026-10-15 21:00.
+# The second route (#778, #1712, lampOS/docs/second-voice.md): from 2026-10-15 21:00 the backup voice standing by, and
+# since 19 Oct the lamp's only voice, as lamp-4ace runs it from its deploy copy (the first builder, #1712 20:01).
+# Deepgram's speech to text, DeepSeek's text model and search, and the configured voice (second.json's ElevenLabs,
+# eleven_v4_turbo) answer every turn, as on lamp-4ace; Gemini Live is not used. Live stays a per-lamp setting: a
+# drop-in with Environment=LAMP_VOICE_ROUTE=gemini. Without second.json or a key file below the voice does not start,
+# and never falls back to Live. Each lamp's person places these, root-only (0600), in /etc/lampOS/voice:
+#   second.json      the route's services and key paths (deploy/product/settings/second.json is its template);
+#   second-llm.key   second.json's llm_credential_file, and Gemini's key (the gemini.key credential, LoadCredential below);
+#   second-stt.key   second.json's stt_credential_file: speech to text;
+#   second-tts.key   second.json's tts_credential_file: the voice;
+#   deepseek.key     DeepSeek's text model and search (the deepseek.key credential).
+LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key
+LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key
+Environment=LAMP_VOICE_ROUTE=second
 Environment=LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json
+Environment=LAMP_SECOND_CHAT=deepseek
+Environment=LAMP_SECOND_SEARCH=deepseek
+Environment=LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo
+Environment=LAMP_SECOND_GEMINI_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/google-search/v1beta
+# The words of this lamp's played test lines, heard as written (#1830); not a product setting.
+Environment="LAMP_SECOND_KEY_TERMS=Hanoi,Da Nang,Ho Chi Minh City,desk lamp,two-line poem,haiku,Bitcoin,gold price,Louvre"
 # Whom it answered: one line per first output the rule judged, private to root on the lamp, never published
 # (lampOS/docs/attention.md, "The record of whom it answered"). Take this line out and nothing is written.
 Environment=LAMP_FIRST_OUTPUT=/var/lib/lampOS/voice/first-output

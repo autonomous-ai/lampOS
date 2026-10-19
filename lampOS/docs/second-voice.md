@@ -950,6 +950,30 @@ lamp's voice (`coordinator/second.rs`, `routes`):
   A value is taken exactly: `Second` or ` second` is refused. A bounded run
   (`lamp-voice directed`) has no second route, and refuses `second`.
 
+**The lamps' voice since 19 October** (the owner, #1712). The product unit
+(`deploy/product/lamp-voice.service`), lamp-52e6's, the repo's lamp-4ace
+unit and the attended pilot set `LAMP_VOICE_ROUTE=second`, as lamp-4ace runs
+it: `LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json`,
+`LAMP_SECOND_CHAT=deepseek`, `LAMP_SECOND_SEARCH=deepseek`,
+`LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo`, the relay's
+`LAMP_SECOND_GEMINI_BASE_URL`, the down-line and the wait cue. Live stays a
+per-lamp setting: a drop-in with `LAMP_VOICE_ROUTE=gemini`. Each lamp's
+person places these root-only (0600) in `/etc/lampOS/voice`; the keys stay
+with the owner:
+
+| File | What reads it |
+|---|---|
+| `second.json` | `LAMP_VOICE_SECOND_CONFIG`; its template is `deploy/product/settings/second.json` |
+| `second-llm.key` | second.json's `llm_credential_file`, and Gemini's key: the unit's credential `gemini.key` (`LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key`) |
+| `second-stt.key` | second.json's `stt_credential_file`: speech to text |
+| `second-tts.key` | second.json's `tts_credential_file`: the voice |
+| `deepseek.key` | DeepSeek's text model and search: the unit's credential `deepseek.key` (`LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key`) |
+
+Without second.json or one of the key files the voice does not start: a
+missing credential stops the unit, and the route never falls back to Live.
+Nothing on a lamp writes second.json yet (setup and the updater place
+`provider.json` only).
+
 With `second`, the journal says once at start:
 `lamp-voice: the voice route is second only (LAMP_VOICE_ROUTE=second): speech to text, a text model and speech answer every turn; Gemini Live is not used`.
 

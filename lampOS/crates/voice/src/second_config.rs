@@ -853,6 +853,49 @@ mod tests {
         assert!(load_from_path(&config).is_err());
     }
 
+    /// #1712, the first builder at 20:01: the product's template
+    /// (`deploy/product/settings/second.json`) is a configuration this
+    /// loader takes, its key files the ones the units name, and with them
+    /// beside it, it loads as lamp-4ace's: the relay for speech to text and
+    /// ElevenLabs for the voice.
+    #[test]
+    fn the_products_template_loads_with_the_key_files_the_units_name() {
+        let template = include_str!("../../../deploy/product/settings/second.json");
+        let value: serde_json::Value = serde_json::from_str(template).unwrap();
+        assert_eq!(
+            value["llm_credential_file"],
+            "/etc/lampOS/voice/second-llm.key"
+        );
+        assert_eq!(
+            value["stt_credential_file"],
+            "/etc/lampOS/voice/second-stt.key"
+        );
+        assert_eq!(
+            value["tts_credential_file"],
+            "/etc/lampOS/voice/second-tts.key"
+        );
+        let directory = directory("template");
+        let mut moved = template.to_owned();
+        for key in ["second-llm.key", "second-stt.key", "second-tts.key"] {
+            let file = directory.join(key);
+            private(&file, &format!("{key}-secret\n"));
+            moved = moved.replace(
+                &format!("/etc/lampOS/voice/{key}"),
+                &file.display().to_string(),
+            );
+        }
+        let config = directory.join("second.json");
+        private(&config, &moved);
+        let route = load_from_path(&config).unwrap();
+        assert_eq!(route.llm_key.expose(), "second-llm.key-secret");
+        assert_eq!(route.tts_key.expose(), "second-tts.key-secret");
+        assert_eq!(route.tts_provider, TtsProvider::ElevenLabs);
+        assert!(
+            matches!(&route.stt, Stt::Autonomous { key, .. } if key.expose() == "second-stt.key-secret")
+        );
+        fs::remove_dir_all(&directory).unwrap();
+    }
+
     /// A model name goes into the request's URL: only a plain name; and
     /// `llm_extra` cannot replace what the request itself says.
     #[test]
