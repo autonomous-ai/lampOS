@@ -333,7 +333,8 @@ the unchanged legacy client, used unless the new Days client is selected.
   came from. The opt-in store supports those links and transitive deletion;
   the legacy client does not send them or use frozen snapshots.
 - **Forgetting that reaches everything** (#1693 (1),
-  `LAMP_MEMORY_FORGET_ALL=on`, with the Days client only; off unless set).
+  `LAMP_MEMORY_FORGET_ALL=on`, with the Days client only; off unless set;
+  both voice routes, Live and the second, since twelve-P2).
   - `forget {source_id}` forgets something recall gave, by the
     `source_id` it showed. The id must be one this session was shown, in
     the scope it was shown from: the person's own when someone known is at
@@ -361,7 +362,8 @@ the unchanged legacy client, used unless the new Days client is selected.
     gave goes and something else stays; everything goes, journal included).
 
 - **Once, at a natural moment** (#1693 (3), `LAMP_MEMORY_THREADS=on`,
-  with the Days client only; off unless set). A session opened for someone
+  with the Days client only; off unless set; both voice routes since
+  twelve-P2). A session opened for someone
   known asks the memory `follow_up` within the note's 300 ms. The memory
   gives at most one open `thread` or `promise` observation of theirs, at
   least 6 hours old (not the same conversation) and at most 14 days old,
@@ -535,9 +537,9 @@ have no task 29 lamp measurements.
 
 ### What a person teaches and corrects (#813)
 
-Off unless set: the provider worker needs `LAMP_MEMORY_RULES=on` beside
+Off unless set: the provider worker, and since twelve-P2 the second route's, needs `LAMP_MEMORY_RULES=on` beside
 `LAMP_MEMORY_DAYS=on` (the coordinator passes both exact values through
-its cleared worker environment, to the provider only). With the legacy
+its cleared worker environment, to the provider and the second route). With the legacy
 memory, or without the switch, the model is told of no new function, the
 memory is asked nothing new and every session note is the same bytes
 (`remember::tests::without_the_rules_switch_nothing_changes`).

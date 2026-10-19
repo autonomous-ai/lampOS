@@ -4710,3 +4710,196 @@ mod tests {
         );
     }
 }
+
+/// twelve-P2 (#1693, the first builder at 21:14 on #1930): with the memory's
+/// switches on, the second route offers and runs what the Live route does,
+/// through its own calls: `remember::start` as its worker starts it,
+/// `tools::declared` as it declares, `tools::answer_keeping_news` as it
+/// answers a call within a turn's memory scope, and `remember::told_for_session`
+/// as it opens a person's session. In a child process: the memory, its
+/// switches and the Days client are this process's globals.
+#[cfg(test)]
+mod memory_switches {
+    use crate::memory_scope::{FaceCache, RequestKey, RequestScope};
+    use lamp_gemini::ToolCall;
+    use serde_json::{Value, json};
+    use std::{
+        io::{BufRead, BufReader, Write},
+        sync::{Arc, Mutex},
+        time::Instant,
+    };
+
+    const CHILD: &str = "LAMP_SECOND_MEMORY_SWITCHES_TEST_CHILD";
+    const NAME: &str =
+        "with_the_memorys_switches_the_second_route_forgets_tells_a_thread_and_lists_rules";
+
+    fn call(name: &str) -> ToolCall {
+        ToolCall {
+            id: format!("c-{name}"),
+            name: name.into(),
+            args: json!({}),
+        }
+    }
+
+    /// The memory part, as much of it as these calls ask: every request
+    /// line kept, and each answered as `lamp-memory` answers it.
+    fn memory(socket: &std::path::Path) -> Arc<Mutex<Vec<Value>>> {
+        let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
+        let read = Arc::new(Mutex::new(Vec::new()));
+        let kept = read.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let kept = kept.clone();
+                std::thread::spawn(move || {
+                    let mut lines = BufReader::new(stream.try_clone().unwrap()).lines();
+                    while let Some(Ok(line)) = lines.next() {
+                        let request: Value = serde_json::from_str(&line).unwrap();
+                        let answer = match request["op"].as_str() {
+                            // A person's frozen note (`remember::PERSON_SCOPE`).
+                            Some("session_open") => json!({"ok":true,"snapshot":{
+                                "session":request["session"],"opened_unix_ms":1,"generation":1,
+                                "invalidated":false,"source_ids":[7],
+                                "note":json!({"scope":"caller-supplied person; identity not verified",
+                                    "untrusted":true,"facts":[{"id":7,"kind":"preference","text":"tea"}]})
+                                    .to_string()}}),
+                            Some("follow_up") => json!({"ok":true,"follow_up":
+                                {"id":12,"category":"thread","text":"Sister's wedding is on Saturday"}}),
+                            Some("forget_all") => json!({"ok":true,"removed":5}),
+                            Some("kept") => json!({"ok":true,"entries":[]}),
+                            _ => json!({"ok":true}),
+                        };
+                        kept.lock().unwrap().push(request);
+                        if writeln!(stream, "{answer}").is_err() {
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+        read
+    }
+
+    #[test]
+    fn with_the_memorys_switches_the_second_route_forgets_tells_a_thread_and_lists_rules() {
+        if std::env::var(CHILD).ok().as_deref() != Some("1") {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    &format!("second_provider::worker::memory_switches::{NAME}"),
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .env(crate::remember::DAYS_ENVIRONMENT, "on")
+                .env(crate::remember::FORGET_ALL_ENVIRONMENT, "on")
+                .env(crate::remember::THREADS_ENVIRONMENT, "on")
+                .env(crate::rules::ENVIRONMENT, "on")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                output.status.success() && stdout.contains("1 passed"),
+                "{stdout}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("lv-second-memory-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        let socket = dir.join("memory.sock");
+        let read = memory(&socket);
+        // As the second worker starts its memory, declares and answers.
+        crate::remember::start(socket.clone(), None);
+        let settings = crate::tools::Settings {
+            memory: Some(socket.clone()),
+            ..crate::tools::Settings::default()
+        };
+        let declared: Vec<String> = crate::tools::declared(&settings)
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect();
+        for name in [
+            crate::remember::FORGET_EVERYTHING,
+            crate::rules::LIST_RULES,
+            crate::rules::KEEP_RULE,
+        ] {
+            assert!(declared.iter().any(|declared| declared == name), "{name}");
+        }
+        // Someone known at the lamp, bound to the turn as its engine binds it.
+        let known = dir.join("known");
+        std::fs::write(&known, "A").unwrap();
+        let faces = FaceCache::default();
+        faces.replace(
+            faces.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&known),
+        );
+        let request = 5;
+        let scope = RequestScope::new(
+            RequestKey {
+                worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            faces.snapshot(Instant::now()),
+        );
+        let lease = scope.lease();
+        let person = crate::remember::person_id("A");
+        assert_eq!(lease.scope().unwrap().person(), Some(person.as_str()));
+
+        // "Forget everything about me" reaches the memory and is answered.
+        let told = crate::tools::answer_keeping_news(
+            &settings,
+            &call(crate::remember::FORGET_EVERYTHING),
+            request,
+            true,
+            Some(&lease),
+        );
+        assert_eq!(told["forgotten"], true, "{told}");
+        assert_eq!(told["everything"], true, "{told}");
+        assert!(
+            read.lock()
+                .unwrap()
+                .iter()
+                .any(|line| line["op"] == "forget_all" && line["person"] == person.as_str()),
+            "{:?}",
+            read.lock().unwrap()
+        );
+
+        // A session opened for them is told the one open thread.
+        let note = crate::remember::told_for_session(&socket, 2, Some(&person));
+        assert!(
+            note.contains("\"Sister's wedding is on Saturday\""),
+            "{note}"
+        );
+        assert!(
+            read.lock()
+                .unwrap()
+                .iter()
+                .any(|line| line["op"] == "follow_up" && line["person"] == person.as_str())
+        );
+
+        // Their rules are listed from the memory too.
+        let before = read.lock().unwrap().len();
+        let listed = crate::tools::answer_keeping_news(
+            &settings,
+            &call(crate::rules::LIST_RULES),
+            request,
+            true,
+            Some(&lease),
+        );
+        assert!(listed.get("error").is_none(), "{listed}");
+        assert!(
+            read.lock().unwrap()[before..]
+                .iter()
+                .any(|line| line["op"] == "kept"
+                    && line["person"]
+                        .as_str()
+                        .is_some_and(|scope| scope.starts_with("r-"))),
+            "{:?}",
+            read.lock().unwrap()
+        );
+        drop(scope);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
