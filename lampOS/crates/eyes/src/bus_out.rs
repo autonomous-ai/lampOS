@@ -11,13 +11,20 @@
 //! while the camera is open, and a list that old says nothing about who is
 //! there now. With the camera closed nothing is published, and the last
 //! list is left to run out.
-use crate::{faces, facing, speaking};
-use lamp_bus::{Bus, Publisher};
-use lamp_msgs::{Diagnostic, Face, Faces, Level};
+//!
+//! With `LAMP_PRESENCE=on` as well (#1677), whether anyone is at the lamp,
+//! on `room/presence` ([`crate::away`]): the faces of each look and the
+//! voice's lines on `voice/heard`, said once a second while the eyes look.
+use crate::{away::Away, faces, facing, speaking};
+use lamp_bus::{Bus, Publisher, Subscriber};
+use lamp_msgs::{Diagnostic, Face, Faces, Level, RoomPresence, Speech};
 use std::{io, time::Duration};
 
 /// Where the eyes read whether to publish. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_BUS";
+/// Where the eyes read whether to say if anyone is at the lamp, with the
+/// bus on. `on` only.
+pub const PRESENCE_ENVIRONMENT: &str = "LAMP_PRESENCE";
 /// The name the eyes publish under.
 pub const SOURCE: &str = "eyes";
 /// How long a list of faces means anything.
@@ -194,6 +201,15 @@ pub struct BusOut {
     ids: Ids,
     alive_at_us: u64,
     reported_at_us: Option<u64>,
+    /// With `LAMP_PRESENCE=on`: whether anyone is at the lamp.
+    presence: Option<Presence>,
+}
+
+/// `room/presence`, what it is judged from, and the voice's lines.
+struct Presence {
+    out: Publisher,
+    heard: Subscriber,
+    away: Away,
 }
 
 impl BusOut {
@@ -203,13 +219,24 @@ impl BusOut {
         if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on") {
             return None;
         }
-        match Bus::from_environment().and_then(|bus| Self::on(&bus)) {
-            Ok(out) => Some(out),
+        let (bus, mut out) = match Bus::from_environment().and_then(|bus| {
+            let out = Self::on(&bus)?;
+            Ok((bus, out))
+        }) {
+            Ok(both) => both,
             Err(error) => {
                 eprintln!("lamp-eyes: nothing is published on the bus: {error}");
-                None
+                return None;
             }
+        };
+        // Without it, or if it can't be said, the faces are published as
+        // before.
+        if std::env::var(PRESENCE_ENVIRONMENT).ok().as_deref() == Some("on")
+            && let Err(error) = out.say_presence(&bus)
+        {
+            eprintln!("lamp-eyes: whether anyone is at the lamp is not said: {error}");
         }
+        Some(out)
     }
 
     pub fn on(bus: &Bus) -> io::Result<Self> {
@@ -226,7 +253,23 @@ impl BusOut {
             },
             alive_at_us: 0,
             reported_at_us: None,
+            presence: None,
         })
+    }
+
+    /// Also say whether anyone is at the lamp, on `room/presence`, from the
+    /// faces of each look and the voice's lines on `voice/heard` (#1677).
+    pub fn say_presence(&mut self, bus: &Bus) -> io::Result<()> {
+        let mut out =
+            bus.publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), SOURCE)?;
+        out.expires_after(Some(RoomPresence::LASTS));
+        let heard = bus.subscribe_typed(Speech::TOPICS[0], "eyes_presence", Speech::TYPE)?;
+        self.presence = Some(Presence {
+            out,
+            heard,
+            away: Away::default(),
+        });
+        Ok(())
     }
 
     /// One look: what the detector found in it.
@@ -240,14 +283,29 @@ impl BusOut {
         let seen = message(found, opens, filled, &mut self.ids, now_us);
         self.alive_at_us = now_us;
         let _ = self.faces.publish_json(now_us, &seen);
+        if let Some(presence) = self.presence.as_mut() {
+            presence.away.looked(now_us, !seen.faces.is_empty());
+        }
     }
 
     /// Call from the loop whether or not the camera is open: with it closed
     /// nothing is published, and this is what says the eyes are still there.
+    /// With `LAMP_PRESENCE=on`, whether anyone is at the lamp is said from
+    /// here, once a second while the eyes look.
     pub fn tick(&mut self, now_us: u64) {
         if now_us.saturating_sub(self.alive_at_us) >= 1_000_000 {
             self.alive_at_us = now_us;
             let _ = self.faces.alive();
+        }
+        if let Some(presence) = self.presence.as_mut() {
+            // When the voice heard the words, by the host's monotonic clock,
+            // never later than now: lines that waited are as old as they are.
+            while let Ok(Some(line)) = presence.heard.recv(Duration::ZERO) {
+                presence.away.heard(line.header.at_us.min(now_us));
+            }
+            if let Some(now) = presence.away.say(now_us) {
+                let _ = presence.out.publish_json(now_us, &now);
+            }
         }
     }
 
@@ -498,6 +556,97 @@ mod tests {
         assert_eq!(said.len(), 4, "{said:?}");
         assert_eq!(said[0].level, Level::Ok);
         assert_eq!(said[3].message, "the camera does not open");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// #1677: with presence on, each look and the voice's lines make
+    /// `room/presence`, said once a second, good for three, and nothing once
+    /// the looks stop.
+    #[test]
+    fn whether_anyone_is_at_the_lamp_is_said_from_the_looks_and_the_voices_lines() {
+        let root = std::path::PathBuf::from(format!("/tmp/lep-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(RoomPresence::TOPIC, "test", RoomPresence::TYPE)
+            .unwrap();
+        let mut voice = bus
+            .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        let mut said = Vec::new();
+        let mut take = |hears: &mut lamp_bus::Subscriber| {
+            while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+                assert_eq!(message.header.expires_ms, Some(3_000));
+                said.push(message.parse::<RoomPresence>().unwrap());
+            }
+        };
+        // Without the switch, nothing is said.
+        out.saw(&[], &[], PICTURE, 1_000_000);
+        out.tick(1_000_000);
+        take(&mut hears);
+        out.say_presence(&bus).unwrap();
+        // An empty room for 25 s, a look every 500 ms.
+        let s = 1_000_000u64;
+        // Read after each turn: a subscriber keeps only so many of a kept
+        // topic's messages.
+        for look in 0..50u64 {
+            let at = 2 * s + look * s / 2;
+            out.saw(&[], &[], PICTURE, at);
+            out.tick(at);
+            take(&mut hears);
+        }
+        // A voice heard at 26.5 s (the bus stamps the words when heard).
+        voice
+            .publish_json(
+                26 * s + s / 2,
+                &Speech {
+                    text: "where are my keys".into(),
+                    finished: true,
+                    locale: None,
+                    request: None,
+                },
+            )
+            .unwrap();
+        out.saw(&[], &[], PICTURE, 27 * s);
+        out.tick(27 * s);
+        take(&mut hears);
+        // A face at 28 s.
+        let seen = [face(240.0, 120.0, 160.0, 200.0, 0.0)];
+        out.saw(&seen, &[], PICTURE, 28 * s);
+        out.tick(28 * s);
+        take(&mut hears);
+        // The looks stop: after 5 s nothing more is said.
+        for turn in 0..20u64 {
+            out.tick(28 * s + turn * s / 2);
+            take(&mut hears);
+        }
+        assert_eq!(
+            said.first(),
+            Some(&RoomPresence {
+                someone: false,
+                nobody_s: 0
+            })
+        );
+        let before_voice = said
+            .iter()
+            .position(|now| now.someone)
+            .expect("the voice is someone");
+        assert_eq!(
+            said[before_voice - 1],
+            RoomPresence {
+                someone: false,
+                nobody_s: 24
+            }
+        );
+        assert_eq!(before_voice, 25, "once a second, then at once: {said:?}");
+        // Someone from the voice on, for as long as the eyes look.
+        assert!(
+            said[before_voice..].iter().all(|now| now.someone),
+            "{said:?}"
+        );
+        assert_eq!(said.len(), before_voice + 6, "{said:?}");
         std::fs::remove_dir_all(&root).unwrap();
     }
 

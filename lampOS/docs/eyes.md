@@ -881,6 +881,24 @@ same way: before 2026-10-14 it was not given while the camera was not
 permitted, so the eyes read as gone from the bus whenever they were not
 looking.
 
+### Whether anyone is at the lamp (`LAMP_PRESENCE=on`, #1677)
+
+With `LAMP_PRESENCE=on` beside `LAMP_BUS=on`, the eyes also say on
+`room/presence` (`lamp_msgs::RoomPresence`) whether anyone is at the lamp:
+`someone` while a face was seen or a voice heard within 20 s, else
+`nobody_s`, how long nobody has been there. Once a second while they look
+and at once when `someone` changes, each good for 3 s
+(`crates/eyes/src/away.rs`, said from `bus_out.rs`'s turn of the loop, so
+`main.rs` is unchanged). A face is any face of a look as published on
+`humans/faces/tracked`; a voice is any line on `voice/heard`, which the eyes
+subscribe to as `eyes_presence`, timed by when the voice heard it. With no
+look for 5 s nothing is said, so a closed camera never reads as nobody, and
+the count begins again when looks come back. It is the one signal the light
+going out and Messages read ([presence.md](presence.md)). A presence switch
+whose subscription fails is said once in the journal, and the faces are
+published as before. Not run on a lamp: its cost there is part of
+presence.md's lamp check.
+
 ### Whether a face is speaking (`LAMP_EYES_SPEAKING=on`, #720)
 
 Off unless `LAMP_EYES_SPEAKING=on` is in the eyes' unit beside `LAMP_BUS=on`.

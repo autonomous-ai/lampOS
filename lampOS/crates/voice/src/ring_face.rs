@@ -187,6 +187,12 @@ const COUNTDOWN_LOW: f32 = 0.15;
 /// eases and does not snap (First, #711).
 const SETTLE_EASE_US: f32 = 170_000.0;
 const SETTLE_US: u64 = 600_000;
+/// A light asked to fade in (#1677, a skill's light going out when nobody
+/// is there) is eased toward with a time of its fade over this: 98% of the
+/// way by the fade's end, its last visible step about three quarters of the
+/// way through. The ease is exponential, so the light falls as a share of
+/// itself, which the eye reads as an even dimming, like falling asleep.
+const FADE_EASES: f32 = 4.0;
 /// How long a tap on the head is listened for at rest: the attention rule's
 /// own window for a tap ([`crate::attention::TAPPED_BEFORE_US`]), so the
 /// face is shown as long as a request may begin as a call. It runs from the
@@ -239,6 +245,13 @@ pub struct Face {
     /// How the lamp's own light moves at rest, and since when (#940 item 3,
     /// a skill's pattern): none, and it rests in its own slow breath.
     pattern: Option<(LightPattern, u64)>,
+    /// How slowly, in µs, the face rests into its own light, when the light
+    /// shown was asked to fade in (#1677): none, its own quick ease.
+    fade_us: Option<u64>,
+    /// When a light that faded in was let go: the face then settles back
+    /// into its light as after a tap ([`SETTLE_EASE_US`] for
+    /// [`SETTLE_US`]), waking rather than snapping on.
+    woke_us: Option<u64>,
 }
 
 impl Default for Face {
@@ -270,6 +283,8 @@ impl Face {
             accent: 0,
             accent_at_us: 0,
             pattern: None,
+            fade_us: None,
+            woke_us: None,
         }
     }
 
@@ -369,6 +384,22 @@ impl Face {
     /// faces, a tap's and an ember are unchanged.
     pub fn pattern(&mut self, pattern: Option<(LightPattern, u64)>) {
         self.pattern = pattern;
+    }
+
+    /// How slowly the face rests into the lamp's own light, from `now_us`
+    /// (#1677, [`crate::ring_light::RingLight::fade`]): over `fade_ms` while
+    /// the light shown asks it, as something falling asleep, and its own
+    /// quick ease without. A turn's faces, a tap's and the face closing after
+    /// a turn ease as ever. Once such a light is let go, the face settles
+    /// back over about half a second, waking.
+    pub fn fade(&mut self, fade_ms: Option<u32>, now_us: u64) {
+        let fade_us = fade_ms.map(|ms| u64::from(ms) * 1_000);
+        if fade_us.is_some() {
+            self.woke_us = None;
+        } else if self.fade_us.is_some() {
+            self.woke_us = Some(now_us);
+        }
+        self.fade_us = fade_us;
     }
 
     /// The frame for `now_us`. `level` is the voice in play on the scale of
@@ -471,7 +502,18 @@ impl Face {
         });
         let open = open * blink * (1.0 - (1.0 - COUNTDOWN_LOW) * countdown);
         let seconds = (now_us % 3_600_000_000) as f32 / 1_000_000.0;
-        let ease = follow(step_us, if settling { SETTLE_EASE_US } else { EASE_US });
+        // At rest on its own light: slowly into a light asked to fade in
+        // (#1677), and back with a tap's settle once it is let go.
+        let own = mood == Mood::Resting && !settling && since_let_go.is_none();
+        let waking = self
+            .woke_us
+            .is_some_and(|at| own && now_us.saturating_sub(at) < SETTLE_US);
+        let pace = match self.fade_us.filter(|_| own) {
+            Some(fade_us) => fade_us as f32 / FADE_EASES,
+            None if settling || waking => SETTLE_EASE_US,
+            None => EASE_US,
+        };
+        let ease = follow(step_us, pace);
         let accent_t = (self.accent != 0
             && now_us >= self.accent_at_us
             && now_us - self.accent_at_us < ACCENT_US)
@@ -1234,6 +1276,95 @@ mod tests {
         assert_eq!(Lit::of(true, "mauve", 3), None);
         assert_eq!(Lit::of(true, "blue", 0), None);
         assert_eq!(Lit::of(true, "blue", LEVELS + 1), None);
+    }
+
+    /// #1677: a light asked to fade in is rested into over its fade, as
+    /// something falling asleep, never in one step; a turn over it is as
+    /// quick as ever; let go, the face wakes back into its light in about
+    /// half a second, not at once.
+    #[test]
+    fn a_light_asked_to_fade_in_is_rested_into_slowly_and_woken_from_in_half_a_second() {
+        let (warm, out) = (
+            Lit::of(true, "warm", 3).unwrap(),
+            Lit::of(false, "warm", 3).unwrap(),
+        );
+        // Each frame beside a face resting at warm 3 and one at the ember,
+        // drawn at the same times, so the breath is the same in all three.
+        let mut lit = Face::new();
+        lit.light(warm);
+        let mut ember = Face::new();
+        ember.light(out);
+        let mut face = Face::new();
+        face.light(warm);
+        let frame = |face: &mut Face, at_us: u64| total(&face.render(Mood::Resting, 0, at_us, 48));
+        for step in 0..100u64 {
+            for face in [&mut lit, &mut ember, &mut face] {
+                frame(face, step * 20_000);
+            }
+        }
+        // It goes out over 30 s from 2 s.
+        face.light(out);
+        face.fade(Some(30_000), 2_000_000);
+        let mut fell = Vec::new();
+        for step in 0..1_500u64 {
+            let at = 2_000_000 + step * 20_000;
+            fell.push((
+                frame(&mut lit, at),
+                frame(&mut ember, at),
+                frame(&mut face, at),
+            ));
+        }
+        let share = |(lit, ember, face): (u32, u32, u32)| {
+            (face as f32 - ember as f32) / (lit as f32 - ember as f32)
+        };
+        // Most of the light is there after a second, about a quarter after
+        // ten, nearly none by the end: an exponential over a quarter of the
+        // fade.
+        assert!(share(fell[50]) > 0.8, "{:?}", fell[50]);
+        assert!((0.15..0.4).contains(&share(fell[500])), "{:?}", fell[500]);
+        assert!(share(fell[1_499]) < 0.05, "{:?}", fell[1_499]);
+        // Never a step: no frame falls by a tenth of the light from the one
+        // before. Its own quick ease takes a quarter in the first frame.
+        let most = fell
+            .windows(2)
+            .map(|pair| share(pair[0]) - share(pair[1]))
+            .fold(0.0f32, f32::max);
+        assert!(most < 0.1, "{most}");
+        // A turn's face over it comes as quickly as ever.
+        let mut plain = Face::new();
+        assert_eq!(
+            play(&mut face, Mood::Listening, 120, 32_000_000, 80).last(),
+            play(&mut plain, Mood::Listening, 120, 32_000_000, 80).last(),
+        );
+        // Back to rest, out still, and let go at 60 s: it wakes into its
+        // light, more slowly than a snap, and is there within the second.
+        for step in 0..1_320u64 {
+            frame(&mut face, 33_600_000 + step * 20_000);
+        }
+        face.light(warm);
+        face.fade(None, 60_000_000);
+        let mut woke = Vec::new();
+        for step in 0..50u64 {
+            let at = 60_000_000 + step * 20_000;
+            woke.push((
+                frame(&mut lit, at),
+                frame(&mut ember, at),
+                frame(&mut face, at),
+            ));
+        }
+        assert!(share(woke[0]) < 0.2, "{:?}", woke[0]);
+        assert!(share(woke[5]) < 0.6, "{:?}", woke[5]);
+        assert!(share(woke[49]) > 0.9, "{:?}", woke[49]);
+        // Once woken, a change eases as quickly as ever: a quarter of the
+        // way in its first frame.
+        face.light(out);
+        let at = 61_020_000;
+        let next = (
+            frame(&mut lit, at),
+            frame(&mut ember, at),
+            frame(&mut face, at),
+        );
+        assert!(share(next) < 0.85, "{next:?}");
     }
 
     #[test]

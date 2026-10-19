@@ -6,7 +6,9 @@
 //! the program's own clock when a message arrives, a message's `at_us` when
 //! a recording is replayed.
 use lamp_bus::Header;
-use lamp_msgs::{Faces, Light, LightPattern, PatternKind, SkillEvent, SkillStage, Speech};
+use lamp_msgs::{
+    Faces, Light, LightPattern, LightRequest, PatternKind, SkillEvent, SkillStage, Speech,
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
@@ -345,6 +347,10 @@ struct LightFile {
     #[serde(rename = "for")]
     lasting: Option<String>,
     dim: Option<u8>,
+    /// `true`: the light goes out, asked of the ring (#1677).
+    out: Option<bool>,
+    /// How slowly the ring fades into it, with `out`.
+    over: Option<String>,
     until: Option<String>,
     pattern: Option<PatternFile>,
 }
@@ -443,7 +449,7 @@ impl Permissions {
             Call::Gaze { .. } | Call::Gesture(_) | Call::Move(_) | Call::Mood { .. } => {
                 ("body", self.body)
             }
-            Call::Light { .. } | Call::Dim { .. } => ("light", self.light),
+            Call::Light { .. } | Call::Dim { .. } | Call::Out { .. } => ("light", self.light),
             Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. } => ("speak", self.speak),
             Call::Look => ("look", self.look),
             Call::AfterSay | Call::Ends => return None,
@@ -660,15 +666,9 @@ impl Skill {
 
     /// Whether a step holds something until its trigger stops holding.
     fn holds_until_ends(&self) -> bool {
-        self.steps.iter().any(|(_, step)| {
-            matches!(
-                step,
-                Step::Call(Call::Dim {
-                    until_ends: true,
-                    ..
-                })
-            )
-        })
+        self.steps
+            .iter()
+            .any(|(_, step)| matches!(step, Step::Call(call) if call.held_until_ends()))
     }
 }
 
@@ -798,6 +798,14 @@ pub enum Call {
     /// Steps dimmer, to the actions part's `light_dimmer`; with
     /// `until_ends`, held until the trigger stops holding, then given back.
     Dim { steps: u8, until_ends: bool },
+    /// The light goes out (#1677): asked of the ring only
+    /// (`LAMP_LIGHT_REQUESTS=on`) as the light shown, off, faded into over
+    /// `over_ms` when given; with `until_ends`, held until the trigger stops
+    /// holding, then given back, and the person's light comes back by itself.
+    Out {
+        over_ms: Option<u32>,
+        until_ends: bool,
+    },
     /// A note for the voice to say in its own words.
     Say(String),
     /// Words the voice keeps itself and says when asked (#939, (c)): the
@@ -861,6 +869,20 @@ impl Source {
 }
 
 impl Call {
+    /// Whether it holds the light until its trigger stops holding.
+    pub fn held_until_ends(&self) -> bool {
+        matches!(
+            self,
+            Self::Dim {
+                until_ends: true,
+                ..
+            } | Self::Out {
+                until_ends: true,
+                ..
+            }
+        )
+    }
+
     /// The call's name and its arguments, as a test names them.
     pub fn named(&self) -> (&'static str, Value) {
         match self {
@@ -899,6 +921,19 @@ impl Call {
             }
             Self::Dim { steps, until_ends } => {
                 let mut args = json!({ "dim": steps });
+                if *until_ends {
+                    args["until"] = json!("ends");
+                }
+                ("light", args)
+            }
+            Self::Out {
+                over_ms,
+                until_ends,
+            } => {
+                let mut args = json!({ "out": true });
+                if let Some(over_ms) = over_ms {
+                    args["over_ms"] = json!(over_ms);
+                }
                 if *until_ends {
                     args["until"] = json!("ends");
                 }
@@ -1504,15 +1539,9 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
     // A tool's run has no trigger to end it: what it held would be held for
     // good.
     if (triggers.is_empty() || file.tool.is_some())
-        && steps.iter().any(|(_, step)| {
-            matches!(
-                step,
-                Step::Call(Call::Dim {
-                    until_ends: true,
-                    ..
-                })
-            )
-        })
+        && steps
+            .iter()
+            .any(|(_, step)| matches!(step, Step::Call(call) if call.held_until_ends()))
     {
         return Err(
             "until = \"ends\" is the end of a trigger: in a skill with one and no tool".into(),
@@ -1525,15 +1554,10 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         if quiet.is_some() {
             return Err("[quiet] in a skill with an each trigger: an item's run has none".into());
         }
-        if steps.iter().any(|(_, step)| {
-            matches!(
-                step,
-                Step::Call(Call::Dim {
-                    until_ends: true,
-                    ..
-                })
-            )
-        }) {
+        if steps
+            .iter()
+            .any(|(_, step)| matches!(step, Step::Call(call) if call.held_until_ends()))
+        {
             return Err(
                 "until = \"ends\" in a skill with an each trigger: an item's run has no end".into(),
             );
@@ -1675,6 +1699,47 @@ fn light_call(file: LightFile) -> Result<Call, String> {
     {
         return Err("a light's for is at most 10m".into());
     }
+    if file.over.is_some() && file.out != Some(true) {
+        return Err("over goes with out = true".into());
+    }
+    match file.out {
+        Some(true) => {
+            if file.colour.is_some()
+                || file.dim.is_some()
+                || file.level.is_some()
+                || file.lasting.is_some()
+                || file.pattern.is_some()
+            {
+                return Err(
+                    "out takes no colour, dim, level, for or pattern: only over and until".into(),
+                );
+            }
+            // As the ring takes a fade (`LightRequest::FADE_MS`), whole ms.
+            let over_ms = file
+                .over
+                .as_deref()
+                .map(|over| {
+                    let ms = duration_us(over)? / 1_000;
+                    u32::try_from(ms)
+                        .ok()
+                        .filter(|ms| LightRequest::FADE_MS.contains(ms))
+                        .ok_or_else(|| {
+                            format!(
+                                "over = {over:?}: from {} s to {} s",
+                                LightRequest::FADE_MS.start() / 1_000,
+                                LightRequest::FADE_MS.end() / 1_000
+                            )
+                        })
+                })
+                .transpose()?;
+            return Ok(Call::Out {
+                over_ms,
+                until_ends,
+            });
+        }
+        Some(false) => return Err("out is true or left out".into()),
+        None => {}
+    }
     match (file.colour, file.dim) {
         (Some(colour), None) => {
             if !Light::COLOURS.contains(&colour.as_str()) {
@@ -1687,7 +1752,7 @@ fn light_call(file: LightFile) -> Result<Call, String> {
                 return Err("level is 1 to 5".into());
             }
             if until_ends {
-                return Err("until goes with dim".into());
+                return Err("until goes with dim or out".into());
             }
             let pattern = file
                 .pattern
@@ -1709,7 +1774,9 @@ fn light_call(file: LightFile) -> Result<Call, String> {
             }
             Ok(Call::Dim { steps, until_ends })
         }
-        _ => Err("a light is a colour (with a level and a for) or dim = 1 to 4".into()),
+        _ => {
+            Err("a light is a colour (with a level and a for), dim = 1 to 4, or out = true".into())
+        }
     }
 }
 

@@ -195,6 +195,8 @@ pub struct RingLight {
     /// Lights asked for that lapse, when switched on, and the one shown.
     requests: Option<(Subscriber, Requests)>,
     requested: Option<Light>,
+    /// How slowly the shown request asked to be faded into, in ms (#1677).
+    fading: Option<u32>,
     /// The shown request's pattern, its asker and light, and since when it
     /// moves (#940 item 3): from the first resting frame that draws it, and
     /// a renewal keeps that, so a pulse plays once and is seen.
@@ -283,6 +285,7 @@ impl RingLight {
                 drew: None,
                 requests: None,
                 requested: None,
+                fading: None,
                 moving: None,
                 pulses: Vec::new(),
                 reached: None,
@@ -462,6 +465,7 @@ impl RingLight {
                 });
             }
             let shown = requests.shown(now_us);
+            self.fading = shown.and_then(|request| request.fade_ms);
             // Its pattern, started afresh only for a new asker, light or
             // pattern.
             let wanted = shown.and_then(|request| {
@@ -535,6 +539,14 @@ impl RingLight {
     pub fn pattern(&self) -> Option<(LightPattern, u64)> {
         let moving = self.moving.as_ref().filter(|_| self.testing.is_none())?;
         Some((moving.pattern, moving.since_us?))
+    }
+
+    /// How slowly the face comes into its light, in ms (#1677): the shown
+    /// request's fade, as a skill's light going out when nobody is there
+    /// asks it; none under a self-test, for the person's light or for a
+    /// request that asks none.
+    pub fn fade(&self) -> Option<u32> {
+        self.fading.filter(|_| self.testing.is_none())
     }
 
     /// A resting frame drew the face at `drawn_at_us`, showing the lamp's
@@ -968,6 +980,7 @@ mod tests {
             },
             light: light(true, colour, 4),
             pattern: None,
+            fade_ms: None,
         }
     }
 
@@ -1245,6 +1258,57 @@ mod tests {
             std::thread::sleep(Duration::from_millis(2));
         }
         assert_eq!(ring.face(), &light(true, "white", 5));
+    }
+
+    /// #1677: the shown request's fade goes to the face while it is shown,
+    /// never under a self-test, and none once it is given back; a fade out
+    /// of bounds is not a request the ring takes.
+    #[test]
+    fn a_requests_fade_goes_to_the_face_while_it_is_shown() {
+        let root = Root::new("light-fade");
+        let (mut ring, _) = RingLight::on(&root.0).unwrap();
+        ring.take_requests(&root.0, "boot-test").unwrap();
+        let bus = Bus::new(&root.0).unwrap();
+        let mut glows = bus
+            .publisher_declared(LightRequest::TOPIC, &LightRequest::declaration(), "skills")
+            .unwrap();
+        let mut tests = bus
+            .publisher_declared(TEST_TOPIC, &Light::declaration(), "selftest")
+            .unwrap();
+        let skill = lamp_msgs::Priority::Skill;
+        let out = |until_us, fade_ms| {
+            let mut asked = request("skill:light-out", skill, until_us, "warm");
+            asked.light.on = false;
+            asked.fade_ms = fade_ms;
+            asked
+        };
+        let mut at = 0u64;
+        ring.tick(at);
+        assert_eq!(ring.fade(), None, "the person's light");
+        glows
+            .publish_json(1, &out(20_000_000, Some(30_000)))
+            .unwrap();
+        looked(&mut ring, &mut at);
+        assert_eq!(ring.face(), &light(false, "warm", 4));
+        assert_eq!(ring.fade(), Some(30_000));
+        // A self-test over it is drawn as ever, and the fade comes back after.
+        tests.publish_json(2, &light(true, "red", 2)).unwrap();
+        looked(&mut ring, &mut at);
+        assert_eq!(ring.fade(), None);
+        at += TEST_HOLDS_US;
+        looked(&mut ring, &mut at);
+        assert_eq!(ring.fade(), Some(30_000));
+        // Given back: the person's light, at the face's own ease.
+        glows.publish_json(3, &out(0, Some(30_000))).unwrap();
+        looked(&mut ring, &mut at);
+        assert_eq!(ring.face(), &first());
+        assert_eq!(ring.fade(), None);
+        // Past a minute it is not a fade: the request is passed over.
+        glows
+            .publish_json(4, &out(at + 20_000_000, Some(60_001)))
+            .unwrap();
+        looked(&mut ring, &mut at);
+        assert_eq!((ring.face(), ring.fade()), (&first(), None));
     }
 
     /// #940 item 3: the shown request's pattern goes to the face from the

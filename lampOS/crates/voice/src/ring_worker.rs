@@ -634,6 +634,7 @@ fn service(
                 face.light(asked);
             }
             face.pattern(light.pattern());
+            face.fade(light.fade(), at);
         }
         if let Some(ceiling) = resting
             && pending.is_none()
@@ -844,6 +845,7 @@ mod drawn_tests {
                     },
                     light: asked.clone(),
                     pattern: None,
+                    fade_ms: None,
                 },
             )
             .unwrap();

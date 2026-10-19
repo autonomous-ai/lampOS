@@ -496,7 +496,18 @@ that takes the light (`src/ring_light.rs`). Started with
   no frame drew (a turn over it, outranked) is not counted. V1's blink, notification flash
   and rainbow are not taken: they read as a machine (CLAUDE.md's rule 8).
   A turn's faces, a tap's, an ember and a self-test never move with it.
-  A ring without patterns shows the light steady: the field is optional. A boot
+  A ring without patterns shows the light steady: the field is optional.
+  A request may also carry a `fade_ms` (#1677, 1 to 60 s; past either end
+  it is not taken): while it is the light shown, resting frames ease into
+  it with a time of a quarter of the fade instead of the face's 70 ms, so
+  the light falls as a share of itself, 98% of the way by the fade's end,
+  never in a step (`ring_face.rs`, `FADE_EASES`). That is a skill's light
+  going out when nobody is there ([presence.md](presence.md)). A turn's
+  face over it, a tap's and the face closing after a turn ease as ever, a
+  self-test is shown at once, and once it is let go the face settles back
+  into the person's light over about half a second, as after a tap,
+  waking rather than snapping on. `light/reached` is still said 350 ms into
+  it. A ring without fades eases at its own 70 ms. A boot
   clock that cannot be read is said once and the ring takes the person's
   light alone.
 

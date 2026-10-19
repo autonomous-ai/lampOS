@@ -53,7 +53,7 @@ The `[[expect]]` entries are **all** the calls the case may make, in order:
 any other call fails it, so "exactly once" needs nothing more. Arguments left
 out of `args` are not compared. The runtime gives: `body.gaze` `look_at`,
 `x`, `y`, `size`; `body.gesture` `gesture`; `body.move` `move`; `light` `colour`, `level`, `for`,
-or `dim`, `until`; `body.mood` `mood`, `for_ms`; `say` `note`; `look`, none; `ends`, none (a dim held `until = "ends"` given back when its trigger ends). A skill with `[quiet]` hours needs `clock = "10:00"` in the expect file, the local time of the case's first message: without it, it makes no call. For a skill started by its `tool` (someone asks), say when the model calls
+or `dim`, `until`, or `out`, `over_ms`, `until`; `body.mood` `mood`, `for_ms`; `say` `note`; `look`, none; `ends`, none (a dim held `until = "ends"` given back when its trigger ends). A skill with `[quiet]` hours needs `clock = "10:00"` in the expect file, the local time of the case's first message: without it, it makes no call. For a skill started by its `tool` (someone asks), say when the model calls
 it, from the case's first message; a case that is only that needs no
 recording:
 
