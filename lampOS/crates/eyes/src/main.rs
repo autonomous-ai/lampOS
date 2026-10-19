@@ -612,7 +612,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     },
                     Some(Ask::List) => serde_json::json!({"people": who.people.names()}),
                     Some(Ask::Forget(name)) => match who.people.forget(&name) {
-                        Ok(forgot) => {
+                        // Set-aside files it could not search: said, with the
+                        // forget waiting for them (#1586).
+                        Ok(lamp_eyes::who::Forgot { forgot, unsearched }) if unsearched > 0 => {
+                            eprintln!(
+                                "lamp-eyes: asked to forget a face; forgotten: {forgot}; {unsearched} set-aside files could not be searched, and the forget waits for them"
+                            );
+                            who.known = None;
+                            serde_json::json!({"forgot": forgot, "unsearched": unsearched})
+                        }
+                        Ok(lamp_eyes::who::Forgot { forgot, .. }) => {
                             eprintln!("lamp-eyes: asked to forget a face; forgotten: {forgot}");
                             who.known = None;
                             serde_json::json!({"forgot": forgot})
