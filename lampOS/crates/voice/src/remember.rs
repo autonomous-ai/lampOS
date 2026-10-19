@@ -36,6 +36,7 @@
 //!   their memory and told to each of their sessions after its note.
 //!
 //! No word of what was said, kept or asked for is ever logged.
+use crate::thread::FinishedExchange;
 use lamp_gemini::{Tool, ToolCall};
 use serde_json::{Value, json};
 use std::{
@@ -493,7 +494,7 @@ enum Job {
         at_unix_ms: u64,
         heard: String,
         said: String,
-        /// Who was at the lamp when it was over: `None` for the room.
+        /// Its response-bound scope: `None` for the room.
         person: Option<String>,
     },
     Refresh,
@@ -589,7 +590,7 @@ pub fn keep_out(request: u64) {
 }
 
 /// The request is over: hand every finished exchange not handed on before
-/// to the writer, for whoever the eyes know is at the lamp now. Never
+/// to the writer, preserving each exchange's response-bound scope. Never
 /// waits; does nothing without a memory.
 pub fn finished(request: u64) {
     if DAYS_MODE.get() == Some(&true) {
@@ -600,22 +601,7 @@ pub fn finished(request: u64) {
             Ok(mut thread) => thread.finished(request, Instant::now()),
             Err(_) => return,
         };
-        let wall = unix_ms();
-        let person = person_now();
-        for (request, age, heard, said) in done {
-            if KEPT_OUT
-                .lock()
-                .is_ok_and(|kept_out| kept_out.contains(&request))
-            {
-                continue;
-            }
-            client.finished_exchange_for(
-                wall.saturating_sub(age.as_millis() as u64),
-                &heard,
-                &said,
-                person.as_deref(),
-            );
-        }
+        hand_on_days(done, unix_ms(), client);
         return;
     }
     let Some(jobs) = JOBS.get() else { return };
@@ -623,31 +609,41 @@ pub fn finished(request: u64) {
         Ok(mut thread) => thread.finished(request, Instant::now()),
         Err(_) => return,
     };
-    hand_on(done, unix_ms(), person_now(), jobs);
+    hand_on(done, unix_ms(), jobs);
+}
+
+/// The same keep/forget exclusion for both journal backends. Scope is carried
+/// by each exchange; completion-time face observations never remap it.
+fn journalable(done: Vec<FinishedExchange>) -> impl Iterator<Item = FinishedExchange> {
+    done.into_iter().filter(|exchange| {
+        !KEPT_OUT
+            .lock()
+            .is_ok_and(|kept_out| kept_out.contains(&exchange.request))
+    })
+}
+
+fn hand_on_days(done: Vec<FinishedExchange>, wall: u64, client: &DaysClient) {
+    for exchange in journalable(done) {
+        client.finished_exchange_for(
+            wall.saturating_sub(exchange.age.as_millis() as u64),
+            &exchange.heard,
+            &exchange.said,
+            exchange.whose.as_deref(),
+        );
+    }
 }
 
 /// Queue finished exchanges for the writer, but for those in which the lamp
 /// was asked to keep or forget something.
-fn hand_on(
-    done: Vec<(u64, Duration, String, String)>,
-    wall: u64,
-    person: Option<String>,
-    jobs: &SyncSender<Job>,
-) {
-    for (request, age, heard, said) in done {
-        if KEPT_OUT
-            .lock()
-            .is_ok_and(|kept_out| kept_out.contains(&request))
-        {
-            continue;
-        }
-        let at_unix_ms = wall.saturating_sub(age.as_millis() as u64);
+fn hand_on(done: Vec<FinishedExchange>, wall: u64, jobs: &SyncSender<Job>) {
+    for exchange in journalable(done) {
+        let at_unix_ms = wall.saturating_sub(exchange.age.as_millis() as u64);
         if jobs
             .try_send(Job::Exchange {
                 at_unix_ms,
-                heard,
-                said,
-                person: person.clone(),
+                heard: exchange.heard,
+                said: exchange.said,
+                person: exchange.whose,
             })
             .is_err()
         {
@@ -3026,9 +3022,14 @@ mod tests {
         // Their exchanges go to their journal.
         let (jobs, work) = sync_channel(1);
         hand_on(
-            vec![(u64::MAX - 50, Duration::ZERO, "h".into(), "s".into())],
+            vec![FinishedExchange {
+                request: u64::MAX - 50,
+                age: Duration::ZERO,
+                heard: "h".into(),
+                said: "s".into(),
+                whose: Some(MINH.into()),
+            }],
             NOW,
-            Some(MINH.into()),
             &jobs,
         );
         assert!(matches!(
@@ -3238,23 +3239,98 @@ mod tests {
     }
 
     #[test]
+    fn both_journal_backends_preserve_each_stored_scope_and_keep_out() {
+        let private = u64::MAX - 160;
+        keep_out(private);
+        let batch = || {
+            let start = Instant::now();
+            let mut thread = crate::thread::Thread::new();
+            for (request, whose) in [
+                (private - 3, None),
+                (private - 2, Some("p-a")),
+                (private - 1, Some("p-b")),
+                (private, Some("p-private")),
+            ] {
+                thread.seen_now(whose.map(str::to_owned));
+                thread.person("asked", true, start);
+                thread.lamp(request, "said", start);
+            }
+            // A different face before completion must not remap this batch.
+            thread.seen_now(Some("p-current".into()));
+            thread.at_lamp(Some("p-current".into()));
+            thread.finished(private, start + Duration::from_secs(3))
+        };
+        let expected = [None, Some("p-a"), Some("p-b")];
+        let (jobs, work) = sync_channel(4);
+        hand_on(batch(), NOW, &jobs);
+        for whose in expected {
+            let Job::Exchange {
+                person,
+                at_unix_ms,
+                heard,
+                said,
+            } = work.try_recv().unwrap()
+            else {
+                panic!("expected exchange")
+            };
+            assert_eq!(person.as_deref(), whose);
+            assert_eq!(at_unix_ms, NOW - 3000);
+            assert_eq!((heard.as_str(), said.as_str()), ("asked", "said"));
+        }
+        assert!(work.try_recv().is_err());
+        let (jobs, work) = sync_channel(4);
+        let mut context = DaysContext::default();
+        for (index, whose) in expected.into_iter().enumerate() {
+            context.include(whose, &[index as u64 + 10]);
+        }
+        let client = DaysClient {
+            socket: PathBuf::from("/unused-no-io"),
+            prefix: "test".into(),
+            zone: Vec::new(),
+            context: Mutex::new(context),
+            keeping: Mutex::new(()),
+            jobs,
+            lost: Arc::new(AtomicU64::new(0)),
+            threads: AtomicBool::new(false),
+            forget_all: AtomicBool::new(false),
+        };
+        hand_on_days(batch(), NOW, &client);
+        for (index, whose) in expected.into_iter().enumerate() {
+            let DaysJob::Exchange {
+                person,
+                at_unix_ms,
+                heard,
+                said,
+                sources,
+                ..
+            } = work.try_recv().unwrap()
+            else {
+                panic!("expected Days exchange")
+            };
+            assert_eq!(person.as_deref(), whose);
+            assert_eq!(at_unix_ms, NOW - 3000);
+            assert_eq!((heard.as_str(), said.as_str()), ("asked", "said"));
+            assert_eq!(sources, vec![index as u64 + 10]);
+        }
+        assert!(work.try_recv().is_err());
+    }
+
+    #[test]
     fn finished_exchanges_are_queued_with_when_they_began_but_for_those_kept_out() {
         let (jobs, work) = sync_channel(2);
         // Requests no other test names.
         let (plain, private, late) = (u64::MAX - 40, u64::MAX - 41, u64::MAX - 42);
         keep_out(private);
-        let done = |request| {
-            (
-                request,
-                Duration::from_secs(3),
-                "asked".to_owned(),
-                "said".to_owned(),
-            )
+        let done = |request| FinishedExchange {
+            request,
+            age: Duration::from_secs(3),
+            heard: "asked".to_owned(),
+            said: "said".to_owned(),
+            whose: None,
         };
         hand_on(
             vec![done(plain), done(private), done(late), done(late)],
             NOW,
-            None,
             &jobs,
         );
         // Two fit; the private one was never queued, and the fourth found
