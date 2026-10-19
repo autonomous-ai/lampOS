@@ -4,6 +4,19 @@
 
 Newest first. Times from `date` (+07).
 
+- 02:44 #2029 read (Thirteen: trials thread row): Tests' P2 confirmed (known-file check timed, fails 3/3 here; polling passes); rest right; merge on fixed green
+- 02:38 #2027 full read: no P1/P2; four P3s (journal-holds-skills untested, guard judges an earlier plan, person's skill turned product mixes, links followed); first builder's
+- 02:36 #2028 read (Nine: trials light-show row): no finding; merge on green
+- 02:28 #2022 e6b1c442c adds the Policy-answer test; asked Sixth to fold two commits; merge on folded green
+- 02:28 first look #2027 (El: rounds place product skills): on-by-default update path -> first builder's; full read running
+- 02:24 #2020 31c647f61: P3 fixed (End behind the queue); two commits to fold; first builder's
+- 02:20 #2019 merged as df8c51af4 (trials row for who was here); no issue
+- 02:20 #1997 merged as e127ad739 (who was here: someone the lamp knows, off); noted on #1685
+- 02:17 #2022 read (Sixth: #2012's P3s): no finding; merge on green
+- 02:16 #2020 read (Twelve: remember after a forget kept): no P1/P2; P3 a queued journal job can restore the ids; first builder's
+- 02:10 #2017 read (Fourth: the name alone carries into the next line, #2002's P1): no finding; first builder's
+- 02:09 #2018 merged as c0bd584ee (speaker lapse tests wait for the link, #1569 row 39); noted on #1569
+- 02:07 #2011 re-read 4de994a4d: both P2s and P3s fixed; two commits to fold; first builder's on green
 - 02:03 #2008 read (Ten: seeing who speaks): no P1/P2; P3 eyes write face before name, a torn read keeps A's line for B (checked by hand); P3 looks counted per read; P3 no off test
 - 02:01 #1997 c79db5cc6: P3 fixed (prune mutation caught); merge on green
 - 01:54 #1997 read (Nine: who was here says someone the lamp knows): no finding, P3 prune untested; merge on green
