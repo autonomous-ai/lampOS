@@ -309,3 +309,9 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   empty store beside one keeps its identity after a crash (the reviewer's
   #1616 P3). Offline overnight; back at 10:10 +07.
 - Next: #1679 (light scenes, pointing, light shows), then #1693 (memory).
+- #1693 (1) as #1723: `forget {source_id}` and `forget_everything`, behind
+  `LAMP_MEMORY_FORGET_ALL`. Two copies of this session ran in one worktree
+  for a while this morning; the duplicate stopped, its tests were kept, and
+  its withdrawn design comment is marked on #1693.
+- twelve-P1, #1720 (proposal): the Queue #705 is at GitHub's 2,500-comment
+  limit, and nobody can post there; reports go on PRs until a new queue.
