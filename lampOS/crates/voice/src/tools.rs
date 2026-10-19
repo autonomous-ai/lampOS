@@ -1287,6 +1287,7 @@ mod tests {
                 lead_in: true,
                 asked: true,
                 accounts: false,
+                machine_names: false,
                 needs: None,
                 staff_note: false,
             }),
@@ -1518,6 +1519,7 @@ mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };
@@ -2043,6 +2045,7 @@ mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };

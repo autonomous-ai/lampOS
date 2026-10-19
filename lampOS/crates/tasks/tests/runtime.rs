@@ -1370,10 +1370,14 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
         }
     };
     until(1);
-    assert_eq!(
-        s.ask(json!({"op":"targets"}))["targets"],
-        json!([{"alias":"office","engine":"claude"}])
-    );
+    // With its own name beside it (#1676).
+    let start = Instant::now();
+    while s.ask(json!({"op":"targets"}))["targets"]
+        != json!([{"alias":"office","engine":"claude","name":"Office iMac"}])
+    {
+        assert!(start.elapsed() < Duration::from_secs(5), "no name told");
+        thread::sleep(Duration::from_millis(10));
+    }
     let report = tasks_diagnostic_until(&s, |d| said(d, "handovers_off").is_none());
     assert_eq!(said(&report, "signed_in").as_deref(), Some("yes"));
 
@@ -1396,9 +1400,24 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
     s.counts.signed_out.store(false, Ordering::SeqCst);
     until(2);
     let told = s.ask(json!({"op":"targets"}));
+    let start = Instant::now();
+    while s.ask(json!({"op":"targets"}))["targets"]
+        != json!([{"alias":"macbook-air","engine":"claude","name":"MacBook Air"},
+            {"alias":"office","engine":"claude","name":"Office iMac"}])
+    {
+        assert!(start.elapsed() < Duration::from_secs(5), "{told}");
+        thread::sleep(Duration::from_millis(10));
+    }
+    // The first renamed: the same alias, its new name told.
+    s.counts.machines.lock().unwrap()[1].label = "Studio".into();
+    let start = Instant::now();
+    while s.ask(json!({"op":"targets"}))["targets"][1]["name"] != "Studio" {
+        assert!(start.elapsed() < Duration::from_secs(5), "rename not told");
+        thread::sleep(Duration::from_millis(10));
+    }
     assert_eq!(
-        told["targets"],
-        json!([{"alias":"macbook-air","engine":"claude"},{"alias":"office","engine":"claude"}])
+        s.ask(json!({"op":"targets"}))["targets"][1]["alias"],
+        "office"
     );
 }
 
