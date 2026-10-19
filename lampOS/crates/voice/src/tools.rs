@@ -754,7 +754,9 @@ pub fn run_call(
                     }
                     _ => ("nobody", (unavailable(), false)),
                 },
-                Err(told) => ("the skills", (told, false)),
+                // Refused by the voice itself, no skill asked: the journal
+                // says so (the reviewer on #1706).
+                Err(told) => (crate::use_skill::NAME, (told, true)),
             }
         }
         Route::Decline | Route::Clock | Route::Nobody => ("nobody", (unavailable(), false)),
@@ -2073,6 +2075,56 @@ mod tests {
         assert_eq!(rest, ["rest"]);
     }
 
+    /// The reviewer on #1706: the setup line's two notes with `use_skill`,
+    /// the skills past its bound and its lines named alone or left out.
+    #[test]
+    fn the_setup_line_says_what_use_skill_cut() {
+        let dir = directory("cut");
+        std::fs::create_dir(dir.join(SKILLS_DIR)).unwrap();
+        // Within the catalog's own 64 KB, and long enough that the lines fill.
+        let long = "x".repeat(300);
+        let skills: Vec<Value> = (0..120)
+            .map(
+                |n| json!({"name": format!("{n:0>48}").replacen('0', "a", 1), "description": long}),
+            )
+            .collect();
+        std::fs::write(
+            dir.join(SKILLS_DIR).join(CATALOG_FILE),
+            json!({"tools": skills}).to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join(CATALOG_FILE),
+            r#"{"tools":[{"name":"light_on","description":"Light."}]}"#,
+        )
+        .unwrap();
+        let settings = Settings {
+            exec: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        let all = skill_tools(&settings);
+        let offered = crate::use_skill::offered(&all).len();
+        assert!(offered < 120);
+        let said = crate::session_tools::setup_line(&declared(&settings), &settings);
+        assert!(
+            said.contains(&format!("; {offered} skills through use_skill")),
+            "{said}"
+        );
+        assert!(said.contains(" (past use_skill's bound)"), "{said}");
+        let (named, left) = crate::use_skill::cut(crate::use_skill::offered(&all));
+        assert!(!named.is_empty() && !left.is_empty());
+        assert!(
+            said.ends_with(&format!(
+                "; use_skill's lines: {} named alone, {} left out",
+                named.len(),
+                left.len()
+            )),
+            "{said}"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     /// A call of `use_skill` reaches the skill's own socket as the skill's
     /// own call, its choice and yes-or-no under the skill's own names, and
     /// the skill's answer goes to the model: on the cascade's path
@@ -2125,6 +2177,10 @@ mod tests {
                 .starts_with("There is no skill named juggle."),
             "{told}"
         );
+        // Told by the voice itself: the journal names use_skill, which
+        // answered, not the skills (the reviewer on #1706).
+        let (whom, (_, answered)) = run_call(&route(&settings, &juggle.name), &juggle, 7, true);
+        assert_eq!((whom, answered), (crate::use_skill::NAME, true));
         std::fs::remove_dir_all(dir).unwrap();
     }
 
