@@ -375,6 +375,31 @@ impl Days {
         self.add(person, at, &heard, &said, "", sources, rules)
     }
     pub fn remember(&mut self, person: &Person, at: u64, text: &str) -> Result<u64> {
+        self.remember_from(person, at, text, &[])
+    }
+
+    /// [`Self::remember`], with the exchanges of the conversation it came up
+    /// in (`from`, the person's own, at most 64): forgetting it then removes
+    /// them too (#1693, `LAMP_MEMORY_FORGET_ALL`).
+    pub fn remember_from(
+        &mut self,
+        person: &Person,
+        at: u64,
+        text: &str,
+        from: &[u64],
+    ) -> Result<u64> {
+        for id in from {
+            let exchange: bool = self.db.query_row(
+                "SELECT EXISTS(SELECT 1 FROM entries WHERE person=? AND id=? AND kind='exchange')",
+                params![person.as_str(), id],
+                |r| r.get(0),
+            )?;
+            if !exchange {
+                return Err(bad(
+                    "a kept thing comes only from the person's own exchanges",
+                ));
+            }
+        }
         let text = store::tidy(text, store::TEXT_BYTES);
         if text.is_empty() {
             return Err(Error::new("empty", "there is no text to remember"));
@@ -390,7 +415,7 @@ impl Days {
                 "the kept list is full; nothing was removed",
             ));
         }
-        self.add(person, at, "", "", &text, &[], &[])
+        self.add(person, at, "", "", &text, from, &[])
     }
     // The one private writer of an exchange or a kept entry: each argument
     // is a column or its links.
@@ -580,12 +605,16 @@ impl Days {
         )?;
         versions(&tx)?;
         // Forgetting an extracted fact also removes its evidence, otherwise a
-        // later tidy pass could simply extract the same fact again. This can
-        // remove an entire exchange containing more than one subject.
-        if record.kind == "observation" {
-            // Only the person's own evidence: a rule the exchange followed,
-            // in the scope beside theirs, is not evidence of the fact.
-            tx.execute("WITH RECURSIVE roots(rid) AS (SELECT rid FROM doomed UNION SELECT s.parent FROM sources s JOIN roots r ON s.child=r.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1) INSERT OR IGNORE INTO doomed SELECT rid FROM roots",[person.as_str()])?;
+        // later tidy pass could simply extract the same fact again; and a
+        // kept thing goes with the conversation it came up in (#1693,
+        // `remember_from`). This can remove an entire exchange containing
+        // more than one subject. One step back, the person's own exchanges
+        // only: an exchange's own sources are what its session was shown,
+        // not where the fact came from, so climbing them removed kept things
+        // that were only shown (#2003). A rule the exchange followed, in the
+        // scope beside theirs, is not evidence either.
+        if record.kind == "observation" || record.kind == "kept" {
+            tx.execute("INSERT OR IGNORE INTO doomed SELECT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'",[person.as_str()])?;
         }
         descendants(&tx, true)?;
         let count = erase(&tx)?;

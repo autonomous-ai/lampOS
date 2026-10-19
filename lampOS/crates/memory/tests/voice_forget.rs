@@ -245,3 +245,39 @@ fn forget_everything_removes_all_of_someone_known_and_never_the_room_s() {
     let (told, ok) = run(FORGET_EVERYTHING, json!({}));
     assert!(ok && told["forgotten"] == false, "{told}");
 }
+
+/// #1693: something remembered goes with the conversation it came up in.
+/// The earlier turn where it was said is kept with it (the voice sends the
+/// conversation's journalled exchanges with `remember`), so "forget that"
+/// removes it too; an earlier conversation about something else stays.
+#[test]
+fn forget_that_removes_the_conversation_a_kept_thing_came_up_in() {
+    assert!(switch_forget_all(true));
+    let fixture = Fixture::new(|_, _| {}, None);
+    let client = fixture.client();
+    // An earlier conversation, about something else.
+    assert!(client.finished_exchange(fixture.now, "synthetic: what's the weather", "Sunny"));
+    let (_, weather) = fixture.next("append_linked");
+    assert!(client.end_conversation());
+    fixture.next("conversation_end");
+    // This conversation: said, then asked to be kept.
+    assert!(client.finished_exchange(
+        fixture.now,
+        "synthetic: my violet umbrella is in the car",
+        "Good to know"
+    ));
+    let (_, said) = fixture.next("append_linked");
+    // The writer takes the store's answer a moment after the store gives
+    // it; on a lamp the next turn is seconds later.
+    std::thread::sleep(Duration::from_millis(200));
+    remember(&client, "synthetic violet umbrella in the car");
+    let (keep, _) = fixture.next("remember");
+    assert_eq!(keep["source_ids"], json!([said["id"]]));
+    let violet = recalled(&client, "violet").expect("recall finds it");
+    let (told, ok) = client.run(&call(FORGET, json!({"source_id": violet})), BUDGET);
+    assert!(ok && told["forgotten"] == true, "{told}");
+    // The kept thing and the turn it came from are gone; the weather stays.
+    assert_eq!(fixture.count("entries"), 1);
+    assert_eq!(recalled(&client, "umbrella"), None);
+    assert!(recalled(&client, "weather").is_some(), "{weather}");
+}

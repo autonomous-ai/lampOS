@@ -83,6 +83,10 @@ pub enum Request {
         person: Who,
         at_unix_ms: u64,
         text: String,
+        /// The Days store's: the conversation's exchanges it came up in
+        /// (#1693), removed with it. The legacy store keeps none.
+        #[serde(default)]
+        source_ids: Vec<u64>,
     },
     /// What it was asked to keep, for telling a new session.
     Kept {
@@ -337,10 +341,12 @@ fn done(store: &mut Store, request: Request, now_unix_ms: u64) -> Result<Respons
                 .map_err(not_added)?;
             Response::Added { id }
         }
+        // The legacy store keeps no links.
         Request::Remember {
             person,
             at_unix_ms,
             text,
+            ..
         } => {
             let id = store
                 .remember(&one(person)?, at_unix_ms, &text)
@@ -694,6 +700,17 @@ mod tests {
                 person: Who::Unsaid,
                 at_unix_ms: 5,
                 text: "black coffee".into(),
+                source_ids: vec![],
+            }
+        );
+        // The Days store's: where it came from (#1693).
+        assert_eq!(
+            parse(r#"{"op":"remember","at_unix_ms":5,"text":"black coffee","source_ids":[3]}"#),
+            Request::Remember {
+                person: Who::Unsaid,
+                at_unix_ms: 5,
+                text: "black coffee".into(),
+                source_ids: vec![3],
             }
         );
         assert_eq!(
