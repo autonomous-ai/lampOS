@@ -2235,6 +2235,32 @@ fn went_on_told(
     signs
 }
 
+/// How long after the end of the lamp's own words a line is in a
+/// conversation going on, whenever its answer began: as long as one may
+/// follow on from them ([`crate::follows_on::WITHIN_US`]).
+pub(crate) const AFTER_THE_LAMPS_WORDS: Duration =
+    Duration::from_micros(crate::follows_on::WITHIN_US);
+
+/// Whether a conversation with the lamp is going on: the thread's, 45 s from
+/// an answer's start ([`crate::thread::GOING_ON_FOR`]); or within
+/// [`AFTER_THE_LAMPS_WORDS`] of the end of the lamp's words (`said_ago`); or
+/// [`CALL_CARRIES_FOR`] from the person's call (`called_ago`). A story told
+/// for 40 s or more outlives the thread's window while it is told: on
+/// lamp-4ace on 20 Oct at 01:47 and 01:49, two hand-overs said as stories
+/// ended ("Hey Lamp, ask Claude Code to write a two-line poem…", "… ask
+/// Codex to write a haiku…") lost "Hey Lamp" to the lamp's own voice and
+/// were held as no conversation, "it was last heard saying words, to their
+/// end, 0 s ago" (the first builder at 01:50 and 02:04 on #1712).
+fn going_on_from(
+    said_going_on: bool,
+    said_ago: Option<Duration>,
+    called_ago: Option<Duration>,
+) -> bool {
+    said_going_on
+        || said_ago.is_some_and(|ago| ago <= AFTER_THE_LAMPS_WORDS)
+        || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR)
+}
+
 /// How long a call let out carries the person's next lines when the lamp
 /// has said no word since (`Heeding::called_at`): the owner's lines on
 /// lamp-4ace came every 6 s. The lamp's own words carry them for
@@ -2554,12 +2580,12 @@ impl Heeding {
         // before the lamp's answers were said, and were held as no
         // conversation).
         let called_ago = self.called_at.map(|at| now.saturating_duration_since(at));
-        let going_on = said_going_on || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR);
         // From the end of what the lamp said, not from when its answer began,
         // which the thread keeps (#1712, the first builder at 19:21: "And what
         // about tomorrow?" 18 s after the weather line, a long answer, was
         // held in a busy room).
         let said_ago = to_the_end(said_ago, self.said_ended_ago(monotonic_us()));
+        let going_on = going_on_from(said_going_on, said_ago, called_ago);
         let mut left_alone = None;
         let mut signs = Signs {
             room: crate::room_told::Room::Unknown,
@@ -3467,6 +3493,23 @@ mod tests {
         // No words in the thread: none, whatever was played.
         assert_eq!(to_the_end(None, Some(s(1))), None);
         assert_eq!(to_the_end(Some(s(30)), None), Some(s(30)));
+    }
+
+    /// #1712 (the first builder at 01:50 and 02:04): a line said as a long
+    /// story ends is in a conversation going on, though the thread's 45 s
+    /// from the story's start have passed; 20 s after the lamp's words it
+    /// isn't; a call carries as before.
+    #[test]
+    fn a_line_just_after_a_long_answer_is_in_a_conversation_going_on() {
+        let s = Duration::from_secs;
+        // The thread's window passed, the lamp's words ended just now.
+        assert!(super::going_on_from(false, Some(s(0)), None));
+        assert!(super::going_on_from(false, Some(s(20)), None));
+        assert!(!super::going_on_from(false, Some(s(21)), None));
+        // No words in the thread, no call: none.
+        assert!(!super::going_on_from(false, None, None));
+        assert!(super::going_on_from(false, None, Some(s(10))));
+        assert!(super::going_on_from(true, Some(s(44)), None));
     }
 
     #[test]
