@@ -4690,6 +4690,17 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1396 changed** (the first builder, 10:1x, on the backend's question): a Lamp 2 stays a `lamp` on the backend, with no new type. The lamp tells the generations apart with `"generation": "lamp-v2"`, now also on every `lamp-cloud` reply (asked by the backend at 10:32 and agreed at 10:34). That's my next PR. The backend PR that added the type is closed, and the app PR is reworked to pick the Lamp 2 page by the generation.
 - **#1673's piece 4:** as agreed, the news wouldn't reach the phone unasked (the reason is in the app repository, so only a pointer on #1673). On the lamp's side, news not told aloud is to be given with the answer to the person's next text; it's built locally, after the follow-up.
 
+## 2026-10-19, 12:15 ICT: #1726, #1731 and #1742 merged; the app side handed to mobile; the first builder's two texting calls gating
+
+- **#1726 merged** (11:15): the fixes for #1713's reviews.
+- **#1731 merged** (11:38): `generation` on every `lamp-cloud` reply. It was refiled from #1729, whose body named the backend person by handle. The rule since 11:08 is no person's name or handle on lampOS. My two #1396 comments with it were deleted and posted again, as the reviewer and the first builder asked.
+- **#1742 merged** (12:02): the texts' task, which the spoken system can't reach (#1726's P3), and piece 4's lamp side, where news is given with the next text's answer.
+- **#1396's app side is mobile's** (the first builder, 11:20). Mobile's PR is up in the app repository, so mine there is closed. The backend keeps `os_generation` on the device record.
+- **#1673:** mobile agreed the lamp side's shape (12:1x), and I answered its two wire questions from the code. The unasked news relay is the BFF team's and mobile's (12:04).
+- **Gating now, the first builder's two calls (11:53):**
+  - a text never runs a skill that moves the body (`lamp-skills`' tools file says which do);
+  - a text is given news only of work asked for by text.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
