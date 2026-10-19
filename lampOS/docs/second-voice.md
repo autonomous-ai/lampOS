@@ -1024,11 +1024,13 @@ It needs two files in `/etc/lampOS/voice`, root's and 0600:
 Without either, the voice does not start, and the route never falls back to
 Live. `lamp-selftest`'s `voice_route` part names what is missing (`selftest.md`).
 
-Only lamp-4ace's repo unit loads DeepSeek's own key and Gemini's
-(`LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key`,
-`gemini.key:/etc/lampOS/voice/second-llm.key`), for its A/B of DeepSeek
-direct against the relay. Its own second.json names `second-llm.key`,
-`second-stt.key` and `second-tts.key`, which hold the relay key.
+lamp-4ace's repo unit takes DeepSeek through the relay too (the owner,
+21:3x: "instead of using their direct deepseek key"), and loads only
+Gemini's key (`LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key`).
+The A/B of DeepSeek direct against the relay takes `deepseek.key` in
+`probe-cascade`'s own transient unit, never in the voice's. Its own
+second.json names `second-llm.key`, `second-stt.key` and `second-tts.key`,
+which hold the relay key.
 
 With `second`, the journal says once at start:
 `lamp-voice: the voice route is second only (LAMP_VOICE_ROUTE=second): speech to text, a text model and speech answer every turn; Gemini Live is not used`.

@@ -137,24 +137,24 @@ Environment=LAMP_CUT_KEEPS_NAME=on
 Environment=LAMP_PROGRESS_NEWS=on
 # The second route (#778, #1712, lampOS/docs/second-voice.md): from 2026-10-15 21:00 the backup voice standing by, and
 # since 19 Oct the lamp's only voice, as lamp-4ace runs it from its deploy copy (the first builder, #1712 20:01).
-# Deepgram's speech to text, DeepSeek's text model and search, and the configured voice (second.json's ElevenLabs,
-# eleven_v4_turbo) answer every turn, as on lamp-4ace; Gemini Live is not used. Live stays a per-lamp setting: a
-# drop-in with Environment=LAMP_VOICE_ROUTE=gemini. Without second.json or a key file below the voice does not start,
-# and never falls back to Live. Each lamp's person places these, root-only (0600), in /etc/lampOS/voice:
-#   second.json      the route's services and key paths (deploy/product/settings/second.json is its template);
-#   second-llm.key   second.json's llm_credential_file, and Gemini's key (the gemini.key credential, LoadCredential below);
+# Speech to text, DeepSeek's text model and search, and the configured voice (second.json's ElevenLabs,
+# eleven_v4_turbo) answer every turn, all through the Autonomous relay, as on a product lamp; Gemini Live is not used.
+# Live stays a per-lamp setting: a drop-in with Environment=LAMP_VOICE_ROUTE=gemini. Without second.json or a key file
+# below the voice does not start, and never falls back to Live. This lamp's own, root-only (0600), in /etc/lampOS/voice:
+#   second.json      the route's services and key paths (deploy/product/settings/second.json is the product's);
+#   second-llm.key   second.json's llm_credential_file, the relay key (DeepSeek through the relay takes it too), and
+#                    Gemini's key (the gemini.key credential, LoadCredential below);
 #   second-stt.key   second.json's stt_credential_file: speech to text;
-#   second-tts.key   second.json's tts_credential_file: the voice;
-#   deepseek.key     DeepSeek's text model and search (the deepseek.key credential).
-# Only this lamp loads DeepSeek's own key and Gemini's, for the A/B of DeepSeek direct against the relay
-# (LAMP_SECOND_DEEPSEEK_BASE_URL in a drop-in); a product lamp needs neither (deploy/product/lamp-voice.service).
+#   second-tts.key   second.json's tts_credential_file: the voice.
+# DeepSeek through the relay since 19 Oct, as the owner asked (21:3x, "instead of using their direct deepseek key"):
+# the A/B of DeepSeek direct takes deepseek.key in probe-cascade's own transient unit, never in the voice's.
 LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key
-LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key
 Environment=LAMP_VOICE_ROUTE=second
 Environment=LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json
 Environment=LAMP_SECOND_CHAT=deepseek
 Environment=LAMP_SECOND_SEARCH=deepseek
 Environment=LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo
+Environment=LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek
 Environment=LAMP_SECOND_GEMINI_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/google-search/v1beta
 # The words of this lamp's played test lines, heard as written (#1830); not a product setting.
 Environment="LAMP_SECOND_KEY_TERMS=Hanoi,Da Nang,Ho Chi Minh City,desk lamp,two-line poem,haiku,Bitcoin,gold price,Louvre"
