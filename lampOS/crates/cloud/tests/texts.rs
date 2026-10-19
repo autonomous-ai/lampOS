@@ -30,6 +30,7 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
         wifi: Wifi::default(),
         ring: Ring::default(),
         texts: Texts::on(texting),
+        reports: None,
     };
     (lamp, bus_root)
 }

@@ -33,6 +33,9 @@ against lamp-06c1.
     the device's record, and the app picks the Lamp 2 page by it (#1396, the
     first builder and the backend, 19 Oct). V1's readers pass over a field
     they don't know. Setup's status says the same (`docs/setup.md`).
+- **Sends health and crash reports** with `LAMP_REPORTS=on` and the
+  person's yes (#1683): numbers and listed names only, on
+  `<fd_channel>/report` at QoS 1 ("Health and crash reports", below).
 - **Pings the backend every 15 s**, as V1's `status_reporter`: `POST
   {base}/ping`, where `base` is `llm_base_url` with a trailing `/v1` cut,
   `?mqtt=true` while no broker is kept, with the voice's key as the bearer
@@ -63,6 +66,7 @@ routes are not served. Each kind is carried out by the part that owns it.
 | `led.resting.set` (`{"mode": "default" \| "off" \| "custom", "color": [r, g, b]}`) | asked on `light/command`, as the actions program asks it, and read back from `light/state` within 1 s; the snapshot of what is shown. `off` keeps the colour and the level, and black is `off`, as V1 |
 | `led.resting.preview` (`{"color": [r, g, b]}`) | asked on `light/request` at `conversation` priority (over a skill's glow, under the person's own light), on the host's boot clock, holding 10 s unless asked again, so an abandoned screen leaves nothing behind (V1's 10 s); a save gives it back first. A light asked for at the lamp ("make your light blue") ends it, and a drag that goes on stays given way until it pauses past its 10 s (the reviewer on #1464). Answered only when it fails, as V1, so a drag does not flood `fd_channel`. Refused where the ring takes no lights that lapse (`LAMP_LIGHT_REQUESTS`, on in the product) |
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
+| `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`) and how many reports wait. A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `device.rename` | refused for now; step 2, through setup's record |
@@ -105,8 +109,202 @@ is the same light. Two differences from V1 the page should know:
   the drop-in).
 - **Never printed:** the broker's password and the key appear in no journal
   line and on no bus topic; the account's debug form hides them.
-- **The reset** empties `/var/lib/lampos-cloud` and removes
-  `/etc/lampOS/setup/backend.json` with the rest of the person's data.
+- **The reset** empties `/var/lib/lampos-cloud` (with the reports' queue and
+  the person's later choice on them) and removes
+  `/etc/lampOS/setup/backend.json` and `/etc/lampOS/setup/reports.json`
+  with the rest of the person's data.
+
+## Health and crash reports (#1683, step 1)
+
+If something on a lamp breaks in a home, the company should know and fix it
+in an update. The owner's verdict (`v1-verdicts.md`): "Health and crash
+reports reaching the company: **System**, opt-in at setup: only health and
+crashes, never sound, pictures or words." Agreed on #1683
+([the design](https://github.com/autonomous-ai/lampOS/issues/1683#issuecomment-6259598135)
+and the first builder's yes; the backend agreed the record on #1683, with
+[two changes](https://github.com/autonomous-ai/lampOS/issues/1683#issuecomment-6259804444):
+a sub-topic and `id`). This is the lamp side
+(`crates/cloud/src/reports.rs`); the app's screen and the backend's store
+are built by their own builders.
+
+**Off unless set.** Nothing is sent, read or written for reports unless all
+three are on: `LAMP_CLOUD=on`; `LAMP_REPORTS=on` in `lamp-cloud`'s unit
+(and in the voice's, for the stop by voice); and the person's yes, read at
+each send, never kept past a change. Without the switch `lamp-cloud` starts
+no driver, subscribes to nothing, writes no file, and answers `reports.get`
+and `reports.set` as kinds it lacks. Without the yes, the driver only says
+`reports/state` (`share: false`) and reads nothing else.
+
+### What is sent
+
+Every field is a number, a boolean, an enum, an RFC 3339 time the lamp
+writes, or a name from a fixed list, by construction: a part's or a unit's
+name in a report is a `&'static str` taken from the list, never the name as
+it came; a build is hex digits and `+`; and no type in a report holds text
+that came in. So no `message`, `reason`, `values` or journal line can reach
+a report, whatever a part writes on the bus or in an exit note. The canary
+test (`no_secret_planted_in_any_input_reaches_any_report`) plants a
+person's name, a Wi-Fi name, an address, the host name, the zone, a key and
+words said in every input, and finds none of them in any report of any
+kind, nor in the app's answer.
+
+Every report has:
+
+| Field | Type | From |
+|---|---|---|
+| `type` | `"report"` | fixed |
+| `schema` | `"lamp-report/1"` | fixed: adding a field keeps `/1`; removing, renaming or retyping one is `/2` |
+| `device` | `"lamp"` | as every other reply: the backend routes by it |
+| `id` | string | the device's id, as `info` carries it: the backend finds the device by it, and drops a message without one |
+| `generation` | `"lamp-v2"` | as setup's status says it |
+| `kind` | `health`, `crash` or `stopped` | |
+| `seq` | number | counts up on this lamp; starts again after a reset |
+| `sent_at` | RFC 3339 UTC, whole seconds | set once, when the report is made, and kept on every send again: the backend drops a duplicate by `(device, seq, sent_at)` |
+| `clock_synced`, `uptime_s` | bool or null, number | `board/state` (a crash and `stopped` say null and 0) |
+| `build` | `<sequence>+<commit12>` or null | `lamp-update`'s state |
+| `dropped` | `{queue_full, over_rate, too_big}` | the lamp's own counts of what it did not send |
+
+- **`health`** adds `level` (`lamp/health`; `stale` when it is past its
+  lifespan), `parts` (`[{name, level, age_ms}]`, worst first, at most 32,
+  named by the list; no `message`), `missing`, `other_parts` (names not in
+  the list, and parts past 32), `board` (`cpu_load` 2 dp, `memory_used` and
+  `disk_free` 3 dp, `hottest_c` 1 dp, `wifi_dbm`; zones' names are never
+  sent; `cpu_c`, `throttled` and `throttled_s` are null in step 1, as they
+  are only on the board's own diagnostic), `online` and `down_for_s`
+  (`lamp/online`), `selftest` (`{verdict, failed, other_failed,
+  not_checked, build}`, part names only, never a reason or a value) and
+  `restarts` (each unit's `NRestarts` since boot, asked of `systemctl show`
+  within 2 s, at most once a minute).
+- **`crash`** adds `unit`, `result` (systemd's `$SERVICE_RESULT`:
+  `exit-code`, `signal`, `core-dump`, `watchdog`, `timeout`, `oom-kill`,
+  `start-limit-hit`, or `other`), `exit_code` (with `$EXIT_CODE=exited`),
+  `signal` (`SIGSEGV` and fifteen others by name, when `killed` or
+  `dumped`), `ran_s`, `restarts_since_boot`, `level_before` (that part's
+  level in the last `lamp/health` read) and `panic`, null until step 2.
+- **`stopped`** adds nothing: the last word when the person says no, so the
+  backend deletes what it has of this lamp.
+
+**The lists.** Parts: the product's `--expect` list
+(`deploy/product/lamp-health.service`) and those `lamp-health show` knows
+by name, plus `skills` and `cloud`. Units: the product's `lamp-*.service`
+files, held the same by a test. Self-test parts: those `lamp-selftest`
+names.
+
+**Never sent:** sound, pictures, anything said or typed, any name (the
+person's, a face's, a speaker's), Wi-Fi names or passwords, addresses, the
+host name, the zone, reminders, tasks, memory, skills' contents, any
+message, reason or journal line, and the person's key. The other replies'
+identity (`mac`, `local_ip`, `timezone`) is not used: a report has its own
+builder. The 15 s ping is unchanged.
+
+### How often, and how it is sent
+
+- **Health:** five minutes after `lamp-cloud` starts, then every 15
+  minutes. A part at `error` for 60 s sends one at once, at most once an
+  hour for that part. It waits while `voice/state` is not `resting`, up to
+  60 s.
+- **Crash:** each exit note is read within 10 s and handed over at once,
+  at most 12 an hour and 50 a day across every unit; past that only
+  `dropped.over_rate` counts up.
+- **Size:** at most 4 KiB; one over that is not sent and counts in
+  `dropped.too_big`.
+- **The wire:** `lamp-cloud`'s own connection and login, on
+  **`<fd_channel>/report`**, at QoS 1. Below the reply channel, so a report
+  is never handed to the app's side as a reply (the backend). No reply is
+  expected. A report is handed to the client only while connected and kept
+  until the broker acknowledges it: the client numbers its publishes in the
+  order they are handed over, so each acknowledgement is matched to its
+  report. A connection that drops first loses the client's copy (a clean
+  start), and the lamp hands the report over again, with the same `seq`,
+  once it is back.
+- **The queue,** `/var/lib/lampos-cloud/reports/`: crash reports are files
+  there (0600), read back when `lamp-cloud` starts; only the newest health
+  waits, in memory, so flash is written only when something crashes.
+  Bounded at 64 reports or 256 KiB, nothing older than 7 days; when full,
+  the oldest health goes first, and a crash only when nothing but crashes
+  is left, each counted in `dropped.queue_full`.
+
+### Crashes: the exit note
+
+`lamp-cloud exit-note UNIT` runs as `ExecStopPost=` of every lampOS unit,
+through one prefix drop-in, `/etc/systemd/system/lamp-.service.d/exit-note.conf`
+(`deploy/product/exit-note.conf`). It writes only systemd's
+`$SERVICE_RESULT`, `$EXIT_CODE` and `$EXIT_STATUS`, the unit's name,
+`systemctl show`'s restarts and run time, the monotonic time and the boot,
+to `/run/lampos-exits/<unit>@<at_us>.json` (root, 0644), the newest 8 per
+unit. A `success`, or a unit not on the list, writes nothing; the note never
+fails a stop (`-`); no journal is read. `lamp-cloud` reads the folder every
+10 s and takes each note once, across its own restarts, until the next
+boot. `lamp-update install` writes no drop-in, so this one goes on a lamp
+with the switch, by hand for the trial. Core dumps and backtraces are never
+sent; step 2's panic hook (`{file, line}` only) comes after step 1 has run
+a week.
+
+### The person's choice
+
+- **At setup**, `"share_reports": true` in the setup request; only the
+  JSON `true` is a yes. Setup keeps the answer, a no included, in
+  `/etc/lampOS/setup/reports.json` ([setup.md](setup.md)), which
+  `lamp-cloud` reads where it is. A lamp set up on its own page is off.
+- **Later, in the app:** `reports.get` and `reports.set` (the device API
+  above), the only way to turn reports on after setup: it is the person's
+  own tap, from their account. `lamp-cloud` keeps that choice in
+  `/var/lib/lampos-cloud/reports.json` (0600), which wins over setup's.
+- **By voice:** "stop sending reports" calls `reports_stop`, a system
+  function the voice declares only with `LAMP_REPORTS=on`
+  ([tools.md](tools.md)). It puts `{"share": false}` on `reports/request`
+  and answers from `reports/state` within 2 s. **The bus can only turn
+  reports off:** `lamp-cloud` takes no `share: true` from it, since
+  anything on the lamp can write there. There is no voice "on".
+- **A no deletes:** every queued report and its file goes at once, and one
+  `stopped` takes their place. It is kept, on flash too, until it is sent,
+  never dropped offline, and sent once more on the next connection: the
+  broker's ack is not the backend's store, and a no lost there would last
+  until the reports expire (the backend; deleting twice is harmless). A yes
+  again drops a `stopped` already through once, so it never comes after
+  the new reports. Nothing else is sent after it.
+- **Factory reset** removes `/etc/lampOS/setup/reports.json` and empties
+  `/var/lib/lampos-cloud` (the later choice and the queue); the next setup
+  asks again, default off.
+
+On the bus: `reports/request` (`ReportsRequest {share}`, an event) and
+`reports/state` (`ReportsState {share, queued}`, kept, every 5 s, lasting
+15 s), in [msgs.md](msgs.md).
+
+### Changes from the design
+
+- Setup's file is read where it is (0644) rather than handed in by
+  `LoadCredential=`: a credential whose file is missing stops a unit from
+  starting, and no lamp set up before this has one. No unit line changes:
+  `ProtectSystem=strict` leaves `/etc` and `/run` readable.
+- Added under `/1`: `dropped.too_big`, `selftest.other_failed` and the
+  `other` result.
+- From the backend on #1683: the topic is `<fd_channel>/report`, not
+  `fd_channel`; the payload carries `id` (the design proposed none);
+  `stopped` is kept until it is sent and sent once more on the next
+  connection, rather than dropped when offline.
+- "Are you sending reports?" by voice is not built: only the stop is
+  declared, one function of the 32.
+
+### The backend's side, as agreed
+
+Reports are kept by device, apart from the account and the person's
+profile, for 90 days, then deleted; not used for analytics, and report
+bodies stay out of the backend's logs. Support reaches them only with the
+lamp's id the person gives. `stopped` deletes that device's reports and
+nothing more is kept until reports start again; removing a device from its
+account deletes them too. **Until the backend says its store is up, a
+report sent to the company is dropped**, and the company broker's taking a
+publish on `/report` is still to be confirmed, so the trial is on a broker
+on the Mac.
+
+Not shown: no lamp has run it. The trial is on lamp-06c1 under a hold, with
+a broker on the Mac first and the company's only once the backend says its
+store is ready: turn latency with and without, `lamp-cloud`'s CPU over an
+hour (under 0.5 % added), bytes over 24 h (under 200 KB), no flash write
+without a crash, a `kill -SEGV` reported within 60 s, a crash loop held at
+12 an hour, delivery after 30 min offline, the stop by voice and by
+`reports.set`, and the reset.
 
 ## What the backend reads
 
@@ -163,6 +361,21 @@ answers on `fd_channel`; a refused login backing off and said once; a dropped
 connection made and subscribed again. A backend in the test checks the ping's
 bearer and body, a failure said once, and a rotated broker kept. Not yet run
 against the company's broker or on a lamp.
+
+The reports (#1683): each kind's fields as sent; the canary; each of the
+three gates closed sends nothing (no setup file, a no, one unreadable,
+`"true"`, `1`, a newer wording; a later no of the lamp's own); the bus only
+turning reports off; a no deleting the queue and its files with nothing
+after but `stopped`; a no given offline kept across a restart, sent on the
+next connection and once more on the one after; the bounds (12 an hour, 50
+a day, 64 reports, healths before crashes, 7 days) and the 4 KiB cut; exit
+notes (a success and a unit not lampOS's write nothing, 8 per unit, each
+taken once across a restart, a new boot starting again); the drop-in's
+line; the lists against the product's units; `reports.get` and
+`reports.set` with and without the switch; and against the test broker, a
+report on `fd/…/report` with `info`'s id leaving the queue on the ack, and
+sent again after a dropped connection. `tests/report_contract.rs` pins the
+fields by name and type, the topic, and `sent_at` kept on a send again.
 
 `tests/app_contract.rs` holds the fields the Autonomous app's device page
 reads, by name and type (Fourth on #1396): `versions.firmware`,

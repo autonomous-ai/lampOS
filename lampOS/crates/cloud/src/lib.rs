@@ -11,4 +11,5 @@ pub mod lamp;
 pub mod light;
 pub mod online;
 pub mod ping;
+pub mod reports;
 pub mod wire;

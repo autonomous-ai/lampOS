@@ -70,6 +70,11 @@ pub trait Lamp {
     fn chat_events(&mut self, _now_ms: u64) -> Vec<Value> {
         Vec::new()
     }
+    /// Health and crash reports (#1683, `crate::reports`): there only with
+    /// `LAMP_CLOUD=on` and `LAMP_REPORTS=on`.
+    fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
+        None
+    }
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -131,6 +136,24 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             lamp.send_text(&text, now_ms)?;
             some(json!({"run_id": text.run_id, "session_id": text.session_id}))
         }
+        // Health and crash reports (#1683): whether the person's yes stands,
+        // since when and how many wait; and the person's own choice, from
+        // their account, the only way to turn them on after setup.
+        "reports.get" | "reports.set" if lamp.reports().is_some() => {
+            let shared = lamp.reports().ok_or_else(|| not_here(kind))?;
+            if kind == "reports.set" {
+                let share = data
+                    .get("share")
+                    .and_then(Value::as_bool)
+                    .ok_or("share must be true or false")?;
+                let now = crate::reports::now_s();
+                shared
+                    .with(|reports| reports.set(share, now))
+                    .map_err(|_| "the choice could not be kept".to_owned())?;
+                shared.wake.notify_one();
+            }
+            some(shared.with(|reports| reports.answer()))
+        }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -157,6 +180,8 @@ pub mod tests {
         pub texting: bool,
         pub texts: Vec<lamp_msgs::ChatIn>,
         pub to_give: Vec<Value>,
+        /// Reports (#1683), with their switch.
+        pub reports: Option<std::sync::Arc<crate::reports::Shared>>,
     }
 
     impl Lamp for Fake {
@@ -207,6 +232,9 @@ pub mod tests {
         }
         fn texting(&self) -> bool {
             self.texting
+        }
+        fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
+            self.reports.clone()
         }
         fn send_text(&mut self, text: &lamp_msgs::ChatIn, _now_ms: u64) -> Result<(), String> {
             self.texts.push(text.clone());
@@ -326,6 +354,43 @@ pub mod tests {
             answer(&mut lamp, "led.resting.get", &Value::Null),
             Err("the ring is not running".to_owned())
         );
+    }
+
+    /// #1683: the app reads and sets the person's choice, only with the
+    /// switch; a no deletes what waits.
+    #[test]
+    fn reports_are_read_and_set_from_the_app_only_with_their_switch() {
+        let mut lamp = lamp();
+        for kind in ["reports.get", "reports.set"] {
+            assert_eq!(
+                answer(&mut lamp, kind, &json!({"share": true})),
+                Err(not_here(kind))
+            );
+        }
+        let places = crate::reports::tests::places("answer");
+        lamp.reports = Some(crate::reports::Shared::new(crate::reports::Reports::open(
+            places.clone(),
+        )));
+        let got = answer(&mut lamp, "reports.get", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(got, json!({"share": false, "since": null, "queued": 0}));
+        let on = answer(&mut lamp, "reports.set", &json!({"share": true}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(on["share"], true);
+        assert!(on["since"].is_string());
+        for data in [json!({"share": "true"}), json!({"share": 1}), json!({})] {
+            assert_eq!(
+                answer(&mut lamp, "reports.set", &data),
+                Err("share must be true or false".to_owned()),
+                "{data}"
+            );
+        }
+        let off = answer(&mut lamp, "reports.set", &json!({"share": false}))
+            .unwrap()
+            .unwrap();
+        assert_eq!((&off["share"], &off["queued"]), (&json!(false), &json!(1)));
     }
 
     #[test]

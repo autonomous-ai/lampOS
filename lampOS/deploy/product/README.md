@@ -30,6 +30,7 @@ What is one lamp's own is outside them:
 | `lamp-setup.service` | First boot only: while the marker is missing and setup's settings exist (#806, #811) |
 | `lampos-setup-done.path` | Starts `lampos.target` once the marker exists ([install.md](../../docs/install.md), "Setup at first boot, without the keeper") |
 | `lamp-setup-reset.service` | In the target: the reset button held 5 s |
+| `exit-note.conf` | Not a unit and not installed by `install`: the reports' prefix drop-in, `/etc/systemd/system/lamp-.service.d/exit-note.conf`, put on a lamp with `LAMP_REPORTS=on` (#1683, `docs/cloud.md`). `lamp-cloud exit-note %n` as every lampOS unit's `ExecStopPost=` |
 
 `lamp-update install` (docs/install.md) carries all of these inside it and puts them on a lamp.
 
