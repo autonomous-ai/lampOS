@@ -4,6 +4,36 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 23:36 #1699 (Fifth: prepare to unplug): P2 LAMP_UNPLUG never reaches the ring worker (env_clear), so the sentence is never said; two P3s; first builder's
+- 23:33 #1836: merged with an attribution line in its PR body (my hand merge didn't stop on the check); the commit has none; asked Jarvis to remove it
+- 23:32 merged #1836 (Jarvis: Smoky air and Dusty air, off) as dec9cb69e, by hand: PR run green, duplicate cancelled
+- 23:23 #1973: the name stand-ins gated to the second route (P2 fixed); P3 asks_to_look stands; first builder's
+- 23:22 #1985 (#1972 folded): same change; merge on green
+- 23:21 read #1981 (Seventh: a slow SPI write isn't a fault, a faulted ring restarts): no P1/P2, two mutations caught; P3 settle_restart untested; first builder's after the lamp run
+- 23:21 #1981: corrected my read; the first builder's P1 (the 2 s re-tune tolerance removed) stands; I had missed it
+- 23:19 #1972: P2 fixed (root-only set-aside on /run); fold, then I merge on green
+- 23:18 merged #1956 (Ten: Mood's lamp minute, Rust numbers) as b0d7b6b76
+- 23:17 first read of #1982 (El: names and zone after setup, a root helper): no P1/P2; three P3s (socket gate, 30 min hold vs 4 connections, /etc RW); first builder's
+- 23:15 merged #1975 (stop_words flake) as 491fa8d5a, by hand: every job step green, the check stuck by GitHub's incident
+- 23:14 #1972 (Tests: trials.sh): P2 the memory store's copy stays in /tmp (rm without sudo); P3 forget's proof is second-route only
+- 23:13 read #1975 (Tests: stop_words flake, >= 2): no finding; merge on green
+- 23:10 #1950: its PR run failed a capture timing test under load (the dispatch run is green); re-ran the failed job
+- 23:09 #1977's P2 fixed (the worker asks the eyes who is here); #1979's wait is 2 s; both first builder's
+- 23:08 merged #1971 (Third: #1899's two P3s) as ea1901de4
+- 22:56 #1979 (Ten: lamp-cloud's faces.add_photo): no P1/P2 of its own; P3 a 10 s wait on the keepalive runtime; first builder's after #1968/#1977
+- 22:50 #1977 (Ten: the voice asks about a photo face): P2 the asked name is set in the coordinator but the yes/no runs in the provider worker, so it never reaches the eyes
+- 22:45 read #1836 (Jarvis: Smoky air and Dusty air skills, off): no finding; merge on green
+- 22:39 #1968: consent P2 fixed (answers only for the face here and asked); no finding left; first builder's after Third
+- 22:36 #1973 audit: P2 the second route's extra name words (Lynn, Lin, Line...) are on for Live too; P3 asks_to_look needs a closing mark on Live; rest is second-route only
+- 22:33 merged #1961 (Seventh: a ring that ended mid-session is dated before the stop) as e647d8b4a
+- 22:32 first read of #1973 (#1712 lands: the second route); deploy/msgs untouched; P3 the workflow keeps #1712's branch; squash, not rebase; Live-path audit follows
+- 22:28 #1968 re-read (unconfirmed photo faces): P2 photo_yes confirms without the face being asked or at the lamp; two P3s
+- 22:27 read #1971 (Third: #1899's two P3s): no P1/P2; P3 the '—' is per arm not per kind; merge on green
+- 22:26 #1965: my P2 fixed (pulses need a burst of 4); fold, then first builder's after the lamp trial
+- 22:24 #1956 conflicts with #1899 in voice-eval main.rs; asked Ten to rebase
+- 22:21 first read of #1968 (Ten: faces from a photo): no P1/P2; P3 the photo is processed on the eyes' main loop; privacy path, first builder's after Third
+- 22:21 #1956: the Python is gone (awk); merge on green ARM64
+- 22:20 #1965 (Thirteen: each lamp's head pads read against their factory baseline): P2 a quick factory touch marks a level pad 'pulses' for good; first builder's merge after the lamp trial
 - 22:14 read #1961 (Seventh: a ring that ended mid-session is dated before the stop, a record field only): no finding, two mutations caught; merge on green
 - 22:10 #1956: measuring moved to Rust and reads right; the test's fake lamp-bus is still Python (P2, smaller)
 - 22:09 merged #1955 (#1846 refiled: PR-scoped ARM64 tests) as 2b8a2c1f9; closed #1846
