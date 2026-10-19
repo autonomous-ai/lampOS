@@ -218,7 +218,10 @@ or muted: what `voice/state` says then was not checked). It says news that
 stopped or asks something, which no skill takes, 10 s after it came in. Left out, with
 why (`install::NOT_PRODUCT_SKILLS`): Desk tutor, which reads handwriting
 from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`) that
-the product doesn't run, and its marks, called only after its look. A test
+the product doesn't run, and its marks, called only after its look; and
+Light out when you leave (#1677, [presence.md](presence.md)), which reads
+the eyes' `room/presence`, off in the product (`LAMP_PRESENCE`) until its
+lamp check. A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
 product lamp tells each session 31 functions of the 32 a session takes
 (`lamp_gemini::MAX_TOOLS`): the voice's own 13, the actions part's 17 and

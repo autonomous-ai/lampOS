@@ -13,6 +13,7 @@ they disagree with this file, they are right.
 | `voice/heard`, `voice/said` | What a person said, what the lamp said (text) | Rarely: a trigger matches the whole text exactly, so it cannot hear a request in someone's own words or a number in it. For "when I ask, do X", use a `tool` (skill-folder.md); a spoken timer or reminder ("focus for 25 minutes") is the voice's own (`set_timer`), not a skill's |
 | `voice/state` | Resting, listening, thinking, speaking | Keeping out of a conversation |
 | `room/state` | Unknown, quiet, busy | Doing nothing in a busy room |
+| `room/presence` | Whether anyone is at the lamp: `someone` (a face seen or a voice heard within 20 s) and `nobody_s`, how long nobody has been there. Once a second while the eyes look (`LAMP_PRESENCE=on`), nothing while they don't: no value is not known, never nobody | Something for when nobody has been there a while (`nobody_s` above a line), as Light out does |
 | `name/heard` | The lamp's name was heard, how sure | |
 | `controls/gesture`, `controls/state` | A touch gesture on the head or base; button holds | Answering a touch |
 | `ears/level`, `ears/sudden` | The room's loudness every 100 ms; a sudden sound | Quiet hours, a bang |

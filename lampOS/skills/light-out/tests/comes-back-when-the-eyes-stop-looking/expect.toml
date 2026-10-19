@@ -1,0 +1,16 @@
+# From 10:00, nobody: the light goes out at 600 s. The eyes stop looking after
+# 700 s (a mute, the privacy switch): their last presence runs out at 703 s,
+# seen at the next message, the voice's at 710.5 s, and the light is given
+# back. Not known is never nobody.
+clock = "10:00"
+
+[[expect]]
+at = "600s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 30000, until = "ends" }
+
+[[expect]]
+at = "710s"
+within = "1s"
+call = "ends"

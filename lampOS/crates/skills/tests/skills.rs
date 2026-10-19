@@ -312,6 +312,7 @@ fn every_skill_folder_says_its_kind_and_version() {
         named(SkillKind::Core),
         [
             "dance",
+            "light-out",
             "reminders",
             "stretch-break",
             "stuffy-air",
@@ -4580,6 +4581,160 @@ fn a_dim_until_it_ends_asked_of_the_ring_is_given_back_when_the_trigger_ends() {
         !back.claim.holds_at("boot-test", lamp_ipc::monotonic_us()),
         "{back:?}"
     );
+}
+
+/// The light going out while someone is in view (#1677's step, on a trigger
+/// a test can hold), given back when they go.
+const OUT_WHILE: &str = r#"
+[trigger]
+topic = "humans/faces/tracked"
+rearm = "leaves"
+[ask]
+policy = "light"
+[[do]]
+light = { out = true, over = "30s", until = "ends" }
+"#;
+
+/// #1677: the light going out is asked of the ring as the light shown, off,
+/// with its fade, renewed with it while it holds, and given back when the
+/// trigger ends; the person's light is never touched.
+#[test]
+fn the_light_going_out_is_asked_of_the_ring_with_its_fade_and_given_back_when_the_trigger_ends() {
+    let seen = the_program_timed(
+        OUT_WHILE,
+        true,
+        &[],
+        3,
+        1,
+        4,
+        (Ring::Asked, After::Leaves(None)),
+        false,
+    );
+    assert!(seen.lights.is_empty(), "{:?}", seen.lights);
+    let done = &seen.events[3].why;
+    assert!(
+        done.contains("light out: asked of the ring, faded into over 30000 ms")
+            && done.contains("held until its trigger ended")
+            && done.contains("light given back"),
+        "{done}"
+    );
+    assert!(seen.requests.len() >= 2, "{:?}", seen.requests);
+    let (asked, back) = (&seen.requests[0], seen.requests.last().unwrap());
+    assert_eq!(asked.light, Light::new(false, "blue", 3).unwrap());
+    assert_eq!((asked.fade_ms, asked.pattern), (Some(30_000), None));
+    assert!(asked.check().is_ok(), "{asked:?}");
+    assert_eq!(back.light, asked.light);
+    assert!(
+        !back.claim.holds_at("boot-test", lamp_ipc::monotonic_us()),
+        "{back:?}"
+    );
+}
+
+/// #1677: without the ring's switch the light is left alone, never turned
+/// off as the person's own, and the run says why.
+#[test]
+fn without_the_ring_the_light_is_never_put_out() {
+    let seen = the_program_then(OUT_WHILE, true, &[], 3, 1, 4, Some(None));
+    assert!(seen.lights.is_empty(), "{:?}", seen.lights);
+    let done = seen
+        .events
+        .iter()
+        .find(|event| event.stage == SkillStage::Done)
+        .expect("done");
+    assert!(
+        done.why.contains(
+            "light out: left alone, since only the ring puts it out (LAMP_LIGHT_REQUESTS=on)"
+        ),
+        "{}",
+        done.why
+    );
+    assert!(!done.why.contains("held until"), "{}", done.why);
+}
+
+/// #1677: `out` is its own light step: only with `over` (1 to 60 s) and
+/// `until`; `over` only with it; it is named as a test names it.
+#[test]
+fn the_light_going_out_is_loaded_with_its_fade_and_refused_with_anything_else() {
+    let dir = tempfile::tempdir().unwrap();
+    let with = |name: &str, light: &str| {
+        skill_with(
+            dir.path(),
+            name,
+            &OUT_WHILE.replace(
+                r#"light = { out = true, over = "30s", until = "ends" }"#,
+                &format!("light = {light}"),
+            ),
+        )
+    };
+    let skill = load(&with(
+        "out",
+        r#"{ out = true, over = "30s", until = "ends" }"#,
+    ))
+    .unwrap();
+    let out = Call::Out {
+        over_ms: Some(30_000),
+        until_ends: true,
+    };
+    assert!(out.held_until_ends());
+    assert_eq!(
+        out.named(),
+        (
+            "light",
+            serde_json::json!({"out": true, "over_ms": 30000, "until": "ends"})
+        )
+    );
+    let quick = Call::Out {
+        over_ms: None,
+        until_ends: false,
+    };
+    assert!(!quick.held_until_ends());
+    assert_eq!(quick.named().1, serde_json::json!({"out": true}));
+    assert_eq!(skill.triggers.len(), 1);
+    load(&with("quick", "{ out = true }")).unwrap();
+    load(&with("second", r#"{ out = true, over = "1s" }"#)).unwrap();
+    load(&with("minute", r#"{ out = true, over = "60s" }"#)).unwrap();
+    for (name, light, why) in [
+        (
+            "short",
+            r#"{ out = true, over = "999ms" }"#,
+            "from 1 s to 60 s",
+        ),
+        (
+            "long",
+            r#"{ out = true, over = "61s" }"#,
+            "from 1 s to 60 s",
+        ),
+        (
+            "coloured",
+            r#"{ out = true, colour = "warm" }"#,
+            "out takes no colour",
+        ),
+        ("dimmed", "{ out = true, dim = 1 }", "out takes no colour"),
+        (
+            "levelled",
+            "{ out = true, level = 2 }",
+            "out takes no colour",
+        ),
+        (
+            "lasting",
+            r#"{ out = true, for = "4s" }"#,
+            "out takes no colour",
+        ),
+        ("false", "{ out = false }", "out is true or left out"),
+        (
+            "slow-dim",
+            r#"{ dim = 1, over = "30s" }"#,
+            "over goes with out = true",
+        ),
+        (
+            "slow-colour",
+            r#"{ colour = "warm", over = "30s" }"#,
+            "over goes with out = true",
+        ),
+    ] {
+        let refused = load(&with(name, light)).unwrap_err();
+        assert!(refused.contains(why), "{name}: {refused}");
+    }
 }
 
 #[test]
