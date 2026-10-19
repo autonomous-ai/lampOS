@@ -1070,6 +1070,10 @@ fn the_skills_tools_are_in_their_own_folder_which_the_voice_reads() {
     };
     let skills = unit("lamp-skills.service");
     assert!(skills.contains("\nRuntimeDirectory=lampos-skills\n"));
+    // The skills a person turned off are kept across a restart in its own
+    // state folder (#1685), the one #1732's daily journal shares.
+    assert!(skills.contains(" --state-dir /var/lib/lampos-skills-state "));
+    assert!(skills.contains("\nStateDirectory=lampos-skills-state\nStateDirectoryMode=0700\n"));
     assert!(skills.contains(" --tools-dir /run/lampos-skills "));
     assert!(!skills.contains("/run/lampos-actions/skills"));
     assert!(

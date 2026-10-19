@@ -1,0 +1,16 @@
+# 09:00, 70 minutes at the desk, the eyes' room/activity saying head_down
+# (reading or writing, #1678) from minute 40 to 60: nothing at 45, then the
+# tilt at the first face after they look up, at 60.
+clock = "09:00"
+
+[[expect]]
+at = "60m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "60m"
+within = "1m"
+call = "light"
+args = { dim = 1 }

@@ -39,6 +39,12 @@ field = "state"           # It never says a word about posture. Without the eyes
 not_equals = "head_down"  # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
 unknown = "holds"
 
+# One nudge an hour between the wellbeing skills (#1685): with none of the
+# installable ones on the lamp, it is the only member and nothing changes.
+[budget]
+group = "wellbeing"
+per_hour = 1
+
 [ask]
 policy = "nudge"
 

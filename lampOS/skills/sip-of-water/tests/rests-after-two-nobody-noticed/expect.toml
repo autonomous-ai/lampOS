@@ -1,0 +1,28 @@
+# 10:00, three sittings of 100 minutes, never moving, never turning to it:
+# at 90 and 195 minutes, then nothing until the morning ([rest]).
+clock = "10:00"
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "light"
+args = { colour = "blue" }
+
+
+[[expect]]
+at = "195m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "195m"
+within = "1m"
+call = "light"
+args = { colour = "blue" }

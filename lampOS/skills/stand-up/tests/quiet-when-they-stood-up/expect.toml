@@ -1,0 +1,4 @@
+# 10:00, an hour at the desk, away three minutes (past the two minutes a
+# look away is), then another hour: neither sitting is 100 minutes, nothing.
+clock = "10:00"
+none = true

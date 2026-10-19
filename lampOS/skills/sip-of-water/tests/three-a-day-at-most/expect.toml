@@ -1,0 +1,41 @@
+# 10:00, four sittings of 100 minutes, five minutes away between, moving
+# now and then (each noticed): at 90, 195 and 300 minutes, not a fourth.
+clock = "10:00"
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "light"
+args = { colour = "blue" }
+
+
+[[expect]]
+at = "195m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "195m"
+within = "1m"
+call = "light"
+args = { colour = "blue" }
+
+
+[[expect]]
+at = "300m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "300m"
+within = "1m"
+call = "light"
+args = { colour = "blue" }
