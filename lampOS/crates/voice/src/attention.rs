@@ -922,6 +922,17 @@ impl Attention {
         }
     }
 
+    /// The lamp's own turn (its news, a reminder) began to be heard at
+    /// `at_us`, on a route that judges only spoken turns and so never sees
+    /// the own turn begin (the second route, #1712): news someone can reply
+    /// to, as [`Self::spoke`] marks it.
+    pub fn news_told(&mut self, at_us: u64) {
+        if self.spoken_to {
+            self.news_us = Some(at_us);
+            self.worked(at_us);
+        }
+    }
+
     /// The lamp started a task, a timer or a reminder at `at_us`, by this
     /// process's clock.
     pub fn worked(&mut self, at_us: u64) {

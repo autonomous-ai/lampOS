@@ -803,6 +803,14 @@ pub fn serve(
                 heeding.lock().ok()?.name_note_for(request)
             }));
         }
+        {
+            let heeding = heeding.clone();
+            engine = engine.telling_what_it_did(Arc::new(move |did| {
+                if let Ok(mut heeding) = heeding.lock() {
+                    heeding.lamp_did(did);
+                }
+            }));
+        }
         if files.attention_near
             && let (Ok(mut heeding), Some(root)) = (heeding.lock(), files.bus_root.as_deref())
         {
@@ -1135,6 +1143,16 @@ impl Heeding {
     /// `heard_as` saying it may have sounded like another word.
     pub(crate) fn telling_the_name(&mut self, needs_face: bool, heard_as: bool) {
         self.name_note = Some((needs_face, heard_as));
+    }
+
+    /// What the lamp did, for the rule, as the Live worker tells its own:
+    /// its work, for a question about it later, and its own turn heard, for
+    /// a reply to it (#1712).
+    pub(crate) fn lamp_did(&mut self, did: crate::second_provider::Did) {
+        match did {
+            crate::second_provider::Did::Worked(at_us) => self.attention.worked(at_us),
+            crate::second_provider::Did::Spoke(at_us) => self.attention.news_told(at_us),
+        }
     }
 
     /// The note `request` earned when it was judged, if any.
@@ -2530,6 +2548,46 @@ mod tests {
             .and_then(|ms| ms.parse::<u64>().ok());
         assert_eq!(counted, Some(0), "the battery's pattern reads it");
         assert!(super::run_after(&crate::tools::Route::Clock, "the_time", 7).is_none());
+    }
+
+    /// #1712, lamp-4ace's A/B: after a hand-over and 104 s, every line
+    /// without the name was held as no conversation, where Live answered.
+    /// With `--spoken-to`, as on the Live worker: a question about the lamp's
+    /// work 105 s after a tool turn is for it, and so is a line 105 s after
+    /// its own news, in a room not busy; with neither, it is held.
+    #[test]
+    fn after_a_tool_turn_or_the_lamps_news_a_line_105_s_later_is_judged_as_live_judges_it() {
+        let signs = || super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on: false,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let at = |seconds: u64| 1_000_000_000 + seconds * 1_000_000;
+        let line = |seconds: u64| (at(seconds), at(seconds) + 1_500_000);
+        let judged = |did: Option<crate::second_provider::Did>, heard: &str| {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if let Some(did) = did {
+                heeding.lamp_did(did);
+            }
+            heeding.judge(9, line(105), heard, signs())
+        };
+        use crate::second_provider::Did;
+        let held = judged(None, "How is that task going?");
+        assert_eq!(held, Some(crate::attention::NOT_SPOKEN_TO));
+        assert_eq!(
+            judged(Some(Did::Worked(at(0))), "How is that task going?"),
+            None
+        );
+        assert_eq!(
+            judged(None, "What time is it?"),
+            Some(crate::attention::NOT_SPOKEN_TO)
+        );
+        assert_eq!(judged(Some(Did::Spoke(at(0))), "What time is it?"), None);
     }
 
     /// #1712: the room this route keeps is told on the bus (`room/state`)

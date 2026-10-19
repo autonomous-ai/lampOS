@@ -185,6 +185,19 @@ pub type NameNote = Arc<dyn Fn(u64) -> Option<&'static str> + Send + Sync>;
 /// for the person's yes (`crate::agent_tasks::pending_note`): with its
 /// request, to the note or nothing.
 pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
+/// What the lamp did, for the rule for whom it answers
+/// (`worker::Heeding::lamp_did`), as the Live worker tells its own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Did {
+    /// A task, a timer or a reminder asked of its parts, at this time: a
+    /// question about its work later is for it (`attention::worked`).
+    Worked(u64),
+    /// Its own turn (news, a reminder) began to be heard at this time: a
+    /// reply to it is for it (`attention::news_told`).
+    Spoke(u64),
+}
+/// Where the engine says what the lamp did.
+pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
 
 /// What every turn task shares.
 struct Shared {
@@ -217,6 +230,8 @@ struct Shared {
     name_note: Option<NameNote>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
+    /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
+    did: Option<LampDid>,
 }
 
 /// A stop to be told beside a request's chat ([`crate::provider_worker::STOPPED_NOTE`]).
@@ -462,6 +477,7 @@ impl Engine {
                 staff: None,
                 name_note: None,
                 task_waiting: None,
+                did: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -532,6 +548,18 @@ impl Engine {
     pub fn noting_the_name(mut self, note: NameNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.name_note = Some(note);
+        }
+        self
+    }
+
+    /// What the lamp did is told to `did`: its work asked of its parts and
+    /// its own turns heard, which the rule for whom it answers takes as
+    /// the Live worker's does (#1712: after a hand-over and 104 s, every line
+    /// was held as no conversation, where Live took a question about the
+    /// work or a reply to its news). Before any turn only.
+    pub fn telling_what_it_did(mut self, did: LampDid) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.did = Some(did);
         }
         self
     }
@@ -1477,6 +1505,14 @@ async fn answer(
                 reasoning.take(),
             ));
             for call in &calls {
+                // The lamp's own work, for a question about it later, as the
+                // Live worker marks it for any turn not held (#829).
+                if (crate::agent_tasks::is_tool(&call.name)
+                    || crate::tools::is_schedule_tool(&call.name))
+                    && let Some(did) = &shared.did
+                {
+                    did(Did::Worked(monotonic_us()));
+                }
                 let result =
                     (shared.tools)(request, heard, call.name.clone(), call.args.clone()).await;
                 messages.push(Message::tool(call.id.clone(), result.to_string()));
@@ -1536,6 +1572,12 @@ async fn answer(
                                 room.spoke_unasked(request, monotonic_us());
                             }
                         });
+                        // Its own turn heard: news someone may reply to.
+                        if asked != Asker::Spoken
+                            && let Some(did) = &shared.did
+                        {
+                            did(Did::Spoke(monotonic_us()));
+                        }
                         reached(&times, |times| &mut times.audio);
                         eprintln!(
                             "lamp-voice second: request {request} first answer audio {} ms after the words were heard",

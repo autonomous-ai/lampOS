@@ -2151,3 +2151,68 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
     let ops: Vec<&str> = ops.iter().filter_map(|op| op["op"].as_str()).collect();
     assert_eq!(ops, ["status", "prepare", "status", "confirm"]);
 }
+
+/// #1712: what the lamp did is told to the rule, as the Live worker tells its
+/// own: a task, timer or reminder asked of its parts is its work, and its
+/// own written turn heard is news someone may reply to. A lookup is
+/// neither.
+#[tokio::test]
+async fn the_lamps_work_and_its_own_turns_are_told_to_the_rule() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Set a timer for one minute.".to_owned()),
+                Ok("What time is it?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "set_timer",
+                        json!({"text": "timer", "seconds": 60}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Done."), Ok(ChatEvent::Done)],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        "the_time",
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Noon."), Ok(ChatEvent::Done)],
+                vec![text("Claude Code is done."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let did: Arc<Mutex<Vec<&'static str>>> = Arc::default();
+    let seen = did.clone();
+    let mut engine = engine.telling_what_it_did(Arc::new(move |did| {
+        seen.lock().unwrap().push(match did {
+            Did::Worked(_) => "worked",
+            Did::Spoke(_) => "spoke",
+        })
+    }));
+    for request in 1..=2 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    }
+    assert_eq!(
+        *did.lock().unwrap(),
+        ["worked"],
+        "the timer only, not the time"
+    );
+    engine.submit(written(3, "Tell the person their task is done."));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(*did.lock().unwrap(), ["worked", "spoke"]);
+}

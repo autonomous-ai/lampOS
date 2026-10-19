@@ -328,6 +328,11 @@ order is kept. A written turn is the same from the chat on.
   under the same lock as its recall and after its forgetting and reload
   (`thread::current`), so they are only the person's at the lamp and never
   something forgotten. The route keeps no copy of its own.
+  Its calls are not kept, so while a task this voice prepared waits for
+  the person's yes (`agent_tasks::pending_note`, within `CONFIRM_WITHIN`),
+  a spoken request is told so beside its words, with the tasks part on:
+  without it, on lamp-4ace on 19 Oct, the yes was taken as a new
+  hand-over, asked about again and never started.
 - **A tool call knows whether it was heard.** The engine passes `heard`
   to the tool runner: true in a spoken turn, false in a written one, as the
   Live route does, so a yes to prepared work cannot come in a turn the lamp
@@ -811,6 +816,13 @@ after a take-over, but now for every turn:
     past the lamp. The rule is set as the Live worker sets its own: remarks
     held (`LAMP_REMARKS`), and with `LAMP_SPOKEN_TO` only talk between
     people counted, by day too;
+  - **told what the lamp did** (`Engine::telling_what_it_did`,
+    `worker::Heeding::lamp_did`), as the Live worker tells its rule: a
+    task, a timer or a reminder asked of its parts (`attention::worked`),
+    so a question about its work later is for it, and its own turn
+    beginning to be heard (`attention::news_told`), so a reply to its news
+    is. Without it, on lamp-4ace on 19 Oct, every line 104 s after a
+    hand-over was held as no conversation, where Live answered all five;
   - **told and kept:** `room/state` on the bus at each tick, and the room's
     file (`LAMP_ROOM_FILE`) kept about once a second and taken back at the
     start, as on the Live route.
