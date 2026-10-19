@@ -543,9 +543,16 @@ fn tool_holder(skills: &Path, name: &str, tool: &str) -> Option<(String, SkillKi
 /// What the loaded `skills` give the model: their functions, and what a
 /// session does past its room (`docs/tools.md`).
 fn functions_said(skills: &[Skill]) -> String {
+    // A skill's `[stop]` is one function more (#1685).
     let tools: Vec<&str> = skills
         .iter()
-        .filter_map(|skill| skill.tool.as_deref())
+        .flat_map(|skill| {
+            skill
+                .tool
+                .as_deref()
+                .into_iter()
+                .chain(skill.stop.as_ref().map(|stop| stop.tool.as_str()))
+        })
         .collect();
     if tools.is_empty() {
         return "The skills here give the model no function.".into();

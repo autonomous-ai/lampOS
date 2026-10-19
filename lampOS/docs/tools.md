@@ -191,8 +191,9 @@ product's is `/run/lampos-skills`), and the voice reads and calls them the
 same way, at the same session open and within the same deadline:
 
     <skills>/tools.json   each skill's tool, described with its SKILL.md description,
-                          with the parameters of its choice and flag, if it has them,
-                          and beside the tools, "body": the tools whose skill asks
+                          with the parameters of its choice and flag, if it has them;
+                          a skill's [stop] function (#1685), its "how" one of snooze,
+                          off or on; and beside the tools, "body": the tools whose skill asks
                           for the body (a text never runs one, #1673)
     <skills>/call.sock    {"op":"call","name":"dance","args":{"style":"calm"}} -> {"ok":true,"result":{"next":"..."}}
                           arguments that are not the tool's -> {"ok":false,"error":"..."}
