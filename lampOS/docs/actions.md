@@ -36,6 +36,17 @@ one second to send its line. A second `lamp-actions` on the same directory
 is refused while the first answers. It cannot catch a signal; killed, it
 leaves the call it was in unanswered, and the voice tells its model so.
 
+The units keep its folder, `/run/lampos-actions`, across a restart: a
+crash's, an update's or `systemctl restart`
+(`RuntimeDirectoryPreserve=restart`, El on #1588). Since it cannot catch
+SIGTERM, a restart leaves `tools.json` where it is. The new process finds
+the old `call.sock` unanswered and replaces it, then writes `tools.json` and
+`ready` again before it serves. With the same names in the catalog, the
+voice reads the same set and renews no session. Before, a restart in a quiet
+room cost two reconnects: the catalog gone, then back. A stop and a later
+start still remove the folder, and the voice renews for the functions gone
+and back as before ([tools.md](tools.md)).
+
 Only what can be done now is offered. With no mixer given there are no
 volume actions; the light's are offered while the ring's owner is saying
 what it shows and for 15 s after (`light::LIGHT_GRACE`, below), and are
