@@ -414,7 +414,11 @@ from a speaker across the desk, and "Hey Lamp, what's the weather in
 Hanoi?" 30 s later made no request at all. A forced yield (a stop word)
 that resumes is no fruitless yield. The session's `duplex_policy` event
 gives both numbers (`fruitless_yields_before_fallback`,
-`fruitless_yield_forgiven_after_ms`).
+`fruitless_yield_forgiven_after_ms`). Each forgiving is traced on the block
+it happens (`duplex_fruitless_forgiven`, with `forgiven_so_far`), and
+`duplex_summary` counts them (`fruitless_forgiven`):
+`fallen_back_at_end` says only whether the last reply had fallen back when
+the session ended (Eighth on #2048).
 
 What that means for a person in the room:
 
