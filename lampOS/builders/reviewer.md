@@ -21,7 +21,7 @@ Every ready pull request into `lamp-voice` (not a draft), oldest first.
    crates it touches, from `lampOS/`: `cargo fmt --all --check`,
    `cargo clippy -p <crate> --all-targets -- -D warnings`, and
    `cargo test -p <crate> -- --test-threads=1`. A test that fails here and
-   passes alone, in a family listed as flaky in the Queue (#705), is
+   passes alone, in a family listed as flaky in the Queue (#1722), is
    noted, not a blocker.
 2. **Review like an owner of the code.** Look for wrong behaviour, a missed
    case, a switch that is not really off, a test that cannot fail, a doc
