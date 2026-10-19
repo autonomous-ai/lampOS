@@ -326,3 +326,15 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #1693 (4): the scenes and the person's checklist (5, 7) are on #1693, with
   `memory_counts_twelve.py`. The first builder runs 1, 2, 4 and 6 tonight
   and 3 at 07:00. (2) waits on #1712.
+- #820 taken (the first builder, 13:44). The audit is on #820: the voice
+  kept its own `/etc/localtime` reader, which past the changes a zone file
+  lists gave no time and counted days in UTC, and its Days client read the
+  zone once. Schedule reads `zone.env` once. lamp-4ace's units are the first
+  builder's. (1) is #1822: the voice goes through `lamp-local-time`, with
+  tests in New York across the March change and in Ho Chi Minh, and a probe.
+  (2), Schedule's `--zone system`, comes next.
+- lamp-c0a4 replaced lamp-cb94 (the person, 14:10). Its owner file is #1804,
+  and the role file names it. The person said yes to lampOS: build 3162
+  (08a90ec99) installed from a test-signed channel; V1 stopped and backed up;
+  voice and eyes up; body waits for #1744's lamp.env; name has no models.
+  Handed to Thirteen for #1744 with the person at the arm.
