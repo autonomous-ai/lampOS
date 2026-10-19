@@ -12,9 +12,17 @@ pub const SETTLE_US: u64 = 500_000;
 pub const EDGE_US: u64 = 20_000;
 pub const FRESH_US: u64 = 100_000;
 /// A candidate whose longest pulse is at least this held its level under a
-/// hand; one whose pulses were all shorter pulsed under it (a TTP223's
-/// pulsing mode, 50-100 ms). The touch's own longest tap.
+/// hand. The touch's own longest tap.
 pub const HELD_US: u64 = 500_000;
+/// A change of a line this soon after its last one, and no sooner than
+/// [`EDGE_US`], is a fast one: a TTP223 pulsing under a hand (50-100 ms) makes
+/// them many times a second. As the touch engine's pulse gap.
+pub const FAST_US: u64 = 250_000;
+/// A candidate pulsed under a hand only after this many fast changes in its
+/// touches: two quick taps on a pad that holds its level make none, and with
+/// neither these nor a held level it says no `reads`, so the factory step
+/// asks again (the reviewer on #1965).
+pub const BURST: u64 = 4;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct LineEvidence {
@@ -28,7 +36,11 @@ pub struct LineEvidence {
     /// How many times the line changed in the hands-away phase; none
     /// without one.
     pub rest_changes: Option<u64>,
-    /// How a touch showed on a candidate: its level held, or pulses.
+    /// How many of the line's changes in the touches came 20-250 ms after
+    /// the one before.
+    pub fast_changes: u64,
+    /// How a touch showed on a candidate: its level held for 500 ms, or
+    /// [`BURST`] fast changes; neither, none.
     pub reads: Option<Reads>,
 }
 
@@ -57,6 +69,8 @@ pub struct Discovery {
     contacts: [Contact; 4],
     /// Each line's last level read in the hands-away phase.
     resting: [Option<bool>; 4],
+    /// Each line's last level in the touches, and when it last changed.
+    touched: [(Option<bool>, Option<u64>); 4],
 }
 
 impl Discovery {
@@ -83,6 +97,7 @@ impl Discovery {
                         longest_pulse_us: 0,
                         active_low_candidate: None,
                         rest_changes: (rest_us > 0).then_some(0),
+                        fast_changes: 0,
                         reads: None,
                     })
                     .collect(),
@@ -95,6 +110,7 @@ impl Discovery {
             },
             contacts: std::array::from_fn(|_| Contact::default()),
             resting: [None; 4],
+            touched: [(None, None); 4],
         })
     }
 
@@ -115,16 +131,18 @@ impl Discovery {
         {
             self.report.gaps += 1;
             self.contacts = std::array::from_fn(|_| Contact::default());
+            self.touched = [(None, None); 4];
         }
         self.report.last_us = Some(at_us);
         self.report.observations += 1;
         let rest_us = self.report.rest_us;
-        for (index, ((line, contact), resting)) in self
+        for (index, (((line, contact), resting), touched)) in self
             .report
             .lines
             .iter_mut()
             .zip(&mut self.contacts)
             .zip(&mut self.resting)
+            .zip(&mut self.touched)
             .enumerate()
         {
             let Some(idle) = line.idle_high else {
@@ -145,6 +163,24 @@ impl Discovery {
                 }
                 *contact = Contact::default();
                 continue;
+            }
+            if touched.0.replace(high).is_some_and(|was| was != high) {
+                if touched
+                    .1
+                    .is_some_and(|last| (EDGE_US..=FAST_US).contains(&(at_us - last)))
+                {
+                    line.fast_changes += 1;
+                }
+                touched.1 = Some(at_us);
+            }
+            if line.active_low_candidate.is_some() {
+                line.reads = if line.longest_pulse_us >= HELD_US {
+                    Some(Reads::Level)
+                } else if line.fast_changes >= BURST {
+                    Some(Reads::Pulses)
+                } else {
+                    None
+                };
             }
             if !contact.armed {
                 if active {
@@ -178,11 +214,13 @@ impl Discovery {
                     line.longest_pulse_us = line.longest_pulse_us.max(duration);
                     if line.completed_pulses >= 2 {
                         line.active_low_candidate = Some(idle);
-                        line.reads = Some(if line.longest_pulse_us >= HELD_US {
-                            Reads::Level
+                        line.reads = if line.longest_pulse_us >= HELD_US {
+                            Some(Reads::Level)
+                        } else if line.fast_changes >= BURST {
+                            Some(Reads::Pulses)
                         } else {
-                            Reads::Pulses
-                        });
+                            None
+                        };
                     }
                 }
                 contact.pressed_since = None;

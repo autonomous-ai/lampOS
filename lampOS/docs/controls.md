@@ -224,14 +224,18 @@ its level by its `active_low`, as before.
 `discover-head --rest-seconds R` measures it: after the 500 ms settle, R
 seconds of hands away, in which each line's changes are counted
 (`rest_changes`); then the touches, as before. A candidate whose longest
-pulse lasted 500 ms or more held its level (`reads: level`), one whose pulses
-were all shorter pulsed (`reads: pulses`). The factory step refuses a pad
-with any change at rest, and writes `head_rest` only from a report that has
-both. Tests: `tests/head_rest.rs` (cb94's 77 s flip is nothing on a pulse
+pulse lasted 500 ms or more held its level (`reads: level`); one whose line
+made at least four changes each 20 to 250 ms after the one before
+(`fast_changes`, `BURST`) pulsed (`reads: pulses`); with neither, as two
+quick taps on a pad that holds its level, it says none (the reviewer on
+#1965), since `pulses` written for such a pad would never read a resting
+hand. The factory step refuses a pad with any change at rest, or with no
+`reads`, and asks again; it writes `head_rest` only from a report that
+measured both. Tests: `tests/head_rest.rs` (cb94's 77 s flip is nothing on a pulse
 pad and a touch, stroke and sleep on a level one; a resting hand from either
 rest; one or two pulses a tap; a bounce or a slow change nothing; a pulse pad
 arms on a line resting high), `tests/head_discovery.rs`
-(`the_hands_away_phase_*`), `tests/touch_pins.rs` (`head_rest_*`) and
+(`the_hands_away_phase_*`, `two_quick_touches_on_a_level_pad_*`), `tests/touch_pins.rs` (`head_rest_*`) and
 `deploy/factory/steps-test.sh`. Not shown: any lamp's pads read this way;
 whether a pad whose rest drifts later, after the factory, is told.
 

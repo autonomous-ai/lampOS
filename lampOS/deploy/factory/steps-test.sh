@@ -208,6 +208,10 @@ lamp; before=$(cat "$T/root/$PINSF")
 FAKE_DISCOVERY="{\"lines\":[$(pulled 97 false false false 2 false | sed 's/}$/,"rest_changes":3,"reads":"level"}/'),$(pulled 98 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":"pulses"}/')],\"hardware_mapping_installed\":false}" \
   ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "a pad whose rest changed with hands away: nothing written, controls started again" '[[ $status == 1 ]] && grep -q "head pad lines \[97\] changed with hands away" "$T/out" && [[ $(cat "$T/root/$PINSF") == "$before" ]] && grep -q "systemctl start lamp-controls" "$T/log" && ! grep -q "systemctl restart" "$T/log"'
+lamp; before=$(cat "$T/root/$PINSF")
+FAKE_DISCOVERY="{\"lines\":[$(pulled 97 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":null}/'),$(pulled 98 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":"pulses"}/')],\"hardware_mapping_installed\":false}" \
+  ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
+check "a pad touched too quickly to tell how it reads: nothing written, asked again" '[[ $status == 1 ]] && grep -q "head pad lines \[97\] were neither held half a second nor pulsing" "$T/out" && [[ $(cat "$T/root/$PINSF") == "$before" ]] && ! grep -q "systemctl restart" "$T/log"'
 lamp
 FAKE_DISCOVERY="{\"lines\":[$(pulled 97 false false false 2 false),$(pulled 98 false false false 2 false)],\"hardware_mapping_installed\":false}" \
   ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?

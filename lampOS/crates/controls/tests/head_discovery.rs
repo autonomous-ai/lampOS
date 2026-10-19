@@ -132,3 +132,21 @@ fn the_hands_away_phase_counts_a_rest_that_changes_and_each_candidate_says_how_i
             .all(|line| line.rest_changes.is_none())
     );
 }
+
+/// The reviewer on #1965: two quick touches on a pad that holds its level
+/// (300 ms each, under the 500 ms hold) are neither a held level nor a
+/// pulsing pad, so it says no `reads` and the factory step asks again, rather
+/// than writing `pulses` for good.
+#[test]
+fn two_quick_touches_on_a_level_pad_say_nothing_of_how_it_reads() {
+    let mut scan = Discovery::with_rest(0, [(false, false); 4], 1_000_000).unwrap();
+    feed(&mut scan, 0, 1_995_000, 0);
+    for begin in [2_000_000, 2_800_000] {
+        feed(&mut scan, begin, begin + 295_000, 1);
+        feed(&mut scan, begin + 300_000, begin + 795_000, 0);
+    }
+    let line = &scan.report().lines[0];
+    assert_eq!(line.active_low_candidate, Some(false));
+    assert_eq!(line.fast_changes, 0);
+    assert_eq!(line.reads, None);
+}

@@ -271,6 +271,12 @@ step_head_pads() {
     fail "head pad lines $restless changed with hands away, so their rest does not hold and a touch can't be told on them (#1764): the pins are not changed (report: $report)"
     return 1
   fi
+  local unread
+  unread=$("$JQ" -c '[.[] | select(.rest_changes != null and .reads == null) | .line]' <<<"$pads")
+  if [[ $unread != "[]" ]]; then
+    fail "head pad lines $unread were neither held half a second nor pulsing under the hand: touch each pad about a second, and run the step again (report: $report)"
+    return 1
+  fi
   if [[ $("$JQ" length <<<"$pads") != 2 ]]; then
     fail "head pads found on $("$JQ" -c '[.[].line]' <<<"$pads") lines, not two, each touched twice: the pins are not changed (report: $report)"
     return 1
