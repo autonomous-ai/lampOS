@@ -920,6 +920,10 @@ fn worker_command(
             var(crate::second_config::CREDENTIALS_ENV).as_deref(),
         ))
         .envs(second_route_worker_environment(role, &var))
+        .envs(second_scoped_context_worker_environment(
+            role,
+            var(crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -935,6 +939,18 @@ fn memory_days_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some(("LAMP_MEMORY_DAYS", "on"))
+}
+
+// The second route's scoped context (#1675, #1839), passed the same narrow
+// way: the exact `on`, to the second route only, which reads it.
+fn second_scoped_context_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on"))).then_some((
+        crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
+        "on",
+    ))
 }
 
 // The rules' switch (#813), passed the same narrow way: the exact `on`, to
@@ -1185,6 +1201,12 @@ mod tests {
                         "LAMP_MEMORY_DAYS",
                         ["provider", "second"].as_slice(),
                     ),
+                    // The second route's scoped context reaches it alone.
+                    (
+                        second_scoped_context_worker_environment,
+                        "LAMP_SECOND_SCOPED_CONTEXT",
+                        ["second"].as_slice(),
+                    ),
                     // Rules reach both routes too (twelve-P2).
                     (
                         memory_rules_worker_environment,
@@ -1311,7 +1333,8 @@ mod tests {
     /// command it is started with. A script in the worker's place writes
     /// the environment it got: the provider has the memory's two switches,
     /// the clock and the typed name's file, the second route the memory's
-    /// days, the clock and the name's file (#1323), and capture the quiet
+    /// days, the clock, the name's file (#1323) and its scoped context
+    /// (#1839), and capture the quiet
     /// evidence switch (#1285) and the detector's input (#828). With every other variable set to a secret,
     /// nothing else reaches any of them but the shell's own.
     #[test]
@@ -1335,6 +1358,7 @@ mod tests {
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
                     crate::second_provider::net::key_terms::ENVIRONMENT,
                     crate::second_config::FLUX_ENV,
+                    crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -1432,6 +1456,7 @@ mod tests {
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_KNOWN_NAMES=on",
                     "LAMP_SECOND_PREPARED=on",
+                    "LAMP_SECOND_SCOPED_CONTEXT=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
                     "LAMP_SECOND_SPEECH_WARM=on",
                     "LAMP_SECOND_STEADY_FIRST=on",

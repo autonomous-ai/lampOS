@@ -183,6 +183,9 @@ pub type ScopedToolRunner = Arc<
 
 /// The system message for a turn, built when the turn's chat begins.
 pub type System = Arc<dyn Fn() -> Told + Send + Sync>;
+/// The system message built for the admitted request's immutable scope, never
+/// for whoever is in view when the chat begins.
+pub type ScopedSystem = Arc<dyn Fn(&crate::memory_scope::ScopeLease) -> Told + Send + Sync>;
 
 /// What a turn's chat is told: the system message, and the exchanges just
 /// before it as messages (user, then assistant), oldest first. Both come
@@ -303,6 +306,7 @@ struct Shared {
     tools: ToolRunner,
     scoped_tools: Option<ScopedToolRunner>,
     system: System,
+    scoped_system: Option<ScopedSystem>,
     clock: Clock,
     /// When answer audio was last sent.
     answered_at: Mutex<Option<Instant>>,
@@ -674,6 +678,7 @@ impl Engine {
                 tools,
                 scoped_tools: None,
                 system,
+                scoped_system: None,
                 clock,
                 answered_at: Mutex::new(None),
                 said_until_us: AtomicU64::new(0),
@@ -727,10 +732,11 @@ impl Engine {
         boot: lamp_turn_owner::BootId,
         cache: Arc<crate::memory_scope::FaceCache>,
         runner: ScopedToolRunner,
+        system: Option<ScopedSystem>,
     ) -> Self {
-        Arc::get_mut(&mut self.shared)
-            .expect("configured before admission")
-            .scoped_tools = Some(runner);
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.scoped_tools = Some(runner);
+        shared.scoped_system = system;
         self.memory = Some((boot, cache));
         self
     }
@@ -758,6 +764,21 @@ impl Engine {
         {
             scope.revoke();
         }
+    }
+
+    /// Whether turns are told and kept for their admitted memory scope
+    /// (a [`ScopedSystem`] given to [`Self::with_memory_scope`]).
+    pub(crate) fn scopes_context(&self) -> bool {
+        self.shared.scoped_system.is_some()
+    }
+
+    /// Authority of the current admitted request, including its immutable scope.
+    pub(crate) fn memory_lease(&self) -> Option<crate::memory_scope::ScopeLease> {
+        self.turn
+            .as_ref()?
+            .memory_scope
+            .as_ref()
+            .map(|scope| scope.lease())
     }
 
     fn memory_scope(
@@ -1661,7 +1682,7 @@ async fn spoken(
                 }
             }
             Some(said) = next_early(&mut early) => {
-                prepared = prepared_on(&shared, request, prepared, said, &cut_in);
+                prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, &cut_in);
             }
         }
     }
@@ -1673,14 +1694,14 @@ async fn spoken(
         tokio::select! {
             finished = &mut finish => break finished,
             Some(said) = next_early(&mut early) => {
-                prepared = prepared_on(&shared, request, prepared, said, &cut_in);
+                prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, &cut_in);
             }
         }
     };
     // Every early word sent before the words were final counts: a
     // `TurnResumed` just before the end still takes them back.
     while let Some(said) = early.as_mut().and_then(|early| early.try_recv().ok()) {
-        prepared = prepared_on(&shared, request, prepared, said, &cut_in);
+        prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, &cut_in);
     }
     let text = match finished {
         Ok(text) => {
@@ -1962,8 +1983,13 @@ impl Prepared {
     /// The chat asked on `words`, as round 1 would be asked: the turn's
     /// system message and history, the `notes` known so far, then the
     /// words.
-    fn begin(shared: &Shared, words: String, notes: &[String]) -> Self {
-        let mut messages = (shared.system)().messages();
+    fn begin(
+        shared: &Shared,
+        scope: Option<&crate::memory_scope::ScopeLease>,
+        words: String,
+        notes: &[String],
+    ) -> Self {
+        let mut messages = told(shared, scope).messages();
         messages.extend(notes.iter().cloned().map(Message::system));
         messages.push(Message::user(words.clone()));
         let mut chat = shared.services.chat(messages.clone());
@@ -2059,11 +2085,20 @@ async fn next_early(early: &mut Option<mpsc::UnboundedReceiver<net::Early>>) -> 
     }
 }
 
+/// What a turn's chat is told: for its admitted scope when this route
+/// scopes context ([`Engine::with_memory_scope`]), as before otherwise.
+fn told(shared: &Shared, scope: Option<&crate::memory_scope::ScopeLease>) -> Told {
+    match (&shared.scoped_system, scope) {
+        (Some(system), Some(lease)) => system(lease),
+        _ => (shared.system)(),
+    }
+}
+
 /// What a turn's prepared chat is once `said` comes: begun on new early
 /// words, kept on the same, dropped when the person went on.
 fn prepared_on(
     shared: &Shared,
-    request: u64,
+    (request, scope): (u64, Option<&crate::memory_scope::ScopeLease>),
     prepared: Option<Prepared>,
     said: net::Early,
     notes: &[String],
@@ -2080,7 +2115,7 @@ fn prepared_on(
             eprintln!(
                 "lamp-voice second: request {request}: its chat is begun on the line's early words"
             );
-            Some(Prepared::begin(shared, words, notes))
+            Some(Prepared::begin(shared, scope, words, notes))
         }
         net::Early::Resumed => {
             if prepared.is_some() {
@@ -2249,7 +2284,13 @@ async fn answer(
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
         }
-        let mut messages = (shared.system)().messages();
+        let told = told(shared, scope.as_ref());
+        // Building it can wait on the memory service: a request revoked
+        // meanwhile is not asked with what was read for it.
+        if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+            return Err(Stop::Gone);
+        }
+        let mut messages = told.messages();
         // A chat begun on the early words stands for round 1 if it fits.
         let mut prepared = prepared_for.and_then(|(prepared, said)| {
             match prepared.misfit(&messages, &notes, &said) {
