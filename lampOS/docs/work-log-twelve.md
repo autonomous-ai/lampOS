@@ -406,3 +406,6 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #2029 folded and rebased (light-show row). #2021: `passes` renamed to the
   wrong-and-intrusive half, with `missed_of_worth`. Memory's quality on the
   cheaper voice is #2037: six probe-tools cases, counts only.
+- #2029 and #2021 merged; #1973 landed the second route on lamp-voice.
+  #2037: the peer read's P2 (another person's room secret never repeated)
+  and P3s (never-mind keeps nothing) fixed, with a probe.
