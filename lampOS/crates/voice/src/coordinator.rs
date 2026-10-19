@@ -1790,6 +1790,25 @@ pub fn run_serve(config: &Path, output: &Path, options: SessionOptions) -> Resul
     // and so is a wrong `LAMP_SECOND_*` switch. Each run reads them again as
     // it starts its workers (`spawn_rig`), after the session folder: this
     // early refusal is held by `run_serve_refuses_a_wrong_route_before_anything_starts`.
+    // An update round brings this binary and the second route's unit but
+    // never `/etc/lampOS` (docs/updates.md), so the product's second.json is
+    // placed here when the unit asks for it at the product's path and it is
+    // not there (#1940). A failure is said, and the start goes on to refuse
+    // or run as before.
+    match crate::second_config::place_product_if_missing(
+        std::env::var_os(second::ROUTE_ENV).as_deref(),
+        std::env::var_os(crate::second_config::SECOND_CONFIG_ENV).as_deref(),
+    ) {
+        Ok(true) => eprintln!(
+            "lamp-voice: the second route's configuration was missing: placed the product's at {} (install's own)",
+            crate::second_config::PRODUCT_PATH
+        ),
+        Ok(false) => {}
+        Err(error) => eprintln!(
+            "lamp-voice: the product's second route configuration could not be placed at {}: {error}",
+            crate::second_config::PRODUCT_PATH
+        ),
+    }
     if let second::Routes::SecondOnly(_) = second::routes_from_environment(true)? {
         eprintln!("{}", second::SECOND_ONLY_LINE);
     }

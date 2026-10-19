@@ -887,6 +887,10 @@ fn worker_command(
             role,
             var(crate::remember::FORGET_ALL_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_observe_worker_environment(
+            role,
+            var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
+        ))
         .envs(kernel_clock_worker_environment(
             role,
             var(crate::local_time::KERNEL_CLOCK_ENVIRONMENT).as_deref(),
@@ -979,6 +983,17 @@ fn memory_forget_all_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::FORGET_ALL_ENVIRONMENT, "on"))
+}
+
+// The observation pass's switch (#1693 (2)), passed the same narrow way:
+// the exact `on`, to the second route alone, the one worker with a model's
+// credential (`credentials_worker_environment`) to ask.
+fn memory_observe_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::OBSERVE_ENVIRONMENT, "on"))
 }
 
 // The open threads' switch (#1693 (3)), passed the same narrow way: the
@@ -1264,6 +1279,12 @@ mod tests {
                         "LAMP_MEMORY_FORGET_ALL",
                         ["provider", "second"].as_slice(),
                     ),
+                    // The observation pass, the route with a model (#1693 (2)).
+                    (
+                        memory_observe_worker_environment,
+                        "LAMP_MEMORY_OBSERVE",
+                        ["second"].as_slice(),
+                    ),
                     // The clock's switch, the two that tell the time.
                     (
                         kernel_clock_worker_environment,
@@ -1392,6 +1413,7 @@ mod tests {
                     crate::rules::ENVIRONMENT,
                     crate::remember::FORGET_ALL_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
+                    crate::remember::OBSERVE_ENVIRONMENT,
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
                     crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1484,6 +1506,7 @@ mod tests {
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_OBSERVE=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",

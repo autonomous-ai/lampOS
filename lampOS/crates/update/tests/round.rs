@@ -1560,3 +1560,81 @@ fn a_round_after_install_keeps_lamp_updates_own_folder() {
         "lamp-update 1"
     );
 }
+
+/// #1940, the reviewer's P1 and the first builder's 00:11: a lamp installed
+/// before the second route was the lamps' voice has no `second.json`. A
+/// round whose build's voice unit asks for it places it as install does,
+/// private and install's own, before the unit is written, and the voice
+/// comes up on it.
+#[test]
+fn a_round_places_second_json_before_a_voice_unit_that_needs_it() {
+    use lamp_update::install;
+    use std::os::unix::fs::PermissionsExt;
+    let mut lamp = Lamp::new();
+    assert!(!lamp.exists(install::SECOND_PATH));
+    let second = format!(
+        "{}Environment=LAMP_VOICE_ROUTE=second\nEnvironment=LAMP_VOICE_SECOND_CONFIG={}\n",
+        voice_unit(&"0".repeat(64)),
+        install::SECOND_PATH
+    );
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 2"),
+            ("lamp-turn-end", "turn-end 2"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[("lamp-voice.service", &second)],
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+    assert_eq!(lamp.read(install::SECOND_PATH), install::SECOND);
+    let mode = std::fs::metadata(lamp.root.join(install::SECOND_PATH.trim_start_matches('/')))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o600);
+    assert!(
+        lamp.read("/etc/systemd/system/lamp-voice.service")
+            .contains("LAMP_VOICE_ROUTE=second")
+    );
+    assert_eq!(lamp.calls(), ["reload", "restart lamp-voice.service"]);
+    // Install's own now, so a later install keeps it up to date.
+    assert_eq!(
+        lamp.state()["settings"][install::SECOND_PATH],
+        sha(install::SECOND)
+    );
+}
+
+/// The same round when `second.json` cannot be placed (here a folder in
+/// its place): nothing is written, the old voice unit stays and nothing is
+/// restarted, so the voice that runs keeps running.
+#[test]
+fn a_round_that_cannot_place_second_json_writes_no_unit() {
+    use lamp_update::install;
+    let mut lamp = Lamp::new();
+    std::fs::create_dir_all(lamp.root.join(install::SECOND_PATH.trim_start_matches('/'))).unwrap();
+    let second = format!(
+        "{}Environment=LAMP_VOICE_ROUTE=second\nEnvironment=LAMP_VOICE_SECOND_CONFIG={}\n",
+        voice_unit(&"0".repeat(64)),
+        install::SECOND_PATH
+    );
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 2"),
+            ("lamp-turn-end", "turn-end 2"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[("lamp-voice.service", &second)],
+    );
+    assert!(
+        matches!(lamp.round(), Outcome::Failed(why) if why.contains("second.json cannot be placed"))
+    );
+    assert_eq!(
+        lamp.read("/etc/systemd/system/lamp-voice.service"),
+        voice_unit(&sha("voice 1"))
+    );
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+}

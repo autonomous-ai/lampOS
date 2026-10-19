@@ -642,6 +642,23 @@ order is kept. A written turn is the same from the chat on.
     lamp said" (or "… in a busy room; the model is not told …"), "only
     the lamp's name was said, and the model is told so", and "… no words
     of it came back: asked as the name".
+- **In a busy room, a line going on waits for the Policy**
+  (`LAMP_GOING_ON_ASKS=on`, with the rule and the bus, #1522; #1712, item
+  4): a line the rule would let out only as a conversation going on, and
+  nothing else (no name, call, face, close voice, question of the lamp's
+  or remark), waits for the Policy's attention decision on it, as on the
+  Live route. It is played on `answer`, a `stay_quiet` said back to the
+  lamp or `look_up`, held on any other `stay_quiet`, and played with no
+  decision in `policy_holds::WAIT` (2 s), so a Policy that is down does not
+  make the lamp deaf. The rule says the line waits
+  (`second_provider::WAITS_FOR_POLICY`), and the turn asks it again every
+  50 ms (`Heeding::policy_now`), never blocking the worker's one thread; a
+  chat begun on the line's early words goes on meanwhile. A decision
+  already there is used at once, so most lines wait for nothing: the
+  Policy decides as the line's words end, and this route's words are final
+  about 0.6 s after. The journal says "its answer waits for the Policy's
+  decision", then "the Policy's decision came after N ms" or "no decision
+  of the Policy's came in N ms".
 - **The first request after a stop is told of it.** With
   `LAMP_STOP_TOLD=on`, the first request after a hand or the head stopped
   the lamp carries `after_stop`. Gemini is told so with `STOPPED_NOTE`. This
@@ -727,6 +744,19 @@ When the coordinator switches (below):
   check and no staff note, the two things it guards on the Live route. On
   lamp-4ace on 2026-10-16 this route answered "Me." and half a question
   between colleagues while Gemini's session was renewed; both are held now.
+  With `LAMP_REPORTS=on`, a held line whose heard words name `report`,
+  `reports`, `sharing`, `sending` or `data` (`attention::HELD_ASKED_WORDS`,
+  #1925; any other is sent nowhere) is still asked once, told only the
+  functions done though a line's answer is held
+  (`attention::DONE_THOUGH_HELD`, today `reports_stop`), with a note that
+  nothing said now is heard (`HELD_NOTE`), as the Live route's model hears
+  every line and its `reports_stop` is done though held (the first builder
+  on #1722, 16:44). Only those calls are run, with no round after; any
+  words are dropped and nothing is played. The turn ends when that round
+  does, given up after `HELD_WITHIN` (6 s); a line begun meanwhile replaces
+  it, and words carried from a line it cut short are answered beside it.
+  The round costs one more chat request per held line naming reports, only
+  with the switch.
 - **Back to Gemini:** silently, at the next idle moment with Gemini Ready,
   or at the start of the next turn if the room never goes quiet. Nothing
   is said about it.
@@ -1026,6 +1056,42 @@ lamp's voice (`coordinator/second.rs`, `routes`):
   A value is taken exactly: `Second` or ` second` is refused. A bounded run
   (`lamp-voice directed`) has no second route, and refuses `second`.
 
+**The lamps' voice since 19 October** (the owner, #1712). The product unit
+(`deploy/product/lamp-voice.service`), lamp-52e6's, the repo's lamp-4ace
+unit and the attended pilot set `LAMP_VOICE_ROUTE=second`, as lamp-4ace runs
+it: `LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json`,
+`LAMP_SECOND_CHAT=deepseek`, `LAMP_SECOND_SEARCH=deepseek`,
+`LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo`, the down-line and the wait cue.
+Live stays a per-lamp setting: a drop-in with `LAMP_VOICE_ROUTE=gemini`.
+
+**A product lamp needs nothing a person adds** (the first builder at 21:08
+and 21:14). Every service goes through the Autonomous relay with the one key
+the lamp already has:
+- DeepSeek's chat and search go through the relay
+  (`LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek`,
+  #1939), with second.json's `llm_credential_file`, so the unit loads no
+  credential.
+- Speech to text and the voice fall back to the text model's base and key,
+  as on V1.
+
+It needs two files in `/etc/lampOS/voice`, root's and 0600:
+
+| File | Placed by | What reads it |
+|---|---|---|
+| `second.json` | install, and an update round before it writes a voice unit that names it, from `deploy/product/settings/second.json` (the relay's `…/api/v1/ai`, `gpt-4.1-mini`, ElevenLabs), kept up to date while it is install's own; a lamp's own is kept. On a lamp whose updater predates the round's step, the voice places the same bytes as it starts when the file is missing (`second_config::place_product_if_missing`; updates.md) | `LAMP_VOICE_SECOND_CONFIG` |
+| `credential` | setup (the user's key), or install from V1's config; the same file `provider.json` names | second.json's `llm_credential_file`, for every service |
+
+Without either, the voice does not start, and the route never falls back to
+Live. `lamp-selftest`'s `voice_route` part names what is missing (`selftest.md`).
+
+lamp-4ace's repo unit takes DeepSeek through the relay too (the owner,
+21:3x: "instead of using their direct deepseek key"), and loads only
+Gemini's key (`LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key`).
+The A/B of DeepSeek direct against the relay takes `deepseek.key` in
+`probe-cascade`'s own transient unit, never in the voice's. Its own
+second.json names `second-llm.key`, `second-stt.key` and `second-tts.key`,
+which hold the relay key.
+
 With `second`, the journal says once at start:
 `lamp-voice: the voice route is second only (LAMP_VOICE_ROUTE=second): speech to text, a text model and speech answer every turn; Gemini Live is not used`.
 
@@ -1082,6 +1148,33 @@ record is written.
 - **Its exit ends the voice**, as Gemini's does (`coordinator::mandatory`):
   it is the only voice. A standby's exit is still dropped, and Gemini goes
   on.
+- **Its stop is Gemini's (#1620).** On a stop (SIGTERM, a mute, a fault)
+  `Rig::shutdown` sends it Stop with the other workers and holds it to the
+  same shared deadline, exit recheck, kill, reap and cleanup accounting
+  (`ForcedStop`/`WorkerExit` under its own role, `second`). Speech to text,
+  the chat and the voice are tasks inside this one process, not children of
+  their own; the endpoint is the session's, on either route. Tested
+  mid-request and for a worker that ignores Stop
+  (`second_route::a_stop_while_the_second_route_alone_is_mid_request_is_clean`,
+  `a_second_worker_that_ignores_stop_is_killed_and_named_as_geminis_is`).
+  A stop during a blocking call no longer holds it: `serve` ends its tokio
+  runtime with `worker::finish` (`shutdown_background()`), since a plain
+  drop waited, with no bound, for running `spawn_blocking` work (a tool
+  call, up to `tools::ASK_DEADLINE`, 1.5 s; a text's tool call; a DNS
+  lookup) and outlasted the shared 300 ms, so the worker was killed and
+  cleanup failed. The process exits right after; blocking work left
+  detached dies with it, as the Live worker's detached call threads do
+  (`a_stop_during_a_slow_tool_call_lets_the_second_worker_exit_within_its_deadline`:
+  1.50 s before, within 300 ms after).
+- **Its start never waits for a service (#1567).** The worker says its link
+  is Ready, session 1, as it starts (`worker::run`), before any service is
+  asked; speech to text and the chat connect per line. A refused or silent
+  Deepgram, DeepSeek or ElevenLabs fails each line (`TurnFailed`, with the
+  fault of `second_provider::fault`), never readiness, so the voice runs
+  past the 25 s budget with `LAMP_START_OFFLINE` on or off; the switch has
+  nothing to wait for here
+  (`the_second_route_alone_with_its_services_refused_stays_up_past_the_startup_budget`,
+  `the_second_workers_link_is_ready_before_any_service_is_asked`).
 - **No "My voice sounds a little different just now."** `--only-voice` turns
   the announcement off (`Engine::announcing`): there is no other voice to
   differ from, and it would be the first thing heard in every answer after
@@ -1338,7 +1431,7 @@ after a take-over, but now for every turn:
   #1712: a phrase rule is easy to trip.
 - **Live route only, so not on this route:** the same-voice
   check,
-  `LAMP_GOING_ON_ASKS`, the head tap
+  the head tap
   and `--addressed` for whom it answers, sight, camera and air facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).
 - **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its
@@ -1425,12 +1518,15 @@ that voice's alone (`services::in_one_voice`). A provider chosen over the
 configured one takes its own default voice, since `tts_voice` names one of
 the configured provider's, and the chosen voice's model is
 `LAMP_SECOND_SPEECH_MODEL`'s. No sentence goes to another voice: one the
-voice fails to start (a refusal, a quota, a broken connection, or an answer
-with no sound) is asked of it once more, `lamp-voice second: <voice> failed
-to start a sentence (…); asked once more`; failing again it is not said,
-`<voice> failed again (…); the sentence is not said`, and the turn goes on as for
-any speech that never rendered. A sentence begun and then lost fails as
-any does. The journal at start names the voice: `the voice is ElevenLabs,
+voice fails to start (a refusal, a quota, a broken connection, an answer
+with no sound, or no first sound within 4 s, `START_WITHIN`) is asked of it
+once more, `lamp-voice second: <voice> failed to start a sentence (…);
+asked once more`; failing again it is not said, `<voice> failed again (…);
+the sentence is not said, and the turn goes on`, and the turn goes on with
+the next sentence. Before #1844's C the second failure failed the whole
+turn, against what this said, and a host that took the connection and never
+answered cost the connection's 10 s and its response's, twice: now at most
+8 s a sentence. A sentence begun and then lost fails as any does. The journal at start names the voice: `the voice is ElevenLabs,
 model eleven_v4_turbo, the lamp's one voice`.
 
 **The key.** The voice unit's credential `gemini.key`

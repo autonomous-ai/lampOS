@@ -795,6 +795,44 @@ fn the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config() {
     assert!(bare.said.iter().any(|line| line.starts_with("no key")));
 }
 
+/// #1712 (the first builder at 21:08): the second route is the lamps' voice,
+/// so a fresh install places its services, private, on the relay with the
+/// voice's one key; a lamp's own file (lamp-4ace's) is kept, and said.
+#[test]
+fn the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    assert_eq!(
+        fs::read_to_string(lamp.on(install::SECOND_PATH)).unwrap(),
+        install::SECOND
+    );
+    assert_eq!(
+        fs::metadata(lamp.on(install::SECOND_PATH))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
+    let second: serde_json::Value = serde_json::from_str(install::SECOND).unwrap();
+    assert_eq!(second["llm_credential_file"], install::CREDENTIAL_PATH);
+    // A lamp's own is the lamp's: kept on the next install.
+    let own = r#"{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"/etc/lampOS/voice/second-llm.key"}"#;
+    fs::write(lamp.on(install::SECOND_PATH), own).unwrap();
+    lamp.said.clear();
+    lamp.install().unwrap();
+    assert_eq!(
+        fs::read_to_string(lamp.on(install::SECOND_PATH)).unwrap(),
+        own
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with(&format!("kept {}", install::SECOND_PATH)))
+    );
+}
+
 /// The owner's decision on #806 (16:13): the voice's key is the user's, and
 /// a reset wipes it with the person's data. V1's config on a lamp that ran
 /// V1 may still hold the previous owner's key, so install, run again after

@@ -143,6 +143,37 @@ fn meaning(text: &str) -> Vec<&str> {
 }
 
 /// Whether two units would make systemd do the same.
+/// The last value a unit's `Environment=` lines give `name`, as systemd
+/// reads them: assignments split by spaces, each perhaps in double quotes.
+pub fn environment(text: &str, name: &str) -> Option<String> {
+    let mut found = None;
+    for line in text.lines().map(str::trim) {
+        let Some(assignments) = line.strip_prefix("Environment=") else {
+            continue;
+        };
+        let mut word = String::new();
+        let mut quoted = false;
+        let mut words = Vec::new();
+        for c in assignments.chars() {
+            match c {
+                '"' => quoted = !quoted,
+                ' ' if !quoted => words.push(std::mem::take(&mut word)),
+                _ => word.push(c),
+            }
+        }
+        words.push(word);
+        for word in words {
+            if let Some(value) = word
+                .strip_prefix(name)
+                .and_then(|rest| rest.strip_prefix('='))
+            {
+                found = Some(value.to_owned());
+            }
+        }
+    }
+    found
+}
+
 pub fn same(a: &str, b: &str) -> bool {
     meaning(a) == meaning(b)
 }

@@ -1,5 +1,7 @@
 //! The engine against scripted services: no network.
 use super::*;
+
+mod held_consent;
 use futures_util::stream::{self, BoxStream};
 use net::ToolCall;
 use serde_json::json;
@@ -32,6 +34,8 @@ struct Script {
     /// The final words come this long after the line's end, as `Finalize`'s
     /// answer does.
     finish_after: Option<Duration>,
+    /// The functions each chat told only some was told ([`Services::chat_only`]).
+    told_only: Mutex<Vec<&'static [&'static str]>>,
 }
 
 struct ScriptListener {
@@ -98,6 +102,15 @@ impl Services for Script {
         } else {
             scripted.boxed()
         }
+    }
+
+    fn chat_only(
+        &self,
+        messages: Vec<Message>,
+        only: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.told_only.lock().unwrap().push(only);
+        self.chat(messages)
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
@@ -4156,5 +4169,149 @@ async fn a_chat_begun_on_a_cut_ins_early_words_carries_its_note() {
         assert_eq!(chats.len(), asked, "called {called}: {chats:?}");
         let cut_in = Message::system(crate::cut_in_told::NOTE);
         assert!(chats.iter().all(|chat| chat.contains(&cut_in)), "{chats:?}");
+    }
+}
+
+/// #1895 on the second route (the first builder, 19:49): B's first line,
+/// said just after A's while the eyes' count would still say A, reaches
+/// the memory as B's. Its memory call runs with B's admitted scope and its
+/// chat is told for B, never for A. Deepgram and DeepSeek are the script.
+#[tokio::test]
+async fn b_first_line_after_a_reaches_the_memory_as_bs() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    let path = std::env::temp_dir().join(format!(
+        "sixth-b-first-line-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    let observe = |cache: &FaceCache, name: &str| {
+        std::fs::write(&path, name).unwrap();
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+    };
+    let remember = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "m1",
+                "remember",
+                json!({"text":"my test code is 2580"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Lamp, remember that my test code is 417.".to_owned()),
+                Ok("Lamp, remember that my test code is 2580.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                remember(),
+                vec![text("Got it."), Ok(ChatEvent::Done)],
+                remember(),
+                vec![text("Got it."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let cache = Arc::new(FaceCache::default());
+    let scopes: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
+    let seen = scopes.clone();
+    let runner: ScopedToolRunner = Arc::new(move |_, _, name, _, lease: ScopeLease| {
+        assert_eq!(name, "remember");
+        seen.lock()
+            .unwrap()
+            .push(lease.scope().unwrap().person().map(str::to_owned));
+        Box::pin(async { json!({"ok":true}) })
+    });
+    let mut engine = engine
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([13; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            Some(Arc::new(|lease: &ScopeLease| {
+                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+            })),
+        )
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    observe(&cache, "A");
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    // B steps in; A's line is just over.
+    observe(&cache, "B");
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    turn(&mut engine).await;
+    let a = crate::remember::person_id("A");
+    let b = crate::remember::person_id("B");
+    assert_eq!(*scopes.lock().unwrap(), [Some(a.clone()), Some(b.clone())]);
+    let asked = script.asked.lock().unwrap();
+    let b_told = Message::system(format!("for {:?}", Some(b.as_str())));
+    let a_told = Message::system(format!("for {:?}", Some(a.as_str())));
+    assert_eq!(asked[2][0], b_told, "B's first round is told for B");
+    assert_eq!(asked[3][0], b_told, "and so is its round after the call");
+    assert!(asked[2..].iter().all(|messages| messages[0] != a_told));
+    std::fs::remove_file(path).unwrap();
+}
+
+/// #1712, item 4 (`LAMP_GOING_ON_ASKS`, #1522): a line the rule says waits
+/// for the Policy is asked once the Policy's hook decides it is played, and
+/// not at all when held; a hook that never decides lets it be played after
+/// the bound, as with no decision.
+#[tokio::test(start_paused = true)]
+async fn a_line_that_waits_for_the_policy_goes_as_it_decides() {
+    for (decides_after, says, asked) in [
+        (Some(3), None, 1),
+        (Some(3), Some("held"), 0),
+        (None, None, 1),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("And what about tomorrow".to_owned())].into()),
+            chats: Mutex::new([vec![text("Rain."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let polled = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = polled.clone();
+        let mut engine = engine
+            .heeding(Arc::new(|_, _, _, _| Some(super::WAITS_FOR_POLICY)))
+            .asking_the_policy(Arc::new(move |request| {
+                assert_eq!(request, 1);
+                let polls = counted.fetch_add(1, Ordering::SeqCst) + 1;
+                decides_after.filter(|after| polls >= *after).map(|_| says)
+            }));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(10), engine.next())
+                .await
+                .expect("the turn ends");
+            if matches!(event, ProviderOutput::TurnComplete { .. }) {
+                break;
+            }
+        }
+        assert_eq!(
+            script.asked.lock().unwrap().len(),
+            asked,
+            "decides after {decides_after:?}, says {says:?}"
+        );
+        let polls = polled.load(Ordering::SeqCst);
+        match decides_after {
+            Some(after) => assert_eq!(polls, after),
+            // Up to the bound, `policy_holds::WAIT` and four polls more.
+            None => assert!((40..=46).contains(&polls), "{polls} polls"),
+        }
     }
 }

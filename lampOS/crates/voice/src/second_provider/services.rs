@@ -17,6 +17,21 @@ pub trait Services: Send + Sync + 'static {
     /// The answer to `messages`, as it is written; a failure to connect is
     /// the stream's first item.
     fn chat(&self, messages: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>>;
+    /// [`Self::chat`], told only the lamp's functions named in `only`, for
+    /// a held line's calls done though its answer is held
+    /// ([`crate::attention::DONE_THOUGH_HELD`]); never narrowed further.
+    /// None, from services that cannot.
+    fn chat_only(
+        &self,
+        messages: Vec<Message>,
+        only: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        let _ = (messages, only);
+        stream::iter([Err(net::Error::Protocol(
+            "no chat told only some functions",
+        ))])
+        .boxed()
+    }
     /// `text` spoken, as 24 kHz mono packets; dropping it stops the download.
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>>;
     /// As [`Services::speak`], a piece of `turn`'s answer, which the voice
@@ -188,6 +203,23 @@ impl Net {
         Ok(self)
     }
 
+    /// A chat told every function, or only those named.
+    fn chat_told(
+        &self,
+        messages: Vec<Message>,
+        only: Option<&'static [&'static str]>,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        let chat = self.chat.clone();
+        stream::once(async move { chat.send_only(&messages, only).await })
+            .map_ok(|answer| {
+                stream::try_unfold(answer, |mut answer| async move {
+                    Ok(answer.next().await?.map(|event| (event, answer)))
+                })
+            })
+            .try_flatten()
+            .boxed()
+    }
+
     /// Speech is Gemini's, in `voice` (`LAMP_SECOND_SPEECH=gemini`); a
     /// sentence it cannot say goes to the configured voice.
     pub fn speaking_with_gemini(
@@ -260,10 +292,17 @@ impl Voice {
     }
 }
 
+/// How long a voice has to give a sentence's first sound, each time asked
+/// (#1844's C): a host that never answers costs 4 s, not the connection's
+/// 10 s plus its response's.
+const START_WITHIN: std::time::Duration = std::time::Duration::from_secs(4);
+
 /// `text` in the lamp's one voice, never another's (#1712, the owner: "one
-/// voice per lamp"). A sentence the voice fails to start is asked once more;
-/// failing again, it is not said, and the turn goes on as for any speech
-/// that never rendered. A sentence begun and then lost fails as any does.
+/// voice per lamp"). A sentence the voice fails to start within
+/// [`START_WITHIN`] is asked once more; failing again, it is not said, and
+/// the turn goes on with the next sentence (#1844's C: before, the second
+/// failure failed the whole turn). A sentence begun and then lost fails as
+/// any does.
 fn in_one_voice(
     voice: Voice,
     text: String,
@@ -273,19 +312,32 @@ fn in_one_voice(
         if !GeminiTts::speaks(&text) {
             return Ok(stream::empty().boxed());
         }
-        match voice.first(&text, turn).await {
+        let first = |voice: &Voice| {
+            let text = text.clone();
+            let voice = voice.clone();
+            async move {
+                tokio::time::timeout(START_WITHIN, voice.first(&text, turn))
+                    .await
+                    .unwrap_or(Err(net::Error::Timeout("speech's first sound")))
+            }
+        };
+        match first(&voice).await {
             Ok(speech) => Ok(speech),
             Err(error) => {
                 eprintln!(
                     "lamp-voice second: {} failed to start a sentence ({error}); asked once more",
                     voice.name()
                 );
-                voice.first(&text, turn).await.inspect_err(|again| {
-                    eprintln!(
-                        "lamp-voice second: {} failed again ({again}); the sentence is not said",
-                        voice.name()
-                    );
-                })
+                match first(&voice).await {
+                    Ok(speech) => Ok(speech),
+                    Err(again) => {
+                        eprintln!(
+                            "lamp-voice second: {} failed again ({again}); the sentence is not said, and the turn goes on",
+                            voice.name()
+                        );
+                        Ok(stream::empty().boxed())
+                    }
+                }
             }
         }
     })
@@ -313,15 +365,15 @@ impl Services for Net {
     }
 
     fn chat(&self, messages: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>> {
-        let chat = self.chat.clone();
-        stream::once(async move { chat.send(&messages).await })
-            .map_ok(|answer| {
-                stream::try_unfold(answer, |mut answer| async move {
-                    Ok(answer.next().await?.map(|event| (event, answer)))
-                })
-            })
-            .try_flatten()
-            .boxed()
+        self.chat_told(messages, None)
+    }
+
+    fn chat_only(
+        &self,
+        messages: Vec<Message>,
+        only: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.chat_told(messages, Some(only))
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
@@ -509,7 +561,7 @@ mod tests {
         let results: Vec<_> = in_one_voice(Voice::Gemini(gemini), "Hello there.".into(), None)
             .collect()
             .await;
-        assert!(matches!(results.as_slice(), [Err(_)]), "not said");
+        assert!(results.is_empty(), "not said, and no error: {results:?}");
         assert_eq!(gemini_asked.await.unwrap(), 2, "asked twice, no more");
     }
 
@@ -537,8 +589,47 @@ mod tests {
         )
         .collect()
         .await;
-        assert!(matches!(results.as_slice(), [Err(_)]));
+        assert!(results.is_empty(), "not said, and no error: {results:?}");
         assert_eq!(asked.await.unwrap(), 2);
+    }
+
+    /// #1844's C: a voice whose host takes the connection and never answers
+    /// is given 4 s a try, twice, and the sentence is not said, with no
+    /// error, so the turn goes on.
+    #[tokio::test(start_paused = true)]
+    async fn a_voice_that_never_answers_is_given_four_seconds_twice() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let held = tokio::spawn(async move {
+            let mut kept = Vec::new();
+            while let Ok((socket, _)) = listener.accept().await {
+                kept.push(socket);
+            }
+        });
+        let tts = Arc::new(
+            Tts::with(
+                TtsProvider::ElevenLabs,
+                &format!("http://{address}"),
+                "k",
+                Some("v"),
+            )
+            .unwrap(),
+        );
+        let began = tokio::time::Instant::now();
+        let results: Vec<_> = in_one_voice(
+            Voice::Configured(tts, "ElevenLabs"),
+            "Hello there.".into(),
+            None,
+        )
+        .collect()
+        .await;
+        assert!(results.is_empty(), "{results:?}");
+        let took = began.elapsed();
+        assert!(
+            took >= 2 * START_WITHIN && took < 2 * START_WITHIN + std::time::Duration::from_secs(1),
+            "{took:?}"
+        );
+        held.abort();
     }
 
     /// Nothing to say asks no voice at all.

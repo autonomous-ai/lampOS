@@ -28,7 +28,12 @@
 //!
 //! With a [`Heed`] (`--attention`, `worker::Heeding`), a spoken turn's words
 //! are judged by the Live route's rule for whom it answers before the chat
-//! is asked; words it holds end the turn unanswered (#1014).
+//! is asked; words it holds end the turn unanswered (#1014). With
+//! [`Engine::doing_though_held`] (`LAMP_REPORTS=on`), a held line whose
+//! words name reports ([`crate::attention::HELD_ASKED_WORDS`]) is still
+//! asked once, told only the functions done though a line's answer is held
+//! ([`crate::attention::DONE_THOUGH_HELD`]), as the Live route's model
+//! hears every line: those calls are done, and nothing of it is said.
 //!
 //! Failures are `TurnFailed` with the stage the coordinator accepts
 //! (`coordinator/cloud.rs`): `InputOpen` while the request's input is still
@@ -156,6 +161,11 @@ const CUE_MOST_SAMPLES: usize = net::TTS_SAMPLE_RATE as usize * 6 / 10;
 const CUE_FADE_SAMPLES: usize = net::TTS_SAMPLE_RATE as usize * 3 / 100;
 /// The tool whose call means the words were not for the lamp.
 const NOT_FOR_ME: &str = "not_for_me";
+/// A held line's one round ([`Engine::doing_though_held`]), its first event
+/// and its calls together, is given up past this: the line is over by then.
+pub const HELD_WITHIN: Duration = Duration::from_secs(6);
+/// Beside a held line's words, for its one round: what it is asked for.
+pub const HELD_NOTE: &str = "These words were not said to you, and nothing you say now is heard. If the person asks to stop sending reports, call reports_stop; otherwise call nothing.";
 /// Microphone packets (10 ms each) held while speech-to-text connects:
 /// 30 s, more than its 10 s connect bound and as much as the coordinator
 /// replays at once when a line moves to this route (`coordinator/second.rs`).
@@ -334,6 +344,9 @@ struct Shared {
     heard_last: Mutex<Option<(u64, String)>>,
     /// The stop to be told (`after_stop`), with the request it is for.
     stop_untold: Mutex<Option<StopToTell>>,
+    /// A held line is asked for the calls done though it is held
+    /// ([`Engine::doing_though_held`]).
+    though_held: bool,
     /// With `LAMP_STAFF_NOTE=on`: the note for words that name the staff.
     staff: Option<StaffNote>,
     /// With `LAMP_NAME_NOTE=on`: the note for a line the lamp's name began.
@@ -343,6 +356,9 @@ struct Shared {
     /// Whether a request was judged in a busy room ([`Engine::judging_busy`]):
     /// a line that may follow on from the lamp is not told so there.
     busy: Option<Busy>,
+    /// The Policy's decision for a line that waits for it
+    /// ([`Engine::asking_the_policy`], [`WAITS_FOR_POLICY`]).
+    policy_now: Option<PolicyNow>,
     /// The note on whether a line called the lamp by name.
     call_note: Option<CallNote>,
     /// Whether the lamp's name was heard since a time.
@@ -570,6 +586,21 @@ struct Turn {
 /// Whether a request was judged in a busy room (`worker::Heeding`).
 pub type Busy = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 
+/// What the rule says of a line that waits for the Policy's decision
+/// (`LAMP_GOING_ON_ASKS`, #1522): in a busy room, a line it would let out
+/// only as a conversation going on. The turn then asks
+/// [`Engine::asking_the_policy`]'s hook every [`POLICY_POLL`] until it
+/// decides, as the Live worker keeps such a line's first output.
+pub(crate) const WAITS_FOR_POLICY: &str = "it waits for the Policy's decision";
+
+/// The Policy's decision for a line that waits for it: `None` while it may
+/// still come, then the line's verdict (`None` to play it, or why it is
+/// held).
+pub type PolicyNow = Arc<dyn Fn(u64) -> Option<Option<&'static str>> + Send + Sync>;
+
+/// How often a line that waits for the Policy asks again.
+const POLICY_POLL: Duration = Duration::from_millis(50);
+
 /// What a spoken line is told beside its words from the coordinator's
 /// marks, as the Live route tells them (#1712, item 4 of the first
 /// builder's 20:15: the second worker dropped `Called`, and told none of
@@ -697,10 +728,12 @@ impl Engine {
                 announce: true,
                 heard_last: Mutex::new(None),
                 stop_untold: Mutex::new(None),
+                though_held: false,
                 staff: None,
                 name_note: None,
                 conversation_alone: None,
                 busy: None,
+                policy_now: None,
                 call_note: None,
                 name_sounded: None,
                 task_waiting: None,
@@ -822,6 +855,15 @@ impl Engine {
     /// tells it.
     pub fn telling_cut_ins(mut self, on: bool) -> Self {
         self.cut_in_told = on;
+        self
+    }
+
+    /// The Policy's decision for a line the rule says waits for it
+    /// ([`WAITS_FOR_POLICY`], `LAMP_GOING_ON_ASKS`). Before any turn only.
+    pub fn asking_the_policy(mut self, policy: PolicyNow) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.policy_now = Some(policy);
+        }
         self
     }
 
@@ -1026,6 +1068,21 @@ impl Engine {
             if let Some(shared) = shared {
                 shared.cues = Some(Arc::default());
             }
+        }
+        self
+    }
+
+    /// A line the rule holds, when its heard words name reports
+    /// ([`crate::attention::HELD_ASKED_WORDS`]), is still asked once, told
+    /// only the functions done though a line's answer is held, and those
+    /// calls are done; its answer stays held and nothing of it is said
+    /// (`LAMP_REPORTS=on`, the first builder on #1722, 16:44). Any other
+    /// held line is sent nowhere (#1925). Before any turn only.
+    pub fn doing_though_held(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared);
+        debug_assert!(shared.is_some(), "set before any turn");
+        if let Some(shared) = shared {
+            shared.though_held = on;
         }
         self
     }
@@ -1697,7 +1754,7 @@ async fn spoken(
                 }
             }
             Some(said) = next_early(&mut early) => {
-                prepared = prepared_on(&shared, request, prepared, said, &cut_in);
+                prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, &cut_in);
             }
         }
     }
@@ -1709,14 +1766,14 @@ async fn spoken(
         tokio::select! {
             finished = &mut finish => break finished,
             Some(said) = next_early(&mut early) => {
-                prepared = prepared_on(&shared, request, prepared, said, &cut_in);
+                prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, &cut_in);
             }
         }
     };
     // Every early word sent before the words were final counts: a
     // `TurnResumed` just before the end still takes them back.
     while let Some(said) = early.as_mut().and_then(|early| early.try_recv().ok()) {
-        prepared = prepared_on(&shared, request, prepared, said, &cut_in);
+        prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, &cut_in);
     }
     let text = match finished {
         Ok(text) => {
@@ -1794,13 +1851,29 @@ async fn spoken(
             "lamp-voice second: request {request}: its answer is held back: a short sound, and nothing shows it was said to the lamp: not heard as a short word (this route has no ears or eyes)"
         );
     }
-    let heeded = match &shared.heed {
+    let mut heeded = match &shared.heed {
         Some(heed) if !empty && !held => {
             let window = said.lock().map_or((0, 0), |said| *said);
             heed(request, window, &text, continues_from)
         }
         _ => None,
     };
+    // In a busy room, a line going on waits for the Policy's decision
+    // (`LAMP_GOING_ON_ASKS`, #1522), as the Live worker keeps such a line's
+    // first output; a chat begun on its early words goes on meanwhile. The
+    // rule ends the wait at `policy_holds::WAIT`; past a little more, or
+    // with no hook, the line is played, as with no decision.
+    if heeded == Some(WAITS_FOR_POLICY) {
+        let bound = tokio::time::Instant::now() + crate::policy_holds::WAIT + POLICY_POLL * 4;
+        heeded = loop {
+            tokio::time::sleep(POLICY_POLL).await;
+            match shared.policy_now.as_ref().map(|now| now(request)) {
+                Some(Some(verdict)) => break verdict,
+                Some(None) if tokio::time::Instant::now() < bound => {}
+                _ => break None,
+            }
+        };
+    }
     if let Some(why) = heeded {
         eprintln!("lamp-voice second: request {request}: its answer is held back: {why}");
     }
@@ -1830,6 +1903,17 @@ async fn spoken(
             }
             room.unanswered(request, monotonic_us());
         });
+        // Done before the turn is over, since an over turn's task is
+        // stopped; beside the words carried, so their answer never waits.
+        let though_held = async {
+            if heeded.is_some()
+                && shared.though_held
+                && crate::attention::held_line_names_reports(&text)
+            {
+                eprintln!("{}", held_asked_line(request));
+                done_though_held(&shared, (request, scope.as_ref()), &text).await;
+            }
+        };
         if let Some(carried) = carried {
             eprintln!(
                 "lamp-voice second: request {request} is held, so request {}'s words, cut short by it, are answered in its place",
@@ -1841,19 +1925,23 @@ async fn spoken(
                     ..carried.clone()
                 });
             }
-            answer(
-                &shared,
-                (request, scope),
-                carried.text,
-                Asker::Spoken,
-                None,
-                Vec::new(),
-                times,
-                None,
-            )
-            .await;
+            let lease = scope.clone();
+            tokio::join!(
+                though_held,
+                answer(
+                    &shared,
+                    (request, lease),
+                    carried.text,
+                    Asker::Spoken,
+                    None,
+                    Vec::new(),
+                    times,
+                    None,
+                )
+            );
             return;
         }
+        though_held.await;
         if shared.stages(request, &times).await {
             shared
                 .emit(ProviderOutput::TurnComplete {
@@ -2007,8 +2095,13 @@ impl Prepared {
     /// The chat asked on `words`, as round 1 would be asked: the turn's
     /// system message and history, the `notes` known so far, then the
     /// words.
-    fn begin(shared: &Shared, words: String, notes: &[String]) -> Self {
-        let mut messages = (shared.system)().messages();
+    fn begin(
+        shared: &Shared,
+        scope: Option<&crate::memory_scope::ScopeLease>,
+        words: String,
+        notes: &[String],
+    ) -> Self {
+        let mut messages = told(shared, scope).messages();
         messages.extend(notes.iter().cloned().map(Message::system));
         messages.push(Message::user(words.clone()));
         let mut chat = shared.services.chat(messages.clone());
@@ -2104,11 +2197,20 @@ async fn next_early(early: &mut Option<mpsc::UnboundedReceiver<net::Early>>) -> 
     }
 }
 
+/// What a turn's chat is told: for its admitted scope when this route
+/// scopes context ([`Engine::with_memory_scope`]), as before otherwise.
+fn told(shared: &Shared, scope: Option<&crate::memory_scope::ScopeLease>) -> Told {
+    match (&shared.scoped_system, scope) {
+        (Some(system), Some(lease)) => system(lease),
+        _ => (shared.system)(),
+    }
+}
+
 /// What a turn's prepared chat is once `said` comes: begun on new early
 /// words, kept on the same, dropped when the person went on.
 fn prepared_on(
     shared: &Shared,
-    request: u64,
+    (request, scope): (u64, Option<&crate::memory_scope::ScopeLease>),
     prepared: Option<Prepared>,
     said: net::Early,
     notes: &[String],
@@ -2125,7 +2227,7 @@ fn prepared_on(
             eprintln!(
                 "lamp-voice second: request {request}: its chat is begun on the line's early words"
             );
-            Some(Prepared::begin(shared, words, notes))
+            Some(Prepared::begin(shared, scope, words, notes))
         }
         net::Early::Resumed => {
             if prepared.is_some() {
@@ -2195,6 +2297,110 @@ impl Shared {
             return true;
         };
         self.emit(stages).await
+    }
+}
+
+/// The journal's line for a held line asked its one round: no words.
+fn held_asked_line(request: u64) -> String {
+    format!("lamp-voice second: request {request}: a held line names reports: asked once")
+}
+
+/// A held line's calls that withdraw consent, done though its answer stays
+/// held, as the Live route does them ([`crate::attention::DONE_THOUGH_HELD`]):
+/// one round told only those functions, its words never said, and only
+/// those calls run, with no round after. Bounded by [`HELD_WITHIN`].
+async fn done_though_held(
+    shared: &Shared,
+    context: (u64, Option<&crate::memory_scope::ScopeLease>),
+    said: &str,
+) {
+    let (request, scope) = context;
+    let gone = || scope.is_some_and(|scope| !scope.is_current());
+    let began = Instant::now();
+    let asking = async {
+        if gone() {
+            return None;
+        }
+        let mut messages = (shared.system)().messages();
+        if gone() {
+            return None;
+        }
+        messages.push(Message::system(HELD_NOTE));
+        messages.push(Message::user(said.to_owned()));
+        let mut stream = shared
+            .services
+            .chat_only(messages, crate::attention::DONE_THOUGH_HELD);
+        let mut calls = Vec::new();
+        while let Some(event) = stream.next().await {
+            match event {
+                Ok(ChatEvent::ToolCalls(asked)) => calls = asked,
+                Ok(ChatEvent::Done) => break,
+                Ok(_) => {}
+                Err(error) => {
+                    eprintln!(
+                        "lamp-voice second: request {request} held line's round failed: {error}"
+                    );
+                    return None;
+                }
+            }
+        }
+        let mut done = Vec::new();
+        for call in calls
+            .iter()
+            .filter(|call| crate::attention::done_though_held(&call.name))
+        {
+            if gone() {
+                return None;
+            }
+            let told = run_tool(shared, request, true, call, scope).await;
+            done.push((call.name.clone(), told));
+        }
+        Some(done)
+    };
+    match tokio::time::timeout(HELD_WITHIN, asking).await {
+        Ok(Some(done)) => {
+            for (name, told) in done {
+                eprintln!(
+                    "lamp-voice second: request {request}: {name} {} though the answer was held (consent withdrawn), {} ms after the line",
+                    if told.get("ok").is_some() {
+                        "done"
+                    } else {
+                        "asked, not shown done,"
+                    },
+                    began.elapsed().as_millis(),
+                );
+            }
+        }
+        Ok(None) => {}
+        Err(_) => eprintln!(
+            "lamp-voice second: request {request} held line's round had not ended in {} ms; given up",
+            HELD_WITHIN.as_millis()
+        ),
+    }
+}
+
+/// One call run by the route's runner: the admitted request's scoped one
+/// when there is one.
+async fn run_tool(
+    shared: &Shared,
+    request: u64,
+    heard: bool,
+    call: &net::ToolCall,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+) -> Value {
+    match (&shared.scoped_tools, scope) {
+        (Some(run), Some(scope)) => {
+            run(
+                request,
+                heard,
+                call.name.clone(),
+                call.args.clone(),
+                scope.clone(),
+            )
+            .await
+        }
+        (Some(_), None) => crate::tools::unavailable(),
+        (None, _) => (shared.tools)(request, heard, call.name.clone(), call.args.clone()).await,
     }
 }
 
@@ -2298,10 +2504,7 @@ async fn answer(
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
         }
-        let told = match (&shared.scoped_system, &scope) {
-            (Some(system), Some(lease)) => system(lease),
-            _ => (shared.system)(),
-        };
+        let told = told(shared, scope.as_ref());
         // Building it can wait on the memory service: a request revoked
         // meanwhile is not asked with what was read for it.
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -2574,22 +2777,7 @@ async fn answer(
                     did(Did::Worked(monotonic_us()));
                 }
                 acted.store(true, Ordering::Relaxed);
-                let mut result = match (&shared.scoped_tools, &scope) {
-                    (Some(run), Some(scope)) => {
-                        run(
-                            request,
-                            heard,
-                            call.name.clone(),
-                            call.args.clone(),
-                            scope.clone(),
-                        )
-                        .await
-                    }
-                    (Some(_), None) => crate::tools::unavailable(),
-                    (None, _) => {
-                        (shared.tools)(request, heard, call.name.clone(), call.args.clone()).await
-                    }
-                };
+                let mut result = run_tool(shared, request, heard, call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
                 }

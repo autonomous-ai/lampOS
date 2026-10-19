@@ -698,6 +698,28 @@ pub fn done_though_held(function: &str) -> bool {
     DONE_THOUGH_HELD.contains(&function)
 }
 
+/// The words a held line must have, as whole words in any case, to be
+/// asked about [`DONE_THOUGH_HELD`] at all (the first builder on #1925,
+/// 21:32). A held line is talk the lamp judged not for it, in a busy room
+/// people talking to each other (37 such lines in 44 minutes on the first
+/// arm of 19 October), and asking means sending its words to the chat and
+/// paying a round. A stop names what is sent: "stop sending reports",
+/// "stop sharing", "don't send my data". A line with none of these is not
+/// asked and is sent nowhere, as before; a line with one is asked once and
+/// the model decides, so "report to your manager" is asked and the model
+/// calls nothing. Checked on the heard words before anything goes.
+pub const HELD_ASKED_WORDS: &[&str] = &["report", "reports", "sharing", "sending", "data"];
+
+/// Whether a held line's heard words have one of [`HELD_ASKED_WORDS`]
+/// as a whole word, in any case.
+pub fn held_line_names_reports(said: &str) -> bool {
+    said.split(|c: char| !c.is_alphanumeric()).any(|word| {
+        HELD_ASKED_WORDS
+            .iter()
+            .any(|w| word.eq_ignore_ascii_case(w))
+    })
+}
+
 /// Whether an answer is played, and why, for the record.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Verdict {
@@ -4345,5 +4367,40 @@ mod tests {
         attention.heard("Lamp");
         assert_eq!(attention.heard.len(), MOST_HEARD_BYTES);
         assert!(attention.heard.chars().all(|c| c == 'é'));
+    }
+
+    /// A stop to sharing names what is sent, so it is asked (#1925).
+    #[test]
+    fn a_stop_to_sharing_names_reports() {
+        for said in [
+            "Stop sending reports.",
+            "Lamp, stop sharing!",
+            "Don't send my data",
+            "STOP THE REPORTS",
+        ] {
+            assert!(held_line_names_reports(said), "{said}");
+        }
+    }
+
+    /// Busy-room talk with none of the words is not asked, and a part of a
+    /// word is not the word.
+    #[test]
+    fn busy_room_talk_without_the_words_is_not_asked() {
+        for said in [
+            "Send me the file.",
+            "Can you share your screen?",
+            "The reporter called back.",
+            "Is the database up?",
+            "",
+        ] {
+            assert!(!held_line_names_reports(said), "{said}");
+        }
+    }
+
+    /// "report to your manager" has `report`: it is asked once, and the
+    /// model decides, which is meant to call nothing.
+    #[test]
+    fn report_to_your_manager_is_asked_and_left_to_the_model() {
+        assert!(held_line_names_reports("Report to your manager first."));
     }
 }

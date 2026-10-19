@@ -555,7 +555,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    from `/root/config/config.json`, but only into a lamp that never had one
    from install: a key install wrote that is now gone was removed on purpose
    (a reset), and V1's config, which may still hold the previous owner's, is
-   never used to put it back (said instead). Both files root's and 0600, as
+   never used to put it back (said instead). It writes the second route's
+   services too, `/etc/lampOS/voice/second.json`
+   (`deploy/product/settings/second.json`: the relay, every service on that
+   same key; the lamps' voice since 19 Oct, #1712). It's kept and replaced as
+   `provider.json` is, and a lamp's own (lamp-4ace's) is kept. All three files root's and 0600, as
    the voice requires, and kept up to date as the settings are: while each is
    still what an install wrote (its SHA-256 in `state.json`), a newer
    provider, or a key V1 rotated in its config, replaces it; one setup wrote,

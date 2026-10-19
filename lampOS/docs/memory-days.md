@@ -429,9 +429,11 @@ as quoted data rather than instructions:
 
 Output is `{"observations":[{"text":"...","category":"preference",
 "source_ids":[1],"supersedes":null}]}`. One to eight observations, each
-at most 300 UTF-8 bytes, are allowed. Empty output makes no change and is
-reported as empty; the caller need not retry a conversation with nothing
-useful to extract. Unknown fields, invalid categories, missing/foreign
+at most 300 UTF-8 bytes, are allowed. An empty list given to `tidy_apply`
+closes the job with nothing kept (`{"ok":true,"ids":[]}`, #1693 (2)): a
+conversation with nothing useful, or a pass that failed, never waits out its
+day or counts towards `busy`. The voice's adapter is `LAMP_MEMORY_OBSERVE`
+on the second route ([memory.md](memory.md)). Unknown fields, invalid categories, missing/foreign
 sources, duplicate replacements and newer facts overwritten by old evidence
 are refused. Apply rechecks generation, current sources and corrections
 inside its transaction. Ordinary appends do not invalidate useful work.
@@ -439,8 +441,9 @@ inside its transaction. Ordinary appends do not invalidate useful work.
 With a remote adapter, at most 32 KiB of serialized input per submitted
 job would leave the lamp: selected exchange text, timestamps, IDs,
 caller-supplied person scope and prior observations. Repeated attempts would
-send it again. No audio, image or whole store is required. This build sends
-zero model requests; daily traffic and real-model accuracy are unmeasured.
+send it again. No audio, image or whole store is required. With
+`LAMP_MEMORY_OBSERVE` off this build sends zero model requests; with it on,
+one per conversation. Daily traffic and real-model accuracy are unmeasured.
 
 ## Native build and first lamp checks
 

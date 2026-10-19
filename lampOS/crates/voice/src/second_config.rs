@@ -228,6 +228,68 @@ pub struct Gemini {
 }
 
 /// `None` when the variable is unset or empty: the second route is off.
+/// Where the product's voice unit names the second route's configuration
+/// (`deploy/product/lamp-voice.service`).
+pub const PRODUCT_PATH: &str = "/etc/lampOS/voice/second.json";
+/// The product's configuration, as `lamp-update install` places it
+/// (`deploy/product/settings/second.json`, its `install::SECOND`).
+pub const PRODUCT: &str = include_str!("../../../deploy/product/settings/second.json");
+
+/// The product's configuration placed at [`PRODUCT_PATH`] when the voice's
+/// unit asks for the second route there and nothing is there (#1940, the
+/// reviewer's P1 at 00:09). An update round brings this binary and the
+/// voice's new unit, but never what is under `/etc/lampOS`: only `lamp-update
+/// install` places it, and a round runs the updater the lamp already has
+/// (docs/updates.md). Without this, the first round would start a voice
+/// that can't start, put every part back, and refuse every later build. It
+/// is placed as install places it: this process user's, 0600, written whole
+/// and then given its name. Its bytes are install's default, so a later
+/// install keeps it up to date as its own. Any other path, a route other
+/// than `second`, or a file already there (even another one) is left
+/// alone. Returns whether it placed it.
+pub fn place_product_if_missing(
+    route: Option<&std::ffi::OsStr>,
+    configured: Option<&std::ffi::OsStr>,
+) -> io::Result<bool> {
+    place_if_missing(route, configured, Path::new(PRODUCT_PATH), PRODUCT)
+}
+
+fn place_if_missing(
+    route: Option<&std::ffi::OsStr>,
+    configured: Option<&std::ffi::OsStr>,
+    product: &Path,
+    text: &str,
+) -> io::Result<bool> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    if route != Some(std::ffi::OsStr::new("second")) || configured.map(Path::new) != Some(product) {
+        return Ok(false);
+    }
+    match std::fs::symlink_metadata(product) {
+        Ok(_) => return Ok(false),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+    let folder = product
+        .parent()
+        .ok_or_else(|| io::Error::other("the configuration's path has no folder"))?;
+    let placing = folder.join(".second.json.placing");
+    // One a cut left half written is not this one.
+    let _ = std::fs::remove_file(&placing);
+    {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&placing)?;
+        file.write_all(text.as_bytes())?;
+        file.sync_all()?;
+    }
+    std::fs::rename(&placing, product)?;
+    std::fs::File::open(folder)?.sync_all()?;
+    Ok(true)
+}
+
 pub fn load_from_env() -> io::Result<Option<SecondConfig>> {
     from_setting(std::env::var_os(SECOND_CONFIG_ENV))
 }
@@ -874,6 +936,96 @@ mod tests {
             r#","search_url":"https://search.example.invalid/search""#,
         );
         assert!(load_from_path(&config).is_err());
+    }
+
+    /// #1712, the first builder at 21:08 and 21:14: the product's template
+    /// (`deploy/product/settings/second.json`, which install places) is a
+    /// configuration this loader takes, on the relay with the one key a lamp
+    /// already has, `/etc/lampOS/voice/credential`: speech to text and the
+    /// voice fall back to the text model's base and key, and the voice is
+    /// ElevenLabs.
+    #[test]
+    fn the_products_template_loads_on_the_relay_with_the_lamps_one_key() {
+        let template = include_str!("../../../deploy/product/settings/second.json");
+        let value: serde_json::Value = serde_json::from_str(template).unwrap();
+        let named: Vec<&str> = value
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(field, _)| field.ends_with("_credential_file"))
+            .filter_map(|(_, path)| path.as_str())
+            .collect();
+        assert_eq!(named, ["/etc/lampOS/voice/credential"]);
+        let directory = directory("template");
+        let key = directory.join("credential");
+        private(&key, "relay-secret\n");
+        let config = directory.join("second.json");
+        private(
+            &config,
+            &template.replace("/etc/lampOS/voice/credential", &key.display().to_string()),
+        );
+        let route = load_from_path(&config).unwrap();
+        assert_eq!(route.llm_key.expose(), "relay-secret");
+        assert_eq!(route.tts_key, route.llm_key);
+        assert_eq!(route.tts_base_url, route.llm_base_url);
+        assert_eq!(route.tts_provider, TtsProvider::ElevenLabs);
+        assert_eq!(
+            route.stt,
+            Stt::Autonomous {
+                base_url: route.llm_base_url.clone(),
+                key: route.llm_key.clone(),
+            }
+        );
+        assert!(
+            route
+                .llm_base_url
+                .starts_with("https://campaign-api.autonomous.ai/")
+        );
+        fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// #1940, the reviewer's P1 at 00:09: an update round brings the
+    /// second route's unit without `second.json`, so the voice places the
+    /// product's: only for `second` at the product's path, only when
+    /// nothing is there, private, and loadable at once.
+    #[test]
+    fn the_products_configuration_is_placed_only_when_the_route_asks_and_none_is_there() {
+        use std::ffi::OsStr;
+        let directory = directory("placed");
+        let product = directory.join("second.json");
+        let at = Some(product.as_os_str());
+        let second = Some(OsStr::new("second"));
+        // Not asked: another route, no route, or another path.
+        for (route, configured) in [
+            (Some(OsStr::new("gemini")), at),
+            (None, at),
+            (second, Some(OsStr::new("/elsewhere/second.json"))),
+            (second, None),
+        ] {
+            assert!(!place_if_missing(route, configured, &product, PRODUCT).unwrap());
+            assert!(!product.exists());
+        }
+        // Asked and missing: placed whole, 0600, a leftover half-write gone.
+        fs::write(directory.join(".second.json.placing"), "{").unwrap();
+        assert!(place_if_missing(second, at, &product, PRODUCT).unwrap());
+        assert_eq!(fs::read_to_string(&product).unwrap(), PRODUCT);
+        assert_eq!(
+            fs::metadata(&product).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert!(!directory.join(".second.json.placing").exists());
+        // The voice can read it as it reads its own.
+        assert!(read_private(&product, 16_384).is_ok());
+        // Already there, even another: left alone.
+        private(&product, "{\"llm_base_url\":\"https://x.example.invalid\"}");
+        assert!(!place_if_missing(second, at, &product, PRODUCT).unwrap());
+        assert!(
+            fs::read_to_string(&product)
+                .unwrap()
+                .contains("x.example.invalid")
+        );
+        assert_eq!(PRODUCT_PATH, "/etc/lampOS/voice/second.json");
+        fs::remove_dir_all(&directory).unwrap();
     }
 
     /// A model name goes into the request's URL: only a plain name; and
