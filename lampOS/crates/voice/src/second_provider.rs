@@ -2867,6 +2867,10 @@ enum Stop {
     /// `not_for_me`: nothing more is said, and the model judged the line
     /// not said to the lamp.
     Declined,
+    /// The Policy held one of the turn's calls (#1984): nothing more is
+    /// said. It ends as a silent turn; the Policy, which held it, is told
+    /// no other verdict.
+    Held,
     Failed(Fault),
     /// The engine is gone.
     Gone,
@@ -3339,7 +3343,7 @@ async fn answer(
                     "lamp-voice second: request {request}: {} words were let out before a held call; the turn ends here, and nothing more is said",
                     words_out.load(Ordering::Relaxed)
                 );
-                return Err(Stop::Silent);
+                return Err(Stop::Held);
             }
         }
         // ponytail: a model still calling tools after MAX_ROUNDS ends the
@@ -3475,7 +3479,7 @@ async fn answer(
                 idle: true,
             }
         }
-        Err(Stop::GaveUp) => ProviderOutput::TurnComplete {
+        Err(Stop::GaveUp | Stop::Held) => ProviderOutput::TurnComplete {
             request,
             idle: true,
         },
