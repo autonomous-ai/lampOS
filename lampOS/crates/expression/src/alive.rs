@@ -63,7 +63,6 @@ const SIZE_MOST: f64 = 1.3;
 const PACE_QUICKEST: f64 = 0.75;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Breath {
     /// One breath, in and out. The ring's is [`RING_BREATH_US`].
     pub period_us: u64,
@@ -72,7 +71,6 @@ pub struct Breath {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Drift {
     /// The shortest and the longest wait between one drift and the next.
     pub every_us: [u64; 2],
@@ -85,7 +83,6 @@ pub struct Drift {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct WorkLight {
     /// A face taking at least this share of the picture is close.
     pub face_area: f32,
@@ -99,7 +96,6 @@ pub struct WorkLight {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Sleep {
     /// A sleeping name needs the voice owner's person-speech evidence.
     /// Omission preserves the original immediate name wake.
@@ -119,7 +115,6 @@ pub struct Sleep {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Wake {
     /// The stretch, from and back to nothing, played as the sleeping pose
     /// lets go. Brightness is not used.
@@ -151,7 +146,6 @@ impl Wake {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Alive {
     /// The voice's states in which the idle layer runs. Never speaking: the
     /// lamp keeps its head still while it talks (body.md, "A glance first").

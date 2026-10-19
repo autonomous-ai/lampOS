@@ -43,6 +43,8 @@ struct Found {
 
 pub struct RingMood {
     found: Arc<Found>,
+    /// The pace last said in the journal (`lamp_msgs::MoodTaken`).
+    said: lamp_msgs::MoodTaken,
 }
 
 impl RingMood {
@@ -64,7 +66,10 @@ impl RingMood {
                     thread::sleep(Duration::from_micros(LOOK_EVERY_US));
                 }
             })?;
-        Ok(Self { found })
+        Ok(Self {
+            found,
+            said: lamp_msgs::MoodTaken::default(),
+        })
     }
 
     /// Call from the ring's loop with its clock: the breath's phase and pace
@@ -72,11 +77,32 @@ impl RingMood {
     /// A state before its stamp, past its 2.5 s, from anyone but Mood or not
     /// valid is no mood, whatever the thread last found.
     pub fn tick(&mut self, now_us: u64) -> Option<(f64, f32)> {
-        let found = self.found.state.lock().ok()?;
-        found
-            .as_ref()
-            .and_then(|message| MoodState::breath_in(message, now_us))
+        let breath = {
+            let found = self.found.state.lock().ok()?;
+            found
+                .as_ref()
+                .and_then(|message| MoodState::breath_in(message, now_us))
+        };
+        if let Some(line) = taken_line(&mut self.said, breath, now_us) {
+            eprintln!("{line}");
+        }
+        breath
     }
+}
+
+/// The journal's line when the ring takes Mood's pace: only for a fresh
+/// state, so with Mood off it says nothing (`lamp_msgs::MoodTaken`).
+fn taken_line(
+    said: &mut lamp_msgs::MoodTaken,
+    breath: Option<(f64, f32)>,
+    now_us: u64,
+) -> Option<String> {
+    let Some((_, pace)) = breath else {
+        said.gone();
+        return None;
+    };
+    said.due(pace, now_us)
+        .then(|| format!("lamp-voice ring: the ring breathes with Mood: pace {pace:.2}"))
 }
 
 impl Drop for RingMood {
@@ -112,6 +138,27 @@ mod tests {
             familiar: None,
             breath: Some(MoodBreath { phase, pace }),
         }
+    }
+
+    /// The ring's line says the pace it took, first and on a change, and
+    /// nothing with no fresh mood: Mood off writes nothing new.
+    #[test]
+    fn the_ring_says_the_pace_it_takes_and_nothing_with_mood_off() {
+        let mut said = lamp_msgs::MoodTaken::default();
+        for at in [0, 60_000_000, 600_000_000] {
+            assert_eq!(taken_line(&mut said, None, at), None);
+        }
+        assert_eq!(
+            taken_line(&mut said, Some((0.4, 0.81)), 1).as_deref(),
+            Some("lamp-voice ring: the ring breathes with Mood: pace 0.81")
+        );
+        assert_eq!(taken_line(&mut said, Some((0.5, 0.81)), 120_000_000), None);
+        assert!(taken_line(&mut said, Some((0.5, 1.1)), 120_000_000).is_some());
+        // A change 59 s after the last line waits for the minute.
+        assert_eq!(taken_line(&mut said, Some((0.5, 0.81)), 179_000_000), None);
+        // Mood gone, then back at the same pace: said again after a minute.
+        assert_eq!(taken_line(&mut said, None, 200_000_000), None);
+        assert!(taken_line(&mut said, Some((0.5, 1.1)), 200_000_001).is_some());
     }
 
     #[test]

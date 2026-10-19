@@ -1104,8 +1104,6 @@ the file is never read back.
 |---|---|---|---|---|---|---|
 | voice | Live provider settings (install writes them), `/etc/lampOS/voice/provider.json` | JSON | none | refused (`voice/src/config.rs:14`) | refused (`Authentication`, `ReconnectContext`, `SilentResponse`, `config.rs:67-102`) | **refuses to start**: "invalid private provider configuration" (`config.rs:170-178`), the worker exits, `main.rs:23-24` exits 1, restarted until `StartLimitBurst`. The path from worker to exit is read through the `?`s, not run |
 | voice | second route's settings, `/etc/lampOS/voice/second.json` | JSON | none | refused (`second_config.rs:12`) | `tts_provider` is a string checked against a list (`second_config.rs:325-334`) | **refuses to start**, the same way (`second_config.rs:304-324`, called at `second_provider/worker.rs:1156`) |
-| setup | serve config (only `lamp-update install --setup on` writes it, `update/src/install.rs:375-384`), `/etc/lampOS/setup/serve.json` | JSON | none | refused (`setup/src/serve.rs:61`) | n/a | **refuses to start**, exit 2 (`setup/src/main.rs:375-384`, `662-670`), for `serve`, `change` and `wifi`. Not in update's settings list, so a put-back never restores it |
-| setup | reset plan, `/etc/lampOS/setup/reset-plan.json` | JSON | none | refused (`setup/src/reset.rs:44`) | n/a | **refuses to start** before any command (`main.rs:95-104`, `137`): `lamp-setup-reset` restarts and the lamp can't be reset. Not restored by a put-back |
 | tasks | the store's container, `/var/lib/lampos-tasks/store/tasks.sqlite3` | SQLite | `user_version`, must be 1 | an extra table, index or trigger is refused (`tasks/src/store.rs:180-189`) | n/a | **refuses to start** on any other `user_version` (`store.rs:164-168`, through `runtime.rs:1776` to exit 1). Only the JSON snapshot inside is set aside (below) |
 | tasks | task state in the same file (`state.snapshot`) | JSON | `schema` 2 (oldest 1); higher is **set aside** as `tasks.sqlite3.newer-<schema>-<s>`, with a journal and health line (`engine.rs:1008-1025`, `1948-2000`) | read on `State`, `Task`, `Dispatch` (#1512); **refused** on `Target`, `Launch`, `Observation`, `LaunchOutcome` (`harness.rs:108,119,127,183`) | **refused**: e.g. `dispatch.state: "later"` at the same schema | a newer `schema` is set aside (low). An unknown value, or a field on a strict type, **without** a schema bump **refuses to start** (`engine.rs:390`). The bump is a rule in a comment (`engine.rs:58-66`), not a check |
 | schedule | the store's container, `/var/lib/lampos-schedule/store/schedule.sqlite3` | SQLite | `user_version`, must be 1 | n/a | n/a | **refuses to start** (`schedule/src/store.rs:165-169`, `runtime.rs:477`, exit 1) |
@@ -1114,7 +1112,6 @@ the file is never read back.
 | memory | memory across days, `/var/lib/lampos-memory/memory-days.sqlite3` | SQLite | `user_version` ≤ 1 | columns read by name; `CREATE … IF NOT EXISTS` | n/a | **refuses to start** on a higher `user_version`: "written by a newer version" (`memory/src/days.rs:178-184`, through `application.rs:189-197`). No set-aside at all |
 | update | lamp-update's own switch, `/var/lib/lampos-update/self.json` | JSON | `version` 1, never checked | read, dropped | n/a | `serve` confirms it before any round (`update/src/main.rs:668-705`). One it can't parse (`own.rs:71`) is "not confirmed" every 30 s for ever (`main.rs:698`): **no round ever runs**, the service stays active, `OnFailure=` never fires. `lamp-update-back back` exits 1 on the same file every timer run. Only with `LAMP_UPDATE_SELF=on` |
 | controls | `/etc/lampOS/controls/controls.json`, `controls-pins.json` (update's settings write them, `install.rs:339`) | JSON | none | refused (`controls/src/engine.rs:24`, `touch_pins.rs:74`, `pins.rs:45`) | refused | **refuses to start** (`main.rs:269-276`, `597`, `822-826`). Softened: apply restores the files with the build on going back (`update/src/apply.rs:14-20`); a person's own edit is kept and not restored |
-| expression | `/etc/lampOS/expression/expression.json` (update's settings, `install.rs:335`) | JSON | `version` must be 1 (`catalogue.rs:199-206`) | refused (`expression/src/catalogue.rs:27-158`) | refused (`Trigger`, `catalogue.rs:13`) | **refuses to start** (`main.rs:281`, `401-403`). Softened as controls |
 | records | retention config (install writes it), `/etc/lampOS/records.json` | JSON | `schema_version` must be 1 (`records/src/config.rs:98`) | refused (`config.rs:11,22`) | refused (`Kind`, `config.rs:33`) | **every run fails** (`application.rs:277`): the timer's one-shot fails and no session is ever pruned |
 | records | last cleanup report, `/run/lamp-records/last.json` | JSON | `schema_version`; higher is **set aside** as `.newer-N-T` (`json_file.rs:186-241`) | read (`lib.rs:301`) | `mode` must be `apply` or `dry_run` (`lib.rs:241`) | a new `mode` at the same schema: "not a recognized cleanup result" (`application.rs:305`), every run refused until someone removes it. tmpfs, so a boot clears it |
 | body | poses `lamp-body-measure` writes once, `/etc/lampOS/body/lamp.env` (`BODY_POSES`, passed as arguments) | env | none | a flag it doesn't know is refused (`body/src/bin/lamp-body.rs:391`) | an unknown on/off value refused (`lamp-body.rs:270-359`) | **refuses to start** (`lamp-body.rs:781-795`, `StartLimitBurst=3`), if a newer measure's flag meets an older body |
@@ -1156,6 +1153,8 @@ the file is never read back.
 | voice | sessions and first output, `/var/lib/lampOS/voice/sessions/…`, `first-output/*.jsonl` | JSONL | first output `schema` 1 | — | — | written only, never read back at start |
 | cloud | setup's account, `/etc/lampOS/setup/backend.json` | JSON | none | read (`account.rs:14`, all `serde(default)`) | n/a | an extra field reads. A changed type or bad JSON refuses to start, exit 2 (`main.rs:120-123`) |
 | cloud | report choices, `/var/lib/lampos-cloud/reports.json`, `/etc/lampOS/setup/reports.json` | JSON | `asked`; above 1 reads as "no" (`reports.rs:712-713`) | `Value` | an unknown `by` is none (`reports.rs:669`) | read per send; unreadable is "no" |
+| setup | serve config (only `lamp-update install --setup on` writes it, `update/src/install.rs:375-384`), `/etc/lampOS/setup/serve.json` | JSON | none | read, dropped with a line (`setup/src/serve.rs`, `read`) | n/a | an extra field is dropped and named in the journal; a bad known value or bad JSON still refuses to start, exit 2. Not in update's settings list, so a put-back never restores it |
+| setup | reset plan, `/etc/lampOS/setup/reset-plan.json` | JSON | none | **refused**, except `keep_back`, whose every entry is dropped with a line and its path wiped (`setup/src/reset.rs`, `read`) | a `wipe` entry that isn't a plain path's text **refuses the reset**; a newer plan's extra plain path is wiped (still checked against `PROTECTED`) | all or nothing: a refused plan journals nothing, keeps the marker and wipes nothing; `watch-reset` keeps watching and tells the person who holds the button "Nothing was wiped. Update me, then reset again." (say service, network only), the other commands exit 2. A bad known value or bad JSON is refused as before. Not restored by a put-back |
 | setup | done marker `/var/lib/lampos-setup/done`; reset journal `reset.json` | file / JSON | `version` written, never read | n/a | n/a | existence only (`serve.rs:702-703`, `reset.rs:333`) |
 | update | `self-refused`, `previous/`, `log.jsonl`, `harness-at-boot` in `/var/lib/lampos-update/` | text / JSONL | none | n/a | n/a | bad lines skipped (`own.rs:109`, `records.rs:375`); `log.jsonl` never read back |
 | update | apply's `request.json`, `back.json`, `done.json` in `/var/lib/lampos-update/apply/` | JSON | `version`, never checked (`apply.rs:79`, `112`) | read, dropped | `Op` refused (`apply.rs:68`) | refused when used: that apply or back fails and writes nothing (`apply.rs:370`, `623`, `297`) |
@@ -1166,6 +1165,7 @@ the file is never read back.
 | keeper, bus | `keeper.json`; kept logs `logs.*.jsonl` | JSON / JSONL | none | read | n/a | not ready by default (`keeper/src/package.rs:259`); logs only listed by name |
 | settings | snapshot, `--dir/settings.json` | JSON | `version` must be 1 | refused (`settings/src/engine.rs:47,57`) | refused | refuses to start (`main.rs:156`; `#[should_panic]` test `engine.rs:331`). No unit runs lamp-settings |
 | station | a run's record, `--out/<run>.json` | JSON | `format` 1 | refused | refused | only as `--retest-of`, which refuses that run (`station/src/main.rs:117`). A bench tool, not on the lamp |
+| expression | `/etc/lampOS/expression/expression.json` (update's settings, `install.rs:335`) | JSON | `version` must be 1; another is refused | **read**, named once in the journal by path (`catalogue.rs`, `Catalogue::from_json_naming`; `main.rs`, #1680) | refused (`Trigger`, `catalogue.rs:13`) | a newer catalogue's unknown fields, at any depth, are read past and named ("fields this build does not read, ignored: …"); a bad known value, a new trigger or another `version` still refuses to start. Tests: `crates/expression/tests/forward.rs` |
 
 No store: health, mood, air, name (it reads only its models), actions,
 turn-end, observer, ears, camera, audio, ring, environment, lean,
@@ -1184,8 +1184,11 @@ test does (#1512):
    and value; a file it can't read at all is the only refusal. Then the
    delivery consumer's child (with schedule, below).
 2. **setup**: `serve.json` and `reset-plan.json` read one release
-   forward. A put-back doesn't restore them, and the reset depends on the
-   plan.
+   forward (`el/stores-setup`, the rule agreed on #2060). A next build
+   names anything to wipe as a plain path in `wipe`, which this build
+   wipes, and anything to keep back only in `keep_back`, whose entries
+   this build drops (wiping more). A new `wipe` kind or any other new
+   field refuses the reset whole, with nothing wiped.
 3. **tasks**: a higher SQLite `user_version` sets the file aside, as a
    higher `schema` does; an unknown stored value without a bump is set
    aside, not refused.
@@ -1197,7 +1200,7 @@ test does (#1512):
    aside, not deleted.
 6. **update**: `self.json` it can't read is set aside and the rounds go
    on; so is `journal.json`, with a line.
-7. **controls**, **expression**, **records**, **body**: read their files
+7. **controls**, **expression** (#2065), **records**, **body**: read their files
    one release forward (one PR each).
 8. The medium rows after: **cloud** (reports deleted and `state.json`
    reset silently), **eyes** (`forgets-pending`), **skills** (`off`).
