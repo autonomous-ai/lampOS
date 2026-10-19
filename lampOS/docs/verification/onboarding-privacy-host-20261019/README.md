@@ -148,3 +148,24 @@ setup onboarding tests: 5 passed, 0 failed across 26 summaries. Install: 52
 passed, 0 failed. Full lamp-voice: 2,331 passed, 0 failed, 12 ignored across
 32 summaries. Workspace build passed. The counts in earlier sections keep
 their stated bases; exact-head ARM64 and physical evidence remain outstanding.
+
+## Wait bound (20 October 2026, Third's P3)
+
+On head `ec97549ba`, uncommitted. With `LAMP_PRIVACY_CONTROLS=on` and no open,
+fresh receipt, privacy waited with no offer, no try and no bound. Now, after
+`SIT_GIVE_UP_US` (60 s) with nothing offered or in an attempt, privacy is
+`not_available` (one `onboarding_stopped` journal row,
+`why: no_open_privacy_receipt`) and the walk reaches where_you_sit; a later
+open, fresh receipt offers privacy again. Never marked done.
+
+- `a_receipt_never_open_and_fresh_leaves_privacy_not_available_after_the_bound`
+  (bound, walk goes on, re-offered on a fresh open receipt)
+- `an_open_fresh_receipt_before_the_bound_is_offered_as_usual`
+
+Gates, from `lampOS/`, fresh target directory, in order: fmt --all --check;
+clippy --workspace --all-targets -D warnings; `-p lamp-voice --lib onboarding`
+and `privacy`; full `-p lamp-voice`; build --workspace. Results: fmt and clippy
+passed; `onboarding` 57 passed, `privacy` 102 passed, 0 failed; full
+lamp-voice 2,420 passed, 1 failed, 12 ignored across 32 summaries, the one
+failure `reminder_waits_for_named_request_second_look_before_its_window_can_expire`
+(reminders, untouched here) passing 3 of 3 runs alone; workspace build passed.

@@ -285,6 +285,12 @@ struct PrivacyFlow {
     pending_result: Option<(Outcome, Option<BootId>)>,
     erase_pending: bool,
     last_open: Option<(String, String, u64)>,
+    /// Since when privacy has been led with no open, fresh receipt and
+    /// nothing offered (Third's P3 on #1792).
+    no_receipt_since: Option<u64>,
+    /// That wait passed [`SIT_GIVE_UP_US`]: privacy is not available until an
+    /// open, fresh receipt is seen again. Memory only.
+    waited_out: bool,
 }
 
 fn fresh_token() -> io::Result<u64> {
@@ -707,10 +713,12 @@ impl Onboarding {
     }
 
     fn privacy_available(&self) -> bool {
-        self.privacy_flow
-            .context
-            .as_ref()
-            .is_some_and(|context| context.location.is_some())
+        !self.privacy_flow.waited_out
+            && self
+                .privacy_flow
+                .context
+                .as_ref()
+                .is_some_and(|context| context.location.is_some())
     }
 
     fn step_available(&self, step: Step) -> bool {
@@ -1228,6 +1236,10 @@ impl Onboarding {
             }
             return None;
         }
+        if self.privacy_open_receipt(now_us).is_some() {
+            self.privacy_flow.no_receipt_since = None;
+            self.privacy_flow.waited_out = false;
+        }
         if !self.storage_idle() {
             return None;
         }
@@ -1265,6 +1277,27 @@ impl Onboarding {
                 self.invalidate_privacy(privacy::Invalidation::FenceFailure);
                 self.led = None;
                 return None;
+            }
+            // A receipt that never turns open and fresh (faulted, stale, or a
+            // reader that stopped) would hold the walk here with nothing
+            // said: past the sitting step's own give-up time the step is not
+            // available, and the next open, fresh receipt offers it again.
+            let unopened = self.privacy_open_receipt(now_us).is_none();
+            let flow = &mut self.privacy_flow;
+            if unopened
+                && flow.offer.is_none()
+                && flow.attempt.is_none()
+                && flow.pending_result.is_none()
+            {
+                let since = *flow.no_receipt_since.get_or_insert(now_us);
+                if now_us.saturating_sub(since) >= SIT_GIVE_UP_US {
+                    flow.waited_out = true;
+                    self.records.push(
+                        json!({"kind":"onboarding_stopped","why":"no_open_privacy_receipt","step":"privacy","at_us":now_us}),
+                    );
+                    self.finish(step, Outcome::NotAvailable, None, now_us);
+                    return None;
+                }
             }
             self.privacy_tick(now_us, quiet_us, can_speak, face.is_some());
             return None;
@@ -1436,6 +1469,8 @@ impl Onboarding {
                 self.privacy_flow.loaded = true;
                 self.privacy_flow.maintenance_failed = false;
                 self.privacy_flow.failures = 0;
+                self.privacy_flow.no_receipt_since = None;
+                self.privacy_flow.waited_out = false;
                 self.privacy_flow.generation = 0;
                 self.desired = Progress::default();
                 self.led = None;

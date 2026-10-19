@@ -259,6 +259,49 @@ fn without_a_receipt_source_privacy_is_unavailable_and_the_walk_goes_on() {
     assert_eq!(walk.led.as_ref().unwrap().step, Step::WhereYouSit);
 }
 
+// Third's P3 on #1792: a receipt source that never shows an open, fresh
+// switch is bounded by the sitting step's give-up time.
+fn stale_tick(walk: &mut Onboarding, now: u64) {
+    walk.drain_storage_for_test(now);
+    walk.tick(now, START_QUIET_US, true, false, face(), true);
+    walk.drain_storage_for_test(now);
+}
+
+#[test]
+fn a_receipt_never_open_and_fresh_leaves_privacy_not_available_after_the_bound() {
+    let (_store, mut walk) = walk();
+    // The fixture's receipt (stamped T) is long stale here.
+    let start = 100 * T;
+    stale_tick(&mut walk, start);
+    stale_tick(&mut walk, start + SIT_GIVE_UP_US - 1);
+    assert!(!walk.kept().steps.contains_key("privacy"));
+    assert!(walk.privacy_pending().invitations.is_empty());
+    stale_tick(&mut walk, start + SIT_GIVE_UP_US);
+    assert_eq!(walk.kept().steps["privacy"].outcome, Outcome::NotAvailable);
+    assert!(
+        walk.records
+            .iter()
+            .any(|row| row["why"] == "no_open_privacy_receipt")
+    );
+    stale_tick(&mut walk, start + SIT_GIVE_UP_US + 1);
+    assert_eq!(walk.led.as_ref().unwrap().step, Step::WhereYouSit);
+    // An open, fresh receipt afterwards offers privacy again.
+    let later = start + SIT_GIVE_UP_US + T;
+    offer(&mut walk, later, 2);
+    assert_eq!(walk.led.as_ref().unwrap().step, Step::Privacy);
+}
+
+#[test]
+fn an_open_fresh_receipt_before_the_bound_is_offered_as_usual() {
+    let (_store, mut walk) = walk();
+    let start = 100 * T;
+    stale_tick(&mut walk, start);
+    let token = offer(&mut walk, start + SIT_GIVE_UP_US - 1, 2);
+    stale_tick(&mut walk, start + SIT_GIVE_UP_US + T);
+    assert!(!walk.kept().steps.contains_key("privacy"));
+    assert_eq!(walk.privacy_pending().invitations[0].invitation, token);
+}
+
 #[test]
 fn a_close_read_just_before_arming_is_offered_again_not_failed() {
     let (_store, mut walk) = walk();

@@ -136,6 +136,16 @@ privacy worker sends no receipt, and without one no invitation could ever be
 offered, so the step is `not_available` and the walk goes on. The product's
 `lamp-voice.service` doesn't set `LAMP_PRIVACY_CONTROLS`.
 
+With the receipt source on, a receipt that never shows the switch open and
+fresh (faulted, stale, a reader that stopped) would hold the walk at privacy
+with nothing offered. That wait is bounded by the sitting step's give-up time
+(60 s, `SIT_GIVE_UP_US`), counted only while nothing is offered or in an
+attempt: past it privacy is recorded `not_available`, the journal gets one
+`onboarding_stopped` row (`why: no_open_privacy_receipt`) and the walk goes on.
+The next open, fresh receipt makes privacy available again and it is offered
+then, as privacy always is once available. Never done: the bound adds no
+evidence. A restart re-arms the wait.
+
 The runner gives the model a note to word the invitation itself, not fixed
 words: the hardware profile's verified switch location, that the switch closes
 the microphones and camera, to close it and open it again, and that the lamp
