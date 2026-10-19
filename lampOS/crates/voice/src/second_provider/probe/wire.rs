@@ -7,8 +7,10 @@
 //!
 //! - **dns**, **tcp**, **tls**: the name looked up, the TCP connect, the
 //!   TLS handshake;
-//! - **send**: the request written, its body whole;
-//! - **first byte**: from the request's last byte to the response's first;
+//! - **send**: the request handed to the kernel, its body whole (on a
+//!   large request part of the upload may still be going, and is counted
+//!   in the first byte);
+//! - **first byte**: from then to the response's first;
 //! - **events**: from the same point to the stream's first and second
 //!   `data:` events, the gap between them, and to its first words or call;
 //! - **done**: to the stream's end.
@@ -20,7 +22,15 @@
 //! lamp-4ace), and **small**, one short line and no functions. A first byte
 //! late by the same on both says the network or the relay's own wait; late
 //! on the lamp's only, the request's size; events that come together after
-//! a late first byte, the relay holding the stream back.
+//! a late first byte, or a first event late after a first byte on time,
+//! the relay holding the stream back.
+//!
+//! Two things it is not. The lamp's request has no memory note, facts,
+//! time line or the route's notes, so its `bytes=` is under a real turn's:
+//! read it beside the route's own `chat request` journal line. And every
+//! request is on a new connection, paying `tcp_ms` and `tls_ms` each time,
+//! where the route reuses a kept one: `done_ms` is the request's, not a
+//! turn's (the first builder's agent on #2024).
 //!
 //! The relay is `deepseek_base_url` (or `LAMP_SECOND_DEEPSEEK_BASE_URL`),
 //! with the route's credential; DeepSeek's own API takes the unit's
@@ -412,6 +422,7 @@ pub struct Kept {
     pub tls: Vec<u64>,
     pub send: Vec<u64>,
     pub first_byte: Vec<u64>,
+    pub first_event: Vec<u64>,
     pub gap: Vec<u64>,
     pub words: Vec<u64>,
     pub done: Vec<u64>,
@@ -424,17 +435,19 @@ impl Kept {
         self.tls.push(times.tls);
         self.send.push(times.send);
         self.first_byte.extend(times.answer.first_byte);
+        self.first_event.extend(times.answer.first_event);
         self.gap.extend(times.answer.gap());
         self.words.extend(times.answer.words);
         self.done.push(times.answer.done);
     }
 
-    fn medians(&self) -> [Option<u64>; 6] {
+    fn medians(&self) -> [Option<u64>; 7] {
         [
             &self.tcp,
             &self.tls,
             &self.send,
             &self.first_byte,
+            &self.first_event,
             &self.gap,
             &self.words,
         ]
@@ -445,8 +458,8 @@ impl Kept {
         let show = |values: &[u64], p| shown(percentile(values, p));
         format!(
             "wire target={target} size={} runs={} failed={} bytes={} tcp_p50_ms={} tls_p50_ms={} \
-             send_p50_ms={} first_byte_p50_ms={} first_byte_p90_ms={} gap_p50_ms={} \
-             words_p50_ms={} words_p90_ms={} done_p50_ms={}",
+             send_p50_ms={} first_byte_p50_ms={} first_byte_p90_ms={} first_event_p50_ms={} \
+             first_event_p90_ms={} gap_p50_ms={} words_p50_ms={} words_p90_ms={} done_p50_ms={}",
             size.name(),
             self.done.len() as u32 + self.failed,
             self.failed,
@@ -456,6 +469,8 @@ impl Kept {
             show(&self.send, 50),
             show(&self.first_byte, 50),
             show(&self.first_byte, 90),
+            show(&self.first_event, 50),
+            show(&self.first_event, 90),
             show(&self.gap, 50),
             show(&self.words, 50),
             show(&self.words, 90),
@@ -466,7 +481,15 @@ impl Kept {
 
 /// The relay's medians less DeepSeek's own, step by step, for one size.
 pub fn difference(relay: &Kept, direct: &Kept, size: Size) -> String {
-    let names = ["tcp", "tls", "send", "first_byte", "gap", "words"];
+    let names = [
+        "tcp",
+        "tls",
+        "send",
+        "first_byte",
+        "first_event",
+        "gap",
+        "words",
+    ];
     let steps = relay
         .medians()
         .into_iter()
@@ -506,7 +529,9 @@ pub fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io::Resul
     let mut targets: Vec<(&str, [Chat; 2])> = Vec::new();
     match &config.hosted.deepseek_base_url {
         Some(base) => targets.push(("relay", chats(base, config.llm_key.expose())?)),
-        None => println!("wire target=relay: left out: no deepseek_base_url"),
+        None => println!(
+            "wire target=relay: left out: no deepseek_base_url (systemd-run does not carry the voice unit's LAMP_SECOND_DEEPSEEK_BASE_URL: give it with -E)"
+        ),
     }
     match unit_credential(credentials.as_deref(), DEEPSEEK_CREDENTIAL) {
         Ok(key) => targets.push((
@@ -727,6 +752,19 @@ mod tests {
         assert!(!error.to_string().contains("127.0.0.1"), "{error}");
     }
 
+    /// The reviewer's P3 on #2024: an error's own words can name the host
+    /// (rustls's name mismatch does), and only the step and kind are told.
+    #[test]
+    fn a_failed_steps_words_are_its_name_and_kind_alone() {
+        let named = io::Error::new(
+            io::ErrorKind::InvalidData,
+            "invalid peer certificate: certificate not valid for name \"relay.example.invalid\"",
+        );
+        let told = step("tls")(named);
+        assert_eq!(told.to_string(), "tls: InvalidData");
+        assert_eq!(told.kind(), io::ErrorKind::InvalidData);
+    }
+
     #[test]
     fn the_lamps_request_declares_every_function_and_the_small_one_none() {
         let declared = cache::functions();
@@ -782,7 +820,7 @@ mod tests {
         ));
         assert_eq!(
             difference(&relay, &direct, Size::Lamp),
-            "wire relay-less-direct size=lamp tcp_ms=+20 tls_ms=+40 send_ms=+0 first_byte_ms=+600 gap_ms=+0 words_ms=+600"
+            "wire relay-less-direct size=lamp tcp_ms=+20 tls_ms=+40 send_ms=+0 first_byte_ms=+600 first_event_ms=+600 gap_ms=+0 words_ms=+600"
         );
         assert!(difference(&relay, &Kept::default(), Size::Small).ends_with("words_ms=none"));
     }
