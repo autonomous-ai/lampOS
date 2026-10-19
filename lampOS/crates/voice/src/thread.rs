@@ -965,13 +965,14 @@ impl Recalling {
         }
         eprintln!("{}", crate::session_tools::setup_line(&tools, &self.tools));
         // Without the light's, the volume's or the reminders' functions it
-        // is told what it can't do right now, in the room kept for it.
-        let config = match crate::session_tools::not_ready(&tools, &self.tools) {
+        // is told what it can't do right now, and with `use_skill` its
+        // skills' lines (#1668), in the room kept for them.
+        let config = match crate::session_tools::told_after(&tools, &self.tools) {
             Some(line) => {
                 let told = format!("{}{line}", config.instruction_text());
                 config.clone().instruction(&told).unwrap_or_else(|_| {
                     eprintln!(
-                        "lamp-voice: the session is not told what it can't do right now: its instruction is full"
+                        "lamp-voice: the session is not told what it can't do right now, nor its skills: its instruction is full"
                     );
                     config
                 })
@@ -1009,7 +1010,7 @@ impl Recalling {
     fn opened(&self, recall: impl FnOnce(usize) -> Option<SessionConfig>) -> SessionConfig {
         let tools = crate::tools::declared(&self.tools);
         let keep =
-            crate::session_tools::not_ready(&tools, &self.tools).map_or(0, |line| line.len());
+            crate::session_tools::told_after(&tools, &self.tools).map_or(0, |line| line.len());
         let config = recall(keep).unwrap_or_else(|| self.config.clone());
         self.equipped_with(config, tools)
     }
@@ -1176,6 +1177,71 @@ mod tests {
         assert_eq!(declared(&recalling), ["volume_up"]);
         catalog(&["volume_up", "light_colour"]);
         assert_eq!(declared(&recalling), ["volume_up", "light_colour"]);
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// #1668: with `use_skill`, a session is given that one function for
+    /// every skill, its instruction lists the skills after the rest, and
+    /// the room for that list is kept from the thread when it is opened.
+    #[test]
+    fn with_use_skill_a_session_is_told_its_skills_after_its_instruction() {
+        let folder = std::env::temp_dir().join(format!("lv-thread-skills-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(folder.join(crate::tools::SKILLS_DIR)).unwrap();
+        std::fs::write(
+            folder.join(crate::tools::CATALOG_FILE),
+            serde_json::json!({"tools":[
+                {"name":"light_colour","description":"Colour."},
+                {"name":"volume_up","description":"Louder."}]})
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            folder
+                .join(crate::tools::SKILLS_DIR)
+                .join(crate::tools::CATALOG_FILE),
+            serde_json::json!({"tools":[{"name":"dance","description":"When asked to dance."}]})
+                .to_string(),
+        )
+        .unwrap();
+        let config = SessionConfig::new(
+            lamp_gemini::GOOGLE_ENDPOINT,
+            lamp_gemini::Credential::api_key("test-only").unwrap(),
+        )
+        .unwrap()
+        .instruction("You are a lamp.")
+        .unwrap();
+        let settings = crate::tools::Settings {
+            exec: Some(folder.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        let section = crate::use_skill::section(&crate::tools::skill_tools(&settings));
+        assert!(
+            section.contains("- dance: When asked to dance."),
+            "{section}"
+        );
+        let recalling = Recalling::new(config.clone()).tools(settings.clone());
+        let equipped = recalling.equipped(config.clone());
+        assert_eq!(
+            equipped.instruction_text(),
+            format!("You are a lamp.{section}")
+        );
+        let opened = recalling.opened(|keep| {
+            assert_eq!(keep, section.len());
+            None
+        });
+        assert_eq!(
+            opened.instruction_text(),
+            format!("You are a lamp.{section}")
+        );
+        // Without the switch: dance is its own function, and nothing is
+        // told after the instruction.
+        let off = Recalling::new(config.clone()).tools(crate::tools::Settings {
+            use_skill: false,
+            ..settings
+        });
+        assert_eq!(off.equipped(config).instruction_text(), "You are a lamp.");
         let _ = std::fs::remove_dir_all(&folder);
     }
 

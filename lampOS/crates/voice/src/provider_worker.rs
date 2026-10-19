@@ -2896,6 +2896,7 @@ impl ToolDesk {
             && matches!(
                 crate::tools::route(&self.settings, &call.name),
                 Route::Executive(_)
+                    | Route::UseSkill(_)
                     | Route::Schedule(_)
                     | Route::Memory(_)
                     | Route::Tasks(_)
@@ -3020,6 +3021,7 @@ impl ToolDesk {
                 );
             }
             route @ (Route::Executive(_)
+            | Route::UseSkill(_)
             | Route::Schedule(_)
             | Route::Memory(_)
             | Route::Tasks(_)
@@ -3031,6 +3033,7 @@ impl ToolDesk {
                 self.run(provider, lineage, call, route, called_us);
             }
             Route::Executive(_)
+            | Route::UseSkill(_)
             | Route::Schedule(_)
             | Route::Memory(_)
             | Route::Tasks(_)
@@ -3075,6 +3078,7 @@ impl ToolDesk {
         if matches!(
             route,
             Route::Executive(_)
+                | Route::UseSkill(_)
                 | Route::Schedule(_)
                 | Route::Tasks(_)
                 | Route::Faces(..)
@@ -3092,8 +3096,10 @@ impl ToolDesk {
         // a yes to a task cannot come in one.
         let heard =
             crate::attention::own_request().load(std::sync::atomic::Ordering::Acquire) != request;
-        let skill =
-            matches!(&route, Route::Executive(dir) if dir.ends_with(crate::tools::SKILLS_DIR));
+        // A skill's answer may ask for a look, called itself or through
+        // `use_skill` (#1668).
+        let skill = matches!(&route, Route::UseSkill(_))
+            || matches!(&route, Route::Executive(dir) if dir.ends_with(crate::tools::SKILLS_DIR));
         let asked = self.asked.clone();
         let session = lineage.session;
         let work = call.clone();
@@ -9603,6 +9609,68 @@ mod tests {
         assert_eq!(asked.0, request);
         assert!(asked.1 > 0);
         assert_eq!(asked.2, None);
+        rig.stop().await;
+    }
+
+    /// #1668: the same through `use_skill`. The call is the skill's own
+    /// when it reaches the skill's socket, and its answer goes to the model
+    /// under the name it was called by, `use_skill`; a look it asks for is
+    /// a skill's look, so the coordinator is asked for it.
+    #[tokio::test]
+    async fn a_skill_reached_through_use_skill_asks_the_coordinator_for_its_look() {
+        use std::io::{BufRead, Write};
+        let home = crate::process::SessionDirectory::create().unwrap();
+        let skills = home.path.join(crate::tools::SKILLS_DIR);
+        std::fs::create_dir(&skills).unwrap();
+        std::fs::write(
+            skills.join(crate::tools::CATALOG_FILE),
+            r#"{"tools":[{"name":"check_my_work","description":"A test."}]}"#,
+        )
+        .unwrap();
+        let listener =
+            std::os::unix::net::UnixListener::bind(skills.join(crate::tools::CALL_SOCKET)).unwrap();
+        let skill = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            stream
+                .write_all(b"{\"ok\":true,\"result\":{\"next\":\"Look.\",\"look\":true}}\n")
+                .unwrap();
+            serde_json::from_str::<serde_json::Value>(&line).unwrap()
+        });
+        let mut rig = LiveRig::start_with(
+            quick_policy(),
+            typed_with(crate::tools::Settings {
+                exec: Some(home.path.clone()),
+                use_skill: true,
+                ..Default::default()
+            }),
+        );
+        let mut dial = rig.ready().await;
+        let request = rig.speak(&mut dial, false, true).await;
+        dial.service
+            .send(json!({"toolCall":{"functionCalls":[{"id":"c8","name":"use_skill","args":{"skill":"check_my_work"}}]}}))
+            .await;
+        dial.service.send(idle_complete()).await;
+        assert_eq!(
+            rig.service_message(&mut dial).await,
+            json!({"toolResponse":{"functionResponses":[
+                {"id":"c8","name":"use_skill","response":{"next":"Look.","look":true}}
+            ]}})
+        );
+        assert_eq!(
+            skill.join().unwrap(),
+            json!({"op":"call","name":"check_my_work","args":{}})
+        );
+        let asked = loop {
+            match rig.output().await {
+                ProviderOutput::LookAsked { request, .. } => break request,
+                _ => continue,
+            }
+        };
+        assert_eq!(asked, request);
         rig.stop().await;
     }
 

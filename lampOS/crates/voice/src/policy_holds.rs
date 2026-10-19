@@ -148,7 +148,7 @@ pub const SETS: [&str; 2] = ["set_timer", "set_reminder"];
 /// [`SCHEDULE_HELD`].
 pub fn holds(route: &crate::tools::Route, name: &str) -> bool {
     match route {
-        crate::tools::Route::Executive(_) => true,
+        crate::tools::Route::Executive(_) | crate::tools::Route::UseSkill(_) => true,
         crate::tools::Route::Schedule(_) => SCHEDULE_HELD.contains(&name),
         _ => false,
     }

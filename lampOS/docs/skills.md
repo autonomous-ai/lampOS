@@ -535,7 +535,10 @@ lamp): `tool = "check_my_work"` in `skill.toml`, described to the model with
 (the unit template gives `@ACTIONS_DIR@/skills`), `lamp-skills` keeps
 `DIR/tools.json`, written whole at each load and removed when no skill has
 a tool, and answers on `DIR/call.sock` the way the actions part does
-([tools.md](tools.md#the-skills)). A call runs the skill's steps without
+([tools.md](tools.md#the-skills)). With the voice's `LAMP_USE_SKILL=on`,
+the model is given one `use_skill` function for every skill instead, with
+each skill's description, choice and yes-or-no in its instruction, and the
+call reaches the skill as its own (#1668). A call runs the skill's steps without
 asking the Policy, since a person asked: the body and the light are made
 as in any run, the light given back after its `for`, and the voice is
 answered with what the model is to do next: at once, before they are

@@ -201,6 +201,53 @@ the executive's, and the request counts as one in which the lamp acted.
 No file, and nothing changes. Host test:
 `the_skills_tools_are_told_after_the_executives_and_go_to_the_skills`.
 
+**Many skills: `use_skill`** (#1668, `LAMP_USE_SKILL=on`, the worker's
+`--use-skill`; off unless set). A session may be given 32 functions; the
+voice's own and the executive's are 30 on a product lamp, so a third skill's
+function was dropped, with a journal line but not a word to the model. With
+the switch a session is given one function for every skill, `use_skill`,
+and none of the skills' own (`crate::use_skill`):
+
+- **`use_skill`'s arguments:** `skill`, one of the installed skills' names
+  (an enum); `choice`, a word from the skill's choice; `flag`, its
+  yes-or-no. A skill takes at most one of each (`tools_file` in
+  `lamp-skills`).
+- **What the session is told:** after the rest of its instruction, "Your
+  skills": one line each, its name, its description, and its choice's name
+  and words and its yes-or-no's name, each with what its parameter says.
+  At most 4,096 bytes (`SECTION_MOST_BYTES`): one past that is named alone,
+  and one past even that is left out of the lines. The Live route keeps that
+  room from the thread as it keeps the room for what it can't do right now;
+  the cascade (`LAMP_VOICE_ROUTE=second`) tells it in each turn's system
+  message.
+- **A call:** routed as `Route::UseSkill` and made the skill's own call
+  when it runs (`use_skill::translate`). The choice and the yes-or-no go
+  under the skill's own parameters' names; one the skill doesn't take is
+  left out, as the skill would refuse it. So the skill's socket sees the
+  same line as when it is called itself, and its answer goes to the model
+  under `use_skill`.
+  - **Told instead:** a skill name that isn't installed ("There is no skill
+    named juggle. Your skills are …"), or a word not in its choice ("dance's
+    choice is one of calm, upbeat, jazz.").
+  - **As a skill's call in every other way:** it waits for the Policy's hold,
+    it never runs on a reply, its answer may ask for a look, and the request
+    counts as one in which the lamp acted.
+- **A skill installed or removed** changes no function's name, so each skill
+  `use_skill` reaches is counted as `use_skill:<skill>` against what the
+  session was given, and the session is renewed for it as for any change.
+  The journal's setup line says `; N skills through use_skill`.
+- **The cost on the host:** a call through it took 0.40 ms against 0.22 ms
+  made itself (`use_skill_cost`, debug build, medians of 300). It reads the
+  catalogs again. The model's own time for a turn through it is not measured
+  yet: that's the lamp check, the same lines with the switch on and off
+  against Live's 2.02–2.21 s tool turns.
+- **Host tests:** `with_use_skill_every_skill_is_reached_through_one_function`,
+  `a_use_skill_call_is_asked_of_its_skill_as_its_own` (the cascade's
+  `answer` and the worker's `run_call`),
+  `with_use_skill_a_session_is_told_its_skills_after_its_instruction`,
+  `a_skill_reached_through_use_skill_asks_the_coordinator_for_its_look`,
+  `a_skill_installed_behind_use_skill_is_a_change`, and `use_skill`'s own.
+
 ### Schedule tools and due speech
 
 `LAMP_SCHEDULE_TOOLS=on` enables six additional Actions tools:

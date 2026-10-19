@@ -128,6 +128,9 @@ pub struct Settings {
     /// The onboarding file, whose mailbox the model's reports go to
     /// ([`crate::onboarding`]).
     pub onboarding: Option<PathBuf>,
+    /// The skills are reached through one function, `use_skill`
+    /// ([`crate::use_skill`], `LAMP_USE_SKILL=on`), not one each.
+    pub use_skill: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -167,6 +170,9 @@ pub fn arguments_from_environment() -> Vec<String> {
     ) {
         flags.push(crate::onboarding::FLAG.to_owned());
         flags.push(file.display().to_string());
+    }
+    if std::env::var(crate::use_skill::ENVIRONMENT).ok().as_deref() == Some("on") {
+        flags.push(crate::use_skill::FLAG.to_owned());
     }
     flags
 }
@@ -318,6 +324,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         settings.onboarding = Some(PathBuf::from(file));
         flags = rest;
     }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::use_skill::FLAG
+    {
+        settings.use_skill = true;
+        flags = rest;
+    }
     Ok((settings, flags))
 }
 
@@ -417,9 +429,46 @@ pub fn time_now() -> Value {
 }
 
 /// The functions a session opened now is told of: the voice's own if they
-/// are switched on, then the executive's if its list is there and reads. A
-/// name the voice uses itself is left out of the executive's.
+/// are switched on, then the executive's if its list is there and reads,
+/// then the skills', each its own or, with `use_skill`, all through that one
+/// ([`crate::use_skill`], #1668). A name the voice uses itself is left out
+/// of the executive's.
 pub fn declared(settings: &Settings) -> Vec<Tool> {
+    let mut tools = core_tools(settings);
+    let skills = skills_after(settings, &tools);
+    if settings.use_skill {
+        tools.extend(crate::use_skill::function(&skills));
+    } else {
+        let room = lamp_gemini::MAX_TOOLS - tools.len();
+        tools.extend(skills.into_iter().take(room));
+    }
+    tools
+}
+
+/// The skills' functions as their tools file says them, those a session
+/// may be told: no name the voice or the executive already has, nor a
+/// Schedule name. What `use_skill` reaches ([`crate::use_skill`]).
+pub fn skill_tools(settings: &Settings) -> Vec<Tool> {
+    skills_after(settings, &core_tools(settings))
+}
+
+fn skills_after(settings: &Settings, told: &[Tool]) -> Vec<Tool> {
+    let Some(directory) = &settings.exec else {
+        return Vec::new();
+    };
+    // The skills' after the executive's: a name already told stays its.
+    catalog(&directory.join(SKILLS_DIR).join(CATALOG_FILE))
+        .into_iter()
+        .filter(|tool| {
+            !voices_own(&tool.name)
+                && !is_schedule_tool(&tool.name)
+                && !told.iter().any(|earlier| earlier.name == tool.name)
+        })
+        .collect()
+}
+
+/// The voice's own functions and the executive's.
+fn core_tools(settings: &Settings) -> Vec<Tool> {
     let mut tools = Vec::new();
     if settings.decline {
         tools.push(not_for_me());
@@ -453,19 +502,6 @@ pub fn declared(settings: &Settings) -> Vec<Tool> {
                 })
                 .take(room),
         );
-        // The skills' after the executive's: a name already told stays its.
-        let skills = catalog(&directory.join(SKILLS_DIR).join(CATALOG_FILE));
-        let room = lamp_gemini::MAX_TOOLS - tools.len();
-        let fresh: Vec<Tool> = skills
-            .into_iter()
-            .filter(|tool| {
-                !voices_own(&tool.name)
-                    && !is_schedule_tool(&tool.name)
-                    && !tools.iter().any(|told| told.name == tool.name)
-            })
-            .take(room)
-            .collect();
-        tools.extend(fresh);
     }
     tools
 }
@@ -479,6 +515,7 @@ fn voices_own(name: &str) -> bool {
         || crate::known_faces::is_tool(name)
         || crate::marked::is_tool(name)
         || crate::onboarding::is_tool(name)
+        || name == crate::use_skill::NAME
 }
 
 /// Whether the skills run `name` and the executive does not.
@@ -556,6 +593,9 @@ pub enum Route {
     Mark(PathBuf),
     /// A step of the first meeting reported, through this onboarding file.
     Onboarding(PathBuf),
+    /// A skill named in a call of `use_skill` ([`crate::use_skill`]), with
+    /// the settings that find it: made the skill's own call when it is run.
+    UseSkill(Box<Settings>),
     /// Nobody here runs that.
     Nobody,
 }
@@ -571,6 +611,9 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     // run by nobody, so it never sets the volume (the reviewer on #1418).
     if APP_CALLS.contains(&name) {
         return Route::Nobody;
+    }
+    if settings.use_skill && name == crate::use_skill::NAME {
+        return Route::UseSkill(Box::new(settings.clone()));
     }
     if is_schedule_tool(name) {
         return match (&settings.exec, settings.schedule_tools) {
@@ -701,6 +744,15 @@ pub fn run_call(
         }
         Route::Mark(session) => ("the marks", crate::marked::run(session, call, heard)),
         Route::Onboarding(file) => ("the onboarding", crate::onboarding::run(file, call)),
+        Route::UseSkill(settings) => {
+            match crate::use_skill::translate(call, &skill_tools(settings)) {
+                Ok(skill) => match crate::tools::route(settings, &skill.name) {
+                    found @ Route::Executive(_) => run_call(&found, &skill, request, heard),
+                    _ => ("nobody", (unavailable(), false)),
+                },
+                Err(told) => ("the skills", (told, false)),
+            }
+        }
         Route::Decline | Route::Clock | Route::Nobody => ("nobody", (unavailable(), false)),
     }
 }
@@ -961,6 +1013,7 @@ mod tests {
     fn with_every_switch_on_the_voices_own_functions_are_a_list_the_link_takes() {
         let settings = Settings {
             decline: true,
+            use_skill: false,
             exec: None,
             memory: Some("/run/lampos-memory/memory.sock".into()),
             clock: true,
@@ -1192,6 +1245,7 @@ mod tests {
             settings,
             Settings {
                 decline: true,
+                use_skill: false,
                 exec: Some(dir.clone()),
                 memory: Some("/run/lampos-memory/memory.sock".into()),
                 clock: true,
@@ -1893,6 +1947,186 @@ mod tests {
             Route::Executive(dir.join(SKILLS_DIR))
         );
         assert_eq!(route(&settings, "light_on"), Route::Executive(dir.clone()));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The executive's seventeen and three skills, as on a product lamp
+    /// with Desk tutor installed (#1668).
+    fn many_skills(name: &str) -> (PathBuf, Settings) {
+        let dir = directory(name);
+        let executive: Vec<Value> = (0..17)
+            .map(|n| json!({"name": format!("light_{n}"), "description": "A light."}))
+            .collect();
+        std::fs::write(
+            dir.join(CATALOG_FILE),
+            json!({"tools": executive}).to_string(),
+        )
+        .unwrap();
+        std::fs::create_dir(dir.join(SKILLS_DIR)).unwrap();
+        std::fs::write(
+            dir.join(SKILLS_DIR).join(CATALOG_FILE),
+            json!({"tools":[
+                {"name":"dance","description":"When someone asks the lamp to dance.",
+                 "parameters":{"type":"object","properties":{
+                    "style":{"type":"string","enum":["calm","upbeat","jazz"],"description":"The mood."},
+                    "long":{"type":"boolean","description":"A long one."}}}},
+                {"name":"check_my_work","description":"Check their work."},
+                {"name":"show_verdict","description":"After check_my_work.",
+                 "parameters":{"type":"object","properties":{
+                    "verdict":{"type":"string","enum":["right","wrong"],"description":"Always one."}}}}]})
+            .to_string(),
+        )
+        .unwrap();
+        // The voice's own thirteen: twelve stand-ins and not_for_me.
+        let settings = Settings {
+            decline: true,
+            exec: Some(dir.clone()),
+            clock: true,
+            memory: Some("/run/lampos-memory/memory.sock".into()),
+            ..Default::default()
+        };
+        (dir, settings)
+    }
+
+    /// #1668: past the 32, one skill was dropped without a word. With
+    /// `use_skill` a session is given that one function for every skill,
+    /// and none of the skills' own; its instruction lists them.
+    #[test]
+    fn with_use_skill_every_skill_is_reached_through_one_function() {
+        let (dir, mut settings) = many_skills("use-skill");
+        let core = core_tools(&settings).len();
+        let off = declared(&settings);
+        assert_eq!(off.len(), core + 3);
+        assert!(off.iter().any(|tool| tool.name == "dance"));
+        settings.use_skill = true;
+        let on = declared(&settings);
+        assert_eq!(on.len(), core + 1);
+        let names: Vec<&str> = on.iter().map(|tool| tool.name.as_str()).collect();
+        assert!(names.contains(&crate::use_skill::NAME), "{names:?}");
+        assert!(!names.contains(&"dance") && !names.contains(&"check_my_work"));
+        assert_eq!(
+            skill_tools(&settings)
+                .iter()
+                .map(|tool| tool.name.as_str())
+                .collect::<Vec<_>>(),
+            ["dance", "check_my_work", "show_verdict"]
+        );
+        let (kept, left_out) = admitted(on);
+        assert!(left_out.is_empty(), "{left_out:?}");
+        assert_eq!(kept.len(), core + 1);
+        assert_eq!(
+            route(&settings, crate::use_skill::NAME),
+            Route::UseSkill(Box::new(settings.clone()))
+        );
+        // Without the switch, use_skill is nobody's, and a catalog's
+        // function of that name is never told.
+        settings.use_skill = false;
+        assert_eq!(
+            route(&settings, crate::use_skill::NAME),
+            Route::Executive(dir.clone())
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A call of `use_skill` reaches the skill's own socket as the skill's
+    /// own call, its choice and yes-or-no under the skill's own names, and
+    /// the skill's answer goes to the model: on the cascade's path
+    /// ([`answer`]) as on the Live worker's ([`run_call`]). One naming no
+    /// skill is told so, and nobody is asked.
+    #[test]
+    fn a_use_skill_call_is_asked_of_its_skill_as_its_own() {
+        let (dir, mut settings) = many_skills("u");
+        settings.use_skill = true;
+        let skills = dir.join(SKILLS_DIR);
+        let served = executive(
+            &skills,
+            b"{\"ok\":true,\"result\":{\"next\":\"Dance.\"}}\n",
+            Duration::ZERO,
+        );
+        let call = ToolCall {
+            id: "c1".into(),
+            name: crate::use_skill::NAME.into(),
+            args: json!({"skill":"dance","choice":"jazz","flag":true}),
+        };
+        assert_eq!(answer(&settings, &call, 7, true), json!({"next":"Dance."}));
+        assert_eq!(
+            served.join().unwrap(),
+            json!({"op":"call","name":"dance","args":{"style":"jazz","long":true}})
+        );
+        std::fs::remove_file(skills.join(CALL_SOCKET)).unwrap();
+        let served = executive(&skills, b"{\"ok\":true,\"result\":{}}\n", Duration::ZERO);
+        let check = ToolCall {
+            args: json!({"skill":"check_my_work"}),
+            ..call.clone()
+        };
+        let (whom, (_, answered)) = run_call(&route(&settings, &check.name), &check, 7, true);
+        assert_eq!(whom, "the executive");
+        assert!(answered);
+        assert_eq!(
+            served.join().unwrap(),
+            json!({"op":"call","name":"check_my_work","args":{}})
+        );
+        std::fs::remove_file(skills.join(CALL_SOCKET)).unwrap();
+        // No skill of that name: told, and no socket is asked.
+        let juggle = ToolCall {
+            args: json!({"skill":"juggle"}),
+            ..call
+        };
+        let told = answer(&settings, &juggle, 7, true);
+        assert!(
+            told["error"]
+                .as_str()
+                .unwrap()
+                .starts_with("There is no skill named juggle."),
+            "{told}"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #1668's cost on the host: a call through `use_skill` against the
+    /// same call made itself, each answered by a stub skill on its socket,
+    /// medians of 300. What it adds in the voice, not the model's turn.
+    #[test]
+    #[ignore = "host-only timing probe; run alone with --ignored --exact --nocapture"]
+    fn use_skill_cost() {
+        use std::io::{BufRead, Write};
+        let (dir, mut settings) = many_skills("c");
+        settings.use_skill = true;
+        let listener = UnixListener::bind(dir.join(SKILLS_DIR).join(CALL_SOCKET)).unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut line = String::new();
+                std::io::BufReader::new(&stream)
+                    .read_line(&mut line)
+                    .unwrap();
+                (&stream)
+                    .write_all(b"{\"ok\":true,\"result\":{}}\n")
+                    .unwrap();
+            }
+        });
+        let median = |call: &ToolCall| {
+            let mut took: Vec<Duration> = (0..300)
+                .map(|_| {
+                    let began = Instant::now();
+                    let _ = answer(&settings, call, 1, true);
+                    began.elapsed()
+                })
+                .collect();
+            took.sort();
+            took[150]
+        };
+        let itself = ToolCall {
+            id: String::new(),
+            name: "dance".into(),
+            args: json!({"style":"jazz"}),
+        };
+        let through = ToolCall {
+            id: String::new(),
+            name: crate::use_skill::NAME.into(),
+            args: json!({"skill":"dance","choice":"jazz"}),
+        };
+        let (a, b) = (median(&itself), median(&through));
+        println!("use_skill_cost: itself {a:?}, through use_skill {b:?}");
         std::fs::remove_dir_all(dir).unwrap();
     }
 
