@@ -712,20 +712,70 @@ fn told(answer: &Value) -> Value {
     json!({"error": words})
 }
 
-/// Who of the remembered people is at the lamp now: the name in the eyes'
-/// file, written in the last three seconds.
-pub fn known_now(path: &Path) -> Option<String> {
-    let modified = std::fs::metadata(path).ok()?.modified().ok()?;
-    let age = SystemTime::now()
-        .duration_since(modified)
-        .unwrap_or_default();
-    if age > FRESH {
-        return None;
+/// A fresh source-file observation, with expiry anchored to the source age.
+/// This identifies a visible face, not the speaker, and never extends session
+/// ownership. Reading belongs off the input/audio path.
+#[derive(Clone, Debug)]
+pub struct FaceObservation {
+    name: String,
+    valid_until: Instant,
+}
+
+impl FaceObservation {
+    pub fn read(path: &Path) -> Option<Self> {
+        use std::io::Read;
+        // Anchor before file I/O so slow reads cannot renew source freshness.
+        let now = Instant::now();
+        let wall = SystemTime::now();
+        let file = std::fs::File::open(path).ok()?;
+        let modified = file.metadata().ok()?.modified().ok()?;
+        let mut bytes = Vec::new();
+        // The source is a small name file. Refuse oversized/corrupt files.
+        file.take(4097).read_to_end(&mut bytes).ok()?;
+        if bytes.len() > 4096 {
+            return None;
+        }
+        let text = String::from_utf8(bytes).ok()?;
+        let observation = Self::from_source(text.trim(), modified, wall, now)?;
+        observation.is_fresh(Instant::now()).then_some(observation)
     }
-    let text = std::fs::read_to_string(path).ok()?;
-    let name = text.trim();
-    (!name.is_empty() && name.len() <= MOST_NAME_BYTES && !name.chars().any(char::is_control))
-        .then(|| name.to_owned())
+
+    fn from_source(
+        name: &str,
+        modified: SystemTime,
+        wall: SystemTime,
+        now: Instant,
+    ) -> Option<Self> {
+        let age = wall.duration_since(modified).ok()?;
+        let remaining = FRESH.checked_sub(age)?;
+        if remaining.is_zero()
+            || name.is_empty()
+            || name.len() > MOST_NAME_BYTES
+            || name.chars().any(char::is_control)
+        {
+            return None;
+        }
+        Some(Self {
+            name: name.to_owned(),
+            valid_until: now.checked_add(remaining)?,
+        })
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn valid_until(&self) -> Instant {
+        self.valid_until
+    }
+    pub fn is_fresh(&self, now: Instant) -> bool {
+        now < self.valid_until
+    }
+}
+
+/// Existing face lookup, backed by a bounded observation read. Future or
+/// expired source timestamps fail closed rather than appearing freshly seen.
+pub fn known_now(path: &Path) -> Option<String> {
+    FaceObservation::read(path).map(|observation| observation.name)
 }
 
 /// The file the eyes keep the known person's name in while they are at the
@@ -828,6 +878,31 @@ pub fn hello(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn observations_expire_from_source_age_without_renewal_on_reread() {
+        let monotonic = Instant::now();
+        let wall = SystemTime::UNIX_EPOCH + Duration::from_secs(100);
+        let modified = wall - Duration::from_secs(2);
+        let first = FaceObservation::from_source("Ann", modified, wall, monotonic).unwrap();
+        assert_eq!(first.valid_until(), monotonic + Duration::from_secs(1));
+        let later = Duration::from_millis(500);
+        let again =
+            FaceObservation::from_source("Ann", modified, wall + later, monotonic + later).unwrap();
+        assert_eq!(first.valid_until(), again.valid_until());
+        assert!(!again.is_fresh(monotonic + Duration::from_secs(1)));
+        assert!(
+            FaceObservation::from_source("Ann", modified, wall + Duration::from_secs(1), monotonic)
+                .is_none()
+        );
+        assert!(
+            FaceObservation::from_source("Ann", wall + Duration::from_nanos(1), wall, monotonic)
+                .is_none()
+        );
+        for invalid in ["", "Ann\nBob"] {
+            assert!(FaceObservation::from_source(invalid, wall, wall, monotonic).is_none());
+        }
+    }
 
     #[test]
     fn what_the_eyes_say_becomes_words_the_model_can_say() {
