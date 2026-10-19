@@ -101,7 +101,7 @@ DROPIN=zz-trial.conf
 # are the running lamp-skills' --dir, user and group, @MEMORY_DIR@ is
 # lamp-memory's --dir, and @SRC@ is TRIALS_SKILLS_SRC.
 # ---------------------------------------------------------------------------
-ROWS="light-out scenes who-was-here activity forget reports nudges smoky dusty"
+ROWS="light-out scenes who-was-here activity forget reports nudges smoky dusty light-show"
 # Rows not here, and why: printed by `list`.
 NOT_HERE="bedtime    Bedtime and Morning (#1732): a draft, not merged; three switches, --zone and its daily state, and it moves the body
 nudges     the other three nudges (#1957): sip-of-water, stand-up and wind-down are tried by hand, as rest-your-eyes is here
@@ -284,6 +284,35 @@ pub humans/faces/tracked latest {"faces":[]} lamp_msgs/Faces'
       EXAMPLE='lamp-skills: dusty-air Done: …'
       IN="lamp-skills.service"
       WAIT=120 ;;
+    light-show)
+      # #1730 (on lamp-voice): light_show called as the voice calls it. The
+      # run waits up to 5 s for the model's line after a call (lamp-skills
+      # main.rs, SPEAK_BEGIN), which a call from here never brings, then
+      # plays the show. Party first, stopped by someone speaking: a show
+      # looks every 200 ms (SHOW_LOOKS) whether voice/state says listening,
+      # kept up here. Then calm, played to its end (five frames of 10 s).
+      # Each run's line is the skill's Done, which says how its show went
+      # and that the light was given back.
+      ABOUT="light show: light_show's party stops when someone speaks, then calm plays through (#1730)"
+      NOTE="a build with #1730, socat or nc -U on the lamp for the calls, the voice resting and nobody speaking to it. Nothing moves: the ring plays a party show, stops within a fifth of a second of the trial saying the voice listens (voice/state; Expression takes it only as a warning), then plays calm for about 50 s, and gives the person's light back after each"
+      SETASIDE="copy @SKILLS_DIR@/light-show"
+      SETUP="rm -rf @SKILLS_DIR@/light-show && cp -a @SRC@/light-show @SKILLS_DIR@/light-show
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/light-show"
+      SWITCHES="lamp-skills.service|LAMP_LIGHT_REQUESTS=on"
+      CAUSE='call light_show {"show":"party"}
+wait 9
+keep voice/state latest {"state":"listening"} lamp_msgs/VoiceState'
+      FIRST='light-show Done: .*show party: stopped in frame [0-9]+ of [0-9]+, the voice is listening to someone'
+      # The why is the run's steps' reports joined by "; " (main.rs
+      # perform): the show's own is certain, the rest left out.
+      FIRSTEX='lamp-skills: light-show Done: …; show party: stopped in frame 2 of 10, the voice is listening to someone; …'
+      THEN='pub voice/state latest {"state":"resting"} lamp_msgs/VoiceState
+call light_show {"show":"calm"}'
+      AFTER='pub voice/state latest {"state":"resting"} lamp_msgs/VoiceState'
+      PROOF='light-show Done: .*show calm: 5 frames shown'
+      EXAMPLE='lamp-skills: light-show Done: …; show calm: 5 frames shown; …'
+      IN="lamp-skills.service"
+      WAIT=90 ;;
     *) return 1 ;;
   esac
 }
