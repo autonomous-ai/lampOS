@@ -76,13 +76,13 @@ async fn reports_stop_is_declared_with_its_switch_and_run_on_the_reports() {
     let more = few.iter().find(|tool| tool.name == MORE).unwrap();
     assert!(more.description.contains(crate::reports_stop::NAME));
 
-    let runner = tool_runner(tools, None, None);
+    let runner = tool_runner(tools, None, None, false);
     let told = runner(7, true, crate::reports_stop::NAME.into(), json!({})).await;
     assert_ne!(told, crate::tools::unavailable());
     let words = told.to_string();
     assert!(words.contains("report"), "{words}");
     // Unheard, it stops nothing: only a person can.
-    let runner = tool_runner(tools_of(&flags), None, None);
+    let runner = tool_runner(tools_of(&flags), None, None, false);
     assert_eq!(
         runner(8, false, crate::reports_stop::NAME.into(), json!({})).await,
         json!({"error": "Only a person can stop the reports."})
@@ -114,7 +114,7 @@ async fn dance_is_declared_from_the_skills_tools_file_and_reaches_their_socket()
     );
 
     let served = skills_socket(&skills);
-    let runner = tool_runner(tools, None, None);
+    let runner = tool_runner(tools, None, None, false);
     assert_eq!(
         runner(7, true, "dance".into(), json!({"style": "jazz"})).await,
         json!({"next": "Danced."})
@@ -140,7 +140,7 @@ async fn dance_is_declared_from_the_skills_tools_file_and_reaches_their_socket()
     );
     std::fs::remove_file(skills.join(crate::tools::CALL_SOCKET)).unwrap();
     let served = skills_socket(&skills);
-    let runner = tool_runner(tools, None, None);
+    let runner = tool_runner(tools, None, None, false);
     assert_eq!(
         runner(
             9,
