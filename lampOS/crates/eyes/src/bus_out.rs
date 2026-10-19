@@ -23,7 +23,7 @@ use crate::{
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_msgs::{
     Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, HumanSeems, Level, RoomActivity,
-    RoomPresence, Speech, StoodUp,
+    RoomPresence, Speech, StoodUp, TurnVerdict, VoiceTurn,
 };
 use std::{io, time::Duration};
 
@@ -32,6 +32,10 @@ pub const ENVIRONMENT: &str = "LAMP_BUS";
 /// Where the eyes read whether to say if anyone is at the lamp, with the
 /// bus on. `on` only.
 pub const PRESENCE_ENVIRONMENT: &str = "LAMP_PRESENCE";
+/// Where the eyes read which voice counts as someone (#1677's part 2):
+/// `addressed`, only a turn the voice answered as said to the lamp
+/// (`voice/turn`); otherwise every line heard (`voice/heard`).
+pub const PRESENCE_VOICE_ENVIRONMENT: &str = "LAMP_PRESENCE_VOICE";
 
 /// Where the eyes read whether to say what the person at the desk is doing
 /// (#1678), with the bus on. `on` only.
@@ -234,7 +238,10 @@ struct ActivityOut {
 /// `room/presence`, what it is judged from, and the voice's lines.
 struct Presence {
     out: Publisher,
+    /// The voice's lines on `voice/heard`, or with `addressed` its answered
+    /// turns on `voice/turn`.
     heard: Subscriber,
+    addressed: bool,
     away: Away,
     /// Whether the last value said someone, for the journal's line.
     said_someone: bool,
@@ -349,15 +356,28 @@ impl BusOut {
     }
 
     /// Also say whether anyone is at the lamp, on `room/presence`, from the
-    /// faces of each look and the voice's lines on `voice/heard` (#1677).
+    /// faces of each look and the voice's lines on `voice/heard` (#1677), or
+    /// with `LAMP_PRESENCE_VOICE=addressed` only its answered turns.
     pub fn say_presence(&mut self, bus: &Bus) -> io::Result<()> {
+        let addressed =
+            std::env::var(PRESENCE_VOICE_ENVIRONMENT).ok().as_deref() == Some("addressed");
+        self.say_presence_by(bus, addressed)
+    }
+
+    /// As [`BusOut::say_presence`], with which voice counts given.
+    pub fn say_presence_by(&mut self, bus: &Bus, addressed: bool) -> io::Result<()> {
         let mut out =
             bus.publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), SOURCE)?;
         out.expires_after(Some(RoomPresence::LASTS));
-        let heard = bus.subscribe_typed(Speech::TOPICS[0], "eyes_presence", Speech::TYPE)?;
+        let heard = if addressed {
+            bus.subscribe_typed(VoiceTurn::TOPIC, "eyes_presence", VoiceTurn::TYPE)?
+        } else {
+            bus.subscribe_typed(Speech::TOPICS[0], "eyes_presence", Speech::TYPE)?
+        };
         self.presence = Some(Presence {
             out,
             heard,
+            addressed,
             away: Away::default(),
             said_someone: false,
         });
@@ -439,8 +459,16 @@ impl BusOut {
         if let Some(presence) = self.presence.as_mut() {
             // When the voice heard the words, by the host's monotonic clock,
             // never later than now: lines that waited are as old as they are.
+            // With `addressed`, only a turn answered as said to the lamp, at
+            // its verdict: chatter it held back is nobody.
             while let Ok(Some(line)) = presence.heard.recv(Duration::ZERO) {
-                presence.away.heard(line.header.at_us.min(now_us));
+                let counts = !presence.addressed
+                    || line
+                        .parse::<VoiceTurn>()
+                        .is_ok_and(|turn| turn.verdict == TurnVerdict::Answered);
+                if counts {
+                    presence.away.heard(line.header.at_us.min(now_us));
+                }
             }
             let before = presence.said_someone;
             if let Some(now) = presence.away.say(now_us) {
@@ -809,6 +837,69 @@ mod tests {
             "{said:?}"
         );
         assert_eq!(said.len(), before_voice + 6, "{said:?}");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// #1677's part 2: with `LAMP_PRESENCE_VOICE=addressed`, a voice is
+    /// someone only on a turn answered as said to the lamp; a turn held back
+    /// and a line merely heard are nobody.
+    #[test]
+    fn with_addressed_only_an_answered_turn_is_someone() {
+        let root = std::path::PathBuf::from(format!("/tmp/lpa-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(RoomPresence::TOPIC, "test", RoomPresence::TYPE)
+            .unwrap();
+        let mut turns = bus
+            .publisher_declared(VoiceTurn::TOPIC, &VoiceTurn::declaration(), "voice")
+            .unwrap();
+        let mut heard = bus
+            .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        out.say_presence_by(&bus, true).unwrap();
+        let s = 1_000_000u64;
+        let mut last = None;
+        let mut look = |out: &mut BusOut, at: u64, last: &mut Option<RoomPresence>| {
+            out.saw(&[], &[], PICTURE, at);
+            out.tick(at);
+            while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+                *last = Some(message.parse::<RoomPresence>().unwrap());
+            }
+        };
+        look(&mut out, s, &mut last);
+        // Chatter: a line heard, and a turn held back as not said to it.
+        let line = Speech {
+            text: "did you see the match".into(),
+            finished: true,
+            locale: None,
+            request: None,
+        };
+        heard.publish_json(2 * s, &line).unwrap();
+        let held = VoiceTurn {
+            request: 7,
+            verdict: TurnVerdict::HeldBack,
+        };
+        turns.publish_json(3 * s, &held).unwrap();
+        look(&mut out, 4 * s, &mut last);
+        assert_eq!(last.map(|now| now.someone), Some(false), "{last:?}");
+        // Said to the lamp: someone, by voice.
+        let answered = VoiceTurn {
+            request: 8,
+            verdict: TurnVerdict::Answered,
+        };
+        turns.publish_json(5 * s, &answered).unwrap();
+        look(&mut out, 6 * s, &mut last);
+        assert_eq!(
+            last,
+            Some(RoomPresence {
+                someone: true,
+                nobody_s: 0,
+                by: Some(lamp_msgs::SeenBy::Voice),
+            })
+        );
         std::fs::remove_dir_all(&root).unwrap();
     }
 
