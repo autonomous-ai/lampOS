@@ -5,10 +5,15 @@
 //! calls `reports_stop` stops the reports, on a bus of the test's own, and
 //! none of its sound is played; a light or volume call on the same held
 //! line is still answered and not run; and a line said to the lamp stops
-//! them and is answered aloud, as before.
+//! them and is answered aloud, as before. A held stop is kept by
+//! `lamp-cloud` as held, the room is not told the line was answered, the
+//! journal says it was done, and nothing of it is said unasked; asked
+//! about reports, the model is told who stopped them and when (Third's
+//! read of #1880, the first builder on #1722, 18:44).
 use super::policy_holds::Desk;
 use super::*;
-use lamp_msgs::{ReportsRequest, ReportsState};
+use crate::provider_worker::seen_in_tests;
+use lamp_msgs::{ReportsBy, ReportsRequest, ReportsState};
 
 /// The tests here share [`crate::reports_stop::TEST_ROOT`]: one at a time.
 static ONE_AT_A_TIME: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -25,9 +30,26 @@ fn heard(text: &str) -> serde_json::Value {
 const NOT_TO_THE_LAMP: &str = "Did you get my message about the budget?";
 const TO_THE_LAMP: &str = "Hey Lamp, stop sending reports.";
 
-/// `lamp-cloud` on the test's bus: reports on, and off once asked. Each
-/// ask it takes is sent on the channel.
-fn cloud(bus: &std::path::Path) -> std::sync::mpsc::Receiver<ReportsRequest> {
+fn wall_s() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+/// Reports on, as `lamp-cloud` first says them.
+fn sending() -> ReportsState {
+    ReportsState {
+        share: true,
+        queued: 1,
+        ..Default::default()
+    }
+}
+
+/// `lamp-cloud` on the test's bus: `first` said, and off once asked, kept
+/// as the voice's, held as asked, and when. Each ask it takes is sent on
+/// the channel.
+fn cloud(bus: &std::path::Path, first: ReportsState) -> std::sync::mpsc::Receiver<ReportsRequest> {
     let bus = lamp_bus::Bus::new(bus).unwrap();
     let mut taking = bus
         .subscribe_typed(ReportsRequest::TOPIC, "cloud", ReportsRequest::TYPE)
@@ -36,13 +58,7 @@ fn cloud(bus: &std::path::Path) -> std::sync::mpsc::Receiver<ReportsRequest> {
         .publisher_declared(ReportsState::TOPIC, &ReportsState::declaration(), "cloud")
         .unwrap();
     state
-        .publish_json(
-            lamp_ipc::monotonic_us(),
-            &ReportsState {
-                share: true,
-                queued: 1,
-            },
-        )
+        .publish_json(lamp_ipc::monotonic_us(), &first)
         .unwrap();
     let (told, asks) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
@@ -53,6 +69,9 @@ fn cloud(bus: &std::path::Path) -> std::sync::mpsc::Receiver<ReportsRequest> {
                 &ReportsState {
                     share: ask.share,
                     queued: 0,
+                    by: Some(ReportsBy::Voice),
+                    held: ask.held,
+                    at_s: Some(wall_s()),
                 },
             );
             if told.send(ask).is_err() {
@@ -65,18 +84,36 @@ fn cloud(bus: &std::path::Path) -> std::sync::mpsc::Receiver<ReportsRequest> {
 
 /// What came of a line heard as `text` whose answer calls `function`: what
 /// the service was answered, the asks `lamp-cloud` took, what the
-/// executive was asked, and whether any of the line's sound was played.
+/// executive was asked, whether any of the line's sound was played, the
+/// line's request and its call's id, and what else the service was sent
+/// after the call's answer.
 struct Came {
     answer: serde_json::Value,
     asks: Vec<ReportsRequest>,
     executive: Vec<serde_json::Value>,
     played: bool,
+    request: u64,
+    id: String,
+    later: Vec<serde_json::Value>,
 }
 
 async fn line(tag: &str, text: &str, function: &str, allowlisted: bool) -> Came {
+    line_with(tag, text, function, allowlisted, sending()).await
+}
+
+async fn line_with(
+    tag: &str,
+    text: &str,
+    function: &str,
+    allowlisted: bool,
+    first: ReportsState,
+) -> Came {
     let desk = Desk::new(tag);
     *crate::reports_stop::TEST_ROOT.lock().unwrap() = Some(desk.bus());
-    let asks = cloud(&desk.bus());
+    let asks = cloud(&desk.bus(), first);
+    // An id of the test's own: the record of what the room was told is
+    // shared by every test in the binary.
+    let id = format!("{tag}-c9");
     let mut options = desk.options(false);
     options.attention = Some(quiet);
     options.spoken_to = true;
@@ -89,7 +126,7 @@ async fn line(tag: &str, text: &str, function: &str, allowlisted: bool) -> Came 
         rig.output().await,
         ProviderOutput::Transcript { request: None, .. }
     ));
-    dial.service.send(function_call("c9", function)).await;
+    dial.service.send(function_call(&id, function)).await;
     let answer = rig.service_message(&mut dial).await;
     // What the model says after its call's answer ("I've stopped sending
     // reports."), watched for half a second with the worker's lease kept
@@ -97,11 +134,15 @@ async fn line(tag: &str, text: &str, function: &str, allowlisted: bool) -> Came 
     // (`policy_holds`' tests).
     dial.service.send(provider_audio(7, 240)).await;
     let mut played = false;
+    let mut later = Vec::new();
     let until = crate::scenario_clock::instant() + Duration::from_millis(500);
     while crate::scenario_clock::instant() < until {
         rig.publish();
         while let Some(wire) = rig.take() {
             played |= matches!(wire, Wire::Output(ProviderOutput::Audio { request: of, .. }) if of == request);
+        }
+        if let Some(message) = dial.service.try_receive(Duration::from_millis(1)).await {
+            later.push(message);
         }
         rig.tick(Duration::from_millis(2)).await;
     }
@@ -112,13 +153,26 @@ async fn line(tag: &str, text: &str, function: &str, allowlisted: bool) -> Came 
         asks: asks.try_iter().collect(),
         executive: desk.asked.try_iter().collect(),
         played,
+        request,
+        id,
+        later,
     }
 }
 
-fn response(function: &str, told: serde_json::Value) -> serde_json::Value {
-    json!({"toolResponse":{"functionResponses":[
-        {"id":"c9","name":function,"response":told}
-    ]}})
+impl Came {
+    fn response(&self, function: &str, told: serde_json::Value) -> serde_json::Value {
+        json!({"toolResponse":{"functionResponses":[
+            {"id":self.id,"name":function,"response":told}
+        ]}})
+    }
+
+    /// Whether anything sent to the service after the call's answer speaks
+    /// of reports: a note, a turn, anything the lamp would say unasked.
+    fn told_of_reports_later(&self) -> bool {
+        self.later
+            .iter()
+            .any(|message| message.to_string().to_lowercase().contains("report"))
+    }
 }
 
 /// "Lamp, stop sending reports." held as not the lamp's (#1796's spoken
@@ -131,14 +185,38 @@ async fn a_held_lines_reports_stop_is_done_and_its_answer_stays_held() {
     let came = line("hcs1", NOT_TO_THE_LAMP, crate::reports_stop::NAME, true).await;
     assert_eq!(
         came.answer,
-        response(
+        came.response(
             crate::reports_stop::NAME,
             json!({"ok": true, "say": crate::reports_stop::STOPPED})
         )
     );
-    assert_eq!(came.asks, [ReportsRequest { share: false }]);
+    // Asked as held, for `lamp-cloud` to keep it so (#1880).
+    assert_eq!(
+        came.asks,
+        [ReportsRequest {
+            share: false,
+            held: true
+        }]
+    );
     assert!(!came.played, "the held answer was played");
     assert!(came.executive.is_empty());
+    // The room is not told the line was answered: the held run is not the
+    // lamp answering (Third's read of #1880).
+    assert!(
+        !seen_in_tests::was_told_answered(&came.id),
+        "the room was told a held line was answered"
+    );
+    // The journal says it was done, and only that.
+    assert_eq!(
+        seen_in_tests::held_done_lines(&came.id),
+        [format!(
+            "request {}: reports_stop done though the answer was held (consent withdrawn)",
+            came.request
+        )]
+    );
+    // Nothing of it is said unasked: nothing about reports goes to the
+    // service after the call's answer.
+    assert!(!came.told_of_reports_later(), "{:?}", came.later);
 }
 
 /// Every other call on a held line stays held as before: a light or a
@@ -152,7 +230,7 @@ async fn a_held_lines_other_calls_are_still_not_done() {
         let came = line(tag, NOT_TO_THE_LAMP, function, true).await;
         assert_eq!(
             came.answer,
-            response(function, json!({"ok": true})),
+            came.response(function, json!({"ok": true})),
             "{function}"
         );
         assert!(came.executive.is_empty(), "{function} was run");
@@ -183,14 +261,55 @@ async fn an_unheld_reports_stop_is_done_and_answered_as_before() {
     let came = line("hcs4", TO_THE_LAMP, crate::reports_stop::NAME, true).await;
     assert_eq!(
         came.answer,
-        response(
+        came.response(
             crate::reports_stop::NAME,
             json!({"ok": true, "say": crate::reports_stop::STOPPED})
         )
     );
-    assert_eq!(came.asks, [ReportsRequest { share: false }]);
+    assert_eq!(came.asks, [ReportsRequest::default()]);
     assert!(came.played, "the answer said to the lamp was not played");
+    // Done and heard: the room is told it was answered, and the journal
+    // has no held line for it.
+    assert!(seen_in_tests::was_told_answered(&came.id));
+    assert!(seen_in_tests::held_done_lines(&came.id).is_empty());
     let came = line("hcs5", NOT_TO_THE_LAMP, crate::reports_stop::NAME, false).await;
     assert!(came.asks.is_empty());
     assert!(!came.played);
+}
+
+/// The first builder on #1722, 18:44: asked about reports after a held
+/// stop, the model is told that someone asked the lamp to stop them, when,
+/// and that they are turned back on in the app; and its answer, said to
+/// the lamp, is played.
+#[tokio::test]
+async fn asked_about_reports_after_a_held_stop_it_says_who_and_when() {
+    let _one = ONE_AT_A_TIME.lock().await;
+    let stopped = ReportsState {
+        share: false,
+        queued: 1,
+        by: Some(ReportsBy::Voice),
+        held: true,
+        at_s: Some(wall_s() - 120),
+    };
+    let came = line_with(
+        "hcs6",
+        "Hey Lamp, are you sending reports?",
+        crate::reports_stop::STATE_NAME,
+        true,
+        stopped,
+    )
+    .await;
+    let told = &came.answer["toolResponse"]["functionResponses"][0]["response"];
+    assert_eq!(told["sending"], false, "{told}");
+    let say = told["say"].as_str().unwrap();
+    assert!(say.contains("Someone asked me to stop them at "), "{say}");
+    assert!(say.contains("today") || say.contains("yesterday"), "{say}");
+    assert!(
+        say.ends_with("They can be turned back on in the app."),
+        "{say}"
+    );
+    // A lookup: nothing asked of `lamp-cloud`, nothing done.
+    assert!(came.asks.is_empty());
+    assert!(came.played);
+    assert!(!seen_in_tests::was_told_answered(&came.id));
 }

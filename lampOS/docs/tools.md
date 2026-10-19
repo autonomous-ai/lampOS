@@ -413,8 +413,19 @@ says so and never claims a stop. Only a request a person said runs it.
 It runs in a request whose answer the attention rule holds too, its
 answer still held: the one call that does (`DONE_THOUGH_HELD`,
 [attention.md](attention.md), "What happens to an answer that is held
-back").
+back"). It then asks with `held: true`, which `lamp-cloud` keeps.
 There is no function to turn reports on: that is the person's own screen.
+
+Beside it, `reports_state`, with no arguments, which the model is to call
+only when the person asks about reports (#1880, the first builder on
+#1722, 18:44). Answered at once in the voice from `reports/state`:
+`{"sending": true, "say": ...}`, or `{"sending": false, "say": "I'm not
+sending reports. Someone asked me to stop them at 3:04 pm today. They can
+be turned back on in the app."}` for the voice's stop, "They were turned off
+in the app at ..." for the app's, in the lamp's own time ("yesterday", or
+the date, when older). Without `lamp-cloud` it says the part is not
+running. Nothing about reports is said unasked: only this call's answer
+carries how they were stopped.
 
 ## `the_time`, the voice's own
 

@@ -66,7 +66,7 @@ routes are not served. Each kind is carried out by the part that owns it.
 | `led.resting.set` (`{"mode": "default" \| "off" \| "custom", "color": [r, g, b]}`) | asked on `light/command`, as the actions program asks it, and read back from `light/state` within 1 s; the snapshot of what is shown. `off` keeps the colour and the level, and black is `off`, as V1 |
 | `led.resting.preview` (`{"color": [r, g, b]}`) | asked on `light/request` at `conversation` priority (over a skill's glow, under the person's own light), on the host's boot clock, holding 10 s unless asked again, so an abandoned screen leaves nothing behind (V1's 10 s); a save gives it back first. A light asked for at the lamp ("make your light blue") ends it, and a drag that goes on stays given way until it pauses past its 10 s (the reviewer on #1464). Answered only when it fails, as V1, so a drag does not flood `fd_channel`. Refused where the ring takes no lights that lapse (`LAMP_LIGHT_REQUESTS`, on in the product) |
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
-| `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`) and how many reports wait. A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
+| `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Read only. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
@@ -362,8 +362,19 @@ a week.
   when the busy-room rule holds the line's answer, `reports_stop` still
   runs and the spoken answer stays held, since stopping only reduces what
   leaves the lamp ([attention.md](attention.md), "What happens to an
-  answer that is held back"). The journal says `request N: reports_stop
-  done though the answer was held (consent withdrawn)`. #1796's spoken
+  answer that is held back"). It costs all of a no, below. **It is made
+  visible, never silent** (the first builder on #1722, 18:44, on Third's
+  read of #1880): the voice asks with `held: true`, and `lamp-cloud` keeps
+  the stop with `by: voice`, `held: true` and when, says them on
+  `reports/state`, and returns them in `reports.get` for the app's row.
+  The voice says it only when asked about reports: `reports_state`
+  ([tools.md](tools.md)) answers "Someone asked me to stop them at 3:04 pm
+  today. They can be turned back on in the app." It is never announced
+  unasked. The ruling's example said "say 'start sending reports'", but the
+  voice can only turn reports off, so it points to the app. A stop when
+  reports are already off changes nothing, so the stop that stopped them
+  is the one kept. The journal says `request N: reports_stop done though
+  the answer was held (consent withdrawn)`. #1796's spoken
   stop on lamp-06c1 had shown the call dropped with the answer.
 - **A no deletes:** every queued report and its file goes at once, and one
   `stopped` takes their place. It is kept, on flash too, until it is sent,
@@ -377,8 +388,10 @@ a week.
   asks again, default off.
 
 On the bus: `reports/request` (`ReportsRequest {share}`, an event) and
-`reports/state` (`ReportsState {share, queued}`, kept, every 5 s, lasting
-15 s), in [msgs.md](msgs.md).
+`reports/state` (`ReportsState {share, queued, by, held, at_s}`, kept,
+every 5 s, lasting 15 s), in [msgs.md](msgs.md). `lamp-cloud` keeps `by`,
+`held` and `at` beside `share` in its own `reports.json`; when several
+asks come in one second, the stop is kept as held only if every one was.
 
 ### Changes from the design
 

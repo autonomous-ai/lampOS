@@ -79,7 +79,7 @@ fn every_report_carries_the_agreed_fields_and_sent_at_is_set_once() {
     assert_eq!(reports.due("dev-42"), sent);
     // The last word: `stopped`, with the same fields and nothing more.
     reports.acked(sent[0].0);
-    reports.stop(1_792_382_500).unwrap();
+    reports.stop(1_792_382_500, false).unwrap();
     let stopped: Value = serde_json::from_str(&reports.due("dev-42")[0].1).unwrap();
     assert_eq!(stopped["kind"], "stopped");
     let mut fields: Vec<&str> = stopped

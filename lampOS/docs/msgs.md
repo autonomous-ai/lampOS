@@ -488,8 +488,9 @@ and are re-exported at the crate root; `reports_topics()` and
 
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
-| `ReportsRequest` | `reports/request` | event | none / none | A part asks for health and crash reports to stop: `share`. `lamp-cloud` takes only `false` from the bus, which anything on the lamp can write ([cloud.md](cloud.md), "Health and crash reports") |
-| `ReportsState` | `reports/state` | latest | 5 s / 15 s | Whether reports are being sent (`share`: the switch on and the person's yes) and how many wait (`queued`) |
+| `ReportsRequest` | `reports/request` | event | none / none | A part asks for health and crash reports to stop: `share`, and `held` (left out when false) when the line's answer was held. `lamp-cloud` takes only `false` from the bus, which anything on the lamp can write ([cloud.md](cloud.md), "Health and crash reports") |
+| `ReportsState` | `reports/state` | latest | 5 s / 15 s | Whether reports are being sent (`share`: the switch on and the person's yes), how many wait (`queued`), and how the newest choice was made: `by` (`voice`, `app`, `setup` or null), `held`, and `at_s` (wall seconds) |
 
 Published by the voice's `reports_stop` (`reports/request`) and
-`lamp-cloud` (`reports/state`), only with `LAMP_REPORTS=on`.
+`lamp-cloud` (`reports/state`), only with `LAMP_REPORTS=on`; the voice's
+`reports_state` reads `reports/state`.
