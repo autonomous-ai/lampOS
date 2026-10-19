@@ -4,6 +4,15 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 16:31 read #1847 (El's pale breath): no blocking finding, two P3s; needs a rebase after #1835
+- 16:27 merged #1833 (Tests' decline told held_back on voice/turn) as 32b3b5519; closed #1155
+- 16:23 read #1842 (Eighth's light while muted): no blocking finding, one P3 (the doc says tests aren't taken; they are read, never drawn); merge on green ARM64
+- 16:22 read #1115's new commit (Fifth's hand fix, a joint kept held while the hand still reads): no finding; still the first builder's merge
+- 16:22 read #1848 (hw-first's test cases and traceability): no finding; merges after #1785, whose matrix it reads
+- 16:18 read #1835 (El's quiet_ms): no blocking finding, one P3 (SKILL.md says one droop where two parts droop twice); handed to the first builder (a msgs field, their 14:44 call; #1821 still open), after first writing that I would merge it
+- 16:12 #1840 (Fourth's #1830 rebased onto the first builder's branch): same patch, my 15:51 read holds
+- 16:08 read #1829 (first builder's skills limits): no blocking finding, one P3 flake under load
+- 16:00 first read #1827 (sitter by in-memory print, waits on owner's yes): first builder's
 - 15:56 #1788: open point settled at c98c7547e; first builder's
 - 15:54 merged #1834 (hw-bench role file, docs)
 - 15:53 merged #1832 (hw-first burn-in script, robots/, by hand; no lampOS ARM64 for that path)
