@@ -97,6 +97,11 @@ pub const LOOK_BEGIN_WITHIN: Duration = Duration::from_secs(5);
 /// What the lamp says when a look's first round has not begun within
 /// [`LOOK_BEGIN_WITHIN`]: after "Let me look.", silence reads as broken.
 pub const COULD_NOT_LOOK: &str = "I couldn't get a good look.";
+/// With Gemini's speech, the answer's first piece goes once this many words
+/// have come, if no sentence or clause ended sooner
+/// ([`Engine::cutting_first_words`]; the first builder on #1712: "cut at the
+/// first clause, a comma or about 6 words").
+pub const FIRST_WORDS: usize = 6;
 /// With `LAMP_SECOND_DOWN_LINE=on`: what the lamp says when a turn's first
 /// round has not begun within its bound, rather than nothing, at most once
 /// in [`DOWN_LINE_EVERY`] (the first builder, 2026-10-17 02:48: the relay's
@@ -239,6 +244,9 @@ struct Shared {
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
     hold: Option<CallHold>,
+    /// The answer's first piece goes once this many words have come
+    /// ([`Engine::cutting_first_words`]).
+    first_words: Option<usize>,
 }
 
 /// A stop to be told beside a request's chat ([`crate::provider_worker::STOPPED_NOTE`]).
@@ -487,6 +495,7 @@ impl Engine {
                 task_waiting: None,
                 did: None,
                 hold: None,
+                first_words: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -581,6 +590,19 @@ impl Engine {
     pub fn noting_the_conversation_alone(mut self, note: NameNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.conversation_alone = Some(note);
+        }
+        self
+    }
+
+    /// The answer's first piece is said once `words` words have come whole,
+    /// if no sentence or clause ended sooner: for a voice asked one request
+    /// a piece (`LAMP_SECOND_SPEECH=gemini`), whose first sound otherwise
+    /// waits for the whole first sentence (#1712: through the relay, 1.89 s
+    /// from the chat's first event to the first audio). Before any turn
+    /// only.
+    pub fn cutting_first_words(mut self, words: usize) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.first_words = Some(words);
         }
         self
     }
@@ -1495,7 +1517,9 @@ async fn answer(
                         }
                         let mut sentences = split.push(&piece);
                         if sentences.is_empty() && !queue.started {
-                            sentences.extend(split.clause());
+                            sentences.extend(split.clause().or_else(|| {
+                                shared.first_words.and_then(|words| split.words(words))
+                            }));
                         }
                         for sentence in sentences {
                             queue.push(sentence).await?;

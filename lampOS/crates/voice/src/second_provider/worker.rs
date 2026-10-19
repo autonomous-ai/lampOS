@@ -819,6 +819,11 @@ pub fn serve(
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
     }
+    // Gemini's speech is asked a piece at a time: its first piece goes after
+    // a few words, not the whole first sentence (#1712).
+    if route.gemini_speech {
+        engine = engine.cutting_first_words(crate::second_provider::FIRST_WORDS);
+    }
     // A hand-over waiting for its yes, with the tasks part (#1712).
     if has_tasks {
         engine = engine.noting_a_task_waiting(Arc::new(|request| {

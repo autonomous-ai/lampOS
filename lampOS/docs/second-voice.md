@@ -951,7 +951,12 @@ service's environment, on this route standing by or alone:
   speech failed (…); ElevenLabs says the sentence`. A sentence Gemini began
   and then lost fails as any voice's does. The journal at start: `lamp-voice
   second: speech is Gemini's (<model>, voice Kore), ElevenLabs for a
-  sentence it cannot start (LAMP_SECOND_SPEECH=gemini)`. Each sentence's
+  sentence it cannot start (LAMP_SECOND_SPEECH=gemini)`. The answer's first
+  piece goes once six words have come whole (`FIRST_WORDS`,
+  `Engine::cutting_first_words`), if no sentence or clause ended sooner,
+  and the rest of that sentence follows as one: Gemini takes no streamed
+  text, so its first sound otherwise waited for the whole first sentence.
+  Other voices keep whole sentences and clauses. Each sentence's
   time to its first audio is journaled, with its length and how many were
   asked beside it, never its words: `lamp-voice second: Gemini's speech
   began in <ms> ms (<n> characters, <k> more asked and not begun)`. As a

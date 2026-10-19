@@ -2346,3 +2346,50 @@ async fn a_held_call_is_not_run_and_the_model_is_told_so() {
         &Message::tool("c1".to_owned(), crate::policy_holds::held().to_string())
     );
 }
+
+/// #1712: with the first words cut, the answer's first piece is said once
+/// that many words have come, before its sentence ends; the rest of the
+/// sentence follows. Without it, the whole sentence.
+#[tokio::test]
+async fn the_first_words_are_said_before_the_first_sentence_ends() {
+    let pieces = || {
+        vec![
+            text("It is warm "),
+            text("and sunny in "),
+            text("Hanoi today."),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("What's the weather?".to_owned()),
+                Ok("What's the weather?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new([pieces(), pieces()].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.cutting_first_words(4);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let said: Vec<String> = turn(&mut engine)
+        .await
+        .into_iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(said, ["said:It is warm and", "said: sunny in Hanoi today."]);
+    let (mut whole, _, _) = scripted(script);
+    whole.submit(start(2));
+    whole.submit(audio(2, 1));
+    whole.submit(end(2));
+    let said: Vec<String> = turn(&mut whole)
+        .await
+        .into_iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(said, ["said:It is warm and sunny in Hanoi today."]);
+}
