@@ -103,11 +103,34 @@ is the same light. Two differences from V1 the page should know:
 - **The unit** (`deploy/product/lamp-cloud.service`) runs it as `lampos` and
   hands it those two files and `lamp-update`'s `state.json` (for the build)
   through `LoadCredential=`, so no file is widened. It starts only once all
-  three are there and setup is done. The drop-in that turns it on carries
-  both `Environment=LAMP_CLOUD=on` and `Conflicts=os-server.service`
-  (V1's `os-server` holds the same client id), so an off `lamp-cloud`
-  never stops `os-server` (the reviewer on #1418; the unit's header has
-  the drop-in).
+  three are there and setup is done.
+- **On in the product (#1815).** The unit itself carries
+  `Environment=LAMP_CLOUD=on`. V1's `os-server` holds the same client id,
+  so the unit stops it as `lamp-cloud` really starts:
+  `ExecStartPre=-+/usr/bin/systemctl stop os-server.service`, as root, and
+  going on where there is none.
+  - **Not `Conflicts=`:** systemd queues that stop with the start job, before
+    any condition is checked. So a `lamp-cloud` skipped for want of setup's
+    account (a lamp set up under V1, or put back to it) would still stop
+    `os-server`, and the app would see the lamp offline. That breaks the
+    #1418 rule that an off `lamp-cloud` never stops it (the reviewer on
+    #1909).
+  - **Shown on lamp-c0a4** (systemd 252) with stand-in units:
+    - `Conflicts=` with a condition that fails stopped the stand-in;
+    - `ExecStartPre=-+` with the condition failing left it running;
+    - with the condition met, it stopped the stand-in and started;
+    - with no such unit, it started.
+  - **What it leaves open:** with no `Conflicts=`, an `os-server` started
+    later, by hand or by a V1 timer, is not stopped, and holds the same
+    client id beside `lamp-cloud`. Each then pushes the other off the broker
+    in turn. That only happens on a lamp put back to V1 with lampOS's units
+    still enabled, which should be masked there (the reviewer's P3 on
+    #1909).
+  Install enables it with the lamp, and `lampos.target` starts it once
+  setup's marker is there (`lampos-setup-done.path`). Setup writes
+  `backend.json` before the marker. So a Lamp 2 set up from the app shows
+  online straight away, and again after a reboot, with no `cloud-on.sh`.
+  To keep it off on a lamp, mask it (`systemctl mask lamp-cloud`).
 - **Never printed:** the broker's password and the key appear in no journal
   line and on no bus topic; the account's debug form hides them.
 - **The reset** empties `/var/lib/lampos-cloud` (with the reports' queue and

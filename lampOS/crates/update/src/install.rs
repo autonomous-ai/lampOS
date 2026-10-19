@@ -1854,6 +1854,19 @@ mod tests {
         }
     }
 
+    /// #1815: the cloud is enabled with the lamp, so a Lamp 2 set up from
+    /// the app is online at the next power-up too, not only after
+    /// `cloud-on.sh`.
+    #[test]
+    fn the_cloud_is_enabled_with_the_lamp() {
+        assert!(enabled().iter().any(|name| name == "lamp-cloud.service"));
+        assert!(
+            enabled()
+                .iter()
+                .any(|name| name == "lampos-setup-done.path")
+        );
+    }
+
     /// #812: the passive self-test is started by its timer alone, which the
     /// lamp's target wants, as the records' check is by its own.
     #[test]
