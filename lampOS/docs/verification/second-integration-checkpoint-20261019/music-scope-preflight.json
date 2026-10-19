@@ -1,0 +1,278 @@
+{
+  "purpose": "Final scope integration and credited-IPC transport preflight; filters overlap and are separate from the complete workspace gate.",
+  "integration_base": "8706fe851d89ea47ec9381a2da8f7017180f6688",
+  "source_sha256": {
+    "lampOS/crates/actions/src/caps_service.rs": "a234c895537fc1aa838f0a97df71ecdb698063a37b46cde22e280cb0144fde82",
+    "lampOS/crates/actions/src/lib.rs": "6e0b199b0c7cce369a0414c286514c9279b2202583b0afd71d5dc2e5bd6d4e95",
+    "lampOS/crates/actions/src/main.rs": "7302f299c8afc56a56334bd60039fb5771d082516b48c9a6a6350630a57034ca",
+    "lampOS/crates/actions/src/server.rs": "2429abbeca08aaedaba685cb17bee4fba14ed4c7af0132bec76474234658001e",
+    "lampOS/crates/actions/src/sound.rs": "8251258895bb5dce813569bfd3f07d629b8419161f5e52b5b9f3318d9347e089",
+    "lampOS/crates/actions/src/speaker_state.rs": "13f017aa44f2abc817be76365b5b2fcba9d579417f7daab4e79f078c600cbd72",
+    "lampOS/crates/actions/tests/speaker_state.rs": "8406f85cdb9c76be58e462b6e9b12f715c12d71bbc7b221c0d6d7cd154a74445",
+    "lampOS/crates/msgs/src/lib.rs": "096b6e76376b1c0429c1d81a7754ead28da00b189790d2aa5f6da724a68f3b71",
+    "lampOS/crates/msgs/src/requested_audio.rs": "289bb4ee3bea350a23dd9bf1ebb32c81199e602ba3e8f02018eaacbdadb61c80",
+    "lampOS/crates/msgs/src/speaker_state.rs": "1012463d9e90e2b099281e165b937a5d2e55fbb465cdadf105a60b1a86533986",
+    "lampOS/crates/skills/examples/render_relaxing_music.rs": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b",
+    "lampOS/crates/skills/src/lib.rs": "75d7e61ad0b1eacde5d3ecf2aad05f296427acdc70b0dab4daaa4c5e906679de",
+    "lampOS/crates/skills/src/main.rs": "668123d7858599dea0b2834e9231b292aa124199750131ea3e7f68b977cd9998",
+    "lampOS/crates/skills/src/requested_audio.rs": "26630b2dcbf8d54de8d1d4e52efd56793f2d743fb7c42347e3c83e431530621e",
+    "lampOS/crates/skills/tests/requested_audio.rs": "e608bf84761c52c2f83d86c774cf6047021a7686d7a421e4646115e41aa5fccd",
+    "lampOS/crates/voice-eval/src/export.rs": "c87e601ec285e1aa2d46042f23e2777f3097a6406edc8befed40fa9a5dcce96d",
+    "lampOS/crates/voice/src/coordinator.rs": "1d31f929bf1990dd91bc5603b1e6447a559d17adb3e4ffacf137ebd3decfbc5a",
+    "lampOS/crates/voice/src/coordinator/cloud.rs": "e5137cefd6a712b58e73807ffa4d72499183b3fe34090c32109dce0271071046",
+    "lampOS/crates/voice/src/coordinator/hand.rs": "0cbdc5bdeb49abbac85ee65c0bdc0639cb72ba8871e121fbbbed442bed46b020",
+    "lampOS/crates/voice/src/coordinator/notices.rs": "6e96a7fd5d65d02db4de9fccc0086302e276cb0c0ac8d951091c7b458b119160",
+    "lampOS/crates/voice/src/coordinator/requested_media.rs": "2ca1dca818da78a65f2b2804a600b5e4e5350029ebad60cb668c70836d3b56d9",
+    "lampOS/crates/voice/src/coordinator/second.rs": "756732946d4e9c45dc2ec56ce8b887454f953f7f51037c319d4e0bcdbd073bc9",
+    "lampOS/crates/voice/src/coordinator/speaker_tone.rs": "a805e6fd30388d43257ef5ded04f6bcb635e6dba48785b5ae0abca6b834c33ee",
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "00f016fe891be903e13c00a024b216dcefd28bd857efac4b9cb83603b32cb48f",
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "58fa301fd2581c0b64c3a8dd445a1c76a514df4c88ae16e6d33d4a6ccad0205c",
+    "lampOS/crates/voice/src/fixture_provider.rs": "3413e0d417119ec9e9c2f0d232b03a312317f6009fe7a29f624104cf2f10e817",
+    "lampOS/crates/voice/src/lib.rs": "72be641ba0edb932776e16abea0bc761a91ff12b229ed60874509eaf68d164ef",
+    "lampOS/crates/voice/src/provider_worker.rs": "3ce6b4d373a8414c5b86a242bb6dd52c950f285cc77453bf3336e37b341e707a",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "96f1f09ea0f55eaee19c6d42d943d58ce68415548f694763af9f5898d9e4dc7c",
+    "lampOS/crates/voice/src/requested_audio.rs": "d3f7da187e6209773daa5faf270b5b9175aa5598092fbc71af3f7fd4b7fa4f20",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "fb50115cca8b54047ff69d62addeb572c6153a8a34775820bf330ba482534708",
+    "lampOS/crates/voice/src/say.rs": "0f189088da789232ad2d5f83e83575331c6f928b9b498d128f1d47049e891d6e",
+    "lampOS/crates/voice/src/second_provider.rs": "70d340bc564a0d951dcc488916a559b13f2064d479f609b79f4adcffa76dea54",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "dc00f232b3a786b3224384a8ab2611da48fde7f7dd79ef64c5dac4952d6f405a",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "3a0835f39916cebff0f99c5cc46eb50ab43d3eff3b9b51aebb8cb2c2b8002b8e",
+    "lampOS/crates/voice/src/tools.rs": "ae3fca06b61a0c989dc558c05a61ad761be71aa178925daadd9e72201d2219af",
+    "lampOS/examples/relaxing-music/LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "lampOS/examples/relaxing-music/PROVENANCE.md": "7510ee01ce0a28d3f62c2e5185b16d1bdb9fd937eede66b71e7f4417d6514a54",
+    "lampOS/examples/relaxing-music/README.md": "b8b58c617c7c60b444f80dc5236d0d5f1d50e3cfb74e815a909755740180ed1e",
+    "lampOS/examples/relaxing-music/SKILL.md": "e861f46fc135c2c593c3aa7396b37ce380f689d5277780049ac07333b9b6358c",
+    "lampOS/examples/relaxing-music/score.rs": "d0bcc0f5553b61b2b46697fb8ee33d5f657e423d78f55a8fb66a59afc5249ad9",
+    "lampOS/examples/relaxing-music/skill.toml": "17217242610421b8d6bd9b37c477386d26673ee61daf768b44bd56664984921b"
+  },
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.55,
+      "log_name": "second-music-scope-preflight-v3-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": [],
+      "latency_lines": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 16.32,
+      "log_name": "second-music-scope-preflight-v3-clippy.log",
+      "log_sha256": "035a2f0a9748ca254b745385227108ed46911b81f672ba01d47b636c2626ba74",
+      "summaries": [],
+      "latency_lines": []
+    },
+    {
+      "stage": "transport",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "ipc_credit_rechecks_camera_scope",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 24.28,
+      "log_name": "second-music-scope-preflight-v3-transport.log",
+      "log_sha256": "40c7d87cc03ae765845b33992bcfeac18bcba6a1e218292090bdc3c70fec0421",
+      "summaries": [
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2135
+        }
+      ],
+      "latency_lines": []
+    },
+    {
+      "stage": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "requested_audio",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 1.65,
+      "log_name": "second-music-scope-preflight-v3-tests.log",
+      "log_sha256": "168adec960be9182782e094f76fff1a12374ada62b3eded5d12c727565ffe45b",
+      "summaries": [
+        {
+          "passed": 40,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2097
+        }
+      ],
+      "latency_lines": [
+        "test coordinator::tests::requested_audio::prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement ... requested audio prepared host handoff: first=275us repeated=329us; target<=250000us; authored speaker IPC acceptance, acoustic onset unmeasured"
+      ]
+    },
+    {
+      "stage": "scoped_audio",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "scoped_audio",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.15,
+      "log_name": "second-music-scope-preflight-v3-scoped_audio.log",
+      "log_sha256": "c4b9fcf415feedfc8fb463a1efc94a8e83e4735c9e46dc771d6b8c46b767919b",
+      "summaries": [
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2135
+        }
+      ],
+      "latency_lines": []
+    },
+    {
+      "stage": "scoped_memory",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "memory_scope",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.15,
+      "log_name": "second-music-scope-preflight-v3-scoped_memory.log",
+      "log_sha256": "df8848bffa57df8eac4625607948207a6b1684523550c6973b9f9bbe8cd177f4",
+      "summaries": [
+        {
+          "passed": 9,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2128
+        }
+      ],
+      "latency_lines": []
+    },
+    {
+      "stage": "admitted_memory",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "scoped_memory_with_audio_context",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.14,
+      "log_name": "second-music-scope-preflight-v3-admitted_memory.log",
+      "log_sha256": "5aab54015af141e4612cae3cbbcbf26092fe3388c2d51982e940762164ba493f",
+      "summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2136
+        }
+      ],
+      "latency_lines": []
+    },
+    {
+      "stage": "revoked_result",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "revoked_tool_result",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.15,
+      "log_name": "second-music-scope-preflight-v3-revoked_result.log",
+      "log_sha256": "52322707dab5076ef812decfa47a59ad2d3bab6470416b4c62db898c1ba0fb5c",
+      "summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2136
+        }
+      ],
+      "latency_lines": []
+    },
+    {
+      "stage": "verdict_order",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "a_held_verdict_is_told_before_its_words_are_taken",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.14,
+      "log_name": "second-music-scope-preflight-v3-verdict_order.log",
+      "log_sha256": "c41268504160a249a16acfd6d5cb4a257722d2865fb845bb6b0597bf0b76211d",
+      "summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2136
+        }
+      ],
+      "latency_lines": []
+    }
+  ],
+  "review": "Independent read-only review confirmed the final credited-queue scope finding closed; no remaining actionable finding in that review scope.",
+  "limitations": "No device or acoustic result. The final published Music head still requires complete workspace and native ARM64 qualification."
+}

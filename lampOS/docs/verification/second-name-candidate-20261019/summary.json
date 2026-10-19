@@ -1,0 +1,130 @@
+[
+  {
+    "model": "primary",
+    "lead_ms": 0,
+    "positive": true,
+    "lines": 12,
+    "lines_with_heard_event": 0,
+    "heard_events": 0
+  },
+  {
+    "model": "primary",
+    "lead_ms": 0,
+    "positive": false,
+    "lines": 24,
+    "lines_with_heard_event": 0,
+    "heard_events": 0
+  },
+  {
+    "model": "primary",
+    "lead_ms": 500,
+    "positive": true,
+    "lines": 12,
+    "lines_with_heard_event": 0,
+    "heard_events": 0
+  },
+  {
+    "model": "primary",
+    "lead_ms": 500,
+    "positive": false,
+    "lines": 24,
+    "lines_with_heard_event": 0,
+    "heard_events": 0
+  },
+  {
+    "model": "primary",
+    "lead_ms": 1000,
+    "positive": true,
+    "lines": 12,
+    "lines_with_heard_event": 2,
+    "heard_events": 2
+  },
+  {
+    "model": "primary",
+    "lead_ms": 1000,
+    "positive": false,
+    "lines": 24,
+    "lines_with_heard_event": 0,
+    "heard_events": 0
+  },
+  {
+    "model": "primary",
+    "lead_ms": 2500,
+    "positive": true,
+    "lines": 12,
+    "lines_with_heard_event": 6,
+    "heard_events": 6
+  },
+  {
+    "model": "primary",
+    "lead_ms": 2500,
+    "positive": false,
+    "lines": 24,
+    "lines_with_heard_event": 0,
+    "heard_events": 0
+  },
+  {
+    "model": "candidate",
+    "lead_ms": 0,
+    "positive": true,
+    "lines": 12,
+    "lines_with_heard_event": 0,
+    "heard_events": 0
+  },
+  {
+    "model": "candidate",
+    "lead_ms": 0,
+    "positive": false,
+    "lines": 24,
+    "lines_with_heard_event": 0,
+    "heard_events": 0
+  },
+  {
+    "model": "candidate",
+    "lead_ms": 500,
+    "positive": true,
+    "lines": 12,
+    "lines_with_heard_event": 2,
+    "heard_events": 2
+  },
+  {
+    "model": "candidate",
+    "lead_ms": 500,
+    "positive": false,
+    "lines": 24,
+    "lines_with_heard_event": 0,
+    "heard_events": 0
+  },
+  {
+    "model": "candidate",
+    "lead_ms": 1000,
+    "positive": true,
+    "lines": 12,
+    "lines_with_heard_event": 1,
+    "heard_events": 1
+  },
+  {
+    "model": "candidate",
+    "lead_ms": 1000,
+    "positive": false,
+    "lines": 24,
+    "lines_with_heard_event": 0,
+    "heard_events": 0
+  },
+  {
+    "model": "candidate",
+    "lead_ms": 2500,
+    "positive": true,
+    "lines": 12,
+    "lines_with_heard_event": 4,
+    "heard_events": 4
+  },
+  {
+    "model": "candidate",
+    "lead_ms": 2500,
+    "positive": false,
+    "lines": 24,
+    "lines_with_heard_event": 2,
+    "heard_events": 2
+  }
+]

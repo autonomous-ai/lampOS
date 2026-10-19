@@ -1,0 +1,172 @@
+--- a/crates/policy/src/hello.rs
++++ b/crates/policy/src/hello.rs
+@@ -1580,0 +1581,103 @@
++    fn second_review_a_new_unjudged_request_does_not_inherit_a_hold() {
++        let (mut hello, started) = to_the_lamp(true);
++        let second = Duration::from_secs(1);
++        let begun = started + hello.options.quiet_for + second;
++        hello.voice(Voice::Listening, begun);
++        hello.heard(begun + second, Some(5));
++        hello.voice(Voice::Thinking, begun + 2 * second);
++        hello.verdict(5, TurnVerdict::HeldBack);
++        hello.voice(Voice::Listening, begun + 3 * second);
++        hello.heard(begun + 4 * second, Some(6));
++        hello.voice(Voice::Thinking, begun + 5 * second);
++        let stopped = begun + 6 * second;
++        hello.voice(Voice::Resting, stopped);
++        assert_eq!(hello.hold(&arrived(), stopped, 0, Room::Busy), Some(Hold::Talking),
++            "request 6 has no verdict and must retain the ordinary quiet");
++    }
++
++    #[test]
++    fn second_review_a_new_answered_request_does_not_inherit_a_hold() {
++        let (mut hello, started) = to_the_lamp(true);
++        let second = Duration::from_secs(1);
++        let begun = started + hello.options.quiet_for + second;
++        hello.voice(Voice::Listening, begun);
++        hello.heard(begun + second, Some(5));
++        hello.voice(Voice::Thinking, begun + 2 * second);
++        hello.verdict(5, TurnVerdict::HeldBack);
++        hello.voice(Voice::Listening, begun + 3 * second);
++        hello.heard(begun + 4 * second, Some(6));
++        hello.voice(Voice::Thinking, begun + 5 * second);
++        hello.verdict(6, TurnVerdict::Answered);
++        let stopped = begun + 6 * second;
++        hello.voice(Voice::Resting, stopped);
++        assert_eq!(hello.hold(&arrived(), stopped, 0, Room::Busy), Some(Hold::Talking),
++            "answered request 6 must retain the ordinary quiet even without audible output");
++    }
++
++    #[test]
++    fn second_review_default_a_new_unjudged_request_does_not_inherit_a_hold() {
++        let (mut hello, started) = to_the_lamp(false);
++        let second = Duration::from_secs(1);
++        let begun = started + hello.options.quiet_for + second;
++        hello.voice(Voice::Listening, begun);
++        hello.heard(begun + second, Some(5));
++        hello.voice(Voice::Thinking, begun + 2 * second);
++        hello.verdict(5, TurnVerdict::HeldBack);
++        hello.voice(Voice::Listening, begun + 3 * second);
++        hello.heard(begun + 4 * second, Some(6));
++        hello.voice(Voice::Thinking, begun + 5 * second);
++        let stopped = begun + 6 * second;
++        hello.voice(Voice::Resting, stopped);
++        assert_eq!(hello.hold(&arrived(), stopped, 0, Room::Busy), Some(Hold::Talking),
++            "request 6 has no verdict and must retain the ordinary quiet");
++    }
++
++    #[test]
++    fn second_review_default_a_new_answered_request_does_not_inherit_a_hold() {
++        let (mut hello, started) = to_the_lamp(false);
++        let second = Duration::from_secs(1);
++        let begun = started + hello.options.quiet_for + second;
++        hello.voice(Voice::Listening, begun);
++        hello.heard(begun + second, Some(5));
++        hello.voice(Voice::Thinking, begun + 2 * second);
++        hello.verdict(5, TurnVerdict::HeldBack);
++        hello.voice(Voice::Listening, begun + 3 * second);
++        hello.heard(begun + 4 * second, Some(6));
++        hello.voice(Voice::Thinking, begun + 5 * second);
++        hello.verdict(6, TurnVerdict::Answered);
++        let stopped = begun + 6 * second;
++        hello.voice(Voice::Resting, stopped);
++        assert_eq!(hello.hold(&arrived(), stopped, 0, Room::Busy), Some(Hold::Talking),
++            "answered request 6 must retain the ordinary quiet even without audible output");
++    }
++
++    #[test]
++    fn second_review_a_second_route_verdict_before_transcript_keeps_its_binding() {
++        let (mut hello, started) = to_the_lamp(true);
++        let second = Duration::from_secs(1);
++        let begun = started + hello.options.quiet_for + second;
++        hello.voice(Voice::Listening, begun);
++        hello.voice(Voice::Thinking, begun + second);
++        hello.verdict(1, TurnVerdict::HeldBack);
++        hello.heard(begun + 2 * second, Some(1));
++        let stopped = begun + 3 * second;
++        hello.voice(Voice::Resting, stopped);
++        assert_eq!(hello.hold(&arrived(), stopped, 0, Room::Busy), None,
++            "the second route publishes this request's hold before its queued transcript");
++    }
++
++    #[test]
++    fn second_review_a_second_route_transcript_before_verdict_is_the_control() {
++        let (mut hello, started) = to_the_lamp(true);
++        let second = Duration::from_secs(1);
++        let begun = started + hello.options.quiet_for + second;
++        hello.voice(Voice::Listening, begun);
++        hello.heard(begun + second, Some(1));
++        hello.voice(Voice::Thinking, begun + 2 * second);
++        hello.verdict(1, TurnVerdict::HeldBack);
++        let stopped = begun + 3 * second;
++        hello.voice(Voice::Resting, stopped);
++        assert_eq!(hello.hold(&arrived(), stopped, 0, Room::Busy), None);
++    }
++
++    #[test]
+--- a/crates/voice/src/second_provider/tests.rs
++++ b/crates/voice/src/second_provider/tests.rs
+@@ -1643,0 +1644,63 @@
++
++// Append inside crates/voice/src/second_provider/tests.rs. This uses that
++// module's Script, scripted, start, audio and end helpers and existing imports.
++// Characterization of the production ordering, not an assertion of the desired
++// Policy outcome: the current-thread worker can publish its verdict while the
++// matching heard transcript is still waiting in Engine's output queue.
++#[tokio::test(flavor = "current_thread")]
++async fn held_verdict_is_published_before_the_queued_transcript_is_consumed() {
++    let script = Arc::new(Script {
++        heard: Mutex::new([Ok("Room talk.".to_owned())].into()),
++        ..Script::default()
++    });
++    let (engine, calls, _) = scripted(script.clone());
++    let (published, received) = tokio::sync::oneshot::channel();
++    let published = Mutex::new(Some(published));
++    let mut engine = engine
++        .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
++        .telling_verdicts(Arc::new(move |request, verdict| {
++            // In the real worker this synchronous callback calls TurnOut::tell.
++            // The barrier observes that boundary without consuming any output.
++            published
++                .lock()
++                .unwrap()
++                .take()
++                .expect("one verdict")
++                .send((request, verdict))
++                .expect("the publication observer is present");
++        }));
++    engine.submit(start(1));
++    engine.submit(audio(1, 1));
++    engine.submit(end(1));
++
++    let verdict = tokio::time::timeout(Duration::from_secs(2), received)
++        .await
++        .expect("publication does not wait for output delivery")
++        .expect("the verdict callback runs");
++    assert_eq!(verdict, (1, lamp_msgs::TurnVerdict::HeldBack));
++
++    // This is the first drain. Neither the worker's 2 ms output loop nor the
++    // coordinator could have published this transcript on voice/heard yet.
++    assert!(matches!(
++        engine.try_output(),
++        Some(ProviderOutput::Started { request: 1, .. })
++    ));
++    assert!(matches!(
++        engine.try_output(),
++        Some(ProviderOutput::Transcript {
++            request: None,
++            text,
++            finished: true,
++        }) if text == "Room talk."
++    ));
++    assert!(matches!(
++        engine.try_output(),
++        Some(ProviderOutput::TurnComplete {
++            request: 1,
++            idle: true,
++        })
++    ));
++    assert!(engine.try_output().is_none());
++    assert!(script.asked.lock().unwrap().is_empty());
++    assert!(calls.lock().unwrap().is_empty());
++}

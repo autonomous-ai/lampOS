@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "experiment_id": "694-historical-f376-paired-synthetic-20261019",
+  "date": "2026-10-19",
+  "interpretation": "Historical #725 initial-name candidate rejected as the replacement on this paired regression. It is not the rescue model or a newly trained trailing-name model.",
+  "public_context": {
+    "issue": "https://github.com/autonomous-ai/lampOS/issues/694",
+    "candidate": "https://github.com/autonomous-ai/lampOS/pull/725"
+  },
+  "checker": {
+    "sha256": "b3ff4870bca34a587173a984438d49e8e0012486b968e390599bae628322b1c1",
+    "source_revision": "5e83af10210cb1a4bfbeb15887274d1e519fe4c8",
+    "target": "aarch64-apple-darwin",
+    "profile": "debug",
+    "debug_information": false,
+    "incremental_compilation": false
+  },
+  "models": {
+    "primary_sha256": "1d238ca7c468bc3b22d6de94155abaec422f7433693e0696302f20157e9af50f",
+    "candidate_sha256": "f376e964711a7460d248f8b48b2c0f07b03f73c5adf270a67536e68b04202030",
+    "frontend_version": "openWakeWord v0.5.1",
+    "mel_sha256": "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
+    "embedding_sha256": "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
+    "identical_frontends": true
+  },
+  "paired_screen_driver_sha256": "8cb680ca31aac9445ddffc0483346e9feafb67df0d8b7b959f313071123bad0f",
+  "inputs": {
+    "manifest_sha256": "5f71e87ebcd3e05acf1cfa7c3e362999388c9753733794df0a25b5e924535103",
+    "distinct_padded_inputs": 144,
+    "unique_utterances": 36,
+    "unique_control_utterances": 24,
+    "unique_control_speech_frames": 531871,
+    "unique_control_speech_seconds": 33.2419375,
+    "synthetic_voices": [
+      "A",
+      "B",
+      "C"
+    ],
+    "format": {
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "sample_bits": 16,
+      "encoding": "signed PCM",
+      "endianness": "little"
+    },
+    "leading_silence_ms": [
+      0,
+      500,
+      1000,
+      2500
+    ],
+    "trailing_silence_ms": 3200,
+    "pair_id_rule": "P000 through P143 follow the saved input-manifest order. Each pair has one primary and one candidate row."
+  },
+  "settings": {
+    "operation": "lamp-name check",
+    "detector_threshold": 0.9,
+    "threshold_changed": false,
+    "rescue_model": null,
+    "quiet_below_dbfs": null,
+    "stop_model": null,
+    "per_input_reset": true,
+    "order": "primary then candidate, interleaved for every input",
+    "per_invocation_timeout_s": 30,
+    "overall_timeout_s": 1800
+  },
+  "warm_selection": {
+    "lead_ms": 2500,
+    "positive_rows": {
+      "positive": true,
+      "phrase_ids": [
+        "bare",
+        "initial",
+        "trailing",
+        "hey"
+      ],
+      "voices": [
+        "A",
+        "B",
+        "C"
+      ],
+      "rows_per_model": 12
+    },
+    "control_rows": {
+      "positive": false,
+      "rows_per_model": 24
+    },
+    "line_hit_rule": "At least one native heard event in that input; not a threshold-positive frame count."
+  },
+  "completeness": {
+    "source_rows": 288,
+    "exported_rows": 288,
+    "omitted_rows": 0,
+    "checker_invocations": 288,
+    "successful_checker_invocations": 288,
+    "failed_checker_invocations": 0,
+    "helper_exit_code": 0
+  },
+  "scheduling": {
+    "requested_nice": 10,
+    "initial_priority_setup_failed": true,
+    "initial_message": "nice: setpriority: Operation not permitted",
+    "subsequent_verified_helper_nice": 10,
+    "screen_restarted": false,
+    "host_timing_comparison": false
+  },
+  "primary_reproducibility": {
+    "earlier_checker_sha256": "d1f961e51e3386d192e44026929aaf0b845e0eacd9490e4645d87e28c1241944",
+    "compared_rows": 144,
+    "matched_rows": 144,
+    "fields": [
+      "PCM digest",
+      "maximum score rounded to four decimals",
+      "maximum input timestamp",
+      "hearing scores and input timestamps"
+    ],
+    "processing_times_compared": false
+  },
+  "source_evidence_sha256": {
+    "raw_results": "8bab416b749ebb37091a17d480c3b689bf6e3f757419b1248ca165520cbc111a",
+    "invocation_records": "0118cd5e14c34436ad199173dfa7e4e1bdfafdf9d12b6f4d8f93aca8e0ce2614",
+    "input_manifest": "5f71e87ebcd3e05acf1cfa7c3e362999388c9753733794df0a25b5e924535103",
+    "raw_summary": "6878496fed7debbcc54b04bc451e30bdc43952dff29733cff68d50044a2f8052",
+    "independent_verification": "5919b332ca166fb19e6288bea09cce99b4d20376e301683386cd5c218e595fa5",
+    "terminal_completion": "c9ef90d379fc1f8b21b9ebd2c0ce6df6b32c0868509d185000144828fb8b6b45",
+    "raw_provenance": "d769ea96534c8017aa791309cc705d3256b37a44f92b1aaa1d44088af06a95c8",
+    "raw_bundle_checksum_manifest": "a24eced1a7708a4481cefe8339636a851b408f2c6e954e4e7247430eb50bc588",
+    "earlier_primary_results": "6cfe96bb8757ca56f701f8bb49b2ab0f0d1b447e42a8749acd9b15454df98a20"
+  },
+  "limitations": [
+    "Reused synthetic direct-PCM fixtures; not a blind held-out or real office-speech result.",
+    "Only 33.2419375 seconds of unique control speech; no false-hearings-per-hour qualification.",
+    "Exact played-line recordings are unavailable.",
+    "Input timestamps are signal positions, not wall-clock or acoustic latency.",
+    "No live capture, audible playback, STT call, device measurement, training or threshold change."
+  ]
+}

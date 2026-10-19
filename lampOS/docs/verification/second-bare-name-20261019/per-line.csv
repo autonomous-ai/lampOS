@@ -1,0 +1,145 @@
+voice,phrase_id,synthetic_text,positive,leading_silence_ms,maximum_score_rounded4,maximum_file_position_s,maximum_from_phrase_onset_s,heard_events_at_0_9,heard_first_crossing_file_positions_s,heard_scores_rounded4,input_duration_s,pcm_sha256
+A,bare,Lamp,true,0,0.0002,2.03,2.03,0,,,3.6385625,6625ae1f782d7ad51ec52ae76e452c3dfa699c1ffe7c1f01ae8115f6d63f964c
+A,bare,Lamp,true,500,0.0002,2.51,2.01,0,,,4.1385625,110c61e7dede0a521df9dc021b6e2184dce3efd4ae5e224c6248dc3227e3cdb0
+A,bare,Lamp,true,1000,0.8137,2.03,1.03,0,,,4.6385625,214f68fd0b81c3fb8113c18e7c97d0b30bb12d2f6f910809981e98fa8953ecd7
+A,bare,Lamp,true,2500,0.8404,3.39,0.89,0,,,6.1385625,6bd467d6af10812115c75191a5884ba911555e0475eadf1bfd586528ce55dcb0
+A,initial,"Lamp, set a timer for five minutes",true,0,0.0001,3.95,3.95,0,,,5.5138125,7f411c0008e8b8e1056c09965236d759027ae7010966f718c392d76eea0501bc
+A,initial,"Lamp, set a timer for five minutes",true,500,0.0001,4.51,4.01,0,,,6.0138125,77bd00d2b84195430f0f14c5a6340a1159f49bee35aa6829aee6b7f6b57f0f4d
+A,initial,"Lamp, set a timer for five minutes",true,1000,0.0737,2.03,1.03,0,,,6.5138125,d6d6a86cd67fb4155a2d2d538d5c30b7ac5ab4bf68a77d4caee62c561fd3ddb6
+A,initial,"Lamp, set a timer for five minutes",true,2500,0.9537,3.39,0.89,1,3.39,0.9537,8.0138125,84e07c0574e65d117a7ac3bc5387e6b4ad62d8fe4d16229115b352ddcd95bf8f
+A,trailing,"Thank you, Lamp",true,0,0.0004,2.51,2.51,0,,,4.4536875,8c1b54c0ed6b08f06cf143a5636fc618d788a5b8895b5a22a4479e8a3088b130
+A,trailing,"Thank you, Lamp",true,500,0.0078,2.27,1.77,0,,,4.9536875,d13dd1cd35f3d62faf1caf11fbfb55c3f2993151aed3c35f67945d4bacdffb0d
+A,trailing,"Thank you, Lamp",true,1000,0.0077,2.75,1.75,0,,,5.4536875,00cce14b761e1c0b3609942a258215d2301192e7b61905522de90f89fd512e99
+A,trailing,"Thank you, Lamp",true,2500,0.0078,4.27,1.77,0,,,6.9536875,fea4f6b33226ea0bdc7f6a7372bccc833551d5dc852f5f6b2832ad1bc87d02f4
+A,hey,Hey Lamp,true,0,0.0003,2.03,2.03,0,,,3.7797500,d9f6593eb08fea4ef71945a47d975a7a6919c762998c0760a9392e4db88c816a
+A,hey,Hey Lamp,true,500,0.0005,2.35,1.85,0,,,4.2797500,6f4acdb9966bf711f67e9fb3bc70f20b4c39e4225e5fab708379b06fc9c2cdc1
+A,hey,Hey Lamp,true,1000,1.0000,2.03,1.03,1,2.03,1.0000,4.7797500,9182829634a18cfa82da2d60bdb8ca31041ffb8a7f5b3a915727406906a516ae
+A,hey,Hey Lamp,true,2500,1.0000,3.23,0.73,1,3.15,1.0000,6.2797500,6bf25bea3822465d9cf9f8a73f8f0c01ce50138c2aa76c20cdee18971c8e6072
+A,near_lamb,Lamb is my favourite dish.,false,0,0.0001,3.15,3.15,0,,,4.6911250,f5d1e1731de4d107d0b82d7125cd0b94f19bf588f4ea6160f52e954a4f554c0d
+A,near_lamb,Lamb is my favourite dish.,false,500,0.0001,3.63,3.13,0,,,5.1911250,91d9e7d277167f6d61080ebddba9a12dd25dee688d07f690baf46565c00a372c
+A,near_lamb,Lamb is my favourite dish.,false,1000,0.0001,4.19,3.19,0,,,5.6911250,fbd982038a6ee146ac3f202cf2aa7c59f02e57f4f3a1a342c728d8c824e02c91
+A,near_lamb,Lamb is my favourite dish.,false,2500,0.0003,2.67,0.17,0,,,7.1911250,8654008d2028f46093e955281a41ae11fb9704220326a7e8ad9b54789cdc8db3
+A,near_land,Land the plane carefully.,false,0,0.0002,2.59,2.59,0,,,4.5564375,f5c6207e7084d69ebafe150d4b6db6208d81e463488e666553d48f083c9f40ab
+A,near_land,Land the plane carefully.,false,500,0.0002,3.47,2.97,0,,,5.0564375,a675fb33a75698f6ad111f6f788d9b311dd9aae3ab0112c4bd75f1c83ce8099b
+A,near_land,Land the plane carefully.,false,1000,0.0002,3.95,2.95,0,,,5.5564375,ab51bc40d463e4ccd71bba7dde00df0b3a3df53d9886af789fdc3998f469aa9a
+A,near_land,Land the plane carefully.,false,2500,0.0003,2.67,0.17,0,,,7.0564375,94b3ad4653a8d3d72ec3a6b9e13e4e8b36ee6c8f6216943c91eab8eb3ae554dc
+A,near_lab,The lab is closed today.,false,0,0.0004,2.59,2.59,0,,,4.5658125,614fbf94a7f7b398b699719d2046aa7df35571e2e5c2090ea659efba3613724b
+A,near_lab,The lab is closed today.,false,500,0.0005,3.07,2.57,0,,,5.0658125,b17c6f6db18418ac9779250a98db61e7acb754e1af878bde613ffa0a7166ccff
+A,near_lab,The lab is closed today.,false,1000,0.0010,3.55,2.55,0,,,5.5658125,33b6e3775779b488a12006a0f7cc35efcbc9a1cd05c07496ba6af16daffc4f9b
+A,near_lab,The lab is closed today.,false,2500,0.0005,5.07,2.57,0,,,7.0658125,1b3c18de9bbd041d83c3dfa5b02fe811016cb43e54f747f1c143c874af6ed100
+A,near_plan,We should plan the trip tomorrow.,false,0,0.0001,3.23,3.23,0,,,4.7539375,daefbee8edca2166bc4c6c803fb48b6230c6b1b14ae843c7e901286bbce72743
+A,near_plan,We should plan the trip tomorrow.,false,500,0.0006,2.35,1.85,0,,,5.2539375,f4c8a29c37ca17035458a79d2b3f47fc54e3b7d4e793df885b0af3cc0a414c8d
+A,near_plan,We should plan the trip tomorrow.,false,1000,0.0003,2.83,1.83,0,,,5.7539375,50b918a22fdd8c24bbe5f9d10c9e8a858ebf385749ec2d86da5f01ef8d132add
+A,near_plan,We should plan the trip tomorrow.,false,2500,0.0006,4.35,1.85,0,,,7.2539375,07cb94486f8ef2fed9c2d7bf744c9dbe936e31a54113c62216e1aa4bde8383a8
+A,mention_kitchen,I left the lamp on in the kitchen.,false,0,0.0002,3.23,3.23,0,,,4.8738125,a7750976fbd50ffcd015c1ec012f2fda9947200dc7fc89a0e0e0aca850a174fe
+A,mention_kitchen,I left the lamp on in the kitchen.,false,500,0.0002,3.79,3.29,0,,,5.3738125,3906c9c4ec7850f935619b2a06c2981cde95ef43b260b867f969155a9f19dadd
+A,mention_kitchen,I left the lamp on in the kitchen.,false,1000,0.0002,4.27,3.27,0,,,5.8738125,f603e24d38c04eb5ae509ffbef11ccd111e643ebfa5109cfdb643eb5474037a8
+A,mention_kitchen,I left the lamp on in the kitchen.,false,2500,0.0003,2.67,0.17,0,,,7.3738125,90ac13e21e50e823a87cf82d85cd5ac3d4a4e21fc0bcc2fc0904f42ec0ce6886
+A,mention_lamp,The lamp is on.,false,0,0.0002,2.51,2.51,0,,,4.0969375,da5c6228608e5908789c6a0d8bca380a68d22df63a75e9101825da2bd42f4876
+A,mention_lamp,The lamp is on.,false,500,0.0005,2.75,2.25,0,,,4.5969375,208def5ad32120a180c8deefc1175a843a32ee161203da40616631f245bddf2e
+A,mention_lamp,The lamp is on.,false,1000,0.0006,3.23,2.23,0,,,5.0969375,ea7447e1147acad66a11133f82faa74ba724e58b3b7898bfe14133461e4b8033
+A,mention_lamp,The lamp is on.,false,2500,0.0018,3.07,0.57,0,,,6.5969375,9dc4a6219b627bd9608ba817517e45d6dbe822ad4c2887a3d60e666d9d2cfdee
+A,no_name_timer,Set a timer for five minutes,false,0,0.0001,3.31,3.31,0,,,4.8891250,d6921768be7fbd975ecd45f82e37661f06ab0899db9f803750f8c5b47cd7f646
+A,no_name_timer,Set a timer for five minutes,false,500,0.0001,3.79,3.29,0,,,5.3891250,d80d3d40b72790175a1c55ee329398f078e7a29fa23d4b38e4cffc99e6ff07bd
+A,no_name_timer,Set a timer for five minutes,false,1000,0.0001,4.35,3.35,0,,,5.8891250,3f6e1719562a35985121008f3020314d89a8a5c33408b08117b8b8efce301e3f
+A,no_name_timer,Set a timer for five minutes,false,2500,0.0002,2.67,0.17,0,,,7.3891250,2c923a54089a38da4d10c30bc2cbc7302d88e7ac45a454d736e0494a4405ded5
+A,no_name_thanks,Thank you,false,0,0.0001,2.19,2.19,0,,,3.8351250,6b2603527ada4c46a1231d73b58a582ff62cf4c0e5329a50a1a59c53a910f617
+A,no_name_thanks,Thank you,false,500,0.0002,2.75,2.25,0,,,4.3351250,718ffd7ce71fcdfd5aae650af50124aa8697fca976f30b4a0ca482d229f2e626
+A,no_name_thanks,Thank you,false,1000,0.0002,3.23,2.23,0,,,4.8351250,8379d39a613bd95e9597d56196ce46505e58c4b330c06c50cd7e92a4ac4a3d00
+A,no_name_thanks,Thank you,false,2500,0.0004,2.67,0.17,0,,,6.3351250,7805abd6003525ac40bc72682e205a40f9a0c3af00dcaa4ba1919cf7305446d3
+B,bare,Lamp,true,0,0.0002,2.03,2.03,0,,,3.6933125,79c0f0d18b0212eff008f393bc2179ebd6272731d21ee988427b78e2ab94c4d4
+B,bare,Lamp,true,500,0.0003,2.43,1.93,0,,,4.1933125,ef8de973e4450bde1535730bb9828335ff47af7156bc67e636989ec0939f39ce
+B,bare,Lamp,true,1000,0.3150,2.03,1.03,0,,,4.6933125,3922e38c77ebfca7f1cc5d0f796e5c0599d43257b532ea9778f1c8772c87f79e
+B,bare,Lamp,true,2500,0.4747,3.55,1.05,0,,,6.1933125,3e098eac1e09ee07c701bd72fdc56e87c1f9f01f4318e9be6dd94dde05c76a32
+B,initial,"Lamp, set a timer for five minutes",true,0,0.0001,4.19,4.19,0,,,5.7290000,172ea97f9f8bedbb7c6e3740b82d5f77ca91b0214d996a341afe3af0424d8978
+B,initial,"Lamp, set a timer for five minutes",true,500,0.0001,4.67,4.17,0,,,6.2290000,07fbea14de655aaaea5862d0978b7915c968a6ff60e1b63f5a0f9b8cae277426
+B,initial,"Lamp, set a timer for five minutes",true,1000,0.7534,2.03,1.03,0,,,6.7290000,c17c0535db182bd58f4b64076717f5a83c73997e353f267f45919f27a5ad1596
+B,initial,"Lamp, set a timer for five minutes",true,2500,0.9222,3.47,0.97,1,3.47,0.9222,8.2290000,b1d164e62a188430f3d87f88f5e537a15240eef3ca55ae204feaf0a21c64f518
+B,trailing,"Thank you, Lamp",true,0,0.0007,2.91,2.91,0,,,4.6360625,7988725899065fa3ee3d40ce4b763e197ec96252f860c15204cc6fd02bfbe429
+B,trailing,"Thank you, Lamp",true,500,0.0042,2.35,1.85,0,,,5.1360625,cc517ccf948e783591fd4df130d9075174f0a643257f090d3c9f6391ce8ed334
+B,trailing,"Thank you, Lamp",true,1000,0.0043,2.83,1.83,0,,,5.6360625,4668c858114e41dc1d5e049e04679af343e7167485f93d169c81a787c2a5130d
+B,trailing,"Thank you, Lamp",true,2500,0.0042,4.35,1.85,0,,,7.1360625,78d298334081344b12d9a81fbe9e6cbc5af816bf7df4f25d93436004cd5c9e98
+B,hey,Hey Lamp,true,0,0.0004,2.11,2.11,0,,,3.8887500,911f6df4c962f3956adab6322939a7b64715981238b4fbf8325f84f088303427
+B,hey,Hey Lamp,true,500,0.0007,2.67,2.17,0,,,4.3887500,b07f692d0b4a2d3e46378f50fe0a75c8265a49d28067b22b0d8a240ecd1c3907
+B,hey,Hey Lamp,true,1000,1.0000,2.03,1.03,1,2.03,1.0000,4.8887500,9657f97bcdab09493198b38dfe1393a2eed30f7859bec0b95c99a5d07348e572
+B,hey,Hey Lamp,true,2500,1.0000,3.47,0.97,1,3.23,1.0000,6.3887500,db43a9de3ab83a4413b409ea9dfcd488d58361b5e6894d52c502b712f1cfe8ab
+B,near_lamb,Lamb is my favourite dish.,false,0,0.0001,3.31,3.31,0,,,4.8409375,7b950390c4cd71fc6e7ee46e1ec91380376d2ae40f0778240c5ac33d26c63655
+B,near_lamb,Lamb is my favourite dish.,false,500,0.0001,3.79,3.29,0,,,5.3409375,1ccd48af9431d419f1f62ab9df20b5be40c76fa197b08e10c5916fb04079947c
+B,near_lamb,Lamb is my favourite dish.,false,1000,0.0011,2.03,1.03,0,,,5.8409375,265a15c894f1771b1d4316c1a629340681e34d7d352281e14f81cb6ed9bb0251
+B,near_lamb,Lamb is my favourite dish.,false,2500,0.0005,3.55,1.05,0,,,7.3409375,289375ed5d27753e2c3ee96e4e15bfbf4de0bd5dfd791bf1659e4a5a86348300
+B,near_land,Land the plane carefully.,false,0,0.0002,2.99,2.99,0,,,4.5663750,3c8fdedad563715147d8816fb12e88e78a3969ee3850a4651a4ee8a5855e3265
+B,near_land,Land the plane carefully.,false,500,0.0001,3.47,2.97,0,,,5.0663750,7a801bc92598e5f7e47cfdda4a58a2432b66a7fc67eb0369e990640ee0f41567
+B,near_land,Land the plane carefully.,false,1000,0.0780,2.03,1.03,0,,,5.5663750,651c275d717d8253d04710235fd87985828d40f4fe27d5ce3b17b1ce0a80d96f
+B,near_land,Land the plane carefully.,false,2500,0.0341,3.55,1.05,0,,,7.0663750,db578f6eed758b97d84fbb86046a81eacc6f9a4108ccfa0dc02020166620cdfe
+B,near_lab,The lab is closed today.,false,0,0.0008,2.75,2.75,0,,,4.7012500,6cb65313ff7a04ab51113464caf0e3c079f2b6883a5b4da258faea763959891a
+B,near_lab,The lab is closed today.,false,500,0.0020,3.23,2.73,0,,,5.2012500,449ef64f7c3945e16a47c1162f9b4259a36d68a80ed2587f77e7e2ae3e2f40ec
+B,near_lab,The lab is closed today.,false,1000,0.0011,3.71,2.71,0,,,5.7012500,ec56b45c43aef24e469b0f697d7e60b617d41de0c1024eccfc984b9ac82f67b5
+B,near_lab,The lab is closed today.,false,2500,0.0020,5.23,2.73,0,,,7.2012500,16ed08d7bd3dc5298cd9cb1348504ecabe504bf8aa2deebdc6ee5de0d5cb972e
+B,near_plan,We should plan the trip tomorrow.,false,0,0.0002,3.31,3.31,0,,,4.8853125,5ea29e6fa8254e6137ee14f0ae98af80e6f2fe0c11775b16f68a720ad0a41700
+B,near_plan,We should plan the trip tomorrow.,false,500,0.0002,3.79,3.29,0,,,5.3853125,df3301fec2e71a00fdc934ed6c4352a485ee2a9d2bae8626b1b418a479458caa
+B,near_plan,We should plan the trip tomorrow.,false,1000,0.0001,4.27,3.27,0,,,5.8853125,6a0982d2e1ad9869e6d2d1842a87800e23f83e2f11f45c61828008beb03317a7
+B,near_plan,We should plan the trip tomorrow.,false,2500,0.0002,2.67,0.17,0,,,7.3853125,e5c419cd30ce6c34e49e371ca8b2f180e7c0f3c362dbc554598c38b8f20e8dcc
+B,mention_kitchen,I left the lamp on in the kitchen.,false,0,0.0003,3.39,3.39,0,,,4.9828125,0528e45e8fe6c96ea9fa667e4919303de5d65d03c14684a9cfb5ad5df227b987
+B,mention_kitchen,I left the lamp on in the kitchen.,false,500,0.0003,3.87,3.37,0,,,5.4828125,00054dc5846ebabe82e0b9982146259191480117926dbf96f43262afcb4836cf
+B,mention_kitchen,I left the lamp on in the kitchen.,false,1000,0.0004,4.35,3.35,0,,,5.9828125,a7c63acbcd266c273a1fc0a7379caa4743ed8b6169c73555017a4402e8bbbedd
+B,mention_kitchen,I left the lamp on in the kitchen.,false,2500,0.0003,5.87,3.37,0,,,7.4828125,81966957ca06c3990a59da54338234838c9f37aa5a0be173b7affbaf19cb4dc8
+B,mention_lamp,The lamp is on.,false,0,0.0003,2.51,2.51,0,,,4.1449375,e53aec4a2e3dec4b65bc91f40e01555f62cd25e640439396364509da169ab247
+B,mention_lamp,The lamp is on.,false,500,0.0003,3.07,2.57,0,,,4.6449375,92d08b2337ef936a7f42f72e565ddd2e1f8fde5f77d1df1458fa56b4b0b8476a
+B,mention_lamp,The lamp is on.,false,1000,0.0003,3.55,2.55,0,,,5.1449375,aff06bcabc95486083834be7ae3b4b8d49644f3fbb238253a65712af2f28d28a
+B,mention_lamp,The lamp is on.,false,2500,0.0004,2.67,0.17,0,,,6.6449375,03d3cc5478c628052fef8fbc05333efca6bc2a89195d04c38a3846024120782b
+B,no_name_timer,Set a timer for five minutes,false,0,0.0001,3.47,3.47,0,,,5.0513125,4bd405e0d6d5dc02fde90bb9e9371c42fa637610388a5d7961e12f0ae48596b5
+B,no_name_timer,Set a timer for five minutes,false,500,0.0002,3.95,3.45,0,,,5.5513125,18a9d26ad879651febad04584ced5471e5db4a757b99812ab13d9fb71758588f
+B,no_name_timer,Set a timer for five minutes,false,1000,0.0001,4.51,3.51,0,,,6.0513125,77bfda81249eaed188ea5cbe969d23c6333492f4f758ef5ac269da23b207ceaa
+B,no_name_timer,Set a timer for five minutes,false,2500,0.0002,5.95,3.45,0,,,7.5513125,7dcb3216b9792b0e1be32f049bf9e8c75dad3c0ac6eb6b6a7156f8468e16d1fa
+B,no_name_thanks,Thank you,false,0,0.0001,2.43,2.43,0,,,3.9625625,3658c61c77d664756b2d82cfb5905e5c168e437870467fc1d1fad8cde48bc878
+B,no_name_thanks,Thank you,false,500,0.0001,2.91,2.41,0,,,4.4625625,d701b9b8bd35a27f2a9f16cd37d69fa4dda2b8c4f7bc04c5d5936de53224a983
+B,no_name_thanks,Thank you,false,1000,0.0001,3.47,2.47,0,,,4.9625625,d05975f786a607ea4a9d6882f39e28d9770b44d1e9be5de298fa0be56cc4fd31
+B,no_name_thanks,Thank you,false,2500,0.0002,2.75,0.25,0,,,6.4625625,420c95b296d513cde14232f25c7e44f84c176191154c801fb64aa43999107c24
+C,bare,Lamp,true,0,0.0001,2.19,2.19,0,,,3.6921250,0bf9ca600d3cda99944c49a1556a85cd917b9e01a7dddc83bab58f27e897f714
+C,bare,Lamp,true,500,0.0002,2.43,1.93,0,,,4.1921250,99fb8f397f8f2a8643a0fd8b83dde77d68ed1ec4d4f072e02b7ad7ec6f314cd4
+C,bare,Lamp,true,1000,0.6455,2.03,1.03,0,,,4.6921250,f3abbe1298a8ee6fb1412a5efcc4a52c715f20e576bf242cab580d7424efbd44
+C,bare,Lamp,true,2500,0.9272,3.55,1.05,1,3.47,0.9272,6.1921250,3b901bfb2a612d284cc21d87e5eba6493a4bdc4d511040fd8048d661a62277c2
+C,initial,"Lamp, set a timer for five minutes",true,0,0.0001,4.11,4.11,0,,,5.6325625,bf279b997a2c059d14feb8fc2062582ec9becce9617fd536ea620ed95b245ec0
+C,initial,"Lamp, set a timer for five minutes",true,500,0.0001,4.59,4.09,0,,,6.1325625,801dacb9d9aec091c5d3cddaf1fd452084a9229fcb53ca94d020248625bff181
+C,initial,"Lamp, set a timer for five minutes",true,1000,0.3281,2.03,1.03,0,,,6.6325625,a32db74f1a889db19d28e541508d56673ecedfee6ec40cfccd596c455ef5dc69
+C,initial,"Lamp, set a timer for five minutes",true,2500,0.5701,3.47,0.97,0,,,8.1325625,a2e2057195d7796d64af174451d24022293da916a78d1f91553d0ed319c00db0
+C,trailing,"Thank you, Lamp",true,0,0.0001,2.75,2.75,0,,,4.5628125,5a73347ba9d966e49223adc1ba5d2a7079bf6a7f9e88df22085578dc03835f68
+C,trailing,"Thank you, Lamp",true,500,0.0967,2.35,1.85,0,,,5.0628125,46a25ab1c7127b5421da3706c270e8f311f700d183f4cdb42000d849e35ed019
+C,trailing,"Thank you, Lamp",true,1000,0.0500,2.83,1.83,0,,,5.5628125,6d813129acb5735662672c43ec95fef5a2aa37302214fdf6028108c4ad4ebf90
+C,trailing,"Thank you, Lamp",true,2500,0.0967,4.35,1.85,0,,,7.0628125,15ec41c66b7caff2aa10cadaab7b38b459c513228b79519d1c3439de4054635a
+C,hey,Hey Lamp,true,0,0.0003,2.11,2.11,0,,,3.9013750,fc9c684fb57b4001a2075e866dd28a6453540afb2543a8eb9294d70ddc7fc3c2
+C,hey,Hey Lamp,true,500,0.0002,2.51,2.01,0,,,4.4013750,e44a148d05c0547c25dd8d3524ccf1e7f63929b0d38e830d0476176f6fc7cf69
+C,hey,Hey Lamp,true,1000,0.7672,2.03,1.03,0,,,4.9013750,5fb5ae3e5f03aa811ef92374e41ebec2910bc3ed0024b280e282e56c3a1a9a9b
+C,hey,Hey Lamp,true,2500,0.9104,3.47,0.97,1,3.47,0.9104,6.4013750,1b325e8357cd4b0586defaa20c2aebfd9e28f51fc1d2772dd9495fe9a9517af6
+C,near_lamb,Lamb is my favourite dish.,false,0,0.0001,3.15,3.15,0,,,4.6800000,08fa5e4dd2b40face49489245fc4d17644c17e6c3f410f5f9eade92c4378b8e4
+C,near_lamb,Lamb is my favourite dish.,false,500,0.0003,2.83,2.33,0,,,5.1800000,8ced820332fc35c47cc879dea05deca16ec9dfbd741129eb81b87a0decb1359a
+C,near_lamb,Lamb is my favourite dish.,false,1000,0.0001,3.31,2.31,0,,,5.6800000,0b287a863a4c059a2c38e676c2a48b4b1a517ba2528acaf355cd75ed636c047b
+C,near_lamb,Lamb is my favourite dish.,false,2500,0.0003,4.83,2.33,0,,,7.1800000,ffa6bbdc792e4f0efc0080ba14d67e8de4cfbcd1c8d333043eaf6bc18e885086
+C,near_land,Land the plane carefully.,false,0,0.0001,2.91,2.91,0,,,4.5343125,e2f895b4b433ef9b738853105fe5ddf81af4d16896239763cb5f288c7846ab99
+C,near_land,Land the plane carefully.,false,500,0.0078,2.43,1.93,0,,,5.0343125,3adab0240364c2419383ca9c19e84c7cabc9245ec38f9427d8e3f5a47ccadeed
+C,near_land,Land the plane carefully.,false,1000,0.0023,2.91,1.91,0,,,5.5343125,19622aa3463293ec62a2e1589b434de3d444aba0721cc5211508e93cc9671c13
+C,near_land,Land the plane carefully.,false,2500,0.0078,4.43,1.93,0,,,7.0343125,550eb3be8d88bcaaac859bde012ee361da0b924afae1902029547036dd5e75cf
+C,near_lab,The lab is closed today.,false,0,0.0045,2.59,2.59,0,,,4.6043125,0d8502429ae285b36b92c7a28463fd1bc1becd85cc21824cda907b412b5a2eb9
+C,near_lab,The lab is closed today.,false,500,0.0051,3.07,2.57,0,,,5.1043125,f7ded7a7564a0d973335a85d9086578d0ad8c1098945ae6a511ed5f7476edd9f
+C,near_lab,The lab is closed today.,false,1000,0.0018,3.63,2.63,0,,,5.6043125,3a6707e28d6bf0f0005a0c98f5d8ad721c0065a0f93b76a44ccffa27eb9d7f34
+C,near_lab,The lab is closed today.,false,2500,0.0051,5.07,2.57,0,,,7.1043125,38284e4b92350d9103693e5e6dad9675a4d1dad1574393492ff00dd0b0b4a206
+C,near_plan,We should plan the trip tomorrow.,false,0,0.0001,3.23,3.23,0,,,4.8369375,f9306a0a15cf530275b42b3803957bea6c7fb47d95b16eb0fdf31fe8851ed834
+C,near_plan,We should plan the trip tomorrow.,false,500,0.0001,3.71,3.21,0,,,5.3369375,90104c6783c9a5721194ab57cce51589159aebd9d0b01d110bdc1ace94334e65
+C,near_plan,We should plan the trip tomorrow.,false,1000,0.0002,4.19,3.19,0,,,5.8369375,b889ebaa63be5a207eab3ada97f0d3457f7878e58a9a59cd02a0edaa52af2479
+C,near_plan,We should plan the trip tomorrow.,false,2500,0.0001,2.67,0.17,0,,,7.3369375,cc2dbc65a90de91945c6961597c0b87292a1b1408de4eed0a379655b6a754797
+C,mention_kitchen,I left the lamp on in the kitchen.,false,0,0.0002,3.39,3.39,0,,,5.0333125,d951f369742beb4da914172526890e16e8eddb1e1fc5b846f754e31f9938a7f4
+C,mention_kitchen,I left the lamp on in the kitchen.,false,500,0.0001,3.95,3.45,0,,,5.5333125,40dc4f02f1fd47124e729b77ca1e4de88b155b91a41c5b263e05a2db743e0ebc
+C,mention_kitchen,I left the lamp on in the kitchen.,false,1000,0.0002,2.43,1.43,0,,,6.0333125,117a767a09fd720cd94a3116fa139c0c5cc1e9ac5971e8c0cfc8778f6543ccfb
+C,mention_kitchen,I left the lamp on in the kitchen.,false,2500,0.0002,3.95,1.45,0,,,7.5333125,8c9533ba068e12c0a221b2b3f344d49b6120c803e0a2e264e3a15bf4a7e4ccbc
+C,mention_lamp,The lamp is on.,false,0,0.0002,2.51,2.51,0,,,4.1154375,5f502645e3b1281fc4fd2c96c49e7ba81961109e96ccd12155cb28ea443357d0
+C,mention_lamp,The lamp is on.,false,500,0.0002,2.91,2.41,0,,,4.6154375,14e537c5196838ba2ad36dcc13ecbd100d3b2c5612895b1a38727bbcba10c676
+C,mention_lamp,The lamp is on.,false,1000,0.0002,3.47,2.47,0,,,5.1154375,7a16c7ada939f5fc2bcd4d54535d4c38685e5edca4f90dbe56da51ed4861e50e
+C,mention_lamp,The lamp is on.,false,2500,0.0020,3.07,0.57,0,,,6.6154375,6649434cd2f20a595225e0a7563a87e26e54f9ad7ce6e029e8559648d80703c6
+C,no_name_timer,Set a timer for five minutes,false,0,0.0001,3.39,3.39,0,,,4.9655000,70f40dc680a167ac51b787f851f24af4abe5c3cf8f41805d15c861c5f8e0a1d1
+C,no_name_timer,Set a timer for five minutes,false,500,0.0001,3.87,3.37,0,,,5.4655000,7a3b8f3b5f4117ee39e8d6a209b3fcf968e6ac73ee4a6703620d5b6879049bd0
+C,no_name_timer,Set a timer for five minutes,false,1000,0.0001,4.43,3.43,0,,,5.9655000,e57102b1a7efb7e1d5dbc61503b2c83e4bd8d59f1e44d393a7e1bd189f04b3c8
+C,no_name_timer,Set a timer for five minutes,false,2500,0.0002,2.67,0.17,0,,,7.4655000,fac8af9256479ff9ef99d004657d582ba1ff95f0f7dc3bc7258c2ef9144be5c0
+C,no_name_thanks,Thank you,false,0,0.0001,2.27,2.27,0,,,3.8743125,817c468c54874a903b2a1db44a09635279f852b6329a5322027f9db1ad7a8b8f
+C,no_name_thanks,Thank you,false,500,0.0001,2.75,2.25,0,,,4.3743125,82394502cfd55d11a2ff32ae682035b103cc9fb0623d99783d295af68352c9a0
+C,no_name_thanks,Thank you,false,1000,0.0001,3.23,2.23,0,,,4.8743125,86c0819e129c0ff3f3bc35c3667f716cbe484ba5cd21ec19f0aba0bde065cfa5
+C,no_name_thanks,Thank you,false,2500,0.0003,2.67,0.17,0,,,6.3743125,7da9eb1e17a1e99e31bf2c3746faa2f81da74d2ebf435fbaf2821ee74a4085e1

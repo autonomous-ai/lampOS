@@ -1,0 +1,114 @@
+{
+  "kind": "focused integration preflight; filters overlap and are not a complete gate",
+  "base": "32b3b5519d55a79448312e8074a14973d498c086",
+  "prepared_bedtime": "02f774a28d5daf7b33cc9627ea3e5e97052d23bb",
+  "music_source": "5d815c9f169cc8c82cf0498ee85d02c1c4170e4a with documented #1833 integration and review changes",
+  "stages": [
+    {
+      "stage": "live_decline",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "an_accepted_decline",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "seconds": 33.48,
+      "log_sha256": "a2bedf128064bcd1f17b8ee44e0172ddb2c777e32369c5ece74a51a37ec36a2d",
+      "test_summaries": [
+        {
+          "passed": 0,
+          "failed": 2,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 2147
+        }
+      ]
+    },
+    {
+      "stage": "live_prior_action",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "a_music_action_before_decline",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 0.28,
+      "log_sha256": "87b11fcb203e6bb0e3ae9287f9d5129a4d0540d098a57fd77c43285b195603f9",
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 2148
+        }
+      ]
+    },
+    {
+      "stage": "second_prior_action",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "a_later_decline_keeps",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 0.15,
+      "log_sha256": "2da1b9a484f1fc4a0a26499f155313fac3a30d58c6dcc57c50b0873cfcbe55f2",
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 2148
+        }
+      ]
+    },
+    {
+      "stage": "second_unacted",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "an_unacted_mixed",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 0.14,
+      "log_sha256": "614227f5a88519b18a2c9c223f4e9cf2eb54e47ee2d4fb5a1be6994eb0e34c93",
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 2148
+        }
+      ]
+    }
+  ],
+  "limitation": "A later ReportsStop control is not included. No device or playback was exercised.",
+  "result": "Both accepted-decline Live regressions dispatched an unintended real local fake Skills RPC and produced a private offer before the fix; prior-action controls passed."
+}

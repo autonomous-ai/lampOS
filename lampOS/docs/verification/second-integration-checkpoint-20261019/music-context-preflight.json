@@ -1,0 +1,180 @@
+{
+  "kind": "Focused scoped-context and requested-audio integration preflight; not a full gate",
+  "source": {
+    "parent": "5e83af10210cb1a4bfbeb15887274d1e519fe4c8",
+    "source_file_count": 1634,
+    "source_tree_sha256": "eb8961246285f13a79a0e3799fac7bbb153fcc38965d525e4892337031066089",
+    "test_root": "source-only copy",
+    "build_environment": {
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_BUILD_JOBS": "2"
+    },
+    "scope": "Focused preflight only; overlapping filters are not a complete crate or workspace gate.",
+    "commit_before_test_fixture_correction": "ea1aba77f70fe6bb3f83530254a5e85f4937bf4e",
+    "working_tree_change": "The revocation fixture uses the existing runtime plus a bounded OS thread; its exact hash and full source digest are recorded."
+  },
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.76,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 17.96,
+      "log_sha256": "a14ebaf2406aa99cbff90767adbb3e442bd893db80fb77fd77fa2f8b6d56e874",
+      "test_summaries": []
+    },
+    {
+      "stage": "requested_audio",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "requested_audio",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 38.27,
+      "log_sha256": "e8bb5cd05926c82aa157e13bcfd1be46d4e0125539bf8de39217be938020dd02",
+      "test_summaries": [
+        "test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 2117 filtered out; finished in 1.70s"
+      ]
+    },
+    {
+      "stage": "scoped_system",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "scoped_system",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 0.15,
+      "log_sha256": "aa0b65ee6e5813e001d4b28a82b3d0a1d8878e5753ef7cf4ef3ea819e4aee28a",
+      "test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2160 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "stage": "messages_isolation",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "the_worker_answers_a_text_without_the_rooms_spoken_conversation",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 0.37,
+      "log_sha256": "5dd2a68e2dbe7ecbb1070dc740eafa9b2925324857fbd736f92f49aa25ba2c5f",
+      "test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2160 filtered out; finished in 0.23s"
+      ]
+    },
+    {
+      "stage": "accepted_decline",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "an_accepted_decline",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 0.8,
+      "log_sha256": "180012dd52375ea4fdffab848e5378e4c4307b0154d6c886acc6c3bd21bec9e3",
+      "test_summaries": [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 2158 filtered out; finished in 0.60s"
+      ]
+    },
+    {
+      "stage": "memory_scope",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "memory_scope",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 0.17,
+      "log_sha256": "052bfd2c543d65d9a2e22db43f06d77c1c764458f964d7e1ce93dab243607024",
+      "test_summaries": [
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 2152 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "stage": "revoked_tool_result",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "revoked_tool_result",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 0.14,
+      "log_sha256": "6b55187163e2c742f06a5191158c60dc75db2e95b0032a8d4f1210a25769f39b",
+      "test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2160 filtered out; finished in 0.00s"
+      ]
+    }
+  ],
+  "source_sha256": {
+    "lampOS/crates/msgs/src/lib.rs": "dd390d66e7f12973d9c49bbb4cabe8506887fcfa181673a6fe6b43dbb0284a1f",
+    "lampOS/crates/voice/src/provider_worker.rs": "e23198f063b2ded5c46b7462e9b6c05af830e40bc9fb60e3ee9ffcff07e78dfe",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "830a6808bcbdabc9478df43daea3612f64b8b6c5bdd10e7bf090c45c7278db94",
+    "lampOS/crates/voice/src/second_provider.rs": "a01f2b2cefbc38fac5dd10d2f7bdf48a69272742095950821268746fb03f8274",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "f11e568bfc6688cf3149bc92806becf6ad2f80b2196e42fe7b78a0e8cb41d12c",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "759411798d730c53f1968f7244f66e3e67f6593fe1b66e5dff169a4662b2c40e"
+  },
+  "all_source_hashes_matched_at_completion": true,
+  "result": "All six filters passed, including 44 requested-audio and 3 accepted-decline tests. Filters overlap and must not be summed. No device, cloud conversation, capture or playback."
+}

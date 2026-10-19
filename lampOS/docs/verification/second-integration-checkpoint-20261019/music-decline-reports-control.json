@@ -1,0 +1,69 @@
+{
+  "kind": "focused source-only accepted-decline regression; not a final full gate",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.63,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 17.76,
+      "log_sha256": "b01ba3c8a2223b7803ebb3928238371575d3eba282d208f90ec54f9cbf57ea0f",
+      "test_summaries": []
+    },
+    {
+      "stage": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "an_accepted_decline",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 25.84,
+      "log_sha256": "0e34e8104ffc1d9403c00cc979804c74c6aa5552632b442c5788f44761400854",
+      "test_summaries": [
+        {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 2147
+        }
+      ]
+    }
+  ],
+  "source_digest_sha256": "9f831647fcfa1274e05d40c8dec741537249a9c9afa27c081335d203491745ca",
+  "sources": {
+    "lampOS/crates/voice/src/provider_worker.rs": "e23198f063b2ded5c46b7462e9b6c05af830e40bc9fb60e3ee9ffcff07e78dfe",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "830a6808bcbdabc9478df43daea3612f64b8b6c5bdd10e7bf090c45c7278db94",
+    "lampOS/crates/voice/src/second_provider.rs": "d0e78fcd466f2b74addd9ce22e90fc0735b60fe0e46d413d3904f14b11f30698",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "7286deafc4bf5eff7d75e4f708774d56eef39a9bf1e25c3316d22d5e543cb9a2"
+  },
+  "result": "3 passed, 0 failed, 0 ignored, 2147 filtered; includes real local fake Skills RPC negative controls and an isolated private-bus ReportsStop child control with Policy holding off/on. No live service, uploader, capture or playback."
+}
