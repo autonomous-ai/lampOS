@@ -378,6 +378,17 @@ touch "$T/send-refused"
 has "settings: says refused" "$T/out" "refused it"
 ls "$T/units"/lamp-setup-change* >/dev/null 2>&1 && bad "settings: the units are left after a refusal" || ok
 
+# guard: a text asked for from the empty room fails the trial before it is
+# turned off, and it is still put back.
+reset
+answer guard
+printf '%s\t%s\n' lamp-skills.service "lamp-skills: guard-mode Done: text: sent on messages/out: Someone came to your desk." >"$T/journal"
+"$SCRIPT" guard >"$T/out" 2>&1; check "guard with a text from the empty room fails" 1 $?
+wait
+has "guard: says the check failed" "$T/out" "FAIL: the then failed"
+hasnt "guard: not turned off after the failure" "$T/calls" '"turn":"off"'
+has "guard: put back after it" "$T/out" "put back: drop-ins removed"
+
 # light-out: --zone added to lamp-skills' own command line and carried,
 # nobody_s kept up every second until the end, then someone said back; an
 # earlier copy of the skill put back as it was.

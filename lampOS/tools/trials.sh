@@ -130,7 +130,7 @@ MOOD_BIN=${TRIALS_MOOD_BIN:-/opt/lampOS/mood/current/lamp-mood}
 # @MOOD_BIN@ is TRIALS_MOOD_BIN, and @BUS@ is lamp-bus. CAUSE's keepfile
 # takes them too.
 # ---------------------------------------------------------------------------
-ROWS="light-out scenes who-was-here activity forget thread reports nudges smoky dusty light-show settings look point sip-of-water stand-up wind-down mood"
+ROWS="light-out scenes who-was-here activity forget thread reports nudges smoky dusty light-show settings look point sip-of-water stand-up wind-down mood guard"
 # Rows not here, and why: printed by `list`.
 NOT_HERE="bedtime    Bedtime and Morning (#1732): a draft, not merged; three switches, --zone and its daily state, and it moves the body
 mood       Mood's minute with the body moving: lampOS/tools/mood-minute.sh --clap (#1956); the mood row here moves nothing
@@ -555,6 +555,39 @@ bus:expression/state|"enabled": ?false.*"drifting"|{"stamp":{"clock_id":"c","at_
       ABSENT='bus:mood/state|"familiar": ?"|{"stamp":{"clock_id":"c","at_us":1,"sequence":1},"session_id":"s","awake":0.15,"energy":0.3,"warmth":0.5,"asleep":false,"familiarity":"unknown","familiar":"regular","breath":{"phase":0.42,"pace":0.81}}'
       # By day the first lines say 1.00 and 0.00 at once; a clap's change
       # is said a minute after them.
+      WAIT=120 ;;
+    guard)
+      # #1907 (on lamp-voice, installable, not in the product): guard mode
+      # turned on as the voice turns it on, with nothing moving. keep_watch
+      # turns on only when someone was heard at the lamp within 30 s and the
+      # ring can show its mark (lamp-skills watch.rs `turn`), so a line is
+      # said on voice/heard first. Then the room is said empty on
+      # room/presence: FIRST is the watch's own "the desk is empty: keeping
+      # watch". THEN, 40 s on, a run step fails the trial if any text was
+      # asked for meanwhile (a text goes on messages/out for lamp-cloud,
+      # which this row never needs), and keep_watch is turned off after a
+      # line heard: PROOF is its mark given back, which only a shown mark
+      # can be. Lines: main.rs `watched`, the skill's Done.
+      ABOUT="guard mode: on by voice with its mark, nothing texted from an empty room, off by voice and the mark gone (#1907)"
+      NOTE="a build with #1907, socat or nc -U for the calls, nobody at the lamp, and the eyes' presence off or the room empty (the trial says the room is empty itself). Nothing moves: the ring shows guard mode's faint blue mark for about a minute, then the person's light again. No text is sent: the row checks that none is asked for. The \"a visit is texted\" half needs a person and the phone, on the arm hour"
+      SETASIDE="copy @SKILLS_DIR@/guard-mode"
+      SETUP="rm -rf @SKILLS_DIR@/guard-mode && cp -a @SRC@/guard-mode @SKILLS_DIR@/guard-mode
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/guard-mode"
+      SWITCHES="lamp-skills.service|LAMP_LIGHT_REQUESTS=on"
+      CAUSE='pub voice/heard event {"text":"Keep an eye on things while I am out.","finished":true} lamp_msgs/Speech
+call keep_watch {"turn":"on"}
+keep room/presence latest {"someone":false,"nobody_s":5} lamp_msgs/RoomPresence'
+      FIRST='guard-mode Done: the desk is empty: keeping watch'
+      FIRSTEX='lamp-skills: guard-mode Done: the desk is empty: keeping watch'
+      THEN='keep room/presence latest {"someone":false,"nobody_s":45} lamp_msgs/RoomPresence
+wait 40
+run ! journalctl -u lamp-skills.service --since -2min -o cat --no-pager | grep -q "guard-mode Done: text"
+pub voice/heard event {"text":"You can stop keeping watch now.","finished":true} lamp_msgs/Speech
+call keep_watch {"turn":"off"}'
+      AFTER='pub room/presence latest {"someone":true,"nobody_s":0} lamp_msgs/RoomPresence'
+      PROOF='guard-mode Done: mark: light given back'
+      EXAMPLE='lamp-skills: guard-mode Done: mark: light given back: asked again with a time already passed'
+      IN="lamp-skills.service"
       WAIT=120 ;;
     *) return 1 ;;
   esac
