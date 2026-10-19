@@ -413,3 +413,10 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   kept for trials.sh). #2037 rebased over #2035, no finding, merges on green.
   D, the Days session leak (everyone at 32, no note on lamp-4ace), is #2049:
   oldest closed at the limit, and each worker closes its own at Stop.
+- #2037's failures on lamp-4ace read case by case: preference-used is two
+  notes saying recall for earlier talk; the corrections and
+  earlier-today-said are left out of the prompt; line 5 is likely the bar.
+  #2063 adds a `quality-fix` arm (`MEMORY_USE_NOTE`) and why each wrong run
+  was wrong, counts only. #2074 fixes trials-test's flaky thread case: the
+  timed proof line came before the trial's mark when a set-up ran long.
+  #2049 rebased onto #1712's compiling head.
