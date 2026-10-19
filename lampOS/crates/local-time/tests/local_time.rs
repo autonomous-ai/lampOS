@@ -108,6 +108,49 @@ fn a_running_reader_takes_up_the_zone_setup_writes_at_its_next_reading() {
     assert_eq!(reader.hour_of_day(noon_utc), 19);
 }
 
+/// A part that keeps a zone by name (Schedule) is given the system's as it
+/// is now: where the link points after setup moves it; the name file's text
+/// for a zone file that is no link; nothing for a fixed offset.
+#[test]
+fn the_system_zone_is_named_as_setup_last_pointed_it() {
+    let root = tempfile::tempdir().unwrap();
+    zoneinfo(root.path());
+    point(root.path(), "Asia/Ho_Chi_Minh");
+    let reader = LocalTime::System(
+        SystemZone::open(root.path().join("localtime"), root.path().join("timezone")).unwrap(),
+    );
+    assert_eq!(reader.name().as_deref(), Some("Asia/Ho_Chi_Minh"));
+    point(root.path(), "America/New_York");
+    assert_eq!(reader.name().as_deref(), Some("America/New_York"));
+
+    let copied = tempfile::tempdir().unwrap();
+    fs::write(
+        copied.path().join("localtime"),
+        jiff_tzdb::get("America/New_York").unwrap().1,
+    )
+    .unwrap();
+    fs::write(copied.path().join("timezone"), "America/New_York\n").unwrap();
+    let copy = LocalTime::System(
+        SystemZone::open(
+            copied.path().join("localtime"),
+            copied.path().join("timezone"),
+        )
+        .unwrap(),
+    );
+    assert_eq!(copy.name().as_deref(), Some("America/New_York"));
+    fs::write(copied.path().join("timezone"), "Middle_Earth/Rivendell\n").unwrap();
+    assert_eq!(copy.name(), None);
+
+    assert_eq!(LocalTime::Offset(420).name(), None);
+    assert_eq!(
+        LocalTime::zone("Asia/Ho_Chi_Minh")
+            .unwrap()
+            .name()
+            .as_deref(),
+        Some("Asia/Ho_Chi_Minh")
+    );
+}
+
 #[test]
 fn a_zone_file_rewritten_in_place_is_read_again() {
     let root = tempfile::tempdir().unwrap();
