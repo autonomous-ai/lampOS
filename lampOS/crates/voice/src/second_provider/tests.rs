@@ -421,6 +421,77 @@ async fn words_the_heed_holds_end_the_turn_unanswered() {
     assert!(calls.lock().unwrap().is_empty());
 }
 
+/// Each judged turn's verdict, as the engine tells it (#1155).
+type TurnsTold = Arc<Mutex<Vec<(u64, lamp_msgs::TurnVerdict)>>>;
+
+fn telling(engine: Engine) -> (Engine, TurnsTold) {
+    let told: TurnsTold = Arc::default();
+    let seen = told.clone();
+    let engine = engine.telling_verdicts(Arc::new(move |request, verdict| {
+        seen.lock().unwrap().push((request, verdict));
+    }));
+    (engine, told)
+}
+
+/// #1155: a turn the heed holds is told held back, for the Policy's hello,
+/// as the journal says it.
+#[tokio::test]
+async fn a_turn_the_heed_holds_is_told_held_back() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Me.".to_owned())].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let (mut engine, told) = telling(engine.heeding(Arc::new(|_, _, _, _| Some("a busy room"))));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(
+        turn(&mut engine).await,
+        ["started:1", "heard:Me.", "complete"]
+    );
+    assert_eq!(
+        *told.lock().unwrap(),
+        [(1, lamp_msgs::TurnVerdict::HeldBack)]
+    );
+}
+
+/// #1155: a turn the heed lets out is told answered. With nothing that
+/// judges turns, as on a route with the rule off, no verdict is told, nor
+/// for a turn with nothing heard: the hello then counts the turn, as it
+/// did before.
+#[tokio::test]
+async fn a_turn_the_heed_lets_out_is_told_answered_and_one_not_judged_is_not_told() {
+    for heed in [true, false] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What time is it?".to_owned()), Ok(String::new())].into()),
+            chats: Mutex::new([vec![text("Noon."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let engine = if heed {
+            engine.heeding(Arc::new(|_, _, _, _| None))
+        } else {
+            engine
+        };
+        let (mut engine, told) = telling(engine);
+        for request in [1, 2] {
+            engine.submit(start(request));
+            engine.submit(audio(request, 1));
+            engine.submit(end(request));
+            let labels = turn(&mut engine).await;
+            assert_eq!(
+                labels.last().map(String::as_str),
+                Some("complete"),
+                "{labels:?}"
+            );
+        }
+        let answered = [(1, lamp_msgs::TurnVerdict::Answered)];
+        let expected: &[_] = if heed { &answered } else { &[] };
+        assert_eq!(*told.lock().unwrap(), expected, "with a heed: {heed}");
+    }
+}
+
 /// A chat that has not begun within `BEGIN_WITHIN` of the words is given
 /// up: the turn ends unanswered, nothing said, not even the announcement.
 #[tokio::test(start_paused = true)]

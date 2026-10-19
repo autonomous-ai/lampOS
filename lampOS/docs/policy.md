@@ -42,7 +42,7 @@ owner's rules for this part:
 
 ## The process
 
-    lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--rules] [--act attention] [--gate]
+    lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--hello-quiet to-the-lamp] [--rules] [--act attention] [--gate]
 
 | Option | What it is | If left out |
 |---|---|---|
@@ -59,6 +59,7 @@ owner's rules for this part:
 | `--act progress` | That question's decisions act: published with `shadow: false`, so that the voice tells a `say_now` ([below](#acting---act-progress-752)). Needs `--progress` | shadow |
 | `--hello` | Also ask, when the voice holds a due hello, whether to say it now ([below](#hello-on-arrival-say-hello-now-752)) | off |
 | `--act hello` | Those decisions act. Needs `--hello` | shadow |
+| `--hello-quiet to-the-lamp` | The hello's 15 s quiet counts only talk to the lamp or by it: a turn the voice held back as not said to the lamp (`voice/turn`) is taken back from it ([below](#the-quiet-counts-talk-to-the-lamp-1155)). Needs `--hello` | all talk counts |
 | `--act attention` | "Is this said to the lamp?" is published with `shadow: false`, for the voice to hold the lamp's actions by ([below](#acting-on-the-lamps-actions---act-attention-800)) | shadow |
 | `--rules` | The progress and hello questions, and with `--gate` the moment question, obey what the people at the lamp asked about it speaking first (`memory/rules`, [above](#a-persons-rules-about-speaking-first-813)). Needs `--progress` or `--hello` | not listened to |
 | `--gate` | Also answer a skill that asks (`skills/ask`) whether the lamp may say hello, tell news or start something itself ([below](#hello-on-arrival-say-hello-now-752)). Needs `--hello` and `--act hello` | not listened to |
@@ -83,6 +84,7 @@ It subscribes, each with its type from [lamp-msgs](msgs.md), to:
 | `voice/said` | What the lamp said: the pieces of its newest answer, put end to end |
 | `voice/state` | Whether the lamp is speaking; whether the person is still being listened to, which sets how long an utterance waits before it is judged; and the moment someone begins to speak, when the model is told to get ready |
 | `room/state` | How the room is: quiet, busy or not known. Not known until the voice has said, and again once the voice has gone |
+| `voice/turn` | With `--hello-quiet to-the-lamp` only: each turn's verdict, answered or held back as not said to the lamp, for the hello's quiet ([below](#the-quiet-counts-talk-to-the-lamp-1155)) |
 | `name/heard` | Each time the lamp's name was heard in its own microphone's sound, with a score ([name.md](name.md)). Whether anything is publishing there at all is looked at once a second |
 | `humans/faces/tracked` | How many faces the eyes see, how many of them are near (a box at least 15% of the picture's height), and how many of those are turned to the lamp. Written down with each decision (`seen`) when the eyes' list is no more than two seconds old, and **not used to make the decision yet**: nobody had stood in front of the lamp when this was written, so there is nothing to weigh it by |
 
@@ -1769,6 +1771,7 @@ a thread of its own.
 |---|---|---|
 | `--hello` | Listen to `voice/arrival` and ask the hello question | off |
 | `--act hello` | Its decisions act: `say_now` says the hello, `wait` keeps it. Needs `--hello`; `--act` may be given once for each question | shadow |
+| `--hello-quiet to-the-lamp` | The 15 s quiet counts only talk to the lamp or by it ([below](#the-quiet-counts-talk-to-the-lamp-1155)). Needs `--hello` | all talk counts |
 
 **Two hard rules, around the decider, and a third with `--rules`.** While
 one holds the answer is `wait`, by the rule (`by` `rule`, a `guard` in the
@@ -1776,7 +1779,9 @@ log), and no model is asked: the voice is waiting, and a question left
 unanswered would leave the hello to its rule.
 
 - **Never while anyone is talking to the lamp:** the voice listening,
-  thinking or speaking, or anything heard or said in the last 15 s.
+  thinking or speaking, or anything heard or said in the last 15 s. With
+  `--hello-quiet to-the-lamp`, the 15 s count only talk to the lamp or by
+  it ([below](#the-quiet-counts-talk-to-the-lamp-1155)).
 - **No hello within twenty minutes of the last:** the voice's minutes since
   its last hello, or the last `say_now` this acted on.
 - **With `--rules` (#813), not when a rule the people at the lamp kept
@@ -1784,6 +1789,55 @@ unanswered would leave the hello to its rule.
   `quiet_mornings`, and the `hello` limits (`never`, not before or from a
   minute of the day, not while the room is not known to be quiet). Guard
   `kept_rule`. A limit on `news` holds no hello.
+
+<a id="the-quiet-counts-talk-to-the-lamp-1155"></a>
+**The quiet counts talk to the lamp (#1155, `--hello-quiet to-the-lamp`).**
+In an office the voice hears talk every few seconds that is not for the
+lamp, so 15 s of quiet seldom come, and the hello is waited by the rule
+nearly always. With this switch the quiet counts only turns said to the
+lamp or by it:
+
+- **What a turn is.** It begins when the voice starts listening after it
+  was resting or speaking, and holds what is heard in it, its thinking, and
+  the voice's resting after it. Its number is the newest request heard in
+  it (`voice/heard`'s `request`): talk that goes on, the voice listening
+  again before it rests, is judged by its newest request. The voice's state
+  and its words come on two topics, so words of a new request heard before
+  the voice is seen listening begin their turn, and the listening seen
+  after them is the same turn.
+- **The verdict.** The voice says each turn's verdict on `voice/turn`
+  (`lamp_msgs/VoiceTurn`, [msgs.md](msgs.md)), as its journal says it:
+  `answered`, or `held_back` when the answer was held as not said to the
+  lamp. On the Live route that is the rule that judges each answer
+  ([attention.md](attention.md)); on the second route the same rule, or a
+  short sound with nothing to show it was said to the lamp. A turn nothing
+  judged, or with nothing heard, is not told, and counts.
+- **Held back.** The turn's talk is taken back from the quiet: it counts
+  again from the talk before the turn began, and nothing more heard,
+  listened to or thought about in that turn counts. The verdict may come
+  while the voice thinks or once it rests. One for another request than
+  the turn's, or said before any of its words were heard, is not this
+  turn's, and the turn counts. Once the lamp has spoken in a turn, as when
+  it asks again what was unclear, the turn is talk by it: it counts until
+  the lamp stops, and no verdict takes it back.
+- **What stays.** Never while the voice listens, thinks or speaks: a turn
+  is counted from its first word until its verdict comes, so a hello never
+  comes over someone talking. Only the hello's own hold changes: the model
+  is still shown the room's talk (`room`, "busy: people are talking", and
+  the seconds since anything was said, all talk counting), for it to judge
+  a hello at the lull, and the moment question beside it (`--gate`) counts
+  all talk as before.
+- **Not counted yet:** a turn the model itself declines as not for the
+  lamp (`not_for_me`) after the rule let it out. It is told `answered`, and
+  counts.
+
+The policy reads `voice/turn` only with the switch on. Tested with a replay
+of a busy office at the rig's scale (`tests/hello.rs`,
+`in_a_busy_office_a_hello_comes_at_a_lull_and_never_over_talk`): a quiet of
+400 ms, the room talking about every 350 ms; someone who comes back while
+it talks is waited by the rule, and one who comes back at the lull, 300 ms
+after the last turn's first word, is asked about and greeted. Without the
+switch the same lull is still inside the quiet, and the rule waits.
 
 A yes that comes back once someone has begun to talk, or once a rule was
 kept, is turned to `wait`; the room it is judged by then is the room as it
