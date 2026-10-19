@@ -15,7 +15,7 @@ log and nothing a lamp runs ([joining.md](joining.md),
 
 ## Current checkpoint: 2026-10-19
 
-Latest read and work, **19:31 UTC**: the connector read all **778 Queue comments**
+Latest connector read, **19:31 UTC**: the connector read all **778 Queue comments**
 and all comments and review threads on the four own open PRs. #2005 has a
 clean peer read; its existing upper timing bound is the reviewer's unchanged
 P3. #2007, #2008, #2016 and #2017 have merged into #1712; the observed tip
@@ -29,9 +29,30 @@ Formatting **3.45 s**, strict workspace Clippy **124.81 s**, and workspace
 build **24.21 s** passed. All **1,589** hashes match both copies. The
 [changed-name scan](verification/second-integration-checkpoint-20261019/caps-rebased-consumers.json)
 covers six changed crates and 27 consumers. This replaces the documentation
-conflict; it does not inherit the old head's native qualification. Rest/Say
-preparation `f0fbb20e7` moves the explicit zero-listeners assertion into its
-own foundation and is running its fresh complete consumer gate.
+conflict; it does not inherit the old head's native qualification.
+
+Rest/Say preparation `f0fbb20e7b0684792b9510801851f5dce7008cc9` on
+`3ad17c000` moves the explicit zero-listeners Say assertion into its own
+foundation and passed its fresh complete
+[27-consumer gate](verification/second-integration-checkpoint-20261019/rest-rebased-host.json):
+**6,818 passed, 0 failed, 30 ignored**, none filtered. Non-Update passed
+**6,686/0/29** in **1,138.56 s**; full Update **132/0/1** in **99.50 s**.
+Formatting **3.55 s**, strict workspace Clippy **127.35 s**, and workspace
+build **24.45 s** passed. All **1,591** frozen source hashes match both the
+checkout and source-only copy. The
+[changed-name scan](verification/second-integration-checkpoint-20261019/rest-rebased-consumers.json)
+covers four changed crates and 27 consumers. New automatic ARM64 remains
+pending publication; earlier native results qualify only their recorded heads.
+
+First's **19:36 UTC** request is to publish Rest/Say (B), scheduled Skills
+(C), and authored Bedtime (D) as stacked PRs now, without waiting for each
+predecessor to merge. C has completed its host gate; D is still running.
+The C result will be recorded separately. Publication remains blocked,
+and no push or comment is claimed.
+
+Cleanup removed **21 completed target directories**, measured by `du` at
+**69,904,036 KiB**; `df` then reported **138 GiB free**. Sources, logs and
+evidence were retained, and active target directories were kept.
 
 The [peer re-read](verification/second-integration-checkpoint-20261019/peer-fixes-reread.json)
 confirms #2008's configuration P2 is fixed in actual merge `d99eee947`: both
@@ -40,12 +61,12 @@ the original settled-writer remember/forget/remember sequence; the reviewer's
 already-reported queued-writer race remains. These are source reviews, not
 independent runtime or lamp tests. Local GitHub REST/GraphQL and Git transport
 still fail intermittently at TLS; the connector can read but refuses comment
-writes. Prepared comments, local log commits and the caps publication remain
+writes. Prepared comments, local log commits and foundation publication remain
 unconfirmed remotely. No automatic approval rejection is involved.
 
 Ready for integration: no (#1996 clean rebase passed the complete host gate; publication and automatic ARM64 for the new head are pending)
 
-Ready for integration: no (#1732 ARM64 is green; the authored skill is being split from shared foundations)
+Ready for integration: no (#1732's earlier ARM64 is green; the split Rest/Say and C host gates passed, D is running, and publication plus new automatic ARM64 remain pending)
 
 Ready for integration: no (#1757 follows Bedtime; warm-listener rehearsal passed focused gates; final full and ARM64 gates remain)
 
@@ -243,8 +264,9 @@ completed successfully: **7,684 nextest passed (1 leaky), 48 skipped**, plus
 identifies GitHub merge checkout `2fe03a67f4d7b7268d1e77663e267438a2868e31`
 against `1b98d6de325592a04c2fb1d56f1c7da10f5402a1`. Release, relay signals,
 binary hashes and upload passed. Four inherited example filename-collision
-warnings remain recorded. The other three split heads remain local and
-unpushed; reviewer merge of each predecessor comes before the next PR.
+warnings remain recorded. The other three split heads remained local and
+unpushed at that checkpoint. First's later 19:36 UTC request supersedes the
+predecessor-merge wait: publish B/C/D as stacked PRs without waiting for merges.
 
 The four-part composition at `7f4cc5c267` passed formatting **3.87 s**,
 strict workspace/all-target Clippy **59.56 s**, all five foundation crates
@@ -422,9 +444,10 @@ no remote publication or latest review state is assumed from those failures.
 A local merge check also found #1996 now conflicts only in the switch table,
 beside #1967's updated unclear-line description. A documentation-only attempt
 did not remove the conflict under Git's actual merge algorithm and is not
-published. A clean rebase will preserve both rows, verify its actual current
-base and receive the applicable gates before publication. The later foundation
-PRs still follow actual predecessor landing, in order.
+published. The clean rebase `3ad17c000` preserves both rows and passed the
+complete host gate recorded above. First's later 19:36 UTC request is to
+publish B/C/D as stacked PRs now; predecessor merges are no longer a publication
+prerequisite. Connectivity still blocks confirming publication.
 
 
 Bedtime and Tasks have only their original automatic PR ARM64 run,
