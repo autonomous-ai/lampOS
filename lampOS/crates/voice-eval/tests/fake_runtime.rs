@@ -919,3 +919,50 @@ fn retained_v1_plan_bytes_still_parse_with_occurrence_retirement_triggers() {
     );
     assert_ne!(old.sha256, s.plan.sha256);
 }
+
+#[test]
+fn a_late_line_after_two_asides_is_played_25_s_and_10_s_after_the_second() {
+    let catalog = StimulusCatalog::load().unwrap();
+    let plan = LoadedPlan::parse(
+        include_str!("../../../fixtures/voice-eval-late-cut-in-v1.json"),
+        &catalog,
+    )
+    .unwrap();
+    let s = Setup { catalog, plan };
+    for (scenario, scene, gap_ms) in [
+        (
+            "late-cut-in-after-fruitless-yields",
+            "late-line-after-asides",
+            25_000,
+        ),
+        (
+            "late-line-too-soon-after-fruitless-yields",
+            "late-line-too-soon",
+            10_000,
+        ),
+    ] {
+        // Two asides spend both fruitless yields early in the story; the
+        // request comes either side of the 20 s that forgives them.
+        let at = |id: &str| {
+            s.catalog
+                .scene(scene)
+                .unwrap()
+                .clips
+                .iter()
+                .find(|clip| clip.utterance == id)
+                .map(|clip| clip.at_ms)
+                .unwrap()
+        };
+        assert_eq!(at("late-math") - at("aside-really"), gap_ms, "{scenario}");
+        assert_eq!(at("aside-really") - at("aside-what"), 4_000, "{scenario}");
+        // A policy that admits every voice turns the asides into turns: the
+        // evaluator fails both, so a pass on a lamp needs them to resume.
+        let records = run(&s, "v2-directed-current", &[scenario], None);
+        let score = score(&s, &records[0]);
+        assert_eq!(score.outcome, Outcome::Failed, "{scenario}");
+        assert!(
+            kinds(&score).contains(&FindingKind::FalseInterruption),
+            "{scenario}"
+        );
+    }
+}

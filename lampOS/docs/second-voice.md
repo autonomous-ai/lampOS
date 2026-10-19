@@ -230,7 +230,19 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   `TurnInfo` came back, and a clean line was heard whole (the first
   builder, 15:54). Its `/v2/listen` paths are 404s. Flux hears English
   only: with an `stt_language` other than `en` or `en-*`, Nova-3 hears the
-  lines and the journal says why once.
+  lines and the journal says why once. So a Vietnamese lamp
+  (`stt_language` `vi`, the only Vietnamese code Nova-3 has) hears with
+  Nova-3 whatever `LAMP_SECOND_FLUX` says, since Flux has no Vietnamese
+  (`flux-general-en`, and `-multi`'s ten languages). Its key terms go with
+  it: Deepgram's keyterm prompting is for Nova-3 monolingual and
+  multilingual alike (Deepgram's docs, read 19 Oct). Whether English names
+  among them help a Vietnamese line is not measured. Host test
+  (`stt::tests::vietnamese_keeps_off_flux_and_reaches_the_stream_with_its_key_terms`,
+  a local server reading the stream's query): `vi` asks `nova-3-general`
+  with `language=vi` and the key terms, with Flux on or off; English or
+  unset with Flux on asks Flux. `LAMP_TRANSCRIPTION_LANGUAGE` is the Live
+  route's transcript hint only: this route's language is `stt_language`
+  (Fourth and the first builder on #1722, 22:52 and 22:54).
 
   Flux tells turns itself. Each `TurnInfo` carries one turn's words so
   far, and `EndOfTurn` ends the turn: by Flux's own model (`trigger`
@@ -537,6 +549,17 @@ order is kept. A written turn is the same from the chat on.
   the first builder at 00:25: on lamp-4ace 8 of 12 lines' words came 0.9
   to 2.3 s after the line, `Finalize`'s answer reaching only 0.3 to 1.2 s
   of the 1.1 to 2.8 s sent; Deepgram was still hearing the burst).
+- **Whose words a line's are, counted, never the words** (#1712, the
+  first builder at 03:48: on lamp-4ace one line said once became two
+  requests of 6 words each, the second begun with nothing played). When a
+  line's words are final, after its `heard N words` line, the journal
+  says `request N: of its W words, K in request M's words it cut short, J
+  in the lamp's answer to request A so far` (each part only when there is
+  one; `tell_whose_words`). Words are compared whole, as their letters and
+  digits in lower case (`shared_words`). The same words again read as a
+  replay of the line before; the lamp's own as an echo of its answer; few
+  of either as someone speaking. The route keeps the words of its latest
+  answer sent to the voice, with its request, for this (`lamp_said`).
 - **With `LAMP_SECOND_STT_WARM=on`, the next line's socket is kept open**
   (off unless set; `Engine::keeping_a_listener_ready`). As a line takes its
   socket, the next is opened in the background and kept with `KeepAlive`
@@ -949,10 +972,14 @@ s after the words.
   - `decided_at_us` is the end-of-speech decision's time on the
     coordinator's clock, to line the two records up.
 
-The battery's tool counter reads the journal: a call the Live route would
-hold for the Policy is said on this route as that route says one it lets
-run: `request N asked for X; run after 0 ms: this route holds no call for
-the Policy` (`worker::run_after`). This route holds none.
+The battery's tool counter reads the journal. Without
+`LAMP_POLICY_HOLDS_ACTIONS`, a call the Live route would hold for the
+Policy is said on this route as that route says one it lets run:
+`request N asked for X; run after 0 ms: this route holds no call for the
+Policy` (`worker::run_after`). With the switch, the bus and the route's
+rule (`LAMP_ATTENTION`), this route holds those calls as Live does, by the
+Policy's decision about the turn. Its gate then says Live's own lines with
+the real wait ([attention.md](attention.md#on-the-second-route-1712)).
 
 ## Coordinator switch
 
@@ -1381,7 +1408,11 @@ after a take-over, but now for every turn:
     In a quiet room it is as on Live, and one more thing: a conversation is
     also going on for 20 s after the end of the lamp's words
     (`AFTER_THE_LAMPS_WORDS`, follows-on's `WITHIN_US`), whenever the answer
-    began (`worker::going_on_from`). The thread's 45 s count from an
+    began (`worker::going_on_from`). In a quiet room only: a busy room still
+    goes on only by the thread's window or the call, and then 15 s after
+    the words (`went_on_told`). With the 20 s there too, an answer of 30 s
+    or more let office talk out in the 15 s after it (the first builder's
+    agent on #2032, 03:09). The thread's 45 s count from an
     answer's start, so a story told for 40 s or more used them up while it
     was told. On lamp-4ace on 20 Oct at 01:47 and 01:49, two hand-overs said
     as stories ended ("Hey Lamp, ask Claude Code to write a two-line
@@ -1803,7 +1834,8 @@ its key is placed.
 ### Timing the candidates (`probe-cascade`)
 
 `lamp-voice probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG]`
-(`second_provider/probe.rs`) times the route's candidates from where it
+(`second_provider/probe.rs`; with `--wire`, the next section) times the
+route's candidates from where it
 runs, with the character of `provider.json` and one fixed question, and
 with `--look` once more with that JPEG (at most 184 KiB) as the question's
 picture, to each model that takes one:
@@ -1845,6 +1877,105 @@ systemd-run --pty --wait \
   /opt/lampOS/voice/current/lamp-voice probe-cascade \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 20 --look /run/lampos-eyes/sight.jpg
 ```
+
+### Where the relay's time goes (`probe-cascade --wire`)
+
+`lamp-voice probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] --wire`
+(`second_provider/probe/wire.rs`) times a chat request step by step, from
+the lamp's side, for DeepSeek through the relay and on its own API (#1934;
+the first builder on #1722, 00:56). On lamp-4ace the relay's answers began
+about 0.6 s later than DeepSeek's own. Each request is the route's own as
+`Chat` builds it (`hosted.deepseek_model`, thinking off), made by hand on a
+connection of its own:
+
+- **dns, tcp, tls:** the name looked up, the TCP connect and the TLS
+  handshake, each on its own;
+- **send:** the request handed to the kernel, its body whole. On a large
+  request part of the upload may still be going, and is counted in the
+  first byte;
+- **first byte:** from then to the response's first;
+- **events:** from the same point to the stream's first and second `data:`
+  events, the gap between them (`gap_ms`), and to its first words or call
+  (`words_ms`);
+- **done:** to the stream's end.
+
+Each run asks each target two requests:
+- **lamp:** a spoken turn's size: the character, a turn's changing part,
+  and every function a turn declares, the actions part's read from
+  `LAMP_ACTIONS_DIR` as `probe-tools` reads them. The route's own was
+  31 KB with 31 functions on lamp-4ace; the probe prints its own `bytes`.
+- **small:** one short line and no functions.
+
+Two things it is not (the first builder's agent on #2024):
+- **The lamp's request is smaller than a real turn's.** It has no memory
+  note, facts, time line or the route's notes. Read its `bytes=` beside the
+  route's own `chat request` journal line for the same lamp, so a size
+  effect isn't read short.
+- **Every request is on a new connection.** It pays `tcp_ms` and `tls_ms`
+  each time, where the route reuses a kept one. So `done_ms` is the
+  request's, not a turn's. The difference line keeps `first_byte` apart
+  from the connect.
+
+How to read it:
+- **A first byte late by the same on both sizes:** the network or the
+  relay's own wait.
+- **Late on the lamp's only:** the request's size.
+- **A late first byte with the first two events close together:** the
+  relay holding the stream back.
+- **A first byte on time and a late first event:** the relay answering
+  its headers at once and holding the stream back.
+
+The relay is `deepseek_base_url` (or `LAMP_SECOND_DEEPSEEK_BASE_URL`) with
+the route's credential. DeepSeek's own API takes the unit's `deepseek.key`.
+A target without its URL or key is left out, saying so.
+
+**On one kept connection** (`--wire --kept`, the first builder on #1934,
+20 Oct 04:16): each target and size is asked three requests on one
+connection (`Arm`):
+- **first:** it makes the connection, so it pays all the steps above.
+- **straight:** right after, with no connect, TLS or slow start.
+- **idle:** after 5 s with nothing sent (`IDLE`). This is what a real turn
+  pays on the route's kept connection. Unless
+  `net.ipv4.tcp_slow_start_after_idle` is 0, the kernel restarts slow start
+  after idle, so a request over about 13 KB waits a round trip again.
+
+Each request has its own changing part, as turns do. An answer is read to
+its body's end, so the connection can carry the next request. A service
+that doesn't keep it ends that run's arms, counted as `closed`.
+
+The lines are `wire kept target=… size=… run=… arm=…`, then each arm's
+medians. `wire kept idle-less-straight target=… size=…` is what restarting
+slow start costs a turn, and `wire kept relay-less-direct size=… arm=…` is
+the relay's share on a kept connection.
+
+**The output:** one line per request:
+`wire target=relay size=lamp run=1 bytes=… status=200 dns_ms=… tcp_ms=…
+tls_ms=… send_ms=… first_byte_ms=… first_event_ms=… second_event_ms=…
+gap_ms=… words_ms=… done_ms=… events=…`. Then each target's and size's
+medians (and the 90th percentile of the first byte, the first event and
+the words), and,
+with both targets, the relay's medians less DeepSeek's own, step by step
+(`wire relay-less-direct size=lamp tcp_ms=+… tls_ms=+… …`).
+
+A failed step is told by its name and kind only (`tcp: TimedOut`). Like
+the rest of the probe it prints counts and milliseconds only, never the
+words asked or answered, a key, a host or a URL. Five runs unless said, at
+most 50. `systemd-run` doesn't carry the voice unit's environment, so the
+relay's URL is given as lamp-4ace's unit has it. Without it, and with no
+`deepseek_base_url` in `second.json`, the relay is left out and only
+DeepSeek's own API is timed (the reviewer on #2024):
+
+```sh
+systemd-run --pty --wait \
+  -p LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key \
+  -E LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek \
+  -E LAMP_ACTIONS_DIR=/run/lampos-actions \
+  /opt/lampOS/voice/current/lamp-voice probe-cascade \
+  /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10 --wire
+```
+
+`--wire --kept` takes the same command with `--kept` after `--wire`. Its 10
+runs ask 120 requests and wait 5 s 40 times, about 4 minutes.
 
 ### How much the prompt cache holds (`probe-cache`)
 
@@ -1948,8 +2079,55 @@ two arms:
 - `memory-note`: the same with `worker::MEMORY_CALLS_NOTE`, which names
   `remember`, `forget` and `recall`.
 
-Its verdict names the arms right every time on the judged lines. Run it like
-`probe-cache`, where lamp-actions runs:
+Its verdict names the arms right every time on the judged lines.
+
+**Then the sayings' three lines** (`SAYING_LINES`, the first builder's
+01:04 and 02:44 on #1722): the lines of #2001's lamp check
+(`second-trio.sh`) that rest on what the model says, each judged on its
+words, so a model or wording change that breaks one shows here without the
+lamp:
+- `asked-again` (#1967): mid-story, the coordinator's written ask-again turn
+  (`speak_up::ASK_AGAIN_NOTE`): right is a short question ("Sorry?", at
+  most three words), nothing called, nothing of the story;
+- `after-the-hum` (#1967, `LAMP_MISHEARD_HUM`): "What's seven times
+  eight?" with `misheard_hum::NOTE` beside it, as the route puts a note:
+  right is 56 in words, nothing called, the story not taken up again;
+- `go-on` (#1986, `LAMP_HOLDING_ANSWER`): after "One moment.", the
+  coordinator's written turn (`holding_answer::NOTE`): right is 391 in
+  words, nothing called, never another holding phrase. Each number and
+  name is matched as a whole word ("56" isn't in "156").
+
+Each is asked with the spoken character and the turn's changing part, with
+every function. It prints `right=N/M` per line and a verdict naming any line
+not right every time; counts only, never the words. The lost line asked
+again (#2001) asks the same chat again, so its check is the engine's tests.
+
+**Then memory's quality** (`probe/quality.rs`, #1693, the first builder at
+03:05 on #1722). There are six cases, each a fresh session told what the lamp
+keeps as its frozen snapshot (with source ids), under the memory note and
+`MEMORY_CALLS_NOTE` as a spoken turn has them:
+- **`preference-used`:** "How do I take my coffee?" with "Takes coffee with
+  milk and no sugar." kept. It's right with **no call**, and words that say
+  "milk" (a whole word).
+- **`correction-first`:** "Actually, I take it with milk now." with "Takes
+  coffee black." kept. It's right when its first call is `forget` or
+  `recall`, never a second `remember`, since nothing replaces a kept thing in
+  one call.
+- **`correction-kept`:** the same, after a `forget` of id 7 answered. It's
+  right when it calls `remember`.
+- **`earlier-today`:** "What did we talk about earlier today?" It's right
+  with `recall`.
+- **`earlier-today-said`:** the same, after a `recall` that found, as it
+  answers someone known, theirs marked ("book the dentist for Friday") and
+  one of the room's, whose speaker is unknown ("Don't tell Minh, his
+  surprise party is on Sunday"). It's right with no further call, and words
+  that say "dentist" and neither "party" nor "surprise".
+- **`never-mind`:** "Forget it, never mind." with something kept. It's right
+  with anything but `forget` or `remember`.
+
+Each case prints `right=N/M`. The bar is the last line: every case right
+every time. Counts only, no words. Run it like `probe-cache`, where
+lamp-actions runs:
 
 ```sh
 systemd-run --pty --wait \

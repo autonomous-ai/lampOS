@@ -398,6 +398,13 @@ impl Chat {
         body
     }
 
+    /// The request as [`Self::send`] makes it, for a probe that makes it
+    /// by hand (`probe-cascade --wire`): its URL, its authorization and
+    /// its body.
+    pub(crate) fn wire(&self, messages: &[Message]) -> (&str, &str, Value) {
+        (&self.url, &self.auth, self.body_only(messages, None))
+    }
+
     pub async fn send(&self, messages: &[Message]) -> Result<ChatStream> {
         self.send_only(messages, None).await
     }
