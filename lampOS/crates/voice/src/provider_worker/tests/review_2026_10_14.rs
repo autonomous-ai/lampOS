@@ -119,6 +119,7 @@ fn in_a_busy_room() -> Options {
         remarks: false,
         going_on_asks: None,
         cut_in_told: false,
+        scoped_session: false,
         misheard_hum: false,
         policy_holds: None,
         follows_run: false,
