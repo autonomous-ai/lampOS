@@ -668,7 +668,15 @@ this room" until someone asks to be recognised.
       case: the lamp has to match the name later, so for anyone with the
       lamp's disk it is the name, lightly hidden, beside set-aside files
       that hold names in plain text anyway (the reviewer and Twelve on
-      #1767).
+      #1767). A file from a later build is read past what it doesn't know.
+      One that can't be read at all is set aside beside it as it was
+      (`forgets-pending.unreadable-<unix s>`), never counted as anyone's
+      records, with a line that counts only, and forgetting goes on (#1680,
+      #2052's audit): before, every `forget` failed while it couldn't be
+      read. At each start a set-aside list that can be read now (the build
+      that wrote it, back after a step back) has its waits merged back, the
+      later word kept for a name in both, and the copy goes, so a face read
+      back from a set-aside file is still forgotten (the reviewer on #2070).
     - **Finishing it:** at each start and each forget, a face of a waiting
       name **kept before the forget was asked** is dropped: read back into
       the people file, or in a set-aside file that can be searched now
