@@ -36,14 +36,12 @@ struct Raw {
     #[serde(default)]
     llm_extra: Option<serde_json::Map<String, serde_json::Value>>,
     /// Google's Gemini API, for `LAMP_SECOND_CHAT=gemini` and
-    /// `LAMP_SECOND_SPEECH=gemini`: its base URL (absent: Google's own),
-    /// its key (absent: the Live route's own, only when that goes to Google
-    /// directly), and the models (absent: [`GEMINI_CHAT_MODEL`],
-    /// [`GEMINI_SPEECH_MODEL`]).
+    /// `LAMP_SECOND_SPEECH=gemini`: its base URL (absent: Google's own)
+    /// and the models (absent: [`GEMINI_CHAT_MODEL`],
+    /// [`GEMINI_SPEECH_MODEL`]). Its key is the voice unit's credential
+    /// [`GEMINI_CREDENTIAL`], never a field here.
     #[serde(default)]
     gemini_base_url: Option<String>,
-    #[serde(default)]
-    gemini_credential_file: Option<String>,
     #[serde(default)]
     gemini_chat_model: Option<String>,
     #[serde(default)]
@@ -184,9 +182,6 @@ pub struct SecondConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Gemini {
     pub base_url: String,
-    /// `gemini_credential_file`'s key. Absent, the Live route's own may be
-    /// used (`ProviderConfig::google_credential_file`).
-    pub key: Option<Key>,
     pub chat_model: String,
     pub speech_model: String,
 }
@@ -268,9 +263,6 @@ pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
         base_url: checked_url(
             given(raw.gemini_base_url).unwrap_or_else(|| GEMINI_BASE_URL.to_owned()),
         )?,
-        key: given(raw.gemini_credential_file)
-            .map(|file| key(&file))
-            .transpose()?,
         chat_model: model(raw.gemini_chat_model, GEMINI_CHAT_MODEL)?,
         speech_model: model(raw.gemini_speech_model, GEMINI_SPEECH_MODEL)?,
     };
@@ -348,6 +340,10 @@ pub const OPENROUTER_CREDENTIAL: &str = "openrouter.key";
 /// The voice unit's credential for DeepSeek's own API
 /// (`LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key`).
 pub const DEEPSEEK_CREDENTIAL: &str = "deepseek.key";
+/// The voice unit's credential for Google's Gemini API, for
+/// `LAMP_SECOND_CHAT=gemini` and `LAMP_SECOND_SPEECH=gemini`
+/// (`LoadCredential=gemini.key:/etc/lampOS/voice/gemini.key`).
+pub const GEMINI_CREDENTIAL: &str = "gemini.key";
 
 /// The key in the unit's credential `name`, in `directory` (the unit's
 /// `CREDENTIALS_DIRECTORY`), read as the other keys are; why not, naming the
@@ -553,20 +549,26 @@ mod tests {
         assert!(route.llm_extra.is_empty());
     }
 
+    /// Gemini's key is the voice unit's credential `gemini.key`, never a
+    /// field of this file: a file that still names one is refused, so a key
+    /// put there is never passed over in silence.
     #[test]
     fn gemini_and_the_extra_chat_fields_are_taken_as_written() {
         let directory = directory("gemini-set");
         let google = directory.join("google.key");
         private(&google, "g-secret\n");
         let (_, config) = written(
+            "gemini-key-field",
+            &format!(r#","gemini_credential_file":"{}""#, google.display()),
+        );
+        let refused = load_from_path(&config).unwrap_err().to_string();
+        assert!(refused.contains("gemini_credential_file"), "{refused}");
+        assert!(!refused.contains("g-secret"));
+        let (_, config) = written(
             "gemini-set",
-            &format!(
-                r#","gemini_credential_file":"{}","gemini_base_url":"https://gemini.example.invalid/v1beta","gemini_chat_model":"gemini-3.5-flash-lite","gemini_speech_model":"gemini-3.8-flash-tts","llm_extra":{{"thinking":{{"type":"disabled"}}}}"#,
-                google.display()
-            ),
+            r#","gemini_base_url":"https://gemini.example.invalid/v1beta","gemini_chat_model":"gemini-3.5-flash-lite","gemini_speech_model":"gemini-3.8-flash-tts","llm_extra":{"thinking":{"type":"disabled"}}"#,
         );
         let route = load_from_path(&config).unwrap();
-        assert_eq!(route.gemini.key, Some(Key("g-secret".into())));
         assert_eq!(
             route.gemini.base_url,
             "https://gemini.example.invalid/v1beta"
@@ -577,7 +579,6 @@ mod tests {
             serde_json::Value::Object(route.llm_extra.clone()),
             serde_json::json!({"thinking": {"type": "disabled"}})
         );
-        assert!(!format!("{route:?}").contains("g-secret"));
     }
 
     /// OpenRouter's pinned DeepSeek snapshot and DeepSeek's own Flash by

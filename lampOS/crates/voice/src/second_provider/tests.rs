@@ -358,6 +358,130 @@ async fn a_tool_call_is_run_and_its_result_answered() {
     );
 }
 
+/// The route A/B of 19 Oct: three hand-overs asked of the second route
+/// alone, none handed over. A spoken request naming Claude Code is asked
+/// with the Live route's staff note beside its words (`LAMP_STAFF_NOTE=on`,
+/// `worker::staff_noting`), `start_agent_task` is among the functions this
+/// route declares, and the call the model makes is run through this
+/// route's own runner (`worker::tool_runner`, as `serve` builds it) to the
+/// tasks part, which prepares the work; the model is told so and asks, and
+/// the lamp says it.
+#[test]
+fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
+    let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let directory = std::env::temp_dir().join(format!("second-tasks-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&directory);
+    std::fs::create_dir_all(&directory).unwrap();
+    let seen = crate::agent_tasks::tests::tasks_part(
+        &directory,
+        vec![
+            (
+                "request.sock",
+                json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}}),
+            ),
+            (
+                "request.sock",
+                json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+            ),
+        ],
+    );
+    let place = crate::agent_tasks::Place {
+        directory: directory.clone(),
+        target: crate::agent_tasks::DEFAULT_TARGET.into(),
+        who: false,
+        lead_in: false,
+        asked: false,
+        needs: None,
+        staff_note: true,
+    };
+    let settings = crate::tools::Settings {
+        tasks: Some(place.clone()),
+        ..crate::tools::Settings::default()
+    };
+    assert!(
+        crate::tools::declared(&settings)
+            .iter()
+            .any(|tool| tool.name == crate::agent_tasks::START)
+    );
+    let task = "Write a two-line poem about the rain";
+    let asked = call("c1", crate::agent_tasks::START, json!({ "task": task }));
+    let heard = "Hey Lamp, ask Claude Code to write a two-line poem about the rain.";
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(heard.to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![asked.clone()])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Shall I start it?"), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        worker::tool_runner(settings, None),
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .noting_staff(worker::staff_noting(place));
+    let labels = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            turn(&mut engine).await
+        });
+    let _ = std::fs::remove_dir_all(&directory);
+    assert_eq!(
+        labels[labels.len() - 4..],
+        [
+            "said:Shall I start it?",
+            "audio:17",
+            "generated",
+            "complete"
+        ]
+    );
+    let asked_of = script.asked.lock().unwrap();
+    assert_eq!(
+        asked_of[0],
+        [
+            Message::system("SYSTEM"),
+            Message::system(crate::staff_note::note(&["Claude Code"])),
+            Message::user(heard),
+        ]
+    );
+    let ops: Vec<Value> = seen.try_iter().collect();
+    assert_eq!(ops.len(), 2, "{ops:?}");
+    assert_eq!(ops[0]["op"], "status");
+    assert_eq!(
+        (&ops[1]["op"], &ops[1]["text"], &ops[1]["target"]),
+        (
+            &json!("prepare"),
+            &json!(task),
+            &json!(crate::agent_tasks::DEFAULT_TARGET)
+        )
+    );
+    let told = asked_of[1]
+        .iter()
+        .find(|message| message.role == "tool")
+        .and_then(|message| message.content.as_ref()?.as_str())
+        .and_then(|content| serde_json::from_str::<Value>(content).ok())
+        .expect("the model is told what the call did");
+    assert_eq!(
+        (&told["prepared"], &told["task"]),
+        (&json!(true), &json!(task))
+    );
+}
+
 #[tokio::test]
 async fn not_for_me_ends_the_turn_in_silence() {
     let script = Arc::new(Script {

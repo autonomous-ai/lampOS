@@ -448,21 +448,28 @@ pub fn parse_flags(dir: &Path, flags: &[String]) -> io::Result<crate::provider_w
     Ok(parsed)
 }
 
-/// The key for Gemini's API: `gemini_credential_file`'s, else the Live
-/// route's own when that is a Google API key. A relay's key is never sent
-/// to Google: without a Google key the worker does not start.
+/// The key for Gemini's API: the voice unit's credential `gemini.key`
+/// (`LoadCredential=gemini.key:<file>`, in `credentials`, its
+/// `CREDENTIALS_DIRECTORY`), as OpenRouter's and DeepSeek's are; without
+/// it, the Live route's own when that is a Google API key. A credential
+/// there but unreadable (not private, a link) is refused, never passed
+/// over. A relay's key is never sent to Google: without a Google key the
+/// worker does not start.
 pub fn gemini_key(
-    config: &crate::second_config::SecondConfig,
     provider: &crate::config::ProviderConfig,
+    credentials: Option<&std::ffi::OsStr>,
 ) -> io::Result<crate::second_config::Key> {
-    if let Some(key) = &config.gemini.key {
-        return Ok(key.clone());
+    use crate::second_config::{GEMINI_CREDENTIAL, unit_credential};
+    match unit_credential(credentials, GEMINI_CREDENTIAL) {
+        Ok(key) => return Ok(key),
+        Err(error) if error.kind() != io::ErrorKind::NotFound => return Err(error),
+        Err(_) => {}
     }
     match provider.google_credential_file() {
         Some(file) => crate::second_config::credential(file),
         None => Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "LAMP_SECOND_CHAT=gemini and LAMP_SECOND_SPEECH=gemini call Google directly and need a Google API key: set gemini_credential_file in the second route's configuration (the Live route's key goes to a relay and is not given to Google)",
+            "LAMP_SECOND_CHAT=gemini and LAMP_SECOND_SPEECH=gemini call Google directly and need a Google API key: the voice unit's credential gemini.key (LoadCredential=gemini.key:<file>); the Live route's key goes to a relay and is not given to Google",
         )),
     }
 }
@@ -483,7 +490,7 @@ pub fn services(
     let hosted = config.hosted.clone();
     let fallback = config.tts_provider.name();
     let key = (route.chat == Some(ChatRoute::Gemini) || route.gemini_speech)
-        .then(|| gemini_key(&config, provider))
+        .then(|| gemini_key(provider, credentials))
         .transpose()?;
     let mut net = Net::new(config, declare).map_err(io::Error::other)?;
     let call = |model| {
@@ -714,31 +721,21 @@ pub fn serve(
             file.as_deref(),
         )
     };
-    let runner: ToolRunner = Arc::new(move |request, heard, name, args| {
-        let settings = tools.clone();
-        let search = search.clone();
-        Box::pin(async move {
-            if let Some(search) = search.filter(|search| search.answers(&name)) {
-                return search.answer(&name, &args).await;
-            }
-            let call = lamp_gemini::ToolCall {
-                id: String::new(),
-                name,
-                args,
-            };
-            tokio::task::spawn_blocking(move || {
-                crate::tools::answer(&settings, &call, request, heard)
-            })
-            .await
-            .unwrap_or_else(|_| crate::tools::unavailable())
-        })
-    });
+    let staff = tools
+        .tasks
+        .clone()
+        .filter(|_| files.staff_note)
+        .map(staff_noting);
+    let runner = tool_runner(tools, search);
     let mut engine = Engine::new(Arc::new(net), system, runner)
         .checking_sounds(checked)
         .waiting_with_a_sound(route.wait_cue)
         .saying_when_down(route.down_line)
         .announcing(!route.only_voice)
         .saying_reminders(reminders);
+    if let Some(staff) = staff {
+        engine = engine.noting_staff(staff);
+    }
     // A look reads the eyes' look file with the Live route's bounds: a full
     // look's still may be older and larger (#836, #941).
     if let Some(path) = files.look.clone() {
@@ -783,6 +780,56 @@ pub fn serve(
         .enable_all()
         .build()?
         .block_on(run(channels, boot, engine, thread))
+}
+
+/// The second route's tool calls: a web search's functions answered by the
+/// search, every other call run as the Live route runs it
+/// (`crate::tools::answer`: the lamp's light and volume, its memory, the
+/// schedule, the tasks part's `start_agent_task` and the rest), whose
+/// journal line for each run is worded as the Live route's.
+pub(crate) fn tool_runner(
+    tools: crate::tools::Settings,
+    search: Option<Arc<Search>>,
+) -> ToolRunner {
+    Arc::new(move |request, heard, name, args| {
+        let settings = tools.clone();
+        let search = search.clone();
+        Box::pin(async move {
+            if let Some(search) = search.filter(|search| search.answers(&name)) {
+                return search.answer(&name, &args).await;
+            }
+            let call = lamp_gemini::ToolCall {
+                id: String::new(),
+                name,
+                args,
+            };
+            tokio::task::spawn_blocking(move || {
+                crate::tools::answer(&settings, &call, request, heard)
+            })
+            .await
+            .unwrap_or_else(|_| crate::tools::unavailable())
+        })
+    })
+}
+
+/// With `LAMP_STAFF_NOTE=on` (`--staff-note`) and the tasks part: the note
+/// the Live route gives beside a request whose words name one of the staff
+/// (`crate::staff_note`), for this route to give beside the words. Here the
+/// words are whole before the chat is asked, so it is never late. On
+/// lamp-4ace on 16 Oct the Live route's model did the work itself until
+/// that note named who the work was for.
+pub(crate) fn staff_noting(place: crate::agent_tasks::Place) -> super::StaffNote {
+    Arc::new(move |request, words| {
+        let who = crate::agent_tasks::named_in_words(&place, words);
+        if who.is_empty() {
+            return None;
+        }
+        eprintln!(
+            "lamp-voice second: request {request}: named {}; the model is told",
+            who.join(" and ")
+        );
+        Some(crate::staff_note::note(&who))
+    })
 }
 
 /// Whether a checked sound heard for `request` may be the person's answer
@@ -1898,13 +1945,15 @@ mod tests {
         assert_eq!(opened, [a.clone(), a]);
     }
 
-    /// Gemini's key: the second route's own `gemini_credential_file`, else
-    /// the Live route's when that is a Google API key. With the Live route
-    /// through a relay and no key of its own, a Gemini switch keeps the
-    /// worker from starting: the relay's key is never sent to Google, and
-    /// without a Gemini switch nothing is asked for.
+    /// Gemini's key: the voice unit's credential `gemini.key`, as
+    /// OpenRouter's and DeepSeek's are, else the Live route's when that is a
+    /// Google API key. A `gemini.key` there but not private is refused, not
+    /// passed over for the Live key. With the Live route through a relay and
+    /// no credential, a Gemini switch keeps the worker from starting: the
+    /// relay's key is never sent to Google, and without a Gemini switch
+    /// nothing is asked for.
     #[test]
-    fn gemini_is_called_with_its_own_key_or_the_live_routes_google_key_never_a_relays() {
+    fn gemini_is_called_with_the_units_key_or_the_live_routes_google_key_never_a_relays() {
         use std::os::unix::fs::PermissionsExt;
         let dir = std::env::temp_dir().join(format!(
             "lamp-second-gemini-key-{}-{:?}",
@@ -1912,26 +1961,30 @@ mod tests {
             std::thread::current().id()
         ));
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        let private = |name: &str, text: &str| {
-            let path = dir.join(name);
+        let credentials = dir.join("credentials");
+        let empty = dir.join("no-credentials");
+        let open = dir.join("open-credentials");
+        for directory in [&credentials, &empty, &open] {
+            std::fs::create_dir_all(directory).unwrap();
+        }
+        let private = |path: std::path::PathBuf, text: &str, mode: u32| {
             std::fs::write(&path, text).unwrap();
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
             path
         };
-        let llm = private("llm.key", "relay-key");
-        let live = private("live.key", "live-google-key\n");
-        let google = private("google.key", "second-google-key");
-        let second = |extra: String| {
-            let path = private(
-                "second.json",
-                &format!(
-                    r#"{{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"{}"{extra}}}"#,
-                    llm.display()
-                ),
-            );
-            crate::second_config::load_from_path(&path).unwrap()
-        };
+        let llm = private(dir.join("llm.key"), "relay-key", 0o600);
+        let live = private(dir.join("live.key"), "live-google-key\n", 0o600);
+        private(credentials.join("gemini.key"), "unit-google-key", 0o600);
+        private(open.join("gemini.key"), "open-google-key", 0o644);
+        let config = private(
+            dir.join("second.json"),
+            &format!(
+                r#"{{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"{}"}}"#,
+                llm.display()
+            ),
+            0o600,
+        );
+        let second = || crate::second_config::load_from_path(&config).unwrap();
         let provider = |endpoint: &str| -> crate::config::ProviderConfig {
             serde_json::from_str(&format!(
                 r#"{{"endpoint":"{endpoint}","model":"m","voice":"Kore","credential_file":"{}"}}"#,
@@ -1941,33 +1994,37 @@ mod tests {
         };
         let direct = provider(lamp_gemini::GOOGLE_ENDPOINT);
         let relay = provider("wss://relay.example.invalid/ws/gemini");
-        let own = second(format!(
-            r#","gemini_credential_file":"{}""#,
-            google.display()
-        ));
-        assert_eq!(
-            super::gemini_key(&own, &relay).unwrap().expose(),
-            "second-google-key"
-        );
-        let plain = second(String::new());
-        assert_eq!(
-            super::gemini_key(&plain, &direct).unwrap().expose(),
-            "live-google-key"
-        );
-        let refused = super::gemini_key(&plain, &relay).unwrap_err().to_string();
-        assert!(refused.contains("gemini_credential_file"), "{refused}");
+        let unit = Some(credentials.as_os_str());
+        for live_route in [&relay, &direct] {
+            assert_eq!(
+                super::gemini_key(live_route, unit).unwrap().expose(),
+                "unit-google-key"
+            );
+        }
+        for none in [None, Some(empty.as_os_str())] {
+            assert_eq!(
+                super::gemini_key(&direct, none).unwrap().expose(),
+                "live-google-key"
+            );
+        }
+        let not_private = super::gemini_key(&direct, Some(open.as_os_str()))
+            .unwrap_err()
+            .to_string();
+        assert!(not_private.contains("gemini.key"), "{not_private}");
+        assert!(!not_private.contains("open-google-key"));
+        let refused = super::gemini_key(&relay, None).unwrap_err().to_string();
+        assert!(refused.contains("gemini.key"), "{refused}");
         assert!(!refused.contains("relay-key") && !refused.contains("live-google-key"));
         let none: super::super::net::Declare = std::sync::Arc::new(Vec::new);
         let speech = super::RouteFlags {
             gemini_speech: true,
             ..super::RouteFlags::default()
         };
-        assert!(
-            super::services(second(String::new()), &relay, speech, None, none.clone()).is_err()
-        );
+        assert!(super::services(second(), &relay, speech, None, none.clone()).is_err());
+        assert!(super::services(second(), &relay, speech, unit, none.clone()).is_ok());
         assert!(
             super::services(
-                second(String::new()),
+                second(),
                 &relay,
                 super::RouteFlags::default(),
                 None,
@@ -1975,7 +2032,7 @@ mod tests {
             )
             .is_ok()
         );
-        assert!(super::services(second(String::new()), &direct, speech, None, none).is_ok());
+        assert!(super::services(second(), &direct, speech, None, none).is_ok());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

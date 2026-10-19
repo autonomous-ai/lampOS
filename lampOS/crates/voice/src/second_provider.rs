@@ -173,6 +173,10 @@ pub type Asked = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 pub type Look = Arc<dyn Fn() -> Result<Vec<u8>, &'static str> + Send + Sync>;
 /// The engine's clock, for the announcement's spell.
 pub type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
+/// The note a spoken request's words earn when they name one of the staff
+/// (`worker::staff_noting`, `crate::staff_note`): `(request, heard)` to the
+/// note, or nothing.
+pub type StaffNote = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 
 /// What every turn task shares.
 struct Shared {
@@ -199,6 +203,8 @@ struct Shared {
     heard_last: Mutex<Option<(u64, String)>>,
     /// The stop to be told (`after_stop`), with the request it is for.
     stop_untold: Mutex<Option<StopToTell>>,
+    /// With `LAMP_STAFF_NOTE=on`: the note for words that name the staff.
+    staff: Option<StaffNote>,
 }
 
 /// A stop to be told beside a request's chat ([`crate::provider_worker::STOPPED_NOTE`]).
@@ -426,6 +432,7 @@ impl Engine {
                 announce: true,
                 heard_last: Mutex::new(None),
                 stop_untold: Mutex::new(None),
+                staff: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -458,6 +465,16 @@ impl Engine {
     pub fn heeding(mut self, heed: Heed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.heed = Some(heed);
+        }
+        self
+    }
+
+    /// A spoken request whose words name one of the staff is asked with the
+    /// Live route's note beside them (`LAMP_STAFF_NOTE=on`,
+    /// `crate::staff_note`). Before any turn only.
+    pub fn noting_staff(mut self, staff: StaffNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.staff = Some(staff);
         }
         self
     }
@@ -699,7 +716,7 @@ impl Engine {
                         text,
                         Asker::Written { looking },
                         picture,
-                        None,
+                        Vec::new(),
                         Times::new(begun),
                     )
                     .await
@@ -753,7 +770,7 @@ impl Engine {
                         note,
                         Asker::Reminder,
                         None,
-                        None,
+                        Vec::new(),
                         Times::new(Instant::now()),
                     )
                     .await
@@ -1020,14 +1037,19 @@ async fn spoken(
     // The first request asked after a hand or the head stopped the lamp: the
     // model is told so, as Gemini is (`STOPPED_NOTE`, #1148), so the story
     // that was stopped is not begun again.
-    let note = shared.stop_untold.lock().ok().and_then(|mut untold| {
+    let stopped = shared.stop_untold.lock().ok().and_then(|mut untold| {
         let stop = untold
             .as_mut()
             .filter(|stop| stop.request == request && !stop.asked)?;
         stop.asked = true;
-        Some(crate::provider_worker::STOPPED_NOTE)
+        Some(crate::provider_worker::STOPPED_NOTE.to_owned())
     });
-    answer(&shared, request, text, Asker::Spoken, None, note, times).await;
+    let staff = shared
+        .staff
+        .as_ref()
+        .and_then(|staff| staff(request, &text));
+    let notes = stopped.into_iter().chain(staff).collect();
+    answer(&shared, request, text, Asker::Spoken, None, notes, times).await;
 }
 
 /// Who asked the turn's chat, which sets what it may do.
@@ -1128,7 +1150,7 @@ async fn answer(
     said: String,
     asked: Asker,
     picture: Option<Vec<u8>>,
-    note: Option<&'static str>,
+    notes: Vec<String>,
     times: Arc<Mutex<Times>>,
 ) {
     let heard = asked == Asker::Spoken;
@@ -1169,7 +1191,7 @@ async fn answer(
         messages.extend(told.history);
         // A note beside the request, never anyone's words (as on the Live
         // route, where a note goes beside what the model hears).
-        messages.extend(note.map(Message::system));
+        messages.extend(notes.into_iter().map(Message::system));
         messages.push(question);
         let asked_at = messages.len() - 1;
         let mut round = 0;

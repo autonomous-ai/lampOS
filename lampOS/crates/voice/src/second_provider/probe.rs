@@ -294,7 +294,7 @@ pub async fn run(
             Tts::new(&config).map_err(io::Error::other)?,
         )),
     )];
-    match super::worker::gemini_key(&config, &provider) {
+    match super::worker::gemini_key(&provider, credentials.as_deref()) {
         Ok(key) => {
             chats.push((
                 format!("chat=gemini({})", config.gemini.chat_model),
