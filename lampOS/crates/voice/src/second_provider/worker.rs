@@ -4289,6 +4289,9 @@ mod tests {
         let judged = |by_day: bool| {
             let mut heeding = super::Heeding::new(true, false, None, None);
             heeding.as_the_only_voice(false, true, by_day);
+            // By day, whatever the hour the test runs at (Third on #1712,
+            // 21:36: from 21:00 it failed once #1928 read the night).
+            heeding.night = || false;
             heeding.judge(9, line, "What time is it?", signs())
         };
         assert!(judged(true).is_some(), "by day, held");
