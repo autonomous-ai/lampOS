@@ -483,6 +483,13 @@ skills (`LAMP_SCHEDULE_SPEAK=skill`, `LAMP_TASK_NEWS=skill`; install.md).
 A skill with a tool costs one of the 32 functions a session takes, after
 the voice's own and the actions part's, and what is past 32 is left out
 without a word: a product lamp's are 31 (`crates/update/tests/functions.rs`).
+An update round brings them up to date from the build (#2014's P2,
+[updates.md](updates.md), "The product's skills"): each build carries the
+product skills as one signed file, `lamp-product-skills`, and a round writes
+each file still install's (or a round's) as recorded, keeps a file the lamp
+changed and never touches a skill the person installed, judges the folder as
+it would leave it with the build's `lamp-skills list` first, and puts the
+files back with a build it puts back.
 `deploy/units/lamp-skills.service` stays the template for a lamp set up by hand.
 The product unit passes `--zone system`, the zone setup saved (#820), across
 summer time (#1384). lamp-4ace's passes neither yet, so there a skill with

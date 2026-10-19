@@ -25,7 +25,7 @@ lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setu
 lamp-update harness-off
 lamp-update harness-on
 lamp-update check-units --cat FILE [--product DIR]
-lamp-update manifest --binaries DIR --deploy DIR --channel NAME --sequence N --commit SHA --files-url URL
+lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --sequence N --commit SHA --files-url URL
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
 lamp-update public-key --key-file PRIVATE
 lamp-update --help
@@ -73,8 +73,10 @@ check-units  says whether a lamp runs exactly the product's units (docs/install.
           It ends with 0 when everything is the same and nothing else is found, 1 when
           not, and 2 for a wrong option or a file it cannot read.
 
-manifest  writes DIR/manifest.json for the binaries in --binaries and the units of
-          each lamp folder (one with a LAMP.md) in --deploy, copied beside them.
+manifest  writes DIR/manifest.json for the binaries in --binaries, the units of
+          each lamp folder (one with a LAMP.md) in --deploy, copied beside them, and
+          the product skills of --skills (lampOS/skills), written beside them as
+          lamp-product-skills.
 sign      writes the signed envelope (lampos-manifest.json) for a manifest, with a
           private key: an unencrypted PKCS#8 Ed25519 key in base64.
 public-key prints the public key of a private key, in base64: what a lamp is given.
@@ -188,6 +190,7 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
         &[
             "binaries",
             "deploy",
+            "skills",
             "channel",
             "sequence",
             "commit",
@@ -200,6 +203,7 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
     let made = publish::make(
         Path::new(wanted(options, "binaries")?),
         Path::new(wanted(options, "deploy")?),
+        Path::new(wanted(options, "skills")?),
         wanted(options, "channel")?,
         sequence,
         wanted(options, "commit")?,

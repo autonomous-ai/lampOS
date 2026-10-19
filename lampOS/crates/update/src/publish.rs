@@ -1,11 +1,15 @@
 //! The manifest of a build, made where it is built: every lampOS binary
-//! in a folder (CI's `arm64-out`, with its `SHA256SUMS`), and every unit of
-//! every lamp's own folder (`deploy/<lamp>/`, a folder with a `LAMP.md`).
-//! The units are copied beside the binaries as `<lamp>.<unit>`, so that
-//! the folder is what is published.
+//! in a folder (CI's `arm64-out`, with its `SHA256SUMS`), every unit of
+//! every lamp's own folder (`deploy/<lamp>/`, a folder with a `LAMP.md`),
+//! and the product's skills (`skills/`, each of
+//! [`PRODUCT_SKILLS`](crate::install::PRODUCT_SKILLS)) as one file,
+//! [`product_skills::BUNDLE`]. The units are copied beside the binaries as
+//! `<lamp>.<unit>`, and the skills written there, so that the folder is
+//! what is published.
 use crate::{
+    install,
     manifest::{self, File, Manifest, SCHEMA, Unit},
-    unit,
+    product_skills, unit,
 };
 use std::{fs, io, path::Path};
 
@@ -14,10 +18,11 @@ fn invalid(why: String) -> io::Error {
 }
 
 /// The manifest, written as `manifest.json` into `binaries`, with the units
-/// copied there.
+/// copied there and the product skills of `skills` written there.
 pub fn make(
     binaries: &Path,
     deploy: &Path,
+    skills: &Path,
     channel: &str,
     sequence: u64,
     commit: &str,
@@ -28,7 +33,12 @@ pub fn make(
     for entry in fs::read_dir(binaries)? {
         let entry = entry?;
         let name = entry.file_name().to_string_lossy().into_owned();
-        if !manifest::is_binary_name(&name) || !entry.file_type()?.is_file() {
+        // The skills' file is made below, never taken as a binary (one
+        // left by an earlier run is written again).
+        if !manifest::is_binary_name(&name)
+            || name == product_skills::BUNDLE
+            || !entry.file_type()?.is_file()
+        {
             continue;
         }
         let bytes = fs::read(entry.path())?;
@@ -47,6 +57,14 @@ pub fn make(
             size: bytes.len() as u64,
         });
     }
+    let bundle = product_skills::make(skills, install::PRODUCT_SKILLS)?;
+    let bytes = product_skills::bytes(&bundle)?;
+    fs::write(binaries.join(product_skills::BUNDLE), &bytes)?;
+    files.push(File {
+        name: product_skills::BUNDLE.to_owned(),
+        sha256: manifest::sha256_hex(&bytes),
+        size: bytes.len() as u64,
+    });
     files.sort_by(|a, b| a.name.cmp(&b.name));
     let mut units = Vec::new();
     for lamp in fs::read_dir(deploy)? {
@@ -131,9 +149,42 @@ mod tests {
             .unwrap();
         }
         let url = "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-7/";
-        let made = make(&out, &deploy, "lamp-voice", 7, &"c".repeat(40), url).unwrap();
+        let skills = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+        let made = make(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            7,
+            &"c".repeat(40),
+            url,
+        )
+        .unwrap();
         let names: Vec<&str> = made.files.iter().map(|file| file.name.as_str()).collect();
-        assert_eq!(names, ["lamp-body", "lamp-voice"]);
+        assert_eq!(names, ["lamp-body", "lamp-product-skills", "lamp-voice"]);
+        // The skills' file is signed with the manifest, as a binary is, and
+        // holds each product skill.
+        let bundle = fs::read(out.join(product_skills::BUNDLE)).unwrap();
+        let listed = &made.files[1];
+        assert_eq!(listed.sha256, manifest::sha256_hex(&bundle));
+        assert_eq!(listed.size, bundle.len() as u64);
+        let bundle = product_skills::parse(&bundle).unwrap();
+        let mut product: Vec<&str> = install::PRODUCT_SKILLS.to_vec();
+        product.sort_unstable();
+        assert_eq!(bundle.skills, product);
+        // Made again, the file left by the first run is not taken for a
+        // binary.
+        let again = make(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            7,
+            &"c".repeat(40),
+            url,
+        )
+        .unwrap();
+        assert_eq!(again, made);
         assert_eq!(made.units.len(), 1);
         assert_eq!(made.units[0].file_name(), "lamp-4ace.lamp-voice.service");
         assert!(out.join("lamp-4ace.lamp-voice.service").is_file());
@@ -142,6 +193,17 @@ mod tests {
 
         // A binary that SHA256SUMS does not know as it is: refused.
         fs::write(out.join("lamp-body"), b"changed").unwrap();
-        assert!(make(&out, &deploy, "lamp-voice", 7, &"c".repeat(40), url).is_err());
+        assert!(
+            make(
+                &out,
+                &deploy,
+                &skills,
+                "lamp-voice",
+                7,
+                &"c".repeat(40),
+                url
+            )
+            .is_err()
+        );
     }
 }
