@@ -40,6 +40,13 @@ const SCALE: (f32, f32) = (0.25, 3.0);
 /// The bars' least values, so that silence stays silence and a hiss is no
 /// word, however quiet the voice.
 const FLOORS: (f32, f32, f32) = (0.015, 0.03, 0.06);
+/// The stress bar's most: the voice's meter stops at 1.0, so a voice that
+/// fills it (a running level near 1.0, scaled past 1.0) would otherwise never
+/// nod, where the fixed bars nodded as each sentence began (Seventh on
+/// #1722, 19 Oct 22:25). `stress_rise` still asks the word to stand out from
+/// the moment before it. A catalogue whose own `stress_level` is higher keeps
+/// it.
+const STRESS_CEILING: f32 = 0.9;
 /// The recent level a stressed word is measured against follows the sound
 /// this fast.
 const RECENT_US: f64 = 250_000.0;
@@ -230,7 +237,9 @@ impl SpeechMotion {
             };
             let quiet_level = (QUIET_LEVEL * scale).max(FLOORS.0);
             let speaking_level = (SPEAKING_LEVEL * scale).max(FLOORS.1);
-            let stress_level = (rules.stress_level * scale).max(FLOORS.2);
+            let stress_level = (rules.stress_level * scale)
+                .min(STRESS_CEILING.max(rules.stress_level))
+                .max(FLOORS.2);
             if level < quiet_level {
                 let since = *self.quiet_since.get_or_insert(now_us);
                 self.paused |= now_us.saturating_sub(since) >= rules.pause_us;
