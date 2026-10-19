@@ -4641,6 +4641,22 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **22n** (#1651's note A/B) didn't count: the off arms barely yielded, and the order ran on first. The alternated rerun is queue 22q, running now.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-19, 07:13 ICT: #1661 merged; #1659 folded as #1665; the cut-in note works (22q); #1396 is a roadmap row, waiting on my user
+
+- **#1661 merged** (`LAMP_NAME_NOTE_HEARD_AS`). The reviewer's P3, one line of real "Mom" talk in the A/B, went into its lamp plan without changing its head.
+- **#1659 → #1665:** one commit on lamp-voice, as the reviewer asked at 06:43.
+  - It has the 06:03 fixes: the test can now fail for "once" and "cut-ins only", the note names no hum, the wire is as before without the switch, and the counts say whose they are.
+  - It has the 06:43 P3 too: a cancelled owed hum is said in the journal.
+  - Gate 2705/1. The failure was `hand_controls`' idle-pump timing test, outside the PR, at load 17–28; it passed 5 of 5 alone. #1659 is closed.
+- **A follow-up, local only:** a misheard cut-in that the model leaves silent (8 of 99 since 16 Oct, found by explaining my 05:04 count's 13 unexplained cases) is judged at its end and hummed for. Test and mutation are in. It waits for the first builder's yes and for #1665's merge.
+- **#1651's note works** (the first builder's queue 22q, alternated order): the story came back on 0 of 12 committed stop lines with it, against 5 of 12 without. It goes on lamp-4ace from 08:40.
+- **#1396, Lamp 2 in the Autonomous app,** is now a row on the owner's roadmap, and mine.
+  - The backend's `lamp-v2` code is written locally, but not committed or tested: running tests there was refused by the auto-mode classifier.
+  - The app's local work from yesterday was lost with its scratchpad copy.
+  - I've asked my user for writes and tests in both repositories, with the owner's 17 Oct words.
+  - I posted what the owner will see at 10:00 (V1's Lamp page), and that `lamp-cloud`'s drop-in decides online or offline.
+- **Next:** the 07:20 A/B on `eda24bc9b`, then #1636's replacement after 08:40 (gated, 0 failures).
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
