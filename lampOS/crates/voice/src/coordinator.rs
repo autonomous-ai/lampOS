@@ -4310,6 +4310,9 @@ fn conversation_with_gate(
     // A yield's request begins at the person's first words, said under the
     // lamp's voice, as far back as 1.6 s (#828). Off unless set.
     let first_words = duplex && crate::activity::first_words_kept();
+    // And a line begun as the lamp's sound ends, at the onset that sound
+    // hid (#1722, `LAMP_REPLY_END_REACH=on`). Off unless set.
+    let reply_end_reach = first_words && crate::activity::reply_end_reach();
     // Listening gaps (#828, `LAMP_LISTEN_GAPS=on`): a long reply's
     // sentence ends held quiet, and a person heard in the lamp's own
     // silence. Off unless set; only with ears.
@@ -4430,6 +4433,7 @@ fn conversation_with_gate(
             "fruitless_yield_forgiven_after_ms":crate::turn_taking::FORGIVE_FRUITLESS_US / 1_000,
             "decision_budget_us":hold.decision_budget_us,
             "first_words_kept_blocks":first_words.then_some(crate::activity::REACH_BACK_BLOCKS),
+            "reply_end_reach_within_blocks":reply_end_reach.then_some(lamp_audio::evidence::QUIET_BLOCKS_CEILING),
             "listen_gaps":listen_gaps.then_some(json!({"after_ms":crate::listen_gaps::AFTER_FRAMES * 1_000 / u64::from(lamp_audio::RENDER_RATE),"quiet_run_ms":crate::listen_gaps::LOW_RUN_CHUNKS * 10,"gap_ms":crate::listen_gaps::GAP_US / 1_000,"silence_heard":true})),
             "stop_words_after_still_blocks":(stop_words.is_some() && !always).then_some(crate::stop_words::FINALIZE_AFTER_STILL_BLOCKS),
             "stop_words_always":(stop_words.is_some() && always).then_some(true),
@@ -5845,6 +5849,8 @@ fn conversation_with_gate(
             // evidence, by each block's own score (#828).
             if yielded {
                 detector.reach_back();
+            } else if reaches_past_reply(reply_end_reach, frame.echo.as_ref()) {
+                detector.reach_back_to_onset();
             }
             let samples = observation.samples;
             let captured_at_us = observation.captured_at_us;
@@ -8248,6 +8254,17 @@ fn clear_capture_lineage(
     detector.discard_inactive_prefix();
     mask.clear_read_lineage();
     Ok(())
+}
+
+/// Whether a start heard now comes as the lamp's sound ends, so that with
+/// `LAMP_REPLY_END_REACH=on` it may begin at the onset that sound hid
+/// ([`crate::activity::TurnDetector::reach_back_to_onset`], #1722): the
+/// lamp's sound quiet under [`lamp_audio::evidence::QUIET_BLOCKS_CEILING`]
+/// blocks, 640 ms, past the 300 ms the duplex rule waits before it lets a
+/// person start.
+fn reaches_past_reply(on: bool, echo: Option<&lamp_audio::evidence::EchoEvidence>) -> bool {
+    on && echo
+        .is_some_and(|echo| echo.render_quiet_blocks < lamp_audio::evidence::QUIET_BLOCKS_CEILING)
 }
 
 /// Duplex hearing for one capture block, before admission sees it. Returns

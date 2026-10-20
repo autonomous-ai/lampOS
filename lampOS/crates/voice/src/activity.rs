@@ -55,6 +55,22 @@ pub fn first_words_kept() -> bool {
     std::env::var(FIRST_WORDS_ENVIRONMENT).ok().as_deref() == Some("kept")
 }
 
+/// With first words kept, a line that starts as the lamp's sound ends begins
+/// at the onset the lamp's sound hid ([`TurnDetector::reach_back_to_onset`]),
+/// with `on`; off unless set (#1722, the first builder at 06:56).
+///
+/// Why: under the lamp's last words the duplex rule takes a person for the
+/// lamp's own sound, and the line starts only once the lamp has been quiet
+/// 300 ms, without what was said under it. On lamp-4ace on 20 October "Hey
+/// Lamp, ask Codex to write a haiku about coffee." said as a story ended
+/// came as its last 8 words, held for no name, in 3 of 4 hand-overs.
+pub const REPLY_END_REACH_ENVIRONMENT: &str = "LAMP_REPLY_END_REACH";
+
+/// Whether the voice's environment says `on`.
+pub fn reply_end_reach() -> bool {
+    std::env::var(REPLY_END_REACH_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// With first words kept, how far back a yield's request may begin: 1.6 s,
 /// the duplex hold's longest retained age.
 pub const REACH_BACK_BLOCKS: usize = 160;
@@ -200,6 +216,9 @@ pub struct TurnDetector {
     first_words: bool,
     /// The next start is a yield's, and may reach back.
     reach_back: bool,
+    /// The next start comes as the lamp's sound ends, and may reach back
+    /// to the onset the lamp's sound hid.
+    reach_onset: bool,
     start_count: u16,
     silence_count: u16,
     end_silence_blocks: u16,
@@ -231,6 +250,7 @@ impl Default for TurnDetector {
             scores: VecDeque::new(),
             first_words: false,
             reach_back: false,
+            reach_onset: false,
             start_count: 0,
             silence_count: 0,
             end_silence_blocks: END_SILENCE_BLOCKS,
@@ -298,6 +318,17 @@ impl TurnDetector {
     /// pre-roll. Only for the next block pushed.
     pub fn reach_back(&mut self) {
         self.reach_back = self.first_words;
+    }
+
+    /// The next utterance to start comes as the lamp's sound ends
+    /// (`LAMP_REPLY_END_REACH=on`, #1722): with first words kept, it begins
+    /// [`REACH_LEAD_BLOCKS`] before the earliest onset of the pre-roll, a run
+    /// of [`START_BLOCKS`] blocks each scored [`START_PROBABILITY`] or more by
+    /// its own score: where it would have started had the lamp not been
+    /// sounding. Never past a block that was not heard. Only for the next
+    /// block pushed.
+    pub fn reach_back_to_onset(&mut self) {
+        self.reach_onset = self.first_words;
     }
 
     /// Configured silence window; with confirmation it is the fallback.
@@ -378,6 +409,7 @@ impl TurnDetector {
         own: Option<f32>,
     ) -> Activity {
         let reach_back = std::mem::take(&mut self.reach_back);
+        let reach_onset = std::mem::take(&mut self.reach_onset);
         if let Err(reason) = self.validate(&frame, probability) {
             return Activity::Fault(reason);
         }
@@ -470,7 +502,7 @@ impl TurnDetector {
             0
         };
         if self.start_count >= START_BLOCKS {
-            let begin = self.begin(reach_back);
+            let begin = self.begin(reach_back, reach_onset);
             self.prefix.drain(..begin);
             self.scores.clear();
             self.active = true;
@@ -511,9 +543,12 @@ impl TurnDetector {
     /// [`PRE_ROLL_BLOCKS`], or for a yield with first words kept,
     /// [`REACH_LEAD_BLOCKS`] before the earliest block scored
     /// [`SILENCE_PROBABILITY`] or more, never past a block that was not heard.
-    fn begin(&self, reach_back: bool) -> usize {
+    /// As the lamp's sound ends (`reach_onset`), [`REACH_LEAD_BLOCKS`] before
+    /// the earliest onset the same way, so the lamp's own last words, which
+    /// the canceller leaves scored under [`START_PROBABILITY`], aren't taken.
+    fn begin(&self, reach_back: bool, reach_onset: bool) -> usize {
         let usual = self.prefix.len().saturating_sub(PRE_ROLL_BLOCKS);
-        if !reach_back || self.scores.len() != self.prefix.len() {
+        if !(reach_back || reach_onset) || self.scores.len() != self.prefix.len() {
             return usual;
         }
         // Never past a block heard without evidence, wherever it is: every
@@ -523,6 +558,24 @@ impl TurnDetector {
             .iter()
             .rposition(Option::is_none)
             .map_or(0, |at| at + 1);
+        if reach_onset && !reach_back {
+            let onset = usize::from(START_BLOCKS);
+            let mut run = 0;
+            for (at, score) in self.scores.iter().enumerate().take(usual).skip(floor) {
+                if score.is_some_and(|score| score >= START_PROBABILITY) {
+                    run += 1;
+                    if run == onset {
+                        return (at + 1 - onset)
+                            .saturating_sub(REACH_LEAD_BLOCKS)
+                            .max(floor)
+                            .min(usual);
+                    }
+                } else {
+                    run = 0;
+                }
+            }
+            return usual;
+        }
         self.scores
             .iter()
             .enumerate()
