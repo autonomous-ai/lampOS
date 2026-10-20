@@ -699,3 +699,63 @@ fn a_store_that_cannot_open_never_claims_readiness_and_any_delivered_report_is_w
         );
     }
 }
+
+/// #1680: memory a newer build wrote doesn't stop the part. It serves, the
+/// journal names the kept file, and health warns with its name.
+#[test]
+fn a_newer_database_is_set_aside_and_health_says_so_while_memory_serves() {
+    let scratch = Scratch::new();
+    let store = scratch.path("store");
+    DirBuilder::new().mode(0o700).create(&store).unwrap();
+    private_file(&store.join(DATABASE), b"");
+    rusqlite::Connection::open(store.join(DATABASE))
+        .unwrap()
+        .execute_batch("CREATE TABLE later(value TEXT); PRAGMA user_version=2")
+        .unwrap();
+    let original = fs::read(store.join(DATABASE)).unwrap();
+    let mut reports = scratch.subscribe();
+    let mut process = Process::start(&scratch, true, true, false);
+    process.ready(&scratch);
+    process.logged("it is set aside as memory-days.sqlite3.newer-db2-");
+    let report = report_when(&mut reports, |report| {
+        report.values.iter().any(|pair| pair.key == "set_aside")
+    });
+    assert_eq!(report.level, Level::Warn);
+    let kept = value(&report, "set_aside").to_owned();
+    assert!(kept.starts_with("memory-days.sqlite3.newer-db2-"), "{kept}");
+    assert_eq!(fs::read(store.join(&kept)).unwrap(), original);
+    ok(
+        &scratch,
+        json!({"op":"remember","person":"everyone","at_unix_ms":now(),"text":"synthetic coffee"}),
+    );
+}
+
+/// #2067: forgetting everything removes the set-aside database, and health
+/// stops warning about it.
+#[test]
+fn forgetting_everything_removes_a_set_aside_database_and_health_stops_warning() {
+    let scratch = Scratch::new();
+    let store = scratch.path("store");
+    DirBuilder::new().mode(0o700).create(&store).unwrap();
+    private_file(&store.join(DATABASE), b"");
+    rusqlite::Connection::open(store.join(DATABASE))
+        .unwrap()
+        .execute_batch("PRAGMA user_version=2")
+        .unwrap();
+    let mut reports = scratch.subscribe();
+    let mut process = Process::start(&scratch, true, true, false);
+    process.ready(&scratch);
+    let report = report_when(&mut reports, |report| {
+        report.values.iter().any(|pair| pair.key == "set_aside")
+    });
+    let kept = value(&report, "set_aside").to_owned();
+    ok(&scratch, json!({"op":"forget_all","person":null}));
+    process.logged(&format!(
+        "a forget also removed the memory a newer build wrote: {kept}"
+    ));
+    assert!(!store.join(&kept).exists());
+    let report = report_when(&mut reports, |report| {
+        report.values.iter().all(|pair| pair.key != "set_aside")
+    });
+    assert_ne!(report.level, Level::Warn, "{report:?}");
+}
