@@ -447,8 +447,27 @@ look asked for, so nobody sees the eyes shut; if that does not open, it is
 back at 320 by 240 by the turns above and the next try is 30 minutes later,
 then every hour. One journal line for each try ("closing the camera to try
 the full size again (try N)") and the usual "camera open, W by H" after it.
-Resetting the camera's USB port to end a refusal is the fifth builder's
-idea, not built here.
+After six opens in a row that did not open, the tries come every 15 s
+instead of every 5 (`reopen::retry_after`), said once ("the device seems
+stuck"), and "camera open again after N opens in a row that did not" when it
+opens: on lamp-52e6 on 2026-10-20 a mute was followed by opens refused at
+`StreamOn`, `SetInterval`, `RequestBuffers` or `Controls` until a reboot, a
+restart of lamp-eyes included (#1941, row 17). Each ioctl returned, only
+late: lamp-eyes was not hung, the device was. A stuck camera's USB
+device is reset (`lamp_camera::linux::reset_usb`, USBDEVFS_RESET), as an
+unplug would: at the sixth failure, then at most once every ten minutes
+(`reopen::reset_now`), never a reboot. It is found by `--usb`'s topology
+and reset only when its vendor and product are the expected ones; the
+journal says "camera's USB device … reset" or why not, and health counts it
+(`camera_resets`). The eyes' user needs write access to the camera's USB
+node, which the lamp's udev rule gives `video`
+(`robots/lamp/rootfs/etc/udev/rules.d/99-lamp-device.rules`). A lamp that
+gets the rule by update has it only after its next boot or a replug of the
+camera (an update reloads rules and triggers nothing,
+[install.md](install.md)); until then each reset says `not reset: Io(13)`. A
+reset is never done while seeing is not permitted (a mute or the switch
+closed): one that falls due then waits for the first failure after seeing is
+permitted again. Health counts the resets since the camera last opened.
 
 The size is at most 3264 by 2448, the camera runtime's bound
 ([camera-runtime.md](camera-runtime.md)); larger is refused at start. On
@@ -943,12 +962,14 @@ under the name `eyes`, for the lamp's health ([health.md](health.md)):
 |---|---|---|
 | `ok` | | The camera is open, or closed because seeing is not permitted now. Closed is the eyes working as they should |
 | `warn` | `the camera does not open` | Permitted, and the camera cannot be opened; it is tried again |
+| `warn` | `the camera does not open; its USB device was reset N times` | The same, once the stuck camera's USB device has been reset (#2126) |
 | `warn` | `the camera stopped giving pictures` | It was open and failed, until it is open again |
 | `warn` | `the eyes set aside N people's records they couldn't read` | While anything is in `set-aside/` beside the people file (#1505), counted once a minute; a camera warning is said first |
 
 The facts beside it are `camera` (`open`, `closed`, `not opening` or
-`failed`) and `set_aside`, the count of people's records set aside (0 when
-none). It is said on every turn of the loop that is due, whatever the
+`failed`), `set_aside`, the count of people's records set aside (0 when
+none), and `camera_resets`, the camera's USB device reset since it last
+opened. It is said on every turn of the loop that is due, whatever the
 camera is doing, and the sign that the eyes are there is now given the
 same way: before 2026-10-14 it was not given while the camera was not
 permitted, so the eyes read as gone from the bus whenever they were not
