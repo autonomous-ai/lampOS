@@ -165,7 +165,7 @@ don't know" or "someone", and ends only when you say stop.
   replay looks at no time between messages, so one `light/reached` holds
   there: the 30 s rule and the 12 hours are the program's, tested in
   `watch.rs` and `skills.rs`.
-- `crates/skills/tests/skills.rs`: the loader's refusals for a watch (a
+- `crates/skills/tests/it/skills.rs`: the loader's refusals for a watch (a
   trigger, a choice other than on and off, a missing permission or topic, a
   mark that isn't faint and steady, a `[[do]]`, an unknown key such as
   `picture`), and the program on a bus of its own: a call with nothing

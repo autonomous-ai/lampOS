@@ -467,7 +467,7 @@ dark, unwell pale over the whole ring; the ask's 2 s bound, the at-once ask's
 100 ms, a missing socket, and the privacy open locking when it can and
 taking the ring when it cannot); `crates/setup/src/wake.rs` (the switch, lit from the first frame,
 the fade-in and the opening, 6 s then 10 s breaths, pale after 5 minutes,
-the fade-out); `crates/setup/tests/wake.rs` (with a real `try_lock` on a
+the fade-out); `crates/setup/tests/it/wake.rs` (with a real `try_lock` on a
 file: the voice's lock fails while the face shows and succeeds the moment
 it is answered, the privacy ring has it within 100 ms, a face that never
 answers cannot keep the privacy ring dark past 100 ms and writes nothing

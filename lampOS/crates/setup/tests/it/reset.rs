@@ -345,7 +345,7 @@ const PERSON_STORES: [&str; 31] = [
 #[test]
 fn the_example_plan_wipes_every_store_of_the_person() {
     let plan: Plan =
-        serde_json::from_str(include_str!("../fixtures/reset-plan-example.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-example.json")).unwrap();
     plan.check().unwrap();
     for store in PERSON_STORES.map(Path::new) {
         assert!(
@@ -370,7 +370,7 @@ fn the_example_plan_wipes_every_store_of_the_person() {
 #[test]
 fn a_reset_takes_harness_sign_in_and_pairings_and_keeps_harness_itself() {
     let plan: Plan =
-        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
     let root = Root::new();
     let harness = root.path(".harness");
     let files = [
@@ -417,8 +417,8 @@ fn reset_wipes_all_onboarding_state_and_keeps_the_core_skill() {
     let home = Path::new("/var/lib/lampOS/voice/onboarding");
     let skill = Path::new("/var/lib/lampOS/skills/onboarding/skill.json");
     for source in [
-        include_str!("../fixtures/reset-plan-product.json"),
-        include_str!("../fixtures/reset-plan-example.json"),
+        include_str!("../../fixtures/reset-plan-product.json"),
+        include_str!("../../fixtures/reset-plan-example.json"),
     ] {
         let plan: Plan = serde_json::from_str(source).unwrap();
         plan.check().unwrap();
@@ -463,9 +463,9 @@ fn reset_wipes_all_onboarding_state_and_keeps_the_core_skill() {
 #[test]
 fn the_product_plan_is_the_example_stopped_by_systemd() {
     let example: Plan =
-        serde_json::from_str(include_str!("../fixtures/reset-plan-example.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-example.json")).unwrap();
     let product: Plan =
-        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
     product.check().unwrap();
     assert_eq!(
         product.stop,
@@ -483,7 +483,7 @@ fn the_product_plan_is_the_example_stopped_by_systemd() {
 #[test]
 fn the_product_reset_wipes_daily_claims_and_caps_but_keeps_service_directories() {
     let plan: Plan =
-        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
     plan.check().unwrap();
     let root = Root::new();
     let stores = ["lampos-skills-state", "lampos-output-caps"];
