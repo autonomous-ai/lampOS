@@ -241,10 +241,10 @@ pads` item warns while it lasts (`line 97 touched since the head was first
 read: left out until let go`, `left_out`; first read at Controls' start, or
 when the reader comes back after a fault). A hand that lands after the first
 acquisition is not left out: the head waits for it to go, as before. With
-every pad left out, the head is not armed. Tests: `tests/touch.rs`
+every pad left out, the head is not armed. Tests: `tests/it/touch.rs`
 (`a_pad_touched_from_the_start_is_left_out_and_the_other_arms`),
-`tests/touch_pins.rs` (`the_probe_at_start_says_which_head_lines_a_pad_drives`)
-and `tests/touch_runtime.rs`
+`tests/it/touch_pins.rs` (`the_probe_at_start_says_which_head_lines_a_pad_drives`)
+and `tests/it/touch_runtime.rs`
 (`controls_says_the_head_lines_and_a_pad_left_out_on_diagnostics`). Not shown:
 the probe on a lamp. It's Linux GPIO, so ARM64 builds it, and lamp-52e6 is
 where it would be seen.
@@ -287,11 +287,11 @@ quick taps on a pad that holds its level, it says none (the reviewer on
 #1965), since `pulses` written for such a pad would never read a resting
 hand. The factory step refuses a pad with any change at rest, or with no
 `reads`, and asks again; it writes `head_rest` only from a report that
-measured both. Tests: `tests/head_rest.rs` (cb94's 77 s flip is nothing on a pulse
+measured both. Tests: `tests/it/head_rest.rs` (cb94's 77 s flip is nothing on a pulse
 pad and a touch, stroke and sleep on a level one; a resting hand from either
 rest; one or two pulses a tap; a bounce or a slow change nothing; a pulse pad
-arms on a line resting high), `tests/head_discovery.rs`
-(`the_hands_away_phase_*`, `two_quick_touches_on_a_level_pad_*`), `tests/touch_pins.rs` (`head_rest_*`) and
+arms on a line resting high), `tests/it/head_discovery.rs`
+(`the_hands_away_phase_*`, `two_quick_touches_on_a_level_pad_*`), `tests/it/touch_pins.rs` (`head_rest_*`) and
 `deploy/factory/steps-test.sh`. Not shown: any lamp's pads read this way;
 whether a pad whose rest drifts later, after the factory, is told.
 
@@ -687,7 +687,7 @@ is no pat. A Pet wakes a sleeping lamp (Expression), and waking at night
 with nobody there isn't a living thing (the reviewer's P2 on #2239, rule
 8). A press runs from the first pad touched until none is, so a real pat on
 another pad while one line drifts high is part of that long press, and no
-Pet is given either. That errs on the quiet side. Tests: `tests/engine.rs`
+Pet is given either. That errs on the quiet side. Tests: `tests/it/engine.rs`
 (`a_press_longer_than_a_pat_gives_no_pet_and_a_pat_still_does`).
 Directional labels, early reversal classification, the first-session chirp
 and spoken phrases are not ported. State publishes
@@ -801,8 +801,8 @@ Tests: `forward::tests`;
 `the_products_files_one_release_ahead_are_read_and_their_new_fields_named`,
 `privacy_keys_and_bad_values_are_still_refused_and_no_value_is_shown` and
 `new_wiring_reads_a_newer_builds_fields_past_and_the_legacy_schema_stays_strict`
-(`tests/touch_pins.rs`); the strip's layers in `tests/mpr121.rs`; the
-replay naming them (`tests/touch_program.rs`).
+(`tests/it/touch_pins.rs`); the strip's layers in `tests/it/mpr121.rs`; the
+replay naming them (`tests/it/touch_program.rs`).
 
 Every configured line is read together every `every_ms` (5 on lamp-4ace)
 and given as one complete observation stamped with the moment of the
@@ -1143,7 +1143,7 @@ reads but breaks this build's own rules still refuses (unmuted with a
 `reason`, an empty `clock_id`, a future watermark), and so does anything
 that is no such object (not JSON, an array, no or a non-whole `version`,
 `version` 0). Each fails closed (`MuteRecord::load_noting`; tests
-`crates/controls/tests/mute.rs`). The mute
+`crates/controls/tests/it/mute.rs`). The mute
 preference now survives a **machine reboot** as well as a service restart;
 timestamps are rebased to the new boot while the muted value is preserved.
 The same-boot release watermark prevents a retained pre-clear hold from

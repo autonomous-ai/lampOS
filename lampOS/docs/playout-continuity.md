@@ -50,7 +50,7 @@ of a run is not in the set.
 
 `six/4` is the coffee reply, `six/5` the ocean reply, `six/6` the story's
 introduction and `six/7` the story. The fixture
-`crates/audio/tests/playout_continuity/replies.tsv` carries, per reply, the
+`crates/audio/tests/it/playout_continuity/replies.tsv` carries, per reply, the
 enqueue times and frame counts, the completion, the recorded first write
 and the recorded runs of zeros, with the SHA-256 of each bundle's
 `runtime/events.jsonl`. It has no audio and no text.
@@ -272,7 +272,7 @@ anyway: one frame, then the speech about 310 ms to 390 ms after it.
 
 ### Negative controls
 
-In `crates/audio/tests/playout_continuity/main.rs`:
+In `crates/audio/tests/it/playout_continuity/mod.rs`:
 
 | Test | What it holds to |
 |---|---|

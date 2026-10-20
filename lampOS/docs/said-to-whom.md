@@ -441,7 +441,7 @@ Here those names mean **counterfactual permission errors**, not audible
 events or false answers per hour. The fitter compares held-out test rows;
 session groups must remain separate from training and calibration.
 
-The [comparison tests](../crates/policy/tests/baseline.rs) contain authored
+The [comparison tests](../crates/policy/tests/it/baseline.rs) contain authored
 truth tables, all exact name aliases and nonmatches, a late name appearing
 only in the completed transcript, a small facing face, a 30-second-old
 exchange, and independent counting examples. These test cases are neither

@@ -274,7 +274,7 @@ for it) loses what is still in the pipe. A test that kills a part and then
 reads its lines must wait for those lines first: on 2026-10-15 the
 `lamp-policy` program test killed the program at once and lost its last
 lines on the slow ARM64 runner, which failed every builder's run for an
-afternoon (#783; `Running::end` in `crates/policy/tests/program.rs` now
+afternoon (#783; `Running::end` in `crates/policy/tests/it/program.rs` now
 waits for them).
 
 Why: `eprintln!` blocks while the journal does not read and panics when its

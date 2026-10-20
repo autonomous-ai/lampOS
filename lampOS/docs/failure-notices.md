@@ -213,7 +213,7 @@ inside heard-always's own scope.
 
 ## Verified, and not
 
-Host, `crates/audio/tests/notice.rs`, 7 tests: an exact load; every
+Host, `crates/audio/tests/it/notice.rs`, 7 tests: an exact load; every
 manifest-level failure; test assets refused in production; one faulty asset
 refusing only itself; format, length and silence checks at both bounds; a
 linked asset; malformed names and text.

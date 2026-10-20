@@ -1382,7 +1382,7 @@ shadow and progress decisions and ones without a number passed over; a late
 decision of the turn before neither releasing nor holding this turn's
 action, in both orders; one still owed to an earlier turn never settling a
 later one), `crates/voice/src/bus_out.rs` (what was heard told with the
-number of the turn whose input began last), `crates/policy/tests/policy.rs`
+number of the turn whose input began last), `crates/policy/tests/it/policy.rs`
 (`a_piece_marked_finished_is_judged_without_the_pause_and_carries_its_request`:
 the decision carries the number of what it judged;
 `pieces_of_two_turns_are_judged_apart_each_with_its_own_number`: turn 1's

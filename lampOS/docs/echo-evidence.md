@@ -127,7 +127,7 @@ final ratios and levels.
 
 ## What was tested
 
-Host, scripted scenes, `crates/audio/tests/evidence.rs`. Every signal is a
+Host, scripted scenes, `crates/audio/tests/it/evidence.rs`. Every signal is a
 function of time sampled at 24 kHz for the speaker and 16 kHz for the
 microphone. The echo path is a 113.5 ms delayed, inverted copy at half
 amplitude with one reflection 4 ms later, plus a noise floor. The scenes run
