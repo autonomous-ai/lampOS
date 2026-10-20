@@ -3101,6 +3101,123 @@ async fn a_full_look_without_its_still_still_says_it_could_not_look() {
     );
 }
 
+/// Jarvis on #2031 (#1803): onboarding's sentence is count-only. Its words
+/// go to the coordinator to be counted, and the model is never asked, so
+/// there is no answer to it; a line going on from it does not begin with
+/// them.
+#[tokio::test]
+async fn the_sentence_is_heard_for_its_count_and_never_asked_of_the_model() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("I sit by the zebrafinch window".to_owned()),
+                Ok("and the lamp".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script.clone());
+    engine.submit(start(1));
+    engine.submit(ProviderInput::CountOnly {
+        request: 1,
+        privacy_generation: 1,
+    });
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(
+        turn(&mut engine).await,
+        [
+            "started:1",
+            "heard:I sit by the zebrafinch window",
+            "complete"
+        ]
+    );
+    assert!(script.asked.lock().unwrap().is_empty());
+    engine.submit(ProviderInput::Start {
+        request: 2,
+        session: 1,
+        privacy_generation: 1,
+        continues: false,
+        continues_cut_off: true,
+        over_the_lamp: false,
+        after_stop: false,
+        follows_on: false,
+        over_the_lamps_voice: false,
+    });
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    turn(&mut engine).await;
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 1);
+    assert!(
+        asked[0]
+            .iter()
+            .all(|message| !format!("{message:?}").contains("zebrafinch")),
+        "{asked:?}"
+    );
+}
+
+/// The reviewer-lead on #2031: onboarding's sentence is not carried into
+/// the next line's speech to text by its sound either, whether that line
+/// begins within `CARRY_AFTER_END` of it or is marked continuing.
+#[tokio::test]
+async fn the_sentences_sound_is_not_carried_into_the_next_line() {
+    let frame = lamp_audio::CAPTURE_SAMPLES;
+    for continues in [false, true] {
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("I sit by the zebrafinch window".to_owned()),
+                    Ok("what's the weather?".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new([vec![text("Sunny."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (mut engine, _, _) = scripted(script.clone());
+        engine.submit(start(1));
+        engine.submit(ProviderInput::CountOnly {
+            request: 1,
+            privacy_generation: 1,
+        });
+        engine.submit(audio_at(1, 1, 1_000));
+        engine.submit(end(1));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let first = script.samples_heard.load(Ordering::Relaxed);
+        assert_eq!(first, frame);
+        engine.submit(ProviderInput::Start {
+            request: 2,
+            session: 1,
+            privacy_generation: 1,
+            continues,
+            continues_cut_off: false,
+            over_the_lamp: false,
+            after_stop: false,
+            follows_on: false,
+            over_the_lamps_voice: false,
+        });
+        engine.submit(audio_at(2, 1, 9_000));
+        engine.submit(end(2));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        assert_eq!(
+            script.samples_heard.load(Ordering::Relaxed) - first,
+            frame,
+            "continues {continues}: only the line's own sound"
+        );
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), 1);
+        assert!(
+            asked[0]
+                .iter()
+                .all(|message| !format!("{message:?}").contains("zebrafinch")),
+            "{asked:?}"
+        );
+    }
+}
+
 /// A request that goes on from one given up after an early end is asked
 /// with that one's words before its own, as Gemini, which heard both, is
 /// told; what is told as heard is its own words only. A request that does

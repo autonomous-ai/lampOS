@@ -15,18 +15,30 @@
 //! the lamp spoke). Nothing of the sound is kept; no voice identity and no
 //! mic2 ratio is used. The measurement itself is `lamp_near_call::near_try`.
 //!
-//! The step is done only when three accepted tries make a bar and the bar's
-//! file is written; it fails, and any old bar is removed, when five prompts
-//! cannot reach three or the tries spread too far. The model may only skip it.
-//! Every file operation runs on the onboarding storage worker; the
-//! interaction loop only buffers bounded evidence and submits.
+//! The name part ends when three accepted tries make a bar and the bar's
+//! file is written, or, with any old bar removed, when five prompts cannot
+//! reach three or the tries spread too far. Then the sentence part (the
+//! first builder's ruling (a), 20 October): the person says a sentence from
+//! where they sit, in their own words. It is done only on the voice's own
+//! evidence: a line ended in the window ([`SENTENCE_WINDOW_US`]) with words
+//! come back for it, said close (the room microphone rose the near rule's bar,
+//! `crate::attention::near_rise_db`, over its quiet during the line: the
+//! level at which the voice takes a line as said to it from close by,
+//! `crate::room_floor::Rise::close_since`), and its words covering it (at
+//! least one for each second of the line's speech, [`MS_A_WORD`]). Short of
+//! that it is coached once, "a little louder" for the level, "a little
+//! closer" for the words, then done or failed. Only counts are kept. The
+//! step's outcome is the sentence part's; the name part's is its bar file.
+//! The model may only skip it. Every file operation runs on the onboarding
+//! storage worker; the interaction loop only buffers bounded evidence and
+//! submits.
 use super::{
     FRESH_MS, GONE_US, Onboarding, Outcome, START_QUIET_US, STEP_GIVE_UP_US, Step,
     TIMED_OUT_QUIET_US, fresh_token, storage,
 };
 use lamp_near_call::{
-    Calibrated, Hearing, Level, MOST_PROMPTS, RISE_MS, SCORE, Spoke, TRIES, Try, WINDOW_MS,
-    asks_again, near_try,
+    Calibrated, Hearing, Level, MOST_PROMPTS, RISE_MS, SCORE, Spoke, Try, WINDOW_MS, asks_again,
+    near_try,
 };
 use lamp_turn_owner::BootId;
 use serde_json::json;
@@ -50,11 +62,56 @@ const MOST_AGO_MS: u64 = 10_000;
 const MOST_SEEN: usize = 256;
 /// The bus is read at most this often.
 const LOOK_EVERY_US: u64 = 20_000;
+/// The sentence part's prompts: the first, and one coached.
+pub(crate) const SENTENCE_PROMPTS: u8 = 2;
+/// A line said for the sentence ends within this long of the prompt's end:
+/// a moment to think of something to say, and a sentence.
+const SENTENCE_WINDOW_US: u64 = 15_000_000;
+/// The words of a line ended in the window are waited for this long past
+/// it: on the second route they came within a second of the line's end.
+const WORDS_WAIT_US: u64 = 3_000_000;
+/// Words covering a line: at least one for each this many milliseconds of
+/// its speech, half the pace of ordinary speech (two to three words a
+/// second). A line whose words came back fewer is a fragment.
+const MS_A_WORD: u64 = 1_000;
 
 pub const NEAR_FIRST: &str = "(Nobody has spoken. Tell them in a few words that you would like to learn how they call you from where they usually sit. Ask them to stay in their seat and call your name once, the way they would to get your attention, and then stay quiet yourself. Do not say your own name, and do not claim anything was measured.)";
 pub const NEAR_AGAIN: &str = "(Ask them in a few words to call your name once more from their seat, the same way, and then stay quiet yourself. Do not say your own name.)";
 pub const NEAR_DONE: &str = "(You have learned how they call you from their seat. Tell them so in a few words. Nothing more.)";
 pub const NEAR_FAILED: &str = "(You could not learn how they call you from their seat this time. Tell them in a few light words that it is fine and that they can redo the setup later. Do not claim anything was measured.)";
+pub const SENTENCE_FIRST: &str = "(Nobody has spoken. Ask them in a few words to say a sentence to you from where they sit, anything at all in their own words, so you can get used to their voice, and then stay quiet yourself while they speak. Do not claim anything was measured.)";
+pub const SENTENCE_LOUDER: &str = "(Ask them in a few words to say another sentence from their seat, a little louder, and then stay quiet yourself.)";
+pub const SENTENCE_CLOSER: &str = "(Ask them in a few words to come a little closer and say another sentence, and then stay quiet yourself.)";
+pub const SENTENCE_AGAIN: &str = "(Ask them in a few words to say another sentence from their seat, and then stay quiet yourself.)";
+pub const SENTENCE_DONE: &str =
+    "(You heard them well from where they sit. Tell them so in a few words. Nothing more.)";
+pub const SENTENCE_FAILED: &str = "(You could not hear them well enough from where they sit this time. Tell them in a few light words: I'll get used to your voice as we talk. Do not claim anything was measured.)";
+
+/// What fell short in a sentence try: the coaching it gets.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Short {
+    /// Not said close: "a little louder".
+    Level,
+    /// No words, or too few to cover it: "a little closer".
+    Coverage,
+}
+
+impl Short {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Level => "level",
+            Self::Coverage => "coverage",
+        }
+    }
+}
+
+/// The last line ended in the sentence window: numbers only.
+#[derive(Clone, Copy)]
+struct Line {
+    speech_ms: u64,
+    close: bool,
+    words: Option<usize>,
+}
 
 /// One piece of evidence from the bus, already validated and dated in Unix
 /// milliseconds.
@@ -118,6 +175,8 @@ impl Seen {
 
 struct Offer {
     token: u64,
+    /// The sentence part's, else the name part's.
+    sentence: bool,
     prompt: u8,
     ready: bool,
     claimed: bool,
@@ -127,6 +186,7 @@ struct Offer {
 }
 
 struct Listening {
+    sentence: bool,
     prompt: u8,
     /// Unix milliseconds, read when the whole prompt's playback was known.
     ended_ms: u64,
@@ -148,6 +208,11 @@ pub(crate) struct NearFlow {
     flight: Option<(storage::Tag, Outcome)>,
     seen: Vec<Seen>,
     spoiled: Option<&'static str>,
+    /// The name part's outcome once its bar is stored: the sentence part
+    /// follows. Memory only: a new voice cycle stores the bar again.
+    named: Option<Outcome>,
+    line: Option<Line>,
+    short: Option<Short>,
 }
 
 impl NearFlow {
@@ -156,7 +221,10 @@ impl NearFlow {
         let Some(listening) = self.listening.as_ref() else {
             return false;
         };
-        at_us >= listening.ended_us
+        // The sentence part holds nothing here: its line is held by its own
+        // window, which lets the words come back.
+        !listening.sentence
+            && at_us >= listening.ended_us
             && at_us - listening.ended_us <= COLLECT_MS * 1_000
             && self.seen.iter().any(|seen| match seen {
                 // The hearing's Unix start on the coordinator's clock, by the
@@ -176,6 +244,7 @@ impl NearFlow {
     pub(crate) fn listening_for_test(ended_ms: u64, ended_us: u64, names_ms: &[u64]) -> Self {
         Self {
             listening: Some(Listening {
+                sentence: false,
                 prompt: 1,
                 ended_ms,
                 ended_us,
@@ -201,6 +270,11 @@ impl NearFlow {
     #[cfg(test)]
     pub(super) fn writing(&self) -> bool {
         self.flight.is_some()
+    }
+
+    #[cfg(test)]
+    pub(super) fn named(&self) -> Option<Outcome> {
+        self.named
     }
 
     fn take_evidence(&mut self) -> (Vec<Hearing>, Vec<Level>, Vec<Spoke>, Option<&'static str>) {
@@ -397,14 +471,30 @@ impl Onboarding {
     /// Drop everything in flight for this step. An offer never handed to the
     /// model gives its prompt back; a claimed one counts.
     pub(super) fn invalidate_near(&mut self) {
-        if let Some(offer) = self.near.offer.as_ref()
-            && !offer.claimed
-            && self.desired.near_call_prompts == offer.prompt
+        if let Some((sentence, prompt)) = self
+            .near
+            .offer
+            .as_ref()
+            .filter(|offer| !offer.claimed)
+            .map(|offer| (offer.sentence, offer.prompt))
+            && *self.prompts(sentence) == prompt
         {
-            self.desired.near_call_prompts = offer.prompt - 1;
+            *self.prompts(sentence) = prompt - 1;
             self.save();
         }
+        // The name part's stored bar stands: the sentence part goes on.
+        let named = self.near.named;
         self.forget_near();
+        self.near.named = named;
+    }
+
+    /// The committed-to-be prompt count of a part.
+    fn prompts(&mut self, sentence: bool) -> &mut u8 {
+        if sentence {
+            &mut self.desired.sentence_prompts
+        } else {
+            &mut self.desired.near_call_prompts
+        }
     }
 
     /// Memory only: what a storage fence or failure leaves of this step. The
@@ -416,6 +506,9 @@ impl Onboarding {
         self.near.flight = None;
         self.near.seen.clear();
         self.near.spoiled = None;
+        self.near.named = None;
+        self.near.line = None;
+        self.near.short = None;
     }
 
     pub(super) fn near_pending(&self) -> Option<lamp_msgs::OnboardingInvitation> {
@@ -423,7 +516,13 @@ impl Onboarding {
         Some(lamp_msgs::OnboardingInvitation {
             invitation: offer.token,
             generation: self.near.generation,
-            attempt: u64::from(offer.prompt),
+            // The sentence's prompts follow the name's five.
+            attempt: u64::from(offer.prompt)
+                + if offer.sentence {
+                    MOST_PROMPTS as u64
+                } else {
+                    0
+                },
             step: lamp_msgs::OnboardingStep::HowYouSound,
             ready: offer.ready && offer.persisted && !offer.claimed && self.storage_idle(),
         })
@@ -444,10 +543,14 @@ impl Onboarding {
         offer.claimed = true;
         offer.ready = false;
         Some(
-            if offer.prompt == 1 {
-                NEAR_FIRST
-            } else {
-                NEAR_AGAIN
+            match (offer.sentence, offer.prompt, self.near.short) {
+                (false, 1, _) => NEAR_FIRST,
+                (false, _, _) => NEAR_AGAIN,
+                (true, 1, _) => SENTENCE_FIRST,
+                (true, _, Some(Short::Level)) => SENTENCE_LOUDER,
+                (true, _, Some(Short::Coverage)) => SENTENCE_CLOSER,
+                // A new voice cycle: what fell short is not known.
+                (true, _, None) => SENTENCE_AGAIN,
             }
             .to_owned(),
         )
@@ -501,15 +604,21 @@ impl Onboarding {
         let offer = self.near.offer.take().expect("a bound offer");
         if !delivered_whole {
             self.near.retry_after_us = now_us.saturating_add(1_000_000);
-            self.records
-                .push(json!({"kind":"onboarding_near_try","prompt":offer.prompt,
+            let kind = if offer.sentence {
+                "onboarding_sentence_try"
+            } else {
+                "onboarding_near_try"
+            };
+            self.records.push(json!({"kind":kind,"prompt":offer.prompt,
                 "accepted":false,"why":"the prompt was not played whole","at_us":now_us}));
             return;
         }
         // History from before the prompt's end is kept (the echo guard); a
         // spoil from before this try is not.
         self.near.spoiled = None;
+        self.near.line = None;
         self.near.listening = Some(Listening {
+            sentence: offer.sentence,
             prompt: offer.prompt,
             ended_ms: (self.unix_clock)(),
             ended_us: now_us,
@@ -527,9 +636,112 @@ impl Onboarding {
         self.near.holds_reply(began_us, at_us)
     }
 
+    /// Whether the sentence part's window is open at `at_us`, from the
+    /// prompt's end to [`SENTENCE_WINDOW_US`] on: a line that ends in it is
+    /// the sentence. The voice lets it reach the words, and holds the
+    /// model's answer to it (`coordinator.rs`, `sentence_window`).
+    pub(crate) fn sentence_window(&self, at_us: u64) -> bool {
+        self.near.listening.as_ref().is_some_and(|listening| {
+            listening.sentence
+                && at_us >= listening.ended_us
+                && at_us - listening.ended_us <= SENTENCE_WINDOW_US
+        })
+    }
+
+    /// A line ended at `at_us`: its speech in milliseconds, and whether it
+    /// was said close. Taken only in the sentence window; a later line
+    /// replaces it.
+    pub(crate) fn sentence_line(&mut self, speech_ms: u64, close: bool, at_us: u64) {
+        if self.sentence_window(at_us) {
+            self.near.line = Some(Line {
+                speech_ms,
+                close,
+                words: None,
+            });
+        }
+    }
+
+    /// How many words came back for the line, never the words. Taken once,
+    /// while its try is open.
+    pub(crate) fn sentence_words(&mut self, words: usize) {
+        if self
+            .near
+            .listening
+            .as_ref()
+            .is_some_and(|listening| listening.sentence)
+            && let Some(line) = self.near.line.as_mut()
+            && line.words.is_none()
+        {
+            line.words = Some(words);
+        }
+    }
+
+    /// Judge the sentence try once a line's words are in, or once the
+    /// window and the words' wait have passed.
+    fn sentence_judge(&mut self, now_us: u64) {
+        let Some(listening) = self.near.listening.as_ref() else {
+            return;
+        };
+        let worded = self.near.line.is_some_and(|line| line.words.is_some());
+        if !worded && now_us < listening.ended_us + SENTENCE_WINDOW_US + WORDS_WAIT_US {
+            return;
+        }
+        let listening = self.near.listening.take().expect("open");
+        let line = self.near.line.take();
+        self.near.seen.clear();
+        let short = match line {
+            None => Some(Short::Level),
+            Some(line) => {
+                let words = line.words.unwrap_or(0) as u64;
+                if words == 0 {
+                    Some(Short::Coverage)
+                } else if !line.close {
+                    Some(Short::Level)
+                } else if words * MS_A_WORD < line.speech_ms {
+                    Some(Short::Coverage)
+                } else {
+                    None
+                }
+            }
+        };
+        self.records.push(json!({"kind":"onboarding_sentence_try",
+            "prompt":listening.prompt,"accepted":short.is_none(),
+            "short":short.map(Short::name),"words":line.and_then(|line| line.words),
+            "speech_ms":line.map(|line| line.speech_ms),
+            "said_close":line.map(|line| line.close),"at_us":now_us}));
+        let outcome = match short {
+            None => Outcome::Done,
+            Some(short) if self.desired.sentence_prompts < SENTENCE_PROMPTS => {
+                self.near.short = Some(short);
+                self.near.retry_after_us = now_us.saturating_add(1_000_000);
+                return;
+            }
+            Some(_) => Outcome::Failed,
+        };
+        self.sentence_finished(outcome, now_us);
+    }
+
+    fn sentence_finished(&mut self, outcome: Outcome, now_us: u64) {
+        self.finish(Step::HowYouSound, outcome, None, now_us);
+        self.owed = Some(if outcome == Outcome::Done {
+            SENTENCE_DONE
+        } else {
+            SENTENCE_FAILED
+        });
+    }
+
     /// Judge the try being listened for, once its evidence is all in. Pure
     /// computation on bounded buffers; never waits for storage.
     pub(super) fn near_judge(&mut self, now_us: u64) {
+        if self
+            .near
+            .listening
+            .as_ref()
+            .is_some_and(|listening| listening.sentence)
+        {
+            self.sentence_judge(now_us);
+            return;
+        }
         let due = self.near.listening.as_ref().is_some_and(|listening| {
             now_us >= listening.ended_us + COLLECT_MS * 1_000 + DELIVERY_GRACE_US
         });
@@ -576,7 +788,10 @@ impl Onboarding {
         }
         self.near.flight = None;
         self.near.finishing = None;
-        self.finish(Step::HowYouSound, outcome, None, now_us);
+        // The name part is over; the step goes on to its sentence part.
+        self.near.named = Some(outcome);
+        self.records.push(json!({"kind":"onboarding_near_call",
+            "outcome":outcome,"at_us":now_us}));
         self.owed = Some(if outcome == Outcome::Done {
             NEAR_DONE
         } else {
@@ -602,8 +817,16 @@ impl Onboarding {
         if self.near.flight.is_some() || self.near.listening.is_some() {
             return;
         }
-        let prompts = self.desired.near_call_prompts;
-        if self.near.offer.is_none()
+        let sentence = self.near.named.is_some();
+        let prompts = *self.prompts(sentence);
+        if sentence {
+            // Every sentence prompt was used, its try never judged (a new
+            // voice cycle): failed.
+            if self.near.offer.is_none() && prompts >= SENTENCE_PROMPTS {
+                self.sentence_finished(Outcome::Failed, now_us);
+                return;
+            }
+        } else if self.near.offer.is_none()
             && self.near.finishing.is_none()
             && !asks_again(usize::from(prompts), self.desired.near_call_tries.len())
         {
@@ -639,10 +862,16 @@ impl Onboarding {
         let ready = can_speak && present && quiet_us >= START_QUIET_US;
         if let Some(offer) = self.near.offer.as_mut() {
             if !offer.persisted {
-                if self.committed.near_call_prompts >= offer.prompt {
+                let committed = if offer.sentence {
+                    self.committed.sentence_prompts
+                } else {
+                    self.committed.near_call_prompts
+                };
+                if committed >= offer.prompt {
                     offer.persisted = true;
                 } else {
-                    self.desired.near_call_prompts = offer.prompt;
+                    let (part, prompt) = (offer.sentence, offer.prompt);
+                    *self.prompts(part) = prompt;
                     self.save();
                     return;
                 }
@@ -664,9 +893,10 @@ impl Onboarding {
             return;
         };
         let prompt = prompts.saturating_add(1);
-        debug_assert!(usize::from(prompt) <= MOST_PROMPTS);
+        debug_assert!(sentence || usize::from(prompt) <= MOST_PROMPTS);
         self.near.offer = Some(Offer {
             token,
+            sentence,
             prompt,
             ready: true,
             claimed: false,
@@ -675,14 +905,15 @@ impl Onboarding {
             bound: None,
         });
         // Its budget is committed before the invitation is published.
-        self.desired.near_call_prompts = prompt;
+        *self.prompts(sentence) = prompt;
         self.save();
         if let Some(led) = self.led.as_mut() {
             led.asked_us = Some(now_us);
         }
         self.records.push(
             json!({"kind":"onboarding_step","step":Step::HowYouSound.name(),
-            "state":"offered","prompt":prompt,"at_us":now_us}),
+            "state":"offered","part":if sentence { "sentence" } else { "name" },
+            "prompt":prompt,"at_us":now_us}),
         );
     }
 }
@@ -694,9 +925,4 @@ pub(super) fn valid_try(done: &Try) -> bool {
         && (0.0..=-lamp_msgs::EARS_SILENCE_DB).contains(&done.rise_db)
         && done.score.is_finite()
         && (SCORE..=1.0).contains(&done.score)
-}
-
-/// Whether a kept "done" is backed by a bar its tries make.
-pub(super) fn done_fits(tries: &[Try]) -> bool {
-    tries.len() == TRIES && lamp_near_call::near_rise(tries).is_some()
 }
