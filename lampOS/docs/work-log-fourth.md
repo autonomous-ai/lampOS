@@ -5075,6 +5075,24 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **The Mac's disk was full** (17:55, 119 MiB free). I dropped my target's incremental caches and old scratch exports, and the other owners cleaned theirs (74 GiB free at 18:05).
 - **A pause on my side,** about 18:40 to 21:00 (a usage limit), with nothing lost.
 
+## 2026-10-20, 23:18 ICT: #2295 merged; #2287's follow-up is #2322; four peer reads
+
+- **Merged:** #2295 (`LAMP_SECOND_PLAYOUT_START_MS`, off), into #1712. Its value waits on lamp-4ace's `start_horizon_needed_us`.
+- **#2287's follow-up:** #2308, then **#2322** after the reviewer's 21:49 read, one commit `f79c408d4` on #1712's `bb0550b9e`, gate 3470/0.
+  - **Way 2:** a sound the eyes saw a face speak through, turned to the lamp, is decided as before. The eyes count to its last speech plus 300 ms, and it skips the body-motion rule.
+  - **Way 1:** with `words`, a lone stop or a lone put-off ("not now", "later") stops the line. Other words are the room's and wait.
+  - **Mutations:** four, each failing a test.
+  - `LAMP_OWN_LINE_KEEPS` stays off until a lamp shows these.
+- **Peer reads, all without a P1:**
+  - **#2301** (Seventh, own answers renew nothing): one P2. One person following up with the lamp without its name or a face stops being answered 45 s after their last line to it; a scratch case on its head showed it.
+  - **#2305** (Seventh, quiet room going on): one P2. With the voice model, a caller's lines under 1.5 s get no likeness and are held.
+  - **#2304** (lamp-skills one wait): one P3. A broken socket sleeps out the wait, so a call can't wake it.
+  - **#2302** (Sixth, a session test): no finding.
+
+  Seventh has taken both P2s into a plan for the first builder.
+- **A pause on my side,** about 22:10 to 23:00 (a usage limit), with nothing lost.
+- **Free: fourth** after #2322.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
