@@ -5,7 +5,7 @@
 `lamp-bus record` writes: `ears/classes` every 500 ms, each message good for
 1.5 s (`expires_ms`), as lamp-ears says it with `LAMP_EARS_CLASSES=on`
 (`crates/ears/src/classes.rs`), with a music score of 0.85 while music plays
-and 0.05 otherwise; and `voice/state`, kept until replaced. Each
+and 0.05 otherwise (a mute: `unavailable`, with no scores); and `voice/state`, kept until replaced. Each
 `expect.toml` sets the local time of the case's first message (`clock`).
 Re-recording a case on a lamp, with its owner's yes, replaces the written one.
 
@@ -20,6 +20,9 @@ lamp-skills`, which runs every skill's cases).
 | `never-while-the-lamp-speaks` | Five minutes of music while the lamp speaks | Pass: nothing |
 | `never-at-night` | From 23:30, five minutes of music | Pass: nothing |
 | `never-with-a-hand-on-it` | Five minutes of music, a hand on the lamp from 5 s | Pass: nothing |
+| `a-second-piece-within-half-an-hour-gets-nothing` | A minute of music, six minutes quiet (rearmed), two minutes of a second piece | Pass: one sway at 20 s only (`cooldown = "30m"`) |
+| `music-under-the-bar-gets-nothing` | Five minutes of music scored 0.55 | Pass: nothing (`above = 0.6`) |
+| `a-mute-in-the-music-starts-it-over` | 12 s of music, 10 s muted (`unavailable`), then music | Pass: one sway at 42 s, not 20 s (the mute is past `gap = "5s"`) |
 
 The threshold (0.6) is provisional: no score is measured on a lamp yet
 (`docs/sound-events.md`). How the sway looks is for the lamp check.

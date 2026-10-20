@@ -1,0 +1,10 @@
+# From 10:00, music (0.85) for a minute, six minutes quiet (rearmed), then a
+# second piece for two minutes: one sway at 20 s only. The second piece is
+# inside the 30-minute cooldown, so it gets nothing.
+clock = "10:00"
+
+[[expect]]
+at = "20s"
+within = "1s"
+call = "body.move"
+args = { move = "sway" }
