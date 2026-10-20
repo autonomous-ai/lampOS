@@ -16,7 +16,7 @@ fn fixture() -> (tempfile::TempDir, std::path::PathBuf) {
     let settings = root.path().join("settings");
     atomic::ensure_private_dir(&settings).unwrap();
     let mut document: Value =
-        serde_json::from_str(include_str!("../fixtures/surround.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/surround.json")).unwrap();
     document["state_dir"] = root.path().join("operations").to_str().unwrap().into();
     document["configuration_dir"] = root.path().join("configuration").to_str().unwrap().into();
     document["socket"] = root

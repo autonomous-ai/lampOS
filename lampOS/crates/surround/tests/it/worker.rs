@@ -1,3 +1,4 @@
+use crate::support;
 use lamp_surround::{
     atomic,
     config::{ProviderDocument, Secret},
@@ -7,8 +8,6 @@ use lamp_surround::{
     owner, reset, setup, startup, update,
     worker::*,
 };
-#[path = "../fixtures/releases/support.rs"]
-pub mod support;
 use std::{
     fs,
     os::unix::fs::PermissionsExt,
