@@ -262,6 +262,14 @@ their provenance; `forget` returns a count after removal and index checks.
 The base `remember` may also name the person's own exchanges it came from,
 `{"op":"remember",…,"source_ids":[3]}` (#1693); forgetting it then removes
 them, one step back. The legacy store ignores them.
+With `"once":true` (#2176, the voice's `LAMP_MEMORY_REMEMBER_ONCE`), a text
+the same person already keeps, active and the same words, ignoring case,
+spacing and a final punctuation mark, is answered
+`{"ok":true,"id":24,"existing":true}` with that kept thing's id, and no
+entry is written; it gains this conversation's `source_ids`, so forgetting
+it with `LAMP_MEMORY_FORGET_ALL` removes both conversations' exchanges
+([the rule](memory-days.md#request-contract)). The
+legacy store ignores `once` and keeps the text again.
 `session_open` returns a frozen `snapshot`; default `conversation_end`
 returns bounded model `input`, without invoking a model. With `submit:true`,
 the current build validates references and returns
@@ -447,6 +455,23 @@ the unchanged legacy client, used unless the new Days client is selected.
     common fold, 7 to 1 finding three days ago and
     not nine, a kept thing by span, bad spans, and without the option the
     same answers).
+
+- **Kept once** (#2176, `LAMP_MEMORY_REMEMBER_ONCE=on`, with the Days
+  client only; off unless set; both voice routes). `remember` asks the
+  store with `"once":true`. A held turn whose words were answered a second
+  time called `remember` again with the same text (lamp-06c1, the second
+  route, build 4142: kept ids 24 and 25). Now a text the person already
+  keeps (the same words, ignoring case, spacing and a final punctuation
+  mark) is that kept thing, no entry is written, it gains this
+  conversation's exchanges as sources (so forgetting it with
+  `LAMP_MEMORY_FORGET_ALL` removes both conversations'), and the model is told
+  `{"remembered":true,"note":"That was already kept."}`, so it doesn't
+  promise to remember it a second time. Off, the request is as before.
+  Tests: `days_protocol::tests::a_remember_once_the_same_person_already_keeps_word_for_word_is_that_kept_thing`,
+  `days::tests::a_remember_once_passes_over_a_kept_thing_no_longer_active`,
+  `days::tests::a_remember_once_links_its_sources_to_the_kept_thing_it_finds`,
+  `protocol::tests::the_legacy_store_ignores_once` and
+  `remember::tests::with_the_switch_remember_asks_once_and_says_what_was_kept_already`.
 
 - **Kept without being asked** (#1693 (2), `LAMP_MEMORY_OBSERVE=on`,
   with the Days client, on the second route only; off unless set).

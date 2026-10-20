@@ -87,6 +87,13 @@ pub enum Request {
         /// (#1693), removed with it. The legacy store keeps none.
         #[serde(default)]
         source_ids: Vec<u64>,
+        /// The Days store's (#2176, `LAMP_MEMORY_REMEMBER_ONCE`): what this
+        /// person already keeps (the same words, ignoring case, spacing and a
+        /// final punctuation mark) is answered with that kept thing's id and
+        /// `"existing":true`; no entry is written, and it gains these
+        /// `source_ids`. The legacy store ignores it.
+        #[serde(default)]
+        once: bool,
     },
     /// What it was asked to keep, for telling a new session.
     Kept {
@@ -341,7 +348,7 @@ fn done(store: &mut Store, request: Request, now_unix_ms: u64) -> Result<Respons
                 .map_err(not_added)?;
             Response::Added { id }
         }
-        // The legacy store keeps no links.
+        // The legacy store keeps no links, and no `once` (#2176).
         Request::Remember {
             person,
             at_unix_ms,
@@ -596,6 +603,17 @@ mod tests {
         }
     }
 
+    /// #2176: the legacy store ignores the Days store's `once`, and keeps
+    /// the same text twice as before.
+    #[test]
+    fn the_legacy_store_ignores_once() {
+        let (_scratch, mut store) = Scratch::new("remember-once");
+        for id in [1, 2] {
+            let request = json!({"op":"remember","at_unix_ms":NOON,"text":"coffee","once":true});
+            assert_eq!(ask(&mut store, request), json!({"ok":true,"id":id}));
+        }
+    }
+
     #[test]
     fn caller_refusals_and_overlong_lines_do_not_report_storage_or_write_evidence() {
         let (_scratch, mut store) = Scratch::new("refusal-metadata");
@@ -701,6 +719,7 @@ mod tests {
                 at_unix_ms: 5,
                 text: "black coffee".into(),
                 source_ids: vec![],
+                once: false,
             }
         );
         // The Days store's: where it came from (#1693).
@@ -711,6 +730,7 @@ mod tests {
                 at_unix_ms: 5,
                 text: "black coffee".into(),
                 source_ids: vec![3],
+                once: false,
             }
         );
         assert_eq!(
