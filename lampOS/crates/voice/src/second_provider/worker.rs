@@ -1112,15 +1112,20 @@ async fn air_task(bus: lamp_bus::Bus, air: Arc<Mutex<crate::air_told::AirTold>>)
 /// part), so a line cut short or retired before any word keeps it for the
 /// next (the reviewer's P3 on #1960). In a busy room it is neither said nor
 /// counted.
+/// The most requests remembered as given the air's note and not yet heard.
+const AIR_GIVEN_MOST: usize = 4;
+
 fn air_noting(
     air: Arc<Mutex<crate::air_told::AirTold>>,
     busy: impl Fn(u64) -> bool + Send + Sync + 'static,
 ) -> (
     crate::second_provider::TaskNote,
-    crate::second_provider::Heard,
+    crate::second_provider::AirHeard,
 ) {
-    // The request given the note and not yet heard: only its answer spends it.
-    let given: Arc<Mutex<Option<u64>>> = Arc::default();
+    // The requests given the note and not yet heard, the newest last: any of
+    // their answers spends it (two can be given it before the first's answer
+    // plays; the reviewer's P3 on #2083). A few at most.
+    let given: Arc<Mutex<std::collections::VecDeque<u64>>> = Arc::default();
     let giving = given.clone();
     let spent = air.clone();
     let note: crate::second_provider::TaskNote = Arc::new(move |request| {
@@ -1129,15 +1134,19 @@ fn air_noting(
             return None;
         }
         let note = air.lock().ok()?.due(now)?;
-        *giving.lock().ok()? = Some(request);
+        let mut giving = giving.lock().ok()?;
+        if giving.len() == AIR_GIVEN_MOST {
+            giving.pop_front();
+        }
+        giving.push_back(request);
         Some(note)
     });
-    let heard: crate::second_provider::Heard = Arc::new(move |request| {
+    let heard: crate::second_provider::AirHeard = Arc::new(move |request| {
         let Ok(mut given) = given.lock() else { return };
-        if *given != Some(request) {
+        if !given.contains(&request) {
             return;
         }
-        *given = None;
+        given.clear();
         if let Ok(mut air) = spent.lock() {
             air.told(monotonic_us());
             eprintln!("lamp-voice second: request {request} is told the air is stuffy");
@@ -4008,6 +4017,16 @@ mod tests {
         assert_eq!(note(5), None, "heard once: told");
         heard(4);
         assert_eq!(note(6), None, "and not again");
+        // Two given it before the first's answer plays (the reviewer's P3 on
+        // #2083): the earlier one's answer heard still spends it.
+        let air = Arc::new(Mutex::new(crate::air_told::AirTold::default()));
+        let (note, heard) = super::air_noting(air.clone(), |_| false);
+        air.lock()
+            .unwrap()
+            .seen(true, Some(1180), now.saturating_sub(11 * 60_000_000));
+        assert!(note(7).is_some() && note(8).is_some(), "due for both");
+        heard(7);
+        assert_eq!(note(9), None, "the earlier one's answer spent it");
     }
 
     /// #1712, the first builder at 16:43: the route's lines are judged as

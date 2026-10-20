@@ -1635,7 +1635,11 @@ after a take-over, but now for every turn:
   room. It's spent only once that request's answer begins to be heard (its
   first audio), then not again for three hours: a line cut short or
   retired before any word keeps it for the next (the reviewer's P3 on
-  #1960). A written turn, the lamp's own, never is. The journal, at that
+  #1960). It's the answer's first audio that spends it, not the air's own
+  sentence: an answer cut in on after its first words counts as told even
+  if the note came later in it (the first builder's P3 on #2083). The last
+  four requests given it are remembered, so an earlier one's answer heard
+  after a later one was given it still spends it. A written turn, the lamp's own, never is. The journal, at that
   first audio: `request N is told the air is stuffy`. Its room
   is the one this route keeps (`room/state`); the room's quiet or busy is
   in each turn's system message with `LAMP_ROOM_FACTS`, as before.
@@ -2147,6 +2151,31 @@ Each is asked with the spoken character and the turn's changing part, with
 every function. It prints `right=N/M` per line and a verdict naming any line
 not right every time; counts only, never the words. The lost line asked
 again (#2001) asks the same chat again, so its check is the engine's tests.
+
+**Then the heeding's four lines** (`HEEDING_LINES`, #2054, the first
+builder's 05:43 on #1722): day lines of the hourly played test on lamp-4ace,
+said by one person after the two-person rounds, each let out only as the
+conversation going on. Each line is judged by the route's own rule
+(`worker::Heeding`, with `--spoken-to`) going on from a conversation in which
+the lamp asked nothing. It is asked with the note the engine gives it then:
+`CONVERSATION_ALONE`, or else the call note. Its first call is put to the
+rule's hold (`holds_call`):
+- `remind`: "Remind me in two minutes to stretch.": right is `set_reminder`,
+  not held;
+- `remind-split`: "Remind me, in two minutes, to drink some water.", cut
+  short after "Remind me," and gone on with as the next request
+  (`continues_from`): the same, judged on the whole chain's words;
+- `to-someone`: "Yes, give me five minutes.", said to someone else: right is
+  no schedule call run (none called, or held);
+- `remember`: "Remember that my favourite colour is green.": right is
+  `remember`, never `not_for_me`.
+
+Before #2054, `remind` was always held and `remember` was told it may be
+people's talk. The model is asked with every function and the schedule's,
+read from the actions part's catalog as a voice with `--schedule-tools`
+reads them. Where the catalog has no schedule, the lines aren't asked, and
+it says so. It prints `right=N/M` and the functions called first per line,
+then a verdict.
 
 **Then memory's quality** (`probe/quality.rs`, #1693, the first builder at
 03:05 on #1722). There are six cases, each a fresh session told what the lamp
