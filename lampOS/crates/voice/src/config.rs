@@ -5,14 +5,17 @@ use lamp_gemini::{
 };
 use serde::Deserialize;
 use std::{
+    collections::BTreeMap,
     fs::OpenOptions,
     io::{self, Read},
     os::unix::fs::{MetadataExt, OpenOptionsExt},
     path::Path,
 };
 
+/// Not `deny_unknown_fields`: a field a newer build writes is read past and
+/// named once at start ([`unread_fields`]), so a roll back never stops the
+/// voice (#1505, #1680). A known field with a bad value is still refused.
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ProviderConfig {
     endpoint: String,
     model: String,
@@ -62,6 +65,72 @@ pub struct ProviderConfig {
     /// A private text file that replaces the built-in instruction.
     #[serde(default)]
     instruction_file: Option<String>,
+    /// The fields this build does not read, by name.
+    #[serde(flatten)]
+    unread: Unread,
+    #[serde(skip)]
+    unread_line: Option<String>,
+}
+/// A file's fields this build does not read, by name; their values are
+/// never kept.
+pub(crate) type Unread = BTreeMap<String, serde::de::IgnoredAny>;
+
+/// Whether a name a file holds is a key's: the private configuration files
+/// never hold a key, each is a credential file of its own.
+fn names_a_key(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    ["key", "token", "secret", "password"]
+        .iter()
+        .any(|word| name == *word || name.ends_with(&format!("_{word}")))
+}
+
+/// The journal line for `file`'s fields this build does not read: `None`
+/// when there are none. A field named as a key's is refused instead, by
+/// name, so the key is moved to its credential file and never kept here.
+pub(crate) fn unread_fields(file: &Path, unread: &Unread) -> io::Result<Option<String>> {
+    if let Some(name) = unread.keys().find(|name| names_a_key(name)) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "{}: {name} is a key, and keys are never written in this file: each goes in a private credential file",
+                file.display()
+            ),
+        ));
+    }
+    Ok((!unread.is_empty()).then(|| {
+        let names: Vec<&str> = unread.keys().map(String::as_str).collect();
+        format!(
+            "{}: fields this build does not read, ignored: {}",
+            file.display(),
+            names.join(", ")
+        )
+    }))
+}
+
+/// A file that does not read as its configuration, with which file and
+/// where: serde's kind of error, line and column, never its message, which
+/// can quote a value, so a key pasted into the wrong field never reaches the
+/// journal (#2061).
+pub(crate) fn unreadable(what: &str, file: &Path, error: serde_json::Error) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("invalid {what} {}: {}", file.display(), json_why(&error)),
+    )
+}
+
+/// A JSON error's kind and place, never its message: `Data at line 1
+/// column 15`, or the kind alone when there is no place.
+fn json_why(error: &serde_json::Error) -> String {
+    if error.line() == 0 {
+        format!("{:?}", error.classify())
+    } else {
+        format!(
+            "{:?} at line {} column {}",
+            error.classify(),
+            error.line(),
+            error.column()
+        )
+    }
 }
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -167,15 +236,25 @@ impl ProviderConfig {
         .then(|| Path::new(&self.credential_file))
     }
 
+    /// The private provider file. One that does not read is still refused,
+    /// naming the file and why: the voice cannot run without it, so there
+    /// is nothing to start on in its place. Fields this build does not read
+    /// are named once in the journal.
     pub fn load(path: &Path) -> io::Result<Self> {
         let data = read_private(path, 16_384)?;
-        let config: Self = serde_json::from_slice(&data).map_err(|_| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                "invalid private provider configuration",
-            )
-        })?;
+        let mut config: Self = serde_json::from_slice(&data)
+            .map_err(|error| unreadable("private provider configuration", path, error))?;
+        let line = unread_fields(path, &config.unread)?;
+        if let Some(line) = &line {
+            eprintln!("lamp-voice: {line}");
+        }
+        config.unread_line = line;
         config.checked()
+    }
+    /// The journal line [`Self::load`] wrote for the file's fields this
+    /// build does not read, if any.
+    pub fn unread_line(&self) -> Option<&str> {
+        self.unread_line.as_deref()
     }
     /// The file's own rules, also for what [`Self::with_patience`] fills in.
     fn checked(self) -> io::Result<Self> {
@@ -547,10 +626,12 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_reconnect_choice_or_field_is_refused() {
+    fn an_unknown_reconnect_choice_is_refused_and_an_unknown_field_kept_by_name() {
         assert!(parsed(r#","resumption":"request""#).is_err());
         assert!(parsed(r#","resumption":true"#).is_err());
-        assert!(parsed(r#","resume":"off""#).is_err());
+        let newer = parsed(r#","resume":"off""#).unwrap();
+        assert_eq!(newer.resumption, ReconnectContext::Retain);
+        assert_eq!(newer.unread.keys().collect::<Vec<_>>(), ["resume"]);
     }
 
     #[test]

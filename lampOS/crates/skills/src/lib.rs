@@ -3003,6 +3003,10 @@ pub struct Engine {
     /// With `LAMP_WHO_WAS_HERE_KNOWN=on`: the eyes' known file, for the
     /// mark of someone the lamp knows ([`known`]), never a name.
     known_file: Option<PathBuf>,
+    /// With `LAMP_WHO_WAS_HERE_NAMES=on` too (#1997): the names of those who
+    /// said yes to being named, from the eyes' `tellable` beside the known
+    /// file.
+    naming: bool,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
@@ -3122,6 +3126,14 @@ impl Engine {
         self
     }
 
+    /// With the mark: a visit by someone who said yes to being named to
+    /// others (the eyes' `tellable`, `LAMP_WHO_WAS_HERE_NAMES=on`, #1997) is
+    /// told with their name, only to a skill with `known_faces = true`.
+    pub fn naming_who_said_yes(mut self) -> Self {
+        self.naming = true;
+        self
+    }
+
     /// `skip_ask`: act without asking the Policy (`LAMP_SKILLS_ASK=skip`).
     /// Without it, or `asking_the_policy`, nothing a skill starts is done.
     pub fn new(skills: Vec<Skill>, skip_ask: bool) -> Self {
@@ -3145,6 +3157,7 @@ impl Engine {
             off_file: None,
             visits: visits::Visits::default(),
             known_file: None,
+            naming: false,
         }
     }
 
@@ -3484,14 +3497,19 @@ impl Engine {
         // The mark of someone the lamp knows only for a skill that may know
         // a known face (`known_faces`); any other is told "someone".
         let marked = self.known_file.is_some() && skill.permissions.known_faces;
-        let record = self.visits.told_marking(
+        let telling = match (marked, self.naming) {
+            (false, _) => visits::Telling::Someone,
+            (true, false) => visits::Telling::Known,
+            (true, true) => visits::Telling::Named,
+        };
+        let record = self.visits.told_as(
             now_us,
             within_us,
             |at_us| match self.local_minute(at_us) {
                 Some(minute) => format!("at {:02}:{:02}, {}", minute / 60, minute % 60, ago(at_us)),
                 None => ago(at_us),
             },
-            marked,
+            telling,
         );
         calls
             .into_iter()
@@ -3777,13 +3795,16 @@ impl Engine {
             // Someone the lamp knows at it, with the mark on: only someone
             // who asked to be remembered, as the eyes write them. The name
             // is let go here, unread past whether there is one.
+            // With names on, and only for someone the eyes say said yes to
+            // being named (`tellable`), the name is kept with the spell.
             if presence.someone
-                && self
-                    .known_file
-                    .as_deref()
-                    .is_some_and(|path| known::name_in(path, known::MARK_FRESH).is_some())
+                && let Some(path) = self.known_file.as_deref()
+                && let Some(name) = known::name_in(path, known::MARK_FRESH)
             {
                 self.visits.known_here();
+                if self.naming && known::tellable_in(&known::tellable_of(path)).contains(&name) {
+                    self.visits.named(&name);
+                }
             }
         }
         // Words still coming count too: the model may call before the end.
@@ -4151,6 +4172,14 @@ impl Engine {
     /// of the newest thing heard (its pieces joined, as the voice joins
     /// them) if it began after that run began; the model reads its `told`.
     pub fn tool(&mut self, name: &str, args: &Value, now_us: u64) -> Result<Run, String> {
+        // Before a record is told, only the names the eyes still say said
+        // yes are kept: a no, a forget or a reset lets the rest go (#1997).
+        if self.naming
+            && let Some(path) = self.known_file.as_deref()
+        {
+            self.visits
+                .keep_names(&known::tellable_in(&known::tellable_of(path)));
+        }
         let sharing: Vec<String> = self
             .skills
             .iter()

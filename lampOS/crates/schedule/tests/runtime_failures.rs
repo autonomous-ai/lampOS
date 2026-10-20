@@ -46,6 +46,7 @@ fn config(root: &Path) -> Config {
         socket: root.join("run/s"),
         bus_root: root.join("b"),
         zone: "Etc/UTC".into(),
+        utc_offset_minutes: None,
         run_for: Some(Duration::from_secs(15)),
         // A report every 50 ms, not the lamp's second, so a test that reads
         // it waits a fraction of a second (#1806).
@@ -129,7 +130,7 @@ fn filled_stderr() -> (Stdio, UnixStream, usize) {
     let mut filled = 0;
     // Finish with one-byte writes so even the first byte of the former
     // per-request eprintln would encounter backpressure.
-    for chunk in [&[b'x'; 4096][..], &[b'x'][..]] {
+    for chunk in [&[b'x'; 4096][..], &b"x"[..]] {
         loop {
             assert!(Instant::now() < deadline, "stderr fixture did not fill");
             assert!(filled < 8 * 1024 * 1024, "unexpected stderr buffer size");

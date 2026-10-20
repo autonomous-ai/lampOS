@@ -423,11 +423,31 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
     // A switch of lamp-update's own not yet confirmed: no round acts, so
     // an updater restarted in phase 2, or the old one run by hand, never
     // begins a second round (#1680). The new one confirms before its first.
-    if let Ok(Some(pending)) = own::pending(run.records.folder()) {
-        let outcome = Outcome::Refused(format!(
+    // One that cannot be read waits the same: the updater that runs, or
+    // lamp-update-back, settles it as a switch that failed.
+    let waits = match own::pending(run.records.folder()) {
+        Ok(Some(pending)) => Some(format!(
             "lamp-update's own switch to its build {} is not confirmed yet",
             &pending.new[..pending.new.len().min(12)]
-        ));
+        )),
+        Ok(None) => None,
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidData => Some(format!(
+            "lamp-update's own switch cannot be read ({error}) and is not confirmed"
+        )),
+        // Not its JSON but the disk or a permission: the file may be fine,
+        // so it is never settled. This round waits, says so, and the next
+        // one reads it again (the reviewer on #2075).
+        Err(error) => {
+            let line = format!(
+                "lamp-update's own switch could not be read this time ({error}): this round waits and the next one tries again"
+            );
+            run.say(&line);
+            run.records.log("self-unread", &line);
+            Some(line)
+        }
+    };
+    if let Some(why) = waits {
+        let outcome = Outcome::Refused(why);
         run.records.log(outcome.kind(), &outcome.kept());
         return outcome;
     }
@@ -498,6 +518,26 @@ impl Run<'_, '_> {
         match self.records.journal() {
             Ok(Some(journal)) => return self.recover(journal),
             Ok(None) => {}
+            // A journal it cannot read is set aside, said, and the round
+            // goes on from the units as they are (#1505): updates must not
+            // stop for good because of their own file.
+            Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
+                match self.records.set_aside("journal.json") {
+                    Ok(aside) => {
+                        let line = format!(
+                            "the journal could not be read ({error}): kept as {}, and the units are taken as they are",
+                            aside.display()
+                        );
+                        self.say(&line);
+                        self.records.log("journal-set-aside", &line);
+                    }
+                    Err(error) => {
+                        return Outcome::Failed(format!(
+                            "the journal cannot be set aside: {error}"
+                        ));
+                    }
+                }
+            }
             Err(error) => return Outcome::Failed(format!("the journal cannot be read: {error}")),
         }
         let mut state = match self.records.state(self.world.say) {

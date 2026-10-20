@@ -570,6 +570,13 @@ fn serve(
                     lamp_skills::known::ENVIRONMENT
                 );
                 engine = engine.marking_known(path.clone());
+                if lamp_skills::known::naming() {
+                    eprintln!(
+                        "lamp-skills: Who was here may name someone who said yes to being named ({})",
+                        lamp_skills::known::NAMES_ENVIRONMENT
+                    );
+                    engine = engine.naming_who_said_yes();
+                }
             }
             None => eprintln!(
                 "lamp-skills: {} is on without --known-file, so Who was here marks nobody",

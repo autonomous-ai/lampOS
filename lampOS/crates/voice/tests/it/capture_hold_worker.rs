@@ -1261,11 +1261,11 @@ fn the_loop_waits_on_the_microphone_only_with_the_switch() {
 /// With the switch, a block is read as it arrives, not when the render comes
 /// (#1498's review): here the render comes 5 ms after each block. The
 /// scripted microphone hands over whole blocks, as the lamp's
-/// `plug:device_micro2` does. Each of the 200 blocks after the first 20
-/// (render beside them, so the prime has started) is read within 1 ms of
-/// being there.
+/// `plug:device_micro2` does. Of the 200 blocks after the first 20 (render
+/// beside them, so the prime has started), all but a few are read within
+/// 1 ms of being there.
 #[test]
-fn with_the_render_5_ms_after_each_block_every_block_is_read_within_a_ms() {
+fn with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms() {
     let late = Duration::from_millis(5);
     warm_up();
     let ticks = 200;
@@ -1292,7 +1292,17 @@ fn with_the_render_5_ms_after_each_block_every_block_is_read_within_a_ms() {
         reads[reads.len() - 1],
     );
     assert_eq!(reads.len(), ticks);
-    assert!(reads[reads.len() - 1] <= 1_000, "{reads:?}");
+    // Without the switch the loop passes every 2 ms, so a block waits for the
+    // next pass: on ARM64, 105 of 200 more than 1 ms, the median 1,016 us
+    // (#1569 row 41). With it, a block is read as it arrives, but the runner
+    // can still take the capture thread off its core once or twice beside
+    // the rest of a pull request's tests: one or two blocks of 200 read 2.2
+    // to 3.4 ms late, the median 23 us. A few slow, never more.
+    let slow = reads.iter().filter(|read| **read > 1_000).count();
+    assert!(
+        slow <= ticks / 40,
+        "{slow} of {ticks} read more than 1 ms after they were there: {reads:?}"
+    );
 }
 
 /// The capture thread's time on a core (ns) and its voluntary and forced
@@ -1334,7 +1344,7 @@ fn capture_thread() -> (u64, u64, u64) {
 /// being sent. The rig sends the render beside each block, so the numbers
 /// hold only when it comes with each block; how a block is read when it
 /// does not is
-/// `with_the_render_5_ms_after_each_block_every_block_is_read_within_a_ms`.
+/// `with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms`.
 #[test]
 #[ignore = "a measurement, 20 s"]
 fn capture_wait_cost() {

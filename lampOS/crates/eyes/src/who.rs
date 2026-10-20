@@ -80,6 +80,22 @@ pub fn keep_known(path: &Path, name: Option<&str>, face: Option<&str>) {
     }
 }
 
+/// The file of names Who was here may say (`lamp-skills --tellable-file`,
+/// #1997): `tellable` beside the known file.
+pub fn tellable_of(known: &Path) -> PathBuf {
+    known.with_file_name("tellable")
+}
+
+/// The names of those who said yes to being named, one a line, replaced
+/// whole (mode 0600); no file when there are none.
+pub fn keep_tellable(path: &Path, names: &[String]) {
+    if names.is_empty() {
+        let _ = std::fs::remove_file(path);
+        return;
+    }
+    replace_line(path, &names.join("\n"));
+}
+
 fn replace_line(path: &Path, line: &str) {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
@@ -304,6 +320,12 @@ pub struct Person {
     /// that only adds, so the file keeps its version (the rule above).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub familiar: Option<f32>,
+    /// Their yes to being named to others in Who was here (#1997, the
+    /// lead's yes 20 Oct): `Some(true)` only, absent for no. An optional
+    /// field under the rule above: an older build reads past it and its next
+    /// save drops it, which only ever narrows what is told.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tell_visits: Option<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -492,6 +514,29 @@ impl People {
             .collect()
     }
 
+    /// The names of those who said yes to being named to others in Who was
+    /// here (#1997).
+    pub fn tellable(&self) -> Vec<String> {
+        self.people
+            .iter()
+            .filter(|person| person.tell_visits == Some(true))
+            .map(|person| person.name.clone())
+            .collect()
+    }
+
+    /// Their yes (`true`) or no to being named to others, saved; whether
+    /// they are someone the lamp remembers.
+    pub fn tell_visits(&mut self, name: &str, yes: bool) -> Result<bool> {
+        let mut next = self.people.clone();
+        let Some(person) = next.iter_mut().find(|person| same_name(&person.name, name)) else {
+            return Ok(false);
+        };
+        person.tell_visits = yes.then_some(true);
+        self.save(&next)?;
+        self.people = next;
+        Ok(true)
+    }
+
     /// Whose print this is, and how alike: the best match at or over
     /// [`SAME_PERSON`], or nobody.
     pub fn who(&self, print: &[f32]) -> Option<(String, f32)> {
@@ -538,6 +583,11 @@ impl People {
             prints,
             added_unix_s: now_unix_s,
             familiar: None,
+            // A remembering starts with no yes to being named, even under a
+            // name that had one: the prints are whoever is at the lamp now,
+            // and the yes was another face's (the reviewer's P2 on #2098).
+            // The voice asks again.
+            tell_visits: None,
         });
         self.save(&next)?;
         self.people = next;
@@ -806,6 +856,11 @@ pub enum Ask {
     PhotoYes(String),
     /// Their no: deleted.
     PhotoNo(String),
+    /// Their yes to being named to others in Who was here (#1997), taken
+    /// only from the known face at the lamp now.
+    VisitsYes(String),
+    /// Their no: not named to others any more.
+    VisitsNo(String),
     Forget(String),
     List,
     Who,
@@ -820,6 +875,8 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
         photo_asked: Option<String>,
         photo_yes: Option<String>,
         photo_no: Option<String>,
+        visits_yes: Option<String>,
+        visits_no: Option<String>,
     }
     if let Ok(consent) = serde_json::from_slice::<Consent>(line) {
         return match consent {
@@ -828,25 +885,49 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
                 photo_asked: None,
                 photo_yes: None,
                 photo_no: None,
+                visits_yes: None,
+                visits_no: None,
             } => Some(Ask::PhotoHere),
             Consent {
                 photo_here: None,
                 photo_asked: Some(name),
                 photo_yes: None,
                 photo_no: None,
+                visits_yes: None,
+                visits_no: None,
             } => Some(Ask::PhotoAsked(name)),
             Consent {
                 photo_here: None,
                 photo_asked: None,
                 photo_yes: Some(name),
                 photo_no: None,
+                visits_yes: None,
+                visits_no: None,
             } => Some(Ask::PhotoYes(name)),
             Consent {
                 photo_here: None,
                 photo_asked: None,
                 photo_yes: None,
                 photo_no: Some(name),
+                visits_yes: None,
+                visits_no: None,
             } => Some(Ask::PhotoNo(name)),
+            Consent {
+                photo_here: None,
+                photo_asked: None,
+                photo_yes: None,
+                photo_no: None,
+                visits_yes: Some(name),
+                visits_no: None,
+            } => Some(Ask::VisitsYes(name)),
+            Consent {
+                photo_here: None,
+                photo_asked: None,
+                photo_yes: None,
+                photo_no: None,
+                visits_yes: None,
+                visits_no: Some(name),
+            } => Some(Ask::VisitsNo(name)),
             _ => None,
         };
     }
@@ -1474,6 +1555,88 @@ mod tests {
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
         directory.join("people.json")
+    }
+
+    /// #1997, the lead's yes: a remembered person's yes to being named to
+    /// others is kept with their face and only theirs; a no takes it back;
+    /// a new remembering under the same name starts without it; a forget
+    /// takes it with them; the `tellable` file holds the yes names, 0600, and is gone with
+    /// none. An older build's file, with no field, reads as no.
+    #[test]
+    fn a_yes_to_being_named_is_kept_with_the_face_and_goes_with_a_no_or_a_forget() {
+        use std::os::unix::fs::PermissionsExt;
+        let path = file("tell");
+        let mut people = People::open(path.clone()).unwrap();
+        people.remember("Alpha", vec![print(0.1)], 1).unwrap();
+        people.remember("Beta", vec![print(0.7)], 1).unwrap();
+        assert!(people.tellable().is_empty(), "nobody said yes yet");
+        assert!(people.tell_visits("Alpha", true).unwrap());
+        assert!(
+            !people.tell_visits("Gamma", true).unwrap(),
+            "not remembered"
+        );
+        assert_eq!(people.tellable(), ["Alpha"]);
+        // Kept on disk, and only for Alpha.
+        let reopened = People::open(path.clone()).unwrap();
+        assert_eq!(reopened.tellable(), ["Alpha"]);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text.matches("tell_visits").count(), 1, "{text}");
+        // Someone else remembered under the same name (other prints): the
+        // first Alpha's yes isn't theirs (the reviewer's P2 on #2098), nor is
+        // it kept for the same face asked again: the voice asks again.
+        people.remember("Alpha", vec![print(0.9)], 2).unwrap();
+        assert!(people.tellable().is_empty(), "a new remembering has no yes");
+        people.tell_visits("Alpha", true).unwrap();
+        people.remember("Alpha", vec![print(0.9)], 3).unwrap();
+        assert!(
+            people.tellable().is_empty(),
+            "nor the same face asked again"
+        );
+        people.tell_visits("Alpha", true).unwrap();
+        // The file beside the known one.
+        let known = path.with_file_name("known");
+        let tellable = tellable_of(&known);
+        assert_eq!(tellable, path.with_file_name("tellable"));
+        keep_tellable(&tellable, &people.tellable());
+        assert_eq!(std::fs::read_to_string(&tellable).unwrap(), "Alpha\n");
+        assert_eq!(
+            std::fs::metadata(&tellable).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        // A no takes it back, and the file goes with the last name.
+        assert!(people.tell_visits("Alpha", false).unwrap());
+        assert!(people.tellable().is_empty());
+        keep_tellable(&tellable, &people.tellable());
+        assert!(!tellable.exists());
+        // A forget takes it with them.
+        people.tell_visits("Beta", true).unwrap();
+        people.forget("Beta").unwrap();
+        assert!(people.tellable().is_empty());
+        // An older build's record, with no field: no.
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{"version":1,"people":[{{"name":"Delta","prints":[{:?}],"added_unix_s":1}}]}}"#,
+                print(0.3)
+            ),
+        )
+        .unwrap();
+        assert!(People::open(path.clone()).unwrap().tellable().is_empty());
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn a_yes_or_no_to_being_named_is_asked_alone() {
+        assert_eq!(
+            ask_of(br#"{"visits_yes":"A"}"#),
+            Some(Ask::VisitsYes("A".into()))
+        );
+        assert_eq!(
+            ask_of(br#"{"visits_no":"A"}"#),
+            Some(Ask::VisitsNo("A".into()))
+        );
+        assert_eq!(ask_of(br#"{"visits_yes":"A","visits_no":"A"}"#), None);
+        assert_eq!(ask_of(br#"{"visits_yes":"A","photo_yes":"A"}"#), None);
     }
 
     /// The known name, and while speaking is judged its face's passing id

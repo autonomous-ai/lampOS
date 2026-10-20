@@ -2,14 +2,15 @@
 //! and a text-to-speech service, with V1's field names. Off unless
 //! `LAMP_VOICE_SECOND_CONFIG` names the file. Keys are never written in it:
 //! each is a private credential file read like `provider.json`'s.
-use crate::config::{read_credential, read_private};
+use crate::config::{Unread, read_credential, read_private, unread_fields, unreadable};
 use serde::Deserialize;
 use std::{ffi::OsString, fmt, io, path::Path};
 
 pub const SECOND_CONFIG_ENV: &str = "LAMP_VOICE_SECOND_CONFIG";
 
+/// Not `deny_unknown_fields`: a field a newer build writes is read past and
+/// named once at start, as `provider.json`'s are (#1505, #1680).
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct Raw {
     llm_base_url: String,
     llm_model: String,
@@ -74,6 +75,8 @@ struct Raw {
     /// `deepseek.key`. Absent: DeepSeek's own, as before.
     #[serde(default)]
     deepseek_base_url: Option<String>,
+    #[serde(flatten)]
+    unread: Unread,
 }
 
 /// OpenRouter's OpenAI-compatible API.
@@ -301,7 +304,19 @@ fn from_setting(value: Option<OsString>) -> io::Result<Option<SecondConfig>> {
     }
 }
 
+/// The second route's file. One that does not read is refused, naming the
+/// file and why: a broken configuration is not run on. Fields this build
+/// does not read are named once in the journal.
 pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
+    let (config, line) = load_reporting(path)?;
+    if let Some(line) = line {
+        eprintln!("lamp-voice second: {line}");
+    }
+    Ok(config)
+}
+
+/// The file, and the journal line for its fields this build does not read.
+fn load_reporting(path: &Path) -> io::Result<(SecondConfig, Option<String>)> {
     let data = read_private(path, 16_384)?;
     // Gemini's key moved to the voice unit's credential: a file that still
     // names the old field is refused by name, so the person setting the lamp
@@ -316,12 +331,9 @@ pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
             "gemini_credential_file is no longer read: Gemini's key is the voice unit's credential gemini.key (LoadCredential=gemini.key:<file>)",
         ));
     }
-    let raw: Raw = serde_json::from_slice(&data).map_err(|_| {
-        invalid(
-            io::ErrorKind::InvalidData,
-            "invalid second route configuration",
-        )
-    })?;
+    let raw: Raw = serde_json::from_slice(&data)
+        .map_err(|error| unreadable("second route configuration", path, error))?;
+    let line = unread_fields(path, &raw.unread)?;
     let given = |value: Option<String>| value.filter(|v| !v.is_empty());
     let tts_provider = match given(raw.tts_provider).as_deref() {
         None | Some("openai") => TtsProvider::OpenAi,
@@ -419,7 +431,7 @@ pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
         deepseek_model: slug(raw.deepseek_model, DEEPSEEK_MODEL)?,
         deepseek_base_url: given(raw.deepseek_base_url).map(checked_url).transpose()?,
     };
-    Ok(SecondConfig {
+    let config = SecondConfig {
         search,
         hosted,
         llm_key: key(&raw.llm_credential_file)?,
@@ -436,7 +448,8 @@ pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
         tts_model: given(raw.tts_model).map(gemini_model).transpose()?,
         llm_extra,
         gemini,
-    })
+    };
+    Ok((config, line))
 }
 
 /// Where systemd gives a unit its credentials (`LoadCredential=`).
@@ -698,7 +711,56 @@ mod tests {
     #[test]
     fn a_key_written_in_the_configuration_is_refused() {
         let (_, config) = written("inline", r#","llm_api_key":"sk-inline""#);
-        assert!(load_from_path(&config).is_err());
+        let error = load_from_path(&config).unwrap_err();
+        assert!(error.to_string().contains("llm_api_key"), "{error}");
+        assert!(!error.to_string().contains("sk-inline"));
+    }
+
+    /// A key pasted into the wrong field is refused, and neither the error
+    /// nor a journal line quotes it (#2061): serde's kind and place only.
+    #[test]
+    fn a_key_pasted_into_a_known_field_is_never_quoted() {
+        for (name, extra) in [
+            (
+                "planted-provider",
+                r#","tts_provider":"sk-test-PLANTED-0000""#,
+            ),
+            ("planted-extra", r#","llm_extra":"sk-test-PLANTED-0000""#),
+        ] {
+            let (_, config) = written(name, extra);
+            let error = load_reporting(&config).err().unwrap();
+            assert!(!format!("{error} {error:?}").contains("PLANTED"), "{error}");
+        }
+        let (_, config) = written(
+            "planted-extra-place",
+            r#","llm_extra":"sk-test-PLANTED-0000""#,
+        );
+        let error = load_from_path(&config).unwrap_err().to_string();
+        let (why, column) = error.rsplit_once(" column ").unwrap();
+        assert!(why.ends_with(": Data at line 1"), "{error}");
+        assert!(column.parse::<usize>().is_ok(), "{error}");
+    }
+
+    /// A field a newer build writes is read past and named once at start
+    /// (#1505, #1680); a known field with a bad value is still refused.
+    #[test]
+    fn a_field_from_a_newer_build_is_read_past_and_named() {
+        let (_, config) = written("newer", r#","tts_speed":1.2,"newer":{"a":[1]}"#);
+        let (route, line) = load_reporting(&config).unwrap();
+        assert_eq!(route.llm_model, "m");
+        assert_eq!(
+            line.unwrap(),
+            format!(
+                "{}: fields this build does not read, ignored: newer, tts_speed",
+                config.display()
+            )
+        );
+        let (_, plain) = written("plain", "");
+        assert_eq!(load_reporting(&plain).unwrap().1, None);
+        let (_, bad) = written("newer-bad", r#","newer":1,"stt_language":7"#);
+        let error = load_from_path(&bad).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert!(error.to_string().contains(bad.to_str().unwrap()), "{error}");
     }
 
     #[test]

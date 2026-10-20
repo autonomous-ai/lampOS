@@ -404,27 +404,40 @@ mod tests {
 
     /// A search that doesn't answer is given up after [`WITHIN`] (3 s), and
     /// the turn goes on, told so: never waited for longer, and never
-    /// before.
+    /// before. Once the server has the request, Tokio's clock is paused and
+    /// stepped to either side of the 3 s, so they aren't waited for (#1806).
     #[tokio::test]
     async fn a_search_that_does_not_answer_is_given_up_after_three_seconds() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
-        // Takes the request and never answers it.
+        // Takes the request and never answers it; says once it has it.
+        let (has, request_in) = tokio::sync::oneshot::channel();
         let _held = tokio::spawn(async move {
-            let (socket, _) = listener.accept().await.unwrap();
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut first = [0u8; 1];
+            socket.read_exact(&mut first).await.unwrap();
+            let _ = has.send(());
             tokio::time::sleep(Duration::from_secs(60)).await;
             drop(socket);
         });
         let search = Search::deepseek_at(&base, "ds-key").unwrap();
-        let began = std::time::Instant::now();
-        let told = search.answer(NAME, &json!({"query": "weather"})).await;
-        let took = began.elapsed();
-        assert_eq!(told, json!({"error": "the search did not answer in time"}));
+        let began = tokio::time::Instant::now();
+        let asked =
+            tokio::spawn(async move { search.answer(NAME, &json!({"query": "weather"})).await });
+        request_in.await.unwrap();
+        tokio::time::pause();
         // The 3 s itself, not `WITHIN`, so a changed bound fails here.
-        assert!(
-            took >= Duration::from_secs(3) && took < Duration::from_secs(5),
-            "{took:?}"
-        );
+        let bound = Duration::from_secs(3);
+        let short_of_it = bound - began.elapsed() - Duration::from_millis(10);
+        tokio::time::advance(short_of_it).await;
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+        assert!(!asked.is_finished(), "given up before {bound:?}");
+        tokio::time::advance(Duration::from_millis(20)).await;
+        let told = asked.await.unwrap();
+        assert_eq!(told, json!({"error": "the search did not answer in time"}));
+        assert!(began.elapsed() < bound + Duration::from_millis(100));
     }
 
     /// `LAMP_SECOND_SEARCH=exa`: Exa's request shape, its own fields from

@@ -79,6 +79,10 @@ pub struct State {
     pub models: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub models_before: BTreeMap<String, String>,
+    /// Fields a later build wrote that this one does not know: kept as
+    /// they were across a save, for that build to read again (#1505).
+    #[serde(flatten)]
+    pub later: BTreeMap<String, serde_json::Value>,
 }
 
 impl State {
@@ -312,6 +316,17 @@ impl Records {
         write_whole(&self.folder.join("state.json"), &bytes, 0o600)
     }
 
+    /// One of its files that cannot be read, renamed `<name>.corrupt-<ms>`
+    /// beside it, never deleted: where it went.
+    pub fn set_aside(&self, name: &str) -> io::Result<PathBuf> {
+        let aside = self.folder.join(format!("{name}.corrupt-{}", unix_ms()));
+        fs::rename(self.folder.join(name), &aside)?;
+        sync_folder(&self.folder)?;
+        Ok(aside)
+    }
+
+    /// A switch under way, if any. One that cannot be read is
+    /// `InvalidData`: the round sets it aside.
     pub fn journal(&self) -> io::Result<Option<Journal>> {
         match fs::read(self.folder.join("journal.json")) {
             Ok(bytes) => serde_json::from_slice(&bytes)
@@ -522,6 +537,26 @@ mod tests {
         records.log("checked", "a line");
         let log = fs::read_to_string(records.folder().join("log.jsonl")).unwrap();
         assert!(log.contains("\"event\":\"checked\""));
+    }
+
+    /// #1505: a state a later build wrote, with a field this one does not
+    /// know, reads, and keeps that field across a save.
+    #[test]
+    fn a_state_from_a_later_build_keeps_its_fields_across_a_save() {
+        let folder = tempfile::tempdir().unwrap();
+        let records = Records::new(folder.path().to_owned());
+        fs::write(
+            folder.path().join("state.json"),
+            br#"{"installed":null,"previous":null,"refused":[],"made":[],"pinned":{"to":7}}"#,
+        )
+        .unwrap();
+        let mut state = records.state(&mut |_| {}).unwrap();
+        state.made.push("/opt/lampOS/voice/x/".into());
+        records.save_state(&state).unwrap();
+        let saved: serde_json::Value =
+            serde_json::from_slice(&fs::read(folder.path().join("state.json")).unwrap()).unwrap();
+        assert_eq!(saved["pinned"], serde_json::json!({"to": 7}));
+        assert_eq!(saved["made"][0], "/opt/lampOS/voice/x/");
     }
 
     #[test]

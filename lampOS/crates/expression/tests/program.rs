@@ -107,6 +107,55 @@ fn built_service_is_shadow_by_default_and_its_lock_survives_second_start() {
 }
 
 #[test]
+fn a_catalogue_with_the_old_head_roll_still_serves_and_says_so_once() {
+    // #955's own `speaking` section, as lamps were given it by hand.
+    let mut catalogue: serde_json::Value =
+        serde_json::from_str(include_str!("../behaviours.json")).unwrap();
+    catalogue["speaking"] = serde_json::json!({
+        "nod": {"base_yaw": 0.0, "shoulder": 0.0, "elbow": 0.0, "head_roll": 0.0, "head_pitch": 0.035},
+        "nod_us": 360000,
+        "nod_gap_us": 900000,
+        "stress_level": 0.35,
+        "stress_rise": 1.5,
+        "sway_roll": 0.025,
+        "pause_us": 350000,
+        "sway_us": 600000,
+        "settle": {"base_yaw": 0.0, "shoulder": 0.0, "elbow": 0.0, "head_roll": 0.0, "head_pitch": 0.03},
+        "settle_us": 600000,
+        "settle_after_us": 1500000
+    });
+    let root = Root::new();
+    let file = root.0.join("expression.json");
+    fs::write(&file, catalogue.to_string()).unwrap();
+    let bus = Bus::new(&root.0).unwrap();
+    let mut running = Running(
+        Command::new(PROGRAM)
+            .args(["serve", "--clock-id", "test", "--seconds", "20"])
+            .arg("--catalogue")
+            .arg(&file)
+            .arg("--bus-root")
+            .arg(&root.0)
+            .env_remove("LAMP_BUS_ROOT")
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap(),
+    );
+    state(&bus, &mut running, None);
+    running.0.kill().unwrap();
+    running.0.wait().unwrap();
+    let mut error = String::new();
+    running
+        .0
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut error)
+        .unwrap();
+    assert_eq!(error.matches("sway_roll").count(), 1, "{error}");
+}
+
+#[test]
 fn malformed_cli_and_existing_output_are_refused() {
     let help = Command::new(PROGRAM).arg("--help").output().unwrap();
     assert!(help.status.success());

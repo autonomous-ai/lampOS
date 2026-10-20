@@ -71,9 +71,32 @@ lamp-schedule serve --enable \
 `--zone` takes an IANA name or `system` (#820): the zone the lamp's setup
 last pointed `/etc/localtime` at, read through `lamp-local-time` as the other
 parts read it, and named again at each request, so a re-setup to another zone
-is followed without a restart (one line says the change). A system zone that
-names no zone in the bundled database is refused at start, as an unknown name
-is; a later one that names none keeps the last that did.
+is followed without a restart (one line says the change). A later system zone
+that names none keeps the last that did.
+
+A zone this build's bundled time zone rules don't know (a newer tzdb's name in
+`zone.env`) never stops the part (#1680). A named one falls back to the
+system's zone when it names one it knows, followed as with `--zone system`.
+Setup links `/etc/localtime` to the same name it writes to `zone.env`, so the
+system's zone is usually unknown too, and the fallback is then the fixed
+offset `zone.env` also holds, `LAMP_UTC_OFFSET_MINUTES` (read from the unit's
+environment): `Etc/GMT+3` for -180, so "remind me at 7" rings at 07:00 at the
+lamp. It is the offset when setup ran, so it can be an hour off across summer
+time, never more. With no offset stored, or one that is not whole hours (no
+`Etc/GMT` zone has it), the fallback is `Etc/UTC`, and a new reminder at a
+clock time with no zone of its own ("at 7 tomorrow", daily, weekly) is
+refused with `bad_time` and a reason, while one in minutes from now, or at a
+time in a named zone, is set. One journal line says which, and health warns
+("Schedule doesn't know the lamp's zone; a new reminder is set in the fallback
+zone's time") with `zone_asked` and `zone`. A reminder already set rings at
+the time it was set for, in its own zone. A stored reminder whose own zone
+this build doesn't know, or whose offset newer zone rules gave, is kept unread
+(below). Tests:
+`an_unknown_zone_falls_back_to_the_systems_and_reminders_still_ring`,
+`an_unknown_zone_falls_back_to_the_stored_utc_offset`,
+`with_no_known_zone_or_offset_a_clock_time_is_refused_and_minutes_still_work`
+(`crates/schedule/tests/engine.rs`), `an_unknown_zone_is_a_health_warning_not_a_stop`
+(`tests/runtime.rs`).
 
 `--dir`, `--socket`, and `--zone` are required when enabled. `--bus-root` defaults
 to `/run/lampos-bus` if omitted; supplying it explicitly
@@ -134,7 +157,7 @@ reset-owner code is changed by this task.
 A new database is prepared as `.schedule.sqlite3.init`, synced, and published
 without replacing an existing database. An interrupted, unpublished empty
 initialization can be recovered. An existing zero-byte database, corrupt
-database, unexpected SQLite schema/version, invalid engine snapshot, unsafe file, or
+database, unexpected SQLite schema or `user_version` 0, invalid engine snapshot, unsafe file, or
 WAL/SHM sidecar is refused rather than replaced with a blank schedule. A valid
 newly initialized schema with no snapshot receives its first engine state.
 Checked rollback journals can be recovered by SQLite. Do not remove a database
@@ -161,8 +184,25 @@ committed work before making a new guarded request. The next mutation replaces
 the discarded cache on disk; reopening before then can report its drop again.
 An invalid active item still refuses the store even if its receipt is also bad.
 
-Unknown enum/tag values in active persisted work are **refused**, not guessed
-or mapped to a default. This includes an unknown repeat kind or weekday. Live
+Unknown enum/tag values in active persisted work are never guessed or mapped
+to a default. A reminder or timer this build can't read at `schema` 1 (an
+unknown repeat kind or weekday, a value of another type, a field twice, a
+zone its time zone rules don't know, or a newer tzdb's rules for a zone they
+do, whose stored offset is not the one they give) is **unread** (#1680): passed over with
+one journal line naming only its id, never sounded, snoozed or acknowledged
+here, kept in the store byte for byte and written back in id order at the next
+save, so the build that wrote it finds it again. It counts toward the 128-item
+bound, and health warns ("Schedule kept stored reminders from a newer build
+that this build can't read; they will not sound") with `unread`. The part
+starts and serves. An item that reads but doesn't hold together (an incoherent
+`local`, id 0, empty text) still refuses the store. A new stored value still
+needs a `schema` bump, pinned by `a_new_stored_value_comes_with_a_schema_bump`
+(`src/engine/stored.rs`). Tests:
+`a_reminder_this_build_cannot_read_is_kept_as_it_is_and_the_part_serves`,
+`a_reminder_by_newer_rules_for_a_known_zone_is_kept_unread` and two beside
+it (`tests/forward.rs`),
+`a_stored_reminder_this_build_cannot_read_is_kept_and_the_part_serves`
+(`tests/runtime.rs`). Live
 requests, clocks, public time descriptors and delivery-ledger inputs retain
 their strict deserializers. The tolerant deadline readers are private to this
 engine's stored items; they do not change a shared digest or wire shape.
@@ -209,8 +249,20 @@ An existing archive name is never clobbered. Rename, sync or replacement failure
 refuses startup and poisons the owner; any already-renamed database remains
 retained. A backend without durable set-aside support refuses a newer snapshot.
 Invalid JSON, nonnumeric/old unsupported schema values and snapshots beyond the
-existing 1 MiB bound are still refused. This recovery applies to the JSON schema,
-not SQLite `user_version`, whose format checks remain strict. A future writer
+existing 1 MiB bound are still refused. A SQLite `user_version` above 1 (a newer
+build's container) is set aside the same way, whole, as
+`schedule.sqlite3.newer-db<version>-<unix seconds>`, never deleted, with one
+journal line, and the part starts with an empty store (#1680). The version is
+read from the file's header before any SQLite connection, so a newer build's
+WAL database, or one with `-wal`/`-shm` beside it, is set aside with its
+sidecars (named after it) rather than refused by the journal-mode and sidecar
+checks; health names it
+as `set_aside`, as above. `user_version` 0 with tables, or a schema it doesn't
+expect at 1, is still refused (corruption, not a newer build). Tests:
+`a_newer_database_version_is_set_aside_whole_and_a_new_store_begins`,
+`a_newer_wal_database_is_set_aside_with_its_sidecars`
+(`tests/storage.rs`), `a_newer_schedule_database_is_set_aside_and_the_part_serves`
+(`tests/runtime.rs`). A future writer
 must bump the JSON schema for new enum values, required fields, raised bounds,
 or optional fields whose omission could change scheduling or delivery behavior.
 

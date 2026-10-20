@@ -640,13 +640,18 @@ stretch of the journal by the lamp's time of day, `HH:MM` or `HH:MM:SS`, as
 
 - **Usage is read from the voice's own lines**, as counts only, never words
   (`src/cost.rs` names each line):
-  - requests, by process and number;
-  - answered: the second route's `first answer audio`, and Live's answers
-    that began, less those held back. Live's begin with its first sound, which
-    it says only with `LAMP_NAME_SIGNAL`, or its answer judged played (`its
-    answer is played: …`), which it says whenever attention judges, as with
-    `LAMP_SPOKEN_TO`. Either switch counts them; with neither, Live's answered
-    reads 0;
+  - requests and answered are counted as `score` counts them, by the one
+    matcher both read (`src/voice_lines.rs`), so the two can't drift (the
+    first builder on #1712, 19 Oct 23:29, read 34 of Live's requests and 0
+    answered). A request is known by its route, process and number. The second
+    route's is its `request N heard W words` line, and it is answered by its
+    `first answer audio`. Live's is any line that begins `request N`, not a
+    sound's `a sound (request N)`, a reminder's `reminder request N` or a
+    picture's `went with request N`. Live's answer begins with its first
+    sound, which it says only with `LAMP_NAME_SIGNAL`, or its answer judged
+    played (`its answer is played: …`), which it says whenever attention
+    judges, as with `LAMP_SPOKEN_TO`, and it counts unless it is held back.
+    Either switch counts them; with neither, Live's answered reads 0;
   - DeepSeek's prompt, cached and completion tokens from each `chat answer`.
     One with "the cache not said" is priced as all uncached, the dearer, and one
     with "no usage given" is counted, not priced;
@@ -669,7 +674,30 @@ stretch of the journal by the lamp's time of day, `HH:MM` or `HH:MM:SS`, as
   per answered line and per "conversation minute". That's 5 requests at the
   arm's own cost a request: the research's model of 4 answered and 1 not.
 - **Tests:** `src/cost.rs` (each line, each price, the three forms of a chat
-  answer's tokens) and `tests/cost.rs` (the command as it is run).
+  answer's tokens, Live's 34 requests read as `score` reads them, and each
+  route's answered lines alike in both), `src/voice_lines.rs` (which Live
+  lines are requests) and `tests/cost.rs` (the command as it is run).
+
+## Whether the end of speech worked: `endpoint`
+
+`lamp-voice-eval endpoint SESSION [--since-us N]` reads the voice's own
+records under `SESSION` (every `events-*.jsonl`, at any depth: a session's
+folder is `/var/lib/lampOS/voice/sessions/<the unit's InvocationID>`) and
+prints two lines: the end-of-speech worker's states in time order
+(`endpoint_worker`: loading, ready, recovering, failed, closed), and the ends
+of speech by their basis (`local_endpoint`'s `endpoint`: `model_complete`,
+`model_uncertain`, `silence`, `silence_fallback` with each fallback's
+reason). It exits 1, with a `FAULT:` line each, when the worker's newest
+state isn't `ready`, when no state was recorded, or when an end of speech
+fell back because the worker failed. `N` is the arm's start on the voice's
+clock (`at_us`): only the ends from it on are counted, while a worker state
+set before it still holds. Counts and states only, no words.
+
+Run it after each arm of a played test (the first builder on #1722, 20 Oct
+2026 07:20; nothing here runs it for you yet): from 19 Oct lamp-4ace's `lamp-turn-end` was the 14 Oct build,
+refused its new options and failed, so every end of speech waited its whole
+600 ms, on every arm of every played test, and no table said so.
+`arm-hour.sh --preflight` checks the same worker before an arm hour.
 
 ## The routes' table from the journal: `score`
 
@@ -695,7 +723,8 @@ a person said reach the table (`score::tests::no_words_said_reach_the_table`).
   answered (the second route's `first answer audio`; Live's answer begun,
   by its `first sound`, said only with `LAMP_NAME_SIGNAL`, or `its answer is
   played`, said whenever attention judges as with `LAMP_SPOKEN_TO`, and not
-  held back), declined by the model (`called
+  held back; counted by the matcher `cost` shares, `src/voice_lines.rs`),
+  declined by the model (`called
   not_for_me`; Live's `the model said it was not for it`, not the one said
   after doing what was asked, which is not taken), unanswered in time (`chat
   round N had not begun`; Live's `; closed as unanswered`, not a wait

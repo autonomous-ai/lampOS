@@ -417,7 +417,9 @@ fn back(options: &BTreeMap<String, String>) -> Result<(), String> {
         &state,
         &mut say,
     )? {
-        own::Back::PutBack(_) => {
+        // A self.json set aside leaves lamp-update to be started too: it
+        // may have failed on it.
+        own::Back::PutBack(_) | own::Back::Unreadable(_) => {
             // Started again whatever brought it here: its start limit may
             // have been reached.
             let _ = Command::new("systemctl")
@@ -691,6 +693,19 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     break;
                 }
                 Ok(own::Confirm::Nothing | own::Confirm::NotOwn) => break,
+                Ok(own::Confirm::Unreadable(own::Unreadable::SetAside)) => break,
+                Ok(own::Confirm::Unreadable(own::Unreadable::PutBack { .. })) => {
+                    // This build is refused: the old one runs in its place.
+                    let program = config.on(own::CURRENT).join(own::BINARY);
+                    let error = Command::new(&program)
+                        .args(std::env::args_os().skip(1))
+                        .exec();
+                    eprintln!(
+                        "lamp-update: {} cannot be started: {error}",
+                        program.display()
+                    );
+                    return ExitCode::FAILURE;
+                }
                 Ok(own::Confirm::NotProven(why)) => format!("not confirmed yet: {why}"),
                 Ok(own::Confirm::Busy) => {
                     "not confirmed yet: another lamp-update is at work".into()

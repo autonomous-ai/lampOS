@@ -22,6 +22,7 @@
 //! A request is known by its process and number, since numbers start again
 //! when the service does.
 
+use crate::voice_lines::{Answers, Route, VoiceLine};
 use std::collections::BTreeMap;
 
 /// One arm: its name and its stretch of the journal, by time of day in
@@ -256,11 +257,11 @@ struct Tally {
     first_audio: BTreeMap<Request, u64>,
     /// The rows already counted for a request, each once.
     seen: std::collections::BTreeSet<(&'static str, Request)>,
-    /// Live's requests whose answer began, by its first sound (said only
-    /// with `LAMP_NAME_SIGNAL`) or its verdict played (said whenever
-    /// attention judges, as with `LAMP_SPOKEN_TO`), and those held back.
-    sounded: std::collections::BTreeSet<Request>,
-    held: std::collections::BTreeSet<Request>,
+    /// Requests answered, as `cost` reads them ([`crate::voice_lines`]):
+    /// the second route's first answer audio, and Live's begun (its first
+    /// sound, said only with `LAMP_NAME_SIGNAL`, or its verdict played, said
+    /// whenever attention judges) and not held back.
+    answers: Answers,
     /// Whether the arm's stretch holds the second route's lines, and Live's.
     second: bool,
     live: bool,
@@ -283,30 +284,27 @@ impl Tally {
     }
 
     fn read(&mut self, line: &str) {
-        let process = number_after(line, "lamp-voice[").unwrap_or(0);
-        let Some(at) = line
-            .find("lamp-voice second: ")
-            .or_else(|| line.find("lamp-voice provider: "))
-        else {
+        let Some(voice) = VoiceLine::of(line) else {
             return;
         };
-        let line = &line[at..];
-        let second = line.starts_with("lamp-voice second: ");
-        if second {
+        self.answers.read(&voice);
+        let line = voice.text;
+        if voice.route == Route::Second {
             self.second = true;
         } else {
             self.live = true;
         }
-        let request = number_after(line, "request ").map(|number| (process, number));
-        if let Some(reason) = line.split("its answer is played: ").nth(1) {
+        let request = voice
+            .request()
+            .map(|(_, process, number)| (process, number));
+        if let Some(reason) = voice.played() {
             self.count("lines judged");
             self.count("let out");
             self.count(let_out_by(reason));
-        } else if let Some(reason) = line.split("its answer is held back: ").nth(1) {
+        } else if let Some(reason) = voice.held() {
             self.count("lines judged");
             self.count("held back");
             self.count(held_for(reason));
-            self.held.extend(request);
         }
         // The second route's `chat round N called a, b`, and Live's decline
         // taken (`the model said it was not for it`); not Live's one said
@@ -364,18 +362,11 @@ impl Tally {
         if let Some(ms) = number_after(line, "first piece to the voice ") {
             self.time("words to first piece to the voice, ms", ms);
         }
-        if let Some(ms) = number_after(line, "first answer audio ") {
-            self.once(
-                "answered (first answer audio; Live: first sound or played, not held)",
-                request,
-            );
+        if let Some(ms) = voice.first_answer_audio() {
             self.time("words to first answer audio, ms", ms);
             if let Some(request) = request {
                 self.first_audio.insert(request, ms);
             }
-        }
-        if !second && (line.contains(": first sound") || line.contains("its answer is played: ")) {
-            self.sounded.extend(request);
         }
     }
 
@@ -491,8 +482,8 @@ impl Tally {
             .or_default() += answered;
     }
 
-    /// Line end to first answer audio, for each request with both, and
-    /// Live's answered: begun (a first sound or played) and not held back.
+    /// Line end to first answer audio, for each request with both, and the
+    /// requests answered, by the matcher `cost` shares.
     fn join(&mut self) {
         let both: Vec<u64> = self
             .first_audio
@@ -502,11 +493,11 @@ impl Tally {
         for ms in both {
             self.time("line end to first answer audio, ms", ms);
         }
-        let answered: Vec<Request> = self.sounded.difference(&self.held).copied().collect();
-        for request in answered {
-            self.once(
+        let answered = self.answers.answered().len() as u64;
+        if answered > 0 {
+            self.counts.insert(
                 "answered (first answer audio; Live: first sound or played, not held)",
-                Some(request),
+                answered,
             );
         }
     }

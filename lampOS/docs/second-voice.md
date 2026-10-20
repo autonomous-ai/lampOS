@@ -268,10 +268,15 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   finals': "request N at the line's end: flux: turns=K, <no turn|the
   latest turn open|the latest turn ended by model|manual|timeout>, <the
   model ended no turn|the model ended turn I T ms before End>,
-  settled=<bool>, heard to H of S ms sent[, force_end answered in A ms (end
-  of turn|no turn)|, force_end unanswered], words
-  from=<settled|force_end|close_stream>". T is how far ahead of the
-  coordinator's end Flux's own end of turn came. That, beside the words,
+  settled=<bool>, heard to H of S ms sent[; closed by the service C ms
+  after force_end, before its answer: <the same counts again, at the
+  close>, W words][, force_end answered in A ms (end of turn|no turn)|,
+  force_end unanswered], words
+  from=<settled|force_end|close_stream|closed_early>". T is how far ahead of the
+  coordinator's end Flux's own end of turn came. `closed_early` is Flux
+  ending the stream after `ForceEndTurn` and before its answer, with no
+  `CloseStream` asked, told as on the Nova route below: when, how far it
+  heard and how many words, never the words. That, beside the words,
   is what the trial is for.
 
   `lamp-voice stt-check` reads the unit's switches now. So
