@@ -1011,3 +1011,159 @@ fn the_breath_goes_on_at_the_pace_and_never_jumps() {
     let night = Engine::new("host-boot".into(), 0, NIGHT).unwrap();
     assert_eq!(pace(&night), MOOD_PACE_SLOWEST);
 }
+
+/// #1671: two `positive` reads in a row from the near face are a smile. The
+/// lamp brightens a little, half a bang's energy and laughter's warmth, at
+/// most once in its cooldown; a smile held on doesn't add again.
+#[test]
+fn a_smile_brightens_the_lamp_a_little_once_in_its_cooldown() {
+    use lamp_mood::engine::SMILE_COOLDOWN_US;
+    use lamp_msgs::SeemsKind::{Positive, Unsure};
+    let mut mood = engine(DAY);
+    send(
+        &mut mood,
+        SECOND_US,
+        EventKind::Faces(Some(face(BOOT, "a"))),
+    );
+    send(&mut mood, 2 * SECOND_US, EventKind::Seems(Some(Positive)));
+    close(state(&mood).energy, 0.30);
+    send(&mut mood, 4 * SECOND_US, EventKind::Seems(Some(Positive)));
+    close(state(&mood).energy, 0.40);
+    close(state(&mood).warmth, 0.63);
+    // Held on: no more, only the pulse fading over its 15 s half-life.
+    send(&mut mood, 6 * SECOND_US, EventKind::Seems(Some(Positive)));
+    close(state(&mood).energy, 0.30 + 0.10 * 0.5f32.powf(2.0 / 15.0));
+    // An unsure read breaks the run, and a smile inside the cooldown adds
+    // nothing.
+    send(&mut mood, 8 * SECOND_US, EventKind::Seems(None));
+    send(&mut mood, 10 * SECOND_US, EventKind::Seems(Some(Positive)));
+    send(&mut mood, 12 * SECOND_US, EventKind::Seems(Some(Positive)));
+    close(state(&mood).energy, 0.30 + 0.10 * 0.5f32.powf(8.0 / 15.0));
+    // After it, a smile counts again.
+    let later = 4 * SECOND_US + SMILE_COOLDOWN_US;
+    send(&mut mood, later, EventKind::Seems(Some(Unsure)));
+    send(
+        &mut mood,
+        later + SECOND_US,
+        EventKind::Seems(Some(Positive)),
+    );
+    let base = state(&mood).energy;
+    send(
+        &mut mood,
+        later + 2 * SECOND_US,
+        EventKind::Seems(Some(Positive)),
+    );
+    let added = state(&mood).energy - base;
+    assert!((added - 0.10).abs() < 0.001, "{added}");
+}
+
+/// One read is no smile, and reads of two kinds don't add up to one.
+#[test]
+fn one_read_or_a_broken_run_is_no_smile() {
+    use lamp_msgs::SeemsKind::{Negative, Positive};
+    let mut mood = engine(DAY);
+    send(
+        &mut mood,
+        SECOND_US,
+        EventKind::Faces(Some(face(BOOT, "a"))),
+    );
+    send(&mut mood, 2 * SECOND_US, EventKind::Seems(Some(Positive)));
+    send(&mut mood, 4 * SECOND_US, EventKind::Seems(Some(Negative)));
+    send(&mut mood, 6 * SECOND_US, EventKind::Seems(Some(Positive)));
+    close(state(&mood).energy, 0.30);
+    close(state(&mood).warmth, 0.60);
+}
+
+/// #1671: three `negative` reads in a row and the lamp keeps someone low
+/// company quietly: its energy a step lower and a startle's let go, for two
+/// minutes, while a face is near. A smile, or nobody near, ends it early.
+#[test]
+fn someone_low_quiets_the_lamp_for_two_minutes_unless_they_smile_or_go() {
+    use lamp_mood::engine::QUIET_US;
+    use lamp_msgs::SeemsKind::{Negative, Positive};
+    // A face the eyes keep seeing, renewed every 10 s for 15.
+    let near = |mood: &mut Engine, at: u64| {
+        mood.apply(
+            at,
+            leased(
+                at,
+                MAX_EVENT_LEASE_US,
+                EventKind::Faces(Some(face(BOOT, "a"))),
+            ),
+        )
+        .unwrap();
+    };
+    let low = |mood: &mut Engine, from: u64| {
+        for read in 0..3 {
+            send(
+                mood,
+                from + read * 2 * SECOND_US,
+                EventKind::Seems(Some(Negative)),
+            );
+        }
+    };
+    let mut mood = engine(DAY);
+    near(&mut mood, SECOND_US);
+    send(&mut mood, 2 * SECOND_US, EventKind::SuddenSound);
+    assert!(state(&mood).energy > 0.50);
+    low(&mut mood, 3 * SECOND_US);
+    close(state(&mood).energy, 0.20);
+    let set = 7 * SECOND_US;
+    let mut at = 10 * SECOND_US;
+    while at < set + QUIET_US {
+        near(&mut mood, at);
+        at += 10 * SECOND_US;
+    }
+    mood.advance(set + QUIET_US - 1, DAY).unwrap();
+    close(state(&mood).energy, 0.20);
+    mood.advance(set + QUIET_US, DAY).unwrap();
+    close(state(&mood).energy, 0.30);
+
+    // A smile ends it.
+    let mut mood = engine(DAY);
+    near(&mut mood, SECOND_US);
+    low(&mut mood, 2 * SECOND_US);
+    close(state(&mood).energy, 0.20);
+    send(&mut mood, 8 * SECOND_US, EventKind::Seems(Some(Positive)));
+    send(&mut mood, 10 * SECOND_US, EventKind::Seems(Some(Positive)));
+    close(state(&mood).energy, 0.40);
+
+    // Nobody near ends it, said or by the face's lease ending, and their
+    // face coming back doesn't bring it back.
+    let mut mood = engine(DAY);
+    near(&mut mood, SECOND_US);
+    low(&mut mood, 2 * SECOND_US);
+    send(&mut mood, 8 * SECOND_US, EventKind::Faces(None));
+    close(state(&mood).energy, 0.30);
+    near(&mut mood, 9 * SECOND_US);
+    close(state(&mood).energy, 0.30);
+    let mut mood = engine(DAY);
+    near(&mut mood, SECOND_US);
+    low(&mut mood, 2 * SECOND_US);
+    mood.advance(SECOND_US + MAX_EVENT_LEASE_US, DAY).unwrap();
+    near(&mut mood, 20 * SECOND_US);
+    close(state(&mood).energy, 0.30);
+}
+
+/// Asleep, how a face seems changes nothing.
+#[test]
+fn a_sleeping_lamp_takes_nothing_from_how_a_face_seems() {
+    use lamp_msgs::SeemsKind::{Negative, Positive};
+    let mut mood = engine(NIGHT);
+    assert!(state(&mood).asleep);
+    // Checked after the smiles and again after the low reads: the low
+    // reads end any pulse, so a smile taken would be gone by then (the
+    // reviewer's P3 1 on #2254).
+    for kinds in [
+        [(1, Positive), (3, Positive)].as_slice(),
+        &[(5, Negative), (7, Negative), (9, Negative)],
+    ] {
+        for &(at, kind) in kinds {
+            send(&mut mood, at * SECOND_US, EventKind::Seems(Some(kind)));
+        }
+        let value = state(&mood);
+        close(value.energy, 0.30);
+        close(value.warmth, 0.60);
+        assert!(value.asleep);
+    }
+}
