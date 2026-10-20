@@ -1,6 +1,6 @@
 ---
 name: who-was-here
-description: Call when someone asks whether anyone was at the lamp while they were away - "was anyone here while I was out?", "did someone come by?", "has anyone been at my desk?". The lamp answers from its record of the room over the last twelve hours, times only: when someone was there and for about how long. It never knows who; with its switch on, at most that someone was a person the lamp knows. Only when asked.
+description: Call when someone asks whether anyone was at the lamp while they were away - "was anyone here while I was out?", "did someone come by?", "has anyone been at my desk?". The lamp answers from its record of the room over the last twelve hours, times only: when someone was there and for about how long. It never knows who; with its switch on, at most that someone was a person the lamp knows, and with names on, the name of someone who said yes to being named. Only when asked.
 ---
 
 # Who was here
@@ -26,6 +26,13 @@ What it keeps, and what it never does:
   face is said as "someone the lamp knows", never who: being remembered
   for a greeting isn't agreeing to have your visits told to whoever asks.
   Anyone else is still someone.
+- **A name only with its own yes.** With names on too
+  (`LAMP_WHO_WAS_HERE_NAMES=on`, off unless set), someone the lamp remembers
+  who said yes to being named to others ("you can tell people when I've
+  been here", asked at the lamp, only of their own face) is said by name.
+  "Don't tell anyone I was here" takes it back, and from then on their
+  visits, past ones too, are someone the lamp knows. Forgetting their face,
+  or the reset, takes it away. A name lives only in memory.
 - **It says when it could not see.** While the camera was closed (the
   privacy switch, a mute) the lamp does not know who came, and says so.
 - **Only when asked.** It never tells you on its own who came by.
