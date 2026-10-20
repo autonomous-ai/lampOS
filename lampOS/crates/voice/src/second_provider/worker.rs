@@ -1384,6 +1384,8 @@ pub fn serve(
     let face_cache = Arc::new(crate::memory_scope::FaceCache::default());
     let scoped_settings = tools.clone();
     let days = crate::remember::days_from_environment();
+    // For what memory holds that fits a turn's words (#2176 row 5c).
+    let (hits_socket, hits_who) = (socket.clone(), who.clone());
     // Told after the character with `LAMP_TASKS_ASKED=on`, as the Live route is (#854).
     let tasks = tools.tasks.clone();
     // What a Live session is told of the moment, with `--session-fact` and
@@ -1574,6 +1576,73 @@ pub fn serve(
     }
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
+    }
+    // What memory holds that may fit a spoken turn's words (#2176 row 5c,
+    // `LAMP_SECOND_MEMORY_HITS=on`, Days only): searched in the scope the
+    // turn's note is told for, the known face's or the room's, within
+    // `HITS_WITHIN`, and told as notes, never as sources. Not with
+    // `LAMP_SECOND_SCOPED_CONTEXT`, whose per-line lease it doesn't read yet.
+    match (crate::remember::hits_on(), hits_socket) {
+        (true, Some(socket)) if days && !scoped_context_from_environment() => {
+            eprintln!(
+                "lamp-voice second: each spoken turn is told what memory holds that may fit its words ({})",
+                crate::remember::HITS_ENVIRONMENT
+            );
+            let who = hits_who;
+            engine = engine.remembering(Arc::new(move |request, heard| {
+                let started = Instant::now();
+                let known = who
+                    .as_deref()
+                    .and_then(crate::known_faces::known_now)
+                    .map(|name| crate::remember::person_id(&name));
+                let session = crate::thread::THREAD
+                    .lock()
+                    .ok()
+                    .and_then(|thread| thread.opened_for().map(str::to_owned));
+                // One count for the turn: the eyes' face and the session's
+                // person agree, or nothing is told (the reviewer's P2 on
+                // #2251).
+                let Some(person) =
+                    crate::remember::hits_scope(known.as_deref(), session.as_deref())
+                else {
+                    eprintln!(
+                        "lamp-voice second: request {request}: memory isn't told: the face and the session's person differ"
+                    );
+                    return None;
+                };
+                let now_unix_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| since.as_millis() as u64);
+                let offset = crate::local_time::offset_here().unwrap_or(0);
+                let note = crate::remember::hits_note(
+                    &socket,
+                    person.as_deref(),
+                    heard,
+                    now_unix_ms,
+                    offset,
+                );
+                eprintln!(
+                    "lamp-voice second: request {request}: memory {} in {} ms ({})",
+                    if note.is_some() {
+                        "told"
+                    } else {
+                        "had nothing told"
+                    },
+                    started.elapsed().as_millis(),
+                    if person.is_some() {
+                        "theirs"
+                    } else {
+                        "the room's"
+                    }
+                );
+                note
+            }));
+        }
+        (true, _) => eprintln!(
+            "lamp-voice second: memory isn't told on each turn: {} needs the Days memory and no LAMP_SECOND_SCOPED_CONTEXT",
+            crate::remember::HITS_ENVIRONMENT
+        ),
+        (false, _) => {}
     }
     // Seeing someone speak (`LAMP_SECOND_SPEAKING_FACE=on`, the first
     // builder on #1722, 00:08): the eyes' faces, read every 100 ms on their

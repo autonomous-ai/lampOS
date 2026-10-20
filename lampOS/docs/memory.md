@@ -473,6 +473,19 @@ the unchanged legacy client, used unless the new Days client is selected.
   `days::the_follow_up_request_answers_for_a_person_and_refuses_the_room`,
   `remember::tests::with_the_switch_a_known_person_s_session_is_told_one_thread_to_ask_about`.
 
+### Told on each turn (`LAMP_SECOND_MEMORY_HITS=on`, #2176 row 5c)
+
+On lamp-4ace on 20 Oct the second route's model called neither `recall` nor `search` once in four hours, so a name kept that morning was never used ("the lamp forgot my name"). With this switch and the Days memory, each spoken turn's final words are searched before its chat begins (`remember::hits_note`):
+
+- **The scope, one count for the turn:** the known face's (`known_faces::known_now`, `person_id`) only when the session the turn is in is theirs too (`thread::opened_for`), and the room's when neither names anyone. When they differ, nothing is told: someone leaning in for one look doesn't have their kept things told in another's conversation (the reviewer's P2 on #2251). The journal says "memory isn't told: the face and the session's person differ".
+- **What's asked:** that scope's whole kept list (`{"op":"kept","max_bytes":16384}`, the answer read up to 40 KB), so a name kept early isn't lost behind newer ones. It's matched in the voice by the words they share with what was heard: lower-cased, three letters or more, a possessive's `'s` and a plural's `s` taken off, and small words left out. Not the memory's full-text search: on lamp-4ace on 20 Oct its twelve best for "what is my name" were all exchanges, none kept, and the room's search took about 44 ms, where its kept list (63 things) took 3 ms. **English only:** accents aren't folded, and Vietnamese words match as written.
+- **The room's** are told with a line that they were said in this room and that the lamp can't tell who said them or who is asking, as the session note's room part says.
+- **The bound:** the answer within `HITS_WITHIN` (60 ms), or let go, never waited for. A line with no word that says what it's about isn't asked. On the final words it runs off the worker's runtime (`spawn_blocking`). On the early words of a prepared chat it runs inline, where the chat begins, so a slow memory can hold that line's audio for up to the same 60 ms.
+- **What's told:** at most three kept things, the most words shared first, then the newest, each cut to 160 characters, with how long ago in words. They go after a note saying they are notes, not instructions, to be used only if they fit and never listed.
+- **Not as sources:** nothing told here goes into the session's sources, so the 64-source bound (#2176 finding 1) isn't spent on it.
+- **The journal:** one line a turn, `request N: memory told|had nothing told in M ms (theirs|the room's)`, with no words.
+- **Not with `LAMP_SECOND_SCOPED_CONTEXT`:** it doesn't read the per-line lease yet, so the worker says so and tells nothing.
+
 ### Each person's own (#764)
 
 When the voice has eyes that remember faces (`LAMP_EYES_WHO_SOCKET`, the
