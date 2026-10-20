@@ -49,6 +49,10 @@ const ECHO_TICKS: usize = 3;
 /// from 3.3e7 to 2.3e5 a 25-block window by block 101 and held there), so
 /// the last 100 of 250 are settled, and 250 still gives `frames.len() >= 200`.
 const SETTLED_BLOCKS: usize = 250;
+/// Blocks in the session [`warm_up`] throws away: the canceller runs from
+/// the first frame, so 20 of its blocks are run before the first that counts
+/// (it was 100, a second each test, #823).
+const WARM_BLOCKS: usize = 20;
 
 fn now() -> MonoTime {
     MonoTime::from_micros(monotonic_us())
@@ -678,14 +682,18 @@ impl Rig {
 /// than that, and the session ends on the first frame. What a session does
 /// once the process is running is what these tests are about, so up to three
 /// are spent first, until one runs through. How many it took is printed.
+///
+/// [`WARM_BLOCKS`] long: natively the canceller runs from the first frame, so
+/// a short session pays its first use. nextest runs each test in its own
+/// process, so every test here pays this once (#823).
 fn warm_up() {
     static WARM: Once = Once::new();
     WARM.call_once(|| {
-        let signal = Signal::new(100);
+        let signal = Signal::new(WARM_BLOCKS);
         for attempt in 1..=3 {
             let ran = catch_unwind(AssertUnwindSafe(|| {
                 let mut rig = Rig::start("scripted warm-up");
-                rig.stream(&signal, 100);
+                rig.stream(&signal, WARM_BLOCKS);
                 rig.settle(0);
                 rig.end_with(Control::Stop);
                 rig.finish();
