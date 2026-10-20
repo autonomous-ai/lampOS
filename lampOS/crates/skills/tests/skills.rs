@@ -30,7 +30,9 @@ const RELOAD: Duration = Duration::from_secs(2);
 /// One pass of the program's main loop, which waits at most 250 ms and then
 /// takes in every topic, the ring's words and its watches. A check that
 /// nothing came waits this long: what the program would wrongly send comes
-/// in the pass that took in its cause (#1806).
+/// in the pass that took in its cause (#1806). It bounds how soon, and is no
+/// proof of absence: a wrong message later than this, as on a loaded
+/// runner, passes the check (the reviewer's P3 on #2328).
 const ONE_PASS: Duration = Duration::from_millis(300);
 
 /// The program's clock as a test drives it (`--clock-control`,
@@ -8696,6 +8698,21 @@ fn a_watch_is_turned_only_by_its_tool_and_holds_to_its_permissions() {
 /// program's clock past 30 s, which would otherwise leave the mark
 /// unconfirmed (Third's privacy read on #1963), and taken in before what
 /// comes next.
+/// The light requests read so far give the old claim back and then ask for
+/// it anew: one that holds at `now` comes after one that doesn't. A renewal
+/// read before the give-back takes neither place (the reviewer's P3 on
+/// #2328).
+fn given_back_and_asked(asked: &[LightRequest], now: u64) -> bool {
+    asked
+        .iter()
+        .position(|asked| !asked.claim.holds_at("boot-test", now))
+        .is_some_and(|back| {
+            asked[back + 1..]
+                .iter()
+                .any(|asked| asked.claim.holds_at("boot-test", now))
+        })
+}
+
 fn still_shows(reached: &mut lamp_bus::Publisher, mark: &LightRequest) {
     reached
         .publish_json(
@@ -9136,10 +9153,10 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
             },
         )
         .unwrap();
-    // The two asked: read until both have come, not until 2 s of quiet.
+    // Read until both have come, not until 2 s of quiet.
     let until = Instant::now() + Duration::from_secs(5);
     let mut asked = Vec::new();
-    while asked.len() < 2
+    while !given_back_and_asked(&asked, lamp_ipc::monotonic_us())
         && let Some(message) = next(
             &mut requests,
             until.saturating_duration_since(Instant::now()),
@@ -9147,12 +9164,9 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
     {
         asked.push(message.parse::<LightRequest>().unwrap());
     }
-    let now = lamp_ipc::monotonic_us();
     assert!(
-        asked.len() >= 2
-            && !asked[0].claim.holds_at("boot-test", now)
-            && asked[1].claim.holds_at("boot-test", now)
-            && asked[1].light == mark.light,
+        given_back_and_asked(&asked, lamp_ipc::monotonic_us())
+            && asked.last().is_some_and(|last| last.light == mark.light),
         "given back and asked again: {asked:?}"
     );
     // Not yet said shown again: a visit is not counted.
@@ -9367,14 +9381,6 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
     let again = turn_on();
     assert!(again.contains("again"), "{again}");
     // Read until both have come, not until 2 s of quiet.
-    let given_back_and_asked = |asked: &[LightRequest], now| {
-        asked
-            .iter()
-            .any(|asked| !asked.claim.holds_at("boot-test", now))
-            && asked
-                .last()
-                .is_some_and(|last| last.claim.holds_at("boot-test", now))
-    };
     let until = Instant::now() + Duration::from_secs(5);
     let mut asked = Vec::new();
     while !given_back_and_asked(&asked, lamp_ipc::monotonic_us())
