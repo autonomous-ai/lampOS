@@ -1516,7 +1516,11 @@ fn descendants(db: &Connection, with_versions: bool) -> Result<()> {
     if with_versions {
         db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
     } else {
-        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
+        // Expiry: a kept thing never expires, even one remembered with its
+        // conversation (#1693): the walk stops at it, and its link to an
+        // expired exchange goes by the foreign key (#2176). A forget, above,
+        // still follows that link to it.
+        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept') INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
     }
     Ok(())
 }

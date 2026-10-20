@@ -1702,6 +1702,56 @@ fn a_kept_thing_goes_with_the_conversation_it_came_up_in_and_nothing_else() {
     assert!(store.record(&room, plain_said).unwrap().is_some());
 }
 
+/// #2176: a kept thing remembered with its conversation outlives that
+/// conversation's expiry, as explicit kept facts do not expire; only its
+/// link to the gone exchange goes. Forgetting it still takes the exchanges
+/// (the test above).
+#[test]
+fn a_kept_thing_outlives_the_expiry_of_the_conversation_it_came_up_in() {
+    let scratch = Scratch::new("kept-outlives");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    let said = store
+        .append(&room, NOW, "my violet umbrella is in the car", "Noted", &[])
+        .unwrap();
+    let umbrella = store
+        .remember_from(&room, NOW, "the violet umbrella is in the car", &[said])
+        .unwrap();
+    assert_eq!(
+        store.record(&room, umbrella).unwrap().unwrap().source_ids,
+        [said]
+    );
+
+    assert_eq!(store.maintain(NOW + 32 * DAY).unwrap(), 1);
+    assert!(store.record(&room, said).unwrap().is_none());
+    let kept = store.record(&room, umbrella).unwrap();
+    assert!(
+        kept.is_some(),
+        "the kept thing expired with its conversation"
+    );
+    assert!(
+        kept.unwrap().source_ids.is_empty(),
+        "no link to a gone exchange"
+    );
+    assert!(found(&mut store, &room, "umbrella").contains(&umbrella));
+    let list = store.kept(&room, 16_384).unwrap();
+    assert_eq!(list.iter().map(|k| k.id).collect::<Vec<_>>(), [umbrella]);
+    drop(store);
+    let dangling: u64 = Connection::open(scratch.0.join(DATABASE))
+        .unwrap()
+        .query_row(
+            "SELECT count(*) FROM sources WHERE child NOT IN (SELECT rid FROM entries) OR parent NOT IN (SELECT rid FROM entries)",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(dangling, 0, "no sources row is left to a gone entry");
+    let mut store = scratch.open(30, NOW + 32 * DAY);
+    assert!(store.record(&room, umbrella).unwrap().is_some());
+    store.forget(&room, umbrella).unwrap();
+    assert!(store.record(&room, umbrella).unwrap().is_none());
+}
+
 /// #2003: forgetting an observation removes the exchange it was taken from,
 /// never a kept thing that exchange's session was only shown.
 #[test]

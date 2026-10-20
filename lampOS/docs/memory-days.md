@@ -352,8 +352,10 @@ returning them, or when any required source expires. Passive inclusion
 in a session note does not keep an unused observation alive. Superseded
 versions age out too. Expiring an old source does not follow the correction
 link to a newer observation with independent evidence. Explicit kept
-facts have no expiry; at 200 items the next remember is refused, without
-dropping an earlier instruction. A forward clock jump can expire data;
+facts have no expiry, even one remembered with its conversation (#1693):
+when those exchanges expire, the fact stays and only its link to them goes
+(#2176); forgetting it still removes them. At 200 items the next
+remember is refused, without dropping an earlier instruction. A forward clock jump can expire data;
 a backward jump cannot move last use backward within a running process.
 No clock authority or persistent maximum clock across restart is added.
 
