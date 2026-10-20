@@ -1,0 +1,23 @@
+{
+  "observed_at_utc": "2026-10-20T15:51:23Z",
+  "music": {
+    "pr": 1757,
+    "head": "fd05557ba14af823863ecc19d738476767bfd77f",
+    "host_base": "dfc5f73c00dbf10a65b668156914d44a19fb4575",
+    "observed_target": "14b38dc6a53cc8d792aedacefc0a7cdaef57fb92",
+    "mergeable": true,
+    "arm64": 39451960133,
+    "clippy": 39451960115,
+    "status": "in_progress"
+  },
+  "policy": {
+    "pr": 2005,
+    "head": "4e1dcb78070d916f4e1acf9729baebe86ad6a490",
+    "host_base": "e26ebab90b1177379a7965cb0da276cdd3fdb153",
+    "observed_target": "e26ebab90b1177379a7965cb0da276cdd3fdb153",
+    "mergeable": true,
+    "arm64": 39452151680,
+    "clippy": 39452151740,
+    "status": "in_progress"
+  }
+}

@@ -46,6 +46,6 @@
     "checkout_tests": "original checkout; all lamp-update tests, including its parent image fixture"
   },
   "portability_limitation": "lamp-update tests/image_journal.rs and tests/image_ramlog.rs read robots/lamp/rootfs outside lampOS; that complete crate is tested in the checkout without filtering any test. The workspace build and all other selected tests run from the source-only copy.",
-  "status": "running; no completed full gate or native CI claimed",
-  "source_commit": null
+  "status": "host complete; automatic ARM64 and x86 CI pending",
+  "source_commit": "fd05557ba14af823863ecc19d738476767bfd77f"
 }

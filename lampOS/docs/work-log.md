@@ -15,65 +15,64 @@ log and nothing a lamp runs ([joining.md](joining.md),
 
 ## Current checkpoint: 2026-10-20
 
-Ready for lamp-voice: no — Music #1757 is in its fresh final host gate.
+Ready for integration: no — the two refreshed heads passed all host gates;
+new automatic ARM64 and x86 Clippy are running.
 
-GitHub access is restored. The start and continuing updates are on
-[Queue #1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6293120562),
-most recently [the integration update](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6294198618).
-The initial 1,627 comments and subsequent Queue/own-PR reviews were read.
-#2157 landed Bedtime/caps at `c4fd23ac20a2502c2b5e539f2c66130a6e06867a`;
-#1732 is closed and the older four-foundation publication plan is superseded.
-#1996 is now [closed as superseded](https://github.com/autonomous-ai/lampOS/pull/1996#issuecomment-6293396655)
-by the verified source carried in #2157. The old-CLI environment path and
-30-store reset inventory are retained. The disabled caps RPC surface remains
-present and returns unavailable without changing ordinary volume or state.
+Both changes are pushed, one commit each. The [Queue update](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6295022773)
+records their heads and counts. #1757 remains draft until its current CI
+merge checkout is verified. Second does not merge either PR.
 
-Music remains the allocated slice of #1685. The frozen checkpoint
-`e1c3226665bbe01dab6dcec678d426d1d3f59d08` on `bc31e93d85` passed formatting,
-strict workspace/all-target Clippy, **11** voice integration tests, **48** audio
-lifecycle tests and **23** Skills tests. Its complete [consumer gate](verification/second-current-checkpoint-20261020/music-before-latest-base.json)
-passed **7,992 / 0 failed / 32 ignored**, none filtered, plus the workspace build;
-all **2,114** source hashes still match both copies.
-These results do not qualify the newer source. The candidate now incorporates
-`dfc5f73c00dbf10a65b668156914d44a19fb4575`, preserving search(found), product
-pins and the Written-turn wait. Its separate fresh source-only gate tests all
-**29 consumer crates**, with all Update tests in the checkout for the inherited
-parent image fixture. The [verification record](verification/second-current-checkpoint-20261020/README.md)
-identifies the source, changed inputs, consumers and preserved failures.
+Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757),
+`fd05557ba14af823863ecc19d738476767bfd77f`, is the allocated music slice of
+#1685, based on `dfc5f73c00dbf10a65b668156914d44a19fb4575` after #2157 landed.
+Its [complete host gate](verification/second-current-checkpoint-20261020/music-final-host.json)
+passed **8,003 / 0 failed / 32 ignored, none filtered**: non-Update
+**7,749 / 0 / 31** in **1,247.48 s**, full Update **254 / 0 / 1** in
+**192.76 s**. Formatting **4.66 s**, strict workspace/all-target Clippy
+**138.77 s**, workspace build **30.98 s** passed. All **29 consumers** and
+all **2,114** frozen source inputs are covered. Focused repeats passed
+**12** integration, **49** audio and **24** Skills tests. The four renderer
+tests, host-debug render, package and disposable install passed, with all
+installed hashes matching. Prepared handoff: **199 / 194 microseconds**
+first/repeated, confirmation retirement to authored speaker IPC acceptance;
+acoustic onset is unmeasured.
 
-Two failures drove corrections: current Reports fixture fields were missing,
-and a strict gap negative showed that recording gaps use a different counter
-from provider speech. Review then found a cancellation/completion race:
-completion now requires winning the ticket's atomic terminal transition.
-Regressions cover that race, search permission states and delayed Written
-Music calls with task news. The current source SHA-256 is
-`8beb566ec9b131ad6c6d12da1229ac60390dcbd55cbb60ccf2c773b142025449`.
-The [new focused checks](verification/second-current-checkpoint-20261020/music-current-focused.json)
-pass: **12** voice integration, **49** audio and **24** Skills tests, plus
-formatting and strict workspace Clippy. The first/repeated prepared host handoff
-measured **199 / 194 microseconds** from confirmation retirement to authored
-speaker IPC acceptance; acoustic onset is unmeasured. No completed full gate
-or new native CI for this newer source is claimed yet. #1757 retains its
-existing lamp-voice target while the #1712 direction is reconciled: that branch
-was observed still missing the #2157 dependency. #2005 has no new review reply. Its unchanged test-only patch applies cleanly
-to current #1712 base `e26ebab90b1177379a7965cb0da276cdd3fdb153`; a separate
-13-consumer refresh is being prepared. Earlier native evidence remains tied
-to its existing published head.
+The PR preserves current Policy and held-consent gates, search(found), warm
+names and delayed Written task news. Recording and provider-speech gaps
+must both be zero, and completion must win its atomic transition against
+cancellation. Earlier failed preflights remain in the [evidence index](verification/second-current-checkpoint-20261020/README.md).
+Music merges cleanly with observed target `14b38dc6a5`; only two docs overlap
+its three newer commits. Automatic [ARM64 39451960133](https://github.com/autonomous-ai/lampOS/actions/runs/39451960133)
+and [x86 Clippy 39451960115](https://github.com/autonomous-ai/lampOS/actions/runs/39451960115)
+are running. Their actual tested base/checkout will be recorded when done.
 
-A separate [row-52 source audit](https://github.com/autonomous-ai/lampOS/issues/1569#issuecomment-6293852079)
-identified a run-thread issue time later than the main tick's sampled time.
-That can fail the test's first-wake stamp bound without extending the original
-12-second deadline. Tests has opened #2318; the deterministic deadline
-regression remains with the routines owner. No production change in that
-separately owned path is included in Music.
+Policy [#2005](https://github.com/autonomous-ai/lampOS/pull/2005),
+`4e1dcb78070d916f4e1acf9729baebe86ad6a490`, refreshes the unchanged test-only
+lookup gate on current #1712 base `e26ebab90b1177379a7965cb0da276cdd3fdb153`.
+Its [complete 13-consumer gate](verification/second-current-checkpoint-20261020/policy-final-host.json)
+passed **5,567 / 0 / 23, none filtered**: **5,317 / 0 / 22** plus full Update
+**250 / 0 / 1**. Formatting, strict workspace/all-target Clippy and workspace
+build passed, and all **2,074** source hashes match. New automatic
+[ARM64 39452151680](https://github.com/autonomous-ai/lampOS/actions/runs/39452151680)
+and [x86 Clippy 39452151740](https://github.com/autonomous-ai/lampOS/actions/runs/39452151740)
+are running; earlier native results qualify only their recorded heads.
 
-Storage cleanup retained all evidence and source commits: the earlier
-27,227,584 KiB build cache cleanup and verified 49-snapshot archive preserved
-the source and logs. Another
-**27 clean completed checkouts**, **6,460,024 KiB**, were removed; all branches
-and commits remain, while active and dirty worktrees were preserved. No other
-builder's job was stopped. No lamp is available to Second; Music stays off and
-Bedtime's physical row remains unqualified.
+GitHub access is restored. #2157 landed Bedtime/caps at `c4fd23ac2`;
+#1732 and #1996 are closed, superseding the older four-foundation publication
+plan. The old-CLI fallback and 30-store reset inventory were verified as
+carried. The disabled caps RPC still exists and returns unavailable.
+The separate [row-52 audit](https://github.com/autonomous-ai/lampOS/issues/1569#issuecomment-6293852079)
+identified the issue-time/tick-time race; its owner has #2320, while Tests has
+#2318. Music contains no change in that separately owned production path.
+
+Storage cleanup preserved all failures, commits and active/dirty checkouts.
+This session removed **31 clean completed worktrees**, **7,426,112 KiB**,
+retaining their branches and commits. The verified 49-source archive remains;
+a further seven completed source copies were archived with all **38,213**
+file hashes checked before removal, reducing **1,273,312 KiB** to
+**213,196 KiB**. Completed build caches were removed, and no other builder's
+job was stopped. No lamp is assigned or accessed. Music stays off; Bedtime's
+physical row remains unqualified.
 
 ## Previous checkpoint: 2026-10-19
 
