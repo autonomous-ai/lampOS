@@ -135,6 +135,9 @@ pub struct Settings {
     /// A name is kept only if the person said it, and a face keeps one
     /// name (`LAMP_NAMES=checked`, [`crate::known_faces::said_by_them`]).
     pub names_checked: bool,
+    /// The person at the lamp may say yes or no to being named in Who was
+    /// here (`LAMP_WHO_WAS_HERE_NAMES=on`, [`crate::known_faces::TELL`]).
+    pub who_visits: bool,
     /// The serving session's folder, for marking a bad moment
     /// ([`crate::marked`]).
     pub mark: Option<PathBuf>,
@@ -172,6 +175,11 @@ pub fn arguments_from_environment() -> Vec<String> {
         flags.push(socket);
         flags.extend(crate::known_faces::names_arguments(
             std::env::var(crate::known_faces::NAMES_ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        ));
+        flags.extend(crate::known_faces::visits_arguments(
+            std::env::var(crate::known_faces::VISITS_ENVIRONMENT)
                 .ok()
                 .as_deref(),
         ));
@@ -336,6 +344,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
             && flag == crate::known_faces::NAMES_FLAG
         {
             settings.names_checked = true;
+            flags = rest;
+        }
+        if let [flag, rest @ ..] = flags
+            && flag == crate::known_faces::VISITS_FLAG
+        {
+            settings.who_visits = true;
             flags = rest;
         }
     }
@@ -531,7 +545,7 @@ fn core_tools(settings: &Settings) -> Vec<Tool> {
         tools.extend(crate::agent_tasks::tools(place));
     }
     if settings.who.is_some() {
-        tools.extend(crate::known_faces::tools_checked(settings.names_checked));
+        tools.extend(crate::known_faces::tools_for(face_switches(settings)));
     }
     if settings.mark.is_some() {
         tools.push(crate::marked::tool());
@@ -685,9 +699,9 @@ pub enum Route {
     Clock,
     /// Work for an agent elsewhere, through the tasks part.
     Tasks(crate::agent_tasks::Place),
-    /// Remember or forget a face, through the eyes on this socket, with
-    /// names checked or not.
-    Faces(PathBuf, bool),
+    /// Remember or forget a face, or say yes or no to being named, through
+    /// the eyes on this socket, as switched.
+    Faces(PathBuf, crate::known_faces::FaceSwitches),
     /// Mark the last minute of this session for review.
     Mark(PathBuf),
     /// A step of the first meeting reported, through this onboarding file.
@@ -705,6 +719,16 @@ pub enum Route {
 /// `lamp_actions::APP_CALLS` (a test holds the two lists equal; the voice
 /// does not link `lamp-actions`).
 pub const APP_CALLS: [&str; 2] = ["volume_level", "volume_to"];
+
+/// The face functions' switches. The yes and no to being named need the
+/// memory too: only with it is a line's scope a known person's (the face
+/// cache), so without it every yes would be refused while still asked for.
+fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
+    crate::known_faces::FaceSwitches {
+        checked: settings.names_checked,
+        visits: settings.who_visits && settings.memory.is_some(),
+    }
+}
 
 pub fn route(settings: &Settings, name: &str) -> Route {
     // The Autonomous app's two volume calls on the executive's socket
@@ -730,7 +754,7 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     }
     if crate::known_faces::is_tool(name) {
         return settings.who.clone().map_or(Route::Nobody, |socket| {
-            Route::Faces(socket, settings.names_checked)
+            Route::Faces(socket, face_switches(settings))
         });
     }
     if crate::marked::is_tool(name) {
@@ -1011,9 +1035,20 @@ fn run_call_with_scope(
         // may keep or forget one, never a request the lamp wrote or a text
         // from the app (the reviewer on #1713), as for marks.
         Route::Faces(..) if !heard => ("the eyes", (json!({"error": FACES_IN_PERSON}), false)),
-        Route::Faces(socket, checked) => {
-            ("the eyes", crate::known_faces::run(socket, call, *checked))
-        }
+        // A yes to being named is taken only from the line's own admitted
+        // scope, the named person's (#1997): none, revoked or narrowed to
+        // the room is nobody's.
+        Route::Faces(socket, switches) => (
+            "the eyes",
+            crate::known_faces::run_for(
+                socket,
+                call,
+                *switches,
+                lease
+                    .and_then(|lease| lease.scope())
+                    .and_then(|scope| scope.person()),
+            ),
+        ),
         Route::Mark(session) => ("the marks", crate::marked::run(session, call, heard)),
         Route::Onboarding(file) => ("the onboarding", crate::onboarding::run(file, call)),
         Route::ReportsStop => (
@@ -1275,7 +1310,7 @@ mod tests {
         let socket = dir.join("eyes.sock");
         let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
         listener.set_nonblocking(true).unwrap();
-        let route = Route::Faces(socket.clone(), false);
+        let route = Route::Faces(socket.clone(), Default::default());
         for name in [crate::known_faces::REMEMBER, crate::known_faces::FORGET] {
             let call = ToolCall {
                 id: String::new(),
@@ -1310,6 +1345,162 @@ mod tests {
         let (_, (told, _)) = asking.join().unwrap();
         assert_ne!(told["error"], FACES_IN_PERSON);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #1997 (Third's guard): a yes to being named reaches the eyes only
+    /// from the named person's own admitted scope; the room's, another
+    /// person's, one narrowed to the room (#2008) or none is refused with
+    /// nothing sent. A no is sent from any scope. Neither is run unheard, nor
+    /// with the switch off.
+    #[test]
+    fn a_yes_to_being_named_is_taken_only_from_the_named_persons_own_scope() {
+        use crate::known_faces::{DONT_TELL, FaceSwitches, NOT_SURE_WHOSE_YES, TELL};
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        let dir = std::env::temp_dir().join(format!("tools-visits-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let socket = dir.join("eyes.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let sent = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let heard = sent.clone();
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten() {
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let answer = if line.contains("visits_yes") {
+                    "{\"visits\":\"yes\"}\n"
+                } else {
+                    "{\"visits\":\"no\"}\n"
+                };
+                heard.lock().unwrap().push(line.trim().to_owned());
+                stream.write_all(answer.as_bytes()).unwrap();
+            }
+        });
+        let on = FaceSwitches {
+            checked: false,
+            visits: true,
+        };
+        let route = Route::Faces(socket.clone(), on);
+        let call = |name: &str| ToolCall {
+            id: String::new(),
+            name: name.into(),
+            args: json!({"name": "Sam"}),
+        };
+        let scoped = |route: &Route, name: &str, scope: ScopeSnapshot, narrowed: bool| -> Value {
+            let owner = RequestScope::new(
+                RequestKey {
+                    worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+                    session: 1,
+                    request: 1,
+                },
+                scope,
+            );
+            let lease = owner.lease();
+            if narrowed {
+                lease.narrow_to_room();
+            }
+            run_call_scoped(route, &call(name), 1, true, &lease).1.0
+        };
+        let taken = std::mem::take::<Vec<String>>;
+        // Sam's own scope: the yes reaches the eyes.
+        let told = scoped(&route, TELL, ScopeSnapshot::of("Sam"), false);
+        assert_eq!(told["ok"], true, "{told}");
+        assert_eq!(
+            taken(&mut sent.lock().unwrap()),
+            [r#"{"visits_yes":"Sam"}"#]
+        );
+        // Anyone else's, or nobody's: refused, nothing sent.
+        for (scope, narrowed) in [
+            (ScopeSnapshot::room(), false),
+            (ScopeSnapshot::of("Alex"), false),
+            (ScopeSnapshot::of("Sam"), true),
+        ] {
+            let told = scoped(&route, TELL, scope.clone(), narrowed);
+            assert_eq!(told["error"], NOT_SURE_WHOSE_YES, "{scope:?} {narrowed}");
+        }
+        assert_eq!(
+            run_call(&route, &call(TELL), 1, true).1.0["error"],
+            NOT_SURE_WHOSE_YES
+        );
+        assert!(sent.lock().unwrap().is_empty());
+        // A no from the room's scope is sent.
+        let told = scoped(&route, DONT_TELL, ScopeSnapshot::room(), false);
+        assert_eq!(told["ok"], true, "{told}");
+        assert_eq!(taken(&mut sent.lock().unwrap()), [r#"{"visits_no":"Sam"}"#]);
+        // Unheard (a text, a line the lamp wrote), or with the switch off:
+        // neither reaches the eyes.
+        for name in [TELL, DONT_TELL] {
+            let unheard = run_call(&route, &call(name), 1, false).1.0;
+            assert_eq!(unheard["error"], FACES_IN_PERSON, "{name}");
+            let off = Route::Faces(socket.clone(), FaceSwitches::default());
+            assert_eq!(
+                scoped(&off, name, ScopeSnapshot::of("Sam"), false),
+                unavailable()
+            );
+        }
+        assert!(sent.lock().unwrap().is_empty());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #1997: the switch is the worker's `--who-visits`, after the names',
+    /// and only then, with the memory (whose face cache gives a line its
+    /// person), are the yes and the no offered and routed.
+    #[test]
+    fn the_yes_and_no_to_being_named_are_offered_only_with_the_switch() {
+        let flags = |rest: &[&str]| {
+            let mut flags = vec![
+                crate::remember::FLAG,
+                "/run/lampos-memory/memory.sock",
+                crate::known_faces::FLAG,
+                "/run/lampos-eyes/who.sock",
+            ];
+            flags.extend(rest);
+            flags.into_iter().map(String::from).collect::<Vec<_>>()
+        };
+        let names = |settings: &Settings| {
+            declared(settings)
+                .into_iter()
+                .map(|tool| tool.name)
+                .collect::<Vec<_>>()
+        };
+        let visits = [crate::known_faces::TELL, crate::known_faces::DONT_TELL];
+        let on = flags(&[
+            crate::known_faces::NAMES_FLAG,
+            crate::known_faces::VISITS_FLAG,
+        ]);
+        let (settings, rest) = take(&on).unwrap();
+        assert!(settings.who_visits && settings.names_checked && rest.is_empty());
+        for name in visits {
+            assert!(names(&settings).iter().any(|told| told == name), "{name}");
+            assert!(matches!(
+                route(&settings, name),
+                Route::Faces(_, switches) if switches.visits && switches.checked
+            ));
+        }
+        // Without the memory, no line is a known person's: neither is offered,
+        // and a call reaches the eyes as switched off.
+        let forgetful = Settings {
+            memory: None,
+            ..settings.clone()
+        };
+        for name in visits {
+            assert!(names(&forgetful).iter().all(|told| told != name), "{name}");
+            assert!(matches!(
+                route(&forgetful, name),
+                Route::Faces(_, switches) if !switches.visits
+            ));
+        }
+        let (settings, _) = take(&flags(&[])).unwrap();
+        assert!(!settings.who_visits);
+        for name in visits {
+            assert!(names(&settings).iter().all(|told| told != name), "{name}");
+        }
+        assert_eq!(
+            crate::known_faces::visits_arguments(Some("on")),
+            [crate::known_faces::VISITS_FLAG]
+        );
+        assert!(crate::known_faces::visits_arguments(Some("yes")).is_empty());
+        assert!(crate::known_faces::visits_arguments(None).is_empty());
     }
 
     /// #799: a function the link would refuse is left out and named; the
@@ -1404,6 +1595,7 @@ mod tests {
             who: Some("/run/lampos-eyes/request.sock".into()),
             // The checked `remember_my_face`, with `replace` (#1057).
             names_checked: true,
+            who_visits: false,
             mark: Some("/var/lib/lampos-voice/session".into()),
             onboarding: Some("/var/lib/lampos-voice/onboarding.json".into()),
             reports_stop: true,
@@ -1647,6 +1839,7 @@ mod tests {
                 schedule_speak: true,
                 who: Some("/run/lampos-eyes/who.sock".into()),
                 names_checked: false,
+                who_visits: false,
                 mark: None,
                 onboarding: None,
                 reports_stop: false,
@@ -1704,7 +1897,10 @@ mod tests {
         assert_eq!(route(&settings, "volume_up"), Route::Executive(dir.clone()));
         let eyes = PathBuf::from("/run/lampos-eyes/who.sock");
         for name in [crate::known_faces::REMEMBER, crate::known_faces::FORGET] {
-            assert_eq!(route(&settings, name), Route::Faces(eyes.clone(), false));
+            assert_eq!(
+                route(&settings, name),
+                Route::Faces(eyes.clone(), Default::default())
+            );
             let blind = Settings {
                 who: None,
                 ..settings.clone()

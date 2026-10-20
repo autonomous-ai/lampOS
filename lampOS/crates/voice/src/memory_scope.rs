@@ -23,6 +23,13 @@ impl ScopeSnapshot {
     pub fn person(&self) -> Option<&str> {
         self.person.as_deref()
     }
+    /// A known person's scope, for other parts' tests.
+    #[cfg(test)]
+    pub fn of(name: &str) -> Self {
+        Self {
+            person: Some(Arc::from(crate::remember::person_id(name))),
+        }
+    }
 }
 
 struct CachedFace {
