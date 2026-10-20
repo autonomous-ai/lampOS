@@ -104,6 +104,13 @@ enum Extra {
         job: String,
         observations: Vec<tidy::Proposal>,
     },
+    /// #2176 (5a): the room's entries become someone known's (`Days::adopt`).
+    Adopt {
+        #[serde(default)]
+        person: Who,
+        to: String,
+        ids: Vec<u64>,
+    },
 }
 
 fn one(person: Who) -> Result<Person> {
@@ -337,6 +344,11 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
         } => {
             json!({"ok":true,"ids":store.tidy_apply(&one(person)?,&job,&tidy::Output{observations})?})
         }
+        Extra::Adopt { person, to, ids } => {
+            let to = one(Who::Id(to))?;
+            let moved = store.adopt(&one(person)?, &to, &ids)?;
+            json!({"ok":true,"moved":moved.len(),"ids":moved})
+        }
     })
 }
 
@@ -363,6 +375,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "follow_up",
             "conversation_end",
             "tidy_apply",
+            "adopt",
         ];
         const OLD: &[&str] = &[
             "append",

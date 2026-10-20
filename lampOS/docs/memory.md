@@ -591,6 +591,41 @@ then use that person's scope:
   and links records within one person; a different person at the lamp ends
   the conversation being collected, which is sent to `conversation_end` in
   its own scope.
+- **What was said before the face was known** (`LAMP_MEMORY_EARLY_WORDS=on`,
+  with Days, the Live route only; off unless set; #2176, 5a;
+  `crates/voice/src/early_words.rs`). The eyes take a few seconds to know a
+  face, and what is said until then is the room's: on lamp-4ace a
+  conversation began the room's at 11:30 and became the owner's at 11:35,
+  its first part left in the room. With the switch, when the Days writer's
+  conversation began the room's and its next exchange is one known
+  person's, before the conversation ended (45 s idle or an end), the room
+  exchanges and the things kept in that conversation are moved to that
+  person's scope by the memory's `adopt` ([memory-days.md](memory-days.md#request-contract)),
+  on the writer's thread, never a turn's. The conversation then goes on as
+  theirs: its end sends the moved exchanges with theirs, and the provider
+  context's sources for them become theirs.
+  - **Only when nobody else could have said them.** The Live route reads
+    the eyes' `humans/faces/tracked` with the known file, twice a second.
+    Nothing moves when, from the conversation's first words (a thing kept
+    first: the 45 s before it) to that moment, any look had two faces or
+    more, more than one face track id was seen, a face had no readable
+    track id, another known person was named, or any moment was not looked
+    at (the camera not allowed, no look fresh within 2 s, two looks more
+    than 2 s apart). Two people known one after the other is another face
+    too. Each face is told apart by its passing track id (`Face.id`, the
+    same while it stays in view), so one unknown face that leaves and
+    another that sits down, never both in one look, is two faces: nothing
+    moves. The limit is the other way: a track id can't be re-identified
+    after a gap over 2 s, and the same person who leaves and comes back has
+    a new id, so a gap, or their own return, means no move.
+  - **Never another conversation's or another worker's.** Only the ids this
+    writer journalled or kept in this conversation; a conversation ended
+    first, a forget, or a fresh worker tracks nothing. A refused or
+    unanswered `adopt` leaves everything the room's and ends the room's
+    conversation as before.
+  - **The journal** says counts only: `is theirs now: exchanges=N kept=N
+    moved=N`, or `stays the room's: why=another_face|cant_tell|incomplete|not_adopted
+    exchanges=N kept=N`.
 - **Seeing someone speak** (`LAMP_SECOND_SPEAKING_FACE=on`, the second
   route only, off unless set; `crates/voice/src/speaking_faces.rs`). It needs
   `LAMP_SECOND_SCOPED_CONTEXT=on` too, which tells and files each turn for

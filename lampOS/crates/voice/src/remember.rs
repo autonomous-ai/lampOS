@@ -1080,7 +1080,9 @@ const ANSWER_BYTES: usize = 8_192;
 pub struct DaysClient {
     socket: PathBuf,
     prefix: String,
-    context: Mutex<DaysContext>,
+    /// Shared with the writer, which moves the room's sources to someone
+    /// known's when their early words follow them ([`crate::early_words`]).
+    context: Arc<Mutex<DaysContext>>,
     /// Held while a rule is counted and kept ([`crate::rules::admit`]).
     keeping: Mutex<()>,
     jobs: SyncSender<DaysJob>,
@@ -1097,6 +1099,8 @@ pub struct DaysClient {
     /// journalled so far. With [`forget_all_on`], a thing remembered in it
     /// is kept with them, so forgetting it removes them too (#1693).
     current: Arc<Mutex<Current>>,
+    /// [`crate::early_words::on`], read when the client is made (#2176, 5a).
+    early: bool,
 }
 
 /// Whose conversation it is (`None` for the room's) and its exchanges.
@@ -1295,6 +1299,9 @@ enum DaysJob {
     },
     Close(String, Option<String>),
     End,
+    /// A thing kept in the room's scope, by its id, with
+    /// [`crate::early_words`]: the conversation's, should it follow.
+    Kept(u64),
 }
 
 impl DaysClient {
@@ -1318,13 +1325,22 @@ impl DaysClient {
         let name = prefix.clone();
         let current = Arc::new(Mutex::new(Current::default()));
         let writing = Arc::clone(&current);
+        let context = Arc::new(Mutex::new(DaysContext::default()));
+        let early = crate::early_words::on();
+        let moving = Arc::clone(&context);
         std::thread::Builder::new()
             .name("lamp-voice-memory-days".into())
-            .spawn(move || days_writer(&path, &name, &work, idle, &lost_worker, &writing))?;
+            .spawn(move || {
+                let early = early.then(|| Early {
+                    faces: &crate::early_words::SEEN,
+                    context: &moving,
+                });
+                days_writer(&path, &name, &work, idle, &lost_worker, &writing, early);
+            })?;
         Ok(Self {
             socket,
             prefix,
-            context: Mutex::new(DaysContext::default()),
+            context,
             keeping: Mutex::new(()),
             jobs,
             lost,
@@ -1337,6 +1353,7 @@ impl DaysClient {
                 std::env::var(REMEMBER_ONCE_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
             current,
+            early,
         })
     }
 
@@ -1711,6 +1728,15 @@ impl DaysClient {
             // queue drops it; the clear above still holds until then.
             let _ = self.jobs.try_send(DaysJob::End);
         }
+        // A thing kept in the room's scope may follow the person its
+        // conversation becomes (#2176, 5a): the writer is told its id.
+        let room_kept = (self.early && call.name == REMEMBER)
+            .then(|| {
+                ids.iter()
+                    .find(|(whose, _)| whose.is_none())
+                    .map(|(_, id)| *id)
+            })
+            .flatten();
         for (whose, id) in ids {
             said = said.or(context.include(whose.as_deref(), &[id]));
         }
@@ -1719,6 +1745,9 @@ impl DaysClient {
         }
         drop(context);
         say(said);
+        if let Some(id) = room_kept {
+            let _ = self.jobs.try_send(DaysJob::Kept(id));
+        }
         (told, true)
     }
 
@@ -2174,6 +2203,10 @@ struct Conversation {
     finished: Option<Instant>,
     overflow: bool,
     incomplete: bool,
+    /// With [`crate::early_words`]: the room's things kept in it, and when
+    /// its first words began, for whether they may follow someone known.
+    kept: Vec<u64>,
+    began: Option<Instant>,
 }
 
 impl Conversation {
@@ -2302,6 +2335,98 @@ pub fn observe_output(text: &str) -> Option<Value> {
     Some(value)
 }
 
+/// What the writer needs for [`crate::early_words`], when it is on.
+struct Early<'a> {
+    faces: &'a Mutex<crate::early_words::Seen>,
+    context: &'a Mutex<DaysContext>,
+}
+
+/// The room's conversation `conversation` becomes `to`'s, someone known,
+/// before it ended (#2176, 5a): when nobody else's face was seen since its
+/// first words, its room exchanges and kept things are moved to their scope
+/// (`adopt`), and the conversation, the sources in the provider's context and
+/// the writer's `current` go on as theirs. False, with nothing changed,
+/// otherwise: the caller ends the room's conversation as before. The journal
+/// has counts only.
+fn adopt_early(
+    socket: &Path,
+    conversation: &mut Conversation,
+    to: Option<&str>,
+    early: &Early<'_>,
+    current: &Mutex<Current>,
+) -> bool {
+    let Some(to) = to else { return false };
+    let (exchanges, kept) = (conversation.sources.len(), conversation.kept.len());
+    if conversation.person.is_some() || exchanges + kept == 0 {
+        return false;
+    }
+    let why = if conversation.overflow || conversation.incomplete || exchanges + kept > SOURCE_IDS {
+        Some("incomplete")
+    } else {
+        let now = Instant::now();
+        match (conversation.began, early.faces.lock()) {
+            (Some(since), Ok(seen)) => seen.alone(to, since, now).err().map(|why| why.as_str()),
+            _ => Some(crate::early_words::Why::CantTell.as_str()),
+        }
+    };
+    if let Some(why) = why {
+        eprintln!(
+            "lamp-voice provider: what was said before a face was known stays the room's: why={why} exchanges={exchanges} kept={kept}"
+        );
+        return false;
+    }
+    let ids: Vec<u64> = conversation
+        .sources
+        .iter()
+        .chain(&conversation.kept)
+        .copied()
+        .collect();
+    let moved: Option<Vec<(u64, u64)>> = bounded_exchange(
+        socket,
+        &json!({"op":"adopt","to":to,"ids":ids}),
+        WRITER_DEADLINE,
+    )
+    .filter(|answer| answer["ok"] == true)
+    .and_then(|answer| serde_json::from_value(answer["ids"].clone()).ok())
+    .filter(|moved: &Vec<(u64, u64)>| ids.iter().all(|id| moved.iter().any(|(old, _)| old == id)));
+    let Some(moved) = moved else {
+        eprintln!(
+            "lamp-voice provider: what was said before a face was known stays the room's: why=not_adopted exchanges={exchanges} kept={kept}"
+        );
+        return false;
+    };
+    let new = |old: u64| moved.iter().find(|(was, _)| *was == old).map(|(_, id)| *id);
+    conversation.sources = conversation
+        .sources
+        .iter()
+        .filter_map(|id| new(*id))
+        .collect();
+    conversation.kept.clear();
+    conversation.person = Some(to.to_owned());
+    if let Ok(mut context) = early.context.lock() {
+        for source in &mut context.sources {
+            if source.0.is_none()
+                && let Some(id) = new(source.1)
+            {
+                *source = (Some(to.to_owned()), id);
+            }
+        }
+    }
+    if let Ok(mut current) = current.lock() {
+        *current = (conversation.person.clone(), conversation.sources.clone());
+    }
+    eprintln!(
+        "lamp-voice provider: what was said before a lone face was known is theirs now: exchanges={exchanges} kept={kept} moved={}",
+        moved.len()
+    );
+    true
+}
+
+/// When words that began `at_unix_ms` began, on this process's clock.
+fn began_at(at_unix_ms: u64) -> Option<Instant> {
+    Instant::now().checked_sub(Duration::from_millis(unix_ms().saturating_sub(at_unix_ms)))
+}
+
 fn days_writer(
     socket: &Path,
     prefix: &str,
@@ -2309,6 +2434,7 @@ fn days_writer(
     idle: Duration,
     lost: &AtomicU64,
     current: &Mutex<Current>,
+    early: Option<Early<'_>>,
 ) {
     let mut conversation = Conversation::default();
     let mut next = 0u64;
@@ -2399,13 +2525,28 @@ fn days_writer(
                 person,
             }) => {
                 // Someone else at the lamp is another conversation, in
-                // another person's journal.
-                if conversation
+                // another person's journal: but for the room's early words
+                // of a lone face now known, with the switch (#2176, 5a).
+                let idle_over = conversation
                     .finished
-                    .is_some_and(|last| finished.saturating_duration_since(last) >= idle)
-                    || (conversation.finished.is_some() && conversation.person != person)
-                {
-                    end(&mut conversation);
+                    .is_some_and(|last| finished.saturating_duration_since(last) >= idle);
+                if idle_over || (conversation.finished.is_some() && conversation.person != person) {
+                    let adopted = !idle_over
+                        && early.as_ref().is_some_and(|early| {
+                            adopt_early(
+                                socket,
+                                &mut conversation,
+                                person.as_deref(),
+                                early,
+                                current,
+                            )
+                        });
+                    if !adopted {
+                        end(&mut conversation);
+                    }
+                }
+                if early.is_some() && conversation.began.is_none() {
+                    conversation.began = began_at(at_unix_ms);
                 }
                 conversation.finished = Some(finished);
                 let answer = bounded_exchange(
@@ -2447,6 +2588,24 @@ fn days_writer(
                     WRITER_DEADLINE,
                 );
             }
+            Ok(DaysJob::Kept(id)) if early.is_some() => {
+                let now = Instant::now();
+                if conversation.wait(idle).is_zero() {
+                    end(&mut conversation);
+                }
+                // Only the room's conversation's; past the bound, too many
+                // to follow anyone ([`adopt_early`]).
+                if conversation.person.is_none() && conversation.kept.len() <= SOURCE_IDS {
+                    conversation.kept.push(id);
+                    // Its words began before the call: as early as the
+                    // conversation could have.
+                    if conversation.began.is_none() {
+                        conversation.began = now.checked_sub(idle);
+                    }
+                    conversation.finished.get_or_insert(now);
+                }
+            }
+            Ok(DaysJob::Kept(_)) => {}
             Ok(DaysJob::End) | Err(RecvTimeoutError::Timeout) => end(&mut conversation),
             Err(RecvTimeoutError::Disconnected) => {
                 end(&mut conversation);
@@ -3313,7 +3472,7 @@ mod tests {
         let mut client = DaysClient::new(PathBuf::from("/unused-no-io")).unwrap();
         let (jobs, work) = sync_channel(4);
         client.jobs = jobs;
-        client.context = Mutex::new(context);
+        client.context = Arc::new(Mutex::new(context));
         client.threads = AtomicBool::new(false);
         client.forget_all = AtomicBool::new(false);
         (client, work)
@@ -3619,6 +3778,7 @@ mod tests {
             Duration::from_secs(1),
             &AtomicU64::new(1),
             &Mutex::new(Current::default()),
+            None,
         );
         let read = served.join().unwrap();
         assert_eq!(
@@ -3628,6 +3788,186 @@ mod tests {
             ["append_linked", "append_linked", "session_close"]
         );
         std::fs::remove_file(socket).unwrap();
+    }
+
+    /// The room's exchange and a thing kept in it, then the exchange of A
+    /// once known, given to the writer: with [`crate::early_words`] and
+    /// `faces` looks of the last ten seconds up to now, what the memory was
+    /// asked (`adopt` answers 1→3 and 7→4); the context holds the kept
+    /// thing's id as the room's.
+    /// A source in the provider's context, with whose it is.
+    type Source = (Option<String>, u64);
+
+    fn early_conversation(
+        name: &str,
+        early: bool,
+        faces: fn(u64) -> usize,
+        end_between: bool,
+    ) -> (Vec<Value>, Vec<Source>, Current) {
+        // Five either way: an adopt in place of the room's end.
+        let (socket, served) = memory(name, 5, |request| match request["op"].as_str() {
+            Some("append_linked") if request["person"] == "p-a" => json!({"ok":true,"id":9}),
+            Some("append_linked") => json!({"ok":true,"id":1}),
+            Some("adopt") => json!({"ok":true,"moved":2,"ids":[[1,3],[7,4]]}),
+            Some("session_close") => json!({"ok":true}),
+            _ => json!({"ok":true,"submitted":false,"reason":"model_unconfigured"}),
+        });
+        let now = Instant::now();
+        let faces_seen = Mutex::new(crate::early_words::Seen::default());
+        for back in (0..=25u64).rev() {
+            let named = (back == 0).then(|| "p-a".to_owned());
+            let ids = (0..faces(back)).map(|n| Some(format!("f{n}"))).collect();
+            faces_seen
+                .lock()
+                .unwrap()
+                .look(Some((ids, named)), now - Duration::from_millis(back * 400));
+        }
+        let mut context = DaysContext::default();
+        assert_eq!(context.include(None, &[7]), None);
+        let context = Mutex::new(context);
+        let current = Mutex::new(Current::default());
+        let (send, receive) = sync_channel(8);
+        let exchange = |at_unix_ms, finished, person: Option<&str>| DaysJob::Exchange {
+            at_unix_ms,
+            finished,
+            heard: "asked".into(),
+            said: "answer".into(),
+            sources: vec![],
+            rules: vec![],
+            person: person.map(str::to_owned),
+        };
+        send.send(exchange(
+            unix_ms() - 2_000,
+            now - Duration::from_secs(2),
+            None,
+        ))
+        .unwrap();
+        send.send(DaysJob::Kept(7)).unwrap();
+        if end_between {
+            send.send(DaysJob::End).unwrap();
+        }
+        send.send(exchange(unix_ms(), now, Some("p-a"))).unwrap();
+        send.send(DaysJob::End).unwrap();
+        send.send(DaysJob::Close("barrier".into(), None)).unwrap();
+        drop(send);
+        days_writer(
+            &socket,
+            "voice-test",
+            &receive,
+            Duration::from_secs(45),
+            &AtomicU64::new(0),
+            &current,
+            early.then_some(Early {
+                faces: &faces_seen,
+                context: &context,
+            }),
+        );
+        let read = served.join().unwrap();
+        std::fs::remove_file(socket).unwrap();
+        let sources = context.lock().unwrap().sources.clone();
+        let current = current.lock().unwrap().clone();
+        (read, sources, current)
+    }
+
+    fn ops(read: &[Value]) -> Vec<String> {
+        read.iter()
+            .map(|r| {
+                format!(
+                    "{} {}",
+                    r["op"].as_str().unwrap(),
+                    r["person"].as_str().unwrap_or("room")
+                )
+            })
+            .collect()
+    }
+
+    /// #2176 (5a): one face all along, then known as A, before the room's
+    /// conversation ended: its exchange and kept thing are moved to A's, off
+    /// the turn's path, and the conversation, the context and `current` go
+    /// on as A's: A's end has the moved exchange too.
+    #[test]
+    fn with_early_words_a_lone_face_once_known_takes_the_rooms_words() {
+        let (read, sources, current) = early_conversation("early-lone", true, |_| 1, false);
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked room",
+                "adopt room",
+                "append_linked p-a",
+                "conversation_end p-a",
+                "session_close room"
+            ]
+        );
+        assert_eq!(read[1], json!({"op":"adopt","to":"p-a","ids":[1,7]}));
+        assert_eq!(read[3]["source_ids"], json!([3, 9]));
+        assert_eq!(sources, [(Some("p-a".to_owned()), 4)]);
+        // The writer's conversation ended last, so `current` is cleared.
+        assert_eq!(current, Current::default());
+    }
+
+    /// Another face in one look, the room's conversation ended between, or
+    /// the switch off: nothing is moved, and the room's conversation ends
+    /// as before, with its own exchange.
+    #[test]
+    fn with_another_face_an_end_between_or_the_switch_off_nothing_moves() {
+        for (name, early, faces, end_between) in [
+            (
+                "early-two",
+                true,
+                (|back| if back == 3 { 2 } else { 1 }) as fn(u64) -> usize,
+                false,
+            ),
+            ("early-ended", true, |_| 1, true),
+            ("early-off", false, |_| 1, false),
+        ] {
+            let (read, sources, _) = early_conversation(name, early, faces, end_between);
+            assert_eq!(
+                ops(&read),
+                [
+                    "append_linked room",
+                    "conversation_end room",
+                    "append_linked p-a",
+                    "conversation_end p-a",
+                    "session_close room"
+                ],
+                "{name}"
+            );
+            assert_eq!(read[1]["source_ids"], json!([1]), "{name}");
+            assert_eq!(read[3]["source_ids"], json!([9]), "{name}");
+            assert_eq!(sources, [(None, 7)], "{name}");
+        }
+    }
+
+    /// A thing kept in the room's scope is told to the writer only with the
+    /// switch, and never someone known's.
+    #[test]
+    fn a_room_kept_thing_is_told_to_the_writer_only_with_early_words() {
+        for (early, person, told) in [
+            (false, None, false),
+            (true, None, true),
+            (true, Some("p-a"), false),
+        ] {
+            let (socket, served) = memory("early-kept", 1, |_| json!({"ok":true,"id":5}));
+            let (mut client, work) = client_with(DaysContext::default());
+            client.socket = socket.clone();
+            client.early = early;
+            let (answer, ok) = client.run_at(
+                &call(REMEMBER, json!({"text":"keys are in the drawer"})),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                person,
+            );
+            assert!(ok && answer["remembered"] == true, "{answer}");
+            served.join().unwrap();
+            std::fs::remove_file(socket).unwrap();
+            let queued: Vec<_> = work.try_iter().collect();
+            assert_eq!(
+                queued.iter().any(|job| matches!(job, DaysJob::Kept(5))),
+                told,
+                "{early} {person:?}"
+            );
+        }
     }
 
     #[test]
@@ -4606,7 +4946,7 @@ mod tests {
         let client = DaysClient {
             socket: PathBuf::from("/unused-no-io"),
             prefix: "test".into(),
-            context: Mutex::new(context),
+            context: Arc::new(Mutex::new(context)),
             keeping: Mutex::new(()),
             jobs,
             lost: Arc::new(AtomicU64::new(0)),
@@ -4615,6 +4955,7 @@ mod tests {
             recall_v2: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
+            early: false,
         };
         hand_on_days(batch(), NOW, &client);
         for (index, whose) in expected.into_iter().enumerate() {

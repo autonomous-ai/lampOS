@@ -1486,6 +1486,13 @@ async fn serve_with_visual<C: Connect>(
         presence.seen(Some(name.clone()), *at);
     }
     let mut presence_read_at: Option<Instant> = None;
+    // With LAMP_MEMORY_EARLY_WORDS=on, how many faces the eyes see, read
+    // with the known file, for whether the room's early words may follow a
+    // lone face once known (#2176, 5a).
+    let faces_bus = BUS_ROOT
+        .get()
+        .filter(|_| switch_file.is_some() && crate::early_words::on())
+        .and_then(|root| lamp_bus::Bus::new(root).ok());
     // The name of the one counted at the lamp, for the name note: a face
     // kept under two names is told one, not each in turn (the reviewer on
     // #1100).
@@ -2126,11 +2133,12 @@ async fn serve_with_visual<C: Connect>(
                 {
                     presence_read_at = Some(Instant::now());
                     let refresh = intake.handoff.memory_face.begin_refresh();
-                    let observation = intake.handoff.authority.filter(|state| state.camera_allowed(MonoTime::from_micros(monotonic_us())))
-                        .and_then(|_| crate::known_faces::FaceObservation::read(path));
+                    let camera = intake.handoff.authority.filter(|state| state.camera_allowed(MonoTime::from_micros(monotonic_us()))).is_some();
+                    let observation = camera.then(|| crate::known_faces::FaceObservation::read(path)).flatten();
                     let fresh = observation.as_ref().map(|face| face.name().to_owned());
                     intake.handoff.memory_face.replace(refresh, observation);
                     let named = fresh.as_deref().map(crate::remember::person_id);
+                    crate::early_words::look(camera, faces_bus.as_ref(), named.clone(), Instant::now());
                     counted = presence.seen(fresh, Instant::now()).map(str::to_owned);
                     let whose = counted.as_deref().map(crate::remember::person_id);
                     let turn_open = intake.handoff.visual_turn().is_some();
