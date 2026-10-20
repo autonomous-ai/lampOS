@@ -464,6 +464,155 @@ async fn a_tool_call_is_run_and_its_result_answered() {
     );
 }
 
+/// lamp-4ace, 20 Oct 21:31: "Lamp, what's my name?" was answered with
+/// `recall`, then `forget_my_face` and `forget`. A forget of any kind the
+/// person's spoken words don't ask for is not run, and the model is told
+/// so; one they ask for runs as before. On a turn the lamp wrote itself, no
+/// forget runs, whatever its text says (the reviewer's P3 on #2317).
+#[tokio::test]
+async fn a_forget_nobody_asked_for_is_not_run() {
+    let refused = Message::tool(
+        "c1",
+        json!({"error": crate::remember::NOT_ASKED_TO_FORGET}).to_string(),
+    );
+    for (name, said, spoken, runs) in [
+        (crate::remember::FORGET, "What's my name?", true, false),
+        (
+            crate::known_faces::FORGET,
+            "Lamp, what's my name?",
+            true,
+            false,
+        ),
+        (crate::remember::FORGET_EVERYTHING, "Who am I?", true, false),
+        (
+            crate::remember::FORGET,
+            "Please forget my name.",
+            true,
+            true,
+        ),
+        (
+            crate::known_faces::FORGET,
+            "Delete my face, please.",
+            true,
+            true,
+        ),
+        (
+            crate::remember::FORGET,
+            "Clear my inbox when you can.",
+            false,
+            false,
+        ),
+    ] {
+        let asked = call("c1", name, json!({}));
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(said.to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![asked.clone()])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Okay."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (mut engine, calls, _) = scripted(script.clone());
+        if spoken {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+        } else {
+            engine.submit(written(1, said));
+        }
+        turn(&mut engine).await;
+        assert_eq!(
+            calls.lock().unwrap().len(),
+            usize::from(runs),
+            "{name}: {said}"
+        );
+        let told = script.asked.lock().unwrap()[1].last().cloned().unwrap();
+        assert_eq!(told == refused, !runs, "{name}: {said}");
+    }
+}
+
+/// Jarvis's P2 on #2331: a yes keyed on the lamp's question's words keeps
+/// leaking, since the model writes the question. So for now a yes alone
+/// forgets nothing, whatever the lamp asked, and the model is told to ask
+/// them to say it; a yes that says it ("Yes, forget everything.") runs.
+#[tokio::test]
+async fn a_yes_alone_forgets_nothing_and_one_that_says_it_does() {
+    for (then, runs) in [("Yes.", false), ("Yes, forget everything.", true)] {
+        let everything = call("c1", crate::remember::FORGET_EVERYTHING, json!({}));
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("Forget everything about me.".to_owned()),
+                    Ok(then.to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![text("Everything, really?"), Ok(ChatEvent::Done)],
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![everything.clone()])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Done."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (mut engine, calls, _) = scripted(script);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        turn(&mut engine).await;
+        engine.retire_through(1);
+        engine.submit(start(2));
+        engine.submit(audio(2, 1));
+        engine.submit(end(2));
+        turn(&mut engine).await;
+        assert_eq!(calls.lock().unwrap().len(), usize::from(runs), "{then}");
+    }
+}
+
+#[test]
+fn only_words_that_ask_to_forget_let_a_forget_run() {
+    for asks in [
+        "Please forget my name.",
+        "Forget it.",
+        "Can you delete my face?",
+        "Erase that.",
+        "stop remembering that",
+        "Quên tên tôi đi.",
+        "Que\u{302}n tên tôi đi.",
+        "Xóa nó.",
+        "Scratch that.",
+        "Get rid of that, please.",
+        "Don't keep that.",
+        "Take that off your list.",
+    ] {
+        assert!(crate::remember::asks_to_forget(asks), "{asks}");
+    }
+    for not in [
+        "What's my name?",
+        "Remember my face.",
+        "I don't remember.",
+        "Forgetful me.",
+        "Rất vui được làm quen.",
+        "Xoa đầu nó đi.",
+        "I keep forgetting my keys.",
+        "She forgets everything.",
+        "",
+    ] {
+        assert!(!crate::remember::asks_to_forget(not), "{not}");
+    }
+}
+
 /// The route A/B of 19 Oct: three hand-overs asked of the second route
 /// alone, none handed over. A spoken request naming Claude Code is asked
 /// with the Live route's staff note beside its words (`LAMP_STAFF_NOTE=on`,

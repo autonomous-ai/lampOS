@@ -70,6 +70,85 @@ pub const FORGET_EVERYTHING: &str = "forget_everything";
 /// something recalled, and `forget_everything` is offered (#1693). Off, the
 /// functions are as before.
 pub const FORGET_ALL_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_ALL";
+/// `off` lets a forget run whatever the person said; any other value, or
+/// none, runs one only when the turn's own words ask to forget
+/// ([`asks_to_forget`]).
+pub const FORGET_ASKED_ENVIRONMENT: &str = "LAMP_FORGET_ASKED";
+/// What the model is told of a forget nobody asked for (lamp-4ace, 20 Oct
+/// 21:31: "Lamp, what's my name?" was answered with `recall`, then
+/// `forget_my_face` and `forget`).
+pub const NOT_ASKED_TO_FORGET: &str = "Nothing was forgotten: a forget runs only when what they say asks for it, in words such as forget, delete or erase, a yes alone included. If they meant it, ask them to say it that way. Otherwise answer what they asked.";
+
+/// Whether `name` is a call that forgets: a kept thing, everything, or a
+/// face.
+pub fn is_forget(name: &str) -> bool {
+    matches!(
+        name,
+        FORGET | FORGET_EVERYTHING | crate::known_faces::FORGET
+    )
+}
+
+/// Whether a forget may run on a turn: a spoken one (`heard`, never the
+/// lamp's own written turns: a hello, a skill's say, task news) whose words
+/// ask for it (`asks`, [`asks_to_forget`]), unless `LAMP_FORGET_ASKED=off`.
+/// A yes alone doesn't: "Forget everything about me." "Everything,
+/// really?" "Yes." is told to say it ("Yes, forget everything"). A forget
+/// that removes someone's face or what they told the lamp is not undone,
+/// so a word too few costs a repeat, and a guess costs what was kept.
+pub fn forget_may_run(heard: bool, asks: bool) -> bool {
+    forget_unguarded() || (heard && asks)
+}
+
+/// `LAMP_FORGET_ASKED=off`: every forget runs, as before.
+pub fn forget_unguarded() -> bool {
+    std::env::var(FORGET_ASKED_ENVIRONMENT).as_deref() == Ok("off")
+}
+
+/// Whether `said` asks to forget, by its words: the English ones folded as
+/// names are matched, and the Vietnamese ones with their accents kept,
+/// written as one letter or as a letter and its mark, since without them
+/// "quen" is "to know someone" and "xoa" "to stroke" (Jarvis's P3 on
+/// #2324). Not taken, so asked again: "never mind what I told you", "don't
+/// tell anyone", and other words without one of these.
+pub fn asks_to_forget(said: &str) -> bool {
+    const ASKS: &[&str] = &[
+        "forget",
+        "delete",
+        "erase",
+        "remove",
+        "wipe",
+        "clear",
+        "unremember",
+    ];
+    // Vietnamese, accents kept: "quên", "xóa" and "xoá".
+    const ASKS_KEPT: &[&str] = &["qu\u{ea}n", "x\u{f3}a", "xo\u{e1}"];
+    const PHRASES: &[&[&str]] = &[
+        &["stop", "remembering"],
+        &["scratch", "that"],
+        &["get", "rid", "of"],
+        &["don't", "keep"],
+        &["dont", "keep"],
+        &["do", "not", "keep"],
+        &["off", "your", "list"],
+    ];
+    let composed = said
+        .to_lowercase()
+        .replace("e\u{302}", "\u{ea}")
+        .replace("o\u{301}", "\u{f3}")
+        .replace("a\u{301}", "\u{e1}");
+    let kept = crate::known_faces::lower_words(&composed);
+    let words = crate::known_faces::folded_words(said);
+    kept.iter().any(|word| ASKS_KEPT.contains(&word.as_str()))
+        || words.iter().any(|word| ASKS.contains(&word.as_str()))
+        || PHRASES.iter().any(|phrase| {
+            words.windows(phrase.len()).any(|window| {
+                window
+                    .iter()
+                    .zip(phrase.iter())
+                    .all(|(word, want)| word == want)
+            })
+        })
+}
 static FORGET_ALL: OnceLock<bool> = OnceLock::new();
 
 /// Whether `forget` takes an id and `forget_everything` is offered.
