@@ -22,10 +22,15 @@ DEVELOPMENT_BINARIES = {'lamp-audio', 'lamp-body-inspect', 'lamp-ipc-probe',
     'lamp-memory-eval', 'lamp-observer', 'lamp-policy-fit', 'lamp-policy-judges',
     'lamp-sound-fixtures', 'lamp-tasks-harness-fixture', 'lamp-voice-eval',
     'lamp-memory-fixture', 'lamp-records-fixture', 'lamp-same-voice', 'lamp-policy-replay'}
-# Factory/provisioning tools are not product runtime: the V2 installer carries only
-# what a product unit starts, and none starts these. lamp-body-measure writes one
-# lamp's BODY_POSES at the bench; poses are never shipped or copied between lamps.
+# Factory/provisioning tools are not product runtime. The generic package carries
+# them under tools/ for the V1 migration script, which measures each lamp's own
+# BODY_POSES; poses are never shipped or copied between lamps. From a source with
+# lamp-body-measure.service (lampOS #2163), the generic package also runs it: a lamp
+# without poses is read seated at rest before its first body start, so the tool
+# also sits beside lamp-body, as lamp-body-worker does.
 PROVISIONING_BINARIES = {'lamp-body-measure'}
+SEATED_MEASURE_UNIT = 'lamp-body-measure.service'
+PROVISION_SETTINGS = ('voice-provider.json', 'controls.json', 'controls-pins.json')
 # The adapter's prepare runs `lamp-keeper prepare` (lamp-voice #1094); its usage
 # line is the build's own statement that the command exists.
 KEEPER_PREPARE = b'\nlamp-keeper prepare\n'
@@ -71,6 +76,53 @@ def check_elf(data, name):
         raise ValueError(f'{name}: expected Linux ARM64 ELF executable')
 
 
+def generic_policy(text, product):
+    """Align the template's policy with the product unit's identity, state and relay.
+
+    The template's DynamicUser is outside the parts' bus group (root:LAMP_USER,
+    2770), its state directory defaults to 0755, which lamp-policy refuses, and
+    without --endpoint it would call its built-in default instead of the
+    product's relay. A changed template fails here rather than being guessed at.
+    """
+    endpoint = re.search(r'--endpoint\s+(https://\S+)', product)
+    if not endpoint:
+        raise ValueError('deploy/product/lamp-policy.service names no --endpoint')
+    if ('DynamicUser=yes\n' not in text or 'StateDirectory=lampos-policy\n' not in text
+            or not re.search(r'^ExecStart=\S*/lamp-policy ', text, re.M)):
+        raise ValueError('lamp-policy.service template changed; review the generic policy rewrite')
+    text = text.replace('DynamicUser=yes\n', 'User=@LAMP_USER@\nGroup=@LAMP_USER@\n', 1)
+    if 'StateDirectoryMode=' not in text:
+        text = text.replace('StateDirectory=lampos-policy\n', 'StateDirectory=lampos-policy\nStateDirectoryMode=0700\n', 1)
+    if '--endpoint' not in text:
+        text = re.sub(r'^(ExecStart=\S*/lamp-policy) ', lambda m: f'{m[1]} --endpoint {endpoint[1]} ', text, count=1, flags=re.M)
+    return text
+
+
+BUS_ENVIRONMENT = ('LAMP_BUS', 'LAMP_BUS_AUDIO')
+BUS_ROOT_OPTION = '--bus-root /run/lampos-bus'
+
+
+def generic_bus(unit, text, product):
+    """Join the parts' bus wherever the product unit of that part does.
+
+    The templates leave the voice, body, eyes and memory off the bus, so name
+    never hears the microphone and health never hears those parts.
+    """
+    lines = ''.join(f'Environment={name}=on\n' for name in BUS_ENVIRONMENT
+                    if f'Environment={name}=on\n' in product and f'Environment={name}=' not in text)
+    if lines:
+        anchor = 'Environment=LD_LIBRARY_PATH=@RELEASE_ROOT@/lib\n'
+        if anchor not in text:
+            raise ValueError(f'{unit}: no Service section to join the bus in')
+        text = text.replace(anchor, anchor + lines, 1)
+    if BUS_ROOT_OPTION in product and '--bus-root' not in text:
+        execs = re.findall(r'^ExecStart=.*$', text, re.M)
+        if len(execs) != 1:
+            raise ValueError(f'{unit}: expected one ExecStart to give the bus root')
+        text = text.replace(execs[0], f'{execs[0]} {BUS_ROOT_OPTION}', 1)
+    return text
+
+
 def package(source, binaries, assets, profile, version, output, adapter, libraries, source_commit):
     if not re.fullmatch(r'[0-9a-f]{40}', source_commit):
         raise ValueError('source_commit must be a full lowercase Git SHA')
@@ -78,7 +130,8 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
         raise ValueError('version must be major.minor.patch')
     generic = profile is None
     if generic:
-        profile = {'substitutions': {}, 'units': list(DEFAULT_UNITS),
+        seated = [SEATED_MEASURE_UNIT] if (Path(source) / 'deploy/units' / SEATED_MEASURE_UNIT).exists() else []
+        profile = {'substitutions': {}, 'units': list(DEFAULT_UNITS) + seated,
                    'required_paths': ['/etc/lampOS/voice/provider.json',
                        '/etc/lampOS/controls/controls.json', '/etc/lampOS/controls/controls-pins.json']}
     if set(profile) - {'substitutions', 'units', 'required_paths'}:
@@ -154,6 +207,20 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
     for name in ('lamp-voice', 'lamp-turn-end'):
         add(f'{voice_dir}/{name}', read_file(binaries, name), True)
     add(f'runtime/body/{binary_hashes["lamp-body"]}/lamp-body-worker', read_file(binaries, 'lamp-body-worker'), True)
+    if generic:
+        # What scripts/provision/lamp-v2-migrate reads from this package on a V1
+        # lamp: the bench tool for its poses and V2's own setting templates.
+        for name in sorted(PROVISIONING_BINARIES):
+            data = read_file(binaries, name)
+            check_elf(data, name)
+            add(f'tools/{name}', data, True)
+            if name == 'lamp-body-measure' and SEATED_MEASURE_UNIT in units:
+                add(f'runtime/body/{binary_hashes["lamp-body"]}/{name}', data, True)
+        for name in PROVISION_SETTINGS:
+            data = read_file(source, f'deploy/product/settings/{name}')
+            if not isinstance(json.loads(data), dict) or SECRET.search(data.decode()):
+                raise ValueError(f'invalid nonsecret setting template: {name}')
+            add(f'provision/{name}', data)
     for name, expected in (ASSETS | OPTIONAL_ASSETS).items():
         if name in OPTIONAL_ASSETS and not (Path(assets) / name).exists():
             continue
@@ -198,6 +265,11 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
             if text.count('[Service]') != 1:
                 raise ValueError(f'{unit}: expected exactly one Service section')
             text = text.replace('[Service]', '[Service]\nEnvironment=LD_LIBRARY_PATH=@RELEASE_ROOT@/lib', 1)
+        if generic and unit == 'lamp-policy.service':
+            text = generic_policy(text, read_file(source, 'deploy/product/lamp-policy.service').decode())
+        # The seated read is a oneshot with no product unit and no bus.
+        if generic and unit.startswith('lamp-') and unit.endswith('.service') and unit != SEATED_MEASURE_UNIT:
+            text = generic_bus(unit, text, read_file(source, f'deploy/product/{unit}').decode())
         for key, value in mapping.items():
             text = text.replace(f'@{key}@', value)
         if generic and unit == 'lamp-controls.service':

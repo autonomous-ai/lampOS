@@ -55,6 +55,127 @@ class PackageTest(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
 
+    POLICY_TEMPLATE = ('[Unit]\nConditionHost=@UNIT_ID@\n[Service]\nDynamicUser=yes\nLoadCredential=jev.key:/etc/lampOS/policy/jev.key\n'
+                       'StateDirectory=lampos-policy\nExecStart=/opt/lampOS/policy/@POLICY_SHA256@/lamp-policy '
+                       '--key-file ${CREDENTIALS_DIRECTORY}/jev.key --log-dir /var/lib/lampos-policy --bus-root /run/lampos-bus\n')
+    PRODUCT_POLICY = ('[Service]\nUser=lampos\nExecStart=/opt/lampOS/policy/current/lamp-policy --key-file %d/jev.key '
+                      '--endpoint https://relay.example/jev/decisions --log-dir /var/lib/lampos-policy\n')
+
+    PRODUCT_UNITS = {
+        'lamp-voice.service': '[Service]\nEnvironment=LAMP_BUS=on\nEnvironment=LAMP_BUS_ROOT=/run/lampos-bus\nEnvironment=LAMP_BUS_AUDIO=on\n',
+        'lamp-body.service': '[Service]\nEnvironment=LAMP_BUS=on\n',
+        'lamp-eyes.service': '[Service]\nEnvironment=LAMP_BUS=on\n',
+        'lamp-memory.service': '[Service]\nExecStart=/opt/lampOS/memory/current/lamp-memory --dir /m --bus-root /run/lampos-bus\n',
+    }
+
+    def write_generic_units(self, extra=''):
+        for unit in pkg.DEFAULT_UNITS:
+            content = '[Unit]\nConditionHost=@UNIT_ID@\n'
+            if unit.endswith('.service'):
+                content += '[Service]\n' + extra
+            if unit == 'lamp-controls.service':
+                content += 'ExecStart=/opt/lampOS/controls/@CONTROLS_SHA256@/lamp-controls --config /opt/lampOS/controls/@CONTROLS_SHA256@/controls.json\n'
+            if unit == 'lamp-policy.service':
+                content = self.POLICY_TEMPLATE
+            if unit == 'lamp-memory.service':
+                content += 'ExecStart=/opt/lampOS/memory/@MEMORY_SHA256@/lamp-memory --dir /m\n'
+            self.write_source('deploy/units/' + unit, content.encode())
+            if unit.endswith('.service'):
+                self.write_source('deploy/product/' + unit, self.PRODUCT_UNITS.get(unit, '[Service]\n').encode())
+        self.write_source('deploy/product/lamp-policy.service', self.PRODUCT_POLICY.encode())
+        for name in pkg.PROVISION_SETTINGS:
+            self.write_source('deploy/product/settings/' + name, b'{"fixture": true}\n')
+        (self.binaries / 'lamp-body-measure').write_bytes(self.adapter.read_bytes() + b'measure')
+
+    def test_generic_carries_migration_tool_and_setting_templates(self):
+        self.write_generic_units()
+        manifest = self.build_generic()
+        with zipfile.ZipFile(self.output) as archive:
+            self.assertEqual(archive.getinfo('tools/lamp-body-measure').external_attr >> 16 & 0o777, 0o755)
+            for name in pkg.PROVISION_SETTINGS:
+                self.assertEqual(archive.read('provision/' + name), b'{"fixture": true}\n')
+        self.assertNotIn('lamp-body-measure', manifest['binaries'])
+        (self.binaries / 'lamp-body-measure').unlink()
+        with self.assertRaisesRegex(ValueError, 'missing or unsafe file: lamp-body-measure'):
+            self.build_generic()
+        self.write_generic_units()
+        self.write_source('deploy/product/settings/voice-provider.json', b'{"key": "AIza' + b'x' * 35 + b'"}')
+        with self.assertRaisesRegex(ValueError, 'nonsecret setting template'):
+            self.build_generic()
+
+    def test_generic_runs_the_seated_measure_when_the_source_has_it(self):
+        # An older source has no seated measure: the package is as before.
+        self.write_generic_units()
+        manifest = self.build_generic()
+        self.assertNotIn(pkg.SEATED_MEASURE_UNIT, manifest['units'])
+        # lampOS #2163: the oneshot reads a lamp without poses, seated, with
+        # the tool beside lamp-body, and joins no bus.
+        self.write_source('deploy/units/' + pkg.SEATED_MEASURE_UNIT, (
+            '[Unit]\nConditionHost=@UNIT_ID@\n[Service]\nType=oneshot\nUser=@LAMP_USER@\n'
+            "ExecStart=/bin/sh -c 'exec /opt/lampOS/body/@BODY_SHA256@/lamp-body-measure "
+            "--device @SERVO_DEVICE@ --unit-id @UNIT_ID@ --lock-directory @MOTOR_LOCK_DIR@ --seated "
+            "--write /var/lib/lampos-body/measured.env'\n").encode())
+        manifest = self.build_generic()
+        self.assertIn(pkg.SEATED_MEASURE_UNIT, manifest['units'])
+        body = manifest['binaries']['lamp-body']
+        with zipfile.ZipFile(self.output) as archive:
+            names = archive.namelist()
+            unit = archive.read('units/' + pkg.SEATED_MEASURE_UNIT).decode()
+            placeholders = json.loads(archive.read('package-manifest.json'))['placeholders']
+            mode = archive.getinfo(f'runtime/body/{body}/lamp-body-measure').external_attr >> 16 & 0o777
+        self.assertIn('tools/lamp-body-measure', names)
+        self.assertEqual(mode, 0o755)
+        self.assertIn(f'@RELEASE_ROOT@/runtime/body/{body}/lamp-body-measure --device @SERVO_DEVICE@', unit)
+        self.assertNotIn('LAMP_BUS', unit)
+        self.assertNotIn('lamp-body-measure', manifest['binaries'])
+        self.assertTrue({'SERVO_DEVICE', 'MOTOR_LOCK_DIR', 'LAMP_USER'} <= set(placeholders))
+
+    def build_generic(self):
+        return pkg.package(self.source, self.binaries, self.assets, None, '1.2.3', self.output, self.adapter, self.libraries, 'a' * 40)
+
+    def test_generic_policy_matches_product_identity_state_and_relay(self):
+        self.write_generic_units()
+        self.build_generic()
+        with zipfile.ZipFile(self.output) as archive:
+            policy = archive.read('units/lamp-policy.service').decode()
+            manifest = json.loads(archive.read('package-manifest.json'))
+        self.assertNotIn('DynamicUser', policy)
+        self.assertIn('User=@LAMP_USER@\nGroup=@LAMP_USER@\n', policy)
+        self.assertIn('StateDirectory=lampos-policy\nStateDirectoryMode=0700\n', policy)
+        self.assertIn('/lamp-policy --endpoint https://relay.example/jev/decisions --key-file', policy)
+        self.assertIn('LAMP_USER', manifest['placeholders'])
+        self.assertIn('/etc/lampOS/policy/jev.key', manifest['required_paths'])
+
+    def test_generic_parts_join_the_bus_as_their_product_units_do(self):
+        self.write_generic_units()
+        self.build_generic()
+        with zipfile.ZipFile(self.output) as archive:
+            units = {u: archive.read('units/' + u).decode() for u in pkg.DEFAULT_UNITS if u.endswith('.service')}
+        self.assertIn('Environment=LAMP_BUS=on\nEnvironment=LAMP_BUS_AUDIO=on\n', units['lamp-voice.service'])
+        for unit in ('lamp-body.service', 'lamp-eyes.service'):
+            self.assertIn('Environment=LAMP_BUS=on\n', units[unit])
+            self.assertNotIn('LAMP_BUS_AUDIO', units[unit])
+        self.assertIn('/lamp-memory --dir /m --bus-root /run/lampos-bus\n', units['lamp-memory.service'])
+        self.assertNotIn('LAMP_BUS=', units['lamp-name.service'])
+        self.assertEqual(units['lamp-policy.service'].count('--bus-root'), 1)
+
+    def test_generic_needs_each_parts_product_unit(self):
+        self.write_generic_units()
+        (self.source / 'deploy/product/lamp-eyes.service').unlink()
+        with self.assertRaisesRegex(ValueError, 'deploy/product/lamp-eyes.service'):
+            self.build_generic()
+
+    def test_generic_policy_rewrite_fails_closed(self):
+        self.write_generic_units()
+        self.write_source('deploy/product/lamp-policy.service', b'[Service]\nExecStart=/x/lamp-policy --log-dir /y\n')
+        with self.assertRaisesRegex(ValueError, 'names no --endpoint'):
+            self.build_generic()
+        self.write_source('deploy/product/lamp-policy.service', self.PRODUCT_POLICY.encode())
+        self.write_source('deploy/units/lamp-policy.service',
+                          self.POLICY_TEMPLATE.replace('DynamicUser=yes\n', 'User=someone\n').encode())
+        with self.assertRaisesRegex(ValueError, 'template changed'):
+            self.build_generic()
+
     def build(self):
         return pkg.package(self.source, self.binaries, self.assets, self.profile, '1.2.3', self.output, self.adapter, self.libraries, 'a' * 40)
 
@@ -147,13 +268,7 @@ class PackageTest(unittest.TestCase):
             self.assertEqual(archive.read('SERVICE_CLEANUP'), b'1\n')
 
     def test_generic_profile_defers_only_declared_device_values(self):
-        for unit in pkg.DEFAULT_UNITS:
-            content = '[Unit]\nConditionHost=@UNIT_ID@\n'
-            if unit.endswith('.service'):
-                content += '[Service]\n'
-            if unit == 'lamp-controls.service':
-                content += 'ExecStart=/opt/lampOS/controls/@CONTROLS_SHA256@/lamp-controls --config /opt/lampOS/controls/@CONTROLS_SHA256@/controls.json\n'
-            self.write_source('deploy/units/' + unit, content.encode())
+        self.write_generic_units()
         pkg.package(self.source, self.binaries, self.assets, None, '1.2.3', self.output, self.adapter, self.libraries, 'a' * 40)
         with zipfile.ZipFile(self.output) as archive:
             manifest = json.loads(archive.read('package-manifest.json'))
@@ -163,8 +278,7 @@ class PackageTest(unittest.TestCase):
             self.assertIn(b'/etc/lampOS/controls/controls.json', archive.read('units/lamp-controls.service'))
 
     def test_generic_rejects_unknown_new_placeholder(self):
-        for unit in pkg.DEFAULT_UNITS:
-            self.write_source('deploy/units/' + unit, b'[Service]\nConditionHost=@UNIT_ID@\nValue=@NEW_UNREVIEWED@\n')
+        self.write_generic_units(extra='Value=@NEW_UNREVIEWED@\n')
         with self.assertRaisesRegex(ValueError, 'unresolved'):
             pkg.package(self.source, self.binaries, self.assets, None, '1.2.3', self.output, self.adapter, self.libraries, 'a' * 40)
 

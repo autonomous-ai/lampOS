@@ -1580,14 +1580,70 @@ build chúng; thêm executable không tự bật service hay chạy self-test/re
 được cài hay bật: `lamp-cloud` kết nối broker công ty, là opt-in và không được dùng
 chung MQTT client ID với os-server V1; `lamp-skills` còn cần skills và settings sản
 phẩm mà ZIP này chưa mang. `lamp-body-measure` là công cụ nhà máy/provisioning ghi
-`BODY_POSES` của từng lamp lúc đứng yên; không unit sản phẩm nào chạy nó nên không
-đưa vào gói, và pose không bao giờ được ship hay chép từ lamp khác.
+`BODY_POSES` của từng lamp lúc đứng yên. ZIP chung mang nó ở
+`tools/lamp-body-measure` cho script migrate V1 bên dưới, và pose không bao giờ được
+ship hay chép từ lamp khác. Khi build từ source lampOS có
+`deploy/units/lamp-body-measure.service` (lampOS #2163), ZIP chung mang thêm unit
+oneshot đó và đặt công cụ cạnh `lamp-body` (`runtime/body/<sha>/`). Trên lamp chưa có
+cả `/etc/lampOS/body/lamp.env` lẫn `/var/lib/lampos-body/measured.env`, sau cutover
+nó đọc lamp đứng yên ở tư thế ngồi (`--home`, pitch window và `--torque on`, không
+stand) trước lần chạy body đầu tiên. Body chỉ cử động đầu và đế cho tới khi có người
+xác nhận lần đứng đầu tiên. Lần đọc bị từ chối (torque đang bật) giữ body không
+chạy, và nó không bao giờ tắt torque. Build từ source cũ thì ZIP như trước.
 `lamp-memory-fixture`, `lamp-records-fixture`, `lamp-policy-replay` và CLI đo
 `lamp-same-voice pairs` hiện là công cụ phát triển nên không đưa vào gói. Binary
 chưa phân loại vẫn làm packaging báo lỗi để không âm thầm bỏ sót runtime mới.
 
-ZIP chung vẫn render `DEFAULT_UNITS` của main từ `lampOS/deploy/units`. Installer
-sản phẩm V2 dùng `lampOS/deploy/product` (chặn theo setup, thêm service và timer,
-settings và đường dẫn khác), nên lamp migrate bằng ZIP này chưa tương đương một bản
-cài sản phẩm V2. Build và đóng gói thành công chỉ chứng minh hợp đồng của gói,
-không chứng minh lamp V2 đã cấu hình đầy đủ.
+ZIP chung vẫn render `DEFAULT_UNITS` của main từ `lampOS/deploy/units`. Chỗ nào
+template khác unit của chính part đó trong `lampOS/deploy/product` đến mức lamp không
+chạy được, packager chỉnh cho khớp và báo lỗi nếu một trong hai phía đổi cấu trúc:
+
+- `lamp-policy.service` chạy bằng `@LAMP_USER@` thay cho `DynamicUser` (nằm ngoài
+  group của bus), có `StateDirectoryMode=0700` (lamp-policy từ chối thư mục log 0755)
+  và `--endpoint` của unit sản phẩm (Jev relay; thiếu nó policy gọi endpoint mặc định).
+- Part nào có unit sản phẩm đặt `LAMP_BUS=on`, `LAMP_BUS_AUDIO=on` hoặc
+  `--bus-root /run/lampos-bus` thì được đặt y vậy: voice, body và eyes vào bus và voice
+  đưa âm thanh mic lên bus, nên name nghe được mic và health nghe được mọi part.
+
+ZIP còn mang các template `voice-provider.json`, `controls.json` và
+`controls-pins.json` của sản phẩm trong `provision/`. Installer sản phẩm V2 vẫn cài
+thêm nhiều thứ (chặn theo setup, schedule, skills, ears, air, records, các tính năng
+`LAMP_*` khác của voice, link `current`), nên lamp migrate chưa phải bản cài sản phẩm
+V2 đầy đủ.
+
+### Migrate một Lamp V1
+
+`scripts/provision/lamp-v2-migrate` chạy trên lamp bằng root sau khi gói đã có trên
+feed. Với `--dry-run` nó không đổi gì; còn lại:
+
+1. Kiểm lamp: `device_type` là `lamp`, updater có preflight protocol, `lamp-os` chưa
+   chạy, có user `orangepi`.
+2. Đọc phần cứng: đúng một adapter servo `1a86` trong `/dev/serial/by-id`, đúng một
+   camera USB (`/dev/video0`, `vendor:product@cổng-usb`), mic `device_micro2`
+   (`--microphone mic2`), `allwinnerhdmi`/`Speaker`, các CPU nhanh nhất và vùng nhiệt
+   `cpu`/`skin`. Thiếu hoặc không phân biệt được thì từ chối.
+3. Tải ZIP `lamp-os` của feed (`OTA_METADATA_URL` hoặc `/root/config/bootstrap.json`,
+   kiểm sha256; `--package ZIP` đọc file cục bộ) và từ chối gói không có `tools/` và
+   `provision/`.
+4. Đo pose nếu chưa có `/etc/lampOS/body/lamp.env` (`--remeasure` đo lại): HAL dừng
+   vài giây, `lamp-body-measure` đọc lamp đứng yên bằng user `orangepi` (nó từ chối
+   root), không ghi thanh ghi nào, và HAL luôn được bật lại. Lamp phải gập và nằm yên.
+   Tool không đo gaze; thiếu gaze thì body từ chối `--gaze-socket`, nên script thêm
+   `--gaze 755,555`, giá trị giữa của hai Lamp V1 đã đo trong `docs/body.md` của
+   lampOS, để đo lại trên chính lamp sau.
+5. Ghi `/etc/lampOS/body/lamp.env`, `package-profile.json`, `voice/provider.json`
+   (0600), `controls/controls.json` và `controls/controls-pins.json` (bỏ `reset`/
+   `legacy_head` chỉ dùng cho touch, vì unit controls chung chạy không có `--touch`),
+   và tạo thư mục voice sessions, memory, actions và lock. File khác nội dung được để
+   nguyên trừ khi có `--force`.
+6. Chạy `software-update lamp-os --activate` và chờ. Prepare ghi credential; nếu V2
+   không ready, updater tự khôi phục V1.
+
+`--no-activate` dừng sau bước 5, `--rollback` chạy
+`software-update rollback-to-legacy lamp-os`. Script không promote gì và không đổi lamp
+khác.
+
+Đã kiểm trên lamp-a63e (V1, 2026-10-19) với các gói build từ lamp-voice `ec9b26a`:
+V1 lên V2, rồi cập nhật V2 lên V2, mọi part active và health `ok`. Voice của nó không
+kết nối được Gemini (quota campaign-api của device đó, `quota_exceeded`), nên phần nói
+chưa được kiểm và voice khởi động lại cho tới khi có quota.
