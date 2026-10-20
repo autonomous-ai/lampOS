@@ -844,6 +844,17 @@ fn observe(
     if let Some(local) = &runner.local_time {
         engine.clock_in(local, now_us, unix_ms());
     }
+    if message.header.topic == Speech::TOPICS[0]
+        && let Some(turn) = message
+            .parse::<Speech>()
+            .ok()
+            .and_then(|speech| speech.request)
+    {
+        let mut newest = NEWEST_HEARD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *newest = newest.max(Some(turn));
+    }
     let made = engine.observe(
         &message.header.topic,
         now_us,
@@ -2270,10 +2281,11 @@ fn wait_out(skill: &str, calls: &[Call], bus: &Bus, lasting_us: u64, said: &mut 
         return;
     }
     let until = clock::now() + Duration::from_micros(lasting_us);
+    let mut stop = SearchStop::new(bus);
     while clock::now() < until {
-        // Someone speaking, the lamp paused or the body pushed ends it, as
-        // a show's frames end (the peer read on #1766).
-        if let Some(why) = show_stopped(bus) {
+        // Words heard, the lamp paused or the body pushed ends it (the
+        // peer read on #1766; a line of no words does not, #1871).
+        if let Some(why) = stop.why(bus) {
             end_hold(skill);
             said.push(format!("{why}: the search ended"));
             return;
@@ -2282,9 +2294,69 @@ fn wait_out(skill: &str, calls: &[Call], bus: &Bus, lasting_us: u64, said: &mut 
     }
 }
 
+/// The newest turn heard on `voice/heard`, as the main loop read it: the
+/// bus keeps no latest of an event topic. Read before each call (#2179).
+static NEWEST_HEARD: Mutex<Option<u64>> = Mutex::new(None);
+
+/// What ends a search (#1685): the body pushed, the lamp paused, or words
+/// heard. The voice listening is not enough: on lamp-52e6 a line of office
+/// noise, 0 words heard, ended a search after its first look (Fifth's row 3,
+/// #1871). Words of the turn that asked for the search, or an earlier one,
+/// do not end it: on Live the last pieces of the asking line can come after
+/// the call. Without `voice/heard` it ends as a show does, on the voice
+/// listening.
+struct SearchStop {
+    heard: Option<Subscriber>,
+    /// The turn of the newest words heard as the search began.
+    asked: Option<u64>,
+}
+
+impl SearchStop {
+    fn new(bus: &Bus) -> Self {
+        static SEARCHES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let n = SEARCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let heard = bus
+            .subscribe(Speech::TOPICS[0], &format!("skills_search_{n}"))
+            .map_err(|error| eprintln!("lamp-skills: voice/heard not read for a search: {error}"))
+            .ok();
+        let asked = *NEWEST_HEARD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        Self { heard, asked }
+    }
+
+    fn why(&mut self, bus: &Bus) -> Option<String> {
+        if let Some(why) = body_stopped(bus) {
+            return Some(why);
+        }
+        let Some(heard) = &mut self.heard else {
+            return voice_listening(bus).then(|| "the voice is listening to someone".into());
+        };
+        let asked = self.asked;
+        let later = |speech: &Speech| match (speech.request, asked) {
+            (Some(turn), Some(asked)) => turn > asked,
+            _ => true,
+        };
+        while let Some(message) = receive(heard, Duration::ZERO) {
+            if message.parse::<Speech>().is_ok_and(|speech| {
+                later(&speech) && speech.text.chars().any(char::is_alphanumeric)
+            }) {
+                return Some("someone spoke to the lamp".into());
+            }
+        }
+        None
+    }
+}
+
 /// Why a show goes no further, if it should not: the body pushed, the lamp
 /// paused, or the voice listening to someone.
 fn show_stopped(bus: &Bus) -> Option<String> {
+    body_stopped(bus)
+        .or_else(|| voice_listening(bus).then(|| "the voice is listening to someone".into()))
+}
+
+/// The body pushed or the lamp paused.
+fn body_stopped(bus: &Bus) -> Option<String> {
     let latest = |topic: &str| bus.latest(topic).ok().flatten();
     if latest(Hand::TOPIC)
         .and_then(|message| message.parse::<Hand>().ok())
@@ -2298,7 +2370,7 @@ fn show_stopped(bus: &Bus) -> Option<String> {
     {
         return Some("the lamp was paused".into());
     }
-    voice_listening(bus).then(|| "the voice is listening to someone".into())
+    None
 }
 
 /// Whether the voice is listening to someone now: a person speaks.
@@ -2634,13 +2706,14 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             let (until_spoken, bus) = (*until_spoken, bus.clone());
             let looks = if until_spoken { SHOW_LOOKS } else { MOOD_EVERY };
             std::thread::spawn(move || {
+                let mut stop = until_spoken.then(|| SearchStop::new(&bus));
                 let mut next = clock::now() + MOOD_EVERY;
                 while next < until {
                     clock::sleep(looks.min(next.saturating_duration_since(clock::now())));
                     if !holding(&skill, number) {
                         break;
                     }
-                    if until_spoken && show_stopped(&bus).is_some() {
+                    if stop.as_mut().and_then(|stop| stop.why(&bus)).is_some() {
                         end_hold(&skill);
                         break;
                     }
