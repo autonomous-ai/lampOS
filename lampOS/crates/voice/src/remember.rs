@@ -80,7 +80,64 @@ pub const FORGET_ASKED_ENVIRONMENT: &str = "LAMP_FORGET_ASKED";
 /// What the model is told of a forget nobody asked for (lamp-4ace, 20 Oct
 /// 21:31: "Lamp, what's my name?" was answered with `recall`, then
 /// `forget_my_face` and `forget`).
-pub const NOT_ASKED_TO_FORGET: &str = "Nothing was forgotten: a forget runs only when what they say asks for it, in words such as forget, delete or erase. A yes alone is not enough: if they meant it, ask them to say it, for example \"Yes, forget everything.\" Otherwise answer what they asked.";
+/// It names both ways to confirm, and that the yes is not one here: on a
+/// text, a written turn, or with nobody known by face, nothing is held.
+pub const NOT_ASKED_TO_FORGET: &str = "Nothing was forgotten: a forget runs when what they say asks for it, in words such as forget, delete or erase, or on a yes said aloud to your question about it by someone you know by face, when the lamp held the call. A yes is not enough here: if they meant it, ask them to say it, for example \"Yes, forget everything.\" Otherwise answer what they asked.";
+
+/// How long a forget held for a person's yes waits for it.
+pub const HELD_FORGET_FOR: std::time::Duration = std::time::Duration::from_secs(60);
+/// What the model is told of a forget run on the person's yes in the turn
+/// it is asked again: it ran already.
+pub const HELD_FORGET_RAN: &str =
+    "Already done: the forget they said yes to has run. Do not call another now.";
+/// What the model is told of a second forget in a turn whose first one
+/// waits for a yes: one waits at a time.
+pub const ONE_FORGET_HELD: &str =
+    "Not done: one forget waits for their yes at a time. Ask about that one only.";
+
+/// What the model is told of a forget held for the person's yes: ask once,
+/// plainly, and the engine runs it on their yes. Never that they did not
+/// ask (rule 8: the lamp asks once and does not nag).
+pub fn held_forget_told(name: &str) -> serde_json::Value {
+    let (what, example) = match name {
+        crate::known_faces::FORGET => ("forget their face", "Shall I forget your face?"),
+        FORGET_EVERYTHING => (
+            "forget everything about them",
+            "Shall I forget everything about you?",
+        ),
+        _ => ("forget that", "Shall I forget that?"),
+    };
+    serde_json::json!({
+        "held": format!(
+            "Not done yet: this waits for their yes. Ask them once, in plain words, whether you should {what} (for example \"{example}\"), and then stop. A plain yes from them within a minute runs it, as does their asking in words; do not call it again for their yes."
+        )
+    })
+}
+
+/// What the forget functions add for the second route's spoken turns, where
+/// a forget nobody asked for in words is held for their yes
+/// ([`held_forget_told`]), so the description and the engine agree.
+pub const HELD_DESCRIBED: &str = " If they didn't ask in their own words, the lamp holds the call: call it once, then ask them plainly, once; their yes, or their asking in words, runs it.";
+/// `forget_everything` for those turns: called at once, as the engine
+/// confirms it, never only after a yes the model asked for (the reviewer
+/// on #2334: that yes alone was refused).
+const FORGET_EVERYTHING_HELD: &str = "Call this when the person asks you to forget everything about them; if you are not sure they mean everything, still call it once and ask. It forgets all you keep of them: what they asked you to remember, your conversations and what you noticed. It works only for someone you know by face; otherwise say what it tells you. Then tell them plainly that it is all gone.";
+
+/// The forget functions as told to the second route's spoken turns: with
+/// [`HELD_DESCRIBED`], unless `LAMP_FORGET_ASKED=off`, where they are as
+/// before. Texts, where a typed yes confirms nothing, keep theirs.
+pub fn held_forgets_described(mut tools: Vec<Tool>) -> Vec<Tool> {
+    if forget_unguarded() {
+        return tools;
+    }
+    for tool in tools.iter_mut().filter(|tool| is_forget(&tool.name)) {
+        if tool.name == FORGET_EVERYTHING {
+            FORGET_EVERYTHING_HELD.clone_into(&mut tool.description);
+        }
+        tool.description.push_str(HELD_DESCRIBED);
+    }
+    tools
+}
 
 /// Whether `name` is a call that forgets: a kept thing, everything, or a
 /// face.
@@ -94,8 +151,9 @@ pub fn is_forget(name: &str) -> bool {
 /// Whether a forget may run on a turn: a spoken one (`heard`, never the
 /// lamp's own written turns: a hello, a skill's say, task news) whose words
 /// ask for it (`asks`, [`asks_to_forget`]), unless `LAMP_FORGET_ASKED=off`.
-/// A yes alone doesn't: "Forget everything about me." "Everything,
-/// really?" "Yes." is told to say it ("Yes, forget everything"). A forget
+/// A yes alone doesn't; on the second route a forget the model calls
+/// unasked is held for a known person's plain yes instead
+/// (`second_provider::HeldForget`). A forget
 /// that removes someone's face or what they told the lamp is not undone,
 /// so a word too few costs a repeat, and a guess costs what was kept.
 pub fn forget_may_run(heard: bool, asks: bool) -> bool {
@@ -107,6 +165,19 @@ pub fn forget_unguarded() -> bool {
     std::env::var(FORGET_ASKED_ENVIRONMENT).as_deref() == Ok("off")
 }
 
+/// The words that ask to forget, folded ([`asks_to_forget`]).
+const ASKS: &[&str] = &[
+    "forget",
+    "delete",
+    "erase",
+    "remove",
+    "wipe",
+    "clear",
+    "unremember",
+];
+/// Vietnamese, accents kept: "quên", "xóa" and "xoá".
+const ASKS_KEPT: &[&str] = &["qu\u{ea}n", "x\u{f3}a", "xo\u{e1}"];
+
 /// Whether `said` asks to forget, by its words: the English ones folded as
 /// names are matched, and the Vietnamese ones with their accents kept,
 /// written as one letter or as a letter and its mark, since without them
@@ -114,17 +185,6 @@ pub fn forget_unguarded() -> bool {
 /// #2324). Not taken, so asked again: "never mind what I told you", "don't
 /// tell anyone", and other words without one of these.
 pub fn asks_to_forget(said: &str) -> bool {
-    const ASKS: &[&str] = &[
-        "forget",
-        "delete",
-        "erase",
-        "remove",
-        "wipe",
-        "clear",
-        "unremember",
-    ];
-    // Vietnamese, accents kept: "quên", "xóa" and "xoá".
-    const ASKS_KEPT: &[&str] = &["qu\u{ea}n", "x\u{f3}a", "xo\u{e1}"];
     const PHRASES: &[&[&str]] = &[
         &["stop", "remembering"],
         &["scratch", "that"],
@@ -152,6 +212,109 @@ pub fn asks_to_forget(said: &str) -> bool {
             })
         })
 }
+
+/// Whether the lamp's `answer` asks about the held forget `name`: one of
+/// its sentences is a question (ends in "?") that asks to forget
+/// ([`asks_to_forget`]) and names that forget: "face" or "khuôn mặt" for
+/// `forget_my_face`, "everything" or "tất cả" for `forget_everything`
+/// ([`names_forget`]), and for a plain `forget` the lamp as the one who
+/// would forget ([`lamp_offers_to_forget`]). "Shall I forget your face?"
+/// does for `forget_my_face`; "Want me to set a reminder?", "I can forget
+/// your face.", "Did you forget your keys?" and "Should I clear the
+/// timer?" don't (Fourth's P2 and 05:11 P3 on #2340). What keeps a forget
+/// held for a yes (`second_provider::HeldForget`).
+pub fn asks_about_forgetting(answer: &str, name: &str) -> bool {
+    let mut sentence = String::new();
+    for c in answer.chars() {
+        sentence.push(c);
+        match c {
+            '?' | '\u{ff1f}' => {
+                let named = match name {
+                    FORGET_EVERYTHING | crate::known_faces::FORGET => names_forget(&sentence, name),
+                    _ => lamp_offers_to_forget(&sentence),
+                };
+                if named && asks_to_forget(&sentence) {
+                    return true;
+                }
+                sentence.clear();
+            }
+            '.' | '!' | '\u{2026}' | '\u{3002}' => sentence.clear(),
+            _ => {}
+        }
+    }
+    false
+}
+
+/// Whether `question` has the lamp offer to forget: a forget word after
+/// words that make the lamp the one who would ("shall I", "should I",
+/// "can I", "may I", "want me to", "like me to", "tôi có nên", "mình có
+/// nên"). "Shall I forget that?" does; "Did you forget it?" doesn't.
+fn lamp_offers_to_forget(question: &str) -> bool {
+    const OFFERS: &[&[&str]] = &[
+        &["shall", "i"],
+        &["should", "i"],
+        &["can", "i"],
+        &["may", "i"],
+        &["want", "me", "to"],
+        &["like", "me", "to"],
+    ];
+    const OFFERS_KEPT: &[&[&str]] = &[
+        &["t\u{f4}i", "c\u{f3}", "n\u{ea}n"],
+        &["m\u{ec}nh", "c\u{f3}", "n\u{ea}n"],
+    ];
+    let after = |words: &[String], offers: &[&[&str]], asks: &[&str]| {
+        offers.iter().any(|offer| {
+            words
+                .windows(offer.len())
+                .position(|window| {
+                    window
+                        .iter()
+                        .zip(offer.iter())
+                        .all(|(word, want)| word == want)
+                })
+                .is_some_and(|at| {
+                    words[at + offer.len()..]
+                        .iter()
+                        .any(|word| asks.contains(&word.as_str()))
+                })
+        })
+    };
+    let composed = question
+        .to_lowercase()
+        .replace("e\u{302}", "\u{ea}")
+        .replace("o\u{301}", "\u{f3}")
+        .replace("a\u{301}", "\u{e1}");
+    after(&crate::known_faces::folded_words(question), OFFERS, ASKS)
+        || after(
+            &crate::known_faces::lower_words(&composed),
+            OFFERS_KEPT,
+            ASKS_KEPT,
+        )
+}
+
+/// Whether `said` names what the forget `name` removes: "everything" or
+/// "tất cả" for `forget_everything`, "face" or "khuôn mặt" for
+/// `forget_my_face`. A plain `forget` (a kept thing) is named by nothing.
+/// With [`asks_to_forget`], what lets a person's ask carry to their next
+/// turn (`second_provider::asked_just_before`): "Clear the timer." or
+/// "Don't forget my keys." names neither, so a forget called after it is
+/// held, as before.
+pub fn names_forget(said: &str, name: &str) -> bool {
+    let words = crate::known_faces::folded_words(said);
+    let kept = crate::known_faces::lower_words(said);
+    let has = |pair: [&str; 2]| kept.windows(2).any(|window| window == pair);
+    match name {
+        FORGET_EVERYTHING => {
+            words.iter().any(|word| word == "everything") || has(["t\u{1ea5}t", "c\u{1ea3}"])
+        }
+        crate::known_faces::FORGET => {
+            words.iter().any(|word| word == "face" || word == "faces")
+                || has(["khu\u{f4}n", "m\u{1eb7}t"])
+        }
+        _ => false,
+    }
+}
+
 static FORGET_ALL: OnceLock<bool> = OnceLock::new();
 
 /// Whether `forget` takes an id and `forget_everything` is offered.

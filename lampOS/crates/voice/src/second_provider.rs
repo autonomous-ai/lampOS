@@ -577,6 +577,9 @@ struct Shared {
         Arc<crate::speaking_faces::SpeakingFaces>,
         std::path::PathBuf,
     )>,
+    /// A forget the model called unasked, held for that person's yes
+    /// ([`HeldForget`]).
+    held_forget: Mutex<HeldForgets>,
 }
 
 /// The last spoken line's sound, at most [`KEPT_SAMPLES`], for a line that
@@ -974,6 +977,7 @@ impl Engine {
                 cut: Mutex::new(None),
                 first_words: None,
                 speaking: None,
+                held_forget: Mutex::new(HeldForgets::default()),
             }),
             output,
             urgent: VecDeque::new(),
@@ -3437,6 +3441,238 @@ async fn ask_look(
     Ok(dropped.is_none())
 }
 
+/// A forget the model called on a spoken turn whose own words don't ask for
+/// one (`remember::asks_to_forget`), held in the engine for that person's
+/// plain yes within `remember::HELD_FORGET_FOR`, and run as it was called
+/// then. #2324, #2326 and #2331 let a yes confirm a forget by reading words,
+/// and each was fooled, since the model writes the question; a held call
+/// ties the yes to the forget the model tried to run (the first builder,
+/// #1722 00:35).
+struct HeldForget {
+    call: net::ToolCall,
+    request: u64,
+    /// Whom it waits for: the admitted request's session and known person.
+    asker: (u64, String),
+    at: Instant,
+    /// Whether the held turn's answer, said whole, asked them about a
+    /// forget ([`settle_held_forget`]): until then no yes runs it (Fourth's
+    /// P2 on #2340: a yes to "Want me to set a reminder?" ran the forget).
+    asked: bool,
+}
+
+/// A person's spoken turn, for the turn after it: the forgets its own
+/// words asked for by name (`remember::asks_to_forget` and
+/// `remember::names_forget`), never their words.
+struct SpokenBefore {
+    request: u64,
+    asker: Option<(u64, String)>,
+    at: Instant,
+    asked: Vec<&'static str>,
+}
+
+/// The forgets that `said` asks for and names: `forget_everything` and
+/// `forget_my_face`, never a plain `forget`, which is always held.
+fn forgets_asked(said: &str) -> Vec<&'static str> {
+    if !crate::remember::asks_to_forget(said) {
+        return Vec::new();
+    }
+    [
+        crate::remember::FORGET_EVERYTHING,
+        crate::known_faces::FORGET,
+    ]
+    .into_iter()
+    .filter(|name| crate::remember::names_forget(said, name))
+    .collect()
+}
+
+#[derive(Default)]
+struct HeldForgets {
+    /// The newest request that has looked at the hold: an older answer
+    /// still running holds nothing past it.
+    latest: u64,
+    /// One at a time.
+    held: Option<HeldForget>,
+    /// The last spoken turn's words' ask, never the lamp's words: a turn
+    /// the lamp wrote clears it ([`asked_just_before`]).
+    before: Option<SpokenBefore>,
+}
+
+/// Whom a turn's forget is held for, or whose yes runs one: the admitted
+/// request's session and known person. None with nobody known (the room)
+/// or no admitted scope: a forget isn't undone, so it takes no anonymous
+/// yes, and such a turn is told to ask in words, as without the hold.
+fn forget_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64, String)> {
+    let scope = scope?;
+    let person = scope.scope()?.person()?.to_owned();
+    Some((scope.key().session, person))
+}
+
+/// The held forget request `request` runs, if any. Every turn takes the
+/// hold: it runs only on a later spoken turn that is a plain yes and
+/// nothing else (`known_faces::plain_agreement`), from the same session's
+/// person, within `remember::HELD_FORGET_FOR`; any other turn drops it,
+/// running nothing. The journal never has the words.
+fn take_held_forget(
+    shared: &Shared,
+    request: u64,
+    heard: bool,
+    said: &str,
+    asker: Option<&(u64, String)>,
+    now: Instant,
+) -> Option<net::ToolCall> {
+    let mut hold = shared.held_forget.lock().ok()?;
+    hold.latest = hold.latest.max(request);
+    let held = hold.held.take()?;
+    let dropped = if !heard {
+        Some("a turn the lamp wrote")
+    } else if !held.asked {
+        Some("the lamp did not ask about it")
+    } else if held.request >= request {
+        Some("not a later turn")
+    } else if !crate::known_faces::plain_agreement(said) {
+        Some("not a plain yes")
+    } else if asker != Some(&held.asker) {
+        Some("not the same person")
+    } else if now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR {
+        Some("too late")
+    } else {
+        None
+    };
+    match dropped {
+        Some(why) => {
+            eprintln!(
+                "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): {why}",
+                held.call.name, held.request
+            );
+            None
+        }
+        None => Some(held.call),
+    }
+}
+
+/// What came of holding a forget.
+enum Holding {
+    Held,
+    /// One this turn already waits.
+    OneWaits,
+    /// A newer request has begun: nothing is held for this one.
+    Stale,
+}
+
+/// Holds `call` for `asker`'s yes, in place of one an earlier turn held.
+fn hold_forget(
+    shared: &Shared,
+    request: u64,
+    call: &net::ToolCall,
+    asker: (u64, String),
+    now: Instant,
+) -> Holding {
+    let Ok(mut hold) = shared.held_forget.lock() else {
+        return Holding::Stale;
+    };
+    if hold.latest != request {
+        return Holding::Stale;
+    }
+    if let Some(held) = &hold.held {
+        if held.request == request {
+            return Holding::OneWaits;
+        }
+        eprintln!(
+            "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): a new held call",
+            held.call.name, held.request
+        );
+    }
+    eprintln!(
+        "lamp-voice second: request {request}: held a forget ({}) for their yes",
+        call.name
+    );
+    hold.held = Some(HeldForget {
+        call: call.clone(),
+        request,
+        asker,
+        at: now,
+        asked: false,
+    });
+    Holding::Held
+}
+
+/// The held turn `request` is over: its hold stands only if `answer`, the
+/// lamp's words said whole, asks them about a forget
+/// (`remember::asks_about_forgetting`: a question that names one). An
+/// answer cut, failed or held (`None`) or one that asks anything else drops
+/// it. On top of the call, so what the model writes never widens it.
+fn settle_held_forget(shared: &Shared, request: u64, answer: Option<&str>) {
+    let Ok(mut hold) = shared.held_forget.lock() else {
+        return;
+    };
+    let Some(held) = hold
+        .held
+        .as_mut()
+        .filter(|held| held.request == request && !held.asked)
+    else {
+        return;
+    };
+    let why = match answer {
+        Some(answer) if crate::remember::asks_about_forgetting(answer, &held.call.name) => {
+            held.asked = true;
+            return;
+        }
+        Some(_) => "the lamp's answer asked nothing about it",
+        None => "its answer did not finish",
+    };
+    eprintln!(
+        "lamp-voice second: request {request}: dropped a held forget ({}, held in request {request}): {why}",
+        held.call.name
+    );
+    hold.held = None;
+}
+
+/// The forgets the same person's own spoken turn just before `request`, in
+/// the same session and within `remember::HELD_FORGET_FOR`, asked for in
+/// words and named (`asked`, [`forgets_asked`] of their words alone): one
+/// of those the model calls on this turn runs at once, never asked twice
+/// (Fourth's P3 on #2340: "Forget everything about me." "Everything,
+/// really?" "Yes."). Records this turn for the next; a turn the lamp wrote
+/// records nothing of its words and clears the one before. Nobody known,
+/// nothing counts.
+fn asked_just_before(
+    shared: &Shared,
+    request: u64,
+    heard: bool,
+    asked: Vec<&'static str>,
+    asker: Option<&(u64, String)>,
+    now: Instant,
+) -> Vec<&'static str> {
+    let Ok(mut hold) = shared.held_forget.lock() else {
+        return Vec::new();
+    };
+    if hold
+        .before
+        .as_ref()
+        .is_some_and(|before| before.request >= request)
+    {
+        return Vec::new();
+    }
+    let before = hold.before.take();
+    hold.before = heard.then(|| SpokenBefore {
+        request,
+        asker: asker.cloned(),
+        at: now,
+        asked,
+    });
+    match before {
+        Some(before)
+            if heard
+                && asker.is_some()
+                && before.asker.as_ref() == asker
+                && now.saturating_duration_since(before.at) <= crate::remember::HELD_FORGET_FOR =>
+        {
+            before.asked
+        }
+        _ => Vec::new(),
+    }
+}
+
 /// One call run by the route's runner: the admitted request's scoped one
 /// when there is one.
 async fn run_tool(
@@ -3566,14 +3802,36 @@ async fn answer(
     // tool is asked with the words alone (the reviewer on #1075).
     let mut seeing = picture.is_some();
     // A forget runs only on a spoken turn whose words ask for it (lamp-4ace,
-    // 20 Oct 21:31: a question was answered with two forgets). A yes alone
-    // forgets nothing: the model is told to ask them to say it, until a
-    // forget the lamp asks to confirm is held and run on the yes itself
-    // (Jarvis's held-call follow-up on #2331).
-    let forget_may_run =
-        crate::remember::forget_may_run(heard, crate::remember::asks_to_forget(&said));
+    // 20 Oct 21:31: a question was answered with two forgets). One the model
+    // calls unasked is held for that person's plain yes ([`HeldForget`]);
+    // a yes with nothing held forgets nothing.
+    // One the same person asked for in words on their turn just before
+    // runs at once ([`asked_just_before`]).
+    let asks_now = crate::remember::asks_to_forget(&said);
+    let asker = forget_asker(scope.as_ref());
+    let asked_before = asked_just_before(
+        shared,
+        request,
+        heard,
+        forgets_asked(&said),
+        asker.as_ref(),
+        (shared.clock)(),
+    );
+    let forget_may_run = crate::remember::forget_may_run(heard, asks_now);
+    let mut held_forget_runs = take_held_forget(
+        shared,
+        request,
+        heard,
+        &said,
+        asker.as_ref(),
+        (shared.clock)(),
+    );
     let words = Message::user(said.clone());
-    let prepared_for = prepared.map(|prepared| (prepared, said.clone()));
+    // A chat begun on the early words was asked without the held forget's
+    // result, so it does not stand for round 1.
+    let prepared_for = prepared
+        .filter(|_| held_forget_runs.is_none())
+        .map(|prepared| (prepared, said.clone()));
     let question = match picture {
         Some(jpeg) => Message::user_seeing(said, &jpeg),
         None => Message::user(said),
@@ -3614,6 +3872,47 @@ async fn answer(
         // A note beside the request, never anyone's words (as on the Live
         // route, where a note goes beside what the model hears).
         messages.extend(notes.into_iter().map(Message::system));
+        // The held forget their yes runs, before round 1, as any call of a
+        // spoken turn: never on a line the rule holds, and with the Policy's
+        // decision.
+        let mut held_forget_ran = false;
+        if let Some(call) = held_forget_runs.take() {
+            let by_rule = shared
+                .hold
+                .as_ref()
+                .is_some_and(|hold| hold(request, &call.name));
+            let policed = match &shared.policy {
+                Some(gate) if !by_rule => gate(request, call.name.clone()).await,
+                _ => Policed::Run,
+            };
+            if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                return Err(Stop::Gone);
+            }
+            if by_rule || policed == Policed::Held {
+                eprintln!(
+                    "lamp-voice second: request {request}: dropped a held forget ({}): the line is held",
+                    call.name
+                );
+                if policed == Policed::Held {
+                    return Err(Stop::Held);
+                }
+            } else {
+                acted.store(true, Ordering::Relaxed);
+                let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
+                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                    return Err(Stop::Gone);
+                }
+                eprintln!(
+                    "lamp-voice second: request {request}: ran a held forget ({})",
+                    call.name
+                );
+                messages.push(Message::system(format!(
+                    "(For you to know: they said yes, so the {} you asked them about has run, with this result: {result}. Say in a few words that it is done, and do not call it again.)",
+                    call.name
+                )));
+                held_forget_ran = true;
+            }
+        }
         messages.push(question);
         // What round 1 was asked, kept for the rounds after it.
         if let Some(prepared) = &prepared {
@@ -3939,18 +4238,39 @@ async fn answer(
                 {
                     did(Did::Worked(monotonic_us()));
                 }
-                if crate::remember::is_forget(&call.name) && !forget_may_run {
-                    eprintln!(
-                        "lamp-voice second: request {request} chat round {round}: {} not run: nothing they said asks to forget ({})",
-                        call.name,
-                        crate::remember::FORGET_ASKED_ENVIRONMENT
-                    );
-                    messages.push(Message::tool(
-                        call.id.clone(),
-                        serde_json::json!({"error": crate::remember::NOT_ASKED_TO_FORGET})
-                            .to_string(),
-                    ));
+                // Or one their turn just before asked for by name.
+                let asked_just_before = heard && asked_before.contains(&call.name.as_str());
+                if crate::remember::is_forget(&call.name) && !forget_may_run && !asked_just_before {
+                    let holding = match forget_asker(scope.as_ref()) {
+                        _ if held_forget_ran => None,
+                        Some(asker) if heard => {
+                            Some(hold_forget(shared, request, call, asker, (shared.clock)()))
+                        }
+                        _ => Some(Holding::Stale),
+                    };
+                    let told = match holding {
+                        None => serde_json::json!({"error": crate::remember::HELD_FORGET_RAN}),
+                        Some(Holding::Held) => crate::remember::held_forget_told(&call.name),
+                        Some(Holding::OneWaits) => {
+                            serde_json::json!({"error": crate::remember::ONE_FORGET_HELD})
+                        }
+                        Some(Holding::Stale) => {
+                            eprintln!(
+                                "lamp-voice second: request {request} chat round {round}: {} not run: nothing they said asks to forget ({})",
+                                call.name,
+                                crate::remember::FORGET_ASKED_ENVIRONMENT
+                            );
+                            serde_json::json!({"error": crate::remember::NOT_ASKED_TO_FORGET})
+                        }
+                    };
+                    messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
+                }
+                if crate::remember::is_forget(&call.name) && asked_just_before && !forget_may_run {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} runs: their turn just before asked to forget",
+                        call.name
+                    );
                 }
                 acted.store(true, Ordering::Relaxed);
                 let mut result = run_tool(shared, request, heard, call, scope.as_ref()).await;
@@ -4141,6 +4461,12 @@ async fn answer(
         Ok(whole)
     };
     let ended = tokio::try_join!(writing, saying);
+    // A forget held in this turn stands only on its answer said whole.
+    settle_held_forget(
+        shared,
+        request,
+        ended.as_ref().ok().map(|(_, whole)| whole.as_str()),
+    );
     // Only asking the person to wait ("One moment."), with nothing called:
     // the coordinator asks this route to go on, as it asks Gemini
     // (`LAMP_HOLDING_ANSWER`, `crate::holding_answer`; the first builder's
