@@ -6886,11 +6886,20 @@ fn a_searchs_pose_held_past_its_run_still_ends_when_the_lamp_is_paused() {
 }
 
 fn a_searchs_pose_held_past_its_run_ends(paused: bool) {
+    // The windows whose poses are not counted are skipped at once and read
+    // after, not stepped a second at a time with a read each (#1806): the
+    // desk's eight seconds only put the second look late, and a hold that
+    // was not let go would show in a skip of three seconds as in steps. The
+    // held window is stepped, a pose a second as the lamp sends them.
+    let skipped = |program: &ToolProgram, window: Duration| {
+        program.clock.skip(window);
+        program.said()
+    };
     let mut program = ToolProgram::with("look", SEARCH, &[]);
     let right = r#"{"level":0,"mood":"reading","toward":0.5}"#;
     assert_eq!(program.call("look_for", "{}")["ok"], true);
     assert_eq!(program.colours(1), ["white"]);
-    let _desk = program.poses(Duration::from_secs(8));
+    let _desk = skipped(&program, Duration::from_secs(8));
     assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
     // The run's ten seconds end: its light given back, the right still held.
     let held = program.poses(Duration::from_secs(3));
@@ -6922,7 +6931,10 @@ fn a_searchs_pose_held_past_its_run_ends(paused: bool) {
     }
     program.clock.skip(Duration::from_millis(300));
     let _before = program.said();
-    assert_eq!(program.poses(Duration::from_secs(3)), Vec::<String>::new());
+    assert_eq!(
+        skipped(&program, Duration::from_secs(3)),
+        Vec::<String>::new()
+    );
 }
 
 /// The first tier of #1684's design as a trigger: PM2.5 up at least 100
