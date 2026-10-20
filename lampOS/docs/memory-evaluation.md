@@ -238,7 +238,7 @@ run used the evaluator's explicit timers and reported no resource total.
 
 ## Local store and socket measurements
 
-The separate `tests/days_timing.rs` fixture compares the default file store
+The separate `tests/it/days_timing.rs` fixture compares the default file store
 with the optional database, through the same Unix-socket server. The final
 run on the Mac identified above used the completed implementation with
 SQLite DELETE/EXTRA/fullfsync, in release mode. The two functional test

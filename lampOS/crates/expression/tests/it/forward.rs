@@ -7,7 +7,7 @@ use lamp_expression::Catalogue;
 use serde_json::{Value, json};
 
 fn builtin() -> Value {
-    serde_json::from_str(include_str!("../behaviours.json")).unwrap()
+    serde_json::from_str(include_str!("../../behaviours.json")).unwrap()
 }
 
 fn read(value: &Value) -> Result<(Catalogue, Vec<String>), String> {
@@ -39,7 +39,8 @@ fn a_newer_catalogues_fields_are_read_past_and_named_by_path() {
 
 #[test]
 fn the_speaking_section_reads_a_newer_key_too() {
-    let mut newer: Value = serde_json::from_str(include_str!("../alive-behaviours.json")).unwrap();
+    let mut newer: Value =
+        serde_json::from_str(include_str!("../../alive-behaviours.json")).unwrap();
     // A later release's speaking key, which this build does not know.
     newer["speaking"]["sway_pitch"] = json!(0.02);
     newer["alive"]["glimmer"] = json!(true);
@@ -73,28 +74,36 @@ fn a_bad_known_value_an_unknown_trigger_or_another_version_is_still_refused() {
 #[test]
 fn every_shipped_catalogue_names_no_field_it_does_not_read() {
     for (name, text) in [
-        ("behaviours", include_str!("../behaviours.json")),
-        ("alive-behaviours", include_str!("../alive-behaviours.json")),
+        ("behaviours", include_str!("../../behaviours.json")),
+        (
+            "alive-behaviours",
+            include_str!("../../alive-behaviours.json"),
+        ),
         (
             "playout-behaviours",
-            include_str!("../playout-behaviours.json"),
+            include_str!("../../playout-behaviours.json"),
         ),
-        ("rest-behaviours", include_str!("../rest-behaviours.json")),
+        (
+            "rest-behaviours",
+            include_str!("../../rest-behaviours.json"),
+        ),
         (
             "product",
-            include_str!("../../../deploy/product/settings/expression.json"),
+            include_str!("../../../../deploy/product/settings/expression.json"),
         ),
         (
             "lamp-4ace alive",
-            include_str!("../../../deploy/lamp-4ace/expression-alive-lamp-4ace.json"),
+            include_str!("../../../../deploy/lamp-4ace/expression-alive-lamp-4ace.json"),
         ),
         (
             "lamp-4ace name speech",
-            include_str!("../../../deploy/lamp-4ace/expression-alive-name-speech-lamp-4ace.json"),
+            include_str!(
+                "../../../../deploy/lamp-4ace/expression-alive-name-speech-lamp-4ace.json"
+            ),
         ),
         (
             "lamp-4ace rest",
-            include_str!("../../../deploy/lamp-4ace/expression-rest-lamp-4ace.json"),
+            include_str!("../../../../deploy/lamp-4ace/expression-rest-lamp-4ace.json"),
         ),
     ] {
         let (_, unread) = Catalogue::from_json_naming(text).unwrap();

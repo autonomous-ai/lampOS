@@ -1,6 +1,6 @@
 //! Comparable file-store and opt-in-store timings on the machine that runs
 //! this. First request means a fresh process/store, not a cold filesystem cache.
-//! Run with `cargo test -p lamp-memory --release --test days_timing -- --ignored --nocapture`.
+//! Run with `cargo test -p lamp-memory --release --test it days_timing:: -- --ignored --nocapture`.
 use lamp_memory::{Options, Server, Store, days::Days, server::Memory};
 use serde_json::{Value, json};
 use std::{

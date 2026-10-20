@@ -8,13 +8,14 @@ use lamp_expression::{
 use serde_json::Value;
 
 const CLOCK: &str = "recent-playout-fixture";
-const RECENT: &str = include_str!("../fixtures/recent-playout.jsonl");
-const GENERATION: &str = include_str!("../fixtures/recent-playout-generation.jsonl");
+const RECENT: &str = include_str!("../../fixtures/recent-playout.jsonl");
+const GENERATION: &str = include_str!("../../fixtures/recent-playout-generation.jsonl");
 const FOLLOW: &str = "follow played sound";
 const EXPIRED: &str = "playout is expired, too far ahead, overlapping or out of order";
 
 fn catalogue(resumable: bool) -> Catalogue {
-    let mut catalogue = Catalogue::from_json(include_str!("../playout-behaviours.json")).unwrap();
+    let mut catalogue =
+        Catalogue::from_json(include_str!("../../playout-behaviours.json")).unwrap();
     catalogue.resumable_voice = resumable;
     catalogue
 }
@@ -226,7 +227,7 @@ fn ended_frames_are_not_queued_and_hold_discards_the_one_future_frame() {
 fn existing_catalogues_keep_strict_default_and_same_output_when_window_is_zero() {
     assert_eq!(Catalogue::builtin().timing.recent_playout_us, 0);
     assert_eq!(
-        Catalogue::from_json(include_str!("../rest-behaviours.json"))
+        Catalogue::from_json(include_str!("../../rest-behaviours.json"))
             .unwrap()
             .timing
             .recent_playout_us,

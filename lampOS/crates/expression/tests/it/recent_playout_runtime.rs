@@ -34,7 +34,8 @@ impl Drop for Root {
 }
 
 fn catalogue(recent: bool) -> Catalogue {
-    let mut catalogue = Catalogue::from_json(include_str!("../playout-behaviours.json")).unwrap();
+    let mut catalogue =
+        Catalogue::from_json(include_str!("../../playout-behaviours.json")).unwrap();
     if !recent {
         catalogue.timing.recent_playout_us = 0;
     }
@@ -96,7 +97,7 @@ fn message(frame: &VoicePlayout) -> Message {
 }
 
 fn populate(bus: &Bus, at_us: u64) {
-    for line in include_str!("../fixtures/recent-playout.jsonl")
+    for line in include_str!("../../fixtures/recent-playout.jsonl")
         .lines()
         .take(3)
     {

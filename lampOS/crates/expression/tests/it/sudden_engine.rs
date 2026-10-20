@@ -45,7 +45,7 @@ fn glance() -> Behaviour {
 }
 
 fn catalogue(with_glance: bool) -> Catalogue {
-    let mut value = Catalogue::from_json(include_str!("../rest-behaviours.json")).unwrap();
+    let mut value = Catalogue::from_json(include_str!("../../rest-behaviours.json")).unwrap();
     // This is an injected zero lag for planner tests, not a motor measurement.
     value.timing.body_lag_us = Some(0);
     if with_glance {
@@ -231,7 +231,7 @@ fn a_glance_that_moves_the_body_or_lasts_or_repeats_is_refused() {
 #[test]
 fn lamp_4ace_catalogue_is_valid_and_glances_at_a_sound() {
     let lamp = Catalogue::from_json(include_str!(
-        "../../../deploy/lamp-4ace/expression-rest-lamp-4ace.json"
+        "../../../../deploy/lamp-4ace/expression-rest-lamp-4ace.json"
     ))
     .unwrap();
     let glance = lamp

@@ -1,7 +1,6 @@
 //! The real binary's optional reports, with synthetic records and temporary
 //! stores. These are development-host integration checks, not lamp timings.
-#[path = "support/health_control.rs"]
-pub mod health_control;
+use crate::health_control;
 
 use health_control::{Controller, Window};
 use lamp_bus::{Bus, Message, Subscriber};

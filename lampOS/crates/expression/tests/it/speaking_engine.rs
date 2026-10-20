@@ -11,7 +11,7 @@ const CLOCK: &str = "speaking-test-boot";
 const TICK: u64 = 20_000;
 
 fn catalogue(speaking: bool) -> Catalogue {
-    let mut catalogue = Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+    let mut catalogue = Catalogue::from_json(include_str!("../../alive-behaviours.json")).unwrap();
     // An injected zero lag for planner tests, not a motor measurement.
     catalogue.timing.body_lag_us = Some(0);
     if !speaking {
@@ -354,7 +354,7 @@ fn a_hiss_is_no_speech_however_quiet_the_voice() {
 /// now takes the farthest piece said, so the same answer nods and sways.
 #[test]
 fn an_answer_said_200_ms_ahead_nods_and_sways_at_the_catalogues_own_lag() {
-    let mut catalogue = Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+    let mut catalogue = Catalogue::from_json(include_str!("../../alive-behaviours.json")).unwrap();
     assert_eq!(catalogue.timing.body_lag_us, Some(300_000));
     catalogue.timing.body_lag_us = Some(300_000);
     let mut lamp = Lamp::new(catalogue, Room::Quiet);
@@ -408,7 +408,7 @@ fn loud_story(tune: impl FnOnce(&mut Catalogue)) -> (usize, usize, usize) {
         seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
         spread[(seed >> 33) as usize % spread.len()]
     };
-    let mut catalogue = Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+    let mut catalogue = Catalogue::from_json(include_str!("../../alive-behaviours.json")).unwrap();
     tune(&mut catalogue);
     let mut lamp = Lamp::new(catalogue, Room::Quiet);
     let (from, end) = (1_000_000, 151_000_000);
@@ -521,7 +521,7 @@ fn a_catalogue_without_speaking_plans_its_speech_as_before() {
 /// roll ignored, no sway, and the rest of its speech as before.
 #[test]
 fn a_catalogue_with_the_old_head_roll_still_loads_and_does_not_sway() {
-    let text = include_str!("../alive-behaviours.json")
+    let text = include_str!("../../alive-behaviours.json")
         .replace("\"sway_yaw\": 0.08", "\"sway_roll\": 0.025")
         .replace("\"sway_us\": 800000", "\"sway_us\": 600000");
     let mut old = Catalogue::from_json(&text).unwrap();
@@ -687,10 +687,10 @@ fn with_the_measured_body_lag_the_speaking_level_still_nods_and_sways() {
 #[test]
 fn the_products_catalogue_nods_sways_and_settles_as_the_alive_one_does() {
     let product = Catalogue::from_json(include_str!(
-        "../../../deploy/product/settings/expression.json"
+        "../../../../deploy/product/settings/expression.json"
     ))
     .unwrap();
-    let alive = Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+    let alive = Catalogue::from_json(include_str!("../../alive-behaviours.json")).unwrap();
     let speaking = product.speaking.expect("the product's catalogue speaks");
     assert_eq!(Some(speaking), alive.speaking);
     assert!(speaking.sway_yaw > 0.0, "the base sways between sentences");

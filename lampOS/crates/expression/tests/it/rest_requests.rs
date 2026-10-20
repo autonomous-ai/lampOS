@@ -18,7 +18,7 @@ const CLOCK: &str = "rest-test";
 const TARGET: &str = "expression-one";
 
 fn catalogue() -> Catalogue {
-    Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap()
+    Catalogue::from_json(include_str!("../../alive-behaviours.json")).unwrap()
 }
 
 fn stamp(at_us: u64, sequence: u64) -> ClockStamp {

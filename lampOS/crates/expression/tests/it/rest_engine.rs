@@ -8,7 +8,7 @@ use lamp_msgs::{
 const CLOCK: &str = "rest-test-boot";
 
 fn catalogue() -> Catalogue {
-    let mut value = Catalogue::from_json(include_str!("../rest-behaviours.json")).unwrap();
+    let mut value = Catalogue::from_json(include_str!("../../rest-behaviours.json")).unwrap();
     // This is an injected zero lag for planner tests, not a motor measurement.
     value.timing.body_lag_us = Some(0);
     value

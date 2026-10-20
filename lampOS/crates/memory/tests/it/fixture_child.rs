@@ -1,8 +1,5 @@
 //! Child adapter boundaries. These do not replace the original health scenarios.
-#[path = "../src/fixture_protocol.rs"]
-pub mod fixture_protocol;
-#[path = "../src/fixture_schedule.rs"]
-pub mod fixture_schedule;
+use crate::{fixture_protocol, fixture_schedule};
 
 use fixture_protocol::{
     Channel, Checked, HOST_WAIT, Outcome, Step, marker, read_frame, write_frame,

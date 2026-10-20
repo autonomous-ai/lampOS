@@ -80,7 +80,7 @@ roll back after a newer build wrote the catalogue never stops it. A known
 field with a bad value, an unknown value of a known field (a new trigger)
 or a `version` other than 1 is still refused. A missing field the build
 writes only when set (an empty list, `false`, none) is not named. Tests:
-`crates/expression/tests/forward.rs`.
+`crates/expression/tests/it/forward.rs`.
 
 | Initial behavior | Built-in plan |
 |---|---|
@@ -188,7 +188,7 @@ lamp-4ace's catalogue (`deploy/lamp-4ace/expression-rest-lamp-4ace.json`)
 has "glance at a sound": the head up 0.07 rad in 250 ms, a slight tilt
 (0.03 rad) while it holds, back at rest by 1.6 s, then nothing for 30 s,
 so a run of knocks gets one glance, as a person glances at the first and
-lets the rest go (rule 8). Tests: `tests/sudden_engine.rs`.
+lets the rest go (rule 8). Tests: `tests/it/sudden_engine.rs`.
 
 ## Optional idle layer, sleep and waking
 
@@ -325,14 +325,14 @@ each sway is 75% to 100% of `sway_yaw`, eased, without rolling the head,
 and the base is at centre before each pause ends and after the answer; an
 answer that ends mid-sway eases back to centre, never further out; a
 short breath does not sway; a long answer settles and a short one does not; held or cut in on, nothing moves;
-poses outside the limits are refused). `crates/expression/tests/speaking_engine.rs`
+poses outside the limits are refused). `crates/expression/tests/it/speaking_engine.rs`
 runs an eight-second answer with stressed words every 1.1 s and a half-second
 pause every 3 s through the engine, in a quiet and a busy room. It expects
 2 or 3 nods (one a sentence), the base turned out by more than 0.055 rad, over 0.02 rad
 of pitch range, the settle, and what speaking adds never stepping more than
 0.007 rad of pitch or of yaw in a 20 ms tick. Without `speaking`, the
 same answer plans none of it and never turns the base, and #955's section
-with `sway_roll` loads and plans no sway (`tests/program.rs`: the service
+with `sway_roll` loads and plans no sway (`tests/it/program.rs`: the service
 starts with it and says so once). It also checks the fences: a new turn, or a
 cancelled answer, carries none of the old answer's motion (the offsets equal
 a catalogue without speaking on every tick), and a finished answer is
@@ -817,7 +817,7 @@ The task 18 fixtures all use `expression-rest-fixture` and the explicit
 | [`rest-expired.jsonl`](../crates/expression/fixtures/rest-expired.jsonl) | Quiet-room evidence expires at 47 seconds, cancelling the active rest clip |
 
 These are written inputs, not lamp recordings. The
-[`rest_replay` tests](../crates/expression/tests/rest_replay.rs) also exercise
+[`rest_replay` tests](../crates/expression/tests/it/rest_replay.rs) also exercise
 loss, expiry, shadow mode, real local bus adaptation and the built CLI.
 Their isolated healthy-status case supplies an authored zero body lag;
 the shipped catalogue leaves lag unknown, so the CLI still reports that
