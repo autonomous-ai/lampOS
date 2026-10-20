@@ -1041,9 +1041,14 @@ looking.
 ### A face from a photo (`--photo-dir`, faces from a photo)
 
 Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given, which needs the
-recogniser (`--recogniser`, `--people`, `--who-socket`). The folder is the
-eyes' own (0700); whatever receives a photo from the app on the lamp puts
-it there. That part, lamp-cloud's, isn't built yet. Then it asks on the
+recogniser (`--recogniser`, `--people`, `--who-socket`). On a lamp the
+folder is `/run/lampos-photos` (`lampos`'s, 0700), made at boot by the
+product's tmpfiles and belonging to neither the eyes' unit nor lamp-cloud's
+(cloud.md, "A face from the app's photo"); the eyes make it at 0700 if they
+can, and refuse one open to others. One that isn't ready stops only photos:
+the eyes start without them, say so once, and check it again at each photo
+asked, answering `photos_off` while it isn't. lamp-cloud puts the app's
+photo there (`faces.add_photo`), then asks on the
 `who` socket, as the voice does: `{"remember":"NAME","photo":"FILE"}`.
 `FILE` is a plain file name in the folder: letters, digits, `-`, `_` and
 `.`, not hidden, at most 128 bytes (`photo::plain_file`).

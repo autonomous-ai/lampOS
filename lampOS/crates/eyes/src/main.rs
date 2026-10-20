@@ -559,9 +559,15 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         let _ = writeln!(stream, "{value}");
     }
 
-    // The photo folder, the eyes' own, before anything is asked of it.
-    if let Some(dir) = &arguments.photo_dir {
-        lamp_eyes::photo::ready(dir)?;
+    // The photo folder (`/run/lampos-photos` on a lamp, made at boot by the
+    // product's tmpfiles, docs/cloud.md), before anything is asked of it.
+    // One that can't be made or is open to others stops only photos, never
+    // the camera, presence or recognition: each photo asked checks it again
+    // (Reviewer-lead on #2273).
+    if let Some(dir) = &arguments.photo_dir
+        && let Err(error) = lamp_eyes::photo::ready(dir)
+    {
+        eprintln!("lamp-eyes: photos are off until the photo folder is ready: {error}");
     }
     let detector = Detector::load(&arguments.model)?;
     let mut mesh = match (&arguments.mouth_model, &arguments.mouth_runtime) {
@@ -948,6 +954,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             (Some(dir), None) => {
                                 let _ = lamp_eyes::photo::take(dir, &file);
                                 serde_json::json!({"error": "not_a_name"})
+                            }
+                            (Some(dir), Some(_)) if lamp_eyes::photo::ready(dir).is_err() => {
+                                eprintln!(
+                                    "lamp-eyes: did not add a face from a photo: the photo folder isn't ready"
+                                );
+                                serde_json::json!({"error": "photos_off"})
                             }
                             (Some(dir), Some(name)) => {
                                 eprintln!("lamp-eyes: asked to add a face from a photo");

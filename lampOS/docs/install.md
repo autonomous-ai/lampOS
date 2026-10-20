@@ -337,6 +337,8 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   unit names and nothing else makes. Both were found on lamp-06c1 on
   2026-10-16: with the locks 0775 the body never opened the servo port, and
   without the sessions folder the voice could not start.
+  It also makes `/run/lampos-photos` (`lampos`'s, 0700), the app's photos
+  for the eyes when `LAMP_PHOTO_FACES` is on (cloud.md).
 - **The body's unit id** is the host name (`--unit-id %H`), and no unit
   says `ConditionHost=`.
 - **The clock** (#811): a lamp has no battery clock, so after a boot its
