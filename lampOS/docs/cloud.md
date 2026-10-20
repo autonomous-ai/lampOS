@@ -17,6 +17,10 @@ against lamp-06c1.
   `mqtt://{mqtt_endpoint}:{mqtt_port}` with the account's login, V1's client
   id `os-server-{device_id}`, a clean start and a 60 s session expiry, as V1.
   The keepalive is 60 s (V1 asks 65,535 s, which never notices a dead link).
+  It takes, and tells the broker it takes, packets of up to about 11 MiB
+  (`MOST_PACKET_BYTES`): a `faces.add_photo` with the largest photo, in
+  base64. `rumqttc`'s own limit, 10 KiB, dropped the connection on every
+  photo (Mobile on lamp-0c89, 20 Oct).
   On every connection it subscribes to `fa_channel` at QoS 1 and says `info`
   unasked on `fd_channel`, so the backend sees it at once. A connection that
   fails, or a login the broker refuses, is tried again after a wait that
@@ -793,7 +797,8 @@ broker in the test built from `rumqttc`'s own codec: coming online as V1
 (client id, keepalive, clean start, expiry, login), `info` on connect and
 answers on `fd_channel`; a command sent first on five other topics (the
 reply channel, another lamp's, longer, shorter, another case) done and
-answered only once, from `fa_channel`; a refused login backing off and said once; a dropped
+answered only once, from `fa_channel`; a `faces.add_photo` with the
+largest photo read and answered, not dropped with the connection; a refused login backing off and said once; a dropped
 connection made and subscribed again. A backend in the test checks the ping's
 bearer and body, a failure said once, and a rotated broker kept. Not yet run
 against the company's broker or on a lamp.
