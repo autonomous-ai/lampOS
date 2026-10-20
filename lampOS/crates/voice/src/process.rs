@@ -895,6 +895,10 @@ fn worker_command(
             role,
             var(crate::early_words::ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_forget_about_worker_environment(
+            role,
+            var(crate::remember::FORGET_ABOUT_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_observe_worker_environment(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
@@ -999,6 +1003,16 @@ fn memory_forget_all_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::FORGET_ALL_ENVIRONMENT, "on"))
+}
+
+// Forgetting what a thing was about (#2176), passed the same narrow way, to
+// the same two routes as forgetting everything.
+fn memory_forget_about_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::FORGET_ABOUT_ENVIRONMENT, "on"))
 }
 
 // Recall's second version (#2176), passed the same narrow way: the exact
@@ -1367,6 +1381,12 @@ mod tests {
                         "LAMP_MEMORY_EARLY_WORDS",
                         ["provider"].as_slice(),
                     ),
+                    // And forgetting by what it is about (#2176).
+                    (
+                        memory_forget_about_worker_environment,
+                        "LAMP_MEMORY_FORGET_ABOUT",
+                        ["provider", "second"].as_slice(),
+                    ),
                     // The observation pass, the route with a model (#1693 (2)).
                     (
                         memory_observe_worker_environment,
@@ -1500,6 +1520,7 @@ mod tests {
                     "LAMP_MEMORY_DAYS",
                     crate::rules::ENVIRONMENT,
                     crate::remember::FORGET_ALL_ENVIRONMENT,
+                    crate::remember::FORGET_ABOUT_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
                     crate::remember::RECALL_V2_ENVIRONMENT,
@@ -1589,6 +1610,7 @@ mod tests {
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EARLY_WORDS=on",
+                    "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_RECALL_V2=on",
@@ -1605,6 +1627,7 @@ mod tests {
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
+                    "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_OBSERVE=on",

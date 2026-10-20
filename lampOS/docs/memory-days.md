@@ -210,7 +210,10 @@ once. Startup file access is outside the note/call budgets.
 
 With someone the eyes know at the lamp (#764,
 [memory.md](memory.md#each-persons-own-764)), every request above names
-their person id: `remember`, `forget_last`, their `session_open` beside the
+their person id: `remember`, `forget_last` (and with
+`LAMP_MEMORY_FORGET_ABOUT=on` the `kept` listing and each `forget {id}` of
+`forget {about}`, #2176; with no match of theirs it also lists the room's,
+whose only forgettable things are those the session had), their `session_open` beside the
 room's (validated against the store's person scope), `search` or `recall`
 for theirs before the room's, `append_linked` with only their own source IDs,
 and `conversation_end` and `session_close` in their scope. The source union

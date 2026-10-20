@@ -51,7 +51,8 @@ signal-hook = { version = "=0.4.4", default-features = false }
 # A skill made by voice is held to what a made skill may use (`made_skill`,
 # #1685), as `lamp-skills` reads `skill.toml`: the same version and features.
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
-# A kept fact held against the words heard (`remember::heard`, #2176): the
+# A kept fact held against the words heard (`remember::heard`, #2176), and
+# `forget {about}` folding words as the memory's search does (#2176): the
 # version `lamp-memory` already builds, so no new package.
 unicode-normalization = "0.1"
 

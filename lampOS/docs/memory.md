@@ -473,6 +473,115 @@ the unchanged legacy client, used unless the new Days client is selected.
   `protocol::tests::the_legacy_store_ignores_once` and
   `remember::tests::with_the_switch_remember_asks_once_and_says_what_was_kept_already`.
 
+- **Forgetting what a thing was about** (#2176, `LAMP_MEMORY_FORGET_ABOUT=on`,
+  with the Days client only; off unless set; both voice routes).
+  - **Why:** on lamp-06c1 (second route, 20 Oct 14:28), "never mind, forget
+    what I said about my bicycle" called `forget {}`, which sent
+    `forget_last`: it removed the newest kept thing, a coffee preference,
+    and the three bicycle things stayed.
+  - **What the model gets:** `forget` also takes `about`, one to four key
+    words. It is told to give it when the person names what to forget, and
+    to call with nothing for the last thing kept. With
+    `LAMP_MEMORY_FORGET_ALL` on as well it takes `source_id` too, and an id
+    wins when both are given. It is told to say what is gone as "I've
+    forgotten the two things about your bicycle", without repeating them.
+  - **What is sent:** one `kept` listing (`max_bytes` 16,384, the store's
+    most) of one scope: the person's own when someone known is at the lamp,
+    else the room's. The voice matches locally, so no match is left out of
+    a ranked top few. The store keeps at most 200 kept things of a person,
+    each at most 300 bytes, and lists newest first until the next does not
+    fit. A listing with less than 300 bytes of room left may have dropped
+    older ones, so it forgets nothing and the model is told it keeps too
+    much to look through. Then one `forget {id}` for each match, in the
+    same scope. Nobody's is listed for another person.
+  - **Someone known, and the room's:** recall gives someone known theirs
+    and then the room's (`recall_both`). So when their own has no match,
+    the room's is listed too. A match there was kept before the lamp knew
+    who was talking. It is forgotten under the room's rule below, and the
+    model is told it was from before the lamp knew who was talking. If the
+    rule leaves it, nothing is forgotten and the model is told it is there
+    and stays, never "nothing".
+  - **The room's: only what this conversation had.** With nobody known
+    (and for the room's matches above), only kept things this session was
+    shown (its told note, what recall or search gave) or kept are
+    forgotten. The voice already holds those ids as the session's sources.
+    The room's memory is everyone's in the house, so a guest or the TV
+    must not remove the rest of it, as `forget_everything` is guarded on
+    #1723. The rest stay, and the model is told how many (`left`, with a
+    note that they were not from this conversation). A known person's own
+    scope keeps the rule as it was: all their own kept things.
+  - **What matches:** kept things only, never exchanges or observations.
+    The key words of `about` are its words of two or more letters or
+    digits, without a few that name no topic. English: my, the, a, an,
+    our, your, his, her, their, its, this, that, these, those, i, me, we,
+    you, is, are, was, of, to, about, what, said, told, forget.
+    Vietnamese: của, là, tôi, và, có, không, này, đó, thì, mà, những, các,
+    một, cho, với, được, quên, chuyện, đi. So the whole line given as
+    `about` ("forget what I told you about my bicycle", "quên chuyện cà phê
+    đi") keeps only its topic ("bicycle", "cà phê"). Those are compared with their accents kept (NFC, lower-cased, `đ`
+    as `d`), since without them they are other words: "tôi" is not "tối",
+    "có" is not "cỏ", "cho" is not "chó", and "đỏ" stays a key word. Then
+    both sides are folded as the memory's search folds them
+    (`crates/memory/src/search.rs`: NFC, lower-cased, `đ` as `d`, accents
+    removed), so "xe đạp" matches "Xe dap mau do". A kept thing matches
+    when it has every key word. It matches words, not synonyms or plurals:
+    "my bicycle" matches "Their bicycle is red" (as lamp-06c1's second
+    route wrote it) and "Ossa's bicycle is red", not "The bike is blue"
+    and not "My coffee is black". No key word left, as in "my the",
+    forgets nothing, and the model is told so.
+  - **What the model is told:** `{"forgotten":true,"count":2,"about":"bicycle"}`:
+    how many went and the person's own `about`. The kept texts are never
+    sent: they would go to the route's model at the moment the person asked
+    for them to be gone, and be read out to whoever is in the room.
+  - **More than one match:** all matches are forgotten, at most eight. The
+    person named the topic, so versions of one fact ("red", then "blue")
+    all go, which is what was asked. Asking the person to choose one would
+    leave the others to come back. Requiring every key word keeps a broad
+    word from reaching other things.
+  - **Nothing forgotten when unsure:** no match, more than eight matches, a
+    listing that may not be whole, or no key word in `about` forgets
+    nothing, and the model is told so ("I forgot nothing"). It never falls
+    back to `forget_last`. A listing that fails forgets nothing too
+    ("My memory is not answering right now").
+  - **Stopped part way:** if a later `forget {id}` gets no reply or one
+    that is not `ok`, or the scope lapses or the time runs out after some
+    were removed, the model is told how many went with `"all":false` and
+    "Some of it may be forgotten", not "I could not do that". With none
+    removed it is "My memory is not answering right now", as before.
+  - **Guards, as for `forget`:** the call counts as an uncertain write until
+    every removal is acknowledged; a reply that is lost or not `ok` leaves
+    it counted, which keeps journalling stopped. A confirmed forget stops
+    journalling until a fresh worker (`inhibit(Stopped::Forgotten)`, its
+    line said once the context's lock is dropped), clears the
+    conversation's ids and ends the writer's conversation, as `forget`
+    does. The context lock is held only to count, to check the session's
+    sources and to record, never across a request.
+  - **Off:** every function the model is told of is the same as before, and
+    an `about` sent anyway is passed over: `forget` sends `forget_last`.
+  - **Tests:** in `remember::tests`,
+    `with_the_about_switch_forget_removes_the_kept_things_it_is_about`
+    (requests, scopes, no match, stop words alone, too many, journalling),
+    `forget_about_drops_words_that_name_no_topic`,
+    `forget_about_my_bicycle_forgets_their_bicycle_and_never_tells_its_words`,
+    `forget_about_matches_without_accents_as_search_does`,
+    `forget_about_lists_every_kept_thing_and_forgets_nothing_from_a_cut_list`,
+    `forget_about_in_the_room_reaches_only_what_this_session_had`,
+    `forget_about_for_someone_known_tells_of_the_rooms_from_before`,
+    `forget_about_that_stops_part_way_says_some_may_be_forgotten` and
+    `without_the_about_switch_forget_is_as_before`. And
+    `crates/memory/tests/voice_forget_about.rs`, the voice's client against
+    the real store: both bicycle things go, coffee stays, another person's
+    bicycle stays; in the room's, what this conversation kept goes, matched
+    without accents, and one kept by an earlier session stays.
+  - **`conversation_end` refused after a forget:** on lamp-06c1 at 14:28
+    the `conversation_end` right after `forget_last` was refused
+    `bad_request`. The conversation's exchanges were linked to the coffee
+    preference (the session had been shown it), so forgetting it removed
+    them too. The writer then ended its conversation naming exchanges the
+    store no longer had, and the store refused. That conversation is not
+    tidied, which is right: its evidence was forgotten. #2176 does not
+    change this.
+
 - **Kept without being asked** (#1693 (2), `LAMP_MEMORY_OBSERVE=on`,
   with the Days client, on the second route only; off unless set).
   - **When:** at each conversation's end (45 s idle, or another person),
