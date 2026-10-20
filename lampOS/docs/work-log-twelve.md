@@ -431,3 +431,7 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   recall's things, the snapshot's own word, and a `quality-marked` arm with
   the room's things marked on themselves. #1712's `6ea61281d` doesn't
   compile (`Heard` twice, from `22b383c82`); told on the Queue.
+- #2063's next head `19096d05d` (the first builder, 09:49): today's recall
+  quotes their own words as `said_today` ("nothing said today" when none),
+  answered word for word; the preference line opens the memory note. One
+  commit on #1712's `61b690638`; probe 47/0.
