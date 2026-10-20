@@ -1,0 +1,4 @@
+set	pairs	same	different	same median	same lowest	different median	different highest	same under 0.45	different at or over 0.45	same under 0.30	different at or over 0.30
+mic2, the lamp answering	all (15 lines)	49	56	0.50	-0.02	0.18	0.29	20	0		0
+mic2, the lamp answering	both clips quiet	20	25	0.57	0.35	0.20	0.25	3	0	0	0
+clean renders (Sixth)	all (15 lines)	49	56	0.70	0.61	0.16	0.24	0	0	0	0
