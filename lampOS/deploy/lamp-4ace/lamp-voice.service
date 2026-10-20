@@ -95,6 +95,8 @@ Environment=LAMP_STALLS=on
 # group by group, the battery before and after): conversation and attention.
 Environment=LAMP_TOOL_LEAD_IN=on
 Environment=LAMP_WAIT_KEEPS_ANSWER=on
+# The lamp's own motors take no turn while an answer is awaited (#1712's B, the first builder at 06:44; needs LAMP_BUS=on, set below).
+Environment=LAMP_MOTION_KEEPS_ANSWER=on
 Environment=LAMP_STOP_TOLD=on
 # LAMP_ADDRESSED stays off: Ten's census (#1238) says "most likely wrong on lamp-4ace" (it sits sideways to the desk).
 # LAMP_ASKER_FIRST records first, to set its 6 dB margin from lamp-4ace (group-talk.md).

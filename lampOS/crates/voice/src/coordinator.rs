@@ -252,6 +252,33 @@ fn may_hold_once_decided(wait: AnswerWait) -> bool {
     wait.waited && wait.sounding && wait.heard
 }
 
+/// #1712's B (the first builder at 06:44, `LAMP_MOTION_KEEPS_ANSWER=on`):
+/// what the body's motion makes of `candidate`, a new sound while an answer
+/// is awaited and has not sounded (the request in flight, its first words
+/// not yet played). One that began as the body moved a joint is the lamp's
+/// own sound, its motors, as its playout is, and takes no turn
+/// ([`crate::body_motion::Judged::Moved`]). The lamp's name heard with it
+/// is still a call (as for [`while_answer_waits`]). Anything else is heard
+/// as before: no answer awaited, an answer that has sounded, or the lamp
+/// sounding now, where the duplex hears what is its own.
+fn body_heard(
+    judged: impl FnOnce() -> crate::body_motion::Judged,
+    reply: Option<&Reply>,
+    sounding: bool,
+    name_began_us: Option<u64>,
+    candidate: &crate::admission::Candidate,
+) -> crate::body_motion::Judged {
+    let awaited = reply.is_some_and(|current| current.local_input_ended && !current.had_audio);
+    let named = name_began_us.is_some_and(|began| {
+        began.saturating_add(crate::activity::CALL_BEFORE_US) >= candidate.trigger_read_at_us
+    });
+    if awaited && !sounding && !named {
+        judged()
+    } else {
+        crate::body_motion::Judged::Still
+    }
+}
+
 /// [`WhileAnswerWaits`] for `candidate` at `at_us`: `ended` if its sound is
 /// over, and the detector's pause in blocks.
 fn while_answer_waits(
@@ -4234,6 +4261,14 @@ fn conversation_with_gate(
         .is_some()
         .then(|| crate::bus_out::NameIn::from_environment_on(lamp_msgs::NameHeard::RISING_TOPIC))
         .flatten();
+    // #1712's B: the body's joints, so that a sound its motors make while
+    // an answer is awaited takes no turn (`LAMP_MOTION_KEEPS_ANSWER=on`).
+    let mut motion_in = crate::body_motion::MotionIn::from_environment();
+    if motion_in.is_some() {
+        eprintln!(
+            "lamp-voice: motion keeps the answer: while an answer is awaited, a sound that begins as the body moves a joint (4 servo counts or more a message) is the lamp's own, unless its name is heard"
+        );
+    }
     if asker_first.is_some() {
         eprintln!(
             "lamp-voice: asker first{}: for {} s while an answer is awaited, speech more than {:.0} dB under the asker's takes no turn; {}",
@@ -6036,6 +6071,55 @@ fn conversation_with_gate(
                             )?;
                         }
                         continue;
+                    }
+                    // #1712's B: a new sound that began as the body moved a
+                    // joint, while an answer is awaited, is the lamp's own
+                    // motors: let go, and the answer goes on. Until the
+                    // body has said where it was then, it waits.
+                    if let Some(motion) = motion_in.as_mut() {
+                        let waits_until_us = candidate
+                            .trigger_read_at_us
+                            .saturating_add(crate::body_motion::WAITS_US)
+                            .min(candidate.decision_deadline_us.saturating_sub(20_000));
+                        match body_heard(
+                            || {
+                                motion.judge(
+                                    candidate.first_read_at_us,
+                                    candidate.trigger_read_at_us,
+                                    at_us,
+                                    crate::privacy_bus::wall_ms(),
+                                    waits_until_us,
+                                )
+                            },
+                            reply.as_ref(),
+                            reply_sounding(&playback_mask, reply, at_us),
+                            name_began_us,
+                            &candidate,
+                        ) {
+                            crate::body_motion::Judged::Moved { began, ended } => {
+                                if let Some(rejection) =
+                                    admission.release_prospective(monotonic_us())?
+                                {
+                                    record_input_rejection(trace, rejection)?;
+                                }
+                                detector.clear_prospective();
+                                eprintln!(
+                                    "lamp-voice: a sound that began as the body moved a joint was let go; the answer goes on"
+                                );
+                                record(
+                                    trace,
+                                    json!({"kind":"input_let_go_body_moving","at_us":at_us,
+                                        "turn":reply.as_ref().map(|current| current.owner.turn()),
+                                        "onset_from_us":candidate.first_read_at_us,
+                                        "onset_to_us":candidate.trigger_read_at_us,
+                                        "moved_from_us":began,"moved_until_us":ended,
+                                        "boundary":"a new sound began as the body moved a joint while an answer was awaited: the lamp's own motors"}),
+                                )?;
+                                continue;
+                            }
+                            crate::body_motion::Judged::Waits => continue,
+                            crate::body_motion::Judged::Still => {}
+                        }
                     }
                     // #1123: while an answer is awaited and has not
                     // sounded, a new sound takes the turn only once it has
