@@ -4055,3 +4055,263 @@ fn an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so() {
         lamp.calls()
     );
 }
+
+impl Lamp {
+    /// `self.json` turned into bytes that are not JSON, written `ago`
+    /// before now: before the link moved when `ago` is long enough.
+    fn spoil_pending(&self, ago: Duration) {
+        let path = self.records().join("self.json");
+        fs::write(&path, b"{\"version\": 1, \"old\": \"").unwrap();
+        fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(std::time::SystemTime::now() - ago)
+            .unwrap();
+    }
+
+    /// The names of what the records set aside, as `<name>.corrupt-<ms>`.
+    fn set_aside(&self, name: &str) -> Vec<String> {
+        fs::read_dir(self.records())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|found| found.starts_with(&format!("{name}.corrupt-")))
+            .collect()
+    }
+
+    fn logged(&self, event: &str) -> bool {
+        fs::read_to_string(self.records().join("log.jsonl"))
+            .unwrap_or_default()
+            .contains(&format!("\"event\":\"{event}\""))
+    }
+}
+
+/// #1680, #1505: a `self.json` that cannot be read, while a round knows
+/// the two builds from elsewhere (the link moved after the file was
+/// written, and `update/` holds one other build): the switch is taken as
+/// failed, never as confirmed. The updater that runs puts the old build
+/// back and refuses the new one, the file is kept aside, and the next
+/// round runs.
+#[test]
+fn an_unreadable_self_json_with_both_builds_known_is_put_back() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    lamp.spoil_pending(Duration::from_secs(60));
+
+    // A round by hand is refused while it waits, as for a readable one.
+    let refused = lamp.round();
+    assert!(
+        matches!(&refused, Outcome::Refused(why) if why.contains("cannot be read")),
+        "{refused:?}"
+    );
+    assert_eq!(lamp.own_build(), new);
+
+    assert_eq!(
+        lamp.confirm(&new),
+        own::Confirm::Unreadable(own::Unreadable::PutBack {
+            old: old.clone(),
+            new: new.clone()
+        })
+    );
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(own::refused(&lamp.records()), vec![new.clone()]);
+    assert!(lamp.pending().is_none());
+    assert_eq!(lamp.set_aside("self.json").len(), 1);
+    assert!(lamp.logged("self-put-back"));
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert_eq!(lamp.own_build(), old);
+}
+
+/// The same file seen by lamp-update-back: a new updater still running
+/// within its deadline (counted from the file's own time) is waited for;
+/// one that failed is put back.
+#[test]
+fn lamp_update_back_puts_back_an_unreadable_self_json() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    lamp.spoil_pending(Duration::from_secs(60));
+
+    assert_eq!(
+        lamp.back(update_unit("active", "running"), records_now()),
+        own::Back::Waiting
+    );
+    assert_eq!(lamp.own_build(), new);
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), records_now()),
+        own::Back::Unreadable(own::Unreadable::PutBack {
+            old: old.clone(),
+            new: new.clone()
+        })
+    );
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(own::refused(&lamp.records()), vec![new]);
+    assert_eq!(lamp.set_aside("self.json").len(), 1);
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+}
+
+/// When the builds are not known (here the file was written after the
+/// link last moved, so the link may still name the old build), nothing is
+/// guessed: after the dry round a confirmation needs, the file is set
+/// aside with a line, the link is left, and the next round runs. Before
+/// that dry round passes, it waits.
+#[test]
+fn an_unreadable_self_json_with_the_builds_unknown_is_set_aside() {
+    let mut lamp = Lamp::installed_switching_itself();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    std::thread::sleep(Duration::from_millis(20));
+    lamp.spoil_pending(Duration::ZERO);
+
+    let key = lamp.config.key;
+    lamp.config.key = throwaway().public_key().as_ref().try_into().unwrap();
+    assert!(matches!(lamp.confirm(&new), own::Confirm::NotProven(_)));
+    assert!(lamp.set_aside("self.json").is_empty());
+    lamp.config.key = key;
+
+    assert_eq!(
+        lamp.confirm(&new),
+        own::Confirm::Unreadable(own::Unreadable::SetAside)
+    );
+    assert_eq!(lamp.own_build(), new);
+    assert!(own::refused(&lamp.records()).is_empty());
+    assert_eq!(lamp.set_aside("self.json").len(), 1);
+    assert!(lamp.logged("self-set-aside"));
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+}
+
+/// The reviewer on #2075, 06:49: a power cut inside the put-back of an
+/// unreadable `self.json` never turns it around. Cut after `self-refused`
+/// is written (here the link's move fails, as a cut would leave it), then
+/// after the link moves: each start ends with the link on the good build,
+/// the failed one refused and the file set aside.
+#[test]
+fn a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around() {
+    // A cut after `self-refused`, before the link moves.
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    lamp.spoil_pending(Duration::from_secs(60));
+    let blocker = lamp.root.join("opt/lampOS/update/.current.lamp-update");
+    fs::create_dir_all(blocker.join("held")).unwrap();
+    let cut = own::back(
+        &lamp.records(),
+        &lamp.root,
+        records_now(),
+        &update_unit("failed", "failed"),
+        &mut |_| {},
+    );
+    assert!(cut.is_err(), "{cut:?}");
+    assert_eq!(own::refused(&lamp.records()), vec![new.clone()]);
+    assert_eq!(lamp.own_build(), new);
+    assert!(lamp.set_aside("self.json").is_empty());
+    fs::remove_dir_all(&blocker).unwrap();
+    assert_eq!(
+        lamp.confirm(&new),
+        own::Confirm::Unreadable(own::Unreadable::PutBack {
+            old: old.clone(),
+            new: new.clone()
+        })
+    );
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(own::refused(&lamp.records()), vec![new.clone()]);
+    assert_eq!(lamp.set_aside("self.json").len(), 1);
+
+    // A cut after the link moves, before the file is set aside.
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    lamp.spoil_pending(Duration::from_secs(60));
+    fs::write(lamp.records().join("self-refused"), format!("{new}\n")).unwrap();
+    lamp_update::records::replace_link(&lamp.root.join("opt/lampOS/update/current"), &old).unwrap();
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), records_now()),
+        own::Back::Unreadable(own::Unreadable::PutBack {
+            old: old.clone(),
+            new: new.clone()
+        })
+    );
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(own::refused(&lamp.records()), vec![new]);
+    assert_eq!(lamp.set_aside("self.json").len(), 1);
+    assert!(lamp.pending().is_none());
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+}
+
+/// The reviewer on #2075, 06:49: a `self.json` the disk will not give
+/// (here a folder in its place), not bad JSON, is never settled: the file
+/// may be fine. The round waits with a line, and the next one tries again.
+#[test]
+fn a_self_json_the_disk_cannot_give_is_tried_again_next_round() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let path = lamp.records().join("self.json");
+    fs::create_dir(&path).unwrap();
+    let refused = lamp.round();
+    assert!(
+        matches!(&refused, Outcome::Refused(why) if why.contains("the next one tries again")),
+        "{refused:?}"
+    );
+    assert!(lamp.logged("self-unread"));
+    assert!(lamp.said.iter().any(|line| line.contains("tries again")));
+    let back = own::back(
+        &lamp.records(),
+        &lamp.root,
+        records_now(),
+        &update_unit("failed", "failed"),
+        &mut |_| {},
+    );
+    assert!(back.is_err(), "{back:?}");
+    assert!(path.is_dir());
+    assert!(lamp.set_aside("self.json").is_empty());
+    fs::remove_dir(&path).unwrap();
+    assert_eq!(lamp.round(), Outcome::UpToDate(1), "{:?}", lamp.said);
+}
+
+/// #1505: a `self.json` from a later version, with a field this build
+/// does not know, reads as a switch that waits and is confirmed as ever.
+/// A guard: it read so before, and lamp-update-back must keep reading it.
+#[test]
+fn a_self_json_from_a_later_version_still_reads() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    let later = serde_json::json!({
+        "version": 2,
+        "old": old,
+        "new": new,
+        "at_unix_ms": records_now(),
+        "why": "a later build's reason",
+    });
+    fs::write(
+        lamp.records().join("self.json"),
+        serde_json::to_vec(&later).unwrap(),
+    )
+    .unwrap();
+    let pending = lamp.pending().unwrap();
+    assert_eq!((pending.version, pending.new.as_str()), (2, new.as_str()));
+    assert_eq!(lamp.confirm(&new), own::Confirm::Confirmed);
+}
+
+/// #1505: a `journal.json` that cannot be read no longer fails every round
+/// for good: it is set aside with a line and the round goes on.
+#[test]
+fn an_unreadable_journal_is_set_aside_and_the_round_goes_on() {
+    let mut lamp = Lamp::installed();
+    fs::write(lamp.records().join("journal.json"), b"{not json").unwrap();
+    assert_eq!(lamp.round(), Outcome::UpToDate(1), "{:?}", lamp.said);
+    assert_eq!(lamp.set_aside("journal.json").len(), 1);
+    assert!(!lamp.records().join("journal.json").exists());
+    assert!(lamp.logged("journal-set-aside"));
+}

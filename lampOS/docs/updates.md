@@ -622,6 +622,20 @@ does three things only: the link, the refusal and the restart. The deadline
 is on the wall clock: on a lamp without a battery clock, a switch made
 before NTP set the time may be put back early, or late, once it is set.
 
+**A `self.json` that can't be read** (#1505) is a switch that failed, never
+one confirmed. The builds are taken as known only when `update/current`
+moved after the file was written (so it names the new build) and
+`/opt/lampOS/update/` holds exactly one other build with a `lamp-update` in
+it (the old one). Then the link goes back, the new build goes into
+`self-refused`, and the file is renamed `self.json.corrupt-<ms>`: by the new
+updater in its confirm step, which then execs the old one, or by
+lamp-update-back on its usual gate, the deadline counted from the file's
+mtime. Otherwise nothing is guessed: the file is renamed the same way with a
+`self-set-aside` line in `log.jsonl`, the link is left, and rounds go on;
+`serve` does so only after the dry round a confirmation needs. A round by
+hand is refused while the file waits. Only a lamp-update-back installed from
+this build on does its part.
+
 ### Models in the manifest (`LAMP_UPDATE_MODELS`, off)
 
 A build can carry the models its parts read (`models.rs`, #1680): a
@@ -1109,7 +1123,6 @@ the file is never read back.
 | schedule | the store's container, `/var/lib/lampos-schedule/store/schedule.sqlite3` | SQLite | `user_version`, must be 1 | n/a | n/a | **refuses to start** (`schedule/src/store.rs:165-169`, `runtime.rs:477`, exit 1) |
 | schedule | reminders and timers in the same file | JSON | `schema` 1; higher is **set aside** as `schedule.sqlite3.newer-…`, its identity kept (`engine.rs:349-361`, `416-419`) | read | **refused**: `SavedRepeat`, `Weekday`, `Item` (`engine/stored.rs:69`); e.g. a repeat `kind: "monthly"` | an unknown value at schema 1 **refuses to start** (`stored.rs:36` → `engine.rs:345` → exit). The receipt alone is dropped with a line (`stored.rs:18-22`) |
 | schedule | the zone setup and install write, `/etc/lampOS/zone.env` (`LAMP_ZONE`) | env | none | n/a | a zone this build's tzdb doesn't know | **refuses to start** (`engine.rs:301-306`, `320-324`; `validate_zone`, `time.rs:225`). Skew between tzdb releases, not a store format |
-| update | lamp-update's own switch, `/var/lib/lampos-update/self.json` | JSON | `version` 1, never checked | read, dropped | n/a | `serve` confirms it before any round (`update/src/main.rs:668-705`). One it can't parse (`own.rs:71`) is "not confirmed" every 30 s for ever (`main.rs:698`): **no round ever runs**, the service stays active, `OnFailure=` never fires. `lamp-update-back back` exits 1 on the same file every timer run. Only with `LAMP_UPDATE_SELF=on` |
 | controls | `/etc/lampOS/controls/controls.json`, `controls-pins.json` (update's settings write them, `install.rs:339`) | JSON | none | refused (`controls/src/engine.rs:24`, `touch_pins.rs:74`, `pins.rs:45`) | refused | **refuses to start** (`main.rs:269-276`, `597`, `822-826`). Softened: apply restores the files with the build on going back (`update/src/apply.rs:14-20`); a person's own edit is kept and not restored |
 | body | poses `lamp-body-measure` writes once, `/etc/lampOS/body/lamp.env` (`BODY_POSES`, passed as arguments) | env | none | a flag it doesn't know is refused (`body/src/bin/lamp-body.rs:391`) | an unknown on/off value refused (`lamp-body.rs:270-359`) | **refuses to start** (`lamp-body.rs:781-795`, `StartLimitBurst=3`), if a newer measure's flag meets an older body |
 
@@ -1121,8 +1134,6 @@ the file is never read back.
 | schedule (run by the voice) | reminder delivery ledger, `/var/lib/lampOS/voice/schedule-delivery/schedule.sqlite3` | SQLite + JSON | `user_version` 1; `schema` 1, higher **set aside** (`schedule/src/delivery.rs:562-605`) | top level read (`delivery.rs:397`); nested types refused (`delivery.rs:45-185`) | refused (`delivery.rs:128,164`) | a nested field or a new value without a bump, or a higher `user_version`: the reminder child exits, the voice logs "Schedule consumer failed" and runs on (`voice/src/reminders.rs:319-326`). Reminders stay unsaid on every restart; the data is kept |
 | memory | old journal and kept files, imported once, `/var/lib/lampos-memory/<person>/journal-*.jsonl`, `kept.jsonl` | JSONL | none | read, dropped (`Exchange`, `Kept` take no `deny_unknown_fields`) | — | a line that doesn't read is only counted, then the file is deleted (`days.rs:228-295`, `308-324`): **dropped**. Not changed by #1680: an older build's files, not a newer one's, and a line that doesn't read is a cut or broken one; keeping it would keep a journal past `keep_days` and past a forget |
 | memory | a tidy job's input and result (`jobs` table) | JSON in TEXT | none | refused (`tidy.rs:52-93`; `#[should_panic]` test `tidy.rs:395`) | refused (`Category`, `tidy.rs:44`) | not at start: that tidy fails "stored tidy input is invalid" (`days.rs:976`, `1127`, `1147`). The job clears a day after it was prepared, as every job does: `maintain` runs at start and before every request (`days.rs:344-347`, `days_protocol.rs:245`); until then it counts toward the 8 pending (`MAX_PENDING`) |
-| update | `/var/lib/lampos-update/state.json` | JSON | none | read, dropped (`records.rs:50`) | n/a | read when a round acts (`round.rs:503` → `records.rs:270`). Unparseable is set aside as `state.json.corrupt-<ms>` with a line (low); a readable newer one loses its fields on the next save (`records.rs:309`). `peek_state` falls back to empty silently (`records.rs:302`) |
-| update | `/var/lib/lampos-update/journal.json`, a switch under way | JSON | none | read, dropped (`records.rs:104-149`) | n/a | one it can't parse: every round is `Failed("the journal cannot be read")` (`round.rs:498`), never set aside, so updates stop until someone removes it. A newer field about what to put back is not put back |
 | eyes | forgets waiting, `/var/lib/lampos-eyes/set-aside/forgets-pending` | JSON | none | read | n/a | set aside as `forgets-pending.unreadable-<unix s>` with a line, never counted as records, and forgetting goes on; merged back at a start once it can be read (`who.rs` `pending`, #1680) |
 | skills | skills the person turned off, `/var/lib/lampos-skills-state/off` (cloud reads it too, `cloud/src/skills.rs:81`) | text lines | none | n/a | n/a | a line that isn't a plain name is skipped with no line (`skills/src/lib.rs:3158-3170`) and gone at the next rewrite (`lib.rs:3178-3190`) |
 | cloud | login a ping rotated, `/var/lib/lampos-cloud/rotated.json` | JSON | none | read (`cloud/src/account.rs:14`) | n/a | unreadable falls back to setup's account silently (`main.rs:124-128`); the next rotation overwrites it whole |
@@ -1157,6 +1168,9 @@ the file is never read back.
 | setup | serve config (only `lamp-update install --setup on` writes it, `update/src/install.rs:375-384`), `/etc/lampOS/setup/serve.json` | JSON | none | read, dropped with a line (`setup/src/serve.rs`, `read`) | n/a | an extra field is dropped and named in the journal; a bad known value or bad JSON still refuses to start, exit 2. Not in update's settings list, so a put-back never restores it |
 | setup | reset plan, `/etc/lampOS/setup/reset-plan.json` | JSON | none | **refused**, except `keep_back`, whose every entry is dropped with a line and its path wiped (`setup/src/reset.rs`, `read`) | a `wipe` entry that isn't a plain path's text **refuses the reset**; a newer plan's extra plain path is wiped (still checked against `PROTECTED`) | all or nothing: a refused plan journals nothing, keeps the marker and wipes nothing; `watch-reset` keeps watching and tells the person who holds the button "Nothing was wiped. Update me, then reset again." (say service, network only), the other commands exit 2. A bad known value or bad JSON is refused as before. Not restored by a put-back |
 | setup | done marker `/var/lib/lampos-setup/done`; reset journal `reset.json` | file / JSON | `version` written, never read | n/a | n/a | existence only (`serve.rs:702-703`, `reset.rs:333`) |
+| update | lamp-update's own switch, `/var/lib/lampos-update/self.json` | JSON | `version` 1, never checked | read, dropped (a guard test) | n/a | fixed for #1680: one it can't parse is a switch that **failed**, never one confirmed. When the link moved after the file was written and `update/` holds exactly one other build, the new build is refused, then the link goes back, then the file is set aside (`update/src/own.rs`, `known_builds`, `settle`); a cut between steps never turns it around, since a start that finds the other build refused takes the put-back as done and only sets the file aside. This is done by the updater that runs, which then execs the old one, or by `lamp-update-back` on its usual gate, the deadline counted from the file's mtime. When the builds aren't known it's renamed `self.json.corrupt-<ms>` with a `log.jsonl` line and the link left, by `serve` only after the dry round a confirm needs. A round refuses while it waits. A file the disk won't give (not bad JSON) is never settled: that round is refused with a line (`self-unread`) and the next one reads it again. Only a `lamp-update-back` installed from this build on does its part |
+| update | `/var/lib/lampos-update/state.json` | JSON | none | **kept**: fields a later build wrote survive a save (`State::later`, `records.rs`) | n/a | read when a round acts. Unparseable is set aside as `state.json.corrupt-<ms>` with a line. `peek_state` (dry rounds) still falls back to empty silently |
+| update | `/var/lib/lampos-update/journal.json`, a switch under way | JSON | none | read, dropped (`records.rs`) | n/a | fixed for #1680: one it can't parse is set aside as `journal.json.corrupt-<ms>` with a line (`round.rs`, `acting`), and the round goes on from the units as they are. What it drops is a half-done switch's put-back: units, links, models, settings and skill files stay as the cut switch left them, the next round finishes that switch, and if that fails its put-back returns to the mixed state, not to the build before. Still better than every round failing for good. A newer field about what to put back is still not put back |
 | update | `self-refused`, `previous/`, `log.jsonl`, `harness-at-boot` in `/var/lib/lampos-update/` | text / JSONL | none | n/a | n/a | bad lines skipped (`own.rs:109`, `records.rs:375`); `log.jsonl` never read back |
 | update | apply's `request.json`, `back.json`, `done.json` in `/var/lib/lampos-update/apply/` | JSON | `version`, never checked (`apply.rs:79`, `112`) | read, dropped | `Op` refused (`apply.rs:68`) | refused when used: that apply or back fails and writes nothing (`apply.rs:370`, `623`, `297`) |
 | policy | decision and judge logs, `/var/lib/lampos-policy/<kind>-<date>.jsonl` | JSONL | none | never parsed by the daemon (`record.rs:136-145`) | n/a | only the last byte is read, to end a cut line |
@@ -1201,8 +1215,10 @@ test does (#1512):
    a new one, with a line and a health warning; an unknown category is
    kept, not read as `Thread` (both done, #1680). Old journal lines that
    don't read stay dropped: they are an older build's (the row above).
-6. **update**: `self.json` it can't read is set aside and the rounds go
-   on; so is `journal.json`, with a line.
+6. **update** (done): `self.json` it can't read is a failed switch, put
+   back when both builds are known, else set aside, and the rounds go on;
+   `journal.json` is set aside with a line; `state.json` keeps a later
+   build's fields.
 7. **controls**, **expression** (#2065), **records**, **body**: read their files
    one release forward (one PR each).
 8. The medium rows after: **cloud** (reports deleted and `state.json`

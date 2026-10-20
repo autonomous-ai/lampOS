@@ -18,6 +18,14 @@
 //! so it is a contract for good: its four fields keep their meaning, a new
 //! version may add fields, and back reads any version and ignores what it
 //! does not know.
+//!
+//! A `self.json` that cannot be read at all (#1505, docs/updates.md) is
+//! taken as a switch that failed, never as one confirmed. When the two
+//! builds are known from elsewhere ([`known_builds`]) the link goes back
+//! and the new build is refused, as back does; when they are not, nothing
+//! is guessed: the file is set aside with a line in `log.jsonl`, the link
+//! left, and the next round runs. Either way the file is renamed, never
+//! deleted.
 use crate::{
     judge::UnitState,
     records::{Records, replace_link, sync_folder, unix_ms, write_whole},
@@ -90,6 +98,148 @@ pub(crate) fn begin(records: &Path, old: &str, new: &str) -> io::Result<()> {
     write_whole(&records.join(PENDING), &bytes, 0o600)
 }
 
+/// `self.json`, read as a switch waits on it: `Err(None)` when it is there
+/// but cannot be read as one (its JSON, or its four fields).
+fn waiting(records: &Path) -> Result<Option<Pending>, Option<String>> {
+    match pending(records) {
+        Ok(found) => Ok(found),
+        Err(error) if error.kind() == io::ErrorKind::InvalidData => Err(None),
+        Err(error) => Err(Some(format!("{PENDING}: {error}"))),
+    }
+}
+
+/// When `self.json` was written, in unix ms: the start of its deadline
+/// when its own `at_unix_ms` cannot be read.
+fn written_unix_ms(records: &Path) -> Option<u64> {
+    let at = fs::metadata(records.join(PENDING)).ok()?.modified().ok()?;
+    Some(at.duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64)
+}
+
+/// The builds an unreadable `self.json` named, from elsewhere: only when
+/// `update/current` moved after the file was written (so it names the new
+/// build) and `update/` holds exactly one other build with a lamp-update
+/// in it (the old one). Otherwise None: nothing is guessed.
+///
+/// When that other build is already refused and the link's is not, a cut
+/// came inside [`settle`] after the link went back: the link names the old
+/// build, the put-back is done, and only the file is left to set aside.
+pub fn known_builds(records: &Path, root: &Path) -> Option<Known> {
+    let link = on_root(root, CURRENT);
+    let written = fs::metadata(records.join(PENDING)).ok()?.modified().ok()?;
+    let moved = fs::symlink_metadata(&link).ok()?.modified().ok()?;
+    if moved < written {
+        return None;
+    }
+    let named = fs::read_link(&link).ok()?.to_str()?.to_owned();
+    if !is_build(&named) {
+        return None;
+    }
+    let mut others = fs::read_dir(on_root(root, FOLDER))
+        .ok()?
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            (is_build(&name) && name != named && entry.path().join(BINARY).is_file())
+                .then_some(name)
+        });
+    let other = others.next()?;
+    if others.next().is_some() {
+        return None;
+    }
+    let refused = refused(records);
+    let is_refused = |build: &str| refused.iter().any(|known| known == build);
+    match (is_refused(&other), is_refused(&named)) {
+        (false, _) => Some(Known {
+            old: other,
+            new: named,
+            done: false,
+        }),
+        (true, false) => Some(Known {
+            old: named,
+            new: other,
+            done: true,
+        }),
+        (true, true) => None,
+    }
+}
+
+/// Two builds an unreadable `self.json` is known to have named.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Known {
+    pub old: String,
+    pub new: String,
+    /// The link names `old` again and `new` is refused already.
+    pub done: bool,
+}
+
+/// What became of a `self.json` that could not be read.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Unreadable {
+    /// Both builds known: the link names `old` again, `new` is refused.
+    PutBack { old: String, new: String },
+    /// Not known: the link is left as it is.
+    SetAside,
+}
+
+/// Settles an unreadable `self.json`, the records' lock held: the switch
+/// failed. The file is kept under a new name and a line says what was done.
+fn settle(records: &Path, root: &Path, say: &mut dyn FnMut(&str)) -> Result<Unreadable, String> {
+    let held = Records::new(records.to_owned());
+    let known = known_builds(records, root);
+    // Refused before the link moves: a cut between the two leaves the
+    // failed build refused, so the next start never takes the old build,
+    // which the link names again, for the new one (the reviewer on #2075).
+    if let Some(Known {
+        old,
+        new,
+        done: false,
+    }) = &known
+    {
+        refuse(records, new)?;
+        replace_link(&on_root(root, CURRENT), old)
+            .map_err(|error| format!("{CURRENT}: {error}"))?;
+    }
+    let aside = held
+        .set_aside(PENDING)
+        .map_err(|error| format!("{PENDING}: {error}"))?;
+    let (event, line, settled) = match known {
+        Some(Known { old, new, .. }) => (
+            "self-put-back",
+            format!(
+                "{PENDING} could not be read: lamp-update's build {} is taken as not confirmed, {CURRENT} names {} again, and the file is kept as {}",
+                &new[..12],
+                &old[..12],
+                aside.display()
+            ),
+            Unreadable::PutBack { old, new },
+        ),
+        None => (
+            "self-set-aside",
+            format!(
+                "{PENDING} could not be read and the builds it names are not known from elsewhere: kept as {}, {CURRENT} left as it is",
+                aside.display()
+            ),
+            Unreadable::SetAside,
+        ),
+    };
+    say(&line);
+    held.log(event, &line);
+    Ok(settled)
+}
+
+fn refuse(records: &Path, build: &str) -> Result<(), String> {
+    let mut refused = refused(records);
+    if !refused.iter().any(|known| known == build) {
+        refused.push(build.to_owned());
+    }
+    write_whole(
+        &records.join(REFUSED),
+        format!("{}\n", refused.join("\n")).as_bytes(),
+        0o600,
+    )
+    .map_err(|error| format!("{REFUSED}: {error}"))
+}
+
 fn end(records: &Path) -> io::Result<()> {
     match fs::remove_file(records.join(PENDING)) {
         Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
@@ -126,6 +276,9 @@ pub enum Confirm {
     /// Another lamp-update holds the records' lock.
     Busy,
     Confirmed,
+    /// `self.json` could not be read: settled as a switch that failed.
+    /// After [`Unreadable::PutBack`] the caller starts the old build.
+    Unreadable(Unreadable),
 }
 
 /// Phase 2: the new lamp-update, running from build `running`, confirms
@@ -138,8 +291,11 @@ pub fn confirm(
 ) -> Result<Confirm, String> {
     let folder = config.on(&config.records);
     let failed = |error: io::Error| format!("{PENDING}: {error}");
-    let Some(pending) = pending(&folder).map_err(failed)? else {
-        return Ok(Confirm::Nothing);
+    let pending = match waiting(&folder) {
+        Ok(None) => return Ok(Confirm::Nothing),
+        Ok(Some(pending)) => pending,
+        Err(Some(why)) => return Err(why),
+        Err(None) => return confirm_unreadable(config, world),
     };
     if running != Some(pending.new.as_str()) || !link_names(&config.root, &pending.new) {
         return Ok(Confirm::NotOwn);
@@ -174,6 +330,35 @@ pub fn confirm(
     Ok(Confirm::Confirmed)
 }
 
+/// An unreadable `self.json`, seen by the updater that runs: when the
+/// builds are known it is put back at once; when they are not, the file is
+/// set aside only after the dry round a confirmation needs.
+fn confirm_unreadable(config: &Config, world: &mut World) -> Result<Confirm, String> {
+    let folder = config.on(&config.records);
+    if known_builds(&folder, &config.root).is_none() {
+        let dry = Config {
+            apply: false,
+            ..config.clone()
+        };
+        match round(&dry, world) {
+            Outcome::UpToDate(_) | Outcome::Would(_) | Outcome::WaitsForModels(_) => {}
+            other => return Ok(Confirm::NotProven(other.to_string())),
+        }
+    }
+    let records = Records::new(folder.clone());
+    let _lock = match records.lock() {
+        Ok(lock) => lock,
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => return Ok(Confirm::Busy),
+        Err(error) => return Err(error.to_string()),
+    };
+    match waiting(&folder) {
+        Ok(None) => Ok(Confirm::Nothing),
+        Ok(Some(_)) => Ok(Confirm::NotOwn),
+        Err(Some(why)) => Err(why),
+        Err(None) => settle(&folder, &config.root, world.say).map(Confirm::Unreadable),
+    }
+}
+
 fn pending_now(folder: &Path) -> Result<Option<Pending>, String> {
     pending(folder).map_err(|error| format!("{PENDING}: {error}"))
 }
@@ -188,6 +373,8 @@ pub enum Back {
     Waiting,
     /// The link names the old build again, and the new one is refused.
     PutBack(Pending),
+    /// `self.json` could not be read: settled as a switch that failed.
+    Unreadable(Unreadable),
 }
 
 /// lamp-update-back: the link back, the new binary refused; the caller
@@ -201,7 +388,7 @@ pub fn back(
     lamp_update: &UnitState,
     say: &mut dyn FnMut(&str),
 ) -> Result<Back, String> {
-    if pending_now(records)?.is_none() {
+    if matches!(waiting(records), Ok(None)) {
         return Ok(Back::Nothing);
     }
     let held = Records::new(records.to_owned());
@@ -210,14 +397,21 @@ pub fn back(
         Err(error) if error.kind() == io::ErrorKind::WouldBlock => return Ok(Back::Busy),
         Err(error) => return Err(error.to_string()),
     };
-    let Some(pending) = pending_now(records)? else {
-        return Ok(Back::Nothing);
-    };
     let running = lamp_update.active == "active" && lamp_update.sub == "running";
-    let late = now_unix_ms
-        >= pending
-            .at_unix_ms
-            .saturating_add(DEADLINE.as_millis() as u64);
+    let late = |at: u64| now_unix_ms >= at.saturating_add(DEADLINE.as_millis() as u64);
+    let pending = match waiting(records) {
+        Ok(None) => return Ok(Back::Nothing),
+        Ok(Some(pending)) => pending,
+        Err(Some(why)) => return Err(why),
+        // Its deadline runs from when the file was written.
+        Err(None) => {
+            if running && !late(written_unix_ms(records).unwrap_or(0)) {
+                return Ok(Back::Waiting);
+            }
+            return settle(records, root, say).map(Back::Unreadable);
+        }
+    };
+    let late = late(pending.at_unix_ms);
     if running && !late {
         return Ok(Back::Waiting);
     }
@@ -228,16 +422,7 @@ pub fn back(
         replace_link(&on_root(root, CURRENT), &pending.old)
             .map_err(|error| format!("{CURRENT}: {error}"))?;
     }
-    let mut refused = refused(records);
-    if !refused.contains(&pending.new) {
-        refused.push(pending.new.clone());
-    }
-    write_whole(
-        &records.join(REFUSED),
-        format!("{}\n", refused.join("\n")).as_bytes(),
-        0o600,
-    )
-    .map_err(|error| format!("{REFUSED}: {error}"))?;
+    refuse(records, &pending.new)?;
     end(records).map_err(|error| format!("{PENDING}: {error}"))?;
     say(&format!(
         "lamp-update's build {} did not confirm itself ({}): {CURRENT} names {} again",
