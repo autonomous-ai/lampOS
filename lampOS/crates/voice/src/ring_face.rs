@@ -255,6 +255,11 @@ pub struct Face {
     /// The lamp's one breath from its inner state, its phase and pace now
     /// ([`Face::breath`]): none, and it breathes on the boot clock.
     breath: Option<(f64, f32)>,
+    /// Whether a skill's light held tints the Speaking face
+    /// (`LAMP_SKILL_LIGHT_SPEAKING=on`), and the light held now
+    /// ([`Face::skill_light`]).
+    tints_speaking: bool,
+    held: Option<Lit>,
 }
 
 impl Default for Face {
@@ -289,6 +294,8 @@ impl Face {
             fade_us: None,
             woke_us: None,
             breath: None,
+            tints_speaking: false,
+            held: None,
         }
     }
 
@@ -338,6 +345,24 @@ impl Face {
     /// blinks come as much sooner or later as the pace says.
     pub fn breath(&mut self, breath: Option<(f64, f32)>) {
         self.breath = breath;
+    }
+
+    /// Switch the skill's light on the Speaking face on or off
+    /// (`LAMP_SKILL_LIGHT_SPEAKING=on`): off, a held light changes no turn's
+    /// face, as before.
+    pub fn tints_speaking(&mut self, on: bool) {
+        self.tints_speaking = on;
+    }
+
+    /// The light a skill holds now, as the ring shows it over the person's
+    /// ([`crate::ring_light::RingLight::held`]), or `None`. With
+    /// [`Face::tints_speaking`] on, the Speaking face takes its colour, at
+    /// its level or [`SKILL_LEVEL_LEAST`], so a light a skill holds through
+    /// its words (Welcome back's warm glow) comes with them, as
+    /// `docs/skills.md` means it to; given back, the next frame is plain
+    /// Speaking again, eased like any other change.
+    pub fn skill_light(&mut self, held: Option<Lit>) {
+        self.held = held;
     }
 
     /// Switch the eye on or off ([`Face::eye`]'s field says what it does).
@@ -553,10 +578,11 @@ impl Face {
                     && self.lit.on
                     && !(*kind == PatternKind::Pulse && *cycles >= 1.0)
             };
+            let held = self.held.filter(|_| self.tints_speaking);
             let wanted = match motion.filter(moves) {
                 Some(motion) => moving(self.lit, motion, pixel),
                 None => look(
-                    mood, self.level, seconds, breath, angle, self.lit, ceiling, look_to,
+                    mood, self.level, seconds, breath, angle, self.lit, held, ceiling, look_to,
                 ),
             };
             let scale = accent_t.map_or([1.0; 3], |t| accent_scale(self.accent, t, angle));
@@ -725,10 +751,27 @@ const CANDLE_DIP: f32 = 0.2;
 /// How much brighter than the level a pulse's arc is at its middle.
 const PULSE_RISE: f32 = 1.35;
 
+/// The Speaking face's own warm, and its least glow, with the voice quiet.
+const SPEAKING_TINT: [f32; 3] = [1.0, 0.72, 0.30];
+const SPEAKING_LEAST: f32 = 0.26;
+/// A skill's light held over the Speaking face (`LAMP_SKILL_LIGHT_SPEAKING`):
+/// this share of the face's colour is the light's, the rest Speaking's own
+/// warm, so the face is still the lamp speaking, in the light's colour.
+const SKILL_TINT_SHARE: f32 = 0.6;
+/// The least level a held light tints the Speaking face at. The ring cannot
+/// tell a level the skill named from one `lamp-skills` filled in from the
+/// light shown (`crates/skills/src/glow.rs`, `asked`): Welcome back's warm
+/// glow names none and comes at the person's level, 1 on most lamps, and
+/// under Speaking's own least glow a level 1 or 2 is not seen. The middle,
+/// as `glow.rs`'s `LEVEL_UNKNOWN`.
+pub const SKILL_LEVEL_LEAST: u8 = 3;
+
 /// The wanted colour of one pixel, each channel as a share of the ceiling.
 /// `look_to`: the eye's look, as the angle around the ring toward the
 /// person and how much the far side dims, from 0 to 1. `breath`: where the
-/// resting breath is, from 0 to 1 ([`Face::breath`]).
+/// resting breath is, from 0 to 1 ([`Face::breath`]). `held`: a skill's
+/// light that tints the Speaking face ([`Face::skill_light`]), with the
+/// switch on.
 #[allow(clippy::too_many_arguments)]
 fn look(
     mood: Mood,
@@ -737,6 +780,7 @@ fn look(
     breath: f32,
     angle: f32,
     lit: Lit,
+    held: Option<Lit>,
     ceiling: u8,
     look_to: Option<(f32, f32)>,
 ) -> [f32; 3] {
@@ -794,10 +838,29 @@ fn look(
             // Warm, and as bright as the lamp's own voice is loud, with a
             // slow two-lobed turn so that it is never a flat disc.
             let turn = wave(seconds, 3.1, 2.0, angle);
-            (
-                [1.0, 0.72, 0.30],
-                (0.26 + 0.74 * level.powf(0.8)) * (0.90 + 0.10 * turn),
-            )
+            match held.filter(|held| held.on) {
+                // A skill's light held with the words: its colour mixed into
+                // the face, and the face's least glow that of its level, so
+                // it still moves with the voice above it.
+                Some(held) => {
+                    let level_of_light = held.level.clamp(SKILL_LEVEL_LEAST, LEVELS);
+                    let least = LEVEL_GLOW[usize::from(level_of_light) - 1]
+                        .0
+                        .max(SPEAKING_LEAST);
+                    let tint: [f32; 3] = std::array::from_fn(|channel| {
+                        SPEAKING_TINT[channel]
+                            + (held.tint[channel] - SPEAKING_TINT[channel]) * SKILL_TINT_SHARE
+                    });
+                    (
+                        tint,
+                        (least + (1.0 - least) * level.powf(0.8)) * (0.90 + 0.10 * turn),
+                    )
+                }
+                None => (
+                    SPEAKING_TINT,
+                    (SPEAKING_LEAST + 0.74 * level.powf(0.8)) * (0.90 + 0.10 * turn),
+                ),
+            }
         }
     };
     tint.map(|channel| channel * glow)
@@ -1944,5 +2007,220 @@ mod tests {
             blinks(lamp_msgs::MOOD_PACE_QUICKEST),
         );
         assert!(slow < plain && plain < quick, "{slow} {plain} {quick}");
+    }
+
+    /// A face speaking at `level` for `frames` frames from `from_us`, with
+    /// the switch `on` and a skill's light `held`.
+    fn speaking_with(
+        on: bool,
+        held: Option<Lit>,
+        level: u8,
+        from_us: u64,
+        frames: u64,
+    ) -> Vec<[Rgb; PIXEL_COUNT]> {
+        let mut face = Face::new();
+        face.tints_speaking(on);
+        face.skill_light(held);
+        play(&mut face, Mood::Speaking, level, from_us, frames)
+    }
+
+    /// Each channel summed over the ring.
+    fn channels(frame: &[Rgb; PIXEL_COUNT]) -> [u32; 3] {
+        frame.iter().fold([0; 3], |[r, g, b], pixel| {
+            [
+                r + u32::from(pixel.red),
+                g + u32::from(pixel.green),
+                b + u32::from(pixel.blue),
+            ]
+        })
+    }
+
+    /// El on #1722 (14:35): Welcome back's warm light was covered by the
+    /// Speaking face for its whole life. Off unless set: a skill's light
+    /// held changes no frame of any turn's face.
+    #[test]
+    fn without_the_switch_a_held_skill_light_leaves_every_face_as_it_was() {
+        let blue = Lit::of(true, "blue", 4).unwrap();
+        for mood in [Mood::Listening, Mood::Thinking, Mood::Speaking] {
+            let mut plain = Face::new();
+            let mut held = Face::new();
+            held.skill_light(Some(blue));
+            assert_eq!(
+                play(&mut plain, mood, 120, 1, 100),
+                play(&mut held, mood, 120, 1, 100),
+                "{mood:?}"
+            );
+        }
+    }
+
+    /// With `LAMP_SKILL_LIGHT_SPEAKING=on`, the Speaking face takes the held
+    /// light's colour and its level's glow, and still follows the voice;
+    /// the other faces of a turn are their own.
+    #[test]
+    fn with_the_switch_a_held_skill_light_tints_speaking_in_its_colour_at_its_level() {
+        let blue = |level| Some(Lit::of(true, "blue", level).unwrap());
+        let last = |frames: Vec<[Rgb; PIXEL_COUNT]>| *frames.last().unwrap();
+        let plain = last(speaking_with(true, None, 0, 1, 50));
+        let tinted = last(speaking_with(true, blue(4), 0, 1, 50));
+        let [pr, _, pb] = channels(&plain);
+        let [tr, _, tb] = channels(&tinted);
+        // Blue leads where Speaking's own warm had red leading.
+        assert!(
+            pr > pb && tb > tr,
+            "{:?} {:?}",
+            channels(&plain),
+            channels(&tinted)
+        );
+        // At its level: quiet, level 4's glow over Speaking's least, and
+        // level 5 brighter still.
+        assert!(
+            total(&tinted) > total(&plain),
+            "{} {}",
+            total(&tinted),
+            total(&plain)
+        );
+        let five = last(speaking_with(true, blue(5), 0, 1, 50));
+        assert!(total(&five) > total(&tinted));
+        // Still the lamp speaking: brighter with its voice.
+        let loud = last(speaking_with(true, blue(4), 255, 1, 50));
+        assert!(total(&loud) > total(&tinted) * 11 / 10);
+        // Never over the ceiling.
+        assert!(
+            speaking_with(true, blue(5), 255, 1, 100)
+                .iter()
+                .flatten()
+                .all(|pixel| pixel.red <= 48 && pixel.green <= 48 && pixel.blue <= 48)
+        );
+        // Listening and Thinking are their own, held light or not.
+        for mood in [Mood::Listening, Mood::Thinking] {
+            let mut plain = Face::new();
+            plain.tints_speaking(true);
+            let mut held = plain.clone();
+            held.skill_light(blue(4));
+            assert_eq!(
+                play(&mut plain, mood, 120, 1, 100),
+                play(&mut held, mood, 120, 1, 100),
+                "{mood:?}"
+            );
+        }
+        // A held light that is out (#1677's ember) tints nothing.
+        let out = Some(Lit::of(false, "blue", 4).unwrap());
+        assert_eq!(
+            speaking_with(true, out, 120, 1, 50),
+            speaking_with(true, None, 120, 1, 50)
+        );
+    }
+
+    /// Welcome back's warm glow comes at the person's level, 1 on most
+    /// lamps: a held light under [`SKILL_LEVEL_LEAST`] tints at it.
+    #[test]
+    fn a_held_skill_light_under_the_middle_level_tints_speaking_at_the_middle() {
+        let warm = |level| Some(Lit::of(true, "warm", level).unwrap());
+        let at_three = speaking_with(true, warm(3), 60, 1, 60);
+        assert_eq!(speaking_with(true, warm(1), 60, 1, 60), at_three);
+        assert_eq!(speaking_with(true, warm(2), 60, 1, 60), at_three);
+        assert_ne!(speaking_with(true, None, 60, 1, 60), at_three);
+    }
+
+    /// Given back, the face is plain Speaking again from the next frame,
+    /// eased as any change: a tenth of a second on most of the way, by
+    /// half a second as if no light had been held.
+    #[test]
+    fn a_skill_light_given_back_leaves_plain_speaking_at_once() {
+        let mut plain = Face::new();
+        plain.tints_speaking(true);
+        let mut held = plain.clone();
+        held.skill_light(Some(Lit::of(true, "blue", 4).unwrap()));
+        let apart = |a: &[Rgb; PIXEL_COUNT], b: &[Rgb; PIXEL_COUNT]| -> u32 {
+            a.iter()
+                .zip(b)
+                .map(|(a, b)| {
+                    u32::from(a.red.abs_diff(b.red))
+                        + u32::from(a.green.abs_diff(b.green))
+                        + u32::from(a.blue.abs_diff(b.blue))
+                })
+                .sum()
+        };
+        let before = play(&mut held, Mood::Speaking, 100, 1, 50);
+        let wide = apart(
+            before.last().unwrap(),
+            play(&mut plain, Mood::Speaking, 100, 1, 50).last().unwrap(),
+        );
+        assert!(wide > 0);
+        held.skill_light(None);
+        let after = play(&mut held, Mood::Speaking, 100, 1_000_001, 25);
+        let plain_after = play(&mut plain, Mood::Speaking, 100, 1_000_001, 25);
+        let left = |frame: usize| apart(&after[frame], &plain_after[frame]) as f32 / wide as f32;
+        assert!(left(0) < 0.9, "it begins at once: {}", left(0));
+        assert!(left(5) < 0.3, "{}", left(5));
+        assert!(left(24) < 0.02, "{}", left(24));
+    }
+
+    /// El on #1722: a skill's light on the Speaking face never shows over
+    /// the privacy switch. The tinted face is a turn's frame like any other,
+    /// written only under the turn's permit: once the switch closes, the
+    /// ring refuses it and writes nothing.
+    #[test]
+    fn a_tinted_speaking_frame_is_refused_once_the_privacy_switch_closes() {
+        use lamp_ipc::monotonic_us;
+        use lamp_ring::{ChannelCeiling, FrameSink, GuardedRing};
+        use lamp_turn_owner::{
+            AdmissionState, CaptureState, Controller, MonoTime, OutputKind, Permission,
+        };
+        let now = || MonoTime::from_micros(monotonic_us());
+        let boot = crate::process::new_boot().unwrap();
+        let mut controller = Controller::new(boot, now());
+        controller
+            .set_microphone_permission(now(), Permission::Allowed)
+            .unwrap();
+        let until = MonoTime::from_micros(now().as_micros() + 500_000);
+        controller
+            .set_capture(now(), CaptureState::RetainingUntil(until))
+            .unwrap();
+        controller
+            .set_admission(now(), AdmissionState::OpenUntil(until))
+            .unwrap();
+        let owner = controller
+            .admit(now(), lamp_turn_owner::AdmittedInput::NewTurn)
+            .unwrap();
+        controller.input_ended(now(), owner).unwrap();
+        let plan = controller
+            .plan_output(now(), owner, OutputKind::Light, None)
+            .unwrap();
+        let permit = controller.issue_output(now(), plan, 100_000).unwrap();
+        struct Counted(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+        impl FrameSink for Counted {
+            fn write_frame(&mut self, _: &lamp_ring::EncodedFrame) -> std::io::Result<()> {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            }
+        }
+        let writes = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut ring = GuardedRing::new(Counted(writes.clone()), boot).unwrap();
+        ring.install_authority(controller.snapshot(now()).unwrap())
+            .unwrap();
+        let mut face = Face::new();
+        face.tints_speaking(true);
+        face.skill_light(Lit::of(true, "warm", 4));
+        let pixels = face.render(Mood::Speaking, 120, monotonic_us(), 40);
+        let ceiling = ChannelCeiling::new(40).unwrap();
+        // Permitted: the tinted face is written.
+        assert!(ring.show(&pixels, ceiling, permit).is_ok());
+        // The switch closes: the same frame is refused.
+        controller
+            .set_microphone_permission(now(), Permission::Denied)
+            .unwrap();
+        ring.install_authority(controller.snapshot(now()).unwrap())
+            .unwrap();
+        let written = writes.load(std::sync::atomic::Ordering::SeqCst);
+        assert!(ring.show(&pixels, ceiling, permit).is_err());
+        // Refused: no tinted frame is written (only the guard's own black,
+        // if it blanks the ring as the switch closes).
+        let tinted = pixels.map(|pixel| pixel != lamp_ring::Rgb::BLACK);
+        assert!(tinted.iter().any(|lit| *lit));
+        assert!(
+            writes.load(std::sync::atomic::Ordering::SeqCst) <= written + 1,
+            "nothing written under privacy but black"
+        );
     }
 }

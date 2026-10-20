@@ -124,6 +124,7 @@ pub struct RingOptions<'a> {
     pub eye_strong: bool,
     pub head_touch: bool,
     pub light_requests: bool,
+    pub skill_light_speaking: bool,
     pub light_keep: Option<&'a std::path::Path>,
 }
 
@@ -138,7 +139,9 @@ pub struct RingOptions<'a> {
 /// kept on the head dims it, a countdown to sleep ([`crate::ring_head`]).
 /// With a bus, the face at rest breathes the lamp's one breath where Mood
 /// keeps it on that bus ([`crate::ring_mood`]). With `light_requests`, lights asked for that lapse are shown over the
-/// person's ([`crate::ring_requests`], #940). With `light_keep`, the
+/// person's ([`crate::ring_requests`], #940), and with
+/// `skill_light_speaking` as well the one shown tints the Speaking face
+/// ([`Face::skill_light`]). With `light_keep`, the
 /// person's light is kept there across a restart ([`crate::ring_light`]).
 #[cfg(target_os = "linux")]
 pub fn run_continuous(
@@ -153,10 +156,12 @@ pub fn run_continuous(
         eye_strong,
         head_touch,
         light_requests,
+        skill_light_speaking,
         light_keep,
     } = options;
     let light = bus_root.and_then(|root| match RingLight::on_keeping(root, light_keep) {
         Ok((mut light, begins)) => {
+            light.tint_speaking(light_requests && skill_light_speaking);
             // Without them the ring still shows the person's light.
             if light_requests
                 && let Err(error) = boot_clock().and_then(|clock| light.take_requests(root, &clock))
@@ -650,6 +655,8 @@ fn service(
             }
             face.pattern(light.pattern());
             face.fade(light.fade(), at);
+            face.tints_speaking(light.tints_speaking());
+            face.skill_light(light.held());
         }
         if let Some(mood) = mood.as_mut() {
             face.breath(mood.tick(at));
