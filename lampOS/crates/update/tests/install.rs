@@ -1623,14 +1623,19 @@ fn missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept() {
 /// on #811, 13:58).
 #[test]
 fn the_pinned_models_are_the_ones_their_parts_check() {
-    let models = install::models().unwrap();
-    assert_eq!(models.len(), 7);
+    let all = install::models().unwrap();
+    let (notices, models): (Vec<_>, Vec<_>) = all
+        .iter()
+        .partition(|model| model.path.starts_with(NOTICES));
+    assert_eq!((models.len(), notices.len()), (7, 5));
     let release = "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/";
-    for model in &models {
+    for model in &all {
         assert!(model.path.starts_with("/opt/lampOS/"), "{}", model.path);
-        assert!(model.url.starts_with(release), "{}", model.url);
         assert_eq!(model.sha256.len(), 64);
         assert!(model.bytes > 0);
+    }
+    for model in &models {
+        assert!(model.url.starts_with(release), "{}", model.url);
     }
     let wire = include_str!("../../turn-end-wire/src/lib.rs");
     let fast = include_str!("../../turn-end/src/fast.rs");
@@ -1654,6 +1659,51 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
     assert!(
         include_str!("../../../deploy/product/lamp-name.service")
             .contains("--models /opt/lampOS/name/models")
+    );
+}
+
+/// Where the product's voice finds its recorded lines (#1844).
+const NOTICES: &str = "/opt/lampOS/voice/notices/";
+
+/// #1844 (lamp-06c1, 20 Oct): the product unit named a notice folder
+/// nothing filled, so the offline line and "back online" were silent. Now
+/// install places the four recordings and their manifest, from their own
+/// release, in the folder the product voice reads.
+#[test]
+fn install_places_the_voices_recorded_lines_where_the_product_voice_reads_them() {
+    let all = install::models().unwrap();
+    let release = "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-20/";
+    let mut placed: Vec<&str> = all
+        .iter()
+        .filter_map(|model| model.path.strip_prefix(NOTICES))
+        .collect();
+    placed.sort_unstable();
+    assert_eq!(
+        placed,
+        [
+            "back-online.en-US.wav",
+            "manifest.json",
+            "provider-unavailable.en-US.wav",
+            "voice-service-unreachable.en-US.wav",
+            "wifi-lost.en-US.wav",
+        ]
+    );
+    for model in all.iter().filter(|model| model.path.starts_with(NOTICES)) {
+        let file = model.path.strip_prefix(NOTICES).unwrap();
+        assert_eq!(model.url, format!("{release}{file}"));
+        assert!(model.archive.is_none(), "{file}");
+    }
+    let voice = include_str!("../../../deploy/product/lamp-voice.service");
+    let start = voice
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(
+        start.contains(&format!(
+            " --failure-notice-dir {} --failure-notice-language en-US",
+            NOTICES.trim_end_matches('/')
+        )),
+        "{start}"
     );
 }
 
