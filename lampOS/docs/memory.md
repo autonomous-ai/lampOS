@@ -311,6 +311,21 @@ the unchanged legacy client, used unless the new Days client is selected.
   memory that does not answer loses that exchange and nothing else. An
   answer with no word in it is not journalled. Talk the lamp did not
   answer never reaches here.
+- **A forget runs only when it is asked for** (second route and texts,
+  `LAMP_FORGET_ASKED`, on unless `off`): `forget`, `forget_everything` and
+  `forget_my_face` run only on a spoken turn whose words ask to forget
+  (`remember::asks_to_forget`: "forget", "delete", "erase", "remove",
+  "wipe", "clear", "unremember", "stop remembering", "scratch that", "get rid
+  of", "don't keep", "off your list", "quên", "xóa", matched with accents
+  off, as names are), or on a plain yes within 60 s of one
+  (`FORGET_CONFIRMED_WITHIN`: "Forget everything about me." "Everything?"
+  "Yes."). Never on a turn the lamp wrote itself (a hello, a skill's say,
+  task news), whatever its text says. A text runs one only when the typed
+  text asks. Otherwise the call isn't run, the journal says so, and the
+  model is told nothing was forgotten. Not taken, so asked again: "never
+  mind what I told you" and other words without one of these. On lamp-4ace on 20 Oct at 21:31,
+  "Lamp, what's my name?" was answered with `recall`, then `forget_my_face`
+  and `forget`; nothing matched, so nothing went, but a forget is not undone.
 - **Asking it to keep or forget something is not itself kept.** The
   exchange in which `remember` or `forget` was called stays out of the
   journal: the kept list is the record of that.

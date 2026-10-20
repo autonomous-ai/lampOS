@@ -70,6 +70,83 @@ pub const FORGET_EVERYTHING: &str = "forget_everything";
 /// something recalled, and `forget_everything` is offered (#1693). Off, the
 /// functions are as before.
 pub const FORGET_ALL_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_ALL";
+/// `off` lets a forget run whatever the person said; any other value, or
+/// none, runs one only when the turn's own words ask to forget
+/// ([`asks_to_forget`]).
+pub const FORGET_ASKED_ENVIRONMENT: &str = "LAMP_FORGET_ASKED";
+/// What the model is told of a forget nobody asked for (lamp-4ace, 20 Oct
+/// 21:31: "Lamp, what's my name?" was answered with `recall`, then
+/// `forget_my_face` and `forget`).
+pub const NOT_ASKED_TO_FORGET: &str = "They did not ask you to forget anything, so nothing was forgotten. Forget only when what they say asks you to. Answer what they asked.";
+
+/// Whether `name` is a call that forgets: a kept thing, everything, or a
+/// face.
+pub fn is_forget(name: &str) -> bool {
+    matches!(
+        name,
+        FORGET | FORGET_EVERYTHING | crate::known_faces::FORGET
+    )
+}
+
+/// How long a plain yes counts as confirming the forget asked for before it
+/// ("Forget everything about me." "Everything?" "Yes.").
+pub const FORGET_CONFIRMED_WITHIN: Duration = Duration::from_secs(60);
+
+/// Whether a forget may run on a turn: a spoken one (`heard`, never the
+/// lamp's own written turns: a hello, a skill's say, task news) whose words
+/// ask for it (`asks`, [`asks_to_forget`]), or a plain yes to the lamp's
+/// question soon after one did (`confirmed`), unless `LAMP_FORGET_ASKED=off`.
+/// A forget that removes someone's face or what they told the lamp is not
+/// undone, so a word too few costs a repeat ("forget it"), and a guess
+/// costs what was kept.
+pub fn forget_may_run(heard: bool, asks: bool, confirmed: bool) -> bool {
+    forget_unguarded() || (heard && (asks || confirmed))
+}
+
+/// `LAMP_FORGET_ASKED=off`: every forget runs, as before.
+pub fn forget_unguarded() -> bool {
+    std::env::var(FORGET_ASKED_ENVIRONMENT).as_deref() == Ok("off")
+}
+
+/// Whether `said` asks to forget, by its words, folded as names are
+/// matched (accents off, written as one letter or as a letter and its mark,
+/// so "quên" written apart is seen). Not taken, so asked again: "never
+/// mind what I told you", "don't tell anyone", and other words without one
+/// of these.
+pub fn asks_to_forget(said: &str) -> bool {
+    const ASKS: &[&str] = &[
+        "forget",
+        "forgets",
+        "forgetting",
+        "delete",
+        "erase",
+        "remove",
+        "wipe",
+        "clear",
+        "unremember",
+        "quen",
+        "xoa",
+    ];
+    const PHRASES: &[&[&str]] = &[
+        &["stop", "remembering"],
+        &["scratch", "that"],
+        &["get", "rid", "of"],
+        &["don't", "keep"],
+        &["dont", "keep"],
+        &["do", "not", "keep"],
+        &["off", "your", "list"],
+    ];
+    let words = crate::known_faces::folded_words(said);
+    words.iter().any(|word| ASKS.contains(&word.as_str()))
+        || PHRASES.iter().any(|phrase| {
+            words.windows(phrase.len()).any(|window| {
+                window
+                    .iter()
+                    .zip(phrase.iter())
+                    .all(|(word, want)| word == want)
+            })
+        })
+}
 static FORGET_ALL: OnceLock<bool> = OnceLock::new();
 
 /// Whether `forget` takes an id and `forget_everything` is offered.
