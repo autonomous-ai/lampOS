@@ -186,6 +186,9 @@ inspection evidence, not a playback grant.
 | `observe` | `guard`, `id` | Explicit `show` of the bound accepted agent |
 | `claim_speech` | `guard`, `id`, `observation_id`, `text`, `session_id` | Trusted one-time playback grant |
 | `ack_speech` | `guard`, `id`, `observation_id`, `claim_id`, `text_digest`, `session_id`, `played:true` | Trusted completed-playout attestation |
+| `sign_in_start` | none | With `serve --sign-in-by-code` only, trusted: start Harness's sign-in by a spoken code, or give back the one open (["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)) |
+| `sign_in_state` | none | With `serve --sign-in-by-code` only, trusted: the sign-in's code, the email it asks about, or how it ended; `none` before any |
+| `sign_in_answer` | `answer`: `yes` or `no` | With `serve --sign-in-by-code` only, trusted: the person's spoken answer, passed on only while Harness asks (`not_asking` otherwise) |
 | `told` | `guard`, `id`, `observation_id`, `session_id` | Trusted: the voice's news of this observation was heard whole, in its model's own words ([#1390](#closing-a-finished-harness-1390-serve---close-told-off-unless-set)); once only, `already_told` after. Without `--close-told`, `told:false` and nothing written |
 
 The [protocol](../crates/tasks/src/protocol.rs) and
@@ -736,8 +739,8 @@ are off:
     ignores the names fails it) and
     `agent_tasks::tests::the_machine_names_switch_is_taken_on_its_own`.
 
-Not yet: installing Harness (`lamp-update harness-on`, B5) and signing in a
-lamp with no screen (Harness's box ticket, `harness login --ticket`; #1410).
+Signing in a lamp with no screen is by a spoken code since Harness 0.4.23
+(openharness#1410; ["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)).
 The reset plan doesn't list `targets.json.from-machines`. A mark left after
 a reset changes nothing: a missing file is the part's to write anyway, and
 a file a person writes has another sha256.
@@ -757,6 +760,56 @@ Tests: `engine::tests::targets_read_again_are_used_from_then_on_and_a_task_keeps
 (writing over a file without the part's mark fails it),
 `tests/runtime.rs`: `targets_from_machines_are_written_and_used_while_signed_in`
 (asking while signed out fails it), `targets_from_machines_needs_an_engine_and_set_up_later`.
+
+### Signing in by a spoken code (`--sign-in-by-code`, #1676)
+
+`lamp-tasks serve --sign-in-by-code`, off unless set. A lamp has no screen
+to show Harness's QR code. Harness 0.4.23 signs a device in by a code it
+says aloud instead (openharness#1410, the Harness team on 20 October):
+`harness login --code --json`, as the part's own user and `HOME`. The part
+runs Harness's own sign-in and passes the person's answer on; it keeps no
+credential of its own.
+
+- **The voice starts it** with `sign_in_start`, on the trusted route only.
+  The part starts the program on a lane of its own (`Cli::sign_in_by_code`):
+  the same program check, environment and marks as every call, but its
+  stdin kept for the answer, its lines read as they come, and its life
+  [`sign_in::MOST_LIFE`](../crates/tasks/src/sign_in.rs) (11 minutes; Harness
+  keeps a code alive for 10). It never takes the operation lane, so tasks
+  and reads go on beside a sign-in waiting on its person. A start while one
+  is open gives that one back.
+- **The code.** `{"sign_in":"code","code":"12345678","expires_in":…}`: the
+  voice says the digits, and where to type them (Harness on the computer,
+  Machines ▸ Approve a device, or harness.autonomous.ai). The same code
+  kept alive is no change.
+- **The question.** Once the person approves in Harness,
+  `{"sign_in":"asking","email":"…"}`: the voice asks "Sign in as …?", the
+  email read back clearly, as Harness asks. No session exists before the
+  answer, so a stranger who heard the code gains nothing.
+- **The answer.** `sign_in_answer` with `yes` or `no`, written to Harness's
+  stdin only while it asks (`not_asking` otherwise). One answer only: a
+  question after it is passed over. The sign-in's `Debug` hides the digits
+  and the email.
+- **The end.** `{"sign_in":"done","result":"success"}` (the email is kept
+  only for the question), or
+  `"error"` with Harness's code (`DENIED`, `EXPIRED`, `CANCELLED`,
+  `BACKEND_ERROR`) or the part's own: `harness_too_old` (a Harness before
+  0.4.23, which doesn't know `--code`), `ended` (it stopped with no result),
+  `unreadable`, `timeout`, or `no_harness`. Kept for the voice until another
+  starts. Signed in, the part looks at the sign-in and the machines at once
+  (with `--set-up-later`), not a minute later.
+
+The journal says `tasks: sign-in: started`, `code given (good for 120 s)`,
+`approved in Harness: asking whether to sign in`, `answered yes`, and
+`signed in` or `not signed in: CODE`: never the digits or the email.
+
+Tests: `sign_in::tests` (Harness's lines read strictly; a sign-in from its
+code to its end; ended, too old, timed out), the CLI's
+`the_sign_in_by_code_reads_harness_lines_and_writes_the_answer` and
+`a_harness_without_the_code_sign_in_is_told_apart_and_a_dropped_one_stops`
+against a scripted program, and the service's
+`the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end`. The
+voice's side (`sign_in_computer`, `sign_in_answer`) is its own PR.
 
 ## Devin (#1854)
 

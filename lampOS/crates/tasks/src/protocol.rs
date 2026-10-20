@@ -83,6 +83,26 @@ pub enum Request {
         observation_id: u64,
         session_id: String,
     },
+    /// Start Harness's sign-in by a spoken code, or give back the one open
+    /// (`serve --sign-in-by-code`, [`crate::sign_in`]): on the trusted
+    /// route only, since the code it gives is said aloud by the voice.
+    SignInStart {},
+    /// Where the sign-in is: its code, the email to ask about, or how it
+    /// ended.
+    SignInState {},
+    /// The person's spoken answer to "Sign in as …?", only while it is
+    /// asked.
+    SignInAnswer {
+        answer: Answer,
+    },
+}
+
+/// A spoken yes or no.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Answer {
+    Yes,
+    No,
 }
 
 const fn page_size() -> u16 {
@@ -117,6 +137,9 @@ impl Request {
                 | Self::ClaimSpeech { .. }
                 | Self::AckSpeech { .. }
                 | Self::Told { .. }
+                | Self::SignInStart {}
+                | Self::SignInState {}
+                | Self::SignInAnswer { .. }
         )
     }
 
@@ -145,6 +168,9 @@ impl Request {
             Self::ClaimSpeech { .. } => "claim_speech",
             Self::AckSpeech { .. } => "ack_speech",
             Self::Told { .. } => "told",
+            Self::SignInStart {} => "sign_in_start",
+            Self::SignInState {} => "sign_in_state",
+            Self::SignInAnswer { .. } => "sign_in_answer",
         }
     }
 }
@@ -196,6 +222,36 @@ mod tests {
             Request::parse(br#"{"op":"confirm","id":1}"#),
             Err("bad_request")
         );
+    }
+
+    /// #1676: the sign-in's three operations are the trusted route's, with
+    /// no field but the answer, which is a yes or a no.
+    #[test]
+    fn sign_in_operations_are_trusted_and_take_only_a_yes_or_a_no() {
+        for (bytes, name) in [
+            (br#"{"op":"sign_in_start"}"#.as_slice(), "sign_in_start"),
+            (br#"{"op":"sign_in_state"}"#, "sign_in_state"),
+            (
+                br#"{"op":"sign_in_answer","answer":"yes"}"#,
+                "sign_in_answer",
+            ),
+        ] {
+            let request = Request::parse(bytes).unwrap();
+            assert!(request.trusted() && request.guard().is_none(), "{name}");
+            assert_eq!(request.name(), name);
+        }
+        assert_eq!(
+            Request::parse(br#"{"op":"sign_in_answer","answer":"no"}"#).unwrap(),
+            Request::SignInAnswer { answer: Answer::No }
+        );
+        for bytes in [
+            br#"{"op":"sign_in_answer","answer":"maybe"}"#.as_slice(),
+            br#"{"op":"sign_in_answer"}"#,
+            br#"{"op":"sign_in_start","email":"someone@example.com"}"#,
+            br#"{"op":"sign_in_state","code":"12345678"}"#,
+        ] {
+            assert_eq!(Request::parse(bytes), Err("bad_request"));
+        }
     }
 
     #[test]

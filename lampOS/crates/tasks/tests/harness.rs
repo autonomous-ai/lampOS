@@ -1053,6 +1053,129 @@ fn status_is_one_ps_of_the_full_machine_id_bounded_and_never_retried() {
     assert!(rig.calls().is_empty());
 }
 
+/// The sign-in's lines as they come, up to its end, for at most `within`.
+fn sign_in_lines(
+    link: &mut dyn lamp_tasks::sign_in::Link,
+    within: Duration,
+    until_end: bool,
+) -> Vec<Result<lamp_tasks::sign_in::Event, &'static str>> {
+    let until = Instant::now() + within;
+    let mut lines = Vec::new();
+    while Instant::now() < until {
+        match link.poll() {
+            Some(read) => {
+                let ended = read.is_err()
+                    || matches!(read, Ok(lamp_tasks::sign_in::Event::Confirm { .. })) && !until_end
+                    || matches!(read, Ok(lamp_tasks::sign_in::Event::Result(_)));
+                lines.push(read);
+                if ended {
+                    break;
+                }
+            }
+            None => thread::sleep(Duration::from_millis(5)),
+        }
+    }
+    lines
+}
+
+/// #1676: Harness's sign-in by a spoken code is its own `login --code
+/// --json`, run as every call is (the same marks and HOME), its lines read
+/// as they come, the person's answer written to its stdin, and its result
+/// read after it.
+#[test]
+fn the_sign_in_by_code_reads_harness_lines_and_writes_the_answer() {
+    use lamp_tasks::sign_in::{Done, Event};
+    for (yes, done) in [
+        (
+            true,
+            Done::Success {
+                email: Some("someone@example.com".into()),
+            },
+        ),
+        (
+            false,
+            Done::Error {
+                code: "DENIED".into(),
+            },
+        ),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"login":{"code_flow":true}}));
+        let mut link = rig.cli().sign_in_by_code().unwrap();
+        let code = Event::Code {
+            code: "12345678".into(),
+            expires_in: 120,
+        };
+        assert_eq!(
+            sign_in_lines(link.as_mut(), Duration::from_secs(10), false),
+            [
+                Ok(code.clone()),
+                Ok(code),
+                Ok(Event::Confirm {
+                    email: "someone@example.com".into()
+                })
+            ]
+        );
+        let calls = rig.calls();
+        assert_eq!(calls[0]["args"], json!(["login", "--code", "--json"]));
+        assert_eq!(calls[0]["environment"]["AI_AGENT"], "lampos");
+        assert_eq!(
+            calls[0]["environment"]["HOME"],
+            rig.root.path().to_str().unwrap()
+        );
+        link.answer(yes).unwrap();
+        let lines = sign_in_lines(link.as_mut(), Duration::from_secs(10), true);
+        assert_eq!(lines, [Ok(Event::Result(done))]);
+        assert_eq!(
+            fs::read_to_string(rig.root.path().join("answer")).unwrap(),
+            if yes { "yes\n" } else { "no\n" }
+        );
+        // Then its end, and nothing after.
+        assert_eq!(
+            sign_in_lines(link.as_mut(), Duration::from_secs(10), true),
+            [Err("ended")]
+        );
+        assert_eq!(link.poll(), None);
+    }
+}
+
+/// #1676: a Harness before 0.4.23 doesn't know `--code`; the sign-in ends
+/// saying so, not merely that it ended. Stopped early, the program goes.
+#[test]
+fn a_harness_without_the_code_sign_in_is_told_apart_and_a_dropped_one_stops() {
+    let rig = Rig::new();
+    rig.plan(json!({"login":{"stderr":"error: unknown option '--code'\n","exit":1}}));
+    let mut link = rig.cli().sign_in_by_code().unwrap();
+    assert_eq!(
+        sign_in_lines(link.as_mut(), Duration::from_secs(10), true),
+        [Err("harness_too_old")]
+    );
+    let rig = Rig::new();
+    rig.plan(json!({"login":{"exit":1}}));
+    let mut link = rig.cli().sign_in_by_code().unwrap();
+    assert_eq!(
+        sign_in_lines(link.as_mut(), Duration::from_secs(10), true),
+        [Err("ended")]
+    );
+    // Waiting on its person for minutes: dropped, it is stopped at once.
+    let rig = Rig::new();
+    rig.plan(json!({"login":{"delay_ms":5000}}));
+    let link = rig.cli().sign_in_by_code().unwrap();
+    rig.wait_operation("login");
+    let pid = rig.calls()[0]["pid"].as_u64().unwrap();
+    let began = Instant::now();
+    drop(link);
+    assert!(began.elapsed() < Duration::from_secs(2));
+    // Gone, and reaped: `kill -0` finds nothing (on macOS too).
+    let alive = std::process::Command::new("kill")
+        .args(["-0", &pid.to_string()])
+        .stderr(std::process::Stdio::null())
+        .status()
+        .unwrap()
+        .success();
+    assert!(!alive);
+}
+
 /// #1676: the sign-in is one `auth status --json`, read as Harness gives it
 /// (openharness `authStatusCommand`): signed in, signed in and offline, or
 /// not, with the other fields passed over. A failed or unreadable reply is
