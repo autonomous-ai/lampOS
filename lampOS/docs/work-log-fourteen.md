@@ -260,3 +260,18 @@ Ready for lamp-voice: no (a question, no code)
   removal only from the app, adding staying spoken.
 - No task taken; `builder:fourteen` has no such label, and a lamp-side
   read (if wanted) is outside "Crates: none" in my role file either way.
+
+## 2026-10-20 — fourteen-P1 — a third mechanism found, flagged
+
+Ready for lamp-voice: no (a comment, no code)
+
+- Mobile posted `faces.add_photo` (ecm-sds-mobile#13, lampOS #1968/#1977/
+  #1979): a photo from the app, kept only once the person says yes at the
+  lamp — also explicitly "Lamp 2 stays out of Enroll" there. A third
+  mechanism alongside the two fourteen-P1 already named (V1's old
+  `face.enroll`, lampOS's spoken `eyes::who`), and the closest of the three
+  to `eyes::who`'s own consent shape (a photo substitutes for the live
+  capture; the lamp still confirms).
+- Posted the connection on
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6284300313)
+  rather than open a second question: one answer likely covers both.
