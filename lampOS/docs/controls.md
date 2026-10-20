@@ -550,7 +550,11 @@ First's on-lamp sequence is:
    ≥20 ms pulses or one press of 500 ms or more (`HELD_US`, read as a level:
    a person's two touches often merge into one, as on lamp-c0a4 three runs
    in a row, thirteen-P4; a lone short press still finds nothing), prints
-   candidate polarity and how each reads, and installs nothing. A floating, untested or startup-held line
+   candidate polarity and how each reads, and installs nothing. Each line is
+   its own contact, so a hand on two pads at once is a press on each: two
+   pads touched together and then held one by one, or held together only,
+   are both found (`two_pads_touched_together_then_held_one_by_one_are_both_found`,
+   the first builder on #1722, 21 Oct). A floating, untested or startup-held line
    is not a pad mapping. Set the actual observed candidates in the pins file;
    remove the nonexistent primary from lamp-4ace's configuration, not all lamps.
 3. Run `lamp-controls serve --touch --config <unit-controls.json>
