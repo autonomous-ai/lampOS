@@ -3901,25 +3901,37 @@ thread_local! {
     /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
     static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
         const { std::cell::RefCell::new(None) };
-    /// A loop test's open near-call try window (#1803), in the scenario's
+    /// A loop test's near-call try (#1803), in place of onboarding's own.
+    static TEST_NEAR: std::cell::RefCell<Option<crate::onboarding::near::NearFlow>> =
+        const { std::cell::RefCell::new(None) };
+    /// A loop test's open sentence window (#1803), in the scenario's
     /// monotonic microseconds, in place of onboarding's own.
-    static TEST_NEAR_WINDOW: std::cell::Cell<Option<(u64, u64)>> =
-        const { std::cell::Cell::new(None) };
-    /// The same for the step's sentence window.
     static TEST_SENTENCE_WINDOW: std::cell::Cell<Option<(u64, u64)>> =
         const { std::cell::Cell::new(None) };
 }
 
-/// Whether onboarding's near-call try window is open at `at_us` (#1803):
-/// what is said in it is the person calling the lamp's name for the
-/// measurement, and the lamp's answer would spoil the try, so the voice
-/// holds its reply to it. Nothing outside the step is held.
-fn near_call_window(onboarding: Option<&crate::onboarding::Onboarding>, at_us: u64) -> bool {
+/// Whether onboarding's near-call step holds the reply to the utterance
+/// whose speech began at `began_us`, at `at_us` (#1803): its try window is
+/// open and the lamp's name was heard as it began, so it is the person
+/// calling the lamp for the measurement, and the lamp's answer would spoil
+/// the try. Nothing outside the step is held.
+fn near_call_window(
+    onboarding: Option<&crate::onboarding::Onboarding>,
+    began_us: Option<u64>,
+    at_us: u64,
+) -> bool {
+    let Some(began_us) = began_us else {
+        return false;
+    };
     #[cfg(test)]
-    if let Some((from, to)) = TEST_NEAR_WINDOW.with(std::cell::Cell::get) {
-        return (from..to).contains(&at_us);
+    if let Some(held) = TEST_NEAR.with(|near| {
+        near.borrow()
+            .as_ref()
+            .map(|flow| flow.holds_reply(began_us, at_us))
+    }) {
+        return held;
     }
-    onboarding.is_some_and(|walk| walk.near_holds_reply(at_us))
+    onboarding.is_some_and(|walk| walk.near_holds_reply(began_us, at_us))
 }
 
 /// Whether the sentence part's window of onboarding's `how_you_sound` is
@@ -4115,8 +4127,9 @@ fn conversation_with_gate(
     // (`LAMP_SHORT_SOUNDS`): until it is answered the lamp does not ponder
     // it, and the room and the provider do not count it as talk.
     let mut sound_turn: Option<u64> = None;
-    // A turn heard during the near-call step's try window (#1803): it ends
-    // unanswered, however long it runs past the window.
+    // A call heard during the near-call step's try window (#1803): it ends
+    // unanswered, however long it runs past the window, if it is no more
+    // than a call.
     let mut near_call_turn: Option<u64> = None;
     // The turn whose line began in the sentence window (#1803): marked
     // count-only to the provider, its words are counted for onboarding and
@@ -6172,11 +6185,19 @@ fn conversation_with_gate(
                 step => step,
             };
             // An utterance ending in the near-call window is held too, even
-            // if no block of it was (#1803).
-            if matches!(step, AdmissionStep::End(_))
-                && near_call_window(onboarding.as_ref(), monotonic_us())
-            {
-                near_call_turn = reply.as_ref().map(|current| current.owner.turn());
+            // if no block of it was (#1803); but only a call: one with more
+            // said than the name ("can we skip this?") goes on as any other.
+            if matches!(step, AdmissionStep::End(_)) {
+                if near_call_window(
+                    onboarding.as_ref(),
+                    speech_levels.front().map(|(at, _)| *at),
+                    monotonic_us(),
+                ) {
+                    near_call_turn = reply.as_ref().map(|current| current.owner.turn());
+                }
+                if speech_levels.len() > usize::from(crate::activity::CALL_SPEECH_BLOCKS) {
+                    near_call_turn = None;
+                }
             }
             match step {
                 AdmissionStep::None => {}
@@ -6605,7 +6626,11 @@ fn conversation_with_gate(
                         return Err(io::Error::other("speech continuation lost its owner").into());
                     };
                     let turn = current.owner.turn();
-                    if near_call_window(onboarding.as_ref(), monotonic_us()) {
+                    if near_call_window(
+                        onboarding.as_ref(),
+                        speech_levels.front().map(|(at, _)| *at),
+                        monotonic_us(),
+                    ) {
                         near_call_turn = Some(turn);
                     }
                     let mut resumed = None;
@@ -6806,7 +6831,7 @@ fn conversation_with_gate(
                                 "acoustic_speech_end":null});
                         if near_call {
                             endpoint_record["onboarding_near_call"] = json!(
-                                "held: heard in the near-call step's try window, so the lamp does not answer its name"
+                                "held: the name alone, heard in the near-call step's try window, so the lamp does not answer it"
                             );
                         } else {
                             endpoint_record["not_speech"] = json!({"speech_blocks":speech_levels.len(),"fewer_than":crate::not_speech::SCRAP_BLOCKS,
@@ -8147,6 +8172,8 @@ fn conversation_with_gate(
                         match offer.step {
                             lamp_msgs::OnboardingStep::Privacy => "onboarding_privacy_invitation",
                             lamp_msgs::OnboardingStep::HowYouSound => "onboarding_near_call_prompt",
+                            // Only read, never offered by this voice.
+                            lamp_msgs::OnboardingStep::Unknown => "onboarding_invitation",
                         },
                         provider_session,
                         rig.playout_start,

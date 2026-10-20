@@ -328,25 +328,34 @@ fn the_lamp_speaking_spoils_only_the_half_second_before_to_a_second_after() {
     assert_eq!(judge(&mut walk, &prompt)["why"], "the lamp was speaking");
 }
 
-/// The voice holds its reply to what is said from the prompt's end to 7 s
+/// The voice holds its reply to the name heard from the prompt's end to 7 s
 /// on: with the lamp silent after the name, the call in it is accepted.
-/// Before the prompt has played whole, past the window and once the try is
+/// Before the prompt has played whole, before the name is heard, for what is
+/// said after the call ("skip that"), past the window and once the try is
 /// judged, nothing is held.
 #[test]
 fn the_reply_is_held_only_in_the_try_window_and_the_held_call_counts() {
     let store = Store::new(None);
     let mut walk = store.cycle(S);
-    assert!(!walk.near_holds_reply(10 * S));
+    assert!(!walk.near_holds_reply(10 * S, 10 * S));
     let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
-    assert!(!walk.near_holds_reply(prompt.ended_us - 1));
-    for after in [0, 2 * S, 7 * S] {
-        assert!(walk.near_holds_reply(prompt.ended_us + after), "{after}");
-    }
-    assert!(!walk.near_holds_reply(prompt.ended_us + 7 * S + 1));
+    let call = prompt.ended_us + 2 * S;
+    assert!(!walk.near_holds_reply(call, call));
     room(&mut walk, &prompt, 2_400, 21.0);
     name(&mut walk, &prompt, 2_000, 0.98);
+    assert!(!walk.near_holds_reply(call, prompt.ended_us - 1));
+    for after in [2 * S, 7 * S] {
+        assert!(
+            walk.near_holds_reply(call, prompt.ended_us + after),
+            "{after}"
+        );
+    }
+    // The detector is sure of speech a moment after the name began.
+    assert!(walk.near_holds_reply(call + 500_000, call + S));
+    assert!(!walk.near_holds_reply(call + 500_001, call + S));
+    assert!(!walk.near_holds_reply(call, prompt.ended_us + 7 * S + 1));
     assert_eq!(judge(&mut walk, &prompt)["accepted"], true);
-    assert!(!walk.near_holds_reply(prompt.ended_us + 3 * S));
+    assert!(!walk.near_holds_reply(call, prompt.ended_us + 3 * S));
 }
 
 /// Without a Controls receipt source privacy is `not_available` (Third on
@@ -789,9 +798,18 @@ fn a_sentence_said_close_with_its_words_covering_it_ends_the_step_done_and_keeps
     let mut walk = store.cycle(S);
     past_the_name(&mut walk);
     assert_eq!(ask(&mut walk, 80 * S, 4), SENTENCE_FIRST);
-    // Its window holds no name try: the near-call gate stays shut.
+    // Its window holds no name try: the near-call gate stays shut, even for
+    // a sentence that begins with the lamp's name, so the line goes on to its
+    // words and its answer is held as the sentence's.
     assert!(walk.sentence_window(80 * S) && walk.sentence_window(95 * S));
-    assert!(!walk.sentence_window(95 * S + 1) && !walk.near_holds_reply(81 * S));
+    walk.near_seen(Seen::hearing(
+        clock() + 1_600,
+        &NameHeard {
+            score: 0.98,
+            ago_ms: 600,
+        },
+    ));
+    assert!(!walk.sentence_window(95 * S + 1) && !walk.near_holds_reply(81 * S, 81 * S));
     let judged = sentence(&mut walk, 80 * S, 3_000, true, Some(9));
     assert_eq!(judged["accepted"], true, "{judged}");
     assert_eq!(judged["words"], 9);
