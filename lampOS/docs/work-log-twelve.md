@@ -441,3 +441,9 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   find); the installed lamp-controls still doesn't see the pads, asked
   about a newer install. Fourth's held hand-on to memory: yes, with three
   conditions (under 45 s, context at turn end, "forget that" ordering).
+- The memory side of #2145's held hand-on (the first builder's yes, 11:00):
+  `remember::hold` keeps the turn end's sources, rules and time; a forget
+  is counted before it reaches the store and the writer never writes an
+  exchange made before one; a stop hands held answers on before the session
+  closes. `e31557c7d` on `twelve/heard-to-memory`, 4 tests each with a
+  mutation; lamp-voice green. The PR waits for Fourth's folded heads.
