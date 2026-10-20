@@ -31,7 +31,23 @@ pub struct Visits {
     /// their start, in which the eyes knew the face at the lamp. A mark
     /// only: no name, nothing of whom.
     known: Vec<u64>,
+    /// With `LAMP_WHO_WAS_HERE_NAMES=on` too (#1997): the names the eyes knew
+    /// in a spell, by the spell's start, only of people who said yes to
+    /// being named to others, four a spell at most, in memory only.
+    names: Vec<(u64, String)>,
 }
+
+/// How a spell's person is said: as someone, someone the lamp knows, or
+/// with the name of someone who said yes to being named.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Telling {
+    Someone,
+    Known,
+    Named,
+}
+
+/// The most names kept for one spell.
+const MOST_NAMES: usize = 4;
 
 impl Visits {
     /// A value of `room/presence` at `at_us`. A spell begins when someone
@@ -83,6 +99,7 @@ impl Visits {
         }
         let oldest = self.spells.front().map_or(u64::MAX, |(from, _, _)| *from);
         self.known.retain(|from| *from >= oldest);
+        self.names.retain(|(from, _)| *from >= oldest);
         while self.unseen.len() > MOST
             || self.unseen.front().is_some_and(|(_, until)| *until < since)
         {
@@ -100,22 +117,43 @@ impl Visits {
         }
     }
 
+    /// The eyes knew `name`, someone who said yes to being named, at the
+    /// lamp during the spell going on, if one is.
+    pub fn named(&mut self, name: &str) {
+        let Some((from, None, _)) = self.spells.back() else {
+            return;
+        };
+        let from = *from;
+        let here = self.names.iter().filter(|(of, _)| *of == from);
+        if here.clone().count() < MOST_NAMES && !here.clone().any(|(_, kept)| kept == name) {
+            self.names.push((from, name.to_owned()));
+        }
+    }
+
+    /// Only the names still in `tellable` (the eyes' word, now) are kept: a
+    /// no, a forget or a reset lets the rest go.
+    pub fn keep_names(&mut self, tellable: &[String]) {
+        self.names.retain(|(_, name)| tellable.contains(name));
+    }
+
     /// What the record says of the last `within_us` before `now_us`, in
     /// words for the model, with each time as `when` says it (a local time
     /// of day, or how long ago).
     pub fn told(&self, now_us: u64, within_us: u64, when: impl Fn(u64) -> String) -> String {
-        self.told_marking(now_us, within_us, when, false)
+        self.told_as(now_us, within_us, when, Telling::Someone)
     }
 
-    /// [`Visits::told`], with `marked` each spell the eyes knew the face in
-    /// said as "someone the lamp knows", never who.
-    pub fn told_marking(
+    /// [`Visits::told`], with `Known` each spell the eyes knew the face in
+    /// said as "someone the lamp knows", never who; with `Named` too, a
+    /// spell with names kept said with them.
+    pub fn told_as(
         &self,
         now_us: u64,
         within_us: u64,
         when: impl Fn(u64) -> String,
-        marked: bool,
+        telling: Telling,
     ) -> String {
+        let marked = telling != Telling::Someone;
         let Some((last_us, someone)) = self.last else {
             return "The lamp has no record of who was at it: its eyes have said nothing about \
                     the room since it started (presence is off, or they could not see). Say you \
@@ -127,18 +165,33 @@ impl Visits {
         let mut lines: Vec<(u64, String)> = Vec::new();
         for (from, until, face) in &self.spells {
             // A voice with no face: someone passing or out of view.
-            let who = if marked && self.known.contains(from) {
-                "someone the lamp knows"
+            let names: Vec<&str> = if telling == Telling::Named {
+                self.names
+                    .iter()
+                    .filter(|(of, _)| of == from)
+                    .map(|(_, name)| name.as_str())
+                    .collect()
             } else {
-                "someone"
+                Vec::new()
             };
-            let (was, has_been) = if *face {
-                ("was at the lamp", "has been at the lamp")
-            } else {
-                (
+            let who = match names.as_slice() {
+                [] if marked && self.known.contains(from) => "someone the lamp knows".to_owned(),
+                [] => "someone".to_owned(),
+                [one] => (*one).to_owned(),
+                [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+            };
+            let many = names.len() > 1;
+            let (was, has_been) = match (*face, many) {
+                (true, false) => ("was at the lamp", "has been at the lamp"),
+                (true, true) => ("were at the lamp", "have been at the lamp"),
+                (false, false) => (
                     "was heard near the lamp, not seen,",
                     "has been heard near the lamp, not seen,",
-                )
+                ),
+                (false, true) => (
+                    "were heard near the lamp, not seen,",
+                    "have been heard near the lamp, not seen,",
+                ),
             };
             match until {
                 Some(until) if *until >= since => lines.push((
@@ -188,7 +241,15 @@ impl Visits {
             .iter()
             .filter(|(_, until, _)| until.is_some_and(|until| until >= since))
             .count();
-        let mut told = if marked {
+        let mut told = if telling == Telling::Named {
+            format!(
+                "The lamp's record of the room over the last {}, from its eyes and ears: times, \
+                 and a name only for someone who said yes to being named to others; anyone \
+                 else its eyes knew is someone the lamp knows, anyone else someone, and it keeps \
+                 no picture.",
+                length(within_us)
+            )
+        } else if marked {
             format!(
                 "The lamp's record of the room over the last {}, times only, from its eyes and \
                  ears: it never knows who anyone was, only whether its eyes knew a face, someone \
@@ -415,7 +476,7 @@ mod tests {
         visits.seen(true, 0, Some(SeenBy::Face), 30 * M);
         visits.seen(false, 20, None, 40 * M);
         let when = ago(41 * M);
-        let told = visits.told_marking(41 * M, 60 * M, &when, true);
+        let told = visits.told_as(41 * M, 60 * M, &when, Telling::Known);
         assert!(
             told.contains("- someone the lamp knows was at the lamp for "),
             "{told}"
@@ -427,7 +488,7 @@ mod tests {
         );
         assert!(told.contains("only whether its eyes knew a face"), "{told}");
         // Unmarked (no switch, or a skill without known_faces): as before.
-        let plain = visits.told_marking(41 * M, 60 * M, &when, false);
+        let plain = visits.told_as(41 * M, 60 * M, &when, Telling::Someone);
         assert_eq!(plain, visits.told(41 * M, 60 * M, &when));
         assert!(
             !plain.contains("the lamp knows") && plain.contains("never knows who"),
@@ -439,6 +500,50 @@ mod tests {
         visits.seen(true, 0, Some(SeenBy::Face), day);
         visits.known_here();
         assert_eq!(visits.known, [day], "only the new spell's mark is kept");
+    }
+
+    /// #1997: with names on, a spell is said with the names kept for it
+    /// (only of people who said yes), "were" for two; a spell the eyes knew
+    /// with no name is someone the lamp knows; names no longer in the eyes'
+    /// `tellable` are let go before telling.
+    #[test]
+    fn a_spell_is_named_only_for_who_said_yes_and_let_go_on_a_no() {
+        let mut visits = Visits::default();
+        visits.named("Alpha");
+        assert!(visits.names.is_empty(), "no spell going on: nothing kept");
+        visits.seen(true, 0, Some(SeenBy::Face), 10 * M);
+        visits.known_here();
+        for name in ["Alpha", "Alpha", "Beta", "Gamma", "Delta", "Epsilon"] {
+            visits.named(name);
+        }
+        assert_eq!(visits.names.len(), 4, "at most four, each once");
+        visits.seen(false, 20, None, 20 * M);
+        visits.seen(true, 0, Some(SeenBy::Face), 30 * M);
+        visits.known_here();
+        visits.seen(false, 20, None, 40 * M);
+        let when = ago(41 * M);
+        visits.keep_names(&["Alpha".to_owned(), "Beta".to_owned()]);
+        let told = visits.told_as(41 * M, 60 * M, &when, Telling::Named);
+        assert!(
+            told.contains("- Alpha and Beta were at the lamp for "),
+            "{told}"
+        );
+        assert!(
+            told.contains("- someone the lamp knows was at the lamp for "),
+            "the second spell, known with no name: {told}"
+        );
+        assert!(
+            told.contains("a name only for someone who said yes"),
+            "{told}"
+        );
+        // Not named: the names aren't said.
+        let known = visits.told_as(41 * M, 60 * M, &when, Telling::Known);
+        assert!(!known.contains("Alpha"), "{known}");
+        // A no: Beta's name goes.
+        visits.keep_names(&["Alpha".to_owned()]);
+        let after = visits.told_as(41 * M, 60 * M, &when, Telling::Named);
+        assert!(after.contains("- Alpha was at the lamp for "), "{after}");
+        assert!(!after.contains("Beta"), "{after}");
     }
 
     #[test]

@@ -9602,3 +9602,77 @@ body = { gesture = "nod" }
         assert!(error.contains("none of them empty"), "{field}: {error}");
     }
 }
+
+/// #1997 (`LAMP_WHO_WAS_HERE_NAMES`, the lead's yes): with names on, a visit
+/// by someone the eyes' `tellable` lists is told with their name, only to a
+/// skill with `known_faces = true`; once they're out of `tellable` (a no, a
+/// forget) the same visit is someone the lamp knows; with names off it
+/// never is named; a yes given after a visit doesn't name it.
+#[test]
+fn who_was_here_names_only_who_said_yes_and_only_to_a_skill_with_known_faces() {
+    let dir = tempfile::tempdir().unwrap();
+    let marked = WHO.replace("speak = true", "speak = true\nknown_faces = true");
+    let eyes = tempfile::tempdir().unwrap();
+    let known = eyes.path().join("known");
+    let tellable = eyes.path().join("tellable");
+    std::fs::write(&known, "Alpha\n").unwrap();
+    std::fs::write(&tellable, "Alpha\n").unwrap();
+    let engine = |toml: &str, naming: bool| -> Engine {
+        let who = load(&skill_with(dir.path(), "who", toml)).unwrap();
+        let mut engine = Engine::new(vec![who], true).marking_known(known.clone());
+        if naming {
+            engine = engine.naming_who_said_yes();
+        }
+        for at in (0..=60).step_by(2) {
+            engine.observe(
+                "room/presence",
+                at * 1_000_000,
+                br#"{"someone":true,"nobody_s":0,"by":"face"}"#,
+                Some(3_000),
+            );
+        }
+        engine
+    };
+    let note = |engine: &mut Engine| -> String {
+        let calls = engine
+            .tool("who_was_here", &serde_json::json!({}), 61_000_000)
+            .unwrap()
+            .calls;
+        match &calls[..] {
+            [Call::Say(note)] => note.clone(),
+            other => panic!("{other:?}"),
+        }
+    };
+    let mut named = engine(&marked, true);
+    let told = note(&mut named);
+    assert!(
+        told.contains("\n- Alpha has been at the lamp for 1 min"),
+        "{told}"
+    );
+    // Without known_faces, or with names off: never the name.
+    assert!(!note(&mut engine(WHO, true)).contains("Alpha"));
+    let off = note(&mut engine(&marked, false));
+    assert!(
+        off.contains("\n- someone the lamp knows has been at the lamp for 1 min")
+            && !off.contains("Alpha"),
+        "{off}"
+    );
+    // A no (out of tellable): the same visit is someone the lamp knows.
+    std::fs::remove_file(&tellable).unwrap();
+    let after = note(&mut named);
+    assert!(
+        after.contains("\n- someone the lamp knows has been at the lamp for 1 min")
+            && !after.contains("Alpha"),
+        "{after}"
+    );
+    // A yes given after the visit doesn't name it: the name is kept only if
+    // it was in tellable when the visit was seen.
+    let mut earlier = engine(&marked, true);
+    std::fs::write(&tellable, "Alpha\n").unwrap();
+    let later = note(&mut earlier);
+    assert!(
+        later.contains("\n- someone the lamp knows has been at the lamp for 1 min")
+            && !later.contains("Alpha"),
+        "{later}"
+    );
+}
