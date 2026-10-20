@@ -72,6 +72,7 @@ fn real(skills: Option<skills::Places>) -> Real {
         photos: None,
         faces: None,
         schedule: None,
+        update_page: false,
     }
 }
 

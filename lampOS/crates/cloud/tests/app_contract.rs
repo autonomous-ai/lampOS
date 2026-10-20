@@ -166,6 +166,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         photos: None,
         faces: None,
         schedule: None,
+        update_page: false,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -266,6 +267,7 @@ fn the_faces_page_reads_names_and_removes_one() {
             memory: None,
         }),
         schedule: None,
+        update_page: false,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -396,6 +398,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         photos: None,
         faces: None,
         schedule: Some(lamp_actions::schedule::Adapter::new(socket.clone()).unwrap()),
+        update_page: false,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -455,5 +458,101 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
             "{kind}"
         );
     }
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// #2194: `update.status` for the Lamp 2 page, from lamp-update's kept
+/// `update/status` on the bus, with the field types the app takes; `now`
+/// is `unknown` before lamp-update has said anything, and without
+/// `LAMP_APP_UPDATE=on` the kind is not here.
+#[test]
+fn the_software_update_is_answered_from_lamp_updates_status() {
+    let root = PathBuf::from(format!("/tmp/lcu-{}", std::process::id()));
+    let places = lamp(&root);
+    let bus_root = root.join("bus");
+    std::fs::create_dir_all(&bus_root).unwrap();
+    let mut real = Real {
+        places,
+        bus: Some(Bus::new(&bus_root).unwrap()),
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
+        update_page: true,
+    };
+    let me = Identity {
+        device: "lamp".into(),
+        version: "812+460a1a1aa2b3".into(),
+        id: "d-42".into(),
+        mac: "lamp-7f72".into(),
+        ..Identity::default()
+    };
+    let replied = |real: &mut Real| -> Value {
+        let result = answer(real, "update.status", &json!({}));
+        let sent = me
+            .data("2026-10-20T17:00:00Z", "update.status", &result)
+            .to_string();
+        serde_json::from_str(&sent).unwrap()
+    };
+    let before = replied(&mut real);
+    assert_eq!(before["status"], "success", "{before}");
+    assert_eq!(before["data"]["now"], "unknown");
+    assert!(before["data"]["running"].is_null() && before["data"]["last"].is_null());
+
+    let update = Bus::new(&bus_root).unwrap();
+    let mut says = update
+        .publisher_declared(
+            lamp_msgs::UpdateStatus::TOPIC,
+            &lamp_msgs::UpdateStatus::declaration(),
+            "update",
+        )
+        .unwrap();
+    says.publish_json(
+        0,
+        &lamp_msgs::UpdateStatus {
+            running: Some(lamp_msgs::UpdateBuild {
+                sequence: 3309,
+                commit: "4a39f0412".into(),
+            }),
+            now: "fetching".into(),
+            last: Some(lamp_msgs::UpdateResult {
+                outcome: "up-to-date".into(),
+                sequence: Some(3309),
+                at_unix_ms: 1_760_950_000_000,
+            }),
+        },
+    )
+    .unwrap();
+    let told = replied(&mut real);
+    assert_eq!(told["status"], "success", "{told}");
+    let data = &told["data"];
+    for (path, kind_of_value) in [
+        ("running.sequence", Type::Whole),
+        ("running.commit", Type::Text),
+        ("now", Type::Text),
+        ("last.outcome", Type::Text),
+        ("last.sequence", Type::Whole),
+        ("last.at_unix_ms", Type::Whole),
+        ("stale", Type::Flag),
+    ] {
+        let value = field(data, path);
+        assert!(
+            value.is_some_and(|value| is(value, kind_of_value)),
+            "update.status {path}: the app takes {kind_of_value:?}, lamp-cloud said {value:?}"
+        );
+    }
+    assert_eq!(data["now"], "fetching");
+    assert_eq!(data["running"]["sequence"], 3309);
+
+    // Without the switch the kind is not here.
+    real.update_page = false;
+    assert!(answer(&mut real, "update.status", &json!({})).is_err());
     let _ = std::fs::remove_dir_all(root);
 }

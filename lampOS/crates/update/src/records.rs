@@ -400,12 +400,52 @@ impl Records {
     /// One line in the log: what happened, and a sentence. Best effort: a
     /// full disk must not stop an update going back.
     pub fn log(&self, event: &str, line: &str) {
+        self.log_entry(serde_json::json!({"at_unix_ms": unix_ms(), "event": event, "line": line}));
+    }
+
+    /// A round's end in the log, marked as one and with the build it was
+    /// about: what `update/status` says as the last result, read back when
+    /// lamp-update starts again (#2194, `crate::status`).
+    pub fn log_round(&self, event: &str, line: &str, sequence: Option<u64>) {
+        self.log_entry(serde_json::json!({
+            "at_unix_ms": unix_ms(),
+            "event": event,
+            "line": line,
+            "round": true,
+            "sequence": sequence,
+        }));
+    }
+
+    /// The last round's end the log holds, newest file first: its event,
+    /// build and time. Lines a round did not write are passed over.
+    pub fn last_round(&self) -> Option<(String, Option<u64>, u64)> {
+        for name in ["log.jsonl", "log.jsonl.1"] {
+            let Ok(text) = fs::read_to_string(self.folder.join(name)) else {
+                continue;
+            };
+            let found = text.lines().rev().find_map(|line| {
+                let entry: serde_json::Value = serde_json::from_str(line).ok()?;
+                (entry["round"] == true).then(|| {
+                    (
+                        entry["event"].as_str().unwrap_or_default().to_owned(),
+                        entry["sequence"].as_u64(),
+                        entry["at_unix_ms"].as_u64().unwrap_or(0),
+                    )
+                })
+            });
+            if found.is_some() {
+                return found;
+            }
+        }
+        None
+    }
+
+    fn log_entry(&self, entry: serde_json::Value) {
         let _ = self.make();
         let path = self.folder.join("log.jsonl");
         if fs::metadata(&path).is_ok_and(|found| found.len() > MOST_LOG_BYTES) {
             let _ = fs::rename(&path, self.folder.join("log.jsonl.1"));
         }
-        let entry = serde_json::json!({"at_unix_ms": unix_ms(), "event": event, "line": line});
         if let Ok(mut file) = OpenOptions::new()
             .append(true)
             .create(true)

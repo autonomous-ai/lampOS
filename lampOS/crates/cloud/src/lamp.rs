@@ -83,6 +83,9 @@ pub struct Real {
     /// The lamp's timers and reminders for the app, with
     /// `LAMP_APP_SCHEDULE=on` (#2195, `crate::schedule`).
     pub schedule: Option<lamp_actions::schedule::Adapter>,
+    /// The lamp's software update for the app, with `LAMP_APP_UPDATE=on`
+    /// (#2194, `crate::update`).
+    pub update_page: bool,
 }
 
 /// Texts from the app (`crate::chat`, #1673): whether they are taken, the
@@ -559,6 +562,14 @@ impl Lamp for Real {
         self.schedule.as_ref()
     }
 
+    fn update_page(&self) -> bool {
+        self.update_page
+    }
+
+    fn update_status(&self) -> Option<lamp_bus::Message> {
+        self.latest(lamp_msgs::UpdateStatus::TOPIC)
+    }
+
     fn new_run(&mut self, now_ms: u64) -> String {
         self.texts.stream.new_run(now_ms)
     }
@@ -700,6 +711,7 @@ mod tests {
             photos: None,
             faces: None,
             schedule: None,
+            update_page: false,
         };
         let level = Volume {
             volume: 35,
@@ -825,6 +837,7 @@ mod tests {
             photos: None,
             faces: None,
             schedule: None,
+            update_page: false,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.
