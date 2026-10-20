@@ -169,6 +169,11 @@ pub struct Judge {
     leaving: Option<(u64, u32, Option<Side>)>,
     said: Option<(Activity, u64)>,
     journaled_at: Option<u64>,
+    /// The journal's line for a sitter's face lost, once a loss: how its
+    /// last looks moved against what standing up needs (#1669 (e), row 14
+    /// on lamp-52e6), and the look it was said for.
+    lost_line: Option<String>,
+    lost_said_for: Option<u64>,
     /// With the recogniser: the sitter's prints, and what is asked for.
     prints: Option<Prints>,
 }
@@ -409,6 +414,29 @@ impl Judge {
 
     /// A look with no face near: perhaps they stood up and left.
     fn lost(&mut self, now_us: u64) {
+        if let (Some(last_at), Some((_, first)), Some((_, last))) =
+            (self.last_face, self.recent.front(), self.recent.back())
+            && self.lost_said_for != Some(last_at)
+            && now_us.saturating_sub(last_at) <= STOOD_WITHIN_US
+        {
+            self.lost_said_for = Some(last_at);
+            let height = first.height.max(f32::EPSILON);
+            let (rise, size) = (
+                (first.centre_y - last.centre_y) / height,
+                last.height / height,
+            );
+            self.lost_line = Some(format!(
+                "sitter's face lost: over its last {} looks it rose {rise:.2} of its height (standing up needs {STOOD_RISE:.2}) and was {size:.2} as tall (needs {STOOD_SHRINK:.2} or less), last {:.2} across, {:.2} tall: {}",
+                self.recent.len(),
+                last.across,
+                last.height,
+                if rise >= STOOD_RISE && size <= STOOD_SHRINK {
+                    "rising"
+                } else {
+                    "not standing up"
+                }
+            ));
+        }
         if self.leaving.is_none()
             && self
                 .last_face
@@ -430,6 +458,12 @@ impl Judge {
             };
             self.leaving = Some((now_us, sitting, side));
         }
+    }
+
+    /// The journal's line for the sitter's face lost, once a loss: numbers
+    /// only, so a run can tell why a leave was or wasn't a standing up.
+    pub fn lost_journal(&mut self) -> Option<String> {
+        self.lost_line.take()
     }
 
     /// Someone stood up and left: once, [`STOOD_GONE_US`] after the face was
@@ -891,16 +925,32 @@ mod tests {
             );
         }
         judge.looked(131 * S, &[]);
+        let line = judge.lost_journal().unwrap();
+        assert!(
+            line.starts_with(
+                "sitter's face lost: over its last 6 looks it rose 1.05 of its height"
+            ) && line.ends_with(": rising"),
+            "{line}"
+        );
+        assert_eq!(judge.lost_journal(), None, "once a loss");
         assert_eq!(judge.stood_up(132 * S), None, "not gone 2 s yet");
         judge.looked(132 * S + S / 2, &[]);
         let up = judge.stood_up(133 * S).unwrap();
         assert_eq!(up.sitting_s, 130);
         assert_eq!(up.side, None, "left from the middle: no side");
         assert_eq!(judge.stood_up(134 * S), None, "once");
-        // A face that only looked away (no rise) is not standing up.
+        // A face that only looked away (no rise) is not standing up, and
+        // the journal says by how much.
         let mut judge = seated();
         looks(&mut judge, 125, 130, Some(SEATED));
         judge.looked(131 * S, &[]);
+        let line = judge.lost_journal().unwrap();
+        assert!(
+            line.contains("rose 0.00 of its height") && line.ends_with(": not standing up"),
+            "{line}"
+        );
+        judge.looked(132 * S, &[]);
+        assert_eq!(judge.lost_journal(), None, "said once, not every look");
         assert_eq!(judge.stood_up(140 * S), None);
         // Rising and back within 2 s: not standing up either.
         let mut judge = seated();

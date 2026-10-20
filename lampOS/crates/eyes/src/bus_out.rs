@@ -563,6 +563,9 @@ impl BusOut {
             if let Some(line) = activity.judge.journal(now_us) {
                 eprintln!("lamp-eyes: {line}");
             }
+            if let Some(line) = activity.judge.lost_journal() {
+                eprintln!("lamp-eyes: {line}");
+            }
         }
     }
 
