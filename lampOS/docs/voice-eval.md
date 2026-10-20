@@ -693,8 +693,8 @@ fell back because the worker failed. `N` is the arm's start on the voice's
 clock (`at_us`): only the ends from it on are counted, while a worker state
 set before it still holds. Counts and states only, no words.
 
-A played test runs it after each arm (the first builder on #1722, 20 Oct
-2026 07:20): from 19 Oct lamp-4ace's `lamp-turn-end` was the 14 Oct build,
+Run it after each arm of a played test (the first builder on #1722, 20 Oct
+2026 07:20; nothing here runs it for you yet): from 19 Oct lamp-4ace's `lamp-turn-end` was the 14 Oct build,
 refused its new options and failed, so every end of speech waited its whole
 600 ms, on every arm of every played test, and no table said so.
 `arm-hour.sh --preflight` checks the same worker before an arm hour.

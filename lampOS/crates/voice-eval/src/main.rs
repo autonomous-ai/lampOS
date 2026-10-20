@@ -308,11 +308,14 @@ fn endpoint(all: &[String]) -> Result<i32> {
     Ok(if summary.faults().is_empty() { 0 } else { 1 })
 }
 
-/// Every `events-*.jsonl` under `dir`, at any depth.
+/// Every `events-*.jsonl` under `dir`, at any depth. A link is not followed,
+/// so a link to a folder above can't send it round for ever (the reviewer on
+/// #2097).
 fn session_records(dir: &Path, found: &mut Vec<PathBuf>) -> Result<()> {
     for entry in fs::read_dir(dir).map_err(named(dir))? {
-        let path = entry.map_err(named(dir))?.path();
-        if path.is_dir() {
+        let entry = entry.map_err(named(dir))?;
+        let path = entry.path();
+        if entry.file_type().map_err(named(&path))?.is_dir() {
             session_records(&path, found)?;
         } else if path
             .file_name()
