@@ -86,3 +86,15 @@ Ready for lamp-voice: yes (#2298, #2277, #2319)
   person key.
 - The Mac reached load ~400 with six agents running full suites: now
   targeted tests only, ARM64 is the full gate.
+
+## 2026-10-21 night: every #2176 row of mine merged
+
+Ready for lamp-voice: yes (all merged)
+
+- Merged: #2197, #2198, #2206, #2241, #2277 (row 6), #2279, #2282 (3r),
+  #2298 (11), #2299 (10), #2319 (5a, Live only), #2330 (row 3: stable
+  person id; a remove forgets the by-name id only when no other record
+  holds it).
+- Open for #2176: lamp-06c1 re-test with the person (previous-day recall
+  of 20 Oct room facts; the cases with the new switches), the probe after
+  #2063 once it has #2279, twelve's #2226.
