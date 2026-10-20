@@ -346,7 +346,12 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         // answer on the standard output, as systemd hands it a connection
         // to `lamp-skills-manage.socket`; the journal says what was done.
         ("asked", []) => {
-            return match package::asked(&dir, std::io::stdin(), std::io::stdout()) {
+            return match package::asked(
+                &dir,
+                package::ASKED_LOCK_WAIT,
+                std::io::stdin(),
+                std::io::stdout(),
+            ) {
                 Ok(true) => ExitCode::SUCCESS,
                 Ok(false) => ExitCode::FAILURE,
                 Err(error) => {

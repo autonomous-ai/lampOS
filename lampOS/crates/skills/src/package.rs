@@ -851,11 +851,17 @@ pub const ASKED_MOST: u64 = 4_096;
 /// `{"remove": NAME}`, a skill taken off by [`remove`], which checks it
 /// itself, whoever asked: a name that is not a skill's and a core skill are
 /// refused here, not only by the asker (`lamp-cloud`'s `skills.remove`,
-/// #1722). It waits at most [`ASKED_LOCK_WAIT`] for the folder, then refuses
+/// #1722). It waits at most `lock_wait` ([`ASKED_LOCK_WAIT`] on the lamp,
+/// shorter only in a test) for the folder, then refuses
 /// with [`BUSY`] having done nothing; a skill renamed aside whose old folder
 /// was not deleted is answered done, that folder's path in the journal only. `install` is not taken: it will be, for a package from the update
 /// channel under its key's signature alone, once the channel carries skills.
-pub fn asked(skills: &Path, input: impl Read, mut output: impl io::Write) -> io::Result<bool> {
+pub fn asked(
+    skills: &Path,
+    lock_wait: Duration,
+    input: impl Read,
+    mut output: impl io::Write,
+) -> io::Result<bool> {
     let mut line = String::new();
     // A request past its bound, or not UTF-8, is no request.
     let _ = io::BufReader::new(input.take(ASKED_MOST)).read_line(&mut line);
@@ -871,7 +877,7 @@ pub fn asked(skills: &Path, input: impl Read, mut output: impl io::Write) -> io:
         // Renamed aside is removed: where it was set aside, and why it
         // was not then deleted, go to the journal alone.
         (Some(serde_json::Value::String(name)), _) => {
-            taken_off(skills, name, Some(ASKED_LOCK_WAIT)).map(|left| {
+            taken_off(skills, name, Some(lock_wait)).map(|left| {
                 if let Some(left) = left {
                     eprintln!("lamp-skills: asked: removed {name}, but {left}");
                 }
