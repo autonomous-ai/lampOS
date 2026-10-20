@@ -2958,6 +2958,49 @@ async fn a_checked_sound_with_a_word_right_after_the_lamps_question_is_answered(
     }
 }
 
+/// #1854's follow-up (lamp-75c9, 20 Oct 18:19): with
+/// `LAMP_SECOND_WRITTEN_WAIT=on` a turn the lamp wrote itself, such as task
+/// news, is said though its chat begins at 5 s, past `BEGIN_WITHIN`; one that
+/// never begins ends unanswered at `WRITTEN_BEGIN_WITHIN`. A spoken line is
+/// bounded as before. Without the switch, the written turn ends at 3 s
+/// (`a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered`).
+#[tokio::test(start_paused = true)]
+async fn with_its_switch_a_written_turn_waits_seven_seconds_to_begin() {
+    async fn said(first_event_after: Duration, input: ProviderInput) -> (Vec<String>, Duration) {
+        let script = Arc::new(Script {
+            chats: Mutex::new([vec![text("Devin finished."), Ok(ChatEvent::Done)]].into()),
+            first_event_after: Some(first_event_after),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.waiting_for_written(true);
+        engine.submit(input);
+        let begun = tokio::time::Instant::now();
+        let mut said = Vec::new();
+        loop {
+            match engine.next().await {
+                ProviderOutput::Transcript {
+                    request: Some(_),
+                    text,
+                    ..
+                } if !text.is_empty() => said.push(text),
+                ProviderOutput::TurnComplete { .. } => return (said, begun.elapsed()),
+                ProviderOutput::TurnFailed { .. } => panic!("failed"),
+                _ => {}
+            }
+        }
+    }
+    let news = || written(1, "(Nobody has spoken. News from work you handed over.)");
+    let (slow, _) = said(Duration::from_secs(5), news()).await;
+    assert_eq!(slow, ["Devin finished."]);
+    let (never, after) = said(Duration::from_secs(60), news()).await;
+    assert!(never.is_empty(), "{never:?}");
+    assert!(
+        after >= WRITTEN_BEGIN_WITHIN && after < WRITTEN_BEGIN_WITHIN + Duration::from_millis(100),
+        "{after:?}"
+    );
+}
+
 /// The first builder, 21:25: a look's first round may take 5 s, not 3 s;
 /// past it the lamp says it could not look rather than nothing. A refused
 /// picture's retry stays inside the same 5 s (Second on #1154).
@@ -5668,4 +5711,15 @@ async fn the_latest_answers_words_are_kept_for_the_count() {
         said.1.contains("Rain.") && !said.1.contains("four"),
         "{said:?}"
     );
+}
+
+/// #1854's follow-up: with `LAMP_SECOND_WRITTEN_WAIT=on` a turn the
+/// lamp wrote itself may begin as late as 7 s; a spoken one, or any
+/// without the switch, as before.
+#[test]
+fn a_written_turn_waits_longer_only_with_its_switch() {
+    assert_eq!(begin_within(false, true), WRITTEN_BEGIN_WITHIN);
+    assert_eq!(begin_within(true, true), BEGIN_WITHIN);
+    assert_eq!(begin_within(false, false), BEGIN_WITHIN);
+    assert!(WRITTEN_BEGIN_WITHIN > BEGIN_WITHIN && WRITTEN_BEGIN_WITHIN < Duration::from_secs(8));
 }

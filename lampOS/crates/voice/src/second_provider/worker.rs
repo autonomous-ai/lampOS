@@ -1701,6 +1701,19 @@ pub fn serve(
         );
     }
     engine = engine.saying_once(said_once);
+    // The lamp's own written turns, news above all, may begin later than a
+    // spoken one (`LAMP_SECOND_WRITTEN_WAIT=on`; #1854's follow-up).
+    let written_wait = std::env::var(crate::second_provider::WRITTEN_WAIT_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if written_wait {
+        eprintln!(
+            "lamp-voice second: a turn the lamp wrote itself may begin as late as {} ms (LAMP_SECOND_WRITTEN_WAIT)",
+            crate::second_provider::WRITTEN_BEGIN_WITHIN.as_millis()
+        );
+    }
+    engine = engine.waiting_for_written(written_wait);
     // A line lost on the network is asked once more when a service host
     // answers again, the link's own check (`LAMP_RESEND_LOST_LINE=on`; the
     // first builder's 00:02 on #1722). As the only voice, with its hosts.

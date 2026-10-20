@@ -101,6 +101,13 @@ pub const BEGIN_WITHIN_AFTER_CUE: Duration = Duration::from_millis(4_500);
 /// first builder, 21:25). Past it, after "Let me look.", the lamp says
 /// [`COULD_NOT_LOOK`] rather than nothing.
 pub const LOOK_BEGIN_WITHIN: Duration = Duration::from_secs(5);
+/// With `LAMP_SECOND_WRITTEN_WAIT=on` ([`WRITTEN_WAIT_ENVIRONMENT`]): a turn
+/// the lamp wrote itself (news, a skill's say, a reminder; not a look) may
+/// begin this late. Nobody asked and nobody waits, so [`BEGIN_WITHIN`]'s
+/// reason doesn't hold, and a turn given up is news lost: on lamp-75c9 on
+/// 20 Oct at 18:19 "Devin finished" began past 3 s, ended unanswered, and
+/// was never told (`no_audio_answer`). Under the coordinator's 8 s.
+pub const WRITTEN_BEGIN_WITHIN: Duration = Duration::from_secs(7);
 /// What the lamp says when a look's first round has not begun within
 /// [`LOOK_BEGIN_WITHIN`]: after "Let me look.", silence reads as broken.
 pub const COULD_NOT_LOOK: &str = "I couldn't get a good look.";
@@ -255,6 +262,11 @@ pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 /// six forty-four and change.", 2 of the last 4 runs).
 pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 
+/// The second route waits [`WRITTEN_BEGIN_WITHIN`] for the first round of a
+/// turn the lamp wrote itself ([`Engine::waiting_for_written`]): `on`, and
+/// nothing else (#1854's follow-up, the first builder at 18:28 on #1722).
+pub const WRITTEN_WAIT_ENVIRONMENT: &str = "LAMP_SECOND_WRITTEN_WAIT";
+
 /// The note after a round's call results, when that round said `said`
 /// before its calls: the person heard it, so the next round says only what
 /// the results add ([`Engine::saying_once`]).
@@ -395,6 +407,9 @@ struct Shared {
     /// [`Engine::saying_once`]: a round that said words before its calls
     /// tells the next one so ([`said_once_note`]).
     said_once: bool,
+    /// The lamp's own written turns may begin as late as
+    /// [`WRITTEN_BEGIN_WITHIN`] ([`Engine::waiting_for_written`]).
+    written_wait: bool,
     /// [`Engine::resending`]: a spoken line whose chat was lost on the
     /// network is asked once more when the link is back.
     resend: Option<LinkBack>,
@@ -826,6 +841,7 @@ impl Engine {
                 misheard_at_us: Mutex::new(None),
                 holding_answer: false,
                 said_once: false,
+                written_wait: false,
                 resend: None,
                 hearing: None,
                 asked: None,
@@ -1086,6 +1102,17 @@ impl Engine {
     pub fn saying_once(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.said_once = on;
+        }
+        self
+    }
+
+    /// `LAMP_SECOND_WRITTEN_WAIT=on` ([`WRITTEN_WAIT_ENVIRONMENT`]): a turn
+    /// the lamp wrote itself, news above all, waits as long as
+    /// [`WRITTEN_BEGIN_WITHIN`] for its first round, not [`BEGIN_WITHIN`].
+    /// Before any turn only.
+    pub fn waiting_for_written(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.written_wait = on;
         }
         self
     }
@@ -2828,6 +2855,17 @@ enum Asker {
     Reminder,
 }
 
+/// How long a turn's first round may take to begin, when it has no wait's
+/// sound and is no look: [`WRITTEN_BEGIN_WITHIN`] for one the lamp wrote
+/// itself with `written_wait`, else [`BEGIN_WITHIN`].
+fn begin_within(heard: bool, written_wait: bool) -> Duration {
+    if !heard && written_wait {
+        WRITTEN_BEGIN_WITHIN
+    } else {
+        BEGIN_WITHIN
+    }
+}
+
 /// A request's times for [`ProviderOutput::Stages`], from `from` (a spoken
 /// request's line end as this route got it, a written one's start).
 struct Times {
@@ -3152,7 +3190,7 @@ async fn answer(
                     } else if looking {
                         LOOK_BEGIN_WITHIN
                     } else {
-                        BEGIN_WITHIN
+                        begin_within(heard, shared.written_wait)
                     };
                     let mut next = tokio::time::timeout_at(at(first_wait), stream.next()).await;
                     if next.is_err()

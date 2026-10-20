@@ -1154,6 +1154,7 @@ fn second_route_worker_environment(
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
+        crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1197,6 +1198,7 @@ mod tests {
             crate::second_provider::STEADY_FIRST_ENVIRONMENT,
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
+            crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -1497,6 +1499,7 @@ mod tests {
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
+                    || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                 {
                     "on"
@@ -1582,6 +1585,7 @@ mod tests {
                     "LAMP_SECOND_STEADY_FIRST=on",
                     "LAMP_SECOND_STT_WARM=on",
                     "LAMP_SECOND_WEATHER=on",
+                    "LAMP_SECOND_WRITTEN_WAIT=on",
                 ],
             ),
             (

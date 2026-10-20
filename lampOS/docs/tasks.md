@@ -922,6 +922,13 @@ reply in a thread, after reading the channel, in 37 s.
   the person answers it in the Devin session in Harness, but it may be told
   as a result, and the person can't answer Devin from the lamp. A computer
   agent's `needs-input` is unchanged.
+- **A finished session ends `stopped`.** On lamp-75c9 on 20 October, Devin
+  Cloud's session that had replied in Slack ended `stopped`, not
+  `needs-input`. So a cloud agent `stopped` with an answer is read as `idle`
+  too, and told as finished, not "stopped without finishing"; `wait` and
+  `ps`, which carry no answer, read it so, and `show` decides. One `stopped`
+  with no answer stays `stopped`, so it is told and never waited on.
+  `working` and `failed` are as Harness says.
 - **Never closed:** Harness closes no cloud harness ("stop it in Harness"),
   so `close` is never run for one and its task's close is `refused`, once,
   never tried again. **So each hand-over leaves a Devin session open on the
