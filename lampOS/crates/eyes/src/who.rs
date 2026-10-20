@@ -34,6 +34,12 @@ pub const PRINT: usize = 128;
 /// At or over this cosine, two prints are one person: OpenCV's own
 /// threshold for this model.
 pub const SAME_PERSON: f32 = 0.363;
+/// At or over this cosine, a face is near enough to a known person that a
+/// name within one letter of theirs is taken for a mishearing and asked
+/// about (#2176 row 4). On lamp-4ace on 20 Oct a person known since 16 Oct
+/// was saved again under a name one letter off theirs: the new prints came
+/// to at most 0.359 against their own, 0.004 under [`SAME_PERSON`].
+pub const NEAR_PERSON: f32 = 0.30;
 /// People kept, and prints kept of each.
 pub const MOST_PEOPLE: usize = 20;
 pub const MOST_PRINTS: usize = 5;
@@ -381,6 +387,74 @@ pub(crate) fn same_name(a: &str, b: &str) -> bool {
     a.to_lowercase() == b.to_lowercase()
 }
 
+/// Lower-case letters with their accents, by the letter without: the Latin
+/// ones and Vietnamese's, as the voice folds a heard name
+/// (`known_faces::ACCENTED`).
+const ACCENTED: &[(&str, char)] = &[
+    ("àáâãäåāăąảạằắẳẵặầấẩẫậ", 'a'),
+    ("çćč", 'c'),
+    ("ďđ", 'd'),
+    ("èéêëēėęěẻẽẹềếểễệ", 'e'),
+    ("ìíîïīįỉĩị", 'i'),
+    ("ľłĺ", 'l'),
+    ("ñńň", 'n'),
+    ("òóôõöøōőơỏọồốổỗộờớởỡợ", 'o'),
+    ("ŕř", 'r'),
+    ("śšşș", 's'),
+    ("ťţț", 't'),
+    ("ùúûüūůűưủũụừứửữự", 'u'),
+    ("ýÿỳỷỹỵ", 'y'),
+    ("źżž", 'z'),
+];
+
+/// A name lower-cased, with its accents and tone marks taken off, combining
+/// ones too: how two spellings of one name compare.
+fn folded(name: &str) -> Vec<char> {
+    name.trim()
+        .to_lowercase()
+        .chars()
+        .filter(|c| !('\u{300}'..='\u{36f}').contains(c))
+        .map(|c| {
+            ACCENTED
+                .iter()
+                .find(|(letters, _)| letters.contains(c))
+                .map_or(c, |(_, plain)| *plain)
+        })
+        .collect()
+}
+
+/// Two names of three letters or more that aren't the same name but fold to
+/// one, or are one letter apart (one put in, left out or changed) once
+/// folded: how a name misheard once is spelt, or one written two ways.
+/// Shorter names are never near, so "Al" is not asked about "Ali".
+pub(crate) fn near_name(a: &str, b: &str) -> bool {
+    if same_name(a, b) {
+        return false;
+    }
+    let (a, b) = (folded(a), folded(b));
+    if a.len().min(b.len()) < 3 || a.len().abs_diff(b.len()) > 1 {
+        return false;
+    }
+    if a == b {
+        return true;
+    }
+    let (short, long) = if a.len() <= b.len() {
+        (&a, &b)
+    } else {
+        (&b, &a)
+    };
+    let start = short
+        .iter()
+        .zip(long.iter())
+        .take_while(|(x, y)| x == y)
+        .count();
+    if short.len() == long.len() {
+        short[start + 1..] == long[start + 1..]
+    } else {
+        short[start..] == long[start + 1..]
+    }
+}
+
 /// The people the lamp was asked to remember, in one file of mode 0600.
 pub struct People {
     path: PathBuf,
@@ -594,6 +668,21 @@ impl People {
         Ok(name)
     }
 
+    /// `name`'s prints set to `prints`, everything else of them as it was
+    /// (familiarity, who-was-here's yes), written before it answers.
+    fn keep_prints(&mut self, name: &str, prints: Vec<Vec<f32>>) -> Result<()> {
+        let mut next = self.people.clone();
+        for person in next
+            .iter_mut()
+            .filter(|person| same_name(&person.name, name))
+        {
+            person.prints = prints.clone();
+        }
+        self.save(&next)?;
+        self.people = next;
+        Ok(())
+    }
+
     /// The same, keeping one name for one face (`LAMP_NAMES=checked`, #829's
     /// names, the first builder at 13:24 on 16 October): prints that are
     /// already someone's under another name are refused with that name, so
@@ -602,12 +691,27 @@ impl People {
     /// name, that person is forgotten first. Every name the prints are
     /// known by is in the refusal, "A and B", since `replace` forgets
     /// them all (the reviewer on #1057).
+    ///
+    /// Unless `apart`, asked after the person spelled a name that is still
+    /// near, prints at or over [`NEAR_PERSON`] to someone known by a name one
+    /// letter from this one ([`near_name`]) are refused as
+    /// [`Refused::NearTo`], naming the likeliest such person: the same
+    /// person, recognised less well and misheard (#2176 row 4). A face near
+    /// alone, or a name near alone, changes nothing.
+    ///
+    /// Unless `apart` or `replace`, prints under a name already kept are
+    /// never put in place of theirs by a face that isn't theirs (the
+    /// reviewer's P1 on #2202: a sibling's "yes" took a known person's face
+    /// and memory). At [`SAME_PERSON`] they are kept in place, as before.
+    /// Near ([`NEAR_PERSON`]) they are added beside theirs, the newest
+    /// [`MOST_PRINTS`] kept. Under that, [`Refused::NotLikeThem`].
     pub fn remember_one(
         &mut self,
         name: &str,
         prints: Vec<Vec<f32>>,
         now_unix_s: u64,
         replace: bool,
+        apart: bool,
     ) -> std::result::Result<String, Refused> {
         let kept = plain_name(name).ok_or(Refused::NotAName)?;
         // Whoever else these prints are, by the same likeness that
@@ -616,6 +720,47 @@ impl People {
         for (other, _) in prints.iter().filter_map(|print| self.who(print)) {
             if !same_name(&other, &kept) && !known.iter().any(|seen| same_name(seen, &other)) {
                 known.push(other);
+            }
+        }
+        let best_to = |person: &Person| {
+            person
+                .prints
+                .iter()
+                .flat_map(|held| prints.iter().map(move |print| likeness(held, print)))
+                .fold(f32::MIN, f32::max)
+        };
+        if known.is_empty() && !apart {
+            let near = self
+                .people
+                .iter()
+                .filter(|person| near_name(&person.name, &kept))
+                .map(|person| (person, best_to(person)))
+                .filter(|(_, best)| *best >= NEAR_PERSON)
+                .max_by(|a, b| a.1.total_cmp(&b.1));
+            if let Some((person, _)) = near {
+                return Err(Refused::NearTo(person.name.clone()));
+            }
+        }
+        if known.is_empty()
+            && !apart
+            && !replace
+            && let Some(theirs) = self
+                .people
+                .iter()
+                .find(|person| same_name(&person.name, &kept))
+        {
+            let best = best_to(theirs);
+            if best < NEAR_PERSON {
+                return Err(Refused::NotLikeThem);
+            }
+            if best < SAME_PERSON {
+                let mut beside = theirs.prints.clone();
+                beside.extend(prints);
+                let start = beside.len().saturating_sub(MOST_PRINTS);
+                return self
+                    .keep_prints(&kept, beside.split_off(start))
+                    .map(|()| theirs_name(&self.people, &kept))
+                    .map_err(|error| Refused::Store(error.to_string()));
             }
         }
         if !known.is_empty() {
@@ -831,7 +976,8 @@ impl People {
 /// line of JSON, `{"remember":"A"}`, `{"forget":"A"}`,
 /// `{"list":true}` or `{"who":true}`. With one name for one face
 /// (`LAMP_NAMES=checked`), `{"remember":"A","one_face":true}`, and
-/// `"replace":true` once the person said yes to the new name. Anything else
+/// `"replace":true` once the person said yes to the new name, or
+/// `"apart":true` once they said they are not the near one. Anything else
 /// is nothing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
@@ -839,6 +985,7 @@ pub enum Ask {
     RememberOne {
         name: String,
         replace: bool,
+        apart: bool,
     },
     /// Add the one face in a photo in the eyes' photo folder (`--photo-dir`,
     /// [`crate::photo`]), unconfirmed until its person says yes: its file
@@ -940,6 +1087,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
         who: Option<bool>,
         one_face: Option<bool>,
         replace: Option<bool>,
+        apart: Option<bool>,
         photo: Option<String>,
     }
     let line: Line = serde_json::from_slice(line).ok()?;
@@ -951,6 +1099,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            apart: None,
             photo: None,
         } => Some(Ask::Remember(name)),
         Line {
@@ -960,10 +1109,12 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: Some(true),
             replace,
+            apart,
             photo: None,
         } => Some(Ask::RememberOne {
             name,
             replace: replace.unwrap_or(false),
+            apart: apart.unwrap_or(false),
         }),
         Line {
             remember: None,
@@ -972,6 +1123,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            apart: None,
             photo: None,
         } => Some(Ask::Forget(name)),
         Line {
@@ -981,6 +1133,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            apart: None,
             photo: None,
         } => Some(Ask::List),
         Line {
@@ -990,6 +1143,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: Some(true),
             one_face: None,
             replace: None,
+            apart: None,
             photo: None,
         } => Some(Ask::Who),
         Line {
@@ -999,6 +1153,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            apart: None,
             photo: Some(file),
         } => Some(Ask::RememberPhoto { name, file }),
         _ => None,
@@ -1025,11 +1180,22 @@ pub struct Taking {
     /// One name for one face, and whether to replace another name for it
     /// (`Ask::RememberOne`); `None`: as asked plainly.
     pub one_face: Option<bool>,
+    /// Asked after the person said they are not the near one
+    /// ([`Refused::NearTo`]): no near-name check.
+    pub apart: bool,
     prints: Vec<Vec<f32>>,
     started_us: u64,
     saw_any: bool,
     saw_far: bool,
     saw_two: bool,
+}
+
+/// The name as it is kept, for a name asked in another case.
+fn theirs_name(people: &[Person], name: &str) -> String {
+    people
+        .iter()
+        .find(|person| same_name(&person.name, name))
+        .map_or_else(|| name.to_owned(), |person| person.name.clone())
 }
 
 /// Why a face was not kept under a name, with one name for one face.
@@ -1038,6 +1204,11 @@ pub enum Refused {
     NotAName,
     /// The face is someone the lamp knows by this other name.
     KnownAs(String),
+    /// The face is near someone known by a name one letter from this one,
+    /// perhaps the same person misheard ([`People::remember_one`]).
+    NearTo(String),
+    /// The name is someone's the lamp knows, and this face isn't near theirs.
+    NotLikeThem,
     /// The store refused it: full, or the file could not be written.
     Store(String),
 }
@@ -1065,6 +1236,7 @@ impl Taking {
         Self {
             name,
             one_face: None,
+            apart: false,
             prints: Vec::new(),
             started_us: now_us,
             saw_any: false,
@@ -1828,6 +2000,116 @@ mod tests {
         assert_eq!(people.familiar("Ann", after), None);
     }
 
+    /// A print whose cosine to `print(0.3)` is `cosine`.
+    fn at(cosine: f32) -> Vec<f32> {
+        let base = print(0.3);
+        let other = print(1.7);
+        let along: f32 = base.iter().zip(&other).map(|(a, b)| a * b).sum();
+        let across = unit(
+            base.iter()
+                .zip(&other)
+                .map(|(a, b)| b - along * a)
+                .collect(),
+        )
+        .unwrap();
+        let sine = (1.0 - cosine * cosine).sqrt();
+        unit(
+            base.iter()
+                .zip(&across)
+                .map(|(a, b)| cosine * a + sine * b)
+                .collect(),
+        )
+        .unwrap()
+    }
+
+    /// #2176 row 4, lamp-4ace 20 Oct: someone known was saved again under a
+    /// name one letter off theirs, the new prints at most 0.359 to their
+    /// own. A face over [`NEAR_PERSON`] with a name one letter off is
+    /// refused with the near name; `apart` keeps it; a far face, a far name
+    /// or the same name changes nothing.
+    #[test]
+    fn a_near_face_with_a_near_name_is_asked_about_not_kept_beside_it() {
+        assert!((likeness(&at(0.33), &print(0.3)) - 0.33).abs() < 1e-4);
+        // Each case against a store knowing only "Dee", by print(0.3).
+        let known = |case: &str| {
+            let mut people = People::open(file(case)).unwrap();
+            people.remember("Dee", vec![print(0.3)], 1).unwrap();
+            people
+        };
+        let mut people = known("near-name");
+        assert_eq!(
+            people.remember_one("Deep", vec![at(0.2), at(0.33)], 2, false, false),
+            Err(Refused::NearTo("Dee".into()))
+        );
+        assert_eq!(people.names().len(), 1, "nothing kept when asked about");
+        for (name, prints, why) in [
+            ("Dex", vec![at(0.2)], "a far face"),
+            ("Minh", vec![at(0.33)], "a far name"),
+        ] {
+            let mut people = known(&format!("near-name-{name}"));
+            assert_eq!(
+                people.remember_one(name, prints, 2, false, false),
+                Ok(name.to_owned()),
+                "{why}"
+            );
+        }
+        // The same name with a near face: added beside theirs, never in
+        // their place (the reviewer's P1 on #2202), and still recognised.
+        let mut same = known("near-name-same");
+        assert_eq!(
+            same.remember_one("dee", vec![at(0.33)], 2, false, false),
+            Ok("Dee".into())
+        );
+        assert_eq!(same.people[0].prints.len(), 2, "beside, not in place");
+        assert_eq!(
+            same.who(&print(0.3)).map(|(name, _)| name),
+            Some("Dee".into())
+        );
+        // The same name with a face not near theirs: refused, unless it
+        // replaces theirs once they said yes.
+        let mut other = known("near-name-other");
+        assert_eq!(
+            other.remember_one("Dee", vec![at(0.2)], 2, false, false),
+            Err(Refused::NotLikeThem)
+        );
+        assert_eq!(
+            other.who(&print(0.3)).map(|(name, _)| name),
+            Some("Dee".into())
+        );
+        assert_eq!(
+            other.remember_one("Dee", vec![at(0.2)], 3, true, false),
+            Ok("Dee".into())
+        );
+        let mut apart = known("near-name-apart");
+        assert_eq!(
+            apart.remember_one("Deep", vec![at(0.33)], 2, false, true),
+            Ok("Deep".into())
+        );
+        assert_eq!(apart.names().len(), 2, "both kept, as asked");
+    }
+
+    #[test]
+    fn names_one_letter_apart_are_near_and_short_or_same_names_are_not() {
+        for (a, b) in [
+            ("Dee", "Deep"),
+            ("Deep", "dee"),
+            ("Minh", "Linh"),
+            ("Anna", "Ana"),
+            ("Hoa", "Hoà"),
+        ] {
+            assert!(near_name(a, b), "{a} {b}");
+        }
+        for (a, b) in [
+            ("Dee", "DEE"),
+            ("Al", "Ali"),
+            ("Dee", "Dean"),
+            ("Minh", "Mike"),
+            ("Bo", "Bob"),
+        ] {
+            assert!(!near_name(a, b), "{a} {b}");
+        }
+    }
+
     /// The first builder's 13:24: a face known as "A" is asked to be kept
     /// as "B". With one name for one face it is refused with the name it
     /// is known by, and kept as "B" only with `replace`, "A" gone. Another
@@ -1839,30 +2121,30 @@ mod tests {
             .remember("A", vec![print(0.3), print(0.31)], 1)
             .unwrap();
         assert_eq!(
-            people.remember_one("B", vec![print(0.3)], 2, false),
+            people.remember_one("B", vec![print(0.3)], 2, false, false),
             Err(Refused::KnownAs("A".into()))
         );
         assert_eq!(people.names(), vec!["A".to_owned()]);
         // The same name again replaces its own prints, as before.
         assert_eq!(
-            people.remember_one("a", vec![print(0.31)], 3, false),
+            people.remember_one("a", vec![print(0.31)], 3, false, false),
             Ok("a".into())
         );
         // Said yes to: the new name in place of the old.
         assert_eq!(
-            people.remember_one("B", vec![print(0.31)], 4, true),
+            people.remember_one("B", vec![print(0.31)], 4, true, false),
             Ok("B".into())
         );
         assert_eq!(people.names(), vec!["B".to_owned()]);
         assert_eq!(people.who(&print(0.31)).unwrap().0, "B");
         // Someone else is kept beside them.
         assert_eq!(
-            people.remember_one("C", vec![print(1.7)], 5, false),
+            people.remember_one("C", vec![print(1.7)], 5, false, false),
             Ok("C".into())
         );
         assert_eq!(people.names(), vec!["B".to_owned(), "C".to_owned()]);
         assert_eq!(
-            people.remember_one("  ", vec![print(2.9)], 6, false),
+            people.remember_one("  ", vec![print(2.9)], 6, false, false),
             Err(Refused::NotAName)
         );
         // Without the check, a second name sits beside the first, as today.
@@ -1879,10 +2161,13 @@ mod tests {
         people.remember("C", vec![print(1.7)], 2).unwrap();
         let both = vec![print(0.3), print(1.7)];
         assert_eq!(
-            people.remember_one("B", both.clone(), 3, false),
+            people.remember_one("B", both.clone(), 3, false, false),
             Err(Refused::KnownAs("A and C".into()))
         );
-        assert_eq!(people.remember_one("B", both, 4, true), Ok("B".into()));
+        assert_eq!(
+            people.remember_one("B", both, 4, true, false),
+            Ok("B".into())
+        );
         assert_eq!(people.names(), vec!["B".to_owned()]);
     }
 
@@ -1897,16 +2182,27 @@ mod tests {
             ask_of(br#"{"remember":"A","one_face":true}"#),
             Some(Ask::RememberOne {
                 name: "A".into(),
-                replace: false
+                replace: false,
+                apart: false
             })
         );
         assert_eq!(
             ask_of(br#"{"remember":"A","one_face":true,"replace":true}"#),
             Some(Ask::RememberOne {
                 name: "A".into(),
-                replace: true
+                replace: true,
+                apart: false
             })
         );
+        assert_eq!(
+            ask_of(br#"{"remember":"A","one_face":true,"apart":true}"#),
+            Some(Ask::RememberOne {
+                name: "A".into(),
+                replace: false,
+                apart: true
+            })
+        );
+        assert_eq!(ask_of(br#"{"remember":"A","apart":true}"#), None);
         assert_eq!(ask_of(br#"{"remember":"A","replace":true}"#), None);
         assert_eq!(ask_of(br#"{"forget":"A","one_face":true}"#), None);
         // From a photo (`--photo-dir`): a name and the photo's file.

@@ -859,6 +859,44 @@ With the switch:
   they have while they are still correcting it. A name kept from an
   earlier exchange needs the same plain yes. The journal says "did not
   remember a face: it is known by another name", without the name.
+- **A near face with a near name is asked to spell it** (#2176 row 4). On
+  lamp-4ace on 20 Oct a person known since 16 Oct was saved again under
+  their name misheard by one letter: the new prints came to at most 0.359
+  against their own, 0.004 under `SAME_PERSON` (0.363), so the check
+  above let it through. Now, with no print at `SAME_PERSON` to anyone, a
+  print at or over `NEAR_PERSON` (0.30) to someone known by a near name is
+  refused with `{"error":"near_to","near_to":NAME}`, naming the likeliest
+  such person, and nothing is kept. Near names (`who::near_name`) are two
+  names of three letters or more that aren't the same name but are one
+  letter apart (one put in, left out or changed), or no letters apart,
+  once lower-cased with accents and tone marks taken off. A near face with
+  a far name, or a near name with a far face, changes nothing, so a Linh
+  is never asked about unless their face is near Minh's too.
+  - **No known name is said back.** The model is told only that it may
+    have misheard, and to ask them to spell their name. A name the person
+    hasn't said or spelled never passes (`known_faces::name_heard`), so a
+    "yes" to a name the lamp said can't stand in for it. Without that, a
+    sibling who said yes to "are you Minh?" would have taken Minh's face,
+    and with it Minh's memory (the reviewer's P1 on #2202). It also keeps
+    a known person's name from someone who isn't them (P2).
+  - **Spelled as the known name:** kept under it. The same name spelled
+    again: called with `"apart":true`, and kept beside the near one.
+    `apart` is sent only when true, since eyes from before it refuse a
+    field they don't know.
+- **A known name never takes a face that isn't theirs.** Under a name the
+  lamp already keeps, new prints at `SAME_PERSON` to theirs are kept in
+  place of theirs, as before. Near (`NEAR_PERSON` or more) they are added
+  beside theirs, keeping the newest five, with familiarity and the
+  who-was-here yes as they were. Under that, the eyes answer
+  `{"error":"not_like_them"}`, and the model asks whether they want to be
+  known by that name with this face instead. Only once they say yes does
+  `replace` put the new prints in place. Before this, a capture misheard
+  as a known name replaced that person.
+- A face confirmed from a photo keeps its path as before (`apart`). The
+  journal says "did not remember a face: it is near someone known by a
+  near name", or "its name is someone's whose face it isn't", naming
+  nobody. It's part of `LAMP_NAMES=checked`, which the product's unit
+  sets, with no switch of its own.
 - **A name told is a name kept** (the first builder, #705, 13:43). The
   lamp-4ace records showed no face asked to be kept on 15 October at all:
   the model had only said it would remember. With the switch,
