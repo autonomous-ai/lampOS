@@ -4944,6 +4944,24 @@ A usage limit paused me from about 00:40 to 06:2x.
   - the worker trims the thread before the line is asked.
   - Five tests and four mutations. The gate is running.
 
+## 2026-10-20, 11:08 ICT: #2145 up and in review; #2146 merged; the speech socket begun
+
+- **#2145, `LAMP_SAID_AS_HEARD`,** opened 10:22. The reviewer's 10:46 read gave one P2 and three P3s, all fixed in `42f1ea1fc`:
+  - **P2:** a line before any of the answer plays now keeps the person's question, with the lamp's part a dash;
+  - **P3:** a call left out of the thread stays out;
+  - **P3:** the Stop's record is tested as `stop_cut_of`;
+  - **P3:** a doc comment put back on its function.
+  
+  #1712's head is merged in as `9c17b5254`, and the gate is running.
+- **#2146,** #2119's P3 on its own, merged 11:01.
+- **The held hand-on to memory:** I parked it at `fourth/heard-to-memory` (`2fc34650a`). Twelve takes its memory side, with the first builder's yes at 11:00.
+- **Claimed (10:38): the speech socket opened ahead** (#2135's row, the first builder's 10:37).
+  - The shared request and messages are in `tts.rs` (`9bbf400c9`, local), with tests.
+  - The probe's `--wire --socket` arm is written, to apply after #2145's gate.
+- **Answered:**
+  - the backend's relay findings (10:08 on #1934): the socket is under `/ws/`, which corrects my 09:28;
+  - Mobile on lamp-0c89: no provider key is needed (10:54).
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
