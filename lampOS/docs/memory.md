@@ -311,6 +311,31 @@ the unchanged legacy client, used unless the new Days client is selected.
   memory that does not answer loses that exchange and nothing else. An
   answer with no word in it is not journalled. Talk the lamp did not
   answer never reaches here.
+- **A forget runs only when it is asked for** (second route and texts,
+  `LAMP_FORGET_ASKED`, on unless `off`): `forget`, `forget_everything` and
+  `forget_my_face` run only on a spoken turn whose words ask to forget
+  (`remember::asks_to_forget`: "forget", "delete", "erase", "remove",
+  "wipe", "clear", "unremember", "stop remembering", "scratch that", "get rid
+  of", "don't keep", "off your list", matched with accents off, and "quên",
+  "xóa" with their accents kept, since without them "quen" is "to know
+  someone" and "xoa" "to stroke"). Or on a **plain yes** ("Yes.", "Yes,
+  please.", "Vâng ạ.", never "Right, what's on today?") **to the lamp's own
+  question about the forget**: its last line ends in "?" and names a forget,
+  or names "everything" when the ask did (`remember::asks_about_forgetting`),
+  never another question ("Want me to set a reminder?", or "Is everything
+  else okay?" after "Clear the timer."). Lines that only describe
+  forgetting ("I keep forgetting my keys.") aren't asks. It comes within 60 s of such an
+  ask (`FORGET_CONFIRMED_WITHIN`), from the same session's person, while
+  that ask hasn't been done: "Forget everything about me." "Everything,
+  really?" "Yes." A forget that runs spends its ask. With nobody
+  recognised (the room's session), the same-person check can't tell two
+  people apart, so anyone's yes to that question within the minute counts. Never on a turn the
+  lamp wrote itself (a hello, a skill's say, task news), whatever its text
+  says. A text runs one only when the typed text itself asks, so a typed
+  yes doesn't confirm one. Otherwise the call isn't run, the journal says
+  so, and the model is told nothing was forgotten and how to ask, never
+  that the person didn't ask. Not taken, so asked again: "never mind what I
+  told you" and other words without one of these.
 - **Asking it to keep or forget something is not itself kept.** The
   exchange in which `remember` or `forget` was called stays out of the
   journal: the kept list is the record of that.

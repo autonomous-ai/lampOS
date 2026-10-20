@@ -462,6 +462,11 @@ struct Shared {
     /// What memory holds that may fit a spoken request's words
     /// ([`Engine::remembering`]).
     remembered: Option<StaffNote>,
+    /// When a spoken turn's words last asked to forget, and whose session it
+    /// was: for a plain yes to the lamp's question about it, by the same
+    /// session's person ([`crate::remember::still_confirms`]). Cleared once
+    /// a forget runs.
+    forget_asked: Mutex<Option<(Instant, Option<String>, bool)>>,
     /// With `LAMP_NAME_NOTE=on`: the note for a line the lamp's name began.
     name_note: Option<NameNote>,
     /// The note for a line let out only as the conversation going on.
@@ -894,6 +899,7 @@ impl Engine {
                 though_held: false,
                 staff: None,
                 remembered: None,
+                forget_asked: Mutex::new(None),
                 name_note: None,
                 conversation_alone: None,
                 busy: None,
@@ -3394,6 +3400,47 @@ async fn answer(
     // The picture of a look goes in round 1 only: a later round after a
     // tool is asked with the words alone (the reviewer on #1075).
     let mut seeing = picture.is_some();
+    // A forget runs only on a spoken turn whose words ask for it, or on a
+    // plain yes soon after one did (lamp-4ace, 20 Oct 21:31: a question
+    // was answered with two forgets; the reviewer's P2 on #2317: a forget
+    // the model confirms first comes on the yes).
+    let forget_may_run = {
+        let mut asked = shared
+            .forget_asked
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let person = crate::thread::THREAD
+            .lock()
+            .ok()
+            .and_then(|thread| thread.opened_for().map(str::to_owned));
+        // The lamp's last line, of an earlier request, asked about the
+        // forget itself (Jarvis's and the reviewer's P2 and P3 on #2324,
+        // and Jarvis's P2 on #2326: "Want me to set a reminder?" "Yes."
+        // confirms no forget; Fourth's P3 on #2331: "everything" counts
+        // only for an ask that named it).
+        let everything = asked.as_ref().is_some_and(|(_, _, everything)| *everything);
+        let lamp_asked = shared.lamp_said.lock().ok().is_some_and(|lamp| {
+            lamp.0 != 0
+                && lamp.0 < request
+                && crate::remember::asks_about_forgetting(&lamp.1, everything)
+        });
+        let confirmed = lamp_asked
+            && crate::known_faces::plain_agreement(&said)
+            && asked.as_ref().is_some_and(|(at, whose, _)| {
+                crate::remember::still_confirms(*at, Instant::now()) && *whose == person
+            });
+        let asks = crate::remember::asks_to_forget(&said);
+        if heard {
+            *asked = asks.then(|| {
+                (
+                    Instant::now(),
+                    person,
+                    crate::remember::names_everything(&said),
+                )
+            });
+        }
+        crate::remember::forget_may_run(heard, asks, confirmed)
+    };
     let words = Message::user(said.clone());
     let prepared_for = prepared.map(|prepared| (prepared, said.clone()));
     let question = match picture {
@@ -3760,6 +3807,26 @@ async fn answer(
                     && let Some(did) = &shared.did
                 {
                     did(Did::Worked(monotonic_us()));
+                }
+                if crate::remember::is_forget(&call.name) && !forget_may_run {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: nothing they said asks to forget ({})",
+                        call.name,
+                        crate::remember::FORGET_ASKED_ENVIRONMENT
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        serde_json::json!({"error": crate::remember::NOT_ASKED_TO_FORGET})
+                            .to_string(),
+                    ));
+                    continue;
+                }
+                // A forget that runs spends its ask: no later yes confirms
+                // another.
+                if crate::remember::is_forget(&call.name)
+                    && let Ok(mut asked) = shared.forget_asked.lock()
+                {
+                    *asked = None;
                 }
                 acted.store(true, Ordering::Relaxed);
                 let mut result = run_tool(shared, request, heard, call, scope.as_ref()).await;
