@@ -1535,10 +1535,13 @@ impl Engine {
             }
         }
         // The lamp's own speech in its head (#933), when the catalogue says
-        // how: in any room, never while held, concentrating, asleep or cut in.
+        // how: in any room, never while held, asleep or cut in. Concentration
+        // does not still it: the person it speaks to is listening, not at work
+        // (thirteen-P3; on lamp-c0a4 a person facing the lamp read as "still
+        // for work" through half an answer, and no nod or sway came).
         if let Some(rules) = &self.catalogue.speaking {
             let speaking = mode == Voice::Speaking && !self.retired_turn && !asleep;
-            let still = held || concentrating || !joints_fresh || self.interruption.is_some();
+            let still = held || !joints_fresh || self.interruption.is_some();
             let mut names = Vec::new();
             let motion = self
                 .speech

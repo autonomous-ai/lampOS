@@ -3,8 +3,8 @@
 //! stressed words and pauses between sentences.
 use lamp_expression::{Catalogue, Engine, Input, Output};
 use lamp_msgs::{
-    ClockStamp, JointState, Light, Room, RoomState, Voice, VoiceEvent, VoicePlayout, VoiceProgress,
-    VoiceSound, VoiceTiming,
+    ClockStamp, Concentration, JointState, Light, Room, RoomState, Voice, VoiceEvent, VoicePlayout,
+    VoiceProgress, VoiceSound, VoiceTiming,
 };
 
 const CLOCK: &str = "speaking-test-boot";
@@ -24,6 +24,8 @@ struct Lamp {
     engine: Engine,
     sequence: u64,
     room: Room,
+    /// Someone at work by the lamp, as attention says it every 100 ms.
+    concentrating: bool,
 }
 
 impl Lamp {
@@ -32,6 +34,7 @@ impl Lamp {
             engine: Engine::new(catalogue, true, CLOCK).unwrap(),
             sequence: 0,
             room,
+            concentrating: false,
         };
         let stamp = lamp.stamp(0);
         lamp.send(
@@ -106,6 +109,15 @@ impl Lamp {
                 stamp,
                 value: RoomState { state: room },
             },
+        );
+        let stamp = self.stamp(at);
+        let concentrating = self.concentrating;
+        self.send(
+            at,
+            Input::Concentration(Concentration {
+                stamp,
+                concentrating,
+            }),
         );
     }
 
@@ -618,6 +630,28 @@ fn a_new_turn_or_a_cancelled_answer_carries_none_of_the_old_answers_motion() {
     assert!(
         finished
             .iter()
+            .any(|(_, output)| named(output, "settling as it finishes"))
+    );
+}
+
+/// thirteen-P3 (the first builder, 17:13 on #1722, 19 Oct): someone the lamp
+/// speaks to reads as at work through its answer (on lamp-c0a4 a person
+/// facing the lamp was "still for work" in 372 of 796 states, and no nod or
+/// sway came). Its own speech still nods, sways and settles; the rest of
+/// what concentration stills stays still.
+#[test]
+fn someone_at_work_by_the_lamp_does_not_still_its_own_speech() {
+    let mut lamp = Lamp::new(catalogue(true), Room::Quiet);
+    lamp.concentrating = true;
+    let outputs = answer(&mut lamp, 8);
+    let nods = starts(&outputs, "nodding on a stressed word");
+    // At most one nod a sentence (#2030): 2 or 3 in its three.
+    assert!((2..=3).contains(&nods), "{nods}");
+    assert!(starts(&outputs, "swaying between sentences") >= 1);
+    assert!(
+        outputs
+            .iter()
+            .filter(|(at, _)| *at >= 9_000_000)
             .any(|(_, output)| named(output, "settling as it finishes"))
     );
 }

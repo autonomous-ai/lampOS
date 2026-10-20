@@ -248,7 +248,10 @@ catalogue's own lag. The old playout clip still takes the level at the lag
 only. The nods move the head's pitch and the sway turns the base,
 within the catalogue's limits, in any room
 (it is the lamp's own speech). None runs while the body is held, while
-concentrating, asleep, or once someone has cut in, and nothing is owed after.
+asleep, or once someone has cut in, and nothing is owed after. Concentration
+does not still it (thirteen-P3): the person it speaks to is listening, not
+at work, and on lamp-c0a4 a person facing the lamp read as "still for work"
+through half an answer, with no nod or sway.
 - **A nod on a stressed word.** A dip of `nod` (0.035 rad of head pitch, about
   2°) over `nod_us` (0.36 s), in and out smoothly. It comes when the level is
   at least `stress_level` (0.35) and `stress_rise` (1.5) times the recent
