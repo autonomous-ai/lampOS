@@ -1735,8 +1735,12 @@ after a take-over, but now for every turn:
   room. It's spent only once that request's answer begins to be heard (its
   first audio), then not again for three hours: a line cut short or
   retired before any word keeps it for the next (the reviewer's P3 on
-  #1960). A written turn, the lamp's own, never is. The journal, at that
-  first audio: `request N is told the air is stuffy`. Its room
+  #1960). It's the answer's first audio that spends it, not the air's own
+  sentence: an answer cut in on after its first words counts as told even
+  if the note came later in it (the first builder's P3 on #2083). The last
+  four requests given it are remembered, so an earlier one's answer heard
+  after a later one was given it still spends it. A written turn, the
+  lamp's own, never is. The journal, at that first audio: `request N is told the air is stuffy`. Its room
   is the one this route keeps (`room/state`); the room's quiet or busy is
   in each turn's system message with `LAMP_ROOM_FACTS`, as before.
 - **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its

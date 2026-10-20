@@ -1,5 +1,7 @@
 //! Opt-in replacement for the exclusive GPIO worker. Controls reports the
 //! switch; this Voice child combines it with its controller's fresh permission.
+//! On a lamp with no slide (`no-slide`) Controls says so instead, and the
+//! controller (the software mute) alone decides.
 //! Bus/disk work stays in this process, outside the interaction owner's loop.
 use crate::{
     privacy::{PRIVACY_FRESH_US, PrivacyGate},
@@ -9,7 +11,7 @@ use crate::{
 };
 use lamp_bus::{Bus, Kind, Message, Notice, Subscriber};
 use lamp_msgs::{ClockStamp, ControlsState, MicrophonePrivacy, PrivacySwitch};
-use lamp_turn_owner::{BootId, BoundaryGuard, MonoTime, Permission};
+use lamp_turn_owner::{BootId, BoundaryGuard, MonoTime, Permission, Snapshot};
 use std::{
     io,
     path::{Path, PathBuf},
@@ -23,6 +25,9 @@ use std::{
 
 pub const ENVIRONMENT: &str = "LAMP_PRIVACY_CONTROLS";
 pub const ROOT_FLAG: &str = "--controls-root";
+/// The privacy worker's argument for a lamp with no slide. Its environment
+/// is cleared (`worker_command`), so the route reaches it only this way.
+pub const NO_SLIDE_FLAG: &str = "--no-slide";
 const DRAIN_LIMIT: usize = 32;
 #[cfg(any(target_os = "linux", test))]
 pub(crate) const INDICATOR_SUBSCRIBER: &str = "privacy_ring";
@@ -35,35 +40,106 @@ fn invalid(why: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, why.into())
 }
 
-pub fn selected_root(switch: Option<&str>, root: Option<&str>) -> io::Result<Option<PathBuf>> {
-    if switch != Some("on") {
-        return Ok(None);
+/// Which privacy route `LAMP_PRIVACY_CONTROLS` selects. Controls, Voice and
+/// Ears read the same value; any other is off, as builds before `no-slide`
+/// read that value, so a rollback is the route off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Route {
+    /// `on`: Controls reads the slide; a lease needs it read open and the
+    /// controller's permission.
+    Slide,
+    /// `no-slide`: the lamp has no slide and Controls says so in each
+    /// `controls/state`; a lease needs that publication fresh and the
+    /// controller's permission, so the software mute alone closes it.
+    NoSlide,
+}
+
+impl Route {
+    pub fn from_value(switch: Option<&str>) -> Option<Self> {
+        match switch {
+            Some("on") => Some(Self::Slide),
+            Some("no-slide") => Some(Self::NoSlide),
+            _ => None,
+        }
     }
+}
+
+/// The selected route and its Bus root, or None with the route off.
+pub fn selected(switch: Option<&str>, root: Option<&str>) -> io::Result<Option<(PathBuf, Route)>> {
+    let Some(route) = Route::from_value(switch) else {
+        return Ok(None);
+    };
     let root = PathBuf::from(root.unwrap_or("/run/lampos-bus"));
     if !root.is_absolute() {
         return Err(invalid("privacy Bus root must be absolute"));
     }
-    Ok(Some(root))
+    Ok(Some((root, route)))
 }
 
-pub fn root_from_environment() -> io::Result<Option<PathBuf>> {
-    selected_root(
+pub fn selected_root(switch: Option<&str>, root: Option<&str>) -> io::Result<Option<PathBuf>> {
+    Ok(selected(switch, root)?.map(|(root, _)| root))
+}
+
+pub fn from_environment() -> io::Result<Option<(PathBuf, Route)>> {
+    selected(
         std::env::var(ENVIRONMENT).ok().as_deref(),
         std::env::var("LAMP_BUS_ROOT").ok().as_deref(),
     )
 }
 
-pub fn worker_arguments(root: Option<&Path>) -> io::Result<Vec<String>> {
-    match root {
+/// On a lamp with no slide the software mute is the only thing that closes
+/// the microphones, so the voice needs its persisted record
+/// (`--controls-mute`): without it a restart would forget a mute. Refused
+/// before anything starts.
+pub fn refuse_no_slide_without_mute(route: Option<Route>, mute_record: bool) -> io::Result<()> {
+    if route == Some(Route::NoSlide) && !mute_record {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "LAMP_PRIVACY_CONTROLS=no-slide needs --controls-mute: with no slide the software mute alone closes the microphones, and without its record a restart would forget it",
+        ));
+    }
+    Ok(())
+}
+
+/// The privacy worker's arguments after its role. Its environment is
+/// cleared, so the route goes as [`NO_SLIDE_FLAG`].
+pub fn worker_arguments(selected: Option<(&Path, Route)>) -> io::Result<Vec<String>> {
+    match selected {
         None => Ok(Vec::new()),
-        Some(root) if root.is_absolute() => Ok(vec![
-            ROOT_FLAG.into(),
-            root.to_str()
-                .ok_or_else(|| invalid("privacy root must be UTF-8"))?
-                .into(),
-        ]),
+        Some((root, route)) if root.is_absolute() => {
+            let mut arguments = vec![
+                ROOT_FLAG.into(),
+                root.to_str()
+                    .ok_or_else(|| invalid("privacy root must be UTF-8"))?
+                    .into(),
+            ];
+            if route == Route::NoSlide {
+                arguments.push(NO_SLIDE_FLAG.into());
+            }
+            Ok(arguments)
+        }
         Some(_) => Err(invalid("privacy root must be absolute")),
     }
+}
+
+/// What the privacy worker reads back from [`worker_arguments`]: exactly
+/// `--controls-root ROOT`, then `--no-slide` on a lamp with no slide.
+pub fn worker_route(arguments: &[String]) -> io::Result<(PathBuf, Route)> {
+    let (root, route) = match arguments {
+        [flag, root] if flag == ROOT_FLAG => (root, Route::Slide),
+        [flag, root, mode] if flag == ROOT_FLAG && mode == NO_SLIDE_FLAG => (root, Route::NoSlide),
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "privacy worker takes --controls-root ROOT [--no-slide]",
+            ));
+        }
+    };
+    let root = PathBuf::from(root);
+    if !root.is_absolute() {
+        return Err(io::Error::other("privacy root must be absolute"));
+    }
+    Ok((root, route))
 }
 
 pub fn wall_ms() -> u64 {
@@ -72,10 +148,50 @@ pub fn wall_ms() -> u64 {
         .map_or(0, |d| d.as_millis().min(u128::from(u64::MAX)) as u64)
 }
 
+/// One accepted observation for the gates and the lease.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Observation {
+    /// The slide's acquisition, with its level.
+    Slide(PrivacySwitch),
+    /// On a lamp with no slide, the Controls publication saying so: its own
+    /// stamp, read as not muted, with no physical level. Only the
+    /// controller (the software mute) closes the lease then.
+    NoSlide(ClockStamp),
+}
+
+impl Observation {
+    /// The acquisition's sequence and time, or the publication's.
+    pub fn stamp(&self) -> &ClockStamp {
+        match self {
+            Self::Slide(value) => &value.stamp,
+            Self::NoSlide(stamp) => stamp,
+        }
+    }
+
+    /// What the gates take as muted: the slide's level, which an accepted
+    /// slide observation always has, or not muted with no slide.
+    pub fn muted(&self) -> io::Result<bool> {
+        match self {
+            Self::Slide(value) => value.muted.ok_or_else(|| invalid("missing switch level")),
+            Self::NoSlide(_) => Ok(false),
+        }
+    }
+
+    /// The physical level for the lease: never inferred with no slide.
+    pub fn physical_muted(&self) -> Option<bool> {
+        match self {
+            Self::Slide(value) => value.muted,
+            Self::NoSlide(_) => None,
+        }
+    }
+}
+
 /// A restart or discontinuity ends this worker, so the supervisor must close
-/// and verify cleanup before a fresh worker can learn another producer.
+/// and verify cleanup before a fresh worker can learn another producer. Its
+/// kind (a slide, or none) is set when it is made and never changes.
 pub struct SwitchFence {
     clock: String,
+    no_slide: bool,
     session: Option<String>,
     header_sequence: u64,
     publication: Option<ClockStamp>,
@@ -83,9 +199,11 @@ pub struct SwitchFence {
 }
 
 impl SwitchFence {
+    /// For `on`: each state must carry the slide's evidence.
     pub fn new(clock: String) -> Self {
         Self {
             clock,
+            no_slide: false,
             session: None,
             header_sequence: 0,
             publication: None,
@@ -93,12 +211,125 @@ impl SwitchFence {
         }
     }
 
+    /// For `no-slide`: each state must say no slide is wired and carry no
+    /// slide evidence.
+    pub fn no_slide(clock: String) -> Self {
+        Self {
+            no_slide: true,
+            ..Self::new(clock)
+        }
+    }
+
+    pub fn for_route(clock: String, route: Route) -> Self {
+        match route {
+            Route::Slide => Self::new(clock),
+            Route::NoSlide => Self::no_slide(clock),
+        }
+    }
+
+    /// The next accepted observation of this fence's kind, if new.
+    pub fn observe(
+        &mut self,
+        message: &Message,
+        now_us: u64,
+        unix_ms: u64,
+    ) -> io::Result<Option<Observation>> {
+        if self.no_slide {
+            self.accept_no_slide(message, now_us, unix_ms)
+                .map(|stamp| Some(Observation::NoSlide(stamp)))
+        } else {
+            Ok(self
+                .accept(message, now_us, unix_ms)?
+                .map(Observation::Slide))
+        }
+    }
+
+    /// A slide fence's next new acquisition. A state saying no slide is
+    /// wired has none, and is refused.
     pub fn accept(
         &mut self,
         message: &Message,
         now_us: u64,
         unix_ms: u64,
     ) -> io::Result<Option<PrivacySwitch>> {
+        if self.no_slide {
+            return Err(invalid("a no-slide privacy fence reads no slide"));
+        }
+        let (h, state) = self.publication(message, now_us, unix_ms)?;
+        if state.no_privacy_slide {
+            return Err(invalid(
+                "Controls says no slide is wired, but LAMP_PRIVACY_CONTROLS=on reads one",
+            ));
+        }
+        let value = state
+            .privacy
+            .ok_or_else(|| invalid("Controls has no selected privacy source"))?;
+        value.check().map_err(io::Error::other)?;
+        if value.stamp.clock_id != self.clock
+            || value.stamp.at_us > now_us
+            || now_us - value.stamp.at_us >= PRIVACY_FRESH_US
+            || value.muted.is_none()
+            || value.fault.is_some()
+        {
+            return Err(invalid("physical privacy acquisition unavailable"));
+        }
+        let changed = match &self.last {
+            Some(old)
+                if old.reader_session_id != value.reader_session_id
+                    || value.stamp.at_us < old.stamp.at_us
+                    || value.stamp.sequence < old.stamp.sequence =>
+            {
+                return Err(invalid("privacy reader restarted or acquisition regressed"));
+            }
+            Some(old) if value.stamp.sequence == old.stamp.sequence => {
+                if old != &value {
+                    return Err(invalid("privacy acquisition identity changed"));
+                }
+                false
+            }
+            _ => true,
+        };
+        self.session = Some(state.session_id);
+        self.header_sequence = h;
+        self.publication = Some(state.stamp);
+        self.last = Some(value.clone());
+        Ok(changed.then_some(value))
+    }
+
+    /// A no-slide fence's next publication: it must say no slide is wired
+    /// and carry no slide evidence. With every envelope, session, order and
+    /// freshness check a slide's state has, the publication itself is the
+    /// observation, and each accepted one is new.
+    pub fn accept_no_slide(
+        &mut self,
+        message: &Message,
+        now_us: u64,
+        unix_ms: u64,
+    ) -> io::Result<ClockStamp> {
+        if !self.no_slide {
+            return Err(invalid("a slide privacy fence reads the slide"));
+        }
+        let (h, state) = self.publication(message, now_us, unix_ms)?;
+        if !state.no_privacy_slide || state.privacy.is_some() {
+            return Err(invalid(
+                "Controls does not say this lamp has no slide (LAMP_PRIVACY_CONTROLS=no-slide)",
+            ));
+        }
+        self.session = Some(state.session_id);
+        self.header_sequence = h;
+        self.publication = Some(state.stamp.clone());
+        Ok(state.stamp)
+    }
+
+    /// A Controls state whose envelope, publisher, clock, order and freshness
+    /// all hold, with its Bus sequence; nothing is kept until the caller's
+    /// own checks pass.
+    fn publication(
+        &self,
+        message: &Message,
+        now_us: u64,
+        unix_ms: u64,
+    ) -> io::Result<(u64, ControlsState)> {
         let h = &message.header;
         if h.topic != ControlsState::TOPIC
             || h.source != "controls"
@@ -138,39 +369,7 @@ impl SwitchFence {
         {
             return Err(invalid("privacy Controls publisher/clock/order changed"));
         }
-        let value = state
-            .privacy
-            .ok_or_else(|| invalid("Controls has no selected privacy source"))?;
-        value.check().map_err(io::Error::other)?;
-        if value.stamp.clock_id != self.clock
-            || value.stamp.at_us > now_us
-            || now_us - value.stamp.at_us >= PRIVACY_FRESH_US
-            || value.muted.is_none()
-            || value.fault.is_some()
-        {
-            return Err(invalid("physical privacy acquisition unavailable"));
-        }
-        let changed = match &self.last {
-            Some(old)
-                if old.reader_session_id != value.reader_session_id
-                    || value.stamp.at_us < old.stamp.at_us
-                    || value.stamp.sequence < old.stamp.sequence =>
-            {
-                return Err(invalid("privacy reader restarted or acquisition regressed"));
-            }
-            Some(old) if value.stamp.sequence == old.stamp.sequence => {
-                if old != &value {
-                    return Err(invalid("privacy acquisition identity changed"));
-                }
-                false
-            }
-            _ => true,
-        };
-        self.session = Some(state.session_id);
-        self.header_sequence = h.seq;
-        self.publication = Some(state.stamp);
-        self.last = Some(value.clone());
-        Ok(changed.then_some(value))
+        Ok((h.seq, state))
     }
 }
 
@@ -408,8 +607,9 @@ pub fn run(
     mut channels: WorkerChannels,
     controller: BootId,
     root: &Path,
+    route: Route,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    match serve(&mut channels, controller, root) {
+    match serve(&mut channels, controller, root, route) {
         Err(error) if error.is::<Unreadable>() => {
             channels.control.send(WorkerEvent::Fault {
                 code: format!("{UNREADABLE}{error}"),
@@ -420,10 +620,71 @@ pub fn run(
     }
 }
 
+/// The last accepted observation if it is still fresh at `now_us`: younger
+/// than 50 ms, a slide's acquisition or, with no slide, the publication.
+pub fn fresh(last: Option<&Observation>, now_us: u64) -> Option<&Observation> {
+    last.filter(|observed| {
+        now_us
+            .checked_sub(observed.stamp().at_us)
+            .is_some_and(|age| age < PRIVACY_FRESH_US)
+    })
+}
+
+/// Whether the worker grants capture now: its queue fully drained, a fresh
+/// observation, and the capture gate with the controller's permission. The
+/// same with a slide or with none; with none, only the controller (the
+/// software mute) can deny it.
+pub fn grants(
+    gate: &CaptureLeaseGate,
+    state: Snapshot,
+    observed: Option<&Observation>,
+    drained: bool,
+    now_us: u64,
+) -> bool {
+    drained && observed.is_some() && gate.permitted(state, now_us)
+}
+
+/// The lease published at `stamp`, from the controller's state and the last
+/// observation still fresh. It expires by the controller's deadline, 50 ms
+/// after `stamp`, and 50 ms after that observation. On a lamp with no slide
+/// the observation is the Controls publication saying so: the lease says
+/// `no_slide`, and its physical level stays unknown.
+pub fn lease(
+    stamp: ClockStamp,
+    session_id: &str,
+    controller: BootId,
+    state: Snapshot,
+    observed: Option<&Observation>,
+    permitted: bool,
+) -> MicrophonePrivacy {
+    let observed_us = observed.map_or(0, |value| value.stamp().at_us);
+    let mut expires_at_us = state
+        .expires_at()
+        .as_micros()
+        .min(stamp.at_us.saturating_add(PRIVACY_FRESH_US));
+    // An accepted slide observation always has its level, so this is the
+    // slide's own bound, and with no slide the publication's.
+    if observed.is_some() {
+        expires_at_us = expires_at_us.min(observed_us.saturating_add(PRIVACY_FRESH_US));
+    }
+    MicrophonePrivacy {
+        stamp,
+        session_id: session_id.to_owned(),
+        controller_boot: boot_text(controller),
+        microphone_generation: state.microphone_generation(),
+        observed_us,
+        expires_at_us,
+        permitted,
+        physical_muted: observed.and_then(Observation::physical_muted),
+        no_slide: matches!(observed, Some(Observation::NoSlide(_))),
+    }
+}
+
 fn serve(
     channels: &mut WorkerChannels,
     controller: BootId,
     root: &Path,
+    route: Route,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let clock = lamp_controls::runtime::clock_id(None)?;
     let bus = lamp_controls::privacy::selected_bus(Bus::new(root)?);
@@ -433,10 +694,10 @@ fn serve(
         &MicrophonePrivacy::declaration(),
         "voice",
     )?;
-    let mut fence = SwitchFence::new(clock.clone());
+    let mut fence = SwitchFence::for_route(clock.clone(), route);
     let mut guard = BoundaryGuard::new(controller, MonoTime::from_micros(lamp_ipc::monotonic_us()));
     let mut gate = CaptureLeaseGate::default();
-    let mut last: Option<PrivacySwitch> = None;
+    let mut last: Option<Observation> = None;
     let mut published_at = None;
     let mut previous_permission = None;
     let mut sequence = 0u64;
@@ -466,14 +727,19 @@ fn serve(
                 break;
             };
             let now = lamp_ipc::monotonic_us();
-            if let Some(value) = fence.accept(&message, now, wall_ms()).map_err(unreadable)? {
-                let muted = value
-                    .muted
-                    .ok_or_else(|| unreadable("missing switch level"))?;
-                gate.observe(value.stamp.sequence, value.stamp.at_us, now, muted);
+            // With no slide each new publication is fed as not muted, so the
+            // owner's gate, generation and Denied-while-muted rules run as
+            // for a slide read open: only the controller closes it.
+            if let Some(value) = fence
+                .observe(&message, now, wall_ms())
+                .map_err(unreadable)?
+            {
+                let muted = value.muted().map_err(unreadable)?;
+                let acquired = value.stamp();
+                gate.observe(acquired.sequence, acquired.at_us, now, muted);
                 // Revoke the main owner before any Bus publication/disk work.
                 channels.control.send(WorkerEvent::Privacy {
-                    acquired_at_us: value.stamp.at_us,
+                    acquired_at_us: acquired.at_us,
                     muted,
                 })?;
                 last = Some(value);
@@ -488,16 +754,13 @@ fn serve(
             return Ok(());
         }
         let now = lamp_ipc::monotonic_us();
-        let physical = last.as_ref().filter(|sample| {
-            now.checked_sub(sample.stamp.at_us)
-                .is_some_and(|age| age < PRIVACY_FRESH_US)
-        });
+        let physical = fresh(last.as_ref(), now);
         if physical.is_none() && now.saturating_sub(began) >= PRIVACY_FRESH_US {
             return Err(unreadable("physical privacy source expired"));
         }
         if let Some(state) = guard.state() {
-            let permitted = empty && physical.is_some() && gate.permitted(state, now);
-            let level = physical.and_then(|sample| sample.muted);
+            let permitted = grants(&gate, state, physical, empty, now);
+            let level = physical.and_then(Observation::physical_muted);
             let identity = (permitted, level, state.microphone_generation());
             if previous_permission != Some(identity)
                 || published_at.is_none_or(|at| now.saturating_sub(at) >= 10_000)
@@ -505,28 +768,18 @@ fn serve(
                 sequence = sequence
                     .checked_add(1)
                     .ok_or_else(|| invalid("privacy publisher sequence exhausted"))?;
-                let observed_us = physical.map_or(0, |sample| sample.stamp.at_us);
-                let mut expires_at_us = state
-                    .expires_at()
-                    .as_micros()
-                    .min(now.saturating_add(PRIVACY_FRESH_US));
-                if level.is_some() {
-                    expires_at_us = expires_at_us.min(observed_us.saturating_add(PRIVACY_FRESH_US));
-                }
-                let value = MicrophonePrivacy {
-                    stamp: ClockStamp {
+                let value = lease(
+                    ClockStamp {
                         clock_id: clock.clone(),
                         at_us: now,
                         sequence,
                     },
-                    session_id: publisher.boot().to_owned(),
-                    controller_boot: boot_text(controller),
-                    microphone_generation: state.microphone_generation(),
-                    observed_us,
-                    expires_at_us,
+                    publisher.boot(),
+                    controller,
+                    state,
+                    physical,
                     permitted,
-                    physical_muted: level,
-                };
+                );
                 value.check()?;
                 publisher.publish_json(now, &value)?;
                 previous_permission = Some(identity);
@@ -591,6 +844,7 @@ pub(crate) mod tests {
                 expires_at_us: at + PRIVACY_FRESH_US,
                 permitted: false,
                 physical_muted: Some(true),
+                no_slide: false,
             };
             publisher.publish_json(at, &lease).unwrap();
             let read = reader.poll();
@@ -692,6 +946,7 @@ pub(crate) mod tests {
                 expires_at_us: at + PRIVACY_FRESH_US,
                 permitted: false,
                 physical_muted: Some(true),
+                no_slide: false,
             };
             publisher.publish_json(at, &lease).unwrap();
             // Watched from once its publisher is there, as the writer starts

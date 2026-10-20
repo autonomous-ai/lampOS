@@ -761,14 +761,14 @@ fn run() -> Result<()> {
                 },
             )?;
         }
-        [command,role,dir,parent,worker,flag,root] if command=="worker" && role=="privacy" && flag==lamp_voice::privacy_bus::ROOT_FLAG => {
+        // worker privacy DIR PARENT WORKER --controls-root ROOT [--no-slide]
+        [command,role,dir,parent,worker,flags @ ..] if command=="worker" && role=="privacy" && flags.first().is_some_and(|flag| flag==lamp_voice::privacy_bus::ROOT_FLAG) => {
             let parent=parse_boot(parent)?;
             let worker=parse_boot(worker)?;
-            let root=Path::new(root);
-            if !root.is_absolute() { return Err(io::Error::other("privacy root must be absolute").into()); }
+            let (root,route)=lamp_voice::privacy_bus::worker_route(flags)?;
             let mut channels=WorkerChannels::bind(Path::new(dir),role,parent,worker,true)?;
             channels.connect(Path::new(dir),role,true)?;
-            lamp_voice::privacy_bus::run(channels,parent,root)?;
+            lamp_voice::privacy_bus::run(channels,parent,&root,route)?;
         },
         #[cfg(target_os="linux")]
         [command,role,dir,parent,worker,mode,flag,root] if command=="worker" && role=="ring" && mode=="--privacy" && flag=="--bus-root" => {

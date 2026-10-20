@@ -103,6 +103,8 @@ pub struct Service<R: PinReader> {
     pub counts: Counts,
     recorder: Option<crate::record::Recorder>,
     privacy: Option<crate::privacy::Source>,
+    /// The privacy route on a lamp with no slide ([`Self::mark_no_slide`]).
+    no_slide: bool,
     privacy_touch_recording: bool,
     _lock: File,
 }
@@ -167,6 +169,7 @@ impl<R: PinReader> Service<R> {
             counts: Counts::default(),
             recorder: None,
             privacy: None,
+            no_slide: false,
             privacy_touch_recording: false,
             _lock: lock,
         })
@@ -182,6 +185,25 @@ impl<R: PinReader> Service<R> {
 
     pub fn attach_privacy(&mut self, source: crate::privacy::Source) {
         self.privacy = Some(source);
+    }
+
+    /// The privacy route on a lamp with no slide (`LAMP_PRIVACY_CONTROLS=no-slide`):
+    /// nothing is read, and each state says so (`no_privacy_slide`) at the
+    /// route's cadence, as when a slide reader is attached. Refused beside a
+    /// slide reader; a reader attached later wins, and no marker is said.
+    pub fn mark_no_slide(&mut self) -> io::Result<()> {
+        if self.privacy.is_some() {
+            return Err(invalid(
+                "a lamp with a slide reader is not a lamp with no slide",
+            ));
+        }
+        self.no_slide = true;
+        Ok(())
+    }
+
+    /// The privacy route is on: a slide reader, or a lamp with no slide.
+    fn privacy_route(&self) -> bool {
+        self.privacy.is_some() || self.no_slide
     }
 
     /// The --touch privacy-only route records the tagged touch envelope without
@@ -204,7 +226,7 @@ impl<R: PinReader> Service<R> {
     }
 
     pub fn poll_us(&self) -> u64 {
-        if self.privacy.is_some() {
+        if self.privacy_route() {
             crate::privacy::STEP_US
         } else {
             POLL_US
@@ -306,12 +328,14 @@ impl<R: PinReader> Service<R> {
         let mut output = self.engine.tick(at_us);
         if let Some(privacy) = &mut self.privacy {
             output.state.privacy = Some(privacy.monitor.snapshot(at_us));
+        } else if self.no_slide {
+            output.state.no_privacy_slide = true;
         }
         let feedback = Feedback::from(&output.state);
         if !output.gestures.is_empty()
             || self.last_state.is_none_or(|at| {
                 at_us.saturating_sub(at)
-                    >= if self.privacy.is_some() {
+                    >= if self.privacy_route() {
                         crate::privacy::STATE_EVERY_US
                     } else {
                         100_000

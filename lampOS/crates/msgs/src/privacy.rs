@@ -7,7 +7,8 @@ use std::time::Duration;
 pub const MICROPHONE_PRIVACY_FRESH_US: u64 = 50_000;
 
 /// Permission for an independent capture owner, renewed only by Voice while
-/// both its controller and the original physical observation remain valid.
+/// both its controller and the original physical observation remain valid
+/// (on a lamp with no slide, the Controls publication saying so).
 /// Expiry is on the named kernel boot's CLOCK_MONOTONIC, not wall time.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MicrophonePrivacy {
@@ -23,6 +24,15 @@ pub struct MicrophonePrivacy {
     pub permitted: bool,
     /// Unknown is neither permission nor evidence of a deliberate user mute.
     pub physical_muted: Option<bool>,
+    /// A lamp with no slide (`LAMP_PRIVACY_CONTROLS=no-slide`): Controls said
+    /// so, `observed_us` is that Controls publication, and `physical_muted`
+    /// stays unknown. Only Voice's controller (its software mute) closes it.
+    /// Absent, and so left out, on a slide lamp, whose lease is byte for
+    /// byte as before. An Ears built before this field ignores it and finds
+    /// a no-slide lease invalid (a permit with unknown physical state, or an
+    /// acquisition with no level), so it stays closed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub no_slide: bool,
 }
 
 impl MicrophonePrivacy {
@@ -48,27 +58,29 @@ impl MicrophonePrivacy {
             || self.microphone_generation == 0
             || self.expires_at_us <= self.stamp.at_us
             || self.expires_at_us - self.stamp.at_us > MICROPHONE_PRIVACY_FRESH_US
-            || (self.permitted && self.physical_muted != Some(false))
+            // A permit needs a switch read open, or a lamp with no slide,
+            // whose physical state is never inferred.
+            || (self.permitted
+                && self.physical_muted != Some(false)
+                && !(self.no_slide && self.physical_muted.is_none()))
+            || (self.no_slide && self.physical_muted.is_some())
         {
             return Err(Invalid("invalid microphone privacy lease".into()));
         }
-        match self.physical_muted {
-            Some(_) => {
-                if self.observed_us == 0
-                    || self.observed_us > self.stamp.at_us
-                    || self.stamp.at_us - self.observed_us >= MICROPHONE_PRIVACY_FRESH_US
-                    || self.expires_at_us.saturating_sub(self.observed_us)
-                        > MICROPHONE_PRIVACY_FRESH_US
-                {
-                    return Err(Invalid(
-                        "privacy lease outlives its switch acquisition".into(),
-                    ));
-                }
+        // A switch reading, or on a lamp with no slide the Controls
+        // publication that said so, is fenced the same way.
+        if self.physical_muted.is_some() || self.no_slide {
+            if self.observed_us == 0
+                || self.observed_us > self.stamp.at_us
+                || self.stamp.at_us - self.observed_us >= MICROPHONE_PRIVACY_FRESH_US
+                || self.expires_at_us.saturating_sub(self.observed_us) > MICROPHONE_PRIVACY_FRESH_US
+            {
+                return Err(Invalid(
+                    "privacy lease outlives its switch acquisition".into(),
+                ));
             }
-            None if self.observed_us != 0 => {
-                return Err(Invalid("unknown privacy has no acquisition".into()));
-            }
-            None => {}
+        } else if self.observed_us != 0 {
+            return Err(Invalid("unknown privacy has no acquisition".into()));
         }
         Ok(())
     }

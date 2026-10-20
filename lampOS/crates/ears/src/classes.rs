@@ -39,6 +39,28 @@ pub fn enabled(classes: Option<&str>) -> bool {
     classes == Some("on")
 }
 
+/// Whether the classifier starts, from its switch (`LAMP_EARS_CLASSES`) and
+/// the privacy route (`LAMP_PRIVACY_CONTROLS`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Start {
+    /// The switch is not exactly `on`: nothing to say.
+    Off,
+    /// The switch is on, but not on a lamp with a slide (`on`): with
+    /// `no-slide` it never runs (the reviewer's P2 on #2086), said once.
+    NotOnThisRoute,
+    /// It starts.
+    Start,
+}
+
+/// [`Start`] for `classes` and `route`.
+pub fn start(classes: Option<&str>, route: Option<&str>) -> Start {
+    match (enabled(classes), crate::privacy::slide(route)) {
+        (false, _) => Start::Off,
+        (true, false) => Start::NotOnThisRoute,
+        (true, true) => Start::Start,
+    }
+}
+
 /// Qualcomm AI Hub's YAMNet ONNX float export, release v0.59.0
 /// (`yamnet-onnx-float.zip`): the graph and its external weights beside it.
 pub const MODEL_ID: &str = "yamnet-qai-v0.59.0";

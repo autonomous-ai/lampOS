@@ -49,6 +49,7 @@ fn state() -> ControlsState {
         event_sequence: 1,
         rejected_inputs: 0,
         privacy: None,
+        no_privacy_slide: false,
     }
 }
 
@@ -356,4 +357,31 @@ fn base_feedback_needs_ready_observed_contact_and_matching_hold_tier() {
     assert!(value.check().is_err());
     value.base_tier = HoldTier::None;
     value.check().unwrap();
+}
+
+/// `LAMP_PRIVACY_CONTROLS=no-slide`: Controls says no slide is wired. The
+/// marker is left out when false, so other states keep their bytes, and it
+/// never comes with slide evidence.
+#[test]
+fn the_no_slide_marker_is_positive_omitted_when_false_and_never_beside_a_switch() {
+    let plain = serde_json::to_value(state()).unwrap();
+    assert!(plain.get("no_privacy_slide").is_none());
+    let mut marked = state();
+    marked.no_privacy_slide = true;
+    marked.check().unwrap();
+    roundtrip(&marked);
+    assert_eq!(
+        serde_json::to_value(&marked).unwrap()["no_privacy_slide"],
+        json!(true)
+    );
+    let mut both = marked.clone();
+    both.privacy = Some(PrivacySwitch {
+        stamp: marked.stamp.clone(),
+        reader_session_id: "slide".into(),
+        muted: Some(false),
+        fault: None,
+    });
+    assert!(both.check().is_err());
+    both.no_privacy_slide = false;
+    both.check().unwrap();
 }

@@ -22,6 +22,8 @@ enum SavePoint {
 /// Durable software preference with a boot-scoped request watermark. Neither
 /// an owner restart nor a new machine boot clears mute. Physical privacy is a
 /// separate authority; this record never grants permission to open a worker.
+/// On a lamp with no slide (`LAMP_PRIVACY_CONTROLS=no-slide`) it is the only
+/// thing that closes the microphones, so the voice needs it there.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MuteRecord {

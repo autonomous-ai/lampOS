@@ -75,7 +75,8 @@ fn absent_off_and_other_values_preserve_exact_replay_output_and_open_no_bus() {
             .iter()
             .all(|frame| frame.output.state.privacy.is_none())
     );
-    for value in ["off", "ON", "true", ""] {
+    // `no-slide` too: its replay is as off.
+    for value in ["off", "ON", "true", "", "no-slide"] {
         let output = root
             .replay(false)
             .env("LAMP_PRIVACY_CONTROLS", value)

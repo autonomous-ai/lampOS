@@ -427,18 +427,28 @@ fn pump(
 
 /// Room sound classes (#1669): model loading and inference run on their own
 /// thread, never on capture or the pump; capture only offers blocks. Off
-/// unless `LAMP_EARS_CLASSES` is exactly `on`: then no thread, no model, no
-/// handoff for capture and no publisher for the pump.
+/// unless `LAMP_EARS_CLASSES` is exactly `on`, and never on a lamp with no
+/// slide (`route`, `LAMP_PRIVACY_CONTROLS=no-slide`; the reviewer's P2 on
+/// #2086): then no thread, no model, no handoff for capture and no
+/// publisher for the pump.
 fn start_classes(
     switch: Option<&str>,
+    route: Option<&str>,
     model: Option<String>,
     shared: &Arc<Shared>,
 ) -> io::Result<(
     Option<lamp_ears::classes::Handoff>,
     Option<Receiver<Classified>>,
 )> {
-    if !lamp_ears::classes::enabled(switch) {
-        return Ok((None, None));
+    match lamp_ears::classes::start(switch, route) {
+        lamp_ears::classes::Start::Off => return Ok((None, None)),
+        lamp_ears::classes::Start::NotOnThisRoute => {
+            log(
+                "LAMP_EARS_CLASSES=on needs LAMP_PRIVACY_CONTROLS=on, a lamp with a slide; with no-slide no classifier runs",
+            );
+            return Ok((None, None));
+        }
+        lamp_ears::classes::Start::Start => {}
     }
     let (handoff, intake) = lamp_ears::classes::handoff();
     let (send_classes, receive_classes) = mpsc::sync_channel(4);
@@ -538,6 +548,7 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
     let (output, receive_output) = mpsc::sync_channel(CAPACITY);
     let (classes, receive_classes) = start_classes(
         std::env::var("LAMP_EARS_CLASSES").ok().as_deref(),
+        std::env::var("LAMP_PRIVACY_CONTROLS").ok().as_deref(),
         std::env::var("LAMP_EARS_CLASSES_MODEL").ok(),
         &shared,
     )?;
@@ -703,8 +714,25 @@ mod tests {
     fn classes_start_nothing_unless_the_switch_is_on() {
         let shared = Arc::new(Shared::new(false));
         for switch in [None, Some(""), Some("off"), Some("ON"), Some("on ")] {
-            let (handoff, receiver) = start_classes(switch, None, &shared).unwrap();
+            let (handoff, receiver) = start_classes(switch, Some("on"), None, &shared).unwrap();
             assert!(handoff.is_none() && receiver.is_none(), "{switch:?}");
+        }
+        assert_eq!(
+            Arc::strong_count(&shared),
+            1,
+            "no thread holds the shared state"
+        );
+    }
+
+    /// The reviewer's P2 on #2086: on a lamp with no slide
+    /// (`LAMP_PRIVACY_CONTROLS=no-slide`) the switch on starts no
+    /// classifier: no thread, no handoff, no publisher. Only `on` does.
+    #[test]
+    fn with_no_slide_classes_start_nothing() {
+        let shared = Arc::new(Shared::new(false));
+        for route in [Some("no-slide"), None, Some("off")] {
+            let (handoff, receiver) = start_classes(Some("on"), route, None, &shared).unwrap();
+            assert!(handoff.is_none() && receiver.is_none(), "{route:?}");
         }
         assert_eq!(
             Arc::strong_count(&shared),

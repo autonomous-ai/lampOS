@@ -36,6 +36,8 @@ readings; --replay works from kept readings instead of the chip.\n\
 --touch selects the new independent head/strip path and its pins schema. It configures the selected I2C chip even in shadow.\n\
 Without --touch, no new reader, touch topic or gesture interpretation is selected.\n\
 Only LAMP_PRIVACY_CONTROLS=on selects an explicit privacy section in --pins; absent/off never opens chip 1.\n\
+LAMP_PRIVACY_CONTROLS=no-slide is the route on a lamp with no slide: it refuses a privacy section, opens no chip 1,\n\
+and serve's controls/state says no_privacy_slide at the route's cadence. Replay under it is as off.\n\
 Replay never opens a bus or hardware. Times are CLOCK_MONOTONIC microseconds.\n\
 Record/output files must not already exist. Acquisition records are capped at 32 MiB.\n\
 No controls message grants microphone/camera permission or reports a verified stop.";
@@ -277,7 +279,7 @@ fn pins(
     }
     let wiring: lamp_controls::pins::PinsConfig = serde_json::from_slice(&bytes)?;
     if wiring.privacy.is_some() && !privacy_selected() {
-        return Err(UNSELECTED_PRIVACY.into());
+        return Err(unselected_privacy().into());
     }
     Ok(wiring)
 }
@@ -287,6 +289,19 @@ fn pins(
 /// without it fails loudly instead of running with no hand input.
 const UNSELECTED_PRIVACY: &str =
     "the pins file has a privacy section, which needs LAMP_PRIVACY_CONTROLS=on";
+
+/// A privacy section says a slide is wired: that lamp runs the route with
+/// `on`, never `no-slide`, which would leave its slide unread.
+const SLIDE_WIRED: &str = "LAMP_PRIVACY_CONTROLS=no-slide, but the pins file has a privacy section: a slide is wired, which is LAMP_PRIVACY_CONTROLS=on";
+
+/// Why a pins file's privacy section is refused while `on` is not selected.
+fn unselected_privacy() -> &'static str {
+    if no_slide_selected() {
+        SLIDE_WIRED
+    } else {
+        UNSELECTED_PRIVACY
+    }
+}
 
 /// The reader serve uses: the board's lines if a pins file was given, and
 /// otherwise the stand-in that says no input is there.
@@ -430,30 +445,61 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             .map(|path| pins(path))
             .transpose()?
             .and_then(|pins| pins.privacy)
+            .map_or(PrivacyRoute::None, PrivacyRoute::Slide)
+    } else if no_slide_selected() {
+        // Read here only so that a privacy section is refused (`pins`).
+        if let Some(path) = &args.pins {
+            pins(path)?;
+        }
+        PrivacyRoute::NoSlide
     } else {
-        None
+        PrivacyRoute::None
     };
     serve(args, config, &clock, reader, privacy)
 }
 
+/// What `serve` attaches for the privacy route.
+enum PrivacyRoute {
+    /// The route is off, or `on` with no privacy section (said at start).
+    None,
+    /// `on`: the slide named by the pins file's privacy section.
+    Slide(lamp_controls::privacy::Pins),
+    /// `no-slide`: no slide is wired; each `controls/state` says so.
+    NoSlide,
+}
+
+impl PrivacyRoute {
+    /// The route's cadence and the bus's quick rescan apply.
+    fn on(&self) -> bool {
+        !matches!(self, Self::None)
+    }
+}
+
 /// One line at start for the privacy route (lamp-4ace, 2026-10-16 10:01:
 /// Controls said nothing of it, so nobody could tell whether it was on).
-fn say_privacy(privacy: Option<&lamp_controls::privacy::Pins>) {
+fn say_privacy(privacy: &PrivacyRoute) {
     match privacy {
-        Some(pins) => eprintln!(
+        PrivacyRoute::Slide(pins) => eprintln!(
             "lamp-controls: privacy route on: {} line {}, LOW is muted",
             pins.chip, pins.line
         ),
-        None if privacy_selected() => eprintln!(
+        PrivacyRoute::NoSlide => eprintln!(
+            "lamp-controls: privacy route on, no slide: the voice grants from its mute alone"
+        ),
+        PrivacyRoute::None if privacy_selected() => eprintln!(
             "lamp-controls: {}=on but the pins file has no privacy section: no privacy source",
             lamp_controls::privacy::ENV
         ),
-        None => {}
+        PrivacyRoute::None => {}
     }
 }
 
 fn privacy_selected() -> bool {
     lamp_controls::privacy::selected(std::env::var_os(lamp_controls::privacy::ENV).as_deref())
+}
+
+fn no_slide_selected() -> bool {
+    lamp_controls::privacy::no_slide(std::env::var_os(lamp_controls::privacy::ENV).as_deref())
 }
 
 fn privacy_source(
@@ -476,22 +522,24 @@ fn serve(
     config: Config,
     clock: &str,
     reader: Box<dyn lamp_controls::input::PinReader>,
-    privacy: Option<lamp_controls::privacy::Pins>,
+    privacy: PrivacyRoute,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let bus = if let Some(root) = args.bus_root {
         Bus::new(root)?
     } else {
         Bus::from_environment()?
     };
-    let bus = if privacy.is_some() {
+    let bus = if privacy.on() {
         lamp_controls::privacy::selected_bus(bus)
     } else {
         bus
     };
     let mut service = Service::new(&bus, config, reader, clock)?;
-    say_privacy(privacy.as_ref());
-    if let Some(pins) = privacy {
-        service.attach_privacy(privacy_source(&pins, clock)?);
+    say_privacy(&privacy);
+    match privacy {
+        PrivacyRoute::Slide(pins) => service.attach_privacy(privacy_source(&pins, clock)?),
+        PrivacyRoute::NoSlide => service.mark_no_slide()?,
+        PrivacyRoute::None => {}
     }
     if let Some(path) = args.record {
         if args.touch {
@@ -572,10 +620,12 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
     use lamp_controls::{strip_worker::Worker, touch_pins::TouchPinsConfig, touch_runtime};
     let wiring = TouchPinsConfig::load(args.pins.as_ref().expect("validated pins argument"))?;
     if wiring.privacy.is_some() && !privacy_selected() {
-        return Err(UNSELECTED_PRIVACY.into());
+        return Err(unselected_privacy().into());
     }
     let privacy = privacy_selected().then(|| wiring.privacy.clone()).flatten();
-    if privacy.is_some() && wiring.privacy_only(&config)? {
+    if let Some(pins) = &privacy
+        && wiring.privacy_only(&config)?
+    {
         if args.command == "replay" {
             let records =
                 lamp_controls::touch_replay::read(File::open(args.input.as_ref().unwrap())?)?;
@@ -602,7 +652,7 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
             config,
             clock,
             Box::new(lamp_controls::touch_pins::NoGpio),
-            privacy,
+            PrivacyRoute::Slide(pins.clone()),
         );
     }
     let touch = wiring.check(&config)?;
@@ -631,22 +681,29 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
         eprintln!("{}", serde_json::to_string(&summary)?);
         return Ok(());
     }
+    let privacy = match privacy {
+        Some(pins) => PrivacyRoute::Slide(pins),
+        None if no_slide_selected() => PrivacyRoute::NoSlide,
+        None => PrivacyRoute::None,
+    };
     let gpio = touch_reader(&wiring, clock)?;
     let bus = if let Some(root) = args.bus_root {
         Bus::new(root)?
     } else {
         Bus::from_environment()?
     };
-    let bus = if privacy.is_some() {
+    let bus = if privacy.on() {
         lamp_controls::privacy::selected_bus(bus)
     } else {
         bus
     };
     let mut service =
         touch_runtime::Service::new(&bus, config, wiring.clone(), gpio, None::<Worker>, clock)?;
-    say_privacy(privacy.as_ref());
-    if let Some(pins) = privacy {
-        service.attach_privacy(&bus, privacy_source(&pins, clock)?)?;
+    say_privacy(&privacy);
+    match privacy {
+        PrivacyRoute::Slide(pins) => service.attach_privacy(&bus, privacy_source(&pins, clock)?)?,
+        PrivacyRoute::NoSlide => service.mark_no_slide(&bus, clock)?,
+        PrivacyRoute::None => {}
     }
     if let Some(path) = args.record {
         service.record_to(&path)?;

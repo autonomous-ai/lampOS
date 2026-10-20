@@ -92,6 +92,7 @@ fn controls() -> ControlsState {
         event_sequence: 0,
         rejected_inputs: 0,
         privacy: None,
+        no_privacy_slide: false,
     }
 }
 
