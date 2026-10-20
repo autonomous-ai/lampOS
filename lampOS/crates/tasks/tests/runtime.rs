@@ -1458,8 +1458,9 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
 
 /// #1676: Harness's sign-in by a spoken code through the service, on the
 /// trusted route only: started once while open, its code, the question,
-/// the answer passed on only while asked, and how it ended, kept for the
-/// voice; started anew once done. Without `--sign-in-by-code` it is off.
+/// the answer passed on only once the voice heard the question told, in a
+/// later request, and how it ended, kept for the voice; started anew, with
+/// the next id, once done. Without `--sign-in-by-code` it is off.
 #[test]
 fn the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end() {
     use lamp_tasks::sign_in::{Done, Event};
@@ -1487,11 +1488,19 @@ fn the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end() {
     assert_eq!(started["ok"], true, "{started}");
     assert_eq!(started["sign_in"], "code");
     assert_eq!(started["code"], "12345678");
+    // Counted from the clock, so not taken for one before a restart.
+    let id = started["id"].as_u64().unwrap();
+    assert!(id > 1_700_000_000_000, "{started}");
+    assert_eq!(started["code_told"], true);
     // Asked again while open: the same one, not another.
     assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["code"], "12345678");
     assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 1);
     assert_eq!(
-        s.trusted(json!({"op":"sign_in_answer","answer":"yes"}))["error"],
+        s.trusted(json!({"op":"sign_in_answer","answer":"yes","request":2}))["error"],
+        "not_asking"
+    );
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_asked","id":id,"request":2}))["error"],
         "not_asking"
     );
     s.counts
@@ -1514,11 +1523,32 @@ fn the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end() {
     };
     assert_eq!(until("asking")["email"], "someone@example.com");
     assert_eq!(
-        s.ask(json!({"op":"sign_in_answer","answer":"yes"}))["error"],
+        s.ask(json!({"op":"sign_in_answer","answer":"yes","request":9}))["error"],
         "untrusted"
     );
+    assert_eq!(
+        s.ask(json!({"op":"sign_in_asked","id":id,"request":3}))["error"],
+        "untrusted"
+    );
+    // Asked in Harness, but not yet heard said by the lamp: a yes is for
+    // something else.
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_answer","answer":"yes","request":9}))["error"],
+        "not_told"
+    );
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_asked","id":id + 7,"request":3}))["error"],
+        "not_this_sign_in"
+    );
+    let told = s.trusted(json!({"op":"sign_in_asked","id":id,"request":3}));
+    assert_eq!(told["sign_in"], "asking", "{told}");
+    // The yes in the request the question was told in isn't its answer.
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_answer","answer":"yes","request":3}))["error"],
+        "not_told"
+    );
     assert!(s.counts.sign_in_answers.lock().unwrap().is_empty());
-    let answered = s.trusted(json!({"op":"sign_in_answer","answer":"yes"}));
+    let answered = s.trusted(json!({"op":"sign_in_answer","answer":"yes","request":4}));
     assert_eq!(answered["sign_in"], "answered", "{answered}");
     assert_eq!(*s.counts.sign_in_answers.lock().unwrap(), [true]);
     s.counts
@@ -1534,7 +1564,7 @@ fn the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end() {
         s.trusted(json!({"op":"sign_in_state"}))["result"],
         "success"
     );
-    s.trusted(json!({"op":"sign_in_start"}));
+    assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["id"], id + 1);
     assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 2);
 }
 

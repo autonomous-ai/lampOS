@@ -24,6 +24,9 @@ pub const MOST_LIFE: Duration = Duration::from_secs(11 * 60);
 /// No line from Harness's sign-in is read past this many bytes.
 pub const MOST_LINE_BYTES: usize = 4096;
 const MOST_EMAIL_BYTES: usize = 254;
+/// How long after the question is told an answer to it is taken: a yes
+/// heard later is for something else.
+pub const ANSWER_WINDOW: Duration = Duration::from_secs(120);
 const MOST_EXPIRES_IN: u64 = 600;
 
 /// One line of `harness login --code --json`. Its `Debug` hides the digits
@@ -193,26 +196,53 @@ pub enum State {
 /// One sign-in, from its start until it is done; the done state is kept
 /// until another starts, for the voice to read.
 pub struct Session {
+    id: u64,
     link: Option<Box<dyn Link>>,
     state: State,
     until: Instant,
+    /// The voice's request in which the question was heard whole, and
+    /// when ([`Session::asked`]).
+    told: Option<(u64, Instant)>,
+    /// The code a start's answer gave the voice, which says it then: a
+    /// newer code is the news's to tell.
+    code_given: Option<String>,
 }
 
 impl Session {
-    pub fn new(link: Box<dyn Link>, now: Instant) -> Self {
+    /// `id` tells this sign-in from the ones before it, for the voice's
+    /// news.
+    pub fn new(id: u64, link: Box<dyn Link>, now: Instant) -> Self {
         Self {
+            id,
             link: Some(link),
             state: State::Starting,
             until: now + MOST_LIFE,
+            told: None,
+            code_given: None,
         }
     }
 
     /// One that could not start: done, with why.
-    pub fn failed(code: &str) -> Self {
+    pub fn failed(id: u64, code: &str) -> Self {
         Self {
+            id,
             link: None,
             state: State::Done(Done::Error { code: code.into() }),
             until: Instant::now(),
+            told: None,
+            code_given: None,
+        }
+    }
+
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
+    /// The code now, if any, was given in a start's answer
+    /// (`sign_in_start`), which the voice says itself.
+    pub fn code_given(&mut self) {
+        if let State::Code { code, .. } = &self.state {
+            self.code_given = Some(code.clone());
         }
     }
 
@@ -279,19 +309,70 @@ impl Session {
                 code: "timeout".into(),
             });
         }
+        // A question told and not answered in time can't be answered any
+        // more: ended, so the person can start again (the reviewer's P3 on
+        // #2174), not left open until `MOST_LIFE`.
+        if matches!(self.state, State::Asking { .. })
+            && self
+                .told
+                .is_some_and(|(_, at)| now.saturating_duration_since(at) > ANSWER_WINDOW)
+        {
+            said.push("not signed in: too_late".into());
+            self.finish(Done::Error {
+                code: "too_late".into(),
+            });
+        }
+        // The code given is kept no longer than the code is (the
+        // reviewer's P3).
+        if !matches!(self.state, State::Code { .. }) {
+            self.code_given = None;
+        }
         said
     }
 
     fn finish(&mut self, done: Done) {
         self.state = State::Done(done);
+        self.code_given = None;
         // Dropped: the program is stopped, if it hasn't ended itself.
         self.link = None;
     }
 
-    /// The person's answer, only while the question is asked.
-    pub fn answer(&mut self, yes: bool) -> Result<(), &'static str> {
+    /// The voice heard the question "Sign in as …?" said whole, in its
+    /// `request`: only from then is an answer taken. The first telling
+    /// counts; a question never said, or cut off, opens nothing. A telling
+    /// in a lower request than the first is a restarted voice's, whose
+    /// numbers began again: it replaces the first (the reviewer's P3).
+    pub fn asked(&mut self, id: u64, request: u64, now: Instant) -> Result<(), &'static str> {
+        if id != self.id {
+            return Err("not_this_sign_in");
+        }
         if !matches!(self.state, State::Asking { .. }) {
             return Err("not_asking");
+        }
+        match self.told {
+            Some((told_in, _)) if request >= told_in => {}
+            _ => self.told = Some((request, now)),
+        }
+        Ok(())
+    }
+
+    /// The person's answer, in the voice's `request`: taken once, only in a
+    /// request after the one the question was told in, and within
+    /// [`ANSWER_WINDOW`] of it. An answer too soon leaves the question open;
+    /// one too late ends the sign-in, which can't be answered any more.
+    pub fn answer(&mut self, yes: bool, request: u64, now: Instant) -> Result<(), &'static str> {
+        if !matches!(self.state, State::Asking { .. }) {
+            return Err("not_asking");
+        }
+        let (told_in, told_at) = self.told.ok_or("not_told")?;
+        if request <= told_in {
+            return Err("not_told");
+        }
+        if now.saturating_duration_since(told_at) > ANSWER_WINDOW {
+            self.finish(Done::Error {
+                code: "too_late".into(),
+            });
+            return Err("too_late");
         }
         let link = self.link.as_mut().ok_or("not_asking")?;
         if link.answer(yes).is_err() {
@@ -306,12 +387,13 @@ impl Session {
 
     /// What the voice reads (`sign_in_state`).
     pub fn view(&self, now: Instant) -> Value {
-        match &self.state {
+        let mut view = match &self.state {
             State::Starting => json!({"sign_in": "starting"}),
             State::Code { code, until } => json!({
                 "sign_in": "code",
                 "code": code,
                 "expires_in": until.saturating_duration_since(now).as_secs(),
+                "code_told": self.code_given.as_ref() == Some(code),
             }),
             State::Asking { email } => json!({"sign_in": "asking", "email": email}),
             State::Answered { yes } => {
@@ -321,7 +403,9 @@ impl Session {
             State::Done(Done::Error { code }) => {
                 json!({"sign_in": "done", "result": "error", "code": code})
             }
-        }
+        };
+        view["id"] = self.id.into();
+        view
     }
 }
 
@@ -357,7 +441,7 @@ mod tests {
             lines: lines.clone(),
             answers: answers.clone(),
         };
-        (Session::new(Box::new(link), now), lines, answers)
+        (Session::new(1, Box::new(link), now), lines, answers)
     }
 
     fn code(code: &str) -> Option<Result<Event, &'static str>> {
@@ -435,15 +519,18 @@ mod tests {
     fn a_sign_in_goes_from_its_code_to_the_question_to_the_answer() {
         let now = Instant::now();
         let (mut session, lines, answers) = scripted(now);
-        assert_eq!(session.view(now)["sign_in"], "starting");
-        assert_eq!(session.answer(true), Err("not_asking"));
+        assert_eq!(session.view(now), json!({"sign_in": "starting", "id": 1}));
+        assert_eq!(session.answer(true, 1, now), Err("not_asking"));
         lines.lock().unwrap().extend([code("12345678"), None]);
         let said = session.tend(now);
         assert_eq!(said, ["code given (good for 120 s)"]);
         assert_eq!(
             session.view(now + Duration::from_secs(20)),
-            json!({"sign_in": "code", "code": "12345678", "expires_in": 100})
+            json!({"sign_in": "code", "code": "12345678", "expires_in": 100, "code_told": false, "id": 1})
         );
+        // Given in a start's answer: the voice said it.
+        session.code_given();
+        assert_eq!(session.view(now)["code_told"], true);
         // Kept alive: the same code, nothing new to say.
         lines.lock().unwrap().extend([code("12345678"), None]);
         assert!(session.tend(now + Duration::from_secs(60)).is_empty());
@@ -457,13 +544,14 @@ mod tests {
         assert_eq!(said, ["approved in Harness: asking whether to sign in"]);
         assert_eq!(
             session.view(now),
-            json!({"sign_in": "asking", "email": "someone@example.com"})
+            json!({"sign_in": "asking", "email": "someone@example.com", "id": 1})
         );
-        assert_eq!(session.answer(true), Ok(()));
+        assert_eq!(session.asked(1, 4, now), Ok(()));
+        assert_eq!(session.answer(true, 5, now), Ok(()));
         assert_eq!(*answers.lock().unwrap(), [true]);
         assert_eq!(session.view(now)["answer"], "yes");
         // Only one answer.
-        assert_eq!(session.answer(false), Err("not_asking"));
+        assert_eq!(session.answer(false, 6, now), Err("not_asking"));
         lines.lock().unwrap().extend([
             Some(Ok(Event::Result(Done::Success {
                 email: Some("someone@example.com".into()),
@@ -476,7 +564,7 @@ mod tests {
         // Done: the email is kept no longer than the question.
         assert_eq!(
             session.view(now),
-            json!({"sign_in": "done", "result": "success"})
+            json!({"sign_in": "done", "result": "success", "id": 1})
         );
         assert_eq!(session.state(), &State::Done(Done::Success { email: None }));
         for line in ["code given (good for 120 s)", "signed in"] {
@@ -497,7 +585,7 @@ mod tests {
         assert_eq!(session.tend(now), ["not signed in: harness_too_old"]);
         assert_eq!(
             session.view(now),
-            json!({"sign_in": "done", "result": "error", "code": "harness_too_old"})
+            json!({"sign_in": "done", "result": "error", "code": "harness_too_old", "id": 1})
         );
         let (mut session, lines, answers) = scripted(now);
         lines.lock().unwrap().extend([
@@ -507,7 +595,8 @@ mod tests {
             None,
         ]);
         session.tend(now);
-        assert_eq!(session.answer(false), Ok(()));
+        session.asked(1, 1, now).unwrap();
+        assert_eq!(session.answer(false, 2, now), Ok(()));
         assert_eq!(*answers.lock().unwrap(), [false]);
         lines.lock().unwrap().extend([
             Some(Ok(Event::Result(Done::Error {
@@ -525,7 +614,7 @@ mod tests {
         assert_eq!(session.tend(now + MOST_LIFE), ["not signed in: timeout"]);
         assert!(!session.open());
         assert_eq!(
-            Session::failed("no_harness").view(now)["code"],
+            Session::failed(3, "no_harness").view(now)["code"],
             "no_harness"
         );
     }
@@ -547,11 +636,12 @@ mod tests {
             .unwrap()
             .extend([code("12345678"), confirm(), None]);
         session.tend(now);
-        assert_eq!(session.answer(true), Ok(()));
+        session.asked(1, 1, now).unwrap();
+        assert_eq!(session.answer(true, 2, now), Ok(()));
         lines.lock().unwrap().extend([confirm(), None]);
         assert!(session.tend(now).is_empty());
         assert_eq!(session.state(), &State::Answered { yes: true });
-        assert_eq!(session.answer(true), Err("not_asking"));
+        assert_eq!(session.answer(true, 3, now), Err("not_asking"));
         assert_eq!(*answers.lock().unwrap(), [true]);
         let printed = format!(
             "{:?} {:?} {:?} {:?} {:?}",
@@ -577,5 +667,106 @@ mod tests {
             !printed.contains("1234") && !printed.contains("example") && !printed.contains('@'),
             "{printed}"
         );
+    }
+
+    /// #2137's redesign: an answer is taken only after the voice heard the
+    /// question whole, in a later request, within two minutes, once. One
+    /// too soon doesn't spend the question; one for another sign-in tells
+    /// nothing; a restarted voice's telling replaces the first. Past the
+    /// window, the sign-in ends, by an answer or by the clock.
+    #[test]
+    fn an_answer_is_taken_only_in_a_later_request_soon_after_the_question_was_told() {
+        let now = Instant::now();
+        let confirm = || {
+            Some(Ok(Event::Confirm {
+                email: "someone@example.com".into(),
+            }))
+        };
+        let (mut session, lines, answers) = scripted(now);
+        lines.lock().unwrap().extend([code("12345678"), None]);
+        session.tend(now);
+        // Told before Harness asks: nothing is opened.
+        assert_eq!(session.asked(1, 3, now), Err("not_asking"));
+        lines.lock().unwrap().extend([confirm(), None]);
+        session.tend(now);
+        // Not told yet: a yes heard is for something else.
+        assert_eq!(session.answer(true, 9, now), Err("not_told"));
+        assert_eq!(session.asked(2, 4, now), Err("not_this_sign_in"));
+        assert_eq!(session.answer(true, 9, now), Err("not_told"));
+        assert_eq!(session.asked(1, 4, now), Ok(()));
+        // A later telling doesn't move the question on.
+        assert_eq!(session.asked(1, 7, now + Duration::from_secs(60)), Ok(()));
+        // The request the question was told in, or one before it.
+        assert_eq!(session.answer(true, 4, now), Err("not_told"));
+        assert_eq!(session.answer(true, 3, now), Err("not_told"));
+        assert!(answers.lock().unwrap().is_empty());
+        assert_eq!(
+            session.state(),
+            &State::Asking {
+                email: "someone@example.com".into()
+            }
+        );
+        // Refusals spent nothing: the next request in time, at the window's
+        // very edge, is taken, once.
+        assert!(session.tend(now + ANSWER_WINDOW).is_empty());
+        assert_eq!(session.answer(false, 5, now + ANSWER_WINDOW), Ok(()));
+        assert_eq!(
+            session.answer(true, 6, now + ANSWER_WINDOW),
+            Err("not_asking")
+        );
+        assert_eq!(*answers.lock().unwrap(), [false]);
+        assert_eq!(session.view(now)["id"], 1);
+
+        // A voice restarted while Harness asks: its numbers began again,
+        // and its telling counts in place of the first.
+        let (mut session, lines, answers) = scripted(now);
+        lines.lock().unwrap().extend([confirm(), None]);
+        session.tend(now);
+        session.asked(1, 40, now).unwrap();
+        assert_eq!(session.answer(true, 3, now), Err("not_told"));
+        session.asked(1, 2, now + Duration::from_secs(5)).unwrap();
+        assert_eq!(
+            session.answer(true, 3, now + Duration::from_secs(6)),
+            Ok(())
+        );
+        assert_eq!(*answers.lock().unwrap(), [true]);
+
+        // Past the window, by an answer: ended, and said why.
+        let (mut session, lines, answers) = scripted(now);
+        lines.lock().unwrap().extend([confirm(), None]);
+        session.tend(now);
+        session.asked(1, 4, now).unwrap();
+        let late = now + ANSWER_WINDOW + Duration::from_secs(1);
+        assert_eq!(session.answer(true, 5, late), Err("too_late"));
+        assert!(answers.lock().unwrap().is_empty());
+        assert_eq!(session.view(late)["code"], "too_late");
+        assert!(!session.open());
+        // And by the clock, with no answer at all.
+        let (mut session, lines, _) = scripted(now);
+        lines.lock().unwrap().extend([confirm(), None]);
+        session.tend(now);
+        session.asked(1, 4, now).unwrap();
+        assert_eq!(session.tend(late), ["not signed in: too_late"]);
+        assert!(!session.open());
+    }
+
+    /// The reviewer's P3 on #2174: the code a start gave is kept only while
+    /// the code is.
+    #[test]
+    fn the_code_given_is_forgotten_once_the_code_is_spent() {
+        let now = Instant::now();
+        let (mut session, lines, _) = scripted(now);
+        lines.lock().unwrap().extend([code("12345678"), None]);
+        session.tend(now);
+        session.code_given();
+        assert_eq!(session.view(now)["code_told"], true);
+        lines.lock().unwrap().extend([
+            Some(Ok(Event::Confirm {
+                email: "someone@example.com".into(),
+            })),
+            None,
+        ]);
+        session.tend(now);
+        assert_eq!(session.code_given, None);
     }
 }
