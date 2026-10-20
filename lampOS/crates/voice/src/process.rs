@@ -1191,6 +1191,7 @@ fn second_route_worker_environment(
         crate::local_time::PLACE_ENVIRONMENT,
         crate::second_provider::net::weather::ENVIRONMENT,
         crate::second_provider::PREPARED_ENVIRONMENT,
+        crate::second_provider::OPEN_NAME_ENVIRONMENT,
         crate::second_provider::STT_WARM_ENVIRONMENT,
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
@@ -1257,6 +1258,7 @@ mod tests {
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
+            crate::second_provider::OPEN_NAME_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -1587,6 +1589,7 @@ mod tests {
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
+                    || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                 {
                     "on"
@@ -1677,6 +1680,7 @@ mod tests {
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_KNOWN_NAMES=on",
                     "LAMP_SECOND_MEMORY_HITS=on",
+                    "LAMP_SECOND_OPEN_NAME=on",
                     "LAMP_SECOND_PREPARED=on",
                     "LAMP_SECOND_SAID_ONCE=on",
                     "LAMP_SECOND_SCOPED_CONTEXT=on",

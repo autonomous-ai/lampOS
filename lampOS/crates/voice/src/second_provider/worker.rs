@@ -1807,6 +1807,17 @@ pub fn serve(
         );
         engine = engine.keeping_a_listener_ready(true);
     }
+    // A line whose words end before a name waits for it (#2135).
+    if std::env::var(crate::second_provider::OPEN_NAME_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+    {
+        eprintln!(
+            "lamp-voice second: a line whose words end before a name is answered no sooner than 1.5 s after its end (LAMP_SECOND_OPEN_NAME)"
+        );
+        engine = engine.waiting_for_a_name(true);
+    }
     // A spoken turn's chat begun on the line's early words (#1712).
     if std::env::var(crate::second_provider::PREPARED_ENVIRONMENT)
         .ok()
