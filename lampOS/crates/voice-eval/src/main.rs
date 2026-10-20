@@ -74,7 +74,10 @@ const USAGE: &str = "usage:
       HH:MM or HH:MM:SS by the lamp's clock; DIR holds the played test's scene files
       and battery summaries; YYYY-MM-DD is the day the first arm begins)
   lamp-voice-eval mood-minute DIR
-      the numbers of Mood's lamp minute from the taps tools/mood-minute.sh wrote in DIR";
+      the numbers of Mood's lamp minute from the taps tools/mood-minute.sh wrote in DIR
+  lamp-voice-eval motion-voice SESSIONS... [--plays FILE]... [--offset-us N] [--json]
+      LAMP_MOTION_VOICE=record's levels for each sound the body-moving rule let go, with or
+      without a played line (#PLAY_US scene files or plays.tsv), and the bar that keeps the lines";
 
 /// `cost JOURNAL --prices FILE --arm NAME FROM TO ... [--voice-estimate
 /// VOICE N]`: what each arm cost, printed (the first builder on #1722, 19
@@ -445,6 +448,41 @@ fn run() -> Result<i32> {
     }
     let mut args = Args { values: all };
     match command.as_str() {
+        "motion-voice" => {
+            use lamp_voice_eval::motion_voice;
+            let mut plays = Vec::new();
+            for file in args.take_all("--plays")? {
+                plays.push(fs::read_to_string(&file)?);
+            }
+            let offset_us: i64 = args
+                .take("--offset-us")?
+                .map(|value| value.parse())
+                .transpose()?
+                .unwrap_or(0);
+            let as_json = args.take_flag("--json");
+            let mut folders = Vec::new();
+            while let Ok(path) = args.positional() {
+                folders.extend(motion_voice::sessions(Path::new(&path)));
+            }
+            args.done()?;
+            if folders.is_empty() {
+                return Err(invalid(USAGE));
+            }
+            let spans: Vec<(u64, u64)> = plays
+                .iter()
+                .flat_map(|text| motion_voice::plays(text, offset_us))
+                .collect();
+            let report = motion_voice::report(
+                motion_voice::rows(&folders)?,
+                (!plays.is_empty()).then_some(spans.as_slice()),
+            );
+            if as_json {
+                println!("{report}");
+            } else {
+                print!("{}", motion_voice::table(&report));
+            }
+            return Ok(0);
+        }
         "mood-minute" => {
             let dir = PathBuf::from(args.positional()?);
             args.done()?;

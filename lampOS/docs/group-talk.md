@@ -422,6 +422,9 @@ be measured, with a person at the arm.
   heard), or with too few blocks of its own, it is let go as before.
 - No new wait: it judges the blocks the sound has when the rule decides,
   inside its wait for the body's word.
+- **Reading `record`'s lines:** `lamp-voice-eval motion-voice SESSIONS
+  --plays SCENES` lines each let-go up with the played lines and gives the
+  bar that keeps the lines and lets the rest go (`voice-eval.md`).
 - **The known cost of `on`:** a motor sound as loud as the asker is
   theirs too, as at 04:34 if that line was so loud. It goes on to the
   answer wait, which lets it go only if it ends or goes quiet first.

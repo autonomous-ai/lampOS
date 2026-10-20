@@ -522,6 +522,30 @@ journal alone does not carry the wait's decisions, the words or the route.
 `--since`/`--until` filter the journal's own stamps. Only counts and
 numbers are printed. What each count means: `group-talk.md`, "Counting it".
 
+## The body-moving rule's levels: `motion-voice` (#2371)
+
+    sudo lamp-voice-eval motion-voice /var/lib/lampOS/voice/sessions \
+        --plays scenes/*.txt [--offset-us N] [--json]
+
+For `LAMP_MOTION_VOICE=record` (`group-talk.md`, "The asker's voice isn't
+the motors"): each `input_let_go_body_moving` (and `input_kept_body_moving`,
+with `on`) in the sessions given, one folder each or a folder of them, with
+the sound's level, the asker's, how far under it is in decibels,
+`would_keep`, and whether a played line was sounding at its onset.
+- **The plays** (`--plays`, repeatable): the scenes' `#PLAY_US START ...`
+  lines (a line ends at the next one's start, or 4 s on) or a `plays.tsv`'s
+  `START<TAB>END` lines, on the records' `at_us` clock; `--offset-us` is
+  added to the plays' times. A line counts as sounding from 0.2 s before it
+  to 0.3 s after.
+- **Then:** the spread of how far under the asker the sounds were, with a
+  line and without one, on the upper tenth (what the rule judges) and on
+  the middle. Then the bar that keeps the most lines and lets the most of
+  the rest go: the fewest wrong, then the tightest. When the two don't
+  overlap it says the clean range too.
+- **Set apart:** a sound with no asker's level, or with fewer than the rule's
+  6 speech blocks, isn't in the bar; each is counted.
+- **Numbers only:** never a word heard or a scene's line.
+
 ## A session's minutes, with no words: `export` (#1119)
 
 Builders without the lamp make test cases from what it did. `export` takes a
