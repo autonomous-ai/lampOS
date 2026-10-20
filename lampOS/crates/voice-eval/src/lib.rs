@@ -13,6 +13,7 @@
 pub mod annotations;
 pub mod canary;
 pub mod cost;
+pub mod endpoint;
 pub mod evaluate;
 pub mod events;
 pub mod export;
