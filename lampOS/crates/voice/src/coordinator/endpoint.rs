@@ -20,6 +20,25 @@ use lamp_turn_end_wire::{
 use serde_json::{Value, json};
 use std::{io, path::Path, time::Duration};
 
+/// The switch that sends a line too short for the commit's floor to the
+/// model too (`ConfirmPolicy::short_verdict_blocks`, #2135): `on`, and
+/// nothing else.
+pub const SHORT_VERDICT_SWITCH: &str = "LAMP_ENDPOINT_SHORT_VERDICT";
+
+/// Speech blocks a short line needs to be sent with the switch: 0.2 s, so
+/// a word ("Yes.") is asked, and a click or a cough's scrap is not.
+pub const SHORT_VERDICT_BLOCKS: u16 = 20;
+
+/// The short lines' floor the switch's `value` asks for, under the
+/// profile's own `least`: none with it off, or with no floor to go under.
+fn short_verdict_blocks(value: Option<&str>, least: u16) -> u16 {
+    if value == Some("on") && least > SHORT_VERDICT_BLOCKS {
+        SHORT_VERDICT_BLOCKS
+    } else {
+        0
+    }
+}
+
 /// The switch that starts the fast worker with ONNX Runtime's threads not
 /// spinning while they wait for work (#1608): off unless `on`. The worker
 /// runs at the voice's real-time priority, where a spinning thread holds its
@@ -148,6 +167,20 @@ impl EndpointRig {
         if let Some(commit) = endpoint.commit_blocks {
             policy.commit_blocks = commit;
         }
+        // A line too short for that floor is asked too, and its verdict ends
+        // it no sooner (`LAMP_ENDPOINT_SHORT_VERDICT`, #2135).
+        policy.short_verdict_blocks = short_verdict_blocks(
+            std::env::var(SHORT_VERDICT_SWITCH).ok().as_deref(),
+            policy.least_speech_blocks,
+        );
+        if policy.short_verdict_blocks > 0 {
+            eprintln!(
+                "lamp-voice: a line of {} to {} ms of speech is sent to the end-of-turn model too; only a clearly unfinished one waits past the silence window, to {} ms ({SHORT_VERDICT_SWITCH})",
+                u64::from(policy.short_verdict_blocks) * 10,
+                u64::from(policy.least_speech_blocks) * 10,
+                u64::from(policy.incomplete_blocks) * 10
+            );
+        }
         detector = detector
             .with_confirmation(classifier, policy)
             .map_err(io::Error::other)?;
@@ -269,6 +302,24 @@ impl EndpointRig {
 mod tests {
     use super::*;
     use lamp_turn_end_wire::{Outcome, Submit, Token};
+
+    /// #2135: only `on` sends short lines to the model, and only under a
+    /// floor there is: 20 blocks with the responsive profile's 80, none
+    /// with the parity profile's 0.
+    #[test]
+    fn short_lines_are_asked_only_with_the_switch_and_a_floor() {
+        assert_eq!(short_verdict_blocks(Some("on"), 80), SHORT_VERDICT_BLOCKS);
+        for value in [None, Some(""), Some("off"), Some("ON"), Some("1")] {
+            assert_eq!(short_verdict_blocks(value, 80), 0, "{value:?}");
+        }
+        assert_eq!(short_verdict_blocks(Some("on"), 0), 0);
+        assert_eq!(short_verdict_blocks(Some("on"), SHORT_VERDICT_BLOCKS), 0);
+        let policy = ConfirmPolicy {
+            short_verdict_blocks: short_verdict_blocks(Some("on"), 80),
+            ..ConfirmPolicy::responsive()
+        };
+        assert!(policy.validate().is_ok());
+    }
 
     /// #1608: `--no-spin` only with the switch, and only for the fast worker.
     #[test]
