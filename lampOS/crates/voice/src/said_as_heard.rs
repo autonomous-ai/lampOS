@@ -18,9 +18,19 @@
 //! that. The Live route is told nothing new: Gemini's server keeps what it
 //! made, so its history can't be put right this way.
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 
 /// Where the coordinator reads the switch.
 pub const ENVIRONMENT: &str = "LAMP_SAID_AS_HEARD";
+/// The provider worker's flag for it, right after `--messages`: the second
+/// route then holds an answer's hand-on to memory until it is known how
+/// much of it was heard ([`HeldHandOn`]).
+pub const FLAG: &str = "--said-as-heard";
+/// The longest an answer's hand-on to memory is held after its turn ends:
+/// the most audio a reply holds (30 s, `MAX_REPLY_SAMPLES`), and well before
+/// memory's Days writer ends a conversation idle for 45 s (Twelve, 10:40 on
+/// #1722).
+pub const HAND_ON_WITHIN: Duration = Duration::from_secs(30);
 
 /// After the words of a piece cut while it played.
 pub const CUT: &str = "—";
@@ -32,6 +42,56 @@ pub fn from_environment() -> bool {
 
 fn on(value: Option<&str>) -> bool {
     value == Some("on")
+}
+
+/// The worker's flags for the switch, from the coordinator's environment.
+pub fn arguments_from_environment() -> Vec<String> {
+    arguments(std::env::var(ENVIRONMENT).ok().as_deref())
+}
+
+fn arguments(value: Option<&str>) -> Vec<String> {
+    if on(value) {
+        vec![FLAG.to_owned()]
+    } else {
+        Vec::new()
+    }
+}
+
+/// Take a leading [`FLAG`] off a worker's flags.
+pub fn take(flags: &[String]) -> (bool, &[String]) {
+    match flags {
+        [flag, rest @ ..] if flag == FLAG => (true, rest),
+        _ => (false, flags),
+    }
+}
+
+/// An answer's hand-on to the lamp's memory, held from its turn's end
+/// (`crate::remember::finished`). The route sends a long answer in seconds
+/// and the lamp plays it for many more, so handed on then, memory took it
+/// whole even when a line or a Stop cut it. Held, it goes once the next line
+/// begins, after its words are kept as heard, or after [`HAND_ON_WITHIN`],
+/// or as the worker stops. Each call gives the request to hand on now.
+#[derive(Debug, Default)]
+pub struct HeldHandOn(Option<(u64, Instant)>);
+
+impl HeldHandOn {
+    /// `request`'s turn ended at `now`: held, and an older one held before
+    /// it is handed on now.
+    pub fn hold(&mut self, request: u64, now: Instant) -> Option<u64> {
+        self.0.replace((request, now)).map(|(older, _)| older)
+    }
+
+    /// A new line begins, or the worker stops: what is held goes now.
+    pub fn release(&mut self) -> Option<u64> {
+        self.0.take().map(|(request, _)| request)
+    }
+
+    /// What has been held [`HAND_ON_WITHIN`] by `now` goes now.
+    pub fn due(&mut self, now: Instant) -> Option<u64> {
+        self.0
+            .take_if(|(_, at)| now.saturating_duration_since(*at) >= HAND_ON_WITHIN)
+            .map(|(request, _)| request)
+    }
 }
 
 /// How much of a reply was played before a line, or a Stop, cut it.
@@ -110,9 +170,34 @@ mod tests {
     #[test]
     fn the_switch_is_on_only_when_said() {
         assert!(on(Some("on")));
+        assert_eq!(arguments(Some("on")), [FLAG]);
         for value in [None, Some(""), Some("off"), Some("1"), Some("ON")] {
             assert!(!on(value), "{value:?}");
+            assert!(arguments(value).is_empty(), "{value:?}");
         }
+        let flags = [FLAG.to_owned(), "x".to_owned()];
+        assert_eq!(take(&flags), (true, &flags[1..]));
+        assert_eq!(take(&flags[1..]), (false, &flags[1..]));
+    }
+
+    /// An answer's hand-on waits for the next line, the most a reply can
+    /// play, or the stop; one held goes when a newer turn ends.
+    #[test]
+    fn a_held_hand_on_goes_with_the_next_line_or_once_the_reply_has_played() {
+        let start = Instant::now();
+        let mut held = HeldHandOn::default();
+        assert_eq!(held.release(), None);
+        assert_eq!(held.hold(1, start), None);
+        assert_eq!(
+            held.due(start + HAND_ON_WITHIN - Duration::from_millis(1)),
+            None
+        );
+        assert_eq!(held.due(start + HAND_ON_WITHIN), Some(1));
+        assert_eq!(held.due(start + HAND_ON_WITHIN * 2), None, "once");
+        assert_eq!(held.hold(2, start), None);
+        assert_eq!(held.hold(3, start), Some(2));
+        assert_eq!(held.release(), Some(3));
+        assert_eq!(held.release(), None);
     }
 
     /// Three sentences of a story, the second cut halfway: the first whole,
