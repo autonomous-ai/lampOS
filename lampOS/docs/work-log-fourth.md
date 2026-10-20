@@ -5111,6 +5111,14 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **My #2301 P2 showed on lamp-4ace** (the first builder, 01:02): with `LAMP_GOING_ON_NOT_OWN` on, one person's day lines fell from 12 of 12 to 9 of 12, three follow-ups without the name. The switch is off again. Seventh is making it keep the same person's follow-ups.
 - **Free: fourth.**
 
+## 2026-10-21, 02:14 ICT: #2345 up (the first line's socket opened before it); #2340 read; the cut traced to the line's end
+
+- **Claimed at 01:23** (the first builder, 01:15): #2135's cold first request. Request 1 after the 21:23 start waited 753 ms for its speech-to-text socket.
+- **#2345, onto #1712** (`f3ba25174` on `83c02449a`): with `LAMP_SECOND_STT_WARM` on, the worker opens the kept socket at its first authority that allows listening, once a privacy generation, with the same 3 min expiry. Two new tests, five mutations each fail one. Gate green: 3498 passed, 0 failed.
+- **The cut on that line** ("my name is" and then the name): the session records show the turn-end model's `model_complete` (0.933) at 400 ms, so it wasn't the socket. The first builder dropped the journal line they'd asked for at 01:40. My 02:01 on #1722 proposes holding the answer when the final words end on an open name, under a switch. It waits on whether request 2 went on from request 1.
+- **#2340 peer read** (the held forget): one P2 (the yes ran the forget whatever the lamp asked) and one P3 (asked twice when the model confirms first). The first builder told the author to take both before merging.
+- **Names:** I'd quoted the name said at the lamp in three Queue comments; it's replaced by a placeholder.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5132,6 +5140,7 @@ with unfitted weights and no proof that it improves the busy-room floor.
 takes a cut answer as heard only with #2186. `LAMP_SECOND_SPEECH_SOCKET` and
 `probe-cascade --wire --socket` were not run on a lamp.
 `LAMP_OWN_LINE_KEEPS` is off unless set and was not run on a lamp.
+The first line's socket opened before it (#2345) was not run on a lamp.
 lamp-peek's one page (#2259) was not run on a lamp; its timings are this
 Mac's. `probe-cascade --wire --sizes` (#2276) was not run anywhere with a
 real key.
