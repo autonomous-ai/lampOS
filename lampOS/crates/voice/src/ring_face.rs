@@ -357,7 +357,7 @@ impl Face {
     /// The light a skill holds now, as the ring shows it over the person's
     /// ([`crate::ring_light::RingLight::held`]), or `None`. With
     /// [`Face::tints_speaking`] on, the Speaking face takes its colour, at
-    /// its level or [`SKILL_LEVEL_LEAST`], so a light a skill holds through
+    /// [`SKILL_SPEAKING_LEVEL`]'s glow, so a light a skill holds through
     /// its words (Welcome back's warm glow) comes with them, as
     /// `docs/skills.md` means it to; given back, the next frame is plain
     /// Speaking again, eased like any other change.
@@ -758,13 +758,16 @@ const SPEAKING_LEAST: f32 = 0.26;
 /// this share of the face's colour is the light's, the rest Speaking's own
 /// warm, so the face is still the lamp speaking, in the light's colour.
 const SKILL_TINT_SHARE: f32 = 0.6;
-/// The least level a held light tints the Speaking face at. The ring cannot
+/// The level a held light tints the Speaking face at, whatever its own. Over
+/// it the voice would have only the gap to the ceiling, 0.90 to 1.0 at
+/// level 5, the idle turn's own swing, and the face would read as a lit
+/// disc, not a mouth (Seventh on #2253). Under it, the ring cannot
 /// tell a level the skill named from one `lamp-skills` filled in from the
 /// light shown (`crates/skills/src/glow.rs`, `asked`): Welcome back's warm
 /// glow names none and comes at the person's level, 1 on most lamps, and
 /// under Speaking's own least glow a level 1 or 2 is not seen. The middle,
 /// as `glow.rs`'s `LEVEL_UNKNOWN`.
-pub const SKILL_LEVEL_LEAST: u8 = 3;
+pub const SKILL_SPEAKING_LEVEL: u8 = 3;
 
 /// The wanted colour of one pixel, each channel as a share of the ceiling.
 /// `look_to`: the eye's look, as the angle around the ring toward the
@@ -840,11 +843,12 @@ fn look(
             let turn = wave(seconds, 3.1, 2.0, angle);
             match held.filter(|held| held.on) {
                 // A skill's light held with the words: its colour mixed into
-                // the face, and the face's least glow that of its level, so
-                // it still moves with the voice above it.
+                // the face, and the face's least glow that of the middle
+                // level whatever the light's, so the colour shows over
+                // Speaking's own least and the voice still moves it over
+                // most of plain Speaking's span (Seventh on #2253).
                 Some(held) => {
-                    let level_of_light = held.level.clamp(SKILL_LEVEL_LEAST, LEVELS);
-                    let least = LEVEL_GLOW[usize::from(level_of_light) - 1]
+                    let least = LEVEL_GLOW[usize::from(SKILL_SPEAKING_LEVEL) - 1]
                         .0
                         .max(SPEAKING_LEAST);
                     let tint: [f32; 3] = std::array::from_fn(|channel| {
@@ -2054,10 +2058,12 @@ mod tests {
     }
 
     /// With `LAMP_SKILL_LIGHT_SPEAKING=on`, the Speaking face takes the held
-    /// light's colour and its level's glow, and still follows the voice;
-    /// the other faces of a turn are their own.
+    /// light's colour and, quiet, [`SKILL_SPEAKING_LEVEL`]'s glow whatever
+    /// the light's level (4 and 5 alike), and still follows the voice; the
+    /// other faces of a turn are their own. That the voice keeps two thirds
+    /// or more of plain Speaking's span at every level is the next test's.
     #[test]
-    fn with_the_switch_a_held_skill_light_tints_speaking_in_its_colour_at_its_level() {
+    fn with_the_switch_a_held_skill_light_tints_speaking_in_its_colour_at_level_three() {
         let blue = |level| Some(Lit::of(true, "blue", level).unwrap());
         let last = |frames: Vec<[Rgb; PIXEL_COUNT]>| *frames.last().unwrap();
         let plain = last(speaking_with(true, None, 0, 1, 50));
@@ -2071,8 +2077,8 @@ mod tests {
             channels(&plain),
             channels(&tinted)
         );
-        // At its level: quiet, level 4's glow over Speaking's least, and
-        // level 5 brighter still.
+        // Quiet, the middle level's glow over Speaking's least, at level 4
+        // and at level 5 alike.
         assert!(
             total(&tinted) > total(&plain),
             "{} {}",
@@ -2080,7 +2086,7 @@ mod tests {
             total(&plain)
         );
         let five = last(speaking_with(true, blue(5), 0, 1, 50));
-        assert!(total(&five) > total(&tinted));
+        assert_eq!(five, tinted);
         // Still the lamp speaking: brighter with its voice.
         let loud = last(speaking_with(true, blue(4), 255, 1, 50));
         assert!(total(&loud) > total(&tinted) * 11 / 10);
@@ -2111,8 +2117,31 @@ mod tests {
         );
     }
 
+    /// Seventh on #2253 (16:18): at levels 4 and 5 the least glow left the
+    /// voice only the gap to the ceiling, 0.90 to 1.0 at level 5, the idle
+    /// turn's own swing, so the face read as a lit disc, not a mouth. At
+    /// every level the voice still moves the tinted face over at least two
+    /// thirds of plain Speaking's span, as a share of its loudest.
+    #[test]
+    fn a_held_skill_light_at_any_level_leaves_the_voice_its_span() {
+        let last = |frames: Vec<[Rgb; PIXEL_COUNT]>| *frames.last().unwrap();
+        let span = |held: Option<Lit>| {
+            let quiet = total(&last(speaking_with(true, held, 0, 1, 50)));
+            let loud = total(&last(speaking_with(true, held, 255, 1, 50)));
+            f64::from(loud - quiet) / f64::from(loud)
+        };
+        let plain = span(None);
+        for level in 1..=LEVELS {
+            let tinted = span(Some(Lit::of(true, "blue", level).unwrap()));
+            assert!(
+                tinted >= plain * 2.0 / 3.0,
+                "level {level}: {tinted:.2} against plain {plain:.2}"
+            );
+        }
+    }
+
     /// Welcome back's warm glow comes at the person's level, 1 on most
-    /// lamps: a held light under [`SKILL_LEVEL_LEAST`] tints at it.
+    /// lamps: a held light under [`SKILL_SPEAKING_LEVEL`] tints at it too.
     #[test]
     fn a_held_skill_light_under_the_middle_level_tints_speaking_at_the_middle() {
         let warm = |level| Some(Lit::of(true, "warm", level).unwrap());
