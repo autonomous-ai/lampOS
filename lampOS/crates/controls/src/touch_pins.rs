@@ -184,6 +184,11 @@ impl TouchPinsConfig {
                 return Err("touch input names and GPIO lines must be unique".into());
             }
         }
+        // The head pads are the pins file's: a lamp's own settings file
+        // naming two and the product's pins naming four (#1798), or the
+        // reverse, still start, as long as each pad both name is named
+        // alike and in the same place. Controls refusing to start would
+        // close the microphones on the privacy route.
         if self
             .buttons
             .iter()
@@ -192,8 +197,8 @@ impl TouchPinsConfig {
             || self
                 .head_pads
                 .iter()
-                .map(|pin| &pin.name)
-                .ne(config.head_pads.iter())
+                .zip(&config.head_pads)
+                .any(|(pin, name)| pin.name != *name)
         {
             return Err(
                 "touch pins must name configured primary/head inputs in the same order".into(),

@@ -1,5 +1,8 @@
 use lamp_controls::{
-    engine::{Config, Engine, HEAD_DECISION_US, HEAD_SESSION_US, MAX_PENDING_GESTURES},
+    engine::{
+        Config, Engine, HEAD_DECISION_US, HEAD_PAT_LONGEST_US, HEAD_SESSION_US,
+        MAX_PENDING_GESTURES,
+    },
     input::{INPUT_FRESH_US, Level, Observation, PinReader, ScriptedPins},
 };
 use lamp_msgs::{
@@ -609,10 +612,40 @@ fn a_long_head_contact_is_never_a_button_hold_or_an_early_action() {
     rig.head(600_000, 0, true);
     rig.to(6_000_000);
     assert!(rig.events.is_empty());
+    // Over a pat's longest (#2239's P2), so no Pet at its release either.
     rig.head(6_010_000, 0, false);
     rig.to(7_410_000);
-    assert_eq!(rig.kinds(), vec![Gesture::Pet]);
-    assert_eq!(rig.events[0].intent, ControlIntent::Pet);
+    assert!(rig.events.is_empty());
+}
+
+/// The reviewer's P2 on #2239 (rule 8): lamp-cb94's line 97 drifted high at
+/// rest for 77 s and back (#1764). That's no pat, so no `Pet`, which would
+/// wake a sleeping lamp with nobody there. A hand's 1 s pat still is one,
+/// and so is a press of exactly the longest pat; the cycle after a long
+/// press counts again.
+#[test]
+fn a_press_longer_than_a_pat_gives_no_pet_and_a_pat_still_does() {
+    let decided = |release: u64| release + HEAD_SESSION_US + HEAD_DECISION_US;
+    let mut drift = Rig::new(head_config());
+    drift.head(600_000, 1, true);
+    drift.head(77_600_000, 1, false);
+    drift.to(decided(77_600_000) + 1_000_000);
+    assert!(drift.events.is_empty(), "{:?}", drift.kinds());
+    drift.head(81_000_000, 0, true);
+    drift.head(82_000_000, 0, false);
+    drift.to(decided(82_000_000));
+    assert_eq!(drift.kinds(), vec![Gesture::Pet]);
+    let mut pat = Rig::new(head_config());
+    pat.head(600_000, 0, true);
+    pat.head(1_600_000, 0, false);
+    pat.to(decided(1_600_000));
+    assert_eq!(pat.kinds(), vec![Gesture::Pet]);
+    assert_eq!(pat.events[0].duration_us, 1_000_000);
+    let mut longest = Rig::new(head_config());
+    longest.head(600_000, 0, true);
+    longest.head(600_000 + HEAD_PAT_LONGEST_US, 0, false);
+    longest.to(decided(600_000 + HEAD_PAT_LONGEST_US));
+    assert_eq!(longest.kinds(), vec![Gesture::Pet]);
 }
 
 #[test]

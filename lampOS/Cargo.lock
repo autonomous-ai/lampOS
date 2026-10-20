@@ -2276,6 +2276,7 @@ dependencies = [
  "httparse",
  "lamp-actions",
  "lamp-bus",
+ "lamp-controls",
  "lamp-gemini",
  "lamp-msgs",
  "lamp-skills",

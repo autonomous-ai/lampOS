@@ -193,6 +193,23 @@ pads (First, #711):
 
 ### Each lamp's own head pads (#711)
 
+**Every lamp's pads are wired to its own lines.** Each lamp's pads are on any
+of lines 37, 96, 97 and 98, and the hardware team's bench test passes when two
+or more read a touch (the hardware lead, #2182). Known so far:
+
+- lamp-4ace: 37 and 96 (below, "The board's reader");
+- lamp-52e6 and lamp-cb94: 97 and 98 (#1362, #1764);
+- lamp-c0a4: 37 and 97 (#2151);
+- lamp-dbda: 37, 96 and 97 (#2182).
+
+So **the product's pins read all four lines**, active-high and pulled down,
+until the factory step writes the unit's own (#1798). A line with no pad
+rests low under the pull-down, so it reads as no touch. Before, the product
+named 37 and 96, and on lamp-52e6 the head read nothing: under `--touch`,
+`event_sequence` stayed at 0 through five touches (the lead, #1798). Install
+moves a lamp's own pins file off that old guess (install.md). The factory
+step writes the two to four lines it finds, with their baseline (below).
+
 Each unit's head pads rest and read differently (#1764): lamp-4ace's rest low
 and are held high by a hand; lamp-cb94's line 97 flipped at rest and read
 touched for 77 s with no hand on it, a stroke and a sleep from nobody; and
@@ -281,9 +298,17 @@ The new pins schema has `chip`, `buttons`, `head_pads`, `every_ms`, optional
 `reset`, optional `base` and optional `legacy_head` (false unless set; see
 above). Only chip 0 is allowed. Optional primary is line 99; reset is
 active-low line 100, pulled up, in its own field. Head candidates are
-37/96/97/98, selected and polarized per unit. Names/lines are unique and
-match the Controls configuration. The privacy switch, chip 1 line 9, remains
-Voice's. A base requires `base_selected_mask` to exactly match its working
+37/96/97/98, selected and polarized per unit. Names/lines are unique. The
+buttons match the Controls configuration's. The head pads are the pins
+file's: each pad the configuration names too must have the same name in the
+same place, but either may name more (#1798). So a lamp's own
+`controls.json` naming two pads, kept by install, still starts beside the
+product's pins naming four. The pins decide the head pads; the settings
+only check the names both give. So a settings file naming none no longer
+keeps the head off beside pins that name some. A Controls that refused to
+start would close the microphones on the privacy route. The privacy
+switch, chip 1 line 9, remains Voice's. A base requires `base_selected_mask`
+to exactly match its working
 electrodes (4095 for all twelve, 3823/0x0EEF for lamp-4ace's ten), and a complete
 explicit profile: twelve independently specified touch thresholds and twelve
 release thresholds, baseline filters, FFI/SFI/ESI, global/per-pad CDC/CDT,
@@ -612,8 +637,17 @@ once (`discover-head`, above), and Controls never probes or learns pins as it
 runs; V1's 20 ms LOW rule was for learning an unknown pad, not for
 every touch. Both edges extend the 200 ms contact timer, and each completed
 session restarts the 1.2 s decision timer. An isolated pulse resolves as Pet
-1.4 s after its last edge. Directional labels, early reversal classification,
-the first-session chirp and spoken phrases are not ported. State publishes
+1.4 s after its last edge. A cycle with a press longer than 3 s gives no Pet
+(`HEAD_PAT_LONGEST_US`, as the touch path's hold). A line that drifts high
+at rest and back, as lamp-cb94's 97 did for 77 s with no hand on it (#1764),
+is no pat. A Pet wakes a sleeping lamp (Expression), and waking at night
+with nobody there isn't a living thing (the reviewer's P2 on #2239, rule
+8). A press runs from the first pad touched until none is, so a real pat on
+another pad while one line drifts high is part of that long press, and no
+Pet is given either. That errs on the quiet side. Tests: `tests/engine.rs`
+(`a_press_longer_than_a_pat_gives_no_pet_and_a_pat_still_does`).
+Directional labels, early reversal classification, the first-session chirp
+and spoken phrases are not ported. State publishes
 head-active edges promptly for an optional small visual reaction; it cannot
 establish listening readiness. Any brain notification must remain limited to
 one per 60 s by its consumer, as in V1; the Pet event is not permission to speak.

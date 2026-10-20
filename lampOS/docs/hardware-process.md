@@ -72,11 +72,12 @@ order is the issue's own list.
    speaker, the five joints, ring, camera, touch, sensors, board, storage.
 3. The operator does the manual steps the coverage matrix lists: looking
    at the ring, listening to the speaker, touching every pad, pressing the
-   buttons. The head's touch pads are wired per unit (lamp-52e6's are on
-   lines 97 and 98, not 37 and 96; #1362), so before the touch checks the
-   station finds this unit's pair and polarity with a person touching and
-   releasing each pad in turn, and writes them into the unit's pins file
-   (#1744's `steps.sh`).
+   buttons. The head's touch pads are wired per unit, on any of lines 37,
+   96, 97 and 98 (lamp-52e6's on 97 and 98, lamp-dbda's on 37, 96 and 97;
+   #1362, #2182). The product reads all four until the station finds this
+   unit's pads (two to four) and their polarity, with a person holding each
+   pad in turn, and writes them into the unit's pins file (#1744's
+   `steps.sh`, #1798).
 4. `lamp-station` turns the self-test report and the manual steps into one
    run record against the matrix
    ([#1741](https://github.com/autonomous-ai/lampOS/pull/1741),
