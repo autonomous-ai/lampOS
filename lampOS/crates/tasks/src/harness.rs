@@ -192,6 +192,10 @@ pub struct Ended {
 /// much longer than that the adapter allows it before it is killed.
 pub const WAIT_HELD: Duration = Duration::from_secs(600);
 const WAIT_SLACK: Duration = Duration::from_secs(30);
+/// How long `harness start` is given: Harness itself waits up to 60 s for
+/// the daemon it started to claim its pid file (`PLATFORM_START_WAIT_MS`),
+/// longer than [`Config::read_timeout`] may be (the reviewer's P3 on #2309).
+pub const DAEMON_START_TIMEOUT: Duration = Duration::from_secs(75);
 /// No more agents than this are waited on in one `wait`.
 pub const MOST_WAITED: usize = 64;
 
@@ -646,6 +650,24 @@ impl Cli {
             return Err("machines_failed".into());
         }
         parse_machines(&reply.stdout).map_err(str::to_string)
+    }
+
+    /// Start Harness's daemon (`harness start`; with `harness service
+    /// install`, through systemd, as on a lamp): after a sign-in by code,
+    /// which stops it while its user service doesn't start it again
+    /// (openharness#1463). It starts nothing else and answers nothing; one
+    /// already running is left as it is. It has [`DAEMON_START_TIMEOUT`],
+    /// and holds the job lane that long at most: no hand-over can work
+    /// until the daemon is up.
+    pub fn start_daemon(&self) -> Result<(), String> {
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run(&["start".into()], DAEMON_START_TIMEOUT)
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("start_failed".into());
+        }
+        Ok(())
     }
 
     /// Harness's own sign-in by a spoken code (`harness login --code
