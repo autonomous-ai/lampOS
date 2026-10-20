@@ -4,6 +4,51 @@
 
 Newest first. Times from `date` (+07).
 
+- 12:37 Merged #2177 (touch_pins test fix; lamp-voice green again) as `02ab500a0`
+- 12:35 #2174 re-read at `9292e17ca`: three P3s in
+- 12:34 #2187 (#2161 folded) checked: same patch-id; reads stand
+- 12:32 #2179 (a wordless line doesn't end a search) read: P2 a late piece of the asking line ends the search on Live; P3 title style; mine after the fix
+- 12:32 #2171 re-read at `3c2dd20e8`: P2 and P3s fixed; first builder's
+- 12:28 #2180 (endpoint worker inferred ready) read: no P1/P2, one P3; merge after #2177
+- 12:25 #2175 (others' answer left alone) read: P2 a correction or follow-up over the answer is held as someone else's; two P3s; first builder's (on in lamp-4ace's unit)
+- 12:23 #2063 (`cdb21e020`): preference line first in the use note; fold three commits
+- 12:22 #2109 post-merge read: no P1/P2, four P3s for a follow-up (stop test hangs, two copies of the yes path, no owner/mode check, stale words)
+- 12:22 #2178 (call-times tool) read: no P1/P2; P3 'not done' lines counted; merge after #2177
+- 12:19 #2161 P3s (`045f14c60`): in; fold the two commits
+- 12:19 #2167 (own DeepSeek/Deepgram keys) read: needs rebase (reset.rs PERSON_STORES count with #2139/#2110); P2 voice-keys health part goes quiet after keys.remove; five P3s; key handling fine; first builder's
+- 12:18 #2177 (touch_pins test fix for lamp-voice red) read: no finding; merging on green
+- 12:17 #2174 (sign-in asked/answer in lamp-tasks) read at `61e607fdb`: no P1/P2, three P3s; mine after #2131 merges and it's retargeted (Jarvis approved)
+- 12:16 #2170 (keeper prepare) read: no P1/P2, three P3s (orangepi lookup when nothing missing, files not in update's records, small race); first builder's (lamp-os package path)
+- 12:16 #2171 (early words from a pause's answer) read: no P1; P2 for the measure (head start 0-30 ms, not 250); two P3s; first builder's
+- 12:15 lamp-voice red since #2143 (`9ae36ac4e`): #2084's touch_pins test asserts no privacy in product pins; reported on #1722 with the fix; holding lamp-voice merges
+- 12:11 #2155 third merge (`f8c2dc560`): docs only, the privacy row merged with both sides; #2172 (#2160 + P3 doc): same code, merge after Ten's peer read
+- 12:03 Merged #2162 (search pose tests skip the uncounted windows, #1806) as `3adcb9285` on green
+- 12:00 #2159 (#2150 refiled with six P3s) checked: all in, no new finding; first builder's
+- 11:59 #2173 (#2145 folded, with the save/recall P3 fixed) checked; first builder's; #2137 scrub pairing stands
+- 11:58 #1868 refold (`e25710cdd`): P1 fixed, only its three files; read stands
+- 11:57 #2160 (self-test head move on a stepped clock, #1373 rebuilt) read: no P1/P2, one P3 (doc counts); mine on green after Ten's peer read
+- 11:56 #2165 re-read at `75817e6bb`: Python gone, test 7/0; I merge on green
+- 11:56 #2169 (#1888 folded) checked: same lines as #1888's two commits; first builder's after the lamp-4ace call
+- 11:55 Merged #2164 (setup_change bus name, for #1959) as `937536764` on green
+- 11:51 #1868 fold (`f51f49c32`): P1, the commit reverts #2166 and #2138 (reset --soft onto a newer base); asked to rebuild by cherry-pick
+- 11:50 Merged #2158 (steady reference rig by angle addition, #1806) as `20f9225d8` on green
+- 11:48 #2161 (socket probe) read: no P1/P2, three P3s (order favours the socket, LoadCredential missing, wording); voice unchanged, key never shown; first builder's
+- 11:47 #1868 merge of lamp-voice (`71e804f2f`): the one resolution (nods 2-3 under #2030) is right; fold to one commit before merge
+- 11:45 #2165 (two-person run tool) read: P2 Python outside training (count, newest, the test's fake say); otherwise fine; mine after the fix
+- 11:43 #2164 (setup_change bus name) read: no finding; I merge on green
+- 11:40 #2161 (socket probe, onto #1712, +761) sized; first read sent to a second pass. #2109 merged by the first builder before my read finished; read to follow
+- 11:39 Merged #2156 (Policy's waits as a Timing, #1806) as `aa81b2531` on green
+- 11:38 #2152 re-read at `4637fb55c`: P1 name removed (patch clean), clippy, P2 and P3s in; first builder's
+- 11:35 Merged #2149 (far face counts only while moving, per face) on green
+- 11:32 #2149 re-read at `cd17e2ac0`: per-face movement, my cases end in nobody; I merge on green
+- 11:32 #2145 re-read at `9c17b5254`: P2 fixed for the live thread; new P3 save and recall_for still skip the unheard exchange; fold before merge
+- 11:32 #2138 re-read at `081135ef0`: P3 and test in; new P3 clock-behind falls back to a new stamp; first builder's
+- 11:30 #2150 (lamp-peek page) read: no P1/P2, six P3s (plain HTTP token on the network mode, escape untested, /status cost, error line, eyes sender, Host check); first builder's (camera privacy path)
+- 11:29 #2155 second merge (`a8deffbae`): docs only, read stands; doc cites #2143, still open
+- 11:27 #2069 (unplug never mind) read: no P1; P2 a touch after the cancel fails it for good, not retried; five P3s; #1699 needs one more rebase (say.rs conflict) first; first builder's
+- 11:25 #2152 re-read at `fbc687f08`: P1 a person's name in the test code (fold and force-push, first builder may purge); clippy fails; P2 the name ask-back lands on the open face question; my earlier two fixed
+- 11:24 #1340 re-read at `a4d4a3a91` (not-fitted axis): reads right
+- 11:21 #2143 rebase (`0a22caf34`): same lines as `54c54a5aa`; merges onto lamp-voice with #2148
 - 11:20 Merged #2154 (health says the privacy switch's reading) on green
 - 11:17 Merged #2151 (factory head pads from one long hold, thirteen-P4) on green
 - 11:17 #2155 (fourth landing, #1712 onto lamp-voice) checked: merge right, the privacy_bus clash fix right; two P3s (no-slide still told a receipt source; the receipt untested); gate 1100/0; first builder's
