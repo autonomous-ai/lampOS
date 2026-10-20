@@ -438,11 +438,15 @@ units stopped:
    and read differently (#1764): lamp-cb94's line 97 flipped at rest and read
    touched for 77 s with no hand on it, and lamp-c0a4's pulsed under a hand.
    So `lamp-controls discover-head --seconds 40 --rest-seconds 10`, hands
-   away for its first 11 s and then each pad touched twice, finds this
+   away for its first 11 s and then each pad held about 2 s (or touched
+   twice; on lamp-c0a4 a person's two touches merged into one long one,
+   thirteen-P4), finds this
    unit's pair and polarity, which go into `head_pads`, and each pad's own
    baseline, which goes into `head_rest` (its rest, and whether a touch holds
    its level or pulses; controls.md, "Each lamp's own head pads"). A pad
-   whose line changed with hands away is refused and nothing is written. The
+   whose line changed with hands away is refused and nothing is written.
+   The step names each pad as it is found (its line, its rest, and whether
+   it read level or pulses). The
    product's 37 and 96, active-high, with no `head_rest`, are only a
    default. On an MPR121 strip it is
    `lamp-controls calibrate-touch` (controls.md, "Run without a lamp, then
