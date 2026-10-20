@@ -249,6 +249,17 @@ pub(crate) struct Transcript {
 
 impl Transcript {
     pub fn add(&mut self, heard: Heard) {
+        // A final that ends no later than the finals before it, with the
+        // last one's words, is that one again (a second copy, as a proxy
+        // or a `Finalize` might send): its words are not said twice.
+        // Finals never overlap, so a new one always ends later.
+        if heard.is_final
+            && !heard.transcript.is_empty()
+            && self.covered.is_some_and(|covered| heard.end <= covered)
+            && self.segments.last() == Some(&heard.transcript)
+        {
+            return;
+        }
         if !heard.is_final {
             if !heard.transcript.is_empty() {
                 self.pending = Some(Pending::Interim(heard.end));
@@ -1258,6 +1269,35 @@ mod tests {
         transcript.speech_started(2.6);
         assert!(!transcript.settled(2.5), "someone talks again");
         assert_eq!(transcript.words().0, "what time is it");
+    }
+
+    /// A second copy of a final (the same words, ending no later) is not
+    /// said twice; a new final, or the same words later in the audio, is.
+    #[test]
+    fn a_final_said_again_is_not_heard_twice() {
+        let result = |text: &str, is_final, end| Heard {
+            transcript: text.to_owned(),
+            is_final,
+            speech_final: true,
+            from_finalize: false,
+            end,
+        };
+        let mut transcript = Transcript::default();
+        transcript.add(result("hey lamp", true, 0.6));
+        transcript.add(result("hey lamp", true, 0.6));
+        assert_eq!(transcript.words().0, "hey lamp");
+        transcript.add(result("what time is it", true, 1.8));
+        transcript.add(result("what time is it", true, 1.7));
+        assert_eq!(transcript.words().0, "hey lamp what time is it");
+        // The same words said again later are new.
+        transcript.add(result("what time is it", true, 3.0));
+        assert_eq!(
+            transcript.words().0,
+            "hey lamp what time is it what time is it"
+        );
+        // An interim of the same words is a preview, as before.
+        transcript.add(result("what time is it", false, 3.0));
+        assert!(!transcript.settled(3.0), "an interim with words is pending");
     }
 
     #[test]
