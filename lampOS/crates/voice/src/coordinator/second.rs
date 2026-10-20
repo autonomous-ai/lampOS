@@ -970,6 +970,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         }
     }
 

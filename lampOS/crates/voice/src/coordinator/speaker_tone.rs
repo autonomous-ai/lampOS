@@ -229,6 +229,7 @@ pub(super) fn commit_sound_turn(
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
+        handed: 0,
     };
     owner.input_ended(now(), current.owner)?;
     snapshot = owner.snapshot(now())?;

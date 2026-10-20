@@ -231,6 +231,7 @@ fn start(request: u64) -> ProviderInput {
         after_stop: false,
         follows_on: false,
         over_the_lamps_voice: false,
+        heard_of_cut: None,
     }
 }
 fn audio(request: u64, sequence: u64) -> ProviderInput {
@@ -2833,6 +2834,7 @@ async fn a_request_going_on_from_one_given_up_begins_with_its_words() {
         after_stop: false,
         follows_on: false,
         over_the_lamps_voice: false,
+        heard_of_cut: None,
     });
     engine.submit(audio(2, 1));
     engine.submit(end(2));
@@ -2868,6 +2870,7 @@ async fn a_request_going_on_takes_only_the_words_of_the_one_just_before_it_in_it
         after_stop: false,
         follows_on: false,
         over_the_lamps_voice: false,
+        heard_of_cut: None,
     };
     let script = Arc::new(Script {
         heard: Mutex::new(
@@ -2936,6 +2939,7 @@ async fn the_first_request_after_a_stop_is_told_of_it_beside_its_words() {
         after_stop: true,
         follows_on: false,
         over_the_lamps_voice: false,
+        heard_of_cut: None,
     });
     engine.submit(audio(1, 1));
     engine.submit(end(1));
@@ -2973,6 +2977,7 @@ async fn a_stop_whose_request_is_never_asked_is_told_with_the_next_one() {
         after_stop,
         follows_on: false,
         over_the_lamps_voice: false,
+        heard_of_cut: None,
     };
     let stopped = Message::system(crate::provider_worker::STOPPED_NOTE);
     for (next_session, told) in [(1, true), (2, false)] {
@@ -3013,6 +3018,7 @@ async fn a_stop_goes_with_a_request_going_on_and_never_past_two_minutes() {
         after_stop,
         follows_on: false,
         over_the_lamps_voice: false,
+        heard_of_cut: None,
     };
     let stopped = Message::system(crate::provider_worker::STOPPED_NOTE);
     let answered = || vec![text("Sure."), Ok(ChatEvent::Done)];
@@ -3197,6 +3203,7 @@ async fn a_request_going_on_names_the_one_begun_before_it_in_its_session() {
         after_stop: false,
         follows_on: false,
         over_the_lamps_voice: false,
+        heard_of_cut: None,
     };
     let script = Arc::new(Script {
         heard: Mutex::new(
@@ -4548,6 +4555,7 @@ fn start_marked(
         after_stop,
         follows_on,
         over_the_lamps_voice: over_the_voice,
+        heard_of_cut: None,
     }
 }
 
@@ -5401,4 +5409,166 @@ async fn the_latest_answers_words_are_kept_for_the_count() {
         said.1.contains("Rain.") && !said.1.contains("four"),
         "{said:?}"
     );
+}
+
+/// `LAMP_SAID_AS_HEARD` (the first builder, 09:38 on #1722): a story cut in
+/// its second sentence is in the next request's history as what was played
+/// of it, its first sentence and the second's first words with the dash, and
+/// never its third; and the cut-in note still tells the model it was cut
+/// there. The thread is kept from the engine's output as the worker keeps it.
+#[tokio::test]
+async fn a_line_that_cuts_the_story_is_asked_with_the_story_as_heard() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Tell me a story.".to_owned()),
+                Ok("Wait, who was he?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    text("Once a keeper lived by the sea. "),
+                    text("Every night he climbed the stairs to the light. "),
+                    text("One winter a ship came."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("A keeper named Tom."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let thread = Arc::new(Mutex::new(crate::thread::Thread::new()));
+    let told = thread.clone();
+    let tools: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(move || Told {
+            text: "SYSTEM".to_owned(),
+            after: None,
+            history: told
+                .lock()
+                .unwrap()
+                .recent(Instant::now(), Duration::from_secs(300), 6)
+                .into_iter()
+                .flat_map(|exchange| {
+                    [
+                        Message::user(exchange.person),
+                        Message::assistant(exchange.lamp),
+                    ]
+                })
+                .collect(),
+        }),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .telling_cut_ins(true)
+    .announcing(false);
+    // A turn to its end, its words kept in the thread as the worker keeps
+    // them: each piece of the lamp's, and the person's words.
+    async fn kept_turn(engine: &mut Engine, thread: &Mutex<crate::thread::Thread>) {
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+                .await
+                .expect("the turn ends");
+            let mut thread = thread.lock().unwrap();
+            match event {
+                ProviderOutput::Transcript {
+                    request: None,
+                    text,
+                    finished,
+                } => thread.person(&text, finished, Instant::now()),
+                ProviderOutput::Transcript {
+                    request: Some(request),
+                    text,
+                    ..
+                } if !text.is_empty() => {
+                    thread.lamp(request, &format!("{} ", text.trim_start()), Instant::now());
+                }
+                ProviderOutput::TurnComplete { .. } => return,
+                _ => {}
+            }
+        }
+    }
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    kept_turn(&mut engine, &thread).await;
+    let sent = thread
+        .lock()
+        .unwrap()
+        .recent(Instant::now(), Duration::from_secs(300), 6);
+    assert!(sent[0].lamp.contains("ship"), "as sent: {:?}", sent[0].lamp);
+    // The line cuts it halfway through its second piece of sound: each
+    // piece's speech is 1,500 samples here.
+    let mut cutting = start_marked(2, true, false, false);
+    if let ProviderInput::Start { heard_of_cut, .. } = &mut cutting {
+        *heard_of_cut = Some(crate::said_as_heard::HeardOfCut {
+            request: 1,
+            samples: 1_500 + 750,
+        });
+    }
+    super::worker::keep_heard(&mut thread.lock().unwrap(), &engine, &cutting);
+    engine.submit(cutting);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    kept_turn(&mut engine, &thread).await;
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 2, "{asked:?}");
+    let story = asked[1]
+        .iter()
+        .find(|message| message.role == "assistant")
+        .and_then(|message| message.content.as_ref()?.as_str().map(str::to_owned))
+        .expect("the story in its history");
+    assert!(
+        story.starts_with("Once a keeper lived by the sea. Every") && story.ends_with('—'),
+        "{story:?}"
+    );
+    assert!(!story.contains("ship"), "{story:?}");
+    assert!(
+        asked[1].contains(&Message::system(crate::cut_in_told::NOTE)),
+        "{:?}",
+        asked[1]
+    );
+}
+
+/// The reviewer's P3 on #2145: a call written as words mid-answer is left
+/// out of what was heard, as the thread leaves it out, and its sound still
+/// counts. Played whole, what was heard is what the thread keeps.
+#[tokio::test]
+async fn a_call_written_in_the_answer_is_left_out_of_what_was_heard() {
+    use crate::said_as_heard::HeardOfCut;
+    let (engine, _, _) = scripted(Arc::new(Script::default()));
+    let pieces = [
+        ("Sure.", 1_000),
+        (" set_timer{", 500),
+        ("\"minutes\": 5}", 500),
+        (" It is set.", 1_000),
+    ];
+    for (words, samples) in pieces {
+        engine.shared.said_piece(4, Some(words));
+        engine.shared.said_samples(4, samples);
+    }
+    let heard = |samples| {
+        engine
+            .said_as_heard(HeardOfCut {
+                request: 4,
+                samples,
+            })
+            .unwrap()
+            .0
+    };
+    assert_eq!(heard(3_000), "Sure. It is set.");
+    assert_eq!(heard(2_500), "Sure. It—");
+    assert_eq!(heard(1_500), "Sure.", "within the call's sound");
+    let mut thread = crate::thread::Thread::new();
+    let now = Instant::now();
+    thread.person("Set a timer.", true, now);
+    for (words, _) in pieces {
+        thread.lamp(4, &format!("{} ", words.trim_start()), now);
+    }
+    let kept = thread.recent(now, Duration::from_secs(300), 6);
+    assert_eq!(kept[0].lamp, heard(3_000));
 }

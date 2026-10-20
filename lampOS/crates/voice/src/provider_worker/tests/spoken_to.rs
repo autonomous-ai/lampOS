@@ -853,6 +853,7 @@ async fn voice_line_over(
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice,
+            heard_of_cut: None,
         })
         .unwrap();
     // Each block sent once the socket takes it, the coordinator's lease

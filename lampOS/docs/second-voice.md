@@ -1670,6 +1670,62 @@ after a take-over, but now for every turn:
   itself and they are let go. On lamp-4ace on 19 Oct at 15:56 the weather
   and a race result were searched, then ended by the owner's next line,
   which was held, and were never said.
+- **What the lamp said is kept as what was heard** (`LAMP_SAID_AS_HEARD=on`,
+  off unless set; #1712, the first builder's yes on #1722, 20 Oct 09:38).
+  - **The fault it fixes:** this route sends each piece of an answer, its
+    words and then its sound, as fast as speech is made, and a reply holds
+    up to 30 s of audio. The worker keeps each piece's words as the lamp's
+    as they're sent. So a line said over the lamp 5 s into a 15 s story was
+    asked with the whole story as the lamp's words. "Go on" then skipped
+    what was never heard, and the cut-in note's "you stopped there" meant
+    the story's end.
+  - **The coordinator** counts each reply's samples handed to the speaker
+    (`Reply::handed`). It puts them on the Start of the line that cuts the
+    reply, or of the first line after a Stop that cut one on its session:
+    `heard_of_cut`, the cut request and its samples played. It's left off
+    the wire otherwise, and the session record's `input_admitted` says it.
+  - **The route** keeps each piece's words and samples as sent
+    (`said_as_heard::Piece`). A wait sound and the announcement count their
+    time with no words. So does a call written as words mid-answer, which
+    the thread leaves out (`CallsLeftOut`, on the same text), so a cut never
+    tells it back as the lamp's words (the reviewer's P3 on #2145).
+  - **At that Start,** before the line is asked, the cut request's words in
+    the thread become what was heard (`said_as_heard::heard`,
+    `Thread::heard_only`):
+    - each piece played whole;
+    - then the played share of the words of the piece playing at the cut,
+      rounded down, with "—" after them;
+    - and nothing after.
+  - **Nothing more of that answer is kept.**
+    - **A cut before any word** keeps the exchange, with the lamp's part a
+      dash. The next line is still asked with the person's own question,
+      and memory is handed it too (the reviewer's P2 on #2145: "What's the
+      capital of Peru?", then "and how many people live there?" before the
+      answer sounded, had lost the question). A thread read back from its
+      file knows such an exchange by its dash.
+    - Its end is the heard end, so a question it never played isn't taken
+      as asked (`lamp_asked`).
+  - **The journal says** `request N: H of its answer's W words were played,
+    M ms of it, before it was cut; request K is asked with only those as
+    the lamp's`.
+  - **The lamp's memory** takes the trimmed words only when the cut came
+    while the route was still sending the answer. A retired request's output
+    is dropped, so its exchange is handed on at the next request's end,
+    after the trim. When the route had sent all of it, and its turn had
+    ended, before the cut, memory already has the whole answer. That's the
+    usual case for a long story, sent in seconds and played for many more.
+  - **Not covered:**
+    - the memory case above;
+    - a Stop followed by a written request rather than a spoken line: a
+      written request has no Start, so that answer stays as sent;
+    - the Stop's path through the session loop: its record of the cut is
+      tested as a function (`stop_cut_of`), and end to end only on a lamp
+      (a Stop over a story, then "go on").
+
+    The share of a cut piece assumes its words are spread evenly over its
+    sound.
+  - **The Live route** is told nothing new: Gemini's server keeps what it
+    made, so its history can't be put right this way.
 - **The name note** (`LAMP_NAME_NOTE`) is given as on the Live route
   (`worker::Heeding::telling_the_name`): a line the lamp's name began, heard
   by `lamp-name` at `called::LEAST_SCORE` or more no more than
