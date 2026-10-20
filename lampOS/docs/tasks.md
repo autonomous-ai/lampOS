@@ -1905,34 +1905,6 @@ staff (`agent_tasks::start`), and the second worker never did. So
 as Claude Code. The second worker now reads them as the Live worker does,
 with `LAMP_TASKS_WHO=on` (`second_provider::worker::start_tasks`).
 
-**Several of the staff: a hand-over, never talk to someone else (#1722).**
-On lamp-4ace on 2026-10-21 at 00:06, with the staff now read on the second
-route and two of them (Claude Code and Codex), only 1 of 3 hand-overs was
-prepared (3 of 3 before): "Hey Lamp, ask Claude Code to write a two-line poem
-about the rain." got `not_for_me`, and "can you ask Claude Code to write a
-short poem about the sea?" got "That's not mine to hand over, and nobody's
-asked me". The two-agent texts said "asks to have Claude Code and Codex do
-something" (both together), "one of the person's agents" (which reads as a
-person, as `not_for_me`'s "people talking to each other" does), "it is
-theirs to do, not yours", and "names neither Claude Code or Codex nor …".
-With two or more of the staff now:
-
-- `start_agent_task` says "asks to have Claude Code or Codex do something";
-- the session note opens "Claude Code and Codex are the person's agents on
-  their office computer, never anyone in the room: when the person asks you
-  to have Claude Code or Codex do something ("ask Claude Code to …", "can you
-  get Claude Code to …"), they are asking you to hand it over, not talking to
-  someone else, so never call not_for_me for it. Hand it over with
-  start_agent_task every time, …", and its exception says "names neither
-  Claude Code nor Codex nor work on their office computer".
-
-With the staff unread or one of them, both texts are as before, word for word
-(`asking_the_lamp_to_have_one_of_several_agents_do_something_is_a_hand_over`).
-The trade-off: "ask Claude Code to …" said between two people in the room is
-taken as a hand-over, which still asks before starting (`LAMP_TASKS_ASKED`).
-On with `LAMP_TASKS_WHO=on`, no switch of its own (the first builder,
-2026-10-21 00:58). Not played on a lamp yet.
-
 With one target, `start_agent_task` still had no `who`, its description
 named only that agent, the staff's note matched only the staff, and the
 voice sent any call to the one there was. Off unless
