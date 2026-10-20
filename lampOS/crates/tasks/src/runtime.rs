@@ -1949,6 +1949,9 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 // part runs, and says so until someone looks (#1505).
                 let targets_newer = report.summary["targets_newer"].as_u64();
                 let set_aside = report.summary["set_aside"].as_str().map(str::to_owned);
+                // Stored tasks a newer build wrote that this one can't read:
+                // kept as they are, and not followed (#1680).
+                let unread = report.summary["unread"].as_u64().unwrap_or(0);
                 // With `--set-up-later`: why hand-overs are off, or will
                 // fail, while the lamp is not yet set up for them (#1676).
                 // Not set up is not unwell; a targets file that is not
@@ -1974,6 +1977,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     || targets_newer.is_some()
                     || targets_invalid
                     || set_aside.is_some()
+                    || unread > 0
                     || handover_failed
                 {
                     Level::Warn
@@ -1998,6 +2002,8 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     "The task targets file changed and is not valid; the targets before it are kept"
                 } else if set_aside.is_some() {
                     "Tasks set aside a store from a newer build; its tasks are not followed"
+                } else if unread > 0 {
+                    "Tasks kept stored tasks from a newer build that this build can't read; they are not followed"
                 } else if handover_failed {
                     "Tasks could not hand the last task over"
                 } else {
@@ -2030,6 +2036,9 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 }
                 if let Some(name) = set_aside.as_deref() {
                     value = value.with("set_aside", name);
+                }
+                if unread > 0 {
+                    value = value.with("unread", unread);
                 }
                 if let Some(found) = set_up {
                     if let Some((reason, _)) = off {

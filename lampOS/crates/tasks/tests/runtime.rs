@@ -1561,3 +1561,87 @@ fn targets_from_machines_needs_an_engine_and_set_up_later() {
         "{unknown}"
     );
 }
+
+/// The tasks database, opened by hand as a newer build would write it.
+fn tasks_database(s: &Running) -> rusqlite::Connection {
+    rusqlite::Connection::open(s.config.dir.join("tasks.sqlite3")).unwrap()
+}
+
+/// #1680: a tasks database from a newer build (`user_version` 2) doesn't
+/// stop the part: it is kept whole, the part starts with an empty store,
+/// serves, and says so on health.
+#[test]
+fn a_newer_tasks_database_is_set_aside_and_the_part_serves() {
+    let mut s = Running::new(false);
+    let prepared = s.prepare();
+    s.stop();
+    tasks_database(&s)
+        .execute_batch("PRAGMA user_version=2")
+        .unwrap();
+    s.start();
+    assert_eq!(s.status()["summary"]["retained"], 0);
+    let kept = s.status()["summary"]["set_aside"]
+        .as_str()
+        .expect("the kept store is said")
+        .to_owned();
+    assert!(kept.starts_with("tasks.sqlite3.newer-db2-"), "{kept}");
+    let old = rusqlite::Connection::open(s.config.dir.join(&kept)).unwrap();
+    let snapshot: Vec<u8> = old
+        .query_row("SELECT snapshot FROM state", [], |row| row.get(0))
+        .unwrap();
+    let snapshot: Value = serde_json::from_slice(&snapshot).unwrap();
+    assert_eq!(
+        snapshot["tasks"][0]["id"], prepared["id"],
+        "its task is kept"
+    );
+    drop(old);
+    s.prepare();
+    let report = tasks_diagnostic_until(&s, |report| {
+        report.values.iter().any(|pair| pair.key == "set_aside")
+    });
+    assert_eq!(report.level, Level::Warn);
+}
+
+/// #1680: a stored task with a value this build doesn't know, at the same
+/// `schema`, doesn't stop the part: it is kept in the store as it is, the
+/// part serves, and health counts it.
+#[test]
+fn a_stored_task_this_build_cannot_read_is_kept_and_the_part_serves() {
+    let mut s = Running::new(false);
+    let prepared = s.prepare();
+    s.stop();
+    let db = tasks_database(&s);
+    let snapshot: Vec<u8> = db
+        .query_row("SELECT snapshot FROM state", [], |row| row.get(0))
+        .unwrap();
+    let mut state: Value = serde_json::from_slice(&snapshot).unwrap();
+    state["tasks"][0]["dispatch"]["state"] = json!("a_state_from_later");
+    let later = state["tasks"][0].clone();
+    db.execute(
+        "UPDATE state SET snapshot = ?1",
+        [serde_json::to_vec(&state).unwrap()],
+    )
+    .unwrap();
+    drop(db);
+    s.start();
+    let summary = s.status()["summary"].clone();
+    assert_eq!(summary["retained"], 0, "{summary}");
+    assert_eq!(summary["unread"], 1, "{summary}");
+    assert!(summary["set_aside"].is_null(), "{summary}");
+    let next = s.prepare();
+    assert_ne!(next["id"], prepared["id"]);
+    let report = tasks_diagnostic_until(&s, |report| {
+        report
+            .values
+            .iter()
+            .any(|pair| pair.key == "unread" && pair.value == "1")
+    });
+    assert_eq!(report.level, Level::Warn);
+    s.stop();
+    let snapshot: Vec<u8> = tasks_database(&s)
+        .query_row("SELECT snapshot FROM state", [], |row| row.get(0))
+        .unwrap();
+    let state: Value = serde_json::from_slice(&snapshot).unwrap();
+    assert_eq!(state["tasks"][0], later, "kept as it is");
+    assert_eq!(state["tasks"][1]["id"], next["id"]);
+}
