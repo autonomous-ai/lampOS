@@ -128,6 +128,8 @@ per-lamp facts, and physical privacy.
 
 Onboarding uses `/var/lib/lampOS/voice/onboarding/progress.json`; the privacy
 checkpoint and transient handoff files share its root-owned 0700 directory.
+The room sounds yes (#1722 item 1) is `/var/lib/lampOS/consent/room-sounds.json`,
+0640 root:lampos so lamp-ears can read it; both reset plans wipe that file.
 The product unit names that canonical file without enabling `LAMP_ONBOARDING`.
 Both reset plans wipe the entire directory's contents, including pending writes,
 temporary files and mailbox descendants, retaining the empty private container.

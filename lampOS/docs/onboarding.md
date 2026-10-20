@@ -28,6 +28,7 @@ ready, not paused) and a face is in front of it.
 | 4 | `touch` | asks them, in a few words, to touch the top of its head gently, then stays quiet | a head-pad touch from Controls (`controls/touch`, `lamp_msgs/TouchEvent` from `controls`, `source: head`, enabled; `lamp-controls --touch`) after the ask: done. Short of that, after 8 s of quiet, one reminder; 60 s after the ask: failed. The model may only skip it. Not available without the voice's bus (`LAMP_BUS=on`) or the subscription to `controls/touch`; the base strip stays off (#1891) | the outcome only |
 | 5 | `privacy` | led first, before step 1, whenever it is available (see "Physical privacy step" below); the core onboarding skill requests a short invitation naming the verified switch location | a delivered invitation, fresh physical close, the voice's verified microphone cleanup, then a fresh same-source open and normal readiness; the camera's close is not checked | bounded attempt evidence and completion identity |
 | 6 | `giving_way` | placeholder | — | — |
+| 6½ | `room_sounds` | only on a lamp with no privacy slide (`LAMP_PRIVACY_CONTROLS=no-slide`, exactly): asks once whether it may notice music and laughter, with the line "the lamp notices music and laughter, nothing is recorded" (see "Room sounds" below); elsewhere `not_available`, unspoken | the model calls `setup_step`: `done` only after a clear yes, `skipped` for a no; never reported, `failed` after 90 s as any step | a yes alone, as `/var/lib/lampOS/consent/room-sounds.json` |
 | 7 | `preferences` | asks about quiet hours and whether it may say hello, one at a time; keeps each as a rule with `keep_rule` (#813) when the provider worker has both `LAMP_MEMORY_DAYS=on` and `LAMP_MEMORY_RULES=on` ([memory.md](memory.md), "What a person teaches and corrects"); without either, or with the legacy memory, there is no `keep_rule` and the model keeps them with `remember` if it has a memory at all and says that is everything | the model calls `setup_step` as soon as it has heard the second answer, before it says anything else (row 10 on lamp-52e6: asked and answered, never reported) | the rules, in memory |
 
 A placeholder is the step of a part another builder owns: whether the body
@@ -49,6 +50,52 @@ on. Nobody in front of the lamp for 30 s: the step being led is dropped and
 asked again when someone is back. The keeper's pause
 ([keeper.md](keeper.md)) stops it the same way: nothing is begun while
 paused, and the step being led is asked again afterwards.
+
+## Room sounds (#1722 item 1)
+
+On a lamp with no privacy slide, music and laughter (`ears/classes`,
+#1669) are off until the person says yes; on a slide lamp they stay on
+behind the switch, as built, and this step is never offered. The voice
+reads `LAMP_PRIVACY_CONTROLS` once when the walk is made; only the exact
+value `no-slide` makes the step available, and all of it stays behind
+`LAMP_ONBOARDING` like every step.
+
+The step is asked once. Any kept outcome ends it: a yes (`done`), a no
+(`skipped`) or silence (`failed` after 90 s, as any step) is in the
+progress file, so a restart, a mute or a rebuilt walk does not ask again.
+A no and silence store nothing more: the step's outcome and time only,
+as every declined step. Only a yes writes a record for lamp-ears, and it
+holds the answer and its time, never words or sound.
+
+The record, for lamp-ears (`onboarding/storage.rs`, `room_sounds`):
+
+- Path: `/var/lib/lampOS/consent/room-sounds.json` (`ROOM_SOUNDS_PATH`),
+  outside the voice's 0700 folder, which lamp-ears (`lampos`) cannot
+  enter. `deploy/product/lampos.conf` makes `/var/lib/lampOS/consent`
+  0750 root:lampos.
+- Written whole by the onboarding storage worker (temporary file, mode set
+  after it is made since the voice's `UMask=0077`, group set, synced,
+  renamed, folder synced): 0640 root:lampos, the group's id read from
+  `/etc/group` by name at the voice's start. With no `lampos` group the
+  voice says so once and writes it 0600 root's, which lamp-ears reads as
+  no, the safe side. A write that fails is said once and leaves no file
+  (no again); the progress stands.
+- Written only by the progress write that first keeps the yes; removed by
+  any progress write or start whose `room_sounds` outcome is not `done`.
+  It is never written back from the progress, so once removed it stays
+  gone until a new yes.
+- Shape: `{"version":1,"room_sounds":"yes","at_unix_s":<when the yes was kept>}`.
+- Read rule: yes only when the file is a JSON object whose `room_sounds`
+  is exactly `"yes"`. Missing, unreadable, unparseable, over 4096 bytes,
+  or anything else is no. Read one version ahead: `version` and any other
+  field are ignored.
+
+Taking the yes back: it is withdrawn by `redo_setup` (the progress
+emptied, the file removed on that write), by a forget of everything
+(`forget_everything`, `remember.rs`: whoever asks, the household's yes
+goes with their memory, with a journal line naming the file only), and by
+the factory reset (the reset plan wipes the file). There is no separate
+"stop noticing music" yet.
 
 ## Movement during onboarding
 
@@ -85,7 +132,9 @@ step's outcome, when, and step 1's framing. Only the coordinator writes it.
 The provider worker, which runs the model's functions, appends what the
 model reported to a mailbox beside it (`FILE.told`), and the coordinator
 takes that in twice a second. Once lamp-settings (#808) is merged this
-moves there. Nothing leaves the lamp.
+moves there. Nothing leaves the lamp. A step this build does not know (a
+later build's, after a roll-back) is read past and kept as it is: the file
+is not refused, and the walk goes on with the steps it knows (#2110).
 
 Each step is also in the session record: `onboarding_step` (asked, or its
 outcome and framing), `onboarding_guide` (a word on where to move it, with

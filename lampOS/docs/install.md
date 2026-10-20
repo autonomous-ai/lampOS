@@ -369,8 +369,10 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   `/run/lampos-bus` as the keeper makes it, and `/run/lampos-locks/{motor,camera}`
   (each 0700 and `lampos`'s, under a root 0755 parent, as the body and the
   eyes require) in place of lamp-4ace's lock folders under the board user's
-  home; and `/var/lib/lampOS/voice/sessions` (root, 0700), which the voice's
-  unit names and nothing else makes. Both were found on lamp-06c1 on
+  home; `/var/lib/lampOS/voice/sessions` (root, 0700), which the voice's
+  unit names and nothing else makes; and `/var/lib/lampOS/consent`
+  (root:lampos, 0750), where the voice keeps the room sounds yes for
+  lamp-ears (#1722 item 1). Both were found on lamp-06c1 on
   2026-10-16: with the locks 0775 the body never opened the servo port, and
   without the sessions folder the voice could not start.
   It also makes `/run/lampos-photos` (`lampos`'s, 0700), the app's photos
