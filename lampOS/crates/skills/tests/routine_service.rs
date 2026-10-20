@@ -21,6 +21,9 @@ const SKILL: &str = "routine-check";
 const INPUT: &str = "fixture/routine";
 const WAIT: Duration = Duration::from_secs(5);
 const POLL: Duration = Duration::from_millis(25);
+/// How often the program looks for changed definitions, on its own clock
+/// (`RELOAD_EVERY` in `main.rs`).
+const RELOAD: Duration = Duration::from_secs(2);
 
 struct Running(Child);
 impl Drop for Running {
@@ -228,10 +231,17 @@ rest = {{ op = "wake" }}
     }
 
     fn barrier(&self) {
+        self.skip(Duration::ZERO);
+    }
+
+    /// Skips the program's clock `by`, once it has taken in what was
+    /// published before. The routines run on the host's clock, so their
+    /// renewals don't move.
+    fn skip(&self, by: Duration) {
         let mut stream = UnixStream::connect(self.root.path().join("clock.sock")).unwrap();
         stream.set_read_timeout(Some(WAIT)).unwrap();
         stream.set_write_timeout(Some(WAIT)).unwrap();
-        writeln!(stream, "{{\"skip_us\":0}}").unwrap();
+        writeln!(stream, "{{\"skip_us\":{}}}", by.as_micros()).unwrap();
         let mut line = String::new();
         BufReader::new(stream.take(1_024))
             .read_line(&mut line)
@@ -489,6 +499,8 @@ fn reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest() {
         format!("enabled = false\n{manifest}"),
     )
     .unwrap();
+    // The next look for changed definitions, now rather than up to 2 s on.
+    fixture.skip(RELOAD);
     let until = Instant::now() + WAIT;
     let mut last = rest.clone();
     while fs::read_to_string(&journal)
