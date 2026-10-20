@@ -834,12 +834,16 @@ too (`ConfirmPolicy::short_verdict_blocks`). Its verdict ends it no sooner:
 - only a clearly unfinished one (under 0.01) holds it, to the 1.5 s
   `incomplete_blocks`, so the rest of "Hey Lamp, my…" stays in the line.
 
-Each End of such a line says `short_asked: true`
-(`local_endpoint.endpoint`): the inferences the switch adds, one each (134
-ms, 145 ms round trip on lamp-4ace on 21 Oct), counted from those. The
-floor was set on 14 Oct when, in a talkative office, the model took a whole
-core and the board reached 76 °C; with the switch the lamp check watches
-the board's temperature beside the counts.
+Each End of such a line says how many times it was sent under the floor
+(`short_asks`, `local_endpoint.endpoint`): the inferences the switch adds,
+one a pause (134 ms, 145 ms round trip on lamp-4ace on 21 Oct), so a line
+that pauses twice before the floor counts two (the reviewer's P3 on
+#2380). The floor was set on 14 Oct when, in a talkative office, the model
+took a whole core and the board reached 76 °C. The endpoint runs before
+the room's rules, so in a busy room every short line of other people's
+talk is asked too: the cost is measured in a talkative room, not only in
+the played test's empty one (below). If that shows heat, short lines are
+skipped while the room is busy, as a next step.
 
 Not covered: a line under 20 speech blocks. Round 1 of `open-name.sh` at
 03:11 (turn 68) had 12, its name missed by `lamp-name` (#694); and "Hey
@@ -850,9 +854,12 @@ Tests: `with_short_verdicts_an_unfinished_short_line_waits_and_a_finished_one_en
 (`tests/it/endpoint_confirmation.rs`) and
 `coordinator::endpoint::tests::short_lines_are_asked_only_with_the_switch_and_a_floor`.
 
-For a lamp, both ways: the played test's `silence_fallback` count, `short_asked`
-count and board temperature over the run; `open-name.sh`; and the day's
-short replies ("Yes. … Please start it.") ending no later.
+For a lamp, both ways: the played test's `silence_fallback` count and
+`short_asks` sum; `open-name.sh`; and the day's short replies ("Yes. …
+Please start it.") ending no later. Then, with the switch on, a stretch of
+two people talking (#829's `twopeople829.sh`, or an hour at the desk), with
+the `short_asks` sum, the worker's CPU and the board's temperature beside
+the same stretch with it off (the reviewer's P3 on #2380).
 
 ## Cut at a comma (#782, 2026-10-15)
 

@@ -223,8 +223,9 @@ Each `Activity::End` records an `EndpointDecision`:
   - `endpoint_policy`: the policy, worker command and model hash;
   - `endpoint_worker`: each availability change, with the worker report;
   - `local_endpoint.endpoint`: the decision and its verdict provenance;
-    `includes_silence_wait_ms` is the actual pause; `short_asked: true` on
-    a line under the commit's floor sent to the model all the same
+    `includes_silence_wait_ms` is the actual pause; `short_asks` on a
+    line under the commit's floor sent to the model all the same, one a
+    pause
     (`LAMP_ENDPOINT_SHORT_VERDICT`, `endpoint-pilot.md`);
   - `endpoint_worker_final`: counters and the complete teardown result. Its
     top-level `reaped: false` can mean the supervisor is still waiting for the

@@ -807,11 +807,16 @@ pub struct EndpointDecision {
     /// lamp's name (`--call-wait-ms`, #782). Absent otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub call_wait_ms: Option<u64>,
-    /// The line was under the commit's floor and sent to the model all the
-    /// same (`ConfirmPolicy::short_verdict_blocks`): the submissions the
-    /// switch adds, counted from these. Absent otherwise.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub short_asked: bool,
+    /// How many times the line was sent to the model under the commit's
+    /// floor (`ConfirmPolicy::short_verdict_blocks`): the inferences the
+    /// switch adds, one a pause, so a line that pauses twice before the
+    /// floor counts two (the reviewer's P3 on #2380). Absent when none.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub short_asks: u16,
+}
+
+fn is_zero(count: &u16) -> bool {
+    *count == 0
 }
 
 impl EndpointDecision {
@@ -823,7 +828,7 @@ impl EndpointDecision {
             fallback: None,
             verdict: None,
             call_wait_ms: None,
-            short_asked: false,
+            short_asks: 0,
         }
     }
 }
@@ -876,9 +881,9 @@ struct Confirmation {
     pause_blocks: u16,
     /// Speech blocks heard in this utterance.
     speech_blocks: u16,
-    /// This utterance was sent under the commit's floor
+    /// How many times this utterance was sent under the commit's floor
     /// ([`ConfirmPolicy::short_verdict_blocks`]).
-    short_asked: bool,
+    short_asks: u16,
 }
 
 impl Confirmation {
@@ -892,7 +897,7 @@ impl Confirmation {
             pause: Pause::Listening,
             pause_blocks: 0,
             speech_blocks: 0,
-            short_asked: false,
+            short_asks: 0,
         }
     }
 
@@ -912,7 +917,7 @@ impl Confirmation {
         self.pause = Pause::Listening;
         self.pause_blocks = 0;
         self.speech_blocks = 0;
-        self.short_asked = false;
+        self.short_asks = 0;
         self.audio.clear();
     }
 
@@ -973,10 +978,17 @@ impl Confirmation {
         let audio = self.audio.make_contiguous();
         let snapshot = &audio[..audio.len().saturating_sub(late)];
         self.pause = match self.classifier.submit(token, snapshot) {
-            Submit::Accepted => Pause::Waiting {
-                token,
-                submitted: self.pause_blocks,
-            },
+            Submit::Accepted => {
+                // An inference the switch adds: taken by the worker, under
+                // the floor (a busy slot's retry is counted once, here).
+                if self.speech_blocks < self.policy.least_speech_blocks {
+                    self.short_asks = self.short_asks.saturating_add(1);
+                }
+                Pause::Waiting {
+                    token,
+                    submitted: self.pause_blocks,
+                }
+            }
             Submit::Busy => Pause::Busy,
             Submit::Unavailable => Pause::Unavailable(self.classifier.availability().reason()),
         };
@@ -1016,7 +1028,6 @@ impl Confirmation {
                         || (policy.short_verdict_blocks > 0
                             && self.speech_blocks >= policy.short_verdict_blocks)) =>
             {
-                self.short_asked |= self.speech_blocks < policy.least_speech_blocks;
                 self.submit()
             }
             Pause::Busy => self.submit(),
@@ -1027,7 +1038,7 @@ impl Confirmation {
             }
             _ => {}
         }
-        let short_asked = self.short_asked;
+        let short_asks = self.short_asks;
         let decide = |basis, heard: Option<Heard>, fallback| EndpointDecision {
             basis,
             silence_ms: u64::from(pause) * 10,
@@ -1035,7 +1046,7 @@ impl Confirmation {
             fallback,
             verdict: heard.map(|heard| heard.trace),
             call_wait_ms: None,
-            short_asked,
+            short_asks,
         };
         match self.pause {
             Pause::Heard(heard)
