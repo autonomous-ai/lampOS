@@ -162,10 +162,33 @@ Off unless `LAMP_PHOTO_FACES=on`, with the eyes' photo folder
 (`LAMP_EYES_PHOTO_DIR`, the folder given to `lamp-eyes --photo-dir`, for
 example `/run/lampos-eyes/photos`) and their request socket
 (`LAMP_EYES_WHO_SOCKET`). lamp-cloud's unit is `ProtectSystem=strict`, so a
-lamp switching it on also adds the folder to the unit's `ReadWritePaths` in
-the same drop-in. lamp-cloud and the eyes are both `lampos`; the eyes make
-the folder theirs at 0700 when they start and refuse one open to others
-(`photo::ready`).
+lamp switching it on also gives the unit, in the same drop-in, the folder
+and an order after the eyes:
+
+    [Unit]
+    After=lamp-eyes.service
+    [Service]
+    ReadWritePaths=-/run/lampos-eyes/photos
+
+- **The folder is made by the eyes** when they start (`photo::ready`), and
+  under `ProtectSystem=strict` lamp-cloud can write only the paths there
+  when its own namespace was set up. Without the `-`, systemd refuses to
+  start lamp-cloud when the folder isn't there yet ("Failed to set up mount
+  namespacing", Mobile on lamp-0c89, #1396, 20 Oct 16:2x). With it, the
+  entry is skipped, and the folder that comes later is **read-only** to
+  lamp-cloud: `faces.add_photo` then fails until lamp-cloud restarts
+  (reviewer-two on #2263).
+- **`After=lamp-eyes.service`** starts lamp-cloud after the eyes. The eyes
+  are `Type=exec`, so that is once their program has started, not once it
+  made the folder, and a slow eyes start can still lose the race. The `-` stays,
+  as a guard against the start failure.
+- **So after a boot, check once:** an add-photo from the app writes, or
+  `ExecMainStartTimestamp` (`systemctl show -p ExecMainStartTimestamp`) of
+  lamp-cloud is after the eyes'. If an add fails with a read-only folder,
+  restart lamp-cloud once the eyes are up.
+
+lamp-cloud and the eyes are both `lampos`; the eyes make the folder theirs
+at 0700 and refuse one open to others (`photo::ready`).
 
 - **Only the lamp's own account:** the kind comes over the lamp's `fa_channel`
   like every other, which only its signed-in account may publish to
