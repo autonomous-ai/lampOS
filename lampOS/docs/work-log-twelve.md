@@ -425,3 +425,9 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   first call is forget, the room's never repeated or hinted at; line 5 right
   answered from the talk. #2049 rebased onto `bebea8708` (lamp-voice
   2290/0). #2074 rebased over #2042, one `after_mark` wait, Tests' P3; 495/0.
+- #2049 and #2074 merged, ARM64 green. #2063 at `74341122c` on lamp-4ace:
+  corrections 10/10, but preference-used 5/9 and earlier-today-said 2/10
+  (the room's secret said). Folded to `923c56816`: "only theirs" is about
+  recall's things, the snapshot's own word, and a `quality-marked` arm with
+  the room's things marked on themselves. #1712's `6ea61281d` doesn't
+  compile (`Heard` twice, from `22b383c82`); told on the Queue.
