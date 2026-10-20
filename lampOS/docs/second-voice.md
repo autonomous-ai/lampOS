@@ -504,6 +504,11 @@ order is kept. A written turn is the same from the chat on.
       "remember my violet umbrella is in the car" and "forget that" were
       answered in words, nothing kept or forgotten, while `recall`, which
       the memory note names, was called (the first builder on #1722, 00:34).
+    - any function a system or user message of the turn names as a whole
+      word (`named`): a note that says "call remember_my_face", such as
+      setup's who_you_are note or the name-told note, is given it at once.
+      Behind `more_functions`, on lamp-52e6 (row 10), DeepSeek called plain
+      `remember` for it and never closed the step, 2 tries of 3.
   - **Behind `more_functions`:** `forget_everything`, the faces', the time elsewhere
     (`the_time`), a mark for review, the stop of reports, and any skill
     function given on its own.
