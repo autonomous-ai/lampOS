@@ -10,7 +10,10 @@
 #
 # Each time as `journalctl --since` takes it ("2026-10-20 13:40:00", "13:40").
 # JOURNALCTL names another journalctl: a test's stand-in, or from a Mac
-# `JOURNALCTL="ssh lamp-4ace journalctl"`, with times that have no spaces.
+# `JOURNALCTL="ssh lamp-4ace journalctl"`, with times that have no spaces:
+# "13:04:21" for today, or "@1760940261" (seconds since 1970) for any day.
+# The lamp's journalctl doesn't take the ISO "2026-10-20T13:04:21" (the first
+# builder on #1722, 20 Oct 13:06).
 #
 # The lines it reads:
 #   lamp-voice second: request N asked for NAME; WHOM answered in M ms; ...
