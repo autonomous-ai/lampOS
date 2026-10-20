@@ -1297,15 +1297,19 @@ pub(crate) fn who(task: &Value) -> &'static str {
     match task["target"]["engine"].as_str() {
         Some("codex") => "Codex",
         Some("opencode") => "OpenCode",
-        Some("devin") => "Devin",
+        Some("devin" | "devin-cloud") => "Devin",
         _ => "Claude Code",
     }
 }
 
 /// Where the rest of a task's answer is: "their MacBook Air" for a computer
 /// known by its own name (`LAMP_TASKS_MACHINE_NAMES`, #1676), else "their
-/// computer", as without it.
+/// computer", as without it; for Devin Cloud, which works on no computer,
+/// "the Devin session in Harness".
 pub(crate) fn their_computer(task: &Value) -> String {
+    if task["target"]["engine"] == "devin-cloud" {
+        return "the Devin session in Harness".to_owned();
+    }
     task["target_alias"]
         .as_str()
         .and_then(crate::agent_tasks::machine_name)
@@ -1344,6 +1348,24 @@ fn note(task: &Value, data: &Value, age_ms: u64) -> Option<String> {
         "a while ago, and you have not told them yet:"
     };
     let opening = "(Nobody has spoken. News from work you handed over for the person.";
+    // Devin Cloud is read as done whether or not it asked something
+    // (openharness#1449, `harness::state_of`): a question in its answer is
+    // said, with where they answer it, not told as a result (Jarvis's P2 on
+    // #2240).
+    let (no_question_cut, no_question) = if task["target"]["engine"] == "devin-cloud" {
+        let asks = format!(
+            "If its answer asks them something, say what it asks, and that they answer it in {computer}."
+        );
+        (
+            format!("and no question of your own. {asks}"),
+            format!("No question of your own at the end. {asks}"),
+        )
+    } else {
+        (
+            "and no question.".to_owned(),
+            "No question at the end.".to_owned(),
+        )
+    };
     let state = match data["state"].as_str()? {
         "idle" if !answer.is_empty() => "idle",
         state @ ("needs-input" | "stopped" | "failed") => state,
@@ -1355,13 +1377,13 @@ fn note(task: &Value, data: &Value, age_ms: u64) -> Option<String> {
             "{opening} {who} {when} finished the task they gave it: \"{asked}\". Its answer is long; it begins: \"{answer}{more}\". \
              Tell them now in one or two natural spoken sentences, as a good chief of staff would: \"Oh, {who} just finished…\" (\"earlier\" if it was a while ago), \
              then its gist in one plain line from that beginning (a story: who it is about and what happens; code: what it does now), \
-             then that the rest is on {computer}. Never only that. No code, lists, file paths or links, and no question.)"
+             then that the rest is on {computer}. Never only that. No code, lists, file paths or links, {no_question_cut})"
         ),
         "idle" => format!(
             "{opening} {who} {when} finished the task they gave it: \"{asked}\". What it came back with: \"{answer}{more}\". \
              Tell them now, the way a good chief of staff tells the person they work for: one or two natural spoken sentences, \
              starting with something like \"Oh, {who} just finished…\" (or \"earlier\" if it was a while ago), then the gist of the result in plain words. \
-             Do not read out code, lists, file paths or links; if there is more than fits, say the rest is on {computer}. No question at the end.)"
+             Do not read out code, lists, file paths or links; if there is more than fits, say the rest is on {computer}. {no_question})"
         ),
         "needs-input" if answer.is_empty() && more.is_empty() => format!(
             "{opening} {who} has stopped and is waiting for them about the task they gave it: \"{asked}\". {})",
@@ -3390,9 +3412,35 @@ mod tests {
             ("codex", "Codex"),
             ("opencode", "OpenCode"),
             ("devin", "Devin"),
+            ("devin-cloud", "Devin"),
             ("a_later_engine", "Claude Code"),
         ] {
             assert_eq!(who(&json!({"target":{"engine":engine}})), name, "{engine}");
         }
+        // A question in Devin Cloud's answer is said, with where it's
+        // answered; other engines' news is as before.
+        let task =
+            |engine: &str| json!({"text":"Reply in the release thread","target":{"engine":engine}});
+        let done = json!({"state":"idle","answer":"Which release do you mean, 2.1 or 2.2?"});
+        let cloud = note(&task("devin-cloud"), &done, 0).unwrap();
+        assert!(
+            cloud.contains("If its answer asks them something"),
+            "{cloud}"
+        );
+        assert!(
+            cloud.contains("answer it in the Devin session in Harness"),
+            "{cloud}"
+        );
+        let plain = note(&task("claude"), &done, 0).unwrap();
+        assert!(!plain.contains("asks them something"), "{plain}");
+        // Devin Cloud's work is on no computer of theirs.
+        assert_eq!(
+            their_computer(&json!({"target":{"engine":"devin-cloud"},"target_alias":"devin"})),
+            "the Devin session in Harness"
+        );
+        assert_eq!(
+            their_computer(&json!({"target":{"engine":"devin"},"target_alias":"devin"})),
+            "their computer"
+        );
     }
 }

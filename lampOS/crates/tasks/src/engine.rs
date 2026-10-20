@@ -69,7 +69,11 @@ fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
 /// Devin task is written as 2 ([`State::schema_needed`]): one with only
 /// other engines' work stays 1, so a build before Devin still reads it after
 /// a rollback, and the person's hand-overs stay (the first builder on #1872).
-const SCHEMA: u32 = 2;
+///
+/// 3: a target's engine may be `devin-cloud`, whose agents have Harness's
+/// `cloud_…` ids (#1854, openharness#1444). Only a state holding a Devin
+/// Cloud task is written as 3, by the same rule.
+const SCHEMA: u32 = 3;
 /// The oldest `schema` this build reads and writes: a state with no Devin
 /// task.
 const OLDEST_SCHEMA: u32 = 1;
@@ -534,14 +538,7 @@ fn code(value: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 fn agent_id(value: &str) -> bool {
-    value.len() == 36
-        && value.bytes().enumerate().all(|(i, b)| {
-            if [8, 13, 18, 23].contains(&i) {
-                b == b'-'
-            } else {
-                b.is_ascii_digit() || (b'a'..=b'f').contains(&b)
-            }
-        })
+    crate::harness::agent_id(value)
 }
 fn creation_id(value: &str) -> bool {
     (16..=96).contains(&value.len())
@@ -663,18 +660,19 @@ fn task_label(store_id: &str, id: u64) -> String {
 }
 
 impl State {
-    /// The `schema` this state is written with: [`SCHEMA`] only when a task
-    /// in it is Devin's, else [`OLDEST_SCHEMA`].
+    /// The `schema` this state is written with: the lowest that reads every
+    /// task in it: 3 with a Devin Cloud task, 2 with a Devin one, else
+    /// [`OLDEST_SCHEMA`].
     fn schema_needed(&self) -> u32 {
-        if self
-            .tasks
+        self.tasks
             .iter()
-            .any(|task| task.launch.target.engine == EngineKind::Devin)
-        {
-            SCHEMA
-        } else {
-            OLDEST_SCHEMA
-        }
+            .map(|task| match task.launch.target.engine {
+                EngineKind::DevinCloud => 3,
+                EngineKind::Devin => 2,
+                _ => OLDEST_SCHEMA,
+            })
+            .max()
+            .unwrap_or(OLDEST_SCHEMA)
     }
     /// A state read may carry a `schema` above the one it needs (its Devin
     /// tasks since dropped), never one below: a schema-1 state naming Devin
@@ -2033,10 +2031,7 @@ impl<P: Persistence> Engine<P> {
                 }
                 Some(Settled {
                     task_id: task.id,
-                    engine: serde_json::to_value(task.launch.target.engine)
-                        .ok()?
-                        .as_str()?
-                        .to_owned(),
+                    engine: task.launch.target.engine.bus_name(),
                     state: newest.data.state.clone(),
                     ago_ms,
                 })
@@ -2057,10 +2052,7 @@ impl<P: Persistence> Engine<P> {
                     machine_id: task.launch.target.machine_id.clone(),
                     agent_id: task.dispatch.agent_id.clone()?,
                     // As the target file names it; the same words as `new`.
-                    engine: serde_json::to_value(task.launch.target.engine)
-                        .ok()?
-                        .as_str()?
-                        .to_owned(),
+                    engine: task.launch.target.engine.bus_name(),
                     accepted_ago_ms: age,
                 })
             })
@@ -4090,7 +4082,7 @@ mod tests {
         assert!(engine.summary()["set_aside"].is_null());
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(3);
+        newer["schema"] = json!(4);
         let memory = Memory::default();
         memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&newer).unwrap());
         let engine = Engine::open(
@@ -4102,7 +4094,7 @@ mod tests {
         )
         .unwrap();
         let kept = engine.summary()["set_aside"].as_str().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-3-"), "{kept}");
+        assert!(kept.starts_with("tasks.sqlite3.newer-4-"), "{kept}");
         drop(engine);
         let mut engine = Engine::open(
             memory.clone(),
@@ -4347,6 +4339,41 @@ mod tests {
         assert!(Engine::open(memory, devin(), STORE, RESTART, &clock(2)).is_err());
     }
 
+    /// #1854: a store that holds a Devin Cloud task is written as 3, which a
+    /// build before it sets aside; its `cloud_` agent id is kept and read
+    /// back; one that names Devin Cloud under schema 2 is refused.
+    #[test]
+    fn a_store_with_a_devin_cloud_task_is_written_as_schema_three() {
+        let cloud = || {
+            let mut staff = targets();
+            let desk = staff.get_mut("desk").unwrap();
+            desk.engine = EngineKind::DevinCloud;
+            desk.project = String::new();
+            staff
+        };
+        let memory = Memory::default();
+        let mut engine = Engine::open(memory.clone(), cloud(), STORE, SESSION, &clock(0)).unwrap();
+        assert_eq!(written(&memory)["schema"], 1);
+        prepare(&mut engine, 0);
+        let stored = written(&memory);
+        assert_eq!(stored["schema"], 3);
+        assert_eq!(
+            stored["tasks"][0]["launch"]["target"]["engine"],
+            "devin-cloud"
+        );
+        assert_eq!(stored["tasks"][0]["launch"]["target"]["project"], "");
+        drop(engine);
+        let engine = Engine::open(memory.clone(), cloud(), STORE, RESTART, &clock(1))
+            .expect("a schema-3 store opens");
+        assert_eq!(engine.state.tasks.len(), 1);
+        drop(engine);
+        let mut wrong = written(&memory);
+        wrong["schema"] = json!(2);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&wrong).unwrap());
+        assert!(Engine::open(memory, cloud(), STORE, RESTART, &clock(2)).is_err());
+    }
+
     /// A store from a newer `schema` is set aside whole and this build
     /// starts with an empty one, never destroying it (#1505).
     #[test]
@@ -4355,7 +4382,7 @@ mod tests {
         accepted(&mut engine, 0);
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(3);
+        newer["schema"] = json!(4);
         newer["tasks"][0]["dispatch"]["state"] = json!("a_state_from_later");
         let bytes = serde_json::to_vec(&newer).unwrap();
         let memory = Memory::default();
@@ -4369,7 +4396,7 @@ mod tests {
         )
         .expect("a newer store is set aside, not refused");
         let kept = engine.set_aside().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-3-"), "{kept}");
+        assert!(kept.starts_with("tasks.sqlite3.newer-4-"), "{kept}");
         assert_eq!(
             memory.0.borrow().kept,
             [(kept, bytes)],
@@ -5184,13 +5211,15 @@ mod tests {
             EngineKind::Claude,
             EngineKind::Opencode,
             EngineKind::Devin,
+            EngineKind::DevinCloud,
         ];
         for value in engine {
             match value {
                 EngineKind::Codex
                 | EngineKind::Claude
                 | EngineKind::Opencode
-                | EngineKind::Devin => {}
+                | EngineKind::Devin
+                | EngineKind::DevinCloud => {}
             }
         }
         let vocabulary = [
@@ -5204,10 +5233,10 @@ mod tests {
         assert_eq!(
             (SCHEMA, vocabulary.as_str()),
             (
-                2,
+                3,
                 "dispatch: prepared queued attempting accepted pending not_sent uncertain cancelled invalidated; \
                  read: requested attempting finished failed; speech: claimed spoken uncertain; \
-                 close: attempting closed refused left failed; engine: codex claude opencode devin"
+                 close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud"
             ),
             "a new stored value needs a `schema` bump (see SCHEMA): raise it, then write this line again"
         );

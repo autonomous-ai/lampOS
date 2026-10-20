@@ -238,10 +238,12 @@ the task was started on. The `@<id>` form before it is refused ("Name the
 machine with --machine <id>."), so a `lamp-tasks` build from before that
 change fails every launch with `new_failed`.
 
-The engine allowlist is `codex`, `claude`, `opencode` or `devin` (OpenCode
-since task 41: Harness 0.4.2's `harness new --help` names it, and its ask
-mode passes OpenCode no flag; see "Who gets the work"; Devin since #1854,
-see "Devin" below). A project is an explicit name
+The engine allowlist is `codex`, `claude`, `opencode`, `devin` or
+`devin-cloud` (OpenCode since task 41: Harness 0.4.2's `harness new --help`
+names it, and its ask mode passes OpenCode no flag; see "Who gets the work";
+Devin since #1854, see "Devin" below; Devin Cloud, see "Devin Cloud"). A
+`devin-cloud` target's project is empty: it works in no folder. Otherwise a
+project is an explicit name
 (at most 128 UTF-8 bytes) or an absolute/`~/` folder (at most 512 bytes).
 Leading option/target syntax, ambiguous relative folders, control characters
 and whitespace around a project are refused. Text is at most 1,000 UTF-8
@@ -841,9 +843,8 @@ voice's side (`sign_in_computer`, `sign_in_answer`) is its own PR.
 `devin` is Devin's own terminal program on the person's computer, which
 Harness starts in a pane like Claude Code and Codex, with its hooks and its
 transcript readers (openharness `cli/src/engines/devin/`). So `ps`, `show` and
-`wait` read it as they read the others. Devin Cloud (`devin-cloud`, Devin's
-REST API on a GitHub repository, billed in ACUs) is a separate agent the
-CLI's `new` doesn't start, and isn't one of the lamp's.
+`wait` read it as they read the others. Devin Cloud is a separate engine,
+`devin-cloud` ("Devin Cloud" below).
 
 - **No `--mode`.** Devin has no permission modes in Harness: its `new`
   leaves the mode out for it and refuses one it is sent
@@ -878,6 +879,81 @@ CLI's `new` doesn't start, and isn't one of the lamp's.
   - the voice's `agent_tasks::tests::the_person_may_hand_work_to_devin_by_name`, `every_description_fits_the_service_whatever_the_switches` (now with four), and `task_news::tests::news_names_the_agent_each_engine_is`.
 - **Not yet shown:** a real hand-over to Devin. It needs a computer with
   Devin signed in and the lamp on the same Harness account (#1854, step 3).
+
+## Devin Cloud (#1854, openharness#1444)
+
+`devin-cloud` is Devin in Devin's own cloud, billed in ACUs. It needs
+Harness 0.4.27 or later on the lamp and on the person's computer: an older
+`new` refuses it, and the task ends `new_failed`. Harness 0.4.27
+starts it with `harness new devin-cloud` (openharness#1444), under the
+computer that holds the person's Devin connection: the target's
+`machine_id` is that computer's. The lamp holds no Devin key and no other
+secret; the secrets Devin uses (a Slack bot token, say) are kept in Devin,
+by the person. Shown from the person's laptop on 20 October, through
+Harness: "reply hello" in 10 s; a post in a private Slack channel with a bot
+token kept as a Devin secret, its permalink in the answer, in 49 s; and a
+reply in a thread, after reading the channel, in 37 s.
+
+- **No folder, no `--mode`.** The target's `project` is empty (any other is
+  `invalid_project`, and an empty one for another engine still is), and
+  `new` is sent `devin-cloud --machine <id> --name <name>` with neither a
+  folder nor a mode (`EngineKind::cloud`, `has_modes`). Its receipt is taken
+  as Devin's is: no mode and no bypass (Harness 0.4.27 sends both `null`).
+  No repository is sent (Devin Cloud needs none) and no `--acu-limit`, so
+  Harness's 5 applies.
+- **What leaves the lamp, and where it stays.** Only the confirmed task's
+  text, as for any engine: the same prepare and the person's yes, after a
+  read-back that says "Devin, in Devin's cloud". Nothing of the thread,
+  memory or context goes with it. **That text goes to a third party,
+  Cognition (Devin's maker), and stays in that Devin session**, which the
+  lamp never closes. As for every engine, a typed request with a typed yes in
+  the same chat starts it too (#1673); neither the model on its own nor a
+  skill can start one without a yes.
+- **Its id** is Harness's `cloud_` and 16 hex digits, taken wherever a
+  computer agent's UUID is (`harness::agent_id`): `show`, `wait`, `ps` and
+  the stored task.
+- **Its answer is told as done.** A Devin Cloud agent that has answered is
+  `needs-input` in `show` and `wait` (exit 3) whether or not it asked
+  anything (openharness#1449), so lamp-tasks reads a cloud agent's
+  `needs-input` as `idle` in `show`, `wait` and `ps` (so progress doesn't
+  say it waits), and its answer is told. **The lamp can't tell a real
+  question from a finished task until openharness#1449 is answered:** the
+  news asks the model to say a question it finds in Devin's answer, and that
+  the person answers it in the Devin session in Harness, but it may be told
+  as a result, and the person can't answer Devin from the lamp. A computer
+  agent's `needs-input` is unchanged.
+- **Never closed:** Harness closes no cloud harness ("stop it in Harness"),
+  so `close` is never run for one and its task's close is `refused`, once,
+  never tried again. **So each hand-over leaves a Devin session open on the
+  person's account,** spending up to Harness's 5 ACUs of their Devin
+  account (no `--acu-limit` is sent; a per-target limit would be the place
+  for one), which the read-back doesn't say; the person ends it in Harness
+  or in Devin.
+- **On the bus:** `tasks/status` names the engine `devin_cloud`
+  (`EngineKind::bus_name`), since its check (`msgs::tasks`, `engine_named`)
+  takes letters, digits and `_` only; Harness is still asked for
+  `devin-cloud`. With the dash, one Devin Cloud task made every status fail
+  its check, and progress and the settled wake were lost for every task
+  (Jarvis's P1 on #2240). The Policy tells the model `devin_cloud` as Devin.
+- **The store's `schema` is 3 only while it holds a Devin Cloud task,** by
+  the same rule as Devin's 2: a build from before sets it aside, and a
+  schema-2 store that names Devin Cloud is refused.
+- **The voice** knows it as Devin (`agent_tasks::KINDS`), heard as Devin is;
+  "Devin" is one name among the ones speech to text listens for. The
+  read-back says "Devin, in Devin's cloud", news names it Devin, and the rest
+  of its answer is "in the Devin session in Harness", not on their
+  computer. A lamp should have one Devin target or the other. With both, the
+  voice keeps the first in the tasks part's order as the one "Devin" names
+  (`staff_from` keeps one member a name), and the other gets no work by
+  name.
+- **Tests:**
+  - `tests/harness.rs` `devin_cloud_is_asked_for_with_no_folder_or_mode_and_its_cloud_receipt_binds` (its real receipt; the folder and target rules) and `a_devin_cloud_answer_is_read_as_idle_and_it_is_never_asked_to_close` (`show`, `wait` beside a computer agent, `close`, and ids not Harness's form);
+  - `engine::tests::a_store_with_a_devin_cloud_task_is_written_as_schema_three`;
+  - the voice's `agent_tasks::tests::the_person_may_hand_work_to_devin_cloud_by_name` and `task_news::tests::news_names_the_agent_each_engine_is` (with a question in Devin Cloud's answer);
+  - `tests/harness.rs` `every_engines_bus_name_passes_the_status_check`, and the Policy's `devin_cloud_is_told_as_devin`;
+  - in `a_devin_cloud_answer_is_read_as_idle_and_it_is_never_asked_to_close`, a cloud agent `working` or `failed` stays so (reading every cloud state as done fails it).
+- **Not yet shown:** the lamp itself handing work to Devin Cloud, by voice
+  (lamp-75c9, with its person).
 
 ## Host qualification and first lamp check
 

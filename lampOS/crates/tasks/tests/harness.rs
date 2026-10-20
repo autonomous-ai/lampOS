@@ -364,6 +364,167 @@ fn devin_is_asked_for_by_name_with_no_mode_and_its_receipt_claims_none() {
     }
 }
 
+/// A Devin Cloud agent's id, as Harness 0.4.27 gave one on 20 October.
+const CLOUD: &str = "cloud_4b0055ec2843353e";
+
+/// #1854, openharness#1444: Devin Cloud is asked for by name with no folder
+/// and no `--mode`, and its receipt (Harness 0.4.27's, as it came on 20
+/// October: a `cloud_` id, no mode, a null bypass) binds the task.
+#[test]
+fn devin_cloud_is_asked_for_with_no_folder_or_mode_and_its_cloud_receipt_binds() {
+    let rig = Rig::new();
+    let mut request = launch();
+    request.target.engine = EngineKind::DevinCloud;
+    request.target.project = String::new();
+    rig.new_step(step(json!({"ok":true,"machineId":MACHINE,"agent":{
+        "id":CLOUD,"name":"lamp-task-001","engine":"devin-cloud",
+        "permissionMode":null,"bypassPermission":null,"location":"cloud",
+        "cloud":{"place":"Devin's cloud","state":"starting"}}})));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: CLOUD.into()
+        }
+    );
+    let args = rig.calls()[1]["args"].as_array().unwrap().clone();
+    assert_eq!(
+        args[..6],
+        [
+            json!("new"),
+            json!("devin-cloud"),
+            json!("--machine"),
+            json!(MACHINE),
+            json!("--name"),
+            json!("lamp-task-001")
+        ]
+    );
+    assert!(!args.iter().any(|arg| arg == "--mode"), "{args:?}");
+    assert_eq!(args[6], "--json");
+    // Its target names no folder; another agent's must.
+    assert_eq!(request.target.validate(), Ok(()));
+    request.target.project = "desk-work".into();
+    assert_eq!(request.target.validate(), Err("invalid_project".into()));
+    request.target.engine = EngineKind::Codex;
+    request.target.project = String::new();
+    assert_eq!(request.target.validate(), Err("invalid_project".into()));
+}
+
+/// The reviewer's P1 on #2240: every engine's name on the bus passes
+/// `tasks/status`' check, Devin Cloud's as `devin_cloud`, while Harness is
+/// still asked for `devin-cloud`.
+#[test]
+fn every_engines_bus_name_passes_the_status_check() {
+    for engine in [
+        EngineKind::Codex,
+        EngineKind::Claude,
+        EngineKind::Opencode,
+        EngineKind::Devin,
+        EngineKind::DevinCloud,
+    ] {
+        let settled = lamp_msgs::TaskSettled {
+            task: 1,
+            engine: engine.bus_name(),
+            state: lamp_msgs::AgentState::Idle,
+            settled: true,
+            at_unix_ms: 1_791_964_900_000,
+        };
+        assert_eq!(settled.check(), Ok(()), "{engine:?}");
+    }
+    assert_eq!(EngineKind::DevinCloud.bus_name(), "devin_cloud");
+    assert_eq!(EngineKind::Codex.bus_name(), "codex");
+}
+
+/// openharness#1449: a Devin Cloud agent that has answered is `needs-input`
+/// whether or not it asked anything, so its `show` and `wait` read it as
+/// `idle` and its answer is told; a computer's agent waiting for the person
+/// is still `needs-input`. Harness closes no cloud harness, so none is
+/// asked to.
+#[test]
+fn a_devin_cloud_answer_is_read_as_idle_and_it_is_never_asked_to_close() {
+    let rig = Rig::new();
+    let mut reply = shown();
+    reply["id"] = json!(CLOUD);
+    reply["state"] = json!("needs-input");
+    reply["answer"] = json!("Posted: https://example.slack.com/archives/C1/p1");
+    reply["links"] = json!([{"label":"Session","url":"https://app.devin.ai/sessions/1"}]);
+    reply["needsPerson"] = json!(true);
+    rig.show_step(step(reply));
+    let observation = rig.cli().observe(MACHINE, CLOUD).unwrap();
+    assert_eq!(
+        (observation.agent_id.as_str(), observation.state.as_str()),
+        (CLOUD, "idle")
+    );
+    assert!(observation.answer.starts_with("Posted:"));
+    // Only `needs-input` is read so: a cloud agent working or failed is as
+    // Harness says (the reviewer's P3 4 on #2240).
+    for state in ["working", "failed"] {
+        let mut reply = shown();
+        reply["id"] = json!(CLOUD);
+        reply["state"] = json!(state);
+        rig.show_step(step(reply));
+        assert_eq!(rig.cli().observe(MACHINE, CLOUD).unwrap().state, state);
+        let row = json!({"harnesses":[{"id":CLOUD,"state":state}]}).to_string();
+        assert_eq!(parse_ps(row.as_bytes()).unwrap()[0].state, state);
+        if state == "failed" {
+            assert_eq!(
+                parse_wait(Some(4), row.as_bytes(), &[CLOUD.to_owned()]).unwrap()[0].state,
+                state
+            );
+        }
+    }
+    let agents = vec![CLOUD.to_owned(), AGENT.to_owned()];
+    let both = json!({"harnesses":[
+        {"id":CLOUD,"state":"needs-input","needsPerson":true},
+        {"id":AGENT,"state":"needs-input"}]})
+    .to_string();
+    assert_eq!(
+        parse_wait(Some(3), both.as_bytes(), &agents).unwrap(),
+        [
+            Ended {
+                agent_id: CLOUD.into(),
+                state: "idle".into()
+            },
+            Ended {
+                agent_id: AGENT.into(),
+                state: "needs-input".into()
+            }
+        ]
+    );
+    // `ps` too, so progress doesn't say it waits for the person (Jarvis's P2).
+    let listed = json!({"harnesses":[
+        {"id":CLOUD,"state":"needs-input"},
+        {"id":AGENT,"state":"needs-input"}]})
+    .to_string();
+    let states: Vec<(String, String)> = parse_ps(listed.as_bytes())
+        .unwrap()
+        .into_iter()
+        .map(|row| (row.agent_id, row.state))
+        .collect();
+    assert_eq!(
+        states,
+        [
+            (CLOUD.to_owned(), "idle".to_owned()),
+            (AGENT.to_owned(), "needs-input".to_owned())
+        ]
+    );
+    let calls = rig.calls().len();
+    assert_eq!(rig.cli().close(MACHINE, CLOUD), Ok(Closed::Refused));
+    assert_eq!(rig.calls().len(), calls, "close was never run");
+    // Only Harness's own form of a cloud id is taken.
+    for bad in [
+        "cloud_4b0055ec2843353",
+        "cloud_4B0055EC2843353E",
+        "cloud_4b0055ec2843353e0",
+        "cloud-4b0055ec2843353e",
+    ] {
+        assert_eq!(
+            rig.cli().observe(MACHINE, bad),
+            Err("invalid_agent_id".into()),
+            "{bad}"
+        );
+    }
+}
+
 #[test]
 fn opencode_is_asked_for_by_name_in_auto_mode_and_bound_only_by_its_own_receipt() {
     let rig = Rig::new();
