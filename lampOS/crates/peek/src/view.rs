@@ -347,19 +347,6 @@ pub fn status_page(rows: &[UnitRow], endpoint: Option<&(String, u64)>, age: Dura
     page("status", Some(5), true, &body)
 }
 
-/// The list of views.
-pub fn index_page() -> String {
-    page(
-        "lamp-peek",
-        None,
-        true,
-        "<p>Read only: nothing here changes the lamp.</p><ul>\
-         <li><a href=\"/cam\">camera</a>: faces as boxes</li>\
-         <li><a href=\"/bus\">bus</a>: states and counts</li>\
-         <li><a href=\"/status\">status</a>: units and builds</li></ul>",
-    )
-}
-
 /// What a request without the token gets: a form that sends it in the
 /// body, never in the address (the first builder on #2141, 10:26).
 pub fn token_page(why: &str) -> String {

@@ -9,6 +9,48 @@ It is **off unless `LAMP_PEEK=on`**. It is **never in `deploy/product`**, and
 **never on a person's lamp**: putting it there would loosen privacy, which is
 the owner's call.
 
+## The one page
+
+`/` is one page with a sidebar: **Overview, Turns, Camera, Body, Health**
+(the lead's second step on #1711, 20 Oct, after V1's monitor). One event
+stream (`GET /events`, server-sent events) keeps every section fresh: the
+camera's frame four times a second (`serve::PUSH_EVERY`), the others once a
+second. Each section is HTML made and escaped on the lamp (`crates/peek/src/page.rs`).
+The page's few lines of script only put it in its place, and read nothing
+from the address but which section is shown.
+
+| Section | What it shows | Where it comes from |
+|---|---|---|
+| Overview | The voice's state; someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release | the kept values below, the turns, `/status`'s rows |
+| Turns | The newest 20 turns, newest first, as V1's Flow: what took the turn (`local_speech`, or the lamp's own: `skill_says`, `lamp_speaks_first`...), then from the end of speech the final words, the first token and the first audio, each with its own time in brackets and the slowest marked; then how it ended (`played`, `no audio`, `failed`, or why it was cut) and what held it, if anything did | the voice's own session records ([below](#turns-from-the-voices-records)) |
+| Camera | The frame `/cam.svg` draws, faces as boxes | as `/cam` |
+| Body | Each joint where it is against where it was last asked to be (`commanded`), how far off (marked past 0.05 rad) and its effort; the body's own word: its level and sentence, its state (`ready`, `paused`, `stopping`), `standing` from 0 folded to 1 standing, the warmest joint, "met resistance" in the last minute and since it started; its last stop and why, as it said it | `body/joint_states`; the body's diagnostic, sent by the body about the body (`watch::body_of`) |
+| Health | Each part's item as `lamp-health show` gives it: its level, its message as it says it (cut to 160 characters, escaped), and how long ago; the parts never heard from; each unit's build | `lamp/health`; `/status`'s rows |
+
+### Turns from the voice's records
+
+The newest session's `metadata/events-*.jsonl` is read on from where the
+last read ended, at most once a second whoever asks (`turns::Turns`). Only
+these kinds are taken, and of each only the fields named:
+
+- `input_admitted`: `admission_basis`;
+- `answer_stages` (the second route's own count, each from the end of
+  speech): `words_ms`, `chat_first_ms`, `first_answer_audio_ms`;
+- `answer_first_audio`: `after_decision_ms`, the first audio on either route;
+- `turn_finished`: `outcome`;
+- what held a turn or a sound in it: `floor_held`, `answer_waits`,
+  `input_let_go_answer_waits`, `input_let_go_own_line`,
+  `input_let_go_body_moving`, `asker_first_answer_held`,
+  `provider_turn_unclear`, `provider_turn_failed`.
+
+A `transcript` record, or any field not named, is never read. A name that
+is not plain (letters, digits, `-_./`) shows as `?`. A newer session starts
+the turns again. A file first read when it is longer than 4 MB is read from
+4 MB before its end: only the newest turns are kept. On this Mac, in
+release, the first read of a 63 MB session took 7.5 ms, a read of one more
+turn 0.26 ms, a read with nothing new 0.08 ms, and making the section of 20
+turns 0.03 ms. Not yet timed on a lamp.
+
 ## The three views
 
 | View | What it shows | Where it comes from |
@@ -33,13 +75,18 @@ the owner's call.
 - **No words.** Of `voice/heard` and `voice/said` it keeps only whether the
   piece is finished, the request number and the locale, never `text`. Of a
   diagnostic it keeps the part's name and level, and the eyes' `camera`
-  value. A diagnostic's message is never shown.
+  value. A diagnostic's message is never shown on `/bus`. The one page
+  shows two sentences the lamp makes about itself: the body's own (its
+  diagnostic, sent by the body about the body, with only its named values),
+  and each part's health item, as the lead asked (#1711, 20 Oct). Both are
+  cut to 160 characters and escaped. The turns are numbers and kinds only.
 - **No audio, no recording, and nothing kept.** What `/bus` holds is in memory,
   60 lines at most.
 
 ## It reads, it never writes
 
-- Every view is a GET, and every other method is refused (405).
+- Every view, and the one page's stream, is a GET, and every other method is
+  refused (405).
 - It never publishes on the bus. Its one mark there is the subscriber socket
   each reader of an event topic binds (`peek.*` in `<topic>/subs/`).
 - No setting, no button, no update. V1's `/monitor` lost a lamp's install to
@@ -61,6 +108,28 @@ Environment=LAMP_PEEK=on
 
 It answers on `127.0.0.1:8077`. **Reach it through ssh:**
 `ssh -L 8077:127.0.0.1:8077 <lamp>`, then open `http://127.0.0.1:8077/`.
+
+### One address on an office lamp: `http://lamp-xxxx.local/`
+
+On an office lamp the drop-in can put it on port 80, as V1's monitor was,
+with the token (below):
+
+```ini
+# /etc/systemd/system/lamp-peek.service.d/on.conf
+[Service]
+Environment=LAMP_PEEK=on
+Environment=LAMP_PEEK_LISTEN=0.0.0.0:80
+LoadCredential=peek-token:/etc/lampOS/peek/token
+```
+
+avahi already announces the lamp's name (`lamp-xxxx`, `docs/setup.md`). The
+unit takes port 80 with one capability, `CAP_NET_BIND_SERVICE`, and no
+other (`AmbientCapabilities=` and `CapabilityBoundingSet=`). It never runs
+beside setup, whose hotspot page and nginx have port 80:
+`ConditionPathExists=/var/lib/lampos-setup/done` keeps it off a lamp not
+set up, and `Conflicts=lamp-setup.service` stops it when a reset starts
+setup again. A lamp set up while it was off starts it at the next boot, or
+by hand.
 
 Without a token it answers only when `Host` is `127.0.0.1`, `localhost` or
 `[::1]` (403 otherwise). Then no other page in the same browser can reach it
@@ -98,6 +167,13 @@ token, or with one too short, it refuses to start (exit 2).
   only for its own user's processes, so a part running as another user shows
   `?` for its running build. Its release still shows.
 - **The turn's owner.** It lives inside the voice, not on the bus.
+- **Torque on or off.** The body doesn't say it on the bus. Its state says
+  `stopping` as it stops, and its sentence then says why, "stopped with
+  its torque off" for an overload. `effort` is how hard each joint works.
+- **Seated.** The body says `standing`, from 0 folded to 1 standing; the
+  seated measure (#2163) isn't on the bus.
+- **A Live turn's steps.** Gemini Live sends no `answer_stages`, so a Live
+  turn shows only its first audio after the decision.
 
 ## What `/status` costs
 
@@ -106,7 +182,9 @@ on a lamp), and reads the newest session's `events-*.jsonl` for its
 `endpoint_worker` lines. So the rows are kept for 30 s
 (`serve::STATUS_KEPT`), and a tab refreshing every 5 s reads them at most
 twice a minute. A read hasn't been timed on a lamp yet. Time one on the
-office lamp before a `/status` tab stays open beside a timed row.
+office lamp before a `/status` tab stays open beside a timed row. The one
+page's Overview and Health use the same rows, kept the same 30 s, so an open
+page reads them twice a minute however many tabs show it.
 
 ## Tests
 
@@ -134,3 +212,24 @@ own, and asks for it over HTTP:
 - `beyond_this_machine_without_a_token_it_does_not_start`: the binary exits 2
   for the network with no token or a short one, and 0, saying it is off,
   without `LAMP_PEEK=on`.
+- `the_one_page_streams_each_section_and_never_a_word`: on a real bus and a
+  session folder of its own, the stream carries all five sections:
+  - a turn's steps with their own times and the slowest marked;
+  - a turn the lamp began itself, and what held it;
+  - an elbow 0.2 off where it was asked to be;
+  - the body's values, and not another part's speaking as the body;
+  - a health item's `<script>` escaped, and a part never heard from.
+
+  A word planted in a `transcript` record, in `voice/heard` and among the
+  body's values is in no section, nor on the page.
+- `the_stream_reads_only_and_asks_for_the_token`: POST, PUT, DELETE and
+  PATCH get 405; without the token, 401 and no event; with its cookie, the
+  sections.
+- `turns::tests::a_turns_steps_and_end_are_read_from_its_records_and_nothing_else`
+  and `turns::tests::the_records_are_read_on_from_where_the_last_read_ended`:
+  - only new lines are taken, and half a line waits for its end;
+  - only the newest 20 turns are kept;
+  - a long file is first read from near its end;
+  - a newer session starts again.
+- `tests::the_unit_takes_port_80_only_once_setup_is_done`: the unit's
+  setup condition, its conflict with setup, and its one capability.

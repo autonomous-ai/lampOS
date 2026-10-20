@@ -4,7 +4,10 @@
 //! 2026: the person sat to the side, which only a Mac's camera pointed at
 //! the lamp showed.
 //!
-//! Three views and nothing else:
+//! `/` is one page with a sidebar, Overview, Turns, Camera, Body and
+//! Health, kept fresh by one event stream (`/events`, [`page`]): each
+//! turn's timings from the voice's own records ([`turns`]), never words.
+//! Beside it, three views:
 //! - `/cam`: the eyes' faces as boxes on a plain frame, never a picture,
 //!   and nothing while the camera is closed ([`view::cam_svg`]);
 //! - `/bus`: the kept values and the events of a few topics, counts and
@@ -17,7 +20,9 @@
 //! has.
 use std::net::SocketAddr;
 
+pub mod page;
 pub mod serve;
+pub mod turns;
 pub mod units;
 pub mod view;
 pub mod watch;
@@ -94,5 +99,41 @@ mod tests {
         assert!(check_listen(at("0.0.0.0:8077"), Some("a token; of 20 chars")).is_err());
         // A short token is refused here too: it would be asked for.
         assert!(check_listen(at(DEFAULT_LISTEN), Some("short")).is_err());
+    }
+
+    /// Port 80 only once the lamp is set up, never beside setup, which has
+    /// it for the hotspot's page; and that one capability, nothing more
+    /// (the lead's amendment on #1711, 20 Oct).
+    #[test]
+    fn the_unit_takes_port_80_only_once_setup_is_done() {
+        let unit = include_str!("../lamp-peek.service");
+        let lines: Vec<&str> = unit
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.starts_with('#'))
+            .collect();
+        for wanted in [
+            "ConditionPathExists=/var/lib/lampos-setup/done",
+            "Conflicts=lamp-setup.service",
+            "After=local-fs.target lamp-setup.service",
+            "AmbientCapabilities=CAP_NET_BIND_SERVICE",
+            "CapabilityBoundingSet=CAP_NET_BIND_SERVICE",
+            "NoNewPrivileges=yes",
+            "ProtectSystem=strict",
+        ] {
+            assert!(lines.contains(&wanted), "{wanted}");
+        }
+        let capabilities: Vec<&&str> = lines
+            .iter()
+            .filter(|line| line.contains("Capabilit"))
+            .collect();
+        assert_eq!(capabilities.len(), 2, "{capabilities:?}");
+        // On, it listens beyond this machine only from a drop-in, with the
+        // token.
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.starts_with("Environment=LAMP_PEEK"))
+        );
     }
 }

@@ -2019,6 +2019,7 @@ name = "lamp-peek"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "futures-util",
  "lamp-bus",
  "lamp-keeper",
  "lamp-msgs",
