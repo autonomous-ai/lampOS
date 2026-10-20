@@ -461,6 +461,38 @@ mod sleep_name {
         assert_eq!(got, value);
     }
 
+    /// #1670, through the service and its bus: with Mood's state saying the
+    /// lamp's one breath is fully in, the head holds at the top of a breath,
+    /// where the plain clock's breath goes on rising and falling.
+    #[test]
+    fn the_service_breathes_the_head_with_moods_breath_from_the_bus() {
+        let (mut plain, mut mood) = (SleepingService::new(), SleepingService::with_mood(0.5));
+        // In, past the layer's blend and the breath's catch-up.
+        for _ in 0..30 {
+            plain.step();
+            mood.step();
+        }
+        let (mut low, mut high) = (f64::MAX, f64::MIN);
+        for _ in 0..30 {
+            let held = mood.pitch();
+            assert!((held - -0.03).abs() < 1e-3, "{held}");
+            let pitch = plain.pitch();
+            low = low.min(pitch);
+            high = high.max(pitch);
+        }
+        assert!(high - low > 0.01, "{low} {high}");
+        // #1749: Mood at its most lively, through the same bus: the same
+        // breath 1.3 times as large (energy 1), held at the top.
+        let mut lively = SleepingService::with_mood_energy(0.5, 0.7);
+        for _ in 0..30 {
+            lively.step();
+        }
+        for _ in 0..30 {
+            let held = lively.pitch();
+            assert!((held - -0.039).abs() < 1e-3, "{held}");
+        }
+    }
+
     struct SleepingService {
         service: runtime::Service,
         voice: Publisher,
@@ -471,6 +503,9 @@ mod sleep_name {
         activity: Publisher,
         /// With `serve --head-touch`: the head's requests and `voice/privacy`.
         head: Option<(Publisher, Publisher)>,
+        /// With the lamp's one breath read (#1670): Mood's state, said each
+        /// step at this phase and this energy.
+        mood: Option<(Publisher, f32, f32)>,
         now_us: u64,
         state: Voice,
         _root: Root,
@@ -487,6 +522,26 @@ mod sleep_name {
 
         /// As [`Self::with`], and with `serve --head-touch` when `head`.
         fn with_head(change: fn(runtime::Service) -> runtime::Service, head: bool) -> Self {
+            Self::build(change, head, None)
+        }
+
+        /// A service that reads the lamp's one breath, and Mood saying it at
+        /// `phase` each step (#1670).
+        fn with_mood(phase: f32) -> Self {
+            Self::with_mood_energy(phase, 0.3)
+        }
+
+        /// As [`Self::with_mood`], with Mood's energy at `energy`, which
+        /// sets both the breath's pace and the moves' liveliness.
+        fn with_mood_energy(phase: f32, energy: f32) -> Self {
+            Self::build(|service| service, false, Some((phase, energy)))
+        }
+
+        fn build(
+            change: fn(runtime::Service) -> runtime::Service,
+            head: bool,
+            mood: Option<(f32, f32)>,
+        ) -> Self {
             let root = Root::new();
             let bus = Bus::new(&root.0).unwrap();
             let mut catalogue =
@@ -503,6 +558,9 @@ mod sleep_name {
                 .with_local_time(offset);
             if head {
                 service = service.with_head_touch(&bus).unwrap();
+            }
+            if mood.is_some() {
+                service = service.with_mood_breath(&bus);
             }
             let service = change(service);
             bus.publisher_declared(Light::TOPICS[0], &Light::declaration(), "actions")
@@ -551,6 +609,18 @@ mod sleep_name {
                             "voice",
                         )
                         .unwrap(),
+                    )
+                }),
+                mood: mood.map(|(phase, energy)| {
+                    (
+                        bus.publisher_declared(
+                            lamp_msgs::MoodState::TOPIC,
+                            &lamp_msgs::MoodState::declaration(),
+                            "mood",
+                        )
+                        .unwrap(),
+                        phase,
+                        energy,
                     )
                 }),
                 now_us: START_US,
@@ -627,6 +697,28 @@ mod sleep_name {
             timing.state = self.state;
             // No envelope published below is older than this.
             let publishing = runtime::unix_ms();
+            if let Some((mood, phase, energy)) = self.mood.as_mut() {
+                let state = lamp_msgs::MoodState {
+                    stamp: ClockStamp {
+                        clock_id: "test".into(),
+                        at_us: self.now_us,
+                        sequence: self.now_us,
+                    },
+                    session_id: "mood-session".into(),
+                    awake: 0.7,
+                    energy: *energy,
+                    warmth: 0.6,
+                    asleep: false,
+                    attention: None,
+                    familiarity: lamp_msgs::Familiarity::Unknown,
+                    familiar: None,
+                    breath: Some(lamp_msgs::MoodBreath {
+                        phase: *phase,
+                        pace: lamp_msgs::mood_pace(0.7, *energy, false),
+                    }),
+                };
+                mood.publish_json(987_654_321, &state).unwrap();
+            }
             // Loosest limit first, strictest last (#912): the room (2 s),
             // the voice and the faces (500 ms), the joints (300 ms).
             self.room
@@ -670,6 +762,11 @@ mod sleep_name {
             assert_eq!(self.service.counts.refused, 0);
             assert_eq!(self.service.counts.input_errors, 0);
             output
+        }
+
+        /// The head's pitch the service asks for at the next step.
+        fn pitch(&mut self) -> f64 {
+            self.step().body.map_or(0.0, |body| body.offsets.head_pitch)
         }
 
         fn sleep(&mut self) {
@@ -1067,4 +1164,89 @@ fn offline_face_reads_only_a_fresh_offline_from_lamp_online() {
             "{online:?}"
         );
     }
+}
+
+/// #1670: the service takes the lamp's one breath and its liveliness from
+/// Mood's state only: fresh, valid and from `mood`; else neither.
+#[test]
+fn mood_in_reads_only_a_fresh_valid_state_from_mood() {
+    use lamp_msgs::{Familiarity, MOOD_STATE_TTL_US, MoodBreath, MoodState};
+    let root = Root::new();
+    let bus = Bus::new(&root.0).unwrap();
+    let latest = || bus.latest(MoodState::TOPIC).unwrap();
+    assert_eq!(runtime::mood_in(latest().as_ref(), 5_000_000), (None, None));
+    let state = |energy: f32, sequence: u64| MoodState {
+        stamp: ClockStamp {
+            clock_id: "boot".into(),
+            at_us: 5_000_000,
+            sequence,
+        },
+        session_id: "s".into(),
+        awake: 0.85,
+        energy,
+        warmth: 0.6,
+        asleep: false,
+        attention: None,
+        familiarity: Familiarity::Unknown,
+        familiar: None,
+        breath: Some(MoodBreath {
+            phase: 0.5,
+            pace: lamp_msgs::mood_pace(0.85, energy, false),
+        }),
+    };
+    let mut mood = bus
+        .publisher_declared(MoodState::TOPIC, &MoodState::declaration(), "mood")
+        .unwrap();
+    mood.publish_json(1, &state(0.70, 1)).unwrap();
+    // At its stamp: its phase, and the most lively.
+    assert_eq!(
+        runtime::mood_in(latest().as_ref(), 5_000_000),
+        (Some(0.5), Some(0.5))
+    );
+    // Before its stamp or past its 2.5 s: nothing.
+    assert_eq!(runtime::mood_in(latest().as_ref(), 4_999_999), (None, None));
+    assert_eq!(
+        runtime::mood_in(latest().as_ref(), 5_000_000 + MOOD_STATE_TTL_US),
+        (None, None)
+    );
+    // Calm: the catalogue's own style.
+    mood.publish_json(2, &state(0.30, 2)).unwrap();
+    assert_eq!(
+        runtime::mood_in(latest().as_ref(), 5_000_000),
+        (Some(0.5), Some(0.0))
+    );
+    // From anyone but Mood: nothing.
+    bus.publisher_declared(MoodState::TOPIC, &MoodState::declaration(), "replay")
+        .unwrap()
+        .publish_json(3, &state(0.70, 3))
+        .unwrap();
+    assert_eq!(runtime::mood_in(latest().as_ref(), 5_000_000), (None, None));
+}
+
+/// The journal says the liveliness the idle layer takes from Mood, first and
+/// on a change, and nothing with no fresh state: Mood off writes nothing new
+/// (the first builder on #1722, 03:54).
+#[test]
+fn the_liveliness_taken_is_said_and_nothing_with_mood_off() {
+    let mut said = lamp_msgs::MoodTaken::default();
+    for at in [0, 60_000_000, 600_000_000] {
+        assert_eq!(runtime::liveliness_line(&mut said, None, at), None);
+    }
+    assert_eq!(
+        runtime::liveliness_line(&mut said, Some(-0.31), 1).as_deref(),
+        Some("lamp-expression: Mood's liveliness -0.31")
+    );
+    assert_eq!(
+        runtime::liveliness_line(&mut said, Some(-0.3), 120_000_000),
+        None
+    );
+    assert!(runtime::liveliness_line(&mut said, Some(0.5), 120_000_000).is_some());
+    // A change 59 s after the last line waits for the minute.
+    assert_eq!(
+        runtime::liveliness_line(&mut said, Some(-0.3), 179_000_000),
+        None
+    );
+    // Mood gone, then back at the same liveliness: said again after a minute.
+    assert_eq!(runtime::liveliness_line(&mut said, None, 200_000_000), None);
+    assert!(runtime::liveliness_line(&mut said, Some(0.5), 200_000_001).is_some());
 }

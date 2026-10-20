@@ -381,3 +381,25 @@ fn an_entry_cannot_name_a_path_or_carry_malformed_text() {
         Err(Missing::InvalidManifest)
     );
 }
+
+/// #1959: the Wi-Fi helper's one recorded line is a kind of its own, loaded
+/// as any other and only by its own name.
+#[test]
+fn the_wifi_lost_line_is_a_kind_of_its_own() {
+    let directory = Directory::new();
+    let samples = tone(RATE * 4);
+    let bytes = wav(RATE, 1, &samples);
+    directory.write("wifi-lost.en-US.wav", &bytes);
+    let mut value = entry("wifi_lost", "wifi-lost.en-US.wav", &bytes, RATE * 4);
+    value["transcript"] =
+        "I can't reach any Wi-Fi. Hold my button for five seconds to set me up again.".into();
+    directory.provision(vec![value]);
+    let notices = directory.load(Approval::Production);
+    let notice = notices.get(NoticeKind::WifiLost, "en-US").unwrap();
+    assert_eq!(notice.samples(), samples);
+    assert_eq!(notice.info.kind, NoticeKind::WifiLost);
+    assert_eq!(
+        notices.get(NoticeKind::ProviderUnavailable, "en-US").err(),
+        Some(Missing::NotProvisioned)
+    );
+}

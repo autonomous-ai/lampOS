@@ -73,6 +73,8 @@ cargo fmt --all -- --check
 | `lamp-voice` | Finite directed qualification with separate capture, speaker, physical privacy and provider processes, optional ring and camera workers; continuous service and complete failure isolation remain in progress. |
 | `lamp-observer` | Mac room recording and native microphone permission preflight; explicit cached iMac-speaker playback with delivery/failure evidence. |
 | `lamp-voice-eval` | Event-triggered conversation acceptance runner and evaluator: pre-registered scenarios, append-only attempt ledger, fake runtime, trace import and a prepared physical runner. See [voice evaluation](docs/voice-eval.md). |
+| `lamp-station` | A production test station's record of one run, passes included, and its verdict, from the lamp's self-test, the station's answers and the versioned coverage matrix (`production/`). Runs on the station, never on a lamp. See [production testing](docs/production-testing.md). |
+| `lamp-peek` | A read-only page on an office lamp, off unless `LAMP_PEEK=on`: one page with a sidebar (Overview, Turns, Camera, Body, Health), each turn's timings from the voice's own records, the eyes' faces as boxes, never pictures, the joints against their goals, each part's health, and the bus's states and counts, never words. On 127.0.0.1 unless given a token, or `http://lamp-xxxx.local/` on an office lamp's drop-in; never in `deploy/product`. See [peek](docs/peek.md). |
 
 See the [directed runtime](docs/live-runtime.md),
 [conversation/ring ownership](docs/ring-choreography.md),

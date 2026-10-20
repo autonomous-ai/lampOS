@@ -1,0 +1,13 @@
+Oct 20 14:25:08.718365 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 20: speech to text opened in 755 ms, 1050 ms of the line's sound waiting
+Oct 20 14:25:11.288776 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 20 at the line's end: settled=false, speech_final=false, finals cover none of 2870 ms sent, pending=interim 1000 ms after the last final, last final none, finalize answered in 298 ms to 2290 ms, results 3 with words, 1 without, words from=close_stream
+Oct 20 14:25:11.288776 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 20 heard 6 words, the last 754 ms after the line ended
+Oct 20 14:25:11.288776 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 20: of its 6 words, 2 in the lamp's answer to request 19 so far
+Oct 20 14:25:11.290309 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 20: no conversation going on: it was last heard saying words, to their end, 54 s ago, it was last called 67 s ago, 0 lines left alone since it last spoke
+Oct 20 14:25:11.290309 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 20: its answer is played: the text shows it was called
+Oct 20 14:25:12.127437 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat request 22852 bytes, 10 messages, 32 tools; its answer began in 836 ms; the last request 60 s before; its tools as the last request's, its first message not
+Oct 20 14:25:12.488835 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 20 chat round 1 first event in 1199 ms
+Oct 20 14:25:12.602809 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat answer: its first words or call 1198 ms and its end 1312 ms after it was asked; 5692 prompt tokens, 128 from the cache, 5564 not; 2 completion tokens
+Oct 20 14:25:12.602809 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 20 first piece to the voice 1313 ms after the words were heard, 1 words
+Oct 20 14:25:13.018515 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 20 ElevenLabs piece 1: 5 chars, sent 1313 ms after the words were heard on a reused connection; its first audio byte 415 ms after it went
+Oct 20 14:25:13.018515 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 20 first answer audio 1729 ms after the words were heard
+Oct 20 14:25:13.288533 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 20 ElevenLabs: 1 of 1 pieces began, 1 on a reused connection, 5 chars; the first piece's first audio byte 415 ms after it went, the slowest 415 ms

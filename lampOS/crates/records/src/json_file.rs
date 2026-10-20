@@ -135,8 +135,23 @@ pub fn read_changed<T: DeserializeOwned>(
     let Some((bytes, stamp)) = read_bytes(&dir, path, limit, prior)? else {
         return Ok(None);
     };
-    let value = serde_json::from_slice(&bytes).map_err(|error| invalid(error.to_string()))?;
+    // serde's category, line and column, never its message (#1680).
+    let value =
+        serde_json::from_slice(&bytes).map_err(|error| crate::forward::unreadable(path, &error))?;
     Ok(Some((value, stamp)))
+}
+
+/// `records.json` at `path`, one release forward ([`crate::config::read`]),
+/// with the ordinary trust and size checks; none when it matches `prior`.
+pub fn read_config(
+    path: &Path,
+    prior: Option<&Stamp>,
+) -> io::Result<Option<(crate::config::Read, Stamp)>> {
+    let dir = parent(path, false)?;
+    let Some((bytes, stamp)) = read_bytes(&dir, path, CONFIG_BYTES, prior)? else {
+        return Ok(None);
+    };
+    Ok(Some((crate::config::read(path, &bytes)?, stamp)))
 }
 
 fn read_bytes(
@@ -183,11 +198,19 @@ pub enum ReportRead {
     SetAside,
 }
 
-fn decode_report(bytes: &[u8]) -> io::Result<Result<RunReport, u64>> {
+/// Why a report is a newer build's: its schema, or at this build's schema a
+/// `mode` it doesn't know (#1680).
+enum Newer {
+    Schema(u64),
+    Mode,
+}
+
+fn decode_report(bytes: &[u8]) -> io::Result<Result<RunReport, Newer>> {
     match serde_json::from_slice::<RunReport>(bytes) {
         Ok(report) => Ok(Ok(report)),
         Err(_) => match crate::newer_report_schema(bytes)? {
-            Some(schema) => Ok(Err(schema)),
+            Some(schema) => Ok(Err(Newer::Schema(schema))),
+            None if crate::newer_report_mode(bytes) => Ok(Err(Newer::Mode)),
             None => Err(invalid("unrecognized cleanup report")),
         },
     }
@@ -207,10 +230,10 @@ pub fn read_report_changed(
     };
     match decode_report(&bytes)? {
         Ok(report) => Ok(Some((ReportRead::Current(report), stamp))),
-        Err(schema) => {
+        Err(newer) => {
             trusted_directory(&dir, true)?;
             fs::flock(&dir, fs::FlockOperation::NonBlockingLockExclusive)?;
-            set_aside_report(&dir, path, &stamp, schema, at_unix_s)?;
+            set_aside_report(&dir, path, &stamp, &newer, at_unix_s)?;
             Ok(Some((ReportRead::SetAside, stamp)))
         }
     }
@@ -220,7 +243,7 @@ fn set_aside_report(
     dir: &OwnedFd,
     path: &Path,
     expected: &Stamp,
-    schema: u64,
+    newer: &Newer,
     at_unix_s: u64,
 ) -> io::Result<()> {
     // A writer may have replaced the result between its read and this lock.
@@ -232,12 +255,24 @@ fn set_aside_report(
         ));
     }
     let name = path.file_name().unwrap();
-    let kept = format!("{}.newer-{schema}-{at_unix_s}", name.to_str().unwrap());
+    let (tag, why) = match newer {
+        Newer::Schema(schema) => (
+            schema.to_string(),
+            format!("is newer than this build (schema {schema})"),
+        ),
+        // The mode itself is not told: a value, as the journal never does.
+        Newer::Mode => (
+            "mode".to_owned(),
+            format!(
+                "has a mode this build does not know, at its schema {}",
+                crate::REPORT_SCHEMA_VERSION
+            ),
+        ),
+    };
+    let kept = format!("{}.newer-{tag}-{at_unix_s}", name.to_str().unwrap());
     fs::renameat_with(dir, name, dir, kept.as_str(), RenameFlags::NOREPLACE)?;
     fs::fsync(dir)?;
-    eprintln!(
-        "lamp-records: cleanup result is newer than this build (schema {schema}); kept as {kept}; awaiting a new cleanup result"
-    );
+    eprintln!("lamp-records: cleanup result {why}; kept as {kept}; awaiting a new cleanup result");
     Ok(())
 }
 
@@ -296,8 +331,8 @@ pub fn write_report(path: &Path, report: &RunReport) -> io::Result<()> {
     fs::flock(&dir, fs::FlockOperation::NonBlockingLockExclusive)?;
     match read_bytes(&dir, path, REPORT_BYTES, None) {
         Ok(Some((prior, stamp))) => {
-            if let Err(schema) = decode_report(&prior)? {
-                set_aside_report(&dir, path, &stamp, schema, report.at_unix_s)?;
+            if let Err(newer) = decode_report(&prior)? {
+                set_aside_report(&dir, path, &stamp, &newer, report.at_unix_s)?;
             }
         }
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
@@ -487,7 +522,7 @@ mod tests {
             .unwrap();
         write(&path, &report()).unwrap();
         fs::flock(&parent, fs::FlockOperation::NonBlockingLockExclusive).unwrap();
-        assert!(set_aside_report(&parent, &path, &prior, 2, 18).is_err());
+        assert!(set_aside_report(&parent, &path, &prior, &Newer::Schema(2), 18).is_err());
         assert_eq!(
             stdfs::read(&path).unwrap(),
             serde_json::to_vec(&report()).unwrap()
@@ -500,13 +535,18 @@ mod tests {
     fn unrecognized_or_unknown_supported_values_are_preserved_on_read_and_write() {
         let dir = scratch();
         let path = dir.join("last.json");
-        let mut unknown_mode = serde_json::to_value(report()).unwrap();
-        unknown_mode["mode"] = "later_mode".into();
-        unknown_mode["later"] = true.into();
+        // A mode that isn't a plain word, and a plain new one beside a
+        // broken known field: neither is a newer build's report (#1680).
+        let mut bad_mode = serde_json::to_value(report()).unwrap();
+        bad_mode["mode"] = "Later Mode!".into();
+        let mut broken = serde_json::to_value(report()).unwrap();
+        broken["mode"] = "later_mode".into();
+        broken["at_unix_s"] = "soon".into();
         for bytes in [
             b"{malformed".to_vec(),
             br#"{"schema_version":2}"#.to_vec(),
-            serde_json::to_vec(&unknown_mode).unwrap(),
+            serde_json::to_vec(&bad_mode).unwrap(),
+            serde_json::to_vec(&broken).unwrap(),
         ] {
             stdfs::write(&path, &bytes).unwrap();
             assert!(read_report_changed(&path, None, 17).is_err());
@@ -514,6 +554,38 @@ mod tests {
             assert_eq!(stdfs::read(&path).unwrap(), bytes);
             assert_eq!(stdfs::read_dir(&dir).unwrap().count(), 1);
         }
+        stdfs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #2052's audit, the records row for `last.json` (#1680): at this
+    /// build's schema, a newer build's plain new `mode` is a newer build's
+    /// report. It is set aside whole on read and on write, as a newer schema
+    /// is, so the cleanup goes on, and it is never cleanup evidence. Before,
+    /// every run was refused until someone removed it.
+    #[test]
+    fn a_newer_builds_mode_at_this_schema_is_set_aside_whole_on_read_and_write() {
+        let dir = scratch();
+        let path = dir.join("last.json");
+        let mut later = serde_json::to_value(report()).unwrap();
+        later["mode"] = "later_mode".into();
+        later["later"] = true.into();
+        let bytes = serde_json::to_vec(&later).unwrap();
+        stdfs::write(&path, &bytes).unwrap();
+        let (read, _) = read_report_changed(&path, None, 16).unwrap().unwrap();
+        assert!(matches!(read, ReportRead::SetAside));
+        assert!(!path.exists());
+        assert_eq!(
+            stdfs::read(dir.join("last.json.newer-mode-16")).unwrap(),
+            bytes
+        );
+        stdfs::write(&path, &bytes).unwrap();
+        write_report(&path, &report()).unwrap();
+        assert_eq!(
+            stdfs::read(dir.join("last.json.newer-mode-17")).unwrap(),
+            bytes
+        );
+        let (read, _) = read_report_changed(&path, None, 18).unwrap().unwrap();
+        assert!(matches!(read, ReportRead::Current(current) if current.mode == "apply"));
         stdfs::remove_dir_all(dir).unwrap();
     }
 

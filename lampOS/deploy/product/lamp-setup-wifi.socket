@@ -1,0 +1,20 @@
+# lampOS Wi-Fi changed after setup (#1959, lampOS/docs/setup.md, "The Wi-Fi changed after setup"):
+# the socket lamp-cloud asks root's Wi-Fi helper on. Its own, beside lamp-setup-change.socket,
+# since this helper needs the network and the radio. One change at a time. Nothing reaches it
+# unless lamp-cloud has LAMP_SETTINGS_CHANGE=on and LAMP_SETTINGS_WIFI=on.
+[Unit]
+Description=lampOS Wi-Fi changed after setup: the socket lamp-cloud asks on
+PartOf=lampos.target
+ConditionPathExists=/var/lib/lampos-setup/done
+
+[Socket]
+ListenStream=/run/lampos-setup-wifi/wifi.sock
+SocketUser=root
+SocketGroup=lampos
+SocketMode=0660
+DirectoryMode=0755
+Accept=yes
+MaxConnections=1
+
+[Install]
+WantedBy=lampos.target

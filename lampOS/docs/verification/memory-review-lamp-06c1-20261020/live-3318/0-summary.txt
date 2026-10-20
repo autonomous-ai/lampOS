@@ -1,0 +1,6 @@
+baseline 13:28-13:30 +07
+memory ExecStart: --keep-days 30 --zone system --memory-days --bus-root /run/lampos-bus ; no drop-ins
+voice: LAMP_MEMORY_SOCKET set, LAMP_MEMORY_DAYS=on, LAMP_MEMORY_RULES=on; LAMP_MEMORY_FORGET_ALL, LAMP_VOICE_ROUTE, LAMP_SECOND_SCOPED_CONTEXT unset; LAMP_ATTENTION=busy-near
+voice current d6089a6a38f9..., memory current 0ce3bbfa071d... (sha256 == dir name); both started 12:15:30
+store: everyone exchanges=8 kept=0; r-everyone rules=0 ; eyes known file absent -> no known face
+Mac volume was 60 at start; restored to 60 at 13:48:56

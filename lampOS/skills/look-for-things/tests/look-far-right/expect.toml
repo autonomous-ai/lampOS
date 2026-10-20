@@ -1,0 +1,21 @@
+# Two places on, farther to the right: the whole half-picture.
+[[call_tool]]
+name = "look_for"
+at = "0s"
+args = { place = "far_right" }
+
+[[expect]]
+call = "look"
+
+[[expect]]
+call = "body.mood"
+
+[[expect]]
+call = "light"
+
+[[expect]]
+call = "say"
+
+[[expect]]
+call = "body.mood"
+args = { mood = "reading", toward = 1.0 }

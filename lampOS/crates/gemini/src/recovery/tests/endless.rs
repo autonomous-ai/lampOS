@@ -256,6 +256,68 @@ async fn a_refusal_that_passes_with_time_is_asked_again_after_the_pause_and_not_
     assert!(supervisor.is_connected());
 }
 
+/// #1567, lamp-75c9 on 2026-10-19: the account was out of quota from the
+/// start. The first connection refused for quota is said once as
+/// unavailable and asked again only after the pause, not hammered, and the
+/// session that comes up is reported fresh.
+#[tokio::test(start_paused = true)]
+async fn a_first_connection_refused_for_quota_is_asked_again_after_the_pause() {
+    let (dialer, mut dials) = connector(config());
+    let mut supervisor = Supervisor::new(dialer, endless()).unwrap();
+    let serve = async {
+        let mut refused = next_dial(&mut dials).await;
+        refused.service.receive().await;
+        refused
+            .service
+            .close(1011, "You exceeded your current quota")
+            .await;
+        let at = Instant::now();
+        let mut again = next_dial(&mut dials).await;
+        let waited = at.elapsed();
+        again.service.accept().await;
+        (again, waited, refused)
+    };
+    let watch = async {
+        let mut seen = Vec::new();
+        loop {
+            match supervisor.poll_link() {
+                Some(update) if matches!(update.kind, LinkUpdateKind::Ready { .. }) => {
+                    seen.push(update);
+                    return seen;
+                }
+                Some(update) => seen.push(update),
+                None => tokio::time::sleep(Duration::from_millis(2)).await,
+            }
+        }
+    };
+    let (seen, (_again, waited, _refused)) = timeout(WAIT, async { tokio::join!(watch, serve) })
+        .await
+        .expect("the link in time");
+    assert!(waited >= PAUSE, "asked again after {waited:?}");
+    let [unavailable, ready] = seen[..] else {
+        panic!("one refusal and one ready, got {seen:?}")
+    };
+    assert!(matches!(
+        unavailable.kind,
+        LinkUpdateKind::Unavailable {
+            error: Error::QuotaExceeded
+        }
+    ));
+    assert!(matches!(
+        ready.kind,
+        LinkUpdateKind::Ready {
+            context: Context::Fresh,
+            attempts: 2,
+            after: Some(Error::QuotaExceeded),
+            ..
+        }
+    ));
+    assert!(
+        dials.try_recv().is_err(),
+        "one connection asked again, no more"
+    );
+}
+
 /// Endless is not blind. A fault that a new connection would only repeat
 /// ends the supervisor as before, and so do a first connection refused
 /// outright, a conversation lost under a policy that requires it kept, and

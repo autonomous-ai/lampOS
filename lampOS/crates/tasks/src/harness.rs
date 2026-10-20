@@ -73,12 +73,21 @@ const ENVIRONMENT: &[&str] = &[
 /// The agents a target may name. `opencode` since Harness 0.4.2 names it
 /// in `harness new --help` ("claude (default), codex, opencode, …"); its ask
 /// mode passes OpenCode no flag, so OpenCode asks as it does by default.
+/// `devin` (#1854) is Devin's own terminal program on the computer, read as
+/// the others are (openharness `cli/src/engines/devin/`). `devin-cloud` is
+/// Devin Cloud, which Harness 0.4.27's `new` starts (openharness#1444): it
+/// runs in Devin's cloud, under the computer that holds the person's Devin
+/// connection, with no folder and no modes, and uses the secrets the person
+/// keeps in Devin (a Slack token among them); the lamp holds none.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum EngineKind {
     Codex,
     Claude,
     Opencode,
+    Devin,
+    #[serde(rename = "devin-cloud")]
+    DevinCloud,
 }
 
 impl EngineKind {
@@ -87,7 +96,31 @@ impl EngineKind {
             Self::Codex => "codex",
             Self::Claude => "claude",
             Self::Opencode => "opencode",
+            Self::Devin => "devin",
+            Self::DevinCloud => "devin-cloud",
         }
+    }
+
+    /// The engine's name on the bus (`tasks/status`), whose check takes
+    /// letters, digits and `_` only (`msgs::tasks`): `devin_cloud` for Devin
+    /// Cloud, whose name for Harness has a dash (the reviewer on #2240).
+    pub fn bus_name(self) -> String {
+        self.argument().replace('-', "_")
+    }
+
+    /// Whether the agent runs in its maker's cloud, not on the computer: no
+    /// folder is sent, its id is Harness's `cloud_…` one, and Harness closes
+    /// none of them.
+    pub fn cloud(self) -> bool {
+        matches!(self, Self::DevinCloud)
+    }
+
+    /// Whether the agent has Harness's permission modes. Devin has none:
+    /// Harness leaves the mode out for it and refuses one it is sent
+    /// (`INVALID_PERMISSION_MODE`; openharness `cli/src/lib/newCommand.ts`),
+    /// so it opens in its own default.
+    fn has_modes(self) -> bool {
+        !matches!(self, Self::Devin | Self::DevinCloud)
     }
 }
 
@@ -192,6 +225,32 @@ fn machine_id(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+/// An agent's id as Harness gives it: a UUID for one on a computer, or
+/// `cloud_` and 16 hex digits for a cloud one (Harness 0.4.27).
+pub fn agent_id(value: &str) -> bool {
+    uuid(value)
+        || value.strip_prefix("cloud_").is_some_and(|hex| {
+            hex.len() == 16
+                && hex
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        })
+}
+
+/// What Harness's `state` for agent `id` means here: a cloud agent is
+/// `needs-input` once it has answered and waits for a next message, whether
+/// or not it asked anything, so it is read as `idle`, and its answer is told.
+/// A question it asked is in that answer. Only `needs-input`: a cloud agent
+/// `working` or `failed` is as Harness says. When openharness#1449 gives a
+/// way to tell a question from a finished answer, read that here instead.
+fn state_of(id: &str, state: String) -> String {
+    if id.starts_with("cloud_") && state == "needs-input" {
+        "idle".into()
+    } else {
+        state
+    }
+}
+
 fn uuid(value: &str) -> bool {
     value.len() == 36
         && value.bytes().enumerate().all(|(index, byte)| {
@@ -207,6 +266,14 @@ impl Target {
     pub fn validate(&self) -> Result<(), String> {
         if !machine_id(&self.machine_id) {
             return Err("invalid_machine".into());
+        }
+        // A cloud agent works in no folder: its target names none.
+        if self.engine.cloud() {
+            return if self.project.is_empty() {
+                Ok(())
+            } else {
+                Err("invalid_project".into())
+            };
         }
         let folder = self.project.starts_with('/') || self.project.starts_with("~/");
         let maximum = if folder { 512 } else { 128 };
@@ -422,26 +489,32 @@ impl Cli {
         // list again and can fall back to a name if the ID disappears meanwhile.
         // The machine is named with `--machine` (Harness 0.4.2); the `@id`
         // form before it is refused.
-        let args = vec![
+        let mut args: Vec<OsString> = vec![
             "new".into(),
             launch.target.engine.argument().into(),
             "--machine".into(),
             launch.target.machine_id.clone().into(),
-            launch.target.project.clone().into(),
-            "--name".into(),
-            launch.name.clone().into(),
-            // Harness's default, approved by the owner on 2026-10-15: Claude
-            // Code works in its own project folder without asking, and still
-            // stops for anything risky. With `ask` it asked before every file
-            // it wrote, with nobody at the computer to answer: a two-line poem
-            // waited on "Do you want to create coffee_poem.txt?" while the
-            // lamp said "still working".
-            "--mode".into(),
-            "auto".into(),
+        ];
+        // A cloud agent is given no folder (openharness#1444).
+        if !launch.target.engine.cloud() {
+            args.push(launch.target.project.clone().into());
+        }
+        args.extend(["--name".into(), launch.name.clone().into()]);
+        // Harness's default, approved by the owner on 2026-10-15: Claude
+        // Code works in its own project folder without asking, and still
+        // stops for anything risky. With `ask` it asked before every file
+        // it wrote, with nobody at the computer to answer: a two-line poem
+        // waited on "Do you want to create coffee_poem.txt?" while the
+        // lamp said "still working". An agent with no modes (Devin) is
+        // sent none, as Harness itself leaves it out (#1854).
+        if launch.target.engine.has_modes() {
+            args.extend(["--mode".into(), "auto".into()]);
+        }
+        args.extend([
             "--json".into(),
             "--task".into(),
             launch.prompt.clone().into(),
-        ];
+        ]);
         match self.run(&args, self.config.launch_timeout) {
             Ok(reply) if reply.success => parse_launch(&reply.stdout, launch),
             Ok(_) => uncertain("new_failed"),
@@ -455,7 +528,7 @@ impl Cli {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
-        if !uuid(agent_id) {
+        if !self::agent_id(agent_id) {
             return Err("invalid_agent_id".into());
         }
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
@@ -492,8 +565,13 @@ impl Cli {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
-        if !uuid(agent_id) {
+        if !self::agent_id(agent_id) {
             return Err("invalid_agent_id".into());
+        }
+        // Harness closes no cloud harness (openharness#1444: "stop it in
+        // Harness"), so none is asked: refused, not to be asked again.
+        if agent_id.starts_with("cloud_") {
+            return Ok(Closed::Refused);
         }
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
         let reply = self
@@ -570,6 +648,52 @@ impl Cli {
         parse_machines(&reply.stdout).map_err(str::to_string)
     }
 
+    /// Harness's own sign-in by a spoken code (`harness login --code
+    /// --json`, Harness 0.4.23; `serve --sign-in-by-code`, #1676): the same
+    /// program, checked as every run is, with the same environment and
+    /// `HOME`, but its own life ([`crate::sign_in::MOST_LIFE`]), its stdin
+    /// kept for the person's answer and its lines read as they come. Never
+    /// takes the operation lock: a sign-in waits minutes on a person.
+    pub fn sign_in_by_code(&self) -> Result<Box<dyn crate::sign_in::Link>, String> {
+        if self.poisoned.load(Ordering::Acquire) {
+            return Err("cleanup_incomplete".into());
+        }
+        if !executable_identity(&self.config.executable)
+            .is_ok_and(|identity| identity == self.executable)
+        {
+            return Err("executable_changed".into());
+        }
+        let mut command = Command::new(&self.config.executable);
+        command
+            .args(["login", "--code", "--json"])
+            .env_clear()
+            .envs(&self.config.environment);
+        if !self.config.as_person {
+            command
+                .env("AI_AGENT", "lampos")
+                .env("HARNESS_AGENT_SESSION", &self.caller_session);
+        }
+        command
+            .current_dir(&self.config.environment["HOME"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .process_group(0);
+        let mut child = command.spawn().map_err(|_| "spawn_failed".to_string())?;
+        let pid = Pid::from_child(&child);
+        let (Some(stdin), Some(stdout), Some(stderr)) =
+            (child.stdin.take(), child.stdout.take(), child.stderr.take())
+        else {
+            let _ = kill_process_group(pid, Signal::KILL);
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("pipe_failed".into());
+        };
+        Ok(Box::new(CodeSignIn::start(
+            child, pid, stdin, stdout, stderr,
+        )))
+    }
+
     /// A second adapter on the same CLI and settings, for `wait`
     /// (`serve --push-wait`): held for minutes, it must never take the one
     /// operation lane launches and reads share.
@@ -594,7 +718,7 @@ impl Cli {
         }
         if agents.is_empty()
             || agents.len() > MOST_WAITED
-            || agents.iter().any(|agent| !uuid(agent))
+            || agents.iter().any(|agent| !self::agent_id(agent))
         {
             return Err("invalid_agent_id".into());
         }
@@ -897,6 +1021,123 @@ impl Drop for OwnedChild {
     }
 }
 
+/// A running `harness login --code --json` ([`Cli::sign_in_by_code`]): its
+/// lines read on a thread of their own, its answer written to its stdin,
+/// and its process group stopped when dropped.
+struct CodeSignIn {
+    child: Child,
+    pid: Pid,
+    stdin: std::process::ChildStdin,
+    read: std::sync::mpsc::Receiver<Result<crate::sign_in::Event, &'static str>>,
+    ended: bool,
+}
+
+/// What Harness writes when it doesn't know `--code`: a build before 0.4.23
+/// ("error: unknown option '--code'").
+fn too_old(errors: &str) -> bool {
+    let errors = errors.to_lowercase();
+    errors.contains("unknown option") || errors.contains("unknown argument")
+}
+
+impl CodeSignIn {
+    fn start(
+        child: Child,
+        pid: Pid,
+        stdin: std::process::ChildStdin,
+        stdout: ChildStdout,
+        stderr: ChildStderr,
+    ) -> Self {
+        let (send, read) = std::sync::mpsc::sync_channel(8);
+        // What it says on stderr, bounded, for why it ended with no result.
+        let errors = thread::spawn(move || {
+            let mut kept = Vec::new();
+            let _ = stderr.take(STDERR_LIMIT as u64).read_to_end(&mut kept);
+            String::from_utf8_lossy(&kept).into_owned()
+        });
+        thread::spawn(move || {
+            use std::io::BufRead;
+            let mut lines = io::BufReader::new(stdout);
+            let mut line = Vec::new();
+            let ended = loop {
+                line.clear();
+                match (&mut lines)
+                    .take(crate::sign_in::MOST_LINE_BYTES as u64 + 1)
+                    .read_until(b'\n', &mut line)
+                {
+                    Ok(0) | Err(_) => break None,
+                    Ok(_) => {}
+                }
+                let text = std::str::from_utf8(&line).map(str::trim);
+                let read = match text {
+                    Ok("") => continue,
+                    Ok(text) if line.len() <= crate::sign_in::MOST_LINE_BYTES => {
+                        crate::sign_in::parse_line(text)
+                    }
+                    _ => Err("unreadable"),
+                };
+                match read {
+                    Ok(None) => {}
+                    Ok(Some(event)) => {
+                        if send.send(Ok(event)).is_err() {
+                            return;
+                        }
+                    }
+                    Err(code) => break Some(code),
+                }
+            };
+            let code = ended.unwrap_or_else(|| {
+                if errors.join().is_ok_and(|errors| too_old(&errors)) {
+                    "harness_too_old"
+                } else {
+                    "ended"
+                }
+            });
+            let _ = send.send(Err(code));
+        });
+        Self {
+            child,
+            pid,
+            stdin,
+            read,
+            ended: false,
+        }
+    }
+}
+
+impl crate::sign_in::Link for CodeSignIn {
+    fn poll(&mut self) -> Option<Result<crate::sign_in::Event, &'static str>> {
+        if self.ended {
+            return None;
+        }
+        match self.read.try_recv() {
+            Ok(read) => {
+                self.ended = read.is_err();
+                Some(read)
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => None,
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                self.ended = true;
+                Some(Err("ended"))
+            }
+        }
+    }
+
+    fn answer(&mut self, yes: bool) -> io::Result<()> {
+        use std::io::Write;
+        self.stdin.write_all(if yes { b"yes\n" } else { b"no\n" })?;
+        self.stdin.flush()
+    }
+}
+
+impl Drop for CodeSignIn {
+    fn drop(&mut self) {
+        // Its whole group, as every run here is stopped; then reaped.
+        let _ = kill_process_group(self.pid, Signal::KILL);
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
 #[derive(Deserialize)]
 struct Machine {
     #[serde(rename = "machineId")]
@@ -983,8 +1224,19 @@ struct CreatedAgent {
     id: String,
     name: String,
     engine: EngineKind,
-    permission_mode: String,
-    bypass_permission: Value,
+    /// Absent, or null, for an agent with no modes (Devin, #1854).
+    #[serde(default)]
+    permission_mode: Option<String>,
+    /// Required for an agent with modes, as before #1854: `None` only when
+    /// the field is missing, an explicit `null` being `Some(Null)`.
+    #[serde(default, deserialize_with = "present")]
+    bypass_permission: Option<Value>,
+}
+
+/// A field that is there, `null` included, as `Some`: only a missing one is
+/// `None` (by `default`).
+fn present<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Value>, D::Error> {
+    Value::deserialize(deserializer).map(Some)
 }
 
 fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
@@ -1022,10 +1274,14 @@ fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
     let Some(agent) = reply.agent else {
         return uncertain("invalid_reply");
     };
-    if !uuid(&agent.id)
+    if !agent_id(&agent.id)
         || agent.name != launch.name
         || agent.engine != launch.target.engine
-        || !auto_permission(&agent.permission_mode, &agent.bypass_permission)
+        || !asked_permission(
+            launch.target.engine,
+            agent.permission_mode.as_deref(),
+            agent.bypass_permission.as_ref(),
+        )
     {
         return uncertain("invalid_reply");
     }
@@ -1038,6 +1294,19 @@ fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
 /// mode, `full` among them, is not what was asked for.
 fn auto_permission(mode: &str, bypass: &Value) -> bool {
     mode == "auto" && (bypass.is_null() || bypass.is_boolean())
+}
+
+/// What was asked for: `auto` for an agent with modes; for one with none
+/// (Devin), no mode was sent, so the receipt must claim none that approves
+/// on its own (`auto` or `full`) and no bypass. Its exact receipt is not yet
+/// seen from Harness: absent, null, or another mode, are all taken.
+fn asked_permission(engine: EngineKind, mode: Option<&str>, bypass: Option<&Value>) -> bool {
+    if engine.has_modes() {
+        return mode
+            .zip(bypass)
+            .is_some_and(|(mode, bypass)| auto_permission(mode, bypass));
+    }
+    !matches!(mode, Some("auto" | "full")) && bypass != Some(&Value::Bool(true))
 }
 
 #[derive(Deserialize)]
@@ -1084,8 +1353,8 @@ fn parse_observation(bytes: &[u8], expected: &str) -> Result<Observation, &'stat
         _ => return Err("invalid_observation"),
     };
     Ok(Observation {
+        state: state_of(&reply.id, reply.state),
         agent_id: reply.id,
-        state: reply.state,
         ask,
         answer: reply.answer,
         truncated: reply.truncated,
@@ -1179,7 +1448,7 @@ pub fn parse_ps(bytes: &[u8]) -> Result<Vec<Listed>, &'static str> {
     }
     let mut listed = Vec::new();
     for row in reply.harnesses {
-        if !uuid(&row.id) {
+        if !agent_id(&row.id) {
             continue;
         }
         if !token(&row.state, 32) {
@@ -1193,8 +1462,8 @@ pub fn parse_ps(bytes: &[u8]) -> Result<Vec<Listed>, &'static str> {
             .map(|about| clip(about.trim(), MOST_ABOUT_BYTES))
             .filter(|about| !about.is_empty());
         listed.push(Listed {
+            state: state_of(&row.id, row.state),
             agent_id: row.id,
-            state: row.state,
             last_active_unix_ms,
             about,
         });
@@ -1240,8 +1509,8 @@ pub fn parse_wait(
             continue;
         }
         ended.push(Ended {
+            state: state_of(&row.id, row.state),
             agent_id: row.id,
-            state: row.state,
         });
     }
     // An exit that says one ended, with none of ours listed, is not read.

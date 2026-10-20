@@ -18,6 +18,8 @@ lamp-skills`, which runs every skill's cases).
 | `waits-for-the-talk-to-end` | A face for 58 minutes; `voice/state` listening at 48, speaking at 50, resting at 56 | Pass: nothing during the talk, then one stretch at the first face after it, 56.5 minutes (`wait = "10m"`, #1021). Was `quiet-while-talking`, when a chance held back was spent |
 | `quiet-while-the-talk-goes-on` | The same, the talk never ending before the recording does | Pass: nothing |
 | `across-the-room` | `acts-after-50-minutes` with the face 0.04 of the picture tall, someone across the room (lamp-4ace, 2026-10-16 15:16, when it fired for them) | Pass: nothing (`near = 0.14`); without `near` it stretched at 50 minutes |
+| `waits-for-a-look-up` | `acts-after-50-minutes` with `room/activity` (#1678) written beside each face, `head_down` from minute 48 to 54 | Pass: nothing at 50 minutes, one stretch at the first face after 54. Without the `[[while]]` it stretches at 50 minutes |
+| `lets-it-go-when-they-stay-head-down` | `quiet-until-they-leave` to minute 70, `room/activity` `head_down` from 45 to 65 | Pass: nothing: the chance at 50 waits its ten minutes and is let go, and it re-arms only when they leave. Without the `[[while]]` it stretches at 50 |
 | `quiet-when-paused` | Not recorded: waits for the Policy's gate (#939) | Not run |
 
 `quiet-when-paused` waits for the Policy's gate (#939), the one gate for

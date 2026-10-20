@@ -20,6 +20,7 @@
 //! like the last one the detector ran on, and needs no detector. With
 //! `LAMP_PRESENCE=on`, [`away`] says whether anyone is at the lamp, from the
 //! faces and the voice's lines, on `room/presence` (#1677).
+pub mod activity;
 pub mod away;
 pub mod bus_out;
 pub mod change;
@@ -29,7 +30,10 @@ pub mod full_look;
 pub mod kept;
 pub mod mesh;
 pub mod permit;
+pub mod photo;
 pub mod picture;
+pub mod reopen;
+pub mod seems;
 pub mod sight;
 pub mod speaking;
 pub mod steady;

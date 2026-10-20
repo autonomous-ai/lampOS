@@ -5,7 +5,7 @@
 use lamp_body::calibration::UnitId;
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-body-measure --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY [--write ABSOLUTE_FILE]\n\nThe factory's per-lamp body step: reads the lamp at rest with torque off (lamp-body-inspect's\nread-only plan: no register writes, no torque, no motion) and prints this lamp's own\nlamp.env (BODY_POSES: --home, --folded-arm, --stand, --pitch-window, --torque). With --write\nit also writes that file, which must not exist yet (/etc/lampOS/body/lamp.env on the product).\nRefused, with why, where the body would refuse the poses. --gaze is not measured here (body.md).\nStop the body and every other bus owner first. Linux only.\n";
+const USAGE: &str = "lamp-body-measure --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY [--write ABSOLUTE_FILE] [--seated]\n\nThe factory's per-lamp body step: reads the lamp at rest with torque off (lamp-body-inspect's\nread-only plan: no register writes, no torque, no motion) and prints this lamp's own\nlamp.env (BODY_POSES: --home, --folded-arm, --stand, --pitch-window, --torque). With --write\nit also writes that file, which must not exist yet (/etc/lampOS/body/lamp.env on the product).\nRefused, with why, where the body would refuse the poses. --gaze is not measured here (body.md).\nWith --seated the file holds only --home, --pitch-window and --torque on: a lamp whose first stand\nno person has confirmed yet, whose body then holds and moves the head and base only, never the arm (#2163).\nStop the body and every other bus owner first. Linux only.\n";
 
 #[derive(Debug)]
 struct Arguments {
@@ -13,6 +13,8 @@ struct Arguments {
     unit_id: UnitId,
     lock_directory: PathBuf,
     write: Option<PathBuf>,
+    /// Only the head's poses: no stand, no folded arm (#2163).
+    seated: bool,
 }
 
 fn bounded(path: &std::path::Path) -> bool {
@@ -28,9 +30,21 @@ fn bounded(path: &std::path::Path) -> bool {
 fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, &'static str> {
     let mut args = args.into_iter();
     let (mut device, mut unit_id, mut lock_directory, mut write) = (None, None, None, None);
+    let mut seated = false;
     while let Some(key) = args.next() {
+        if key == "--seated" {
+            if seated {
+                return Err("unknown or duplicate option");
+            }
+            seated = true;
+            continue;
+        }
         if key == "--help" {
-            if device.is_some() || unit_id.is_some() || lock_directory.is_some() || write.is_some()
+            if device.is_some()
+                || unit_id.is_some()
+                || lock_directory.is_some()
+                || write.is_some()
+                || seated
             {
                 return Err("--help must be used alone");
             }
@@ -61,6 +75,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         unit_id: unit_id.ok_or("--unit-id is required")?,
         lock_directory: lock_directory.ok_or("--lock-directory is required")?,
         write,
+        seated,
     };
     if ![&result.device, &result.lock_directory]
         .into_iter()
@@ -137,7 +152,12 @@ fn finish(
     report: &lamp_body::inspection::InspectionReport,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let read = lamp_body::poses::rest_read(report)?;
-    let text = lamp_body::poses::lamp_env(arguments.unit_id.as_str(), &read, &measured_at())?;
+    let form = if arguments.seated {
+        lamp_body::poses::seated_lamp_env
+    } else {
+        lamp_body::poses::lamp_env
+    };
+    let text = form(arguments.unit_id.as_str(), &read, &measured_at())?;
     print!("{text}");
     if let Some(path) = &arguments.write {
         write_new(path, &text).map_err(|error| format!("{}: {error}", path.display()))?;
@@ -153,6 +173,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error>> {
     let _ = (
         arguments.unit_id,
         arguments.write,
+        arguments.seated,
         write_new as fn(&std::path::Path, &str) -> std::io::Result<()>,
         measured_at as fn() -> String,
     );
@@ -210,6 +231,113 @@ mod tests {
             assert!(parse(args(&bad)).is_err(), "{bad:?}");
         }
         assert!(parse(args(&["--help"])).unwrap().is_none());
+    }
+
+    /// #2163: `--seated` takes no value, once, anywhere; the plain form stays the default.
+    #[test]
+    fn seated_is_a_flag_given_once() {
+        let base = [
+            "--device",
+            "/dev/ttyACM0",
+            "--unit-id",
+            "lamp-a63e",
+            "--lock-directory",
+            "/var/lib/lampos-locks/motor",
+        ];
+        assert!(!parse(args(&base)).unwrap().unwrap().seated);
+        let seated = parse(args(
+            &[
+                &["--seated"][..],
+                &base[..],
+                &["--write", "/var/lib/lampos-body/measured.env"],
+            ]
+            .concat(),
+        ))
+        .unwrap()
+        .unwrap();
+        assert!(seated.seated);
+        assert_eq!(
+            seated.write.as_deref(),
+            Some(std::path::Path::new("/var/lib/lampos-body/measured.env"))
+        );
+        for bad in [
+            [&base[..], &["--seated", "--seated"]].concat(),
+            vec!["--seated", "--help"],
+            vec!["--seated"],
+        ] {
+            assert!(parse(args(&bad)).is_err(), "{bad:?}");
+        }
+    }
+
+    /// #2163: the generic package's oneshot reads seated, into its own
+    /// state folder and never the confirmed file, as the parts' account, and
+    /// stays active so the keeper does not wait on it; the generic body
+    /// requires it and takes the confirmed poses over the seated ones. Read
+    /// from the unit files themselves.
+    #[test]
+    fn the_generic_units_read_seated_once_and_the_confirmed_poses_win() {
+        const MEASURE: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/units/lamp-body-measure.service"
+        ));
+        const BODY: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/units/lamp-body.service"
+        ));
+        let settings = |unit: &'static str, key: &str| -> Vec<&'static str> {
+            unit.lines()
+                .filter_map(|line| line.strip_prefix(key)?.strip_prefix('='))
+                .collect()
+        };
+        assert_eq!(settings(MEASURE, "Type"), ["oneshot"]);
+        assert_eq!(settings(MEASURE, "RemainAfterExit"), ["yes"]);
+        assert_eq!(settings(MEASURE, "User"), ["@LAMP_USER@"]);
+        assert_eq!(settings(MEASURE, "StateDirectory"), ["lampos-body"]);
+        let exec = settings(MEASURE, "ExecStart")[0];
+        // Nothing read where either file is there.
+        for path in [
+            "[ -e /etc/lampOS/body/lamp.env ]",
+            "[ -e /var/lib/lampos-body/measured.env ]",
+        ] {
+            assert!(exec.contains(path), "{path}");
+        }
+        let command = exec
+            .split_once("exec ")
+            .and_then(|(_, rest)| rest.strip_suffix('\''))
+            .expect("the read is exec'd last");
+        let words: Vec<&str> = command
+            .split_whitespace()
+            .skip(1)
+            .map(|word| match word {
+                "@SERVO_DEVICE@" => "/dev/ttyACM0",
+                "@UNIT_ID@" => "lamp-a63e",
+                "@MOTOR_LOCK_DIR@" => "/var/lib/lampos-locks/motor",
+                word => word,
+            })
+            .collect();
+        let read = parse(args(&words)).unwrap().unwrap();
+        assert!(read.seated);
+        assert_eq!(
+            read.write.as_deref(),
+            Some(std::path::Path::new("/var/lib/lampos-body/measured.env"))
+        );
+        assert!(!MEASURE.contains("--write /etc/"));
+
+        assert!(settings(BODY, "Requires").contains(&"lamp-body-measure.service"));
+        assert!(
+            settings(BODY, "After")
+                .iter()
+                .any(|after| after.contains("lamp-body-measure.service"))
+        );
+        // The later EnvironmentFile wins: the confirmed poses over the seated.
+        assert_eq!(
+            settings(BODY, "EnvironmentFile"),
+            [
+                "-/var/lib/lampos-body/measured.env",
+                "-/etc/lampOS/body/lamp.env"
+            ]
+        );
+        assert!(settings(BODY, "ExecStart")[0].ends_with(" $BODY_POSES"));
     }
 
     #[test]

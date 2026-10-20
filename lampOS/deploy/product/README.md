@@ -25,11 +25,15 @@ What is one lamp's own is outside them:
 | `settings/` | What no build carries and every lamp shares: Expression's catalogue (from lamp-4ace's `expression-alive-name-speech`) and the controls' two files, installed in `/etc/lampOS/<part>/` |
 | `lamp-<part>.service` | Each part, `PartOf=` and `WantedBy=lampos.target`, in keeper.md's order |
 | `lamp-update.service` | Outside the target; `--apply on`; the channel on GitHub |
+| `lamp-update-back.service`, `lamp-update-back.timer` | Outside the target (#1680): lamp-update's own previous build put back, from the fixed path `/usr/local/lib/lampos/lamp-update-back`, when a switch of its own (`LAMP_UPDATE_SELF=on`) is not confirmed; started by `lamp-update.service`'s `OnFailure=` and every 2 min by the timer. The service has no `[Install]` |
 | `lamp-records.service`, `lamp-records.timer` | Hourly, outside the target |
 | `lamp-selftest.service`, `lamp-selftest.timer` | The passive self-test (#812): the timer is in the target and waits for setup's marker; it runs the service 5 min after the lamp starts and every 6 h. The service has no `[Install]` |
 | `lamp-setup.service` | First boot only: while the marker is missing and setup's settings exist (#806, #811) |
 | `lampos-setup-done.path` | Starts `lampos.target` once the marker exists ([install.md](../../docs/install.md), "Setup at first boot, without the keeper") |
 | `lamp-setup-reset.service` | In the target: the reset button held 5 s |
+| `lamp-setup-change.socket`, `lamp-setup-change@.service` | Root's helper for names and the zone changed from the app after setup (#1959, `docs/setup.md`, "Changed after setup"): the socket is in the target and waits for setup's marker; each connection from `lamp-cloud` starts one service. Not yet in `install`'s list, so no lamp gets them until their lamp check |
+| `lamp-setup-wifi.socket`, `lamp-setup-wifi@.service` | Root's helper for the Wi-Fi changed from the app after setup (#1959, `docs/setup.md`, "The Wi-Fi changed after setup"): its own socket, one change at a time, with the network the names' helper has not. Not yet in `install`'s list, so no lamp gets them until their lamp check |
+| `lamp-skills-manage.socket`, `lamp-skills-manage@.service` | Root's helper that removes an installed or made-here skill for the app's skills page (#1722, `docs/skills.md`, "The manage helper"; `docs/cloud.md`, "The skills page"): systemd holds the socket (group `lampos`, 0660) and starts the service as root for each connection, `lamp-skills asked` with only the skills folder writable and no network. Not yet in `lamp-update`'s install list: it goes there after its lamp check |
 | `exit-note.conf` | Not a unit and not installed by `install`: the reports' prefix drop-in, `/etc/systemd/system/lamp-.service.d/exit-note.conf`, put on a lamp with `LAMP_REPORTS=on` (#1683, `docs/cloud.md`). `lamp-cloud exit-note %n` as every lampOS unit's `ExecStopPost=` |
 
 `lamp-update install` (docs/install.md) carries all of these inside it and puts them on a lamp.

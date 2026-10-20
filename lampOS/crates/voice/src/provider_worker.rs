@@ -90,6 +90,8 @@ static SESSION_FACT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBo
 static ROOM_FACTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether a stuffy room is told beside what a person says.
 static AIR_FACTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Whether an unwell part is told beside what a person says.
+static HEALTH_FACTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether the model is told, while a person is still speaking, that the
 /// lamp's name was heard (`crate::called`).
 static NAME_NOTE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -137,6 +139,9 @@ pub struct Files {
     /// Whether a stuffy room is told beside what a person says
     /// (`--air-facts`, `crate::air_told`).
     pub air_facts: bool,
+    /// Whether an unwell part is told beside what a person says
+    /// (`--health-facts`, `crate::health_told`).
+    pub health_facts: bool,
     /// Whether the link is never given up (`--keep-link`).
     pub keep_link: bool,
     /// Whether input waits for room in the link's queue (`--wait-for-room`).
@@ -253,6 +258,9 @@ pub struct Files {
     pub provider_patience: bool,
     /// Whether a holding-only answer is reported for one continuation.
     pub holding_answer: bool,
+    /// Whether a line goes only into a session opened for the person it was
+    /// admitted for (`--live-scoped-session`, [`crate::scoped_session`]).
+    pub scoped_session: bool,
 }
 
 /// The bus's root for this worker, if it publishes.
@@ -302,6 +310,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (cut_ins_not_talk, flags) = crate::room_told::take_cut_ins(flags);
     let (room_file, flags) = crate::room_told::take_file(flags)?;
     let (air_facts, flags) = crate::air_told::take(flags);
+    let (health_facts, flags) = crate::health_told::take(flags);
     let (keep_link, flags) = take_keep_link(flags);
     let (wait_for_room, flags) = take_wait_for_room(flags);
     let (mut tools, flags) = crate::tools::take(flags)?;
@@ -336,6 +345,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (messages, flags) = crate::messages::take(flags);
     let (others_answer, flags) = crate::others_answer::take(flags);
     let (said_as_heard, flags) = crate::said_as_heard::take(flags);
+    let (scoped_session, flags) = crate::scoped_session::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -350,6 +360,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         cut_ins_not_talk,
         room_file,
         air_facts,
+        health_facts,
         keep_link,
         wait_for_room,
         tools,
@@ -385,6 +396,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         messages,
         others_answer,
         said_as_heard,
+        scoped_session,
     };
     Ok((continuation, sight, files, visual))
 }
@@ -986,6 +998,8 @@ pub(crate) struct Options {
     pub(crate) remarks: bool,
     /// A spoken cut-in over the lamp's answer is told ([`crate::cut_in_told`]).
     pub(crate) cut_in_told: bool,
+    /// A line goes only into its admitted person's session ([`crate::scoped_session`]).
+    pub(crate) scoped_session: bool,
     /// A misheard cut-in's next request is told so ([`crate::misheard_hum`]).
     pub(crate) misheard_hum: bool,
     /// The bus the Policy's decisions are read from when, in a busy room, a
@@ -1045,6 +1059,7 @@ impl Options {
             remarks: false,
             going_on_asks: None,
             cut_in_told: false,
+            scoped_session: false,
             misheard_hum: false,
             policy_holds: None,
             follows_run: false,
@@ -1179,6 +1194,7 @@ pub async fn run_with_continuation(
         room.leave_cut_ins_out(files.cut_ins_not_talk);
     }
     AIR_FACTS.store(files.air_facts, std::sync::atomic::Ordering::Relaxed);
+    HEALTH_FACTS.store(files.health_facts, std::sync::atomic::Ordering::Relaxed);
     NAME_NOTE.store(files.name_note, std::sync::atomic::Ordering::Relaxed);
     HEAD_TOUCH.store(files.head_touch, std::sync::atomic::Ordering::Relaxed);
     NAME_NOTE_BUSY_FACE.store(
@@ -1329,6 +1345,7 @@ pub async fn run_with_continuation(
         follows_run: files.policy_holds && files.follows_run,
         remarks: files.attention && files.remarks,
         cut_in_told: files.cut_in_told,
+        scoped_session: files.scoped_session,
         misheard_hum: files.attention && files.ask_unclear && files.misheard_hum,
         going_on_asks: match (files.attention && files.going_on_asks, &files.bus_root) {
             (true, Some(root)) => Some(root.clone()),
@@ -1426,6 +1443,7 @@ async fn serve_with_visual<C: Connect>(
     intake.handoff.resend = provider.resends_lost_lines();
     intake.handoff.reminders.enabled = options.tools.schedule_speak;
     intake.handoff.cut_in_told = options.cut_in_told;
+    intake.handoff.scoped_session = options.scoped_session;
     intake.handoff.misheard_hum = options.misheard_hum;
     // The same-voice check (#829), only beside the rule that plays only for
     // a lamp spoken to.
@@ -1459,6 +1477,13 @@ async fn serve_with_visual<C: Connect>(
         .filter(|_| AIR_FACTS.load(std::sync::atomic::Ordering::Relaxed))
         .and_then(|root| lamp_bus::Bus::new(root).ok());
     let mut air_told = crate::air_told::AirTold::default();
+    // The lamp's health, read from the bus every five seconds when it is told.
+    let health_bus = BUS_ROOT
+        .get()
+        .filter(|_| HEALTH_FACTS.load(std::sync::atomic::Ordering::Relaxed))
+        .and_then(|root| lamp_bus::Bus::new(root).ok());
+    let mut health_told = crate::health_told::HealthTold::default();
+    let mut health_read_at: Option<Instant> = None;
     // Someone who asked the lamp to know their face, at the lamp: the eyes'
     // file beside their socket, read twice a second; told once a session.
     let known_file = options
@@ -1526,6 +1551,16 @@ async fn serve_with_visual<C: Connect>(
         crate::bus_out::RoomOut::on(root)
             .map_err(|error| {
                 eprintln!("lamp-voice provider: the room is not published on the bus: {error}")
+            })
+            .ok()
+    });
+    // Each turn's verdict, as the journal says it below (#1155).
+    let mut turn_out = BUS_ROOT.get().and_then(|root| {
+        crate::bus_out::TurnOut::on(root)
+            .map_err(|error| {
+                eprintln!(
+                    "lamp-voice provider: turns' verdicts are not published on the bus: {error}"
+                )
             })
             .ok()
     });
@@ -1742,6 +1777,14 @@ async fn serve_with_visual<C: Connect>(
                 for line in desk.take_lines() {
                     if let Some(log) = first_output.as_mut() {
                         log.tool_call(&line);
+                    }
+                }
+                // A line the model itself said was not for it is told held
+                // back, as a line the rule holds is (#1155, the first builder
+                // on #1817). One it acted on first is the lamp's.
+                for request in desk.take_declines() {
+                    if let Some(out) = turn_out.as_mut() {
+                        out.tell(request, lamp_msgs::TurnVerdict::HeldBack, monotonic_us());
                     }
                 }
                 // A session that has answered nothing for a long run of
@@ -2047,6 +2090,28 @@ async fn serve_with_visual<C: Connect>(
                         );
                     }
                 }
+                // The lamp's health: read every five seconds, the kept value
+                // only; an unwell part is told beside what a person is saying
+                // to the lamp, once a session for each set of parts, to be
+                // said only if asked (`crate::health_told`, #1681).
+                if let Some(bus) = health_bus.as_ref() {
+                    if health_read_at.is_none_or(|at| at.elapsed() >= Duration::from_secs(5)) {
+                        health_read_at = Some(Instant::now());
+                        health_told.seen(crate::health_told::read(bus).as_ref(), monotonic_us());
+                    }
+                    if let Some(live) = provider.live_session()
+                        && let Some(open) = intake.handoff.visual_turn()
+                        && open.session == live
+                        && let Some(note) = health_told.due(&live)
+                        && add_note(&provider, &mut intake.handoff.noted, open.request, &note).is_ok()
+                    {
+                        health_told.told(live);
+                        eprintln!(
+                            "lamp-voice provider: request {}: told the session inside it how its parts are",
+                            open.request.get()
+                        );
+                    }
+                }
                 // The person at the lamp is someone it knows: what they say
                 // is told their name, once a session (`crate::known_faces`);
                 // with a session for each person, the name of the one counted.
@@ -2317,7 +2382,7 @@ async fn serve_with_visual<C: Connect>(
                             && let Some((began, ended)) = attention.window()
                         {
                             let rise = rise_in(&ears_levels, (began, ended), monotonic_us());
-                            attention.set_near(rise.is_some_and(|rise| rise >= crate::attention::NEAR_RISE_DB));
+                            attention.set_near(rise.is_some_and(|rise| rise >= crate::attention::near_rise_db()));
                         }
                         if attention.waits_for_policy(request, room, going_on, turned)
                             && let Ok(first) = notice
@@ -2460,7 +2525,7 @@ async fn serve_with_visual<C: Connect>(
                                 && let Some((began, ended)) = attention.window()
                             {
                                 let rise = rise_in(&ears_levels, (began, ended), monotonic_us());
-                                attention.set_near(rise.is_some_and(|rise| rise >= crate::attention::NEAR_RISE_DB));
+                                attention.set_near(rise.is_some_and(|rise| rise >= crate::attention::near_rise_db()));
                                 judged_rise = rise.map(|rise| (request, rise));
                             }
                             // Said to the lamp from close to it, over the
@@ -2654,6 +2719,13 @@ async fn serve_with_visual<C: Connect>(
                                 .filter(|(of, _)| *of == request)
                                 .map(|(_, rise)| format!(" (the room microphone {rise:.1} dB over its quiet)"))
                                 .unwrap_or_default();
+                            if let (Some(out), Some(verdict)) = (turn_out.as_mut(), verdict.as_ref()) {
+                                let told = match verdict {
+                                    crate::attention::Verdict::Hold(_) => lamp_msgs::TurnVerdict::HeldBack,
+                                    _ => lamp_msgs::TurnVerdict::Answered,
+                                };
+                                out.tell(request, told, monotonic_us());
+                            }
                             match verdict {
                                 Some(crate::attention::Verdict::Hold(why)) => {
                                     eprintln!("lamp-voice provider: request {request}: its answer is held back: {why}{rise}");
@@ -2858,6 +2930,9 @@ struct ToolDesk {
     settings: crate::tools::Settings,
     /// The newest request the model said was not for it.
     declined: Option<u64>,
+    /// Each request declined and not acted on since the worker last took
+    /// them, to be told held back on `voice/turn` (#1155).
+    declines: Vec<u64>,
     /// The newest request in which the executive was asked to do
     /// something. Doing what was asked and then saying it was not for the
     /// lamp cannot both be right, and what was done cannot be undone: the
@@ -2962,6 +3037,9 @@ struct Asked {
     took: Duration,
     /// When the call reached the worker.
     called_us: u64,
+    /// Done though its line's answer is held, as a call that withdraws
+    /// consent ([`crate::attention::DONE_THOUGH_HELD`]).
+    held: bool,
     /// The news key a `check_agent_task` answer held, taken out of what the
     /// model is told (#1390).
     news: Option<String>,
@@ -2972,6 +3050,7 @@ impl ToolDesk {
         Self {
             settings,
             declined: None,
+            declines: Vec::new(),
             acted: None,
             asked,
             answers,
@@ -3056,6 +3135,21 @@ impl ToolDesk {
                 .is_ok();
             (sent, monotonic_us())
         };
+        // A call that withdraws consent is done though its line's answer
+        // is held: stopping what leaves the lamp never waits for the room
+        // (the first builder on #1722, 16:44). Its answer stays held: the
+        // model is told, and nothing it says is played.
+        if held
+            && crate::attention::done_though_held(&call.name)
+            && self.waiting < lamp_gemini::MAX_TOOL_CALLS
+            && let Route::ReportsStop(_) = crate::tools::route(&self.settings, &call.name)
+        {
+            // Kept by `lamp-cloud` as a held line's stop, shown in the app
+            // and told when asked (the first builder on #1722, 18:44).
+            let route = Route::ReportsStop(true);
+            self.run(provider, lineage, call, route, called_us, memory, true);
+            return;
+        }
         // A request whose answer is held back has nothing done for it
         // either: the call is answered, and not run.
         if held
@@ -3069,7 +3163,7 @@ impl ToolDesk {
                     | Route::Faces(..)
                     | Route::Mark(_)
                     | Route::Onboarding(_)
-                    | Route::ReportsStop
+                    | Route::ReportsStop(_)
             )
         {
             let (sent, sent_us) = tell(&crate::tools::declined());
@@ -3139,6 +3233,25 @@ impl ToolDesk {
             return;
         }
         match crate::tools::route(&self.settings, &call.name) {
+            Route::ReportsState => {
+                // A lookup, answered at once: only when the model was asked
+                // about reports, never said unasked (#1880).
+                let told =
+                    crate::reports_stop::state_now(&mut crate::reports_stop::Bus::of_the_lamp());
+                let (sent, sent_us) = tell(&told);
+                self.line(
+                    lineage.session,
+                    request,
+                    &call.name,
+                    called_us,
+                    sent_us,
+                    true,
+                    sent,
+                );
+                eprintln!(
+                    "lamp-voice provider: request {request}: the model asked about reports; told whether they are sent"
+                );
+            }
             Route::Clock => {
                 let told = crate::tools::time_now_for(self.settings.places, &call.args);
                 let (sent, sent_us) = tell(&told);
@@ -3174,6 +3287,7 @@ impl ToolDesk {
             }
             Route::Decline => {
                 self.declined = Some(request);
+                self.declines.push(request);
                 let (sent, sent_us) = tell(&crate::tools::declined());
                 self.line(
                     lineage.session,
@@ -3196,10 +3310,10 @@ impl ToolDesk {
             | Route::Faces(..)
             | Route::Mark(_)
             | Route::Onboarding(_)
-            | Route::ReportsStop)
+            | Route::ReportsStop(_))
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
-                self.run(provider, lineage, call, route, called_us, memory);
+                self.run(provider, lineage, call, route, called_us, memory, false);
             }
             Route::Executive(_)
             | Route::UseSkill(_)
@@ -3209,7 +3323,7 @@ impl ToolDesk {
             | Route::Faces(..)
             | Route::Mark(_)
             | Route::Onboarding(_)
-            | Route::ReportsStop
+            | Route::ReportsStop(_)
             | Route::Nobody => {
                 let (sent, sent_us) = tell(&crate::tools::unavailable());
                 self.line(
@@ -3239,6 +3353,7 @@ impl ToolDesk {
         route: crate::tools::Route,
         called_us: u64,
         memory: Option<crate::memory_scope::ScopeLease>,
+        held: bool,
     ) {
         use crate::tools::Route;
         let request = lineage.request.get();
@@ -3247,17 +3362,23 @@ impl ToolDesk {
         if crate::tools::keeps_out(&route, &call.name) {
             crate::remember::keep_out(request);
         }
-        if matches!(
-            route,
-            Route::Executive(_)
-                | Route::UseSkill(_)
-                | Route::Schedule(_)
-                | Route::Tasks(_)
-                | Route::Faces(..)
-                | Route::Mark(_)
-                | Route::ReportsStop
-        ) {
+        // A call done though its answer is held is not the lamp answering:
+        // the room is told nothing of it, as of any held line.
+        if !held
+            && matches!(
+                route,
+                Route::Executive(_)
+                    | Route::UseSkill(_)
+                    | Route::Schedule(_)
+                    | Route::Tasks(_)
+                    | Route::Faces(..)
+                    | Route::Mark(_)
+                    | Route::ReportsStop(_)
+            )
+        {
             self.acted = Some(request);
+            #[cfg(test)]
+            seen_in_tests::told_answered(&call.id);
             // Something done is the lamp answering, words or none (#829,
             // the sixth on #1029). A lookup, an action the Policy held and
             // a held request never come here (the reviewer on #1069).
@@ -3302,6 +3423,7 @@ impl ToolDesk {
                     took: started.elapsed(),
                     called_us,
                     news,
+                    held,
                 });
             });
         match spawned {
@@ -3421,6 +3543,7 @@ impl ToolDesk {
                             route,
                             parked.called_us,
                             parked.memory,
+                            false,
                         );
                     } else {
                         let sent = provider
@@ -3523,6 +3646,22 @@ impl ToolDesk {
                         "not sent: its connection has gone"
                     }
                 );
+                if done.held {
+                    if done.answered {
+                        let line = format!(
+                            "request {}: {} done though the answer was held (consent withdrawn)",
+                            done.request, done.call.name
+                        );
+                        eprintln!("lamp-voice provider: {line}");
+                        #[cfg(test)]
+                        seen_in_tests::held_done(&done.call.id, line);
+                    } else {
+                        eprintln!(
+                            "lamp-voice provider: request {}: {} asked though the answer was held (consent withdrawn); not shown done",
+                            done.request, done.call.name
+                        );
+                    }
+                }
             },
         );
     }
@@ -3602,6 +3741,10 @@ impl ToolDesk {
     /// The calls answered since the last take.
     fn take_lines(&mut self) -> Vec<crate::first_output::ToolCallLine> {
         std::mem::take(&mut self.lines)
+    }
+    /// The requests declined since the last take (#1155).
+    fn take_declines(&mut self) -> Vec<u64> {
+        std::mem::take(&mut self.declines)
     }
     /// The requests whose look was asked in a call's answer since the last take.
     fn take_looks(&mut self) -> Vec<(u64, u64, Option<String>)> {
@@ -4346,6 +4489,9 @@ struct InputHandoff {
     /// model has been told so.
     cut_in_told: bool,
     cut_in: Option<RequestId>,
+    /// A line goes only into its admitted person's session
+    /// ([`crate::scoped_session`]).
+    scoped_session: bool,
     /// Whether a misheard cut-in's next request is told so
     /// ([`crate::misheard_hum`]); when the newest such cut-in was held; and
     /// the request to tell, until the model has been told.
@@ -4657,6 +4803,9 @@ impl InputHandoff {
                 .is_some_and(|old| old.camera_generation() != state.camera_generation())
         {
             self.memory_face.invalidate();
+            if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                thread.admitted_unknown();
+            }
             if let Some(kept) = self
                 .kept
                 .as_mut()
@@ -5145,6 +5294,27 @@ impl InputHandoff {
                     return Err(io::Error::other("provider input already started").into());
                 }
                 let expected = SessionId::new(session)?;
+                // Read before the line is sent, so it is bound to the face
+                // the eyes named as it began, never a later one.
+                let memory_snapshot = self.memory_face.snapshot(Instant::now());
+                // Someone known in another known person's session: not sent,
+                // and that session is opened again for them between turns
+                // (`crate::scoped_session`). A refusal is reported only
+                // where an outage is.
+                if self.scoped_session
+                    && self.tolerate_outage
+                    && self.memory_worker.is_some()
+                    && let Some(person) = memory_snapshot.person()
+                    && crate::thread::THREAD
+                        .lock()
+                        .is_ok_and(|mut thread| thread.admitted(person, Instant::now()))
+                {
+                    eprintln!(
+                        "lamp-voice provider: a line was said by someone the session is not for; it is not sent, and a new session is opened for them between turns"
+                    );
+                    return self
+                        .refused_start(request, StartRefusal::SessionMismatch { live: expected });
+                }
                 if let Err(refusal) = input.start(expected, request) {
                     return self.refused_start(request, refusal);
                 }
@@ -5170,7 +5340,6 @@ impl InputHandoff {
                 if let Some(voices) = self.voices.as_mut() {
                     voices.began(request.get(), !over_the_lamps_voice);
                 }
-                let memory_snapshot = self.memory_face.snapshot(Instant::now());
                 self.bind_memory(request, expected, memory_snapshot.clone());
                 self.submitted = Some(SubmittedInput {
                     request,
@@ -5706,6 +5875,52 @@ fn push_text(
     });
 }
 
+/// What a test reads of what the worker did with a call, which the room's
+/// state and the journal do not show it: the ids of calls the room was
+/// told answered their line ([`ToolDesk::run`]), and each journal line for
+/// a call done though its answer was held, by call id (Third's read of
+/// #1880: flipping a held run to unheld had left every test passing).
+#[cfg(test)]
+pub(crate) mod seen_in_tests {
+    use std::sync::Mutex;
+
+    static TOLD_ANSWERED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    static HELD_DONE: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+
+    pub(super) fn told_answered(id: &str) {
+        if let Ok(mut ids) = TOLD_ANSWERED.lock() {
+            ids.push(id.to_owned());
+        }
+    }
+
+    pub(super) fn held_done(id: &str, line: String) {
+        if let Ok(mut lines) = HELD_DONE.lock() {
+            lines.push((id.to_owned(), line));
+        }
+    }
+
+    /// Whether the room was told a call with this id answered its line.
+    pub(crate) fn was_told_answered(id: &str) -> bool {
+        TOLD_ANSWERED
+            .lock()
+            .is_ok_and(|ids| ids.iter().any(|told| told == id))
+    }
+
+    /// The journal lines for a held call with this id.
+    pub(crate) fn held_done_lines(id: &str) -> Vec<String> {
+        HELD_DONE.lock().map_or_else(
+            |_| Vec::new(),
+            |lines| {
+                lines
+                    .iter()
+                    .filter(|(of, _)| of == id)
+                    .map(|(_, line)| line.clone())
+                    .collect()
+            },
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     mod holding_answer;
@@ -5741,6 +5956,7 @@ mod tests {
             took: Duration::from_millis(41),
             called_us: 1_000,
             news: None,
+            held: false,
         };
         desk.asked.send(asked(7, "start_agent_task", true)).unwrap();
         desk.asked
@@ -5809,6 +6025,7 @@ mod tests {
             took: Duration::from_millis(3),
             called_us: 1,
             news: None,
+            held: false,
         };
         let look = serde_json::json!({"next": "Say only \"Let me take a look.\"", "look": true});
         desk.asked.send(asked(7, look.clone(), true, true)).unwrap();
@@ -5861,6 +6078,7 @@ mod tests {
             took: Duration::from_millis(3),
             called_us: 1,
             news: news.map(str::to_owned),
+            held: false,
         };
         desk.asked.send(asked(7, Some("s1:2:4"))).unwrap();
         desk.asked.send(asked(8, Some("s1:3:5"))).unwrap();
@@ -5900,6 +6118,7 @@ mod tests {
                 took: Duration::from_millis(40),
                 called_us: 1,
                 news: None,
+                held: false,
             })
             .unwrap();
         desk.waiting = 1;
@@ -6300,6 +6519,58 @@ mod tests {
         handoff.fail(request);
         assert!(!first.is_current());
         assert!(handoff.memory_lease(lineage).is_none());
+    }
+
+    /// #1675's Live part: with `LAMP_LIVE_SCOPED_SESSION`, a line admitted
+    /// for B is not sent into a session opened for A; it fails as not
+    /// delivered and the session is due again, for B. Without the switch it
+    /// is sent, as before.
+    #[test]
+    fn a_line_for_someone_else_known_is_not_sent_into_their_session() {
+        let a = crate::remember::person_id("ScopedAnn");
+        let b = crate::remember::person_id("ScopedBob");
+        for scoped in [false, true] {
+            let mut owner = controller();
+            let mut handoff = memory_handoff();
+            handoff.tolerate_outage = true;
+            handoff.scoped_session = scoped;
+            let sink = RecordingSink::default();
+            let request = authorize(&mut owner, &mut handoff);
+            {
+                let mut thread = crate::thread::THREAD.lock().unwrap();
+                thread.admitted_unknown();
+                thread.at_lamp(Some(a.clone()));
+                thread.opening(Instant::now());
+            }
+            cache_face(&handoff, "ScopedBob");
+            handoff
+                .submit(start(request, &handoff), NOW, &sink)
+                .unwrap();
+            let sent = sink.calls.borrow().contains(&Call::Start(request));
+            let due = crate::thread::THREAD
+                .lock()
+                .unwrap()
+                .switch_due(Instant::now());
+            if scoped {
+                assert!(!sent);
+                assert_eq!(handoff.undelivered, Some(request));
+                assert!(due, "the session is opened again for B");
+                assert!(
+                    crate::thread::THREAD
+                        .lock()
+                        .unwrap()
+                        .opening(Instant::now())
+                );
+                assert_eq!(
+                    crate::thread::THREAD.lock().unwrap().opened_for(),
+                    Some(b.as_str())
+                );
+            } else {
+                assert!(sent);
+                assert_eq!(handoff.undelivered, None);
+            }
+            crate::thread::THREAD.lock().unwrap().admitted_unknown();
+        }
     }
 
     #[test]
@@ -8173,6 +8444,10 @@ mod tests {
         snapshot: Snapshot,
         dials: UnboundedReceiver<Dial>,
         worker: JoinHandle<Result<()>>,
+        /// How long each heartbeat's capture and admission leases last: the
+        /// coordinator's 100 ms (`INPUT_LEASE_US`), unless a test that
+        /// measures something else sets more.
+        lease_us: u64,
         /// Held for the rig's life, and let go last (#1422).
         _one: OneThread,
     }
@@ -8386,6 +8661,7 @@ mod tests {
                 worker: tokio::spawn(serve_with_visual(
                     worker, boot, provider, options, visual, None,
                 )),
+                lease_us: 100_000,
                 _one: one,
             };
             rig.publish();
@@ -8411,7 +8687,7 @@ mod tests {
         fn heartbeat(&mut self) -> io::Result<()> {
             let at = monotonic_us();
             let now = MonoTime::from_micros(at);
-            let lease = MonoTime::from_micros(at + 100_000);
+            let lease = MonoTime::from_micros(at + self.lease_us);
             self.owner
                 .set_capture(now, CaptureState::RetainingUntil(lease))
                 .unwrap();
@@ -8908,6 +9184,7 @@ mod tests {
             remarks: false,
             going_on_asks: None,
             cut_in_told: false,
+            scoped_session: false,
             misheard_hum: false,
             policy_holds: None,
             follows_run: false,
@@ -8939,6 +9216,7 @@ mod tests {
                 remarks: false,
                 going_on_asks: None,
                 cut_in_told: false,
+                scoped_session: false,
                 misheard_hum: false,
                 policy_holds: None,
                 follows_run: false,
@@ -8995,6 +9273,7 @@ mod tests {
                 remarks: false,
                 going_on_asks: None,
                 cut_in_told: false,
+                scoped_session: false,
                 misheard_hum: false,
                 policy_holds: None,
                 follows_run: false,
@@ -9993,6 +10272,7 @@ mod tests {
                 remarks: false,
                 going_on_asks: None,
                 cut_in_told: false,
+                scoped_session: false,
                 misheard_hum: false,
                 policy_holds: None,
                 follows_run: false,
@@ -11805,6 +12085,15 @@ mod tests {
             .map(|index| provider_audio(index as i16, FRAMES))
             .collect();
         let mut rig = LiveRig::start(quick_policy());
+        // The rig is the coordinator, on this one thread with the worker and
+        // the scripted service. Each 2 s message is about 128 KB of JSON, and
+        // in a debug build the worker can take more than 100 ms to read and
+        // decode one, so on a loaded host the next heartbeat came late, the
+        // turn lost its owner and every packet was dropped (no output in 5 s,
+        // 8 of 20 runs here under load; #1569). On a lamp the coordinator is
+        // its own process. This test is about flow control and order, so its
+        // leases are a second long.
+        rig.lease_us = 1_000_000;
         let mut dial = rig.ready().await;
         let request = rig.speak(&mut dial, false, true).await;
         // 80 s of speech offered at once: 40 provider messages of 2 s each,
@@ -13539,6 +13828,7 @@ mod tests {
                     remarks: false,
                     going_on_asks: None,
                     cut_in_told: false,
+                    scoped_session: false,
                     misheard_hum: false,
                     policy_holds: None,
                     follows_run: false,
@@ -13615,6 +13905,7 @@ mod tests {
                     remarks: false,
                     going_on_asks: None,
                     cut_in_told: false,
+                    scoped_session: false,
                     misheard_hum: false,
                     policy_holds: None,
                     follows_run: false,
@@ -14000,6 +14291,9 @@ mod tests {
     /// A line going on in a busy room waits for the Policy (#1522): tests
     /// only.
     mod going_on_asks;
+    /// A held line's `reports_stop` is done, its answer kept held (the
+    /// first builder on #1722, #1683): tests only.
+    mod held_consent;
     /// A name told is a name kept (`LAMP_NAMES=checked`): tests only.
     mod names;
     /// The Policy holds the lamp's actions (#800): tests only.

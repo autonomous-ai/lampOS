@@ -343,6 +343,7 @@ impl Waiting {
                 Some(WorkerEvent::Privacy {
                     acquired_at_us,
                     muted,
+                    ..
                 }) => {
                     self.sequence = self
                         .sequence

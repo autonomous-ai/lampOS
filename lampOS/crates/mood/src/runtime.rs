@@ -4,8 +4,9 @@ use crate::{
     engine::{Engine, Event},
     input::{INPUTS, InputAdapter},
 };
-use jiff::{Timestamp, tz::TimeZone};
+use jiff::Timestamp;
 use lamp_bus::{Bus, Publisher, Subscriber};
+use lamp_local_time::LocalTime;
 use lamp_msgs::{ClockStamp, Diagnostic, Level, MoodState};
 use serde::Serialize;
 use std::{
@@ -70,7 +71,7 @@ pub trait Clock: Send + Sync + 'static {
 
 pub struct SystemClock {
     id: String,
-    zone: TimeZone,
+    zone: LocalTime,
 }
 
 impl SystemClock {
@@ -91,7 +92,9 @@ impl SystemClock {
         }
         .check()
         .map_err(io::Error::other)?;
-        let zone = TimeZone::get(zone).map_err(io::Error::other)?;
+        // An IANA name, or `system`: the lamp's own zone, followed as it
+        // changes (#1670, as Schedule and Skills take it).
+        let zone = LocalTime::zone(zone)?;
         Ok(Self { id, zone })
     }
 }
@@ -113,11 +116,10 @@ impl Clock for SystemClock {
         let wall = Timestamp::now();
         let unix_ms =
             u64::try_from(wall.as_millisecond()).map_err(|_| invalid("wall clock before 1970"))?;
-        let local = wall.to_zoned(self.zone.clone());
         Ok(Sample {
             now_us,
             unix_ms,
-            local_minute: Some(local.hour() as u16 * 60 + local.minute() as u16),
+            local_minute: Some(self.zone.minute_of_day(unix_ms)),
         })
     }
 }

@@ -158,7 +158,7 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   keeps the name alone. **With `LAMP_SECOND_KNOWN_NAMES=on`** (#753), the
   names the lamp knows follow the unit's words, each its own `keyterm`:
   - the name typed at setup (`LAMP_PERSON_NAME`);
-  - the agents it hands work to, "Claude Code", "Codex" and "OpenCode",
+  - the agents it hands work to, "Claude Code", "Codex", "OpenCode" and "Devin",
     when it has a tasks part (on lamp-4ace on 19 Oct "ask Codex" came back
     "Next to write").
 
@@ -272,10 +272,15 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   finals': "request N at the line's end: flux: turns=K, <no turn|the
   latest turn open|the latest turn ended by model|manual|timeout>, <the
   model ended no turn|the model ended turn I T ms before End>,
-  settled=<bool>, heard to H of S ms sent[, force_end answered in A ms (end
-  of turn|no turn)|, force_end unanswered], words
-  from=<settled|force_end|close_stream>". T is how far ahead of the
-  coordinator's end Flux's own end of turn came. That, beside the words,
+  settled=<bool>, heard to H of S ms sent[; closed by the service C ms
+  after force_end, before its answer: <the same counts again, at the
+  close>, W words][, force_end answered in A ms (end of turn|no turn)|,
+  force_end unanswered], words
+  from=<settled|force_end|close_stream|closed_early>". T is how far ahead of the
+  coordinator's end Flux's own end of turn came. `closed_early` is Flux
+  ending the stream after `ForceEndTurn` and before its answer, with no
+  `CloseStream` asked, told as on the Nova route below: when, how far it
+  heard and how many words, never the words. That, beside the words,
   is what the trial is for.
 
   `lamp-voice stt-check` reads the unit's switches now. So
@@ -677,7 +682,12 @@ order is kept. A written turn is the same from the chat on.
   Otherwise it's dropped and round 1 is asked as before. Neither the rule
   nor a tool runs early, since both change what the lamp knows or does.
   The cost is a dropped round now and then, and one more of the system
-  message's memory recalls for each line it's begun on. The journal says
+  message's memory recalls for each line it's begun on. **A known
+  slowness:** with `LAMP_SECOND_SCOPED_CONTEXT=on` (#1839) a turn is told for
+  its admitted scope, but the early round is begun from the unscoped system
+  message, so every scoped turn drops it as "the conversation changed". That
+  is safe, and no faster than without the switch (the merge of `lamp-voice`
+  into #1712, 19 Oct). The journal says
   `request N: its chat is begun on the line's early words`, then `… is
   kept, begun T ms ago` or `… is dropped: <why>`. In a host test on the
   paused clock, with a 400 ms `Finalize` answer and a chat's 600 ms to its
@@ -707,10 +717,17 @@ order is kept. A written turn is the same from the chat on.
   sent, pending=<none|interim D ms after the last final|speech_started D
   ms after the last final>, last final <T ms before End|none>[, pause
   finalize at <P> ms, answered|unanswered at End[, sound after it],
-  loudest after it <L> dBFS][, a pause finalize never answered][, finalize
-  answered in <A> ms to <E> ms|, finalize unanswered], results <N> with
-  words, <M> without, words from=<settled|flush|finalize|close_stream>[+interim]",
-  the last naming which path gave the words. The results count every
+  loudest after it <L> dBFS][, a pause finalize never answered][; closed by
+  the service <C> ms after finalize, before its answer: settled=…, finals
+  cover … of … ms sent, …, <W> words][, finalize answered in <A> ms to <E>
+  ms|, finalize unanswered], results <N> with words, <M> without, words
+  from=<settled|flush|finalize|close_stream|closed_early>[+interim]",
+  the last naming which path gave the words. `closed_early` is the service
+  ending the stream after `Finalize` and before its answer, with no
+  `CloseStream` asked: the turn goes on with the words so far, and the
+  part in `;` says when, how far the finals reached at the close and how
+  many words there were, never the words, so a line that lost its end shows
+  (the reviewer on #1954). The results count every
   result the service sent, interim and final: none with words says the
   service heard no words at all (#1712: on lamp-4ace on 19 Oct at 15:21 the
   owner's line had finals covering 3.07 of 3.79 s and no words). `+interim`

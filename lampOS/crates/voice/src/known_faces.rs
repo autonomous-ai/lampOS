@@ -288,10 +288,33 @@ pub fn visits_arguments(value: Option<&str>) -> Vec<String> {
 /// two of them ("A, double N" spells "Ann"), but "double U" is W.
 pub fn said_by_them(name: &str, said: &str) -> bool {
     let (name, theirs) = (folded_words(name), folded_words(said));
+    let spelled = spelled_runs(&theirs);
+    !name.is_empty()
+        && name
+            .iter()
+            .all(|word| theirs.contains(word) || spelled.iter().any(|letters| letters == word))
+}
+
+/// Whether each of `name`'s words is spelled letter by letter in `said`
+/// ("L I N H."), not only said ("Linh."): what `apart` needs (both
+/// reviewers' P2 on #2269: a name said again can be misheard again, as
+/// exactly the near name).
+pub fn spelled_by_them(name: &str, said: &str) -> bool {
+    let name = folded_words(name);
+    let spelled = spelled_runs(&folded_words(said));
+    !name.is_empty()
+        && name
+            .iter()
+            .all(|word| spelled.iter().any(|letters| letters == word))
+}
+
+/// The runs of single letters in `theirs`, each put together as a word
+/// ([`said_by_them`]'s rules).
+fn spelled_runs(theirs: &[String]) -> Vec<String> {
     let mut spelled: Vec<String> = Vec::new();
     let mut run = String::new();
     let mut doubled = false;
-    for word in &theirs {
+    for word in theirs {
         if word == "double" {
             doubled = true;
             continue;
@@ -318,10 +341,7 @@ pub fn said_by_them(name: &str, said: &str) -> bool {
         let first = chars.next();
         letters.chars().count() < 2 || chars.any(|c| Some(c) != first)
     });
-    !name.is_empty()
-        && name
-            .iter()
-            .all(|word| theirs.contains(word) || spelled.iter().any(|letters| letters == word))
+    spelled
 }
 
 /// The words of `text` as a name is matched: lowercase, without accents,
@@ -552,6 +572,21 @@ const NOT_HEARD: &str = "You did not hear that name in what they said. Say the n
 /// What the model is told when it would replace a name before the person
 /// agreed to the new one.
 const NOT_AGREED: &str = "They have not said yes to that name yet. Say the new name back and ask whether they want to be known by it instead. Only if they say yes, call this again with the new name and replace true.";
+/// What the model is told when the face is near someone known by a name one
+/// letter from the one heard (#2176 row 4): the name may be misheard, so
+/// they spell it, and no known name is said back. The spelled name goes with
+/// `apart`, whatever the first call held, so a sibling heard as exactly a
+/// known name is asked once, not twice (Reviewer-lead's P3 on #2252), and
+/// the eyes still judge a known name's face. `apart` is taken only when the
+/// turn in hand spells the name ([`spelled_by_them`]): a name said again, or
+/// a yes, goes without it and is asked about again (both reviewers' P2 on
+/// #2269).
+const NEAR_TO: &str = "You may have misheard their name. Do not say any name you know. Ask them to spell their name, letter by letter, then call this again with the name as they spelled it and apart true.";
+/// What the model is told when the face can't be kept under that name (it
+/// is someone's the lamp knows, and this face isn't near theirs). It says
+/// nothing of who the lamp knows, and no yes changes it (the reviewer's P1
+/// and P2 on #2211).
+const NOT_LIKE_THEM: &str = "You cannot keep this face under that name. Do not say why, and do not say whether you know anyone by it. Ask them for another name they would like to be known by. The lamp's owner can remove an old face in the app.";
 /// Remembering looks for up to four seconds.
 pub const DEADLINE: Duration = Duration::from_secs(6);
 /// The known file counts while it is this fresh: the eyes renew it every
@@ -600,7 +635,8 @@ pub fn tools_for(switches: FaceSwitches) -> Vec<Tool> {
                     "type": "object",
                     "properties": {
                         "name": {"type": "string", "description": "Their name, as they said or spelled it."},
-                        "replace": {"type": "boolean", "description": "Only when you were told this face is known by another name, and they said yes to being known by this one instead."}
+                        "replace": {"type": "boolean", "description": "Only when you were told this face is known by another name, and they said yes to being known by this one instead."},
+                        "apart": {"type": "boolean", "description": "Only when you were told you may have misheard their name, and they then spelled it letter by letter."}
                     },
                     "required": ["name"]
                 })
@@ -747,7 +783,17 @@ fn run_switched(
     if checked && call.name == REMEMBER && replace && !agreed_to(name, said) {
         return (json!({"error": NOT_AGREED}), true);
     }
+    // `apart` only on a name spelled in the turn in hand: one said again may
+    // be misheard again as exactly the near name (both reviewers' P2 on
+    // #2269), so it goes without and the eyes ask about it again.
+    let apart = call.args.get("apart").and_then(Value::as_bool) == Some(true)
+        && spelled_by_them(name, &said.this);
     let line = match call.name.as_str() {
+        // `apart` only when true: eyes from before #2176 row 4 refuse a
+        // field they don't know.
+        REMEMBER if checked && apart => {
+            json!({"remember": name, "one_face": true, "replace": replace, "apart": true})
+        }
         REMEMBER if checked => json!({"remember": name, "one_face": true, "replace": replace}),
         REMEMBER => json!({"remember": name}),
         FORGET => json!({"forget": name}),
@@ -906,6 +952,14 @@ fn told_asking(answer: &Value, visits: bool) -> Value {
         (Some(true), _) => return json!({"ok": true, "note": FORGOTTEN_SOME_KEPT_APART}),
         (Some(false), _) => return json!({"error": NOT_KNOWN_SOME_KEPT_APART}),
         (None, _) => {}
+    }
+    // No name the lamp knows is said back: the face may be someone else's
+    // who only looks alike (the reviewer's P1 and P2 on #2202).
+    if answer.get("error").and_then(Value::as_str) == Some("near_to") {
+        return json!({"error": NEAR_TO});
+    }
+    if answer.get("error").and_then(Value::as_str) == Some("not_like_them") {
+        return json!({"error": NOT_LIKE_THEM});
     }
     if answer.get("error").and_then(Value::as_str) == Some("known_as")
         && let Some(known) = answer.get("known_as").and_then(Value::as_str)
@@ -1760,6 +1814,112 @@ mod tests {
                 json!({"remember": "Jim", "one_face": true, "replace": false}),
                 json!({"remember": "Jim", "one_face": true, "replace": true}),
                 json!({"remember": "B"}),
+            ]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+    /// #2176 row 4, lamp-4ace 20 Oct: a person known by their face was
+    /// saved again under their name misheard. A near face with a near name
+    /// gets a spelling asked, with no known name said back; a yes to a known
+    /// name the lamp said never stands in for hearing it (the reviewer's P1
+    /// on #2202); the spelled name goes to the eyes; the same name spelled
+    /// again goes with `apart`, said again or agreed to without it; a known
+    /// name with a face not theirs is asked about before it replaces theirs.
+    #[test]
+    fn a_near_name_is_spelled_and_no_yes_stands_in_for_it() {
+        let call = |args: Value| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args,
+        };
+        let (socket, asked) = eyes(vec![
+            json!({"error": "near_to", "near_to": "Minh"}),
+            json!({"remembered": "Minh"}),
+            json!({"remembered": "Linh"}),
+            json!({"error": "near_to", "near_to": "Minh"}),
+            json!({"error": "near_to", "near_to": "Minh"}),
+            json!({"error": "not_like_them"}),
+        ]);
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Linh"})),
+            true,
+            &Said::now("Remember my face, I'm Linh."),
+        );
+        let told = words["error"].as_str().unwrap();
+        assert!(
+            told.contains("spell") && told.contains("apart true") && !told.contains("Minh"),
+            "{told}"
+        );
+        // "Are you Minh?" "Yes." is not Minh's name heard.
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Minh"})),
+            true,
+            &Said {
+                this: "Yes.".into(),
+                before: vec![("Remember my face, I'm Linh.".into(), "Are you Minh?".into())],
+            },
+        );
+        assert!(
+            words["error"].as_str().unwrap().contains("spell"),
+            "{words}"
+        );
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Minh"})),
+            true,
+            &Said::now("M I N H."),
+        );
+        assert_eq!(words, json!({"ok": true, "remembered": "Minh"}));
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Linh", "apart": true})),
+            true,
+            &Said::now("L I N H."),
+        );
+        assert_eq!(words, json!({"ok": true, "remembered": "Linh"}));
+        // Both reviewers' P2 on #2269: `apart` with the name said again, or a
+        // yes to it said back, goes without it, and the spelling is asked
+        // for again.
+        for said in [
+            Said::now("Minh."),
+            Said {
+                this: "Yes.".into(),
+                before: vec![("M I N H.".into(), "Minh, is that right?".into())],
+            },
+        ] {
+            let (words, _) = run_with(
+                &socket,
+                &call(json!({"name": "Minh", "apart": true})),
+                true,
+                &said,
+            );
+            assert!(
+                words["error"].as_str().unwrap().contains("spell"),
+                "{words}"
+            );
+        }
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Minh"})),
+            true,
+            &Said::now("I'm Minh."),
+        );
+        let refused = words["error"].as_str().unwrap();
+        assert!(
+            refused.contains("another name") && !refused.contains("replace"),
+            "{refused}"
+        );
+        assert_eq!(
+            asked.join().unwrap(),
+            [
+                json!({"remember": "Linh", "one_face": true, "replace": false}),
+                json!({"remember": "Minh", "one_face": true, "replace": false}),
+                json!({"remember": "Linh", "one_face": true, "replace": false, "apart": true}),
+                json!({"remember": "Minh", "one_face": true, "replace": false}),
+                json!({"remember": "Minh", "one_face": true, "replace": false}),
+                json!({"remember": "Minh", "one_face": true, "replace": false}),
             ]
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());

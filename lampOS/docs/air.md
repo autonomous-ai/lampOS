@@ -161,6 +161,42 @@ a window once if it fits; not again for three hours. A reading older than
 are the Stuffy air skill (`skills/stuffy-air`, #1021, `docs/skills.md`),
 off unless installed and not yet run on a lamp.
 
+The PM figures are read by two skills (#1684, `docs/skills.md`), held out
+of the product's install until measured: Smoky air (`skills/smoky-air`)
+says one exact line when PM2.5 jumps by 100 µg/m³ within three minutes to
+150 or more, and Dusty air (`skills/dusty-air`) one a day when it has been
+125 or more for an hour. Neither is a smoke alarm: the sensor has no VOC,
+gas or carbon monoxide reading, and (as #1684's design reads Sensirion's
+datasheet, not yet confirmed) it counts no particle under about 0.3 µm,
+which fresh flame makes.
+
+Their words never say fire, alarm or smoke alarm: Smoky air's line is
+"The air reads like smoke. If something's burning, please check it.", and
+Dusty air's "The air here has been very dusty for about an hour. I can't
+tell where it's coming from." Neither has a `[stop]`, so a passing "stop"
+said to the lamp cannot snooze them (#1837's P3). Their numbers are
+provisional: four of Smoky air's cases (kettle steam, toast, a candle blown
+out, a match) are placeholders, to be replaced by the real recording
+(#1684), and the numbers are set again from those traces.
+
+### Smoky air and Dusty air on a trial lamp
+
+They are off unless put on: `lamp-update install` does not write them
+(`install::NOT_PRODUCT_SKILLS`), and there is no switch to turn on. Both
+say `kind = "core"`, so `lamp-skills install` refuses them ("a core skill
+comes with the lamp"). For a trial, as root on the lamp, copy each folder
+into the skills folder, which `lamp-skills` looks at every 2 s:
+
+    install -d -m 0755 /var/lib/lampOS/skills/smoky-air /var/lib/lampOS/skills/dusty-air
+    cp skills/smoky-air/skill.toml skills/smoky-air/SKILL.md /var/lib/lampOS/skills/smoky-air/
+    cp skills/dusty-air/skill.toml skills/dusty-air/SKILL.md /var/lib/lampOS/skills/dusty-air/
+
+`lamp-skills list` then shows both. With no air sensor, publish `air/state`
+by hand, as Stuffy air's check did
+(`docs/verification/stuffy-air-lamp-06c1-20261017/`). To turn them off,
+remove the two folders (`lamp-skills remove` refuses a core skill too); a
+later `lamp-update install` does not remove them.
+
 ## Not shown
 
 - The PM figures against a reference instrument: one sensor, one office.

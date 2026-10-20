@@ -1,0 +1,25 @@
+# Not on the desk: the next look, to the left, a quarter of the picture
+# across. (A replay makes each call a fresh run; a search's looks, the
+# first where it is named or at the desk when none is, are the program's,
+# tested in crates/skills/tests/skills.rs.)
+[[call_tool]]
+name = "look_for"
+at = "0s"
+args = { place = "left" }
+
+[[expect]]
+call = "look"
+
+[[expect]]
+call = "body.mood"
+args = { mood = "reading" }
+
+[[expect]]
+call = "light"
+
+[[expect]]
+call = "say"
+
+[[expect]]
+call = "body.mood"
+args = { mood = "reading", toward = -0.5, until_spoken = true }

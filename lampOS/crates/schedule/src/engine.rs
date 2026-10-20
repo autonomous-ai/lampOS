@@ -5,6 +5,7 @@ use crate::{
     store::{MAX_STATE_BYTES, Store},
     time::{self, ClockSample, Deadline, When},
 };
+use lamp_local_time::LocalTime;
 use lamp_msgs::{ClockStamp, ScheduleDue, ScheduleNotice};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -122,11 +123,65 @@ struct State {
     store_id: String,
     revision: u64,
     next_id: u64,
+    /// The reminders and timers this build reads. One it can't (a newer
+    /// build's value, written without a `schema` bump, or a zone its time
+    /// zone rules don't know) is in [`State::unread`].
+    #[serde(deserialize_with = "stored::readable_items")]
     items: Vec<Item>,
+    /// Reminders and timers in the store this build can't read, as their own
+    /// JSON text and id: never sounded, snoozed or acknowledged here, and
+    /// written back as they are, so the build that wrote them still finds
+    /// them (#1680).
+    #[serde(skip)]
+    unread: Vec<Unread>,
     // Read separately: an unreadable retry cache must not hide valid items,
     // nor may unknown request fields be stripped to manufacture an exact retry.
     #[serde(skip_deserializing)]
     last_receipt: Option<Receipt>,
+}
+
+/// A stored reminder or timer this build can't read: its JSON text as
+/// stored, and its `id` when that alone reads, to keep the items in order.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Unread {
+    id: Option<u64>,
+    json: String,
+}
+
+/// The state as stored: its items, read or not, in `id` order, each unread
+/// one as its own text, byte for byte.
+fn encode(state: &State) -> Result<Vec<u8>, Error> {
+    if state.unread.is_empty() {
+        return serde_json::to_vec(state).map_err(storage);
+    }
+    #[derive(Serialize)]
+    #[serde(untagged)]
+    enum Slot<'a> {
+        Read(&'a Item),
+        Unread(Box<serde_json::value::RawValue>),
+    }
+    #[derive(Serialize)]
+    struct Out<'a> {
+        #[serde(flatten)]
+        rest: serde_json::Map<String, Value>,
+        items: Vec<Slot<'a>>,
+    }
+    let Value::Object(mut rest) = serde_json::to_value(state).map_err(storage)? else {
+        return Err(storage("state is not an object"));
+    };
+    rest.remove("items");
+    let mut slots: Vec<(u64, Slot)> = state
+        .items
+        .iter()
+        .map(|item| (item.id, Slot::Read(item)))
+        .collect();
+    for unread in &state.unread {
+        let raw = serde_json::value::RawValue::from_string(unread.json.clone()).map_err(storage)?;
+        slots.push((unread.id.unwrap_or(u64::MAX), Slot::Unread(raw)));
+    }
+    slots.sort_by_key(|(id, _)| *id);
+    let items = slots.into_iter().map(|(_, slot)| slot).collect();
+    serde_json::to_vec(&Out { rest, items }).map_err(storage)
 }
 
 /// The identity, revision and next id of a store a newer build wrote, read
@@ -176,7 +231,12 @@ impl State {
         if self.schema != SCHEMA
             || !valid_id(&self.store_id)
             || self.next_id == 0
-            || self.items.len() > MAX_ITEMS
+            || self.items.len() + self.unread.len() > MAX_ITEMS
+            // An unread item's id is one this build never gives again.
+            || self
+                .unread
+                .iter()
+                .any(|unread| unread.id.is_some_and(|id| id == 0 || id >= self.next_id))
         {
             return Err(invalid());
         }
@@ -276,7 +336,20 @@ pub struct Engine<P: Persistence> {
     persistence: P,
     set_aside: Option<String>,
     state: State,
+    /// The zone a new reminder is set in, by name: `--zone`'s, or with
+    /// `--zone system` the system's as setup last pointed it ([`Self::system`]).
     zone: String,
+    /// `--zone system` (#820): the system's zone, named again at each request,
+    /// so a re-setup is followed without a restart. A reminder already set
+    /// keeps the zone it was set in.
+    system: Option<LocalTime>,
+    /// The zone asked for when it is not one this build knows, and
+    /// [`Self::zone`] is the fallback (#1680).
+    zone_asked: Option<String>,
+    /// The fallback is UTC with no offset stored to stand for the lamp's
+    /// zone: a new reminder at a clock time with no zone of its own is
+    /// refused, as it would ring hours off (#1680).
+    no_wall_clock: bool,
     last_clock: ClockSample,
     recovered: BTreeSet<u64>,
     failed: bool,
@@ -285,9 +358,132 @@ pub struct Engine<P: Persistence> {
 impl<P: Persistence> Engine<P> {
     /// `new_store_id` is fresh random data in serve, and injectable in tests.
     /// Existing stores retain their identity and monotonically rising IDs.
+    ///
+    /// A zone this build's time zone rules don't know never stops it: see
+    /// [`Self::open_with_system`].
     pub fn open(
+        persistence: P,
+        zone: &str,
+        now: &ClockSample,
+        new_store_id: &str,
+    ) -> Result<Self, Error> {
+        Self::open_with_offset(persistence, zone, None, now, new_store_id)
+    }
+
+    /// [`Self::open`] with `offset_minutes`, the lamp's UTC offset east when
+    /// setup ran (`LAMP_UTC_OFFSET_MINUTES` in `zone.env`), for the fallback
+    /// from a zone this build doesn't know.
+    pub fn open_with_offset(
+        persistence: P,
+        zone: &str,
+        offset_minutes: Option<i32>,
+        now: &ClockSample,
+        new_store_id: &str,
+    ) -> Result<Self, Error> {
+        Self::open_with_system(
+            persistence,
+            zone,
+            || LocalTime::zone("system"),
+            offset_minutes,
+            now,
+            new_store_id,
+        )
+    }
+
+    /// [`Self::open`] with `system` for the system's zone. A zone asked for
+    /// that this build's time zone rules don't know (a newer tzdb's, in
+    /// `zone.env`) falls back to the system's zone, followed as with `--zone
+    /// system`. Setup points the system's zone at the same name, so that is
+    /// unknown too, and the fallback is then the fixed offset
+    /// `offset_minutes` (`Etc/GMT+3` for -180): 07:00 rings at 07:00 at the
+    /// lamp, an hour off at most across summer time. With no offset stored,
+    /// or one that is not whole hours, it is UTC, and a new reminder at a
+    /// clock time with no zone of its own is refused, while one in minutes
+    /// from now is set. A journal line and [`Self::zone_fallback`] for health
+    /// say which (#1680). A reminder already set keeps ringing at the time it
+    /// was set for, in its own zone.
+    pub fn open_with_system(
+        persistence: P,
+        zone: &str,
+        system: impl FnOnce() -> io::Result<LocalTime>,
+        offset_minutes: Option<i32>,
+        now: &ClockSample,
+        new_store_id: &str,
+    ) -> Result<Self, Error> {
+        if zone != "system" && time::validate_zone(zone).is_ok() {
+            return Self::open_in(persistence, zone, None, None, now, new_store_id);
+        }
+        let system = system()
+            .map_err(|error| eprintln!("schedule: the system's time zone cannot be read: {error}"))
+            .ok();
+        Self::fall_back(persistence, zone, system, offset_minutes, now, new_store_id)
+    }
+
+    /// [`Self::open`] following `system`, the system's zone (`--zone system`).
+    /// One whose name is not a zone the bundled zones know falls back to UTC
+    /// until it names one, with a line (#1680).
+    pub fn open_following(
+        persistence: P,
+        system: LocalTime,
+        now: &ClockSample,
+        new_store_id: &str,
+    ) -> Result<Self, Error> {
+        Self::fall_back(persistence, "system", Some(system), None, now, new_store_id)
+    }
+
+    /// Open in the system's zone when it names one this build knows, else
+    /// in the fixed offset `offset_minutes`, else in UTC; `asked` is the zone
+    /// asked for, said when it is not the one used.
+    fn fall_back(
+        persistence: P,
+        asked: &str,
+        system: Option<LocalTime>,
+        offset_minutes: Option<i32>,
+        now: &ClockSample,
+        new_store_id: &str,
+    ) -> Result<Self, Error> {
+        let named = system
+            .as_ref()
+            .and_then(LocalTime::name)
+            .filter(|name| time::validate_zone(name).is_ok());
+        // `--zone system` with a system zone it knows is no fallback.
+        let fell_back = named.is_none() || asked != "system";
+        let fixed = offset_minutes.and_then(fixed_offset_zone);
+        let no_wall_clock = named.is_none() && fixed.is_none();
+        let zone = named
+            .or_else(|| fixed.clone())
+            .unwrap_or_else(|| "Etc/UTC".to_owned());
+        let asked = fell_back.then(|| asked.to_owned());
+        if let Some(asked) = &asked {
+            let asked = if asked == "system" {
+                "the system's zone"
+            } else {
+                asked
+            };
+            if no_wall_clock {
+                eprintln!(
+                    "schedule: {asked} is not a zone this build knows, and no whole-hour UTC offset is stored for the lamp; a new reminder at a clock time with no zone of its own is refused, one in minutes from now is set, and one already set rings at the time it was set for, in its own zone"
+                );
+            } else if fixed.as_deref() == Some(zone.as_str()) {
+                eprintln!(
+                    "schedule: {asked} is not a zone this build knows; a new reminder with no zone of its own is set in {zone} time, the lamp's UTC offset when setup ran (07:00 is 07:00 at the lamp, an hour off at most across summer time), and one already set rings at the time it was set for, in its own zone"
+                );
+            } else {
+                eprintln!(
+                    "schedule: {asked} is not a zone this build knows; a new reminder with no zone of its own is set in {zone} time (07:00 is 07:00 {zone}), and one already set rings at the time it was set for, in its own zone"
+                );
+            }
+        }
+        let mut engine = Self::open_in(persistence, &zone, asked, system, now, new_store_id)?;
+        engine.no_wall_clock = no_wall_clock;
+        Ok(engine)
+    }
+
+    fn open_in(
         mut persistence: P,
         zone: &str,
+        zone_asked: Option<String>,
+        system: Option<LocalTime>,
         now: &ClockSample,
         new_store_id: &str,
     ) -> Result<Self, Error> {
@@ -355,6 +551,7 @@ impl<P: Persistence> Engine<P> {
                     revision: revision + 1,
                     next_id,
                     items: Vec::new(),
+                    unread: Vec::new(),
                     last_receipt: None,
                 },
                 None => State {
@@ -363,15 +560,14 @@ impl<P: Persistence> Engine<P> {
                     revision: 0,
                     next_id: 1,
                     items: Vec::new(),
+                    unread: Vec::new(),
                     last_receipt: None,
                 },
             },
         };
         state.check()?;
         if !existing {
-            persistence
-                .commit(&serde_json::to_vec(&state).map_err(storage)?)
-                .map_err(storage)?;
+            persistence.commit(&encode(&state)?).map_err(storage)?;
         }
         if let Some((schema, kept)) = &set_aside {
             eprintln!(
@@ -386,10 +582,28 @@ impl<P: Persistence> Engine<P> {
             set_aside: set_aside.map(|(_, name)| name),
             state,
             zone: zone.into(),
+            zone_asked,
+            no_wall_clock: false,
+            system,
             last_clock: now.clone(),
             recovered,
             failed: false,
         })
+    }
+
+    /// Stored reminders and timers this build can't read, kept as they are
+    /// and never sounded here (#1680).
+    pub fn unread(&self) -> usize {
+        self.state.unread.len()
+    }
+
+    /// The zone asked for and the one used instead, when the one asked for
+    /// (`--zone`, or the system's with `--zone system`) is not one this
+    /// build's time zone rules know (#1680). `None` when it is.
+    pub fn zone_fallback(&self) -> Option<(&str, &str)> {
+        self.zone_asked
+            .as_deref()
+            .map(|asked| (asked, self.zone.as_str()))
     }
 
     /// The retained database's name when opening a newer schema started a
@@ -425,7 +639,7 @@ impl<P: Persistence> Engine<P> {
 
     fn save(&mut self, candidate: State) -> Result<(), Error> {
         candidate.check()?;
-        let bytes = serde_json::to_vec(&candidate).map_err(storage)?;
+        let bytes = encode(&candidate)?;
         if let Err(error) = self.persistence.commit(&bytes) {
             // A failed sync may follow a committed transaction. Publishing the
             // older in-memory state or retrying it would hide that ambiguity.
@@ -589,6 +803,7 @@ impl<P: Persistence> Engine<P> {
     }
 
     pub fn answer(&mut self, request: Request, now: &ClockSample) -> Result<Value, Error> {
+        self.follow_zone();
         self.tick(now)?;
         match &request {
             Request::Status {} => {
@@ -670,10 +885,24 @@ impl<P: Persistence> Engine<P> {
                         "Reminder text must contain 1 to 300 UTF-8 bytes and no control characters.",
                     ));
                 }
-                if next.items.len() == MAX_ITEMS {
+                // Items this build can't read count too: they stay.
+                if next.items.len() + next.unread.len() >= MAX_ITEMS {
                     return Err(err(
                         "full",
                         "There are already 128 active reminders and timers; cancel or acknowledge one.",
+                    ));
+                }
+                if self.no_wall_clock
+                    && matches!(
+                        when,
+                        When::At { zone: None, .. }
+                            | When::Daily { zone: None, .. }
+                            | When::Weekly { zone: None, .. }
+                    )
+                {
+                    return Err(err(
+                        "bad_time",
+                        "This lamp's zone is not one this build knows and no UTC offset is stored, so a reminder at a clock time can't be set; one in minutes from now, or at a time in a named zone, can.",
                     ));
                 }
                 let deadline = time::resolve(when, now, &self.zone).map_err(bad_time)?;
@@ -751,6 +980,26 @@ impl<P: Persistence> Engine<P> {
         Ok(response)
     }
 
+    /// With `--zone system`, the system's zone as it is now; one that names
+    /// no zone this build knows keeps the last that did.
+    fn follow_zone(&mut self) {
+        if let Some(name) = self.system.as_ref().and_then(LocalTime::name)
+            && name != self.zone
+            && time::validate_zone(&name).is_ok()
+        {
+            eprintln!(
+                "schedule: the system's zone is now {name} (was {})",
+                self.zone
+            );
+            self.zone = name;
+            self.no_wall_clock = false;
+            // `--zone system` naming a zone it knows again is no fallback.
+            if self.zone_asked.as_deref() == Some("system") {
+                self.zone_asked = None;
+            }
+        }
+    }
+
     fn guard(&self, guard: &Guard) -> Result<(), Error> {
         if guard.revision != self.state.revision {
             return Err(err(
@@ -760,6 +1009,21 @@ impl<P: Persistence> Engine<P> {
         }
         Ok(())
     }
+}
+
+/// The tzdb's fixed-offset zone for `minutes` east of UTC (`Etc/GMT+3` for
+/// -180: its sign is POSIX's, west positive), when the offset is whole hours
+/// and such a zone exists.
+fn fixed_offset_zone(minutes: i32) -> Option<String> {
+    if minutes % 60 != 0 {
+        return None;
+    }
+    let west = -(minutes / 60);
+    let name = match west {
+        0 => "Etc/GMT".to_owned(),
+        west => format!("Etc/GMT{west:+}"),
+    };
+    time::validate_zone(&name).is_ok().then_some(name)
 }
 
 fn with_identity(mut body: Value, store_id: &str, revision: u64) -> Value {

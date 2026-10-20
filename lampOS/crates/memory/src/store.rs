@@ -477,7 +477,7 @@ fn add_line(dir: &Path, path: &Path, line: &str) -> io::Result<()> {
         // line would be joined to it and lost with it.
         let mut last = [0u8];
         file.read_exact_at(&mut last, before - 1)?;
-        if last != [b'\n'] {
+        if last != *b"\n" {
             bytes.push(b'\n');
         }
     }

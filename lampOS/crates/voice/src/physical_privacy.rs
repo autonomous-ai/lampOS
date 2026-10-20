@@ -47,6 +47,7 @@ pub fn run(mut channels: WorkerChannels) -> Result<(), Box<dyn std::error::Error
         // No active-low flag was requested: Inactive is electrical low => mute.
         let muted = request.value(9)? == Value::Inactive;
         channels.control.send(WorkerEvent::Privacy {
+            receipt: None,
             acquired_at_us: monotonic_us(),
             muted,
         })?;

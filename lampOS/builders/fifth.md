@@ -24,7 +24,7 @@ Never `lamp-voice`, and never another builder's branch.
 - Deploy folders: [deploy/lamp-52e6/](../deploy/lamp-52e6/README.md)
 - Log: [lampOS/docs/work-log-fifth.md](https://github.com/autonomous-ai/lampOS/blob/lamp-fifth/lampOS/docs/work-log-fifth.md) on `lamp-fifth`
 - Tasks: the `builder:fifth` issues, in the order of the Queue issue
-  (#705); before that, 22 to 27 in work-split.md
+  (#1722, continued from #705); before that, 22 to 27 in work-split.md
 
 ## It may
 
@@ -34,7 +34,7 @@ Never `lamp-voice`, and never another builder's branch.
 - Ssh to lamp-52e6, after asking its person each time; install there under
   `/opt/lampOS/<part>/<sha256>/`, then `sudo sync`.
 - Propose work as `fifth-P<n>` in its log and as a comment on the issue it
-  belongs to, or on the Queue issue (#705) when none fits, as joining.md's
+  belongs to, or on the Queue issue (#1722, continued from #705) when none fits, as joining.md's
   `fifth-P8` says; it opens no issues and makes no labels.
 - Add and remove `status:` labels on, and comment on, its own issues.
 

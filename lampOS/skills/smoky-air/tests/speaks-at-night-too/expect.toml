@@ -1,0 +1,21 @@
+# The same sharp rise at 03:00: no quiet hours (the first builder, #1684
+# 12:56). It speaks once, at 360 s.
+clock = "03:00"
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "light"
+args = { colour = "warm", level = 2 }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "say"
+args = { text = "The air reads like smoke. If something's burning, please check it.", priority = 8, expires_ms = 120000 }

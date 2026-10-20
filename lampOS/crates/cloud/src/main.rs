@@ -10,7 +10,7 @@
 use lamp_cloud::account::{self, Account};
 use lamp_cloud::lamp::{self, Places, Real, Ring, Texts, Wifi};
 use lamp_cloud::wire::Identity;
-use lamp_cloud::{beat, online, ping, reports};
+use lamp_cloud::{beat, online, ping, reports, skills};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -164,6 +164,19 @@ fn main() -> ExitCode {
         ring: Ring::default(),
         texts: Texts::on(lamp_cloud::chat::on_from_environment()),
         reports: shared,
+        // The app's skills page (#1722): only with LAMP_SKILLS_PAGE=on too.
+        skills: skills::on_from_environment().then(skills::Places::product),
+        // Names and the zone after setup (#1959): only with LAMP_SETTINGS_CHANGE=on too.
+        // The Wi-Fi too only with LAMP_SETTINGS_WIFI=on (#1959's second piece).
+        changes: lamp_cloud::settings::on_from_environment().then(|| {
+            lamp_cloud::settings::Changes::product(lamp_cloud::settings::wifi_on_from_environment())
+        }),
+        // A face from the app's photo (#1968): only with LAMP_PHOTO_FACES=on.
+        photos: lamp_cloud::photos::Place::from_environment(),
+        // The faces it knows, and removing one (#2192): only with LAMP_FACES_PAGE=on.
+        faces: lamp_cloud::faces::Eyes::from_environment(),
+        // The lamp's timers and reminders for the app (#2195): only with LAMP_APP_SCHEDULE=on.
+        schedule: lamp_cloud::schedule::from_environment(),
     };
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -186,6 +199,11 @@ fn main() -> ExitCode {
         ring: Ring::default(),
         texts: Texts::default(),
         reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
     };
     runtime.block_on(async move {
         let looks = async move {

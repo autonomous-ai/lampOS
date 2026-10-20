@@ -25,7 +25,7 @@ use crate::{
     progress::{Choice, LocalTime},
     rules::{Kept, Kind},
 };
-use lamp_msgs::{Decision, Rules, Voice, VoiceArrival};
+use lamp_msgs::{Decision, Rules, TurnVerdict, Voice, VoiceArrival};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::{
@@ -136,6 +136,13 @@ pub struct Options {
     /// (`memory/rules`, `lamp-policy --rules`, [`crate::rules`], #813), and
     /// so does the moment question beside it. Off unless set.
     pub rules: bool,
+    /// Only talk to the lamp or by it counts toward [`QUIET_FOR`]
+    /// (`lamp-policy --hello-quiet to-the-lamp`, #1155): a turn whose answer
+    /// the voice held back as not said to the lamp (`voice/turn`) is taken
+    /// back from the quiet. The hold while the voice listens, thinks or
+    /// speaks is unchanged, so a hello never comes over someone talking.
+    /// Off unless set: all talk counts, as before.
+    pub quiet_to_the_lamp: bool,
 }
 
 impl Options {
@@ -148,6 +155,7 @@ impl Options {
             act: false,
             gate: false,
             rules: false,
+            quiet_to_the_lamp: false,
         }
     }
 }
@@ -383,7 +391,12 @@ pub struct Hello {
     asking: Option<Asking>,
     waiting: VecDeque<Waiting>,
     voice: Option<Voice>,
+    /// The newest talk, by anyone: what the model is shown, and what the
+    /// moment question counts.
     last_talk: Option<Instant>,
+    /// The newest talk the hello's own quiet counts: the same, or with
+    /// [`Options::quiet_to_the_lamp`] only talk to the lamp or by it (#1155).
+    lamp_talk: Option<Instant>,
     last_listening: Option<Instant>,
     unasked: VecDeque<Instant>,
     /// Hellos chosen, which in shadow nobody hears, and the last one that
@@ -400,6 +413,27 @@ pub struct Hello {
     moment: Option<crate::moment::Moment>,
     /// The newest rules about speaking first, with `--rules` only.
     rules: Kept,
+    /// With [`Options::quiet_to_the_lamp`]: the talk before the turn under
+    /// way (or the last) began, and whether the voice held its answer back
+    /// as not said to the lamp. Such a turn's talk is taken back from the
+    /// quiet (#1155). None once the lamp has spoken in it: then it is talk
+    /// by the lamp, and no verdict takes it back.
+    turn_floor: Option<Option<Instant>>,
+    turn_held: bool,
+    /// The newest request heard in the turn under way, once known: a
+    /// verdict for another request, or one said before any of the turn's
+    /// words were heard, is not this turn's.
+    turn_request: Option<u64>,
+    /// The turn under way was begun by its words, heard before the voice
+    /// was seen listening: the voice's state and its words come on two
+    /// topics, and the loop may take a word first. Its listening, when
+    /// seen, is the same turn.
+    turn_by_words: bool,
+    /// A verdict said before its request's words reached the policy, kept
+    /// for them: the voice's words and its verdicts come on two topics, and
+    /// the second route says a verdict before its words go out (Second on
+    /// #1782). Let go when words of a later request come instead.
+    pending_verdict: Option<(u64, TurnVerdict)>,
     totals: Totals,
 }
 
@@ -435,6 +469,7 @@ impl Hello {
             waiting: VecDeque::new(),
             voice: None,
             last_talk: None,
+            lamp_talk: None,
             last_listening: None,
             unasked: VecDeque::new(),
             notes: VecDeque::new(),
@@ -443,6 +478,11 @@ impl Hello {
             started: Instant::now(),
             moment: None,
             rules: Kept::default(),
+            turn_floor: None,
+            turn_held: false,
+            turn_request: None,
+            turn_by_words: false,
+            pending_verdict: None,
             totals: Totals::default(),
         })
     }
@@ -459,6 +499,18 @@ impl Hello {
     /// Whether it obeys the people's rules ([`Options::rules`]).
     pub fn obeys_rules(&self) -> bool {
         self.options.rules
+    }
+
+    /// Whether only talk to the lamp or by it counts toward its quiet
+    /// ([`Options::quiet_to_the_lamp`]): then it reads `voice/turn`.
+    pub fn quiet_to_the_lamp(&self) -> bool {
+        self.options.quiet_to_the_lamp
+    }
+
+    /// Whether the talk now is a turn the voice held back, which with
+    /// [`Options::quiet_to_the_lamp`] does not count toward the quiet.
+    fn held_back(&self) -> bool {
+        self.options.quiet_to_the_lamp && self.turn_held
     }
 
     /// What the people at the lamp asked it about speaking first, newest:
@@ -520,7 +572,7 @@ impl Hello {
             room,
             someone_here,
             quiet_s: u32::try_from(quiet.as_secs()).unwrap_or(u32::MAX),
-            talking: self.talking(now),
+            talking: self.talking_at_all(now),
             // Acting, the lamp's own turns are counted from `voice/state`.
             spoke_up_last_hour: u32::try_from(self.unasked.len()).unwrap_or(u32::MAX),
         };
@@ -529,13 +581,35 @@ impl Hello {
 
     /// Someone is talking to the lamp: the voice listening, thinking or
     /// speaking, or anything heard or said in the last [`Options::quiet_for`].
+    /// With [`Options::quiet_to_the_lamp`], only talk to the lamp or by it
+    /// counts toward that quiet.
     fn talking(&self, now: Instant) -> bool {
+        self.voice_busy() || self.within_quiet(self.lamp_talk, now)
+    }
+
+    /// As [`Self::talking`], all talk counting: for the moment question.
+    fn talking_at_all(&self, now: Instant) -> bool {
+        self.voice_busy() || self.within_quiet(self.last_talk, now)
+    }
+
+    fn voice_busy(&self) -> bool {
         matches!(
             self.voice,
             Some(Voice::Listening | Voice::Thinking | Voice::Speaking)
-        ) || self
-            .last_talk
-            .is_some_and(|at| now.saturating_duration_since(at) < self.options.quiet_for)
+        )
+    }
+
+    fn within_quiet(&self, talk: Option<Instant>, now: Instant) -> bool {
+        talk.is_some_and(|at| now.saturating_duration_since(at) < self.options.quiet_for)
+    }
+
+    /// Talk at `now`: counted toward the hello's quiet unless it is a turn
+    /// the voice held back ([`Self::held_back`]).
+    fn talked(&mut self, now: Instant) {
+        self.last_talk = Some(now);
+        if !self.held_back() {
+            self.lamp_talk = Some(now);
+        }
     }
 
     /// A skill asks to say hello (`skills/ask`, #939): put as an arrival,
@@ -632,8 +706,16 @@ impl Hello {
         match state {
             Voice::Listening => {
                 self.end_own_turn();
+                // A turn begins: listened to after quiet, or over the lamp.
+                // Listened to again while thinking is the same turn.
+                // One its words began already is the same.
+                if self.turn_by_words {
+                    self.turn_by_words = false;
+                } else if !matches!(self.voice, Some(Voice::Listening | Voice::Thinking)) {
+                    self.begin_turn();
+                }
                 self.last_listening = Some(now);
-                self.last_talk = Some(now);
+                self.talked(now);
             }
             Voice::Speaking => {
                 // A turn the lamp began itself, at its first sound only:
@@ -646,9 +728,14 @@ impl Hello {
                     turn.spoke = true;
                     self.unasked.push_back(now);
                 }
-                self.last_talk = Some(now);
+                // The lamp speaking is talk by it, whatever the turn was,
+                // and no verdict said after takes it back.
+                self.turn_floor = None;
+                self.turn_held = false;
+                self.turn_by_words = false;
+                self.talked(now);
             }
-            Voice::Thinking => self.last_talk = Some(now),
+            Voice::Thinking => self.talked(now),
             // The quiet begins when the voice stops, not at its last
             // heartbeat before: an active state is said again once a
             // second, so that one can be most of a second old (the
@@ -659,7 +746,7 @@ impl Hello {
                     self.voice,
                     Some(Voice::Listening | Voice::Thinking | Voice::Speaking)
                 ) {
-                    self.last_talk = Some(now);
+                    self.talked(now);
                 }
             }
         }
@@ -683,11 +770,99 @@ impl Hello {
     pub fn voice_gone(&mut self) {
         self.end_own_turn();
         self.voice = None;
+        self.turn_floor = None;
+        self.turn_held = false;
+        self.turn_request = None;
+        self.turn_by_words = false;
+        self.pending_verdict = None;
     }
 
-    /// Something was heard, or said by the lamp.
+    /// A turn begins, counted from the talk before it.
+    fn begin_turn(&mut self) {
+        self.turn_floor = Some(self.lamp_talk);
+        self.turn_held = false;
+        self.turn_request = None;
+    }
+
+    /// Something was said by the lamp.
     pub fn talk(&mut self, now: Instant) {
         self.last_talk = Some(now);
+        self.lamp_talk = Some(now);
+    }
+
+    /// Something a person said was heard, in `request` when the voice
+    /// numbered it: with [`Options::quiet_to_the_lamp`], not counted in a
+    /// turn the voice held back. The newest request heard is the turn's:
+    /// talk that goes on, listened to again before the voice rests, is
+    /// judged by its newest request.
+    pub fn heard(&mut self, now: Instant, request: Option<u64>) {
+        // The verdict said already for these words, if one was.
+        let judged = match (request, self.pending_verdict) {
+            (Some(heard), Some((said, verdict))) if heard == said => {
+                self.pending_verdict = None;
+                Some(verdict)
+            }
+            (Some(heard), Some((said, _))) if heard > said => {
+                self.pending_verdict = None;
+                None
+            }
+            _ => None,
+        };
+        // Words of a new request while the voice is not seen listening or
+        // thinking begin their turn; a late piece of the turn's own request
+        // does not, nor words whose turn was judged before they came.
+        if request.is_some()
+            && request != self.turn_request
+            && judged.is_none()
+            && !matches!(self.voice, Some(Voice::Listening | Voice::Thinking))
+        {
+            self.begin_turn();
+            self.turn_by_words = true;
+        }
+        // A new request in the turn is not judged yet: one held back before
+        // it no longer holds back what comes now (Second on #1782: the voice
+        // can take a new request while a held answer waits, thinking to
+        // listening with no rest between).
+        if self.turn_floor.is_some() && request.is_some() {
+            if request != self.turn_request {
+                self.turn_held = false;
+            }
+            self.turn_request = request;
+            if let Some(verdict) = judged {
+                self.judged(verdict);
+            }
+        }
+        self.talked(now);
+    }
+
+    /// The voice's verdict on the turn under way, or the last
+    /// (`voice/turn`, #1155). With [`Options::quiet_to_the_lamp`], a turn
+    /// held back as not said to the lamp is taken back from the quiet,
+    /// which counts again from the talk before it; the room's talk is
+    /// still told to the model as the room it hears. It may come while the
+    /// voice thinks or once it rests. A verdict for a turn the lamp has
+    /// spoken in changes nothing.
+    pub fn verdict(&mut self, request: u64, verdict: TurnVerdict) {
+        if !self.options.quiet_to_the_lamp {
+            return;
+        }
+        match self.turn_request {
+            Some(turn) if turn == request => self.judged(verdict),
+            // For an earlier request than the turn's: not this turn's.
+            Some(turn) if request < turn => {}
+            // Its words have not come yet: kept for them.
+            _ => self.pending_verdict = Some((request, verdict)),
+        }
+    }
+
+    /// The turn under way is judged: held back, its talk is taken back.
+    fn judged(&mut self, verdict: TurnVerdict) {
+        if verdict == TurnVerdict::HeldBack
+            && let Some(floor) = self.turn_floor
+        {
+            self.turn_held = true;
+            self.lamp_talk = floor;
+        }
     }
 
     fn hold(&self, arrival: &VoiceArrival, now: Instant, unix_ms: u64, room: Room) -> Option<Hold> {
@@ -1102,6 +1277,467 @@ mod tests {
             Some(Hold::Talking)
         );
         assert_eq!(hello.hold(&arrival, stopped + quiet, 0, Room::Quiet), None);
+    }
+
+    /// A hello with its quiet counting only talk to the lamp or by it, and
+    /// the instant it started.
+    fn to_the_lamp(on: bool) -> (Hello, Instant) {
+        let options = Options {
+            quiet_to_the_lamp: on,
+            ..Options::new(Duration::from_secs(1), None)
+        };
+        let hello = Hello::start(Never, options).unwrap();
+        let started = hello.started;
+        (hello, started)
+    }
+
+    fn arrived() -> VoiceArrival {
+        VoiceArrival {
+            arrival: 1,
+            away_min: 60,
+            there_s: 3,
+            quiet_s: 300,
+            since_hello_min: None,
+        }
+    }
+
+    /// A turn of the room's talk: listened to, `request` heard, thought
+    /// about, and resting again `long` after it began; with its verdict
+    /// said while it was thought about, when there is one.
+    fn turn(
+        hello: &mut Hello,
+        at: Instant,
+        request: u64,
+        verdict: Option<TurnVerdict>,
+        long: Duration,
+    ) {
+        hello.voice(Voice::Listening, at);
+        hello.heard(at + long / 4, Some(request));
+        hello.voice(Voice::Thinking, at + long / 2);
+        if let Some(verdict) = verdict {
+            hello.verdict(request, verdict);
+        }
+        hello.voice(Voice::Resting, at + long);
+    }
+
+    /// #1155: an office talks every few seconds, not to the lamp. With the
+    /// quiet counting only talk to the lamp, a turn the voice held back is
+    /// taken back from it: the hello is not held by the rule once the voice
+    /// rests, and the model judges it, the room's talk told as the room. It
+    /// is still held while the voice listens or thinks: never over someone
+    /// talking.
+    #[test]
+    fn with_the_quiet_to_the_lamp_a_turn_held_back_is_taken_back_from_the_quiet() {
+        let (mut hello, started) = to_the_lamp(true);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        // Quiet since it started, then the room talks.
+        let begun = started + quiet + second;
+        hello.voice(Voice::Listening, begun);
+        hello.heard(begun + second, Some(5));
+        assert_eq!(
+            hello.hold(&arrived(), begun + second, 0, Room::Busy),
+            Some(Hold::Talking)
+        );
+        hello.voice(Voice::Thinking, begun + 2 * second);
+        hello.verdict(5, TurnVerdict::HeldBack);
+        assert_eq!(
+            hello.hold(&arrived(), begun + 2 * second, 0, Room::Busy),
+            Some(Hold::Talking),
+            "never while the voice thinks"
+        );
+        // Words still coming in the turn held back do not count either.
+        hello.heard(begun + 2 * second, Some(5));
+        hello.voice(Voice::Resting, begun + 3 * second);
+        assert_eq!(
+            hello.hold(&arrived(), begun + 3 * second, 0, Room::Busy),
+            None
+        );
+        // And the room again, every few seconds: each held back.
+        let mut at = begun + 8 * second;
+        for request in 6..10 {
+            turn(
+                &mut hello,
+                at,
+                request,
+                Some(TurnVerdict::HeldBack),
+                3 * second,
+            );
+            assert_eq!(hello.hold(&arrived(), at + 3 * second, 0, Room::Busy), None);
+            at += 6 * second;
+        }
+        // A verdict may come once the voice rests: the turn is taken back
+        // then.
+        turn(&mut hello, at, 10, None, 3 * second);
+        assert_eq!(
+            hello.hold(&arrived(), at + 3 * second, 0, Room::Busy),
+            Some(Hold::Talking)
+        );
+        hello.verdict(10, TurnVerdict::HeldBack);
+        assert_eq!(hello.hold(&arrived(), at + 3 * second, 0, Room::Busy), None);
+    }
+
+    /// #1155: the switch is the hello's own quiet only. A turn held back
+    /// is still talk for the moment question beside it (`--gate`), as for
+    /// what the model is shown: a reminder asked at the lull the hello may
+    /// take is held by the moment's rule while anyone talks.
+    #[test]
+    fn with_the_quiet_to_the_lamp_the_moment_question_still_counts_all_talk() {
+        let moment = crate::moment::Moment::start(
+            Never,
+            crate::moment::Options::new(Duration::from_secs(1), None),
+        )
+        .unwrap();
+        let (hello, started) = to_the_lamp(true);
+        let mut hello = hello.with_moment(moment);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        let begun = started + quiet + second;
+        turn(
+            &mut hello,
+            begun,
+            5,
+            Some(TurnVerdict::HeldBack),
+            3 * second,
+        );
+        let lull = begun + 3 * second;
+        assert_eq!(hello.hold(&arrived(), lull, 0, Room::Busy), None);
+        let ask = lamp_msgs::SkillAsk {
+            ask: 1,
+            skill: "stretch-break".into(),
+            act: crate::moment::REMINDER.into(),
+            person: None,
+            away_min: None,
+            there_s: None,
+        };
+        assert!(hello.asked_moment(&ask, lull));
+        let decided = hello.moment_turn(lull, 0, Room::Busy, Some(true));
+        assert!(decided.is_some(), "a reminder is decided at once");
+        assert_eq!(hello.moment_totals().unwrap().held_talking, 1);
+    }
+
+    /// #1155: a turn the voice answered is talk to the lamp, and holds the
+    /// whole quiet as before; so does the lamp speaking.
+    #[test]
+    fn with_the_quiet_to_the_lamp_a_turn_answered_holds_the_whole_quiet() {
+        let (mut hello, started) = to_the_lamp(true);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        let begun = started + quiet + second;
+        hello.voice(Voice::Listening, begun);
+        hello.heard(begun + second, Some(5));
+        hello.voice(Voice::Thinking, begun + 2 * second);
+        hello.verdict(5, TurnVerdict::Answered);
+        hello.voice(Voice::Speaking, begun + 3 * second);
+        let stopped = begun + 5 * second;
+        hello.voice(Voice::Resting, stopped);
+        assert_eq!(
+            hello.hold(
+                &arrived(),
+                stopped + quiet - Duration::from_millis(1),
+                0,
+                Room::Quiet
+            ),
+            Some(Hold::Talking)
+        );
+        assert_eq!(
+            hello.hold(&arrived(), stopped + quiet, 0, Room::Quiet),
+            None
+        );
+        // A turn with no verdict at all counts as before, too.
+        let next = stopped + quiet + second;
+        turn(&mut hello, next, 6, None, 3 * second);
+        assert_eq!(
+            hello.hold(
+                &arrived(),
+                next + 3 * second + quiet - Duration::from_millis(1),
+                0,
+                Room::Quiet
+            ),
+            Some(Hold::Talking)
+        );
+    }
+
+    /// #1155: the room's talk goes on, the voice listening again before it
+    /// rests: the turn is judged by its newest request, not by a late
+    /// verdict for an earlier one, and once held back nothing more in it
+    /// counts, its listening again included.
+    #[test]
+    fn a_turn_that_goes_on_is_judged_by_its_newest_request() {
+        let (mut hello, started) = to_the_lamp(true);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        let begun = started + quiet + second;
+        hello.voice(Voice::Listening, begun);
+        hello.heard(begun + second / 2, Some(5));
+        hello.voice(Voice::Thinking, begun + second);
+        hello.voice(Voice::Listening, begun + 2 * second);
+        hello.heard(begun + 2 * second + second / 2, Some(6));
+        hello.voice(Voice::Thinking, begun + 3 * second);
+        hello.verdict(6, TurnVerdict::HeldBack);
+        // The same people go on talking in the turn held back.
+        hello.voice(Voice::Listening, begun + 3 * second + second / 2);
+        assert_eq!(
+            hello.hold(&arrived(), begun + 3 * second + second / 2, 0, Room::Busy),
+            Some(Hold::Talking),
+            "never while the voice listens"
+        );
+        hello.heard(begun + 3 * second + second / 2, Some(6));
+        hello.voice(Voice::Thinking, begun + 4 * second);
+        hello.voice(Voice::Resting, begun + 5 * second);
+        assert_eq!(
+            hello.hold(&arrived(), begun + 5 * second, 0, Room::Busy),
+            None
+        );
+    }
+
+    /// #1155: the voice's state and its words come on two topics, and the
+    /// policy may take a turn's first words before it sees the voice
+    /// listening. They begin the turn, and the listening seen after them is
+    /// the same turn, judged by their request. A late piece of the last
+    /// turn's own words, heard as the voice rests, begins none.
+    #[test]
+    fn words_heard_before_the_voice_is_seen_listening_begin_their_turn() {
+        let (mut hello, started) = to_the_lamp(true);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        let begun = started + quiet + second;
+        turn(
+            &mut hello,
+            begun,
+            5,
+            Some(TurnVerdict::HeldBack),
+            3 * second,
+        );
+        let next = begun + 4 * second;
+        hello.heard(next, Some(5));
+        assert_eq!(hello.hold(&arrived(), next, 0, Room::Busy), None);
+        hello.heard(next, Some(6));
+        hello.voice(Voice::Listening, next);
+        hello.voice(Voice::Thinking, next + second);
+        hello.verdict(6, TurnVerdict::HeldBack);
+        hello.voice(Voice::Resting, next + 2 * second);
+        assert_eq!(
+            hello.hold(&arrived(), next + 2 * second, 0, Room::Busy),
+            None
+        );
+    }
+
+    /// Second on #1782: a turn held back, and then a new request in it, the
+    /// voice listening again with no rest between, as when it takes a new
+    /// request while a held answer waits. The new request's talk counts
+    /// until it is judged: answered, or with no verdict at all, it holds
+    /// the whole quiet; held back too, the turn is taken back again.
+    #[test]
+    fn a_new_request_in_a_turn_held_back_counts_until_it_is_judged() {
+        for second_verdict in [
+            None,
+            Some(TurnVerdict::Answered),
+            Some(TurnVerdict::HeldBack),
+        ] {
+            let (mut hello, started) = to_the_lamp(true);
+            let quiet = hello.options.quiet_for;
+            let second = Duration::from_secs(1);
+            let begun = started + quiet + second;
+            hello.voice(Voice::Listening, begun);
+            hello.heard(begun + second / 2, Some(5));
+            hello.voice(Voice::Thinking, begun + second);
+            hello.verdict(5, TurnVerdict::HeldBack);
+            hello.voice(Voice::Listening, begun + 2 * second);
+            hello.heard(begun + 2 * second + second / 2, Some(6));
+            hello.voice(Voice::Thinking, begun + 3 * second);
+            if let Some(verdict) = second_verdict {
+                hello.verdict(6, verdict);
+            }
+            let rested = begun + 4 * second;
+            hello.voice(Voice::Resting, rested);
+            let held = hello.hold(&arrived(), rested, 0, Room::Busy);
+            match second_verdict {
+                Some(TurnVerdict::HeldBack) => assert_eq!(held, None),
+                _ => {
+                    assert_eq!(held, Some(Hold::Talking), "{second_verdict:?}");
+                    assert_eq!(
+                        hello.hold(&arrived(), rested + quiet, 0, Room::Busy),
+                        None,
+                        "{second_verdict:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The first builder on #1817: a line the rule let out and the model
+    /// then declined (`not_for_me`) is told answered, then held back. The
+    /// held back takes the turn back from the quiet.
+    #[test]
+    fn a_turn_the_model_declines_after_the_rule_let_it_out_is_taken_back() {
+        let (mut hello, started) = to_the_lamp(true);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        let begun = started + quiet + second;
+        hello.voice(Voice::Listening, begun);
+        hello.heard(begun + second / 2, Some(5));
+        hello.voice(Voice::Thinking, begun + second);
+        hello.verdict(5, TurnVerdict::Answered);
+        hello.verdict(5, TurnVerdict::HeldBack);
+        let rested = begun + 2 * second;
+        hello.voice(Voice::Resting, rested);
+        assert_eq!(hello.hold(&arrived(), rested, 0, Room::Busy), None);
+    }
+
+    /// Second on #1782: the second route says its verdict before the words
+    /// it judged go out, so the policy can take the verdict first. It is
+    /// kept for its words, whether they come while the voice still thinks
+    /// or once it rests, and they are the judged turn's, not a new one.
+    #[test]
+    fn a_verdict_said_before_its_words_is_kept_for_them() {
+        for words_after_rest in [false, true] {
+            let (mut hello, started) = to_the_lamp(true);
+            let quiet = hello.options.quiet_for;
+            let second = Duration::from_secs(1);
+            let begun = started + quiet + second;
+            hello.voice(Voice::Listening, begun);
+            hello.voice(Voice::Thinking, begun + second);
+            hello.verdict(1, TurnVerdict::HeldBack);
+            let rested = begun + 2 * second;
+            if words_after_rest {
+                hello.voice(Voice::Resting, rested);
+                hello.heard(rested, Some(1));
+            } else {
+                hello.heard(begun + second, Some(1));
+                hello.voice(Voice::Resting, rested);
+            }
+            assert_eq!(
+                hello.hold(&arrived(), rested, 0, Room::Busy),
+                None,
+                "words after the rest: {words_after_rest}"
+            );
+        }
+    }
+
+    /// A verdict kept for words that never come does not take back a later
+    /// request's talk, and one for an earlier request than the turn's is
+    /// still not this turn's.
+    #[test]
+    fn a_kept_verdict_is_only_for_its_own_words() {
+        let (mut hello, started) = to_the_lamp(true);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        let begun = started + quiet + second;
+        hello.voice(Voice::Listening, begun);
+        hello.voice(Voice::Thinking, begun + second);
+        hello.verdict(1, TurnVerdict::HeldBack);
+        // Its words never come; the next request's do.
+        hello.voice(Voice::Listening, begun + 2 * second);
+        hello.heard(begun + 2 * second, Some(2));
+        hello.voice(Voice::Thinking, begun + 3 * second);
+        let rested = begun + 4 * second;
+        hello.voice(Voice::Resting, rested);
+        assert_eq!(
+            hello.hold(&arrived(), rested, 0, Room::Busy),
+            Some(Hold::Talking)
+        );
+        // A late verdict for request 1 now is for an earlier request.
+        hello.verdict(1, TurnVerdict::HeldBack);
+        hello.heard(rested, Some(1));
+        assert_eq!(
+            hello.hold(&arrived(), rested, 0, Room::Busy),
+            Some(Hold::Talking)
+        );
+    }
+
+    /// #1155: a turn held back that the lamp then speaks in, as when it
+    /// asks again what was unclear, is talk by the lamp: it counts until
+    /// the lamp stops, and a verdict said after changes nothing.
+    #[test]
+    fn a_turn_held_back_that_the_lamp_speaks_in_counts_until_it_stops() {
+        let (mut hello, started) = to_the_lamp(true);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        let begun = started + quiet + second;
+        hello.voice(Voice::Listening, begun);
+        hello.heard(begun + second / 2, Some(5));
+        hello.voice(Voice::Thinking, begun + second);
+        hello.verdict(5, TurnVerdict::HeldBack);
+        hello.voice(Voice::Speaking, begun + 2 * second);
+        let stopped = begun + 4 * second;
+        hello.voice(Voice::Resting, stopped);
+        hello.verdict(5, TurnVerdict::HeldBack);
+        assert_eq!(
+            hello.hold(
+                &arrived(),
+                stopped + quiet - Duration::from_millis(1),
+                0,
+                Room::Quiet
+            ),
+            Some(Hold::Talking)
+        );
+        assert_eq!(
+            hello.hold(&arrived(), stopped + quiet, 0, Room::Quiet),
+            None
+        );
+    }
+
+    /// #1155: without `--hello-quiet to-the-lamp`, all talk counts, held
+    /// back or not, as before.
+    #[test]
+    fn without_the_quiet_to_the_lamp_a_turn_held_back_still_holds_the_quiet() {
+        let (mut hello, started) = to_the_lamp(false);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        let begun = started + quiet + second;
+        turn(
+            &mut hello,
+            begun,
+            5,
+            Some(TurnVerdict::HeldBack),
+            3 * second,
+        );
+        let stopped = begun + 3 * second;
+        assert_eq!(
+            hello.hold(
+                &arrived(),
+                stopped + quiet - Duration::from_millis(1),
+                0,
+                Room::Busy
+            ),
+            Some(Hold::Talking)
+        );
+        assert_eq!(hello.hold(&arrived(), stopped + quiet, 0, Room::Busy), None);
+        // A verdict said once the voice rests changes nothing either.
+        let next = stopped + quiet + second;
+        turn(&mut hello, next, 6, None, 3 * second);
+        hello.verdict(6, TurnVerdict::HeldBack);
+        assert_eq!(
+            hello.hold(&arrived(), next + 3 * second, 0, Room::Busy),
+            Some(Hold::Talking)
+        );
+    }
+
+    /// #1155: a verdict for another turn than the one under way changes
+    /// nothing: one for the last turn, said late, does not take back the
+    /// next one's talk.
+    #[test]
+    fn a_verdict_for_another_turn_is_not_this_turns() {
+        let (mut hello, started) = to_the_lamp(true);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        let begun = started + quiet + second;
+        hello.voice(Voice::Listening, begun);
+        hello.heard(begun + second, Some(8));
+        hello.voice(Voice::Thinking, begun + 2 * second);
+        hello.verdict(7, TurnVerdict::HeldBack);
+        let stopped = begun + 3 * second;
+        hello.voice(Voice::Resting, stopped);
+        assert_eq!(
+            hello.hold(
+                &arrived(),
+                stopped + quiet - Duration::from_millis(1),
+                0,
+                Room::Quiet
+            ),
+            Some(Hold::Talking)
+        );
     }
 
     #[test]

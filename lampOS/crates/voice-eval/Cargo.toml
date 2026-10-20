@@ -21,6 +21,8 @@ lamp-observer = { path = "../observer" }
 lamp-local-time = { path = "../local-time" }
 # The observation pass's dry run on a copy of a lamp's store (#1693 (4)).
 lamp-memory = { path = "../memory" }
+# Mood's state and breath, read as the readers read them (`mood-minute`, #1670).
+lamp-msgs = { path = "../msgs" }
 
 [lints]
 workspace = true
@@ -36,3 +38,5 @@ lamp-skills = { path = "../skills" }
 # The Policy's copies of the voice's bars, held equal to the voice's own
 # (tests/pinned_copies.rs, Fourth on #1510).
 lamp-policy = { path = "../policy" }
+# The head's breath and the ring's, held to one (tests/one_breath.rs, #1670).
+lamp-expression = { path = "../expression" }

@@ -1,0 +1,20 @@
+# 21:30, an hour at the desk: the 20 minutes are up at 21:50, before its
+# hour, so the chance is kept and taken at 22:00.
+clock = "21:30"
+
+[[expect]]
+at = "30m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "sleepy" }
+
+[[expect]]
+at = "30m"
+within = "1m"
+call = "light"
+args = { dim = 1, until = "ends" }
+
+[[expect]]
+at = "62m"
+within = "1m"
+call = "ends"

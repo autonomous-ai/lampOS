@@ -182,7 +182,7 @@ killed, and what the others do is counted.
 | Actions (the page's executive) | `lamp-actions` ([actions.md](actions.md); what the voice expects of it is in [tools.md](tools.md)) | Every action the Live model asks for: checking it, asking "shall I?" where decision 7 requires it, sending it to the component that carries it out, and returning what was established so that it can be said | open | The lamp chats and can do nothing it is asked to do, and says so. Running today, for its volume and its light |
 | Tasks | `lamp-tasks` (new) | Work handed to agents through Harness: what was sent, to whom, what came back, what has been said of it | open | The lamp chats, and says it cannot reach the agents just now |
 | Harness | the Harness team's own service, installed on the lamp | The account's session and the way to its other machines | Harness team | As for Tasks |
-| Memory | `lamp-memory` ([memory.md](memory.md)) | The journal, what it was told to keep, a store for each person, forgetting | open | The lamp talks without recalling earlier days, and says so. Running today; its next layer ([memory-days.md](memory-days.md) on `lamp-fourth`) is built and not on a lamp |
+| Memory | `lamp-memory` ([memory.md](memory.md)) | The journal, what it was told to keep, a store for each person, forgetting | open | The lamp talks without recalling earlier days, and says so. Running today; its next layer ([memory-days.md](memory-days.md)) is on in the product: the unit's `--memory-days`, and the voice's `LAMP_MEMORY_DAYS=on` |
 | Controls | `lamp-controls` (being built by the third builder) | The touch pad and the button: stop, mute, privacy | open | The lamp is spoken to as before and cannot be tapped |
 | Schedules | `lamp-schedule` ([schedule.md](schedule.md); built by Third, off unless enabled) | Durable reminders, elapsed timers and pending delivery receipts | open | The lamp says it cannot set one just now; pending work survives and is offered late after recovery. First still wires Voice to retrieve and acknowledge it |
 | Name | `lamp-name` ([name.md](name.md)) | Hearing "Hey Lamp" and "Lamp ơi" in what the microphone hears, and saying so on the bus. It decides nothing | open | The lamp talks as before. A new session in a busy room goes by the service's text alone, and no second look is taken at a call that got nothing ([attention.md](attention.md)). Running today |
@@ -584,7 +584,7 @@ a speed comparison with and without it.
 | One picture, with the request to answer from it | When the lamp has said it will look; the session is renewed afterwards | Built, asleep |
 | A note to say hello from | When someone sits down after a long absence | Built, recording only |
 | A task's receipt, question or result, to speak from | When it arrives, at a pause | Not built (step 5) |
-| The day's conversations | At opening, shortened | Not built (decision 12) |
+| The day's conversations | At opening, shortened | Not told at opening: decision 12 is built with a `recall` tool instead, and each session is told what it was asked to keep ([memory.md](memory.md)) |
 
 The wording describes how things are and never tells the lamp to keep
 quiet or what not to mention: the first did the one and got a spoken
@@ -868,9 +868,9 @@ and 4:
 ## Decision 12 in more detail: memory across days
 
 A proposal for the product owner to answer, written the evening they chose
-memory across days. Nothing of it is built. Today the lamp carries the
-last exchanges for ten minutes and its character says it does not remember
-earlier conversations.
+memory across days. It has since been built as `lamp-memory`
+([memory.md](memory.md)) and is on in the product; what follows is the
+proposal as written.
 
 Three things, kept apart:
 

@@ -1,0 +1,3 @@
+Oct 20 13:38:02.834551 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 77: the lamp's name was heard in a busy room and nobody is turned to the lamp (the room microphone 9.1 dB over its quiet); the model is not told
+Oct 20 13:38:06.153587 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 77: the model said it was not for it
+Oct 20 13:38:06.157115 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(7277) prompt=Some(7269) prompt_audio=Some(1637) response=Some(8) response_audio=None thoughts=None cached=None

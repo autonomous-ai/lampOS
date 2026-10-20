@@ -1,0 +1,10 @@
+# From 10:00, PM2.5 at 140 for three hours, a face in view, the voice
+# resting. One line at 11:00, an hour after the air passed 125, then
+# nothing more.
+clock = "10:00"
+
+[[expect]]
+at = "3600s"
+within = "60s"
+call = "say"
+args = { text = "The air here has been very dusty for about an hour. I can't tell where it's coming from.", priority = 5, expires_ms = 30000 }

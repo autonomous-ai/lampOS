@@ -1,0 +1,31 @@
+[package]
+name = "lamp-peek"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# A read-only page on an office lamp (#2141, docs/peek.md): the eyes' faces
+# as boxes, never pictures, the bus's counts and states, never words, and
+# the units. Off unless `LAMP_PEEK=on`, on 127.0.0.1 unless given a token,
+# and never in deploy/product.
+[[bin]]
+name = "lamp-peek"
+path = "src/main.rs"
+
+[dependencies]
+lamp-bus = { path = "../bus" }
+lamp-msgs = { path = "../msgs" }
+# The keeper's own unit patterns, so the page lists what the keeper does.
+# Without its default `prepare`, which builds lamp-update.
+lamp-keeper = { path = "../keeper", default-features = false }
+serde.workspace = true
+serde_json.workspace = true
+# As crates/setup has them: a small server, HTTP/1 only.
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
+tokio = { version = "1", features = ["rt", "net", "time", "signal", "macros", "sync"] }
+# The one page's event stream (axum's `Sse` takes a stream), as the voice has it.
+futures-util = { version = "=0.3.34", default-features = false, features = ["std"] }
+
+[lints]
+workspace = true

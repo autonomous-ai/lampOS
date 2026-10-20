@@ -1,0 +1,18 @@
+2026-10-19T20:00:00+0700 lamp-4ace systemd[1]: Started lamp-voice.service - lampOS voice.
+2026-10-19T20:00:01+0700 lamp-4ace lamp-voice[100]: lamp-voice: stop words: heard-always, all the lamp's speech, from the mic2 blocks, through the second voice's speech-to-text at the relay
+2026-10-19T20:00:05+0700 lamp-4ace kernel: usb 1-1: reset high-speed USB device number 2
+2026-10-19T20:00:40+0700 lamp-4ace lamp-voice[100]: lamp-voice second: request 6 heard 3 words, the last 210 ms after the line ended
+2026-10-19T20:00:41+0700 lamp-4ace lamp-voice[100]: lamp-voice second: request 6 goes on from the request given up: its 2 words begin it
+2026-10-19T20:30:00+0700 lamp-4ace systemd[1]: Started lamp-voice.service - lampOS voice.
+2026-10-19T20:30:01+0700 lamp-4ace lamp-voice[200]: lamp-voice: the voice route is second only (LAMP_VOICE_ROUTE=second): speech to text, a text model and speech answer every turn; Gemini Live is not used
+2026-10-19T20:30:01+0700 lamp-4ace lamp-voice[200]: lamp-voice: wait words: a sound while an answer waits is judged by its words, through the second voice's speech-to-text at the relay
+2026-10-19T20:30:02+0700 lamp-4ace lamp-voice[200]: lamp-voice: wait words: a stream is ready, connected in 640 ms
+2026-10-19T20:30:05+0700 lamp-4ace lamp-voice[200]: lamp-voice second: request 1 heard 3 words, the last 180 ms after the line ended
+2026-10-19T20:30:06+0700 lamp-4ace lamp-voice[200]: lamp-voice second: request 1 first answer audio 900 ms after the words were heard
+2026-10-19T20:30:10+0700 lamp-4ace lamp-voice[200]: lamp-voice second: request 2 heard 0 words, the last 50 ms after the line ended
+2026-10-19T20:30:11+0700 lamp-4ace lamp-voice[200]: lamp-voice: a yield's words came: 1 word, a stop phrase
+2026-10-19T20:30:11+0700 lamp-4ace lamp-voice[200]: lamp-voice: stop words: a held stop phrase acts after 120 ms held
+2026-10-19T20:30:12+0700 lamp-4ace lamp-voice[200]: lamp-voice: a short sound just after the lamp was stopped is not taken as a request
+2026-10-19T20:30:20+0700 lamp-4ace lamp-voice[200]: lamp-voice second: request 7 speech to text failed: marmalade lighthouse
+2026-10-19T20:30:21+0700 lamp-4ace lamp-voice[200]: lamp-voice second: request 9 chat round 1 called remember_zebrafinch
+2026-10-19T20:30:22+0700 lamp-4ace lamp-voice[200]: lamp-voice: hello Pemberton, the quokka is here

@@ -161,6 +161,131 @@ fn connect(path: &Path) -> io::Result<Connection> {
     Ok(db)
 }
 
+/// The published database's `user_version` when it is above the one this
+/// build writes: a newer build's, set aside rather than refused. Any other
+/// version but 1 is refused by [`validate`].
+///
+/// Read from the file's header, before any SQLite connection: opening one
+/// with this build's settings would refuse a newer build's WAL database or
+/// its `-wal`/`-shm` sidecars, or change its journal mode (#1680, as #2057).
+/// A file too short or not SQLite's is left to [`validate`].
+fn newer_version(held: &File) -> io::Result<Option<u64>> {
+    let file = open_file(held, DATABASE, false)?;
+    let mut header = [0u8; 100];
+    if file.metadata()?.len() < header.len() as u64 {
+        return Ok(None);
+    }
+    std::os::unix::fs::FileExt::read_exact_at(&file, &mut header, 0)?;
+    if &header[..16] != b"SQLite format 3\0" {
+        return Ok(None);
+    }
+    let version = u64::from(u32::from_be_bytes([
+        header[60], header[61], header[62], header[63],
+    ]));
+    Ok((version > 1).then_some(version))
+}
+
+/// Keep a newer build's database whole under a new name, its sidecars
+/// beside it under the same name, never deleted (#1680, as #1505 does for a
+/// newer `schema` inside). Its reminders are not sounded here; health names
+/// it while it is there ([`kept_aside`]).
+fn set_aside_newer(path: &Path, held: &File, version: u64) -> io::Result<()> {
+    // A crash after the sidecars' renames and before the database's: the
+    // database takes their stamp again (the reviewer's P3 on #2057).
+    let since = match orphan_stamp(path, &version.to_string())? {
+        Some(stamp) => stamp,
+        None => std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs())
+            .to_string(),
+    };
+    let kept = format!("{DATABASE}.newer-db{version}-{since}");
+    let sidecars = [
+        ("-journal", MAX_DATABASE_BYTES + MAX_STATE_BYTES as u64),
+        ("-wal", MAX_DATABASE_BYTES),
+        ("-shm", MAX_DATABASE_BYTES),
+    ];
+    // Each must be this owner's private file before it is moved.
+    let mut present = Vec::new();
+    for (suffix, bound) in sidecars {
+        if check_file(&path.join(format!("{DATABASE}{suffix}")), bound)?.is_some() {
+            present.push(suffix);
+        }
+    }
+    for suffix in present {
+        unix::renameat_with(
+            held,
+            format!("{DATABASE}{suffix}"),
+            held,
+            format!("{kept}{suffix}"),
+            RenameFlags::NOREPLACE,
+        )?;
+    }
+    unix::renameat_with(held, DATABASE, held, &kept, RenameFlags::NOREPLACE)?;
+    held.sync_all()?;
+    eprintln!(
+        "schedule: the store was written by a newer build (database version {version}, this build reads 1); it is set aside as {kept}, and this build starts with an empty store"
+    );
+    Ok(())
+}
+
+/// The `<s>` of an earlier set-aside at this `version` whose `-wal`, `-shm`
+/// or `-journal` was renamed but not its database: a crash between the
+/// renames. The newest such stamp, reused so the database joins its
+/// sidecars again rather than taking a new one (the reviewer's P3 on #2057).
+///
+/// Only a leftover this database's crash could have left: the database's
+/// mtime no later than the ctime of each of the stamp's sidecars (their
+/// rename set it), and none of the database's own sidecars landing on a name
+/// already there. A stale leftover from an older crash, or a complete
+/// earlier set-aside, takes a new stamp instead (the reviewer's P3 on #2138).
+fn orphan_stamp(path: &Path, version: &str) -> io::Result<Option<String>> {
+    let prefix = format!("{DATABASE}.newer-db{version}-");
+    let database = fs::symlink_metadata(path.join(DATABASE))?;
+    let written = (database.mtime(), database.mtime_nsec());
+    let mut newest: Option<(u64, String)> = None;
+    'entries: for entry in fs::read_dir(path)? {
+        let name = entry?.file_name();
+        let Some(rest) = name.to_str().and_then(|name| name.strip_prefix(&prefix)) else {
+            continue;
+        };
+        let Some(stamp) = ["-wal", "-shm", "-journal"]
+            .iter()
+            .find_map(|suffix| rest.strip_suffix(suffix))
+        else {
+            continue;
+        };
+        let Ok(at) = stamp.parse::<u64>() else {
+            continue;
+        };
+        match fs::symlink_metadata(path.join(format!("{prefix}{stamp}"))) {
+            Ok(_) => continue,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+        for suffix in ["-wal", "-shm", "-journal"] {
+            let leftover = match fs::symlink_metadata(path.join(format!("{prefix}{stamp}{suffix}")))
+            {
+                Ok(leftover) => leftover,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+                Err(error) => return Err(error),
+            };
+            if (leftover.ctime(), leftover.ctime_nsec()) < written {
+                continue 'entries;
+            }
+            match fs::symlink_metadata(path.join(format!("{DATABASE}{suffix}"))) {
+                Ok(_) => continue 'entries,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+        }
+        if newest.as_ref().is_none_or(|(newest, _)| at > *newest) {
+            newest = Some((at, stamp.to_owned()));
+        }
+    }
+    Ok(newest.map(|(_, stamp)| stamp))
+}
+
 fn validate(db: &Connection) -> io::Result<()> {
     let version: u64 = db
         .query_row("PRAGMA user_version", [], |row| row.get(0))
@@ -293,7 +418,8 @@ pub struct Store {
 }
 
 /// The newest store kept aside in `dir` that is still there, by its name
-/// (`schedule.sqlite3.newer-<schema>-<unix seconds>`), if any: until someone
+/// (`schedule.sqlite3.newer-<schema>-<unix seconds>`, or
+/// `newer-db<version>-<unix seconds>` for a newer database), if any: until someone
 /// looks, health says reminders were set aside and won't sound (#1562's
 /// follow-up, as lamp-tasks' #1554). Read only for its names.
 pub fn kept_aside(dir: &Path) -> io::Result<Option<String>> {
@@ -305,6 +431,13 @@ pub fn kept_aside(dir: &Path) -> io::Result<Option<String>> {
         let Some(rest) = name.strip_prefix(&prefix) else {
             continue;
         };
+        // A kept database's sidecars are named after it; it alone is said.
+        if ["-journal", "-wal", "-shm"]
+            .iter()
+            .any(|suffix| rest.ends_with(suffix))
+        {
+            continue;
+        }
         let since = rest
             .rsplit('-')
             .next()
@@ -320,6 +453,14 @@ pub fn kept_aside(dir: &Path) -> io::Result<Option<String>> {
 impl Store {
     pub fn open(dir: &Path) -> io::Result<Self> {
         let (path, held) = directory(dir)?;
+        // A newer build's database first: its journal mode and sidecars are
+        // its own, so they are moved with it, not refused.
+        if check_file(&path.join(DATABASE), MAX_DATABASE_BYTES)?.is_some()
+            && check_file(&path.join(INITIALIZING), MAX_DATABASE_BYTES)?.is_none()
+            && let Some(version) = newer_version(&held)?
+        {
+            set_aside_newer(&path, &held, version)?;
+        }
         check_sidecars(&path, DATABASE)?;
         if check_file(&path.join(DATABASE), MAX_DATABASE_BYTES)?.is_none() {
             initialize(&path, &held)?;
@@ -332,6 +473,9 @@ impl Store {
         if file.metadata()?.len() == 0 {
             return Err(invalid("existing schedule database is empty"));
         }
+        // A newer build's container: the schema has one version and no
+        // history of additive changes, so nothing promises this build reads
+        // it. It was set aside above, and this build began an empty store.
         let db = connect(&path.join(DATABASE))?;
         validate(&db)?;
         let store = Self {

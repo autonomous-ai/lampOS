@@ -81,9 +81,33 @@ impl Clock {
     /// As [`Clock::skip`], with `between` run once a stand-in's time has
     /// skipped and before the program's has.
     fn skip_after(&self, by: Duration, between: impl FnOnce()) {
+        let Some(stream) = self.sent(by, between) else {
+            return;
+        };
+        let mut line = String::new();
+        BufReader::new(&stream).read_line(&mut line).unwrap();
+        assert!(line.contains("now_us"), "{line}");
+    }
+
+    /// As [`Clock::skip`], for the skip the program is to end on: it can end
+    /// before its answer is whole, or written at all, so the answer is read
+    /// and not judged; whether it ended is the test's to check. Answered
+    /// whole, 25 of 200 runs of such a test failed beside fourteen busy
+    /// processes on a Mac, with `{"` and the stream's end (#1569 row 44).
+    fn skip_ending(&self, by: Duration) {
+        if let Some(stream) = self.sent(by, || {}) {
+            let mut line = String::new();
+            let _ = BufReader::new(&stream).read_line(&mut line);
+        }
+    }
+
+    /// The skip sent, `between` run first: the stream its answer comes on,
+    /// or none on the host's clock, where `by` is slept.
+    fn sent(&self, by: Duration, between: impl FnOnce()) -> Option<UnixStream> {
         let Some(socket) = &self.socket else {
             std::thread::sleep(by);
-            return between();
+            between();
+            return None;
         };
         let deadline = Instant::now() + Duration::from_secs(10);
         let stream = loop {
@@ -105,9 +129,7 @@ impl Clock {
         stream
             .set_read_timeout(Some(Duration::from_secs(10)))
             .unwrap();
-        let mut line = String::new();
-        BufReader::new(&stream).read_line(&mut line).unwrap();
-        assert!(line.contains("now_us"), "{line}");
+        Some(stream)
     }
 
     /// Skips the program's clock to `at`, if it is not there yet.
@@ -312,23 +334,37 @@ fn every_skill_folder_says_its_kind_and_version() {
         named(SkillKind::Core),
         [
             "dance",
+            "dusty-air",
             "laugh-glance",
             "light-out",
             "light-scenes",
             "light-show",
             "music-sway",
             "not-feeling-well",
+            "onboarding",
             "point-light",
             "reminders",
+            "smoky-air",
             "stretch-break",
             "stuffy-air",
             "task-news",
+            "watch-you-leave",
             "welcome-back"
         ]
     );
     assert_eq!(
         named(SkillKind::Installable),
-        ["desk-tutor", "desk-tutor-marks"]
+        [
+            "desk-tutor",
+            "desk-tutor-marks",
+            "guard-mode",
+            "look-for-things",
+            "rest-your-eyes",
+            "sip-of-water",
+            "stand-up",
+            "who-was-here",
+            "wind-down"
+        ]
     );
     for skill in &skills {
         assert_eq!(skill.version.as_deref(), Some("1.0.0"), "{}", skill.name);
@@ -629,6 +665,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
                 mood: "reading".into(),
                 lasting_us: 1_000_000,
                 toward: None,
+                until_spoken: false,
             },
             "body",
         ),
@@ -639,6 +676,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
                 lasting: None,
                 pattern: None,
                 keep: false,
+                until_ends: false,
             },
             "light",
         ),
@@ -1668,6 +1706,7 @@ fn a_light_files_pattern_is_loaded_and_held_to_its_bounds() {
                 low: 1,
             }),
             keep: false,
+            until_ends: false,
         }
     );
     let candle = with_light(
@@ -1740,6 +1779,7 @@ fn present_for_a_while_through_short_dropouts_once_a_sitting_and_only_while_rest
                 lasting: Some("4s".into()),
                 pattern: None,
                 keep: false,
+                until_ends: false,
             }
         ]
     );
@@ -2185,6 +2225,14 @@ fn a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go() {
         "{:?}",
         seen.events
     );
+}
+
+/// A reading pose's definition, checked with no program and no clock: the
+/// mood must be one the body knows, with its `for`, of at most 2 minutes.
+/// Apart from the test above, which runs one at a time in the realtime
+/// group (#1806).
+#[test]
+fn a_reading_pose_needs_a_known_mood_and_a_for_of_at_most_two_minutes() {
     let dir = tempfile::tempdir().unwrap();
     for (step, why) in [
         ("body = { mood = \"dance\", for = \"3s\" }", "not one of"),
@@ -2886,6 +2934,15 @@ fn asking_the_policy_in(
     root: &Path,
     clock: &Clock,
 ) -> (Running, Bus, mpsc::Receiver<(String, Instant)>) {
+    asking_the_policy_with(root, clock, &hello_after_a_second())
+}
+
+/// [`asking_the_policy_in`] with this hello.
+fn asking_the_policy_with(
+    root: &Path,
+    clock: &Clock,
+    hello: &str,
+) -> (Running, Bus, mpsc::Receiver<(String, Instant)>) {
     fs::create_dir(root.join("skills")).unwrap();
     let bus = Bus::new(root.join("bus")).unwrap();
     let voice = UnixListener::bind(root.join("say.sock")).unwrap();
@@ -2903,7 +2960,7 @@ fn asking_the_policy_in(
     // (#1128). On a clock the test moves it is put in after, as before.
     let on_the_host = clock.socket.is_none();
     if on_the_host {
-        skill_with(&root.join("skills"), "hello", &hello_after_a_second());
+        skill_with(&root.join("skills"), "hello", hello);
     }
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
     command
@@ -2924,7 +2981,7 @@ fn asking_the_policy_in(
     let running = Running(command.spawn().unwrap());
     clock.started();
     if !on_the_host {
-        skill_with(&root.join("skills"), "hello", &hello_after_a_second());
+        skill_with(&root.join("skills"), "hello", hello);
         clock.skip(RELOAD);
     }
     let deadline = Instant::now() + Duration::from_secs(20);
@@ -3092,6 +3149,77 @@ fn asking_the_policy_a_skill_acts_only_on_a_say_now_that_names_its_ask() {
     // Only the first say_now was said, the late one passed over too.
     std::thread::sleep(Duration::from_millis(300));
     assert_eq!(said.try_iter().count(), 0);
+}
+
+/// The next ask on `skills/ask`, within `wait`.
+fn next_ask(asks: &mut lamp_bus::Subscriber, wait: Duration) -> Option<serde_json::Value> {
+    let deadline = Instant::now() + wait;
+    while Instant::now() < deadline {
+        if let Some(message) = asks.recv(Duration::from_millis(50)).unwrap() {
+            return Some(serde_json::from_slice(&message.payload).unwrap());
+        }
+    }
+    None
+}
+
+/// #1685, the program: with the Policy asked, a hello with `[rest]` that
+/// nobody noticed (the face still there, not turned to the lamp, not moved,
+/// past its while) rests once a `say_now` made it, and the next face is not
+/// asked about; one the Policy said `wait` to made nothing, so the next face
+/// is.
+#[test]
+fn asking_the_policy_a_hello_made_and_not_noticed_rests() {
+    for (choice, asked_again) in [("say_now", false), ("wait", true)] {
+        // Short: a socket's whole path has to fit in 103 bytes.
+        let dir = tempfile::Builder::new()
+            .prefix("sr")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let root = dir.path();
+        let bus = Bus::new(root.join("bus")).unwrap();
+        let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+        let mut asks = bus.subscribe("skills/ask", "policy").unwrap();
+        let mut decisions = bus
+            .publisher_declared(
+                "policy/decisions",
+                &lamp_msgs::Decision::declaration(),
+                "policy",
+            )
+            .unwrap();
+        let clock = Clock::at(root);
+        let hello = format!(
+            "{}[rest]\nafter_ignored = 1\nwithin = \"10s\"\n",
+            hello_after_a_second()
+        );
+        let (_running, bus, said) = asking_the_policy_with(root, &clock, &hello);
+        let mut eyes = bus
+            .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+            .unwrap();
+        let face: serde_json::Value = serde_json::from_str(FACE).unwrap();
+        a_face_appears(&mut eyes, &clock, false);
+        let ask = next_ask(&mut asks, Duration::from_secs(5)).expect("the face asked about");
+        decisions
+            .publish_json(
+                1,
+                &serde_json::json!({"ask": ask["ask"], "about": "hello", "choice": choice,
+                    "shadow": false, "probability": 0.9, "answers": {}, "by": "rule",
+                    "took_ms": 3}),
+            )
+            .unwrap();
+        let answer = next_answer(&mut events, Instant::now() + Duration::from_secs(5));
+        assert_eq!(answer.allowed, Some(choice == "say_now"), "{answer:?}");
+        if choice == "say_now" {
+            said.recv_timeout(Duration::from_secs(2)).unwrap();
+        }
+        eyes.publish_json(1, &face).unwrap();
+        clock.skip(Duration::from_secs(11));
+        a_face_appears(&mut eyes, &clock, false);
+        assert_eq!(
+            next_ask(&mut asks, Duration::from_secs(1)).is_some(),
+            asked_again,
+            "{choice}"
+        );
+    }
 }
 
 /// On the lamp's own clock, without `--clock-control`: a Policy that
@@ -3999,7 +4127,9 @@ fn the_dance_asking(
     let mut line = String::new();
     BufReader::new(&stream).read_line(&mut line).unwrap();
     assert!(line.contains("Say you will."), "{line}");
-    std::thread::sleep(Duration::from_millis(200));
+    // At once: the program takes the voice's latest state when it looks
+    // (`said_lately`), so `speaking` said before it begins to wait is seen
+    // all the same (#1806).
     voice
         .publish_json(1, &serde_json::json!({"state": "speaking"}))
         .unwrap();
@@ -4132,8 +4262,9 @@ fn a_clip_the_body_said_dropped_is_followed_by_nothing() {
 }
 
 /// #940: under arbitration the body names whose a drop was, why and who
-/// holds the body; the run says so, and takes no other skill's drop of the
-/// same clip as its own.
+/// holds the body; the run says so. The next three tests are the same
+/// dance's other cases, one each so that each runs beside the others
+/// (#1806: together they took 4.4 s).
 #[test]
 fn a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body() {
     let (_, played, _, done, reached) = the_dance_asking(false, Line::Said, Says::Busy, true);
@@ -4147,7 +4278,12 @@ fn a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body() {
         "{}",
         done.why
     );
-    // The run's last clip has no next to wait on it: said at the run's end.
+}
+
+/// #940: the run's last clip has no next to wait on it: its drop is said at
+/// the run's end.
+#[test]
+fn a_last_clip_dropped_for_another_skill_is_said_at_the_runs_end() {
     let (_, played, _, done, reached) = the_dance_asking(false, Line::Said, Says::LastBusy, true);
     assert_eq!((played.len(), reached), (1, 2), "{}", done.why);
     assert!(
@@ -4156,13 +4292,21 @@ fn a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body() {
         "{}",
         done.why
     );
-    // Without the skill's switch (and so on a product lamp, the body's off
-    // too), the run says nothing new of a last clip dropped (the reviewer
-    // on #1473).
+}
+
+/// Without the skill's switch (and so on a product lamp, the body's off
+/// too), the run says nothing new of a last clip dropped (the reviewer on
+/// #1473).
+#[test]
+fn without_body_requests_a_last_clip_dropped_is_not_said() {
     let (_, played, _, done, _) = the_dance_asking(false, Line::Said, Says::LastBusy, false);
     assert_eq!(played.len(), 1, "{}", done.why);
     assert!(!done.why.contains("the body dropped"), "{}", done.why);
-    // Another skill's nod dropped is not this run's: both are played.
+}
+
+/// #940: another skill's nod dropped is not this run's: both are played.
+#[test]
+fn another_skills_dropped_clip_is_not_the_runs_own() {
     let (_, played, _, done, reached) =
         the_dance_asking(false, Line::Said, Says::AnothersFirst, true);
     assert_eq!((played.len(), reached), (2, 2), "{}", done.why);
@@ -4849,6 +4993,186 @@ fn a_dim_held_until_it_ends_is_given_back_when_its_skill_is_removed() {
         "{:?}",
         seen.lights
     );
+}
+
+/// #1681: a pale breath held while someone is in view (Not feeling well's
+/// light, on a trigger a test can hold), given back when they go.
+const BREATH_WHILE: &str = r#"
+[trigger]
+topic = "humans/faces/tracked"
+rearm = "leaves"
+[ask]
+policy = "nudge"
+[[do]]
+light = { colour = "white", level = 2, pattern = { kind = "breathe", period = "10s", low = 1 }, until = "ends" }
+"#;
+
+/// #1681: the pale breath is asked of the ring with its pattern, renewed
+/// while the trigger holds, and given back when it ends; the person's light
+/// is never touched.
+#[test]
+fn a_breath_until_it_ends_is_asked_of_the_ring_and_given_back_when_the_trigger_ends() {
+    let seen = the_program_timed(
+        BREATH_WHILE,
+        true,
+        &[],
+        3,
+        1,
+        4,
+        (Ring::Asked, After::Leaves(None)),
+        false,
+    );
+    assert!(seen.lights.is_empty(), "{:?}", seen.lights);
+    let done = &seen.events[3].why;
+    assert!(
+        done.contains(
+            "light white: asked of the ring at level 2, breathing every 10000 ms down to 1"
+        ) && done.contains("held until its trigger ended")
+            && done.contains("light given back"),
+        "{done}"
+    );
+    assert!(seen.requests.len() >= 2, "{:?}", seen.requests);
+    let (asked, back) = (&seen.requests[0], seen.requests.last().unwrap());
+    assert_eq!(asked.light, Light::new(true, "white", 2).unwrap());
+    assert_eq!(
+        asked.pattern,
+        Some(LightPattern {
+            kind: PatternKind::Breathe,
+            period_ms: 10_000,
+            low: 1,
+        })
+    );
+    assert!(asked.check().is_ok(), "{asked:?}");
+    assert_eq!(back.light, asked.light);
+    assert!(
+        !back.claim.holds_at("boot-test", lamp_ipc::monotonic_us()),
+        "{back:?}"
+    );
+}
+
+/// #1681: without the ring the breath is the actions part's steady pale
+/// light, held until the trigger ends and then given back.
+#[test]
+fn a_breath_until_it_ends_without_the_ring_is_held_steady_and_given_back() {
+    let seen = the_program_then(BREATH_WHILE, true, &[], 3, 1, 4, Some(None));
+    let done = &seen.events[3];
+    assert_eq!(done.stage, SkillStage::Done, "{:?}", seen.events);
+    assert!(
+        done.why.contains("steady: its pattern needs the ring's")
+            && done.why.contains("held until its trigger ended")
+            && done.why.contains("light given back to on blue at 3"),
+        "{}",
+        done.why
+    );
+    assert_eq!(seen.lights.len(), 4, "{:?}", seen.lights);
+    assert!(seen.lights[0].contains("\"white\""), "{:?}", seen.lights);
+    assert!(seen.lights[1].contains("light_dimmer"), "{:?}", seen.lights);
+    assert!(seen.lights[2].contains("\"blue\""), "{:?}", seen.lights);
+    assert!(
+        seen.lights[3].contains("light_brighter"),
+        "{:?}",
+        seen.lights
+    );
+}
+
+/// #1681: a light the person changed while the breath was held is theirs.
+#[test]
+fn a_light_changed_while_a_breath_was_held_is_left_as_it_is() {
+    let theirs = Light::new(true, "red", 5).unwrap();
+    let seen = the_program_then(BREATH_WHILE, true, &[], 3, 1, 4, Some(Some(theirs)));
+    let done = &seen.events[3];
+    assert!(
+        done.why
+            .contains("changed meanwhile or not known, so left as it is"),
+        "{}",
+        done.why
+    );
+    assert_eq!(seen.lights.len(), 2, "{:?}", seen.lights);
+}
+
+/// #1681: the breath held, its skill's folder removed while the trigger
+/// still holds: the reload gives the light back and the run is done.
+#[test]
+fn a_breath_held_until_it_ends_is_given_back_when_its_skill_is_removed() {
+    let seen = the_program_timed(
+        BREATH_WHILE,
+        true,
+        &[],
+        3,
+        1,
+        4,
+        (Ring::Off, After::Removed),
+        false,
+    );
+    let done = &seen.events[3];
+    assert_eq!(done.stage, SkillStage::Done, "{:?}", seen.events);
+    assert!(
+        done.why.contains("held until its trigger ended")
+            && done.why.contains("light given back to on blue at 3"),
+        "{}",
+        done.why
+    );
+    assert_eq!(seen.lights.len(), 4, "{:?}", seen.lights);
+    assert!(seen.lights[2].contains("\"blue\""), "{:?}", seen.lights);
+    assert!(
+        seen.lights[3].contains("light_brighter"),
+        "{:?}",
+        seen.lights
+    );
+}
+
+/// #1681: a colour takes `until = "ends"`, held and named so; never with a
+/// `for` of its own or `keep`.
+#[test]
+fn a_colour_until_it_ends_is_loaded_and_refused_with_a_for_or_keep() {
+    let dir = tempfile::tempdir().unwrap();
+    let line = r#"light = { colour = "white", level = 2, pattern = { kind = "breathe", period = "10s", low = 1 }, until = "ends" }"#;
+    let with = |name: &str, light: &str| {
+        skill_with(
+            dir.path(),
+            name,
+            &BREATH_WHILE.replace(line, &format!("light = {light}")),
+        )
+    };
+    let skill = load(&with(
+        "breath",
+        r#"{ colour = "white", level = 2, pattern = { kind = "breathe", period = "10s", low = 1 }, until = "ends" }"#,
+    ))
+    .unwrap();
+    assert_eq!(skill.triggers.len(), 1);
+    let held = Call::Light {
+        colour: "white".into(),
+        level: Some(2),
+        lasting: None,
+        pattern: None,
+        keep: false,
+        until_ends: true,
+    };
+    assert!(held.held_until_ends());
+    assert_eq!(
+        held.named(),
+        (
+            "light",
+            serde_json::json!({"colour": "white", "level": 2, "until": "ends"})
+        )
+    );
+    load(&with("steady", r#"{ colour = "white", until = "ends" }"#)).unwrap();
+    for (name, light) in [
+        (
+            "lasting",
+            r#"{ colour = "white", for = "4s", until = "ends" }"#,
+        ),
+        (
+            "kept",
+            r#"{ colour = "white", keep = true, until = "ends" }"#,
+        ),
+    ] {
+        let refused = load(&with(name, light)).unwrap_err();
+        assert!(
+            refused.contains("with a colour takes no for and no keep"),
+            "{name}: {refused}"
+        );
+    }
 }
 
 /// Stuffy air's trigger and quiet hours, as #1021 asks, with no condition.
@@ -5814,7 +6138,8 @@ fn the_tools_socket_lost_is_made_again_and_the_folder_gone_ends_lamp_skills() {
     // The folder gone, under a parent it cannot write.
     fs::remove_dir_all(&tools).unwrap();
     fs::set_permissions(&run, fs::Permissions::from_mode(0o555)).unwrap();
-    clock.skip(RELOAD);
+    // It ends on this skip, and may before its answer is written.
+    clock.skip_ending(RELOAD);
     let deadline = Instant::now() + Duration::from_secs(10);
     let status = loop {
         if let Some(status) = child.try_wait().unwrap() {
@@ -5850,6 +6175,33 @@ struct ToolProgram {
 }
 
 impl ToolProgram {
+    /// The voice says what it heard: `text`, finished. A search ends on
+    /// words heard, not on the voice merely listening (#1871).
+    fn heard(&self, text: &str) {
+        self.heard_in(text, None);
+    }
+
+    /// `text` heard on `voice/heard` as part of turn `request`.
+    fn heard_in(&self, text: &str, request: Option<u64>) {
+        let bus = Bus::new(self._dir.path().join("bus")).unwrap();
+        bus.publisher_declared(
+            lamp_msgs::Speech::TOPICS[0],
+            &lamp_msgs::Speech::declaration(),
+            "voice",
+        )
+        .unwrap()
+        .publish_json(
+            1,
+            &lamp_msgs::Speech {
+                text: text.into(),
+                finished: true,
+                locale: None,
+                request,
+            },
+        )
+        .unwrap();
+    }
+
     /// With the skill `name` of `toml` and its `shows/`, the light shown
     /// blue at 3, ready for a call.
     fn with(name: &str, toml: &str, shows: &[(&str, &str)]) -> Self {
@@ -6247,6 +6599,21 @@ fn the_loader_holds_kept_lights_shows_turns_and_choices_to_their_rules() {
             "tool = \"t\"\n[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\ndefault = \"z\"\n[[do]]\nsay = \"Hi.\"\n".into(),
             "its default",
         ),
+        // #1669 (e): a choice read from the trigger's field is a trigger's
+        // alone, with no tool and no default.
+        (
+            "tool = \"t\"\n[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\nfield = \"side\"\n[[do]]\nsay = \"Hi.\"\n".into(),
+            "a trigger's",
+        ),
+        // With a trigger too: the tool alone refuses it (the reviewer on #2012).
+        (
+            format!("tool = \"t\"\n{TRIGGERED}[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\nfield = \"side\"\n[[do]]\nif_choice = [\"a\"]\nlight = {{ colour = \"warm\" }}\n"),
+            "a trigger's",
+        ),
+        (
+            format!("{TRIGGERED}[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\nfield = \"side\"\ndefault = \"a\"\n[[do]]\nif_choice = [\"a\"]\nlight = {{ colour = \"warm\" }}\n"),
+            "no default",
+        ),
     ]
     .into_iter()
     .enumerate()
@@ -6333,6 +6700,359 @@ fn a_step_for_some_choices_is_made_only_for_them_and_the_default_stands_in() {
         );
         assert_eq!(relax[1].1["colour"], "warm");
     }
+}
+
+/// A search of three looks (#1685), the desk first.
+const SEARCH: &str = r#"
+tool = "look_for"
+[choice]
+name = "place"
+about = "Where."
+one_of = ["desk", "left", "right"]
+default = "desk"
+[search]
+looks = 3
+give_up = "Say kindly you can't see it from here."
+[[do]]
+body = { mood = "reading", for = "10s" }
+light = { colour = "white", for = "10s" }
+look = true
+say = "Say what you see."
+[[do]]
+if_choice = ["left"]
+body = { mood = "reading", for = "10s", toward = -0.5 }
+[[do]]
+if_choice = ["right"]
+body = { mood = "reading", for = "10s", toward = 0.5 }
+"#;
+
+/// #1685: a search's first look is at the desk when the call names no
+/// place, each look after it where it is asked, and none past its looks:
+/// the model is told to give up kindly and nothing more moves. (A first
+/// look that names a place is made there: below, after someone speaks.)
+#[test]
+fn a_search_looks_at_the_desk_first_then_where_asked_and_no_more_than_its_looks() {
+    let program = ToolProgram::with("look", SEARCH, &[]);
+    let plain = r#"{"level":0,"mood":"reading"}"#;
+    let left = r#"{"level":0,"mood":"reading","toward":-0.5}"#;
+    let right = r#"{"level":0,"mood":"reading","toward":0.5}"#;
+    // No place named: the desk.
+    let first = program.call("look_for", "{}");
+    assert_eq!(first["ok"], true, "{first}");
+    assert_eq!(first["result"]["look"], true, "{first}");
+    assert_eq!(program.colours(1), ["white"]);
+    let desk = program.poses(Duration::from_secs(1));
+    assert!(
+        !desk.is_empty() && desk.iter().all(|pose| pose == plain),
+        "{desk:?}"
+    );
+    assert_eq!(program.call("look_for", r#"{"place":"left"}"#)["ok"], true);
+    assert!(program.said().iter().any(|pose| pose == left));
+    assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
+    assert!(program.said().iter().any(|pose| pose == right));
+    // The fourth look is past its three: refused, the model told to give
+    // up, and the head left where it was, on the right.
+    let fourth = program.call("look_for", r#"{"place":"left"}"#);
+    assert_eq!(fourth["ok"], false, "{fourth}");
+    assert_eq!(fourth["error"], "Say kindly you can't see it from here.");
+    let after = program.poses(Duration::from_secs(2));
+    assert!(
+        !after.is_empty() && after.iter().all(|pose| pose == right),
+        "{after:?}"
+    );
+    // The light was made once, by the first look.
+    assert_eq!(program.colours(0), Vec::<String>::new());
+}
+
+/// #1685: someone speaking ends a search within a fifth of a second: its
+/// pose let go, so the head comes back up, and the light given back. The
+/// next ask is a new search, its first look where it is asked: "try the
+/// left" mid-search looks to the left, not at the desk again (the peer
+/// read on #1766).
+#[test]
+fn someone_speaking_ends_a_search_its_pose_and_its_light() {
+    let mut program = ToolProgram::with("look", SEARCH, &[]);
+    assert_eq!(program.call("look_for", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
+    let held = program.poses(Duration::from_secs(1));
+    assert!(!held.is_empty(), "{held:?}");
+    program
+        .voice
+        .publish_json(
+            1,
+            &VoiceState {
+                state: lamp_msgs::Voice::Listening,
+            },
+        )
+        .unwrap();
+    program.heard("try the left");
+    program.clock.skip(Duration::from_millis(300));
+    // Given back well before the search's ten seconds.
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        ["blue"]
+    );
+    let _before = program.said();
+    assert_eq!(program.poses(Duration::from_secs(3)), Vec::<String>::new());
+    // The voice resting again, "try the left": a new search, on the left.
+    program
+        .voice
+        .publish_json(
+            1,
+            &VoiceState {
+                state: lamp_msgs::Voice::Resting,
+            },
+        )
+        .unwrap();
+    // The ended run said done to the program's loop meanwhile.
+    std::thread::sleep(Duration::from_millis(300));
+    assert_eq!(program.call("look_for", r#"{"place":"left"}"#)["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    // Its steps' poses in order, the turned one last, which the body
+    // keeps: never the desk alone.
+    let again = program.said();
+    assert_eq!(
+        again.last().map(String::as_str),
+        Some(r#"{"level":0,"mood":"reading","toward":-0.5}"#),
+        "{again:?}"
+    );
+}
+
+/// #1871 (Fifth's row 3 on lamp-52e6): a line of office noise, the voice
+/// listening and 0 words heard, ended a search after its first look. Now
+/// only words end it: the voice listening to a line with none goes on, the
+/// pose held and the light kept; words then end it as before.
+#[test]
+fn a_line_with_no_words_does_not_end_a_search() {
+    let mut program = ToolProgram::with("look", SEARCH, &[]);
+    assert_eq!(program.call("look_for", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
+    let held = program.poses(Duration::from_secs(1));
+    assert!(!held.is_empty(), "{held:?}");
+    program
+        .voice
+        .publish_json(
+            1,
+            &VoiceState {
+                state: lamp_msgs::Voice::Listening,
+            },
+        )
+        .unwrap();
+    program.heard("");
+    program.heard(" ... ");
+    program.clock.skip(Duration::from_millis(300));
+    // Still looking: no light given back, and the pose still said.
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        Vec::<String>::new()
+    );
+    assert!(!program.poses(Duration::from_secs(1)).is_empty());
+    // Words end it.
+    program.heard("stop");
+    program.clock.skip(Duration::from_millis(300));
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        ["blue"]
+    );
+}
+
+/// The reviewer on #2179: on Live the last pieces of the line that asked
+/// for the search can be published after the call. Words of the asking turn
+/// do not end the search; words of a later turn do.
+#[test]
+fn the_asking_lines_late_words_do_not_end_its_search() {
+    let program = ToolProgram::with("look", SEARCH, &[]);
+    program.heard_in("lamp, can you look", Some(4));
+    assert_eq!(program.call("look_for", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
+    let held = program.poses(Duration::from_secs(1));
+    assert!(!held.is_empty(), "{held:?}");
+    program.heard_in("lamp, can you look for my keys?", Some(4));
+    program.clock.skip(Duration::from_millis(300));
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        Vec::<String>::new()
+    );
+    assert!(!program.poses(Duration::from_secs(1)).is_empty());
+    program.heard_in("found them", Some(5));
+    program.clock.skip(Duration::from_millis(300));
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        ["blue"]
+    );
+}
+
+/// #1685: the lamp paused ends a search as someone speaking does: its pose
+/// let go within a fifth of a second and its light given back, well before
+/// its ten seconds (the peer read on #1766).
+#[test]
+fn a_pause_ends_a_search_its_pose_and_its_light() {
+    let program = ToolProgram::with("look", SEARCH, &[]);
+    assert_eq!(program.call("look_for", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
+    let held = program.poses(Duration::from_secs(1));
+    assert!(!held.is_empty(), "{held:?}");
+    let bus = Bus::new(program._dir.path().join("bus")).unwrap();
+    let mut pause = bus
+        .publisher_declared(
+            lamp_msgs::Pause::TOPIC,
+            &lamp_msgs::Pause::declaration(),
+            "voice",
+        )
+        .unwrap();
+    pause
+        .publish_json(1, &lamp_msgs::Pause { paused: true })
+        .unwrap();
+    program.clock.skip(Duration::from_millis(300));
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        ["blue"]
+    );
+    let _before = program.said();
+    assert_eq!(program.poses(Duration::from_secs(3)), Vec::<String>::new());
+}
+
+/// #1685: a search's looks as the loader holds them: in a skill a person
+/// starts by its tool, with a look and a choice with a default; a few looks
+/// and words to give up with. Its next look's arguments: as asked, the
+/// default first when none is named, then none.
+#[test]
+fn a_search_is_held_to_its_rules_and_its_looks_are_counted() {
+    let dir = tempfile::tempdir().unwrap();
+    let search = load(&skill_with(dir.path(), "look", SEARCH)).unwrap();
+    let left = serde_json::json!({"place": "left"});
+    // A place named is looked at, even first; none named, the desk.
+    assert_eq!(search.search_look(&left, 0).unwrap(), left);
+    assert_eq!(
+        search.search_look(&serde_json::json!({}), 0).unwrap(),
+        serde_json::json!({"place": "desk"})
+    );
+    assert_eq!(search.search_look(&left, 1).unwrap(), left);
+    assert_eq!(search.search_look(&left, 2).unwrap(), left);
+    assert_eq!(
+        search.search_look(&left, 3).unwrap_err(),
+        "Say kindly you can't see it from here."
+    );
+    // Its poses end when someone speaks; another skill's do not.
+    let poses = |skill: &lamp_skills::Skill| -> Vec<serde_json::Value> {
+        let mut engine = Engine::new(vec![skill.clone()], true);
+        engine
+            .tool(skill.tool.as_deref().unwrap(), &left, 1_000_000)
+            .unwrap()
+            .calls
+            .iter()
+            .map(Call::named)
+            .filter(|(name, _)| *name == "body.mood")
+            .map(|(_, args)| args)
+            .collect()
+    };
+    assert!(
+        poses(&search)
+            .iter()
+            .all(|args| args["until_spoken"] == true)
+    );
+    let point = load(&skill_with(
+        dir.path(),
+        "point",
+        &SEARCH.replace(
+            "[search]\nlooks = 3\ngive_up = \"Say kindly you can't see it from here.\"\n",
+            "",
+        ),
+    ))
+    .unwrap();
+    assert!(
+        poses(&point)
+            .iter()
+            .all(|args| args.get("until_spoken").is_none())
+    );
+    assert_eq!(point.search_look(&left, 9).unwrap(), left);
+    for (number, (from, to, why)) in [
+        ("tool = \"look_for\"", "tool = \"look_for\"\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n[ask]\npolicy = \"hello\"", "started by its tool alone"),
+        ("look = true\n", "", "with look = true"),
+        ("default = \"desk\"\n", "", "with a default"),
+        ("looks = 3", "looks = 0", "1 to 8"),
+        ("looks = 3", "looks = 9", "1 to 8"),
+        ("give_up = \"Say kindly you can't see it from here.\"", "give_up = \" \"", "at most 256 bytes"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let toml = SEARCH.replace(from, to);
+        assert_ne!(toml, SEARCH, "{from}");
+        let error = load(&skill_with(dir.path(), &format!("bad{number}"), &toml)).unwrap_err();
+        assert!(error.contains(why), "{to}: {error}");
+    }
+}
+
+/// #1685: a look made late in a search holds its pose past the run's own
+/// end; someone speaking then still lets it go within a fifth of a second,
+/// by the pose's own look at the voice.
+#[test]
+fn a_searchs_pose_held_past_its_run_still_ends_when_someone_speaks() {
+    a_searchs_pose_held_past_its_run_ends(false);
+}
+
+/// The same with the lamp paused (the peer read on #1766).
+#[test]
+fn a_searchs_pose_held_past_its_run_still_ends_when_the_lamp_is_paused() {
+    a_searchs_pose_held_past_its_run_ends(true);
+}
+
+fn a_searchs_pose_held_past_its_run_ends(paused: bool) {
+    // The windows whose poses are not counted are skipped at once and read
+    // after, not stepped a second at a time with a read each (#1806): the
+    // desk's eight seconds only put the second look late, and a hold that
+    // was not let go would show in a skip of three seconds as in steps. The
+    // held window is stepped, a pose a second as the lamp sends them.
+    let skipped = |program: &ToolProgram, window: Duration| {
+        program.clock.skip(window);
+        program.said()
+    };
+    let mut program = ToolProgram::with("look", SEARCH, &[]);
+    let right = r#"{"level":0,"mood":"reading","toward":0.5}"#;
+    assert_eq!(program.call("look_for", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    let _desk = skipped(&program, Duration::from_secs(8));
+    assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
+    // The run's ten seconds end: its light given back, the right still held.
+    let held = program.poses(Duration::from_secs(3));
+    assert_eq!(program.colours(1), ["blue"]);
+    assert!(
+        held.iter().filter(|pose| *pose == right).count() >= 2,
+        "{held:?}"
+    );
+    if paused {
+        let bus = Bus::new(program._dir.path().join("bus")).unwrap();
+        bus.publisher_declared(
+            lamp_msgs::Pause::TOPIC,
+            &lamp_msgs::Pause::declaration(),
+            "voice",
+        )
+        .unwrap()
+        .publish_json(1, &lamp_msgs::Pause { paused: true })
+        .unwrap();
+    } else {
+        program
+            .voice
+            .publish_json(
+                1,
+                &VoiceState {
+                    state: lamp_msgs::Voice::Listening,
+                },
+            )
+            .unwrap();
+        program.heard("found them");
+    }
+    program.clock.skip(Duration::from_millis(300));
+    let _before = program.said();
+    assert_eq!(
+        skipped(&program, Duration::from_secs(3)),
+        Vec::<String>::new()
+    );
 }
 
 /// The first tier of #1684's design as a trigger: PM2.5 up at least 100
@@ -6741,6 +7461,2296 @@ fn exact_words_reach_the_voice_unchanged_at_their_priority() {
     assert!(done.contains("light given back to on blue at 3"), "{done}");
 }
 
+/// A nudge started by a stuffy room, as the nudges' limits are tested with
+/// (#1685): `top` is the limits, `trigger` added to the trigger.
+fn nudge_skill(dir: &Path, name: &str, top: &str, trigger: &str) -> lamp_skills::Skill {
+    load(&skill_with(
+        dir,
+        name,
+        &format!(
+            "{top}\n[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n{trigger}\n[ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ colour = \"warm\", for = \"5s\" }}\n"
+        ),
+    ))
+    .unwrap()
+}
+
+/// Once each stuffy spell: a chance had is spent until the air is good
+/// again for ten minutes, as Stuffy air's.
+const ONCE: &str = "rearm = { below = 1000, for = \"10m\" }";
+
+/// The skills a stuffy-room reading at `at_ms` starts.
+fn stuffy(engine: &mut Engine, at_ms: u64) -> Vec<String> {
+    engine
+        .observe("air/indoor", at_ms * 1_000, br#"{"co2":1200}"#, None)
+        .into_iter()
+        .filter(|run| !run.calls.is_empty())
+        .map(|run| run.skill)
+        .collect()
+}
+
+/// #1685: `most_a_day` lets a skill start itself that many times a local
+/// day, counted from the local date with the time known: after midnight it
+/// may again.
+#[test]
+fn most_a_day_lets_a_skill_start_itself_that_often_a_local_day() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = nudge_skill(dir.path(), "sip", "most_a_day = 2", "");
+    assert_eq!(skill.most_a_day, Some(2));
+    let mut engine = Engine::new(vec![skill], true);
+    // 23:59:57 local (UTC+7) at 0 s.
+    engine.clock(420, 0, 1_792_429_197_000);
+    let runs: Vec<usize> = (0..6)
+        .map(|at| stuffy(&mut engine, at * 1_000).len())
+        .collect();
+    // 23:59:57 and :58, not :59; 00:00:00 and :01 again, not :02.
+    assert_eq!(runs, [1, 1, 0, 1, 1, 0]);
+}
+
+/// #1685: `[active]` lets a skill start itself only between its hours. A
+/// chance outside them is kept, as in the quiet hours, and taken at the
+/// trigger's first message once they begin; with the local time not known,
+/// never.
+#[test]
+fn an_active_window_starts_a_skill_only_between_its_hours() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = || {
+        nudge_skill(
+            dir.path(),
+            "sip",
+            "[active]\nfrom = \"10:00\"\nto = \"17:00\"",
+            ONCE,
+        )
+    };
+    // 09:59:58 local at 0 s.
+    let mut engine = Engine::new(vec![skill()], true);
+    engine.clock(0, 0, 1_792_403_998_000);
+    let runs: Vec<usize> = (0..4)
+        .map(|at| stuffy(&mut engine, at * 1_000).len())
+        .collect();
+    assert_eq!(runs, [0, 0, 1, 0]);
+    // 16:59:59 local at 0 s: none at 17:00 on.
+    let mut evening = Engine::new(vec![skill()], true);
+    evening.clock(0, 0, 1_792_429_199_000);
+    let runs: Vec<usize> = (1..4)
+        .map(|at| stuffy(&mut evening, at * 1_000).len())
+        .collect();
+    assert_eq!(runs, [0, 0, 0]);
+    let mut unknown = Engine::new(vec![skill()], true);
+    assert!((0..4).all(|at| stuffy(&mut unknown, at * 1_000).is_empty()));
+}
+
+/// #1685: a `[budget]` is shared by its group: its runs an hour between
+/// them, the smallest `per_hour` a member names. The second's chance is
+/// kept, and taken once the hour since the first has passed. A skill in no
+/// group is not held back.
+#[test]
+fn a_shared_budget_gives_its_group_its_runs_an_hour_between_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = nudge_skill(
+        dir.path(),
+        "sip",
+        "[budget]\ngroup = \"nudges\"\nper_hour = 1",
+        ONCE,
+    );
+    let second = nudge_skill(
+        dir.path(),
+        "eyes",
+        "[budget]\ngroup = \"nudges\"\nper_hour = 2",
+        ONCE,
+    );
+    assert_eq!(second.budget, Some(("nudges".to_owned(), 2)));
+    let alone = nudge_skill(dir.path(), "other", "", ONCE);
+    let mut engine = Engine::new(vec![first, second, alone], true);
+    assert_eq!(stuffy(&mut engine, 0), ["sip", "other"]);
+    assert!(stuffy(&mut engine, 1_800_000).is_empty());
+    assert!(stuffy(&mut engine, 3_599_999).is_empty());
+    assert_eq!(stuffy(&mut engine, 3_600_000), ["eyes"]);
+    // Two an hour between two that both say two.
+    let two = |name: &str| {
+        nudge_skill(
+            dir.path(),
+            name,
+            "[budget]\ngroup = \"breaks\"\nper_hour = 2",
+            ONCE,
+        )
+    };
+    let mut engine = Engine::new(vec![two("a"), two("b"), two("c")], true);
+    assert_eq!(stuffy(&mut engine, 0), ["a", "b"]);
+    assert!(stuffy(&mut engine, 60_000).is_empty());
+}
+
+/// A face at the desk, a fifth of the picture wide, its box from `left`
+/// and `top` and `tall` of the picture, turned to the lamp or not.
+fn desk_face(left: f32, top: f32, tall: f32, facing: bool) -> String {
+    format!(
+        r#"{{"faces":[{{"id":"a","xmin":{left},"ymin":{top},"xmax":{},"ymax":{},"confidence":0.9,"facing":{facing}}}]}}"#,
+        left + 0.2,
+        top + tall
+    )
+}
+
+/// The face as the run began: centred across, its centre 0.4 down, 0.2
+/// tall.
+fn seated(facing: bool) -> String {
+    desk_face(0.4, 0.3, 0.2, facing)
+}
+
+fn faces(engine: &mut Engine, at_ms: u64, faces: &str) {
+    engine.observe(
+        "humans/faces/tracked",
+        at_ms * 1_000,
+        faces.as_bytes(),
+        None,
+    );
+}
+
+fn heard(engine: &mut Engine, at_ms: u64, text: &str) {
+    engine.observe(
+        "voice/heard",
+        at_ms * 1_000,
+        format!(r#"{{"text":"{text}","finished":true}}"#).as_bytes(),
+        None,
+    );
+}
+
+/// A resting nudge every 20 s, its while 10 s, resting after `after`
+/// unnoticed.
+fn resting_skill(dir: &Path, after: u32) -> lamp_skills::Skill {
+    nudge_skill(
+        dir,
+        "sip",
+        &format!("[rest]\nafter_ignored = {after}\nwithin = \"10s\""),
+        "cooldown = \"20s\"",
+    )
+}
+
+/// #1685: `[rest]`. A run nobody noticed in its while (no face turned to
+/// the lamp, the face not moved, nothing heard, someone still in view)
+/// counts; after `after_ignored` of them in a row the skill rests until the
+/// next local 06:00, or 12 h with the local time not known.
+#[test]
+fn a_skill_rests_until_the_morning_after_runs_nobody_noticed() {
+    let dir = tempfile::tempdir().unwrap();
+    // 20:59:28 local (UTC+7) at 0 s, so the second run's while ends at
+    // 21:00:00 local, nine hours before the morning.
+    for (clock, rests_s) in [
+        (None, 32 + 12 * 3_600),
+        (Some(1_792_418_368_000), 32 + 9 * 3_600),
+    ] {
+        let mut engine = Engine::new(vec![resting_skill(dir.path(), 2)], true);
+        if let Some(unix_ms) = clock {
+            engine.clock(420, 0, unix_ms);
+        }
+        assert!(engine.topics().contains(&"humans/faces/tracked".to_owned()));
+        assert!(engine.topics().contains(&"voice/heard".to_owned()));
+        for (at, ran) in [(0, 1), (21, 1), (42, 0)] {
+            faces(&mut engine, at * 1_000, &seated(false));
+            assert_eq!(stuffy(&mut engine, at * 1_000).len(), ran, "at {at} s");
+            // Shifting a little, and nothing that is words.
+            faces(
+                &mut engine,
+                (at + 5) * 1_000,
+                &desk_face(0.45, 0.3, 0.22, false),
+            );
+            heard(&mut engine, (at + 6) * 1_000, " ");
+            faces(&mut engine, (at + 11) * 1_000, &seated(false));
+        }
+        assert_eq!(
+            engine.resting_until("sip", 42_000_000),
+            Some(rests_s * 1_000_000)
+        );
+        assert!(stuffy(&mut engine, rests_s * 1_000 - 1).is_empty());
+        assert_eq!(stuffy(&mut engine, rests_s * 1_000).len(), 1, "the morning");
+        assert_eq!(engine.resting_until("sip", rests_s * 1_000_000), None);
+    }
+    // One unnoticed is not two.
+    let mut engine = Engine::new(vec![resting_skill(dir.path(), 2)], true);
+    faces(&mut engine, 0, &seated(false));
+    stuffy(&mut engine, 0);
+    engine.tick(11_000_000);
+    assert_eq!(engine.resting_until("sip", 11_000_000), None);
+}
+
+/// #1685: with the Policy asked, a run is watched for once it is made (its
+/// answer `say_now`, the program telling [`Engine::made`]): a run it said no
+/// to showed nothing, so is not one nobody noticed. The day's most and the
+/// budget count it when asked, as the cooldown does.
+#[test]
+fn with_the_policy_asked_only_a_run_made_can_be_ignored() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut engine = Engine::new(vec![resting_skill(dir.path(), 1)], false).asking_the_policy();
+    faces(&mut engine, 0, &seated(false));
+    let asked = engine.observe("air/indoor", 0, br#"{"co2":1200}"#, None);
+    assert!(asked.iter().all(|run| run.ask.is_some()), "{asked:?}");
+    engine.tick(11_000_000);
+    assert_eq!(engine.resting_until("sip", 11_000_000), None, "said no");
+    faces(&mut engine, 21_000, &seated(false));
+    assert_eq!(
+        engine
+            .observe("air/indoor", 21_000_000, br#"{"co2":1200}"#, None)
+            .len(),
+        1
+    );
+    engine.made("sip", 22_000_000);
+    engine.tick(31_500_000);
+    assert_eq!(engine.resting_until("sip", 31_500_000), None, "its while");
+    engine.tick(32_001_000);
+    assert!(engine.resting_until("sip", 32_001_000).is_some(), "made");
+    let mut engine = Engine::new(
+        vec![nudge_skill(dir.path(), "once", "most_a_day = 1", "")],
+        false,
+    )
+    .asking_the_policy();
+    assert_eq!(
+        engine
+            .observe("air/indoor", 0, br#"{"co2":1200}"#, None)
+            .len(),
+        1
+    );
+    assert!(
+        engine
+            .observe("air/indoor", 1_000_000, br#"{"co2":1200}"#, None)
+            .is_empty()
+    );
+}
+
+/// #1685: a run is noticed, and the count of runs nobody noticed begins
+/// again, by a face turned to the lamp, the face moved across or down,
+/// nearer or farther, a word, or nobody left in view as its while ends:
+/// each alone keeps a skill resting after one from resting; nothing of it
+/// rests it.
+#[test]
+fn a_run_noticed_by_a_look_a_move_a_word_or_leaving_is_not_ignored() {
+    let dir = tempfile::tempdir().unwrap();
+    for how in [
+        "nothing", "turned", "across", "down", "nearer", "farther", "a word", "gone",
+    ] {
+        let mut engine = Engine::new(vec![resting_skill(dir.path(), 1)], true);
+        faces(&mut engine, 0, &seated(false));
+        assert_eq!(stuffy(&mut engine, 0).len(), 1, "{how}");
+        faces(&mut engine, 4_000, &seated(false));
+        match how {
+            "turned" => faces(&mut engine, 5_000, &seated(true)),
+            "across" => faces(&mut engine, 5_000, &desk_face(0.6, 0.3, 0.2, false)),
+            "down" => faces(&mut engine, 5_000, &desk_face(0.4, 0.5, 0.2, false)),
+            "nearer" => faces(&mut engine, 5_000, &desk_face(0.4, 0.25, 0.3, false)),
+            "farther" => faces(&mut engine, 5_000, &desk_face(0.4, 0.35, 0.14, false)),
+            "a word" => heard(&mut engine, 5_000, "not now"),
+            "gone" => faces(&mut engine, 9_000, NOBODY),
+            _ => {}
+        }
+        // After its while, nothing counts: someone turning to it then.
+        engine.tick(10_001_000);
+        faces(&mut engine, 10_500, &seated(true));
+        assert_eq!(
+            engine.resting_until("sip", 11_000_000).is_some(),
+            how == "nothing",
+            "{how}"
+        );
+    }
+    // Turned to it after the while: still ignored.
+    let mut engine = Engine::new(vec![resting_skill(dir.path(), 1)], true);
+    faces(&mut engine, 0, &seated(false));
+    stuffy(&mut engine, 0);
+    faces(&mut engine, 10_500, &seated(true));
+    assert!(engine.resting_until("sip", 11_000_000).is_some());
+}
+
+/// #1685: the limits are held to what they are for: each on what a skill
+/// starts itself, a group a plain name, the counts and whiles in bounds.
+#[test]
+fn the_nudge_limits_are_held_to_their_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    let trigger = "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n";
+    let each = "[trigger]\ntopic = \"tasks/status\"\neach = \"settled\"\nkey = \"task\"\nfield = \"state\"\nequals = \"idle\"\nwhen = \"appears\"\n[ask]\npolicy = \"nudge\"\n";
+    let step = "[[do]]\nlight = { colour = \"warm\", for = \"5s\" }\n";
+    for (number, (limit, head, why)) in [
+        (
+            "tool = \"t\"\nmost_a_day = 2\n",
+            "",
+            "in a skill with a trigger",
+        ),
+        (
+            "tool = \"t\"\n[active]\nfrom = \"10:00\"\nto = \"17:00\"\n",
+            "",
+            "in a skill with a trigger",
+        ),
+        (
+            "[budget]\ngroup = \"nudges\"\nper_hour = 1\n",
+            each,
+            "not an each trigger",
+        ),
+        ("[rest]\nafter_ignored = 2\n", each, "not an each trigger"),
+        ("most_a_day = 0\n", trigger, "most_a_day is 1 to 24"),
+        ("most_a_day = 25\n", trigger, "most_a_day is 1 to 24"),
+        (
+            "[active]\nfrom = \"10:00\"\nto = \"10:00\"\n",
+            trigger,
+            "different times",
+        ),
+        (
+            "[active]\nfrom = \"25:00\"\nto = \"10:00\"\n",
+            trigger,
+            "not a time of day",
+        ),
+        (
+            "[budget]\ngroup = \"Nudges\"\nper_hour = 1\n",
+            trigger,
+            "lowercase letters",
+        ),
+        (
+            "[budget]\ngroup = \"my_nudges\"\nper_hour = 1\n",
+            trigger,
+            "lowercase letters",
+        ),
+        (
+            "[budget]\ngroup = \"nudges\"\nper_hour = 0\n",
+            trigger,
+            "per_hour is 1 to 6",
+        ),
+        (
+            "[budget]\ngroup = \"nudges\"\nper_hour = 7\n",
+            trigger,
+            "per_hour is 1 to 6",
+        ),
+        (
+            "[rest]\nafter_ignored = 0\n",
+            trigger,
+            "after_ignored is 1 to 5",
+        ),
+        (
+            "[rest]\nafter_ignored = 6\n",
+            trigger,
+            "after_ignored is 1 to 5",
+        ),
+        (
+            "[rest]\nafter_ignored = 2\nwithin = \"9s\"\n",
+            trigger,
+            "within is 10s to 5m",
+        ),
+        (
+            "[rest]\nafter_ignored = 2\nwithin = \"6m\"\n",
+            trigger,
+            "within is 10s to 5m",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let error = load(&skill_with(
+            dir.path(),
+            &format!("bad{number}"),
+            &format!("{limit}{head}{step}"),
+        ))
+        .unwrap_err();
+        assert!(error.contains(why), "{limit}: {error}");
+    }
+    let good = nudge_skill(
+        dir.path(),
+        "good",
+        "most_a_day = 24\n[active]\nfrom = \"22:00\"\nto = \"06:00\"\n[budget]\ngroup = \"wellbeing-2\"\nper_hour = 6\n[rest]\nafter_ignored = 5",
+        "",
+    );
+    assert_eq!(good.most_a_day, Some(24));
+    assert_eq!(good.budget, Some(("wellbeing-2".to_owned(), 6)));
+    assert_eq!(
+        good.rest,
+        Some(lamp_skills::Rest {
+            after_ignored: 5,
+            within_us: lamp_skills::NOTICED_WITHIN_US
+        })
+    );
+    let edges = nudge_skill(
+        dir.path(),
+        "edges",
+        "most_a_day = 1\n[budget]\ngroup = \"a\"\nper_hour = 1\n[rest]\nafter_ignored = 1\nwithin = \"5m\"",
+        "",
+    );
+    assert_eq!(edges.rest.map(|rest| rest.within_us), Some(300_000_000));
+}
+
+/// A stuffy-room nudge with a `[stop]` function, `stuffy_nudges` (#1685).
+fn stoppable(dir: &Path) -> PathBuf {
+    skill_with(
+        dir,
+        "sip",
+        "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n\
+         [stop]\ntool = \"stuffy_nudges\"\nabout = \"When someone asks you to stop the stuffy-room nudges, for today or for good, or to have them again.\"\n\
+         [[do]]\nlight = { colour = \"warm\", for = \"5s\" }\n",
+    )
+}
+
+/// Whether a stuffy-room reading at `at_s` starts the nudge.
+fn nudges(engine: &mut Engine, at_s: u64) -> bool {
+    engine
+        .observe("air/indoor", at_s * 1_000_000, br#"{"co2":1200}"#, None)
+        .iter()
+        .any(|run| !run.calls.is_empty())
+}
+
+/// What the model is told of `how`, called at `at_s`.
+fn stop(engine: &mut Engine, how: &str, at_s: u64) -> Result<String, String> {
+    engine
+        .tool(
+            "stuffy_nudges",
+            &serde_json::json!({ "how": how }),
+            at_s * 1_000_000,
+        )
+        .map(|run| {
+            lamp_skills::told(&run.calls)["next"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+}
+
+/// #1685: a skill's `[stop]` is one function for the model, its choice
+/// `how`: `snooze` until the next local morning, `off` until it is asked
+/// for again, `on` to have it again. It stops only what the skill starts
+/// itself, and says so to the model in words to pass on.
+#[test]
+fn a_skills_stop_snoozes_it_until_the_morning_or_turns_it_off_until_asked() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = load(&stoppable(dir.path())).unwrap();
+    let tools = tools_file(std::slice::from_ref(&skill));
+    assert_eq!(tools["tools"][0]["name"], "stuffy_nudges");
+    assert_eq!(
+        tools["tools"][0]["parameters"]["properties"]["how"]["enum"],
+        serde_json::json!(["snooze", "off", "on"])
+    );
+    // 20:00 local (UTC+7) at 0 s: the morning is ten hours on.
+    let mut engine = Engine::new(vec![skill.clone()], true);
+    engine.clock(420, 0, 1_792_414_800_000);
+    assert!(nudges(&mut engine, 0));
+    let told = stop(&mut engine, "snooze", 1).unwrap();
+    assert!(told.contains("tomorrow morning"), "{told}");
+    assert!(!nudges(&mut engine, 2));
+    assert!(!nudges(&mut engine, 10 * 3_600 - 1));
+    assert!(nudges(&mut engine, 10 * 3_600));
+    let told = stop(&mut engine, "off", 10 * 3_600 + 1).unwrap();
+    assert!(told.contains("ask"), "{told}");
+    assert!(!nudges(&mut engine, 40 * 3_600));
+    let told = stop(&mut engine, "on", 40 * 3_600 + 1).unwrap();
+    assert!(told.contains("again"), "{told}");
+    assert!(nudges(&mut engine, 40 * 3_600 + 2));
+    // A snooze lifted by `on`; 12 h with the local time not known.
+    let mut engine = Engine::new(vec![skill], true);
+    stop(&mut engine, "snooze", 0).unwrap();
+    assert!(!nudges(&mut engine, 12 * 3_600 - 1));
+    assert!(nudges(&mut engine, 12 * 3_600));
+    stop(&mut engine, "snooze", 12 * 3_600 + 1).unwrap();
+    stop(&mut engine, "on", 12 * 3_600 + 2).unwrap();
+    assert!(nudges(&mut engine, 12 * 3_600 + 3));
+    // Asked wrongly: told how, and nothing changed.
+    for args in [
+        serde_json::json!({}),
+        serde_json::json!({ "how": "later" }),
+        serde_json::json!({ "how": "off", "for": "a week" }),
+        serde_json::json!("off"),
+    ] {
+        let refused = engine.tool("stuffy_nudges", &args, 0).unwrap_err();
+        assert!(refused.contains("snooze, off or on"), "{refused}");
+    }
+    assert!(nudges(&mut engine, 12 * 3_600 + 4));
+}
+
+/// #1685: a `[stop]` is one function a skill, in its tools file beside the
+/// skill's own, so a session's 32 count it once; `lamp-skills list` counts
+/// it. Its name is one skill's, as a tool's is. It is held to its rules:
+/// only in a skill with a trigger, not with `each`, a function's name not
+/// the skill's own tool, and an `about` that says when to call it.
+#[test]
+fn a_skills_stop_is_one_function_held_to_its_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    stoppable(dir.path());
+    // Another skill's by the same name, later in folder order.
+    skill_with(
+        dir.path(),
+        "zz-other",
+        "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n\
+         [stop]\ntool = \"stuffy_nudges\"\nabout = \"Another.\"\n[[do]]\nlight = { colour = \"warm\" }\n",
+    );
+    let (loaded, errors) = load_all(dir.path());
+    assert_eq!(loaded.len(), 1);
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.contains("is the installable skill sip's")),
+        "{errors:?}"
+    );
+    let tools = tools_file(&loaded);
+    assert_eq!(tools["tools"].as_array().unwrap().len(), 1, "{tools}");
+    assert!(
+        tools["tools"][0]["description"]
+            .as_str()
+            .unwrap()
+            .starts_with("When someone asks you to stop")
+    );
+    fs::remove_dir_all(dir.path().join("zz-other")).unwrap();
+    let listed = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+        .args(["list".as_ref(), "--dir".as_ref(), dir.path().as_os_str()])
+        .output()
+        .unwrap();
+    let listed = String::from_utf8_lossy(&listed.stdout);
+    assert!(
+        listed.contains("The skills here give the model 1 function (stuffy_nudges)."),
+        "{listed}"
+    );
+    let trigger = "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n";
+    let each = "[trigger]\ntopic = \"tasks/status\"\neach = \"settled\"\nkey = \"task\"\nfield = \"state\"\nequals = \"idle\"\nwhen = \"appears\"\n[ask]\npolicy = \"nudge\"\n";
+    let step = "[[do]]\nlight = { colour = \"warm\" }\n";
+    let stop =
+        |tool: &str, about: &str| format!("[stop]\ntool = \"{tool}\"\nabout = \"{about}\"\n");
+    let refused = tempfile::tempdir().unwrap();
+    for (number, (head, stop, why)) in [
+        (
+            "tool = \"stuffy\"\n",
+            stop("stuffy_nudges", "When."),
+            "in a skill with a trigger",
+        ),
+        (each, stop("news_off", "When."), "not an each trigger"),
+        (trigger, stop("Stuffy", "When."), "a lowercase letter"),
+        (trigger, stop("9_lives", "When."), "a lowercase letter"),
+        (
+            "tool = \"stuffy\"\n[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n",
+            stop("stuffy", "When."),
+            "not the skill's tool",
+        ),
+        (trigger, stop("stuffy_nudges", " "), "about is 1 to 512 bytes"),
+        (
+            trigger,
+            stop("stuffy_nudges", &"a".repeat(513)),
+            "about is 1 to 512 bytes",
+        ),
+        (
+            trigger,
+            stop("stuffy_nudges", "When.\\tNow."),
+            "no control characters",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let error = load(&skill_with(
+            refused.path(),
+            &format!("bad{number}"),
+            &format!("{head}{stop}{step}"),
+        ))
+        .unwrap_err();
+        assert!(error.contains(why), "{stop}: {error}");
+    }
+    let most = load(&skill_with(
+        refused.path(),
+        "longest",
+        &format!("{trigger}{}{step}", stop("stuffy_nudges", &"a".repeat(512))),
+    ))
+    .unwrap();
+    assert_eq!(most.stop.map(|stop| stop.about.len()), Some(512));
+}
+
+/// #1685: `off` is kept in the part's state folder (`--state-dir`) as one
+/// line, the skill's name, and nothing else: a new engine reading it has the
+/// skill off, and `on` takes the line away. A snooze is never written, so a
+/// new engine has forgotten it. A line that is not a name is passed over.
+#[test]
+fn off_is_kept_as_one_line_a_skill_and_a_snooze_is_not() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    let skill = load(&stoppable(dir.path())).unwrap();
+    let off = state.path().join(lamp_skills::OFF_FILE);
+    let mut engine = Engine::new(vec![skill.clone()], true);
+    assert!(engine.keep_off_in(state.path()).unwrap().is_empty());
+    stop(&mut engine, "snooze", 0).unwrap();
+    assert!(!off.exists());
+    let told = stop(&mut engine, "off", 1).unwrap();
+    assert!(!told.contains("restarts"), "{told}");
+    assert_eq!(fs::read_to_string(&off).unwrap(), "sip\n");
+    // Written beside it and moved over it: nothing left beside it.
+    assert!(!state.path().join("off.new").exists());
+    // The program again, on the same folder.
+    let mut again = Engine::new(vec![skill.clone()], true);
+    assert_eq!(again.keep_off_in(state.path()).unwrap(), ["sip"]);
+    assert!(again.stopped("sip", 0));
+    assert!(!nudges(&mut again, 13 * 3_600));
+    stop(&mut again, "on", 13 * 3_600 + 1).unwrap();
+    assert_eq!(fs::read_to_string(&off).unwrap(), "");
+    assert!(nudges(&mut again, 13 * 3_600 + 2));
+    // A snooze, then the program again: it is forgotten.
+    stop(&mut again, "snooze", 13 * 3_600 + 3).unwrap();
+    assert!(again.stopped("sip", (13 * 3_600 + 4) * 1_000_000));
+    let mut after = Engine::new(vec![skill.clone()], true);
+    after.keep_off_in(state.path()).unwrap();
+    assert!(!after.stopped("sip", 0));
+    assert!(nudges(&mut after, 0));
+    // A line that is not a name passed over; one of a skill not loaded kept.
+    fs::write(&off, "sip\nNot a name\n\nother-skill\n").unwrap();
+    let mut read = Engine::new(vec![skill.clone()], true);
+    assert_eq!(
+        read.keep_off_in(state.path()).unwrap(),
+        ["other-skill", "sip"]
+    );
+    // Kept nowhere: off until the program stops, and the model told so.
+    let mut nowhere = Engine::new(vec![skill], true);
+    let told = stop(&mut nowhere, "off", 0).unwrap();
+    assert!(told.contains("only until the lamp restarts"), "{told}");
+    assert!(!nudges(&mut nowhere, 1));
+}
+
+/// The program on the host's clock with the skills in `root/skills` and
+/// its state in `root/state`, on a bus and a tools folder of its own for
+/// `start`, its trigger's topic subscribed to.
+fn stop_program(root: &Path, start: u32) -> (Running, Bus, PathBuf) {
+    let bus = Bus::new(root.join(format!("bus{start}"))).unwrap();
+    let tools = root.join(format!("tools{start}"));
+    let running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                root.join("skills").as_os_str(),
+                "--bus-root".as_ref(),
+                root.join(format!("bus{start}")).as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--state-dir".as_ref(),
+                root.join("state").as_os_str(),
+                "--actions-socket".as_ref(),
+                root.join("actions.sock").as_os_str(),
+            ])
+            .env("LAMP_SKILLS_ASK", "skip")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("tools.json").exists() || bus.subscribers("air/indoor").unwrap().is_empty() {
+        assert!(Instant::now() < deadline, "the skill was never loaded");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    (running, bus, tools)
+}
+
+/// The model's call of the `[stop]` function with `how`, as the voice
+/// makes it.
+fn call_stop(tools: &Path, how: &str) -> serde_json::Value {
+    let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+    writeln!(
+        &stream,
+        r#"{{"op":"call","name":"stuffy_nudges","args":{{"how":"{how}"}}}}"#
+    )
+    .unwrap();
+    let mut line = String::new();
+    BufReader::new(&stream).read_line(&mut line).unwrap();
+    serde_json::from_str(&line).unwrap()
+}
+
+/// The air part and the skills' events, on one program's bus: one
+/// publisher a start, so each reading is newer than the last.
+struct Air {
+    indoor: lamp_bus::Publisher,
+    events: lamp_bus::Subscriber,
+}
+
+impl Air {
+    fn on(bus: &Bus) -> Self {
+        let air = lamp_bus::Declaration::new("test/Air", 1, lamp_bus::Kind::Latest);
+        Self {
+            indoor: bus.publisher_declared("air/indoor", &air, "air").unwrap(),
+            events: bus.subscribe(SkillEvent::TOPIC, "test").unwrap(),
+        }
+    }
+
+    /// Whether a stuffy-room reading starts the nudge within `wait`: its
+    /// trigger's run, not the model's call of `[stop]`.
+    fn nudged_within(&mut self, wait: Duration) -> bool {
+        self.indoor
+            .publish_json(1, &serde_json::json!({ "co2": 1200 }))
+            .unwrap();
+        let deadline = Instant::now() + wait;
+        while Instant::now() < deadline {
+            if let Some(message) = self.events.recv(Duration::from_millis(50)).unwrap() {
+                let event: SkillEvent = message.parse().unwrap();
+                if event.skill == "sip"
+                    && event.stage == SkillStage::Triggered
+                    && event.why.contains("air/indoor")
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+/// #1685, the program: a skill a person turned off is off again after a
+/// restart, read from `--state-dir`, until they turn it on.
+#[test]
+fn the_program_keeps_a_skill_off_across_a_restart() {
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("so")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    fs::create_dir(root.join("skills")).unwrap();
+    fs::create_dir(root.join("state")).unwrap();
+    stoppable(&root.join("skills"));
+    let (running, bus, tools) = stop_program(root, 1);
+    let mut air = Air::on(&bus);
+    let told = call_stop(&tools, "off");
+    assert!(
+        told["result"]["next"]
+            .as_str()
+            .unwrap()
+            .contains("until they ask"),
+        "{told}"
+    );
+    assert!(!air.nudged_within(Duration::from_millis(800)));
+    drop(running);
+    assert_eq!(fs::read_to_string(root.join("state/off")).unwrap(), "sip\n");
+    let (_running, bus, tools) = stop_program(root, 2);
+    let mut air = Air::on(&bus);
+    assert!(
+        !air.nudged_within(Duration::from_millis(800)),
+        "off after the restart"
+    );
+    let told = call_stop(&tools, "on");
+    assert!(
+        told["result"]["next"].as_str().unwrap().contains("again"),
+        "{told}"
+    );
+    assert!(air.nudged_within(Duration::from_secs(3)), "on again");
+    assert_eq!(fs::read_to_string(root.join("state/off")).unwrap(), "");
+}
+
+/// #1685, the program: a snooze is in memory only, so after a restart the
+/// skill nudges again, and nothing was written.
+#[test]
+fn the_program_forgets_a_snooze_at_a_restart() {
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("sn")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    fs::create_dir(root.join("skills")).unwrap();
+    fs::create_dir(root.join("state")).unwrap();
+    stoppable(&root.join("skills"));
+    let (running, bus, tools) = stop_program(root, 1);
+    let mut air = Air::on(&bus);
+    let told = call_stop(&tools, "snooze");
+    assert!(
+        told["result"]["next"]
+            .as_str()
+            .unwrap()
+            .contains("tomorrow morning"),
+        "{told}"
+    );
+    assert!(!air.nudged_within(Duration::from_millis(800)));
+    drop(running);
+    assert!(!root.join("state/off").exists());
+    let (_running, bus, _tools) = stop_program(root, 2);
+    let mut air = Air::on(&bus);
+    assert!(
+        air.nudged_within(Duration::from_secs(3)),
+        "the snooze forgotten"
+    );
+}
+
+/// Guard mode is a watch (#1685): turned on only by its tool, never by a
+/// trigger; its tool's choice is on and off; its mark is faint and steady;
+/// and it may text, know a face from one it does not know and show its
+/// mark only as its permissions say.
+#[test]
+fn a_watch_is_turned_only_by_its_tool_and_holds_to_its_permissions() {
+    let dir = tempfile::tempdir().unwrap();
+    let loaded = load(&skills_root().join("guard-mode")).unwrap();
+    let watch = loaded.watch.as_ref().unwrap();
+    assert_eq!(watch.every_us, 600_000_000);
+    assert_eq!(watch.asked_within_us, 30_000_000);
+    assert_eq!(watch.most_us, 12 * 3_600_000_000);
+    assert!(
+        watch
+            .if_heard
+            .contains(&vec!["keep".to_owned(), "an".into(), "eye".into()])
+    );
+    assert_eq!(loaded.tool.as_deref(), Some("keep_watch"));
+    assert!(loaded.triggers.is_empty());
+    for (from, to, why) in [
+        (
+            "tool = \"keep_watch\"",
+            "tool = \"keep_watch\"\n[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true",
+            "never on its own",
+        ),
+        (
+            "one_of = [\"on\", \"off\"]",
+            "one_of = [\"on\", \"off\", \"later\"]",
+            "exactly \"on\" and \"off\"",
+        ),
+        (
+            "one_of = [\"on\", \"off\"]",
+            "one_of = [\"on\", \"off\"]\ndefault = \"on\"",
+            "with no default",
+        ),
+        ("messages = true\n", "", "needs messages = true"),
+        ("known_faces = true\n", "", "needs known_faces = true"),
+        ("light = true\n", "", "needs light = true"),
+        (
+            "\"voice/heard\", ",
+            "",
+            "a watch reads voice/heard, and voice/heard is not in [permissions] topics",
+        ),
+        (
+            "\"voice/privacy\"",
+            "\"lamp/pause\"",
+            "a watch reads voice/privacy",
+        ),
+        ("level = 1 }", "level = 3 }", "a faint light"),
+        (
+            "level = 1 }",
+            "level = 2, pattern = { kind = \"breathe\" } }",
+            "a faint light",
+        ),
+        ("every = \"10m\"", "every = \"10s\"", "every is 1m to 24h"),
+        (
+            "asked_within = \"30s\"",
+            "asked_within = \"10m\"",
+            "asked_within is 5s to 2m",
+        ),
+        (
+            "every = \"10m\"",
+            "every = \"10m\"\npicture = true",
+            "unknown field `picture`",
+        ),
+        ("most = \"12h\"", "most = \"30m\"", "most is 1h to 24h"),
+        ("most = \"12h\"", "most = \"25h\"", "most is 1h to 24h"),
+        ("most = \"12h\"", "", "missing field `most`"),
+        (
+            "if_heard = [",
+            "if_heard = [\"\", ",
+            "if_heard is 1 to 16 entries",
+        ),
+        (
+            "if_heard = [",
+            "if_heard = [] #",
+            "if_heard is 1 to 16 entries",
+        ),
+        (
+            "[watch]\nevery",
+            "[[do]]\nlight = { colour = \"blue\" }\n\n[watch]\nevery",
+            "a watch has no [[do]]",
+        ),
+    ] {
+        let folder: String = why
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect();
+        let skill = repo_skill_with(&dir.path().join(folder), "guard-mode", from, to);
+        let error = load(&skill).unwrap_err();
+        assert!(error.contains(why), "{to}: {error}");
+    }
+    // What it may do, in words.
+    assert_eq!(
+        loaded.permissions.said(),
+        "reads room/presence, humans/faces/tracked, voice/heard, voice/privacy; light, messages, known faces"
+    );
+    // Its tool, with its choice, for the model.
+    let file = tools_file(std::slice::from_ref(&loaded));
+    assert_eq!(file["tools"][0]["name"], "keep_watch");
+    assert_eq!(
+        file["tools"][0]["parameters"]["properties"]["turn"]["enum"],
+        serde_json::json!(["on", "off"])
+    );
+}
+
+/// The ring's word that guard mode's `mark` still shows, as a ring says it
+/// after each renewal (about every 10 s): said once a test has skipped the
+/// program's clock past 30 s, which would otherwise leave the mark
+/// unconfirmed (Third's privacy read on #1963), and taken in before what
+/// comes next.
+fn still_shows(reached: &mut lamp_bus::Publisher, mark: &LightRequest) {
+    reached
+        .publish_json(
+            1,
+            &lamp_msgs::LightReached {
+                source: mark.claim.source.clone(),
+                light: mark.light.clone(),
+            },
+        )
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+}
+
+/// Guard mode through the program, on a bus of its own (#1685): a call
+/// with nothing heard at the lamp is refused; asked out loud, its faint mark
+/// is asked of the ring, a visit gives one text on `messages/out`, and the
+/// face of the person who asked, back in the eyes' known file, ends it and
+/// gives the mark back, with no text.
+#[test]
+fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
+    use lamp_msgs::{LightReached, MessageOut, RoomPresence};
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("gm")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    copy(
+        &skills_root().join("guard-mode"),
+        &root.join("skills/guard-mode"),
+    );
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut requests = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
+    let mut texts = bus.subscribe(MessageOut::TOPIC, "phone").unwrap();
+    let mut presence = bus
+        .publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), "eyes")
+        .unwrap();
+    let mut heard = bus
+        .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+        .unwrap();
+    let mut reached = bus
+        .publisher_declared(LightReached::TOPIC, &LightReached::declaration(), "ring")
+        .unwrap();
+    let known = root.join("known");
+    let tools = root.join("tools");
+    let clock = Clock::at(root);
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                root.join("skills").as_os_str(),
+                "--bus-root".as_ref(),
+                root.join("bus").as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--known-file".as_ref(),
+                known.as_os_str(),
+                "--boot-id".as_ref(),
+                OsStr::new("boot-test"),
+            ])
+            .args(clock.args())
+            .env("LAMP_LIGHT_REQUESTS", "on")
+            .env_remove("LAMP_SKILLS_ASK")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("call.sock").exists()
+        || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+    {
+        assert!(Instant::now() < deadline, "guard mode was never loaded");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let call = |turn: &str| {
+        let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+        writeln!(
+            &stream,
+            r#"{{"op":"call","name":"keep_watch","args":{{"turn":"{turn}"}}}}"#
+        )
+        .unwrap();
+        let mut line = String::new();
+        BufReader::new(&stream).read_line(&mut line).unwrap();
+        serde_json::from_str::<serde_json::Value>(&line).unwrap()
+    };
+    let say = |presence: &mut lamp_bus::Publisher, someone: bool| {
+        presence
+            .publish_json(
+                1,
+                &RoomPresence {
+                    someone,
+                    nobody_s: if someone { 0 } else { 20 },
+                    by: someone.then_some(lamp_msgs::SeenBy::Voice),
+                },
+            )
+            .unwrap();
+        // Taken in before the clock moves on.
+        clock.skip(Duration::ZERO);
+    };
+    let next = |subscriber: &mut lamp_bus::Subscriber, within: Duration| {
+        let until = Instant::now() + within;
+        loop {
+            if let Some(message) = subscriber.recv(Duration::from_millis(50)).unwrap() {
+                break Some(message);
+            }
+            if Instant::now() >= until {
+                break None;
+            }
+        }
+    };
+    // Asked by a text: nothing heard at the lamp, refused, no mark.
+    let refused = call("on");
+    assert_eq!(refused["ok"], false, "{refused}");
+    assert!(
+        refused["error"].as_str().unwrap().contains("out loud"),
+        "{refused}"
+    );
+    assert!(next(&mut requests, Duration::from_millis(300)).is_none());
+    // A, whose face the eyes know, asks out loud.
+    fs::write(&known, "known-a\n").unwrap();
+    heard
+        .publish_json(
+            1,
+            &Speech {
+                text: "Lamp, keep an eye on things while I'm out".into(),
+                finished: true,
+                locale: None,
+                request: None,
+            },
+        )
+        .unwrap();
+    let on = call("on");
+    assert_eq!(on["ok"], true, "{on}");
+    assert!(
+        on["result"]["next"]
+            .as_str()
+            .unwrap()
+            .contains("keep an eye on things"),
+        "{on}"
+    );
+    let mark: LightRequest = next(&mut requests, Duration::from_secs(5))
+        .expect("the mark")
+        .parse()
+        .unwrap();
+    assert_eq!(mark.light, Light::new(true, "blue", 1).unwrap());
+    assert_eq!(
+        (mark.claim.source.as_str(), mark.claim.priority),
+        ("skill:guard-mode", Priority::Skill)
+    );
+    // The ring says the mark shows: the watch counts from here.
+    reached
+        .publish_json(
+            1,
+            &LightReached {
+                source: mark.claim.source.clone(),
+                light: mark.light.clone(),
+            },
+        )
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    // A leaves; someone comes and stays two minutes, then goes.
+    fs::remove_file(&known).unwrap();
+    say(&mut presence, true);
+    say(&mut presence, false);
+    say(&mut presence, true);
+    clock.skip(Duration::from_secs(120));
+    still_shows(&mut reached, &mark);
+    say(&mut presence, true);
+    say(&mut presence, false);
+    let text: MessageOut = next(&mut texts, Duration::from_secs(5))
+        .expect("a text")
+        .parse()
+        .unwrap();
+    assert_eq!(text.from, "skill:guard-mode");
+    assert!(
+        text.text.ends_with(", for about 2 minutes.")
+            && text.text.starts_with("Someone was at your desk"),
+        "{text:?}"
+    );
+    assert!(!text.text.contains("known-a"));
+    // A back, known again: the watch ends, its mark given back.
+    say(&mut presence, true);
+    fs::write(&known, "known-a\n").unwrap();
+    let mut back = None;
+    let until = Instant::now() + Duration::from_secs(10);
+    while back.is_none() && Instant::now() < until {
+        let Some(message) = next(&mut requests, Duration::from_secs(1)) else {
+            continue;
+        };
+        let asked: LightRequest = message.parse().unwrap();
+        if !asked.claim.holds_at("boot-test", lamp_ipc::monotonic_us()) {
+            back = Some(asked);
+        }
+    }
+    assert!(back.is_some(), "the mark was not given back");
+    // No text for the person who asked coming back.
+    say(&mut presence, false);
+    assert!(next(&mut texts, Duration::from_millis(500)).is_none());
+    // A call to stop now says it wasn't on.
+    let off = call("off");
+    assert_eq!(off["ok"], true, "{off}");
+    assert!(
+        off["result"]["next"].as_str().unwrap().contains("weren't"),
+        "{off}"
+    );
+}
+
+/// The eyes' `room/activity`, as they say it while someone sits at the desk.
+fn activity(engine: &mut Engine, at_ms: u64, state: &str) {
+    activity_with(engine, at_ms, state, true);
+}
+
+/// The same, with or without the sitting's baseline in.
+fn activity_with(engine: &mut Engine, at_ms: u64, state: &str, baseline: bool) {
+    engine.observe(
+        "room/activity",
+        at_ms * 1_000,
+        format!(r#"{{"state":"{state}","for_s":0,"sitting_s":600,"baseline":{baseline}}}"#)
+            .as_bytes(),
+        Some(3_000),
+    );
+}
+
+/// The reviewer's P3 on #1938: a run begun before the sitting's baseline
+/// was in (`at_desk`, `baseline` false) is not noticed by the baseline
+/// coming in and saying `head_down`: the person did nothing. Standing up
+/// still notices it.
+#[test]
+fn a_baseline_coming_in_mid_run_is_no_noticing() {
+    let dir = tempfile::tempdir().unwrap();
+    for (stood, noticed) in [(false, false), (true, true)] {
+        let mut engine = Engine::new(vec![resting_skill(dir.path(), 1)], true);
+        faces(&mut engine, 0, &seated(false));
+        activity_with(&mut engine, 0, "at_desk", false);
+        assert_eq!(stuffy(&mut engine, 0).len(), 1);
+        activity_with(&mut engine, 3_000, "head_down", true);
+        if stood {
+            engine.observe("room/stood_up", 5_000_000, br#"{"sitting_s":600}"#, None);
+        }
+        engine.tick(10_001_000);
+        assert_eq!(
+            engine.resting_until("sip", 11_000_000).is_none(),
+            noticed,
+            "stood up: {stood}"
+        );
+    }
+}
+
+/// #1685, the eyes' word (#1678): a run is noticed by the person standing up
+/// and leaving (`room/stood_up`), or by any change in what `room/activity`
+/// says they are doing from what it said as the run began (looking up from
+/// the page, leaning in), and `away` is gone; the same activity all through,
+/// someone still and turned away, is not noticed, and a skill resting after
+/// one rests. These topics are the program's own reading for a `[rest]`.
+#[test]
+fn a_run_is_noticed_by_the_eyes_activity_changing_or_a_stand_up() {
+    let dir = tempfile::tempdir().unwrap();
+    let topics = Engine::new(vec![resting_skill(dir.path(), 1)], true).topics();
+    assert!(topics.contains(&"room/activity".to_owned()), "{topics:?}");
+    assert!(topics.contains(&"room/stood_up".to_owned()), "{topics:?}");
+    for (how, after, noticed) in [
+        ("the same", None, false),
+        ("looked up", Some("at_desk"), true),
+        ("leaned in", Some("leaning_in"), true),
+        ("away", Some("away"), true),
+        ("stood up", None, true),
+    ] {
+        let mut engine = Engine::new(vec![resting_skill(dir.path(), 1)], true);
+        faces(&mut engine, 0, &seated(false));
+        activity(&mut engine, 0, "head_down");
+        assert_eq!(stuffy(&mut engine, 0).len(), 1, "{how}");
+        activity(&mut engine, 3_000, "head_down");
+        match (how, after) {
+            ("stood up", _) => {
+                engine.observe("room/stood_up", 5_000_000, br#"{"sitting_s":600}"#, None);
+            }
+            (_, Some(state)) => activity(&mut engine, 5_000, state),
+            _ => activity(&mut engine, 5_000, "head_down"),
+        }
+        // After its while, nothing counts: looking up then.
+        engine.tick(10_001_000);
+        activity(&mut engine, 10_500, "at_desk");
+        assert_eq!(
+            engine.resting_until("sip", 11_000_000).is_none(),
+            noticed,
+            "{how}"
+        );
+    }
+}
+
+/// The peer read's P2 on #1807, the program: guard mode counts only while
+/// the ring shows its mark. Before the ring first says it shows, a visit
+/// is not counted (reviewer-two on #1937). Told the mark is outranked by another program's
+/// light (Light out's, as the desk empties), the program gives the mark back
+/// and asks for it again with a new claim; until the ring says it is shown
+/// again (`light/reached`), a visit is not counted and nothing is texted;
+/// shown, the next visit is.
+#[test]
+fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
+    use lamp_msgs::{LightOutranked, LightReached, MessageOut, RoomPresence};
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("gs")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    copy(
+        &skills_root().join("guard-mode"),
+        &root.join("skills/guard-mode"),
+    );
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut requests = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
+    let mut texts = bus.subscribe(MessageOut::TOPIC, "phone").unwrap();
+    let mut presence = bus
+        .publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), "eyes")
+        .unwrap();
+    let mut heard = bus
+        .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+        .unwrap();
+    let mut outranked = bus
+        .publisher_declared(
+            LightOutranked::TOPIC,
+            &LightOutranked::declaration(),
+            "ring",
+        )
+        .unwrap();
+    let mut reached = bus
+        .publisher_declared(LightReached::TOPIC, &LightReached::declaration(), "ring")
+        .unwrap();
+    let tools = root.join("tools");
+    let clock = Clock::at(root);
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                root.join("skills").as_os_str(),
+                "--bus-root".as_ref(),
+                root.join("bus").as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--boot-id".as_ref(),
+                OsStr::new("boot-test"),
+            ])
+            .args(clock.args())
+            .env("LAMP_LIGHT_REQUESTS", "on")
+            .env_remove("LAMP_SKILLS_ASK")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("call.sock").exists()
+        || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+    {
+        assert!(Instant::now() < deadline, "guard mode was never loaded");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let next = |subscriber: &mut lamp_bus::Subscriber, within: Duration| {
+        let until = Instant::now() + within;
+        loop {
+            if let Some(message) = subscriber.recv(Duration::from_millis(50)).unwrap() {
+                break Some(message);
+            }
+            if Instant::now() >= until {
+                break None;
+            }
+        }
+    };
+    let say = |presence: &mut lamp_bus::Publisher, someone: bool| {
+        presence
+            .publish_json(
+                1,
+                &RoomPresence {
+                    someone,
+                    nobody_s: if someone { 0 } else { 20 },
+                    by: someone.then_some(lamp_msgs::SeenBy::Voice),
+                },
+            )
+            .unwrap();
+        clock.skip(Duration::ZERO);
+    };
+    // A visit: they leave, someone comes for two minutes and goes.
+    let visit = |presence: &mut lamp_bus::Publisher| {
+        say(presence, false);
+        say(presence, true);
+        clock.skip(Duration::from_secs(120));
+        say(presence, true);
+        say(presence, false);
+    };
+    heard
+        .publish_json(
+            1,
+            &Speech {
+                text: "Lamp, keep an eye on things while I'm out".into(),
+                finished: true,
+                locale: None,
+                request: None,
+            },
+        )
+        .unwrap();
+    // Taken in before the call.
+    std::thread::sleep(Duration::from_millis(300));
+    let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+    writeln!(
+        &stream,
+        r#"{{"op":"call","name":"keep_watch","args":{{"turn":"on"}}}}"#
+    )
+    .unwrap();
+    let mut line = String::new();
+    BufReader::new(&stream).read_line(&mut line).unwrap();
+    assert!(line.contains(r#""ok":true"#), "{line}");
+    let mark: LightRequest = next(&mut requests, Duration::from_secs(5))
+        .expect("the mark")
+        .parse()
+        .unwrap();
+    let source = mark.claim.source.clone();
+    assert_eq!(source, "skill:guard-mode");
+    // A visit while the ring goes on saying the mark shows.
+    let shown_visit = |presence: &mut lamp_bus::Publisher, reached: &mut lamp_bus::Publisher| {
+        say(presence, false);
+        say(presence, true);
+        clock.skip(Duration::from_secs(120));
+        still_shows(reached, &mark);
+        say(presence, true);
+        say(presence, false);
+    };
+    // The ring has not said yet that the mark shows (reviewer-two on
+    // #1937): a visit is not counted.
+    visit(&mut presence);
+    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    // The old claim's renewals while the clock went on: not the test's.
+    while next(&mut requests, Duration::from_millis(300)).is_some() {}
+    // Another program's light over it: given back, and asked for anew.
+    outranked
+        .publish_json(
+            1,
+            &LightOutranked {
+                source: source.clone(),
+                by: "skill:light-out".into(),
+            },
+        )
+        .unwrap();
+    let mut asked = Vec::new();
+    while let Some(message) = next(&mut requests, Duration::from_secs(2)) {
+        asked.push(message.parse::<LightRequest>().unwrap());
+    }
+    let now = lamp_ipc::monotonic_us();
+    assert!(
+        asked.len() >= 2
+            && !asked[0].claim.holds_at("boot-test", now)
+            && asked[1].claim.holds_at("boot-test", now)
+            && asked[1].light == mark.light,
+        "given back and asked again: {asked:?}"
+    );
+    // Not yet said shown again: a visit is not counted.
+    visit(&mut presence);
+    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    // Shown: the next visit is.
+    reached
+        .publish_json(
+            1,
+            &LightReached {
+                source,
+                light: mark.light.clone(),
+            },
+        )
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    clock.skip(Duration::from_secs(600));
+    still_shows(&mut reached, &mark);
+    shown_visit(&mut presence, &mut reached);
+    let text: MessageOut = next(&mut texts, Duration::from_secs(5))
+        .expect("a text once the mark shows")
+        .parse()
+        .unwrap();
+    assert!(text.text.ends_with(", for about 2 minutes."), "{text:?}");
+}
+
+/// The first builder's ruling on #1937, the program: the person's own light
+/// over guard mode's mark ("turn the light off" on the way out) is never
+/// asked over. The watch pauses: no new claim, no visit counted, and one
+/// text, "I've paused watching while your light is off." Their light going
+/// on again alone does not resume it. Asked again in words, it goes on: its
+/// mark given back and asked for anew, and counting once the ring shows it.
+#[test]
+fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
+    use lamp_msgs::{LightOutranked, LightReached, MessageOut, RoomPresence};
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("gp")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    copy(
+        &skills_root().join("guard-mode"),
+        &root.join("skills/guard-mode"),
+    );
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut requests = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
+    let mut texts = bus.subscribe(MessageOut::TOPIC, "phone").unwrap();
+    let mut presence = bus
+        .publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), "eyes")
+        .unwrap();
+    let mut heard = bus
+        .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+        .unwrap();
+    let mut outranked = bus
+        .publisher_declared(
+            LightOutranked::TOPIC,
+            &LightOutranked::declaration(),
+            "ring",
+        )
+        .unwrap();
+    let mut reached = bus
+        .publisher_declared(LightReached::TOPIC, &LightReached::declaration(), "ring")
+        .unwrap();
+    let mut state = bus
+        .publisher_declared(Light::TOPICS[1], &Light::declaration(), "actions")
+        .unwrap();
+    let tools = root.join("tools");
+    let clock = Clock::at(root);
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                root.join("skills").as_os_str(),
+                "--bus-root".as_ref(),
+                root.join("bus").as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--boot-id".as_ref(),
+                OsStr::new("boot-test"),
+            ])
+            .args(clock.args())
+            .env("LAMP_LIGHT_REQUESTS", "on")
+            .env_remove("LAMP_SKILLS_ASK")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("call.sock").exists()
+        || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+    {
+        assert!(Instant::now() < deadline, "guard mode was never loaded");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let next = |subscriber: &mut lamp_bus::Subscriber, within: Duration| {
+        let until = Instant::now() + within;
+        loop {
+            if let Some(message) = subscriber.recv(Duration::from_millis(50)).unwrap() {
+                break Some(message);
+            }
+            if Instant::now() >= until {
+                break None;
+            }
+        }
+    };
+    let say = |presence: &mut lamp_bus::Publisher, someone: bool| {
+        presence
+            .publish_json(
+                1,
+                &RoomPresence {
+                    someone,
+                    nobody_s: if someone { 0 } else { 20 },
+                    by: someone.then_some(lamp_msgs::SeenBy::Voice),
+                },
+            )
+            .unwrap();
+        clock.skip(Duration::ZERO);
+    };
+    // A visit: they leave, someone comes for two minutes and goes.
+    let visit = |presence: &mut lamp_bus::Publisher| {
+        say(presence, false);
+        say(presence, true);
+        clock.skip(Duration::from_secs(120));
+        say(presence, true);
+        say(presence, false);
+    };
+    let speak = |heard: &mut lamp_bus::Publisher| {
+        heard
+            .publish_json(
+                1,
+                &Speech {
+                    text: "Lamp, keep an eye on things while I'm out".into(),
+                    finished: true,
+                    locale: None,
+                    request: None,
+                },
+            )
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+    };
+    let turn_on = || {
+        let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+        writeln!(
+            &stream,
+            r#"{{"op":"call","name":"keep_watch","args":{{"turn":"on"}}}}"#
+        )
+        .unwrap();
+        let mut line = String::new();
+        BufReader::new(&stream).read_line(&mut line).unwrap();
+        line
+    };
+    speak(&mut heard);
+    assert!(turn_on().contains(r#""ok":true"#));
+    let mark: LightRequest = next(&mut requests, Duration::from_secs(5))
+        .expect("the mark")
+        .parse()
+        .unwrap();
+    let source = mark.claim.source.clone();
+    // A visit while the ring goes on saying the mark shows.
+    let shown_visit = |presence: &mut lamp_bus::Publisher, reached: &mut lamp_bus::Publisher| {
+        say(presence, false);
+        say(presence, true);
+        clock.skip(Duration::from_secs(120));
+        still_shows(reached, &mark);
+        say(presence, true);
+        say(presence, false);
+    };
+    // The person's own light over it: no new claim, paused, one line.
+    outranked
+        .publish_json(
+            1,
+            &LightOutranked {
+                source: source.clone(),
+                by: LightOutranked::PERSON.into(),
+            },
+        )
+        .unwrap();
+    let paused: MessageOut = next(&mut texts, Duration::from_secs(3))
+        .expect("the pause's line")
+        .parse()
+        .unwrap();
+    assert_eq!(paused.text, "I've paused watching while your light is off.");
+    assert!(
+        next(&mut requests, Duration::from_millis(1_500)).is_none(),
+        "no claim over the person's light"
+    );
+    // Paused: a visit is not counted.
+    visit(&mut presence);
+    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    // Their light on again, unasked: still paused, no claim, no counting.
+    state
+        .publish_json(1, &Light::new(true, "white", 5).unwrap())
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(500));
+    clock.skip(Duration::from_secs(600));
+    visit(&mut presence);
+    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    let since: Vec<LightRequest> = std::iter::from_fn(|| next(&mut requests, Duration::ZERO))
+        .map(|message| message.parse().unwrap())
+        .collect();
+    // Only the old claim's renewals: nothing given back, so no new claim.
+    let now = lamp_ipc::monotonic_us();
+    assert!(
+        since
+            .iter()
+            .all(|asked| asked.claim.holds_at("boot-test", now) && asked.light == mark.light),
+        "no claim over the person's light: {since:?}"
+    );
+    // Asked again in words: the mark asked for anew, counting once shown.
+    speak(&mut heard);
+    let again = turn_on();
+    assert!(again.contains("again"), "{again}");
+    let mut asked = Vec::new();
+    while let Some(message) = next(&mut requests, Duration::from_secs(2)) {
+        asked.push(message.parse::<LightRequest>().unwrap());
+    }
+    let now = lamp_ipc::monotonic_us();
+    assert!(
+        asked
+            .iter()
+            .any(|asked| !asked.claim.holds_at("boot-test", now))
+            && asked
+                .last()
+                .is_some_and(|last| last.claim.holds_at("boot-test", now)),
+        "given back and asked anew: {asked:?}"
+    );
+    reached
+        .publish_json(
+            1,
+            &LightReached {
+                source,
+                light: mark.light.clone(),
+            },
+        )
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    clock.skip(Duration::from_secs(600));
+    still_shows(&mut reached, &mark);
+    shown_visit(&mut presence, &mut reached);
+    let text: MessageOut = next(&mut texts, Duration::from_secs(5))
+        .expect("a text once asked again and shown")
+        .parse()
+        .unwrap();
+    assert!(text.text.ends_with(", for about 2 minutes."), "{text:?}");
+}
+
+/// Third's privacy read on #1963, the program: on a lamp the ring says
+/// guard mode's mark shows again after each renewal. When it goes quiet
+/// (the ring worker stopped, or it forgot the claim) and no
+/// `light/outranked` comes, the program goes on renewing the mark, and once
+/// the ring's last word is 30 s old it takes the mark as hidden:
+/// `skills/events` says so, and a visit is not counted or texted. The
+/// ring's next word counts again.
+#[test]
+fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s() {
+    use lamp_msgs::{LightReached, MessageOut, RoomPresence};
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("gq")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    copy(
+        &skills_root().join("guard-mode"),
+        &root.join("skills/guard-mode"),
+    );
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut requests = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
+    let mut texts = bus.subscribe(MessageOut::TOPIC, "phone").unwrap();
+    let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+    let mut presence = bus
+        .publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), "eyes")
+        .unwrap();
+    let mut heard = bus
+        .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+        .unwrap();
+    let mut reached = bus
+        .publisher_declared(LightReached::TOPIC, &LightReached::declaration(), "ring")
+        .unwrap();
+    let tools = root.join("tools");
+    let clock = Clock::at(root);
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                root.join("skills").as_os_str(),
+                "--bus-root".as_ref(),
+                root.join("bus").as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--boot-id".as_ref(),
+                OsStr::new("boot-test"),
+            ])
+            .args(clock.args())
+            .env("LAMP_LIGHT_REQUESTS", "on")
+            .env_remove("LAMP_SKILLS_ASK")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("call.sock").exists()
+        || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+    {
+        assert!(Instant::now() < deadline, "guard mode was never loaded");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let next = |subscriber: &mut lamp_bus::Subscriber, within: Duration| {
+        let until = Instant::now() + within;
+        loop {
+            if let Some(message) = subscriber.recv(Duration::from_millis(50)).unwrap() {
+                break Some(message);
+            }
+            if Instant::now() >= until {
+                break None;
+            }
+        }
+    };
+    let say = |presence: &mut lamp_bus::Publisher, someone: bool| {
+        presence
+            .publish_json(
+                1,
+                &RoomPresence {
+                    someone,
+                    nobody_s: if someone { 0 } else { 20 },
+                    by: someone.then_some(lamp_msgs::SeenBy::Voice),
+                },
+            )
+            .unwrap();
+        clock.skip(Duration::ZERO);
+    };
+    heard
+        .publish_json(
+            1,
+            &Speech {
+                text: "Lamp, keep an eye on things while I'm out".into(),
+                finished: true,
+                locale: None,
+                request: None,
+            },
+        )
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+    writeln!(
+        &stream,
+        r#"{{"op":"call","name":"keep_watch","args":{{"turn":"on"}}}}"#
+    )
+    .unwrap();
+    let mut line = String::new();
+    BufReader::new(&stream).read_line(&mut line).unwrap();
+    assert!(line.contains(r#""ok":true"#), "{line}");
+    let mark: LightRequest = next(&mut requests, Duration::from_secs(5))
+        .expect("the mark")
+        .parse()
+        .unwrap();
+    // Shown, and the desk empty: keeping watch.
+    still_shows(&mut reached, &mark);
+    say(&mut presence, false);
+    // The ring goes quiet: 31 s of the mark's renewals, each asked of the
+    // ring on the same claim, and no word that it shows.
+    let mut renewals = 0;
+    for _ in 0..3 {
+        clock.skip(Duration::from_secs(10));
+        while let Some(message) = next(&mut requests, Duration::from_millis(500)) {
+            let asked: LightRequest = message.parse().unwrap();
+            assert!(
+                asked.light == mark.light
+                    && asked.claim.holds_at("boot-test", lamp_ipc::monotonic_us()),
+                "a renewal: {asked:?}"
+            );
+            renewals += 1;
+        }
+    }
+    assert!(renewals >= 3, "renewed {renewals} times");
+    clock.skip(Duration::from_secs(1));
+    let said = std::iter::from_fn(|| next(&mut events, Duration::from_secs(2)))
+        .map(|message| message.parse::<SkillEvent>().unwrap().why)
+        .find(|why| why == "its mark has not been confirmed for 30 s: no visit counted");
+    assert!(said.is_some(), "the mark unconfirmed, said");
+    // A visit now: not counted, nothing texted.
+    say(&mut presence, true);
+    say(&mut presence, false);
+    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    // The ring's word again: the next visit is counted.
+    still_shows(&mut reached, &mark);
+    say(&mut presence, true);
+    say(&mut presence, false);
+    let text: MessageOut = next(&mut texts, Duration::from_secs(5))
+        .expect("a text once the ring says the mark shows again")
+        .parse()
+        .unwrap();
+    assert!(text.text.ends_with(", for under a minute."), "{text:?}");
+}
+
+/// A haze at the desk, for the other member of a group: `air/state`'s
+/// PM2.5 above 100.
+fn hazy_skill(dir: &Path, name: &str, top: &str) -> lamp_skills::Skill {
+    load(&skill_with(
+        dir,
+        name,
+        &format!(
+            "{top}\n[trigger]\ntopic = \"air/state\"\nfield = \"pm2_5\"\nabove = 100\ncooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ colour = \"warm\", for = \"5s\" }}\n"
+        ),
+    ))
+    .unwrap()
+}
+
+/// The skills a hazy reading at `at_ms` starts.
+fn hazy(engine: &mut Engine, at_ms: u64) -> Vec<String> {
+    engine
+        .observe("air/state", at_ms * 1_000, br#"{"pm2_5":150}"#, None)
+        .into_iter()
+        .filter(|run| !run.calls.is_empty())
+        .map(|run| run.skill)
+        .collect()
+}
+
+/// #1685: a group's hour goes first to the member that has waited for it
+/// longest and still waits, not to the first in folder order; one that has
+/// stopped waiting (held back for it no more within
+/// `BUDGET_WAIT_LIVE_US`) holds nobody back.
+#[test]
+fn a_groups_hour_goes_to_the_member_waiting_longest_while_it_waits() {
+    let dir = tempfile::tempdir().unwrap();
+    let group = "[budget]\ngroup = \"g\"\nper_hour = 1";
+    let skills = || {
+        vec![
+            nudge_skill(dir.path(), "a", group, "cooldown = \"1h\""),
+            hazy_skill(dir.path(), "b", group),
+        ]
+    };
+    let minute = 60_000;
+    let mut engine = Engine::new(skills(), true);
+    assert_eq!(stuffy(&mut engine, 0), ["a"]);
+    // B waits from minute 10, and still at 59.
+    assert!(hazy(&mut engine, 10 * minute).is_empty());
+    assert!(hazy(&mut engine, 59 * minute).is_empty());
+    // At 60 the hour is free and A is due again, first in order: B goes.
+    assert!(stuffy(&mut engine, 60 * minute).is_empty());
+    assert_eq!(hazy(&mut engine, 60 * minute), ["b"]);
+    // A waited from 60: its at 120.
+    assert_eq!(stuffy(&mut engine, 120 * minute), ["a"]);
+    // B held back at 10, then its air cleared: nothing waits at 60.
+    let mut engine = Engine::new(skills(), true);
+    assert_eq!(stuffy(&mut engine, 0), ["a"]);
+    assert!(hazy(&mut engine, 10 * minute).is_empty());
+    assert_eq!(stuffy(&mut engine, 60 * minute), ["a"]);
+}
+
+/// #1685: the four wellbeing skills and Stretch break as they are in
+/// `lampOS/skills/`, on one engine, through a five-hour sitting from 10:00
+/// with someone moving now and then (each nudge noticed): one nudge an hour
+/// between them, each in the order it came due, and none of them a word.
+/// Rest your eyes at 45 minutes; Stretch break due at 50, waiting to 105; A
+/// sip of water due at 90, to 165; Stand up due at 100, to 225; then Rest
+/// your eyes again. Wind down is outside its hours. The four share one
+/// `[stop]`, `wellbeing_nudges`: one function in the tools file, which
+/// stops the one that came last, or with `all` every one of them.
+#[test]
+fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
+    let names = [
+        "rest-your-eyes",
+        "sip-of-water",
+        "stand-up",
+        "stretch-break",
+        "wind-down",
+    ];
+    let skills: Vec<lamp_skills::Skill> = names
+        .iter()
+        .map(|name| load(&skills_root().join(name)).unwrap())
+        .collect();
+    for skill in &skills {
+        assert_eq!(
+            skill.budget,
+            Some(("wellbeing".to_owned(), 1)),
+            "{}",
+            skill.name
+        );
+        assert!(!skill.permissions.speak, "{}", skill.name);
+        if skill.name != "stretch-break" {
+            assert!(skill.most_a_day.is_some() && skill.rest.is_some());
+            assert_eq!(skill.stop.as_ref().unwrap().tool, "wellbeing_nudges");
+        }
+    }
+    let tools = tools_file(&skills);
+    let functions: Vec<&str> = tools["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(functions, ["wellbeing_nudges"], "{tools}");
+    assert_eq!(
+        tools["tools"][0]["parameters"]["properties"]["all"]["type"],
+        "boolean"
+    );
+    let mut engine = Engine::new(skills, true);
+    // 10:00 local at 0 s.
+    engine.clock(0, 0, 36_000_000);
+    engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+    let mut nudged = Vec::new();
+    for half in 0..=600u64 {
+        let left = if half % 2 == 0 { 0.3 } else { 0.5 };
+        let faces = format!(
+            r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+            left + 0.3
+        );
+        for run in engine.observe(
+            "humans/faces/tracked",
+            half * 30_000_000,
+            faces.as_bytes(),
+            None,
+        ) {
+            if !run.calls.is_empty() {
+                assert!(
+                    !run.calls.iter().any(|call| matches!(call, Call::Say(_))),
+                    "{run:?}"
+                );
+                nudged.push((half / 2, run.skill));
+            }
+        }
+    }
+    let nudged: Vec<(u64, &str)> = nudged
+        .iter()
+        .map(|(minute, skill)| (*minute, skill.as_str()))
+        .collect();
+    assert_eq!(
+        nudged,
+        [
+            (45, "rest-your-eyes"),
+            (105, "stretch-break"),
+            (165, "sip-of-water"),
+            (225, "stand-up"),
+            (285, "rest-your-eyes")
+        ]
+    );
+    // "Not today": the one that came last of the four, by its name.
+    let told = |run: lamp_skills::Run| {
+        lamp_skills::told(&run.calls)["next"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let at = 301 * 60_000_000;
+    let snoozed = engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "snooze"}),
+            at,
+        )
+        .unwrap();
+    assert!(told(snoozed).contains("none of the rest your eyes nudges until tomorrow morning"));
+    assert!(engine.stopped("rest-your-eyes", at) && !engine.stopped("sip-of-water", at));
+    // All of them, and on again.
+    let all = engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "snooze", "all": true}),
+            at,
+        )
+        .unwrap();
+    assert!(told(all).contains("none of the wellbeing nudges"));
+    assert!(
+        ["rest-your-eyes", "sip-of-water", "stand-up", "wind-down"]
+            .iter()
+            .all(|skill| engine.stopped(skill, at))
+    );
+    assert!(!engine.stopped("stretch-break", at));
+    for args in [
+        serde_json::json!({"how": "on", "all": "yes"}),
+        serde_json::json!({"how": "on", "which": "stand-up"}),
+    ] {
+        assert!(
+            engine.tool("wellbeing_nudges", &args, at).is_err(),
+            "{args}"
+        );
+    }
+    engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "on", "all": true}),
+            at,
+        )
+        .unwrap();
+    assert!(!engine.stopped("sip-of-water", at));
+}
+
+/// #1685: a `[stop]` may be shared only by skills of one `[budget]` group;
+/// one of another group, or a skill's own `tool` by the name, is refused as
+/// any taken name is.
+#[test]
+fn a_shared_stop_is_one_groups_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let stopped = |name: &str, group: &str| {
+        skill_with(
+            dir.path(),
+            name,
+            &format!(
+                "[budget]\ngroup = \"{group}\"\nper_hour = 1\n[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\n[[do]]\nlight = {{ colour = \"warm\" }}\n"
+            ),
+        );
+    };
+    stopped("a", "g");
+    stopped("b", "g");
+    stopped("c", "other");
+    let (loaded, errors) = load_all(dir.path());
+    let names: Vec<&str> = loaded.iter().map(|skill| skill.name.as_str()).collect();
+    assert_eq!(names, ["a", "b"]);
+    assert!(
+        errors.iter().any(|error| error
+            .contains("a `[stop]` is shared only by the skills of one `[budget]` group")),
+        "{errors:?}"
+    );
+    // Alone, a [stop] takes no `all`.
+    let mut engine = Engine::new(vec![loaded[0].clone()], true);
+    assert!(
+        engine
+            .tool("nudges", &serde_json::json!({"how": "off", "all": true}), 0)
+            .is_err()
+    );
+    // Shared, none of them yet: every one.
+    let mut engine = Engine::new(loaded, true);
+    engine
+        .tool("nudges", &serde_json::json!({"how": "off"}), 0)
+        .unwrap();
+    assert!(engine.stopped("a", 0) && engine.stopped("b", 0));
+}
+
+/// Who was here (#1685), with its record of the last hour.
+const WHO: &str = r#"
+tool = "who_was_here"
+[permissions]
+topics = ["room/presence"]
+speak = true
+[history]
+topic = "room/presence"
+within = "1h"
+[[do]]
+say = "Say who was here."
+"#;
+
+/// #1685: a `[history]` skill listens to `room/presence`, and its call's
+/// note is followed by the record of the room: a visit with its length and
+/// how long ago, and with the local time known, its time of day too. Not in
+/// a triggered skill, of another topic, past a day, or without the topic in
+/// its permissions.
+#[test]
+fn a_history_is_told_to_the_call_from_room_presence_and_held_to_its_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    let who = load(&skill_with(dir.path(), "who", WHO)).unwrap();
+    let mut engine = Engine::new(vec![who], true);
+    assert_eq!(engine.topics(), ["room/presence"]);
+    let presence = |engine: &mut Engine, at_s: u64, someone: bool, nobody_s: u32| {
+        engine.observe(
+            "room/presence",
+            at_s * 1_000_000,
+            format!(r#"{{"someone":{someone},"nobody_s":{nobody_s}}}"#).as_bytes(),
+            Some(3_000),
+        );
+    };
+    // A visit from 60 s, its last face at 179 s, said gone at 200 s; then
+    // someone again from 600 s.
+    for at in (0..=620).step_by(2) {
+        let (someone, nobody_s) = match at {
+            60..=198 => (true, 0),
+            600.. => (true, 0),
+            _ if at < 60 => (false, at as u32),
+            _ => (false, at as u32 - 179),
+        };
+        presence(&mut engine, at, someone, nobody_s);
+    }
+    let note = |engine: &mut Engine| -> String {
+        let calls = engine
+            .tool("who_was_here", &serde_json::json!({}), 620_000_000)
+            .unwrap()
+            .calls;
+        match &calls[..] {
+            [Call::Say(note)] => note.clone(),
+            other => panic!("{other:?}"),
+        }
+    };
+    assert_eq!(
+        note(&mut engine),
+        "Say who was here.\n\nThe lamp's record of the room over the last 1 h, times only, from \
+         its eyes and ears: it never knows who anyone was, and keeps no picture.\
+         \n- someone was at the lamp for 1 min, 9 min ago\
+         \n- someone has been at the lamp for under a minute, since under a minute ago, and still is"
+    );
+    // At 12:00:00 local when the clock read 620 s: the visit began at 11:50.
+    engine.clock(60, 620_000_000, 1_792_407_600_000);
+    assert!(
+        note(&mut engine).contains("\n- someone was at the lamp for 1 min, at 11:50, 9 min ago"),
+        "{}",
+        note(&mut engine)
+    );
+    // Then nothing for half a minute: the spell going on ends where it was
+    // last known, and the stretch unseen is said.
+    presence(&mut engine, 650, false, 30);
+    let calls = engine
+        .tool("who_was_here", &serde_json::json!({}), 650_000_000)
+        .unwrap()
+        .calls;
+    let [Call::Say(after)] = &calls[..] else {
+        panic!("{calls:?}");
+    };
+    assert!(
+        after.contains("\n- someone was at the lamp for under a minute, at 11:59")
+            && after.contains("\n- it could not see or hear the room for under a minute, at 12:00")
+            && !after.contains("still is"),
+        "{after}"
+    );
+    for (number, (from, to, why)) in [
+        (
+            "tool = \"who_was_here\"",
+            "tool = \"who_was_here\"\n[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n[ask]\npolicy = \"hello\"",
+            "started by its tool alone",
+        ),
+        ("topic = \"room/presence\"\nwithin", "topic = \"voice/heard\"\nwithin", "times only"),
+        ("within = \"1h\"", "within = \"25h\"", "1m to 24h"),
+        ("within = \"1h\"", "within = \"30s\"", "1m to 24h"),
+        ("topics = [\"room/presence\"]", "topics = []", "not permitted"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let toml = WHO.replace(from, to);
+        assert_ne!(toml, WHO, "{from}");
+        let error = load(&skill_with(dir.path(), &format!("bad{number}"), &toml)).unwrap_err();
+        assert!(error.contains(why), "{to}: {error}");
+    }
+}
+
+/// #1685's mark (`LAMP_WHO_WAS_HERE_KNOWN`; Third's privacy read and the
+/// first builder's (a), 20 Oct on #1997): with the eyes' known file given, a
+/// spell the eyes knew the face in is told as "someone the lamp knows",
+/// never the name, and only to a skill whose permissions say
+/// `known_faces = true`; any other `[history]` skill is told "someone".
+/// Without the file, nothing of the eyes is read.
+#[test]
+fn who_was_here_marks_someone_the_lamp_knows_only_with_known_faces_and_never_names_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let marked = WHO.replace("speak = true", "speak = true\nknown_faces = true");
+    let eyes = tempfile::tempdir().unwrap();
+    let known = eyes.path().join("known");
+    std::fs::write(&known, "Alpha\n").unwrap();
+    let note = |toml: &str, mark: bool| -> String {
+        let who = load(&skill_with(dir.path(), "who", toml)).unwrap();
+        let mut engine = Engine::new(vec![who], true);
+        if mark {
+            engine = engine.marking_known(known.clone());
+        }
+        for at in (0..=60).step_by(2) {
+            engine.observe(
+                "room/presence",
+                at * 1_000_000,
+                br#"{"someone":true,"nobody_s":0,"by":"face"}"#,
+                Some(3_000),
+            );
+        }
+        let calls = engine
+            .tool("who_was_here", &serde_json::json!({}), 61_000_000)
+            .unwrap()
+            .calls;
+        match &calls[..] {
+            [Call::Say(note)] => note.clone(),
+            other => panic!("{other:?}"),
+        }
+    };
+    let told = note(&marked, true);
+    assert!(
+        told.contains("\n- someone the lamp knows has been at the lamp for 1 min"),
+        "{told}"
+    );
+    assert!(!told.contains("Alpha"), "never the name: {told}");
+    // A `[history]` skill without known_faces: someone, the words as before.
+    let unpermitted = note(WHO, true);
+    assert!(
+        unpermitted.contains("\n- someone has been at the lamp for 1 min")
+            && !unpermitted.contains("the lamp knows")
+            && !unpermitted.contains("Alpha"),
+        "{unpermitted}"
+    );
+    // The switch off: the same.
+    assert_eq!(note(&marked, false), unpermitted);
+}
+
+/// The peer read on #2022: with the Policy asked, Watch you leave's run is
+/// made only if the trigger's newest message still chooses a side when the
+/// answer comes; one from the middle meanwhile makes nothing.
+#[test]
+fn watch_you_leave_asked_of_the_policy_goes_ahead_only_while_a_side_is_chosen() {
+    let left = br#"{"sitting_s":900,"side":"left"}"#;
+    let middle = br#"{"sitting_s":900}"#;
+    for (between, made) in [(None, true), (Some(middle), false)] {
+        let mut engine = Engine::new(
+            vec![load(&skills_root().join("watch-you-leave")).unwrap()],
+            false,
+        )
+        .asking_the_policy();
+        // 10:00, outside its quiet hours.
+        engine.clock(0, 0, 600 * 60_000);
+        engine.observe("voice/state", 1, br#"{"state":"resting"}"#, None);
+        let asked = engine.observe("room/stood_up", 2, left, Some(5_000));
+        assert_eq!(asked.len(), 1);
+        if let Some(message) = between {
+            engine.observe("room/stood_up", 3, message, Some(5_000));
+        }
+        let moved: Option<Vec<String>> = engine.still(&asked[0], 4).map(|calls| {
+            calls
+                .iter()
+                .map(|call| match call {
+                    Call::Move(clip) => clip.name.clone(),
+                    other => format!("{other:?}"),
+                })
+                .collect()
+        });
+        assert_eq!(
+            moved,
+            made.then(|| vec!["watch-left".to_owned()]),
+            "a middle message in between: {}",
+            between.is_some()
+        );
+    }
+}
+
+/// A current onboarding invitation is not old task news: restart may deliver
+/// it once, and the runner still decides whether its exact token is current.
+#[test]
+fn onboarding_pending_snapshot_is_asked_once_and_retry_is_an_explicit_edge() {
+    let skill = load(&skills_root().join("onboarding")).unwrap();
+    let message = |id, ready| {
+        serde_json::json!({"invitations":[{
+            "invitation":id,"generation":7,"attempt":2,"step":"privacy","ready":ready
+        }]})
+        .to_string()
+    };
+    let mut engine = Engine::new(vec![skill.clone()], true);
+    let send = |engine: &mut Engine, at, text: String| {
+        engine
+            .observe(
+                lamp_msgs::OnboardingPending::TOPIC,
+                at,
+                text.as_bytes(),
+                None,
+            )
+            .into_iter()
+            .flat_map(|run| run.calls)
+            .collect::<Vec<_>>()
+    };
+    let expected = vec![Call::SayFrom(lamp_skills::Source::Onboarding, Some(81))];
+    assert_eq!(send(&mut engine, 1, message(81, true)), expected);
+    assert!(send(&mut engine, 2, message(81, true)).is_empty());
+    assert!(send(&mut engine, 2, "{\"invitations\":[{}]}".into()).is_empty());
+    assert!(send(&mut engine, 2, message(81, true)).is_empty());
+    // Reload with the same pending token is not another request.
+    engine.replace(vec![skill.clone()]);
+    assert!(send(&mut engine, 3, message(81, true)).is_empty());
+    // A refusal is retried only when the runner publishes another ready edge.
+    assert!(send(&mut engine, 4, message(81, false)).is_empty());
+    assert_eq!(send(&mut engine, 5, message(81, true)), expected);
+    assert!(send(&mut engine, 6, message(81, true)).is_empty());
+    // The restarted skill has no run in progress; its pending snapshot is read.
+    let mut restarted = Engine::new(vec![skill], true);
+    assert_eq!(send(&mut restarted, 7, message(81, true)), expected);
+    assert!(send(&mut restarted, 8, message(81, true)).is_empty());
+    assert_eq!(
+        send(&mut restarted, 9, message(82, true)),
+        vec![Call::SayFrom(lamp_skills::Source::Onboarding, Some(82))]
+    );
+}
+
+#[test]
+fn onboarding_refuses_wrong_kind_wrong_trigger_and_unbounded_pending_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    for (i, from, to) in [
+        (0, "kind = \"core\"", "kind = \"installable\""),
+        (1, "key = \"invitation\"", "key = \"generation\""),
+        (2, "field = \"ready\"", "field = \"other\""),
+    ] {
+        let folder = repo_skill_with(&dir.path().join(i.to_string()), "onboarding", from, to);
+        assert!(load(&folder).unwrap_err().contains("core onboarding"));
+    }
+    let renamed = dir.path().join("other-core");
+    copy(&skills_root().join("onboarding"), &renamed);
+    let front = fs::read_to_string(renamed.join("SKILL.md")).unwrap();
+    fs::write(
+        renamed.join("SKILL.md"),
+        front.replace("name: onboarding", "name: other-core"),
+    )
+    .unwrap();
+    assert!(load(&renamed).unwrap_err().contains("core onboarding"));
+    let skill = load(&skills_root().join("onboarding")).unwrap();
+    for bad in [
+        serde_json::json!({"invitations":[{"invitation":0,"generation":1,"attempt":1,"step":"privacy","ready":true}]}),
+        serde_json::json!({"invitations":[{"invitation":1,"generation":1,"attempt":1,"step":"unknown","ready":true}]}),
+        serde_json::json!({"invitations":[
+            {"invitation":1,"generation":1,"attempt":1,"step":"privacy","ready":true},
+            {"invitation":2,"generation":1,"attempt":1,"step":"privacy","ready":true}]}),
+    ] {
+        let mut engine = Engine::new(vec![skill.clone()], true);
+        assert!(
+            engine
+                .observe(
+                    lamp_msgs::OnboardingPending::TOPIC,
+                    1,
+                    bad.to_string().as_bytes(),
+                    None
+                )
+                .is_empty()
+        );
+    }
+}
+
+#[test]
+fn onboarding_request_names_invitation_and_has_no_extra_tool_or_authority() {
+    let skill = load(&skills_root().join("onboarding")).unwrap();
+    assert!(skill.tool.is_none());
+    assert_eq!(skill.kind, SkillKind::Core);
+    assert_eq!(
+        skill.permissions.topics,
+        [lamp_msgs::OnboardingPending::TOPIC]
+    );
+    assert!(skill.permissions.speak);
+    assert!(!skill.permissions.body && !skill.permissions.light && !skill.permissions.look);
+    assert!(skill.permissions.actions.is_empty());
+    let call = Call::SayFrom(lamp_skills::Source::Onboarding, Some(81));
+    assert_eq!(
+        call.named(),
+        (
+            "say",
+            serde_json::json!({"from":"onboarding","invitation":81})
+        )
+    );
+}
+
 /// #1669, Jarvis on #1920: a dotted `rise` field and a dotted `each` list
 /// and `key` read inside objects, as a trigger's field does; an empty step
 /// is refused at load.
@@ -6832,4 +9842,78 @@ body = { gesture = "nod" }
         .unwrap_err();
         assert!(error.contains("none of them empty"), "{field}: {error}");
     }
+}
+
+/// #1997 (`LAMP_WHO_WAS_HERE_NAMES`, the lead's yes): with names on, a visit
+/// by someone the eyes' `tellable` lists is told with their name, only to a
+/// skill with `known_faces = true`; once they're out of `tellable` (a no, a
+/// forget) the same visit is someone the lamp knows; with names off it
+/// never is named; a yes given after a visit doesn't name it.
+#[test]
+fn who_was_here_names_only_who_said_yes_and_only_to_a_skill_with_known_faces() {
+    let dir = tempfile::tempdir().unwrap();
+    let marked = WHO.replace("speak = true", "speak = true\nknown_faces = true");
+    let eyes = tempfile::tempdir().unwrap();
+    let known = eyes.path().join("known");
+    let tellable = eyes.path().join("tellable");
+    std::fs::write(&known, "Alpha\n").unwrap();
+    std::fs::write(&tellable, "Alpha\n").unwrap();
+    let engine = |toml: &str, naming: bool| -> Engine {
+        let who = load(&skill_with(dir.path(), "who", toml)).unwrap();
+        let mut engine = Engine::new(vec![who], true).marking_known(known.clone());
+        if naming {
+            engine = engine.naming_who_said_yes();
+        }
+        for at in (0..=60).step_by(2) {
+            engine.observe(
+                "room/presence",
+                at * 1_000_000,
+                br#"{"someone":true,"nobody_s":0,"by":"face"}"#,
+                Some(3_000),
+            );
+        }
+        engine
+    };
+    let note = |engine: &mut Engine| -> String {
+        let calls = engine
+            .tool("who_was_here", &serde_json::json!({}), 61_000_000)
+            .unwrap()
+            .calls;
+        match &calls[..] {
+            [Call::Say(note)] => note.clone(),
+            other => panic!("{other:?}"),
+        }
+    };
+    let mut named = engine(&marked, true);
+    let told = note(&mut named);
+    assert!(
+        told.contains("\n- Alpha has been at the lamp for 1 min"),
+        "{told}"
+    );
+    // Without known_faces, or with names off: never the name.
+    assert!(!note(&mut engine(WHO, true)).contains("Alpha"));
+    let off = note(&mut engine(&marked, false));
+    assert!(
+        off.contains("\n- someone the lamp knows has been at the lamp for 1 min")
+            && !off.contains("Alpha"),
+        "{off}"
+    );
+    // A no (out of tellable): the same visit is someone the lamp knows.
+    std::fs::remove_file(&tellable).unwrap();
+    let after = note(&mut named);
+    assert!(
+        after.contains("\n- someone the lamp knows has been at the lamp for 1 min")
+            && !after.contains("Alpha"),
+        "{after}"
+    );
+    // A yes given after the visit doesn't name it: the name is kept only if
+    // it was in tellable when the visit was seen.
+    let mut earlier = engine(&marked, true);
+    std::fs::write(&tellable, "Alpha\n").unwrap();
+    let later = note(&mut earlier);
+    assert!(
+        later.contains("\n- someone the lamp knows has been at the lamp for 1 min")
+            && !later.contains("Alpha"),
+        "{later}"
+    );
 }

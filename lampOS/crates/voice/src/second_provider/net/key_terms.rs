@@ -3,7 +3,7 @@
 //! unit's own words first (`LAMP_SECOND_KEY_TERMS`, the places people ask
 //! about and words like "desk lamp"), then, with `LAMP_SECOND_KNOWN_NAMES=on`,
 //! the names the lamp knows: the one typed at setup, and the agents it hands
-//! work to ("Claude Code", "Codex", "OpenCode", when it has a tasks part).
+//! work to ("Claude Code", "Codex", "OpenCode", "Devin", when it has a tasks part).
 //! Never the known faces' names: the list of everyone the lamp remembers would
 //! leave the house with every line, people who only asked to be recognised
 //! among them (the reviewer on #1818). Sending them needs the owner's yes.

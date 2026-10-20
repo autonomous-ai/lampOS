@@ -2,6 +2,7 @@
 
 pub mod base;
 pub mod engine;
+pub mod forward;
 pub mod head_discovery;
 pub mod input;
 pub mod mpr121;

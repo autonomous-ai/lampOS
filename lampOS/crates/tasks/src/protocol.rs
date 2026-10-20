@@ -83,6 +83,34 @@ pub enum Request {
         observation_id: u64,
         session_id: String,
     },
+    /// Start Harness's sign-in by a spoken code, or give back the one open
+    /// (`serve --sign-in-by-code`, [`crate::sign_in`]): on the trusted
+    /// route only, since the code it gives is said aloud by the voice.
+    SignInStart {},
+    /// Where the sign-in is: its code, the email to ask about, or how it
+    /// ended.
+    SignInState {},
+    /// The voice heard "Sign in as …?" said whole, for sign-in `id`, in its
+    /// `request`: from then an answer is taken.
+    SignInAsked {
+        id: u64,
+        request: u64,
+    },
+    /// The person's spoken answer to "Sign in as …?", in the voice's
+    /// `request`: taken only once it was told, in a later request, within
+    /// two minutes ([`crate::sign_in::Session::answer`]).
+    SignInAnswer {
+        answer: Answer,
+        request: u64,
+    },
+}
+
+/// A spoken yes or no.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Answer {
+    Yes,
+    No,
 }
 
 const fn page_size() -> u16 {
@@ -117,6 +145,10 @@ impl Request {
                 | Self::ClaimSpeech { .. }
                 | Self::AckSpeech { .. }
                 | Self::Told { .. }
+                | Self::SignInStart {}
+                | Self::SignInState {}
+                | Self::SignInAsked { .. }
+                | Self::SignInAnswer { .. }
         )
     }
 
@@ -145,6 +177,10 @@ impl Request {
             Self::ClaimSpeech { .. } => "claim_speech",
             Self::AckSpeech { .. } => "ack_speech",
             Self::Told { .. } => "told",
+            Self::SignInStart {} => "sign_in_start",
+            Self::SignInState {} => "sign_in_state",
+            Self::SignInAsked { .. } => "sign_in_asked",
+            Self::SignInAnswer { .. } => "sign_in_answer",
         }
     }
 }
@@ -196,6 +232,46 @@ mod tests {
             Request::parse(br#"{"op":"confirm","id":1}"#),
             Err("bad_request")
         );
+    }
+
+    /// #1676: the sign-in's operations are the trusted route's; they carry
+    /// numbers and a yes or a no, never a code or an email.
+    #[test]
+    fn sign_in_operations_are_trusted_and_take_only_a_yes_or_a_no() {
+        for (bytes, name) in [
+            (br#"{"op":"sign_in_start"}"#.as_slice(), "sign_in_start"),
+            (br#"{"op":"sign_in_state"}"#, "sign_in_state"),
+            (
+                br#"{"op":"sign_in_asked","id":1,"request":4}"#,
+                "sign_in_asked",
+            ),
+            (
+                br#"{"op":"sign_in_answer","answer":"yes","request":5}"#,
+                "sign_in_answer",
+            ),
+        ] {
+            let request = Request::parse(bytes).unwrap();
+            assert!(request.trusted() && request.guard().is_none(), "{name}");
+            assert_eq!(request.name(), name);
+        }
+        assert_eq!(
+            Request::parse(br#"{"op":"sign_in_answer","answer":"no","request":5}"#).unwrap(),
+            Request::SignInAnswer {
+                answer: Answer::No,
+                request: 5
+            }
+        );
+        for bytes in [
+            br#"{"op":"sign_in_answer","answer":"maybe","request":5}"#.as_slice(),
+            br#"{"op":"sign_in_answer","request":5}"#,
+            br#"{"op":"sign_in_answer","answer":"yes"}"#,
+            br#"{"op":"sign_in_asked","id":1}"#,
+            br#"{"op":"sign_in_asked","id":1,"request":4,"email":"someone@example.com"}"#,
+            br#"{"op":"sign_in_start","email":"someone@example.com"}"#,
+            br#"{"op":"sign_in_state","code":"12345678"}"#,
+        ] {
+            assert_eq!(Request::parse(bytes), Err("bad_request"));
+        }
     }
 
     #[test]

@@ -1,0 +1,8 @@
+Oct 20 13:48:05.584234 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 91: the model is told the lamp's name was heard
+Oct 20 13:48:07.416153 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 91: its answer is played: the room is not known to be busy (the room microphone 8.5 dB over its quiet)
+Oct 20 13:48:07.417663 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 91: the model asked the time; told [the time tool's answer left out]
+Oct 20 13:48:07.418637 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(5613) prompt=Some(5607) prompt_audio=Some(383) response=Some(6) response_audio=None thoughts=None cached=None
+Oct 20 13:48:11.185482 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(5741) prompt=Some(5664) prompt_audio=Some(383) response=Some(77) response_audio=Some(77) thoughts=None cached=None
+Oct 20 13:48:22.956534 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 92: the model is told the lamp's name was heard
+Oct 20 13:48:25.597681 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 92: its answer is played: the session has heard enough to be trusted (the room microphone 8.1 dB over its quiet)
+Oct 20 13:48:26.872084 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(5942) prompt=Some(5906) prompt_audio=Some(525) response=Some(36) response_audio=Some(36) thoughts=None cached=None

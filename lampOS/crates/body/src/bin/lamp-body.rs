@@ -4,7 +4,7 @@
 use lamp_body::{calibration::UnitId, moves::Asker};
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-body exit-report < LINE_OR_JOURNAL\n\nReads the newest exit report the body printed ({\"port\":...,\"body\":{...}}, e.g. from\n`journalctl -u lamp-body -o short-iso`) on stdin and prints it as plain lines: when (the journal\nprefix), the stop, stood and steps, per joint bad_temperatures, temperature_flaps and bad_reads,\nthe settles, the peak temperatures and goal_writes; a field older bodies lack says so. Exits 0 when\nthe newest was read, 1 when stdin holds none, 3 when the newest cannot be read (cut short: said,\nwith the previous readable one after it, labelled) and 4 when stdin cannot be read. It never\nopens the port.\n\nlamp-body --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --mood-socket ABSOLUTE_PATH [--home PITCH,ROLL,YAW] [--reach UP,DOWN,ROLL,YAW] [--speed COUNTS_PER_SECOND] [--servo-speed N] [--servo-acceleration N] [--stand PITCH,ROLL,YAW,SHOULDER,ELBOW --folded-arm SHOULDER,ELBOW [--stand-share PERCENT] [--stand-seconds N] [--awake-seconds N] [--arm-load SHOULDER,ELBOW] [--idle on|off]] [--gaze-socket ABSOLUTE_PATH --gaze YAW,PITCH [--gaze-reach YAW,PITCH]] [--stand-roll COUNTS] [--force-limit N] [--torque on|off] [--wake on|off] [--give-way return|stay|off] [--limp on|off] [--overload release] [--let-go-at-stop on|off] [--rest-glance on|off] [--pitch-window LOW,HIGH] [--look-at-name on|off] [--moves ABSOLUTE_DIR] [--arbitration on|off]\n\nOwns the servo port and moves head pitch, head roll and base yaw a few degrees around\na home pose (the one given, in encoder counts, or else where they are found), for the mood\nit is told on the socket. Without --stand it never touches the shoulder or the elbow, and\nwithout --stand or --torque on it writes torque only off, on all five, as a run ends on a surprise\nor a start is refused for heat or load. With --stand (which needs --home and --folded-arm) it also raises the shoulder and\nthe elbow to that pose when a mood other than rest arrives, folds them down again\n--awake-seconds after the last one, and writes torque once to a shoulder or elbow found\nwith an old overload latched. With --gaze-socket and --gaze it takes where a face is from\nlamp-eyes on that socket ({\"face\":{...}} or {\"face\":null}) and, while the lamp listens\nor speaks, turns the head to it in small corrections: --gaze is the counts of base yaw and of\nhead pitch, signed, that bring a face from the right and from the bottom edge of the picture\nto its middle. Refuses to start unless the three joints have torque on, a clear\nstatus and the head is inside its start window; one found as hot or as loaded as a run stops\nat is refused with torque off on all five, so that nothing pushes on until the next start. With --torque on it first takes hold of a\njoint found without torque (the three always, the shoulder and the elbow with --stand):\nits goal is written as where it is, then torque on, and if it then moves more than 12 counts\nit does not start. With --wake on and --home, a joint found outside where it may start\n(the head out of its start window, or a joint farther from home than it may be found) but within\n400 counts of home is not refused: before anything else it is brought home slowly, a small stir,\na pause, then an eased rise at 20 counts a second at most, never away from home, the head\nfirst and the base once the head is up; an arm found off\nits way is not lowered, and the lamp runs folded. By default --give-way return and --limp on
+const USAGE: &str = "lamp-body exit-report < LINE_OR_JOURNAL\n\nReads the newest exit report the body printed ({\"port\":...,\"body\":{...}}, e.g. from\n`journalctl -u lamp-body -o short-iso`) on stdin and prints it as plain lines: when (the journal\nprefix), the stop, stood and steps, per joint bad_temperatures, temperature_flaps and bad_reads,\nthe settles, the peak temperatures and goal_writes; a field older bodies lack says so. Exits 0 when\nthe newest was read, 1 when stdin holds none, 3 when the newest cannot be read (cut short: said,\nwith the previous readable one after it, labelled) and 4 when stdin cannot be read. It never\nopens the port.\n\nlamp-body --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --mood-socket ABSOLUTE_PATH [--home PITCH,ROLL,YAW] [--reach UP,DOWN,ROLL,YAW] [--speed COUNTS_PER_SECOND] [--servo-speed N] [--servo-acceleration N] [--stand PITCH,ROLL,YAW,SHOULDER,ELBOW --folded-arm SHOULDER,ELBOW [--stand-share PERCENT] [--stand-seconds N] [--awake-seconds N] [--arm-load SHOULDER,ELBOW] [--idle on|off]] [--gaze-socket ABSOLUTE_PATH [--gaze YAW,PITCH] [--gaze-reach YAW,PITCH]] [--stand-roll COUNTS] [--force-limit N] [--torque on|off] [--wake on|off] [--give-way return|stay|off] [--limp on|off] [--overload release] [--let-go-at-stop on|off] [--rest-glance on|off] [--pitch-window LOW,HIGH] [--look-at-name on|off] [--moves ABSOLUTE_DIR] [--arbitration on|off]\n\nOwns the servo port and moves head pitch, head roll and base yaw a few degrees around\na home pose (the one given, in encoder counts, or else where they are found), for the mood\nit is told on the socket. Without --stand it never touches the shoulder or the elbow, and\nwithout --stand or --torque on it writes torque only off, on all five, as a run ends on a surprise\nor a start is refused for heat or load. With --stand (which needs --home and --folded-arm) it also raises the shoulder and\nthe elbow to that pose when a mood other than rest arrives, folds them down again\n--awake-seconds after the last one, and writes torque once to a shoulder or elbow found\nwith an old overload latched. With --gaze-socket and --gaze it takes where a face is from\nlamp-eyes on that socket ({\"face\":{...}} or {\"face\":null}) and, while the lamp listens\nor speaks, turns the head to it in small corrections: --gaze is the counts of base yaw and of\nhead pitch, signed, that bring a face from the right and from the bottom edge of the picture\nto its middle. --gaze-socket without --gaze (a lamp whose gaze is not measured yet) runs with gaze off and\nsays so. Refuses to start unless the three joints have torque on, a clear\nstatus and the head is inside its start window; one found as hot or as loaded as a run stops\nat is refused with torque off on all five, so that nothing pushes on until the next start. With --torque on it first takes hold of a\njoint found without torque (the three always, the shoulder and the elbow with --stand):\nits goal is written as where it is, then torque on, and if it then moves more than 12 counts\nit does not start. With --wake on and --home, a joint found outside where it may start\n(the head out of its start window, or a joint farther from home than it may be found) but within\n400 counts of home is not refused: before anything else it is brought home slowly, a small stir,\na pause, then an eased rise at 20 counts a second at most, never away from home, the head\nfirst and the base once the head is up; an arm found off\nits way is not lowered, and the lamp runs folded. By default --give-way return and --limp on
 (--give-way off is the body as it was before them, and --limp off keeps giving way without the
 slump). With --give-way, a joint that pushes at its goal without moving for\n1.5 s is told to stop (its goal becomes where it is; torque is never written off); with\n--give-way stay, a head or base joint that gave way and is moved more than 15 counts by\na hand for over a second stays where it was put. With --limp on as well, as the old runtime
 did, a head or base joint that a hand stops and still pushes a second later makes the lamp
@@ -25,6 +25,10 @@ struct Arguments {
     servo_acceleration: Option<u8>,
     standing: Option<StandingChoice>,
     gaze: Option<GazeChoice>,
+    /// `--gaze-socket` given without `--gaze`: a factory `lamp.env` before
+    /// its gaze is measured with a face (install.md). The body runs with gaze
+    /// off and says so; the path is still checked.
+    unmeasured_gaze_socket: Option<PathBuf>,
     stand_roll: Option<u16>,
     force_limit: Option<u16>,
     torque_on: bool,
@@ -39,6 +43,50 @@ struct Arguments {
     moves: Option<PathBuf>,
     arbitration: bool,
 }
+
+/// Every option this build reads. One that is not among them is refused.
+/// One from the lamp's own poses file (`BODY_POSES`, written by
+/// `lamp-body-measure` into `/etc/lampOS/body/lamp.env`) is refused too,
+/// with a line that names it and says the body stays still: a pose option a
+/// newer measure adds may be a bound that lamp's mechanics need, as
+/// `--pitch-window` once was, and a body that stands still until it is
+/// updated is the safe failure, not one that moves on bounds it knows to be
+/// incomplete (the first builder on #2071, 20 Oct 06:28; #1680's one
+/// exception, a safety rule).
+const OPTIONS: [&str; 32] = [
+    "--arbitration",
+    "--arm-load",
+    "--awake-seconds",
+    "--device",
+    "--folded-arm",
+    "--force-limit",
+    "--gaze",
+    "--gaze-reach",
+    "--gaze-socket",
+    "--give-way",
+    "--home",
+    "--idle",
+    "--let-go-at-stop",
+    "--limp",
+    "--lock-directory",
+    "--look-at-name",
+    "--mood-socket",
+    "--moves",
+    "--overload",
+    "--pitch-window",
+    "--reach",
+    "--rest-glance",
+    "--servo-acceleration",
+    "--servo-speed",
+    "--speed",
+    "--stand",
+    "--stand-roll",
+    "--stand-seconds",
+    "--stand-share",
+    "--torque",
+    "--unit-id",
+    "--wake",
+];
 
 /// What `--give-way` said; the body's own type is built for Linux only.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -95,7 +143,18 @@ fn home_of(value: &str) -> Option<[u16; 3]> {
     parts.next().is_none().then_some(home)
 }
 
+#[cfg(test)]
 fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, &'static str> {
+    parse_with(args, None)
+}
+
+/// As [`parse`], `poses` being the lamp's poses file's options as systemd
+/// gave them (`BODY_POSES`): an option there this build does not read is
+/// still refused, and named.
+fn parse_with(
+    args: impl IntoIterator<Item = OsString>,
+    poses: Option<&str>,
+) -> Result<Option<Arguments>, &'static str> {
     let mut args = args.into_iter();
     let (mut device, mut unit_id, mut lock_directory, mut mood_socket) = (None, None, None, None);
     let mut home = None;
@@ -388,18 +447,36 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                         .ok_or("--gaze-reach is YAW,PITCH in encoder counts")?,
                 );
             }
-            _ => return Err("unknown or duplicate option"),
+            _ => {
+                let name = key.to_str().unwrap_or_default();
+                let from_poses =
+                    poses.is_some_and(|poses| poses.split_whitespace().any(|word| word == name));
+                if !OPTIONS.contains(&name) && from_poses {
+                    eprintln!(
+                        "lamp-body: /etc/lampOS/body/lamp.env: {name}: an option this build does not read, written by a newer measure; the body stays still until this lamp is updated"
+                    );
+                    return Err("an option in the lamp's poses file this build does not read");
+                }
+                return Err("unknown or duplicate option");
+            }
         }
     }
-    // Eyes are a socket and what the picture is worth, or nothing.
-    let gaze = match (gaze_socket, gaze_turn) {
-        (Some(socket), Some(turn)) => Some(GazeChoice {
-            socket,
-            turn,
-            reach: gaze_reach.unwrap_or([250, 120]),
-        }),
-        (None, None) if gaze_reach.is_none() => None,
-        _ => return Err("--gaze-socket and --gaze go together, and --gaze-reach needs them"),
+    // Eyes are a socket and what the picture is worth, or nothing. A socket
+    // without --gaze is a lamp whose gaze is not measured yet: the product's
+    // unit passes the socket and the reach, and lamp-body-measure writes no
+    // --gaze (thirteen-P1, lamp-c0a4 on 19 Oct); it runs with gaze off.
+    let (gaze, unmeasured_gaze_socket) = match (gaze_socket, gaze_turn) {
+        (Some(socket), Some(turn)) => (
+            Some(GazeChoice {
+                socket,
+                turn,
+                reach: gaze_reach.unwrap_or([250, 120]),
+            }),
+            None,
+        ),
+        (Some(socket), None) => (None, Some(socket)),
+        (None, None) if gaze_reach.is_none() => (None, None),
+        _ => return Err("--gaze needs --gaze-socket, and --gaze-reach needs them"),
     };
     // A load bound at or over the force limit could never be read, and the
     // guard it is would be off.
@@ -452,6 +529,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         servo_acceleration,
         standing,
         gaze,
+        unmeasured_gaze_socket,
         stand_roll,
         force_limit,
         torque_on: torque.unwrap_or(false),
@@ -475,7 +553,11 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     if result.stand_roll.is_some() && result.standing.is_none() {
         return Err("--stand-roll needs --stand");
     }
-    let gaze_path = result.gaze.as_ref().map(|gaze| &gaze.socket);
+    let gaze_path = result
+        .gaze
+        .as_ref()
+        .map(|gaze| &gaze.socket)
+        .or(result.unmeasured_gaze_socket.as_ref());
     for path in [&result.device, &result.lock_directory, &result.mood_socket]
         .into_iter()
         .chain(gaze_path)
@@ -778,7 +860,8 @@ fn main() -> std::process::ExitCode {
     {
         return exit_report();
     }
-    let arguments = match parse(std::env::args_os().skip(1)) {
+    let poses = std::env::var("BODY_POSES").ok();
+    let arguments = match parse_with(std::env::args_os().skip(1), poses.as_deref()) {
         Ok(None) => {
             print!("{USAGE}");
             return std::process::ExitCode::SUCCESS;
@@ -847,6 +930,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         arguments.servo_acceleration,
         arguments.standing,
         arguments.gaze,
+        arguments.unmeasured_gaze_socket,
         arguments.stand_roll,
         arguments.force_limit,
         arguments.torque_on,
@@ -1250,6 +1334,11 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
             }
         }
     };
+    if arguments.unmeasured_gaze_socket.is_some() {
+        eprintln!(
+            "lamp-body: gaze off: --gaze-socket without --gaze, which is measured with a face (install.md); the eyes are not read"
+        );
+    }
     // The eyes' socket, for a body that looks. A file left by an earlier
     // run is not a listener: replace it.
     let (looking, sights) = match &arguments.gaze {
@@ -1478,6 +1567,68 @@ mod tests {
         values.iter().map(OsString::from).collect()
     }
 
+    /// #1680, the first builder on #2071: a newer `lamp-body-measure` may
+    /// write a pose option this build does not read. The body stays strict
+    /// on it (it may be a bound the arm needs), and says which option and
+    /// why; the poses it knows still read; an unknown word, a bad value or a
+    /// known option twice is refused as before.
+    #[test]
+    fn a_newer_poses_files_option_still_stops_the_body() {
+        let poses = "--home 1772,2057,2034 --shoulder-trim 12 --torque on";
+        let line: Vec<&str> =
+            [&FULL[..], &poses.split_whitespace().collect::<Vec<_>>()[..]].concat();
+        assert_eq!(
+            parse_with(args(&line), Some(poses)).err(),
+            Some("an option in the lamp's poses file this build does not read")
+        );
+        assert_eq!(
+            parse_with(args(&line), None).err(),
+            Some("unknown or duplicate option")
+        );
+        // The poses it knows read as before.
+        let known = "--home 1772,2057,2034 --torque on";
+        let line: Vec<&str> =
+            [&FULL[..], &known.split_whitespace().collect::<Vec<_>>()[..]].concat();
+        let read = parse_with(args(&line), Some(known)).unwrap().unwrap();
+        assert_eq!(read.home, Some([1772, 2057, 2034]));
+        let typo = [&FULL[..], &["--wakee", "on"]].concat();
+        assert!(parse_with(args(&typo), Some(known)).is_err());
+        let line = [&FULL[..], &["--home", "1,2"]].concat();
+        assert!(parse_with(args(&line), Some("--home 1,2")).is_err());
+        let twice = "--home 1772,2057,2034 --home 1772,2057,2034";
+        let line = [
+            &FULL[..],
+            &["--home", "1772,2057,2034", "--home", "1772,2057,2034"],
+        ]
+        .concat();
+        assert!(parse_with(args(&line), Some(twice)).is_err());
+    }
+
+    /// Every option the usage names is one this build reads, so a known
+    /// option is never taken for a newer one.
+    #[test]
+    fn every_option_the_usage_names_is_known() {
+        let synopsis = USAGE
+            .split("lamp-body --device")
+            .nth(1)
+            .and_then(|rest| rest.split("\n\n").next())
+            .unwrap();
+        let named: Vec<&str> = format!("--device{synopsis}")
+            .split(|c: char| !(c.is_ascii_lowercase() || c == '-'))
+            .filter(|word| word.starts_with("--") && word.len() > 2)
+            .map(|word| {
+                OPTIONS
+                    .iter()
+                    .find(|known| **known == word)
+                    .copied()
+                    .unwrap_or_else(|| panic!("{word} not in OPTIONS"))
+            })
+            .collect();
+        for option in OPTIONS {
+            assert!(named.contains(&option), "{option} not in the usage");
+        }
+    }
+
     const FULL: [&str; 8] = [
         "--device",
         "/dev/example",
@@ -1488,6 +1639,55 @@ mod tests {
         "--mood-socket",
         "/run/lampos-body/mood.sock",
     ];
+
+    /// #2163 (Fifth on #2228): a seated lamp.env (lamp-body-measure
+    /// --seated) is for the generic package's unit, a V1 lamp moved to V2:
+    /// from that unit's own ExecStart it starts a body that may not stand
+    /// and holds the head and base. The product unit passes the stand's
+    /// own options, so it takes only a standing file (the factory's, after
+    /// its watched stand) and refuses a seated one: a product lamp is never
+    /// seated. Read from the unit files, so neither can drift from this.
+    #[test]
+    fn a_seated_poses_line_starts_the_generic_unit_and_never_stands() {
+        const SEATED: &str = "--home 1772,2052,2038 --pitch-window 1740,2030 --torque on";
+        let start = |unit: &str| {
+            let exec = unit
+                .lines()
+                .find_map(|line| line.strip_prefix("ExecStart="))
+                .expect("the unit has an ExecStart");
+            let words: Vec<String> = exec
+                .split_whitespace()
+                .skip(1)
+                .flat_map(|word| match word {
+                    "@BODY_POSES@" | "$BODY_POSES" => {
+                        SEATED.split_whitespace().map(str::to_owned).collect()
+                    }
+                    "@SERVO_DEVICE@" => vec!["/dev/ttyACM0".to_owned()],
+                    "@MOTOR_LOCK_DIR@" => vec!["/var/lib/lampos-locks/motor".to_owned()],
+                    "@UNIT_ID@" | "%H" => vec!["lamp-a63e".to_owned()],
+                    word => vec![word.to_owned()],
+                })
+                .collect();
+            assert!(
+                !words.iter().any(|word| word.contains('@')),
+                "a placeholder this test does not fill: {words:?}"
+            );
+            parse(words.iter().map(OsString::from))
+        };
+        let generic = start(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/units/lamp-body.service"
+        )))
+        .expect("the generic unit starts a seated body")
+        .unwrap();
+        assert!(generic.standing.is_none());
+        assert!(generic.torque_on);
+        let product = start(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/product/lamp-body.service"
+        )));
+        assert!(product.is_err(), "a product lamp is never seated");
+    }
 
     #[test]
     fn every_path_is_explicit_and_nothing_else_is_accepted() {
@@ -1971,8 +2171,23 @@ mod tests {
         .unwrap();
         assert_eq!((reached.turn, reached.reach), ([342, -200], [300, 100]));
         assert!(with(&[]).unwrap().unwrap().gaze.is_none());
-        for refused in [
+        // A socket without --gaze, the reach given or not, as the product's
+        // unit passes them before a lamp's gaze is measured: gaze off.
+        for unmeasured in [
             &socket[..],
+            &[&socket[..], &["--gaze-reach", "480,120"]].concat(),
+        ] {
+            let parsed = with(unmeasured).unwrap().unwrap();
+            assert!(parsed.gaze.is_none(), "{unmeasured:?}");
+            assert_eq!(
+                parsed.unmeasured_gaze_socket,
+                Some(PathBuf::from("/run/lampos-body/gaze.sock"))
+            );
+        }
+        assert!(with(&[]).unwrap().unwrap().unmeasured_gaze_socket.is_none());
+        for refused in [
+            &["--gaze-socket", "gaze.sock"][..],
+            &["--gaze-socket", "gaze.sock", "--gaze-reach", "480,120"],
             &["--gaze", "342,200"],
             &["--gaze-reach", "300,100"],
             &["--gaze-socket", "gaze.sock", "--gaze", "342,200"],
@@ -1991,6 +2206,53 @@ mod tests {
         ] {
             assert!(with(refused).is_err(), "{refused:?}");
         }
+    }
+
+    /// #2188: the product unit's own `ExecStart`, with the poses a freshly
+    /// measured lamp has (lamp-body-measure writes no `--gaze`), starts with
+    /// gaze off; with this lamp's `--gaze` added once measured, gaze is on.
+    /// Read from the unit file, so a unit and this rule cannot drift apart.
+    #[test]
+    fn the_product_unit_starts_a_fresh_lamp_with_gaze_off_and_on_once_measured() {
+        const UNIT: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/product/lamp-body.service"
+        ));
+        let exec = UNIT
+            .lines()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .expect("the product unit has an ExecStart");
+        // lamp-a63e's lamp.env as lamp-body-measure wrote it (19 Oct): no --gaze.
+        let measured = "--home 1772,2052,2038 --folded-arm 2047,2046 --stand 1772,2052,2038,2657,2602 --pitch-window 1740,2030 --torque on";
+        assert!(!measured.contains("--gaze "), "{measured}");
+        // systemd splits an unquoted $BODY_POSES on whitespace, and %H is the host.
+        let start = |poses: &str| {
+            let words: Vec<String> = exec
+                .split_whitespace()
+                .skip(1)
+                .flat_map(|word| match word {
+                    "$BODY_POSES" => poses.split_whitespace().map(str::to_owned).collect(),
+                    "%H" => vec!["lamp-a63e".to_owned()],
+                    word => vec![word.to_owned()],
+                })
+                .collect();
+            parse(words.iter().map(OsString::from))
+        };
+        let fresh = start(measured)
+            .expect("a freshly measured lamp's body starts")
+            .unwrap();
+        assert!(fresh.gaze.is_none());
+        assert_eq!(
+            fresh.unmeasured_gaze_socket,
+            Some(PathBuf::from("/run/lampos-body/gaze.sock"))
+        );
+        let looked = start(&format!("{measured} --gaze 755,555"))
+            .expect("a lamp with its gaze measured starts")
+            .unwrap();
+        let gaze = looked.gaze.expect("gaze is on once measured");
+        assert_eq!(gaze.turn, [755, 555]);
+        assert_eq!(gaze.reach, [480, 120], "the unit's own --gaze-reach");
+        assert!(looked.unmeasured_gaze_socket.is_none());
     }
 
     #[test]

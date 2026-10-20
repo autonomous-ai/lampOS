@@ -57,7 +57,8 @@ The group is a nextest filterset, written twice in `.config/nextest.toml`
 identical. Until 2026-10-17 it was written a third time, as the `pr`
 profile's exclusion:
 
-- the whole test binary `lamp-voice::capture_hold_worker` (the evaluator's
+- `lamp-voice`'s `capture_hold_worker` tests, a module of its one integration
+  binary since #1806 (`binary_id(lamp-voice::it) & test(/^capture_hold_worker::/)`; the evaluator's
   four, `serve_session`, `physical_loopback`, `serve_relay` and
   `final_dispatch`, and six of `lamp-memory::health`'s seven tests left on
   2026-10-17, below);
@@ -72,6 +73,32 @@ profile's exclusion:
   (`lamp-actions::server`'s light test and `lamp-memory::health`'s
   `the_environment_alone_does_not_enable_reporting_or_create_bus_data` left
   on 2026-10-17, below);
+- two tests of `lamp-skills::skills`, named exactly, that run the real
+  program on the host's clock by design (#1806, Seventh's choice on
+  2026-10-19): `asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait`
+  (the production 2.5 s give-up, and the late answer after it passed over)
+  and `a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go`
+  (a real one-second re-publication during a 1.5 s hold). They took 4.5 s
+  and 3.6 s on ARM64. The reading pose's checks of a skill's definition,
+  which need no clock, are a test of their own outside the group,
+  `a_reading_pose_needs_a_known_mood_and_a_for_of_at_most_two_minutes`;
+- one more of `lamp-skills::skills`, named exactly,
+  `asking_the_policy_a_hello_made_and_not_noticed_rests` (#1829, the
+  reviewer's P3 on 2026-10-19): it skips the program's clock for the run
+  itself, but waits up to 20 s of real time for the program to start and
+  subscribe, and once missed that under a load of about 30;
+- two tests of `lamp-voice`'s `hand_controls`, named exactly, that count
+  the input pump's real wakes for a second by design (#1806, #1569 row 35,
+  2026-10-19): `with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once`
+  (at most 10 passes waiting, 100 or more ticking, and a stop within 100 ms)
+  and `with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump`. They
+  took 2.6 s and 1.3 s on ARM64; beside 8 busy cores and four SQLite stores
+  syncing on a Mac, the first's stop took 103 ms to 1.09 s in 18 of 20 runs;
+- two more of `lamp-skills::skills`, named exactly, that start the real
+  program twice on the host's clock, a restart between, and wait 800 ms of
+  real time for a nudge that must not come (#1837):
+  `the_program_keeps_a_skill_off_across_a_restart` and
+  `the_program_forgets_a_snooze_at_a_restart`;
 - tests with a real-clock bound that a loaded runner misses: none now. A
   test goes here only until it gets its own time; the bound the lamp runs
   with is never raised for it. `lamp-voice`'s `coordinator::motor::tests::native_head`
@@ -93,8 +120,14 @@ From `lampOS/`, the group alone, one test at a time as on the runner:
 cargo nextest run --release --workspace --profile realtime -j 1
 ```
 
-What a pull request runs: `--profile pr`, every test, the group one at a
-time. Everything one test at a time, as the full run:
+What a pull request runs: `--profile pr`, the group one at a time, over the
+crates its diff changes, every crate that depends on them, and lamp-cloud,
+lamp-voice-eval and lamp-update, whose tests read other crates' files
+(`.github/scripts/lampos-pr-crates.py`, the project lead's proposal, 19 Oct).
+It runs every crate when the diff touches `Cargo.lock`, any `Cargo.toml`,
+`crates/msgs`, `bus` or `ipc`, `deploy/`, `skills/`, `.config/`, the docs
+tests read, the script, the workflow or any other path. A push to
+`lamp-voice` runs every crate. Everything one test at a time, as the full run:
 `cargo nextest run --release --workspace -j 1`. `cargo test` is unaffected
 and runs everything.
 
@@ -1189,6 +1222,45 @@ version fails three tests and this one only the hold test, which is on the
 host clock by design. With 400 ms, both pass. 30 copies at once, three
 rounds: 90 of 90.
 
+## The self-test's head move on a clock its tests step (#1128)
+
+`lamp-selftest`'s head-move tests drive the check against a simulated body
+on its own thread. They took 26 s on Linux (30.6 s once #1340's wait for a
+still joint came in), the slowest on pull requests after the ring check
+(the 17.5 s test alone, run 39014782754). Each move eases out over 0.4 s,
+allows 2 s to reach and 3 s to come back, with a 20 ms step.
+
+The check now reads the crate's `Clock` (`now`, `pause`), as the ring check
+does: `one_move`, `moves` and #1340's `settled`. On the lamp it is the
+host's (`Check::run` passes `Host`), and the same reads happen. The tests
+give it a stepped clock, and the simulated body runs on the host's clock
+until the check first pauses, so its report and first readings come as on a
+lamp. After that it takes one step for each pause, and the clock moves on
+only once it has. The body moves by steps, not by time, so each 20 ms of the
+check is one 20 ms step of the body, without the wait. The body's report
+wait (`REPORT_WITHIN`) and the silent body's 1.5 s stay on the host's clock.
+#1340's own test of `settled` passes the host's clock too, since its
+shaking head drifts by real time.
+
+Stepping it first showed #1329, a real hazard: a move's start was read
+while the head still settled after the last move, and the merged test
+passed by 0.1 count of `NEAR`. Stepped, it failed every time. #1340 waits
+for a still joint first. `settled` has to read the same clock as the move:
+on the host's, the stepped body stands still during the wait and seems
+settled where it isn't. At #1373 (19 October, Linux x86_64 in podman) the ten
+head tests took 6.5 s (3 of 3), and the crate passed 59 of 59. #1340 then
+added an eleventh, the axis that is not fitted. On ARM64 (run 39370639743,
+20 October) the four Linux-only move tests took 2.2, 1.6, 1.4 and 1.4 s,
+where the full run of 19 October (39337741436) had 17.4 s and 6.7 s for the
+two slowest.
+
+The simulated body counts each request's lease in its own 20 ms steps, from
+the lease's own length, not against the host's clock: stepped, a 200 ms
+lease judged by real time outlasted the whole move, so a check that asked
+once and never renewed passed where a lamp's body would have dropped its
+request (the reviewer's P2 on #1373). With the lease in steps, that check
+fails both move tests again.
+
 ## The kept-note read gets the test's own bound (#1269)
 
 `remember::tests::someone_known_keeps_to_their_own_and_is_answered_from_theirs_then_the_room`
@@ -1526,3 +1598,41 @@ Kept as they are, each for its own reason:
   over 32,000 of `POLL_US` (2 ms) for a scenario of about 65 s of logical
   time. A shorter plan or a driver that jumps to the next thing due would cut
   it. That is voice-eval's own design, proposed on #1128.
+
+## The Policy's own waits, short in its tests (#1806, 20 October)
+
+Five of `lamp-policy::policy`'s tests waited out two of the loop's own waits
+in the full run of 19 October (39337741436). Four waited for the lamp's words
+after its first sound (`outcome::WORDS_FOR`, 1 s):
+`what_the_lamp_did_after_each_decision_is_written_beside_it` 1.8 s,
+`a_lamp_that_spoke_before_it_was_decided_is_written_with_a_time_less_than_nothing`
+1.5 s, and `a_piece_taken_up_after_the_lamps_sound_but_sent_before_it_is_answered_by_it`
+and `a_session_stamped_minutes_ago_is_timed_by_its_taking_up` 1.2 s each.
+`how_the_room_is_and_who_the_eyes_see_are_taken_from_the_bus` (2.3 s) slept
+2.1 s for the eyes' list to outlast `SEEN_FOR` (2 s).
+
+The two are now a `policy::Timing { words_for, seen_for }` in `Beside`.
+`Timing::LAMP` and the default are the lamp's 1 s and 2 s, and `lamp-policy`'s
+own `main` passes `Timing::LAMP`, so the lamp is unchanged.
+`the_loops_own_waits_are_the_lamps_unless_a_test_says_otherwise` holds those
+values. The second judge's tracker (`--local-judge`) takes the same
+`seen_for`.
+
+The five tests use `QUICK`: 400 ms for the words, and 1 s for the list. The
+tests send their words within milliseconds of the lamp's first sound, so
+400 ms still takes them all in. In the room test the second utterance comes
+150 ms after the list, and the test sleeps 1.1 s before the third.
+On this Mac the five took 8.05 s and now take 4.85 s, each run
+from its own build: 1.81 to 1.22, 1.51 to 0.96, 1.20 to 0.69, 1.21 to 0.66
+and 2.32 to 1.32. With the loop's list read on `SEEN_FOR` in place of its own
+`seen_for`, the room test fails (the third decision still saw the faces).
+
+Left as they are, for what each is there to show:
+- `hello`'s office scenes are timed to the rig's 400 ms quiet. Halved, the
+  lull would sit 50 ms inside it on a busy runner.
+- `decide`'s picture test needs its 1.1 s gap. It is what makes "the new frame
+  is sent with its own age" a check: with a gap of 100 ms, an age measured
+  from the old frame would pass `< 500 ms` too.
+- `judges_program` keeps `--seconds 2`. The child's time starts at its
+  start, and inside it the test waits for the ready report, sends a line,
+  and waits for a decision with a 1 s deadline.

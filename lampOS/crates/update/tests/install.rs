@@ -48,12 +48,17 @@ struct FakeHost {
     harness_refuses: bool,
     /// Each command `harness-off`'s steps ran, as its arguments.
     steps: Vec<String>,
+    /// Each command Harness at boot's steps ran, as its arguments.
+    boot_steps: Vec<String>,
     /// The step that fails: the first command containing this text.
     failing_step: Option<String>,
     /// What `harness service status --json` prints.
     status_json: String,
     /// What `pgrep` finds; none makes it end with 1, as `pgrep` does.
     pids: String,
+    /// What each `harness version` says, in turn; when none is left, the
+    /// version `harness-on` needs.
+    versions: std::collections::VecDeque<Result<String, String>>,
 }
 
 /// `harness service status --json` once the service is gone (Harness
@@ -89,9 +94,25 @@ impl Host for FakeHost {
 
     fn harness_at_boot(&mut self, user: &str, home: &str) -> Result<(), String> {
         self.calls.push(format!("harness {user} {home}"));
-        if self.harness_refuses {
-            return Err("harness service install: no user manager".into());
-        }
+        // The real steps, each through stand-ins, the drop-in written under
+        // the root; `harness service install` refuses on demand.
+        let (steps, refuses) = (&mut self.boot_steps, self.harness_refuses);
+        install::harness_at_boot_with(
+            &mut |argv: &[String]| {
+                let line = argv.join(" ");
+                steps.push(line.clone());
+                match argv[0].as_str() {
+                    "id" => Ok("999\n".into()),
+                    _ if refuses && line.ends_with("service install") => {
+                        Err("harness service install: no user manager".into())
+                    }
+                    _ => Ok(String::new()),
+                }
+            },
+            &self.root,
+            user,
+            home,
+        )?;
         // What logind and the Harness CLI leave behind.
         let linger = self.root.join("var/lib/systemd/linger");
         fs::create_dir_all(&linger).unwrap();
@@ -126,6 +147,8 @@ impl Host for FakeHost {
                     "ln" => {
                         let link = root.join(argv[3].trim_start_matches('/'));
                         fs::create_dir_all(link.parent().unwrap()).unwrap();
+                        // Never written through a link already there.
+                        let _ = fs::remove_file(&link);
                         fs::write(link, "#!/bin/sh\n").unwrap();
                         Ok(String::new())
                     }
@@ -142,12 +165,20 @@ impl Host for FakeHost {
         Ok(())
     }
 
+    fn harness_version(&mut self, user: &str, home: &str) -> Result<String, String> {
+        self.calls.push(format!("harness version {user} {home}"));
+        self.versions
+            .pop_front()
+            .unwrap_or_else(|| Ok("0.4.23\n".into()))
+    }
+
     fn harness_off(&mut self, user: &str, home: &str) -> Result<Vec<String>, String> {
         self.calls.push(format!("harness-off {user} {home}"));
         // The real steps, each through stand-ins for `id`, `runuser … harness`,
         // `loginctl` and `pgrep`.
         let (steps, failing) = (&mut self.steps, self.failing_step.clone());
         let (status, pids) = (self.status_json.clone(), self.pids.clone());
+        let root = self.root.clone();
         let left = install::harness_off_with(
             &mut |argv: &[String]| {
                 let line = argv.join(" ");
@@ -157,6 +188,10 @@ impl Host for FakeHost {
                 }
                 match argv[0].as_str() {
                     "id" => Ok("999\n".into()),
+                    "rm" => {
+                        let _ = fs::remove_file(root.join(argv[2].trim_start_matches('/')));
+                        Ok(String::new())
+                    }
                     "pgrep" if pids.is_empty() => Err("pgrep: exit 1".into()),
                     "pgrep" => Ok(pids.clone()),
                     _ if line.ends_with("service status --json") => Ok(status.clone()),
@@ -191,13 +226,16 @@ struct Lamp {
     said: Vec<String>,
 }
 
-/// Every binary the product starts, and the voice's worker: a line of text each.
+/// Every binary the product starts, the voice's worker and the body's
+/// factory tools: a line of text each.
 fn binaries() -> Vec<String> {
     let mut names: Vec<String> = install::parts()
         .into_iter()
         .map(|part| part.binary)
         .collect();
     names.push("lamp-turn-end".into());
+    names.push("lamp-body-measure".into());
+    names.push("lamp-body-mood".into());
     names
 }
 
@@ -239,6 +277,10 @@ impl Lamp {
             files_url: CHANNEL.into(),
             files,
             units: Vec::new(),
+            min_updater: None,
+            models: Vec::new(),
+            settings: Vec::new(),
+            image: Vec::new(),
         };
         let bytes = serde_json::to_vec(&manifest).unwrap();
         channel.files.insert(
@@ -260,9 +302,11 @@ impl Lamp {
             failing_enables: 0,
             harness_refuses: false,
             steps: Vec::new(),
+            boot_steps: Vec::new(),
             failing_step: None,
             status_json: STATUS_GONE.into(),
             pids: String::new(),
+            versions: Default::default(),
         };
         Self {
             _dir: dir,
@@ -332,6 +376,14 @@ fn a_blank_lamp_gets_every_part_its_units_and_nothing_started() {
     }
     // The voice's worker beside the voice, where the voice starts it.
     assert!(lamp.on("/opt/lampOS/voice/current/lamp-turn-end").is_file());
+    // The body's factory tools beside the body, where steps.sh runs them (#2189).
+    for tool in ["lamp-body-measure", "lamp-body-mood"] {
+        assert!(
+            lamp.on(&format!("/opt/lampOS/body/current/{tool}"))
+                .is_file(),
+            "{tool}"
+        );
+    }
 
     for (name, text) in PRODUCT {
         let written = fs::read_to_string(lamp.on(&format!("/etc/systemd/system/{name}"))).unwrap();
@@ -467,6 +519,31 @@ fn a_build_without_a_part_is_refused_before_anything_is_written() {
     assert!(!lamp.on("/etc/systemd").exists());
 }
 
+/// #2249 (the reviewer's P2): a build from before the body's factory tools
+/// (19 Oct) still installs every part; the tools are said missing, once
+/// each, and not put beside the body.
+#[test]
+fn a_build_without_the_bodys_factory_tools_still_installs() {
+    let mut lamp = Lamp::new(188, &["lamp-body-measure", "lamp-body-mood"]);
+    lamp.install().unwrap();
+    assert!(lamp.on("/opt/lampOS/body/current/lamp-body").is_file());
+    assert!(lamp.on("/opt/lampOS/voice/current/lamp-turn-end").is_file());
+    for tool in ["lamp-body-measure", "lamp-body-mood"] {
+        assert!(
+            !lamp
+                .on(&format!("/opt/lampOS/body/current/{tool}"))
+                .exists()
+        );
+        let said: Vec<&String> = lamp
+            .said
+            .iter()
+            .filter(|line| line.contains(tool))
+            .collect();
+        assert_eq!(said.len(), 1, "{tool}: {:?}", lamp.said);
+        assert!(said[0].contains("build 188 carries no"), "{said:?}");
+    }
+}
+
 #[test]
 fn a_newer_build_moves_each_link_and_keeps_the_old_folders() {
     let mut lamp = Lamp::new(188, &[]);
@@ -567,6 +644,11 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
         } else if *name == "lamp-setup.service" {
             // Setup is the one that runs while the marker is missing.
             assert!(unit.contains(&format!("ConditionPathExists=!{SETUP_DONE}").as_str()));
+        } else if *name == "lamp-waking.service" {
+            // The waking face is before the lamp, on a set-up lamp only:
+            // before the marker the ring is the setup light's (#1681).
+            assert!(unit.contains(&condition.as_str()), "{name}");
+            assert!(section(text, "Install").contains(&"WantedBy=sysinit.target"));
         } else if *name == "lampos-setup-done.path" {
             // And this starts the lamp once it is there.
             let path = section(text, "Path");
@@ -579,7 +661,7 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             );
         }
     }
-    assert_eq!(gated.len(), 20, "{gated:?}");
+    assert_eq!(gated.len(), 21, "{gated:?}");
     for outside in ["lamp-update.service", "lamp-records.timer"] {
         assert!(!gated.contains(&outside), "{outside}");
     }
@@ -1079,6 +1161,10 @@ fn the_skills_tools_are_in_their_own_folder_which_the_voice_reads() {
     };
     let skills = unit("lamp-skills.service");
     assert!(skills.contains("\nRuntimeDirectory=lampos-skills\n"));
+    // The skills a person turned off are kept across a restart in its own
+    // state folder (#1685), the one #1732's daily journal shares.
+    assert!(skills.contains(" --state-dir /var/lib/lampos-skills-state "));
+    assert!(skills.contains("\nStateDirectory=lampos-skills-state\nStateDirectoryMode=0700\n"));
     assert!(skills.contains(" --tools-dir /run/lampos-skills "));
     assert!(!skills.contains("/run/lampos-actions/skills"));
     assert!(
@@ -1354,6 +1440,75 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
 
 const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
 
+/// The reviewer's P1 on #2143: a lamp whose pins are its own (the
+/// factory's head pads, before this build) keeps them, and gains the
+/// build's `privacy` section, which the product's units now select; without
+/// it Controls has no privacy source and the lamp never hears. Everything
+/// else is kept, it is said, and installing again changes nothing. A pins
+/// file that isn't a JSON object is left, and said.
+#[test]
+fn a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest() {
+    let mut lamp = Lamp::new(188, &[]);
+    let own = r#"{
+  "chip": "/dev/gpiochip0",
+  "buttons": [{"name": "primary", "line": 99, "active_low": true, "pull": "up"}],
+  "head_pads": [{"name": "head-1", "line": 41, "active_low": true, "pull": "up"}],
+  "every_ms": 5,
+  "reset": {"name": "reset", "line": 100, "active_low": true, "pull": "up"},
+  "legacy_head": true
+}
+"#;
+    fs::create_dir_all(lamp.on(PINS).parent().unwrap()).unwrap();
+    fs::write(lamp.on(PINS), own).unwrap();
+    let first = lamp.install().unwrap();
+    let pins: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(lamp.on(PINS)).unwrap()).unwrap();
+    assert_eq!(
+        pins["privacy"],
+        serde_json::json!({"chip": "/dev/gpiochip1", "line": 9, "active_low": true, "pull": "up"})
+    );
+    let mut kept = pins.clone();
+    kept.as_object_mut().unwrap().remove("privacy");
+    assert_eq!(
+        kept,
+        serde_json::from_str::<serde_json::Value>(own).unwrap()
+    );
+    assert!(
+        first.changed.contains(&format!("wrote {PINS}")),
+        "{:?}",
+        first.changed
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with(&format!("added the privacy section to {PINS}"))),
+        "{:?}",
+        lamp.said
+    );
+    let added = fs::read_to_string(lamp.on(PINS)).unwrap();
+    lamp.said.clear();
+    let again = lamp.install().unwrap();
+    assert_eq!(fs::read_to_string(lamp.on(PINS)).unwrap(), added);
+    assert!(
+        !again.changed.contains(&format!("wrote {PINS}")),
+        "{:?}",
+        again.changed
+    );
+    // Not a JSON object: left as it is, and said.
+    let mut odd = Lamp::new(189, &[]);
+    fs::create_dir_all(odd.on(PINS).parent().unwrap()).unwrap();
+    fs::write(odd.on(PINS), "[]\n").unwrap();
+    odd.install().unwrap();
+    assert_eq!(fs::read_to_string(odd.on(PINS)).unwrap(), "[]\n");
+    assert!(
+        odd.said
+            .iter()
+            .any(|line| line.starts_with(&format!("{PINS} is not a JSON object"))),
+        "{:?}",
+        odd.said
+    );
+}
+
 /// The reviewer's case on #815: install, move the primary button to
 /// another line on this lamp, install the same build again. The lamp's
 /// line stays, it is said, and nothing else is written or asked.
@@ -1562,6 +1717,18 @@ fn tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder() 
         .unwrap()
         .1;
     assert!(voice.contains("/var/lib/lampOS/voice/sessions/${INVOCATION_ID}"));
+}
+
+/// The reviewer on #1913, 19:50: the tmpfiles install writes are recorded,
+/// so a build's newer tmpfiles reach the lamp.
+#[test]
+fn install_records_the_tmpfiles_it_writes() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    assert_eq!(
+        lamp.state().settings[install::TMPFILES_PATH],
+        sha256_hex(install::TMPFILES.as_bytes())
+    );
 }
 
 /// A newer build's default reaches a setting nobody changed; a setting
@@ -2159,6 +2326,8 @@ fn harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep() {
             format!("{harness} stop"),
             format!("{harness} service status --json"),
             "loginctl disable-linger lampos".to_owned(),
+            "rm -f /etc/systemd/system/user@999.service.d/lamp-home.conf".to_owned(),
+            "systemctl daemon-reload".to_owned(),
             "pgrep -u lampos -f harnessd".to_owned(),
         ]
     );
@@ -2169,7 +2338,13 @@ fn harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep() {
 /// finishes. A status that does not answer is said, not a failure.
 #[test]
 fn a_failing_step_keeps_the_record_and_a_later_run_finishes() {
-    for step in ["id -u", "service uninstall", "stop", "disable-linger"] {
+    for step in [
+        "id -u",
+        "service uninstall",
+        "stop",
+        "disable-linger",
+        "lamp-home.conf",
+    ] {
         let mut lamp = Lamp::with_harness();
         lamp.install().unwrap();
         lamp.host.failing_step = Some(step.into());
@@ -2185,7 +2360,7 @@ fn a_failing_step_keeps_the_record_and_a_later_run_finishes() {
         lamp.host.failing_step = None;
         assert_eq!(lamp.harness_off().unwrap(), Vec::<String>::new(), "{step}");
         assert_eq!(lamp.harness_left_on(), [false, false, false], "{step}");
-        assert_eq!(lamp.host.steps.len(), ran + 6, "{step}: all six again");
+        assert_eq!(lamp.host.steps.len(), ran + 8, "{step}: all eight again");
     }
     let mut lamp = Lamp::with_harness();
     lamp.install().unwrap();
@@ -2804,6 +2979,122 @@ fn harness_on_keeps_a_harness_already_there() {
     assert!(lamp.host.steps.is_empty());
 }
 
+/// #1676, the first builder at 09:46: a Harness `harness-on` put there (the
+/// link to the launcher in its HOME) older than 0.4.23 is brought up to the
+/// version Harness's own installer ships, with `harness version` read before
+/// and after; one new enough is kept; a failed or still too old install
+/// keeps it and says `harness_too_old`, and so does an older Harness put
+/// there otherwise, which is never installed over.
+#[test]
+fn harness_on_updates_its_own_older_harness_and_says_one_too_old() {
+    let ours = |lamp: &Lamp| {
+        let link = lamp.on(install::HARNESS);
+        fs::create_dir_all(link.parent().unwrap()).unwrap();
+        let _ = fs::remove_file(&link);
+        std::os::unix::fs::symlink(
+            format!("{}/.local/bin/harness", install::HARNESS_HOME),
+            &link,
+        )
+        .unwrap();
+    };
+    let installs = |lamp: &Lamp| lamp.called("harness-on lampos /var/lib/lampos-tasks");
+    let too_old = |lamp: &Lamp| {
+        lamp.said
+            .iter()
+            .filter(|line| line.starts_with("harness_too_old:"))
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    // Updated: 0.4.19 before, 0.4.24 after.
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    ours(&lamp);
+    lamp.host.versions = [Ok("0.4.19\n".into()), Ok("v0.4.24\n".into())].into();
+    let changed = lamp.harness_on().unwrap();
+    assert_eq!(
+        changed,
+        [
+            "Harness updated from 0.4.19 to 0.4.24 by its own installer, for signing in by a spoken code",
+            "Harness starts at boot as lampos",
+            "lamp-tasks.service started again",
+        ]
+    );
+    assert_eq!(installs(&lamp), 1);
+    assert!(
+        lamp.host
+            .steps
+            .iter()
+            .any(|step| step.contains("install.sh | sh"))
+    );
+    // New enough: kept, nothing installed.
+    lamp.host.versions = [Ok("0.4.24\n".into())].into();
+    assert_eq!(lamp.harness_on().unwrap(), Vec::<String>::new());
+    assert_eq!(installs(&lamp), 1);
+    assert!(
+        lamp.said.iter().any(
+            |line| line == "Harness 0.4.24 is already at /usr/local/bin/harness: kept as it is"
+        )
+    );
+    // Its installer failed: kept, said, and the rest goes on.
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    ours(&lamp);
+    lamp.host.failing_step = Some("curl".into());
+    lamp.host.versions = [Ok("0.4.19\n".into()), Ok("0.4.19\n".into())].into();
+    let changed = lamp.harness_on().unwrap();
+    assert!(
+        !changed.iter().any(|line| line.contains("updated")),
+        "{changed:?}"
+    );
+    let said = too_old(&lamp);
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(said[0].contains("installer failed") && said[0].contains("Harness 0.4.19 is kept"));
+    assert!(
+        fs::symlink_metadata(lamp.on(install::HARNESS))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    // Installed, and still too old.
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    ours(&lamp);
+    lamp.host.versions = [Ok("0.4.19\n".into()), Ok("0.4.20\n".into())].into();
+    let changed = lamp.harness_on().unwrap();
+    assert!(
+        !changed.iter().any(|line| line.contains("updated")),
+        "{changed:?}"
+    );
+    assert!(too_old(&lamp)[0].contains("Harness is 0.4.20 after its own installer"));
+    // Put there otherwise, older: never installed over.
+    let mut lamp = Lamp::with_harness();
+    lamp.install().unwrap();
+    lamp.host.versions = [Err("harness version: not found".into())].into();
+    let changed = lamp.harness_on().unwrap();
+    assert!(
+        !changed.iter().any(|line| line.contains("updated")),
+        "{changed:?}"
+    );
+    assert_eq!(installs(&lamp), 0);
+    assert!(too_old(&lamp)[0].contains("wasn't put there by harness-on"));
+    assert!(lamp.host.steps.is_empty());
+}
+
+#[test]
+fn harness_versions_are_read_as_harness_prints_them() {
+    for (text, version) in [
+        ("0.4.23\n", Some((0, 4, 23))),
+        ("v0.4.24", Some((0, 4, 24))),
+        ("harness 0.5.0-beta.1", Some((0, 5, 0))),
+        ("0.4", None),
+        ("", None),
+    ] {
+        assert_eq!(install::harness_version_of(text), version, "{text}");
+    }
+    assert!(install::harness_version_of("0.4.19").unwrap() < install::HARNESS_LEAST);
+    assert!(install::harness_version_of("0.10.0").unwrap() > install::HARNESS_LEAST);
+}
+
 /// A step that fails stops there: no link to nothing, nothing recorded, the
 /// tasks part not started again, and a later run tries again from the start.
 /// Without lampOS installed, it refuses before asking anything.
@@ -2833,4 +3124,88 @@ fn harness_on_stops_at_a_failing_step_and_leaves_no_link() {
     lamp.host.failing_step = None;
     lamp.harness_on().unwrap();
     assert!(lamp.on(install::HARNESS).exists());
+}
+
+/// #1676, shown on lamp-75c9 on 19 Oct: Harness at boot gives `lampos`'s own
+/// user manager, and no part, the `HOME` Harness writes its unit under, so
+/// `harness service install` finds it. The steps in order: the drop-in,
+/// `daemon-reload` and `try-restart` of that manager before the linger
+/// starts it, then the service install. `harness-off` takes the drop-in
+/// away after the linger.
+#[test]
+fn harness_at_boot_gives_lamposs_manager_its_home_first() {
+    let mut lamp = Lamp::with_harness();
+    lamp.install().unwrap();
+    let harness = "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 /usr/local/bin/harness";
+    assert_eq!(
+        lamp.host.boot_steps,
+        [
+            "id -u lampos".to_owned(),
+            "install -d -o lampos -g lampos -m 0700 /var/lib/lampos-tasks".to_owned(),
+            "systemctl daemon-reload".to_owned(),
+            "systemctl try-restart user@999.service".to_owned(),
+            "loginctl enable-linger lampos".to_owned(),
+            format!("{harness} service install"),
+        ]
+    );
+    let drop_in = lamp.on("etc/systemd/system/user@999.service.d/lamp-home.conf");
+    assert_eq!(
+        fs::read_to_string(&drop_in).unwrap(),
+        "[Service]\nEnvironment=HOME=/var/lib/lampos-tasks\n"
+    );
+    use std::os::unix::fs::PermissionsExt;
+    assert_eq!(
+        fs::metadata(&drop_in).unwrap().permissions().mode() & 0o7777,
+        0o644
+    );
+    lamp.harness_off().unwrap();
+    assert!(!drop_in.exists(), "harness-off takes it away");
+}
+
+/// A refused service install stops there: the drop-in is written (the next
+/// run writes it again, the same), nothing is recorded, and a later install
+/// asks again.
+#[test]
+fn a_refused_service_install_records_nothing_and_keeps_the_drop_in() {
+    let mut lamp = Lamp::with_harness();
+    lamp.host.harness_refuses = true;
+    assert!(lamp.install().is_err());
+    assert!(!lamp.on("var/lib/lampos-update/harness-at-boot").exists());
+    assert!(
+        lamp.on("etc/systemd/system/user@999.service.d/lamp-home.conf")
+            .exists()
+    );
+    assert!(
+        lamp.host
+            .boot_steps
+            .last()
+            .unwrap()
+            .ends_with("service install")
+    );
+    lamp.host.harness_refuses = false;
+    lamp.install().unwrap();
+    assert!(lamp.on("var/lib/lampos-update/harness-at-boot").exists());
+}
+
+/// The reviewer on #1788: a lamp that has not run `install` since #1680 has
+/// no lamp-update-back at its fixed path. Its unit's condition then skips
+/// it, from the timer or from lamp-update's `OnFailure=`, rather than
+/// failing every 2 min with a missing `ExecStart`.
+#[test]
+fn lamp_update_back_waits_for_its_binary_rather_than_failing() {
+    let back = PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-update-back.service")
+        .unwrap()
+        .1;
+    let unit = section(back, "Unit");
+    assert!(
+        unit.contains(&format!("ConditionPathExists={}", lamp_update::own::BACK).as_str()),
+        "{unit:?}"
+    );
+    let exec = section(back, "Service")
+        .into_iter()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(exec.starts_with(&format!("ExecStart={} ", lamp_update::own::BACK)));
 }

@@ -31,6 +31,11 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
         ring: Ring::default(),
         texts: Texts::on(texting),
         reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
     };
     (lamp, bus_root)
 }

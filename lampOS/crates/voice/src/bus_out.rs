@@ -28,7 +28,9 @@
 //! that only the lamp's own programs can enter.
 use crate::ring_wire::RingPhase;
 use lamp_bus::{Bus, Publisher};
-use lamp_msgs::{LinkFault, Room, RoomState, Speech, Voice, VoiceLink, VoiceState};
+use lamp_msgs::{
+    LinkFault, Room, RoomState, Speech, TurnVerdict, Voice, VoiceLink, VoiceState, VoiceTurn,
+};
 use std::{
     io,
     path::{Path, PathBuf},
@@ -115,6 +117,30 @@ impl RoomOut {
             crate::room_told::Room::Busy => Room::Busy,
         };
         let _ = self.room.publish_json(now_us, &RoomState { state });
+    }
+}
+
+/// Each turn's verdict (`voice/turn`, #1155), from the process that
+/// reaches it: answered, or its answer held back as not said to the lamp.
+/// The Policy's hello counts only turns to the lamp toward its quiet.
+pub struct TurnOut {
+    turn: Publisher,
+}
+
+impl TurnOut {
+    pub fn on(root: &Path) -> io::Result<Self> {
+        let bus = Bus::new(root)?;
+        Ok(Self {
+            turn: bus.publisher_declared(VoiceTurn::TOPIC, &VoiceTurn::declaration(), SOURCE)?,
+        })
+    }
+
+    /// Says `request`'s verdict, once, as it is reached. A send that
+    /// fails changes nothing for the voice.
+    pub fn tell(&mut self, request: u64, verdict: TurnVerdict, now_us: u64) {
+        let _ = self
+            .turn
+            .publish_json(now_us, &VoiceTurn { request, verdict });
     }
 }
 
@@ -723,6 +749,8 @@ pub fn link_state(link_up: bool, down_for_us: u64) -> VoiceLink {
 }
 
 pub struct BusOut {
+    onboarding: Option<Publisher>,
+    last_onboarding: Option<(lamp_msgs::OnboardingPending, u64)>,
     state: Publisher,
     heard: Publisher,
     said: Publisher,
@@ -755,7 +783,15 @@ impl BusOut {
             return None;
         }
         let link = std::env::var(LINK_ENVIRONMENT).ok().as_deref() == Some("on");
-        match Bus::from_environment().and_then(|bus| Self::on(&bus)?.with_link(&bus, link)) {
+        match Bus::from_environment().and_then(|bus| {
+            Self::on(&bus)?.with_link(&bus, link)?.with_onboarding(
+                &bus,
+                std::env::var(crate::onboarding::ENVIRONMENT)
+                    .ok()
+                    .as_deref()
+                    == Some("on"),
+            )
+        }) {
             Ok(out) => Some(out),
             Err(error) => {
                 eprintln!("lamp-voice: nothing is published on the bus: {error}");
@@ -767,6 +803,8 @@ impl BusOut {
     pub fn on(bus: &Bus) -> io::Result<Self> {
         let [heard, said] = Speech::TOPICS;
         Ok(Self {
+            onboarding: None,
+            last_onboarding: None,
             state: bus.publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), SOURCE)?,
             heard: bus.publisher_declared(heard, &Speech::declaration(), SOURCE)?,
             said: bus.publisher_declared(said, &Speech::declaration(), SOURCE)?,
@@ -785,6 +823,38 @@ impl BusOut {
             calls: crate::not_speech::CallsLeftOut::new(),
             could_not_start: 0,
         })
+    }
+
+    /// Only enabled onboarding publishes invitation identities. This carries no
+    /// sensor data and never grants microphone or camera authority.
+    pub fn with_onboarding(mut self, bus: &Bus, enabled: bool) -> io::Result<Self> {
+        if enabled {
+            self.onboarding = Some(bus.publisher_declared(
+                lamp_msgs::OnboardingPending::TOPIC,
+                &lamp_msgs::OnboardingPending::declaration(),
+                SOURCE,
+            )?);
+        }
+        Ok(self)
+    }
+
+    pub fn onboarding_pending(&mut self, value: &lamp_msgs::OnboardingPending, now_us: u64) {
+        let Some(out) = self.onboarding.as_mut() else {
+            return;
+        };
+        if value.check().is_err()
+            || self
+                .last_onboarding
+                .as_ref()
+                .is_some_and(|(old, at)| old == value && now_us.saturating_sub(*at) < 500_000)
+        {
+            return;
+        }
+        // Failed publication is retried on the next pass, never counted as an
+        // invitation delivered to the person or consumed by the core skill.
+        if out.publish_json(now_us, value).is_ok() {
+            self.last_onboarding = Some((value.clone(), now_us));
+        }
     }
 
     /// The service began to take in the person's words for turn `request`.
@@ -1197,6 +1267,58 @@ mod tests {
         assert_eq!(
             latest.parse::<VoiceLink>().unwrap(),
             VoiceLink::unavailable(LinkFault::Transport)
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn onboarding_is_opt_in_and_retries_publish_only_valid_bounded_identity() {
+        use lamp_msgs::{OnboardingInvitation, OnboardingPending, OnboardingStep};
+        let (bus, root) = bus("onboard");
+        let mut pending = OnboardingPending {
+            invitations: vec![OnboardingInvitation {
+                invitation: 7,
+                generation: 2,
+                attempt: 1,
+                step: OnboardingStep::Privacy,
+                ready: true,
+            }],
+        };
+        let mut off = BusOut::on(&bus)
+            .unwrap()
+            .with_onboarding(&bus, false)
+            .unwrap();
+        off.onboarding_pending(&pending, 10);
+        assert!(bus.latest(OnboardingPending::TOPIC).unwrap().is_none());
+        let mut on = BusOut::on(&bus)
+            .unwrap()
+            .with_onboarding(&bus, true)
+            .unwrap();
+        on.onboarding_pending(&pending, 10);
+        let first = bus.latest(OnboardingPending::TOPIC).unwrap().unwrap();
+        assert_eq!(first.parse::<OnboardingPending>().unwrap(), pending);
+        on.onboarding_pending(&pending, 11);
+        assert_eq!(
+            bus.latest(OnboardingPending::TOPIC)
+                .unwrap()
+                .unwrap()
+                .header
+                .seq,
+            first.header.seq
+        );
+        pending.invitations[0].ready = false;
+        on.onboarding_pending(&pending, 12);
+        let stopped = bus.latest(OnboardingPending::TOPIC).unwrap().unwrap();
+        assert!(stopped.header.seq > first.header.seq);
+        pending.invitations[0].invitation = 0;
+        on.onboarding_pending(&pending, 13);
+        assert_eq!(
+            bus.latest(OnboardingPending::TOPIC)
+                .unwrap()
+                .unwrap()
+                .header
+                .seq,
+            stopped.header.seq
         );
         let _ = std::fs::remove_dir_all(root);
     }

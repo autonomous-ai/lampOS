@@ -14,7 +14,7 @@ fn journal(name: &str) -> std::path::PathBuf {
 2026-10-19T20:00:06+0700 lamp-4ace lamp-voice[100]: lamp-voice second: chat answer: its first words or call 812 ms and its end 1430 ms after it was asked; 8000 prompt tokens, 6000 from the cache, 2000 not; 100 completion tokens
 2026-10-19T20:00:07+0700 lamp-4ace lamp-voice[100]: lamp-voice second: request 1 first answer audio 900 ms after the words were heard
 2026-10-19T20:00:08+0700 lamp-4ace lamp-voice[100]: lamp-voice second: request 1 ElevenLabs: 2 of 2 pieces began, 1 on a reused connection, 400 chars; the first piece's first audio byte 300 ms after it went, the slowest 350 ms
-2026-10-19T21:00:01+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 1 began
+2026-10-19T21:00:01+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 1 got no answer in 4000 ms; closed as unanswered, connection kept
 2026-10-19T21:00:03+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: usage total=Some(1500) prompt=Some(1000) prompt_audio=Some(400) response=Some(500) response_audio=Some(300) thoughts=None cached=None
 ",
     )

@@ -1,0 +1,49 @@
+# lampOS peek: a read-only page on an office lamp (lampOS/docs/peek.md, #2141).
+# Office lamps only, installed by hand: never in deploy/product, never on a person's lamp.
+# Template: replace every @NAME@ as deploy/units/README.md says. Off until a drop-in sets
+# LAMP_PEEK=on (/etc/systemd/system/lamp-peek.service.d/on.conf).
+[Unit]
+Description=lampOS peek (read-only page, office lamps only)
+ConditionHost=@UNIT_ID@
+# Only on a lamp that is set up: while setup runs, its hotspot page and
+# nginx have port 80. No Conflicts= with lamp-setup: at boot on a lamp that
+# was reset, systemd would keep this unit's start and drop setup's, and then
+# this condition fails and nothing listens (the reviewer on #2259). A reset
+# reboots, and the missing marker keeps this off.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target lamp-setup.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=@LAMP_USER@
+Group=@LAMP_USER@
+# The journal, for each unit's last error line.
+SupplementaryGroups=systemd-journal
+Slice=lampos-parts.slice
+Nice=10
+Environment=LAMP_BUS_ROOT=/run/lampos-bus
+# 127.0.0.1:8077 unless set. Anywhere else needs the token below. An office
+# lamp's drop-in sets 0.0.0.0:80, so the page is http://lamp-xxxx.local/.
+#Environment=LAMP_PEEK_LISTEN=0.0.0.0:80
+#LoadCredential=peek-token:/etc/lampOS/peek/token
+# Port 80 and nothing else: the one capability it is given.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+ExecStart=/opt/lampOS/peek/@PEEK_SHA256@/lamp-peek
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+SyslogIdentifier=lamp-peek
+NoNewPrivileges=yes
+# It reads: the whole system is read-only to it, but for the bus root, where
+# each reader of an event topic binds its subscriber socket.
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+
+[Install]
+WantedBy=multi-user.target

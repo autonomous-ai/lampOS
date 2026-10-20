@@ -9,6 +9,7 @@ pub(crate) type Result<T> = std::result::Result<T, Box<dyn std::error::Error + S
 #[derive(Debug)]
 pub(crate) struct PhysicalMute {
     pub(crate) observed_at_us: u64,
+    pub(crate) onboarding: Option<crate::onboarding::privacy::Checkpoint>,
 }
 impl fmt::Display for PhysicalMute {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -199,6 +200,22 @@ fn wait_loop(
 /// How long the wait may go without one fresh privacy observation.
 const UNAVAILABLE_WAIT: Duration = Duration::from_secs(1);
 
+#[cfg(test)]
+thread_local! {
+    /// A test's own wait for the same rule, on its thread only (#1806).
+    static TEST_UNAVAILABLE_WAIT: std::cell::Cell<Option<Duration>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// [`UNAVAILABLE_WAIT`], or in a test that set one, its own.
+fn unavailable_wait() -> Duration {
+    #[cfg(test)]
+    if let Some(wait) = TEST_UNAVAILABLE_WAIT.with(std::cell::Cell::get) {
+        return wait;
+    }
+    UNAVAILABLE_WAIT
+}
+
 fn wait_loop_with_gate(
     worker: &mut Worker,
     boot: BootId,
@@ -241,6 +258,7 @@ fn wait_loop_with_gate(
         for _ in 0..16 {
             match worker.channels.control.receive::<WorkerEvent>()? {
                 Some(WorkerEvent::Privacy {
+                    receipt: _,
                     acquired_at_us,
                     muted,
                 }) => {
@@ -266,7 +284,7 @@ fn wait_loop_with_gate(
         let state = gate.state(MonoTime::from_micros(at));
         if state != PrivacyState::Unavailable {
             fresh_since = Instant::now();
-        } else if fresh_since.elapsed() >= UNAVAILABLE_WAIT {
+        } else if fresh_since.elapsed() >= unavailable_wait() {
             return Err(
                 io::Error::other("physical privacy observation unavailable while waiting").into(),
             );
@@ -374,14 +392,17 @@ pub(crate) mod tests {
                     let event = match script {
                         Script::Missing => None,
                         Script::Gap if ticks == 0 => Some(WorkerEvent::Privacy {
+                            receipt: None,
                             acquired_at_us: at,
                             muted: true,
                         }),
                         Script::Stale if ticks == 0 => Some(WorkerEvent::Privacy {
+                            receipt: None,
                             acquired_at_us: at - PRIVACY_FRESH_US,
                             muted: true,
                         }),
                         Script::LateThenUnmute => Some(WorkerEvent::Privacy {
+                            receipt: None,
                             acquired_at_us: if ticks == 0 {
                                 at - PRIVACY_FRESH_US
                             } else {
@@ -402,6 +423,7 @@ pub(crate) mod tests {
                                 muted_seen.store(true, Ordering::SeqCst);
                             }
                             Some(WorkerEvent::Privacy {
+                                receipt: None,
                                 acquired_at_us: at,
                                 muted,
                             })
@@ -657,32 +679,54 @@ pub(crate) mod tests {
         fs::remove_dir(&directory.path).unwrap();
     }
 
+    /// Unknown, stale, invalid or failed GPIO never provides unmute
+    /// authority: one test for each, so that each runs beside the others
+    /// (#1806: the five one after another took 3.1 s on ARM64).
+    fn never_provides_unmute_authority(script: Script) {
+        // The same rule on a tenth of the wait: a missing, broken or stale
+        // reading is given up on after it, as after the lamp's second.
+        TEST_UNAVAILABLE_WAIT.with(|wait| wait.set(Some(UNAVAILABLE_WAIT / 10)));
+        let directory = SessionDirectory::create().unwrap();
+        let (worker, peer) = mock(&directory.path, script, Arc::new(AtomicBool::new(false)));
+        let mut allowed = false;
+        let error = wait_worker(
+            worker,
+            new_boot().unwrap(),
+            &Termination::inactive(),
+            |state, _, _| {
+                allowed |= state == PrivacyState::Allowed;
+                Ok(())
+            },
+        )
+        .unwrap_err();
+        assert!(error.downcast_ref::<PhysicalMute>().is_none());
+        assert!(!allowed);
+        assert!(peer.join().unwrap().received_stop);
+    }
+
     #[test]
-    fn unknown_stale_invalid_or_failed_gpio_never_provides_unmute_authority() {
-        for script in [
-            Script::Missing,
-            Script::Gap,
-            Script::Stale,
-            Script::Fault,
-            Script::Invalid,
-        ] {
-            let directory = SessionDirectory::create().unwrap();
-            let (worker, peer) = mock(&directory.path, script, Arc::new(AtomicBool::new(false)));
-            let mut allowed = false;
-            let error = wait_worker(
-                worker,
-                new_boot().unwrap(),
-                &Termination::inactive(),
-                |state, _, _| {
-                    allowed |= state == PrivacyState::Allowed;
-                    Ok(())
-                },
-            )
-            .unwrap_err();
-            assert!(error.downcast_ref::<PhysicalMute>().is_none());
-            assert!(!allowed);
-            assert!(peer.join().unwrap().received_stop);
-        }
+    fn missing_gpio_never_provides_unmute_authority() {
+        never_provides_unmute_authority(Script::Missing);
+    }
+
+    #[test]
+    fn a_gap_in_gpio_never_provides_unmute_authority() {
+        never_provides_unmute_authority(Script::Gap);
+    }
+
+    #[test]
+    fn stale_gpio_never_provides_unmute_authority() {
+        never_provides_unmute_authority(Script::Stale);
+    }
+
+    #[test]
+    fn failed_gpio_never_provides_unmute_authority() {
+        never_provides_unmute_authority(Script::Fault);
+    }
+
+    #[test]
+    fn invalid_gpio_never_provides_unmute_authority() {
+        never_provides_unmute_authority(Script::Invalid);
     }
 
     #[test]
@@ -700,6 +744,7 @@ pub(crate) mod tests {
                 }
                 peer.control
                     .send(WorkerEvent::Privacy {
+                        receipt: None,
                         acquired_at_us: monotonic_us(),
                         muted: false,
                     })

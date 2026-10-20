@@ -1,0 +1,4 @@
+Oct 20 13:31:09.149192 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 65: its answer is held back: a busy room, and nothing shows it was called or that anyone is turned to the lamp (the room microphone 10.5 dB over its quiet)
+Oct 20 13:31:09.149192 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 65 asked for remember; not done: its answer is held back
+Oct 20 13:31:09.152847 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(5991) prompt=Some(5977) prompt_audio=Some(780) response=Some(14) response_audio=None thoughts=None cached=None
+Oct 20 13:31:12.185355 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(6065) prompt=Some(6003) prompt_audio=Some(780) response=Some(62) response_audio=Some(62) thoughts=None cached=None

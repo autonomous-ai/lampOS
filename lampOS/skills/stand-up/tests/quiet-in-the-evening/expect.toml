@@ -1,0 +1,4 @@
+# 20:00, 110 minutes at the desk: the 100 minutes are up at 21:40, after
+# its hours (08:00 to 20:00) and before the night's: nothing.
+clock = "20:00"
+none = true

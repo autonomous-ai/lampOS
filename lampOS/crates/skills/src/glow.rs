@@ -380,6 +380,7 @@ mod tests {
             lasting: None,
             pattern: None,
             keep: false,
+            until_ends: false,
         }
     }
 
@@ -553,6 +554,7 @@ mod tests {
                 low: 1,
             }),
             keep: false,
+            until_ends: false,
         };
         let mut glow = Glow::new(&glows, "calm", None);
         assert_eq!(

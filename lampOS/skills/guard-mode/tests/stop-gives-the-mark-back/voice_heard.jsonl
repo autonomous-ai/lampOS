@@ -1,0 +1,3 @@
+{"topic":"voice/heard","declaration":{"type":"lamp_msgs/Speech","version":1,"kind":"event"}}
+{"header":{"topic":"voice/heard","kind":"event","enc":"json","type":"lamp_msgs/Speech","source":"voice","boot":"6c1a7e0f3b5d2e91","seq":1,"at_us":2000000,"at_unix_ms":1792400002000},"payload_b64":"eyJ0ZXh0IjoiTGFtcCwga2VlcCBhbiBleWUgb24gdGhpbmdzIHdoaWxlIEknbSBvdXQiLCJmaW5pc2hlZCI6dHJ1ZX0="}
+{"header":{"topic":"voice/heard","kind":"event","enc":"json","type":"lamp_msgs/Speech","source":"voice","boot":"6c1a7e0f3b5d2e91","seq":2,"at_us":298000000,"at_unix_ms":1792400298000},"payload_b64":"eyJ0ZXh0IjoiT2theSwgeW91IGNhbiBzdG9wIG5vdyIsImZpbmlzaGVkIjp0cnVlfQ=="}

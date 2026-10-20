@@ -53,6 +53,62 @@ Expression counts nobody for its sleep (`alive.rs`). `room/state` says how
 the room sounds and `attention/addressed` one request at a time, so neither
 carries this.
 
+**Only a voice said to the lamp (`LAMP_PRESENCE_VOICE=addressed`, part 2,
+the first builder's yes on 19 Oct).** By default every finished line on
+`voice/heard` is someone for 20 s, so in an office chatter near the lamp
+keeps the light on. With `LAMP_PRESENCE_VOICE=addressed` in the eyes' unit,
+a voice counts only on a `voice/turn` the voice answered as said to the lamp
+(`answered`, #1155), at that verdict's time; a turn it held back as not said
+to it, and a line only heard, are nobody. `by` is still `voice`. The cost:
+the verdict comes after the voice has judged the line, about 1 to 3 s after
+the words end, so the light coming back on a voice alone, from out of view,
+is that much slower; a face brings it back at once, and "Hey Lamp" from a
+dark doorway is still answered. Off unless set: unset, it is `voice/heard`
+as before.
+
+**A far face counts only while it moves (`LAMP_PRESENCE_FAR=moving`, the
+first builder on #1678, 20 Oct).** By default any face counts, near or far.
+At lamp-75c9 on 20 Oct at 10:17 a steady face far behind the sitter, 0.06
+of the picture tall at its right (someone in the office, or a picture),
+held `room/presence` at someone for about 37 s after the sitter had left. At
+home that keeps the light on. With `LAMP_PRESENCE_FAR=moving` in the eyes'
+unit, a face under 0.14 of the picture's height (`away::NEAR_TALL`, the line
+the activity judge and the still places use) counts only:
+- within 4 s of a near face (`NEAR_LATELY_US`): the sitter the detector
+  missed for a look, or someone walking away; or
+- while its own centre, by its passing id, has moved 0.05 of the picture,
+  across or down, within 10 s (`MOVED`, `MOVED_WITHIN_US`): someone walking
+  past or coming to the lamp. A false face's box moves 0.01 to 0.02 look to
+  look (`still.rs`), and so does a steady face far behind. Each face is
+  judged on its own, so two steady far faces taking turns as the tallest,
+  or a face found for one look elsewhere, are not a move (the reviewer on
+  #2149); or
+- while it's the sitter's at their place: within `activity::REACH` of the
+  last near face's heights of the place's centre, and at least half that
+  face's height (`AT_PLACE_TALL`), whatever its id. The place follows the
+  sitter's face look to look, as the activity judge's `sitter_in` follows
+  its sitter, and is forgotten 4 s after no such face is at it. That's the
+  sitter leaning back (0.6 to 0.95 of their seated height at lamp-75c9) or
+  sitting low (0.68). A small face far behind the chair, in line with the
+  camera, is under half and doesn't count (the reviewer on #2183).
+
+A near face always counts. The costs:
+- Someone sitting still far from the lamp, at another desk, is nobody,
+  which is what the light wants.
+- A steady face behind the chair that is at least half the sitter's height
+  (a big picture, or someone close behind them) keeps counting after they
+  leave, for as long as it stays found. A small far face there doesn't.
+
+**Why the place** (#1677's rerun, lamp-75c9, 20 Oct 11:55–12:04): sitting,
+the face was 0.146 to 0.2 of the picture tall. Leaning back still, it was
+0.12 to 0.14, under 0.14 in 242 of 341 looks, and its id changed from f1 to
+f10 while the place held (0.52 to 0.55 across, 0.37 to 0.40 down). Counted
+only by the line, presence said nobody 131 s into leaning back. The line
+itself stays at 0.14, since a lower one would let a bigger far face in (the
+first builder, 12:12 on #1677). Walking out, with the far face in view at
+0.73, it said nobody 23.8 s after the last near face. Off unless set:
+unset, every face counts as before.
+
 **Never "nobody" when it is not known.** Nothing is said while the eyes are
 not looking: the camera closed by the privacy switch, a mute or the voice
 gone, or no look for 5 s (`away::BLIND_AFTER_US`, Expression's
@@ -63,6 +119,16 @@ who came and went while the eyes were shut is not known. A gap of under 5 s
 
 **Readers.**
 - Light out when you leave: `nobody_s` above 599, below.
+- Who was here (`skills/who-was-here`, #1685), an installable skill: when
+  a person asks "was anyone here while I was out?", the model is told the
+  spells someone was at the lamp over the last 12 hours, and when the lamp
+  could not tell (a gap past a value's 3 s), each with its length and how
+  long ago (`crates/skills/src/visits.rs`, `[history]` in
+  [skills.md](skills.md)). Times only, in `lamp-skills`' memory, a day at
+  most, lost at a restart; a spell ends where `nobody_s` says the last face
+  or voice was. A spell in which no value's `by` said a face, only a voice,
+  is told as someone heard near the lamp, not seen (a passer-by, or someone
+  out of view); a value with no `by` (an older eyes') counts as a face.
 - Messages (#1673): "nobody for 5 minutes" is `someone` false and
   `nobody_s` at least 300, on a value that has not run out.
 
@@ -159,7 +225,9 @@ heard, so `someone` comes back and the skill's ask ends with it.
 - `crates/eyes`: `away.rs`'s judge (someone within 20 s, nobody counted from
   the last face or voice, nothing when the eyes stop, the count begun again
   after), and `bus_out.rs`'s `room/presence` on a real bus from looks and
-  `voice/heard`.
+  `voice/heard`; with `addressed`, a line heard and a turn held back nobody
+  and an answered turn someone by voice
+  (`with_addressed_only_an_answered_turn_is_someone`).
 - `crates/voice`: the face fading into a light slowly, no frame falling by a
   tenth, a turn over it as quick as ever, the wake in about half a second
   (`ring_face.rs`); the ring giving the shown request's fade to the face,

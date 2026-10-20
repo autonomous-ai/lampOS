@@ -1,0 +1,7 @@
+Oct 20 13:43:30.667965 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 85: the model is told the lamp's name was heard
+Oct 20 13:43:33.100008 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 85: its answer is played: its name was heard plainly in the room's sound (the room microphone 7.7 dB over its quiet)
+Oct 20 13:43:33.101363 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(8523) prompt=Some(8513) prompt_audio=Some(2322) response=Some(10) response_audio=None thoughts=None cached=None
+Oct 20 13:43:33.104040 lamp-06c1 lamp-memory[2377]: lamp-memory: search person=everyone ok entries=1
+Oct 20 13:43:33.106369 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 85 asked for recall; the memory answered in 4 ms; the answer was sent
+Oct 20 13:43:35.663814 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(8628) prompt=Some(8577) prompt_audio=Some(2322) response=Some(51) response_audio=Some(51) thoughts=None cached=None
+Oct 20 13:43:35.689305 lamp-06c1 lamp-memory[2377]: lamp-memory: append_linked person=everyone ok entries=0

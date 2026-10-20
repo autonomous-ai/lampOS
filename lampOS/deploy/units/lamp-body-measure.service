@@ -1,0 +1,37 @@
+# lampOS body: this lamp's seated poses, read once at rest before its first body start (#2163).
+# For a lamp moved to V2 without the factory's step (a V1 lamp): lamp-body-measure --seated reads
+# the joints with torque off, writes nothing to a servo, and writes /var/lib/lampos-body/measured.env
+# once: --home, the pitch window and --torque on, with no stand. Its body then holds and moves the
+# head and base only, never the arm, until a person confirms its first stand and the factory's step
+# writes /etc/lampOS/body/lamp.env (body.md). With either file there, it reads nothing.
+# It always runs and stays active (RemainAfterExit), so the keeper does not wait on it. A read it
+# refuses (torque on, a head outside its window) fails it, and lamp-body, which requires it, does
+# not start: the journal says why. It never turns torque off to get a read: an arm that is up would
+# drop (Fifth on #2163).
+[Unit]
+Description=lampOS body: this lamp's seated poses, read once at rest (lamp-body-measure --seated)
+ConditionHost=@UNIT_ID@
+PartOf=lampos.target
+Before=lamp-body.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Never root: the servo port's owner refuses a process that could bypass its lock.
+User=@LAMP_USER@
+Group=@LAMP_USER@
+SupplementaryGroups=dialout
+Slice=lampos-parts.slice
+WorkingDirectory=/
+StateDirectory=lampos-body
+StateDirectoryMode=0755
+ExecStart=/bin/sh -c 'if [ -e /etc/lampOS/body/lamp.env ] || [ -e /var/lib/lampos-body/measured.env ]; then echo "lamp-body-measure: this lamp has its poses; nothing read"; exit 0; fi; exec /opt/lampOS/body/@BODY_SHA256@/lamp-body-measure --device @SERVO_DEVICE@ --unit-id @UNIT_ID@ --lock-directory @MOTOR_LOCK_DIR@ --seated --write /var/lib/lampos-body/measured.env'
+TimeoutStartSec=60
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-body-measure
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=lampos.target

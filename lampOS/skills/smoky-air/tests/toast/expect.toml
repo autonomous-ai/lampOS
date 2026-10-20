@@ -1,0 +1,18 @@
+# PLACEHOLDER, to be replaced by the real recording (#1684): no trace
+# has been recorded yet, so this case has no .jsonl and is counted, not run.
+# The event: Toast burnt until it smokes, in the same room.
+# Should it speak? Yes, once, within 2 minutes of smoke being seen at the desk (the positive).
+# To make it: record `air/state` on a lamp with an air sensor (lamp-4ace or
+# lamp-52e6) while the event happens, put the recording here beside this
+# file, and set `clock` and the `at` of each call from it.
+[[expect]]
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+call = "light"
+args = { colour = "warm", level = 2 }
+
+[[expect]]
+call = "say"
+args = { text = "The air reads like smoke. If something's burning, please check it.", priority = 8, expires_ms = 120000 }

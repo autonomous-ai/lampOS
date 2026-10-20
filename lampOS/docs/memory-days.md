@@ -33,9 +33,10 @@ comparison material outside standalone lampOS.
 ## Switch and reply path
 
 Start `lamp-memory` with `--memory-days` to enable this store. Without it,
-the existing JSONL implementation is used. No deployment or voice setting
-is changed. The opt-in binary never calls a model, starts a model worker,
-or makes a network request. It logs that the model adapter is unconfigured.
+the existing JSONL implementation is used. The flag changes no voice
+setting. The product unit (`deploy/product/lamp-memory.service`) passes it,
+and the product's voice unit sets `LAMP_MEMORY_DAYS=on` (below). The opt-in
+binary never calls a model, starts a model worker, or makes a network request. It logs that the model adapter is unconfigured.
 
 The message `the model adapter is not configured` means this build does not
 automatically extract promises, threads or preferences from conversations,
@@ -88,7 +89,9 @@ The coordinator clears worker environments, then forwards only the exact
 non-Unicode values pass nothing; all other roles retain their empty
 environment. This narrow exception was approved in
 [Fourth-Q29](https://github.com/autonomous-ai/lampOS/issues/698#issuecomment-6165838226).
-No deployment has been changed. Host checks, retained failures and first and
+Task 29 changed no deployment. The switch has been on since: on lamp-4ace from
+15 Oct (#743), and now in the product's `deploy/product/lamp-voice.service`
+([switches.md](switches.md)). Host checks, retained failures and first and
 repeated client timings are in
 [task 29's evidence](verification/memory-voice-host-20261014/README.md).
 The task's final native ARM64 run and readiness are recorded in Fourth's log
@@ -144,6 +147,32 @@ does not clear that inhibition. Forget also invalidates the local recap;
 this code cannot retract words already delivered to a cloud provider.
 Conservative links may delete more derived exchanges than exact citations
 would. Exchanges that use remember/forget still stay out of the journal.
+
+The stop is said in the voice's journal (#2176); nothing else about it
+changes. When journalling first stops, one line names why:
+
+    lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+
+`why` is `forgotten` (a confirmed `forget` or `forget_everything`),
+`rule_forgotten`, `light_rule_forgotten` (the rules keeping the light on
+forgotten), `sources_limit` or `rules_limit` (a 65th distinct source or rule
+in the provider's context) or `poisoned` (the context's lock poisoned while a
+rule was linked). Only the first reason is kept. Then each exchange held back
+by the stop, or by a write not yet acknowledged, is counted, and the 1st,
+2nd, 4th, 8th and so on say the count:
+
+    lamp-voice provider: memory journal stopped: why=forgotten unacknowledged_writes=0 not_journalled=4
+
+With only an unacknowledged write holding exchanges back, `why` is
+`unacknowledged_write`. Exchanges lost otherwise (longer than 60,000 bytes, a
+busy context, a full queue) are not in `not_journalled`. After `poisoned` the
+lock stays poisoned, so every later exchange finds the context busy and none
+is counted. The lines carry no
+word said or kept and no person's id. A journal that never stopped says
+nothing new (`remember::tests::a_journal_that_never_stopped_says_nothing_new`,
+`remember::tests::a_stopped_journal_says_why_and_how_many_it_held_back`).
+These lines come from the provider worker, a process apart from the one
+that publishes the voice's `diagnostics`, so they are not on the bus.
 
 One worker owns a bounded queue of 32 exchanges and cleanup requests. Live
 Voice only attempts to enqueue; full queues drop new work. The worker
@@ -273,6 +302,27 @@ stale copies or resurrect forgotten records. Do not remove that guard by
 deleting the database. Trial the feature on a disposable directory first.
 There is no export or automatic downgrade tool in this task.
 
+A database a newer build wrote (`user_version` above 1) doesn't stop
+memory: it is renamed `memory-days.sqlite3.newer-db<version>-<seconds>`,
+never changed, and this build starts an empty one. No code reads the file
+back yet: on a roll forward the newer build opens `memory-days.sqlite3`,
+which is now this build's store. Whichever build brings `user_version` 2
+reads `newer-db2-*` back. The journal says it with the file's name only,
+and health warns with `set_aside` on every start while the file is there
+(#1680). Its records are not read or searched by this build.
+
+It is the person's memory too, and this build can't reach a fact or a
+person inside it, so every forget (`forget`, `forget_last` and
+`forget_all`, for one person or everyone) removes every set-aside file
+whole, with its `-journal`, `-wal` and `-shm`. Nothing said forgotten
+stays on disk. The journal line names only the files, and health's
+`set_aside` warning clears (#2067). It lasts no longer than the journal:
+the usual pass, on every request, removes one, sidecars too, once its
+`<seconds>` stamp (the store's clock when it was set aside) is
+`keep_days` old, with a journal line naming only the files, and the warning
+moves to a younger one or clears. The 5 s reset wipes the whole
+`/var/lib/lampos-memory` folder, so it removes them too.
+
 The connection uses rollback-journal `DELETE`, `synchronous=EXTRA`,
 `fullfsync=ON`, foreign keys and in-memory temporary tables. EXTRA also
 requests synchronization of the directory entry after journal removal;
@@ -300,6 +350,12 @@ Both versions remain stored; normal search and new notes exclude the old
 version. `history:true` exposes it for inspection. The pass does not
 overwrite or delete evidence. A model's choice of category and correction
 can still be wrong; structural validation cannot prove meaning.
+An observation in a category a newer build wrote is kept as stored and
+read with `category:null`: never read as another category, given to a tidy
+pass as a previous observation, chosen as one, or superseded (#1680). It
+takes none of the 32 previous-observation slots, so a tidy pass still sees
+up to 32 real ones, and a session note shows it as a plain fact, labelled
+`preference` as a kept fact is, never as its newer category (#2067).
 
 `forget {id}` removes that record, its replacement chain in both
 directions, and all linked descendants. When the target is an observation,
@@ -334,8 +390,10 @@ returning them, or when any required source expires. Passive inclusion
 in a session note does not keep an unused observation alive. Superseded
 versions age out too. Expiring an old source does not follow the correction
 link to a newer observation with independent evidence. Explicit kept
-facts have no expiry; at 200 items the next remember is refused, without
-dropping an earlier instruction. A forward clock jump can expire data;
+facts have no expiry, even one remembered with its conversation (#1693):
+when those exchanges expire, the fact stays and only its link to them goes
+(#2176); forgetting it still removes them. At 200 items the next
+remember is refused, without dropping an earlier instruction. A forward clock jump can expire data;
 a backward jump cannot move last use backward within a running process.
 No clock authority or persistent maximum clock across restart is added.
 
@@ -351,7 +409,7 @@ and counts, never queries, remembered words or model output.
 
 The request cap is 64 KiB. New operations refuse unknown fields. Existing
 operations keep their response shapes and text limits. Extra error codes
-include `full`, `busy`, `stale`, `done` and `version`; `bad_request` covers
+include `full`, `busy`, `stale` and `done`; `bad_request` covers
 invalid references or model output, and `storage` has a content-free
 message. A refusal leaves the connection usable.
 
@@ -603,8 +661,9 @@ The scenes played again at 14:50 do not count: the office was loud, the
 room was busy, and the voice's busy-room rule held the requests (including
 the call to remember: "asked for remember; not done"). To be played in a
 quiet room. At that lamp checkpoint, Voice did not use the new ranked
-response order, frozen session note or conversation-end handoff. Task 29's
-client above has not changed that recorded lamp result.
+response order, frozen session note or conversation-end handoff. The voice's
+switch for them, `LAMP_MEMORY_DAYS=on`, went on later: on lamp-4ace on
+15 Oct (#743), and in the product unit since ([switches.md](switches.md)).
 
 ## Not shown
 

@@ -1445,6 +1445,14 @@ pub fn serve(
         .as_deref()
         .filter(|_| files.room_facts)
         .and_then(|root| lamp_bus::Bus::new(root).ok());
+    // With `--health-facts`, an unwell part, kept up from the bus by a
+    // thread of its own; a turn reads only what it keeps (#1681).
+    let health = files
+        .bus_root
+        .as_deref()
+        .filter(|_| files.health_facts)
+        .and_then(|root| lamp_bus::Bus::new(root).ok())
+        .map(|bus| crate::health_told::watch(bus, crate::health_told::READ_EVERY));
     // What the texts' task is built from, kept before the spoken turns take
     // their own (`texts_task`).
     let texts_from = (character.clone(), tools.clone());
@@ -1526,7 +1534,7 @@ pub fn serve(
             ),
         );
         let time = crate::agent_tasks::noted(time, tasks.as_ref());
-        let facts = facts(session_fact && !going_on, room);
+        let facts = facts(session_fact && !going_on, room) + &health_fact(health.as_deref());
         if steady_first {
             steady_first_message(
                 format!("{character}{skills}"),
@@ -1983,8 +1991,24 @@ pub fn serve(
     // Without the rule, a line's own words say whether it called the lamp.
     if !files.attention {
         engine = engine.noting_whether_called(Arc::new(|_, words| {
-            Some(call_note(crate::attention::called_by_name(words)))
+            Some(call_note(crate::attention::called_by_name_on(words, true)))
         }));
+    }
+    // Each judged turn's verdict on the bus, for the Policy's hello (#1155).
+    if let Some(root) = files.bus_root.as_deref() {
+        match crate::bus_out::TurnOut::on(root) {
+            Ok(out) => {
+                let out = Mutex::new(out);
+                engine = engine.telling_verdicts(Arc::new(move |request, verdict| {
+                    if let Ok(mut out) = out.lock() {
+                        out.tell(request, verdict, lamp_ipc::monotonic_us());
+                    }
+                }));
+            }
+            Err(error) => eprintln!(
+                "lamp-voice second: turns' verdicts are not published on the bus: {error}"
+            ),
+        }
     }
     if checked {
         let file = thread.clone();
@@ -2483,6 +2507,18 @@ pub(crate) fn facts(session: bool, room: Option<crate::room_told::Room>) -> Stri
         .collect()
 }
 
+/// Which parts are unwell, with `--health-facts`, for this turn's system
+/// message (`crate::health_told`): from what the watch keeps, every turn
+/// while it lasts, since each chat starts with nothing; empty when all is
+/// well, nothing fresh is known, or the switch is off.
+pub(crate) fn health_fact(
+    health: Option<&std::sync::Mutex<crate::health_told::HealthTold<()>>>,
+) -> String {
+    health
+        .and_then(|health| health.lock().ok()?.now())
+        .map_or(String::new(), |line| format!("\n\n{line}"))
+}
+
 /// The Live route's rule for whom it answers (`crate::attention`, given
 /// with `--attention`), run on this route's spoken turns with what this
 /// route can give it: how the room is as Gemini's worker publishes it
@@ -2868,6 +2904,8 @@ impl Heeding {
     ) -> Self {
         let mut attention = crate::attention::Attention::default();
         attention.ignore_name_in_passing(name_in_passing_ignored);
+        // Deepgram's "Lynn" and "Lin" for "Lamp" call it here, never on Live.
+        attention.count_stand_alone_ins(true);
         let bus = bus_root.and_then(|root| {
             let bus = lamp_bus::Bus::new(root).ok()?;
             let names = bus
@@ -3311,7 +3349,7 @@ impl Heeding {
                 .and_then(|levels| levels.lock().ok())
                 .is_some_and(|levels| {
                     levels.iter().any(|(at, rise)| {
-                        (began..=ended).contains(at) && *rise >= crate::attention::NEAR_RISE_DB
+                        (began..=ended).contains(at) && *rise >= crate::attention::near_rise_db()
                     })
                 }),
             continues_from: None,
@@ -3884,7 +3922,8 @@ pub(crate) fn steady_first_message(
 }
 
 /// The thread in the room `used` bytes of the system message leave it,
-/// and `whose` exchanges as messages, both under the thread's one lock.
+/// and the exchanges as messages, both `whose` alone (a person's memory id,
+/// or none for the room), under the thread's one lock.
 fn thread_and_history(
     used: usize,
     file: Option<&Path>,
@@ -4477,8 +4516,6 @@ mod tests {
         assert_eq!(super::busy_bar(named, "Okay.", false), None);
     }
 
-    /// #1712, the first builder at 18:57: in a busy room a conversation goes
-    /// on 15 s from the lamp's last words; in a quiet one, Live's 45 s.
     /// #1712, the first builder at 19:21: "And what about tomorrow?" came
     /// 18 s after the weather line, after a long answer, and was held in a
     /// busy room. The 15 s count from the end of the lamp's words.
@@ -4530,6 +4567,8 @@ mod tests {
         assert!(super::going_on_from(true, Some(s(44)), None));
     }
 
+    /// #1712, the first builder at 18:57: in a busy room a conversation goes
+    /// on 15 s from the lamp's last words; in a quiet one, Live's 45 s.
     #[test]
     fn a_busy_rooms_conversation_goes_on_fifteen_seconds() {
         use crate::room_told::Room;
@@ -5543,6 +5582,13 @@ mod tests {
     }
 
     #[test]
+    fn the_health_fact_is_empty_with_the_switch_off_and_when_nothing_is_known() {
+        assert_eq!(health_fact(None), "");
+        let kept = std::sync::Mutex::new(crate::health_told::HealthTold::<()>::default());
+        assert_eq!(health_fact(Some(&kept)), "");
+    }
+
+    #[test]
     fn the_second_worker_takes_the_live_workers_flags_but_keep_link() {
         let dir = Path::new("/run/lamp-voice");
         let flags = strings(&[
@@ -5553,6 +5599,7 @@ mod tests {
             "--session-fact",
             "--room-facts",
             "--air-facts",
+            "--health-facts",
             "--tools",
             "--actions-dir",
             "/run/lamp-exec",

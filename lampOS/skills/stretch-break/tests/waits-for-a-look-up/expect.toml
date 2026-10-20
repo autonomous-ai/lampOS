@@ -1,0 +1,13 @@
+# The acts-after-50-minutes recording, with the eyes' room/activity saying
+# head_down from minute 48 to 54 (reading, #1678): nothing at 50 minutes,
+# then one stretch at the first face after they look up, within the ten
+# minutes the chance is kept (wait = "10m").
+[[expect]]
+at = "54m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+call = "body.gesture"
+args = { gesture = "stretching" }

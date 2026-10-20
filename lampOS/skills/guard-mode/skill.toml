@@ -1,0 +1,42 @@
+# Guard mode (#1685; the first builder's design of 19 Oct 12:08): while the
+# person is out, the lamp tells them by text when someone is at their desk.
+# An installable skill, off until they ask for it out loud at the lamp, and
+# off again when they say stop or the lamp sees their own face come back.
+# A watch (docs/skills.md, "A watch"; crates/skills/src/watch.rs): no
+# trigger, no steps; what it does is its [watch]. docs/guard-mode.md.
+needs = ["eyes", "light"]
+# Installable (docs/skills.md, "Core and installable skills"), and held out
+# of the product's install until it has been tried on a lamp
+# (install::NOT_PRODUCT_SKILLS). Without the eyes' room/presence
+# (LAMP_PRESENCE=on) it never starts counting; without the ring's light
+# requests (LAMP_LIGHT_REQUESTS=on) it refuses to turn on, since nobody may
+# be watched without its mark.
+kind = "installable"
+version = "1.0.0"
+tool = "keep_watch"
+
+[choice]
+name = "turn"
+about = "on: the person at the lamp asked you out loud to keep an eye on things while they're out; off: they asked you to stop, or said they're back"
+one_of = ["on", "off"]
+
+# What it may read and use, and nothing more: who is at the lamp (counts and
+# times), the faces' sizes, what was heard (it turns on only just after
+# someone spoke), the privacy switch; whether a face is known, never whose;
+# one short text out; and the light only for its faint mark. No picture, no
+# body, no sound.
+[permissions]
+topics = ["room/presence", "humans/faces/tracked", "voice/heard", "voice/privacy"]
+light = true
+messages = true
+known_faces = true
+
+[watch]
+every = "10m"                           # at most one text in ten minutes
+asked_within = "30s"                    # on only when someone spoke at the lamp this lately: asked out loud, never by a text...
+# ...and asked for it in words: the newest thing heard has one of these
+# among its whole words, so the model's call after talk of something else is
+# refused (the peer read on #1807).
+if_heard = ["keep an eye", "keep watch", "watch my desk", "watch the desk", "guard", "look after my desk", "while i'm out", "while i am out", "while i'm away", "while i am away"]
+most = "12h"                            # it ends by itself twelve hours after it was asked, with one text that it has stopped
+mark = { colour = "blue", level = 1 }   # the faint mark while it is on, so nobody is watched without a sign; while the ring shows something else over it, it counts nothing

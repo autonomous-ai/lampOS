@@ -292,31 +292,46 @@ fn invalid_and_duplicate_cli_options_are_rejected_before_replay_or_output_creati
     }
 }
 
+/// A recording's unknown field is refused before any output is made. The
+/// files a newer build may have written, `controls.json` and the pins file,
+/// are read past theirs, named once (#1680).
 #[test]
-fn malformed_or_unknown_schema_fields_are_rejected_before_creating_output() {
+fn an_unknown_input_field_is_refused_before_output_and_a_newer_files_field_is_named() {
     let root = Root::new();
-    for target in ["controls.json", "pins.json", "input.jsonl"] {
+    for target in ["controls.json", "pins.json"] {
         root.restore();
-        if target == "input.jsonl" {
-            fs::write(
-                root.file(target),
-                b"{\"now_us\":0,\"input\":{\"kind\":\"tick\",\"unknown\":true}}\n",
-            )
-            .unwrap();
-        } else {
-            let mut value: Value =
-                serde_json::from_slice(&fs::read(root.file(target)).unwrap()).unwrap();
-            value["unknown"] = true.into();
-            fs::write(root.file(target), serde_json::to_vec(&value).unwrap()).unwrap();
-        }
-        let path = root.file("uncreated.jsonl");
+        let mut value: Value =
+            serde_json::from_slice(&fs::read(root.file(target)).unwrap()).unwrap();
+        value["unknown"] = true.into();
+        fs::write(root.file(target), serde_json::to_vec(&value).unwrap()).unwrap();
+        let path = root.file(&format!("read-past-{target}l"));
         let mut command = root.replay();
         command.arg("--output").arg(&path);
         let output = root.run(command);
-        assert!(!output.status.success());
-        assert!(String::from_utf8_lossy(&output.stderr).contains("unknown field"));
-        assert!(!path.exists());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(output.status.success(), "{stderr}");
+        assert!(
+            stderr.contains(&format!(
+                "lamp-controls: {}: fields this build does not read, ignored: unknown",
+                root.file(target).display()
+            )),
+            "{stderr}"
+        );
+        assert!(path.exists());
     }
+    root.restore();
+    fs::write(
+        root.file("input.jsonl"),
+        b"{\"now_us\":0,\"input\":{\"kind\":\"tick\",\"unknown\":true}}\n",
+    )
+    .unwrap();
+    let path = root.file("uncreated.jsonl");
+    let mut command = root.replay();
+    command.arg("--output").arg(&path);
+    let output = root.run(command);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unknown field"));
+    assert!(!path.exists());
 }
 
 #[test]

@@ -189,7 +189,8 @@ pub fn judge(
         .filter(|rise| rise.is_finite())
         .reduce(f32::max)
         .map(|rise| rise.clamp(-120.0, 120.0));
-    let near = rise_db.map(|rise| rise >= crate::attention::NEAR_RISE_DB);
+    let bar = crate::attention::near_rise_db();
+    let near = rise_db.map(|rise| rise >= bar);
     let seen = looks.between(request.began_us, until);
     let facing_close = seen.share.map(|share| share >= FACING_SHARE);
     Addressed {

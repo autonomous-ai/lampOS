@@ -61,6 +61,7 @@ fn config(root: &Path) -> Config {
         set_up_later: None,
         // Its report every 50 ms, not each second: a test reading it waits
         // a fraction of a second (#1128).
+        sign_in_by_code: false,
         report_every: Duration::from_millis(50),
     }
 }
@@ -307,7 +308,7 @@ fn filled_stderr() -> (Stdio, UnixStream, usize) {
     writer.set_nonblocking(true).unwrap();
     let until = Instant::now() + FIXTURE_BOUND;
     let mut filled = 0;
-    for chunk in [&[b'x'; 4096][..], &[b'x'][..]] {
+    for chunk in [&[b'x'; 4096][..], &b"x"[..]] {
         loop {
             assert!(Instant::now() < until, "stderr did not fill");
             assert!(filled < 8 * 1024 * 1024, "unexpected stderr buffer size");

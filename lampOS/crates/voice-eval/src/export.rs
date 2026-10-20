@@ -141,17 +141,23 @@ const PARTS: &[&str] = &[
     "lamp-eyes",
     "lamp-health",
     "lamp-memory",
+    "lamp-mood",
     "lamp-name",
     "lamp-policy",
     "lamp-records",
     "lamp-schedule",
     "lamp-selftest",
     "lamp-setup",
+    "lamp-setup-change",
     "lamp-setup-reset",
+    "lamp-setup-wifi",
     "lamp-skills",
     "lamp-tasks",
     "lamp-update",
+    "lamp-update-apply",
+    "lamp-update-back",
     "lamp-voice",
+    "lamp-waking",
 ];
 
 /// How far a session's last event may be from its files' modification time
@@ -504,7 +510,7 @@ fn modified_ms(file: &Path) -> Option<u64> {
 }
 
 /// Days since 1970-01-01 of a civil date (Howard Hinnant's algorithm).
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+pub(crate) fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let year = if month <= 2 { year - 1 } else { year };
     let era = year.div_euclid(400);
     let year_of_era = year - era * 400;
@@ -672,6 +678,7 @@ const BUS_TOPICS: &[&str] = &[
     "expression/state",
     "humans/faces/tracked",
     "humans/familiar",
+    "humans/seems",
     "lamp/health",
     "lamp/online",
     "lamp/pause",
@@ -684,6 +691,7 @@ const BUS_TOPICS: &[&str] = &[
     "light/state",
     "light/test",
     "memory/rules",
+    "messages/out",
     "mic2/audio",
     "mood/state",
     "name/heard",
@@ -691,8 +699,10 @@ const BUS_TOPICS: &[&str] = &[
     "policy/decisions",
     "reports/request",
     "reports/state",
+    "room/activity",
     "room/presence",
     "room/state",
+    "room/stood_up",
     "schedule/due",
     "selftest/speaker",
     "selftest/speaker/request",
@@ -712,6 +722,7 @@ const BUS_TOPICS: &[&str] = &[
     "voice/sound",
     "voice/state",
     "voice/timing",
+    "voice/turn",
 ];
 
 /// Standard base64, as `lamp-bus record` writes payloads.
@@ -1439,6 +1450,7 @@ mod tests {
             line("humans/faces/tracked", 2, json!({"faces": [face, {"id": "b", "xmin": 0.1}]})),
             line("voice/state", 2, json!({"state": "listening"})),
             line("voice/state", 3, json!({"state": SECRETS[13]})),
+            line("voice/turn", 3, json!({"request": 7, "verdict": "held_back"})),
             line("humans/names", 3, json!({"name": SECRETS[10]})),
             line("humans/known/annasmith", 3, json!({})),
             line(SECRETS[12], 3, json!({})),
@@ -1783,14 +1795,28 @@ mod tests {
     #[test]
     fn the_parts_are_the_products_units() {
         let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
-        let mut units: Vec<String> = fs::read_dir(product)
+        let mut units: Vec<String> = fs::read_dir(&product)
             .unwrap()
             .filter_map(|entry| {
                 let name = entry.unwrap().file_name().to_string_lossy().into_owned();
-                name.strip_suffix(".service").map(str::to_owned)
+                // A template's journal tag is its `SyslogIdentifier=` when it
+                // sets one (`lamp-skills-manage@.service` journals as
+                // `lamp-skills`), else its name without the `@`
+                // (`lamp-setup-change@.service` says `lamp-setup-change`).
+                let unit = name.strip_suffix(".service")?;
+                let Some(template) = unit.strip_suffix('@') else {
+                    return Some(unit.to_owned());
+                };
+                let text = fs::read_to_string(product.join(&name)).unwrap();
+                let tag = text
+                    .lines()
+                    .find_map(|line| line.strip_prefix("SyslogIdentifier="))
+                    .unwrap_or(template);
+                Some(tag.trim().to_owned())
             })
             .collect();
         units.sort();
+        units.dedup();
         let mut parts: Vec<String> = PARTS.iter().map(|part| (*part).to_owned()).collect();
         parts.sort();
         assert_eq!(parts, units);
@@ -1885,6 +1911,10 @@ mod tests {
         // fields... and `person` beside `faces` (the reviewer's P3 on #1165).
         assert_eq!(left["bus_fields_by_topic"]["humans/faces/tracked"], 6);
         assert_eq!(left["bus_messages_by_topic"]["voice/state"], 1);
+        // A turn's verdict (#1155) is lampOS's: counted under its topic, and
+        // what it says left out.
+        assert_eq!(left["bus_messages_by_topic"]["voice/turn"], 1);
+        assert!(!all_output(&out).contains("held_back"));
         // `humans/names`, `humans/known/annasmith` and a secret topic are not
         // lampOS's topics: counted as `other`, never by their names.
         assert_eq!(left["bus_messages_by_topic"]["other"], 3);

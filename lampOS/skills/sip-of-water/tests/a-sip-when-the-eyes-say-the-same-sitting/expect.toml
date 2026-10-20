@@ -1,0 +1,16 @@
+# As a-sip-after-90-minutes, with the eyes' room/activity beside the faces
+# (LAMP_ACTIVITY on): the sitter's own sitting_s has lasted as long, so at 90
+# minutes it turns to them and its light breathes once.
+clock = "10:00"
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "light"
+args = { colour = "blue", level = 2 }

@@ -38,6 +38,7 @@
 //! No word of what was said, kept or asked for is ever logged.
 use crate::thread::FinishedExchange;
 use lamp_gemini::{Tool, ToolCall};
+use lamp_local_time::LocalTime;
 use serde_json::{Value, json};
 use std::{
     collections::VecDeque,
@@ -357,8 +358,8 @@ fn run_for_guarded(
         return result;
     }
     let now = unix_ms();
-    let offset = crate::local_time::offset_here().unwrap_or(0);
-    let Some(mut request) = request(call, now, offset) else {
+    let zone = crate::local_time::system();
+    let Some(mut request) = request(call, now, zone) else {
         return (
             json!({"error": "There was nothing in that for me to keep."}),
             true,
@@ -380,7 +381,7 @@ fn run_for_guarded(
     let Some(answer) = answer else {
         return (gone(), false);
     };
-    let told = answer_for(&call.name, &answer, now, offset);
+    let told = answer_for(&call.name, &answer, now, zone);
     if matches!(call.name.as_str(), REMEMBER | FORGET) && answer["ok"] == true {
         // The note a new session is told has changed.
         if let Some(jobs) = JOBS.get() {
@@ -405,7 +406,7 @@ fn run_for_guarded(
 }
 
 /// The memory's request for a call, or nothing when it asks to keep nothing.
-fn request(call: &ToolCall, now_unix_ms: u64, offset_seconds: i32) -> Option<Value> {
+fn request(call: &ToolCall, now_unix_ms: u64, zone: Option<&LocalTime>) -> Option<Value> {
     Some(match call.name.as_str() {
         REMEMBER => {
             let text = call.args.get("text").and_then(Value::as_str)?.trim();
@@ -427,7 +428,7 @@ fn request(call: &ToolCall, now_unix_ms: u64, offset_seconds: i32) -> Option<Val
                 .get("days_ago")
                 .and_then(Value::as_u64)
                 .filter(|days| *days <= 3_650)
-                .map(|days| day_name(local_day(now_unix_ms, offset_seconds) - days as i64));
+                .map(|days| day_name(local_day(now_unix_ms, zone) - days as i64));
             json!({"op":"recall","query":about,"day":day,"limit":RECALL_ENTRIES,"max_bytes":RECALL_BYTES})
         }
     })
@@ -496,7 +497,12 @@ fn marked(mut answer: Value) -> Value {
 
 /// What to tell the model for the memory's answer. `None` for one that is
 /// not the answer to that request.
-fn answer_for(name: &str, answer: &Value, now_unix_ms: u64, offset_seconds: i32) -> Option<Value> {
+fn answer_for(
+    name: &str,
+    answer: &Value,
+    now_unix_ms: u64,
+    zone: Option<&LocalTime>,
+) -> Option<Value> {
     if answer.get("ok").and_then(Value::as_bool)? {
         return Some(match name {
             REMEMBER => {
@@ -518,14 +524,14 @@ fn answer_for(name: &str, answer: &Value, now_unix_ms: u64, offset_seconds: i32)
                 _ => json!({"forgotten": true, "everything": true}),
             },
             _ => {
-                let today = local_day(now_unix_ms, offset_seconds);
+                let today = local_day(now_unix_ms, zone);
                 let found: Vec<Value> = answer
                     .get("entries")?
                     .as_array()?
                     .iter()
                     .filter_map(|entry| {
                         let when = when(
-                            today - local_day(entry.get("at_unix_ms")?.as_u64()?, offset_seconds),
+                            today - local_day(entry.get("at_unix_ms")?.as_u64()?, zone),
                         );
                         let mut item = match entry.get("kind")?.as_str()? {
                             "kept" => json!({"when": when, "asked_to_remember": entry.get("text")?}),
@@ -551,9 +557,12 @@ fn answer_for(name: &str, answer: &Value, now_unix_ms: u64, offset_seconds: i32)
     }
 }
 
-/// The local day a moment falls on, as days since 1970-01-01.
-fn local_day(unix_ms: u64, offset_seconds: i32) -> i64 {
-    ((unix_ms / 1_000) as i64 + i64::from(offset_seconds)).div_euclid(86_400)
+/// The local day a moment falls on, as days since 1970-01-01: each moment
+/// with the zone's offset at it, so a day before a daylight-saving change
+/// is counted as it was then (#820). UTC only while the lamp's zone cannot
+/// be read at all ([`crate::local_time::system`]).
+fn local_day(unix_ms: u64, zone: Option<&LocalTime>) -> i64 {
+    zone.map_or((unix_ms / 86_400_000) as i64, |zone| zone.day(unix_ms))
 }
 
 /// `YYYY-MM-DD`, as the memory names a day.
@@ -884,16 +893,20 @@ impl DaysClient {
             };
             // What this session's provider is told is what its exchanges
             // follow: a rule forgotten in an earlier one is not among them.
-            match self.context.lock() {
+            let said = match self.context.lock() {
                 Ok(mut context) => {
                     context.rules.clear();
-                    context.rule(None, room.iter().map(|rule| rule.id));
-                    if let (Some(person), Some(theirs)) = (person, &theirs) {
-                        context.rule(Some(person), theirs.iter().map(|rule| rule.id));
+                    let said = context.rule(None, room.iter().map(|rule| rule.id));
+                    match (person, &theirs) {
+                        (Some(person), Some(theirs)) => {
+                            said.or(context.rule(Some(person), theirs.iter().map(|rule| rule.id)))
+                        }
+                        _ => said,
                     }
                 }
                 Err(_) => return UNAVAILABLE.into(),
-            }
+            };
+            say(said);
             note.push_str(&crate::rules::note(&room, theirs.as_deref()));
         }
         if let Some(person) = person.filter(|_| self.threads.load(Ordering::Acquire)) {
@@ -924,10 +937,11 @@ impl DaysClient {
         ) else {
             return String::new();
         };
-        match self.context.lock() {
+        let said = match self.context.lock() {
             Ok(mut context) => context.include(Some(person), &[id]),
             Err(_) => return String::new(),
-        }
+        };
+        say(said);
         // Counts only, never the thread's words: the trial's proof
         // (`trials.sh thread`) and a lamp's record that it was told. Said
         // when the memory has given it and it joins the note; a session
@@ -1000,9 +1014,6 @@ const ANSWER_BYTES: usize = 8_192;
 pub struct DaysClient {
     socket: PathBuf,
     prefix: String,
-    // Read once before readiness. Tool deadlines contain no filesystem I/O
-    // for timezone lookup; offset_at still follows listed DST transitions.
-    zone: Vec<u8>,
     context: Mutex<DaysContext>,
     /// Held while a rule is counted and kept ([`crate::rules::admit`]).
     keeping: Mutex<()>,
@@ -1084,6 +1095,14 @@ struct DaysContext {
     /// A write whose acknowledgement is not known may have committed. Keep
     /// journalling inhibited after an ambiguous response; never invent its ID.
     uncertain_writes: u64,
+    /// Why `journal_inhibited` was first set, said in the journal once
+    /// (#2176). It changes nothing that is journalled.
+    stopped_by: Option<Stopped>,
+    /// Exchanges not journalled because journalling was inhibited or a
+    /// write was unacknowledged, since the worker started (#2176). Those
+    /// lost otherwise (too long, a busy context, a full queue) are not
+    /// counted here; all of them are in [`DaysClient::lost`] as before.
+    held_back: u64,
     /// The rules ([`crate::rules`]) the provider's context may hold, each
     /// with whose rules scope it is in (`None` for the room's): those the
     /// session was told, and those kept or listed in it. An exchange is
@@ -1093,32 +1112,114 @@ struct DaysContext {
     rules: Vec<(Option<String>, u64)>,
 }
 
+/// Why memory's journal stopped until a fresh worker (#2176): said in the
+/// journal with no word said or kept, and no person's id.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Stopped {
+    /// A confirmed `forget` or `forget_everything`.
+    Forgotten,
+    /// A rule forgotten (`forget_rule`).
+    RuleForgotten,
+    /// The rules keeping the light on, forgotten.
+    LightRuleForgotten,
+    /// More than [`SOURCE_IDS`] sources in the provider's context.
+    SourcesLimit,
+    /// More than [`SOURCE_IDS`] rules in the provider's context.
+    RulesLimit,
+    /// The context's lock was poisoned while a rule was linked.
+    Poisoned,
+}
+
+impl Stopped {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Forgotten => "forgotten",
+            Self::RuleForgotten => "rule_forgotten",
+            Self::LightRuleForgotten => "light_rule_forgotten",
+            Self::SourcesLimit => "sources_limit",
+            Self::RulesLimit => "rules_limit",
+            Self::Poisoned => "poisoned",
+        }
+    }
+}
+
+/// The journal line said once, as journalling first stops.
+fn stopped_line(why: Stopped) -> String {
+    format!(
+        "lamp-voice provider: memory journal stopped until a fresh worker: why={}",
+        why.as_str()
+    )
+}
+
+/// Says a line built under the context's lock, once its guard is dropped:
+/// that lock is never held across I/O (#2186).
+fn say(line: Option<String>) {
+    if let Some(line) = line {
+        eprintln!("{line}");
+    }
+}
+
 impl DaysContext {
-    fn include(&mut self, person: Option<&str>, ids: &[u64]) {
+    /// Journalling stops until a fresh worker, as before; the first reason
+    /// is kept, and its line returned for the caller to [`say`] once the
+    /// guard is dropped (#2176).
+    #[must_use = "the line is said after the context's guard is dropped"]
+    fn inhibit(&mut self, why: Stopped) -> Option<String> {
+        self.journal_inhibited = true;
+        if self.stopped_by.is_some() {
+            return None;
+        }
+        self.stopped_by = Some(why);
+        Some(stopped_line(why))
+    }
+
+    /// An exchange held back by a stop is counted; the line to say, at the
+    /// 1st, 2nd, 4th, 8th … so a long stop says little (#2176).
+    fn held_back_line(&self) -> Option<String> {
+        if !self.held_back.is_power_of_two() {
+            return None;
+        }
+        let why = match self.stopped_by {
+            Some(why) => why.as_str(),
+            None if self.journal_inhibited => "unknown",
+            None => "unacknowledged_write",
+        };
+        Some(format!(
+            "lamp-voice provider: memory journal stopped: why={why} unacknowledged_writes={} not_journalled={}",
+            self.uncertain_writes, self.held_back
+        ))
+    }
+
+    /// Sources now in the provider's context; a stop's line, as
+    /// [`Self::inhibit`].
+    #[must_use = "the line is said after the context's guard is dropped"]
+    fn include(&mut self, person: Option<&str>, ids: &[u64]) -> Option<String> {
         for id in ids {
             let source = (person.map(str::to_owned), *id);
             if !self.sources.contains(&source) {
                 if self.sources.len() == SOURCE_IDS {
-                    self.journal_inhibited = true;
-                    return;
+                    return self.inhibit(Stopped::SourcesLimit);
                 }
                 self.sources.push(source);
             }
         }
+        None
     }
 
-    /// Rules now in the provider's context, of this person's rules scope.
-    fn rule(&mut self, person: Option<&str>, ids: impl IntoIterator<Item = u64>) {
+    /// Rules now in the provider's context, of this person's rules scope;
+    /// a stop's line, as [`Self::inhibit`].
+    #[must_use = "the line is said after the context's guard is dropped"]
+    fn rule(&mut self, person: Option<&str>, ids: impl IntoIterator<Item = u64>) -> Option<String> {
         for id in ids {
             let rule = (person.map(str::to_owned), id);
             if !self.rules.contains(&rule) {
                 if self.rules.len() == SOURCE_IDS {
-                    self.journal_inhibited = true;
-                    return;
+                    return self.inhibit(Stopped::RulesLimit);
                 }
                 self.rules.push(rule);
             }
         }
+        None
     }
 
     /// This person's own rules, for a write to their scope.
@@ -1180,12 +1281,10 @@ impl DaysClient {
     }
 
     fn with_idle(socket: PathBuf, idle: Duration) -> io::Result<Self> {
-        let mut zone = Vec::new();
-        let loaded = std::fs::File::open("/etc/localtime")
-            .and_then(|file| file.take(65_537).read_to_end(&mut zone));
-        if loaded.is_err() || zone.len() > 65_536 {
-            zone.clear();
-        }
+        // The zone is opened before readiness; at each call after, it is
+        // looked at (three `stat` calls and a `readlink`) and read again only
+        // when setup changed it (`lamp-local-time`, #820).
+        let _ = crate::local_time::system();
         let prefix = format!(
             "voice-{}",
             crate::process::boot_text(crate::process::new_boot()?)
@@ -1207,7 +1306,6 @@ impl DaysClient {
         Ok(Self {
             socket,
             prefix,
-            zone,
             context: Mutex::new(DaysContext::default()),
             keeping: Mutex::new(()),
             jobs,
@@ -1319,18 +1417,20 @@ impl DaysClient {
         let until = started + deadline;
         let (snapshot, ids) = self.open_one(&name, None, until)?;
         let theirs = person.and_then(|person| self.open_one(&name, Some(person), until));
+        let mut said = None;
         let accepted = match self.context.try_lock() {
             Ok(mut context)
                 if context.session.as_ref() == Some(&name) && started.elapsed() < deadline =>
             {
-                context.include(None, &ids);
+                said = context.include(None, &ids);
                 if let Some((_, ids)) = &theirs {
-                    context.include(person, ids);
+                    said = said.or(context.include(person, ids));
                 }
                 true
             }
             _ => false,
         };
+        say(said);
         if !accepted {
             let _ = self.jobs.try_send(DaysJob::Close(name.clone(), None));
             if theirs.is_some() {
@@ -1416,13 +1516,13 @@ impl DaysClient {
         let started = Instant::now();
         let deadline = deadline.min(crate::tools::ASK_DEADLINE);
         let now = unix_ms();
-        let offset = crate::local_time::offset_at(&self.zone, (now / 1000) as i64).unwrap_or(0);
+        let zone = crate::local_time::system();
         let Some(left) = deadline.checked_sub(started.elapsed()) else {
             return (gone(), false);
         };
         match lease {
-            Some(_) => self.run_at_guarded(call, left, (now, offset), person, lease),
-            None => self.run_at(call, left, now, offset, person),
+            Some(_) => self.run_at_guarded(call, left, (now, zone), person, lease),
+            None => self.run_at(call, left, now, zone, person),
         }
     }
 
@@ -1431,21 +1531,21 @@ impl DaysClient {
         call: &ToolCall,
         deadline: Duration,
         now: u64,
-        offset: i32,
+        zone: Option<&LocalTime>,
         person: Option<&str>,
     ) -> (Value, bool) {
-        self.run_at_guarded(call, deadline, (now, offset), person, None)
+        self.run_at_guarded(call, deadline, (now, zone), person, None)
     }
 
     fn run_at_guarded(
         &self,
         call: &ToolCall,
         deadline: Duration,
-        time: (u64, i32),
+        time: (u64, Option<&LocalTime>),
         person: Option<&str>,
         lease: Option<&crate::memory_scope::ScopeLease>,
     ) -> (Value, bool) {
-        let (now, offset) = time;
+        let (now, zone) = time;
         if !scope_current(lease) {
             return (gone(), false);
         }
@@ -1490,7 +1590,7 @@ impl DaysClient {
             FORGET_EVERYTHING => return (gone(), false),
             _ => None,
         };
-        let Some(mut request) = days_request.or_else(|| request(call, now, offset)) else {
+        let Some(mut request) = days_request.or_else(|| request(call, now, zone)) else {
             return (
                 json!({"error":"There was nothing in that for me to keep."}),
                 true,
@@ -1520,7 +1620,7 @@ impl DaysClient {
         let (told, ids) = if call.name == RECALL {
             let Some(result) = deadline
                 .checked_sub(started.elapsed())
-                .and_then(|left| self.recall(&request, person, left, now, offset, lease))
+                .and_then(|left| self.recall(&request, person, left, now, zone, lease))
             else {
                 return (gone(), false);
             };
@@ -1543,7 +1643,7 @@ impl DaysClient {
             let Some(answer) = answer else {
                 return (gone(), false);
             };
-            let Some(told) = answer_for(&call.name, &answer, now, offset) else {
+            let Some(told) = answer_for(&call.name, &answer, now, zone) else {
                 return (gone(), false);
             };
             // Everything includes the rules they gave, kept beside their
@@ -1578,10 +1678,11 @@ impl DaysClient {
         let Ok(mut context) = self.context.try_lock() else {
             return (gone(), false);
         };
+        let mut said = None;
         if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) && told["forgotten"] == true {
             // Already-delivered provider context cannot be retracted here.
             // Do not let later prose recreate forgotten material unlinked.
-            context.journal_inhibited = true;
+            said = context.inhibit(Stopped::Forgotten);
             // The conversation's turns may be gone with it, and journalling
             // has stopped: a later "remember …" names none of them, or the
             // store refuses it for ids it no longer has (Second on #2003).
@@ -1595,11 +1696,13 @@ impl DaysClient {
             let _ = self.jobs.try_send(DaysJob::End);
         }
         for (whose, id) in ids {
-            context.include(whose.as_deref(), &[id]);
+            said = said.or(context.include(whose.as_deref(), &[id]));
         }
         if writes {
             context.uncertain_writes = context.uncertain_writes.saturating_sub(1);
         }
+        drop(context);
+        say(said);
         (told, true)
     }
 
@@ -1612,18 +1715,18 @@ impl DaysClient {
         person: Option<&str>,
         deadline: Duration,
         now: u64,
-        offset: i32,
+        zone: Option<&LocalTime>,
         lease: Option<&crate::memory_scope::ScopeLease>,
     ) -> Option<(Value, Vec<(Option<String>, u64)>)> {
         let Some(person) = person else {
             let answer = bounded_exchange_scoped(&self.socket, request, deadline, lease)?;
-            let (told, ids) = days_answer(&answer, now, offset)?;
+            let (told, ids) = days_answer(&answer, now, zone)?;
             return Some((told, ids.into_iter().map(|id| (None, id)).collect()));
         };
         let (theirs, room) = recall_both(request, person, deadline, |line, left| {
             bounded_exchange_scoped(&self.socket, line, left, lease)
         })?;
-        let (theirs, their_ids) = days_answer(&theirs, now, offset)?;
+        let (theirs, their_ids) = days_answer(&theirs, now, zone)?;
         let mut found = theirs["found"].as_array()?.clone();
         for item in &mut found {
             item["theirs"] = json!(true);
@@ -1633,7 +1736,7 @@ impl DaysClient {
             .map(|id| (Some(person.to_owned()), id))
             .collect();
         if let Some(room) = room {
-            let (room, room_ids) = days_answer(&room, now, offset)?;
+            let (room, room_ids) = days_answer(&room, now, zone)?;
             found.extend(room["found"].as_array()?.iter().cloned());
             ids.extend(room_ids.into_iter().map(|id| (None, id)));
         }
@@ -1742,14 +1845,19 @@ impl DaysClient {
         person: Option<&str>,
         held: Option<Held>,
     ) -> bool {
-        let Ok(context) = self.context.try_lock() else {
+        let Ok(mut context) = self.context.try_lock() else {
             self.lost.fetch_add(1, Ordering::Relaxed);
             return false;
         };
-        if context.journal_inhibited
-            || context.uncertain_writes != 0
-            || heard.len().saturating_add(said.len()) > 60_000
-        {
+        if context.journal_inhibited || context.uncertain_writes != 0 {
+            self.lost.fetch_add(1, Ordering::Relaxed);
+            context.held_back = context.held_back.saturating_add(1);
+            let said = context.held_back_line();
+            drop(context);
+            say(said);
+            return false;
+        }
+        if heard.len().saturating_add(said.len()) > 60_000 {
             self.lost.fetch_add(1, Ordering::Relaxed);
             return false;
         }
@@ -1873,7 +1981,7 @@ impl DaysClient {
         } else {
             None
         };
-        let offset = crate::local_time::offset_at(&self.zone, (now / 1000) as i64).unwrap_or(0);
+        let zone = crate::local_time::system();
         // A write whose acknowledgement is lost may still have committed: a
         // rule kept without its ID here would let what is said under it be
         // journalled unlinked. As for `remember` and `forget`, journalling
@@ -1897,7 +2005,7 @@ impl DaysClient {
             return (gone(), false);
         }
         let told = crate::rules::answer_for(&call.name, &answer, |at| {
-            when(local_day(now, offset) - local_day(at, offset))
+            when(local_day(now, zone) - local_day(at, zone))
         });
         let Some((told, changed)) = told.filter(|(told, _)| crate::tools::sendable(told)) else {
             return (gone(), false);
@@ -1914,26 +2022,30 @@ impl DaysClient {
             _ => vec![],
         };
         // The rule is linked before the fence is lifted.
-        match self.context.lock() {
+        let said = match self.context.lock() {
             Ok(mut context) => {
-                context.rule(owner, shown);
+                let said = context.rule(owner, shown);
                 if writes {
                     context.uncertain_writes = context.uncertain_writes.saturating_sub(1);
                 }
+                said
             }
             // Without the link nothing said now may be journalled.
-            Err(poisoned) => poisoned.into_inner().journal_inhibited = true,
-        }
+            Err(poisoned) => poisoned.into_inner().inhibit(Stopped::Poisoned),
+        };
+        say(said);
         if changed {
             if call.name == crate::rules::FORGET_RULE {
                 // The store removed what was said under the rule. As for
                 // `forget`: the next session's recap is not told it, and
                 // already-delivered context could recreate it unlinked, so
                 // journalling stops until a fresh worker.
-                self.context
+                let said = self
+                    .context
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .journal_inhibited = true;
+                    .inhibit(Stopped::RuleForgotten);
+                say(said);
                 FORGET_THREAD.store(true, Ordering::Release);
                 if let Ok(mut thread) = crate::thread::THREAD.try_lock() {
                     clear_forgotten_thread(&mut thread);
@@ -1995,8 +2107,9 @@ impl DaysClient {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         context.uncertain_writes = context.uncertain_writes.saturating_sub(1);
-        context.journal_inhibited = true;
+        let said = context.inhibit(Stopped::LightRuleForgotten);
         drop(context);
+        say(said);
         FORGET_THREAD.store(true, Ordering::Release);
         if let Ok(mut thread) = crate::thread::THREAD.try_lock() {
             clear_forgotten_thread(&mut thread);
@@ -2095,7 +2208,7 @@ fn snapshot_ids(snapshot: &Value, session: &str, scope: &str) -> Option<Vec<u64>
     (found.len() == source_ids.len()).then_some(source_ids)
 }
 
-fn days_answer(answer: &Value, now: u64, offset: i32) -> Option<(Value, Vec<u64>)> {
+fn days_answer(answer: &Value, now: u64, zone: Option<&LocalTime>) -> Option<(Value, Vec<u64>)> {
     if answer["ok"] != true {
         return None;
     }
@@ -2114,8 +2227,7 @@ fn days_answer(answer: &Value, now: u64, offset: i32) -> Option<(Value, Vec<u64>
             return None;
         }
         sources.push(id);
-        let when =
-            when(local_day(now, offset) - local_day(entry.get("at_unix_ms")?.as_u64()?, offset));
+        let when = when(local_day(now, zone) - local_day(entry.get("at_unix_ms")?.as_u64()?, zone));
         let item = match entry.get("kind")?.as_str()? {
             "kept" => {
                 json!({"source_id":id,"when":when,"asked_to_remember":entry.get("text")?.as_str()?})
@@ -2853,7 +2965,29 @@ mod tests {
 
     // 2026-10-13 22:30 in Ho Chi Minh City, seven hours east of UTC.
     const NOW: u64 = 1_791_905_400_000;
-    const EAST: i32 = 25_200;
+    /// Ho Chi Minh City's offset, the same all year.
+    const EAST: LocalTime = LocalTime::Offset(420);
+
+    /// #820: how many days ago something was kept, counted where the lamp
+    /// stands, in two zones. In New York, kept at 23:30 on Saturday 7 March
+    /// 2026 and asked about at 23:30 the next day, after the clocks went
+    /// forward: one day, each moment with its own offset. One offset for
+    /// both, summer's, as the voice had it, put both on the Sunday.
+    #[test]
+    fn days_ago_are_counted_where_the_lamp_stands_across_a_change_of_its_clocks() {
+        let new_york = LocalTime::zone("America/New_York").unwrap();
+        let saigon = LocalTime::zone("Asia/Ho_Chi_Minh").unwrap();
+        let kept = 1_772_944_200_000; // 2026-03-08 04:30 UTC
+        let asked = 1_773_027_000_000; // 2026-03-09 03:30 UTC
+        let ago = |zone: &LocalTime| local_day(asked, Some(zone)) - local_day(kept, Some(zone));
+        assert_eq!(ago(&new_york), 1);
+        assert_eq!(ago(&LocalTime::Offset(-240)), 0);
+        // 11:30 on Sunday and 10:30 on Monday in Ho Chi Minh City.
+        assert_eq!(ago(&saigon), 1);
+        assert_eq!(ago(&EAST), 1);
+        // Without a zone at all, UTC's days.
+        assert_eq!(local_day(kept, None), 20_520);
+    }
     const DAY: u64 = 86_400_000;
 
     /// #1693, `LAMP_MEMORY_FORGET_ALL`: something recall gave is forgotten
@@ -2872,7 +3006,7 @@ mod tests {
         });
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_all.store(true, Ordering::Release);
-        let run = |name, args| client.run_at(&call(name, args), FIRST_READ, NOW, EAST, None);
+        let run = |name, args| client.run_at(&call(name, args), FIRST_READ, NOW, Some(&EAST), None);
         assert!(run(RECALL, json!({"about":"wedding"})).1);
         // Not shown this session: refused here, nothing sent.
         let (told, answered) = run(FORGET, json!({"source_id":99}));
@@ -2885,6 +3019,10 @@ mod tests {
         assert!(client.context.lock().unwrap().journal_inhibited);
         // One sent to the store reaches what was made before it.
         assert_eq!(client.hand_ons.forgotten.load(Ordering::Acquire), 1);
+        assert_eq!(
+            client.context.lock().unwrap().stopped_by,
+            Some(Stopped::Forgotten)
+        );
         // With nobody known, everything is refused here: the room's memory
         // is the household's (the reviewer on #1723), and nothing is sent.
         let (told, answered) = run(FORGET_EVERYTHING, json!({}));
@@ -2915,12 +3053,12 @@ mod tests {
         });
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_all.store(true, Ordering::Release);
-        client.context.lock().unwrap().include(None, &[8]);
+        assert_eq!(client.context.lock().unwrap().include(None, &[8]), None);
         let (told, _) = client.run_at(
             &call(FORGET, json!({"source_id":8})),
             FIRST_READ,
             NOW,
-            EAST,
+            Some(&EAST),
             Some(MINH),
         );
         assert_eq!(told["forgotten"], false, "{told}");
@@ -2928,7 +3066,7 @@ mod tests {
             &call(FORGET_EVERYTHING, json!({})),
             FIRST_READ,
             NOW,
-            EAST,
+            Some(&EAST),
             Some(MINH),
         );
         assert_eq!(told["forgotten"], false, "{told}");
@@ -2946,7 +3084,7 @@ mod tests {
             &call(FORGET, json!({"source_id":8})),
             FIRST_READ,
             NOW,
-            EAST,
+            Some(&EAST),
             None,
         );
         assert_eq!(
@@ -2971,7 +3109,7 @@ mod tests {
             &call(RECALL, json!({"about":"coffee", "days_ago":1})),
             FIRST_READ,
             NOW,
-            EAST,
+            Some(&EAST),
             None,
         );
         assert!(answered, "{told}");
@@ -2982,7 +3120,7 @@ mod tests {
         assert_eq!(client.context.lock().unwrap().of(None), [8, 2]);
         assert!(
             client
-                .run_at(&call(RECALL, json!({})), FIRST_READ, NOW, EAST, None)
+                .run_at(&call(RECALL, json!({})), FIRST_READ, NOW, Some(&EAST), None)
                 .1
         );
         let read = served.join().unwrap();
@@ -3157,16 +3295,16 @@ mod tests {
             json!({"id":1,"kind":"exchange","at_unix_ms":NOW,"heard":"x"}),
         ] {
             assert_eq!(
-                days_answer(&json!({"ok":true,"entries":[entry]}), NOW, EAST),
+                days_answer(&json!({"ok":true,"entries":[entry]}), NOW, Some(&EAST)),
                 None
             );
         }
         assert_eq!(
-            days_answer(&json!({"ok":false,"entries":[]}), NOW, EAST),
+            days_answer(&json!({"ok":false,"entries":[]}), NOW, Some(&EAST)),
             None
         );
         assert_eq!(
-            days_answer(&json!({"ok":true,"entries":[]}), NOW, EAST)
+            days_answer(&json!({"ok":true,"entries":[]}), NOW, Some(&EAST))
                 .unwrap()
                 .0["found"],
             json!([])
@@ -3176,10 +3314,13 @@ mod tests {
     #[test]
     fn conservative_context_and_conversation_are_bounded_without_silent_truncation() {
         let mut context = DaysContext::default();
-        context.include(None, &(1..=64).collect::<Vec<_>>());
-        context.include(None, &[64]);
+        assert_eq!(context.include(None, &(1..=64).collect::<Vec<_>>()), None);
+        assert_eq!(context.include(None, &[64]), None);
         assert!(!context.journal_inhibited);
-        context.include(None, &[65]);
+        assert_eq!(
+            context.include(None, &[65]),
+            Some(stopped_line(Stopped::SourcesLimit))
+        );
         assert!(context.journal_inhibited);
         assert_eq!(context.sources.len(), 64);
         let mut conversation = Conversation::default();
@@ -3190,6 +3331,120 @@ mod tests {
         assert!(conversation.overflow);
         assert_eq!(conversation.sources.len(), 64);
         assert_eq!(conversation.finished, Some(now));
+    }
+
+    /// A Days client that does no memory I/O, with this context, and its
+    /// queue. Made by [`DaysClient::new`] and then changed, so a field
+    /// added to the client needs nothing here: its own writer ends, with
+    /// nothing written, as its queue is replaced by the test's.
+    fn client_with(context: DaysContext) -> (DaysClient, Receiver<DaysJob>) {
+        let mut client = DaysClient::new(PathBuf::from("/unused-no-io")).unwrap();
+        let (jobs, work) = sync_channel(4);
+        client.jobs = jobs;
+        client.context = Mutex::new(context);
+        client.threads = AtomicBool::new(false);
+        client.forget_all = AtomicBool::new(false);
+        (client, work)
+    }
+
+    /// #2176 (a): journalling that stops says why the first time, and how
+    /// many exchanges it has held back since, on a doubling count. What
+    /// stops it and what it drops are as before.
+    #[test]
+    fn a_stopped_journal_says_why_and_how_many_it_held_back() {
+        let mut context = DaysContext::default();
+        // The reason's line is returned, to be said once the context's
+        // guard is dropped (#2186), not said under it.
+        assert_eq!(
+            context.include(None, &(1..=65).collect::<Vec<_>>()),
+            Some(stopped_line(Stopped::SourcesLimit))
+        );
+        assert!(context.journal_inhibited);
+        assert_eq!(context.stopped_by, Some(Stopped::SourcesLimit));
+        // A later reason does not replace the first, and says nothing.
+        assert_eq!(context.inhibit(Stopped::Forgotten), None);
+        assert_eq!(context.stopped_by, Some(Stopped::SourcesLimit));
+        let (client, work) = client_with(context);
+        let mut said = vec![];
+        for _ in 0..5 {
+            assert!(!client.finished_exchange(NOW, "heard", "said"));
+            said.push(client.context.lock().unwrap().held_back_line());
+        }
+        assert!(work.try_recv().is_err());
+        assert_eq!(client.lost.load(Ordering::Relaxed), 5);
+        let line = |n| {
+            Some(format!(
+                "lamp-voice provider: memory journal stopped: why=sources_limit unacknowledged_writes=0 not_journalled={n}"
+            ))
+        };
+        assert_eq!(said, [line(1), line(2), None, line(4), None]);
+        assert_eq!(client.context.lock().unwrap().held_back, 5);
+
+        let mut rules = DaysContext::default();
+        assert_eq!(
+            rules.rule(None, 1..=65),
+            Some(stopped_line(Stopped::RulesLimit))
+        );
+        assert_eq!(rules.stopped_by, Some(Stopped::RulesLimit));
+        assert_eq!(
+            stopped_line(Stopped::RulesLimit),
+            "lamp-voice provider: memory journal stopped until a fresh worker: why=rules_limit"
+        );
+        let names: Vec<_> = [
+            Stopped::Forgotten,
+            Stopped::RuleForgotten,
+            Stopped::LightRuleForgotten,
+            Stopped::SourcesLimit,
+            Stopped::RulesLimit,
+            Stopped::Poisoned,
+        ]
+        .map(Stopped::as_str)
+        .into();
+        assert_eq!(
+            names,
+            [
+                "forgotten",
+                "rule_forgotten",
+                "light_rule_forgotten",
+                "sources_limit",
+                "rules_limit",
+                "poisoned"
+            ]
+        );
+
+        // A write not yet acknowledged holds exchanges back too, and is
+        // said as that, with no reason of its own kept.
+        let (client, work) = client_with(DaysContext {
+            uncertain_writes: 2,
+            ..DaysContext::default()
+        });
+        assert!(!client.finished_exchange(NOW, "heard", "said"));
+        assert!(work.try_recv().is_err());
+        let context = client.context.lock().unwrap();
+        assert_eq!(context.stopped_by, None);
+        assert_eq!(
+            context.held_back_line().as_deref(),
+            Some(
+                "lamp-voice provider: memory journal stopped: why=unacknowledged_write unacknowledged_writes=2 not_journalled=1"
+            )
+        );
+    }
+
+    /// #2176 (a): journalling that never stopped says nothing and counts
+    /// nothing, and an exchange too long, as before, is not counted as
+    /// held back by a stop.
+    #[test]
+    fn a_journal_that_never_stopped_says_nothing_new() {
+        let (client, work) = client_with(DaysContext::default());
+        assert!(client.finished_exchange(NOW, "heard", "said"));
+        assert!(matches!(work.try_recv(), Ok(DaysJob::Exchange { .. })));
+        assert!(!client.finished_exchange(NOW, &"x".repeat(60_001), "said"));
+        assert_eq!(client.lost.load(Ordering::Relaxed), 1);
+        let context = client.context.lock().unwrap();
+        assert!(!context.journal_inhibited);
+        assert_eq!(context.stopped_by, None);
+        assert_eq!(context.held_back, 0);
+        assert_eq!(context.held_back_line(), None);
     }
 
     #[test]
@@ -3244,7 +3499,7 @@ mod tests {
                 &call(RECALL, json!({"about":"coffee"})),
                 Duration::from_millis(50),
                 NOW,
-                EAST,
+                Some(&EAST),
                 None
             ),
             (gone(), false)
@@ -3954,6 +4209,10 @@ mod tests {
     fn a_person_id_is_their_name_hashed_and_fits_the_memory() {
         // SHA-256 of "minh" begins be9688998f085098.
         assert_eq!(person_id("Minh"), "p-be9688998f085098");
+        // lamp-cloud's copy (`cloud/src/faces.rs`, the app's `face.remove`)
+        // pins the same: a change here must change it too, or the app's
+        // remove forgets another id (the reviewer on #2199).
+        assert_eq!(person_id("Lan"), "p-094a367b026246fb");
         assert_eq!(person_id(" MINH "), person_id("minh"));
         assert_ne!(person_id("Sam"), person_id("Minh"));
         for name in ["Minh", "Sam", "Nguyễn Văn A", "Al"] {
@@ -4139,15 +4398,15 @@ mod tests {
             request(
                 &call(REMEMBER, json!({"text":"  takes coffee black "})),
                 NOW,
-                EAST
+                Some(&EAST)
             ),
             Some(json!({"op":"remember","at_unix_ms":NOW,"text":"takes coffee black"}))
         );
         for nothing in [json!({}), json!({"text":" ... "}), json!({"text":7})] {
-            assert_eq!(request(&call(REMEMBER, nothing), NOW, EAST), None);
+            assert_eq!(request(&call(REMEMBER, nothing), NOW, Some(&EAST)), None);
         }
         assert_eq!(
-            request(&call(FORGET, json!({})), NOW, EAST),
+            request(&call(FORGET, json!({})), NOW, Some(&EAST)),
             Some(json!({"op":"forget_last","kind":"kept"}))
         );
         // Yesterday is the local day before, not UTC's: 22:30 here is
@@ -4156,7 +4415,7 @@ mod tests {
             request(
                 &call(RECALL, json!({"about":" coffee ","days_ago":1})),
                 NOW,
-                EAST
+                Some(&EAST)
             ),
             Some(
                 json!({"op":"recall","query":"coffee","day":"2026-10-12","limit":6,"max_bytes":2400})
@@ -4164,14 +4423,14 @@ mod tests {
         );
         let early = NOW + 4 * 3_600_000;
         assert_eq!(
-            request(&call(RECALL, json!({"days_ago":0})), early, EAST).unwrap()["day"],
+            request(&call(RECALL, json!({"days_ago":0})), early, Some(&EAST)).unwrap()["day"],
             "2026-10-14"
         );
         assert_eq!(
             request(
                 &call(RECALL, json!({"about":"","days_ago":99_999})),
                 NOW,
-                EAST
+                Some(&EAST)
             ),
             Some(json!({"op":"recall","query":null,"day":null,"limit":6,"max_bytes":2400}))
         );
@@ -4185,7 +4444,7 @@ mod tests {
             {"kind":"exchange","id":3,"at_unix_ms":NOW - 3_600_000,"heard":"And tea?","said":"No idea."}
         ]});
         assert_eq!(
-            answer_for(RECALL, &answer, NOW, EAST),
+            answer_for(RECALL, &answer, NOW, Some(&EAST)),
             Some(json!({"found":[
                 {"when":"2 weeks ago","heard":"How do I take my coffee?","you_said":"Black."},
                 {"when":"yesterday","asked_to_remember":"takes coffee black"},
@@ -4193,7 +4452,7 @@ mod tests {
             ]}))
         );
         assert_eq!(
-            answer_for(RECALL, &json!({"ok":true,"entries":[]}), NOW, EAST),
+            answer_for(RECALL, &json!({"ok":true,"entries":[]}), NOW, Some(&EAST)),
             Some(json!({"found":[],"note":"Nothing about that in what I remember."}))
         );
         assert_eq!(
@@ -4212,7 +4471,7 @@ mod tests {
     #[test]
     fn keeping_and_forgetting_are_told_as_what_the_memory_established() {
         assert_eq!(
-            answer_for(REMEMBER, &json!({"ok":true,"id":4}), NOW, EAST),
+            answer_for(REMEMBER, &json!({"ok":true,"id":4}), NOW, Some(&EAST)),
             Some(json!({"remembered":true}))
         );
         assert_eq!(
@@ -4220,12 +4479,12 @@ mod tests {
                 FORGET,
                 &json!({"ok":true,"removed":{"kind":"kept","id":4,"at_unix_ms":1}}),
                 NOW,
-                EAST
+                Some(&EAST)
             ),
             Some(json!({"forgotten":true}))
         );
         assert_eq!(
-            answer_for(FORGET, &json!({"ok":true,"removed":null}), NOW, EAST).unwrap()["forgotten"],
+            answer_for(FORGET, &json!({"ok":true,"removed":null}), NOW, Some(&EAST)).unwrap()["forgotten"],
             false
         );
         assert_eq!(
@@ -4233,7 +4492,7 @@ mod tests {
                 REMEMBER,
                 &json!({"ok":false,"error":"empty","message":"m"}),
                 NOW,
-                EAST
+                Some(&EAST)
             ),
             Some(json!({"error":"There was nothing in that for me to keep."}))
         );
@@ -4245,7 +4504,11 @@ mod tests {
             json!({"entries":[]}),
             json!("ok"),
         ] {
-            assert_eq!(answer_for(REMEMBER, &other, NOW, EAST), None, "{other}");
+            assert_eq!(
+                answer_for(REMEMBER, &other, NOW, Some(&EAST)),
+                None,
+                "{other}"
+            );
         }
     }
 
@@ -4334,12 +4597,11 @@ mod tests {
         let (jobs, work) = sync_channel(4);
         let mut context = DaysContext::default();
         for (index, whose) in expected.into_iter().enumerate() {
-            context.include(whose, &[index as u64 + 10]);
+            assert_eq!(context.include(whose, &[index as u64 + 10]), None);
         }
         let client = DaysClient {
             socket: PathBuf::from("/unused-no-io"),
             prefix: "test".into(),
-            zone: Vec::new(),
             context: Mutex::new(context),
             keeping: Mutex::new(()),
             jobs,
@@ -4492,7 +4754,6 @@ mod tests {
         DaysClient {
             socket: PathBuf::from("/unused-no-io"),
             prefix: "test".into(),
-            zone: Vec::new(),
             context: Mutex::new(DaysContext::default()),
             keeping: Mutex::new(()),
             jobs,
@@ -4511,12 +4772,12 @@ mod tests {
     fn a_held_answer_keeps_what_its_turns_end_knew() {
         let (jobs, work) = sync_channel(4);
         let client = held_test_client(jobs);
-        client.context.lock().unwrap().include(None, &[7]);
-        client.context.lock().unwrap().rule(None, [3]);
+        assert_eq!(client.context.lock().unwrap().include(None, &[7]), None);
+        assert_eq!(client.context.lock().unwrap().rule(None, [3]), None);
         client.hold(41);
         let ended = Instant::now();
-        client.context.lock().unwrap().include(None, &[9]);
-        client.context.lock().unwrap().rule(None, [4]);
+        assert_eq!(client.context.lock().unwrap().include(None, &[9]), None);
+        assert_eq!(client.context.lock().unwrap().rule(None, [4]), None);
         assert_eq!(client.held_requests(), [41]);
         assert!(client.finished_exchange_of(41, NOW, "asked", "said", None));
         let DaysJob::Exchange {

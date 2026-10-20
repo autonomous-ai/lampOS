@@ -29,7 +29,7 @@ Never `lamp-voice`, and never another builder's branch.
 - Deploy folders: `deploy/lamp-75c9/`, once the first builder agrees
 - Log: `lampOS/docs/work-log-eighth.md` on `lamp-eighth`
 - Tasks: the `builder:eighth` issues, in the order of the Queue issue
-  ([#705](https://github.com/autonomous-ai/lampOS/issues/705)). First, as its
+  ([#1722](https://github.com/autonomous-ai/lampOS/issues/1722), continued from #705). First, as its
   person asked: [#704](https://github.com/autonomous-ai/lampOS/issues/704),
   weighing and measuring the lamp for the lean check, on lamp-75c9 (moved
   from the fifth on 2026-10-15). Then
@@ -44,7 +44,7 @@ Never `lamp-voice`, and never another builder's branch.
   person each time; install there under `/opt/lampOS/<part>/<sha256>/`, then
   `sudo sync`.
 - Propose work as `eighth-P<n>` in its log and as a comment on the issue it
-  belongs to, or on the Queue issue (#705) when none fits, as joining.md's
+  belongs to, or on the Queue issue (#1722, continued from #705) when none fits, as joining.md's
   `fifth-P8` says; it opens no issues and makes no labels.
 - Add and remove `status:` labels on, and comment on, its own issues.
 

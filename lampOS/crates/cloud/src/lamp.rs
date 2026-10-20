@@ -68,6 +68,21 @@ pub struct Real {
     pub texts: Texts,
     /// Health and crash reports, with `LAMP_REPORTS=on` (#1683).
     pub reports: Option<std::sync::Arc<crate::reports::Shared>>,
+    /// Where the app's skills page reads the skills, with
+    /// `LAMP_SKILLS_PAGE=on` (#1722).
+    pub skills: Option<crate::skills::Places>,
+    /// Names and the time zone changed after setup, with
+    /// `LAMP_SETTINGS_CHANGE=on` (#1959).
+    pub changes: Option<std::sync::Arc<crate::settings::Changes>>,
+    /// Where a face from the app's photo goes, with `LAMP_PHOTO_FACES=on`
+    /// (#1968, `crate::photos`).
+    pub photos: Option<crate::photos::Place>,
+    /// The eyes asked for the faces they know and to forget one, with
+    /// `LAMP_FACES_PAGE=on` (#2192, `crate::faces`).
+    pub faces: Option<crate::faces::Eyes>,
+    /// The lamp's timers and reminders for the app, with
+    /// `LAMP_APP_SCHEDULE=on` (#2195, `crate::schedule`).
+    pub schedule: Option<lamp_actions::schedule::Adapter>,
 }
 
 /// Texts from the app (`crate::chat`, #1673): whether they are taken, the
@@ -273,6 +288,13 @@ impl Real {
         read(&self.places.proc.join("sys/kernel/hostname"))
     }
 
+    /// The lamp's name in the app: the one the person gave it after setup
+    /// (`device.rename`, #1959), else the host's name, as before.
+    pub fn device_name(&self) -> String {
+        crate::settings::display_name(&read(&self.places.etc.join("lampOS/setup/display-name")))
+            .unwrap_or_else(|| self.hostname())
+    }
+
     pub fn timezone(&self) -> String {
         read(&self.places.etc.join("timezone"))
     }
@@ -411,7 +433,7 @@ impl Lamp for Real {
         json!({
             "hostname": hostname,
             "device_id": self.device_id,
-            "device_name": hostname,
+            "device_name": self.device_name(),
             "uptime_seconds": uptime,
             "timezone": self.timezone(),
         })
@@ -515,6 +537,26 @@ impl Lamp for Real {
 
     fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
         self.reports.clone()
+    }
+
+    fn skills(&self) -> Option<crate::skills::Places> {
+        self.skills.clone()
+    }
+
+    fn changes(&self) -> Option<std::sync::Arc<crate::settings::Changes>> {
+        self.changes.clone()
+    }
+
+    fn photos(&self) -> Option<crate::photos::Place> {
+        self.photos.clone()
+    }
+
+    fn faces(&self) -> Option<crate::faces::Eyes> {
+        self.faces.clone()
+    }
+
+    fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
+        self.schedule.as_ref()
     }
 
     fn new_run(&mut self, now_ms: u64) -> String {
@@ -653,6 +695,11 @@ mod tests {
             ring: Ring::default(),
             texts: Texts::default(),
             reports: None,
+            skills: None,
+            changes: None,
+            photos: None,
+            faces: None,
+            schedule: None,
         };
         let level = Volume {
             volume: 35,
@@ -681,6 +728,17 @@ mod tests {
             json!({"hostname": "lamp-7f72", "device_id": "d-42", "device_name": "lamp-7f72",
                 "uptime_seconds": 86400, "timezone": "Asia/Ho_Chi_Minh"})
         );
+        // The lamp's name in the app, once the person gave it one (#1959):
+        // only `device_name`; the host's own name stays.
+        std::fs::create_dir_all(places.etc.join("lampOS/setup")).unwrap();
+        std::fs::write(places.etc.join("lampOS/setup/display-name"), "Bàn học\n").unwrap();
+        let host = lamp.host();
+        assert_eq!(
+            (&host["device_name"], &host["hostname"]),
+            (&json!("Bàn học"), &json!("lamp-7f72"))
+        );
+        std::fs::write(places.etc.join("lampOS/setup/display-name"), "\n").unwrap();
+        assert_eq!(lamp.host()["device_name"], "lamp-7f72");
         assert_eq!(lamp.versions()["build"], "812+460a1a1aa2b3");
         // The app's About reads `firmware` (Fourth on #1404).
         assert_eq!(lamp.versions()["firmware"], "812+460a1a1aa2b3");
@@ -762,6 +820,11 @@ mod tests {
             ring: Ring::default(),
             texts: Texts::default(),
             reports: None,
+            skills: None,
+            changes: None,
+            photos: None,
+            faces: None,
+            schedule: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.

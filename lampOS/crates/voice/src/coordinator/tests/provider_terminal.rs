@@ -106,6 +106,7 @@ fn run_with_notice_policy(
         provider: spawn("provider"),
         privacy: spawn("privacy"),
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         camera: None,
         motor: None,
@@ -317,6 +318,7 @@ fn run_with_notice_policy(
                         peer.channels
                             .control
                             .send(WorkerEvent::Privacy {
+                                receipt: None,
                                 acquired_at_us: monotonic_us(),
                                 muted: false,
                             })

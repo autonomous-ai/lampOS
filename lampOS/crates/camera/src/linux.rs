@@ -7,9 +7,11 @@
 //! O_NONBLOCK makes DQBUF nonblocking, not every USB/ioctl operation. Budgets
 //! detect returns after a deadline; a supervisor must handle a stalled process.
 
+mod find;
 mod identity;
 mod params;
 mod queue;
+mod reset;
 
 use crate::backend::{Budget, Check, Queue};
 pub use crate::backend::{CleanupReport, Fault as BackendFault, Stage};
@@ -17,6 +19,7 @@ use crate::{
     CallTiming, CaptureConfig, CaptureId, Clock, ClockError, DRIVER_TEARDOWN_BUDGET_US,
     NegotiatedMode, OperationBudget, PortError, PortFrame, PortIo, STOP_BUDGET_US, SourceId,
 };
+pub use find::NotFound;
 pub use identity::IdentityReport;
 use lamp_turn_owner::MonoTime;
 pub use params::{
@@ -169,6 +172,29 @@ fn run_budget<T>(
         cancelled: &cancelled,
     };
     operation(&mut check)
+}
+/// Resets the camera's USB device, as an unplug would (#2126): found by
+/// `expected`'s topology, and only when its vendor and product match. Its
+/// node, on success.
+pub fn reset_usb(expected: &UsbIdentity) -> Result<PathBuf, PortError> {
+    reset::reset_at(
+        std::path::Path::new("/sys/bus/usb/devices"),
+        std::path::Path::new("/dev/bus/usb"),
+        expected,
+    )
+}
+/// The one camera with `vendor` and `product` on any USB port (#2190): its
+/// capture node and its device's topology, or why there is no one.
+pub fn find_camera(
+    vendor: u16,
+    product: u16,
+) -> Result<Result<(PathBuf, String), NotFound>, PortError> {
+    find::find_under(
+        std::path::Path::new("/sys"),
+        std::path::Path::new("/dev"),
+        vendor,
+        product,
+    )
 }
 pub(super) fn errno(errno: i32) -> PortError {
     if errno == 19 || errno == 6 {

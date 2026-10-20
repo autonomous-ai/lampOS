@@ -52,12 +52,17 @@ stream. `declaration_of()` recognizes every catalogue without changing
 | `ImageRef` | `camera/image` | latest | 500 ms | The absolute path of the newest frame's file, its width, height and encoding, and when it was captured |
 | `JointState` | `body/joint_states` | latest | 100 ms | ROS's `sensor_msgs/JointState`: `name`, `position` (rad), `velocity` (rad/s), and `effort`, which here is the share of its full strength each servo reports (0 to 1) and not ROS's newton metres. And `commanded` (rad), which ROS's has not |
 | `Faces` | `humans/faces/tracked` | latest | none | A list of faces: a passing id, a box in fractions of the picture as in ROS4HRI, confidence, yaw if it was estimated, whether it faces the lamp if that was judged, and with `LAMP_EYES_SPEAKING=on` whether its mouth is speaking (`speaking`: `state` yes/no/unknown, a `score`, and `from`, `corners` or `mesh` with `--mouth-model`, whose scale the score is on; `from` absent from eyes before #1470), absent otherwise |
+| `HumanFamiliar` | `humans/familiar` | latest | 2 s, good for 5 s | How familiar the remembered person at the lamp is: `level` `new`, `regular` or `close`, or `null` for nobody near, someone not remembered or not recognised. No name (#1670, [eyes.md](eyes.md)) |
+| `HumanSeems` | `humans/seems` | latest | 2 s, good for 5 s | How the near face seems: `kind` `positive`, `negative` or `unsure`, and a `confidence` from 0 to 1. No name, print or picture, and nothing reads it yet (#1671, [eyes.md](eyes.md)) |
 | `Speech` | `voice/heard`, `voice/said` | event | none | Text, whether it is finished, and the locale and the request's number if known. After `hri_msgs/LiveSpeech` |
 | `VoiceState` | `voice/state` | latest | 1 s | Resting, listening, thinking or speaking |
 | `VoiceLink` | `voice/link` | latest | 1 s | Ready, or unavailable with one of seven kinds of reason |
 | `Online` | `lamp/online` | latest | 1 s | `online` true, false or absent (nobody knows), `from` the part whose link said so, `down_for_s` while offline |
 | `RoomState` | `room/state` | latest | none | Unknown, quiet or busy |
+| `VoiceTurn` | `voice/turn` | event | none | A turn's request and its verdict, `answered` or `held_back` as not said to the lamp (#1155). Said by the voice for each turn its rule judged, and `held_back` for a line the model declines (`not_for_me`); read by the policy's hello with `--hello-quiet to-the-lamp` ([policy.md](policy.md#the-quiet-counts-talk-to-the-lamp-1155)). `turn_topics()` lists it |
 | `RoomPresence` | `room/presence` | latest | 1 s, each good for 3 s | Whether anyone is at the lamp (#1677, [presence.md](presence.md)): `someone`, a face seen or a voice heard within 20 s (`RoomPresence::SOMEONE_WITHIN_S`), and `nobody_s`, how long nobody has been there in whole seconds (0 while someone is), from the last face or voice or from when the eyes began looking; and `by`, while someone is, what last showed it (`face` or `voice`; absent otherwise). Said by the eyes with `LAMP_PRESENCE=on`, once a second while they look and at once when `someone` changes; nothing while they are not looking, so no fresh value is not known, never nobody. Read by Light out when you leave and by Messages (#1673). `presence_topics()` lists it |
+| `RoomActivity` | `room/activity` | latest | 1 s, each good for 3 s | What the face at the desk shows, against the person's own sitting (#1678, [eyes.md](eyes.md#what-the-person-at-the-desk-is-doing-lamp_activityon-1678)): `state` (`away`, `at_desk`, `leaning_in`, `head_down`; `leaning_back` and `sitting_low` were dropped after lamp-75c9's sitting), `for_s`, how long it has held, `sitting_s`, the sitting's length (0 while away), and `baseline`, whether the sitting's first two minutes are in (without it only `away` or `at_desk`). Said by the eyes with `LAMP_ACTIVITY=on`; nothing while they are not looking. Read by Stretch break. `activity_topics()` lists it |
+| `StoodUp` | `room/stood_up` | event | none | Someone at the desk stood up and left (#1678): `sitting_s`, the sitting they left, and `side` (`left` or `right`, the side of the picture they were last seen at; added 2026-10-20, optional, left out near the middle). It lasts 5 s (`StoodUp::LASTS`, `expires_ms`), so a reader that keeps the newest value lets it go and the next departure starts anew. Said once by the eyes with `LAMP_ACTIVITY=on`. For a reader that watches them go (#1669). `activity_topics()` lists it |
 | `Light` | `light/command`, `light/state`, `light/test`, `light/drawn` | latest | 1 s | On or off, one of ten colours by name, a level from 1 to 5; `Light::TINTS` is each colour as the ring draws it, which `lamp-cloud` also tells the app ([cloud.md](cloud.md)) |
 | `Diagnostic` | `diagnostics` | event | 1 s | ROS's `DiagnosticStatus`: ok, warn, error or stale, a name, a message, a few keys and values |
 | `Health` | `lamp/health` | latest | 5 s, means nothing after 15 s | How the whole lamp is: the worst level, one sentence, every part that has reported with its level, message and age, worst first, and the parts that are expected and never reported |
@@ -470,6 +475,7 @@ and are re-exported at the crate root; `chat_topics()` and
 |---|---|---|---|---|
 | `ChatIn` | `chat/in` | event | none / 60 s | A text the person sent from the Autonomous app ([messages.md](messages.md)): the `run_id` `lamp-cloud` acked it with, the app's `session_id` if it gave one, the text, and `speak` (say the reply aloud too; off unless asked) |
 | `ChatOut` | `chat/out` | event | none / none | A piece of the lamp's answer: the `run_id` it answers (none only for task news), the `session_id`, the `ChatPart` (`delta`, `final`, `error`, `task_news`) and its text |
+| `MessageOut` | `messages/out` | event | none / 10 min | A short text the lamp sends unasked, for the person's phone: `from` (`skill:<name>`) and `text`, one line of at most 280 bytes; guard mode's news ([messages.md](messages.md), "Unasked texts"). Published by `lamp-skills`; nothing carries it off the lamp yet |
 
 Published by `lamp-cloud` (`chat/in`) and the voice (`chat/out`). `check()`
 holds a run or session name to 1 to 64 letters, digits, `-`, `_`, `.` or
@@ -488,8 +494,9 @@ and are re-exported at the crate root; `reports_topics()` and
 
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
-| `ReportsRequest` | `reports/request` | event | none / none | A part asks for health and crash reports to stop: `share`. `lamp-cloud` takes only `false` from the bus, which anything on the lamp can write ([cloud.md](cloud.md), "Health and crash reports") |
-| `ReportsState` | `reports/state` | latest | 5 s / 15 s | Whether reports are being sent (`share`: the switch on and the person's yes) and how many wait (`queued`) |
+| `ReportsRequest` | `reports/request` | event | none / none | A part asks for health and crash reports to stop: `share`, and `held` (left out when false) when the line's answer was held. `lamp-cloud` takes only `false` from the bus, which anything on the lamp can write ([cloud.md](cloud.md), "Health and crash reports") |
+| `ReportsState` | `reports/state` | latest | 5 s / 15 s | Whether reports are being sent (`share`: the switch on and the person's yes), how many wait (`queued`), and how the newest choice was made: `by` (`voice`, `app`, `setup` or null), `held`, and `at_s` (wall seconds) |
 
 Published by the voice's `reports_stop` (`reports/request`) and
-`lamp-cloud` (`reports/state`), only with `LAMP_REPORTS=on`.
+`lamp-cloud` (`reports/state`), only with `LAMP_REPORTS=on`; the voice's
+`reports_state` reads `reports/state`.

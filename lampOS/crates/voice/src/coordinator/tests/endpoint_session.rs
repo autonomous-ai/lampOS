@@ -196,8 +196,10 @@ fn capture_peer(
     levels: Option<Levels>,
     echo: Option<Over>,
     seen: Arc<Mutex<Seen>>,
+    starts_after: Duration,
 ) -> PeerStep {
     let mut generation = 0;
+    let mut asked: Option<u64> = None;
     let mut started = None;
     let mut sequence = 0u64;
     Box::new(move || {
@@ -207,30 +209,34 @@ fn capture_peer(
             };
             match control {
                 Control::Authority { snapshot } => generation = snapshot.microphone_generation(),
-                Control::StartCapture if started.is_none() => {
-                    let at = monotonic_us();
-                    let instant = scenario_clock::instant();
-                    channels.control.send(WorkerEvent::CaptureStarted {
-                        epoch: 1,
-                        dsp_epoch: 1,
-                        noise_suppression: NoiseSuppression::On,
-                        privacy_generation: generation,
-                        rate: 16_000,
-                        channels: 1,
-                        period_frames: 160,
-                        buffer_frames: 640,
-                        monotonic_status_timestamps: false,
-                        open_started_at_us: at,
-                        prepared_at_us: at,
-                        capture_started_at_us: at,
-                        start_completed_at_us: at,
-                    })?;
-                    started = Some(at);
-                    seen.lock().unwrap().capture_started = Some(instant);
-                }
+                Control::StartCapture if asked.is_none() => asked = Some(monotonic_us()),
                 Control::Stop => return Ok(false),
                 _ => {}
             }
+        }
+        // A slow microphone (#1567) starts `starts_after` past its request.
+        if started.is_none()
+            && asked.is_some_and(|asked| monotonic_us() >= asked + starts_after.as_micros() as u64)
+        {
+            let at = monotonic_us();
+            let instant = scenario_clock::instant();
+            channels.control.send(WorkerEvent::CaptureStarted {
+                epoch: 1,
+                dsp_epoch: 1,
+                noise_suppression: NoiseSuppression::On,
+                privacy_generation: generation,
+                rate: 16_000,
+                channels: 1,
+                period_frames: 160,
+                buffer_frames: 640,
+                monotonic_status_timestamps: false,
+                open_started_at_us: at,
+                prepared_at_us: at,
+                capture_started_at_us: at,
+                start_completed_at_us: at,
+            })?;
+            started = Some(at);
+            seen.lock().unwrap().capture_started = Some(instant);
         }
         // This synthetic PCM source acquires one block every 10 ms, regardless
         // of when its delivery thread runs. Keep that original source timestamp
@@ -352,7 +358,7 @@ mod capture_timeline {
                 .unwrap();
             channels.control.send(Control::StartCapture).unwrap();
             let seen = Arc::new(Mutex::new(Seen::default()));
-            let mut step = capture_peer(peer, |_| QUIET, None, None, seen.clone());
+            let mut step = capture_peer(peer, |_| QUIET, None, None, seen.clone(), Duration::ZERO);
             assert!(step().unwrap());
             assert!(matches!(
                 channels.control.receive::<WorkerEvent>().unwrap(),
@@ -529,6 +535,7 @@ fn privacy_peer(
             channels.control.send(WorkerEvent::Privacy {
                 acquired_at_us,
                 muted,
+                receipt: None,
             })?;
             let after_send_at_us = monotonic_us();
             seen.lock()
@@ -546,10 +553,15 @@ fn provider_peer(
     seen: Arc<Mutex<Seen>>,
     reply: Option<ProviderReply>,
     ready_after: Option<Duration>,
+    refused: Option<crate::provider_worker::Fault>,
     shape: Option<fn(u64) -> i16>,
 ) -> PeerStep {
     assert!(reply.is_none_or(|reply| reply.packets <= PEER_STEP_BUDGET));
     let mut ready = false;
+    // With `refused`, the first session is refused at once, as the
+    // provider worker says it when the model's account is out of quota
+    // (#1567), and the link that comes later is a session of its own.
+    let mut refused_at: Option<u64> = None;
     // With `ready_after`, the link is down until that long after the
     // peer's first step: a service started with no internet (#830).
     let mut first_step_us: Option<u64> = None;
@@ -563,7 +575,9 @@ fn provider_peer(
             let first = *first_step_us.get_or_insert_with(monotonic_us);
             monotonic_us().saturating_sub(first) < after.as_micros() as u64
         });
-        if !ready && !late {
+        if let Some(reason) = refused
+            && refused_at.is_none()
+        {
             let at = monotonic_us();
             channels.control.send(WorkerEvent::ProviderLink {
                 link: crate::provider_link::ProviderLink {
@@ -571,13 +585,44 @@ fn provider_peer(
                     session: 1,
                     observed_at_us: at,
                     source_clock: None,
-                    state: ProviderLinkState::Ready {
+                    state: ProviderLinkState::Unavailable { reason },
+                },
+            })?;
+            refused_at = Some(at);
+        }
+        if !ready && !late {
+            let at = monotonic_us();
+            let (revision, session, state) = match refused_at.zip(refused) {
+                Some((since, reason)) => (
+                    2,
+                    2,
+                    ProviderLinkState::Ready {
+                        setup_us: 1_000,
+                        attempts: 1,
+                        context: LinkContext::Fresh,
+                        outage_started_at_us: Some(since),
+                        after: Some(reason),
+                    },
+                ),
+                None => (
+                    1,
+                    1,
+                    ProviderLinkState::Ready {
                         setup_us: 1_000,
                         attempts: 1,
                         context: LinkContext::Initial,
                         outage_started_at_us: None,
                         after: None,
                     },
+                ),
+            };
+            channels.control.send(WorkerEvent::ProviderLink {
+                link: crate::provider_link::ProviderLink {
+                    revision,
+                    session,
+                    observed_at_us: at,
+                    source_clock: None,
+                    state,
                 },
             })?;
             ready = true;
@@ -1003,6 +1048,11 @@ struct Lamp {
     lapses_after: Option<usize>,
     /// The provider's link comes up only this long after it starts (#830).
     provider_ready_after: Option<Duration>,
+    /// The provider refuses the first session at once for this reason,
+    /// before the link of `provider_ready_after` (#1567).
+    provider_refused: Option<crate::provider_worker::Fault>,
+    /// The microphone starts only this long after it is asked to (#1567).
+    capture_after: Option<Duration>,
     /// `LAMP_START_OFFLINE`, for this run's thread (#830).
     start_offline: Option<bool>,
     /// Run as the service does (`Lifetime::Serve`), ended by `mute_at`,
@@ -1064,10 +1114,22 @@ fn run_policy_with_peers_held(
         require_real_process_clock();
     }
     let dir = SessionDirectory::create().unwrap();
-    let (capture, capture_peer_channels) = Worker::sleeping_fixture(&dir.path, "capture");
-    let (speaker, speaker_peer_channels) = Worker::sleeping_fixture(&dir.path, "speaker");
-    let (provider, provider_peer_channels) = Worker::sleeping_fixture(&dir.path, "provider");
-    let (privacy, privacy_peer_channels) = Worker::sleeping_fixture(&dir.path, "privacy");
+    // Children that end as their Stop is sent (their input closed), so the
+    // shutdown does not wait out its 300 ms grace to kill four that cannot
+    // stop, as `exec sleep 60` could not (#1806). The ready fixture's echo
+    // proves each child reads its input before a stepped clock moves.
+    let (mut capture, capture_peer_channels, capture_input) =
+        Worker::cooperative_ready_fixture(&dir.path, "capture");
+    let (mut speaker, speaker_peer_channels, speaker_input) =
+        Worker::cooperative_ready_fixture(&dir.path, "speaker");
+    let (mut provider, provider_peer_channels, provider_input) =
+        Worker::cooperative_ready_fixture(&dir.path, "provider");
+    let (mut privacy, privacy_peer_channels, privacy_input) =
+        Worker::cooperative_ready_fixture(&dir.path, "privacy");
+    capture.end_on_stop(capture_input);
+    speaker.end_on_stop(speaker_input);
+    provider.end_on_stop(provider_input);
+    privacy.end_on_stop(privacy_input);
     // Starting children is real OS work. Enter only after their startup barriers
     // and keep the scope through shutdown and collection of scenario timestamps.
     let mut scope = match mode {
@@ -1092,6 +1154,7 @@ fn run_policy_with_peers_held(
             lamp.levels,
             lamp.echo,
             seen.clone(),
+            lamp.capture_after.unwrap_or_default(),
         ),
         privacy_peer(privacy_peer_channels, seen.clone(), mute_at),
         provider_peer(
@@ -1099,6 +1162,7 @@ fn run_policy_with_peers_held(
             seen.clone(),
             reply,
             lamp.provider_ready_after,
+            lamp.provider_refused,
             lamp.reply_shape,
         ),
         speaker_peer(
@@ -1146,6 +1210,7 @@ fn run_policy_with_peers_held(
         speaker,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         camera: None,
         motor: None,
@@ -1202,7 +1267,7 @@ fn run_policy_with_peers_held(
     let elapsed = started.elapsed();
     crate::session_lifetime::set_start_offline_for_test(None);
     crate::listen_gaps::set_for_test(None);
-    // Sleeping fixtures need forced reaping; only the endpoint record matters.
+    // Only the endpoint record matters here.
     let _ = rig.shutdown(&mut trace);
     stop.store(true, Ordering::SeqCst);
     for peer in peers {
@@ -1722,6 +1787,7 @@ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
                         channels
                             .control
                             .send(WorkerEvent::Privacy {
+                                receipt: None,
                                 acquired_at_us: monotonic_us(),
                                 muted: true,
                             })
@@ -1750,6 +1816,7 @@ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
         provider,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         camera: None,
         motor: None,
@@ -3083,6 +3150,95 @@ fn a_service_started_with_no_link_says_so_once_and_is_ready_when_the_link_comes(
     let error = ended.result.as_ref().unwrap_err().to_string();
     assert!(error.contains("voice input never became ready"), "{error}");
     assert!(ended.events("waiting_for_link").is_empty());
+}
+
+/// #1567, lamp-75c9 on 2026-10-19: the model's account was out of quota, the
+/// provider said the first session was refused (`unavailable`, quota) a
+/// second after boot, and 25 s later the voice ended, "voice input never
+/// became ready", until systemd gave up. A refused session is a link that is
+/// not up yet. With `LAMP_START_OFFLINE=on` the service keeps listening past
+/// the budget, says so once and becomes ready on the session that comes
+/// later; asking again is the provider worker's, after its refusal pause
+/// (`RecoveryPolicy::refusal_pause`). Without the switch the budget covers
+/// the link and the voice ends at it, as on that lamp.
+#[test]
+fn a_session_refused_at_start_does_not_end_a_service_started_offline() {
+    use crate::provider_worker::Fault;
+    let link_after = INPUT_READINESS_TIMEOUT + Duration::from_secs(3);
+    let mute_block = (link_after.as_millis() as u64 + 5_000) / 10;
+    let run = |start_offline: bool, refused: Fault| {
+        run_policy_with_peers(
+            TurnTaking::V1Baseline,
+            0,
+            |_| QUIET,
+            EndpointRig::double(delayed(0.0, Duration::ZERO)),
+            None,
+            Some(mute_block),
+            PeerMode::Stepped,
+            Lamp {
+                provider_ready_after: Some(link_after),
+                provider_refused: Some(refused),
+                start_offline: Some(start_offline),
+                serve: true,
+                ..Lamp::default()
+            },
+        )
+    };
+    for refused in [Fault::QuotaExceeded, Fault::RateLimited] {
+        let waited = run(true, refused);
+        let end = format!("{:?}", waited.result.as_ref().unwrap_err());
+        assert!(end.contains("PhysicalMute"), "{refused:?}: {end}");
+        assert_eq!(waited.events("provider_unavailable").len(), 1);
+        assert_eq!(waited.events("waiting_for_link").len(), 1);
+        assert_eq!(waited.events("provider_link_current").len(), 1);
+        let ended = run(false, refused);
+        let error = ended.result.as_ref().unwrap_err().to_string();
+        assert!(
+            error.contains("voice input never became ready"),
+            "{refused:?}: {error}"
+        );
+        assert!(ended.events("waiting_for_link").is_empty());
+    }
+}
+
+/// #1567, slow ears: the startup budget's other half. A microphone that
+/// starts late but within the budget, with the session refused, still makes
+/// a service that waits for its link. One that has not started by the
+/// budget ends the voice even with the switch on: input that is not
+/// retained is not proven, and readiness is never said without it.
+#[test]
+fn slow_ears_within_the_budget_are_waited_for_and_past_it_end_the_voice() {
+    let link_after = INPUT_READINESS_TIMEOUT + Duration::from_secs(3);
+    let mute_block = (link_after.as_millis() as u64 + 5_000) / 10;
+    let run = |capture_after: Duration| {
+        run_policy_with_peers(
+            TurnTaking::V1Baseline,
+            0,
+            |_| QUIET,
+            EndpointRig::double(delayed(0.0, Duration::ZERO)),
+            None,
+            Some(mute_block),
+            PeerMode::Stepped,
+            Lamp {
+                provider_ready_after: Some(link_after),
+                provider_refused: Some(crate::provider_worker::Fault::QuotaExceeded),
+                capture_after: Some(capture_after),
+                start_offline: Some(true),
+                serve: true,
+                ..Lamp::default()
+            },
+        )
+    };
+    let slow = run(INPUT_READINESS_TIMEOUT - Duration::from_secs(5));
+    let end = format!("{:?}", slow.result.as_ref().unwrap_err());
+    assert!(end.contains("PhysicalMute"), "{end}");
+    assert_eq!(slow.events("waiting_for_link").len(), 1);
+    assert_eq!(slow.events("provider_link_current").len(), 1);
+    let deaf = run(INPUT_READINESS_TIMEOUT + Duration::from_secs(1));
+    let error = deaf.result.as_ref().unwrap_err().to_string();
+    assert!(error.contains("voice input never became ready"), "{error}");
+    assert!(deaf.events("waiting_for_link").is_empty());
+    assert!(deaf.events("provider_link_current").is_empty());
 }
 
 /// #828, listening gaps, through the coordinator's own loop: the answer's

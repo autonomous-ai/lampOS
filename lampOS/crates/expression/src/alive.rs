@@ -63,7 +63,6 @@ const SIZE_MOST: f64 = 1.3;
 const PACE_QUICKEST: f64 = 0.75;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Breath {
     /// One breath, in and out. The ring's is [`RING_BREATH_US`].
     pub period_us: u64,
@@ -72,7 +71,6 @@ pub struct Breath {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Drift {
     /// The shortest and the longest wait between one drift and the next.
     pub every_us: [u64; 2],
@@ -85,7 +83,6 @@ pub struct Drift {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct WorkLight {
     /// A face taking at least this share of the picture is close.
     pub face_area: f32,
@@ -99,7 +96,6 @@ pub struct WorkLight {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Sleep {
     /// A sleeping name needs the voice owner's person-speech evidence.
     /// Omission preserves the original immediate name wake.
@@ -119,7 +115,6 @@ pub struct Sleep {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Wake {
     /// The stretch, from and back to nothing, played as the sleeping pose
     /// lets go. Brightness is not used.
@@ -151,15 +146,15 @@ impl Wake {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Alive {
     /// The voice's states in which the idle layer runs. Never speaking: the
     /// lamp keeps its head still while it talks (body.md, "A glance first").
     pub states: Vec<Voice>,
     /// How long the idle layer takes to come in and to go out.
     pub blend_us: u64,
-    /// The energy the style of every move here is drawn from, 0 to 1, until
-    /// the inner state (task 35, #713) says it.
+    /// The energy the style of every move here is drawn from, 0 to 1. Where
+    /// Mood runs, its liveliness moves it by up to a half either way (#1670,
+    /// `Life::energy`).
     pub energy: f32,
     pub breath: Breath,
     pub drift: Drift,
@@ -211,12 +206,24 @@ impl Breath {
         Ok(())
     }
 
-    /// Where the breath is at `now_us`, as the ring's: the boot clock's
-    /// seconds within the hour, over the period.
-    fn at(&self, now_us: u64, size: f64) -> BodyOffsets {
-        let seconds = (now_us % RING_HOUR_US) as f64 / 1e6;
-        let share = 0.5 - 0.5 * (2.0 * PI * seconds / (self.period_us as f64 / 1e6)).cos();
-        add(BodyOffsets::ZERO, self.inhale, share * size)
+    /// How far in the breath is at `now_us`, from 0 (out) to 1 (in), as the
+    /// ring's: at the lamp's one breath's phase where Mood keeps it (#1670,
+    /// `mood`), else the boot clock's seconds within the hour, over the period.
+    pub fn share_at(&self, now_us: u64, mood: Option<f64>) -> f64 {
+        let turns = mood.unwrap_or_else(|| {
+            let seconds = (now_us % RING_HOUR_US) as f64 / 1e6;
+            seconds / (self.period_us as f64 / 1e6)
+        });
+        0.5 - 0.5 * (2.0 * PI * turns).cos()
+    }
+
+    /// Where the breath is at `now_us`, as [`Self::share_at`] says.
+    fn at(&self, now_us: u64, size: f64, mood: Option<f64>) -> BodyOffsets {
+        add(
+            BodyOffsets::ZERO,
+            self.inhale,
+            self.share_at(now_us, mood) * size,
+        )
     }
 
     /// The fastest the breath moves on any axis, radians a second.
@@ -621,6 +628,10 @@ pub(crate) struct Life {
     /// once the voice says it is open (the seventh on #1282).
     voice_muted: bool,
     privacy_muted: bool,
+    /// The lamp's one breath's phase now, where Mood keeps it (#1670).
+    mood_breath: Option<f64>,
+    /// How lively the moves are from the lamp's inner state (#1670).
+    mood_liveliness: Option<f32>,
     tapped_muted_us: Option<u64>,
     /// The body seen moving (its own shift at rest, #933, a gesture, or
     /// this layer's look up at a tap falling back): the goals it last said
@@ -699,6 +710,8 @@ impl Life {
             voice_slept: false,
             voice_muted: false,
             privacy_muted: false,
+            mood_breath: None,
+            mood_liveliness: None,
             tapped_muted_us: None,
             body_goals: None,
             body_fast_since: None,
@@ -940,6 +953,23 @@ impl Life {
         self.privacy_muted = muted;
     }
 
+    /// The lamp's one breath's phase now, where Mood keeps it (#1670).
+    pub(crate) fn set_mood_breath(&mut self, phase: Option<f64>) {
+        self.mood_breath = phase;
+    }
+
+    /// How lively the moves are from the lamp's inner state (#1670).
+    pub(crate) fn set_mood_liveliness(&mut self, liveliness: Option<f32>) {
+        self.mood_liveliness = liveliness;
+    }
+
+    /// The energy the style of every move is drawn from: the catalogue's,
+    /// moved by the lamp's inner state where Mood says it, within 0 to 1, so
+    /// no move passes the bounds checked at energy 1.
+    fn energy(&self) -> f32 {
+        (self.alive.energy + self.mood_liveliness.unwrap_or(0.0)).clamp(0.0, 1.0)
+    }
+
     /// Muted for privacy: the switch last said closed, or the voice's own
     /// mute last said (not its sleep, which a tap wakes).
     fn muted(&self) -> bool {
@@ -1031,8 +1061,8 @@ impl Life {
             .map_or(0, |last| now_us.saturating_sub(last))
             .min(200_000);
         self.last_us = Some(now_us);
-        let size = size(self.alive.energy);
-        let pace = pace(self.alive.energy);
+        let size = size(self.energy());
+        let pace = pace(self.energy());
         let mut planned = Planned::default();
         // Nobody is absent while the eyes are not looking, nor while the
         // voice has someone to listen or answer to.
@@ -1233,7 +1263,7 @@ impl Life {
         // The breath, as the ring's. Its phase jumps once an hour where the
         // ring's does; the body's breath is let catch up at twice its own
         // fastest speed rather than leap.
-        let wanted = self.alive.breath.at(now_us, size);
+        let wanted = self.alive.breath.at(now_us, size, self.mood_breath);
         let most = 2.0 * self.alive.breath.speed(size) * step as f64 / 1e6;
         let breath = match self.breath {
             Some(last) => {
@@ -1288,7 +1318,9 @@ impl Life {
             return (BodyOffsets::ZERO, 0.0);
         };
         let settled = ease(now_us.saturating_sub(since) as f64 / sleep.settle_us as f64);
-        let pose = add(sleep.pose, sleep.breath.at(now_us, 1.0), 1.0);
+        // The sleeping breath is its own (9 s in the catalogue), never the
+        // ring's: it keeps the boot clock.
+        let pose = add(sleep.pose, sleep.breath.at(now_us, 1.0, None), 1.0);
         (add(BodyOffsets::ZERO, pose, settled), settled)
     }
 }

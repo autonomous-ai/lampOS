@@ -1,0 +1,23 @@
+# From 10:00, every part well; the eyes' last report at 59.8 s, then nothing
+# until 500.8 s (a part that crashed and came back). lamp/health every 5 s.
+# quiet_ms passes 5 min at 360 s (300.2 s unheard): it droops once and
+# breathes pale. The last health with quiet_ms is at 500 s; the light is given
+# back at 510 s, 10 s (the gap) after it.
+clock = "10:00"
+
+[[expect]]
+at = "360s"
+within = "1s"
+call = "body.gesture"
+args = { gesture = "sleepy" }
+
+[[expect]]
+at = "360s"
+within = "1s"
+call = "light"
+args = { colour = "white", level = 2, pattern = { kind = "breathe", period_ms = 10000, low = 1 }, until = "ends" }
+
+[[expect]]
+at = "510s"
+within = "1s"
+call = "ends"

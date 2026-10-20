@@ -1,0 +1,23 @@
+# The runner publishes only an eligible, nonpersonal invitation identity.
+# No authority to open either sensor, no body move, and no additional tool.
+kind = "core"
+version = "1.0.0"
+needs = ["voice"]
+
+[permissions]
+topics = ["onboarding/pending"]
+speak = true
+
+[trigger]
+topic = "onboarding/pending"
+each = "invitations"
+key = "invitation"
+field = "ready"
+equals = true
+when = "appears"
+
+[ask]
+policy = "unprompted"
+
+[[do]]
+say = { from = "onboarding" }
