@@ -1233,10 +1233,39 @@ the lamp never says how anyone looks (#1671; the first builder's 14:04).
   on the lamp takes over about 100 ms, it moves to its own thread before
   anything turns `--seems` on (the reviewer on #1859).
 
-Next (#1671): a week's log of time, kind, confidence and whether the
-person's own words or laughter agreed, with no identity, picture or audio,
-deleted after the measure; then a labelled session at a lamp. Only then
-may a core skill tell the conversation "they seem low".
+**The measure (#1671, step 0; the first builder, 20 Oct 16:16).** With
+`--seems-log /var/lib/lampos-eyes/seems.log` (beside a reader; that path
+only, which both reset plans wipe, so a factory reset never leaves it
+behind; any other is refused), each read
+is also one line in that file, made 0600: `{"t": unix_s, "kind",
+"confidence", "from"}`, nothing of whose face. An existing file that's a
+link or open to others is refused. It stops writing at 20,000 lines (about
+11 hours of face time with one reader, 5.5 with both: a day at the desk), and says so once, and a write that fails is said once too. The ground truth is a labelled
+session at a lamp, with its person's yes: they say how they feel at moments
+a builder notes, one line each, `{"t": unix_s, "says":
+"positive"|"negative"|"neutral"}`. Nothing of what people say at other
+times is matched. `lamp-seems-measure READS LABELS --delete` counts, for
+each reader and each confidence from 0.5 to 0.9, the reads that named a kind
+within 10 s of a label, and the wrong ones (any named kind is wrong beside a
+`neutral` label; `unsure` is never judged, and the reader's own confidence
+is written and judged, unrounded). It prints whether each is under the bar,
+wrong at most 1 in 10, or "too few" under 20 reads judged, and removes both
+files: stop lamp-eyes, or take `--seems-log` off it, first. Only after that may
+the conversation be told "they seem low".
+
+**Only for the session:** it reads whoever is near the lamp, not only the
+labelled person, so at a desk it would keep the reads of anyone who stops by
+and never said yes. Turn `--seems-log` on for the labelled session alone,
+with nobody else near, and off right after it; don't leave it running to its
+cap. Measure and delete it before a lamp is passed on (a reset wipes it too).
+
+Tests (`seems_log.rs`): a read's line is its time, kind, confidence (as
+read) and reader only, and 0.695 is not judged at 0.7; the log is 0600,
+counts on from its lines when reopened, stops at its most and says so once,
+says a failed write once, and refuses a link (`O_NOFOLLOW`) or a file open
+to others; under 20 reads judged is "too few"; reads are counted right or wrong against the nearest label
+by reader and confidence, an unsure read and one far from any label not at
+all, and bad lines are refused. The flag needs a reader (`main.rs`).
 
 Tests: a face made grey and 64 by 64; the eight scores made shares;
 `positive`, `negative` and `unsure` at the line and just under it; a file

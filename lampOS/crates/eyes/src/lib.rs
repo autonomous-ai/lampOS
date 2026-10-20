@@ -35,6 +35,7 @@ pub mod photo;
 pub mod picture;
 pub mod reopen;
 pub mod seems;
+pub mod seems_log;
 pub mod sight;
 pub mod speaking;
 pub mod steady;

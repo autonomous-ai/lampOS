@@ -708,7 +708,7 @@ answer on reports, the key, then the marker. So a marker means all the others we
 the backend's link and the answer on reports: those are best effort, and a marker with no
 `backend.json` is what a failed write leaves (its journal line is below). The
 reset plan (`reset-plan-product.json`) also wipes the person's stores
-(memory, faces, tasks and Harness's sign-in, schedule, the Policy's and
+(memory, faces and a labelled session's face reads (`seems.log`), tasks and Harness's sign-in, schedule, the Policy's and
 `lamp-cloud`'s folders, the voice's sessions). It also empties
 `/var/lib/lampos-skills-state` (including daily routine claims) and
 `/var/lib/lampos-output-caps` (durable light and volume restrictions), even
