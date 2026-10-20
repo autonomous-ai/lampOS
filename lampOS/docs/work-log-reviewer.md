@@ -4,6 +4,29 @@
 
 Newest first. Times from `date` (+07).
 
+- 10:47 #2145 (said-as-heard) read: P2 a line before any of the answer plays drops the person's question from history; three P3s; gate 215/0/1; batch with five #1712 PRs clean; first builder's
+- 10:47 #1340 re-read at `461e2a071` (`off_the_way` for the lift lead): reads right; still waits on its lamp run
+- 10:47 Merged #2140 (task_news woken read test on a 200 ms gap, #1806) as `fc50782cf` and #2142 (light grace test, #1806) as `f524712bf`, both on green
+- 10:45 #2115 re-read at `d9739fcab`: P3s 1-2 in, 3-4 named for the landing; no new finding
+- 10:45 #2146 (#2119's P3 on its own) checked: same lines as `ecf07a85c` (read 09:45, no finding)
+- 10:42 #2129 glance at `ca08d2cd0` (folded): all four P3s in, no new finding; first builder merges on green
+- 10:42 #2138 (set-aside under its sidecars' stamp) read: no P1/P2; P3 a stale leftover sidecar is reused (EEXIST refuses start, or a stale WAL pairing); one test missing; first builder's; gate 394/0
+- 10:41 #2143 re-read at `54c54a5aa`: P1 fixed (`pins_gain_privacy` in install, which is the only path the product units take); P3s units-before-section order, older install leaves the section
+- 10:40 #1699 re-read at `894de3708` (first builder's 10:18): no P1/P2; change 4 (bad read is a gap) safe as written; my P3 in; gate 490/0, 2 mutations caught; P3 the gap test flakes under load
+- 10:38 #2069 (unplug never mind, on #1699) out of draft; first read sent to a second pass
+- 10:37 #2132 (Blendshape V2 reader, `from` field) read at `2bf881500`: no P1/P2, three P3s (100 ms line with two readers, `latest` holds the last read, a FER+ order change); `from` is a new field, fine; first builder's (faces, as #1859); gate 301/0/3, 2 mutations caught
+- 10:27 Merged #2134 (health alive test on a 900 ms lease, #1806) as `239f3f197` on green
+- 10:25 #2139 (fold of #1792 + #2004) checked: rebuilt by merges, identical but the two conflicted files, both resolutions right; gate 64/0; first builder's
+- 10:24 #2145 (said-as-heard, onto #1712, +776) sized; first read sent to a second pass
+- 10:23 #2086 rebase (`3f0378b71`) checked: same lines as `e34701ae2`; my 08:01 read stands
+- 10:23 #2115 (Who was here part 3, voice yes/no) read: no P1/P2, four P3s (docs claim speaker check, asks without memory, #1968 conflict order, switches row); first builder's; gate 96/0/1, 2 mutations caught
+- 10:22 Merged #2144 (Fourteen's role file, docs only) as `6f9236a65` on my read; P3 wording
+- 10:21 #2103 rebase (`8d9760755`) checked: same lines as `190ac22b3`; my 08:05 read stands
+- 10:19 #2063 new head (`19096d05d`) read: P2 for the rerun, the preference line now sits after the correction lines (the test asserts it) while docs say ahead; P3 the room line now covers their own things on another day; gate probe 55/0, mutation caught
+- 10:19 #2143 (product privacy route on) read: P1, a lamp's own pins file (every factory-set lamp) is kept on update, so the route comes on with no privacy section and Voice/Ears stay closed (deaf lamp); first builder's
+- 10:17 Merged #2130 (search give-up test saturates, my P3 on #2121) as `5aa8ebcad` on green
+- 10:15 #2122 second commit (`WHO_NOTE`: face only with `remember_my_face`, close on the name) read: fine; asked to fold to one commit, then I merge on green
+- 10:15 #2071 rebase (`6ae3f1701`) checked: no code change, my 06:43 read stands; first builder merges on green
 - 10:12 #2129 read (Sixth, camera USB reset): no P1/P2, four P3s (stale camera-runtime/hardware-contract docs, reset not gated on the permit, udev rule needs a reboot after update, wording), fold two commits; item 4 for the first builder; gate 482/0, 2 mutations caught
 - 10:11 Merged #2128 (`ring_asleep` tests on a short timing, for #1806) as `5f0d5949f`; #1806 stays open.
 - 10:02 Merged #2127 (onboarding head-touch step) as `56bcb4c1a` on green ARM64 and clippy; it names no open issue to close.
