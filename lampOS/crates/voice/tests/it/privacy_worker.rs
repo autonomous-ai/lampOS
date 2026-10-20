@@ -83,6 +83,12 @@ impl Producer {
     /// With `no_slide`, each state says no slide is wired and carries no
     /// slide evidence, as Controls with `LAMP_PRIVACY_CONTROLS=no-slide`.
     fn start(bus: &Bus, clock: String, no_slide: bool) -> Self {
+        Self::start_paired(bus, clock, no_slide, false)
+    }
+
+    /// With `paired`, two states are published at a time, one right after
+    /// the other, so a reader of the topic's kept value skips one each time.
+    fn start_paired(bus: &Bus, clock: String, no_slide: bool, paired: bool) -> Self {
         let mut publisher = bus
             .publisher_declared(
                 ControlsState::TOPIC,
@@ -161,7 +167,9 @@ impl Producer {
                 result.dropped += publisher.publish_json(at_us, &state)?.dropped as u64;
                 last_us.store(at_us, Ordering::Release);
                 published.store(result.samples, Ordering::Release);
-                thread::sleep(SAMPLE.saturating_sub(began.elapsed()));
+                if !paired || result.samples % 2 == 0 {
+                    thread::sleep(SAMPLE.saturating_sub(began.elapsed()));
+                }
             }
             Ok(result)
         }));
@@ -214,11 +222,26 @@ impl Rig {
     }
 
     fn start_with(permission: Permission, no_slide: bool) -> Self {
+        Self::start_from(permission, no_slide, false)
+    }
+
+    /// With `kept_only`, Controls' publisher is on a bus that never looks for
+    /// subscribers again after its first publication, before the worker
+    /// starts, so it never sends the worker a datagram: the worker has only
+    /// the topic's kept value, and its two states at a time skip one there.
+    fn start_from(permission: Permission, no_slide: bool, kept_only: bool) -> Self {
         let root = Root::new();
         let bus = selected_bus(Bus::new(root.0.join("bus")).unwrap());
         let clock = lamp_controls::runtime::clock_id(None).unwrap();
         let subscriber = Self::subscribe(&bus);
-        let producer = Producer::start(&bus, clock.clone(), no_slide);
+        let producer = if kept_only {
+            let never_looks = Bus::new(root.0.join("bus"))
+                .unwrap()
+                .rescan_every(Duration::from_secs(3_600));
+            Producer::start_paired(&never_looks, clock.clone(), no_slide, true)
+        } else {
+            Producer::start(&bus, clock.clone(), no_slide)
+        };
         let boot = new_boot().unwrap();
         let mut controller = Controller::new(boot, now());
         controller
@@ -482,6 +505,54 @@ fn selected_worker_requires_authority_latches_low_and_recovers_only_after_verifi
     let produced = rig.producer.finish();
     eprintln!("synthetic Controls production including verified replacement: {produced:?}");
     assert!(produced.samples > 20);
+}
+
+/// #1569 row 45 (Third's P3 2 on #2244, pinning `serve`'s `resync`): until a
+/// datagram comes, the worker takes Controls' kept value past a gap. This
+/// Controls never finds the worker and puts two states down at a time, so
+/// each kept value the worker reads after its first is one past the last.
+/// It reads on until, with no datagram for twice the topic's 100 ms, the bus
+/// says Controls is late and the worker ends, unreadable. With the gap
+/// counted, its second read would end it as discontinuous.
+#[test]
+fn before_any_datagram_the_worker_reads_the_kept_value_past_gaps_until_controls_is_late() {
+    let mut rig = Rig::start_from(Permission::Denied, false, true);
+    let mut observed = std::collections::BTreeSet::new();
+    let deadline = Instant::now() + WAIT;
+    loop {
+        if rig.worker.as_mut().unwrap().check_running().is_err() {
+            break;
+        }
+        match rig.tick() {
+            Ok(values) => observed.extend(
+                values
+                    .iter()
+                    .map(|value| value.observed_us)
+                    .filter(|at| *at > 0),
+            ),
+            Err(error) => {
+                let text = error.to_string();
+                assert!(!text.contains("discontinuous"), "{text}");
+                assert!(
+                    !text.contains("Fault") || text.contains(lamp_voice::privacy_bus::UNREADABLE),
+                    "a fault other than the switch's: {text}"
+                );
+                if !text.contains(lamp_voice::privacy_bus::UNREADABLE) {
+                    break;
+                }
+            }
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the worker read on with no datagram from Controls"
+        );
+        thread::sleep(Duration::from_millis(1));
+    }
+    assert!(
+        observed.len() >= 3,
+        "only {} switch readings were taken: {observed:?}",
+        observed.len()
+    );
 }
 
 /// Losing Controls is a switch that cannot be read, not a crash (#795): the

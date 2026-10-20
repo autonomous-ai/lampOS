@@ -206,6 +206,7 @@ instance, is said with the next message handed over.
 | Field | What it counts |
 |---|---|
 | `received` | Messages `recv` handed over |
+| `datagrams` | Of `received`, those that came as datagrams, not from the topic's `latest` file: none until a publisher has found this subscriber |
 | `gaps` | Messages known to have been sent and not received |
 | `expired`, `wrong_type` | Messages passed over for either reason |
 | `mean_interval`, `largest_interval` | The time between taking one message and the next, by the subscriber's monotonic clock. The stream's rhythm for a subscriber that reads as fast as messages come, the reader's for one that does not |

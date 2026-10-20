@@ -56,8 +56,17 @@ The selected publishers and subscribers rescan Bus registrations and retained
 state every 5 ms; the ordinary 200 ms discovery interval exceeds this route's
 50 ms freshness limit. Unselected services retain their existing cadence.
 Invalid types, publisher or reader changes, future/stale evidence, reordered
-messages, skipped Bus publications and receive overflow end this worker. It
-ends cleanly, telling the voice the switch is unreadable (a fault beginning
+messages, skipped Bus publications and receive overflow end this worker,
+with one allowance: until Controls' publisher finds the worker's new socket
+(the 5 ms rescan), the worker reads the topic's kept value, and a publication
+in between reaches only that file. So each message up to and including the
+worker's first datagram, within the worker's first second, resyncs the order
+rather than continuing it; the publisher, its clock and the order going
+forward are still checked. From the second datagram on, or after that first
+second, datagrams or not, a skipped publication ends the worker (#1569 row
+45). One that hears no datagram at all ends sooner: after twice
+`controls/state`'s declared 100 ms the bus says Controls is late.
+It ends cleanly, telling the voice the switch is unreadable (a fault beginning
 `privacy switch unreadable: `), and the voice keeps the microphones closed and
 reads again with a fresh worker each second instead of exiting (#795). Any
 other failure of the worker is still an abnormal exit that ends the service.
@@ -181,7 +190,7 @@ still needs the fresh Controls marker and the controller's own permission),
 but on a no-slide lamp nothing else can close the microphones. So the voice
 refuses to start with `no-slide` and no `--controls-mute` (the persisted
 record): a restart would forget a mute. Losing Controls, a
-stale, skipped or reordered publication, a publisher restart, or a state with
+stale, skipped (past the first datagram, as above) or reordered publication, a publisher restart, or a state with
 slide evidence or without the marker ends the worker as unreadable, and the
 microphones stay closed until a fresh worker reads fresh markers again.
 
