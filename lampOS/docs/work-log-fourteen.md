@@ -173,3 +173,45 @@ Ready for lamp-voice: no (the app side only; nothing here changes
   suite flakiness under load, not a regression; the two reruns both matched
   baseline exactly).
 - Not shown: a real Lamp 2. No lamp is Fourteen's.
+
+## 2026-10-20 — #2094, the app side — all three pieces up on ecm-sds-mobile#11
+
+Ready for lamp-voice: no (the app side is in `ecm-sds-mobile`; nothing a
+lamp runs is on this branch)
+
+- Mobile merged ecm-sds-mobile#8 (skills) and #9 (names & time zone) into
+  `v3` at `c5cf58d2`, which also brought `domain/constants/lamp_answers.dart`
+  (`isNotOnThisLamp`) onto `v3` for the first time. Rebased
+  `fourteen/own-keys` onto it (clean, no conflicts); the local
+  `lampOwnKeysIsNotOnThisLamp` duplicate stays for now (folding it into the
+  shared helper is a one-line follow-up, not blocking) but is no longer
+  needed to avoid a cross-branch build dependency.
+- **Piece 3, the API keys row and page**, now buildable against the real
+  merged `_LampSkillsRow`/`_LampSettingsRows` convention instead of an
+  unmerged branch's diff: one settings-tab row ("API keys", Lamp 2 only,
+  mirrors `_LampSkillsRow`'s gating) opening a page with one tile per
+  service; each tile's sheet gives a key (and, for DeepSeek, its base URL)
+  or says "use the lamp's own again". `keys.set`'s kept sentence is shown
+  verbatim (`showSuccessAtTop`), never re-worded. No new tests: private
+  widgets in a `part of` file, which this codebase tests only at the
+  pure-logic layer (piece 2's), same as skills' and settings' own rows.
+- **Found, not mine:** `autonomous_os_detail_page.dart` imports
+  `ui/helpers/lamp_enrollment.dart` twice (lines 68, 85), pre-existing on
+  `v3` at `c5cf58d2` (confirmed on the untouched ref). Left alone rather
+  than editing a file three other branches are concurrently touching.
+- **A measurement mistake, caught before it reached the PR:** a `git
+  checkout origin/v3 -- .` partial-restore left my own new test files in
+  place against the reverted source, misreading as "32 issues on v3" (3
+  phantom errors from a function signature that no longer matched). Redid
+  the comparison with an isolated `git worktree` on `origin/v3`: the real
+  baseline is 29/29, matching exactly.
+- **The full-suite flakiness from earlier ticks is confirmed environmental,
+  not mine:** two separate full runs each failed a different, non-
+  overlapping handful of files purely on "loading" (never the same files
+  twice, besides the one known pre-existing one), and every failing file
+  passed cleanly both in isolation and on a `flutter test -j 2` (lower
+  concurrency) run: 714 passed / 1 skipped / 1 failed, the one failure
+  `test/features/brick/key_insight_period_test.dart`, same as `v3`. That
+  run is what ecm-sds-mobile#11's body reports.
+- `gh pr edit 11` with the three-piece body, gate numbers, both gaps named
+  (piece 2's) and the found-not-mine note.
