@@ -99,6 +99,48 @@ pub fn only_a_stop(text: &str) -> bool {
         })
 }
 
+/// What a person says to put the lamp off for now, each as its words: a
+/// line made only of one of these, with words that ask nothing or go with
+/// it ([`WITH_A_PUT_OFF`]), puts off a line the lamp began itself
+/// (#2287's follow-up; the reviewer on #2308). "Not now." does, and "Not
+/// now, thanks." "Not now, we're talking about the report." asks something
+/// more, and so does "Later we should eat."
+const PUT_OFFS: &[&[&str]] = &[
+    &["not", "now"],
+    &["not", "right", "now"],
+    &["not", "yet"],
+    &["later"],
+    &["maybe", "later"],
+    &["in", "a", "minute"],
+    &["one", "moment"],
+    &["no", "thanks"],
+    &["no", "thank", "you"],
+];
+/// Words that may go with a put-off: "Not now, thanks.", "Lamp, later,
+/// please."
+const WITH_A_PUT_OFF: &[&str] = &["please", "lamp", "hey", "thanks", "sorry", "just"];
+
+/// Whether `text` only puts the lamp off for now ([`PUT_OFFS`]): one of
+/// them in it, and every other word one that asks nothing or goes with it.
+pub fn only_a_put_off(text: &str) -> bool {
+    let words = crate::not_speech::plain_words(text);
+    PUT_OFFS.iter().any(|put_off| {
+        let Some(at) = words.windows(put_off.len()).position(|window| {
+            window
+                .iter()
+                .map(String::as_str)
+                .eq(put_off.iter().copied())
+        }) else {
+            return false;
+        };
+        words.iter().enumerate().all(|(index, word)| {
+            (at..at + put_off.len()).contains(&index)
+                || asks_nothing(word)
+                || WITH_A_PUT_OFF.contains(&word.as_str())
+        })
+    })
+}
+
 /// What the words say of the waited sound so far.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verdict {
@@ -183,6 +225,8 @@ pub struct WaitWords {
     /// captured: speech captured after it is the person going on.
     asked_through_us: Option<u64>,
     verdict: Verdict,
+    /// Its words, once back, only put the lamp off ([`only_a_put_off`]).
+    put_off: bool,
     /// What its words did has been told.
     told: bool,
 }
@@ -197,6 +241,7 @@ impl WaitWords {
             asked_at_us: None,
             asked_through_us: None,
             verdict: Verdict::Pending,
+            put_off: false,
             told: false,
         }
     }
@@ -272,6 +317,7 @@ impl WaitWords {
             && let Some(words) = self.ears.words()
         {
             let count = words_in(&words);
+            self.put_off = only_a_put_off(&words);
             self.verdict = if only_a_stop(&words) {
                 Verdict::Stop(count)
             } else {
@@ -279,6 +325,12 @@ impl WaitWords {
             };
         }
         self.verdict
+    }
+
+    /// Whether `candidate`'s words, back, only put the lamp off
+    /// ([`only_a_put_off`]): for a line the lamp began itself, as a stop is.
+    pub fn put_off(&self, candidate: CandidateId) -> bool {
+        self.candidate == Some(candidate) && self.put_off
     }
 
     /// When the sound in hand's words were asked for, if they were.
@@ -308,6 +360,7 @@ impl WaitWords {
         self.asked_at_us = None;
         self.asked_through_us = None;
         self.verdict = Verdict::Pending;
+        self.put_off = false;
         self.told = false;
     }
 
@@ -496,6 +549,33 @@ pub(crate) mod tests {
     /// by the stop words' own list, stop it, ended or not, before `on`
     /// would decide or after. A stop with something more asked takes the
     /// turn as before, and "Don't stop." is no stop.
+    #[test]
+    fn a_put_off_is_only_what_puts_the_lamp_off() {
+        for put_off in [
+            "Not now.",
+            "Not now, thanks.",
+            "Lamp, not right now, please.",
+            "Later.",
+            "Maybe later.",
+            "Um, not yet.",
+            "In a minute.",
+            "No thanks.",
+            "No, thank you.",
+        ] {
+            assert!(only_a_put_off(put_off), "{put_off}");
+        }
+        for not in [
+            "Not now, we're talking about the report.",
+            "Later we should eat.",
+            "No.",
+            "Now.",
+            "Did you send the report to the team?",
+            "",
+        ] {
+            assert!(!only_a_put_off(not), "{not}");
+        }
+    }
+
     #[test]
     fn words_that_only_say_stop_stop_and_more_take_the_turn() {
         for said in [
