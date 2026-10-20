@@ -76,18 +76,36 @@ impl Drop for Root {
 struct Production {
     samples: u64,
     dropped: u64,
-    /// From the first sample to the last, in µs.
-    span_us: u64,
+    /// The first sample's time and the last's, in µs.
+    first_us: u64,
+    last_us: u64,
 }
 
 impl Production {
-    /// The producer sampled throughout: at least half the samples its own
+    /// The producer sampled through the scenario from `from_us` to `to_us`:
+    /// its samples span at least 80% of it, at least half as many as that
     /// span allows at one each [`SAMPLE`]. A fixed count, as before, held only
     /// for a scenario of a given length: the no-slide test's lasts about
     /// 100 ms and took 21 or 22 samples against "more than 20" (#1569 row 46).
-    fn kept_up(&self) -> bool {
-        self.samples * 2 * SAMPLE.as_micros() as u64 >= self.span_us
+    fn kept_up(&self, from_us: u64, to_us: u64) -> bool {
+        let span_us = self.last_us - self.first_us;
+        span_us * 5 >= to_us.saturating_sub(from_us) * 4
+            && self.samples * 2 * SAMPLE.as_micros() as u64 >= span_us
     }
+}
+
+/// A steady rate over part of the scenario is not keeping up through it.
+#[test]
+fn a_producer_kept_up_only_if_its_samples_span_the_scenario() {
+    let produced = |samples, first_us, last_us| Production {
+        samples,
+        dropped: 0,
+        first_us,
+        last_us,
+    };
+    assert!(produced(21, 1_000, 101_000).kept_up(0, 110_000));
+    assert!(!produced(6, 1_000, 31_000).kept_up(0, 110_000));
+    assert!(!produced(5, 1_000, 101_000).kept_up(0, 110_000));
 }
 
 struct Producer {
@@ -269,7 +287,8 @@ impl Producer {
                     previous_us.map(|previous| at_us.saturating_sub(previous)),
                 );
                 previous_us = Some(at_us);
-                result.span_us = at_us - *first_us.get_or_insert(at_us);
+                result.first_us = *first_us.get_or_insert(at_us);
+                result.last_us = at_us;
                 result.samples += 1;
                 let muted = muted.load(Ordering::Acquire);
                 if muted {
@@ -738,6 +757,7 @@ fn the_real_worker_with_no_slide_grants_from_its_controller_alone() {
     on_time(
         "the_real_worker_with_no_slide_grants_from_its_controller_alone",
         || {
+            let from_us = monotonic_us();
             let mut rig = Rig::start_with(Permission::Denied, true);
             rig.until(|value| value.no_slide);
             rig.observe(Duration::from_millis(80), |value| {
@@ -759,9 +779,13 @@ fn the_real_worker_with_no_slide_grants_from_its_controller_alone() {
                 rig.last_low_event.is_none(),
                 "with no slide nothing is ever observed muted"
             );
+            let to_us = monotonic_us();
             rig.stop_worker();
             let produced = rig.producer.finish();
-            assert!(produced.kept_up(), "{produced:?}");
+            assert!(
+                produced.kept_up(from_us, to_us),
+                "{produced:?} over {from_us}..{to_us}"
+            );
         },
     );
 }
