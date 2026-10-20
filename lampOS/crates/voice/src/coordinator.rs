@@ -3022,6 +3022,7 @@ fn provider_arguments(
     arguments.extend(crate::misheard_hum::arguments_from_environment());
     arguments.extend(crate::holding_answer::arguments_from_environment());
     arguments.extend(crate::messages::arguments_from_environment());
+    arguments.extend(crate::others_answer::arguments_from_environment());
     if let Some(camera) = camera {
         arguments.extend(camera.source.arguments());
     }

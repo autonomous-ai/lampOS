@@ -614,3 +614,26 @@ fn messages_is_read_after_misheard_hum_and_the_holding_answer() {
         .into();
     assert!(parse_flags(dir, &wrong).is_err());
 }
+
+/// #2136: `--others-answer` comes right after `--messages`, as the
+/// coordinator writes them, on both routes' parsers (the worker's
+/// environment is cleared, so this is how the switch reaches the rule).
+#[test]
+fn others_answer_is_read_after_messages() {
+    let dir = std::path::Path::new("/run/test");
+    let flags: Vec<String> = [crate::messages::FLAG, crate::others_answer::FLAG]
+        .map(String::from)
+        .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.messages && files.others_answer);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.others_answer);
+    let (_, _, files, _) = parse_flags(dir, &flags[1..]).unwrap();
+    assert!(files.others_answer && !files.messages);
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert!(!files.others_answer);
+    let wrong: Vec<String> = [crate::others_answer::FLAG, crate::messages::FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+}

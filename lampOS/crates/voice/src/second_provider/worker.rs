@@ -1723,18 +1723,14 @@ pub fn serve(
         // child loads its model now, and only beside `LAMP_SPOKEN_TO=on`.
         // Only as the lamp's only voice: a standby beside Live loads none.
         let same_voice = files.same_voice.clone().filter(|_| route.only_voice);
+        let mut hears = false;
         match (files.spoken_to, same_voice) {
             (true, Some(model)) => match crate::same_voice::Prints::beside_voice(model) {
                 Ok(prints) => {
                     if let Ok(mut heeding) = heeding.lock() {
                         heeding.checking_the_voice(Box::new(prints));
                     }
-                    let heeding = heeding.clone();
-                    engine = engine.hearing(Arc::new(move |request, heard| {
-                        if let Ok(mut heeding) = heeding.lock() {
-                            heeding.hear(request, heard);
-                        }
-                    }));
+                    hears = true;
                 }
                 Err(error) => {
                     eprintln!("lamp-voice second: the same voice is not judged: {error}");
@@ -1744,6 +1740,16 @@ pub fn serve(
                 "lamp-voice second: the same voice is judged only with LAMP_SPOKEN_TO=on: not judged"
             ),
             (_, None) => {}
+        }
+        // Someone else's answer left alone (`LAMP_OTHERS_ANSWER=on`,
+        // #2136): the rule learns which line began over the lamp's answer.
+        if files.others_answer
+            && let Ok(mut heeding) = heeding.lock()
+        {
+            heeding.leaving_others_answers();
+        }
+        if let Some(hook) = hearing_hook(&heeding, hears, files.others_answer) {
+            engine = engine.hearing(hook);
         }
         // The name note, as the Live route gives it (`LAMP_NAME_NOTE=on`).
         if files.name_note
@@ -2491,6 +2497,12 @@ pub(crate) struct Heeding {
     misheard_hum: bool,
     /// The request last ended as a cut-in over the lamp's answer.
     cut_in: Option<u64>,
+    /// Leave alone a reply that answers nothing the lamp asked, said over its
+    /// answer ([`crate::others_answer`]).
+    others_answer: bool,
+    /// The newest request, if it began over the lamp's own answer (its
+    /// Start's `over_the_lamps_voice`), as [`Self::hear`] is told.
+    began_over: Option<u64>,
     /// The same-voice check (`LAMP_SAME_VOICE_MODEL`, #829,
     /// [`Self::checking_the_voice`]), as the Live worker keeps it.
     voices: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
@@ -2676,6 +2688,25 @@ struct Waiting {
 /// then not told it may be people's talk (`Heeding::asks_its_work`).
 const MEMORY_WORDS: [&str; 2] = ["remember", "forget"];
 
+/// The rule's hook for each spoken line's sound ([`Engine::hearing`]), when
+/// it needs one: for the same-voice check (`voice_judged`), or to know which
+/// line began over the lamp's answer (`others_answer`, #2136). Neither, none.
+fn hearing_hook(
+    heeding: &Arc<Mutex<Heeding>>,
+    voice_judged: bool,
+    others_answer: bool,
+) -> Option<crate::second_provider::Hearing> {
+    (voice_judged || others_answer).then(|| {
+        let heeding = heeding.clone();
+        let hook: crate::second_provider::Hearing = Arc::new(move |request, heard| {
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.hear(request, heard);
+            }
+        });
+        hook
+    })
+}
+
 /// What the bus and the thread say as a spoken turn is judged.
 pub(crate) struct Signs {
     pub room: crate::room_told::Room,
@@ -2754,6 +2785,8 @@ impl Heeding {
             policed: None,
             misheard_hum: false,
             cut_in: None,
+            others_answer: false,
+            began_over: None,
             voices: None,
         }
     }
@@ -2769,6 +2802,12 @@ impl Heeding {
     /// began with the lamp quiet, as on Live.
     pub(crate) fn hear(&mut self, request: u64, heard: crate::second_provider::Heard<'_>) {
         use crate::second_provider::Heard;
+        if let Heard::Began {
+            over_the_lamps_voice,
+        } = heard
+        {
+            self.began_over = over_the_lamps_voice.then_some(request);
+        }
         let Some(voices) = self.voices.as_mut() else {
             return;
         };
@@ -2867,6 +2906,12 @@ impl Heeding {
     pub(crate) fn asking_again(&mut self, misheard_hum: bool) {
         self.attention.ask_again_when_unclear(true);
         self.misheard_hum = misheard_hum;
+    }
+
+    /// Leave alone a reply that answers nothing the lamp asked, said over
+    /// its answer ([`crate::others_answer`], `LAMP_OTHERS_ANSWER=on`).
+    pub(crate) fn leaving_others_answers(&mut self) {
+        self.others_answer = true;
     }
 
     /// `request` ended as a cut-in over the lamp's answer: judged as one.
@@ -3386,6 +3431,18 @@ impl Heeding {
         let alone = attention.played_on_the_conversation_alone();
         if alone && lone_words(heard) {
             verdict = Some(crate::attention::Verdict::Hold(LONE_WORDS));
+        }
+        // A reply to nothing the lamp asked, said over its answer, is
+        // someone else's (#2136): "Yes, give me five minutes." to B, over
+        // the story A asked for. `alone` already means no name, no call, no
+        // face, and no question of the lamp's that it answers.
+        if self.others_answer
+            && alone
+            && !lamp_asked
+            && self.began_over == Some(request)
+            && crate::others_answer::begins_as_an_answer(heard)
+        {
+            verdict = Some(crate::attention::Verdict::Hold(crate::others_answer::HELD));
         }
         if busy && let Some(crate::attention::Verdict::Play(why)) = verdict {
             verdict = busy_bar(why, heard, lamp_asked)
@@ -6468,6 +6525,95 @@ mod tests {
             heeding.conversation_note_for(13),
             Some(super::CONVERSATION_ALONE)
         );
+    }
+
+    /// #2136 (the first builder at 11:29 and 11:37): A asked for a story by
+    /// name, and over it answered B, "Yes, give me five minutes." With the
+    /// switch, a reply begun over the lamp's answer, let out only as the
+    /// conversation going on and answering nothing the lamp asked, is held
+    /// as someone else's. Not without the switch, not when it began with the
+    /// lamp quiet, not when the lamp asked, not a line that isn't a reply,
+    /// and not one that calls the lamp.
+    #[test]
+    fn a_reply_to_nothing_the_lamp_asked_said_over_its_answer_is_someone_elses() {
+        use crate::second_provider::Heard;
+        let signs = |lamp_asked: bool| super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on: true,
+            lamp_asked,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let judged = |on: bool, over: bool, lamp_asked: bool, heard: &str| {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if on {
+                heeding.leaving_others_answers();
+            }
+            heeding.hear(
+                9,
+                Heard::Began {
+                    over_the_lamps_voice: over,
+                },
+            );
+            heeding.judge(9, line, heard, signs(lamp_asked))
+        };
+        let reply = "Yes, give me five minutes.";
+        assert_eq!(
+            judged(true, true, false, reply),
+            Some(crate::others_answer::HELD)
+        );
+        assert_eq!(judged(false, true, false, reply), None, "the switch off");
+        assert_eq!(
+            judged(true, false, false, reply),
+            None,
+            "begun with the lamp quiet"
+        );
+        assert_eq!(judged(true, true, true, reply), None, "the lamp asked");
+        assert_eq!(
+            judged(true, true, false, "Tell me more about the fox."),
+            None,
+            "not a reply"
+        );
+        assert_eq!(
+            judged(
+                true,
+                true,
+                false,
+                "Yes, Lamp, set a timer for five minutes."
+            ),
+            None,
+            "it calls the lamp"
+        );
+        // A correction or a question to the lamp, said over its answer by
+        // someone not facing it, goes on (the reviewer's P2 on #2175).
+        for heard in ["No, the fox one.", "Yes, but who was he?"] {
+            assert_eq!(judged(true, true, false, heard), None, "{heard}");
+        }
+    }
+
+    /// The reviewer's P3 on #2175: with the switch alone, no voice check,
+    /// the rule's hearing hook is installed, so the rule learns which line
+    /// began over the lamp's answer; with neither, there's none.
+    #[test]
+    fn the_hearing_hook_is_installed_with_the_switch_alone() {
+        use crate::second_provider::Heard;
+        use std::sync::{Arc, Mutex};
+        let heeding = Arc::new(Mutex::new(super::Heeding::new(false, false, None, None)));
+        assert!(super::hearing_hook(&heeding, false, false).is_none());
+        assert!(super::hearing_hook(&heeding, true, false).is_some());
+        let hook = super::hearing_hook(&heeding, false, true).expect("with the switch alone");
+        heeding.lock().unwrap().leaving_others_answers();
+        hook(
+            9,
+            Heard::Began {
+                over_the_lamps_voice: true,
+            },
+        );
+        assert_eq!(heeding.lock().unwrap().began_over, Some(9));
     }
 
     /// #1712: spoken turns are told how to take what they heard; the

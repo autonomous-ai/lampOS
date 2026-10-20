@@ -174,6 +174,10 @@ pub struct Files {
     /// second route's model (`--messages`, `LAMP_MESSAGES`,
     /// [`crate::messages`], #1673). Only the second route's worker answers.
     pub messages: bool,
+    /// Whether the second route's rule leaves alone a reply that answers
+    /// nothing the lamp asked, said over its answer (`--others-answer`,
+    /// `LAMP_OTHERS_ANSWER`, [`crate::others_answer`], #2136).
+    pub others_answer: bool,
     /// Whether an answer is played only when the lamp was spoken to
     /// (`--spoken-to`, #829).
     pub spoken_to: bool,
@@ -326,6 +330,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (misheard_hum, flags) = crate::misheard_hum::take(flags);
     let (holding_answer, flags) = crate::holding_answer::take(flags);
     let (messages, flags) = crate::messages::take(flags);
+    let (others_answer, flags) = crate::others_answer::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -373,6 +378,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         misheard_hum,
         holding_answer,
         messages,
+        others_answer,
     };
     Ok((continuation, sight, files, visual))
 }

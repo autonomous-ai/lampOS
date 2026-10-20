@@ -85,6 +85,8 @@ Environment=LAMP_SKILLS_DIR=/run/lampos-skills
 Environment=LAMP_TURN_END_PRIORITY=10
 Environment=LAMP_TURN_END_NO_SPIN=on
 Environment=LAMP_CUT_IN_TOLD=on
+# Someone else's answer left alone on the second route (#2136, the first builder at 11:37): a "yes" over the lamp's answer to nothing it asked.
+Environment=LAMP_OTHERS_ANSWER=on
 Environment=LAMP_TIME_PLACES=on
 Environment=LAMP_ROOM_FILE=/run/lampos-voice/room.json
 Environment=LAMP_FOLLOWS_RUN=on
