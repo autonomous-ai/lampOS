@@ -123,7 +123,7 @@ is the same light. Two differences from V1 the page should know:
   `device_id`, `mqtt_endpoint`, `mqtt_port`, `mqtt_username`,
   `mqtt_password`, `fa_channel`, `fd_channel` and `llm_base_url`, as the
   app's setup request sends them. Setup writes it (#1401, `setup.md`), and
-  `tests/setup.rs` reads the product's own setup settings and setup's own
+  `tests/it/setup.rs` reads the product's own setup settings and setup's own
   writer, so the unit's path and the fields can't drift from setup's. The
   voice's key stays in `/etc/lampOS/voice/credential`.
 - **The unit** (`deploy/product/lamp-cloud.service`) runs it as `lampos` and
@@ -288,7 +288,7 @@ list as names and `waiting` only, an empty one, and the eyes' error
 refused; a remove's name checked, and each forget answer said; memory's id
 the voice's, asked for the person and their rules, and `forgotten` only
 when both were done; both asked over the sockets, and nobody answering
-said. `tests/app_contract.rs` pins what the page reads of both (`memory`,
+said. `tests/it/app_contract.rs` pins what the page reads of both (`memory`,
 and `reason` with `kept`), in V1's envelope, and both refused without the
 switch. `online.rs`: only the lamp's own account channel commands it
 (`commanded`).
@@ -434,7 +434,7 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   | `lamp_state` | knows what the lamp itself is doing | — | any other topic (`voice/state`, `lamp/health`, …) |
   | `actions` | uses the lamp's own controls | — | `actions` not empty |
 
-`tests/skills_contract.rs` pins the reply's fields by name and type, in
+`tests/it/skills_contract.rs` pins the reply's fields by name and type, in
 V1's envelope through JSON, from `Real` over `lampOS/skills/`, and the
 refusal's exact words without the switch.
 
@@ -1018,7 +1018,7 @@ taken once across a restart, a new boot starting again); the drop-in's
 line; the lists against the product's units; `reports.get` and
 `reports.set` with and without the switch; and against the test broker, a
 report on `fd/…/report` with `info`'s id leaving the queue on the ack, and
-sent again after a dropped connection. `tests/report_contract.rs` pins the
+sent again after a dropped connection. `tests/it/report_contract.rs` pins the
 fields by name and type, the topic, and `sent_at` kept on a send again.
 One release forward (#2052): a choice it can't read (cut short, garbage,
 empty, no boolean `share`, spoiled while running) is off, kept whole and
@@ -1045,7 +1045,7 @@ folder beside it untouched; a link left as it is; a folder that can't be
 changed leaving the skill whole; no helper, or one answering nonsense,
 removing nothing; and off, `not on this lamp: skills.remove`. Each remove
 goes through the manage helper's own code on a real Unix socket on a short
-`/tmp` path. `tests/skills_contract.rs` pins the fields as sent, and
+`/tmp` path. `tests/it/skills_contract.rs` pins the fields as sent, and
 removes Desk tutor from a copy of `lampOS/skills/` through `Real`, the
 socket and the envelope.
 
@@ -1056,7 +1056,7 @@ the helper; the ack `starting` within 100 ms while a stand-in helper takes
 answers; through the test broker, `starting` then `success` on `fd_channel`;
 and `host.device_name` from the helper's file, the host's name without one.
 
-`tests/app_contract.rs` holds the fields the Autonomous app's device page
+`tests/it/app_contract.rs` holds the fields the Autonomous app's device page
 reads, by name and type (Fourth on #1396): `versions.firmware`,
 `network.private_ip` and `host.hostname` of `system.info`; `volume`, `raw`
 and `max_volume` of `volume.get` and `volume.set`; `muted`,

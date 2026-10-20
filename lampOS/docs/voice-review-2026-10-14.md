@@ -35,13 +35,13 @@ in a loop, or lose its link to the speech service.
 
 The tests are in four files, all named for this review:
 
-- `crates/gemini/tests/review_2026_10_14.rs`
+- `crates/gemini/tests/it/review_2026_10_14.rs`
 - `crates/voice/src/provider_worker/tests/review_2026_10_14.rs` (the
   provider worker's own loop against the scripted service; the one line
   `mod review_2026_10_14;` was added at the end of the worker's test
   module to reach it)
 - `crates/voice/tests/review_2026_10_14.rs`
-- `crates/name/tests/review_2026_10_14.rs`
+- `crates/name/tests/it/review_2026_10_14.rs`
 
 A test whose name begins `review_` shows a fault and fails today. It says
 what should happen, so it passes once the fault is mended. A test whose
@@ -53,7 +53,7 @@ name begins `review_sound_` is an edge that was tried and held; it passes.
 
 **Speaks when it should not.** Test:
 `review_a_note_for_a_request_given_up_is_not_carried_into_the_next_request`
-in `crates/gemini/tests/review_2026_10_14.rs`.
+in `crates/gemini/tests/it/review_2026_10_14.rs`.
 
 What happens:
 
@@ -170,7 +170,7 @@ request begins.
 
 **No effect on what the lamp does.** Test:
 `review_a_hearing_is_never_said_with_a_score_over_one` in
-`crates/name/tests/review_2026_10_14.rs`.
+`crates/name/tests/it/review_2026_10_14.rs`.
 
 `said.rs` holds the first score of a hearing to 1 and not the later ones.
 Nothing holds the model's output to 0..1 (`Hearer::load` checks only that

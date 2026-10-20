@@ -189,7 +189,7 @@ minutes." ([guard-mode.md](guard-mode.md), #1685).
 - `lamp_cloud::online::tests::a_slow_connack_is_waited_for_while_texts_are_taken`:
   a broker that answers CONNECT after 300 ms, six of the looks, is joined at
   the first try, and only once.
-- `crates/cloud/tests/texts.rs`, through `Real` on a bus of the test's own: a
+- `crates/cloud/tests/it/texts.rs`, through `Real` on a bus of the test's own: a
   text on `chat/in` and its answer from a stand-in voice back as V1's events;
   refused at once with nothing listening, and "not on this lamp" with the
   switch off; task news with no text asked first; a text on `chat/in`

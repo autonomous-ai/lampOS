@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn the_centre_of_gravity_is_v1s_on_the_motor_readings_v1_was_checked_on() {
-        // lamp-4ace at rest and standing, 14 October (crates/lean/tests/first_software.rs).
+        // lamp-4ace at rest and standing, 14 October (crates/lean/tests/it/first_software.rs).
         assert!((off_axis_mm([2023.0, 2052.0, 2047.0, 2053.0, 1950.0]) - 17.851).abs() < 0.03);
         assert!((off_axis_mm([2023.0, 2558.0, 2503.0, 2053.0, 1820.0]) - 1.553).abs() < 0.03);
         // Folded, it sits behind its axis; base yaw turns the lean, not how far back.

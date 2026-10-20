@@ -600,7 +600,7 @@ set"), `cancel_reminder` says to list without it, and a list asked
 are set (`lamp_actions::schedule::NOT_YET_DUE`). The count is best effort: a
 `Status` that can't be read leaves the list as it was. Test:
 `a_just_set_timer_is_listed_counted_beside_a_due_only_list_and_cancelled_for_good`
-(`crates/actions/tests/schedule.rs`, against the real Schedule service).
+(`crates/actions/tests/it/schedule.rs`, against the real Schedule service).
 Each listed item also says its `kind`, and `cancel_reminder` says to cancel
 only an item of the kind asked for, so "cancel my timer" with a reminder also
 due cancels only the timer. The list stays oldest first. Test:

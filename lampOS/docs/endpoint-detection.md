@@ -424,7 +424,7 @@ The fast model (`--fast`) also needs the pinned ONNX Runtime library beside
 the worker: `libonnxruntime.so.1.30.0` from Microsoft's
 `onnxruntime-linux-aarch64-1.30.0.tgz` (25,135,496 bytes, SHA-256
 `64e903a4…a4b`; on macOS `libonnxruntime.1.30.0.dylib` from the
-`osx-arm64` archive, for development). Its tests (`tests/fast.rs`) read it
+`osx-arm64` archive, for development). Its tests (`tests/it/fast.rs`) read it
 from `.cache/endpoint/` or `LAMP_ONNX_RUNTIME`:
 
 ```sh

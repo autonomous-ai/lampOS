@@ -14,7 +14,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const REFERENCE: &str = include_str!("fixtures/pipecat-reference.json");
+const REFERENCE: &str = include_str!("../fixtures/pipecat-reference.json");
 
 fn xorshift(seed: u32) -> impl FnMut() -> u32 {
     let mut state = seed;

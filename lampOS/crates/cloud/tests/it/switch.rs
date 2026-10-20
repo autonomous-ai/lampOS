@@ -10,8 +10,8 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 use std::time::{Duration, Instant};
 
 const BIN: &str = env!("CARGO_BIN_EXE_lamp-cloud");
-const UNIT: &str = include_str!("../../../deploy/product/lamp-cloud.service");
-const TMPFILES: &str = include_str!("../../../deploy/product/lampos.conf");
+const UNIT: &str = include_str!("../../../../deploy/product/lamp-cloud.service");
+const TMPFILES: &str = include_str!("../../../../deploy/product/lampos.conf");
 
 /// A `CREDENTIALS_DIRECTORY` as the unit's `LoadCredential=` makes it, with
 /// the broker at `port` on this host. No backend base, so no ping is made.
@@ -157,7 +157,7 @@ fn the_product_unit_is_on_and_stops_v1s_os_server_only_as_it_really_starts() {
 fn lamp_4aces_cloud_on_writes_the_units_whole_drop_in() {
     // lamp-4ace's own installer (#1420) writes its drop-in whole: the switch
     // and the conflict, as it did before the product's unit was on (#1815).
-    const CLOUD_ON: &str = include_str!("../../../deploy/lamp-4ace/cloud-on.sh");
+    const CLOUD_ON: &str = include_str!("../../../../deploy/lamp-4ace/cloud-on.sh");
     let line = CLOUD_ON
         .lines()
         .find(|line| line.contains("> '$DROPIN'"))

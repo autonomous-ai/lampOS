@@ -231,7 +231,7 @@ a lamp.
 
 Tests: Mood's breath begins at the plain phase, goes on at the pace, keeps
 its place at a bang, and a reader moving the last state on lands where Mood
-does (`crates/mood/tests/engine.rs`); with no breath the face is as before,
+does (`crates/mood/tests/it/engine.rs`); with no breath the face is as before,
 frame for frame; the ring breathes at the phase given, 11 to 12 breaths a
 minute at the plain pace, 14 to 15 at the quickest and 8 to 9 at the
 slowest; blinks follow the pace; the ring's reader takes the breath from

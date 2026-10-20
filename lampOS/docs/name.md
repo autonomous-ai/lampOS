@@ -205,7 +205,7 @@ to 75 °C overnight, past the 70 at which it slows itself (#705). With
   models say when they rest (`the_models_say_when_they_rest`). Starting
   one sample off the steps, one step late, or resting a step late each
   fails one of them. With the real models,
-  `tests/quiet_models.rs` (ignored; it needs `LAMP_NAME_MODELS` and
+  `tests/it/quiet_models.rs` (ignored; it needs `LAMP_NAME_MODELS` and
   `LAMP_NAME_SOUND`) gave the same score on every step worked out, to the
   bit, on a laptop on 18 Oct: 70 of 770 steps worked out on 30 s of hiss,
   a 3.6 s line and 30 s more; 578 of 639 on four speech files between
@@ -343,7 +343,7 @@ With it the lamp's health has six parts reporting.
 - **Its own tests are small**: the rule for a hearing (five), the options
   and the report (four), resting (six), not its own voice (five), and two
   from the review of 14 October. The models are not in the repository, so no test here runs
-  them unless they are given (`tests/quiet_models.rs`, ignored);
+  them unless they are given (`tests/it/quiet_models.rs`, ignored);
   `lamp-name check` and the measurement above are what exercises them.
 - **The classifier's training** is outside the repository and was one
   afternoon's work on generated speech. A version trained with similar
