@@ -23,6 +23,7 @@ lamp-keeper health
 lamp-keeper prepare
 lamp-keeper start|stop|restart PART|lamp
 lamp-keeper pause|resume
+lamp-keeper restart-asked
 
 serve watches lamp/health on the bus (LAMP_BUS_ROOT, or /run/lampos-bus).
 Without --act it only says, in its journal, which part it would restart.
@@ -56,6 +57,11 @@ pause says on lamp/pause that the lamp is paused: each part that honours it
 does no new work and holds what it has (the body rests); resume undoes it.
 stop lamp pauses first, waits up to 45 s for the voice to say it is
 resting, stops lampos.target, and then clears the pause.
+restart-asked reads one request on standard input (lamp-cloud's, on
+lamp-keeper-restart.socket) and answers on standard output: refused while
+lamp-update holds its lock (an update installs); else answered, and then,
+holding that lock, lampos.target is restarted as stop lamp stops it.
+Never the machine.
 With --setup-marker, a lamp whose marker does not exist yet (not set up for
 a home) starts only lamp-setup.service, not lampos.target, and is not ready;
 serve starts lampos.target once the marker appears. Installed by the
@@ -79,7 +85,8 @@ fn main() -> ExitCode {
         ["prepare"] => prepare(),
         ["pause"] => say_pause(true),
         ["resume"] => say_pause(false),
-        ["stop", "lamp"] => stop_lamp(),
+        ["stop", "lamp"] => quietly("stop"),
+        ["restart-asked"] => restart_asked(),
         [verb @ ("start" | "stop" | "restart"), part] if units::is_part_name(part) => {
             match Systemctl.command(verb, &units::unit_of(part)) {
                 Ok(()) => ExitCode::SUCCESS,
@@ -160,19 +167,43 @@ fn publish_pause(bus: &Bus, paused: bool) -> std::io::Result<()> {
 /// (docs/surround.md, "the owner protocol").
 const QUIET: Duration = Duration::from_secs(45);
 
-/// Pause, wait for the voice to rest, stop the lamp, clear the pause: a
-/// stop that cuts nobody off.
-fn stop_lamp() -> ExitCode {
+/// How long the asker is given to pass the answer on before the lamp is
+/// paused: lamp-cloud's reply to the app leaves before it is stopped.
+const ANSWERED: Duration = Duration::from_secs(3);
+
+/// `lamp-keeper restart-asked` (#2193): one request from lamp-cloud on
+/// standard input, the answer on standard output, then the restart. The
+/// update's lock is held to the end, so no update starts under it.
+fn restart_asked() -> ExitCode {
+    use std::io::{BufRead, Read, Write};
+    let mut line = String::new();
+    let _ = std::io::BufReader::new(std::io::stdin().take(4_096)).read_line(&mut line);
+    let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
+    // The lock is held to the end, so no update starts under the restart.
+    let (reply, lock) = lamp_keeper::restart::asked(&line, &records);
+    let mut out = std::io::stdout();
+    let _ = writeln!(out, "{reply}").and_then(|()| out.flush());
+    eprintln!("lamp-keeper: restart asked: {reply}");
+    let Some(_lock) = lock else {
+        return ExitCode::SUCCESS;
+    };
+    thread::sleep(ANSWERED);
+    quietly("restart")
+}
+
+/// Pause, wait for the voice to rest, stop or restart the lamp, clear the
+/// pause: one that cuts nobody off.
+fn quietly(verb: &str) -> ExitCode {
     let bus = Bus::from_environment().ok();
     if let Some(bus) = &bus {
         if let Err(why) = publish_pause(bus, true) {
             eprintln!("lamp-keeper: lamp/pause: {why}");
         }
         if !wait_until(QUIET, Duration::from_millis(500), || voice_resting(bus)) {
-            eprintln!("lamp-keeper: the voice did not rest within 45 s; stopping all the same");
+            eprintln!("lamp-keeper: the voice did not rest within 45 s; {verb} all the same");
         }
     }
-    let stopped = Systemctl.command("stop", units::LAMP);
+    let stopped = Systemctl.command(verb, units::LAMP);
     // A pause left kept would hold the lamp paused when it is next started.
     if let Some(bus) = &bus {
         let _ = publish_pause(bus, false);
@@ -180,7 +211,7 @@ fn stop_lamp() -> ExitCode {
     match stopped {
         Ok(()) => ExitCode::SUCCESS,
         Err(why) => {
-            eprintln!("lamp-keeper: stop lamp: {why}");
+            eprintln!("lamp-keeper: {verb} lamp: {why}");
             ExitCode::FAILURE
         }
     }

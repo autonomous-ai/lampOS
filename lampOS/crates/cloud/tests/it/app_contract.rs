@@ -167,6 +167,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         faces: None,
         schedule: None,
         update_page: false,
+        restart: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -268,6 +269,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         }),
         schedule: None,
         update_page: false,
+        restart: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -399,6 +401,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         faces: None,
         schedule: Some(lamp_actions::schedule::Adapter::new(socket.clone()).unwrap()),
         update_page: false,
+        restart: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -486,6 +489,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         faces: None,
         schedule: None,
         update_page: true,
+        restart: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -554,5 +558,95 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
     // Without the switch the kind is not here.
     real.update_page = false;
     assert!(answer(&mut real, "update.status", &json!({})).is_err());
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// A stand-in keeper on its restart socket: each request answered with the
+/// keeper's own [`lamp_keeper::restart::answer`], under an update or not, in
+/// turn; the lines it was sent are handed back.
+fn keeper(socket: &std::path::Path, installing: Vec<bool>) -> std::thread::JoinHandle<Vec<String>> {
+    let listener = UnixListener::bind(socket).unwrap();
+    std::thread::spawn(move || {
+        let mut asked = Vec::new();
+        for installing in installing {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            let update = if installing {
+                Err(lamp_keeper::restart::INSTALLING.to_owned())
+            } else {
+                Ok(())
+            };
+            let (reply, _) = lamp_keeper::restart::answer(&line, update);
+            stream.write_all(format!("{reply}\n").as_bytes()).unwrap();
+            asked.push(line.trim().to_owned());
+        }
+        asked
+    })
+}
+
+/// `system.reboot` (#2193, Mobile's restart button): lamp-cloud asks the
+/// keeper and answers with what it said, before the lamp goes down; under
+/// an update it is refused in plain words. Without the switch it is a kind
+/// this lamp lacks.
+#[test]
+fn a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_update() {
+    let root = PathBuf::from(format!("/tmp/lcr-{}", std::process::id()));
+    let places = lamp(&root);
+    let socket = root.join("restart.sock");
+    let serving = keeper(&socket, vec![false, true]);
+    let mut real = Real {
+        places,
+        bus: None,
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
+        update_page: false,
+        restart: Some(socket),
+    };
+    let me = Identity {
+        device: "lamp".into(),
+        id: "d-42".into(),
+        ..Identity::default()
+    };
+    let said = |real: &mut Real| {
+        let result = answer(real, "system.reboot", &Value::Null);
+        let sent = me
+            .data("2026-10-20T10:00:00Z", "system.reboot", &result)
+            .to_string();
+        serde_json::from_str::<Value>(&sent).unwrap()
+    };
+    let reply = said(&mut real);
+    assert_eq!(reply["status"], "success", "{reply}");
+    assert_eq!(reply["data"]["restarting"], true, "{reply}");
+    let reply = said(&mut real);
+    assert_eq!(reply["status"], "failure", "{reply}");
+    assert!(
+        reply.to_string().contains(lamp_keeper::restart::INSTALLING),
+        "{reply}"
+    );
+    assert_eq!(
+        serving.join().unwrap(),
+        [lamp_keeper::restart::REQUEST, lamp_keeper::restart::REQUEST]
+    );
+    // Off: no keeper asked.
+    real.restart = None;
+    let reply = said(&mut real);
+    assert_eq!(reply["status"], "failure", "{reply}");
+    assert!(
+        reply
+            .to_string()
+            .contains("not on this lamp: system.reboot")
+    );
     let _ = std::fs::remove_dir_all(root);
 }

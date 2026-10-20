@@ -97,8 +97,9 @@ lamp says so.
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `keys.set` (`{"service": "deepseek" \| "deepgram", "key", "base_url"?, "request_id"?}`), `keys.remove` (`{"service", "request_id"?}`), `keys.get` (`{"request_id"?}`) | with `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` (#2094, [own-keys.md](own-keys.md), the contract on #2094 at 11:13 and its additions after): `starting` at once (with `data.request_id`), then `success` with `{"service", "uses": "own", "code": "works", "answer"}` (the answer names where the person's data goes), `{"service", "uses": "lamp"}` or `{"deepseek": "own" \| "lamp", "deepgram": …, "since": {"deepseek", "deepgram"}, "deepseek_host"}`, or `failure` with `error` and `data.code`: `refused`, `unreached`, `not_kept`, `bad_field`, `busy`, `not_allowed` or `unavailable`. `request_id` is said back on every reply. The key is in no reply. Without the switch, V1's "not on this lamp" at once |
+| `system.reboot` | with `LAMP_APP_RESTART=on` (#2193, "A restart from the app" below): asked of the keeper, never done by `lamp-cloud`; `success` with `{"restarting": true}` once the keeper has taken it, before the lamp goes down, or `failure` with the keeper's reason ("an update is being installed: try again once it is done"). The lamp's parts restart (`lampos.target`), not the machine. Without the switch, V1's "not on this lamp" |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
-| anything else (`add_channel`, the other `skills.*`, `face.*`, `tts.*`, the other `led.*`, `system.reboot`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
+| anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
 ### The light: V1's colours on this lamp's
 
@@ -168,6 +169,24 @@ is the same light. Two differences from V1 the page should know:
   the person's later choice on them) and removes
   `/etc/lampOS/setup/backend.json` and `/etc/lampOS/setup/reports.json`
   with the rest of the person's data.
+
+## A restart from the app (#2193, `system.reboot`)
+
+Off unless `LAMP_APP_RESTART=on`. `lamp-cloud` restarts nothing itself: it
+sends the keeper's one request, `{"restart":"lamp"}`, on
+`/run/lampos-keeper-restart/restart.sock` (`lamp-keeper-restart.socket`,
+root's, group `lampos`) and waits at most 2 s for its one line back, as for
+the eyes' answer to a photo. The keeper (`lamp-keeper restart-asked`,
+[keeper.md](keeper.md), "A restart asked from the app") refuses while an
+update installs, and otherwise answers first and restarts `lampos.target`
+3 s later, once the voice is quiet, so the app's `success` leaves before
+`lamp-cloud` is stopped with the rest of the lamp. A keeper not there is
+"the lamp's keeper is not running". Pinned in `tests/app_contract.rs`, with
+a stand-in keeper that answers with the keeper's own code.
+
+Whether the app's "restart" should reboot the machine, as V1's does, is
+the first builder's answer on #2193; until then it restarts the lamp's
+parts.
 
 ## A face from the app's photo (#1968, `faces.add_photo`)
 

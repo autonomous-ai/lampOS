@@ -114,6 +114,13 @@ pub trait Lamp {
     fn update_status(&self) -> Option<lamp_bus::Message> {
         None
     }
+
+    /// Asks the keeper to restart the lamp (`system.reboot`, #2193): its
+    /// answer, given before the lamp goes down, or why not. Only with
+    /// `LAMP_APP_RESTART=on`.
+    fn restart(&mut self) -> Result<Value, String> {
+        Err(not_here("system.reboot"))
+    }
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -267,6 +274,9 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // The lamp's software update, for the app's Lamp 2 page (#2194):
         // only with `LAMP_APP_UPDATE=on`.
         "update.status" if lamp.update_page() => crate::update::status(lamp.update_status()),
+        // A restart from the app (#2193): asked of the keeper, never done
+        // here; the keeper answers first and refuses under an update.
+        "system.reboot" => lamp.restart().map(Some),
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).

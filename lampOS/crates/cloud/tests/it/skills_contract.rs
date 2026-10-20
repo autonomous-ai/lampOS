@@ -73,6 +73,7 @@ fn real(skills: Option<skills::Places>) -> Real {
         faces: None,
         schedule: None,
         update_page: false,
+        restart: None,
     }
 }
 

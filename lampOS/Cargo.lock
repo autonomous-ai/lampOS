@@ -1777,6 +1777,7 @@ dependencies = [
  "lamp-actions",
  "lamp-bus",
  "lamp-ipc",
+ "lamp-keeper",
  "lamp-msgs",
  "lamp-schedule",
  "lamp-setup",
