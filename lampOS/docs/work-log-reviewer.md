@@ -4,6 +4,31 @@
 
 Newest first. Times from `date` (+07).
 
+- 18:10 2283 (#2268 refiled): P2 fixed; new P2 (flaky test shares the global thread, 5 of 12 runs); first builder's
+- 18:13 2267 (merged) post-merge note: no P1/P2, one P3
+- 18:13 2289 ring lease reader resync: no P1/P2, one P3; first builder's
+- 18:27 Merged #2261 (reach-idle probe) as `18ac703d0` on green; rule-8 P3 for a follow-up
+- 18:30 2289 P3 in (test pins the datagram count); first builder's
+- 18:32 2291 (#2283 refiled): steady (12 of 12); first builder's
+- 18:33 2262 P2 and P3 2 fixed; fold to one commit, then mine on green
+- 18:35 2266 (row 3) look note chain: no P1/P2, one P3 (hand stop untested); first builder's after #2218
+- 21:03 Merged #2157 (Bedtime and Morning, disabled core skill) as `c4fd23ac2` on green, the lead's word
+- 21:07 2280 (row 3) search walks on: no P1/P2, two P3s; first builder's after #2266
+- 21:21 2295 second route playout start: no P1/P2, one P3; first builder's
+- 21:23 2297 second route reads who work goes to: no P1/P2; order note with #2294; first builder's
+- 21:25 2293 (merged) post-merge note: agree with Reviewer-lead; P3 (one journal line per skipped renewal)
+- 21:29 2294 fifth landing merge: correct, both sides kept, nothing reverted; first builder's
+- 21:34 2310 music sway test cases: no finding; first builder's
+- 21:36 2278 docs P2 and P3s in; mine on green
+- 21:36 Merged #2262 (look_for found, row 3 step 3) as `e47530a63` on green
+- 21:39 2301 going on not own: P2 (lamp's own lines open no window), beside Fourth's P2; needs a rebase; first builder's
+- 21:40 2306 seems log: agree with Reviewer-lead; two more P3s (reset doesn't wipe the log; logs every face); first builder's
+- 21:44 #2302 read: no finding, closes my #2233 P3; first builder's (onto #1712)
+- 21:46 #2266 at a5aaef234: my P3 closed (hand-stop test), first builder's after #2218
+- 21:46 #2306 at 3c5efeaa1: lead's seven folded, my two P3s (reset, every face) still open; first builder's
+- 21:48 #2305 first read: agree Fourth P2, two P3s (home follow-ups held; copied rule); first builder's; gate to add
+- 21:48 #2307 first read: three P3s (stopped-by-hand told finished; 7 s on every written turn; 8 s bound unnamed); mine on gate
+- 21:49 #2308 first read: #2242 P2 closed both ways; new P2 (with words any talk ends the own line), three P3s; first builder's
 - 18:09 Merged #2286 (row 35 test) as `c31232976` on green
 - 18:07 2260 probe ends on own pull, idle self-test fails a faulty head: no P1/P2; first builder's after the stack
 - 18:05 2282 recall v2: no P1/P2, two P3s; first builder's
