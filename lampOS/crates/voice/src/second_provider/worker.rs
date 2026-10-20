@@ -1281,6 +1281,19 @@ fn with_place(time: Option<String>, place: Option<String>) -> Option<String> {
     }
 }
 
+/// Who work can go to, read from the tasks part as the Live route reads
+/// them (`provider_worker`, `agent_tasks::start`; #1722). Without it, on
+/// lamp-4ace on 20 Oct with two targets (claude and codex) and
+/// `LAMP_TASKS_WHO=on`, this route never read them: `start_agent_task` had
+/// no `who`, "Ask codex to write a haiku about coffee." went to the target
+/// the voice was given, as Claude Code, and the journal had no "work can go
+/// to" line.
+fn start_tasks(tools: &crate::tools::Settings) {
+    if let Some(place) = &tools.tasks {
+        crate::agent_tasks::start(place);
+    }
+}
+
 /// The second route's worker process until Stop. `files` are the Live
 /// provider worker's flags; this route uses the thread's file and the
 /// tools (the memory among them), and has no use yet for the rest. With
@@ -1319,6 +1332,7 @@ pub fn serve(
     crate::second_provider::net::key_terms::start_from_environment(files.tools.tasks.is_some());
     let checked = checks_sounds(&files);
     let tools = files.tools;
+    start_tasks(&tools);
     // As the Live route says them, when this route is the only voice.
     let reminders = route.only_voice && tools.schedule_speak;
     if reminders {
@@ -5410,6 +5424,99 @@ mod tests {
             lamp: "Hello.".into(),
         });
         assert_eq!(spoken, [Message::user("Hi."), Message::assistant("Hello.")]);
+    }
+
+    /// #1722: this route reads who work can go to as the Live route does,
+    /// so `start_agent_task` offers `who` for the tasks part's targets and
+    /// "ask Codex" goes to Codex. Before they are read, the work goes to
+    /// `LAMP_TASKS_TARGET`, as before.
+    #[test]
+    fn the_second_worker_reads_who_work_can_go_to_as_live_does() {
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _staff = crate::agent_tasks::tests::STAFF_HELD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory = std::env::temp_dir().join(format!("second-staff-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = crate::agent_tasks::tests::tasks_part(
+            &directory,
+            vec![(
+                "request.sock",
+                serde_json::json!({"ok":true,"targets":[{"alias":"office-claude","engine":"claude"},{"alias":"office-codex","engine":"codex"}]}),
+            )],
+        );
+        let flags = strings(&[
+            crate::agent_tasks::FLAG,
+            directory.to_str().unwrap(),
+            crate::agent_tasks::TARGET_FLAG,
+            "office-claude",
+            crate::agent_tasks::WHO_FLAG,
+        ]);
+        let place = crate::agent_tasks::take(&flags).unwrap().0.unwrap();
+        // Where "ask Codex" is prepared, through a tasks part of its own.
+        let prepared_for = |tag: &str| -> serde_json::Value {
+            let at =
+                std::env::temp_dir().join(format!("second-staff-{tag}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&at);
+            std::fs::create_dir_all(&at).unwrap();
+            let sent = crate::agent_tasks::tests::tasks_part(
+                &at,
+                vec![
+                    (
+                        "request.sock",
+                        serde_json::json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}}),
+                    ),
+                    (
+                        "request.sock",
+                        serde_json::json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+                    ),
+                ],
+            );
+            let here = crate::agent_tasks::Place {
+                directory: at.clone(),
+                ..place.clone()
+            };
+            let call = lamp_gemini::ToolCall {
+                id: "c".into(),
+                name: crate::agent_tasks::START.into(),
+                args: serde_json::json!({"task":"Write a haiku about coffee","who":"Codex"}),
+            };
+            let (told, _) =
+                crate::agent_tasks::run(&here, &call, 3, true, std::time::Duration::from_secs(5));
+            assert_eq!(told["prepared"], true, "{told}");
+            let wait = std::time::Duration::from_secs(5);
+            // The status first, then the preparation.
+            sent.recv_timeout(wait).unwrap();
+            let target = sent.recv_timeout(wait).unwrap()["target"].clone();
+            let _ = std::fs::remove_dir_all(&at);
+            target
+        };
+        let before = crate::agent_tasks::tools(&place);
+        assert!(before[0].parameters.as_ref().unwrap()["properties"]["who"].is_null());
+        // No staff read: the target the voice was given, as before.
+        assert_eq!(prepared_for("unread"), "office-claude");
+        start_tasks(&crate::tools::Settings {
+            tasks: Some(place.clone()),
+            ..crate::tools::Settings::default()
+        });
+        assert_eq!(
+            seen.recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap(),
+            serde_json::json!({"op":"targets"})
+        );
+        let told = crate::agent_tasks::tools(&place);
+        let codex = prepared_for("read");
+        crate::agent_tasks::tests::forget_staff();
+        let _ = std::fs::remove_dir_all(&directory);
+        assert_eq!(
+            told[0].parameters.as_ref().unwrap()["properties"]["who"]["enum"],
+            serde_json::json!(["Claude Code", "Codex"])
+        );
+        // Two targets read: "ask Codex" goes to Codex.
+        assert_eq!(codex, "office-codex");
     }
 
     /// Tests' map on #1712 (20:11), (2): the task switches

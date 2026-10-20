@@ -1895,6 +1895,39 @@ before it binds a task, is not seen: a receipt that does not leaves the task
   `check_agent_task` name it from the task's engine (`task_news::who`, now
   with OpenCode).
 
+**Read on the second route too, and only the one named (#1722).** On
+lamp-4ace on 2026-10-20 (17:1x) "Ask codex to write a haiku about coffee."
+was heard right and the lamp said "handing that to Claude Code". Its
+`targets.json` had two targets (claude and codex), with `LAMP_TASKS_WHO=on`,
+but the journal had no "work can go to" line: only the Live worker read the
+staff (`agent_tasks::start`), and the second worker never did. So
+`start_agent_task` had no `who`, and all work went to `LAMP_TASKS_TARGET`
+as Claude Code. The second worker now reads them as the Live worker does,
+with `LAMP_TASKS_WHO=on` (`second_provider::worker::start_tasks`).
+
+With one target, `start_agent_task` still had no `who`, its description
+named only that agent, the staff's note matched only the staff, and the
+voice sent any call to the one there was. Off unless
+`LAMP_TASKS_NAMED_ONLY=on` (the provider worker's `--tasks-named-only`,
+after `--tasks-make-skill`, and only with `--tasks-who`). With it, once the
+staff are read:
+
+- `who` is offered even with one of the staff, as an enum of every agent the
+  voice knows (Claude Code, Codex, OpenCode), and its description
+  says who is set up: "Set up on this lamp: Claude Code, and nobody else. If
+  they named another of these, give that name: you will be told it isn't
+  set up, and nothing goes to anyone else."
+- a name that is one of those agents' close forms and not among the staff
+  prepares nothing and asks nothing of the tasks part; the model is told
+  "Nothing was handed over: Codex isn't set up on this lamp. Say so plainly
+  in a few words ("Codex isn't set up on this lamp."), and do not give the
+  work to anyone else unless the person asks you to."
+- the staff's note (`LAMP_STAFF_NOTE`) matches any agent the voice knows, so
+  "ask Codex" is noted as a hand-over where only Claude Code is set up.
+- nobody named is the default, as before; one of the staff named gets it.
+
+Not run on a lamp yet.
+
 **Without the switch, nothing changes.** Tests show that with it off, or on
 with the staff not yet read, or on with one target `office` for Claude Code,
 the three functions declared are exactly the ones before (compared with a

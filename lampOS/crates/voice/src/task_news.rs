@@ -2399,6 +2399,7 @@ mod tests {
             needs: None,
             staff_note: false,
             make_skill: true,
+            named_only: false,
         };
         let kept = read(&on);
         assert!(kept.contains(crate::made_skill::NEEDS_A_YES), "{kept}");
