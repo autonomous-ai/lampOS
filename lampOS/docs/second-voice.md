@@ -580,6 +580,33 @@ order is kept. A written turn is the same from the chat on.
 
   The cost is one idle socket to the relay's proxy during a conversation:
   Deepgram bills the audio sent, and `KeepAlive` sends none.
+- **With `LAMP_SECOND_EARLY_FINALIZE=on` a line's words are asked for at a
+  pause** (off unless set; the first builder on #1722, 20 Oct 07:20 and
+  07:36). On lamp-4ace Deepgram never ends a line itself: the lamp's quiet
+  tail (its noise floor, the canceller's residue) isn't silence to its
+  `endpointing=300`, so every line's end sent `Finalize` and waited
+  270–300 ms, and the early words were a stale interim. With the switch:
+  - **the coordinator's own quiet count** (`TurnDetector::pause_blocks`, no
+    second detector) at 150 ms of a pause, once a pause and only after
+    300 ms of speech since the last ask, so a halting speaker doesn't cut
+    the service's segments every word, sends `ProviderInput::Paused`
+    (`coordinator/early_finalize.rs`);
+  - **the second route asks for the words so far** (`Listener::flush`,
+    `SttStream::paused`, a `Finalize` with the stream kept open). Speech
+    that goes on comes as new finals, appended in order;
+  - **at the line's end**, if that answer came, its finals cover the
+    line's sound (`covers_the_sound`, the rest quiet) and no block since
+    the pause's `Finalize` was over the absolute floor (`SOUND_FLOOR_RMS`:
+    a soft last word, however far under the line's peak, is kept, Jarvis on
+    #2102), they are the line's words at once, with no second `Finalize`
+    (`words from=flush` in the journal's end line). Otherwise the end asks
+    as before. Such a line gives `LAMP_SECOND_PREPARED` no early words, so
+    no chat is begun early on it: its words come at once anyway, and an
+    A/B's "0 early rounds" on those lines isn't a fault;
+  - **not on Flux**, whose flush would end its turn (`ForceEndTurn`) and
+    which ends its turns itself; **not the stop words' stream**, which
+    never takes a pause's answer as its end. The Live worker takes nothing
+    from `Paused`.
 - **With `LAMP_SECOND_PREPARED=on` the chat is begun on the line's early
   words** (off unless set; #1712, the first builder at 17:02: the route's
   first word came about 3.4 s after a line, Live's 2.4 s, and the bar is

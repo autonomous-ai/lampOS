@@ -437,6 +437,10 @@ impl FixtureProvider {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::Paused {
+                request,
+                privacy_generation,
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,
@@ -534,7 +538,7 @@ impl FixtureProvider {
                 // The fixture needs protocol continuity, not retained microphone PCM.
             }
             // A note beside the request: the fixture has no model to tell.
-            ProviderInput::Called { .. } => {}
+            ProviderInput::Called { .. } | ProviderInput::Paused { .. } => {}
             ProviderInput::End { .. } => {
                 let input = self
                     .input

@@ -632,10 +632,18 @@ fn soft(mut clip: Vec<i16>) -> Vec<i16> {
     clip
 }
 
+/// What a line's task is given while the line goes on: its sound, or that
+/// it has gone quiet for a moment (`ProviderInput::Paused`,
+/// `LAMP_SECOND_EARLY_FINALIZE`).
+enum LinePart {
+    Sound(Vec<i16>),
+    Pause,
+}
+
 struct Turn {
     request: u64,
     /// Open until the request's End; `None` after it.
-    audio: Option<mpsc::Sender<Vec<i16>>>,
+    audio: Option<mpsc::Sender<LinePart>>,
     /// The End came marked as a short sound let through; set before the
     /// audio queue closes, read by the turn's task after.
     sound: Arc<AtomicBool>,
@@ -1496,7 +1504,8 @@ impl Engine {
                                 kept.request,
                                 kept.samples.len() / 16
                             );
-                            let _ = audio.try_send(kept.samples.iter().copied().collect());
+                            let _ = audio
+                                .try_send(LinePart::Sound(kept.samples.iter().copied().collect()));
                         }
                         // The line began with the sound carried: the name
                         // heard in it is this line's.
@@ -1573,7 +1582,7 @@ impl Engine {
                     let over = kept.samples.len().saturating_sub(KEPT_SAMPLES);
                     kept.samples.drain(..over);
                 }
-                match audio.try_send(samples) {
+                match audio.try_send(LinePart::Sound(samples)) {
                     Ok(()) => {}
                     // The task already failed the turn itself.
                     Err(mpsc::error::TrySendError::Closed(_)) => turn.audio = None,
@@ -1585,6 +1594,19 @@ impl Engine {
                             reason: Fault::Local,
                         });
                     }
+                }
+            }
+            // The line has gone quiet for a moment: its words so far are
+            // asked for, the stream kept open (`LAMP_SECOND_EARLY_FINALIZE`).
+            // A pause that can't be queued only loses the time it saves.
+            ProviderInput::Paused { request, .. } => {
+                if let Some(audio) = self
+                    .turn
+                    .as_ref()
+                    .filter(|turn| turn.request == request)
+                    .and_then(|turn| turn.audio.as_ref())
+                {
+                    let _ = audio.try_send(LinePart::Pause);
                 }
             }
             // Only the lamp's name: told with the line's words, as Gemini's
@@ -2008,7 +2030,7 @@ impl Shared {
 async fn spoken(
     shared: Arc<Shared>,
     context: (u64, Option<crate::memory_scope::ScopeLease>, Arc<Marks>),
-    mut heard: mpsc::Receiver<Vec<i16>>,
+    mut heard: mpsc::Receiver<LinePart>,
     checked: Option<Arc<AtomicBool>>,
     said: Arc<Mutex<(u64, u64)>>,
     before: Option<String>,
@@ -2094,13 +2116,21 @@ async fn spoken(
     let mut prepared: Option<Prepared> = None;
     loop {
         tokio::select! {
-            samples = heard.recv() => {
-                let Some(samples) = samples else { break };
-                if let Err(error) = listener.send(&samples) {
-                    shared.stages(request, &Times::new(begun)).await;
-                    return shared.fail(request, FailedStage::InputOpen, &error).await;
+            part = heard.recv() => match part {
+                None => break,
+                Some(LinePart::Sound(samples)) => {
+                    if let Err(error) = listener.send(&samples) {
+                        shared.stages(request, &Times::new(begun)).await;
+                        return shared.fail(request, FailedStage::InputOpen, &error).await;
+                    }
                 }
-            }
+                // Only time is lost if it can't go: the End asks anyway.
+                Some(LinePart::Pause) => {
+                    if listener.flush().is_ok() {
+                        eprintln!("lamp-voice second: request {request}: a pause: its words so far are asked for");
+                    }
+                }
+            },
             Some(said) = next_early(&mut early) => {
                 prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, &cut_in);
             }

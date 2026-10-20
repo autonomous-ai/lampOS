@@ -1039,7 +1039,8 @@ impl Peers {
                 Ok(Some(
                     ProviderInput::Audio { .. }
                     | ProviderInput::Written { .. }
-                    | ProviderInput::Called { .. },
+                    | ProviderInput::Called { .. }
+                    | ProviderInput::Paused { .. },
                 )) => {}
                 Ok(Some(ProviderInput::Reminder { .. })) => {
                     panic!("reminders are disabled in this fixture")
@@ -1426,6 +1427,7 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
         early_end_blocks: None,
+        early_finalize: false,
         faint_level: None,
         speaker: spawn("speaker"),
         capture: spawn("capture"),

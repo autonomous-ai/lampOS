@@ -161,6 +161,10 @@ impl Gate {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::Paused {
+                request,
+                privacy_generation,
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,
