@@ -383,9 +383,13 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   `Channel::receive_renewed`: a renewal stale by its age alone, with the next
   renewal in order queued right behind it, is passed over, since that one
   carries the authority now, and at most it costs the gap a lapse costs
-  (#1178). The next is judged by the channel's own rules in turn, and the
-  pass is said (`a renewal … us old (bound … us) passed over: the next
-  renewal is behind it`). A stale renewal alone or followed by any other
+  (#1178). The next is judged by the channel's own rules in turn. The first
+  pass of a run is said (`a renewal … us old (bound … us) passed over: the
+  next renewal is behind it`), and the run as it ends, with its count and
+  its oldest, as for late messages (`on time again after 2 renewals passed
+  over, the oldest … us`), not a line a renewal. A renewal stamped after the
+  reading is not stale by its age: it is refused as before, its channel
+  named. A stale renewal alone or followed by any other
   message, a stale message of any other kind (a `ConnectReference`, a
   `Stop`), and reordered and wrong-boot messages still end the worker, since
   those carry state a skip would lose (the first builder on #1722, 20 Oct
