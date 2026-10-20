@@ -123,14 +123,7 @@ pub(crate) fn request(
             }),
         },
         TtsProvider::ElevenLabs => {
-            let voice = voice.unwrap_or(ELEVENLABS_VOICES[0].0);
-            let id = ELEVENLABS_VOICES
-                .iter()
-                .find(|(name, _)| *name == voice)
-                .map_or(voice, |(_, id)| id);
-            if !id.chars().all(|c| c.is_ascii_alphanumeric()) {
-                return Err(Error::Url);
-            }
+            let id = elevenlabs_voice(voice)?;
             Request {
                 url: format!("{base}/text-to-speech/{id}/stream?output_format=pcm_24000"),
                 header,
@@ -146,6 +139,117 @@ pub(crate) fn request(
         }
     };
     Ok(Some(request))
+}
+
+/// The ElevenLabs voice id for `voice`: one of V1's names, or an id as
+/// given; the first of V1's when unset.
+fn elevenlabs_voice(voice: Option<&str>) -> Result<&str> {
+    let voice = voice.unwrap_or(ELEVENLABS_VOICES[0].0);
+    let id = ELEVENLABS_VOICES
+        .iter()
+        .find(|(name, _)| *name == voice)
+        .map_or(voice, |(_, id)| id);
+    if !id.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return Err(Error::Url);
+    }
+    Ok(id)
+}
+
+/// A speech socket's request: ElevenLabs' `stream-input`, where text goes in
+/// as it comes and audio comes back as it is made, so the socket can be
+/// opened before the answer's first piece exists (#2135's row; the first
+/// builder on #1722, 20 Oct 10:37). Through the Autonomous proxy it is under
+/// `/ws/`, with the key as a bearer (the backend on #1934, 10:05); on
+/// ElevenLabs' own API, with `xi-api-key`. Its URL, key header and value.
+#[derive(Debug, PartialEq)]
+pub(crate) struct SocketRequest {
+    pub url: String,
+    pub header: &'static str,
+    pub value: String,
+}
+
+pub(crate) fn socket_request(
+    base_url: &str,
+    key: &str,
+    voice: Option<&str>,
+    model: Option<&str>,
+) -> Result<SocketRequest> {
+    let model = model.unwrap_or(ELEVENLABS_MODEL);
+    if model.is_empty()
+        || !model
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    {
+        return Err(Error::Url);
+    }
+    let id = elevenlabs_voice(voice)?;
+    let base = openai_base(base_url);
+    reqwest::Url::parse(&base).map_err(|_| Error::Url)?;
+    let (root, header, value) = if on_elevenlabs(&base) {
+        (base, "xi-api-key", key.to_owned())
+    } else {
+        (
+            format!("{base}/ws/elevenlabs"),
+            "authorization",
+            format!("Bearer {key}"),
+        )
+    };
+    let Some(root) = root.strip_prefix("https://") else {
+        return Err(Error::Url);
+    };
+    Ok(SocketRequest {
+        url: format!(
+            "wss://{root}/text-to-speech/{id}/stream-input?model_id={model}&output_format=pcm_24000"
+        ),
+        header,
+        value,
+    })
+}
+
+/// A speech socket's first message: the voice's settings, with speed 1.0 as
+/// a piece over HTTP is given it, and no words yet.
+pub(crate) fn socket_opening() -> Value {
+    json!({"text": " ", "voice_settings": {"speed": 1.0}})
+}
+
+/// `text` as a piece on a speech socket, made into speech at once
+/// (`flush`), as it is sent over HTTP; `None` when nothing in it would be
+/// spoken.
+pub(crate) fn socket_piece(text: &str) -> Option<Value> {
+    if without_tags(text).trim().is_empty() {
+        return None;
+    }
+    Some(json!({"text": format!("{} ", text.trim()), "flush": true}))
+}
+
+/// A speech socket's last message: no more words, so the rest is made and
+/// the socket ends.
+pub(crate) fn socket_end() -> Value {
+    json!({"text": ""})
+}
+
+/// What one of a speech socket's messages said: its audio, 24 kHz 16-bit
+/// PCM, and whether it was the last.
+#[derive(Debug, Default, PartialEq)]
+pub(crate) struct SocketAnswer {
+    pub audio: Vec<u8>,
+    pub last: bool,
+}
+
+/// A speech socket's message read: `None` when it isn't one of its answers
+/// (an error the service sent, or something else).
+pub(crate) fn socket_answer(text: &str) -> Option<SocketAnswer> {
+    use base64::Engine as _;
+    let message: Value = serde_json::from_str(text).ok()?;
+    let audio = match message.get("audio") {
+        Some(Value::String(audio)) => base64::engine::general_purpose::STANDARD
+            .decode(audio)
+            .ok()?,
+        Some(Value::Null) | None => Vec::new(),
+        Some(_) => return None,
+    };
+    let last = message.get("isFinal").and_then(Value::as_bool) == Some(true);
+    (last || !audio.is_empty()).then_some(SocketAnswer { audio, last })
 }
 
 /// The provider's API root: OpenAI's `/v1`, or ElevenLabs' (on the
@@ -782,6 +886,78 @@ mod tests {
                     "response_format": "pcm"}),
             }
         );
+    }
+
+    /// #2135's row: the speech socket is ElevenLabs' `stream-input`, under the
+    /// proxy's `/ws/` with the key as a bearer (the backend on #1934), or on
+    /// ElevenLabs' own API with `xi-api-key`; with the route's voice and
+    /// model, and 24 kHz PCM as a piece over HTTP.
+    #[test]
+    fn the_speech_socket_is_elevenlabs_stream_input_through_the_proxys_ws_path() {
+        let proxied = socket_request(PROXY, "k", None, Some("eleven_v4_turbo")).unwrap();
+        assert_eq!(
+            proxied.url,
+            format!(
+                "{}/v1/ws/elevenlabs/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream-input?model_id=eleven_v4_turbo&output_format=pcm_24000",
+                PROXY.replacen("https://", "wss://", 1)
+            )
+        );
+        assert_eq!(
+            (proxied.header, proxied.value.as_str()),
+            ("authorization", "Bearer k")
+        );
+        let direct =
+            socket_request("https://api.elevenlabs.io/v1/", "k", Some("Ngan"), None).unwrap();
+        assert_eq!(
+            direct.url,
+            "wss://api.elevenlabs.io/v1/text-to-speech/a3AkyqGG4v8Pg7SWQ0Y3/stream-input?model_id=eleven_flash_v2_5&output_format=pcm_24000"
+        );
+        assert_eq!((direct.header, direct.value.as_str()), ("xi-api-key", "k"));
+        for (voice, model) in [(Some("a/b"), None), (None, Some("m&x")), (None, Some(""))] {
+            assert_eq!(socket_request(PROXY, "k", voice, model), Err(Error::Url));
+        }
+        assert_eq!(
+            socket_request("http://tts.example.invalid", "k", None, None),
+            Err(Error::Url)
+        );
+        // Its messages: the settings first, each piece made at once, and the end.
+        assert_eq!(
+            socket_opening(),
+            json!({"text": " ", "voice_settings": {"speed": 1.0}})
+        );
+        assert_eq!(
+            socket_piece(" Sure, [laughs] I can. "),
+            Some(json!({"text": "Sure, [laughs] I can. ", "flush": true}))
+        );
+        assert_eq!(socket_piece(" [sighs] "), None);
+        assert_eq!(socket_end(), json!({"text": ""}));
+    }
+
+    /// A speech socket's answers: audio as base64, and the last one marked.
+    #[test]
+    fn a_speech_sockets_answers_carry_audio_and_say_the_last() {
+        assert_eq!(
+            socket_answer(r#"{"audio":"AQIDBA==","isFinal":false,"normalizedAlignment":null}"#),
+            Some(SocketAnswer {
+                audio: vec![1, 2, 3, 4],
+                last: false
+            })
+        );
+        assert_eq!(
+            socket_answer(r#"{"audio":null,"isFinal":true}"#),
+            Some(SocketAnswer {
+                audio: Vec::new(),
+                last: true
+            })
+        );
+        for other in [
+            r#"{"error":"quota","message":"no"}"#,
+            r#"{"audio":"not base64!","isFinal":false}"#,
+            r#"{"audio":7}"#,
+            "not json",
+        ] {
+            assert_eq!(socket_answer(other), None, "{other}");
+        }
     }
 
     #[test]

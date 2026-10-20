@@ -2220,6 +2220,44 @@ systemd-run --pty --wait \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10 --wire --speech
 ```
 
+**A speech socket opened ahead** (`--wire --socket`, #2135's row; the
+first builder on #1722, 20 Oct 10:37). ElevenLabs' `stream-input` takes
+text as it comes on a websocket and sends audio back as it's made, so the
+route could open one while the chat is still thinking, and its first piece
+would go to a socket already open. Through the relay it's under `/ws/`,
+`…/ws/elevenlabs/text-to-speech/<voice>/stream-input`, with the relay key as
+a bearer (the backend, 10:05 on #1934). On ElevenLabs' own API it takes
+`xi-api-key` (`tts::socket_request`). Each run, each target:
+- **a piece on a kept HTTP connection,** as the route sends its pieces: one
+  piece makes the connection, the next is timed;
+- **another piece of the same length on a socket opened 1 s ahead**
+  (`SOCKET_AHEAD`, about the chat's time to its first piece on lamp-4ace),
+  the two arms first in turn, so neither gains from the other's piece just
+  made (the reviewer on #2161):
+  - the connect, TLS and upgrade are timed;
+  - then the voice's settings, the piece (`flush`) and the end are sent;
+  - from the piece's last byte, its first audio and its end are timed.
+
+The lines are `wire socket http target=… run=…` and `wire socket target=…
+run=…` (`upgrade_ms`, `first_audio_ms`, `done_ms`, `audio_bytes`), each
+one's medians, and `wire socket-less-http target=…`, what the socket saves a
+piece once it's open (negative is faster). With both targets there's also
+`wire socket relay-less-direct`. A socket refused at the upgrade says its
+status, and one closed before any audio says its close code. An answer that
+isn't audio ends that run as failed (`answer: refused`), never shown. Each run asks three pieces a
+target, at most 20 runs. From this Mac with a made-up key, the relay took
+the upgrade and closed with 4001, and ElevenLabs' own API refused it.
+
+Give `-p LoadCredential=elevenlabs.key:…` only with an ElevenLabs key of
+its own; without it the relay alone is timed:
+
+```sh
+systemd-run --pty --wait \
+  -p LoadCredential=elevenlabs.key:/path/to/elevenlabs.key \
+  /opt/lampOS/voice/current/lamp-voice probe-cascade \
+  /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10 --wire --socket
+```
+
 ### How much the prompt cache holds (`probe-cache`)
 
 `lamp-voice probe-cache PROVIDER_CONFIG SECOND_CONFIG [RUNS]` (1 to 20,
