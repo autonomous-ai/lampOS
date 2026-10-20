@@ -22,10 +22,14 @@ DEVELOPMENT_BINARIES = {'lamp-audio', 'lamp-body-inspect', 'lamp-ipc-probe',
     'lamp-memory-eval', 'lamp-observer', 'lamp-policy-fit', 'lamp-policy-judges',
     'lamp-sound-fixtures', 'lamp-tasks-harness-fixture', 'lamp-voice-eval',
     'lamp-memory-fixture', 'lamp-records-fixture', 'lamp-same-voice', 'lamp-policy-replay'}
-# Factory/provisioning tools are not product runtime: no unit starts them. The
-# generic package carries them under tools/ for the V1 migration script, which
-# measures each lamp's own BODY_POSES; poses are never shipped or copied between lamps.
+# Factory/provisioning tools are not product runtime. The generic package carries
+# them under tools/ for the V1 migration script, which measures each lamp's own
+# BODY_POSES; poses are never shipped or copied between lamps. From a source with
+# lamp-body-measure.service (lampOS #2163), the generic package also runs it: a lamp
+# without poses is read seated at rest before its first body start, so the tool
+# also sits beside lamp-body, as lamp-body-worker does.
 PROVISIONING_BINARIES = {'lamp-body-measure'}
+SEATED_MEASURE_UNIT = 'lamp-body-measure.service'
 PROVISION_SETTINGS = ('voice-provider.json', 'controls.json', 'controls-pins.json')
 # The adapter's prepare runs `lamp-keeper prepare` (lamp-voice #1094); its usage
 # line is the build's own statement that the command exists.
@@ -126,7 +130,8 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
         raise ValueError('version must be major.minor.patch')
     generic = profile is None
     if generic:
-        profile = {'substitutions': {}, 'units': list(DEFAULT_UNITS),
+        seated = [SEATED_MEASURE_UNIT] if (Path(source) / 'deploy/units' / SEATED_MEASURE_UNIT).exists() else []
+        profile = {'substitutions': {}, 'units': list(DEFAULT_UNITS) + seated,
                    'required_paths': ['/etc/lampOS/voice/provider.json',
                        '/etc/lampOS/controls/controls.json', '/etc/lampOS/controls/controls-pins.json']}
     if set(profile) - {'substitutions', 'units', 'required_paths'}:
@@ -209,6 +214,8 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
             data = read_file(binaries, name)
             check_elf(data, name)
             add(f'tools/{name}', data, True)
+            if name == 'lamp-body-measure' and SEATED_MEASURE_UNIT in units:
+                add(f'runtime/body/{binary_hashes["lamp-body"]}/{name}', data, True)
         for name in PROVISION_SETTINGS:
             data = read_file(source, f'deploy/product/settings/{name}')
             if not isinstance(json.loads(data), dict) or SECRET.search(data.decode()):
@@ -260,7 +267,8 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
             text = text.replace('[Service]', '[Service]\nEnvironment=LD_LIBRARY_PATH=@RELEASE_ROOT@/lib', 1)
         if generic and unit == 'lamp-policy.service':
             text = generic_policy(text, read_file(source, 'deploy/product/lamp-policy.service').decode())
-        if generic and unit.startswith('lamp-') and unit.endswith('.service'):
+        # The seated read is a oneshot with no product unit and no bus.
+        if generic and unit.startswith('lamp-') and unit.endswith('.service') and unit != SEATED_MEASURE_UNIT:
             text = generic_bus(unit, text, read_file(source, f'deploy/product/{unit}').decode())
         for key, value in mapping.items():
             text = text.replace(f'@{key}@', value)
