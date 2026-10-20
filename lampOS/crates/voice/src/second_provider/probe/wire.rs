@@ -58,7 +58,9 @@
 //! `hosted.deepseek_model` with thinking off. It prints counts and
 //! milliseconds only: never the words asked or answered, a key, a host or a
 //! URL.
-use super::super::net::{self, Chat, Declare, Message, SpeechRequest, speech_request};
+use super::super::net::{
+    self, Chat, Declare, Message, SpeechRequest, on_elevenlabs, speech_request,
+};
 use super::{cache, percentile};
 use crate::second_config::{
     CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, SecondConfig, TtsProvider, unit_credential,
@@ -220,14 +222,6 @@ fn piece(
     )
     .map_err(io::Error::other)?
     .ok_or_else(|| io::Error::other("nothing to speak"))
-}
-
-/// Whether `url` is on ElevenLabs' own API, not the relay.
-fn on_elevenlabs(url: &reqwest::Url) -> bool {
-    url.host_str().is_some_and(|host| {
-        let host = host.to_ascii_lowercase();
-        host == "elevenlabs.io" || host.ends_with(".elevenlabs.io")
-    })
 }
 
 /// One request's times, in ms: the connection's steps, then from the
@@ -941,11 +935,15 @@ fn speech_targets(
         .unwrap_or_else(|| net::default_model(TtsProvider::ElevenLabs).to_owned());
     // The kind, and whether it is on ElevenLabs' own API.
     let kind = |base: &str, key: &str| -> io::Result<(Kind, bool)> {
+        // ElevenLabs' own API by the route's own rule, so the probe and the
+        // route agree on where the request goes (the reviewer on #2119).
+        let own = on_elevenlabs(base);
         let (base, key) = (base.to_owned(), key.to_owned());
         let (voice, model) = (config.tts_voice.clone(), model.clone());
         let request =
             move |run: u32| Wired::speech(piece(&base, &key, voice.as_deref(), &model, run)?);
-        let own = on_elevenlabs(&request(0)?.url);
+        // A voice or URL the route can't ask with fails here, before any run.
+        request(0)?;
         let kind = Kind {
             before: "speech ",
             after: String::new(),
@@ -1729,7 +1727,7 @@ mod tests {
             relay.url.as_str(),
             "https://relay.example.invalid/api/v1/ai/v1/elevenlabs/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream?output_format=pcm_24000"
         );
-        assert!(!on_elevenlabs(&relay.url));
+        assert!(!on_elevenlabs("https://relay.example.invalid/api/v1/ai/v1"));
         assert_eq!(
             (relay.header, relay.value.as_str(), relay.reading),
             ("xi-api-key", "k", Reading::Audio)
@@ -1747,7 +1745,16 @@ mod tests {
             "{}",
             direct.url
         );
-        assert!(on_elevenlabs(&direct.url));
+        assert!(on_elevenlabs(ELEVENLABS_BASE_URL));
+        // Another host of ElevenLabs' is the relay's to the route, so to
+        // the probe too (the reviewer on #2119).
+        assert!(!on_elevenlabs("https://foo.elevenlabs.io/v1"));
+        let other = piece("https://foo.elevenlabs.io/v1", "k", None, "m", 0).unwrap();
+        assert!(
+            other.url.contains("/elevenlabs/text-to-speech/"),
+            "{}",
+            other.url
+        );
         let body: Value = serde_json::from_slice(&direct.body).unwrap();
         assert_eq!(body["text"], PIECES[1], "run 5 is run 1's piece again");
         for text in PIECES {
