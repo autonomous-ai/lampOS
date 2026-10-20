@@ -1,0 +1,51 @@
+{
+  "integration_base": "dfc5f73c00dbf10a65b668156914d44a19fb4575",
+  "source_only": true,
+  "separate_fresh_target_directories": true,
+  "source_tree_sha256": "8beb566ec9b131ad6c6d12da1229ac60390dcbd55cbb60ccf2c773b142025449",
+  "source_file_count": 2114,
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "selected_packages": [
+    "lamp-actions",
+    "lamp-air",
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-controls",
+    "lamp-ears",
+    "lamp-expression",
+    "lamp-eyes",
+    "lamp-health",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-mood",
+    "lamp-msgs",
+    "lamp-name",
+    "lamp-peek",
+    "lamp-policy",
+    "lamp-records",
+    "lamp-schedule",
+    "lamp-selftest",
+    "lamp-settings",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-station",
+    "lamp-surround",
+    "lamp-tasks",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "test_roots": {
+    "tests": "source-only copy; every selected crate except lamp-update",
+    "checkout_tests": "original checkout; all lamp-update tests, including its parent image fixture"
+  },
+  "portability_limitation": "lamp-update tests/image_journal.rs and tests/image_ramlog.rs read robots/lamp/rootfs outside lampOS; that complete crate is tested in the checkout without filtering any test. The workspace build and all other selected tests run from the source-only copy.",
+  "status": "running; no completed full gate or native CI claimed",
+  "source_commit": null
+}
