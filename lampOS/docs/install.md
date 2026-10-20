@@ -335,9 +335,19 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   96, 97 or 98), or Controls does not start, and the button with it. A
   lamp's own pins file with no `privacy` section gains the build's, and
   only that key; the rest and its mode are kept, and install says so
-  (`pins_gain_privacy`). The product's units select the privacy route, and
+  (`own_pins_follow_build`). The product's units select the privacy route, and
   without the section Controls has no privacy source and the lamp never
-  hears (the reviewer on #2143). `/etc/lampOS` is made 0755 and each of these
+  hears (the reviewer on #2143). A lamp's own pins file whose head pads are
+  still the old guess (37 and 96, active-high, pulled down, with no
+  `head_rest`) gets the build's four lines the same way (#1798): the guess
+  read no touch on lamp-52e6 or lamp-cb94. Pins the factory step wrote are
+  kept. A lamp's own `controls.json` that names the old two pads then names
+  the same four, so a Controls put back from before #1798, which wants both
+  files to name the same pads, still starts there. It doesn't where the
+  factory step wrote the pins (two or three pads, kept): install's
+  `controls.json` now names four. Going back by hand across #1798 on such a
+  lamp, also put back `controls.json`, or name the pins' own pads in it
+  (updates.md, "To go back by hand"); a round's put-back writes no settings. `/etc/lampOS` is made 0755 and each of these
   folders 0755, files 0644: readable by `lampos`. A default found with install's own bytes but another mode is install's, and is given its mode (lamp-cb94's settings were there before any install at 0600, and Controls and Expression could not read them, #705); a lamp's own setting found closed is kept as it is, and said. lamp-4ace's `/etc/lampOS`
   is root's alone; `install` does not open one made closed (credentials may
   be below it) and says so. The voice's turn-end model and ONNX
@@ -477,22 +487,25 @@ units stopped:
    `--write` it only prints, so a lamp can be read first and written later.
 2. **The touch pads**, `/etc/lampOS/controls/controls-pins.json`, with a
    person at the lamp. GPIO head pads differ by unit: the hardware team's test
-   reads four candidate lines (37, 96, 97, 98), and lamp-52e6's pads were on
-   97 and 98, driven high while touched (#1362). Each unit's pads also rest
+   passes when two or more of four candidate lines (37, 96, 97, 98) read a
+   touch, and each lamp's pads are on its own lines: lamp-52e6's on 97 and
+   98, driven high while touched (#1362), lamp-dbda's on 37, 96 and 97
+   (#2182). Each unit's pads also rest
    and read differently (#1764): lamp-cb94's line 97 flipped at rest and read
    touched for 77 s with no hand on it, and lamp-c0a4's pulsed under a hand.
    So `lamp-controls discover-head --seconds 40 --rest-seconds 10`, hands
    away for its first 11 s and then each pad held about 2 s (or touched
    twice; on lamp-c0a4 a person's two touches merged into one long one,
    thirteen-P4), finds this
-   unit's pair and polarity, which go into `head_pads`, and each pad's own
+   unit's pads (two to four) and their polarity, which go into `head_pads`, and each pad's own
    baseline, which goes into `head_rest` (its rest, and whether a touch holds
    its level or pulses; controls.md, "Each lamp's own head pads"). A pad
    whose line changed with hands away is refused and nothing is written.
    The step names each pad as it is found (its line, its rest, and whether
    it read level or pulses). The
-   product's 37 and 96, active-high, with no `head_rest`, are only a
-   default. On an MPR121 strip it is
+   product's default reads all four lines, active-high, with no `head_rest`,
+   until this step writes the unit's own (controls.md, "Each lamp's own head
+   pads"). On an MPR121 strip it is
    `lamp-controls calibrate-touch` (controls.md, "Run without a lamp, then
    qualify on one": First's on-lamp sequence), its output installed there,
    but **that half is skipped while the base strip is off**: V2 doesn't use

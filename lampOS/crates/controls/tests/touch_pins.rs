@@ -164,6 +164,37 @@ fn all_four_head_candidates_require_explicit_name_order_and_polarity() {
     assert!(wiring.check(&config).is_err());
 }
 
+/// #1798: the head pads are the pins file's. The product's pins name all
+/// four lines, and a lamp's own settings file, kept by install, names two:
+/// Controls still starts and reads all four. The reverse starts too, with
+/// the pins' two. A pad both name, named otherwise or moved, is refused.
+#[test]
+fn the_head_pads_are_the_pins_and_the_settings_may_name_fewer_or_more() {
+    let mut four = wiring();
+    four.head_pads = HEAD_CANDIDATES
+        .into_iter()
+        .enumerate()
+        .map(|(i, line)| pin(&format!("head-{}", i + 1), line))
+        .collect();
+    let mut two = config();
+    two.head_pads = vec!["head-1".into(), "head-2".into()];
+    assert_eq!(
+        four.check(&two).unwrap().head_pads,
+        ["head-1", "head-2", "head-3", "head-4"]
+    );
+    let mut fewer = four.clone();
+    fewer.head_pads.truncate(2);
+    let mut all = two.clone();
+    all.head_pads = four.head_pads.iter().map(|p| p.name.clone()).collect();
+    assert_eq!(fewer.check(&all).unwrap().head_pads, ["head-1", "head-2"]);
+    let mut renamed = four.clone();
+    renamed.head_pads[1].name = "head-9".into();
+    assert!(renamed.check(&two).is_err());
+    let mut moved = four.clone();
+    moved.head_pads.swap(1, 2);
+    assert!(moved.check(&two).is_err());
+}
+
 #[test]
 fn privacy_chip_and_wrong_primary_reset_or_head_lines_are_rejected() {
     let original = serde_json::to_value(wiring()).unwrap();
@@ -633,7 +664,23 @@ fn the_products_pins_name_the_reset_and_its_unit_serves_the_touch_path() {
     let touch = pins.check(&config).unwrap();
     assert_eq!(touch.reset.as_deref(), Some("reset"));
     assert_eq!(touch.primary.as_deref(), Some("primary"));
-    assert_eq!(touch.head_pads, ["head-1", "head-2"]);
+    // Every line a head pad is wired to on some unit, as the hardware
+    // team's bench test reads them (#1798, #2182).
+    assert_eq!(touch.head_pads, ["head-1", "head-2", "head-3", "head-4"]);
+    assert_eq!(
+        pins.head_pads
+            .iter()
+            .map(|pin| pin.line)
+            .collect::<Vec<_>>(),
+        HEAD_CANDIDATES
+    );
+    assert!(
+        pins.head_pads
+            .iter()
+            .all(|pin| !pin.active_low && pin.pull == Pull::Down),
+        "a line with no pad rests low and reads as no touch"
+    );
+    assert!(pins.head_rest.is_none(), "no unit's baseline is shipped");
     assert!(touch.strip_pads.is_none(), "the base strip waits");
     // A pat stays the old engine's Pet, as the product's voice and
     // Expression read no `controls/touch` (the reviewer on #1167).

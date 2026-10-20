@@ -23,7 +23,7 @@ voice's lease, which a closed switch withdraws. The first builder turns it on
 by default once lamp-52e6 has run it for an hour. A lamp's own pins file
 (the factory's head pads, a calibration), which an update keeps, gains the
 build's `privacy` section when it has none, with everything else in it kept
-(`install::pins_gain_privacy`; the reviewer's P1 on #2143). Without it the
+(`install::own_pins_follow_build`; the reviewer's P1 on #2143). Without it the
 units would select the route with no switch evidence, and the lamp would
 never hear. New lamps keep the section through the factory's steps, which
 change only the head pads or calibrate through the typed profile. On an update, Controls

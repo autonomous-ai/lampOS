@@ -1107,7 +1107,7 @@ pub fn install(
         say,
         &mut |state| save(&records, state),
     )?;
-    pins_gain_privacy(config, &defaults, &mut changed, say)?;
+    own_pins_follow_build(config, &defaults, &mut changed, say)?;
     // The voice's service and the user's key, private. Each is install's
     // while it is still what an install wrote, so a newer provider, or a key
     // V1 rotated in its config, reaches the lamp; one setup wrote, or one
@@ -1315,59 +1315,134 @@ pub fn settings(
 /// Where the product's units read Controls' pins.
 const PINS_PATH: &str = "/etc/lampOS/controls/controls-pins.json";
 
+/// Where they read Controls' settings, which name the head pads too.
+const CONTROLS_PATH: &str = "/etc/lampOS/controls/controls.json";
+
+/// The head pads every product pins file named before #1798: a guess, right
+/// on no unit known since (#2182), which the factory step never wrote.
+const GUESSED_HEAD_PADS: &str = r#"[
+    {"name": "head-1", "line": 37, "active_low": false, "pull": "down"},
+    {"name": "head-2", "line": 96, "active_low": false, "pull": "down"}
+]"#;
+
 /// A lamp's own pins file, which [`settings`] keeps (the factory's head
-/// pads, a calibration), gains the build's `privacy` section when it has
-/// none. The product's units select the privacy route
-/// (`LAMP_PRIVACY_CONTROLS=on`), and without the section Controls has no
-/// privacy source, so Voice and Ears never open a microphone (the
-/// reviewer's P1 on #2143). Only that one key is added; everything else is
-/// kept, the file's mode too. A file that already has the section, a build
-/// without one, a file that isn't there (the default was just written) or
-/// one that isn't a JSON object is left, the last said.
-fn pins_gain_privacy(
+/// pads, a calibration), follows the build where install wrote the part
+/// it changes:
+/// - it gains the build's `privacy` section when it has none. The
+///   product's units select the privacy route (`LAMP_PRIVACY_CONTROLS=on`),
+///   and without the section Controls has no privacy source, so Voice and
+///   Ears never open a microphone (the reviewer's P1 on #2143);
+/// - its head pads, while still the old guess ([`GUESSED_HEAD_PADS`], with
+///   no factory baseline), become the build's: every line a pad is wired
+///   to on some unit (#1798). On lamp-52e6 and lamp-cb94 the guess read no
+///   touch at all. A lamp's own Controls settings naming the old two pads
+///   name the build's then too, so a Controls from before #1798, which
+///   wants both files to name the same pads, still starts if it is put
+///   back.
+///
+/// Only those keys change; everything else is kept, each file's mode too.
+/// A file already like the build, a build without them, a file that isn't
+/// there (the default was just written) or one that isn't a JSON object is
+/// left, the last said.
+fn own_pins_follow_build(
     config: &Install,
     defaults: &[(&str, &str)],
     changed: &mut Vec<String>,
     say: &mut dyn FnMut(&str),
 ) -> Result<(), String> {
-    let Some(section) = defaults
+    let Some(default) = defaults
         .iter()
         .find(|(path, _)| *path == PINS_PATH)
         .and_then(|(_, text)| serde_json::from_str::<serde_json::Value>(text).ok())
-        .and_then(|default| default.get("privacy").cloned())
     else {
         return Ok(());
     };
-    let at = config.on(PINS_PATH);
-    let text = match fs::read_to_string(&at) {
-        Ok(text) => text,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => return Err(format!("{PINS_PATH}: {error}")),
+    let Some(mut pins) = own_object(config, PINS_PATH, say)? else {
+        return Ok(());
     };
-    let mut pins = match serde_json::from_str::<serde_json::Value>(&text) {
-        Ok(serde_json::Value::Object(pins)) => pins,
+    let mut done = Vec::new();
+    if let Some(section) = default.get("privacy")
+        && !pins.contains_key("privacy")
+    {
+        pins.insert("privacy".into(), section.clone());
+        done.push("added the privacy section to");
+    }
+    let guessed: serde_json::Value =
+        serde_json::from_str(GUESSED_HEAD_PADS).expect("the old guess is JSON");
+    let pads = default.get("head_pads").filter(|pads| **pads != guessed);
+    if let Some(pads) = pads
+        && pins.get("head_pads") == Some(&guessed)
+        && !pins.contains_key("head_rest")
+    {
+        pins.insert("head_pads".into(), pads.clone());
+        done.push("put the build's head pads, every line a pad is wired to, in");
+    }
+    // The pins name the build's pads now, whether install wrote them just
+    // before or this did.
+    let names = pads
+        .filter(|pads| pins.get("head_pads") == Some(*pads))
+        .and_then(|pads| pads.as_array())
+        .map(|pads| pads.iter().map(|pad| pad["name"].clone()).collect());
+    if !done.is_empty() {
+        write_object(config, PINS_PATH, pins, changed)?;
+        for what in done {
+            say(&format!(
+                "{what} {PINS_PATH}: this lamp's own pins are kept otherwise"
+            ));
+        }
+    }
+    if let Some(names) = names
+        && let Some(mut controls) = own_object(config, CONTROLS_PATH, say)?
+        && controls.get("head_pads") == Some(&serde_json::json!(["head-1", "head-2"]))
+    {
+        controls.insert("head_pads".into(), serde_json::Value::Array(names));
+        write_object(config, CONTROLS_PATH, controls, changed)?;
+        say(&format!(
+            "named the same head pads in {CONTROLS_PATH}: this lamp's own settings are kept otherwise"
+        ));
+    }
+    Ok(())
+}
+
+/// The JSON object at `path` on this lamp: none for a file that isn't
+/// there, and none, said, for one that isn't an object.
+fn own_object(
+    config: &Install,
+    path: &str,
+    say: &mut dyn FnMut(&str),
+) -> Result<Option<serde_json::Map<String, serde_json::Value>>, String> {
+    let text = match fs::read_to_string(config.on(path)) {
+        Ok(text) => text,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("{path}: {error}")),
+    };
+    match serde_json::from_str::<serde_json::Value>(&text) {
+        Ok(serde_json::Value::Object(object)) => Ok(Some(object)),
         _ => {
             say(&format!(
-                "{PINS_PATH} is not a JSON object: its privacy section is not added, and Controls will say so"
+                "{path} is not a JSON object: it is not changed, and Controls will say so"
             ));
-            return Ok(());
+            Ok(None)
         }
-    };
-    if pins.contains_key("privacy") {
-        return Ok(());
     }
-    pins.insert("privacy".into(), section);
+}
+
+/// `object` written whole over the file at `path`, keeping its mode.
+fn write_object(
+    config: &Install,
+    path: &str,
+    object: serde_json::Map<String, serde_json::Value>,
+    changed: &mut Vec<String>,
+) -> Result<(), String> {
+    let at = config.on(path);
     let mode = fs::metadata(&at)
         .map(|meta| meta.permissions().mode() & 0o777)
-        .map_err(|error| format!("{PINS_PATH}: {error}"))?;
-    let mut bytes = serde_json::to_vec_pretty(&serde_json::Value::Object(pins))
-        .map_err(|error| format!("{PINS_PATH}: {error}"))?;
+        .map_err(|error| format!("{path}: {error}"))?;
+    let mut bytes = serde_json::to_vec_pretty(&serde_json::Value::Object(object))
+        .map_err(|error| format!("{path}: {error}"))?;
     bytes.push(b'\n');
-    write_whole(&at, &bytes, mode).map_err(|error| format!("{PINS_PATH}: {error}"))?;
-    changed.push(format!("wrote {PINS_PATH}"));
-    say(&format!(
-        "added the privacy section to {PINS_PATH}: this lamp's own pins are kept otherwise"
-    ));
+    write_whole(&at, &bytes, mode).map_err(|error| format!("{path}: {error}"))?;
+    changed.push(format!("wrote {path}"));
     Ok(())
 }
 

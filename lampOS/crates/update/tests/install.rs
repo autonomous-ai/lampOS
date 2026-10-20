@@ -1726,6 +1726,127 @@ fn a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest() {
     );
 }
 
+const CONTROLS: &str = "/etc/lampOS/controls/controls.json";
+
+/// #1798: a lamp's own pins file still naming the old guess, head pads on
+/// lines 37 and 96 (lamp-52e6's and lamp-cb94's, which read no touch on
+/// them), gets the build's: every line a pad is wired to. Its own Controls
+/// settings, naming two pads, name the same four, so a Controls put back
+/// from before this, which wants both alike, still starts. Everything else
+/// is kept, and installing again changes nothing. Pins the factory step
+/// wrote (with each pad's baseline) and a settings file naming other pads
+/// are kept.
+#[test]
+fn a_lamps_own_pins_on_the_old_guess_get_every_head_line() {
+    let product: serde_json::Value =
+        serde_json::from_str(SETTINGS.iter().find(|(path, _)| *path == PINS).unwrap().1).unwrap();
+    let lines: Vec<_> = product["head_pads"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|pad| pad["line"].as_u64().unwrap())
+        .collect();
+    assert_eq!(lines, [37, 96, 97, 98]);
+    let guessed = r#"{
+  "chip": "/dev/gpiochip0",
+  "buttons": [{"name": "primary", "line": 99, "active_low": true, "pull": "up"}],
+  "head_pads": [
+    {"name": "head-1", "line": 37, "active_low": false, "pull": "down"},
+    {"name": "head-2", "line": 96, "active_low": false, "pull": "down"}
+  ],
+  "every_ms": 5,
+  "reset": {"name": "reset", "line": 100, "active_low": true, "pull": "up"},
+  "legacy_head": true,
+  "privacy": {"chip": "/dev/gpiochip1", "line": 9, "active_low": true, "pull": "up"}
+}
+"#;
+    let own_controls = r#"{"enabled": true, "buttons": ["primary"], "head_pads": ["head-1", "head-2"], "base_selected_mask": null}
+"#;
+    let read = |lamp: &Lamp, path: &str| -> serde_json::Value {
+        serde_json::from_str(&fs::read_to_string(lamp.on(path)).unwrap()).unwrap()
+    };
+    let mut lamp = Lamp::new(190, &[]);
+    fs::create_dir_all(lamp.on(PINS).parent().unwrap()).unwrap();
+    fs::write(lamp.on(PINS), guessed).unwrap();
+    fs::write(lamp.on(CONTROLS), own_controls).unwrap();
+    let first = lamp.install().unwrap();
+    let mut pins = read(&lamp, PINS);
+    assert_eq!(pins["head_pads"], product["head_pads"]);
+    pins["head_pads"] =
+        serde_json::from_str::<serde_json::Value>(guessed).unwrap()["head_pads"].clone();
+    assert_eq!(
+        pins,
+        serde_json::from_str::<serde_json::Value>(guessed).unwrap()
+    );
+    let mut controls = read(&lamp, CONTROLS);
+    assert_eq!(
+        controls["head_pads"],
+        serde_json::json!(["head-1", "head-2", "head-3", "head-4"])
+    );
+    controls["head_pads"] = serde_json::json!(["head-1", "head-2"]);
+    assert_eq!(
+        controls,
+        serde_json::from_str::<serde_json::Value>(own_controls).unwrap()
+    );
+    for path in [PINS, CONTROLS] {
+        assert!(
+            first.changed.contains(&format!("wrote {path}")),
+            "{:?}",
+            first.changed
+        );
+    }
+    for said in [
+        format!("put the build's head pads, every line a pad is wired to, in {PINS}"),
+        format!("named the same head pads in {CONTROLS}"),
+    ] {
+        assert!(
+            lamp.said.iter().any(|line| line.starts_with(&said)),
+            "{said}: {:?}",
+            lamp.said
+        );
+    }
+    // Controls takes the two files together.
+    let wiring: lamp_controls::touch_pins::TouchPinsConfig =
+        serde_json::from_value(read(&lamp, PINS)).unwrap();
+    let settings: lamp_controls::engine::Config =
+        serde_json::from_value(read(&lamp, CONTROLS)).unwrap();
+    wiring.check(&settings).unwrap();
+    let (pins, controls) = (
+        fs::read_to_string(lamp.on(PINS)).unwrap(),
+        fs::read_to_string(lamp.on(CONTROLS)).unwrap(),
+    );
+    let again = lamp.install().unwrap();
+    assert_eq!(fs::read_to_string(lamp.on(PINS)).unwrap(), pins);
+    assert_eq!(fs::read_to_string(lamp.on(CONTROLS)).unwrap(), controls);
+    assert!(
+        !again
+            .changed
+            .iter()
+            .any(|line| line.starts_with("wrote /etc/lampOS/controls/")),
+        "{:?}",
+        again.changed
+    );
+
+    // The factory step's pins, the same lines with each pad's baseline, are
+    // this unit's own and stay; so do settings naming other pads.
+    let factory = guessed.replace(
+        "  \"every_ms\": 5,",
+        "  \"every_ms\": 5,\n  \"head_rest\": [{\"name\": \"head-1\", \"rest\": \"low\", \"reads\": \"level\"}, {\"name\": \"head-2\", \"rest\": \"low\", \"reads\": \"level\"}],",
+    );
+    assert_ne!(factory, guessed);
+    let other_controls = own_controls.replace("\"head-2\"]", "\"head-9\"]");
+    let mut found = Lamp::new(191, &[]);
+    fs::create_dir_all(found.on(PINS).parent().unwrap()).unwrap();
+    fs::write(found.on(PINS), &factory).unwrap();
+    fs::write(found.on(CONTROLS), &other_controls).unwrap();
+    found.install().unwrap();
+    assert_eq!(fs::read_to_string(found.on(PINS)).unwrap(), factory);
+    assert_eq!(
+        fs::read_to_string(found.on(CONTROLS)).unwrap(),
+        other_controls
+    );
+}
+
 /// The reviewer's case on #815: install, move the primary button to
 /// another line on this lamp, install the same build again. The lamp's
 /// line stays, it is said, and nothing else is written or asked.
