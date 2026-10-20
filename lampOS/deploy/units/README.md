@@ -10,8 +10,8 @@ own folder (`deploy/lamp-4ace/` is the worked example) is made from them:
    `@UNIT_ID@` its host name; `@LAMP_USER@`, `@MEMORY_USER@` and
    `@SURROUND_USER@` the users its parts run as; `@<PART>_SHA256@` the
    SHA-256 of the binary installed under that directory; `@SERVO_DEVICE@`,
-   `@CAMERA_DEVICE@`, `@CAMERA_USB@` its devices; `@VOICE_OPTIONS@` and
-   `@BODY_POSES@` its measured voice options and poses; `@FAST_CPUS@` its
+   `@CAMERA_DEVICE@`, `@CAMERA_USB@` its devices; `@VOICE_OPTIONS@` its
+   measured voice options; `@FAST_CPUS@` its
    fast processors; the rest are paths. Nothing measured on one lamp is
    right for another: the poses and the gaze are measured on each
    ([body.md](../../docs/body.md)). `grep -n @ *.service *.target *.slice`
@@ -43,6 +43,21 @@ greets. It sets `LAMP_SKILLS_ASK=skip` until the Policy's gate exists
 does not start without it: a skill's quiet hours (Stuffy air's night,
 #1021) need the local time. The product's unit passes `--zone system`
 instead, which keeps those hours across summer time (#1384).
+
+`lamp-body.service` takes its poses as the product's unit does, as
+`$BODY_POSES` from files, not from a placeholder: the confirmed ones in
+`/etc/lampOS/body/lamp.env` (the factory's, after its watched stand) over the
+seated ones in `/var/lib/lampos-body/measured.env`. It requires
+`lamp-body-measure.service`, a oneshot for a lamp moved to V2 without the
+factory's step (a V1 lamp, #2163). Where neither file is there, it reads the
+lamp at rest with `lamp-body-measure --seated` as `@LAMP_USER@`, and writes
+`measured.env` once: `--home`, the pitch window and `--torque on`, with no
+stand, so the body holds and moves the head and base only. It always runs and
+stays active (`RemainAfterExit`), so the keeper does not wait on it. A read it
+refuses (torque on, a head outside its window) fails it, so the body does not
+start, and the journal says why. It never turns torque off to get a read. A
+lamp's own folder made from these templates needs one of the two files
+([body.md](../../docs/body.md)).
 
 `lamp-body.service` is `Type=notify` with `WatchdogSec=5`: the body says
 when it is ready and that its loop is alive. The others are `Type=simple`

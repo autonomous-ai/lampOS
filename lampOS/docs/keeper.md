@@ -312,10 +312,15 @@ keeps its own:
   and its `vendor:product@usb-path`, the microphone and speaker cards in
   `/proc/asound/cards` (the speaker's `Speaker` control asked with `amixer
   sget`, a read), the CPUs with the highest top frequency, and the `cpu` and
-  `skin` thermal zones. The poses are `BODY_POSES` from
-  `/etc/lampOS/body/lamp.env`, this lamp's own (lamp-body-measure). Without
-  a measured `--gaze` the model's `755,555` is used, and the profile says
-  `"gaze": "default, not measured"`.
+  `skin` thermal zones. A lamp with `/etc/lampOS/body/lamp.env` (this lamp's
+  own, from lamp-body-measure) has its `BODY_POSES` there too, for older
+  packages' body units, which took the poses in the unit; without a measured
+  `--gaze` the model's `755,555` is used there, and the profile says
+  `"gaze": "default, not measured"`. A lamp without one is not refused: the
+  generic body unit reads its poses from the files, and
+  `lamp-body-measure.service` reads them seated, at rest, after cutover
+  (#2163, `deploy/units/README.md`). That profile has no `BODY_POSES` and
+  says `"gaze": "not measured"`.
 - The settings the package carries in `provision/`: the voice's
   `provider.json` (0600), and the controls' `controls.json` and
   `controls-pins.json` (0644), the pins without `reset` and `legacy_head`,
@@ -324,7 +329,7 @@ keeps its own:
   actions', and the motor and camera locks 0700, the last four the parts'
   account's, `orangepi` on a V1 image).
 
-A missing or doubled device, a missing `lamp.env`, a setting the package
+A missing or doubled device, a `lamp.env` without `--home`, a setting the package
 lacks or a missing account stops it, exit 1, before any of these is written
 (the device key above may already be), and the old runtime keeps the lamp.
 The account is looked up only when a directory it owns is missing, so a

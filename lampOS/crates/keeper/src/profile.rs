@@ -308,15 +308,24 @@ pub fn body_poses(lamp_env: &str) -> Result<String, String> {
     Ok(poses)
 }
 
-/// The profile for this lamp, as the adapter reads it.
-pub fn profile(unit_id: &str, hardware: &Hardware, poses: &str) -> serde_json::Value {
+/// The profile for this lamp, as the adapter reads it. `BODY_POSES` only
+/// when the lamp has its `lamp.env` already: the generic body unit reads its
+/// poses from that file, or from the seated ones `lamp-body-measure.service`
+/// reads after cutover (#2163); the substitution is for older packages'
+/// units, which took them in the unit.
+pub fn profile(unit_id: &str, hardware: &Hardware, poses: Option<&str>) -> serde_json::Value {
     let health_expect: Vec<String> = PARTS
         .iter()
         .map(|part| format!("--expect {part}"))
         .collect();
-    serde_json::json!({
+    let gaze = match poses {
+        Some(poses) if !poses_gaze_is_model(poses) => "measured",
+        Some(_) => "default, not measured",
+        None => "not measured",
+    };
+    let mut profile = serde_json::json!({
         "unit_id": unit_id,
-        "gaze": if poses_gaze_is_model(poses) { "default, not measured" } else { "measured" },
+        "gaze": gaze,
         "substitutions": {
             "UNIT_ID": unit_id,
             "LAMP_USER": LAMP_USER,
@@ -327,7 +336,6 @@ pub fn profile(unit_id: &str, hardware: &Hardware, poses: &str) -> serde_json::V
             "MOTOR_LOCK_DIR": "/var/lib/lampos-locks/motor",
             "CAMERA_LOCK_DIR": "/var/lib/lampos-locks/camera",
             "VOICE_OPTIONS": VOICE_OPTIONS.replace("{mic}", &hardware.microphone),
-            "BODY_POSES": poses,
             "FAST_CPUS": hardware.fast_cpus,
             "MEMORY_DIR": "/var/lib/lampos-memory",
             "MEMORY_SOCKET": "/var/lib/lampos-memory/memory.sock",
@@ -337,7 +345,11 @@ pub fn profile(unit_id: &str, hardware: &Hardware, poses: &str) -> serde_json::V
             "HEALTH_EXPECT": health_expect.join(" "),
             "JUDGE_ZONES": hardware.judge_zones,
         }
-    })
+    });
+    if let Some(poses) = poses {
+        profile["substitutions"]["BODY_POSES"] = poses.into();
+    }
+    profile
 }
 
 fn poses_gaze_is_model(poses: &str) -> bool {
@@ -423,18 +435,24 @@ pub fn prepare(
             hardware.fast_cpus,
             hardware.judge_zones
         ));
-        let lamp_env = fs::read_to_string(on(root, LAMP_ENV)).map_err(|_| {
-            format!(
-                "{LAMP_ENV} is missing: this lamp's poses are not measured yet (lamp-body-measure at rest, deploy/factory/steps.sh)"
-            )
-        })?;
-        let poses = body_poses(&lamp_env)?;
-        if poses_gaze_is_model(&poses) {
+        // No poses yet is not a refusal: lamp-body-measure.service reads
+        // them seated, at rest, after cutover, and the body stays seated
+        // until a person confirms its first stand (#2163).
+        let poses = match fs::read_to_string(on(root, LAMP_ENV)) {
+            Ok(lamp_env) => Some(body_poses(&lamp_env)?),
+            Err(_) => {
+                say(&format!(
+                    "no {LAMP_ENV}: the poses are read seated after cutover (lamp-body-measure.service)"
+                ));
+                None
+            }
+        };
+        if poses.as_deref().is_some_and(poses_gaze_is_model) {
             say(&format!(
                 "gaze: the model's {MODEL_GAZE}, not measured on this lamp"
             ));
         }
-        let text = serde_json::to_string_pretty(&profile(&unit_id, &hardware, &poses))
+        let text = serde_json::to_string_pretty(&profile(&unit_id, &hardware, poses.as_deref()))
             .map_err(|error| error.to_string())?;
         Some(text + "\n")
     } else {
@@ -761,12 +779,35 @@ mod tests {
         assert!(absent(&path.with_extension("keeper-new")));
     }
 
+    /// #2163: a V1 lamp with no poses is prepared, and its poses are left
+    /// to lamp-body-measure.service after cutover.
+    #[test]
+    fn a_lamp_without_poses_is_prepared_and_left_to_the_seated_measure() {
+        let lamp = v1_lamp();
+        fs::remove_file(on(&lamp.0, LAMP_ENV)).unwrap();
+        let mut said = Vec::new();
+        let wrote = prepare(&lamp.0, &lamp.0.join("release"), &mut yes, &mut |line| {
+            said.push(line.to_owned())
+        })
+        .unwrap();
+        assert_eq!(wrote[0], PROFILE);
+        assert!(
+            said.iter()
+                .any(|line| line.contains("lamp-body-measure.service"))
+        );
+        let profile: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(on(&lamp.0, PROFILE)).unwrap()).unwrap();
+        assert!(profile["substitutions"].get("BODY_POSES").is_none());
+        assert_eq!(profile["gaze"], "not measured");
+        assert!(!absent(&on(&lamp.0, "/var/lib/lampos-locks/motor")));
+    }
+
     #[test]
     fn a_refusal_writes_nothing() {
         let lamp = v1_lamp();
-        fs::remove_file(on(&lamp.0, LAMP_ENV)).unwrap();
+        lamp.file(LAMP_ENV, "BODY_POSES=\"--folded-arm 1,2\"\n");
         let why = prepare(&lamp.0, &lamp.0.join("release"), &mut yes, &mut |_| {}).unwrap_err();
-        assert!(why.contains("not measured yet"), "{why}");
+        assert!(why.contains("--home"), "{why}");
         assert!(absent(&on(&lamp.0, PROFILE)));
         assert!(absent(&on(&lamp.0, "/etc/lampOS/voice/provider.json")));
         assert!(absent(&on(&lamp.0, "/var/lib/lampos-locks")));
