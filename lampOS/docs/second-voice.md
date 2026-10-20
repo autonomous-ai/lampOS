@@ -2224,6 +2224,8 @@ medians (and the 90th percentile of the first byte, the first event and
 the words), and,
 with both targets, the relay's medians less DeepSeek's own, step by step
 (`wire relay-less-direct size=lamp tcp_ms=+… tls_ms=+… …`).
+Each run begins on the next size (`kind_order`), so no size is always
+asked first, or after the same one, and the prompt cache favours none.
 
 Only a 200 is timed, on a connection of its own as on a kept one: a
 refused answer's line says its status, and it is counted `closed`, so its
@@ -2249,6 +2251,26 @@ systemd-run --pty --wait \
 `--wire --kept` takes the same command with `--kept` after `--wire`, at most
 20 runs (`MOST_KEPT_RUNS`). Its 10 runs ask 120 requests and wait 5 s 40
 times, about 4 minutes.
+
+**The request's size** (`--wire --sizes`, #2135; the first builder on
+#1722, 20 Oct 16:30). The chat's first event is about 1.6 s median of a
+turn's 2.1 s on lamp-4ace. This measures whether a smaller first request
+brings it sooner, before anyone trims one. It takes the same command with
+`--sizes` after `--wire`. Each run asks each target three requests in place
+of `lamp` and `small` (`Size::SIZES`):
+- **lamp:** today's spoken first round, as above.
+- **few:** the same, given only what `LAMP_SECOND_FEW_TOOLS=on` gives a
+  first round. It's the route's own `worker::few_tools` on the chat, so
+  `more_functions` is among them.
+- **half:** every function, with the character cut to its first half
+  (`half`: at the last line break before its middle, else the last space,
+  else the middle).
+
+After each size's medians come `wire target=… few-less-lamp …` and
+`wire target=… half-less-lamp …`: each step's median less the lamp's
+(negative is sooner). Its 10 runs ask 30 requests on each target. As for
+`lamp`, its bytes are under a real turn's, so read them beside the route's
+own `chat request` journal line.
 
 **The route's speech** (`--wire --speech`, #1934, 20 Oct 08:36). The second
 route's speech goes through the relay too: `tts_base_url` is

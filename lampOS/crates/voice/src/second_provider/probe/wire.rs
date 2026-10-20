@@ -41,6 +41,15 @@
 //! `net.ipv4.tcp_slow_start_after_idle` is 0; their difference is what that
 //! setting would buy. Each request has its own changing part, as turns do.
 //!
+//! With `--sizes` (#2135; the first builder on #1722, 20 Oct 16:30), each
+//! target is asked the lamp's request three ways instead of `lamp` and
+//! `small` ([`Size::SIZES`]): as it is, given only the functions
+//! `LAMP_SECOND_FEW_TOOLS=on` gives a first round, and with its character
+//! cut in half ([`half`]). Each size's medians, then each smaller one's less
+//! the lamp's, say whether trimming the first request brings DeepSeek's
+//! first token sooner. Every run on connections of their own begins on the
+//! next size ([`kind_order`]), so the prompt cache favours none.
+//!
 //! With `--socket` (#2135's row; the first builder on #1722, 20 Oct 10:37),
 //! each run asks each target for a piece on a kept HTTP connection, as the
 //! route sends its pieces, and the same piece on ElevenLabs' speech socket
@@ -93,34 +102,66 @@ const MOST_ANSWER: usize = 1 << 20;
 /// The small request's system message.
 pub const SMALL: &str = "You are a desk lamp. Answer in one short sentence.";
 
-/// Which of the two requests.
+/// Which request: the two `--wire` asks, or with `--sizes` the lamp's
+/// three.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Size {
     Lamp,
     Small,
+    /// The lamp's, given only the few functions `LAMP_SECOND_FEW_TOOLS=on`
+    /// gives a spoken turn's first round (`worker::few_tools`).
+    Few,
+    /// The lamp's, with its character cut to the first half ([`half`]).
+    Half,
 }
 
 impl Size {
     pub const ALL: [Self; 2] = [Self::Lamp, Self::Small];
+    /// `--sizes` (#2135, the first builder on #1722 at 16:30): whether a
+    /// smaller first round brings DeepSeek's first token sooner, before
+    /// anyone trims one.
+    pub const SIZES: [Self; 3] = [Self::Lamp, Self::Few, Self::Half];
 
     pub fn name(self) -> &'static str {
         match self {
             Self::Lamp => "lamp",
             Self::Small => "small",
+            Self::Few => "few",
+            Self::Half => "half",
         }
     }
 
     /// The request's messages in `run`: a spoken turn's, with its own
-    /// changing part each run, or one short line.
+    /// changing part each run (its character halved for `Half`), or one
+    /// short line.
     pub fn messages(self, character: &str, run: u32) -> Vec<Message> {
-        match self {
-            Self::Lamp => vec![
+        let turn = |character: &str| {
+            vec![
                 Message::system(format!("{character}\n\n{}", cache::changing(run))),
                 Message::user(cache::QUESTION),
-            ],
+            ]
+        };
+        match self {
+            Self::Lamp | Self::Few => turn(character),
+            Self::Half => turn(half(character)),
             Self::Small => vec![Message::system(SMALL), Message::user(cache::QUESTION)],
         }
     }
+}
+
+/// The first half of `character`, by characters, ended at the last line
+/// break before its middle, else the last space, else its middle.
+pub fn half(character: &str) -> &str {
+    let middle = character
+        .char_indices()
+        .nth(character.chars().count() / 2)
+        .map_or(character.len(), |(at, _)| at);
+    let first = &character[..middle];
+    let end = first
+        .rfind('\n')
+        .or_else(|| first.rfind(' '))
+        .unwrap_or(middle);
+    character[..end].trim_end()
 }
 
 /// Each request on one kept connection (`--kept`): the first, which makes
@@ -809,13 +850,15 @@ struct Prepared {
 }
 
 /// How `--wire` asks: on one kept connection (`--kept`), the route's speech
-/// instead of its chat (`--speech`), or a piece on a kept connection beside
-/// the same on a speech socket opened ahead (`--socket`).
+/// instead of its chat (`--speech`), a piece on a kept connection beside
+/// the same on a speech socket opened ahead (`--socket`), or the lamp's
+/// request in its three sizes (`--sizes`, [`Size::SIZES`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Mode {
     pub kept: bool,
     pub speech: bool,
     pub socket: bool,
+    pub sizes: bool,
 }
 
 /// The probe, as `lamp-voice probe-cascade … --wire [--kept] [--speech]` or `--wire --socket`
@@ -861,19 +904,21 @@ fn prepare(
             credentials.as_deref(),
             runs,
             &how("each target and size"),
+            mode.sizes,
         )?
     };
     Ok(Prepared { targets, tls })
 }
 
 /// The chat's targets, the relay and DeepSeek's own API, each asked the
-/// lamp's request and the small one.
+/// lamp's request and the small one, or with `sizes` the lamp's three.
 fn chat_targets(
     provider_config: &Path,
     config: &SecondConfig,
     credentials: Option<&OsStr>,
     runs: u32,
     how: &str,
+    sizes: bool,
 ) -> io::Result<Vec<(&'static str, Vec<Kind>)>> {
     let provider = crate::config::ProviderConfig::load(provider_config)?;
     let character: Arc<str> = provider.instruction(false)?.into();
@@ -883,18 +928,14 @@ fn chat_targets(
     let declared = super::tools::functions(Some(actions));
     let count = declared.len();
     let all: Declare = Arc::new(move || declared.clone());
-    let none: Declare = Arc::new(Vec::new);
     let model = &config.hosted.deepseek_model;
+    let asked: &[Size] = if sizes { &Size::SIZES } else { &Size::ALL };
     let kinds = |base: &str, key: &str| -> io::Result<Vec<Kind>> {
-        Size::ALL
-            .into_iter()
+        asked
+            .iter()
+            .copied()
             .map(|size| {
-                let declare = match size {
-                    Size::Lamp => all.clone(),
-                    Size::Small => none.clone(),
-                };
-                let chat = Chat::deepseek_at(base, model, key, declare, false)
-                    .map_err(io::Error::other)?;
+                let chat = size_chat(base, model, key, &all, size)?;
                 let character = character.clone();
                 Ok(Kind {
                     before: "",
@@ -925,6 +966,27 @@ fn chat_targets(
         "wire: DeepSeek's {model}, thinking off, {count} functions on the lamp's request, {runs} runs, {how}"
     );
     Ok(targets)
+}
+
+/// The chat `size` is asked on: every function in `all` but for `small`,
+/// which has none, and for `few` only those `LAMP_SECOND_FEW_TOOLS=on`
+/// gives a first round (`worker::few_tools`).
+pub fn size_chat(
+    base: &str,
+    model: &str,
+    key: &str,
+    all: &Declare,
+    size: Size,
+) -> io::Result<Chat> {
+    let declare: Declare = match size {
+        Size::Small => Arc::new(Vec::new),
+        Size::Lamp | Size::Few | Size::Half => all.clone(),
+    };
+    let chat = Chat::deepseek_at(base, model, key, declare, false).map_err(io::Error::other)?;
+    if size == Size::Few {
+        chat.narrowing(Arc::new(crate::second_provider::worker::few_tools));
+    }
+    Ok(chat)
 }
 
 /// The speech's targets: the route's own (`tts_base_url`: the relay,
@@ -989,6 +1051,13 @@ fn speech_targets(
     Ok(targets)
 }
 
+/// The order run `run` asks `kinds` kinds in: each run begins on the next,
+/// so none is always asked first or after the same one, as the service's
+/// prompt cache holds what a request before it shared.
+pub fn kind_order(run: u32, kinds: usize) -> impl Iterator<Item = usize> {
+    (0..kinds).map(move |step| (step + run as usize) % kinds)
+}
+
 /// Each request on a connection of its own.
 fn run_cold(prepared: &Prepared, runs: u32) -> io::Result<()> {
     let Prepared { targets, tls } = prepared;
@@ -998,7 +1067,7 @@ fn run_cold(prepared: &Prepared, runs: u32) -> io::Result<()> {
         .map(|_| (0..kinds).map(|_| Kept::default()).collect())
         .collect();
     for run in 1..=runs {
-        for index in 0..kinds {
+        for index in kind_order(run, kinds) {
             for ((name, kinds), kept) in targets.iter().zip(&mut kept) {
                 let kind = &kinds[index];
                 let label = kind.named("", &format!("target={name}"));
@@ -1040,7 +1109,39 @@ fn run_cold(prepared: &Prepared, runs: u32) -> io::Result<()> {
             );
         }
     }
+    // With `--sizes`, what each smaller request saves against the lamp's,
+    // on each target (negative is sooner).
+    for line in less_than_lamp(targets, &kept) {
+        println!("{line}");
+    }
     Ok(())
+}
+
+/// Each target's `few` and `half` medians less its `lamp`'s, when it was
+/// asked the lamp's three sizes.
+fn less_than_lamp(targets: &[(&'static str, Vec<Kind>)], kept: &[Vec<Kept>]) -> Vec<String> {
+    let mut lines = Vec::new();
+    for ((name, kinds), kept) in targets.iter().zip(kept) {
+        let at = |size: Size| {
+            kinds
+                .iter()
+                .position(|kind| kind.after == format!(" size={}", size.name()))
+        };
+        let Some(lamp) = at(Size::Lamp) else {
+            continue;
+        };
+        for size in [Size::Few, Size::Half] {
+            if let Some(index) = at(size) {
+                lines.push(less(
+                    &format!("target={name} {}-less-lamp", size.name()),
+                    &kept[index],
+                    &kept[lamp],
+                    Reading::Events,
+                ));
+            }
+        }
+    }
+    lines
 }
 
 /// What became of one arm's request on a kept connection ([`kept_arms`]).
@@ -1929,6 +2030,110 @@ mod tests {
         let (_, _, body) = small.wire(&Size::Small.messages("CHARACTER", 3));
         assert!(body.get("tools").is_none());
         assert_eq!(body["messages"][0]["content"], SMALL);
+    }
+
+    /// `--sizes` (#2135): the lamp's request three ways, the same but for
+    /// what is asked. `few` is given only what `LAMP_SECOND_FEW_TOOLS=on`
+    /// gives a first round, `more_functions` among them; `half` has the
+    /// first half of the character and every function.
+    #[test]
+    fn the_lamps_three_sizes_differ_only_in_their_functions_or_character() {
+        let declared = cache::functions();
+        let count = declared.len();
+        let all: Declare = Arc::new(move || declared.clone());
+        let base = "https://relay.example.invalid/api/v1/ai/v1/deepseek";
+        let chat = |size| size_chat(base, "deepseek-flash", "k", &all, size).unwrap();
+        let (lamp, few, half_chat) = (chat(Size::Lamp), chat(Size::Few), chat(Size::Half));
+        let character = "First line of the character.\nSecond line, a little longer.\nThird.";
+        let names = |body: &Value| -> Vec<String> {
+            body["tools"]
+                .as_array()
+                .map(|tools| {
+                    tools
+                        .iter()
+                        .filter_map(|tool| tool["function"]["name"].as_str().map(str::to_owned))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let (_, _, lamp) = lamp.wire(&Size::Lamp.messages(character, 2));
+        let (_, _, few) = few.wire(&Size::Few.messages(character, 2));
+        let (_, _, halved) = half_chat.wire(&Size::Half.messages(character, 2));
+        assert_eq!(names(&lamp).len(), count);
+        assert_eq!(names(&halved), names(&lamp));
+        let few_names = names(&few);
+        assert!(few_names.len() < count, "{few_names:?}");
+        assert!(
+            few_names.iter().any(|name| name == "more_functions"),
+            "{few_names:?}"
+        );
+        assert_eq!(few["messages"], lamp["messages"]);
+        let system = |body: &Value| body["messages"][0]["content"].as_str().unwrap().to_owned();
+        assert!(system(&lamp).starts_with(character));
+        assert!(system(&halved).starts_with("First line of the character.\n\nRequest 2 "));
+        assert_eq!(halved["messages"][1], lamp["messages"][1]);
+        assert!(serde_json::to_vec(&few).unwrap().len() < serde_json::to_vec(&lamp).unwrap().len());
+    }
+
+    /// The character's first half ends at a line break before its middle,
+    /// else a space, else its middle; and a cut is never inside a
+    /// character.
+    #[test]
+    fn half_the_character_ends_at_a_line_or_a_word() {
+        assert_eq!(half("one two\nthree four five six"), "one two");
+        assert_eq!(half("one two three four"), "one two");
+        assert_eq!(half("abcdefgh"), "abcd");
+        assert_eq!(half("đèn đèn\nđèn đèn đèn"), "đèn đèn");
+        assert_eq!(half(""), "");
+    }
+
+    /// Each run begins on the next kind: over as many runs as kinds, each
+    /// is asked first once, and every run asks each once.
+    #[test]
+    fn each_run_begins_on_the_next_kind() {
+        let firsts: Vec<usize> = (1..=3)
+            .map(|run| kind_order(run, 3).next().unwrap())
+            .collect();
+        assert_eq!(firsts, [1, 2, 0]);
+        for run in 1..=5 {
+            let mut asked: Vec<usize> = kind_order(run, 3).collect();
+            asked.sort_unstable();
+            assert_eq!(asked, [0, 1, 2], "run {run}");
+        }
+        assert_eq!(kind_order(4, 2).collect::<Vec<_>>(), [0, 1]);
+    }
+
+    /// With `--sizes`, each target's `few` and `half` medians less its
+    /// `lamp`'s; without them, no line.
+    #[test]
+    fn each_smaller_size_is_told_less_the_lamps() {
+        let kind = |size: Size| Kind {
+            before: "",
+            after: format!(" size={}", size.name()),
+            reading: Reading::Events,
+            request: Box::new(|_| Err(io::Error::other("not asked"))),
+        };
+        let kept = |first_event: u64| Kept {
+            first_byte: vec![first_event.saturating_sub(10)],
+            first_event: vec![first_event],
+            words: vec![first_event + 5],
+            ..Kept::default()
+        };
+        let targets = vec![(
+            "relay",
+            vec![kind(Size::Lamp), kind(Size::Few), kind(Size::Half)],
+        )];
+        let lines = less_than_lamp(&targets, &[vec![kept(1600), kept(1300), kept(1500)]]);
+        assert_eq!(lines.len(), 2, "{lines:?}");
+        assert!(
+            lines[0].starts_with("wire target=relay few-less-lamp "),
+            "{}",
+            lines[0]
+        );
+        assert!(lines[0].contains(" first_event_ms=-300"), "{}", lines[0]);
+        assert!(lines[1].contains("half-less-lamp") && lines[1].contains(" first_event_ms=-100"));
+        let plain = vec![("relay", vec![kind(Size::Lamp), kind(Size::Small)])];
+        assert!(less_than_lamp(&plain, &[vec![kept(1), kept(1)]]).is_empty());
     }
 
     #[test]
