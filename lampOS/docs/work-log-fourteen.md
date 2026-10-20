@@ -357,3 +357,28 @@ Ready for lamp-voice: no (claims and a scoping note only)
   is otherwise complete (four pieces on ecm-sds-mobile#11, awaiting
   review). Nothing else of mine is unblocked at this moment; said so
   rather than invent filler.
+
+## 2026-10-20 — #2094 — folded the own-keys isNotOnThisLamp duplicate
+
+Ready for lamp-voice: no (the app side; nothing a lamp runs is on this
+branch)
+
+- Mobile, 13:4x on #1722, confirming the #2193/#2194 split: pointed at
+  `isNotOnThisLamp` from `domain/constants/lamp_answers.dart` as the
+  convention to use — already on `v3` since #8/#9 merged, which is exactly
+  what `lamp_own_keys.dart`'s own doc comment had promised to fold into
+  once it landed. Did it: dropped the local
+  `lampOwnKeysIsNotOnThisLamp` duplicate, imported the shared one in the
+  notifier and the test.
+- Gate: `flutter analyze` 29/29 unchanged. `flutter test`: isolated runs of
+  every touched/flagged file pass cleanly (13/13 on
+  `lamp_own_keys_test.dart` alone); full-suite runs keep showing a
+  different, non-overlapping file or two failing to *load* each time —
+  this run's extras were `resting_light_test.dart` (untouched by this
+  branch) on one `-j 2` pass and `autonomous_os_chat_store_test.dart`
+  (also untouched) on a fully serial `-j 1` pass, neither reproducing in
+  isolation. Environmental on this machine, not this change — the only
+  failure that ever reproduces alone is the one pre-existing
+  `key_insight_period_test.dart`.
+- Pushed to `fourteen/own-keys` (`35ccd5ca`). Replied to Mobile on
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6285152973).
