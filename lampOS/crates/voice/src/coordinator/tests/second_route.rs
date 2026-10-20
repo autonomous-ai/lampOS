@@ -3119,3 +3119,47 @@ fn a_name_said_just_after_a_line_that_ended_before_it_goes_on_from_it() {
         assert_eq!(run.finished(1)["outcome"], "user_interrupted", "on {on}");
     }
 }
+
+/// The reviewer's P3s on #2355: in a room busy with other people's talk, a
+/// sound begun just after a line that ended before its name is still held
+/// by the busy-room floor, as the room's next voice is, never joined to the
+/// line as its name. The colleague's "…see you at lunch" never becomes the
+/// person's name. With the switch, as without it.
+#[test]
+fn in_a_busy_room_a_sound_after_a_line_that_ends_before_its_name_is_held_as_before() {
+    let _one = super::pilot_faults::one_session();
+    TEST_ROOM_BUSY.with(|busy| busy.set(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        open_name: true,
+        second_hears: Some("Hey Lamp, my name is"),
+        second_waits_first: true,
+        speak_again: Some(When::Ended(1)),
+        mute_at_frame: Some(300),
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_ROOM_BUSY.with(|busy| busy.set(false));
+    run.assert_clean();
+    assert_eq!(run.events("open_name").len(), 1, "{}", run.summary());
+    assert!(!run.events("floor_held").is_empty(), "{}", run.summary());
+    assert!(
+        !run.events("input_admitted")
+            .iter()
+            .any(|admitted| admitted["goes_on_from_its_name"] == true),
+        "{}",
+        run.summary()
+    );
+    assert!(
+        !run.seen.second.iter().any(|input| matches!(
+            input,
+            ProviderInput::Start {
+                continues_cut_off: true,
+                ..
+            }
+        )),
+        "{}",
+        run.summary()
+    );
+}

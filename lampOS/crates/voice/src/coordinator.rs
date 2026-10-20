@@ -4253,6 +4253,10 @@ thread_local! {
     /// A loop test's `LAMP_WAIT_KEEPS_ANSWER=on` (#1123), as
     /// `TEST_CAMERA_FOLLOWS_EYES`.
     static TEST_WAIT_KEEPS_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's room busy with other people's talk, for the busy-room
+    /// hold, as `TEST_CAMERA_FOLLOWS_EYES`: the fixture plays no three
+    /// unanswered lines.
+    static TEST_ROOM_BUSY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -6556,7 +6560,11 @@ fn conversation_with_gate(
                     // voice: until its answer begins, or 1.8 s have gone
                     // without one, a new sound does not take the turn.
                     let at_us = monotonic_us();
-                    let holding = room.busy()
+                    #[cfg(not(test))]
+                    let busy = room.busy();
+                    #[cfg(test)]
+                    let busy = room.busy() || TEST_ROOM_BUSY.with(std::cell::Cell::get);
+                    let holding = busy
                         && reply.as_ref().is_some_and(|current| {
                             let turn = current.owner.turn();
                             current.local_input_ended
@@ -6572,9 +6580,11 @@ fn conversation_with_gate(
                                 }
                         });
                     // A sound begun just after a line that ended before its
-                    // name goes on from it (`LAMP_SECOND_OPEN_NAME`): no rule
-                    // that keeps the awaited answer lets it go, the keeper's
-                    // pause aside.
+                    // name goes on from it (`LAMP_SECOND_OPEN_NAME`): the
+                    // answer wait and the body's motors don't let it go. The
+                    // keeper's pause, the busy-room hold and asker-first,
+                    // which keep the room's next voice off an awaited answer,
+                    // still do (the reviewer's P3 on #2355).
                     let goes_on_from_name = open_name::goes_on(
                         open_name_turn,
                         reply
@@ -6582,7 +6592,6 @@ fn conversation_with_gate(
                             .map(|current| (current.owner.turn(), answer_unheard(current))),
                         candidate.first_read_at_us,
                     );
-                    let holding = holding && !goes_on_from_name;
                     if paused {
                         // Paused by the keeper: a new sound takes no turn,
                         // whether or not one is under way; that one goes on.
@@ -6939,9 +6948,7 @@ fn conversation_with_gate(
                     let judged = reply
                         .as_ref()
                         .filter(|current| {
-                            !goes_on_from_name
-                                && current.local_input_ended
-                                && (current.playback.is_none() || waited)
+                            current.local_input_ended && (current.playback.is_none() || waited)
                         })
                         .and_then(|current| {
                             let turn = current.owner.turn();
