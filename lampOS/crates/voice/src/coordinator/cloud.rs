@@ -308,6 +308,7 @@ mod tests {
                         after_stop: false,
                         follows_on: false,
                         over_the_lamps_voice: false,
+                        heard_of_cut: None,
                     })
                     .is_err()
             );
@@ -326,6 +327,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         assert!(request.confirm_start(3).is_err());
@@ -351,6 +353,7 @@ mod tests {
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 })
                 .unwrap();
             if stage == FailedStage::AwaitingResponse {
@@ -398,6 +401,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         if ended {
@@ -551,6 +555,7 @@ mod tests {
             last_provider_audio_at_us: None,
             start: lamp_audio::playout::StartGate::new(0),
             need: lamp_audio::playout::StartNeed::default(),
+            handed: 0,
         };
         (owner, Some(reply))
     }
@@ -761,6 +766,7 @@ mod tests {
                             after_stop: false,
                             follows_on: false,
                             over_the_lamps_voice: false,
+                            heard_of_cut: None,
                         })
                         .unwrap();
                     fresh.confirm_start(2).unwrap();

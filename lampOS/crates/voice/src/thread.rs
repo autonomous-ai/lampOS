@@ -126,6 +126,9 @@ pub struct Thread {
     changed: bool,
     /// The answer that opened with a function's name, if the newest did.
     unsaid: Option<u64>,
+    /// The newest answer a line or a Stop cut, kept as what was heard of it
+    /// (`LAMP_SAID_AS_HEARD`, [`Self::heard_only`]): no more of it is kept.
+    cut: Option<u64>,
     calls: crate::not_speech::CallsLeftOut,
     /// Who is at the lamp now, as the worker counts it: whose session it
     /// is, and whose a new exchange is when the eyes name nobody.
@@ -225,6 +228,7 @@ impl Thread {
             heard_done: false,
             changed: false,
             unsaid: None,
+            cut: None,
             calls: crate::not_speech::CallsLeftOut::new(),
             whose: None,
             named: None,
@@ -522,6 +526,11 @@ impl Thread {
         if self.unsaid == Some(request) {
             return;
         }
+        // An answer cut, kept as what was heard of it: what it still sends
+        // was never heard.
+        if self.cut == Some(request) {
+            return;
+        }
         let opening = self.exchanges.back().map(|last| last.request) != Some(request);
         if opening && crate::not_speech::names_a_function(text) {
             self.unsaid = Some(request);
@@ -633,6 +642,29 @@ impl Thread {
         self.heard_at = Some(self.heard_at.map_or(exchange.at, |at| at.max(exchange.at)));
         // Whatever comes next of what they say belongs with it.
         self.heard_done = false;
+        self.changed = true;
+    }
+
+    /// The lamp's words for `request` are only `said`, what was played of its
+    /// answer before a line or a Stop cut it (`LAMP_SAID_AS_HEARD`,
+    /// [`crate::said_as_heard`]), and nothing more of that answer is kept.
+    /// With nothing played, `said` is empty and the exchange is passed over
+    /// as one where the lamp said no word. Nothing changes for an answer
+    /// the thread doesn't hold.
+    pub fn heard_only(&mut self, request: u64, said: &str) {
+        self.cut = Some(request);
+        let Some(exchange) = self
+            .exchanges
+            .iter_mut()
+            .rev()
+            .find(|exchange| exchange.request == request)
+        else {
+            return;
+        };
+        exchange.lamp.clear();
+        exchange.tail.clear();
+        add(&mut exchange.lamp, said, LAMP_BYTES);
+        keep_end(&mut exchange.tail, said, TAIL_BYTES);
         self.changed = true;
     }
 
@@ -1659,6 +1691,44 @@ mod tests {
         let finished = thread.finished(2, at(5));
         assert_eq!(finished.len(), 1);
         assert_eq!(finished[0].request, 2);
+    }
+
+    /// `LAMP_SAID_AS_HEARD`: an answer a line cut after its first words is
+    /// kept as those words, and what it still sends adds none. Its end is
+    /// the heard end, so a question it never played isn't taken as asked. One
+    /// cut before any word is passed over, as an answer with no word is.
+    #[test]
+    fn an_answer_cut_is_kept_as_what_was_heard_of_it() {
+        let mut thread = Thread::new();
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        let within = Duration::from_secs(300);
+        thread.person("Tell me a story.", true, at(1));
+        thread.lamp(1, "Once a keeper lived by the sea. ", at(2));
+        thread.lamp(1, "Do you want to hear more? ", at(2));
+        assert!(thread.lamp_asked(2), "as sent, it asked");
+        thread.heard_only(1, "Once a keeper lived—");
+        thread.lamp(1, "One winter a ship came. ", at(3));
+        let recent = thread.recent(at(4), within, 6);
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].person, "Tell me a story.");
+        assert_eq!(recent[0].lamp, "Once a keeper lived—");
+        assert!(!thread.lamp_asked(2), "its question was never played");
+        // The next answer is kept whole.
+        thread.person("Who was he?", true, at(5));
+        thread.lamp(2, "A keeper named Tom. ", at(6));
+        thread.lamp(2, "He was kind. ", at(6));
+        let recent = thread.recent(at(7), within, 6);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[1].lamp, "A keeper named Tom. He was kind.");
+        // Nothing played of it: the exchange is passed over.
+        thread.heard_only(2, "");
+        let recent = thread.recent(at(7), within, 6);
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].lamp, "Once a keeper lived—");
+        // Nothing for an answer the thread doesn't hold.
+        thread.heard_only(9, "Anything.");
+        assert_eq!(thread.recent(at(7), within, 6).len(), 1);
     }
 
     /// #1505: the thread file as a later build writes it, with a field this

@@ -122,6 +122,7 @@ impl Harness {
             last_provider_audio_at_us: None,
             start: lamp_audio::playout::StartGate::new(0),
             need: lamp_audio::playout::StartNeed::default(),
+            handed: 0,
         };
         Self {
             owner,
@@ -370,6 +371,33 @@ impl Harness {
     fn commit_with(&mut self, accepted: Accepted, cut_in: bool) -> VecDeque<ProviderInput> {
         self.commit_told(accepted, cut_in, false, false)
     }
+    /// Committed with how much of the reply it cuts was played
+    /// (`LAMP_SAID_AS_HEARD`).
+    fn commit_heard(
+        &mut self,
+        accepted: Accepted,
+        cut: crate::said_as_heard::HeardOfCut,
+    ) -> VecDeque<ProviderInput> {
+        let mut queue = VecDeque::new();
+        commit_admitted_input(
+            &mut self.owner,
+            &mut self.reply,
+            &mut None,
+            &mut queue,
+            accepted,
+            1,
+            false,
+            true,
+            None,
+            Some(cut),
+            false,
+            PlayoutStart::default(),
+            &mut self.trace,
+            |_| Ok(()),
+        )
+        .unwrap();
+        queue
+    }
     fn commit_told(
         &mut self,
         accepted: Accepted,
@@ -388,6 +416,7 @@ impl Harness {
             false,
             cut_in,
             after_stop.then_some((1, 1)),
+            None,
             follows_on,
             PlayoutStart::default(),
             &mut self.trace,
@@ -439,6 +468,83 @@ fn v1_baseline_first_write_race_waits_then_discards_original_overlapping_input()
             .is_none()
     );
     assert!(!h.admission.owns_stream());
+}
+
+/// `LAMP_SAID_AS_HEARD`: a reply counts the samples it hands the speaker,
+/// not its last chunk's padding. A line that cuts it is told how much was
+/// played, on its Start and in its record. With no reply in hand, the next
+/// line on a Stop's session is told what the Stop cut, once. Off, nothing.
+#[test]
+fn a_line_that_cuts_a_reply_is_told_how_much_of_it_was_played() {
+    use crate::said_as_heard::HeardOfCut;
+    let mut h = Harness::new(TurnTaking::V1Baseline);
+    let reply = h.reply.as_mut().unwrap();
+    reply.pcm = vec![7; 600].into();
+    reply.generation_done = true;
+    // 240, 240 and its last 120, padded to 240.
+    for _ in 0..3 {
+        assert!(reply.next_speaker_chunk().is_some());
+    }
+    assert!(reply.next_speaker_chunk().is_none());
+    assert_eq!(reply.handed, 600);
+    let request = reply.owner.turn();
+    let mut stop_cut = None;
+    let cut = heard_of_cut(true, h.reply.as_ref(), &mut stop_cut, 1);
+    assert_eq!(
+        cut,
+        Some(HeardOfCut {
+            request,
+            samples: 600
+        })
+    );
+    assert_eq!(
+        heard_of_cut(false, h.reply.as_ref(), &mut stop_cut, 1),
+        None
+    );
+    let stopped = HeardOfCut {
+        request: 3,
+        samples: 4_800,
+    };
+    stop_cut = Some((stopped, 1));
+    assert_eq!(heard_of_cut(true, None, &mut stop_cut, 1), Some(stopped));
+    assert_eq!(heard_of_cut(true, None, &mut stop_cut, 1), None, "once");
+    stop_cut = Some((stopped, 1));
+    assert_eq!(heard_of_cut(true, None, &mut stop_cut, 2), None);
+    assert!(stop_cut.is_none(), "another session's is let go");
+    stop_cut = Some((stopped, 1));
+    assert_eq!(heard_of_cut(false, None, &mut stop_cut, 1), None, "off");
+    // The line that cuts it carries it.
+    h.dispatch(10_000);
+    h.accepted(11_000, 11_000);
+    h.drain(20_000);
+    let mut accepted = None;
+    for n in 1..=30 {
+        if let Some(a) = h.feed(20_000 + TAIL_US + n * 10_000, 0.99).unwrap() {
+            accepted = Some(a);
+            break;
+        }
+    }
+    let cut = cut.unwrap();
+    let queue = h.commit_heard(accepted.expect("a line"), cut);
+    assert!(
+        queue.iter().any(|input| matches!(
+            input,
+            ProviderInput::Start {
+                heard_of_cut: Some(told),
+                ..
+            } if *told == cut
+        )),
+        "{queue:?}"
+    );
+    let admitted = h
+        .trace
+        .iter()
+        .find(|event| event["kind"] == "input_admitted")
+        .expect("admitted");
+    assert_eq!(
+        admitted["heard_of_cut"],
+        serde_json::json!({"request": request, "samples": 600})
+    );
 }
 
 #[test]

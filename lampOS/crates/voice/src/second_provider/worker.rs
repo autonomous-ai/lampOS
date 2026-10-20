@@ -3751,6 +3751,35 @@ pub(crate) fn texts_system_message(character: &str, time: Option<&str>, memory: 
     }
 }
 
+/// With `LAMP_SAID_AS_HEARD=on`, a line that cut the lamp's answer, or the
+/// first after a Stop that cut one, says how much of it was played: only
+/// those words of it are kept as the lamp's ([`crate::said_as_heard`],
+/// [`crate::thread::Thread::heard_only`]). The journal says so, in counts.
+pub(super) fn keep_heard(
+    thread: &mut crate::thread::Thread,
+    engine: &Engine,
+    command: &ProviderInput,
+) {
+    let ProviderInput::Start {
+        request,
+        heard_of_cut: Some(cut),
+        ..
+    } = command
+    else {
+        return;
+    };
+    let Some((said, sent)) = engine.said_as_heard(*cut) else {
+        return;
+    };
+    thread.heard_only(cut.request, &said);
+    eprintln!(
+        "lamp-voice second: request {}: {} of its answer's {sent} words were played, {} ms of it, before it was cut; request {request} is asked with only those as the lamp's",
+        cut.request,
+        said.split_whitespace().count(),
+        cut.samples * 1_000 / u64::from(super::net::TTS_SAMPLE_RATE),
+    );
+}
+
 /// One exchange as chat messages. A request the lamp was given in writing
 /// goes as a system note, never as words a person said; nothing is sent
 /// for a person who said nothing.
@@ -3939,6 +3968,17 @@ pub async fn run(
                     } else {
                         thread.written(*request, text);
                     }
+                }
+                // What was played of an answer this line, or the Stop
+                // before it, cut is the lamp's words of it, before the
+                // line is asked (`LAMP_SAID_AS_HEARD`).
+                if let ProviderInput::Start {
+                    heard_of_cut: Some(_),
+                    ..
+                } = &command
+                    && let Ok(mut thread) = crate::thread::THREAD.lock()
+                {
+                    keep_heard(&mut thread, &engine, &command);
                 }
                 engine.submit(command);
             }
@@ -4823,6 +4863,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         };
         assert!(gate.admits(now_us, &start(first.turn())).unwrap());
         engine.submit(start(first.turn()));

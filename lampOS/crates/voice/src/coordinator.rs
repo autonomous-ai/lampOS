@@ -570,6 +570,9 @@ struct Reply {
     plan: OutputOwner,
     playback: Option<PlaybackToken>,
     pcm: VecDeque<i16>,
+    /// Its samples handed to the speaker so far: how much of it was played
+    /// when a line or a Stop cut it (`LAMP_SAID_AS_HEARD`).
+    handed: u64,
     generation_done: bool,
     provider_idle: bool,
     input_sequence: u64,
@@ -762,6 +765,7 @@ impl Reply {
                 None => break,
             }
         }
+        self.handed += samples.len() as u64;
         samples.resize(240, 0);
         self.voice_level = crate::ring_face::level_of(&samples);
         Some((samples, final_chunk))
@@ -4053,6 +4057,11 @@ fn conversation_with_gate(
     // session it cut tells it (`LAMP_STOP_TOLD=on`, off until it is played).
     let stop_told = crate::not_speech::stop_told_from_environment();
     let mut stop_untold = crate::not_speech::StopToTell::default();
+    // What was played of a reply that a line or a Stop cut is told to that
+    // line, or to the next on the session the Stop cut
+    // (`LAMP_SAID_AS_HEARD=on`, `crate::said_as_heard`).
+    let said_as_heard = crate::said_as_heard::from_environment();
+    let mut stop_cut: Option<(crate::said_as_heard::HeardOfCut, u64)> = None;
     let mut spoke_in_turn: Option<u64> = None;
     // The head tap's "hm?" (#711): its sound, made once for the cycle when
     // the head is read, and when it last played, so it plays at most once
@@ -4816,6 +4825,11 @@ fn conversation_with_gate(
                     .reply
                     .as_ref()
                     .map(|current| current.cloud.session);
+                // How much of that answer was played, for the next line on
+                // its session (`LAMP_SAID_AS_HEARD`).
+                if said_as_heard && let Some(current) = cancellation.reply.as_ref() {
+                    stop_cut = Some((heard_of(current), current.cloud.session));
+                }
                 // A Stop, a head touch, the mute or a gap ends the unclear
                 // turn's asking too: nothing is asked again after it (#926).
                 let hum = asking.hum;
@@ -6436,6 +6450,12 @@ fn conversation_with_gate(
                         lamp_words_ended_us,
                         accepted.candidate.trigger_read_at_us,
                     );
+                    let heard_of_cut = heard_of_cut(
+                        said_as_heard,
+                        reply.as_ref(),
+                        &mut stop_cut,
+                        provider_session,
+                    );
                     snapshot = commit_admitted_input(
                         owner,
                         reply,
@@ -6446,6 +6466,7 @@ fn conversation_with_gate(
                         continues,
                         took_over,
                         stop_untold.take_for(provider_session, monotonic_us()),
+                        heard_of_cut,
                         follows_on,
                         rig.playout_start,
                         trace,
@@ -9577,6 +9598,7 @@ fn commit_written_turn(
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
+        handed: 0,
     };
     owner.input_ended(now(), current.owner)?;
     snapshot = owner.snapshot(now())?;
@@ -9610,6 +9632,31 @@ fn hear_the_call(
 /// Whether the lamp's own answer could be heard: the reply in hand had sound
 /// or is playing, not only in hand and silent while it waits for an answer
 /// (#828, the reviewer on #1291).
+/// How much of `current` was played: its request and the samples handed to
+/// the speaker (`LAMP_SAID_AS_HEARD`).
+fn heard_of(current: &Reply) -> crate::said_as_heard::HeardOfCut {
+    crate::said_as_heard::HeardOfCut {
+        request: current.owner.turn(),
+        samples: current.handed,
+    }
+}
+
+/// With `on` (`LAMP_SAID_AS_HEARD`), how much was played of the reply a line
+/// admitted on `session` cuts, or else of the one a Stop cut on that session
+/// (`stop_cut`). The Stop's is taken either way: it tells only the next line.
+fn heard_of_cut(
+    on: bool,
+    reply: Option<&Reply>,
+    stop_cut: &mut Option<(crate::said_as_heard::HeardOfCut, u64)>,
+    session: u64,
+) -> Option<crate::said_as_heard::HeardOfCut> {
+    let stopped = stop_cut
+        .take()
+        .filter(|(_, of)| *of == session)
+        .map(|(cut, _)| cut);
+    on.then(|| reply.map(heard_of).or(stopped)).flatten()
+}
+
 fn lamps_voice_heard(reply: Option<&Reply>) -> bool {
     reply.is_some_and(|current| current.had_audio || current.playback.is_some())
 }
@@ -9628,6 +9675,9 @@ fn commit_admitted_input(
     // The Stop this request tells of, when it is the first after one
     // (#829): when it came, and the session it cut.
     after_stop: Option<(u64, u64)>,
+    // How much was played of the reply it, or the Stop before it, cut
+    // (`LAMP_SAID_AS_HEARD`).
+    heard_of_cut: Option<crate::said_as_heard::HeardOfCut>,
     // Begun soon after the lamp's words finished (`crate::follows_on`).
     follows_on: bool,
     playout_start: PlayoutStart,
@@ -9664,6 +9714,9 @@ fn commit_admitted_input(
     if follows_on && after_stop.is_none() {
         admitted["follows_on"] = json!(true);
     }
+    if let Some(cut) = heard_of_cut {
+        admitted["heard_of_cut"] = json!({"request":cut.request,"samples":cut.samples});
+    }
     record(trace, admitted)?;
     provider_queue.push_back(ProviderInput::Start {
         session: provider_session,
@@ -9686,6 +9739,7 @@ fn commit_admitted_input(
         follows_on: follows_on && after_stop.is_none(),
         // Begun while the lamp's answer could be heard (#828).
         over_the_lamps_voice,
+        heard_of_cut,
     });
     let mut current = Reply {
         owner: turn,
@@ -9710,6 +9764,7 @@ fn commit_admitted_input(
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
+        handed: 0,
     };
     // One candidate's audio, already bounded by the admission's hold. The
     // standard hold's prefix fits the standing bound as it always has.
@@ -9813,6 +9868,7 @@ fn commit_offline_input(
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
+        handed: 0,
     };
     current.input_sequence = accepted.audio.len() as u64;
     if accepted.ended {
@@ -9975,6 +10031,7 @@ fn commit_back_online(
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
+        handed: 0,
     };
     owner.input_ended(now(), current.owner)?;
     snapshot = owner.snapshot(now())?;
@@ -10038,6 +10095,7 @@ fn continue_after_early_end(
         // model has it; marked again, it would be told twice (El on #1278).
         follows_on: false,
         over_the_lamps_voice: false,
+        heard_of_cut: None,
     });
     let mut current = Reply {
         owner: turn,
@@ -10062,6 +10120,7 @@ fn continue_after_early_end(
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
+        handed: 0,
     };
     // At most a pre-roll, as a new candidate's opening is.
     let bound = PROVIDER_QUEUE_BOUND.max(opening.len() + 2);
@@ -11733,6 +11792,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         request.confirm_start(1).unwrap();
@@ -11791,6 +11851,7 @@ mod tests {
                 last_provider_audio_at_us: None,
                 start: StartGate::new(0),
                 need: StartNeed::default(),
+                handed: 0,
             },
             permit,
         )
@@ -12656,6 +12717,7 @@ mod tests {
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),
+            handed: 0,
         });
         let started = monotonic_us();
         let observed = started + 20_000;
@@ -12942,6 +13004,7 @@ mod tests {
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),
+            handed: 0,
         });
         handle_playback_discard(
             &mut owner,
@@ -13041,6 +13104,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         }
     }
 
