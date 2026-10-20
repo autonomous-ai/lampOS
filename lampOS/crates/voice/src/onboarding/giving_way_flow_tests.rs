@@ -199,7 +199,7 @@ fn outcome(walk: &Onboarding) -> Option<Outcome> {
         .map(|kept| kept.outcome)
 }
 
-fn settle(walk: &mut Onboarding, at: u64) -> Vec<&'static str> {
+fn settle(walk: &mut Onboarding, at: u64) -> Vec<String> {
     // Up to the first note: the walk goes on to its next step after it.
     let mut notes = Vec::new();
     for _ in 0..4 {

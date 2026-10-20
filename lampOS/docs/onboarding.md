@@ -124,6 +124,45 @@ read or written, no turn
 `onboarding::tests::the_switch_is_on_only_with_on_and_an_absolute_file`).
 While the lamp is leading a step it does not also say the hello.
 
+### The nudge (`LAMP_ONBOARDING_NUDGE=on`)
+
+Off unless set; off, the walk is as above. Row 10 try 4 on lamp-52e6 (the
+second route, DeepSeek) found two things it changes:
+
+- **A step the model ends is nudged once.** The model heard the name in
+  lines of 4 and 10 words and called no function: it answered in talk. The
+  coordinator tells the walk of each line the person finished (the input
+  transcript). Once `who_you_are` has one line with words after its note,
+  or `preferences` two (it asks two things), and the step is still open,
+  the walk gives one note at the next quiet moment (3 s) to call
+  `setup_step` now. The one for `who_you_are` says to wait first if the
+  face question is still unanswered. Once per ask; the 90 s fail is as
+  before.
+- **"Who you are" falls back to the name heard.** Still not reported at a
+  quiet moment at least 10 s after that note (so an answer on the face can
+  come first), and the first line after the lamp spoke its question was one
+  or two words (after an "I'm") with no question, yes, no, greeting or
+  thanks: the walk has the model ask "Did I get that right, NAME?", unless
+  its face question is still unanswered. The yes, no and greeting words
+  are English only. A short yes line keeps
+  the step done, as the model's `done` would (the face is kept only by
+  `remember_my_face`); a no has it ask once more for the name, and then
+  the step goes on as before, failing at 90 s. The name is kept in memory
+  only, never in the session record.
+- **"Where you sit" takes a steady face after a guide.** The face was seen
+  in 39 of 40 looks, but the body's gaze kept nudging the head, so it was
+  never still for 3 s. After a guide, any face whose centre stays within
+  0.1 each way and its size within 20% of where the hold began, for 3 s,
+  is done where it is, its framing kept, whether or not the head is still;
+  a hand on the lamp (or one not freshly released) still holds it open. A
+  face that moves starts the 3 s again where it is now, and one that never
+  stays fails at 60 s as before. Before a guide, the rule is as above.
+
+Each step the model ends also gets one `onboarding_nudge` record when it is
+over: `answers` (lines with words), `nudged`, `reported` (the model called
+`setup_step`), `name_asked_back` and `name_confirmed`; counts and booleans,
+no words.
+
 ## Tests
 
 `onboarding::tests`, with a scripted room and face: the steps walked in

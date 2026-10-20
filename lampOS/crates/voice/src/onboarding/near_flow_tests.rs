@@ -208,7 +208,7 @@ fn named(walk: &Onboarding) -> Option<Outcome> {
 }
 
 /// Lets the step finish once no prompt is asked again: the notes said.
-fn settle(walk: &mut Onboarding, at: u64) -> Vec<&'static str> {
+fn settle(walk: &mut Onboarding, at: u64) -> Vec<String> {
     let mut notes = Vec::new();
     for _ in 0..4 {
         notes.extend(walk.tick(at, START_QUIET_US, true, false, face(), true));
