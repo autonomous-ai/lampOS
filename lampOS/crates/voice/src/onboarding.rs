@@ -592,6 +592,8 @@ impl Onboarding {
             goals: None,
             body_heard: false,
             touches: None,
+            nudge: false,
+            released: true,
         }
     }
 
@@ -1500,7 +1502,7 @@ impl Onboarding {
         paused: bool,
         face: Option<Framing>,
         still: bool,
-    ) -> Option<&'static str> {
+    ) -> Option<String> {
         self.poll_storage(now_us);
         // Read every tick, so what came before the ask is never taken.
         let touched = self.head_touched();
