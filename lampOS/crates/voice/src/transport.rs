@@ -177,7 +177,36 @@ impl Channel {
         &mut self,
         now: impl FnMut() -> u64,
     ) -> io::Result<Option<T>> {
-        let received = self.take_next(now);
+        self.receive_renewed_with(now, |_: &T| false)
+    }
+
+    /// [`Self::receive`] for a worker's control channel, where `renews` says
+    /// which messages are authority renewals (#1569 row 42, the first
+    /// builder on #1722, 20 Oct 17:46). A renewal that is stale, but only by
+    /// its age, with the next renewal in order queued right behind it, is
+    /// passed over: that one carries the authority now, and at most it costs
+    /// the gap a lapse costs. A stale renewal alone or followed by any other
+    /// message, a stale message of any other kind, and reordered and
+    /// wrong-boot ones still end the worker, since those carry state a skip
+    /// would lose. A worker that starts slowly (the speaker opening its
+    /// device before its first look) otherwise finds its third renewal
+    /// stale, after the first message's grace and one late message, and
+    /// ends.
+    pub fn receive_renewed<T: DeserializeOwned>(
+        &mut self,
+        renews: impl Fn(&T) -> bool,
+    ) -> io::Result<Option<T>> {
+        self.receive_renewed_with(monotonic_us, renews)
+    }
+
+    /// [`Self::receive_renewed`] on the clock `now` reads, as
+    /// [`Self::receive_with`].
+    pub fn receive_renewed_with<T: DeserializeOwned>(
+        &mut self,
+        now: impl FnMut() -> u64,
+        renews: impl Fn(&T) -> bool,
+    ) -> io::Result<Option<T>> {
+        let received = self.take_next(now, &renews);
         if received.is_err() {
             // The runs worth reading end so (the reviewer on #1660).
             self.say_run("ended by an error");
@@ -185,9 +214,32 @@ impl Channel {
         received
     }
 
+    /// The message right behind `stale` in the socket, if it is the next
+    /// renewal in order from the same boot ([`Self::receive_renewed`]). What
+    /// is read and is not one is dropped: `stale` then ends the worker.
+    fn renewal_behind<T: DeserializeOwned>(
+        &mut self,
+        stale: &Envelope<T>,
+        renews: &impl Fn(&T) -> bool,
+    ) -> io::Result<Option<Envelope<T>>> {
+        let mut data = [0; MAX_DATAGRAM_BYTES];
+        let count = match self.endpoint.try_recv(&mut data) {
+            Ok(count) => count,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        let behind: Envelope<T> = decode(&data[..count])?;
+        Ok((behind.boot == stale.boot
+            && stale.sequence.checked_add(1) == Some(behind.sequence)
+            && behind.sent_at_us >= stale.sent_at_us
+            && renews(&behind.payload))
+        .then_some(behind))
+    }
+
     fn take_next<T: DeserializeOwned>(
         &mut self,
         mut now: impl FnMut() -> u64,
+        renews: &impl Fn(&T) -> bool,
     ) -> io::Result<Option<T>> {
         #[cfg(test)]
         self.probe.attempt();
@@ -209,19 +261,51 @@ impl Channel {
             }
             Err(error) => return Err(error),
         };
-        let packet: Envelope<T> = decode(&data[..count])?;
-        let max_age_us = if self.first_grace && !self.received {
-            self.max_age_us.max(FIRST_CONTROL_MAX_AGE_US)
-        } else {
-            self.max_age_us
-        };
+        let mut packet: Envelope<T> = decode(&data[..count])?;
         // Read the clock after the receive: a message sent since `looked`
         // would otherwise look sent in the future, and be refused.
-        let now = now();
-        let next = self.incoming.is_next(&packet);
+        let mut at_us = now();
+        loop {
+            let max_age_us = if self.first_grace && !self.received {
+                self.max_age_us.max(FIRST_CONTROL_MAX_AGE_US)
+            } else {
+                self.max_age_us
+            };
+            match self.judge(&packet, at_us, max_age_us) {
+                Ok(()) => break,
+                // Stale by its age alone, a renewal, the next renewal behind.
+                Err(error) if renews(&packet.payload) && self.incoming.is_in_order(&packet) => {
+                    let Some(behind) = self.renewal_behind(&packet, renews)? else {
+                        return Err(error);
+                    };
+                    self.incoming.accept(&packet, at_us, u64::MAX)?;
+                    self.received = true;
+                    say(format!(
+                        "lamp-voice: {}: a renewal {} us old (bound {max_age_us} us) passed over: the next renewal is behind it",
+                        self.name,
+                        at_us.saturating_sub(packet.sent_at_us)
+                    ));
+                    packet = behind;
+                    // Again after this receive, for the same reason.
+                    at_us = now();
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        self.received = true;
+        #[cfg(test)]
+        self.probe
+            .record(probe::Direction::Receive, packet.boot, packet.sequence);
+        Ok(Some(packet.payload))
+    }
+
+    /// Takes `packet` in order if it is on time, or late as this channel
+    /// allows; otherwise the error that ends the worker, its order unmoved.
+    fn judge<T>(&mut self, packet: &Envelope<T>, now: u64, max_age_us: u64) -> io::Result<()> {
+        let next = self.incoming.is_next(packet);
         let on_time = self
             .incoming
-            .accept(&packet, now, max_age_us + self.held_up_us);
+            .accept(packet, now, max_age_us + self.held_up_us);
         // A sender held up between stamping a message and sending it (#784,
         // 52e6 on 2026-10-15: one frame 423 ms old after a 400 ms stall)
         // delivers that one message late, in order, and fresh ones after
@@ -234,9 +318,9 @@ impl Channel {
                 self.sender_held_up = false;
                 self.say_run("on time again");
             }
-            Err(_) if self.take_late && self.incoming.is_in_order(&packet) => {
+            Err(_) if self.take_late && self.incoming.is_in_order(packet) => {
                 self.incoming
-                    .accept(&packet, now, u64::MAX)
+                    .accept(packet, now, u64::MAX)
                     .map_err(|error| {
                         io::Error::new(error.kind(), format!("{}: {error}", self.name))
                     })?;
@@ -247,7 +331,7 @@ impl Channel {
             }
             Err(_) if late_but_next() => {
                 self.incoming
-                    .accept(&packet, now, HELD_UP_US)
+                    .accept(packet, now, HELD_UP_US)
                     .map_err(|error| {
                         io::Error::new(error.kind(), format!("{}: {error}", self.name))
                     })?;
@@ -260,11 +344,7 @@ impl Channel {
                 ));
             }
         }
-        self.received = true;
-        #[cfg(test)]
-        self.probe
-            .record(probe::Direction::Receive, packet.boot, packet.sequence);
-        Ok(Some(packet.payload))
+        Ok(())
     }
 
     /// A late message taken ([`Self::taking_late`]), against the bound it
@@ -525,6 +605,93 @@ mod tests {
         sender.send_with(3u32, || t).unwrap();
         t += 1_700_000;
         assert!(receiver.receive_with::<u32>(|| t).is_err());
+    }
+
+    /// #1569 row 42 (the first builder on #1722, 20 Oct 17:46): a renewal
+    /// stale by its age alone, with the next renewal queued behind it, is
+    /// passed over, and the next judged in turn by the channel's own rules
+    /// (one late message in order is taken, as from a held-up sender). Here
+    /// renewals are numbers under 100. Each case is a receiver's first look,
+    /// after the messages queued, as when a worker starts slowly, so no time
+    /// of its own being held up excuses them.
+    #[test]
+    fn a_stale_renewal_with_the_next_renewal_behind_it_is_passed_over() {
+        // Messages sent `apart_us` apart, read `read_us` after the first:
+        // what is taken until the queue is empty, and the error that ends it.
+        let first_look = |messages: &[u32], apart_us: u64, read_us: u64, renewing: bool| {
+            let dir = SessionDirectory::create().unwrap();
+            let (mut sender, mut receiver) = pair(&dir.path);
+            let t = monotonic_us();
+            for (i, message) in messages.iter().enumerate() {
+                sender
+                    .send_with(*message, || t + i as u64 * apart_us)
+                    .unwrap();
+            }
+            let read = t + read_us;
+            let mut taken = Vec::new();
+            loop {
+                let received = if renewing {
+                    receiver.receive_renewed_with(|| read, |value: &u32| *value < 100)
+                } else {
+                    receiver.receive_with::<u32>(|| read)
+                };
+                match received {
+                    Ok(Some(value)) => taken.push(value),
+                    Ok(None) => return (taken, None),
+                    Err(error) => return (taken, Some(error.to_string())),
+                }
+            }
+        };
+        let stale = |error: Option<String>| error.is_some_and(|error| error.contains("stale"));
+        // 150 and 90 ms old: the first passed over, the second on time.
+        assert_eq!(first_look(&[1, 2], 60_000, 150_000, true), (vec![2], None));
+        // Without the rule the first ends it, as before.
+        let (taken, error) = first_look(&[1, 2], 60_000, 150_000, false);
+        assert!(taken.is_empty() && stale(error));
+        // 210, 170, 130 and 90 ms old: 1 passed over, 2 taken late in order,
+        // 3 passed over, 4 on time.
+        assert_eq!(
+            first_look(&[1, 2, 3, 4], 40_000, 210_000, true),
+            (vec![2, 4], None)
+        );
+        // A stale renewal alone still ends it.
+        let (taken, error) = first_look(&[1], 0, 150_000, true);
+        assert!(taken.is_empty() && stale(error));
+        // So does the last of a run of stale renewals, with none fresh.
+        let (taken, error) = first_look(&[1, 2, 3], 10_000, 300_000, true);
+        assert!(taken == [2] && stale(error));
+        // A stale renewal followed by another kind of message ends it.
+        let (taken, error) = first_look(&[1, 100], 60_000, 150_000, true);
+        assert!(taken.is_empty() && stale(error));
+        // A stale message of another kind ends it, a renewal behind or not.
+        let (taken, error) = first_look(&[100, 2], 60_000, 150_000, true);
+        assert!(taken.is_empty() && stale(error));
+    }
+
+    /// Past its first message, a receiver that reads its renewals one at a
+    /// time and on time never needs the pass: each is taken as it comes,
+    /// and `receive_renewed` gives what `receive` gives.
+    #[test]
+    fn renewals_read_on_time_are_taken_one_by_one() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut sender, mut receiver) = pair(&dir.path);
+        let mut t = monotonic_us();
+        for value in 1..=5u32 {
+            sender.send_with(value, || t).unwrap();
+            t += 20_000;
+            assert_eq!(
+                receiver
+                    .receive_renewed_with(|| t, |value: &u32| *value < 100)
+                    .unwrap(),
+                Some(value)
+            );
+        }
+        assert_eq!(
+            receiver
+                .receive_renewed_with(|| t, |value: &u32| *value < 100)
+                .unwrap(),
+            None
+        );
     }
 
     /// Only the next message in order may come late from a sender held up
