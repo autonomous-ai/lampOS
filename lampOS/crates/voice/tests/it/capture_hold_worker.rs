@@ -1270,7 +1270,7 @@ fn with_the_render_5_ms_after_each_block_every_block_is_read_within_a_ms() {
     warm_up();
     let ticks = 200;
     let signal = Signal::new(20 + ticks);
-    let mut rig = Rig::start_waiting(Microphone::Mic2.device(), true);
+    let mut rig = Rig::start_waiting(Microphone::Mic2.device(), false); // PROBE: the switch off
     rig.stream(&signal, 20);
     rig.stream_render(&signal, ticks, late);
     rig.settle(0);
