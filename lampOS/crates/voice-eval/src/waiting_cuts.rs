@@ -462,7 +462,9 @@ pub fn find_sessions(root: &Path) -> Vec<Session> {
     found
 }
 
-fn records(folder: &Path) -> std::io::Result<Vec<Value>> {
+/// A session folder's records, in their service order (`motion_voice`
+/// reads them too).
+pub fn records(folder: &Path) -> std::io::Result<Vec<Value>> {
     let meta = folder.join("metadata");
     let mut names: Vec<PathBuf> = fs::read_dir(&meta)?
         .flatten()
