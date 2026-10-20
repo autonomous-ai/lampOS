@@ -1,3 +1,4 @@
+use crate::support;
 use lamp_surround::{atomic, release::*, selection::*};
 use serde_json::{Value, json};
 use std::{
@@ -5,8 +6,6 @@ use std::{
     os::unix::fs::{PermissionsExt, symlink},
     path::PathBuf,
 };
-#[path = "../fixtures/releases/support.rs"]
-pub mod support;
 use support::*;
 
 fn state(fixture: &Fixture) -> PathBuf {

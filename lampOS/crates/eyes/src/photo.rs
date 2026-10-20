@@ -15,7 +15,7 @@ use std::{
     path::Path,
 };
 
-/// The photo folder, made the eyes' own (0700) if it isn't there; a
+/// The photo folder, made (0700) if it isn't there; a
 /// folder already there is refused unless it is a folder, not a link, and
 /// no one else's to read (#1968: lamp-cloud, the same user, writes into
 /// it).

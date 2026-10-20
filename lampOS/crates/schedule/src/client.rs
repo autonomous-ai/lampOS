@@ -124,21 +124,13 @@ impl Write for Bounded {
     }
 }
 
-/// Connect, send one JSON object and receive one JSON object under `deadline`.
-/// All socket operations are nonblocking. Unix backlog EAGAIN is refused as
-/// unavailable, not mistaken for a pending connection or silently retried.
-/// Filesystem ownership and service-specific reply validation remain the caller's
-/// responsibility. Errors contain neither request text nor private socket paths.
-pub fn exchange(socket: &Path, request: &Value, deadline: Instant) -> Result<Value, Error> {
+/// Connect under one absolute deadline, returning a nonblocking stream.
+/// Unix backlog EAGAIN is refused as unavailable, not mistaken for a pending
+/// connection or silently retried. No request bytes are sent. Filesystem
+/// ownership remains the caller's responsibility.
+pub fn connect(socket: &Path, deadline: Instant) -> Result<UnixStream, Error> {
     remaining(deadline, false)?;
     validate_socket(socket)?;
-    if !request.is_object() {
-        return Err(error(ErrorKind::InvalidRequest, false));
-    }
-    let mut encoded = Bounded(Vec::new());
-    serde_json::to_writer(&mut encoded, request).map_err(|_| error(ErrorKind::TooLong, false))?;
-    encoded.0.push(b'\n');
-    remaining(deadline, false)?;
     let descriptor = rustix::net::socket(
         rustix::net::AddressFamily::UNIX,
         rustix::net::SocketType::STREAM,
@@ -147,7 +139,7 @@ pub fn exchange(socket: &Path, request: &Value, deadline: Instant) -> Result<Val
     .map_err(|_| error(ErrorKind::Unavailable, false))?;
     rustix::io::fcntl_setfd(&descriptor, rustix::io::FdFlags::CLOEXEC)
         .map_err(|_| error(ErrorKind::Io, false))?;
-    let mut stream = UnixStream::from(descriptor);
+    let stream = UnixStream::from(descriptor);
     stream
         .set_nonblocking(true)
         .map_err(|_| error(ErrorKind::Io, false))?;
@@ -168,19 +160,70 @@ pub fn exchange(socket: &Path, request: &Value, deadline: Instant) -> Result<Val
         }
         Err(_) => return Err(error(ErrorKind::Unavailable, false)),
     }
+    remaining(deadline, false)?;
+    Ok(stream)
+}
+
+/// Connect, send one JSON object and receive one JSON object under `deadline`.
+/// All socket operations are nonblocking. Unix backlog EAGAIN is refused as
+/// unavailable, not mistaken for a pending connection or silently retried.
+/// Filesystem ownership and service-specific reply validation remain the caller's
+/// responsibility. Errors contain neither request text nor private socket paths.
+pub fn exchange(socket: &Path, request: &Value, deadline: Instant) -> Result<Value, Error> {
+    exchange_guarded(socket, request, deadline, || Some(()))
+}
+
+/// Like `exchange`, with authority checked immediately before every write.
+/// `acquire` must return promptly. Its guard is held only across a nonblocking
+/// write, never while connecting, polling or reading. Returning `None` refuses
+/// further bytes as unavailable; an earlier write can still be in flight.
+pub fn exchange_guarded<G>(
+    socket: &Path,
+    request: &Value,
+    deadline: Instant,
+    acquire: impl FnMut() -> Option<G>,
+) -> Result<Value, Error> {
+    remaining(deadline, false)?;
+    validate_socket(socket)?;
+    if !request.is_object() {
+        return Err(error(ErrorKind::InvalidRequest, false));
+    }
+    let mut encoded = Bounded(Vec::new());
+    serde_json::to_writer(&mut encoded, request).map_err(|_| error(ErrorKind::TooLong, false))?;
+    encoded.0.push(b'\n');
+    let mut stream = connect(socket, deadline)?;
+    write_request(&mut stream, &encoded.0, deadline, acquire)?;
+    read_response(&mut stream, deadline)
+}
+
+fn write_request<G>(
+    stream: &mut UnixStream,
+    encoded: &[u8],
+    deadline: Instant,
+    mut acquire: impl FnMut() -> Option<G>,
+) -> Result<(), Error> {
     let mut written = 0;
-    while written < encoded.0.len() {
+    while written < encoded.len() {
         remaining(deadline, written != 0)?;
-        match stream.write(&encoded.0[written..]) {
+        let result = {
+            let _guard = acquire().ok_or_else(|| error(ErrorKind::Unavailable, written != 0))?;
+            remaining(deadline, written != 0)?;
+            stream.write(&encoded[written..])
+        };
+        match result {
             Ok(0) => return Err(error(ErrorKind::Io, written != 0)),
             Ok(count) => written += count,
             Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                ready(&stream, PollFlags::OUT, deadline, written != 0)?;
+                ready(stream, PollFlags::OUT, deadline, written != 0)?;
             }
             Err(_) => return Err(error(ErrorKind::Io, written != 0)),
         }
     }
+    Ok(())
+}
+
+fn read_response(stream: &mut UnixStream, deadline: Instant) -> Result<Value, Error> {
     let mut bytes = Vec::new();
     let mut buffer = [0u8; 1024];
     loop {
@@ -213,9 +256,86 @@ pub fn exchange(socket: &Path, request: &Value, deadline: Instant) -> Result<Val
             }
             Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                ready(&stream, PollFlags::IN, deadline, true)?;
+                ready(stream, PollFlags::IN, deadline, true)?;
             }
             Err(_) => return Err(error(ErrorKind::Io, true)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        sync::{Arc, Mutex, MutexGuard, mpsc},
+        time::Duration,
+    };
+
+    struct Written<'a> {
+        guard: Option<MutexGuard<'a, bool>>,
+        finished: mpsc::Sender<()>,
+    }
+    impl Drop for Written<'_> {
+        fn drop(&mut self) {
+            drop(self.guard.take());
+            self.finished.send(()).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_blocked_write_releases_its_guard_and_rechecks_after_readiness() {
+        let (mut stream, mut peer) = UnixStream::pair().unwrap();
+        stream.set_nonblocking(true).unwrap();
+        peer.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+        // Fill the socket without relying on a platform's buffer size.
+        // Finish one byte at a time so even the small request must wait.
+        let mut filled = 0;
+        for block in [&[0u8; 4096][..], &[0u8][..]] {
+            loop {
+                match stream.write(block) {
+                    Ok(0) => panic!("fixture socket closed"),
+                    Ok(count) => {
+                        filled += count;
+                        assert!(filled < 16 * 1024 * 1024, "fixture did not fill");
+                    }
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
+                    Err(error) => panic!("fixture fill: {error}"),
+                }
+            }
+        }
+        let allowed = Arc::new(Mutex::new(true));
+        let held = Arc::clone(&allowed);
+        let (send, receive) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            write_request(
+                &mut stream,
+                b"{\"op\":\"set\"}\n",
+                Instant::now() + Duration::from_secs(3),
+                || {
+                    let guard = held.lock().unwrap();
+                    if !*guard {
+                        return None;
+                    }
+                    Some(Written {
+                        guard: Some(guard),
+                        finished: send.clone(),
+                    })
+                },
+            )
+        });
+        receive.recv_timeout(Duration::from_secs(1)).unwrap();
+        *allowed
+            .try_lock()
+            .expect("guard held during readiness wait") = false;
+        let mut padding = vec![0; filled];
+        peer.read_exact(&mut padding).unwrap();
+        let error = worker.join().unwrap().unwrap_err();
+        assert_eq!(error.kind, ErrorKind::Unavailable);
+        assert!(!error.may_have_sent);
+        assert_eq!(
+            peer.read(&mut [0]).unwrap(),
+            0,
+            "revoked request reached peer"
+        );
     }
 }

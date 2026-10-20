@@ -1,7 +1,7 @@
 //! Opt-in requests, plus the unchanged legacy response shapes. Model payloads
 //! are data for an offline caller; no request here invokes inference.
 use crate::{
-    days::{Days, Error, Result},
+    days::{Days, Error, Result, Wider},
     protocol::{self, Request, Response, Who},
     store::{Ask, Day, Person},
     tidy,
@@ -38,6 +38,33 @@ enum Extra {
         max_bytes: Option<u64>,
         #[serde(default)]
         history: bool,
+        #[serde(default)]
+        day_from: Option<String>,
+        #[serde(default)]
+        day_to: Option<String>,
+        #[serde(default)]
+        recall_v2: bool,
+    },
+    /// The legacy `recall` with any of #2176's fields: a span of days
+    /// (`day_from`, `day_to`) or `recall_v2`. Without them a recall is the
+    /// legacy request, answered as it always was.
+    Recall {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        query: Option<String>,
+        #[serde(default)]
+        day: Option<String>,
+        #[serde(default)]
+        limit: Option<u64>,
+        #[serde(default)]
+        max_bytes: Option<u64>,
+        #[serde(default)]
+        day_from: Option<String>,
+        #[serde(default)]
+        day_to: Option<String>,
+        #[serde(default)]
+        recall_v2: bool,
     },
     Forget {
         #[serde(default)]
@@ -76,6 +103,13 @@ enum Extra {
         person: Who,
         job: String,
         observations: Vec<tidy::Proposal>,
+    },
+    /// #2176 (5a): the room's entries become someone known's (`Days::adopt`).
+    Adopt {
+        #[serde(default)]
+        person: Who,
+        to: String,
+        ids: Vec<u64>,
     },
 }
 
@@ -116,6 +150,39 @@ fn ask<'a>(
         max_bytes: bytes.unwrap_or(4096).min(16384) as usize,
     })
 }
+/// The most days a span names, both ends counted (#2176): "last week" is
+/// seven.
+const SPAN_DAYS: u32 = 14;
+
+/// The days a request names: one `day`, or a span from `day_from` to
+/// `day_to`, both ends counted, oldest first and at most [`SPAN_DAYS`].
+/// The ask's day is the span's first; [`Wider::last_day`] its last.
+fn span(
+    day: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
+) -> Result<(Option<String>, Option<Day>)> {
+    let bad = || {
+        Error::new(
+            "bad_day",
+            "a span is day_from and day_to, YYYY-MM-DD, oldest first, at most 14 days, without day",
+        )
+    };
+    match (day, from, to) {
+        (day, None, None) => Ok((day, None)),
+        (None, Some(from), Some(to)) => {
+            let (first, last) = (
+                Day::parse(&from).ok_or_else(bad)?,
+                Day::parse(&to).ok_or_else(bad)?,
+            );
+            if first > last || last.before(SPAN_DAYS - 1).is_some_and(|edge| first < edge) {
+                return Err(bad());
+            }
+            Ok((Some(from), Some(last)))
+        }
+        _ => Err(bad()),
+    }
+}
 fn value(response: Response) -> Value {
     serde_json::to_value(response).expect("the response contains JSON values only")
 }
@@ -135,9 +202,23 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             at_unix_ms,
             text,
             source_ids,
+            once: false,
         } => value(Response::Added {
             id: store.remember_from(&one(person)?, at_unix_ms, &text, &source_ids)?,
         }),
+        // #2176: what this person already keeps (the same words, ignoring
+        // case, spacing and a final punctuation mark) is that kept thing; no
+        // entry is written, and it gains these `source_ids`.
+        Request::Remember {
+            person,
+            at_unix_ms,
+            text,
+            source_ids,
+            once: true,
+        } => match store.remember_once_from(&one(person)?, at_unix_ms, &text, &source_ids, true)? {
+            (id, true) => json!({"ok":true,"id":id,"existing":true}),
+            (id, false) => value(Response::Added { id }),
+        },
         Request::Kept { person, max_bytes } => value(Response::Kept {
             entries: store.kept(&one(person)?, max_bytes.unwrap_or(4096).min(16384) as usize)?,
         }),
@@ -183,8 +264,39 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             limit,
             max_bytes,
             history,
+            day_from,
+            day_to,
+            recall_v2,
         } => {
-            json!({"ok":true,"entries":store.search(&one(person)?,&ask(Some(&query),day.as_deref(),limit,max_bytes)?,history)?})
+            let (day, last_day) = span(day, day_from, day_to)?;
+            let wider = Wider {
+                last_day,
+                second: recall_v2,
+            };
+            json!({"ok":true,"entries":store.search_wider(&one(person)?,&ask(Some(&query),day.as_deref(),limit,max_bytes)?,history,wider)?})
+        }
+        Extra::Recall {
+            person,
+            query,
+            day,
+            limit,
+            max_bytes,
+            day_from,
+            day_to,
+            recall_v2,
+        } => {
+            let (day, last_day) = span(day, day_from, day_to)?;
+            let wider = Wider {
+                last_day,
+                second: recall_v2,
+            };
+            value(Response::Recalled {
+                entries: store.recall_wider(
+                    &one(person)?,
+                    &ask(query.as_deref(), day.as_deref(), limit, max_bytes)?,
+                    wider,
+                )?,
+            })
         }
         Extra::Forget { person, id } => {
             json!({"ok":true,"removed":store.forget(&one(person)?,id)?})
@@ -232,6 +344,11 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
         } => {
             json!({"ok":true,"ids":store.tidy_apply(&one(person)?,&job,&tidy::Output{observations})?})
         }
+        Extra::Adopt { person, to, ids } => {
+            let to = one(Who::Id(to))?;
+            let moved = store.adopt(&one(person)?, &to, &ids)?;
+            json!({"ok":true,"moved":moved.len(),"ids":moved})
+        }
     })
 }
 
@@ -258,6 +375,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "follow_up",
             "conversation_end",
             "tidy_apply",
+            "adopt",
         ];
         const OLD: &[&str] = &[
             "append",
@@ -278,7 +396,12 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             Some(Value::String(s)) if Person::new(s).is_some() => s.clone(),
             _ => "?".into(),
         };
-        if NEW.contains(&name) {
+        // #2176: a recall with a span or the second version is the new one.
+        let wider = name == "recall"
+            && ["day_from", "day_to", "recall_v2"]
+                .iter()
+                .any(|field| parsed.get(field).is_some());
+        if NEW.contains(&name) || wider {
             extra(
                 store,
                 serde_json::from_value(parsed)
@@ -301,7 +424,8 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             let outcome = format!("ok entries={count}");
             // Reads, maintenance and successful no-op removals must not
             // clear an earlier failure to add a record.
-            let wrote = matches!(op.as_str(), "append" | "remember" | "append_linked");
+            let wrote = matches!(op.as_str(), "append" | "remember" | "append_linked")
+                && response["existing"] != true;
             (response, outcome, false, wrote)
         }
         Err(e) => (
@@ -401,6 +525,62 @@ mod tests {
             assert_eq!(response["ok"], true, "{request}: {}", answer.line);
             assert!(response.get("wrote").is_none());
             assert!(response.get("storage_fault").is_none());
+        }
+    }
+
+    /// #2176, `LAMP_MEMORY_REMEMBER_ONCE`: with `once`, what this person
+    /// already keeps, active and the same words ignoring case, spacing and
+    /// a final punctuation mark, is that kept thing, and nothing is written.
+    /// Anything else is kept as before.
+    #[test]
+    fn a_remember_once_the_same_person_already_keeps_word_for_word_is_that_kept_thing() {
+        let (_scratch, mut store) = Scratch::new("remember-once");
+        const MAI: &str = "p-0123456789abcdef";
+        let mut ask = |request: Value| {
+            let answer = answer(&mut store, request.to_string().as_bytes(), NOW);
+            let line: Value = serde_json::from_str(&answer.line).unwrap();
+            assert_eq!(line["ok"], true, "{line}");
+            (line, answer.wrote)
+        };
+        let once = |text: &str, person: &str| json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":text,"once":true});
+        let (first, wrote) = ask(once("Takes her coffee black.", MAI));
+        assert_eq!(first, json!({"ok":true,"id":1}));
+        assert!(wrote);
+        // Word for word, then differing only by case, space and the stop.
+        for text in ["Takes her coffee black.", "  takes HER   coffee black "] {
+            let (again, wrote) = ask(once(text, MAI));
+            assert_eq!(again, json!({"ok":true,"id":1,"existing":true}), "{text}");
+            assert!(!wrote, "{text}");
+        }
+        // Another text, and the same text of someone else: kept anew.
+        assert_eq!(ask(once("takes her tea black", MAI)).0["id"], 2);
+        assert_eq!(
+            ask(once("Takes her coffee black.", "everyone")).0,
+            json!({"ok":true,"id":1})
+        );
+        let kept = |store: &Days, person: &str| {
+            store
+                .kept(&Person::new(person).unwrap(), 16384)
+                .unwrap()
+                .len()
+        };
+        assert_eq!(kept(&store, MAI), 2);
+        assert_eq!(kept(&store, "everyone"), 1);
+        let line = |store: &mut Days, request: Value| {
+            answer(store, request.to_string().as_bytes(), NOW).line
+        };
+        // Forgotten, it is kept anew (one no longer active: `days`'s test).
+        store.forget(&Person::new(MAI).unwrap(), 1).unwrap();
+        let fresh = line(&mut store, once("takes her coffee black", MAI));
+        assert_eq!(fresh, json!({"ok":true,"id":3}).to_string());
+        // Without `once`, the same text twice is two kept things, as before.
+        for id in [4, 5] {
+            let request =
+                json!({"op":"remember","person":MAI,"at_unix_ms":NOW,"text":"takes her tea black"});
+            assert_eq!(
+                line(&mut store, request),
+                json!({"ok":true,"id":id}).to_string()
+            );
         }
     }
 

@@ -24,11 +24,11 @@ use std::{collections::BTreeSet, io::Cursor, time::Duration};
 
 const FIXTURE: &str = "docs/verification/policy-scenes-lamp-4ace-20261014";
 const SCENES: &str =
-    include_str!("../../../docs/verification/policy-scenes-lamp-4ace-20261014/scenes.jsonl");
+    include_str!("../../../../docs/verification/policy-scenes-lamp-4ace-20261014/scenes.jsonl");
 const WEIGHTS: &str =
-    include_str!("../../../docs/verification/policy-scenes-lamp-4ace-20261014/fit-weights.json");
+    include_str!("../../../../docs/verification/policy-scenes-lamp-4ace-20261014/fit-weights.json");
 const REPORT: &str =
-    include_str!("../../../docs/verification/policy-scenes-lamp-4ace-20261014/fit-report.json");
+    include_str!("../../../../docs/verification/policy-scenes-lamp-4ace-20261014/fit-report.json");
 const FLOAT_TOLERANCE: f64 = 1e-10;
 
 /// Counts, strings, booleans and nulls match exactly. Floating calculations

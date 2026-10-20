@@ -90,10 +90,16 @@ profile's exclusion:
 - two tests of `lamp-voice`'s `hand_controls`, named exactly, that count
   the input pump's real wakes for a second by design (#1806, #1569 row 35,
   2026-10-19): `with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once`
-  (at most 10 passes waiting, 100 or more ticking, and a stop within 100 ms)
-  and `with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump`. They
-  took 2.6 s and 1.3 s on ARM64; beside 8 busy cores and four SQLite stores
-  syncing on a Mac, the first's stop took 103 ms to 1.09 s in 18 of 20 runs;
+  (at most 10 passes waiting, 100 or more ticking, and a wake brought round
+  within 100 ms) and `with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump`.
+  They took 2.6 s and 1.3 s on ARM64; beside 8 busy cores and four SQLite
+  stores syncing on a Mac, the first's stop took 103 ms to 1.09 s in 18 of 20
+  runs. That was the pump letting go of its subscriptions on disk, not its
+  wake: beside four `F_FULLFSYNC` writers a woken stop took a median of 225
+  to 234 ms while the wake's next pass came within 1.5 ms. So since
+  2026-10-20 the wake is judged by that pass (a wake ignored: about 176 ms,
+  every run). The 2 ms tick's count can still fall short beside busy cores
+  and syncs together (26, 30 and 74 passes in 3 of 25 runs);
 - two more of `lamp-skills::skills`, named exactly, that start the real
   program twice on the host's clock, a restart between, and wait 800 ms of
   real time for a nudge that must not come (#1837):

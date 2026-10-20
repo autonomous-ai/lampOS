@@ -16,6 +16,8 @@
     "/var/lib/lampos-tasks/.harness/hook-routes",
     "/var/lib/lampos-tasks/.harness/logs",
     "/var/lib/lampos-schedule/store",
+    "/var/lib/lampos-skills-state",
+    "/var/lib/lampos-output-caps",
     "/var/lib/lampos-policy",
     "/var/lib/lampos-cloud",
     "/var/lib/lampOS/voice/sessions",

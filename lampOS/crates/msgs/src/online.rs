@@ -3,7 +3,9 @@
 //! service, as it reports it on `diagnostics`; with `lamp-health
 //! --reach-probe on`, while that link is down, from a probe of the internet
 //! itself (`from: "reach"`), so it can be online with the link down, and
-//! absent while the probe has not yet answered.
+//! absent while the probe has not yet answered. With `--reach-idle on` too,
+//! the probe asks with the link up, and the internet not answering is
+//! offline from `reach` with the link still ready (#1844).
 use crate::Invalid;
 use lamp_bus::{Declaration, Kind};
 use serde::{Deserialize, Serialize};

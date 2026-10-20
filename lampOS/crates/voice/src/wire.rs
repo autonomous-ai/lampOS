@@ -36,6 +36,14 @@ pub enum Control {
     Stop,
 }
 
+impl Control {
+    /// An authority renewal: a stale one with the next renewal behind it is
+    /// passed over (`Channel::receive_renewed`, #1569 row 42).
+    pub fn is_renewal(&self) -> bool {
+        matches!(self, Self::Authority { .. })
+    }
+}
+
 impl<'de> Deserialize<'de> for Control {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         // Serde's internally tagged unit variants otherwise accept extra keys.

@@ -17,6 +17,15 @@ pub const HEAD_SETTLE_US: u64 = 500_000;
 pub const HEAD_SESSION_US: u64 = 200_000;
 pub const HEAD_DECISION_US: u64 = 1_200_000;
 pub const HEAD_COOLDOWN_US: u64 = 1_500_000;
+/// The longest press that is still a pat: a cycle with a longer one gives no
+/// `Pet`. A press runs from the first pad touched until none is, so a real
+/// pat on another pad while one line drifts high is part of that long press
+/// and gives none either: the quiet side (Reviewer-lead's P3 on #2239). A line that drifts high at rest and back, as lamp-cb94's 97 did
+/// for 77 s with no hand on it (#1764), is no pat, and Expression wakes a
+/// sleeping lamp on a `Pet` (the reviewer's P2 on #2239, rule 8). As the
+/// touch path's hold (`touch::HEAD_SLEEP_US`): a hand kept longer isn't
+/// patting.
+pub const HEAD_PAT_LONGEST_US: u64 = 3_000_000;
 pub const MAX_PENDING_GESTURES: usize = 64;
 pub const MAX_READER_SESSIONS: usize = 32;
 
@@ -150,6 +159,10 @@ struct Head {
     last_edge: Option<u64>,
     first_press: Option<u64>,
     last_release: Option<u64>,
+    /// When the press now under way began, and the longest press this cycle
+    /// ([`HEAD_PAT_LONGEST_US`]).
+    pressed_since: Option<u64>,
+    longest_press: u64,
     pending_session: bool,
     sessions: u8,
     decision_at: Option<u64>,
@@ -161,6 +174,8 @@ impl Head {
         self.last_edge = None;
         self.first_press = None;
         self.last_release = None;
+        self.pressed_since = None;
+        self.longest_press = 0;
         self.pending_session = false;
         self.sessions = 0;
         self.decision_at = None;
@@ -179,6 +194,13 @@ impl Head {
         }
         if mask & !self.raw != 0 {
             self.first_press.get_or_insert(at_us);
+        }
+        if self.raw == 0 {
+            self.pressed_since = Some(at_us);
+        } else if mask == 0
+            && let Some(since) = self.pressed_since.take()
+        {
+            self.longest_press = self.longest_press.max(at_us - since);
         }
         self.raw = mask;
         self.last_edge = Some(at_us);
@@ -213,6 +235,7 @@ impl Head {
             let result = self
                 .first_press
                 .zip(self.last_release)
+                .filter(|_| self.longest_press <= HEAD_PAT_LONGEST_US)
                 .map(|(press, release)| (release, release - press));
             self.clear_cycle();
             self.cooldown_until = Some(at_us + HEAD_COOLDOWN_US);

@@ -457,6 +457,26 @@ fn a_devin_cloud_answer_is_read_as_idle_and_it_is_never_asked_to_close() {
     assert!(observation.answer.starts_with("Posted:"));
     // Only `needs-input` is read so: a cloud agent working or failed is as
     // Harness says (the reviewer's P3 4 on #2240).
+    // A finished Devin Cloud session ends `stopped` (lamp-75c9, 20 Oct): with
+    // an answer it is done, in `show`, `wait` and `ps`; with none, stopped.
+    let mut reply = shown();
+    reply["id"] = json!(CLOUD);
+    reply["state"] = json!("stopped");
+    reply["answer"] = json!("I replied to the 4 new messages in #lamp-devin-demo.");
+    rig.show_step(step(reply.clone()));
+    assert_eq!(rig.cli().observe(MACHINE, CLOUD).unwrap().state, "idle");
+    reply["answer"] = json!("  ");
+    rig.show_step(step(reply));
+    assert_eq!(rig.cli().observe(MACHINE, CLOUD).unwrap().state, "stopped");
+    let row = json!({"harnesses":[{"id":CLOUD,"state":"stopped"}]}).to_string();
+    assert_eq!(parse_ps(row.as_bytes()).unwrap()[0].state, "idle");
+    assert_eq!(
+        parse_wait(Some(4), row.as_bytes(), &[CLOUD.to_owned()]).unwrap()[0].state,
+        "idle"
+    );
+    // A computer agent's `stopped` is as Harness says.
+    let row = json!({"harnesses":[{"id":AGENT,"state":"stopped"}]}).to_string();
+    assert_eq!(parse_ps(row.as_bytes()).unwrap()[0].state, "stopped");
     for state in ["working", "failed"] {
         let mut reply = shown();
         reply["id"] = json!(CLOUD);
@@ -1335,6 +1355,22 @@ fn a_harness_without_the_code_sign_in_is_told_apart_and_a_dropped_one_stops() {
         .unwrap()
         .success();
     assert!(!alive);
+}
+
+/// openharness#1463: after a sign-in by code, Harness's daemon is started
+/// with `harness start`, the CLI's own (through systemd where `harness
+/// service install` put it, as on a lamp), and a failure is said, not hidden.
+#[test]
+fn the_daemon_is_started_with_harness_start() {
+    let rig = Rig::new();
+    rig.plan(json!({"start":step(json!({}))}));
+    assert_eq!(rig.cli().start_daemon(), Ok(()));
+    let calls = rig.calls();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0]["args"], json!(["start"]));
+    let rig = Rig::new();
+    rig.plan(json!({"start":{"exit":1}}));
+    assert_eq!(rig.cli().start_daemon(), Err("start_failed".into()));
 }
 
 /// #1676: the sign-in is one `auth status --json`, read as Harness gives it

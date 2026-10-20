@@ -1274,9 +1274,10 @@ fn waking(shared: &Shared) -> std::os::fd::OwnedFd {
     read
 }
 
-/// A pump on a bus with no publishers, and how many passes it makes over
-/// `for_ms`, and how long a stop then takes.
-fn idle_pump(wait: bool, for_ms: u64) -> (u64, Duration) {
+/// A pump on a bus with no publishers: how many passes it makes over
+/// `for_ms`, and then, with the wait, how long after a wake it comes round
+/// again, the wake given 20 ms into a 200 ms wait.
+fn idle_pump(wait: bool, for_ms: u64) -> (u64, Option<Duration>) {
     let directory = Directory::new();
     let root = directory.0.join("bus");
     let (sender, _input) = mpsc::sync_channel(QUEUE_CAPACITY);
@@ -1289,25 +1290,60 @@ fn idle_pump(wait: bool, for_ms: u64) -> (u64, Duration) {
     let before = shared.passes.load(Ordering::Relaxed);
     thread::sleep(Duration::from_millis(for_ms));
     let passes = shared.passes.load(Ordering::Relaxed) - before;
-    let stopping = std::time::Instant::now();
+    let next_pass = |after: u64| {
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while shared.passes.load(Ordering::Relaxed) == after {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the pump stopped passing"
+            );
+            thread::sleep(Duration::from_micros(100));
+        }
+    };
+    // Under load the wake can come after the wait has ended, and the pass
+    // timed is then the wait's own: that can hide a pump that ignores the
+    // wake, never fail one that heeds it (the lead's reviewer on #2274).
+    let woken = wait.then(|| {
+        next_pass(shared.passes.load(Ordering::Relaxed));
+        thread::sleep(Duration::from_millis(20));
+        let waking = std::time::Instant::now();
+        let at = shared.passes.load(Ordering::Relaxed);
+        shared.wake();
+        next_pass(at);
+        waking.elapsed()
+    });
     shared.stop.store(true, Ordering::Release);
     shared.wake();
     worker.thread().unpark();
+    // The stop ends it, loosely bounded: beside SQLite stores syncing it
+    // took up to 1.09 s (#1569 row 35).
+    let stopping = std::time::Instant::now();
+    while !worker.is_finished() {
+        assert!(
+            stopping.elapsed() < Duration::from_secs(2),
+            "the pump was still running 2 s after its stop"
+        );
+        thread::sleep(Duration::from_millis(1));
+    }
     worker.join().unwrap();
-    (passes, stopping.elapsed())
+    (passes, woken)
 }
 
 /// #705, the lamp's heat: with nothing coming, the waiting pump wakes about
 /// five times a second (the bus's 200 ms rescan) where the 2 ms tick wakes
-/// hundreds of times; a stop still ends it at once.
+/// hundreds of times; a stop still ends it at once. A stop is a wake: the
+/// wake brings the pump round at once, not at its wait's end, and the pass it
+/// brings finds the stop. That is judged by the pump's next pass; its
+/// thread's end is only bounded loosely, at 2 s: ending, the pump lets go of
+/// its subscriptions on disk, and beside four SQLite-like stores syncing
+/// (`F_FULLFSYNC`) a woken stop took a median of 225 to 234 ms on a Mac, up
+/// to 265 ms, while the wake's pass came within 1.5 ms (#1569 row 35).
 #[test]
 fn with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once() {
-    let (waiting, stop_waiting) = idle_pump(true, 1_000);
+    let (waiting, woken) = idle_pump(true, 1_000);
     assert!(waiting <= 10, "{waiting} passes in 1 s");
-    assert!(
-        stop_waiting < Duration::from_millis(100),
-        "{stop_waiting:?}"
-    );
+    let woken = woken.unwrap();
+    assert!(woken < Duration::from_millis(100), "{woken:?}");
     let (ticking, _) = idle_pump(false, 1_000);
     assert!(ticking >= 100, "{ticking} passes in 1 s");
 }

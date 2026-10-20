@@ -33,35 +33,91 @@ pub trait Mixer {
 /// The rules, over whatever control there is.
 pub struct Volume<M> {
     mixer: M,
-    /// The loudest the speaker is allowed, in points.
-    ceiling: u8,
+    /// The product's ceiling, never replaced by a temporary limit.
+    product_ceiling: u8,
+    /// A temporary raw ceiling, independent of the person's volume.
+    limit: Option<u8>,
     /// Where it stood when it was muted.
     before_mute: Option<u8>,
 }
 
 const UNREAD: &str = "I could not read my speaker's volume.";
 const UNCONFIRMED: &str = "I could not confirm my speaker's volume changed.";
+const UNCHANGED: &str = "I could not change my speaker's volume.";
 
 impl<M: Mixer> Volume<M> {
     pub fn new(mixer: M, ceiling: u8) -> Self {
         Self {
             mixer,
-            ceiling: ceiling.clamp(1, 100),
+            product_ceiling: ceiling.clamp(1, 100),
+            limit: None,
             before_mute: None,
+        }
+    }
+
+    fn ceiling(&self) -> u8 {
+        self.limit.map_or(self.product_ceiling, |limit| {
+            limit.min(self.product_ceiling)
+        })
+    }
+
+    /// Apply a raw ceiling of 1..=100, bounded by the product's ceiling.
+    /// A louder mixer is lowered now; a quieter or muted one is left alone.
+    /// The restriction stays active even if its hardware change fails:
+    /// a later call or another `set_limit` can try the bounded write again.
+    ///
+    /// `None` releases the restriction without writing or restoring a level.
+    /// A remembered pre-mute level is lowered with the limit too, never
+    /// restored on release, so a later unmute cannot revive that old level.
+    /// The result reports the actual level, not proof of durable storage;
+    /// the caller owns the limit's lifetime and restart recovery.
+    pub fn set_limit(&mut self, limit: Option<u8>) -> Result<Level, String> {
+        if limit.is_some_and(|limit| !(1..=100).contains(&limit)) {
+            return Err("volume limit must be a whole number from 1 to 100".into());
+        }
+        self.limit = limit;
+        let ceiling = self.ceiling();
+        if limit.is_some() {
+            self.before_mute = self.before_mute.map(|level| level.min(ceiling));
+        }
+        let current = self.mixer.get().map_err(|_| UNREAD.to_owned())?;
+        let now = if limit.is_some() && current > ceiling {
+            self.write(ceiling)?
+        } else {
+            current
+        };
+        Ok(self.level_at(now))
+    }
+
+    /// Every write goes through the current limit. A control may round by
+    /// a point, but an active limit never confirms a level above its ceiling,
+    /// nor a request for silence that still reads above zero.
+    fn write(&mut self, to: u8) -> Result<u8, String> {
+        let ceiling = self.ceiling();
+        let to = if self.limit.is_some() {
+            to.min(ceiling)
+        } else {
+            to
+        };
+        self.mixer.set(to).map_err(|_| UNCHANGED.to_owned())?;
+        match self.mixer.get() {
+            Ok(now)
+                if now.abs_diff(to) <= 1
+                    && (self.limit.is_none() || (now <= ceiling && (to != 0 || now == 0))) =>
+            {
+                Ok(now)
+            }
+            _ => Err(UNCONFIRMED.to_owned()),
         }
     }
 
     /// Set, read back, and say what is there now. A control may round: one
     /// point either way is the level asked for.
     fn change(&mut self, from: u8, to: u8, said: impl Fn(u8) -> String) -> Outcome {
-        if self.mixer.set(to).is_err() {
-            return Outcome::Failed("I could not change my speaker's volume.".into());
-        }
-        match self.mixer.get() {
-            Ok(now) if now.abs_diff(to) <= 1 && (now != from || to == from) => {
-                Outcome::Done(said(now))
-            }
-            _ => Outcome::Failed(UNCONFIRMED.into()),
+        match self.write(to) {
+            Ok(now) if now != from || to == from => Outcome::Done(said(now)),
+            Ok(_) => Outcome::Failed(UNCONFIRMED.into()),
+            Err(why) => Outcome::Failed(why),
         }
     }
 
@@ -69,8 +125,8 @@ impl<M: Mixer> Volume<M> {
         let Ok(current) = self.mixer.get() else {
             return Outcome::Failed(UNREAD.into());
         };
-        let ceiling = self.ceiling;
-        if current >= ceiling {
+        let ceiling = self.ceiling();
+        if current == ceiling || (current > ceiling && self.limit.is_none()) {
             return Outcome::Already(
                 "My speaker is already as loud as it is allowed to go.".into(),
             );
@@ -89,13 +145,13 @@ impl<M: Mixer> Volume<M> {
         if current == 0 {
             return Outcome::Already("My speaker is muted.".into());
         }
-        let floor = FLOOR.min(self.ceiling);
+        let ceiling = self.ceiling();
+        let floor = FLOOR.min(ceiling);
         if current <= floor {
             return Outcome::Already(
                 "My speaker is already as quiet as it goes without being muted.".into(),
             );
         }
-        let ceiling = self.ceiling;
         self.change(current, floor.max(current.saturating_sub(STEP)), |now| {
             format!("My volume is now {now} out of {ceiling}; it was {current}.")
         })
@@ -110,7 +166,11 @@ impl<M: Mixer> Volume<M> {
         }
         let outcome = self.change(current, 0, |_| "My speaker is muted.".into());
         if matches!(outcome, Outcome::Done(_)) {
-            self.before_mute = Some(current);
+            self.before_mute = Some(if self.limit.is_some() {
+                current.min(self.ceiling())
+            } else {
+                current
+            });
         }
         outcome
     }
@@ -119,8 +179,13 @@ impl<M: Mixer> Volume<M> {
         let Ok(current) = self.mixer.get() else {
             return Outcome::Failed(UNREAD.into());
         };
-        let ceiling = self.ceiling;
+        let ceiling = self.ceiling();
         if current > 0 {
+            if self.limit.is_some() && current > ceiling {
+                return self.change(current, ceiling, |now| {
+                    format!("My volume is now {now} out of {ceiling}; it was {current}.")
+                });
+            }
             return Outcome::Already(format!(
                 "My speaker is not muted; its volume is {current} out of {ceiling}."
             ));
@@ -150,11 +215,12 @@ pub struct Level {
 
 impl<M: Mixer> Volume<M> {
     fn level_at(&self, raw: u8) -> Level {
-        let share = (u16::from(raw) * 100 + u16::from(self.ceiling) / 2) / u16::from(self.ceiling);
+        let ceiling = self.ceiling();
+        let share = (u16::from(raw) * 100 + u16::from(ceiling) / 2) / u16::from(ceiling);
         Level {
             volume: share.min(100) as u8,
             raw,
-            max_volume: self.ceiling,
+            max_volume: ceiling,
         }
     }
 
@@ -170,19 +236,12 @@ impl<M: Mixer> Volume<M> {
     /// slider asks (#1396), read back: within a point of the level asked,
     /// or not done. Never past the ceiling.
     pub fn to_share(&mut self, volume: u8) -> Result<Level, String> {
-        let raw = ((u16::from(volume.min(100)) * u16::from(self.ceiling) + 50) / 100) as u8;
-        if self.mixer.set(raw).is_err() {
-            return Err("I could not change my speaker's volume.".to_owned());
+        let raw = ((u16::from(volume.min(100)) * u16::from(self.ceiling()) + 50) / 100) as u8;
+        let now = self.write(raw)?;
+        if now > 0 {
+            self.before_mute = None;
         }
-        match self.mixer.get() {
-            Ok(now) if now.abs_diff(raw) <= 1 => {
-                if now > 0 {
-                    self.before_mute = None;
-                }
-                Ok(self.level_at(now))
-            }
-            _ => Err(UNCONFIRMED.to_owned()),
-        }
+        Ok(self.level_at(now))
     }
 }
 
@@ -348,6 +407,244 @@ pub(crate) mod tests {
             100,
         );
         assert_eq!(unreadable.level(), Err(UNREAD.to_owned()));
+    }
+
+    #[test]
+    fn a_limit_lowers_the_mixer_and_keeps_the_product_ceiling() {
+        let mut volume = at(70, 80);
+        assert_eq!(
+            volume.set_limit(Some(40)),
+            Ok(Level {
+                volume: 100,
+                raw: 40,
+                max_volume: 40,
+            })
+        );
+        assert_eq!(volume.mixer.writes, [40]);
+        // Reapplying it, or relaxing it, never raises the speaker.
+        assert_eq!(volume.set_limit(Some(40)).unwrap().raw, 40);
+        assert_eq!(
+            volume.set_limit(Some(90)),
+            Ok(Level {
+                volume: 50,
+                raw: 40,
+                max_volume: 80,
+            })
+        );
+        assert_eq!(volume.set_limit(None).unwrap().max_volume, 80);
+        assert_eq!(volume.mixer.writes, [40]);
+        assert_eq!(
+            said(volume.up()),
+            "My volume is now 60 out of 80; it was 40."
+        );
+    }
+
+    #[test]
+    fn entering_or_releasing_a_limit_never_raises_or_unmutes_the_speaker() {
+        for current in [0, 1, 10, 30, 40] {
+            let mut volume = at(current, 80);
+            assert_eq!(volume.set_limit(Some(40)).unwrap().raw, current);
+            assert_eq!(volume.set_limit(None).unwrap().raw, current);
+            assert!(volume.mixer.writes.is_empty(), "was at {current}");
+        }
+    }
+
+    #[test]
+    fn invalid_limits_leave_the_existing_restriction_and_hardware_alone() {
+        let mut volume = at(70, 80);
+        volume.set_limit(Some(40)).unwrap();
+        volume.mixer.unreadable = true;
+        for limit in [0, 101, 255] {
+            assert_eq!(
+                volume.set_limit(Some(limit)),
+                Err("volume limit must be a whole number from 1 to 100".into())
+            );
+        }
+        volume.mixer.unreadable = false;
+        assert_eq!(volume.level().unwrap().max_volume, 40);
+        assert_eq!(volume.mixer.writes, [40]);
+    }
+
+    #[test]
+    fn releasing_a_limit_does_not_undo_a_persons_quieter_or_muted_choice() {
+        let mut volume = at(80, 100);
+        volume.set_limit(Some(40)).unwrap();
+        said(volume.down());
+        assert_eq!(volume.set_limit(None).unwrap().raw, 20);
+        assert_eq!(volume.mixer.writes, [40, 20]);
+        // The app's newer choice belongs to the person too.
+        volume.set_limit(Some(40)).unwrap();
+        assert_eq!(volume.to_share(25).unwrap().raw, 10);
+        assert_eq!(volume.set_limit(None).unwrap().raw, 10);
+        assert_eq!(volume.mixer.writes, [40, 20, 10]);
+        volume.set_limit(Some(40)).unwrap();
+        said(volume.mute());
+        assert_eq!(volume.set_limit(None).unwrap().raw, 0);
+        assert_eq!(volume.mixer.writes, [40, 20, 10, 0]);
+        assert_eq!(
+            said(volume.unmute()),
+            "My speaker is back, at 10 out of 100."
+        );
+    }
+
+    #[test]
+    fn releasing_a_limit_cannot_revive_a_louder_pre_mute_level() {
+        let mut volume = at(70, 100);
+        said(volume.mute());
+        assert_eq!(volume.set_limit(Some(40)).unwrap().raw, 0);
+        assert_eq!(volume.set_limit(Some(60)).unwrap().raw, 0);
+        assert_eq!(volume.set_limit(None).unwrap().raw, 0);
+        assert_eq!(volume.mixer.writes, [0]);
+        assert_eq!(
+            said(volume.unmute()),
+            "My speaker is back, at 40 out of 100."
+        );
+
+        // A mixer that has risen outside the owner must not be remembered
+        // above the active limit when the person mutes it again.
+        volume.set_limit(Some(30)).unwrap();
+        volume.mixer.level = 90;
+        said(volume.mute());
+        volume.set_limit(None).unwrap();
+        assert_eq!(
+            said(volume.unmute()),
+            "My speaker is back, at 30 out of 100."
+        );
+    }
+
+    #[test]
+    fn every_person_write_obeys_the_limit_when_the_mixer_is_above_it_again() {
+        for action in ["up", "down", "unmute", "mute", "app"] {
+            let mut volume = at(80, 100);
+            volume.set_limit(Some(40)).unwrap();
+            volume.mixer.writes.clear();
+            volume.mixer.level = 95;
+            let expected = if action == "mute" { 0 } else { 40 };
+            match action {
+                "up" => assert!(matches!(volume.up(), Outcome::Done(_))),
+                "down" => assert!(matches!(volume.down(), Outcome::Done(_))),
+                "unmute" => assert!(matches!(volume.unmute(), Outcome::Done(_))),
+                "mute" => assert!(matches!(volume.mute(), Outcome::Done(_))),
+                _ => assert_eq!(volume.to_share(100).unwrap().raw, expected),
+            }
+            assert_eq!(volume.mixer.level, expected, "{action}");
+            assert_eq!(volume.mixer.writes, [expected], "{action}");
+        }
+    }
+
+    #[test]
+    fn the_app_and_explicit_unmute_use_the_effective_range_even_below_the_floor() {
+        let mut volume = at(70, 80);
+        volume.set_limit(Some(40)).unwrap();
+        assert_eq!(
+            volume.to_share(50).unwrap(),
+            Level {
+                volume: 50,
+                raw: 20,
+                max_volume: 40,
+            }
+        );
+        said(volume.mute());
+        assert_eq!(
+            said(volume.unmute()),
+            "My speaker is back, at 20 out of 40."
+        );
+        volume.set_limit(Some(3)).unwrap();
+        assert_eq!(
+            already(volume.down()),
+            "My speaker is already as quiet as it goes without being muted."
+        );
+        assert_eq!(volume.to_share(0).unwrap().raw, 0);
+        assert_eq!(said(volume.unmute()), "My speaker is back, at 1 out of 3.");
+        assert_eq!(volume.to_share(100).unwrap().raw, 3);
+    }
+
+    #[test]
+    fn a_failed_limit_still_restricts_later_calls_and_can_be_retried() {
+        for failure in ["read", "write", "stuck"] {
+            let mut volume = at(80, 100);
+            volume.mixer.unreadable = failure == "read";
+            volume.mixer.unwritable = failure == "write";
+            volume.mixer.stuck = failure == "stuck";
+            let expected = match failure {
+                "read" => UNREAD,
+                "write" => UNCHANGED,
+                _ => UNCONFIRMED,
+            };
+            assert_eq!(
+                volume.set_limit(Some(40)),
+                Err(expected.into()),
+                "{failure}"
+            );
+            volume.mixer.unreadable = false;
+            volume.mixer.unwritable = false;
+            volume.mixer.stuck = false;
+            assert_eq!(volume.level().unwrap().max_volume, 40, "{failure}");
+            assert_eq!(volume.mixer.level, 80, "{failure}");
+            assert!(matches!(volume.up(), Outcome::Done(_)), "{failure}");
+            assert_eq!(volume.mixer.level, 40, "{failure}");
+            volume.mixer.level = 80;
+            assert_eq!(volume.set_limit(Some(40)).unwrap().raw, 40);
+        }
+    }
+
+    #[test]
+    fn a_limit_whose_readback_fails_is_kept_without_claiming_it_was_applied() {
+        struct ReadbackFailure {
+            level: u8,
+            written: bool,
+        }
+        impl Mixer for ReadbackFailure {
+            fn get(&mut self) -> io::Result<u8> {
+                if self.written {
+                    Err(io::Error::other("readback failed"))
+                } else {
+                    Ok(self.level)
+                }
+            }
+            fn set(&mut self, level: u8) -> io::Result<()> {
+                self.level = level;
+                self.written = true;
+                Ok(())
+            }
+        }
+        let mut volume = Volume::new(
+            ReadbackFailure {
+                level: 80,
+                written: false,
+            },
+            100,
+        );
+        assert_eq!(volume.set_limit(Some(40)), Err(UNCONFIRMED.into()));
+        volume.mixer.written = false;
+        assert_eq!(volume.level().unwrap().raw, 40);
+        assert_eq!(volume.level().unwrap().max_volume, 40);
+        assert_eq!(volume.to_share(100), Err(UNCONFIRMED.into()));
+        assert_eq!(volume.mixer.level, 40);
+    }
+
+    #[test]
+    fn a_control_rounding_above_the_limit_or_above_silence_is_not_confirmed() {
+        struct RoundingUp(u8);
+        impl Mixer for RoundingUp {
+            fn get(&mut self) -> io::Result<u8> {
+                Ok(self.0)
+            }
+            fn set(&mut self, level: u8) -> io::Result<()> {
+                self.0 = level + 1;
+                Ok(())
+            }
+        }
+        let mut volume = Volume::new(RoundingUp(80), 100);
+        assert_eq!(volume.set_limit(Some(40)), Err(UNCONFIRMED.into()));
+        assert!(matches!(volume.up(), Outcome::Failed(_)));
+        assert!(matches!(volume.unmute(), Outcome::Failed(_)));
+        volume.mixer.0 = 80;
+        assert!(matches!(volume.down(), Outcome::Failed(_)));
+        assert_eq!(volume.to_share(100), Err(UNCONFIRMED.into()));
+        assert_eq!(volume.level().unwrap().max_volume, 40);
+        assert!(matches!(volume.mute(), Outcome::Failed(_)));
+        assert_eq!(volume.to_share(0), Err(UNCONFIRMED.into()));
     }
 
     #[test]

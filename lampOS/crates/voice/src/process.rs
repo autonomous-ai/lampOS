@@ -887,9 +887,29 @@ fn worker_command(
             role,
             var(crate::remember::FORGET_ALL_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_recall_v2_worker_environment(
+            role,
+            var(crate::remember::RECALL_V2_ENVIRONMENT).as_deref(),
+        ))
+        .envs(memory_early_words_worker_environment(
+            role,
+            var(crate::early_words::ENVIRONMENT).as_deref(),
+        ))
+        .envs(memory_forget_about_worker_environment(
+            role,
+            var(crate::remember::FORGET_ABOUT_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_observe_worker_environment(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
+        ))
+        .envs(memory_keep_heard_worker_environment(
+            role,
+            var(crate::remember::heard::ENVIRONMENT).as_deref(),
+        ))
+        .envs(memory_remember_once_worker_environment(
+            role,
+            var(crate::remember::REMEMBER_ONCE_ENVIRONMENT).as_deref(),
         ))
         .envs(kernel_clock_worker_environment(
             role,
@@ -985,6 +1005,47 @@ fn memory_forget_all_worker_environment(
         .then_some((crate::remember::FORGET_ALL_ENVIRONMENT, "on"))
 }
 
+// Forgetting what a thing was about (#2176), passed the same narrow way, to
+// the same two routes as forgetting everything.
+fn memory_forget_about_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::FORGET_ABOUT_ENVIRONMENT, "on"))
+}
+
+// Recall's second version (#2176), passed the same narrow way: the exact
+// `on`, to the two routes that offer recall through the Days client.
+fn memory_recall_v2_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::RECALL_V2_ENVIRONMENT, "on"))
+}
+
+// A remember of what is kept already (#2176), passed the same narrow way:
+// the exact `on`, to the two routes that offer `remember`.
+fn memory_remember_once_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::REMEMBER_ONCE_ENVIRONMENT, "on"))
+}
+
+// The room's early words following a lone face once known (#2176, 5a),
+// passed the same narrow way: the exact `on`, to the Live route alone, the
+// one that reads the eyes' faces between turns (`early_words`).
+fn memory_early_words_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "provider" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::early_words::ENVIRONMENT, "on"))
+}
+
 // The observation pass's switch (#1693 (2)), passed the same narrow way:
 // the exact `on`, to the second route alone, the one worker with a model's
 // credential (`credentials_worker_environment`) to ask.
@@ -994,6 +1055,16 @@ fn memory_observe_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::OBSERVE_ENVIRONMENT, "on"))
+}
+
+// Keeping a fact as it was heard (#2176), passed the same narrow way: the
+// exact `on`, to the two routes that run `remember` for a heard line.
+fn memory_keep_heard_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::heard::ENVIRONMENT, "on"))
 }
 
 // The open threads' switch (#1693 (3)), passed the same narrow way: the
@@ -1136,6 +1207,7 @@ fn second_route_worker_environment(
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
+        crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1185,6 +1257,7 @@ mod tests {
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
+            crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
         ] {
@@ -1299,6 +1372,36 @@ mod tests {
                     (
                         memory_forget_all_worker_environment,
                         "LAMP_MEMORY_FORGET_ALL",
+                        ["provider", "second"].as_slice(),
+                    ),
+                    // So does recall's second version (#2176).
+                    (
+                        memory_recall_v2_worker_environment,
+                        "LAMP_MEMORY_RECALL_V2",
+                        ["provider", "second"].as_slice(),
+                    ),
+                    // So does keeping a fact as heard (#2176).
+                    (
+                        memory_keep_heard_worker_environment,
+                        "LAMP_MEMORY_KEEP_HEARD",
+                        ["provider", "second"].as_slice(),
+                    ),
+                    // A remember of what is kept already (#2176).
+                    (
+                        memory_remember_once_worker_environment,
+                        "LAMP_MEMORY_REMEMBER_ONCE",
+                        ["provider", "second"].as_slice(),
+                    ),
+                    // The room's early words, the Live route alone (#2176).
+                    (
+                        memory_early_words_worker_environment,
+                        "LAMP_MEMORY_EARLY_WORDS",
+                        ["provider"].as_slice(),
+                    ),
+                    // And forgetting by what it is about (#2176).
+                    (
+                        memory_forget_about_worker_environment,
+                        "LAMP_MEMORY_FORGET_ABOUT",
                         ["provider", "second"].as_slice(),
                     ),
                     // The observation pass, the route with a model (#1693 (2)).
@@ -1434,8 +1537,13 @@ mod tests {
                     "LAMP_MEMORY_DAYS",
                     crate::rules::ENVIRONMENT,
                     crate::remember::FORGET_ALL_ENVIRONMENT,
+                    crate::remember::FORGET_ABOUT_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
+                    crate::remember::RECALL_V2_ENVIRONMENT,
+                    crate::remember::heard::ENVIRONMENT,
+                    crate::remember::REMEMBER_ONCE_ENVIRONMENT,
+                    crate::early_words::ENVIRONMENT,
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
                     crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1480,6 +1588,7 @@ mod tests {
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
+                    || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                 {
@@ -1528,7 +1637,12 @@ mod tests {
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
+                    "LAMP_MEMORY_EARLY_WORDS=on",
+                    "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_KEEP_HEARD=on",
+                    "LAMP_MEMORY_RECALL_V2=on",
+                    "LAMP_MEMORY_REMEMBER_ONCE=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
@@ -1544,8 +1658,12 @@ mod tests {
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
+                    "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_OBSERVE=on",
+                    "LAMP_MEMORY_RECALL_V2=on",
+                    "LAMP_MEMORY_REMEMBER_ONCE=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_NAMED_ALWAYS=on",
@@ -1574,6 +1692,7 @@ mod tests {
                     "LAMP_SECOND_STEADY_FIRST=on",
                     "LAMP_SECOND_STT_WARM=on",
                     "LAMP_SECOND_WEATHER=on",
+                    "LAMP_SECOND_WRITTEN_WAIT=on",
                 ],
             ),
             (

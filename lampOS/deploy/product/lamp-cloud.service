@@ -48,8 +48,9 @@ StandardError=journal
 SyslogIdentifier=lamp-cloud
 NoNewPrivileges=yes
 ProtectSystem=strict
-# The bus (the microphones, health and the light) and lamp-actions' socket (the volume).
-ReadWritePaths=/run/lampos-bus /run/lampos-actions
+# The bus (the microphones, health and the light) and lamp-actions' socket (the volume); and the
+# app's photos, for the eyes, with LAMP_PHOTO_FACES=on (docs/cloud.md; made by lampos.conf at boot).
+ReadWritePaths=/run/lampos-bus /run/lampos-actions -/run/lampos-photos
 ProtectHome=yes
 PrivateTmp=yes
 # No capability is needed (Fourth on #1404): the broker, the ping and the bus. Netlink is for `iw`,

@@ -1,5 +1,35 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Bedtime and Morning as a core skill (#1672, 2026-10-19)
+
+V1's `hal/app_state.py::_wake_sleepy_peripherals` restores only sleep-owned
+mute state and leaves privacy authoritative; `hal/routes/emotion.py` closes
+input before sleep work. The ambient service fails quiet without a known HAL
+state. Keep the ownership and unknown-state protections. Do not port the
+Python callbacks, spoken sleep announcements, peripheral shutdown or a
+second actuator writer into lampOS.
+
+Reuse the current Expression sleep/wake renderer and the body's #1192
+fold/pause guard. Move automatic local-night/absence and first-person morning
+selection into skill data when `LAMP_REST_REQUESTS=on`; retain manual sleep,
+privacy, name, reminder and conversation reflexes. A session-bound leased
+intent, terminal episode history and a separate planning receipt keep an
+old skill or owner from resuming cancelled work. The morning Say hum waits
+for the planned wake to finish because Say itself changes the Voice owner.
+
+Reuse `lamp-local-time` for local windows and `lamp-schedule::store::Store`
+for durable caps. Reuse `lamp-schedule::client::exchange` for the bounded
+nonblocking private Actions hop, including connect and the complete exchange.
+Reuse light requests for the evening glow and the ring/Volume owners for
+ceilings. Min composition and release without restoration preserve a person's
+off, mute or quieter setting. The fixed quiet hum reuses `head_cue::hum` through
+Say's existing sound guard; no sound binary or model call is added.
+
+All routine switches remain off and the core manifest is disabled. Host tests
+do not establish acoustic volume, optical brightness, applied motion, flash
+power-loss behavior or installed-system timing. The first builder owns the
+[lamp comparison](bedtime-morning.md).
+
 ## Said to the lamp from close to it, task 49 (#753, 2026-10-15)
 
 Keep V1's gaze rule for the face (`hal/drivers/tracking/gaze.py`,

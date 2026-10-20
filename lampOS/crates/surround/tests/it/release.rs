@@ -1,3 +1,4 @@
+use crate::support;
 use lamp_surround::{atomic, release::*};
 use serde_json::{Value, json};
 use std::{
@@ -5,11 +6,9 @@ use std::{
     os::unix::fs::{PermissionsExt, symlink},
     time::Duration,
 };
+use support::*;
 use tough::schema::{Root, Snapshot, Timestamp};
 use url::Url;
-#[path = "../fixtures/releases/support.rs"]
-pub mod support;
-use support::*;
 
 /// Preserve the production struct's serialized field order while changing a
 /// fixture record, then recompute its unkeyed corruption-detection checksum.

@@ -108,6 +108,18 @@ observations stay labelled as observations; all results include source IDs,
 an untrusted-data marker and the unknown-speaker scope. Empty results mean
 there is no matching memory, not permission to invent one.
 
+With `LAMP_MEMORY_RECALL_V2=on` (#2176; off unless set, with the Days
+client only, both voice routes), each recall's `search` or `recall` also
+carries `"recall_v2":true`, and the model may give a span of days:
+`recall {about?, days_ago?, days_ago_from?, days_ago_to?}`, "last week"
+being 7 to 1. The voice sends the span as `day_from` and `day_to`
+(`YYYY-MM-DD`, the lamp's local days) with `day` null. A span given with
+only `days_ago_from` runs to today; with only `days_ago_to` it is that one
+day. A span longer than 14 days keeps its newest 14. Off, the voice sends
+what it sent before and the function has no span. The voice needs a
+lamp-memory from the same build: an older memory refuses the new fields,
+so recall answers nothing until both are updated.
+
 Every new provider session asks `session_open` for a frozen note. Its name
 combines a fresh process nonce and the provider session number. Voice
 validates the complete snapshot and quotes its JSON, retaining its identity,
@@ -210,7 +222,10 @@ once. Startup file access is outside the note/call budgets.
 
 With someone the eyes know at the lamp (#764,
 [memory.md](memory.md#each-persons-own-764)), every request above names
-their person id: `remember`, `forget_last`, their `session_open` beside the
+their person id: `remember`, `forget_last` (and with
+`LAMP_MEMORY_FORGET_ABOUT=on` the `kept` listing and each `forget {id}` of
+`forget {about}`, #2176; with no match of theirs it also lists the room's,
+whose only forgettable things are those the session had), their `session_open` beside the
 room's (validated against the store's person scope), `search` or `recall`
 for theirs before the room's, `append_linked` with only their own source IDs,
 and `conversation_end` and `session_close` in their scope. The source union
@@ -415,14 +430,17 @@ message. A refusal leaves the connection usable.
 
 | Request | Successful response and rules |
 |---|---|
-| `search {query, day?, limit?, max_bytes?, history?}` | `{ok:true, entries:[Record...]}` in relevance order. Searches raw records, kept items and current observations; `history` defaults false. `day` restricts to journal exchanges on that local day. Defaults: 8 results, 4,096 text bytes; maxima 50 and 16,384. Empty or tokenless queries return no records. |
+| `search {query, day?, day_from?, day_to?, recall_v2?, limit?, max_bytes?, history?}` | `{ok:true, entries:[Record...]}` in relevance order. Searches raw records, kept items and current observations; `history` defaults false. `day` restricts to journal exchanges on that local day; `day_from` with `day_to` (#2176) to those from the one through the other, both ends counted. Defaults: 8 results, 4,096 text bytes; maxima 50 and 16,384. Empty or tokenless queries return no records. `recall_v2` (default false): common words are left out of the query first (below), and a day or span also returns kept items kept on those days. |
+| `recall {…, day_from?, day_to?, recall_v2?}` | The legacy `recall` (memory.md), with #2176's fields. With any of them it is parsed as a new operation (unknown fields refused); without them it is the legacy request, answered as before. Same span and `recall_v2` rules as `search`; no query lists the span's exchanges, newest first, and with `recall_v2` the kept items kept on those days too. |
 | `append_linked {at_unix_ms, heard?, said?, source_ids, rule_ids?}` | `{ok:true,id}`. Like append, with at most 64 distinct existing source IDs in the same person's store. Sources can be raw records, kept facts or observations. `rule_ids` (#813), at most 64, are kept entries of the person's own rules scope (`r-<hex>` beside `p-<hex>`, `r-everyone` beside `everyone`); forgetting one removes this exchange. |
 | `forget {id}` | `{ok:true,removed:N}` after transitive deletion and verification; missing ID gives zero. |
+| `remember {at_unix_ms, text, source_ids?, once?}` | The legacy request, with two optional fields: `source_ids` (#1693) and `once` (#2176, default false). Without `once`, as before: `{ok:true,id}`. With `once:true`, when an active kept thing of the same person has the same text after normalisation, `{ok:true,id,existing:true}` with its id, and no entry is written: no row, no last use; the answer reports no write. An existing match gains the new conversation's source links (`source_ids`, checked as a new remember's are), so forgetting it removes both. Otherwise a new kept thing, `{ok:true,id}`. Normalisation: NFC, lower case, trimmed, inner white space collapsed to one space, and punctuation at the end dropped. Another person's text, or a forgotten or replaced one, is not the same. |
 | `session_open {session, max_bytes?}` | `{ok:true,snapshot:Note}`. Default/max cap 1,200 UTF-8 bytes for `Note.note`, including its inner JSON framing and escaping. Outer response metadata and re-escaping are outside that cap. |
 | `follow_up {person}` | `{ok:true,follow_up:{id,category,text}|null}`: at most one open `thread`/`promise` observation of a known person's, 6 h to 14 days old, never given before, none within 24 h of the last given; recorded as given in the same transaction (table `follow_ups`, `ON DELETE CASCADE` with its entry, created `IF NOT EXISTS`, `user_version` unchanged). The room's or a rules scope: `bad_person`. #1693 (3). |
 | `session_close {session}` | `{ok:true}`; safe to repeat. |
 | `conversation_end {conversation, source_ids, previous_ids?, submit?}` | Absent/false `submit`: `{ok:true,input:Input}`. Sources: 1–64 distinct journal exchanges that have already happened. Up to 32 optional current observation IDs select known correction context. True `submit`: the no-model skipped receipt below. |
 | `tidy_apply {job, observations}` | `{ok:true,ids:[...]}`. Entire validated batch commits or none does. Repeat of a completed, retained job returns its original IDs without duplicating writes. |
+| `adopt {to, ids}` | `{ok:true,moved:N,ids:[[old,new]...]}`. #2176 (5a), `LAMP_MEMORY_EARLY_WORDS`: the room's (`person` absent or `everyone`; another `person` is `bad_person`) 1–64 distinct exchanges and kept things, each active, become `to`'s, someone known (`everyone` or an `r-` scope is `bad_person`), in one transaction, with anything of the room's derived only from them (every parent moving; a replacement in either direction stays). Each keeps its row, so its search row, its links and a moved observation's follow-up row (now `to`'s, for their pacing) go with it, and gets the next id in `to`'s numbering; links to what stays are kept, so a forget on either side still reaches it. The room's generation moves on and its notes and jobs are dropped, as for anything of it forgotten. An id not the room's or not active, or `to`'s kept list or observations full (`full`), moves nothing. |
 
 Session and conversation names are 1–64 lowercase ASCII letters, digits, `_` or `-`.
 A `Record` is `{id,person,kind,at_unix_ms,heard,said,text,category,source_ids,
@@ -433,6 +451,25 @@ The first 16 distinct terms of at least two characters are ORed as literal
 tokens. Punctuation cannot become an FTS operator. No stemming, phrase
 reasoning, translation or semantic similarity is claimed. Matching a common
 word is evidence to inspect, not evidence that a question is answerable.
+
+A span (#2176) is both `day_from` and `day_to`, each `YYYY-MM-DD`, the first
+not after the last, at most 14 days with both ends counted, and never
+beside `day`; anything else is `bad_day`. With `recall_v2` the query first
+leaves out a fixed list of common words (`search::COMMON`): English ones
+such as "what", "is", "my", "the", "you", "did", "tell", "remember", and the
+Vietnamese function words "của", "là", "tôi", "và", "có", "không", "này",
+"đó", "thì", "mà", "những", "các", "một", "cho", "với", "được", "gì",
+"nào". They are compared after the same NFC, lowercase and `đ`→`d` folding,
+with accents kept: "chó" (a dog) is not "cho", nor "đỏ" (red) "đó", although
+the index matches them alike. This is a known limit: Vietnamese words that
+only differ by accents from a common word (chó/cho, đỏ/đó, má/mà, lá/là) are
+kept as key words, but the index folds accents, so they also match entries
+with the common word, and ranking does not put the exact word first (both
+fold to one token); folding before the check would drop the real word
+instead. The first 16 of the remaining words are
+ORed. A question of common words only searches nothing and returns no
+records, so "what is my drink order" no longer finds an exchange that
+shares only "my" with it.
 
 `Note` contains `session`, `opened_unix_ms`, `generation`, `note`,
 `source_ids` and `invalidated`. Its note is a JSON string with `scope`,

@@ -193,7 +193,13 @@ pub fn joint(name: &str, heard: &Heard<JointState>) -> PartResult {
 }
 
 /// Every touch source is ready, without a fault, and not held down.
-pub fn touch(heard: &Heard<TouchState>) -> PartResult {
+/// `head` is lamp-controls' `head pads` item when it isn't well and is
+/// fresh ([`crate::hand::head_unread`]): its fault, lines with no pad or a
+/// pad left out since Controls started, fails the head as a pad held 10 s
+/// does, since a stuck pad is left out and never makes a contact to be held
+/// (#1798, the reviewer's P3 2 on #2243). Lines only not probed are said
+/// beside a pass.
+pub fn touch(heard: &Heard<TouchState>, head: Option<&crate::hand::HeadUnread>) -> PartResult {
     let part = "touch";
     let state = match fresh(part, heard, TouchState::TOPIC, "lamp-controls", FAST_FRESH) {
         Ok(state) => state,
@@ -234,6 +240,13 @@ pub fn touch(heard: &Heard<TouchState>) -> PartResult {
             touched.push(source.name.as_str());
         }
     }
+    let has_head = state
+        .sources
+        .iter()
+        .any(|source| source.source == lamp_msgs::TouchSource::Head);
+    if let Some(head) = head.filter(|head| has_head && head.fault) {
+        return PartResult::new(part, Verdict::Fail, &format!("head: {}", head.why));
+    }
     if !touched.is_empty() {
         return PartResult::new(
             part,
@@ -241,7 +254,11 @@ pub fn touch(heard: &Heard<TouchState>) -> PartResult {
             &format!("touched during the check: {}", touched.join(", ")),
         );
     }
-    PartResult::new(part, Verdict::Pass, "idle").with("sources", state.sources.len())
+    let result = PartResult::new(part, Verdict::Pass, "idle").with("sources", state.sources.len());
+    match head.filter(|_| has_head) {
+        Some(head) => result.with("head_pads", &head.why),
+        None => result,
+    }
 }
 
 /// The board is cool enough and has room on its disk.
@@ -483,8 +500,18 @@ pub fn checks(bus: &Bus) -> Vec<Box<dyn Check + '_>> {
                 .when_silent(|bus: &Bus| air_silent(&newest(bus, Health::TOPIC))),
         ),
         Box::new(
-            Listen::new("touch", bus, TouchState::TOPIC, touch)
-                .when_silent(|bus| touch_unread(&newest(bus, ControlsState::TOPIC))),
+            Listen::new(
+                "touch",
+                bus,
+                TouchState::TOPIC,
+                move |heard: &Heard<TouchState>| {
+                    touch(
+                        heard,
+                        crate::hand::head_unread(&newest(bus, Health::TOPIC)).as_ref(),
+                    )
+                },
+            )
+            .when_silent(|bus| touch_unread(&newest(bus, ControlsState::TOPIC))),
         ),
         Box::new(Listen::new("board", bus, BoardState::TOPIC, board)),
         Box::new(Sight { bus }),
@@ -921,6 +948,61 @@ mod tests {
         assert_eq!(check.run(Instant::now()).verdict, Verdict::Pass);
         drop((sensor, health));
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// #1798 (the reviewer's P3 2 on #2243): a stuck head pad is left out
+    /// and never held, so the idle `touch` part reads lamp-controls' `head
+    /// pads` item: a pad left out, or no pad on any line, fails the head as
+    /// a held pad does. Lines only not probed pass, said beside it; with no
+    /// head source the item isn't asked.
+    #[test]
+    fn touch_fails_a_head_its_head_pads_item_says_cant_read() {
+        let state = |head: bool| -> TouchState {
+            let source = |kind: &str, name: &str| {
+                serde_json::json!({
+                    "source": kind, "name": name, "reader_session_id": "reader",
+                    "ready": true, "fault": null, "observed_us": 1000, "armed": true,
+                    "active": false, "contact_id": null, "began_us": null,
+                    "held_us": null, "active_mask": 0, "active_names": [],
+                    "position": null, "toward_pad": null, "distance": 0.0, "speed": 0.0
+                })
+            };
+            let mut sources = vec![source("primary", "primary")];
+            if head {
+                sources.push(source("head", "head"));
+            }
+            serde_json::from_value(serde_json::json!({
+                "stamp": {"clock_id": "controls", "at_us": 1000, "sequence": 1},
+                "session_id": "s1", "enabled": true, "sources": sources,
+                "latest": [], "event_sequence": 0, "rejected_inputs": 0
+            }))
+            .unwrap()
+        };
+        let left_out = crate::hand::HeadUnread {
+            why: "head pads: wired on lines 97, 98; nothing on 37, 96; line 97 touched since the head was first read: left out until let go (warn)".into(),
+            fault: true,
+        };
+        let unknown = crate::hand::HeadUnread {
+            why: "head pads: lines 97, 98 not probed (warn)".into(),
+            fault: false,
+        };
+        let failed = touch(&seen(50, state(true)), Some(&left_out));
+        assert_eq!(failed.verdict, Verdict::Fail);
+        assert_eq!(failed.reason, format!("head: {}", left_out.why));
+        let passed = touch(&seen(50, state(true)), Some(&unknown));
+        assert_eq!(passed.verdict, Verdict::Pass);
+        assert_eq!(
+            passed
+                .values
+                .iter()
+                .find(|value| value.key == "head_pads")
+                .map(|value| value.value.as_str()),
+            Some(unknown.why.as_str())
+        );
+        assert_eq!(touch(&seen(50, state(true)), None).verdict, Verdict::Pass);
+        let no_head = touch(&seen(50, state(false)), Some(&left_out));
+        assert_eq!(no_head.verdict, Verdict::Pass);
+        assert!(no_head.values.iter().all(|value| value.key != "head_pads"));
     }
 
     #[test]

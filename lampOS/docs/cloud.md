@@ -70,7 +70,9 @@ is the one guard the owner's kinds rest on (`faces.add_photo`,
 signed-in account speaks as its owner. **The owner's app acts for the whole
 lamp, not one person at it:** it can cancel any reminder the lamp keeps,
 one another person set by voice at the lamp included, as it can remove any
-face the lamp knows.
+face the lamp knows, and any installed or made-here skill, one another
+person made by voice at the lamp included (`skills.remove`); nothing at the
+lamp says so.
 
 | `cmd` / `kind` | Answer |
 |---|---|
@@ -166,37 +168,47 @@ is the same light. Two differences from V1 the page should know:
 
 ## A face from the app's photo (#1968, `faces.add_photo`)
 
-Off unless `LAMP_PHOTO_FACES=on`, with the eyes' photo folder
-(`LAMP_EYES_PHOTO_DIR`, the folder given to `lamp-eyes --photo-dir`, for
-example `/run/lampos-eyes/photos`) and their request socket
-(`LAMP_EYES_WHO_SOCKET`). lamp-cloud's unit is `ProtectSystem=strict`, so a
-lamp switching it on also gives the unit, in the same drop-in, the folder
-and an order after the eyes:
+Off unless `LAMP_PHOTO_FACES=on`, with the photo folder
+(`LAMP_EYES_PHOTO_DIR`, the folder given to `lamp-eyes --photo-dir`) and
+the eyes' request socket (`LAMP_EYES_WHO_SOCKET`).
 
-    [Unit]
-    After=lamp-eyes.service
-    [Service]
-    ReadWritePaths=-/run/lampos-eyes/photos
+- **The folder is `/run/lampos-photos`**, `lampos`'s at 0700, made at boot
+  by the product's tmpfiles (`deploy/product/lampos.conf`), and lamp-cloud's
+  unit may write it (`ReadWritePaths=-/run/lampos-photos`). It belongs to
+  neither unit, so it is there before both start, and an eyes or lamp-cloud
+  stop, crash or update removes it from under neither (Reviewer-lead on
+  #2263). A folder in the eyes' own `/run/lampos-eyes` was made by the eyes
+  after lamp-cloud's namespace could be set up, and went with every eyes
+  restart: then read-only to lamp-cloud under `ProtectSystem=strict`, and
+  every `faces.add_photo` failed until lamp-cloud restarted (reviewer-two
+  and Reviewer-lead on #2263, Mobile on lamp-0c89).
+- **A lamp switching it on** sets both units, each in a drop-in. lamp-cloud's
+  takes the three variables:
 
-- **The folder is made by the eyes** when they start (`photo::ready`), and
-  under `ProtectSystem=strict` lamp-cloud can write only the paths there
-  when its own namespace was set up. Without the `-`, systemd refuses to
-  start lamp-cloud when the folder isn't there yet ("Failed to set up mount
-  namespacing", Mobile on lamp-0c89, #1396, 20 Oct 16:2x). With it, the
-  entry is skipped, and the folder that comes later is **read-only** to
-  lamp-cloud: `faces.add_photo` then fails until lamp-cloud restarts
-  (reviewer-two on #2263).
-- **`After=lamp-eyes.service`** starts lamp-cloud after the eyes. The eyes
-  are `Type=exec`, so that is once their program has started, not once it
-  made the folder, and a slow eyes start can still lose the race. The `-` stays,
-  as a guard against the start failure.
-- **So after a boot, check once:** an add-photo from the app writes, or
-  `ExecMainStartTimestamp` (`systemctl show -p ExecMainStartTimestamp`) of
-  lamp-cloud is after the eyes'. If an add fails with a read-only folder,
-  restart lamp-cloud once the eyes are up.
+      [Service]
+      Environment=LAMP_PHOTO_FACES=on
+      Environment=LAMP_EYES_PHOTO_DIR=/run/lampos-photos
+      Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
 
-lamp-cloud and the eyes are both `lampos`; the eyes make the folder theirs
-at 0700 and refuse one open to others (`photo::ready`).
+  The eyes' unit gives `--photo-dir` on its command line, so its drop-in
+  clears `ExecStart=` and repeats the product's line (`systemctl cat
+  lamp-eyes`) with `--photo-dir /run/lampos-photos` at its end:
+
+      [Service]
+      ExecStart=
+      ExecStart=/opt/lampOS/eyes/current/lamp-eyes ... --photo-dir /run/lampos-photos
+
+  The voice's asking at the lamp is its own switch (`LAMP_PHOTO_FACES` on
+  lamp-voice, `docs/switches.md`).
+- **On a lamp whose tmpfiles aren't yet the update's**, the folder isn't
+  there: the `-` lets lamp-cloud start anyway, the eyes start without photos
+  (they answer `photos_off`, and their camera, presence and recognition run
+  as before), and `systemd-tmpfiles --create /etc/tmpfiles.d/lampos.conf`
+  then a restart of lamp-cloud makes it work. Run that before setting the
+  eyes' `--photo-dir`.
+
+lamp-cloud and the eyes are both `lampos`; the eyes refuse a folder open
+to others, and make it at 0700 if it is missing (`photo::ready`).
 
 - **Only the lamp's own account:** the kind comes over the lamp's `fa_channel`
   like every other, which only its signed-in account may publish to
@@ -247,7 +259,10 @@ lamp-cloud keeps nothing; both go to the eyes as the voice's own asks do.
   `finishing`. Then memory is asked, as the voice's `forget_everything`
   asks it, `{"op":"forget_all","person":ID}` for the person's id
   (`faces::person_id`, the voice's `p-` and 16 hex digits of the name's
-  hash) and again for their rules' (`r-`, the same digits). `memory` says
+  hash) and again for their rules' (`r-`, the same digits). With the
+  stable memory id (#2176), the id the eyes say too, and the name's own
+  only when the eyes say it is nobody else's (`name_id_free`, #2330;
+  memory.md). `memory` says
   `forgotten` only when both were done, else `kept` with a `reason`: memory
   not reached, refused, or not given to lamp-cloud (no `LAMP_MEMORY_SOCKET`),
   so the app never says gone when it isn't. Memory's socket is mode 0600
@@ -431,8 +446,10 @@ should ever remove one is a separate decision, not taken.
   install), the skill's folder is renamed aside to `.removed-NAME-PID`, so
   it is gone at once and whole for the running program, then deleted.
   `lamp-skills` keeps no data per skill on `lamp-voice` (a held dim is given
-  back at its reload, and #1837's off file, once merged, is one line a
-  skill), so nothing else is set aside: the folder is the skill. A remove
+  back at its reload, and #1837's off file, `OFF_FILE` in `--state-dir`,
+  is one line a skill), so nothing else is set aside: the folder is the
+  skill. A removed skill's line in the off file stays, so a skill installed
+  again under the same name starts off, as it was left. A remove
   killed between the two steps leaves `.removed-NAME-PID`, which the running
   program passes over and the next install deletes.
 - **What the running lamp does.** Nothing is restarted. `lamp-skills`
@@ -458,7 +475,17 @@ should ever remove one is a separate decision, not taken.
   the helper's own journal line (`lamp-skills: asked: …`). A helper that
   can't be reached, or answers nothing a helper would, is `the lamp's
   skills can't be changed now`, with the error in the journal; nothing is
-  then removed, and `lamp-cloud` never falls back to the folder.
+  then removed, and `lamp-cloud` never falls back to the folder. The helper
+  waits at most 4 s for the folder's lock
+  (`lamp_skills::package::ASKED_LOCK_WAIT`, under `lamp-cloud`'s 5 s), and
+  past that refuses in the same words, `the lamp's skills can't be changed
+  now`, having done nothing, so a remove is never finished after
+  `lamp-cloud` stopped waiting for it.
+- **Renamed aside but not deleted** (the second step failed) is a remove
+  done: the skill is already gone for the running program, and the next
+  install deletes `.removed-NAME-PID`. The app gets the list as usual; where
+  the folder was set aside, and why it was not deleted, go to the helper's
+  journal alone, never into the reply.
 - **On a product lamp** the helper's two units are in `deploy/product/`
   (`lamp-skills-manage.socket` and `lamp-skills-manage@.service`) but not
   yet in `lamp-update`'s install list: they go there after their lamp
@@ -467,7 +494,14 @@ should ever remove one is a separate decision, not taken.
 - **How long.** A read of the folder before and after, a connection and
   the start of the helper (one process, started by systemd), two renames
   and a delete; it waits for the folder's lock while an install by hand
-  runs (a package of at most 16 MB), at most 5 s. Not yet timed on a lamp.
+  runs (a package of at most 16 MB), at most 4 s, then refuses. Not yet
+  timed on a lamp.
+- **Known limit: a core skill whose `skill.toml` doesn't parse** counts as
+  installable (`lamp-skills`' `kind_of` reads the kind from the file), so
+  it can be removed, by hand and from the app. It does not load anyway,
+  and the next `lamp-update install` writes it back. Taking "core" from
+  `lamp-update`'s list of shipped names instead would close it; not done
+  here.
 
 ## Health and crash reports (#1683, step 1)
 

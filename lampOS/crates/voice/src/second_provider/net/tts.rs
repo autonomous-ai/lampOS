@@ -41,6 +41,15 @@ pub fn default_model(provider: TtsProvider) -> &'static str {
         TtsProvider::ElevenLabs => ELEVENLABS_MODEL,
     }
 }
+/// The voice a provider speaks in for `voice` (`tts_voice`): the one set,
+/// or, unset, the provider's default ([`request`]'s), by name. For a
+/// recording made in the lamp's voice to name it (`render_line_second`).
+pub fn voice_name(provider: TtsProvider, voice: Option<&str>) -> &str {
+    voice.unwrap_or(match provider {
+        TtsProvider::OpenAi => OPENAI_VOICE,
+        TtsProvider::ElevenLabs => ELEVENLABS_VOICES[0].0,
+    })
+}
 const ELEVENLABS_HOSTS: &[&str] = &[
     "api.elevenlabs.io",
     "api.us.elevenlabs.io",
@@ -129,7 +138,7 @@ pub(crate) fn request(
             body: json!({
                 "model": model,
                 "input": spoken.trim(),
-                "voice": voice.unwrap_or(OPENAI_VOICE),
+                "voice": voice_name(provider, voice),
                 "response_format": "pcm",
             }),
         },
@@ -1011,6 +1020,25 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[test]
+    fn a_voice_is_named_as_set_or_as_the_providers_default() {
+        assert_eq!(voice_name(TtsProvider::ElevenLabs, None), "Rachel");
+        assert_eq!(voice_name(TtsProvider::OpenAi, None), "nova");
+        assert_eq!(voice_name(TtsProvider::ElevenLabs, Some("Ngan")), "Ngan");
+        // The default named is the one a request is made with.
+        let asked = request(
+            TtsProvider::ElevenLabs,
+            "https://api.elevenlabs.io",
+            "k",
+            None,
+            None,
+            "Hi.",
+        )
+        .unwrap()
+        .unwrap();
+        assert!(asked.url.contains("/text-to-speech/21m00Tcm4TlvDq8ikWAM/"));
+    }
 
     /// A local keep-alive HTTP/1.1 server: `GET`s are answered with a short
     /// models list (or never, with `hang_get`), `POST`s with `pcm`. What it

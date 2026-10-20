@@ -1078,7 +1078,8 @@ fn every_skill_folder_is_in_the_product_or_says_why_not() {
 /// lamp gets `lamp-skills` and every product skill whole but its tests,
 /// byte for byte, and no other skill. The voice speaks them through its say
 /// service; its own hello is off, so the lamp greets once, and its reminders
-/// and task news wait for their skills' asks, so each is told once.
+/// and task news wait for their skills' asks, so each is told once. Installed
+/// skills still keep their own enabled default; installation does not run one.
 #[test]
 fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
     let mut lamp = Lamp::new(188, &[]);
@@ -1144,6 +1145,222 @@ fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
     // voice reads at each session (#1656), not the actions part's.
     assert!(skills.contains("--tools-dir /run/lampos-skills"));
     assert!(service.contains(&"Environment=LAMP_ACTIONS_DIR=/run/lampos-actions"));
+}
+
+#[test]
+fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
+    let mut lamp = Lamp::new(195, &[]);
+    lamp.install().unwrap();
+    let root = lamp.on("/var/lib/lampOS/skills");
+    let installed: Vec<_> = install::PRODUCT_SKILLS
+        .iter()
+        .map(|name| lamp_skills::load(&root.join(name)).unwrap())
+        .collect();
+    assert_eq!(installed.len(), 8);
+    let bedtime = installed
+        .iter()
+        .find(|skill| skill.name == "bedtime-morning")
+        .unwrap();
+    assert!(!bedtime.enabled);
+    assert!(bedtime.tool.is_none());
+    assert_eq!(bedtime.kind, lamp_skills::SkillKind::Core);
+    assert_eq!(bedtime.version.as_deref(), Some("1.0.0"));
+    assert_eq!(
+        bedtime.permissions,
+        lamp_skills::Permissions {
+            topics: vec!["humans/faces/tracked".into(), "voice/state".into()],
+            speak: true,
+            light: true,
+            body: true,
+            output_limits: true,
+            ..Default::default()
+        }
+    );
+    assert!(root.join("bedtime-morning/SKILL.md").is_file());
+    // Inventory includes the disabled core and its grants; only live skills
+    // contribute functions. The seven live skills still offer Dance alone.
+    let inventory = lamp_skills::load_each(&root);
+    assert_eq!(inventory.len(), 8);
+    assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
+    let listed = lamp_skills::package::list(&root).unwrap();
+    let row = listed
+        .lines()
+        .find(|line| line.split_whitespace().next() == Some("bedtime-morning"))
+        .unwrap();
+    assert_eq!(
+        row.split_whitespace().take(4).collect::<Vec<_>>(),
+        ["bedtime-morning", "core", "1.0.0", "disabled;"]
+    );
+    assert!(
+        listed
+            .lines()
+            .last()
+            .unwrap()
+            .starts_with("The skills here give the model 1 function (dance)."),
+        "{listed}"
+    );
+    let (live, errors) = lamp_skills::load_all(&root);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(live.len(), 7);
+    assert!(live.iter().all(|skill| skill.name != bedtime.name));
+    assert_eq!(
+        lamp_skills::tools_file(&installed),
+        lamp_skills::tools_file(&live)
+    );
+    // Even a caller that passes the disabled file directly cannot subscribe
+    // its triggers or advertise it beside the product's live tools.
+    assert!(
+        lamp_skills::Engine::new(vec![bedtime.clone()], true)
+            .topics()
+            .is_empty()
+    );
+    assert_eq!(
+        lamp_skills::tools_file(std::slice::from_ref(bedtime)),
+        serde_json::json!({"tools":[]})
+    );
+}
+
+#[test]
+fn product_routine_state_is_private_persistent_and_keeps_new_switches_off() {
+    let mut lamp = Lamp::new(196, &[]);
+    lamp.install().unwrap();
+    for (unit, directory, variable, flag, path) in [
+        (
+            "lamp-skills.service",
+            "lampos-skills-state",
+            "LAMP_SKILLS_DAILY_FILE",
+            "--daily-state",
+            "/var/lib/lampos-skills-state/daily.json",
+        ),
+        (
+            "lamp-actions.service",
+            "lampos-output-caps",
+            "LAMP_OUTPUT_CAPS_DIR",
+            "--caps-dir",
+            "/var/lib/lampos-output-caps",
+        ),
+    ] {
+        let installed =
+            fs::read_to_string(lamp.on(&format!("/etc/systemd/system/{unit}"))).unwrap();
+        let service = section(&installed, "Service");
+        for required in [
+            format!("User={}", install::USER),
+            format!("Group={}", install::USER),
+            format!("StateDirectory={directory}"),
+            "StateDirectoryMode=0700".into(),
+            "ProtectSystem=strict".into(),
+            format!("Environment={variable}={path}"),
+        ] {
+            assert_eq!(
+                service.iter().filter(|line| **line == required).count(),
+                1,
+                "{unit}: {required}"
+            );
+        }
+        // The path comes by environment, never the new flag (#2157).
+        let command = service
+            .iter()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .unwrap();
+        assert!(
+            !command.split_whitespace().any(|word| word == flag),
+            "{unit}"
+        );
+        assert!(Path::new(path).starts_with(format!("/var/lib/{directory}")));
+    }
+    for (unit, text) in install::PRODUCT {
+        for line in section(text, "Service") {
+            for switch in [
+                "LAMP_SKILL_ROUTINES",
+                "LAMP_REST_REQUESTS",
+                "LAMP_OUTPUT_CAPS",
+            ] {
+                assert!(!line.contains(&format!("{switch}=on")), "{unit}: {line}");
+            }
+        }
+    }
+    // Actions needs no caps path while off, and the product's new argument
+    // alone must not open persistent storage or opt into the cap service.
+    let caps = Path::new("/var/lib/lampos-output-caps");
+    let bus = Path::new("/run/lampos-bus");
+    assert!(
+        lamp_actions::caps_service::Config::configured(None, None, None)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        lamp_actions::caps_service::Config::configured(None, Some(caps), Some(bus))
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        lamp_actions::caps_service::Config::configured(
+            Some(std::ffi::OsStr::new("on")),
+            None,
+            Some(bus)
+        )
+        .is_err()
+    );
+}
+
+/// An install takes the units from the updater's own build and the binaries
+/// from the channel's newest, so a unit may meet an older binary. Today's
+/// `lamp-actions` and `lamp-skills` exit 2 on an option they don't know, and
+/// with `Restart=on-failure` both would loop (#2157). The product units pass
+/// only the options both took before Bedtime and Morning (lamp-voice
+/// `ff4a26099`); a newer setting comes as an `Environment=` line, which an
+/// older binary ignores. A new option belongs here only once every channel
+/// carries a binary that takes it.
+#[test]
+fn product_units_pass_only_options_an_older_binary_takes() {
+    for (unit, known) in [
+        (
+            "lamp-actions.service",
+            &[
+                "--dir",
+                "--mixer-card",
+                "--mixer-control",
+                "--volume-ceiling",
+                "--bus-root",
+            ][..],
+        ),
+        (
+            "lamp-skills.service",
+            &[
+                "--dir",
+                "--bus-root",
+                "--gaze-socket",
+                "--mood-socket",
+                "--actions-socket",
+                "--say-socket",
+                "--tools-dir",
+                "--state-dir",
+                "--boot-id",
+                "--clock-control",
+                "--known-file",
+                "--zone",
+                "--utc-offset-minutes",
+            ][..],
+        ),
+    ] {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(name, _)| *name == unit)
+            .unwrap()
+            .1;
+        let command = section(text, "Service")
+            .into_iter()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .unwrap();
+        let options: Vec<_> = command
+            .split_whitespace()
+            .filter(|word| word.starts_with("--"))
+            .collect();
+        assert!(!options.is_empty(), "{unit}");
+        for option in options {
+            assert!(known.contains(&option), "{unit}: {option}");
+        }
+    }
 }
 
 /// The skills' tools were in the actions part's folder, which systemd
@@ -1506,6 +1723,127 @@ fn a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest() {
             .any(|line| line.starts_with(&format!("{PINS} is not a JSON object"))),
         "{:?}",
         odd.said
+    );
+}
+
+const CONTROLS: &str = "/etc/lampOS/controls/controls.json";
+
+/// #1798: a lamp's own pins file still naming the old guess, head pads on
+/// lines 37 and 96 (lamp-52e6's and lamp-cb94's, which read no touch on
+/// them), gets the build's: every line a pad is wired to. Its own Controls
+/// settings, naming two pads, name the same four, so a Controls put back
+/// from before this, which wants both alike, still starts. Everything else
+/// is kept, and installing again changes nothing. Pins the factory step
+/// wrote (with each pad's baseline) and a settings file naming other pads
+/// are kept.
+#[test]
+fn a_lamps_own_pins_on_the_old_guess_get_every_head_line() {
+    let product: serde_json::Value =
+        serde_json::from_str(SETTINGS.iter().find(|(path, _)| *path == PINS).unwrap().1).unwrap();
+    let lines: Vec<_> = product["head_pads"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|pad| pad["line"].as_u64().unwrap())
+        .collect();
+    assert_eq!(lines, [37, 96, 97, 98]);
+    let guessed = r#"{
+  "chip": "/dev/gpiochip0",
+  "buttons": [{"name": "primary", "line": 99, "active_low": true, "pull": "up"}],
+  "head_pads": [
+    {"name": "head-1", "line": 37, "active_low": false, "pull": "down"},
+    {"name": "head-2", "line": 96, "active_low": false, "pull": "down"}
+  ],
+  "every_ms": 5,
+  "reset": {"name": "reset", "line": 100, "active_low": true, "pull": "up"},
+  "legacy_head": true,
+  "privacy": {"chip": "/dev/gpiochip1", "line": 9, "active_low": true, "pull": "up"}
+}
+"#;
+    let own_controls = r#"{"enabled": true, "buttons": ["primary"], "head_pads": ["head-1", "head-2"], "base_selected_mask": null}
+"#;
+    let read = |lamp: &Lamp, path: &str| -> serde_json::Value {
+        serde_json::from_str(&fs::read_to_string(lamp.on(path)).unwrap()).unwrap()
+    };
+    let mut lamp = Lamp::new(190, &[]);
+    fs::create_dir_all(lamp.on(PINS).parent().unwrap()).unwrap();
+    fs::write(lamp.on(PINS), guessed).unwrap();
+    fs::write(lamp.on(CONTROLS), own_controls).unwrap();
+    let first = lamp.install().unwrap();
+    let mut pins = read(&lamp, PINS);
+    assert_eq!(pins["head_pads"], product["head_pads"]);
+    pins["head_pads"] =
+        serde_json::from_str::<serde_json::Value>(guessed).unwrap()["head_pads"].clone();
+    assert_eq!(
+        pins,
+        serde_json::from_str::<serde_json::Value>(guessed).unwrap()
+    );
+    let mut controls = read(&lamp, CONTROLS);
+    assert_eq!(
+        controls["head_pads"],
+        serde_json::json!(["head-1", "head-2", "head-3", "head-4"])
+    );
+    controls["head_pads"] = serde_json::json!(["head-1", "head-2"]);
+    assert_eq!(
+        controls,
+        serde_json::from_str::<serde_json::Value>(own_controls).unwrap()
+    );
+    for path in [PINS, CONTROLS] {
+        assert!(
+            first.changed.contains(&format!("wrote {path}")),
+            "{:?}",
+            first.changed
+        );
+    }
+    for said in [
+        format!("put the build's head pads, every line a pad is wired to, in {PINS}"),
+        format!("named the same head pads in {CONTROLS}"),
+    ] {
+        assert!(
+            lamp.said.iter().any(|line| line.starts_with(&said)),
+            "{said}: {:?}",
+            lamp.said
+        );
+    }
+    // Controls takes the two files together.
+    let wiring: lamp_controls::touch_pins::TouchPinsConfig =
+        serde_json::from_value(read(&lamp, PINS)).unwrap();
+    let settings: lamp_controls::engine::Config =
+        serde_json::from_value(read(&lamp, CONTROLS)).unwrap();
+    wiring.check(&settings).unwrap();
+    let (pins, controls) = (
+        fs::read_to_string(lamp.on(PINS)).unwrap(),
+        fs::read_to_string(lamp.on(CONTROLS)).unwrap(),
+    );
+    let again = lamp.install().unwrap();
+    assert_eq!(fs::read_to_string(lamp.on(PINS)).unwrap(), pins);
+    assert_eq!(fs::read_to_string(lamp.on(CONTROLS)).unwrap(), controls);
+    assert!(
+        !again
+            .changed
+            .iter()
+            .any(|line| line.starts_with("wrote /etc/lampOS/controls/")),
+        "{:?}",
+        again.changed
+    );
+
+    // The factory step's pins, the same lines with each pad's baseline, are
+    // this unit's own and stay; so do settings naming other pads.
+    let factory = guessed.replace(
+        "  \"every_ms\": 5,",
+        "  \"every_ms\": 5,\n  \"head_rest\": [{\"name\": \"head-1\", \"rest\": \"low\", \"reads\": \"level\"}, {\"name\": \"head-2\", \"rest\": \"low\", \"reads\": \"level\"}],",
+    );
+    assert_ne!(factory, guessed);
+    let other_controls = own_controls.replace("\"head-2\"]", "\"head-9\"]");
+    let mut found = Lamp::new(191, &[]);
+    fs::create_dir_all(found.on(PINS).parent().unwrap()).unwrap();
+    fs::write(found.on(PINS), &factory).unwrap();
+    fs::write(found.on(CONTROLS), &other_controls).unwrap();
+    found.install().unwrap();
+    assert_eq!(fs::read_to_string(found.on(PINS)).unwrap(), factory);
+    assert_eq!(
+        fs::read_to_string(found.on(CONTROLS)).unwrap(),
+        other_controls
     );
 }
 

@@ -78,6 +78,11 @@ pub struct Options {
     /// targets ([`crate::reach`], `--reach-probe on`): a relay down with the
     /// internet up is then online. Only with `online`.
     pub reach: Option<Vec<std::net::SocketAddr>>,
+    /// The probe asks with the link up too, every 30 s, and every 5 s once
+    /// the internet doesn't answer; not answering is offline then
+    /// ([`crate::reach::Reach::idle`], `--reach-idle on`, #1844). Only with
+    /// `reach`.
+    pub reach_idle: bool,
     /// Parts that run only where a file is (`--needs`): while it is not
     /// there, the part is listed as off, never missing (#811: tasks without
     /// Harness).
@@ -394,7 +399,11 @@ impl Serve<'_> {
         let mut online = parts::online(self.parts.reports(), now, self.options.stale_after);
         if let Some(reach) = self.reach.as_mut() {
             reach.tend(online.online == Some(false), now);
-            online = parts::with_reach(online, reach.verdict());
+            online = if self.options.reach_idle {
+                parts::with_idle_reach(online, reach.verdict())
+            } else {
+                parts::with_reach(online, reach.verdict())
+            };
         }
         let at_us = self.at_us();
         if !self.online_out.publish(at_us, &online, self.say) {
@@ -613,7 +622,14 @@ pub fn run(
             .reach
             .clone()
             .filter(|_| options.online)
-            .map(crate::reach::Reach::new),
+            .map(crate::reach::Reach::new)
+            .map(|reach| {
+                if options.reach_idle {
+                    reach.idle()
+                } else {
+                    reach
+                }
+            }),
         unreadable: Trouble::default(),
         unreadable_at: None,
         receiving: Trouble::default(),

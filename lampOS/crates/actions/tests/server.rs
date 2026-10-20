@@ -464,3 +464,109 @@ fn its_report_says_what_it_can_do_and_how_much_it_did() {
     assert_eq!(value(&none, "answered").as_deref(), Some("0"));
     assert_eq!(none.name, "actions");
 }
+
+/// A caller is taken as soon as it connects, not at the end of the server's
+/// wait for one (`IDLE`): calls a moment apart, as the voice makes them, are
+/// each answered well inside it (#1806; a sleep there kept each call waiting
+/// up to 50 ms). While nobody calls, the server still wakes for its health
+/// report and its stop flag.
+#[test]
+fn a_caller_is_answered_at_once_and_an_idle_server_still_reports_and_stops() {
+    use lamp_actions::server::{IDLE, REPORT_EVERY};
+    let home = directory("idle");
+    // A short root: a Unix socket's address holds 103 bytes.
+    let root = PathBuf::from(format!("/tmp/la-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut heard = bus
+        .subscribe_typed(
+            lamp_msgs::Diagnostic::TOPIC,
+            "test",
+            lamp_msgs::Diagnostic::TYPE,
+        )
+        .unwrap();
+    let health = bus
+        .publisher_declared(
+            lamp_msgs::Diagnostic::TOPIC,
+            &lamp_msgs::Diagnostic::declaration(),
+            "actions",
+        )
+        .unwrap();
+    let level = Arc::new(AtomicU8::new(50));
+    let stop = Arc::new(AtomicBool::new(false));
+    // The report's period on a clock the test moves on.
+    let base = Instant::now();
+    let ahead_ms = Arc::new(AtomicU64::new(0));
+    let serving = {
+        let (home, level, stop) = (home.clone(), level.clone(), stop.clone());
+        let ahead_ms = ahead_ms.clone();
+        std::thread::spawn(move || {
+            let mut executive = Executive {
+                sound: Some(Volume::new(Shared(level), 100)),
+                light: None::<NoLight>,
+                short: false,
+            };
+            let now = move || base + Duration::from_millis(ahead_ms.load(Ordering::Acquire));
+            serve_with_clock(&home, &mut executive, &stop, Some(health), None, &now)
+        })
+    };
+    until("ready", || home.join(READY_FILE).exists());
+    let report = |heard: &mut lamp_bus::Subscriber| -> lamp_msgs::Diagnostic {
+        heard
+            .recv(Duration::from_secs(5))
+            .unwrap()
+            .expect("a health report")
+            .parse()
+            .unwrap()
+    };
+    let answered = |report: &lamp_msgs::Diagnostic| {
+        report
+            .values
+            .iter()
+            .find(|fact| fact.key == "answered")
+            .map(|fact| fact.value.clone())
+    };
+    assert_eq!(answered(&report(&mut heard)).as_deref(), Some("0"));
+
+    // Ten calls, each a moment after the last answer, while the server
+    // waits for its next caller.
+    let mut took = Vec::new();
+    for call in 0..10 {
+        std::thread::sleep(Duration::from_millis(5));
+        let name = if call % 2 == 0 {
+            "volume_up"
+        } else {
+            "volume_down"
+        };
+        let started = Instant::now();
+        let answer = ask(
+            &home,
+            format!("{{\"op\":\"call\",\"name\":\"{name}\"}}\n").as_bytes(),
+        );
+        took.push(started.elapsed());
+        assert_eq!(answer["ok"], true, "{answer}");
+    }
+    took.sort();
+    let middle = took[took.len() / 2];
+    assert!(
+        middle < IDLE / 2,
+        "the middle call took {middle:?}, against IDLE {IDLE:?}: {took:?}"
+    );
+
+    // Nobody calls. A period on, it says it is well again, with the ten.
+    ahead_ms.fetch_add(REPORT_EVERY.as_millis() as u64, Ordering::AcqRel);
+    assert_eq!(answered(&report(&mut heard)).as_deref(), Some("10"));
+
+    // And it stops within a few of its waits.
+    let stopping = Instant::now();
+    stop.store(true, Ordering::Release);
+    until("the server stops", || serving.is_finished());
+    assert!(
+        stopping.elapsed() < Duration::from_secs(1),
+        "{:?}",
+        stopping.elapsed()
+    );
+    serving.join().unwrap().unwrap();
+    std::fs::remove_dir_all(home).unwrap();
+    std::fs::remove_dir_all(root).unwrap();
+}
