@@ -687,18 +687,37 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    - **Then:** Harness at boot as above, with its record, unless already
      recorded; then `systemctl restart lamp-tasks.service`, only when
      something changed.
-   - **Safe to repeat:** a Harness already at `/usr/local/bin/harness`, put
-     there by hand or by an earlier run, is kept as it is and never
-     installed over. Run again, it changes nothing and restarts nothing.
+   - **Safe to repeat:** a Harness already at `/usr/local/bin/harness` is
+     kept as it is when `harness version` (as `lampos`) says 0.4.23 or
+     later. Run again, it changes nothing and restarts nothing.
+   - **An older one it put there is brought up to date** (#1676, the first
+     builder at 09:46 on 20 Oct): signing in by a spoken code (`harness
+     login --code`, `lamp-tasks serve --sign-in-by-code`) needs Harness
+     0.4.23. When `/usr/local/bin/harness` is `harness-on`'s own link to
+     `/var/lib/lampos-tasks/.local/bin/harness` and says an older version,
+     Harness's own installer is run again, the same steps as above, to the
+     version it ships, and `harness version` is read before and after:
+     "Harness updated from 0.4.19 to 0.4.24 by its own installer". The
+     installer writes nothing it hasn't checked against Harness's sha256
+     metadata. Harness's running daemon updates itself from then on (its
+     installer's header); this is for a lamp where it hasn't run.
+   - **`harness_too_old`, and the rest goes on,** when the installer failed,
+     when it left a version still too old, or when an older Harness at
+     `/usr/local/bin/harness` wasn't put there by `harness-on` (one put
+     there by hand is never installed over). The Harness there is kept,
+     and hand-overs go on with it; only signing in by voice waits.
    - **A failing step stops there,** before the link, so a lamp is never
      left with a link to nothing. Nothing is recorded, and the next run
      starts again.
-   - **Signing in is the person's,** not done here. Harness's box ticket
-     (`harness login --ticket`) is the way for a lamp, once the app hands it
-     one (openharness#1410).
+   - **Signing in is the person's,** not done here: by a spoken code since
+     Harness 0.4.23 (openharness#1410), with `lamp-tasks serve
+     --sign-in-by-code` and the voice's `LAMP_TASKS_SIGN_IN`.
    - **Shown only in tests** (`crates/update/tests/install.rs`): the steps
      in their order through stand-ins; a Harness already there kept; each
-     failing step leaving no link and no record; run again, nothing. On a
+     failing step leaving no link and no record; run again, nothing; its
+     own older Harness updated, a failed or still too old install and one
+     put there otherwise each kept and said `harness_too_old`
+     (`harness_on_updates_its_own_older_harness_and_says_one_too_old`). On a
      lamp, only its "already there" path is shown: lamp-75c9, 19 Oct
      19:45 (Eighth, #1843), with Harness at `/usr/local/bin` after
      `harness-off`, it said "Harness is already at /usr/local/bin/harness:
