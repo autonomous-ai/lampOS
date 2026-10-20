@@ -15,12 +15,12 @@ log and nothing a lamp runs ([joining.md](joining.md),
 
 ## Current checkpoint: 2026-10-20
 
-Ready for integration: no — the two refreshed heads passed all host gates;
-new automatic ARM64 and x86 Clippy are running.
+Ready for reviewer integration: yes — both exact heads passed their complete
+host gates and automatic ARM64 and x86 Clippy. No lamp qualification is claimed.
 
 Both changes are pushed, one commit each. The [Queue update](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6295022773)
-records their heads and counts. #1757 remains draft until its current CI
-merge checkout is verified. Second does not merge either PR.
+records their heads and counts. #1757 is ready for review after its current CI merge checkout was verified.
+Second does not merge either PR.
 
 Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757),
 `fd05557ba14af823863ecc19d738476767bfd77f`, is the allocated music slice of
@@ -44,7 +44,7 @@ cancellation. Earlier failed preflights remain in the [evidence index](verificat
 Music merges cleanly with observed target `14b38dc6a5`; only two docs overlap
 its three newer commits. Automatic [ARM64 39451960133](https://github.com/autonomous-ai/lampOS/actions/runs/39451960133)
 and [x86 Clippy 39451960115](https://github.com/autonomous-ai/lampOS/actions/runs/39451960115)
-are running. Their actual tested base/checkout will be recorded when done.
+passed; their exact tested base and checkout are recorded below.
 
 Policy [#2005](https://github.com/autonomous-ai/lampOS/pull/2005),
 `4e1dcb78070d916f4e1acf9729baebe86ad6a490`, refreshes the unchanged test-only
@@ -55,7 +55,7 @@ passed **5,567 / 0 / 23, none filtered**: **5,317 / 0 / 22** plus full Update
 build passed, and all **2,074** source hashes match. New automatic
 [ARM64 39452151680](https://github.com/autonomous-ai/lampOS/actions/runs/39452151680)
 and [x86 Clippy 39452151740](https://github.com/autonomous-ai/lampOS/actions/runs/39452151740)
-are running; earlier native results qualify only their recorded heads.
+passed; earlier native results qualify only their recorded heads.
 
 GitHub access is restored. #2157 landed Bedtime/caps at `c4fd23ac2`;
 #1732 and #1996 are closed, superseding the older four-foundation publication
@@ -73,6 +73,15 @@ file hashes checked before removal, reducing **1,273,312 KiB** to
 **213,196 KiB**. Completed build caches were removed, and no other builder's
 job was stopped. No lamp is assigned or accessed. Music stays off; Bedtime's
 physical row remains unqualified.
+
+Native results: Automatic [ARM64 39451960133](https://github.com/autonomous-ai/lampOS/actions/runs/39451960133) passed **8,985 nextest tests**, with **50 skipped** by the existing PR/ignored-test selection, **4 doc tests**, **12 own-harness tests** and the relay-signals check. The PR profile excludes the realtime group; skips are not passes. One passed test is reported leaky (`same_voice::tests::each_line_the_check_says_is_said_to_its_journal`); the build also reports four output-name warnings for the existing duplicate `progress_cost`/`replay_cost` examples. Both findings occur in [earlier run 39298987458](https://github.com/autonomous-ai/lampOS/actions/runs/39298987458), and those files are unchanged by this PR. [x86 Clippy 39451960115](https://github.com/autonomous-ai/lampOS/actions/runs/39451960115) passed with no warnings. Both runs tested merge `7f8d5ee98bb0edf211218fa784a8d0ae336c7b21` over base `14b38dc6a53cc8d792aedacefc0a7cdaef57fb92` for head `fd05557ba14af823863ecc19d738476767bfd77f`.
+
+Automatic [ARM64 39452151680](https://github.com/autonomous-ai/lampOS/actions/runs/39452151680) passed **5,608 nextest tests**, with **25 skipped** by the existing PR/ignored-test selection, **4 doc tests**, **12 own-harness tests** and the relay-signals check. The PR profile excludes the realtime group; skips are not passes. One passed test is reported leaky (`same_voice::tests::each_line_the_check_says_is_said_to_its_journal`); the build also reports four output-name warnings for the existing duplicate `progress_cost`/`replay_cost` examples. Both findings occur in [earlier run 39298987458](https://github.com/autonomous-ai/lampOS/actions/runs/39298987458), and those files are unchanged by this PR. [x86 Clippy 39452151740](https://github.com/autonomous-ai/lampOS/actions/runs/39452151740) passed with no warnings. Both runs tested merge `81b029e76f5d9902dffe8854bf8f963bc36bc3b2` over base `e26ebab90b1177379a7965cb0da276cdd3fdb153` for head `4e1dcb78070d916f4e1acf9729baebe86ad6a490`.
+
+The four completed final-gate build caches were removed after their
+processes exited successfully, reclaiming **11,976,604 KiB**. All source
+copies and logs remain. Own scratch usage was measured at **6,163,736 KiB**, below the
+20 GiB cap. The original workspace remains clean.
 
 ## Previous checkpoint: 2026-10-19
 
