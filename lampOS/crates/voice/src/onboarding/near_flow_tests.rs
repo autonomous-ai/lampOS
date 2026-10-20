@@ -289,7 +289,7 @@ fn a_hearing_begun_at_six_seconds_counts_and_one_a_millisecond_later_does_not() 
         walk.near
             .seen()
             .iter()
-            .all(|seen| !matches!(seen, Seen::Hearing(_)))
+            .all(|seen| !matches!(seen, Seen::Hearing(..)))
     );
 }
 
@@ -323,11 +323,111 @@ fn the_lamp_speaking_spoils_only_the_half_second_before_to_a_second_after() {
         speaking: false,
     });
     assert_eq!(judge(&mut walk, &prompt)["accepted"], true);
-    // The prompt's own tail: a name heard 0.3 s after it ended.
+    // The prompt's own tail is not an answer: a name begun 0.3 s after it
+    // ended counts.
     let prompt = play(&mut walk, 50 * S, 1_760_000_050_000, 3);
     room(&mut walk, &prompt, 400, 21.0);
     name(&mut walk, &prompt, 300, 0.98);
+    assert_eq!(judge(&mut walk, &prompt)["accepted"], true);
+}
+
+/// lamp-52e6, row 10: names begun 237 to 478 ms before the prompt's end
+/// were "not heard". A name begun over the prompt's last word, up to 0.5 s
+/// before its end, that ended after it is the call, its rise read from the
+/// prompt's end; one begun earlier, or over by the end, is not. Its reply is
+/// held as any call's.
+#[test]
+fn a_name_begun_over_the_prompts_last_word_counts_from_its_end() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let over = |walk: &mut Onboarding, prompt: &Prompt, before_ms: u64, heard_after_ms: u64| {
+        walk.near_seen(Seen::hearing(
+            prompt.ended_ms + heard_after_ms,
+            &NameHeard {
+                score: 0.98,
+                ago_ms: (before_ms + heard_after_ms) as u32,
+            },
+        ));
+    };
+    for (turn, before_ms) in [(1, 237), (2, 478), (3, 500)] {
+        let at = turn * 20 * S;
+        let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        // The peak while the lamp still spoke is its own voice, left out.
+        walk.near_seen(Seen::level(
+            prompt.ended_ms - 100,
+            &RoomSound {
+                level_db: FLOOR + 30.0,
+                floor_db: Some(FLOOR),
+                own_voice: true,
+            },
+        ));
+        room(&mut walk, &prompt, 300, 6.0);
+        over(&mut walk, &prompt, before_ms, 200);
+        assert!(walk.near_holds_reply(prompt.ended_us - 100_000, prompt.ended_us + S));
+        let judged = judge(&mut walk, &prompt);
+        assert_eq!(judged["accepted"], true, "{before_ms}: {judged}");
+        assert_eq!(judged["rise_db"].as_f64().unwrap() as f32, 6.0);
+    }
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    // Begun 501 ms before the end: talking over the prompt, not the call.
+    let prompt = play(&mut walk, 20 * S, 1_760_000_020_000, 1);
+    room(&mut walk, &prompt, 300, 6.0);
+    over(&mut walk, &prompt, 501, 200);
+    assert!(!walk.near_holds_reply(prompt.ended_us, prompt.ended_us + S));
+    assert_eq!(judge(&mut walk, &prompt)["why"], "the name wasn't heard");
+    // Begun and over before the end: its final hearing came before it.
+    let prompt = play(&mut walk, 40 * S, 1_760_000_040_000, 2);
+    room(&mut walk, &prompt, 300, 6.0);
+    walk.near_seen(Seen::hearing(
+        prompt.ended_ms,
+        &NameHeard {
+            score: 0.98,
+            ago_ms: 400,
+        },
+    ));
+    assert_eq!(judge(&mut walk, &prompt)["why"], "the name wasn't heard");
+    // The lamp still speaking well past the prompt's end is not the prompt.
+    let prompt = play(&mut walk, 60 * S, 1_760_000_060_000, 3);
+    walk.near_seen(Seen::Speaking {
+        at_ms: prompt.ended_ms + 30,
+        speaking: true,
+    });
+    room(&mut walk, &prompt, 300, 6.0);
+    over(&mut walk, &prompt, 300, 200);
     assert_eq!(judge(&mut walk, &prompt)["why"], "the lamp was speaking");
+}
+
+/// lamp-52e6, row 10, try 1: the person spoke over the first prompt, so it
+/// was not played whole. It is offered again with its own number and spends
+/// none of the five, twice in a step at most; a third cut prompt counts.
+#[test]
+fn a_prompt_spoken_over_is_offered_again_twice_at_most() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let boot = BootId::new([3; 16]).unwrap();
+    let cut = |walk: &mut Onboarding, at: u64, turn: u64| {
+        let token = offer(walk, at);
+        let attempt = walk.pending().invitations[0].attempt;
+        walk.take_invitation(token, at).unwrap();
+        assert!(walk.bind_invitation(token, boot, turn));
+        walk.invitation_finished(boot, turn, false, at);
+        walk.drain_storage_for_test(at);
+        let row = walk
+            .take_records()
+            .into_iter()
+            .rfind(|row| row["kind"] == "onboarding_near_try")
+            .unwrap();
+        (attempt, row["offered_again"].clone())
+    };
+    assert_eq!(cut(&mut walk, 10 * S, 1), (1, json!(true)));
+    assert_eq!(walk.kept().near_call_prompts, 0);
+    assert_eq!(cut(&mut walk, 20 * S, 2), (1, json!(true)));
+    // Absence doesn't renew them.
+    nobody(&mut walk, 20 * S + GONE_US);
+    assert_eq!(cut(&mut walk, 60 * S, 3), (1, json!(false)));
+    assert_eq!(walk.kept().near_call_prompts, 1);
+    assert_eq!(call(&mut walk, 80 * S, 22.0, 4)["prompt"], 2);
 }
 
 /// The voice holds its reply to the name heard from the prompt's end to 7 s
@@ -779,10 +879,10 @@ fn sentence(
     walk: &mut Onboarding,
     at: u64,
     speech_ms: u64,
-    close: bool,
+    rise_db: f32,
     words: Option<usize>,
 ) -> Value {
-    walk.sentence_line(speech_ms, close, at + 4 * S);
+    walk.sentence_line(speech_ms, Some(rise_db), at + 4 * S);
     if let Some(words) = words {
         walk.sentence_words(words);
     }
@@ -814,7 +914,7 @@ fn a_sentence_said_close_with_its_words_covering_it_ends_the_step_done_and_keeps
         },
     ));
     assert!(!walk.sentence_window(95 * S + 1) && !walk.near_holds_reply(81 * S, 81 * S));
-    let judged = sentence(&mut walk, 80 * S, 3_000, true, Some(9));
+    let judged = sentence(&mut walk, 80 * S, 3_000, 20.0, Some(9));
     assert_eq!(judged["accepted"], true, "{judged}");
     assert_eq!(judged["words"], 9);
     assert_eq!(settle(&mut walk, 100 * S), [SENTENCE_DONE]);
@@ -841,12 +941,14 @@ fn a_sentence_said_close_with_its_words_covering_it_ends_the_step_done_and_keeps
 
 #[test]
 fn too_quiet_is_coached_a_little_louder_once_and_a_fragment_a_little_closer() {
-    // Not said close: "louder", then a good sentence is done.
+    // Not said close: a line from farther off in a quiet room (up to 15.1
+    // dB, under the calls' 22.4 less 3 and the 18 dB rule), "louder", then a
+    // good sentence is done.
     let store = Store::new(None);
     let mut walk = store.cycle(S);
     past_the_name(&mut walk);
     ask(&mut walk, 80 * S, 4);
-    let judged = sentence(&mut walk, 80 * S, 3_000, false, Some(9));
+    let judged = sentence(&mut walk, 80 * S, 3_000, 15.1, Some(9));
     assert_eq!(
         (judged["accepted"].clone(), judged["short"].clone()),
         (json!(false), json!("level"))
@@ -854,7 +956,7 @@ fn too_quiet_is_coached_a_little_louder_once_and_a_fragment_a_little_closer() {
     assert_eq!(outcome(&walk), None);
     assert_eq!(ask(&mut walk, 110 * S, 5), SENTENCE_LOUDER);
     assert_eq!(
-        sentence(&mut walk, 110 * S, 2_500, true, Some(6))["accepted"],
+        sentence(&mut walk, 110 * S, 2_500, 20.0, Some(6))["accepted"],
         true
     );
     assert_eq!(settle(&mut walk, 130 * S), [SENTENCE_DONE]);
@@ -866,13 +968,13 @@ fn too_quiet_is_coached_a_little_louder_once_and_a_fragment_a_little_closer() {
     past_the_name(&mut walk);
     ask(&mut walk, 80 * S, 4);
     assert_eq!(
-        sentence(&mut walk, 80 * S, 4_000, true, Some(1))["short"],
+        sentence(&mut walk, 80 * S, 4_000, 20.0, Some(1))["short"],
         "coverage"
     );
     assert_eq!(ask(&mut walk, 110 * S, 5), SENTENCE_CLOSER);
     // Words that never came back fall short the same way.
     assert_eq!(
-        sentence(&mut walk, 110 * S, 4_000, true, None)["short"],
+        sentence(&mut walk, 110 * S, 4_000, 20.0, None)["short"],
         "coverage"
     );
     assert_eq!(settle(&mut walk, 140 * S), [SENTENCE_FAILED]);
@@ -880,6 +982,45 @@ fn too_quiet_is_coached_a_little_louder_once_and_a_fragment_a_little_closer() {
     assert!(walk.pending().invitations.is_empty());
     assert_eq!(walk.kept().sentence_prompts, 2);
     assert_eq!(lamp_near_call::read(&store.near_file()), Some(19.4));
+}
+
+/// lamp-52e6, row 10, in an office: the calls from the seat rose 3.9 dB
+/// over the room's loud quiet, and a normal sentence (8 words in 1.95 s)
+/// fell short of the 18 dB rule. The bar is the person's own calls less
+/// 3 dB, never under 3 dB: their sentence passes there, a far, quiet line
+/// does not.
+#[test]
+fn in_a_loud_room_the_sentence_is_judged_against_the_persons_own_calls() {
+    for (rise_db, accepted) in [(4.2, true), (3.0, true), (2.9, false)] {
+        let store = Store::new(None);
+        let mut walk = store.cycle(S);
+        for (turn, rise) in [(1, 3.9), (2, 5.2), (3, 4.4)] {
+            assert_eq!(call(&mut walk, turn * 20 * S, rise, turn)["accepted"], true);
+        }
+        assert_eq!(settle(&mut walk, 70 * S), [NEAR_DONE]);
+        ask(&mut walk, 80 * S, 4);
+        let judged = sentence(&mut walk, 80 * S, 1_950, rise_db, Some(8));
+        assert_eq!(judged["accepted"], accepted, "{judged}");
+        assert_eq!(judged["bar_db"].as_f64().unwrap() as f32, 3.0);
+        if !accepted {
+            assert_eq!(judged["short"], "level");
+        }
+    }
+    // No line's rise known (no bus): never said close.
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    past_the_name(&mut walk);
+    ask(&mut walk, 80 * S, 4);
+    walk.sentence_line(3_000, None, 84 * S);
+    walk.sentence_words(9);
+    walk.tick(85 * S, START_QUIET_US, true, false, face(), true);
+    let judged = walk
+        .take_records()
+        .into_iter()
+        .rfind(|row| row["kind"] == "onboarding_sentence_try")
+        .unwrap();
+    assert_eq!(judged["short"], "level");
+    assert_eq!(judged["bar_db"].as_f64().unwrap() as f32, 18.0);
 }
 
 #[test]
@@ -899,7 +1040,7 @@ fn the_step_is_the_sentences_whatever_the_name_part_came_to() {
     assert_eq!(judged["short"], "level");
     ask(&mut walk, 110 * S, 5);
     assert_eq!(
-        sentence(&mut walk, 110 * S, 2_000, true, Some(5))["accepted"],
+        sentence(&mut walk, 110 * S, 2_000, 20.0, Some(5))["accepted"],
         true
     );
     settle(&mut walk, 130 * S);
@@ -939,7 +1080,7 @@ fn late_lines_skip_redo_and_a_new_cycle_in_the_sentence_part() {
     past_the_name(&mut walk);
     ask(&mut walk, 80 * S, 4);
     // A line ending past the window is not the sentence.
-    walk.sentence_line(3_000, true, 96 * S);
+    walk.sentence_line(3_000, Some(20.0), 96 * S);
     walk.sentence_words(9);
     assert_eq!(sentence_none(&mut walk, 80 * S)["short"], "level");
     // A new voice cycle keeps the prompt spent and the bar is kept again;
@@ -974,7 +1115,7 @@ fn late_lines_skip_redo_and_a_new_cycle_in_the_sentence_part() {
     walk.drain_storage_for_test(81 * S);
     assert_eq!(outcome(&walk), Some(Outcome::Skipped));
     assert!(!walk.sentence_window(82 * S));
-    walk.sentence_line(3_000, true, 82 * S);
+    walk.sentence_line(3_000, Some(20.0), 82 * S);
     walk.sentence_words(9);
     walk.tick(99 * S, START_QUIET_US, true, false, face(), true);
     assert!(

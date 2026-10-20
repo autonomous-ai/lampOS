@@ -170,10 +170,17 @@ impl Rise {
     /// Whether the room microphone rose the near rule's bar
     /// ([`crate::attention::near_rise_db`]) or more since `from_us`.
     pub fn close_since(&self, from_us: u64) -> bool {
-        let bar = crate::attention::near_rise_db();
+        self.most_since(from_us)
+            .is_some_and(|rise| rise >= crate::attention::near_rise_db())
+    }
+
+    /// The largest rise since `from_us`; none without a reading.
+    pub fn most_since(&self, from_us: u64) -> Option<f32> {
         self.rises
             .iter()
-            .any(|(at, rise)| *at >= from_us && *rise >= bar)
+            .filter(|(at, _)| *at >= from_us)
+            .map(|(_, rise)| *rise)
+            .reduce(f32::max)
     }
 }
 
@@ -293,6 +300,8 @@ mod tests {
         rise.sample(1_000_000);
         assert!(rise.close_since(1_000_000));
         assert!(!rise.close_since(1_000_001));
+        assert_eq!(rise.most_since(1_000_000), Some(near));
+        assert_eq!(rise.most_since(1_000_001), None);
         // Within 100 ms of the last sample, the bus is not read.
         say(-60.0 + near + 10.0, false);
         rise.sample(1_050_000);
