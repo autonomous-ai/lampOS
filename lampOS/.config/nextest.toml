@@ -54,6 +54,13 @@ success-output = "final"
 filter = 'binary_id(lamp-voice::it) & test(/^speaker_lapse_worker::/)'
 threads-required = "num-cpus"
 
+# `privacy_worker` says when it begins a test again because its own Controls
+# producer was held up (#1569 row 45), so how often that happens shows in
+# every run's output, passing ones included (the reviewer on #2234).
+[[profile.default.overrides]]
+filter = 'binary_id(lamp-voice::it) & test(/^privacy_worker::/)'
+success-output = "final"
+
 # Pull requests and pushes to lamp-voice on GitHub Actions
 # (.github/workflows/lampos-arm64.yml): every test, the realtime group
 # included. A filter given on the command line is intersected with this.
