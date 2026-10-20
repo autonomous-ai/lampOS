@@ -40,6 +40,9 @@ argv_of() { # the last ExecStart= of the unit's drop-ins, else its own
 case $1 in
   daemon-reload) ;;
   restart | start)
+    # $FAKE/slow-restarts: each restart takes a second (a put-back long
+    # enough to be signalled in the middle of).
+    [[ -e $FAKE/slow-restarts ]] && sleep 1
     # The Nth restart and later fail when $FAKE/restarts-before-failing holds N-1.
     n=$(( $(cat "$FAKE/restarts" 2>/dev/null || echo 0) + 1 ))
     echo "$n" >"$FAKE/restarts"
@@ -601,6 +604,23 @@ echo 1 >"$T/restarts-before-failing"
 "$SCRIPT" forget >"$T/out" 2>&1; check "a failed put back" 3 $?
 wait
 has "a failed put back is said" "$T/out" "PUT BACK FAILED"
+
+# TERM again during the put-back (#2034, 03:40): it still finishes.
+reset
+TRIALS_WAIT=30 "$SCRIPT" forget >"$T/out" 2>&1 &
+pid=$!
+for _ in $(seq 1 100); do grep -q "PLAY: " "$T/out" 2>/dev/null && break; sleep 0.1; done
+touch "$T/slow-restarts"
+kill -TERM $pid
+for _ in $(seq 1 50); do grep -q "put back: " "$T/out" 2>/dev/null && break; sleep 0.1; done
+sleep 0.3
+kill -TERM $pid 2>/dev/null
+sleep 0.5
+kill -TERM $pid 2>/dev/null
+wait $pid
+rm -f "$T/slow-restarts"
+has "a twice-signalled put-back finishes" "$T/out" "put back: drop-ins removed"
+no_dropin "after TERM in the put-back"
 
 # Stopped mid-wait (TERM): still put back.
 reset
