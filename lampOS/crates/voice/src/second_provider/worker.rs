@@ -1418,6 +1418,9 @@ pub fn serve(
     } else {
         spoken_declare
     };
+    // A forget called unasked is held for their yes (`LAMP_FORGET_ASKED`):
+    // the forget functions say so to spoken turns.
+    let spoken_declare = with_held_forgets(spoken_declare);
     let net = services(
         config,
         &provider,
@@ -2565,6 +2568,14 @@ fn with_name_signal(
         declared.push(crate::attention::name_tool());
         declared
     })
+}
+
+/// Spoken turns' forget functions say that one called unasked is held for
+/// the person's yes (`crate::remember::held_forgets_described`).
+fn with_held_forgets(
+    declare: crate::second_provider::net::Declare,
+) -> crate::second_provider::net::Declare {
+    Arc::new(move || crate::remember::held_forgets_described(declare()))
 }
 
 /// The model said it heard its name in `request`: answered, nothing done,

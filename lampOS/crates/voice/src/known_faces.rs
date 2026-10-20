@@ -244,6 +244,13 @@ fn plain_yes(name: &str, turn: &str) -> bool {
         })
 }
 
+/// Whether `turn` is a plain yes and nothing else ([`plain_yes`] with no
+/// name): "Yes.", "OK.", "Vâng ạ.", never "OK, what's my name?" or "Yes?".
+/// What runs a forget held for a person's yes on the second route.
+pub(crate) fn plain_agreement(turn: &str) -> bool {
+    plain_yes("", turn)
+}
+
 /// Whether the lamp said `name` back in the exchange just before the turn
 /// in hand, and the person said a plain yes to it now ([`plain_yes`]):
 /// what `replace` needs, and a name kept from an earlier exchange.

@@ -2,6 +2,7 @@
 use super::*;
 
 mod held_consent;
+mod held_forget;
 use futures_util::stream::{self, BoxStream};
 use net::ToolCall;
 use serde_json::json;

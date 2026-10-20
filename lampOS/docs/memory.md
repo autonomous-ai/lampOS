@@ -329,17 +329,65 @@ the unchanged legacy client, used unless the new Days client is selected.
   of", "don't keep", "off your list", matched with accents off, and "quên",
   "xóa" with their accents kept, since without them "quen" is "to know
   someone" and "xoa" "to stroke"). Lines that only describe forgetting ("I
-  keep forgetting my keys.") aren't asks. **A yes alone forgets nothing**,
-  whatever the lamp asked: "Forget everything about me." "Everything,
-  really?" "Yes." is told to say it ("Yes, forget everything."). Keying a
-  yes on the lamp's question's words kept leaking, since the model writes
-  the question, so a forget the lamp asks to confirm will be held and run
-  on the yes itself (Jarvis's follow-up). Never on a turn the lamp wrote
+  keep forgetting my keys.") aren't asks. Never on a turn the lamp wrote
   itself (a hello, a skill's say, task news), whatever its text says. A
-  text runs one only when the typed text asks. Otherwise the call isn't
-  run, the journal says so, and the model is told nothing was forgotten and
-  how to ask, never that the person didn't ask. Not taken, so asked again:
-  "never mind what I told you" and other words without one of these.
+  text runs one only when the typed text asks; a typed yes confirms
+  nothing. Not taken, so asked again: "never mind what I told you" and
+  other words without one of these.
+- **A forget the model calls unasked is held for a yes** (second route,
+  spoken turns, same switch). Keying a yes on the words of the lamp's
+  question leaked each time (#2324, #2326, #2331), since the model writes
+  the question. So the engine holds the call itself: its name and
+  arguments, the request's session and known person, and the time. The
+  model is told to ask once, plainly ("Shall I forget your face?"), and
+  stop. **The hold stands only on that question:** once the held turn's
+  answer is said whole, it must hold a question (a sentence ending in "?")
+  that asks to forget (the `asks_to_forget` words) and names the forget
+  held (`remember::asks_about_forgetting`): "face" or "khuôn mặt" for
+  `forget_my_face`, "everything" or "tất cả" for `forget_everything`, and
+  for a plain `forget` the lamp as the one who would ("Shall I / Should I
+  / Do you want me to forget …", "Tôi có nên quên …"). "Want me to set a
+  reminder?", "I can forget your face.", "Did you forget your keys?",
+  "Should I clear the timer?" or an answer cut, failed or held drops it.
+  This is on top of the call, so what the model writes never widens it
+  (Fourth's P2 and 05:11 P3 on #2340).
+  Only the next spoken turn can run it, and only when it is a plain yes
+  and nothing else (`known_faces::plain_agreement`: "Yes.", "Vâng.", never
+  "OK, what's my name?" or "Yes?"), said while the same session's person
+  is the face at the lamp, whoever says it (the engine knows the face at
+  the lamp, not who spoke), within 60 s. Any other turn drops it and runs
+  nothing: a no, other words, another face at the lamp, a turn the lamp
+  wrote, a later yes, or a new held call. One waits at a time.
+  **Their ask a turn before carries for the forget it names:** when the
+  same person's own spoken turn just before, in the same session and
+  within 60 s, asked in words (`asks_to_forget` on their words, never the
+  lamp's) and named that forget ("everything" or "tất cả" for
+  `forget_everything`, "face" or "khuôn mặt" for `forget_my_face`,
+  `remember::names_forget`), the call runs at once: "Forget everything
+  about me." "Everything, really?" "Yes." runs it with no second question
+  (Fourth's P3 on #2340). A plain `forget` of a kept thing never carries,
+  and "Clear the timer." or "Don't forget my keys." names neither, so a
+  forget called after them is held. **A yes with nothing held forgets nothing**,
+  whatever the lamp asked: with nothing held, a yes to any question runs
+  nothing. On the turn a held forget runs, the model is told it ran and
+  not to call it again,
+  so the lamp doesn't ask twice. **Nobody known, nothing held:** with no
+  known person in the request's scope (the room, or the camera off),
+  nothing is held, because a forget that can't be undone shouldn't take an
+  anonymous yes. The model is told to ask them to say it in words, as
+  without the hold, and "forget my face" said in words still runs. The
+  forget functions' descriptions on spoken turns say so (call once; if
+  they didn't ask in their own words, the lamp holds it and asks; their
+  yes, or their asking in words, runs it), and `forget_everything` is
+  called once even when the model isn't sure they mean everything, then
+  asked about, rather than asking first. Texts keep their descriptions,
+  and the model's "nothing was forgotten" names both ways and says a yes
+  isn't one there. The journal says "held a forget",
+  "ran a held forget" and "dropped a held forget" with the call's name and
+  the reason, never words. Otherwise a forget not asked for isn't run, the
+  journal says so, and the model is told nothing was forgotten and how to
+  ask, never that the person didn't ask. Not on the Live route, whose tool
+  runner has neither gate; lamps run the second route.
 - **Asking it to keep or forget something is not itself kept.** The
   exchange in which `remember` or `forget` was called stays out of the
   journal: the kept list is the record of that.
