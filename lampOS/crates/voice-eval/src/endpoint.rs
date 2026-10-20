@@ -4,7 +4,7 @@
 //! on #1722, 20 Oct 2026 07:20: an old `lamp-turn-end` refused its new
 //! options from 19 Oct, the worker failed, every end of speech fell back to
 //! the whole silence (`silence_fallback`, `failed`), and no played test said
-//! so. A played test runs `lamp-voice-eval endpoint SESSION` after each arm:
+//! so. Run `lamp-voice-eval endpoint SESSION` after each arm of a played test:
 //! it fails when the worker's newest state isn't `ready`, or when an end of
 //! speech fell back because the worker failed. Counts and states only: no
 //! words.

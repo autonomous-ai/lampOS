@@ -107,3 +107,19 @@ fn a_folder_with_no_records_fails_too() {
     assert_eq!(output.status.code(), Some(1), "{output:?}");
     assert!(String::from_utf8_lossy(&output.stderr).contains("no events-*.jsonl under it"));
 }
+
+#[test]
+fn a_link_back_up_the_session_is_not_followed() {
+    // A link to the session itself, beside its records: followed, the
+    // walk would go round until the stack ran out (the reviewer on #2097).
+    let dir = session("loop", &[("metadata/events-0.jsonl", READY)]);
+    std::os::unix::fs::symlink(&dir, dir.join("metadata/back-up")).unwrap();
+    let output = run(&[dir.to_str().unwrap()]);
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(output.status.code(), Some(0), "{text}");
+    // The records are read once, not once per loop.
+    assert_eq!(
+        text,
+        "end-of-speech worker: loading, ready\nends of speech: 0: \n"
+    );
+}
