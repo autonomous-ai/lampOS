@@ -4053,6 +4053,12 @@ thread_local! {
     static TEST_HOLDING_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_SECOND_LOOK_NOTE=on`, as `TEST_HOLDING_ANSWER`.
     static TEST_LOOK_NOTE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_SECOND_LOOK_WALK=on`, as `TEST_LOOK_NOTE`.
+    static TEST_LOOK_WALK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's skills, in place of lamp-skills' socket, for the
+    /// walk's calls: taken by the loop as it starts.
+    static TEST_WALK_SKILL: std::cell::RefCell<Option<look_note::SkillCaller>> =
+        const { std::cell::RefCell::new(None) };
     /// A loop test's task news, in place of the tasks part, as
     /// `TEST_FULL_LOOK`: taken by the loop as it starts.
     static TEST_TASK_NEWS: std::cell::RefCell<Option<crate::task_news::TaskNews>> =
@@ -4473,7 +4479,20 @@ fn conversation_with_gate(
         == Some("on");
     #[cfg(test)]
     let look_note_on = look_note_on || TEST_LOOK_NOTE.with(std::cell::Cell::get);
-    let mut look_note = look_note::LookNote::new(look_note_on);
+    // And, left again after it, walked on by the lamp to the next place
+    // (`LAMP_SECOND_LOOK_WALK=on`), calling the search's skill itself.
+    let look_walk_on = std::env::var(crate::second_provider::LOOK_WALK_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    #[cfg(test)]
+    let look_walk_on = look_walk_on || TEST_LOOK_WALK.with(std::cell::Cell::get);
+    let mut look_note = look_note::LookNote::new(look_note_on).with_walk(look_walk_on);
+    let walk_skill = look_note::skills_caller();
+    #[cfg(test)]
+    let walk_skill = TEST_WALK_SKILL
+        .with(|skill| skill.borrow().clone())
+        .unwrap_or(walk_skill);
     let policy_detector = match rig.turn_taking {
         // Duplex gates the scores this detector sees; its rule is unchanged.
         TurnTaking::V1Baseline | TurnTaking::Duplex => TurnDetector::v1_baseline(),
@@ -5441,6 +5460,7 @@ fn conversation_with_gate(
                     session,
                     dropped,
                     search,
+                    call,
                 } => match dropped {
                     Some(why) if look.full() => {
                         // Dropped in a search's last look's turn: the
@@ -5482,7 +5502,7 @@ fn conversation_with_gate(
                                 let heard = reply.as_ref().is_some_and(|current| {
                                     current.owner.turn() == request && current.input_sequence > 0
                                 });
-                                look_note.asked(request, heard);
+                                look_note.asked(request, heard, call);
                             }
                         }
                     }
@@ -7394,10 +7414,10 @@ fn conversation_with_gate(
                 && current.delivery_outcome() == "audio_written_unscored"
                 && !sound_finished;
             holding_answer.settled(turn, played_whole, monotonic_us());
-            if let Some(why) = look_note.settled(turn, played_whole, monotonic_us()) {
+            if let Some((kind, why)) = look_note.settled(turn, played_whole, monotonic_us()) {
                 record(
                     trace,
-                    json!({"kind":"look_note_dropped","turn":turn,"why":why,"at_us":monotonic_us()}),
+                    json!({"kind":kind,"turn":turn,"why":why,"at_us":monotonic_us()}),
                 )?;
             }
             if !sound_finished
@@ -7706,6 +7726,13 @@ fn conversation_with_gate(
                     {
                         look_wanted = None;
                         let (note, with_picture) = look.turn();
+                        // A search's walk names the place it looked, with
+                        // the skill's note for the picture; with no
+                        // picture, the eye-shut note alone.
+                        let note = match look_note.walk_line(turn) {
+                            Some(line) if with_picture => format!("{note}{line}"),
+                            _ => note.to_owned(),
+                        };
                         if look.full() && !with_picture {
                             eprintln!(
                                 "lamp-voice: a full look went without its still: {}",
@@ -7724,7 +7751,7 @@ fn conversation_with_gate(
                             owner,
                             reply,
                             &mut provider_queue,
-                            note,
+                            &note,
                             with_picture,
                             "lamp_looks",
                             provider_session,
@@ -7968,8 +7995,10 @@ fn conversation_with_gate(
         }
         // A skill's search left after a look is noted once to go on, under
         // the same gates; the person speaking or a new turn drops it.
+        // After the note, the walk on to the next place, under the same
+        // gates: its look is taken as a skill's look.
         let look_note_now_us = monotonic_us();
-        if let Some(started) = look_note::start(
+        match look_note::start(
             &mut look_note,
             holding::Gates {
                 at_us: look_note_now_us,
@@ -7984,6 +8013,7 @@ fn conversation_with_gate(
                 speaker_pending: speaker_pending.is_some(),
                 submission_draining,
             },
+            &walk_skill,
             owner,
             reply,
             &mut provider_queue,
@@ -7991,8 +8021,35 @@ fn conversation_with_gate(
             trace,
             |state| rig.publish(state),
         )? {
-            snapshot = started;
-            last_publish = monotonic_us();
+            look_note::Started::Nothing => {}
+            look_note::Started::Turn(started) => {
+                snapshot = started;
+                last_publish = monotonic_us();
+            }
+            // The skill looked toward the next place: its still is taken as
+            // for a skill's look, from now (nothing is playing), and goes
+            // as the search's next look turn.
+            look_note::Started::Look { turn, session } => {
+                if look.full() && look_wanted.is_none() {
+                    look_wanted = Some((turn, look_note_now_us));
+                    let by_second = rig
+                        .second
+                        .as_ref()
+                        .is_some_and(second::Route::second_active);
+                    look_held = Some((turn, session, by_second));
+                    look_note.asked(turn, false, None);
+                    record(
+                        trace,
+                        json!({"kind":"look_asked","turn":turn,"by":"walk","at_us":look_note_now_us}),
+                    )?;
+                } else {
+                    look_note.clear();
+                    record(
+                        trace,
+                        json!({"kind":"look_walk_dropped","turn":turn,"why":"its look could not be taken","at_us":look_note_now_us}),
+                    )?;
+                }
+            }
         }
         // A second look at something said to the lamp by name that got
         // nothing, as soon as the lamp is at rest. Someone who has spoken

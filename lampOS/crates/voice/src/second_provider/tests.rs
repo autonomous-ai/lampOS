@@ -6141,14 +6141,21 @@ async fn a_searchs_own_written_turn_takes_the_skills_next_look() {
                     session,
                     dropped,
                     search,
-                } => asked = Some((request, session, dropped, search)),
+                    call,
+                } => asked = Some((request, session, dropped, search, call)),
                 ProviderOutput::TurnComplete { .. } => break,
                 _ => {}
             }
         }
+        // A skill's call goes with its ask, as the model made it, so the
+        // coordinator can walk the search on (`LAMP_SECOND_LOOK_WALK`).
+        let call = (name != LOOK_CALL).then(|| crate::provider_worker::SearchCall {
+            name: name.to_owned(),
+            args: json!({"place": "left"}),
+        });
         assert_eq!(
             asked,
-            Some((2, 1, dropped.map(str::to_owned), name != LOOK_CALL)),
+            Some((2, 1, dropped.map(str::to_owned), name != LOOK_CALL, call)),
             "{case}"
         );
     }
@@ -6158,7 +6165,9 @@ async fn a_searchs_own_written_turn_takes_the_skills_next_look() {
 /// answer called nothing in any round tells the coordinator so
 /// (`LookNoCall`, for its session, before its `TurnComplete`). One whose
 /// answer called something (the next place), a written turn that is no
-/// look, and the switch off tell nothing.
+/// look, and the switch off tell nothing. With `LAMP_SECOND_LOOK_WALK`
+/// (step 4), a search's note turn (no look) answered with nothing called
+/// is told too, so the coordinator walks the search on; no other turn.
 #[tokio::test]
 async fn a_looks_answer_with_no_call_is_told_to_the_coordinator() {
     let said = || vec![text("Not on the desk."), Ok(ChatEvent::Done)];
@@ -6172,26 +6181,97 @@ async fn a_looks_answer_with_no_call_is_told_to_the_coordinator() {
             Ok(ChatEvent::Done),
         ]
     };
+    // (case, look, search, chat, note, walk, told): with the walk
+    // (`LAMP_SECOND_LOOK_WALK`), a search's note turn left so is told too.
     let cases = [
-        ("look, no call, on", true, said(), true, true),
-        ("look, a call, on", true, called(), true, false),
-        ("no look, no call, on", false, said(), true, false),
-        ("look, no call, off", true, said(), false, false),
+        ("look, no call, on", true, false, said(), true, false, true),
+        (
+            "look, a call, on",
+            true,
+            false,
+            called(),
+            true,
+            false,
+            false,
+        ),
+        (
+            "no look, no call, on",
+            false,
+            false,
+            said(),
+            true,
+            false,
+            false,
+        ),
+        (
+            "look, no call, off",
+            true,
+            false,
+            said(),
+            false,
+            false,
+            false,
+        ),
+        (
+            "search note, no call, walk",
+            false,
+            true,
+            said(),
+            true,
+            true,
+            true,
+        ),
+        (
+            "search note, a call, walk",
+            false,
+            true,
+            called(),
+            true,
+            true,
+            false,
+        ),
+        (
+            "search note, no call, no walk",
+            false,
+            true,
+            said(),
+            true,
+            false,
+            false,
+        ),
+        (
+            "search note, no call, walk without the note",
+            false,
+            true,
+            said(),
+            false,
+            true,
+            false,
+        ),
+        (
+            "no search, no look, walk",
+            false,
+            false,
+            said(),
+            true,
+            true,
+            false,
+        ),
     ];
-    for (case, look, chat, on, told) in cases {
+    for (case, look, search, chat, on, walk, told) in cases {
         let script = Arc::new(Script {
             chats: Mutex::new([chat, said()].into()),
             ..Script::default()
         });
         let (engine, _, _) = scripted(script);
-        let mut engine = engine.noting_looks(on);
+        let mut engine = engine.noting_looks(on).walking_looks(walk);
         engine.submit(ProviderInput::Written {
             request: 2,
             session: 1,
             privacy_generation: 1,
             text: "Here is what you see.".into(),
             look,
-            search: false,
+            search,
         });
         let mut events = Vec::new();
         loop {

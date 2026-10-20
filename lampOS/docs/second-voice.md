@@ -1901,6 +1901,38 @@ after a take-over, but now for every turn:
   after them. The journal says `request N answered a look with nothing
   called`. The next place the note asks for is looked at: the note's
   turn is the search's own.
+- **The search walks on, with `LAMP_SECOND_LOOK_WALK=on`** (off unless
+  set; only with `LAMP_SECOND_SKILL_LOOK=on` and `LAMP_SECOND_LOOK_NOTE=on`;
+  step 4 of look-for-things on this route). If the note is left too (its
+  turn's answer, or the next look's in the same search, called nothing),
+  the lamp walks on by itself: the worker tells a search's note turn left
+  so as it tells a look's (`LookNoCall`; `Engine::walking_looks`), and the
+  coordinator (`coordinator::look_note`), under the note's gates (the
+  answer played whole, a second of fresh quiet), calls the search's skill
+  itself, with the call the model made (`LookAsked`'s `call`: its name, the
+  skill's own or `use_skill`, and its arguments) and the next place in
+  `look_note::WALK_ORDER`: left, right, far_left, far_right, then the desk,
+  each skipped if the search already asked it (its first look's place is
+  the call's `place`, or the desk). The call goes on a thread of its own
+  through the voice's own call path (`tools::run_call`, to lamp-skills'
+  `call.sock`, at most 1.5 s), so nothing waits on it and the lamp's speech
+  is never delayed. A picture cannot come back as a call's result on this
+  route, so a look in the skill's answer is taken as a skill's look is
+  (the eyes asked at once, as nothing is playing) and goes as the search's
+  next `lamp_looks` turn, marked as the search's, with "(You looked to the
+  left; the picture is that look.)" and the skill's "When the picture
+  comes:" note after the look's question: the finding stays the model's.
+  The skill's refusal past its looks (look-for-things' `[search]`
+  `give_up`, an error) goes once as a written turn, `look_walk_gave_up`,
+  and the search is over; with no place left the walk asks once more with
+  its newest place, so a search of five places ends with that line (the
+  desk's look and four walked: five looks). A `look_for(found)` from the
+  model is a call, so no `LookNoCall` follows and nothing is walked. The
+  walk stops at the voice's 8 looks and when its places are spent, and at
+  once if the person speaks, another turn begins, the session changes, or
+  a stop by hand or a pause comes; each step is `look_walk_asked` with
+  `place`, each end `look_walk_dropped` with `why`. The journal says `a
+  search's note answered with nothing called is told to the coordinator`.
 - **Live route only, so not on this route:**
   the head tap for whom it answers, sight and camera facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).

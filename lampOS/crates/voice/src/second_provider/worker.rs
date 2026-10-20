@@ -1773,6 +1773,18 @@ pub fn serve(
                 "lamp-voice second: a look's answer that calls nothing is told to the coordinator (LAMP_SECOND_LOOK_NOTE)"
             );
             engine = engine.noting_looks(true);
+            // And a search's note turn left so, so the coordinator walks
+            // the search on (`LAMP_SECOND_LOOK_WALK=on`).
+            if std::env::var(crate::second_provider::LOOK_WALK_ENVIRONMENT)
+                .ok()
+                .as_deref()
+                == Some("on")
+            {
+                eprintln!(
+                    "lamp-voice second: a search's note answered with nothing called is told to the coordinator, which walks it on (LAMP_SECOND_LOOK_WALK)"
+                );
+                engine = engine.walking_looks(true);
+            }
         }
     } else if skill_look == Some("on") {
         eprintln!(

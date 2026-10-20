@@ -282,6 +282,13 @@ pub const SKILL_LOOK_ENVIRONMENT: &str = "LAMP_SECOND_SKILL_LOOK";
 /// else. Only with [`SKILL_LOOK_ENVIRONMENT`].
 pub const LOOK_NOTE_ENVIRONMENT: &str = "LAMP_SECOND_LOOK_NOTE";
 
+/// Where the worker and the coordinator read whether a skill's search the
+/// model leaves again after its note walks on by itself to the next place
+/// (`coordinator::look_note`): the worker then tells a search's note turn
+/// answered with nothing called too ([`Engine::walking_looks`]). `on`, and
+/// nothing else. Only with [`LOOK_NOTE_ENVIRONMENT`].
+pub const LOOK_WALK_ENVIRONMENT: &str = "LAMP_SECOND_LOOK_WALK";
+
 /// The note after a round's call results, when that round said `said`
 /// before its calls: the person heard it, so the next round says only what
 /// the results add ([`Engine::saying_once`]).
@@ -428,6 +435,10 @@ struct Shared {
     /// [`Engine::noting_looks`]: a look's turn whose answer called nothing
     /// sends `LookNoCall`.
     note_looks: bool,
+    /// [`Engine::walking_looks`]: a search's own written turn that is no
+    /// look (its note's) answered with nothing called sends `LookNoCall`
+    /// too.
+    walk_looks: bool,
     /// [`Engine::saying_once`]: a round that said words before its calls
     /// tells the next one so ([`said_once_note`]).
     said_once: bool,
@@ -879,6 +890,7 @@ impl Engine {
                 misheard_at_us: Mutex::new(None),
                 holding_answer: false,
                 note_looks: false,
+                walk_looks: false,
                 said_once: false,
                 resend: None,
                 hearing: None,
@@ -1170,6 +1182,18 @@ impl Engine {
     pub fn noting_looks(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.note_looks = on;
+        }
+        self
+    }
+
+    /// `LAMP_SECOND_LOOK_WALK=on` ([`LOOK_WALK_ENVIRONMENT`]), with
+    /// [`Engine::noting_looks`]: a skill's search's own written turn
+    /// (`Written`'s `search`) whose whole answer called nothing sends
+    /// `LookNoCall` too, look or not, so the coordinator walks the search on
+    /// after its note's answer as after a look's. Before any turn only.
+    pub fn walking_looks(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.walk_looks = on;
         }
         self
     }
@@ -3196,15 +3220,15 @@ const PICTURE_COMES: &str = "When the picture comes:";
 /// At most this many bytes of a skill's note for its picture.
 const PICTURE_NOTE_MAX: usize = 1024;
 /// Around a skill's note for its picture, after the look turn's question.
-const PICTURE_NOTE_BEFORE: &str =
+pub(crate) const PICTURE_NOTE_BEFORE: &str =
     "\n\n(The skill you called for this look said what to do with the picture: ";
-const PICTURE_NOTE_AFTER: &str = ")";
+pub(crate) const PICTURE_NOTE_AFTER: &str = ")";
 
 /// What a skill's answer with a look says to do with its picture: the
 /// words of its `next` after [`PICTURE_COMES`], at most
 /// [`PICTURE_NOTE_MAX`] bytes, cut at a character's end. `None` without
 /// them, or with nothing after them.
-fn picture_note(answer: &Value) -> Option<String> {
+pub(crate) fn picture_note(answer: &Value) -> Option<String> {
     let (_, note) = answer["next"].as_str()?.split_once(PICTURE_COMES)?;
     let note = note.trim();
     let mut end = note.len().min(PICTURE_NOTE_MAX);
@@ -3220,11 +3244,13 @@ fn picture_note(answer: &Value) -> Option<String> {
 /// (unless `heard` says it may look all the same: a skill's search's own
 /// turn) or one that is no longer the turn in hand. True when the look was
 /// asked; then `note`, a skill's for the picture, is kept for the look turn.
+/// A skill's call, `args` with it, goes with the ask, so the coordinator can
+/// walk its search on.
 async fn ask_look(
     shared: &Shared,
     request: u64,
     heard: bool,
-    name: &str,
+    (name, args): (&str, Value),
     note: Option<String>,
 ) -> Result<bool, Stop> {
     // A skill's look is a search's, which may go on in the lamp's own
@@ -3260,6 +3286,10 @@ async fn ask_look(
         session: session.unwrap_or_default(),
         dropped: dropped.map(str::to_owned),
         search,
+        call: search.then(|| crate::provider_worker::SearchCall {
+            name: name.to_owned(),
+            args,
+        }),
     };
     if !shared.emit(asked_look).await {
         return Err(Stop::Gone);
@@ -3656,7 +3686,9 @@ async fn answer(
                 if let Some(rest) = split.finish() {
                     queue.push(rest).await?;
                 }
-                if ask_look(shared, request, heard, LOOK_CALL, None).await? && !queue.started {
+                if ask_look(shared, request, heard, (LOOK_CALL, Value::Null), None).await?
+                    && !queue.started
+                {
                     queue.push(LOOKING.to_owned()).await?;
                 }
                 return Ok(());
@@ -3693,8 +3725,9 @@ async fn answer(
             // A call the Policy held ends the turn after this round.
             let mut policy_held = false;
             // A skill's call answered with `"look": true`, by its name, with
-            // its note for the picture (`LAMP_SECOND_SKILL_LOOK`).
-            let mut skill_looked: Option<(String, Option<String>)> = None;
+            // its arguments and its note for the picture
+            // (`LAMP_SECOND_SKILL_LOOK`).
+            let mut skill_looked: Option<(String, Value, Option<String>)> = None;
             let held_by_rule: Vec<bool> = calls
                 .iter()
                 .map(|call| {
@@ -3783,7 +3816,8 @@ async fn answer(
                         .as_ref()
                         .is_some_and(|skill| skill(&call.name))
                 {
-                    skill_looked = Some((call.name.clone(), picture_note(&result)));
+                    skill_looked =
+                        Some((call.name.clone(), call.args.clone(), picture_note(&result)));
                 }
                 messages.push(Message::tool(call.id.clone(), result.to_string()));
             }
@@ -3810,8 +3844,8 @@ async fn answer(
             // the person asked for the search, and lamp-skills ends it after
             // its last look. Every other turn the lamp wrote takes none
             // (#1146: pictures never chain with nobody speaking).
-            if let Some((name, note)) = skill_looked
-                && ask_look(shared, request, heard || searching, &name, note).await?
+            if let Some((name, args, note)) = skill_looked
+                && ask_look(shared, request, heard || searching, (&name, args), note).await?
             {
                 if !queue.started {
                     queue.push(LOOKING.to_owned()).await?;
@@ -3956,9 +3990,12 @@ async fn answer(
         && matches!(&ended, Ok((_, whole)) if crate::holding_answer::holding_only(whole));
     // A look's turn answered with nothing called: neither the next place
     // nor anything else (`LAMP_SECOND_LOOK_NOTE`). The coordinator knows
-    // whether the look was a skill's search.
-    let look_left =
-        shared.note_looks && looking && ended.is_ok() && !called.load(Ordering::Relaxed);
+    // whether the look was a skill's search. With the walk
+    // (`LAMP_SECOND_LOOK_WALK`), a search's note turn left so is told too.
+    let look_left = shared.note_looks
+        && (looking || (shared.walk_looks && searching))
+        && ended.is_ok()
+        && !called.load(Ordering::Relaxed);
     // The voice's line on the turn's pieces (#1712).
     shared.services.spoken(request);
     let gave_up = matches!(ended, Err(Stop::GaveUp));

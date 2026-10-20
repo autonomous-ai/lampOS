@@ -660,6 +660,16 @@ impl ProviderInput {
         }
     }
 }
+/// A skill's call that asked a search's look (`ProviderOutput::LookAsked`'s
+/// `call`): its function's name as the model called it (the skill's own, or
+/// `use_skill`) and its arguments.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SearchCall {
+    pub name: String,
+    pub args: serde_json::Value,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ProviderOutput {
@@ -733,12 +743,21 @@ pub enum ProviderOutput {
         /// true, so the wire is as before for every other look.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         search: bool,
+        /// With `search`, the skill's call that asked the look, as the model
+        /// made it: the coordinator walks a search on with the same call
+        /// and the next place (`LAMP_SECOND_LOOK_WALK`,
+        /// `coordinator::look_note`). Sent only when there is one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        call: Option<SearchCall>,
     },
     /// The answer to a look's turn (`Written` with `look`) on the second
     /// route ended with nothing called in any round
     /// (`LAMP_SECOND_LOOK_NOTE`): the coordinator may note a skill's search
-    /// once that it can call for the next place. Sent before the request's
-    /// idle `TurnComplete`; no input or speech is granted by it.
+    /// once that it can call for the next place. With
+    /// `LAMP_SECOND_LOOK_WALK`, a search's note turn (`Written` with
+    /// `search`) left so is told too, and the coordinator walks the search
+    /// on. Sent before the request's idle `TurnComplete`; no input or
+    /// speech is granted by it.
     LookNoCall {
         request: u64,
         session: u64,
@@ -1757,7 +1776,7 @@ async fn serve_with_visual<C: Connect>(
                     if dropped.is_none() {
                         look_owed_until = Some(Instant::now() + LOOK_OWED_AT_MOST);
                     }
-                    output.push_back(Outbound::Output(ProviderOutput::LookAsked { request, session, dropped, search: false }));
+                    output.push_back(Outbound::Output(ProviderOutput::LookAsked { request, session, dropped, search: false, call: None }));
                 }
                 for news in desk.news_answered() {
                     output.push_back(Outbound::Output(news));

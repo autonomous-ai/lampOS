@@ -666,7 +666,17 @@ still takes none. Off, it answers the same
 tools but sends no `LookAsked`, so there the model's words are the look,
 as before. With `LAMP_SECOND_LOOK_NOTE=on` too, a search whose look got an
 answer that called nothing is sent one note to call `look_for` with the
-next place, once a search ([second-voice.md](second-voice.md)). When the turn is over the look's
+next place, once a search, and with `LAMP_SECOND_LOOK_WALK=on` a search
+left after its note is walked on by the lamp: it calls the skill itself
+with the next place not yet looked at, sends each picture as the search's
+next look turn naming the place, and the skill's give-up line once past
+its looks ([second-voice.md](second-voice.md)). Any error a `[search]` skill
+answers a walked call with is taken as its give-up: said once, and the
+search ends, so a search skill errors only past its looks (#2280). A walk
+step dropped while its call is in flight (the person spoke within its
+1.5 s) still turns the head: the skill made the pose, and the line that
+ended the step came before it began, so it may hold until its `for`; a
+check for the lamp row, not yet handled. When the turn is over the look's
 written turn goes with the still. The still cannot go in the call's answer
 itself: a function's answer to Gemini Live is words, and the call is
 answered at once while the still takes up to 2.5 s. If no still with
