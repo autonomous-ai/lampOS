@@ -863,9 +863,12 @@ No audio, no pictures. Nothing is sent anywhere from here, though a line
 leaves the lamp, to the voice provider, whenever the voice uses one in an
 answer. The default has whole-word matching; the opt-in mode normalizes
 Unicode and ranks with FTS5, with no embeddings or semantic answer model.
-Its observation pass has only a scripted adapter here. It does not know who speaks: the person is
+Its observation pass has a DeepSeek adapter on the voice's second route
+(`LAMP_MEMORY_OBSERVE=on`, off unless set; above); the memory itself calls no
+model. It does not know who speaks: the person is
 whoever the caller says, and the voice says whom the eyes know at the lamp. Files are not encrypted; forgotten text is unlinked,
-not scrubbed from the flash. The offset from UTC is fixed: no summer time.
+not scrubbed from the flash. `--utc-offset-minutes` is fixed all year;
+`--zone`, which the product unit uses, follows summer time.
 
 ## Not shown
 
