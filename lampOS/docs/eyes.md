@@ -704,6 +704,34 @@ this room" until someone asks to be recognised.
   `LAMP_EYES_WHO_SOCKET` names the socket):
   - The model has two functions, `remember_my_face` and `forget_my_face`,
     each with the name. They are called only when the person asks.
+  - With `LAMP_WHO_WAS_HERE_NAMES=on` (the worker's `--who-visits`, after
+    `--names-checked`; #1997), two more: `tell_others_i_was_here` and
+    `dont_tell_others_i_was_here`, each with the name, sent to the eyes as
+    `visits_yes` and `visits_no`. Off, neither is offered.
+    - Someone just remembered is asked once whether the lamp may tell
+      anyone who asks when they've been at the desk, by name
+      (`known_faces::ASK_TO_NAME`); they can also say so, or take it back,
+      in their own words later.
+    - **A yes only from the named person's own scope** (Third on #1997).
+      It's taken only when the request's admitted scope
+      (`memory_scope::ScopeLease`) is that person's, and not narrowed to the
+      room by the speaking face. With the room's scope, someone else's, or
+      none, it's refused with nothing sent, and the model is told not to ask
+      again then (`known_faces::NOT_SURE_WHOSE_YES`). The eyes' own check,
+      the face at the lamp now, stays under it.
+    - **Its limit:** the scope says whose face was in view as the line
+      began, not who spoke. Someone off camera saying "yes, you can tell
+      people when they've been here" for the person in view is taken. Only
+      a face seen speaking that isn't the known person's narrows the line
+      to the room (`LAMP_SECOND_SPEAKING_FACE=on`, the second route, off by
+      default). The person in view hears the lamp confirm, and can say no.
+    - **Only with the memory** (`LAMP_MEMORY_SOCKET`): the scope is a known
+      person's only through the memory's face cache, so without it neither
+      function is offered and nobody is asked.
+    - **A no from anyone at the lamp,** since it only narrows.
+    - Like the face functions, neither is run for a text or a line the
+      lamp wrote. The journal names nobody: "someone the lamp knows said
+      yes to being named in Who was here", or why a yes wasn't taken.
   - A forget that waits for set-aside files (#1586) is told as what it is,
     never "My eye could not do that just now": forgotten, or not known by
     that name, and that a few old face records the lamp couldn't read are
