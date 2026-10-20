@@ -618,6 +618,26 @@ order is kept. A written turn is the same from the chat on.
     as before. Such a line gives `LAMP_SECOND_PREPARED` no early words, so
     no chat is begun early on it: its words come at once anyway, and an
     A/B's "0 early rounds" on those lines isn't a fault;
+  - **a pause's answer that comes after the line's end** is taken the same
+    way (#2135). On lamp-4ace the end comes 400 ms into the quiet
+    (`smart-turn-fast`'s confident "finished"), 250 ms after the pause's
+    `Finalize`, which Deepgram answers in 220–450 ms; on the first run 6
+    of 19 lines said `words from=flush`. The end still asks, but the
+    service answers in order, so the first `from_finalize` result while a
+    pause's is due is the pause's. With the rest quiet and covered, its
+    finals are the line's words, `words from=flush`, its answer timed from
+    the pause's `Finalize`. After the end, a pause's answer is also told by
+    where it ends: no further than its `Finalize`, where the line's own
+    reaches past it, so a pause's answer that never came doesn't make the
+    line's own taken for it (`a pause finalize never answered`). With a
+    word after it, or short of the sound,
+    the line's own answer is waited for as before, and that answer alone
+    can send `CloseStream`;
+  - **the end line says the pause:** `pause finalize at N ms` (where in
+    the audio it went), `answered` or `unanswered at End`, `sound after
+    it` (a block over the floor), and the loudest block after it in dBFS,
+    from which a busy room's floor would be set. A line with no pause says
+    nothing of one;
   - **not on Flux**, whose flush would end its turn (`ForceEndTurn`) and
     which ends its turns itself; **not the stop words' stream**, which
     never takes a pause's answer as its end. The Live worker takes nothing
@@ -670,9 +690,11 @@ order is kept. A written turn is the same from the chat on.
   journaled once, without words, when the words are in: "lamp-voice second: request N at the line's end:
   settled=<bool>, speech_final=<bool>, finals cover <ms|none> of <ms> ms
   sent, pending=<none|interim D ms after the last final|speech_started D
-  ms after the last final>, last final <T ms before End|none>[, finalize
+  ms after the last final>, last final <T ms before End|none>[, pause
+  finalize at <P> ms, answered|unanswered at End[, sound after it],
+  loudest after it <L> dBFS][, a pause finalize never answered][, finalize
   answered in <A> ms to <E> ms|, finalize unanswered], results <N> with
-  words, <M> without, words from=<settled|finalize|close_stream>[+interim]",
+  words, <M> without, words from=<settled|flush|finalize|close_stream>[+interim]",
   the last naming which path gave the words. The results count every
   result the service sent, interim and final: none with words says the
   service heard no words at all (#1712: on lamp-4ace on 19 Oct at 15:21 the
