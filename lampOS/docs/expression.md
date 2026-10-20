@@ -1083,3 +1083,14 @@ The deterministic integration surface is `Engine::with_rest_requests`,
 strict transport, replay, publisher and Voice changes, privacy/manual sleep,
 reflex precedence, stream loss, and the real bus receipt path. Physical
 behavior and end-to-end lamp latency remain unmeasured for this addition.
+
+## The unplug presentation (#1674)
+
+With `LAMP_UNPLUG=on`, a matching fresh body Ready produces the resting face
+and `asleep` behaviour. Expression acknowledges its publication, or, with no
+light of its own to send (a cancelled voice turn, no fresh voice timing), that
+it presents asleep and asks nothing of the body; the active
+voice ring worker separately acknowledges an actual permitted asleep-frame
+write. The skill requires both, plus Body's live proof. This opt-in path does
+not make ordinary `expression/light` a general ring input or change privacy.
+See [preparing to unplug](unplug.md).

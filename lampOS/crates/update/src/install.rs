@@ -189,7 +189,8 @@ pub const PRODUCT: &[(&str, &str)] = &[
 /// Every behaviour that has a skill runs as the skill (the owner, 19 Oct):
 /// the voice's own hello is off in `lamp-voice.service`, and its reminders
 /// and task news wait for the skill's ask (`LAMP_SCHEDULE_SPEAK=skill`,
-/// `LAMP_TASK_NEWS=skill`).
+/// `LAMP_TASK_NEWS=skill`). Prepare-to-unplug is installed but hidden and
+/// inactive unless `LAMP_UNPLUG=on`.
 pub const PRODUCT_SKILLS: &[&str] = &[
     "welcome-back",
     "reminders",
@@ -202,6 +203,7 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // A failed part shown as a creature a little unwell (#1681): row 8 on
     // lamp-52e6 with the lead, 20 Oct 11:35, read it as unwell, not broken.
     "not-feeling-well",
+    "prepare-unplug",
 ];
 
 /// The skills of `lampOS/skills/` a lamp does not get yet, each with why.
@@ -380,6 +382,9 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("bedtime-morning", "SKILL.md"),
     skill_file!("not-feeling-well", "skill.toml"),
     skill_file!("not-feeling-well", "SKILL.md"),
+    // Core skill #1674 is installed but not advertised until LAMP_UNPLUG=on.
+    skill_file!("prepare-unplug", "skill.toml"),
+    skill_file!("prepare-unplug", "SKILL.md"),
 ];
 
 /// Setup's two settings (docs/setup.md, "On a lamp"), written only with

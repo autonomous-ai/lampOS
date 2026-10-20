@@ -127,7 +127,22 @@ impl Worker {
         directory: &Path,
         parent: BootId,
         extra: &[&str],
+        on_wait: impl FnMut() -> io::Result<()>,
+    ) -> io::Result<RingStartup> {
+        Self::spawn_optional_ring_reading(executable, directory, parent, extra, on_wait, |name| {
+            std::env::var_os(name)
+        })
+    }
+
+    /// The ring's startup with the voice's environment read through `var`,
+    /// so a test can see what reaches the ring without changing its own.
+    pub(super) fn spawn_optional_ring_reading(
+        executable: &Path,
+        directory: &Path,
+        parent: BootId,
+        extra: &[&str],
         mut on_wait: impl FnMut() -> io::Result<()>,
+        var: impl Fn(&str) -> Option<std::ffi::OsString>,
     ) -> io::Result<RingStartup> {
         // Even an immediate bind/exec failure must not hide a mandatory fault.
         on_wait()?;
@@ -139,19 +154,10 @@ impl Worker {
             let boot = new_boot()?;
             let role = lamp_voice_processes::WorkerRole::Ring.as_str();
             let channels = WorkerChannels::bind(&path, role, parent, boot, false)?;
-            let child = Command::new(executable)
-                .arg(lamp_voice_processes::Command::Worker.as_str())
-                .arg(role)
-                .arg(&path)
-                .arg(boot_text(parent))
-                .arg(boot_text(boot))
-                .args(extra)
-                .env_clear()
-                .envs(crate::stalls::passed_on())
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::inherit())
-                .spawn()?;
+            // The same command every worker starts with, so the ring gets
+            // its role's switches (`LAMP_UNPLUG`, the reviewer on #1699).
+            let child =
+                worker_command(executable, &path, role, (parent, boot), extra, &var).spawn()?;
             worker = Some(Box::new(Self {
                 channels,
                 child,

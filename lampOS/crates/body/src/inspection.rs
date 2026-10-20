@@ -305,6 +305,11 @@ pub(crate) trait PortIo {
 pub(crate) trait Runtime {
     fn now(&self) -> Duration;
     fn cancelled(&mut self) -> io::Result<bool>;
+    /// Unplug inhibits automatic take-hold and wake, independently of normal
+    /// cancellation: a guarded fold already under way must still finish.
+    fn recovery_inhibited(&self) -> bool {
+        false
+    }
 }
 
 fn micros(time: Duration) -> u64 {

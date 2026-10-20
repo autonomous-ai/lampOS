@@ -104,6 +104,9 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
     let skills: Vec<lamp_skills::Skill> = install::PRODUCT_SKILLS
         .iter()
         .map(|name| lamp_skills::load(&skills_root().join(name)).unwrap())
+        // The product leaves LAMP_UNPLUG unset: mirror the runtime catalog
+        // filter even though this fixture loads the installed files directly.
+        .filter(|skill| !skill.prepares_unplug())
         .collect();
     let beside = folder.path().join(lamp_voice::tools::SKILLS_DIR);
     std::fs::create_dir(&beside).unwrap();

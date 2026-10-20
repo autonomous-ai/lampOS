@@ -963,6 +963,7 @@ fn serve(
                 seen = Some(print);
                 let (mut skills, errors) = load_all(dir);
                 skills.retain(|skill| options.routines || !skill.is_routine());
+                skills.retain(|skill| !skill.prepares_unplug() || lamp_body::unplug::enabled());
                 for error in errors {
                     eprintln!("lamp-skills: not loaded: {error}");
                 }
@@ -2044,6 +2045,19 @@ fn tool_call(
     let sockets = runner.sockets_for(&run.skill);
     run.calls
         .retain(|call| *call != Call::Look || sockets.may.refuses(call).is_none());
+    if run.calls.contains(&Call::PrepareUnplug)
+        && !lamp_skills::unplug::core_identity(&run.skill, &name)
+    {
+        return refuse("Unplug preparation belongs only to prepare-unplug / prepare_to_unplug.");
+    }
+    if run.calls.contains(&Call::PrepareUnplug)
+        && let Some(why) = sockets.may.refuses(&Call::PrepareUnplug)
+    {
+        return refuse(&why);
+    }
+    if run.calls.contains(&Call::PrepareUnplug) && !lamp_body::unplug::enabled() {
+        return refuse("Preparing to unplug is not enabled. Do not unplug on my confirmation.");
+    }
     let made: Vec<Call> = run
         .calls
         .iter()
@@ -2247,6 +2261,107 @@ fn listen(dir: &Path, asks: Waking<ToolAsk>) -> io::Result<()> {
     Ok(())
 }
 
+/// Folding runs outside the tool listener. Its admission is not success; only
+/// current body evidence and the matching asleep publication permit that line.
+fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
+    use lamp_skills::unplug::{self, Progress};
+    if let Some(why) = sockets.may.refuses(&Call::PrepareUnplug) {
+        return why;
+    }
+    if !lamp_body::unplug::enabled() {
+        return "unplug preparation is disabled; nothing requested".into();
+    }
+    let began = clock::now_us();
+    let (request, since) = match unplug::begin(bus, skill, unplug::TOOL, began) {
+        Ok(request) => request,
+        Err(error) => return format!("unplug preparation could not start: {error}"),
+    };
+    let failure = loop {
+        match unplug::read(bus, &request, since, clock::now_us()) {
+            Ok(Progress::Ready) => {
+                // Recheck after the socket opens, immediately before sending.
+                // The voice must not queue a readiness claim for a later scene.
+                match say_unplug_ready(skill, sockets, bus, &request, since) {
+                    Ok(Some(outcome)) => return outcome,
+                    Ok(None) => {}
+                    Err(error) => break format!("the readiness line could not be sent: {error}"),
+                }
+            }
+            Ok(Progress::Failed(why)) => break why,
+            Err(error) => break format!("completion evidence could not be read: {error}"),
+            Ok(Progress::Waiting) => {}
+        }
+        if clock::now_us().saturating_sub(began) >= unplug::WAIT_US {
+            break "the body and asleep presentation were not confirmed in time".into();
+        }
+        clock::sleep(POLL);
+    };
+    // The latch is deliberately not undone by a failure or a cancelled say.
+    // Resuming automatically could raise the arm after the person heard a reply.
+    let outcome = say_unplug_failure(skill, sockets);
+    format!("unplug preparation failed: {failure}; {outcome}")
+}
+
+fn say_unplug_failure(skill: &str, sockets: &Sockets) -> String {
+    if let Some(why) = sockets.may.refuses(&Call::Say(String::new())) {
+        return why;
+    }
+    say(
+        &sockets.say,
+        "unplug preparation failed",
+        skill,
+        json!({"note": "Say briefly: I could not confirm a safe folded position. Please do not unplug yet.", "priority": 5}),
+        &[],
+        || {},
+    )
+}
+
+fn say_unplug_ready(
+    skill: &str,
+    sockets: &Sockets,
+    bus: &Bus,
+    request: &str,
+    since: u64,
+) -> io::Result<Option<String>> {
+    // Use the admitted run's captured grants, as other skill runs do. A
+    // reload changes future admissions, not this run's permission snapshot.
+    if let Some(why) = sockets.may.refuses(&Call::PrepareUnplug) {
+        return Err(io::Error::new(io::ErrorKind::PermissionDenied, why));
+    }
+    let attempt = || -> io::Result<Option<String>> {
+        let mut stream = UnixStream::connect(&sockets.say)?;
+        stream.set_write_timeout(Some(Duration::from_millis(500)))?;
+        stream.set_read_timeout(Some(SAY_TIMEOUT))?;
+        if lamp_skills::unplug::read(bus, request, since, clock::now_us())?
+            != lamp_skills::unplug::Progress::Ready
+        {
+            return Ok(None);
+        }
+        let ask = json!({
+            "skill": skill, "priority": 8, "expires_in_ms": 500,
+            "unplug_request": request,
+            "text": "My arm is folded. You can unplug me now."
+        });
+        writeln!(stream, "{ask}")?;
+        let mut lines = BufReader::new(stream.take(64 * 1_024));
+        loop {
+            let mut line = String::new();
+            if lines.read_line(&mut line)? == 0 {
+                return Ok(Some(
+                    "the voice closed without confirming the readiness line".into(),
+                ));
+            }
+            let response: serde_json::Value = serde_json::from_str(&line)?;
+            if let Some(outcome) = response["outcome"].as_str() {
+                return Ok(
+                    (outcome != "expired").then(|| format!("unplug readiness line: {outcome}"))
+                );
+            }
+        }
+    };
+    attempt()
+}
+
 /// How the light was changed, to give it back.
 #[derive(Default)]
 struct Changed {
@@ -2354,6 +2469,10 @@ fn perform(
     // its trigger ends, told that end.
     (made, end): (mpsc::Sender<()>, Option<mpsc::Receiver<()>>),
 ) -> String {
+    if calls == [Call::PrepareUnplug] {
+        let _ = made.send(());
+        return prepare_unplug(skill, sockets, bus);
+    }
     // A light the run gives back. One the person keeps is theirs (#1679).
     let is_light = |call: &Call| {
         matches!(
@@ -3123,6 +3242,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             Err(error) => format!("{what}: the actions part was not reached ({error})"),
         };
     match call {
+        Call::PrepareUnplug => "unplug preparation must run with its completion check".into(),
         Call::Gaze { face: None } => "look at the face: no face in view".into(),
         Call::Gaze {
             face: Some((x, y, size)),
@@ -3468,6 +3588,115 @@ mod tests {
                 permissions,
             },
         }
+    }
+
+    fn unplug_grants() -> Permissions {
+        Permissions {
+            body: true,
+            speak: true,
+            topics: lamp_skills::unplug::READ_TOPICS
+                .iter()
+                .map(|topic| (*topic).to_owned())
+                .collect(),
+            ..Permissions::default()
+        }
+    }
+
+    #[test]
+    fn unplug_denied_at_dispatch_neither_latches_nor_sends_delayed_speech() {
+        // Short path for macOS Unix sockets; no process-wide environment change.
+        let dir = tempfile::Builder::new()
+            .prefix("ug")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let listener = UnixListener::bind(dir.path().join("say.sock")).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let mut denied = Vec::new();
+        let mut body = unplug_grants();
+        body.body = false;
+        denied.push(body);
+        let mut speak = unplug_grants();
+        speak.speak = false;
+        denied.push(speak);
+        for topic in lamp_skills::unplug::READ_TOPICS {
+            let mut permission = unplug_grants();
+            permission.topics.retain(|given| given != topic);
+            denied.push(permission);
+        }
+        for permission in denied {
+            let sockets = nowhere(dir.path(), permission.clone());
+            let (made, _) = mpsc::channel();
+            let outcome = perform(
+                lamp_skills::unplug::SKILL,
+                (&[Call::PrepareUnplug], &[]),
+                &sockets,
+                &bus,
+                None,
+                (None, false),
+                (made, None),
+            );
+            assert!(outcome.contains("refused"), "{outcome}");
+            assert!(
+                bus.latest(lamp_body::unplug::Request::TOPIC)
+                    .unwrap()
+                    .is_none()
+            );
+            let error =
+                say_unplug_ready(lamp_skills::unplug::SKILL, &sockets, &bus, "r", 1).unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+            if !permission.speak {
+                assert!(
+                    say_unplug_failure(lamp_skills::unplug::SKILL, &sockets).contains("refused")
+                );
+            }
+            assert_eq!(
+                listener.accept().unwrap_err().kind(),
+                io::ErrorKind::WouldBlock
+            );
+        }
+    }
+
+    #[test]
+    fn unplug_reload_changes_new_admissions_not_captured_run_grants() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_woken, waker) = wake_pipe().unwrap();
+        let (finished, _done) = waking(&Arc::new(waker));
+        let runner = Runner {
+            sockets: nowhere(dir.path(), Permissions::default()),
+            finished,
+            bus: Bus::new(dir.path().join("bus")).unwrap(),
+            glows: None,
+            body_requests: false,
+            ends: RefCell::default(),
+            looks: RefCell::default(),
+            local_time: None,
+            trust_clock: false,
+            clock_waiting: Cell::new(false),
+            rest_client: None,
+            permissions: RefCell::new(HashMap::from([(
+                lamp_skills::unplug::SKILL.to_owned(),
+                unplug_grants(),
+            )])),
+            watching: RefCell::new(Watching {
+                watches: Watches::default(),
+                marks: HashMap::new(),
+                texts: None,
+                known_file: None,
+                signs: None,
+                retaken: HashMap::new(),
+            }),
+        };
+        let admitted = runner.sockets_for(lamp_skills::unplug::SKILL);
+        runner.permissions.borrow_mut().clear();
+        assert!(admitted.may.refuses(&Call::PrepareUnplug).is_none());
+        assert!(
+            runner
+                .sockets_for(lamp_skills::unplug::SKILL)
+                .may
+                .refuses(&Call::PrepareUnplug)
+                .is_some()
+        );
     }
 
     fn light(colour: &str) -> Call {

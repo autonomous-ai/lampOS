@@ -672,3 +672,12 @@ This is best-effort application buffer clearing, not secure physical erasure.
 cannot be retracted. Callers must preserve original source permission in the
 callback; a fresh heartbeat must not grant old samples a new lifetime. Neither
 this API nor ordinary expiry grace establishes consumer retention authorization.
+
+## Unplug completion (#1674)
+
+The opt-in core skill uses kept `body/unplug_request` and three short-lived
+receipts: `body/unplug_state`, `expression/unplug_state`, `ring/unplug_state`.
+The request survives service restarts until reboot; each receipt expires after
+500 ms and carries the matching request identifier. [unplug.md](unplug.md)
+defines the payloads, ownership and proof. No readiness reader treats ordinary
+`body/joint_states`, pause or successful publication alone as safe completion.
