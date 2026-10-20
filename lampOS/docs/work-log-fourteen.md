@@ -560,3 +560,17 @@ commit)
 - Two new tests (a stale reply warning mid-round, `restoring`'s own
   wording); 14/14. Replied on
   [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6294569062).
+
+## 2026-10-20 — #2194: the follow-up needed its own PR
+
+Ready for lamp-voice: yes (same as the two entries above)
+
+- Mobile, 22:3x, on #2194: ecm-sds-mobile#17 had already merged into
+  `v3` before my follow-up commit (restoring/stale) was pushed, so the
+  merged PR doesn't carry it. My mistake — pushed to the branch without
+  checking the PR had closed first.
+- Opened [ecm-sds-mobile#19](https://github.com/autonomous-ai/ecm-sds-mobile/pull/19),
+  same branch, onto `v3`, carrying only that one commit — checked via
+  `gh pr view --json commits,files` that it's exactly the one commit and
+  the two files it touches, not a re-diff of #17.
+- Replied on [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6294640963).
