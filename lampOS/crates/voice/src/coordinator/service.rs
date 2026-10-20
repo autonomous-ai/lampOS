@@ -281,14 +281,18 @@ mod tests {
             checkpoint: checkpoint.to_path_buf(),
         }
     }
+    /// Until the storage is idle, its last outcome taken in. Idle is read
+    /// first and the outcome after it: the other order missed a failure
+    /// that finished between the two snapshots, so the flag it sets was
+    /// never set (#1569 row 55).
     fn storage_idle(trace: &mut SessionState) {
         let until = Instant::now() + Duration::from_secs(5);
         loop {
-            poll_storage(trace);
             let done = trace
                 .onboarding_storage
                 .as_ref()
                 .is_none_or(|store| !store.client().snapshot().unwrap().busy);
+            poll_storage(trace);
             if done {
                 break;
             }
