@@ -1019,6 +1019,42 @@ first round as before; nothing new is read on the input path.
 Off, a turn is told and kept as before, for the person the session was opened
 for.
 
+### A known face lost for a moment
+
+A request's scope is the known face fresh as it is admitted, and the eyes'
+known file is fresh for 3 s after they last see the face. So on lamp-4ace on
+20 October at 12:13, someone known who was lost for a moment mid-conversation
+had their next line's memory calls go to the room's scope (#2176 row 5b).
+
+With `LAMP_FACE_GAP_HOLD=on` (off unless set), on the Second route, the face
+cache (`memory_scope::FaceCache::replace_seen`) keeps that known face through
+a gap, only while all of these hold:
+- **The eyes see no face at all:** their newest unexpired look
+  (`humans/faces/tracked`) is empty. A hand across or a step out of the
+  picture holds; a head turned away is usually still a face in their look,
+  so it doesn't. Any face in view may be someone else's, and no look is not
+  knowing, so either holds nothing.
+- **The lamp was just talking with them:** it answered a turn of theirs
+  aloud within the gap (`FaceCache::answered`, at a turn's end when its own
+  answer's audio went). A line left unclear, judged not for the lamp
+  (`not_for_me`), held or given up marks no one. So someone who gets up and
+  goes isn't held for whoever speaks next from out of the picture, unless
+  they go within 8 s of the lamp's last answer to them: that window is
+  still held, and only told-only held lines (no `recall` or `search`) would
+  close it (the reviewers' P2 on #2265, the first builder's call). On the
+  first exchange there is no answer yet, so a face lost before it ends is
+  the room's.
+- **Within the gap:** up to 8 s (`GAP`) past the face's last fresh
+  sighting, which is the known file's 3 s freshness, so up to about 11 s
+  after the eyes last saw it, and up to 8 s past the lamp's last answer to
+  them, whichever ends first. Holding never renews it.
+
+A different known face is theirs at once, and a privacy change revokes a held
+face as it does a fresh one. The exchange itself already stays with the person
+counted at the lamp (`known_faces::Presence`, 30 s); this keeps the memory
+calls with them too. Without a bus root for the eyes' looks, nothing is held.
+The Live route is not covered.
+
 ### Live route session scope
 
 With `LAMP_LIVE_SCOPED_SESSION=on` (off unless set), a spoken line on the Live

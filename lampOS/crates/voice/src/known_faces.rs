@@ -848,6 +848,19 @@ pub fn known_file_of(socket: &Path) -> PathBuf {
     socket.with_file_name("known")
 }
 
+/// How many faces the eyes see now, from their newest look on the bus
+/// (`humans/faces/tracked`), `None` when there is no unexpired look: for a
+/// known face's held gap ([`crate::memory_scope::FaceCache::replace_seen`]),
+/// which holds only when the eyes looked and saw none.
+pub fn faces_in_view(bus: &lamp_bus::Bus) -> Option<usize> {
+    bus.latest(lamp_msgs::Faces::TOPIC)
+        .ok()
+        .flatten()
+        .filter(|message| !message.expired)
+        .and_then(|message| message.parse::<lamp_msgs::Faces>().ok())
+        .map(|faces| faces.faces.len())
+}
+
 /// [`known_now`] for the eyes the environment names.
 pub fn known_from_environment() -> Option<String> {
     let socket = std::env::var_os(ENVIRONMENT)?;

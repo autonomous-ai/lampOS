@@ -924,6 +924,28 @@ impl Engine {
         self.shared.scoped_system.is_some()
     }
 
+    /// The current request's turn ended: if the lamp spoke its answer (its
+    /// own first audio went, not an announcement's or a cue's), its known
+    /// person is the one the lamp is talking with now, for the face cache's
+    /// held gap (`LAMP_FACE_GAP_HOLD`). A line left unclear, judged not for
+    /// the lamp, held or given up marks no one (the reviewers' P2 and P3 on
+    /// #2265).
+    pub(crate) fn memory_answered(&self, request: u64, at: Instant) {
+        let spoken = self
+            .shared
+            .answered_request
+            .lock()
+            .is_ok_and(|last| *last == Some(request));
+        if spoken
+            && let (Some((_, cache)), Some(turn)) = (&self.memory, self.turn.as_ref())
+            && turn.request == request
+            && let Some(lease) = turn.memory_scope.as_ref().map(|scope| scope.lease())
+            && let Some(scope) = lease.scope()
+        {
+            cache.answered(scope, at);
+        }
+    }
+
     /// Authority of the current admitted request, including its immutable scope.
     pub(crate) fn memory_lease(&self) -> Option<crate::memory_scope::ScopeLease> {
         self.turn

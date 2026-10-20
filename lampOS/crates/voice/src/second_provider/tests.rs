@@ -4155,6 +4155,67 @@ async fn a_look_asked_by_its_call_goes_to_the_coordinator_and_ends_the_turn() {
     );
 }
 
+/// The reviewers' P2 and P3 on #2265 (`LAMP_FACE_GAP_HOLD`): a known face's
+/// gap is held only for someone the lamp answered aloud. A line the model
+/// judged not for the lamp (`not_for_me`) ends its turn but marks no one, so
+/// the face lost after it is the room's; a line the lamp answers marks them,
+/// so the face lost after it is held.
+#[tokio::test]
+async fn only_a_turn_the_lamp_answered_aloud_marks_whom_it_was_talking_with() {
+    use crate::memory_scope::{FaceCache, GAP, ScopeLease};
+    let known = crate::remember::person_id("A");
+    for (said, held) in [
+        (
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    NOT_FOR_ME,
+                    json!({}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            false,
+        ),
+        (vec![text("Sure, here it is."), Ok(ChatEvent::Done)], true),
+    ] {
+        let path =
+            std::env::temp_dir().join(format!("twelve-answered-{}-{held}", std::process::id()));
+        std::fs::write(&path, "A").unwrap();
+        let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What did I keep?".to_owned())].into()),
+            chats: Mutex::new([said].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let runner: ScopedToolRunner =
+            Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+        let mut engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            None,
+        );
+        engine.memory_camera(true, 1);
+        let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
+        let until = seen.valid_until();
+        cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        turn(&mut engine).await;
+        engine.memory_answered(1, until);
+        cache.replace_seen(cache.begin_refresh(), None, Some(0));
+        let whose = cache.snapshot(until + Duration::from_secs(1));
+        assert_eq!(
+            whose.person() == Some(known.as_str()),
+            held,
+            "answered aloud: {held}"
+        );
+        std::fs::remove_file(&path).unwrap();
+    }
+}
+
 #[tokio::test]
 async fn memory_scope_is_bound_before_answer_and_revoked_with_the_turn() {
     use crate::memory_scope::{FaceCache, ScopeLease};

@@ -907,6 +907,10 @@ fn worker_command(
             role,
             var(crate::attention::NEAR_CALIBRATED_ENVIRONMENT).as_deref(),
         ))
+        .envs(face_gap_worker_environment(
+            role,
+            var(crate::memory_scope::GAP_ENVIRONMENT).as_deref(),
+        ))
         .envs(quiet_evidence_worker_environment(
             role,
             var(crate::quiet_pace::EVIDENCE_ENVIRONMENT).as_deref(),
@@ -1055,6 +1059,16 @@ fn near_calibrated_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::attention::NEAR_CALIBRATED_ENVIRONMENT, "on"))
+}
+
+// A known face's held gap (#2176 row 5b), to the one route whose memory
+// scope holds it: the second's, the exact `on`.
+fn face_gap_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::memory_scope::GAP_ENVIRONMENT, "on"))
 }
 
 // The echo evidence's skip (#705), to the one worker that runs it: capture.
@@ -1466,6 +1480,7 @@ mod tests {
                     crate::second_provider::net::key_terms::ENVIRONMENT,
                     crate::second_config::FLUX_ENV,
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
+                    crate::memory_scope::GAP_ENVIRONMENT,
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                 ]
                 .contains(&name)
@@ -1555,6 +1570,7 @@ mod tests {
                 vec![
                     "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
+                    "LAMP_FACE_GAP_HOLD=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_FORGET_ALL=on",

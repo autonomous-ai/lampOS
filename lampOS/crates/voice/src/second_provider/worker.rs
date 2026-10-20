@@ -1381,7 +1381,27 @@ pub fn serve(
         .map(crate::known_faces::known_file_of)
         .filter(|_| socket.is_some());
     let scope_file = who.clone();
-    let face_cache = Arc::new(crate::memory_scope::FaceCache::default());
+    // With LAMP_FACE_GAP_HOLD, a known face lost for a few seconds with no
+    // face in view keeps its memory scope (#2176 row 5b).
+    // The eyes' faces in view, read beside the known file for that hold;
+    // without them nothing can be held, so the hold is off.
+    let faces_bus = crate::memory_scope::gap_from_environment()
+        .and(files.bus_root.clone())
+        .and_then(|root| lamp_bus::Bus::new(root).ok())
+        .map(Arc::new);
+    let face_gap = faces_bus
+        .as_ref()
+        .and(crate::memory_scope::gap_from_environment());
+    match (crate::memory_scope::gap_from_environment(), &faces_bus) {
+        (Some(_), Some(_)) => eprintln!(
+            "lamp-voice second: a known face lost for a few seconds, with no face in view and while the lamp answers them, keeps its memory scope (LAMP_FACE_GAP_HOLD)"
+        ),
+        (Some(_), None) => eprintln!(
+            "lamp-voice second: LAMP_FACE_GAP_HOLD is on but there is no bus to read the eyes' faces from, so no face is held"
+        ),
+        _ => {}
+    }
+    let face_cache = Arc::new(crate::memory_scope::FaceCache::holding_gaps(face_gap));
     let scoped_settings = tools.clone();
     let days = crate::remember::days_from_environment();
     // Told after the character with `LAMP_TASKS_ASKED=on`, as the Live route is (#854).
@@ -1972,13 +1992,16 @@ pub fn serve(
                     interval.tick().await;
                     let token = face_cache.begin_refresh();
                     let path = path.clone();
-                    let observation = tokio::task::spawn_blocking(move || {
-                        crate::known_faces::FaceObservation::read(&path)
+                    let bus = faces_bus.clone();
+                    let (observation, in_view) = tokio::task::spawn_blocking(move || {
+                        (
+                            crate::known_faces::FaceObservation::read(&path),
+                            bus.as_deref().and_then(crate::known_faces::faces_in_view),
+                        )
                     })
                     .await
-                    .ok()
-                    .flatten();
-                    face_cache.replace(token, observation);
+                    .unwrap_or((None, None));
+                    face_cache.replace_seen(token, observation, in_view);
                 }
             })
         });
@@ -4007,6 +4030,10 @@ pub async fn run(
                     .then(|| engine.memory_lease())
                     .flatten();
                 keep_scoped(event, thread.as_deref(), lease.as_ref());
+                // Whom the lamp answered, for a known face's held gap.
+                if let ProviderOutput::TurnComplete { request, .. } = event {
+                    engine.memory_answered(*request, Instant::now());
+                }
             }
             if let Some(event) = &pending {
                 link.output(monotonic_us(), event);
