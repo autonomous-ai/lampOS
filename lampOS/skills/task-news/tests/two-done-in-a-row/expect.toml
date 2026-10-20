@@ -5,7 +5,7 @@
 # message at 70 s, nobody in view: two runs again, without the look. 4 and
 # 5 leave at 160 s, 6 and 8 at 190 s: nothing. (lamp-skills makes the second
 # of a skill's item runs wait for the first, never lets it go: tested in
-# crates/skills/tests/skills.rs.)
+# crates/skills/tests/it/skills.rs.)
 [[expect]]
 at = "40s"
 call = "body.gaze"

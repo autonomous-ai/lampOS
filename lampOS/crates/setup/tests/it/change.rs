@@ -382,22 +382,22 @@ fn the_helper_answers_one_line_and_never_journals_a_name() {
 #[test]
 fn the_products_reset_wipes_the_lamps_name_and_the_unit_runs_the_helper() {
     let plan: Value =
-        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
     let wiped = |path: &str| plan["wipe"].as_array().unwrap().iter().any(|w| w == path);
     assert!(wiped("/etc/lampOS/setup/display-name"));
     assert!(wiped("/etc/lampOS/person/name"));
     let own: Config =
-        serde_json::from_str(include_str!("../fixtures/serve-own-page.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
     assert_eq!(
         own.display_name,
         std::path::Path::new("/etc/lampOS/setup/display-name")
     );
-    let unit = include_str!("../../../deploy/product/lamp-setup-change@.service");
+    let unit = include_str!("../../../../deploy/product/lamp-setup-change@.service");
     assert!(unit.contains(
         "ExecStart=/opt/lampOS/setup/current/lamp-setup change --config /etc/lampOS/setup/serve.json --bus-root /run/lampos-bus --enable\n"
     ));
     assert!(unit.contains("StandardInput=socket\nStandardOutput=socket\n"));
-    let socket = include_str!("../../../deploy/product/lamp-setup-change.socket");
+    let socket = include_str!("../../../../deploy/product/lamp-setup-change.socket");
     assert!(socket.contains("ListenStream=/run/lampos-setup-change/change.sock\n"));
     assert!(socket.contains("SocketGroup=lampos\nSocketMode=0660\n"));
     assert!(socket.contains("Accept=yes\n"));

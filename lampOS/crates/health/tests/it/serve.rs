@@ -1,7 +1,7 @@
 //! The loop on a real bus, in a directory of the test's own: the test
 //! plays the lamp's parts, hands the loop the board it is to read, and
 //! reads what the loop publishes and says about itself.
-mod tree;
+use crate::tree;
 
 use lamp_bus::{Bus, Kind, Message, Publisher, Subscriber};
 use lamp_health::{

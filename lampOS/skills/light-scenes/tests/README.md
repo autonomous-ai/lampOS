@@ -20,6 +20,6 @@ call of the tool, as `[[call_tool]]` in `expect.toml` (`docs/skills.md`,
 A replay lists the calls in order. That a kept light is set through the
 actions part and never given back, and that another scene asked while the
 head is down sets its light and lets the pose go, is the program's, tested
-in `crates/skills/tests/skills.rs`
+in `crates/skills/tests/it/skills.rs`
 (`a_scene_keeps_the_persons_light_and_the_next_scene_lets_the_pose_go`).
 Whether each scene looks right is for a lamp, with its person (#1679).

@@ -233,7 +233,7 @@ heard, so `someone` comes back and the skill's ask ends with it.
   (`ring_face.rs`); the ring giving the shown request's fade to the face,
   none under a self-test or once given back, a fade past a minute refused
   (`ring_light.rs`).
-- `crates/skills`: the `out` step loaded and refused (`tests/skills.rs`), the
+- `crates/skills`: the `out` step loaded and refused (`tests/it/skills.rs`), the
   program asking the ring for the light off with its fade and giving it back
   when the trigger ends, and leaving the light alone without the ring's
   switch.

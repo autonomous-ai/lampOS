@@ -22,7 +22,7 @@ lamp-skills`, which runs every skill's cases).
 **What the replay does not show:**
 
 - **A done the Policy declines.** The replay skips the ask. It is covered in
-  `crates/skills/tests/skills.rs`,
+  `crates/skills/tests/it/skills.rs`,
   `task_news_the_policy_declines_does_nothing_and_asks_once_a_task`: the
   recording of `two-done-in-a-row` through `Engine::new(.., false)`, the
   program's answer with `LAMP_SKILLS_ASK` not set: four asks of `news`, each

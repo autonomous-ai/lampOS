@@ -1,7 +1,7 @@
 //! The board's reader against boards made of files, and each line at
 //! which the board's report turns to a warning or an error, from both
 //! sides.
-mod tree;
+use crate::tree;
 
 use lamp_health::board::{self, Reading, Unread, Zone};
 use lamp_msgs::{Diagnostic, Level};

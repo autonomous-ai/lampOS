@@ -432,9 +432,9 @@ fn fixture(text: &str) -> Config {
 /// who had it (the fifth on #1016).
 #[test]
 fn the_own_page_and_the_product_plan_agree_on_what_setup_saves() {
-    let own = fixture(include_str!("../fixtures/serve-own-page.json"));
+    let own = fixture(include_str!("../../fixtures/serve-own-page.json"));
     let plan: lamp_setup::reset::Plan =
-        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
     plan.check().unwrap();
     assert_eq!(own.marker, plan.marker);
     for saved in [&own.name, &own.credential, &own.policy_key] {
@@ -499,7 +499,7 @@ fn settings_without_key_files_take_the_products_places() {
 #[test]
 fn the_own_page_stops_nginx_after_the_hotspot_restarts_it_and_before_answering() {
     // Reviewer, #817: `device-ap-mode` restarts nginx, which holds port 80.
-    let own = fixture(include_str!("../fixtures/serve-own-page.json"));
+    let own = fixture(include_str!("../../fixtures/serve-own-page.json"));
     assert!(own.page);
     assert_eq!(own.listen, "0.0.0.0:80");
     // The product's setup shows the setup light (#806, First, 17 Oct 14:44).
@@ -521,7 +521,7 @@ fn the_own_page_stops_nginx_after_the_hotspot_restarts_it_and_before_answering()
     assert!(logged[0].contains("stop nginx"), "{logged:?}");
 
     // Behind V1's nginx nothing changes: nginx is started, never stopped.
-    let behind = fixture(include_str!("../fixtures/serve-behind-v1-nginx.json"));
+    let behind = fixture(include_str!("../../fixtures/serve-behind-v1-nginx.json"));
     assert!(behind.free_port.is_empty() && !behind.page && !behind.light);
     let mut lamp = Lamp::new(true);
     let (started, _) = start_on(&mut lamp, &behind, "");
@@ -1115,13 +1115,13 @@ fn the_link_is_written_root_only_and_whole() {
 #[test]
 fn the_products_reset_wipes_the_link_where_the_product_writes_it() {
     let own: Config =
-        serde_json::from_str(include_str!("../fixtures/serve-own-page.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
     assert_eq!(
         own.backend,
         std::path::Path::new("/etc/lampOS/setup/backend.json")
     );
     let plan: Value =
-        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
     assert!(
         plan["wipe"]
             .as_array()
@@ -1321,13 +1321,13 @@ fn the_answer_on_reports_is_written_readable_and_the_reset_removes_it() {
     let written: Value = serde_json::from_slice(&fs::read(&config.reports).unwrap()).unwrap();
     assert_eq!(written["share"], false);
     let own: Config =
-        serde_json::from_str(include_str!("../fixtures/serve-own-page.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
     assert_eq!(
         own.reports,
         std::path::Path::new("/etc/lampOS/setup/reports.json")
     );
     let plan: Value =
-        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
     let wiped = |path: &str| {
         plan["wipe"]
             .as_array()
@@ -1348,7 +1348,7 @@ fn the_answer_on_reports_is_written_readable_and_the_reset_removes_it() {
 /// product's, with a field this build does not know.
 fn serve_ahead() -> Value {
     let mut value: Value =
-        serde_json::from_str(include_str!("../fixtures/serve-own-page.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
     value["hotspot_name"] = json!("Lamp-4ace");
     value
 }
@@ -1359,7 +1359,7 @@ fn a_configuration_one_version_ahead_is_read_and_its_unknown_field_named() {
         lamp_setup::serve::read(&serde_json::to_vec(&serve_ahead()).unwrap()).unwrap();
     assert_eq!(
         config,
-        fixture(include_str!("../fixtures/serve-own-page.json"))
+        fixture(include_str!("../../fixtures/serve-own-page.json"))
     );
     assert_eq!(notes.len(), 1, "{notes:?}");
     assert!(notes[0].contains("`hotspot_name`"), "{notes:?}");
@@ -1377,7 +1377,7 @@ fn setup_starts_with_both_files_one_version_ahead() {
     let config = root.0.join("serve.json");
     fs::write(&config, serde_json::to_vec(&serve_ahead()).unwrap()).unwrap();
     let mut plan: Value =
-        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
     // The reset plan's one field a newer build may add (#2060).
     plan["keep_back"] = json!([{"kind": "later"}]);
     let plan_file = root.0.join("reset-plan.json");
