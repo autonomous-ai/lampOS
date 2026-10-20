@@ -23,7 +23,7 @@ serde.workspace = true
 serde_json.workspace = true
 # As crates/setup has them: a small server, HTTP/1 only.
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
-tokio = { version = "1", features = ["rt", "net", "time", "signal", "macros"] }
+tokio = { version = "1", features = ["rt", "net", "time", "signal", "macros", "sync"] }
 # The one page's event stream (axum's `Sse` takes a stream), as the voice has it.
 futures-util = { version = "=0.3.34", default-features = false, features = ["std"] }
 

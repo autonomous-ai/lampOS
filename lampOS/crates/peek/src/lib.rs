@@ -103,7 +103,9 @@ mod tests {
 
     /// Port 80 only once the lamp is set up, never beside setup, which has
     /// it for the hotspot's page; and that one capability, nothing more
-    /// (the lead's amendment on #1711, 20 Oct).
+    /// (the lead's amendment on #1711, 20 Oct). No `Conflicts=` with setup:
+    /// at boot after a reset systemd would drop setup's start for this one
+    /// (the reviewer on #2259).
     #[test]
     fn the_unit_takes_port_80_only_once_setup_is_done() {
         let unit = include_str!("../lamp-peek.service");
@@ -114,7 +116,6 @@ mod tests {
             .collect();
         for wanted in [
             "ConditionPathExists=/var/lib/lampos-setup/done",
-            "Conflicts=lamp-setup.service",
             "After=local-fs.target lamp-setup.service",
             "AmbientCapabilities=CAP_NET_BIND_SERVICE",
             "CapabilityBoundingSet=CAP_NET_BIND_SERVICE",
@@ -128,6 +129,7 @@ mod tests {
             .filter(|line| line.contains("Capabilit"))
             .collect();
         assert_eq!(capabilities.len(), 2, "{capabilities:?}");
+        assert!(!lines.iter().any(|line| line.starts_with("Conflicts=")));
         // On, it listens beyond this machine only from a drop-in, with the
         // token.
         assert!(

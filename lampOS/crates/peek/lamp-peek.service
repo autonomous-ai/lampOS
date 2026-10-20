@@ -6,9 +6,11 @@
 Description=lampOS peek (read-only page, office lamps only)
 ConditionHost=@UNIT_ID@
 # Only on a lamp that is set up: while setup runs, its hotspot page and
-# nginx have port 80. A reset that starts setup again stops this.
+# nginx have port 80. No Conflicts= with lamp-setup: at boot on a lamp that
+# was reset, systemd would keep this unit's start and drop setup's, and then
+# this condition fails and nothing listens (the reviewer on #2259). A reset
+# reboots, and the missing marker keeps this off.
 ConditionPathExists=/var/lib/lampos-setup/done
-Conflicts=lamp-setup.service
 After=local-fs.target lamp-setup.service
 StartLimitIntervalSec=600
 StartLimitBurst=5
