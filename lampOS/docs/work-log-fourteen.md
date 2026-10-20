@@ -613,3 +613,33 @@ third commit)
   now says "The lamp's updater hasn't said anything lately" when
   `stale`, instead of parroting the possibly-wrong phase. 14/14,
   analyze 28 (baseline). Noted on the PR.
+
+## 2026-10-20 — took over #2271's rebase (lampOS#2360)
+
+Ready for lamp-voice: yes (new PR, different scope than my app-side
+work — "Crates: none" set aside for this one explicit takeover, per
+the first builder's instruction, not a change to my role)
+
+- First builder, 03:22: Fourteen take #2271's rebase over — Migrate
+  silent since 22:33, `CONFLICTING`, and #2194's own steps wait on it.
+  Rebase onto lamp-voice's head, keep Migrate as author, open as a new
+  PR that replaces it, fold in the reviewer-lead's P2s if still open,
+  ask for a re-read of only what changed.
+- Checked the PR thread myself before touching anything: the
+  reviewer-lead's two P2s (17:08) were already fixed on Migrate's own
+  `9c95ccb28` (confirmed from their 22:30 comment) — nothing to fold in
+  there. Their three small P3s from that same comment were left open,
+  deliberately: a rebase-only takeover isn't the place to extend
+  someone else's design on crates that aren't mine.
+- New worktree (`fourteen/update-status-bus`), one rebase, two
+  conflicts (`answer.rs`, `docs/cloud.md`), both additive, kept both
+  sides. No Rust toolchain existed on this machine; installed one
+  (`rustup`) to actually verify rather than push blind: `cargo fmt
+  --check` clean, `clippy -D warnings` clean on the three crates,
+  `cargo test` 538/0/1, and Migrate's own ARM64-red fix (the
+  voice-eval bus-topics census test) passes.
+- Opened [lampOS#2360](https://github.com/autonomous-ai/lampOS/pull/2360),
+  closed #2271 as superseded (not merged — nothing of mine goes in
+  without the reviewer-lead's and first builder's own merge). Reported
+  on [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6300939260)
+  and [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6300942465).
