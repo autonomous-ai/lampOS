@@ -269,6 +269,77 @@ mod tests {
         }
     }
 
+    /// #2163: the generic package's oneshot reads seated, into its own
+    /// state folder and never the confirmed file, as the parts' account, and
+    /// stays active so the keeper does not wait on it; the generic body
+    /// requires it and takes the confirmed poses over the seated ones. Read
+    /// from the unit files themselves.
+    #[test]
+    fn the_generic_units_read_seated_once_and_the_confirmed_poses_win() {
+        const MEASURE: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/units/lamp-body-measure.service"
+        ));
+        const BODY: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/units/lamp-body.service"
+        ));
+        let settings = |unit: &'static str, key: &str| -> Vec<&'static str> {
+            unit.lines()
+                .filter_map(|line| line.strip_prefix(key)?.strip_prefix('='))
+                .collect()
+        };
+        assert_eq!(settings(MEASURE, "Type"), ["oneshot"]);
+        assert_eq!(settings(MEASURE, "RemainAfterExit"), ["yes"]);
+        assert_eq!(settings(MEASURE, "User"), ["@LAMP_USER@"]);
+        assert_eq!(settings(MEASURE, "StateDirectory"), ["lampos-body"]);
+        let exec = settings(MEASURE, "ExecStart")[0];
+        // Nothing read where either file is there.
+        for path in [
+            "[ -e /etc/lampOS/body/lamp.env ]",
+            "[ -e /var/lib/lampos-body/measured.env ]",
+        ] {
+            assert!(exec.contains(path), "{path}");
+        }
+        let command = exec
+            .split_once("exec ")
+            .and_then(|(_, rest)| rest.strip_suffix('\''))
+            .expect("the read is exec'd last");
+        let words: Vec<&str> = command
+            .split_whitespace()
+            .skip(1)
+            .map(|word| match word {
+                "@SERVO_DEVICE@" => "/dev/ttyACM0",
+                "@UNIT_ID@" => "lamp-a63e",
+                "@MOTOR_LOCK_DIR@" => "/var/lib/lampos-locks/motor",
+                word => word,
+            })
+            .collect();
+        let read = parse(args(&words)).unwrap().unwrap();
+        assert!(read.seated);
+        assert_eq!(
+            read.write.as_deref(),
+            Some(std::path::Path::new("/var/lib/lampos-body/measured.env"))
+        );
+        assert!(!MEASURE.contains("--write /etc/"));
+
+        assert!(settings(BODY, "Requires").contains(&"lamp-body-measure.service"));
+        assert!(
+            settings(BODY, "After")
+                .iter()
+                .any(|after| after.contains("lamp-body-measure.service"))
+        );
+        // The later EnvironmentFile wins: the confirmed poses over the seated.
+        assert_eq!(
+            settings(BODY, "EnvironmentFile"),
+            [
+                "-/var/lib/lampos-body/measured.env",
+                "-/etc/lampOS/body/lamp.env"
+            ]
+        );
+        assert!(settings(BODY, "ExecStart")[0].ends_with(" $BODY_POSES"));
+    }
+
     #[test]
     fn the_file_is_written_once_and_never_over_another() {
         let path = std::env::temp_dir().join(format!("lamp-env-{}", std::process::id()));

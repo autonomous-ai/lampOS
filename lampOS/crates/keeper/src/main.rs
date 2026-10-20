@@ -46,8 +46,9 @@ install's code. It stops nothing and touches no hardware or unit. With no
 usable key it says so and exits 0, as install does: setup takes the key.
 Then, where missing, it writes what a V1 lamp lacks for the generic
 package: /etc/lampOS/package-profile.json from a read-only hardware probe
-and this lamp's /etc/lampOS/body/lamp.env, the package's provision/
-settings, and the runtime directories. A device it cannot find, or one
+(with /etc/lampOS/body/lamp.env's poses if it has one; without, they are
+read seated after cutover by lamp-body-measure.service), the package's
+provision/ settings, and the runtime directories. A device it cannot find, or one
 found twice, stops it with exit 1 before any of these is written.
 status prints every lampOS unit: its state, its build and its health.
 start, stop and restart act on lamp-PART.service, or lampos.target for lamp.
