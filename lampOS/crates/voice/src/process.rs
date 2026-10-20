@@ -1226,6 +1226,7 @@ fn second_route_worker_environment(
         crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
+        crate::speaking_faces::EYES_ENVIRONMENT,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1279,6 +1280,7 @@ mod tests {
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
+            crate::speaking_faces::EYES_ENVIRONMENT,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -1661,6 +1663,7 @@ mod tests {
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
+                    || name == crate::speaking_faces::EYES_ENVIRONMENT
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                 {
                     "on"
@@ -1727,6 +1730,7 @@ mod tests {
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
+                    "LAMP_EYES_SPEAKING=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_KERNEL_CLOCK=on",

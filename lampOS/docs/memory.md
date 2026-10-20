@@ -354,10 +354,37 @@ the unchanged legacy client, used unless the new Days client is selected.
   Only the next spoken turn can run it, and only when it is a plain yes
   and nothing else (`known_faces::plain_agreement`: "Yes.", "Vâng.", never
   "OK, what's my name?" or "Yes?"), said while the same session's person
-  is the face at the lamp, whoever says it (the engine knows the face at
-  the lamp, not who spoke), within 60 s. Any other turn drops it and runs
+  is the face at the lamp, within 60 s. Any other turn drops it and runs
   nothing: a no, other words, another face at the lamp, a turn the lamp
   wrote, a later yes, or a new held call. One waits at a time.
+  **Where the eyes read speaking, it is their face saying it** (#2377,
+  the reviewer's P3 1 on #2340). Without that, the engine knows only the
+  face at the lamp, not who spoke, so anyone in the room could say the
+  yes. With `LAMP_EYES_SPEAKING=on` in the voice's unit as well as the
+  eyes' (and the bus and the eyes' known file), the voice reads the eyes'
+  faces on its own thread ([`speaking_faces`](../crates/voice/src/speaking_faces.rs),
+  as `LAMP_SECOND_SPEAKING_FACE` does). The yes runs the call only when,
+  over the yes line's own sound, from its start to its end, the held
+  person's face (the id beside the known file, read with their name) is
+  seen speaking and no other face is (`speaking_faces::seen_saying`). It
+  uses that reader's own bar: a face reads speaking in at least half of
+  the looks, with at least three looks. Nobody seen speaking, another face
+  speaking while they are at the lamp, both speaking, too few looks, or no
+  fresh face beside the known file all count as not seen. That is the safe
+  side, and a missed reading costs one "Yes, forget my face." said again.
+  Then the hold is dropped and nothing runs. The model is told once that
+  the yes did not count and that nothing was forgotten
+  (`remember::unseen_yes_told`). It may ask them, once and in a few words,
+  to say it themselves ("Yes, forget my face."), with no explanation. That
+  ask in words runs it at once, and a second plain yes runs nothing,
+  because nothing is held. With the switch on, the worker reads the eyes'
+  faces every 100 ms from its start to its end, on the reader seeing who
+  speaks (`LAMP_SECOND_SPEAKING_FACE`) already runs when that is on, or on
+  its own otherwise; only the judging, at a line's end, waits for a held
+  forget. Without the bus or the known faces file, the journal says once
+  that the speaking check is off and a plain yes runs as before.
+  With the switch off, the yes runs it while their face is at the lamp,
+  whoever says it, as before.
   **Their ask a turn before carries for the forget it names:** when the
   same person's own spoken turn just before, in the same session and
   within 60 s, asked in words (`asks_to_forget` on their words, never the
