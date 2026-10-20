@@ -166,6 +166,16 @@ pub fn still_id(jpeg: &[u8]) -> Option<u64> {
         .ok()
 }
 
+/// A still as the eyes write it for the ask `id`, for tests.
+#[cfg(test)]
+pub(crate) fn still_of(id: u64) -> Vec<u8> {
+    let text = format!("lamp-look {id}");
+    let mut jpeg = vec![0xff, 0xd8, 0xff, 0xfe, 0, text.len() as u8 + 2];
+    jpeg.extend_from_slice(text.as_bytes());
+    jpeg.extend_from_slice(&[0xff, 0xdb, 0, 2, 0xff, 0xd9]);
+    jpeg
+}
+
 /// The coordinator's side of a look, full or not.
 #[derive(Debug)]
 pub struct Look {
@@ -555,14 +565,6 @@ mod tests {
     }
 
     /// A still as the eyes write it (`lamp_eyes::full_look::tagged`).
-    fn still_of(id: u64) -> Vec<u8> {
-        let text = format!("lamp-look {id}");
-        let mut jpeg = vec![0xff, 0xd8, 0xff, 0xfe, 0, text.len() as u8 + 2];
-        jpeg.extend_from_slice(text.as_bytes());
-        jpeg.extend_from_slice(&[0xff, 0xdb, 0, 2, 0xff, 0xd9]);
-        jpeg
-    }
-
     #[test]
     fn a_still_s_id_is_read_from_its_comment_and_nothing_else_has_one() {
         assert_eq!(still_id(&still_of(42)), Some(42));

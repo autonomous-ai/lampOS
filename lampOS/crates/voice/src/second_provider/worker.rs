@@ -1434,6 +1434,7 @@ pub fn serve(
     let scope_file = who.clone();
     let face_cache = Arc::new(crate::memory_scope::FaceCache::default());
     let scoped_settings = tools.clone();
+    let skill_settings = tools.clone();
     let days = crate::remember::days_from_environment();
     // For what memory holds that fits a turn's words (#2176 row 5c).
     let (hits_socket, hits_who) = (socket.clone(), who.clone());
@@ -1749,6 +1750,21 @@ pub fn serve(
     }
     if look_by_call {
         engine = engine.looking_by_call();
+    }
+    // A skill's answer that asks for a look takes the turn's full look, as
+    // on the Live route (`LAMP_SECOND_SKILL_LOOK=on`, #941): only where the
+    // model can look at all.
+    let skill_look = std::env::var(crate::second_provider::SKILL_LOOK_ENVIRONMENT).ok();
+    let skill_look = skill_look.as_deref();
+    if takes_skill_looks(skill_look, look_by_call) {
+        eprintln!(
+            "lamp-voice second: a skill's answer that asks for a look takes the turn's full look (LAMP_SECOND_SKILL_LOOK)"
+        );
+        engine = engine.looking_for_skills(skill_call(skill_settings));
+    } else if skill_look == Some("on") {
+        eprintln!(
+            "lamp-voice second: LAMP_SECOND_SKILL_LOOK is on, but there is no full look (LAMP_LOOK_FULL and LAMP_EYES_LOOK_FILE): a skill's look is not taken"
+        );
     }
     // The next line's speech to text kept connected (#1712).
     if std::env::var(crate::second_provider::STT_WARM_ENVIRONMENT)
@@ -2246,6 +2262,23 @@ pub(crate) fn answered_here(
     search: Option<Arc<Search>>,
 ) -> crate::second_provider::policy::AnsweredHere {
     Arc::new(move |name| name == MORE || search.as_ref().is_some_and(|search| search.answers(name)))
+}
+
+/// Whether a skill's look is taken on this route: `LAMP_SECOND_SKILL_LOOK`
+/// exactly `on`, and a full look to take it with.
+fn takes_skill_looks(switch: Option<&str>, look_by_call: bool) -> bool {
+    switch == Some("on") && look_by_call
+}
+
+/// Whether a call of a name goes to the skills, in either of their folders
+/// or through `use_skill`, as the Live worker decides which answers may ask
+/// for a look (#941, #1668, #1656).
+pub(crate) fn skill_call(settings: crate::tools::Settings) -> crate::second_provider::SkillCall {
+    Arc::new(move |name| {
+        let route = crate::tools::route(&settings, name);
+        matches!(route, crate::tools::Route::UseSkill(_))
+            || crate::tools::is_skills(&settings, &route)
+    })
 }
 
 /// One call of the model's, as both runners run it.
@@ -4416,6 +4449,17 @@ mod route_checks;
 
 #[cfg(test)]
 mod tests {
+    /// The reviewer on #2218 (P3 2): a skill's look is taken only with the
+    /// switch exactly `on` and a full look; nothing else turns it on.
+    #[test]
+    fn a_skills_look_needs_the_switch_on_and_a_full_look() {
+        assert!(super::takes_skill_looks(Some("on"), true));
+        for switch in [None, Some(""), Some("On"), Some("1"), Some("off")] {
+            assert!(!super::takes_skill_looks(switch, true), "{switch:?}");
+        }
+        assert!(!super::takes_skill_looks(Some("on"), false));
+    }
+
     /// #1712's map, item 6: the air's note is due after ten minutes of a
     /// stuffy room, never in a busy one, spent only once its request's
     /// answer is heard (a line cut short before any word keeps it; the

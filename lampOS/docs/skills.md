@@ -652,10 +652,15 @@ the calling session's: no session is renewed while it is owed (at most
 ready one when its turn would go, it is dropped. A call in a turn the
 lamp wrote itself (the look's own turn, a hello) takes no look, nor does
 one whose answer never reached the model; every dropped look is
-recorded as `look_dropped` with `why`. Only Gemini Live takes a tool's
-look: the second route answers the same tools but sends no `LookAsked`
-(its engine answers the call inside the tool round), so there the
-model's words are the look, as before. When the turn is over the look's
+recorded as `look_dropped` with `why`. The second route takes a tool's
+look only with `LAMP_SECOND_SKILL_LOOK=on`: its engine then sends
+`LookAsked` for a skills call answered with `"look": true`, says "Let me
+look." itself and ends the turn, and the look's turn goes to its own
+session with the say's note after "When the picture comes:" after its
+question; in a turn the lamp wrote itself the look is dropped and the turn
+goes on to its next round ([second-voice.md](second-voice.md)). Off, it answers the same
+tools but sends no `LookAsked`, so there the model's words are the look,
+as before. When the turn is over the look's
 written turn goes with the still. The still cannot go in the call's answer
 itself: a function's answer to Gemini Live is words, and the call is
 answered at once while the still takes up to 2.5 s. If no still with

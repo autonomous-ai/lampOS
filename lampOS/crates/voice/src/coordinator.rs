@@ -4031,6 +4031,9 @@ thread_local! {
     /// file. Thread-local, so no other test's loop takes it.
     static TEST_FULL_LOOK: std::cell::RefCell<Option<std::path::PathBuf>> =
         const { std::cell::RefCell::new(None) };
+    /// A loop test's eyes, with no eyes' link: each still asked for is
+    /// written at once to `TEST_FULL_LOOK`'s file, with its ask's id.
+    static TEST_EYES_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_UNCLEAR_HUM=on` (#1421), as `TEST_FULL_LOOK`.
     static TEST_UNCLEAR_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_MISHEARD_HUM=on` (#828), as `TEST_FULL_LOOK`.
@@ -4343,9 +4346,10 @@ fn conversation_with_gate(
     // asked only once its first audio plays or its reply ends, the moment
     // the lamp would have said it will look, so the head lamp-skills sent
     // down before answering is moving and the eyes wait for it to settle.
-    // With the session that made the call: the look's turn goes to it, or
-    // the look is dropped.
-    let mut look_held: Option<(u64, u64)> = None;
+    // With the session that made the call, and whether the second route
+    // was answering when it was made: the look's turn goes to that session
+    // on that route, or the look is dropped.
+    let mut look_held: Option<(u64, u64, bool)> = None;
     // A turn held as unclear in a conversation, and when (#926): asked again
     // with a written turn once it is over.
     let mut asking = AskAgainState::default();
@@ -5428,7 +5432,15 @@ fn conversation_with_gate(
                             &mut look_wanted,
                             trace,
                         )? {
-                            look_held = Some((request, session));
+                            // The route answering now made the call: the
+                            // second route's sessions are numbered apart
+                            // from Gemini's, so the number alone is not
+                            // enough.
+                            let by_second = rig
+                                .second
+                                .as_ref()
+                                .is_some_and(second::Route::second_active);
+                            look_held = Some((request, session, by_second));
                         }
                     }
                 },
@@ -7562,17 +7574,21 @@ fn conversation_with_gate(
             // A tool's look waits for its turn's first audio or its end; the
             // still's wait counts from the eyes' ask.
             let by_tool = look_held
-                .filter(|(of, _)| *of == turn)
-                .map(|(_, session)| session);
+                .filter(|(of, ..)| *of == turn)
+                .map(|(_, session, by_second)| (session, by_second));
             let asked_again = asking.wanted().is_some_and(|(of, _)| of == turn);
-            // A tool's look goes only to the session that made the call: one
-            // renewed meanwhile never saw it, nor the second route, whose
-            // sessions are numbered apart (only Gemini's worker asks a
-            // tool's look). Worked out before the ask, so none is made.
-            let gone = by_tool.is_some_and(|session| {
-                rig.second
-                    .as_ref()
-                    .is_some_and(second::Route::second_active)
+            // A tool's look goes only to the session that made the call, on
+            // the route that made it: one renewed meanwhile never saw it,
+            // nor the other route, whose sessions are numbered apart (a
+            // Gemini call whose turn the second route took, or the second
+            // route's once Gemini is back). While a route answers, `cloud`
+            // is its link. Worked out before the ask, so none is made.
+            let gone = by_tool.is_some_and(|(session, by_second)| {
+                by_second
+                    != rig
+                        .second
+                        .as_ref()
+                        .is_some_and(second::Route::second_active)
                     || unasked_session(&cloud, paused).is_some_and(|ready| ready != session)
             });
             if (by_tool.is_none() || tool_look_due(reply.as_ref(), turn))
@@ -9400,6 +9416,12 @@ fn ask_for_still(
     if let Some(eyes) = eyes {
         eyes.look_full(id, side);
     }
+    #[cfg(test)]
+    if TEST_EYES_ANSWER.get()
+        && let Some(path) = TEST_FULL_LOOK.with(|still| still.borrow().clone())
+    {
+        std::fs::write(path, crate::sight::still_of(id))?;
+    }
     record(
         trace,
         json!({"kind":"look_full_asked","turn":turn,"side":side,"at_us":clock}),
@@ -9419,13 +9441,13 @@ fn tool_look_due(reply: Option<&Reply>, turn: u64) -> bool {
 /// says so: no still goes for an answer nobody heard.
 fn drop_unsaid_look(
     look_wanted: &mut Option<(u64, u64)>,
-    look_held: Option<(u64, u64)>,
+    look_held: Option<(u64, u64, bool)>,
     turn: u64,
     why: &str,
     trace: &mut SessionState,
 ) -> Result<()> {
     if look_wanted.take_if(|(of, _)| *of == turn).is_some() {
-        let by = if look_held.is_some_and(|(of, _)| of == turn) {
+        let by = if look_held.is_some_and(|(of, ..)| of == turn) {
             "tool"
         } else {
             "words"

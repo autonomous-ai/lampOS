@@ -187,10 +187,15 @@ giving the model one with everything said was switched off).
   is recorded as `look_dropped` with `why`, a tool's look the coordinator
   turns down too. A turn cut off unsaid or asked again ("Sorry?") drops
   its look before the eyes are asked, and so does a look owed when the
-  second route has taken over or the calling session has been renewed;
-  once dropped, the second route's own "Let me take a look." on that turn
-  asks for a look of its own. Gemini Live only: the second route sends
-  no `LookAsked`.
+  other route answers now (the second route took a Gemini call's turn, or
+  Gemini is back from the second route's) or the calling session has been
+  renewed: the coordinator keeps which route made the call, since the two
+  routes' sessions are numbered apart; once dropped, the second route's
+  own "Let me take a look." on that turn asks for a look of its own. The
+  second route sends `LookAsked` for its own `take_a_look`, and with
+  `LAMP_SECOND_SKILL_LOOK=on` for a skill's answer with `"look": true`
+  ([second-voice.md](second-voice.md)); its look goes to its own session,
+  with the skill's note for the picture after the look turn's question.
   A full look that goes without its still says so in one journal line,
   "a full look went without its still: asked for ID, the file held ..., N
   ms old" (nothing, another ask's still, or a picture with no id; no

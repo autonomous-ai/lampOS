@@ -1830,6 +1830,36 @@ after a take-over, but now for every turn:
   words "Let me look." stays beside it (`speak_up::asks_to_look`); both
   ask for the same turn's look, which is taken once. The first builder on
   #1712: a phrase rule is easy to trip.
+- **A skill's look step, with `LAMP_SECOND_SKILL_LOOK=on`** (off unless
+  set; #941 on this route). A call the skills answer (`skills/`, in either
+  folder or through `use_skill`: `worker::skill_call`), such as
+  `skills/look-for-things`' `look_for`, whose answer has `"look": true`
+  asks the coordinator for the turn's full look as `take_a_look` does
+  (`Engine::looking_for_skills`): the round's other calls are answered,
+  the lamp says "Let me look." if nothing of the answer was said, and the
+  turn ends there, with no round for the model to say it will look. The
+  coordinator asks the eyes once the answer's first audio plays or its
+  reply ends, never before it, so the still holds up no answer; the
+  picture goes in the look turn after it (`lamp_looks`) to this route's own
+  session. A person who speaks first takes the turn and the look is
+  dropped (`look_dropped`). Only with a full look; without one the switch
+  says so at the start and does nothing. What the skill's answer says to
+  do with the picture (its `next` after "When the picture comes:",
+  `lamp_skills::told`; at most 1024 bytes, none without those words) is
+  kept with the look's session and given once to that session's next look
+  turn: in its user message, after the question (`LOOK_FULL_NOTE`), as
+  "(The skill you called for this look said what to do with the picture:
+  …)", beside the picture. So the model reads the picture with the skill's
+  say (point-light's "say whether you can see it… call point_light once
+  more", look-for-things' "say where it is… call look_for once more"), as
+  Gemini does on Live, where the call's answer stays in its session. Any
+  other turn begun first lets it go, and a look turn with no picture (the
+  no-look note) leaves it out. In a turn the lamp wrote itself the look is
+  dropped (`LookAsked` with why) and the turn goes on: the skill's answer
+  goes to the model, whose next round's words are said, as with the
+  switch off. The journal says `request N called look_for: the look is
+  asked of the coordinator`. Off, the answer goes to the model as before
+  and its words are the look.
 - **Live route only, so not on this route:**
   the head tap for whom it answers, sight and camera facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).
