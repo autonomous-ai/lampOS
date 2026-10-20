@@ -283,7 +283,8 @@ pub const NAMED_ALWAYS_ENVIRONMENT: &str = "LAMP_NAMED_ALWAYS";
 
 /// Where the worker reads whether the lamp's own answers to lines let out
 /// only as the conversation going on keep that conversation going: `on`, and
-/// nothing else, and they don't (the first builder's 17:2x task on Queue
+/// nothing else, and they don't when another face than the caller's is
+/// seen speaking the line (the first builder's 17:2x task and 01:02 on Queue
 /// #1722, `Heeding::not_counting_own_answers`).
 pub const GOING_ON_NOT_OWN_ENVIRONMENT: &str = "LAMP_GOING_ON_NOT_OWN";
 
