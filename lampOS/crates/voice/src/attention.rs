@@ -785,6 +785,19 @@ pub enum Verdict {
 pub const NAME_BEFORE_US: u64 = 1_500_000;
 const NAMED: &str = "its name was heard in the room's sound";
 
+/// With `LAMP_NAME_SECOND_SIGN=on`, a hearing of the name that began no
+/// later than this into the line's sound (from [`NAME_BEFORE_US`] before
+/// it) is the name at the line's start, a call ("Hey Lamp, …", "Lamp, …"),
+/// and is its own second sign ([`Attention::weigh_the_name`]). The line's
+/// sound opens with the voice's pre-roll, about 0.25 s before the speech:
+/// "Lamp" in "Hey Lamp, …" begins about 0.5 s in. A passing mention comes
+/// a few words into the line ("I left the lamp on…", "Yes, the lamp
+/// looked at me…"), from about 0.9 s in. On lamp-4ace on 2026-10-21 at
+/// 03:38 "Hey Lamp, good morning!", heard at 1.000, its words written
+/// "Mainland. Good morning.", was dropped without it (the first builder at
+/// 03:54 on #1722).
+pub const NAME_AT_THE_START_US: u64 = 700_000;
+
 /// A tap on the lamp's head (#711, `docs/creature.md` "Touch") counts as a
 /// call for a request that begins no longer than this after it: the tap
 /// asks the lamp to listen, and the person may take a breath first. It is
@@ -958,6 +971,9 @@ pub struct Attention {
     /// such a hearing counts for the request in hand.
     named_sure_us: Option<u64>,
     named_sure: bool,
+    /// Whether a hearing that counts for the request in hand began at the
+    /// line's start ([`NAME_AT_THE_START_US`]).
+    named_at_start: bool,
     /// When the lamp's head was last tapped, and whether that counts for the
     /// request in hand ([`TAPPED_BEFORE_US`]).
     tapped_us: Option<u64>,
@@ -1074,7 +1090,8 @@ impl Attention {
     /// request in hand only in the room's sound counts for nothing alone,
     /// at any score, [`SURE_SCORE`] too. It counts with a second sign: a
     /// face turned to the lamp (`turned`), said close to the lamp, said to
-    /// it from close, or its words calling it. On lamp-4ace on 2026-10-20
+    /// it from close, its words calling it, or the hearing at the line's
+    /// start ([`NAME_AT_THE_START_US`]). On lamp-4ace on 2026-10-20
     /// at 18:16, 18:17 and 18:20 a hearing of 0.9, where the office's false
     /// hearings reach 0.997, opened a conversation with nobody calling the
     /// lamp, and the lines after it were answered as that conversation
@@ -1088,7 +1105,11 @@ impl Attention {
         };
         let alone = self.name_second_sign
             && self.named
-            && !(turned == Some(true) || self.near || self.addressed || text_calls);
+            && !(turned == Some(true)
+                || self.near
+                || self.addressed
+                || text_calls
+                || self.named_at_start);
         if alone {
             self.named = false;
             self.named_sure = false;
@@ -1284,6 +1305,10 @@ impl Attention {
         self.named_sure = self
             .named_sure_us
             .is_some_and(|named| named.saturating_add(NAME_BEFORE_US) >= now_us);
+        self.named_at_start = self.named
+            && self
+                .named_us
+                .is_some_and(|named| named <= now_us.saturating_add(NAME_AT_THE_START_US));
         self.tapped = self.tapped_us.is_some_and(|tapped| {
             tapped <= now_us && tapped.saturating_add(TAPPED_BEFORE_US) >= now_us
         });
@@ -1328,7 +1353,7 @@ impl Attention {
         let after_unanswered = self.after_unanswered;
         let before = (session == self.session && self.began_us.is_some()).then(|| {
             (
-                self.named,
+                (self.named, self.named_at_start),
                 self.named_sure,
                 self.best_score,
                 std::mem::take(&mut self.heard),
@@ -1338,7 +1363,16 @@ impl Attention {
             )
         });
         self.began_at(request, session, now_us);
-        if let Some((named, named_sure, best_score, heard, near, addressed, began_us)) = before {
+        if let Some((
+            (named, named_at_start),
+            named_sure,
+            best_score,
+            heard,
+            near,
+            addressed,
+            began_us,
+        )) = before
+        {
             self.named |= named;
             self.named_sure |= named_sure;
             self.best_score = self.best_score.max(best_score);
@@ -1346,6 +1380,14 @@ impl Attention {
             self.near |= near;
             self.addressed |= addressed;
             self.began_us = began_us;
+            // At the start is judged against the first part's start, not
+            // the continuation's: a hearing mid-way through the first part
+            // is never at the start because the line was cut there.
+            self.named_at_start = named_at_start
+                || (self.named
+                    && self.named_us.is_some_and(|n| {
+                        began_us.is_some_and(|b| n <= b.saturating_add(NAME_AT_THE_START_US))
+                    }));
             self.after_another = after_another;
             self.after_question = after_question;
             self.after_unanswered = after_unanswered;
@@ -1394,6 +1436,7 @@ impl Attention {
         {
             self.named = true;
             self.named_sure |= sure;
+            self.named_at_start |= at_us <= began.saturating_add(NAME_AT_THE_START_US);
             self.best_score = self.best_score.max(score);
         }
     }
@@ -4542,5 +4585,48 @@ mod tests {
         ] {
             assert!(!only_the_name(not), "{not}");
         }
+    }
+
+    /// `LAMP_NAME_SECOND_SIGN=on`: a hearing at the line's start
+    /// ([`NAME_AT_THE_START_US`]) is its own second sign, whether it was
+    /// heard before the line began or in it, and it stays one for the line
+    /// going on after the lamp ended it early; a later one is dropped.
+    #[test]
+    fn with_a_second_sign_asked_the_name_at_the_lines_start_is_one() {
+        let began = 10_000_000;
+        let dropped = |at: u64, before: bool, going_on: bool| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            if before {
+                attention.name_heard_scored(at, 0.95);
+            }
+            attention.began_at(1, 1, began);
+            if !before {
+                attention.name_heard_scored(at, 0.95);
+            }
+            if going_on {
+                attention.continued_at(2, 1, began + 3_000_000);
+            }
+            attention.weigh_the_name(None)
+        };
+        for going_on in [false, true] {
+            for before in [false, true] {
+                let at_start = began + NAME_AT_THE_START_US;
+                assert!(!dropped(at_start, before, going_on), "{before} {going_on}");
+                assert!(
+                    dropped(at_start + 1, before, going_on),
+                    "{before} {going_on}"
+                );
+            }
+            assert!(!dropped(began - NAME_BEFORE_US, true, going_on));
+        }
+        // A line begun at 10.0 s, the name heard 1.0 s in (mid-line), cut
+        // and continued at 11.8 s: the hearing is still mid-line, dropped.
+        let mut attention = Attention::default();
+        attention.ask_a_second_sign_of_the_name(true);
+        attention.began_at(1, 1, began);
+        attention.name_heard_scored(began + 1_000_000, 0.95);
+        attention.continued_at(2, 1, began + 1_800_000);
+        assert!(attention.weigh_the_name(None));
     }
 }

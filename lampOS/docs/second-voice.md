@@ -1994,7 +1994,21 @@ after a take-over, but now for every turn:
   line's signs are in, drops the hearing for that line unless a second sign
   is there: the eyes' newest fresh look has a face turned to the lamp (read
   whatever the rule's form), the line was said close to the lamp or to it
-  from close, or its words call it. At any score, `attention::SURE_SCORE`
+  from close, or its words call it, or the hearing began at the line's
+  start: no later than `attention::NAME_AT_THE_START_US` (0.7 s) into the
+  line's sound, which opens with the voice's pre-roll (about 0.25 s), or
+  up to `NAME_BEFORE_US` before it. "Lamp" in "Hey Lamp, …" begins about
+  0.5 s in; a passing mention comes a few words in ("I left the lamp on…",
+  about 1.15 s; #829 scene 2's three). The first builder at 03:54 on #1722:
+  lamp-4ace's played tests b0333 and b0413 each lost their first four day
+  lines, "Hey Lamp, good morning!" heard at 1.000 (`began_ms_ago=480`) with
+  its words written "Mainland. Good morning.". The 18:20 shape's words were
+  not read: its test takes its hearing mid-line; heard at a line's start
+  (another device's wake word heard as the lamp's name) it would count, and
+  so would a line opening with "Lamp" said to someone else ("Lamp's broken
+  again") and a name heard in the last 1.5 s of the line before
+  (`NAME_BEFORE_US`). A line cut and continued keeps the first part's start:
+  a hearing mid-way through it stays mid-line. At any score, `attention::SURE_SCORE`
   too: a sure hearing alone is the same lone sign. Dropped, the line is
   judged as one with no name: no `NAMED`, no `NAMED_PLAINLY`, no call, so no
   conversation goes on from it, the Policy's gate is not told the name, and

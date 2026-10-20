@@ -8232,7 +8232,12 @@ mod tests {
     /// it out as the conversation going on. With
     /// `LAMP_NAME_SECOND_SIGN=on` the first is held, so no call opens
     /// a conversation and the four are held too; without it, as before.
-    /// Quiet room and busy room, with `--spoken-to`.
+    /// Quiet room and busy room, with `--spoken-to`. Its words were not
+    /// read (the owner was talking to another device), so where its
+    /// hearing fell is assumed: mid-line, as a passing word heard as the
+    /// lamp's name is. Heard at the line's start it would count as a call
+    /// ([`crate::attention::NAME_AT_THE_START_US`]), which
+    /// `with_a_second_sign_asked_the_name_at_a_lines_start_counts` pins.
     #[test]
     fn with_a_second_sign_asked_a_name_heard_only_in_the_rooms_sound_opens_nothing() {
         use crate::room_told::Room;
@@ -8249,7 +8254,7 @@ mod tests {
                     896,
                     (10_000_000, 11_500_000),
                     "So where do we put the lamp review?",
-                    room_name_signs(room, false, None, false, vec![(9_800_000, 0.95)]),
+                    room_name_signs(room, false, None, false, mid_line(0.95)),
                 );
                 assert_eq!(first.is_none(), !on, "{room:?} {on}: the first line");
                 // Going on from the call let out, as `signs` reads it.
@@ -8274,7 +8279,7 @@ mod tests {
     #[test]
     fn with_a_second_sign_asked_a_name_heard_in_the_rooms_sound_counts_with_one() {
         use crate::room_told::Room;
-        let named = |score| vec![(9_800_000, score)];
+        let named = mid_line;
         let plain = "What is on my calendar today?";
         for room in [Room::Quiet, Room::Busy] {
             let judged = |turned, near, heard, score| {
@@ -8321,7 +8326,7 @@ mod tests {
                 896,
                 (10_000_000, 11_500_000),
                 "What is on my calendar today?",
-                room_name_signs(Room::Quiet, false, turned, false, vec![(10_200_000, 0.95)]),
+                room_name_signs(Room::Quiet, false, turned, false, mid_line(0.95)),
             );
             heeding.name_note_for(896)
         };
@@ -8332,6 +8337,86 @@ mod tests {
             Some(crate::called::note(false)),
             "turned"
         );
+    }
+
+    /// A hearing of the name mid-line in a line said from 10 s to 11.5 s,
+    /// past [`crate::attention::NAME_AT_THE_START_US`]: a word heard as the
+    /// lamp's name in passing.
+    fn mid_line(score: f32) -> Vec<(u64, f32)> {
+        vec![(11_000_000, score)]
+    }
+
+    /// b0333 and b0413 on lamp-4ace on 2026-10-21 (the first builder at
+    /// 03:54 on #1722): "Hey Lamp, good morning!", heard at 1.000 with
+    /// `began_ms_ago=480`, its words written "Mainland. Good morning.",
+    /// nobody turned to the lamp and nothing close, was dropped by
+    /// `LAMP_NAME_SECOND_SIGN=on` and the day lines after it lost. A
+    /// hearing that began within [`crate::attention::NAME_AT_THE_START_US`]
+    /// of the line's sound (the voice's pre-roll, about 0.25 s, and "Hey",
+    /// about 0.25 s) is a call, so it is played; one a moment later is
+    /// dropped as before. Quiet room and busy room.
+    #[test]
+    fn with_a_second_sign_asked_the_name_at_a_lines_start_counts() {
+        use crate::attention::NAME_AT_THE_START_US;
+        use crate::room_told::Room;
+        let line = (10_000_000, 11_500_000);
+        for room in [Room::Quiet, Room::Busy] {
+            let judged = |at: u64| {
+                room_name_heeding(true).judge(
+                    896,
+                    line,
+                    "Mainland. Good morning.",
+                    room_name_signs(room, false, None, false, vec![(at, 1.0)]),
+                )
+            };
+            assert_eq!(judged(line.0 + 500_000), None, "{room:?}: b0333");
+            assert_eq!(judged(line.0 + NAME_AT_THE_START_US), None, "{room:?}");
+            assert!(
+                judged(line.0 + NAME_AT_THE_START_US + 1).is_some(),
+                "{room:?}"
+            );
+            // Heard just before the line's sound began: at its start too.
+            assert_eq!(judged(line.0 - 300_000), None, "{room:?}");
+        }
+    }
+
+    /// #829 scene 2, "the lamp named in passing" (the first builder's
+    /// `twopeople829.sh`, 15 October), in a busy room: each "lamp" comes a
+    /// few words into its line, so a hearing of it begins past
+    /// [`crate::attention::NAME_AT_THE_START_US`] and, with
+    /// `LAMP_NAME_SECOND_SIGN=on`, is dropped: none of the three is
+    /// answered. Their words were played, not measured: at the office's
+    /// rate, about 0.3 s a word after a 0.25 s pre-roll, "Yes," with its
+    /// comma 0.45 s. Without the switch, a hearing lets each out.
+    #[test]
+    fn with_a_second_sign_asked_the_lamp_named_in_passing_stays_dropped() {
+        use crate::room_told::Room;
+        let began = 10_000_000;
+        for (line, into) in [
+            (
+                "Did you see the lamp turn its head this morning?",
+                250_000 + 4 * 300_000,
+            ),
+            (
+                "Yes, the lamp looked at me when I came in.",
+                250_000 + 450_000 + 300_000,
+            ),
+            (
+                "I left the lamp on in the kitchen yesterday.",
+                250_000 + 3 * 300_000,
+            ),
+        ] {
+            assert!(into > crate::attention::NAME_AT_THE_START_US, "{line}");
+            for on in [false, true] {
+                let held = room_name_heeding(on).judge(
+                    896,
+                    (began, began + 3_000_000),
+                    line,
+                    room_name_signs(Room::Busy, false, None, false, vec![(began + into, 0.97)]),
+                );
+                assert_eq!(held.is_some(), on, "{on}: {line}");
+            }
+        }
     }
 
     /// The rule with `--spoken-to`, strict, and the eyes and the voice's
