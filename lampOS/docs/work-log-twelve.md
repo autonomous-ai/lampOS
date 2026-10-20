@@ -476,3 +476,6 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   the store no longer has, counted). #2265: the reviewer's P2 (way out 1,
   held only for someone the lamp was answering) and P3s; the reviewer-lead's
   doc fix. Both say Part of #2176.
+- #2226 rebased onto lamp-voice `cdc734188` past RECALL_V2/KEEP_HEARD; the
+  reviewer-lead's P3: another person's ids still refused on conversation_end.
+  Status table to the first builder on #1722; free: twelve.
