@@ -76,6 +76,18 @@ impl Drop for Root {
 struct Production {
     samples: u64,
     dropped: u64,
+    /// From the first sample to the last, in µs.
+    span_us: u64,
+}
+
+impl Production {
+    /// The producer sampled throughout: at least half the samples its own
+    /// span allows at one each [`SAMPLE`]. A fixed count, as before, held only
+    /// for a scenario of a given length: the no-slide test's lasts about
+    /// 100 ms and took 21 or 22 samples against "more than 20" (#1569 row 46).
+    fn kept_up(&self) -> bool {
+        self.samples * 2 * SAMPLE.as_micros() as u64 >= self.span_us
+    }
 }
 
 struct Producer {
@@ -98,7 +110,10 @@ const SHORTLY_US: u64 = 500_000;
 /// worker's fault for a switch it can't read, a gap in the lease stream
 /// this rig reads, and the worker's clean end after either, seen as its
 /// exit or as its control socket refusing the rig. Under a 150 ms stall of
-/// the producer, 2 of 5 runs failed only as that refusal.
+/// the producer, 2 of 5 runs failed only as that refusal. A worker killed by
+/// a signal between the rig's `check_running` and its send reads as that
+/// refusal too, so under a producer stall such a crash is begun again; it
+/// still opens nothing (the reviewer on #2255).
 const FAIL_CLOSED: [&str; 4] = [
     lamp_voice::privacy_bus::UNREADABLE,
     "privacy lease stream lost continuity",
@@ -180,7 +195,9 @@ fn failure_text(failure: &(dyn Any + Send)) -> &str {
 /// the real worker say, rightly, that the switch can't be read (#1569 row
 /// 45, ARM64 run 39375553918). Every other failure fails at once: one that
 /// permits or revokes late, whatever the host did, even right after a stall
-/// (the text decides that, not the time); a spawn that panics; the
+/// (the text decides that, not the time); a spawn that panics in
+/// `Rig::start` (a respawn in `restart_verified` that exits 0 while the
+/// producer is held up is begun again, as it fails closed); the
 /// cooperative exit and the old lease's expiry around a restart; and a
 /// fail-closed one with the producer on time, such as a worker that never
 /// came up while the producer ran on time. One that comes three times
@@ -238,6 +255,7 @@ impl Producer {
             let deadline = Instant::now() + Duration::from_secs(10);
             let mut result = Production::default();
             let mut previous_us = None;
+            let mut first_us = None;
             while !stop.load(Ordering::Acquire) {
                 if Instant::now() >= deadline {
                     return Err(io::Error::other(
@@ -251,6 +269,7 @@ impl Producer {
                     previous_us.map(|previous| at_us.saturating_sub(previous)),
                 );
                 previous_us = Some(at_us);
+                result.span_us = at_us - *first_us.get_or_insert(at_us);
                 result.samples += 1;
                 let muted = muted.load(Ordering::Acquire);
                 if muted {
@@ -742,7 +761,7 @@ fn the_real_worker_with_no_slide_grants_from_its_controller_alone() {
             );
             rig.stop_worker();
             let produced = rig.producer.finish();
-            assert!(produced.samples > 20);
+            assert!(produced.kept_up(), "{produced:?}");
         },
     );
 }
