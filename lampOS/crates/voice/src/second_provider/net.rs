@@ -20,7 +20,7 @@ pub use chat::{
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
 pub use sentences::Sentences;
 pub use stt::{Early, Replies, SttStream, check as stt_check};
-pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, Turn, default_model};
+pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, Turn, default_model, voice_name};
 /// A piece of speech's request as `Tts` makes it, for `probe-cascade --wire
 /// --speech`.
 pub(crate) use tts::{Request as SpeechRequest, request as speech_request};
