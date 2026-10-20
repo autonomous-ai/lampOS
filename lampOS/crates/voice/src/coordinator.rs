@@ -4177,6 +4177,9 @@ fn conversation_with_gate(
     let mut onboarding_feel = onboarding
         .as_ref()
         .and_then(|_| crate::onboarding::giving_way::Feel::from_environment());
+    // The inputs the walk's steps need, last recorded (`onboarding_inputs`,
+    // row 10 on lamp-52e6): says, bus, ears, body, feel, storage.
+    let mut onboarding_inputs: Option<(bool, bool, bool, bool, bool, bool)> = None;
     // News from the work handed to agents on other computers, told
     // unasked at a good moment (`docs/tasks.md`).
     #[cfg(test)]
@@ -4827,6 +4830,24 @@ fn conversation_with_gate(
             );
         }
         if let Some(walk) = onboarding.as_mut() {
+            // Which input keeps a step not_available, once per change:
+            // booleans only, no paths (row 10 on lamp-52e6).
+            let inputs = (
+                says.is_some(),
+                bus_out.is_some(),
+                onboarding_ears.is_some(),
+                body_link.is_some(),
+                onboarding_feel.is_some(),
+                !trace.onboarding_privacy_disabled,
+            );
+            if onboarding_inputs != Some(inputs) {
+                record(
+                    trace,
+                    json!({"kind":"onboarding_inputs","says":inputs.0,"bus":inputs.1,"ears":inputs.2,
+                        "body":inputs.3,"feel":inputs.4,"storage":inputs.5,"at_us":monotonic_us()}),
+                )?;
+                onboarding_inputs = Some(inputs);
+            }
             walk.set_near_available(
                 says.is_some()
                     && bus_out.is_some()

@@ -68,6 +68,27 @@ pause), it is offered again no sooner than a day later
 (`offered_at_unix_s`). Its note is its owner's to word, beginning "one more
 thing I can do now"; until then a placeholder note says so.
 
+## Why a step is not_available
+
+Each measured step needs these, by switch, checked at every poll of the walk:
+
+- `how_you_sound`: `LAMP_SAY=on` (the say socket made), `LAMP_BUS=on` with
+  the bus up when the session starts (the ears' subscriptions to
+  `name/heard`, `ears/level` and `voice/state`), and onboarding storage
+  started.
+- `giving_way`: `LAMP_SAY=on`, `LAMP_BUS=on` with the bus up when the
+  session starts (the feel's subscriptions to `body/joint_states` and
+  `body/hand`), `LAMP_BODY_MOOD_SOCKET` (the body link), and onboarding
+  storage started.
+- `touch`: `LAMP_BUS=on` and the walk's own subscription to `controls/touch`;
+  it is not part of the record below.
+
+The session record `onboarding_inputs` names which one is false:
+`{"kind":"onboarding_inputs","says","bus","ears","body","feel","storage","at_us"}`,
+booleans only, no paths, recorded while the walk exists, once at the first
+poll and again whenever one of them changes (row 10 on lamp-52e6, where
+both steps were `not_available` with every switch set).
+
 ## Starting and redoing
 
 It starts the first time the voice runs with the switch on and no step kept
