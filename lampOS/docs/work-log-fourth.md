@@ -4909,6 +4909,18 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **The plan:** a line whose speech began in the reply's last 2–3 s is given its sound from that start, one line only, never the name twice. Off unless set, with a test, onto #1712, and the plan on #1722 before code.
 - **#2079, the third landing,** is gated (3155 passed, 0 failed), read by the reviewer with no finding, and waits for its ARM64.
 
+## 2026-10-20, 09:11 ICT: the name past the reply waits for its merge; the speech probe begun
+
+- **#2079, the third landing,** was merged at 07:05.
+- **#2099, the name lost as a reply ends** (it replaces #2096, which was closed at 07:54): head `626efae5f` onto #1712's `61b690638`.
+  - With `LAMP_REPLY_END_REACH=on`, a line begun as the lamp's sound ends starts at the onset that sound hid.
+  - This replaces the name-anchored plan, because lamp-name heard nothing under the reply (the first builder, 07:08).
+  - Gate 3166 passed, 0 failed. ARM64 is green, and the reviewer had no finding at 08:00. It waits for the first builder's merge, then the hand-overs.
+- **Begun: `probe-cascade --wire --speech`** (#1934). I proposed it at 08:36; with no answer by 08:51 I started it, since it's a hand-run probe that changes nothing in the voice.
+  - The route's speech goes through the relay too, so the probe times the route's own ElevenLabs piece through the relay and, with a key, direct.
+  - It times each step to the first audio and the piece's end, with `--kept` as well.
+  - Commit `e77f7aa3a` on `fourth/probe-wire-speech`; its gate is running.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -4925,6 +4937,9 @@ were not run on a lamp. `attention/addressed` is off unless
 `LAMP_ADDRESSED=on` and was not run on a lamp: no face, level or busy room was
 tried. The local judge remains shadow-only behind `--local-judge`,
 with unfitted weights and no proof that it improves the busy-room floor.
+`LAMP_REPLY_END_REACH` is off unless set and was not run on a lamp.
+`probe-cascade --wire --speech` was tried only from this Mac with made-up
+keys (both targets answered 401), not on a lamp.
 Native Linux ARM64 execution so far is on GitHub runners, not on a lamp.
 The log contains no unanswered question requiring
 the owner to relay a message.
