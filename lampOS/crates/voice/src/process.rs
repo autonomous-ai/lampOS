@@ -1132,6 +1132,7 @@ fn second_route_worker_environment(
         crate::remember::HITS_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
+        crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1179,6 +1180,7 @@ mod tests {
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
+            crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -1471,6 +1473,7 @@ mod tests {
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
+                    || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                 {
                     "on"
@@ -1527,6 +1530,7 @@ mod tests {
                 vec![
                     "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
+                    "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",

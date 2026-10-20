@@ -1885,7 +1885,31 @@ after a take-over, but now for every turn:
   `not_for_me{}` written as words still ends such a turn, the Live route is
   unchanged, and the speaking face (`LAMP_SECOND_SPEAKING_FACE`) is not
   read here. The rule's own text call (`attention::called`) still lets out
-  a line opening with a stand-in, with or without the switch.
+  a line opening with a stand-in, with or without the switch; for that,
+  `LAMP_BUSY_CALLED_STRICT`, next.
+- **A busy room's call by the text, narrowed** (`LAMP_BUSY_CALLED_STRICT=on`;
+  with `--attention`). On #1712's branch the busy room let out "Man, that
+  meeting ran long.", "Plan the sprint for tomorrow.", "Mom, can you pick me
+  up?", "Lamp is broken, can you fix it?" and "Lamb for dinner tonight?" as
+  `CALLED_IN_TEXT` (the first builder on #1722, 16:11). With the switch,
+  `Heeding::judge` tells the rule, before each line, whether the room is busy
+  with nobody turned to the lamp (`Attention::narrow_the_call`); then the
+  text's call (`Attention::called_in_text`, read for the verdict, the
+  journal's sign and `called_for_itself`) counts only as "Lamp" or "Lamb"
+  set off as a call (`attention::begins_with_the_name`) or with the name
+  heard by `lamp-name` for the line (`Attention`'s `named`). Otherwise the
+  line is judged as one with no call: in the strict busy rule,
+  `BUSY_UNCALLED`. With a face turned to the lamp, in a quiet room, or
+  without the switch, nothing changes. A call set off later in the line
+  ("…, Lamp?") is narrowed too: it counts only with the name heard or a
+  face. Not narrowed: a bare call's own text (`Attention::call_shown`, for
+  the line after it) is read as before. The Live route is unchanged.
+  Two limits (#2257's review): "set off" leans on the text's comma, and
+  speech to text doesn't always write the pause, so "Lamp what time is it"
+  counts only with the name heard; and the name heard is the low bar
+  (`called::LEAST_SCORE`, 0.9), which the office's false hearings reach
+  (0.93 to 0.997, #829), so a stand-in with a false hearing still counts.
+  Narrower than without the switch, not closed.
 - **Its own answers keep nothing going** (`LAMP_GOING_ON_NOT_OWN=on`, the
   first builder's 17:2x task on #1722). A conversation goes on, on this
   route, by the thread's window (45 s from the start of any answer of the
