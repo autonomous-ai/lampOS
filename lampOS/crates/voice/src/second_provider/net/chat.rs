@@ -334,7 +334,7 @@ impl Chat {
     /// when not due, or when it failed (the chat then connects as before).
     pub async fn warm(&self) -> Option<(u16, std::time::Duration)> {
         let models = self.url.replacen("/chat/completions", "/models", 1);
-        let (status, took, _) = super::warm_get(
+        let (status, took, ..) = super::warm_get(
             &self.client,
             &self.last_sent,
             WARM_AFTER,

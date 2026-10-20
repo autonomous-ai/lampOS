@@ -1,7 +1,8 @@
 //! Streamed speech as 24 kHz mono 16-bit PCM from OpenAI or ElevenLabs, as
 //! V1's `hal/drivers/voice/tts/{openai,elevenlabs}.py` ask for it.
 use super::{
-    CONNECT, Error, Result, STALL, chunk, http_client, local_socket, openai_base, post, warm_get,
+    CONNECT, Error, Result, STALL, chunk, http_client, keeps_its_connection, local_socket,
+    openai_base, post, warm_get,
 };
 use crate::second_config::{SecondConfig, TtsProvider};
 use futures_util::{SinkExt, StreamExt};
@@ -9,7 +10,10 @@ use serde_json::{Value, json};
 use std::{
     collections::VecDeque,
     net::SocketAddr,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 use tokio_tungstenite::{
@@ -315,6 +319,53 @@ const WARM_BYTES: usize = 256 << 10;
 /// more than the pieces of one answer in flight at once.
 const SOCKETS: usize = 8;
 
+/// The latest connections by local socket, each with whether it is known
+/// to be idle in the client's pool: a piece's or warming's answer read to
+/// its end gives its connection back (HTTP/1.1, one request on it at a
+/// time); one dropped mid-body, as at a cut-in, or failed, takes it with it,
+/// and is forgotten.
+type Connections = Arc<Mutex<VecDeque<(SocketAddr, bool)>>>;
+
+/// A piece's connection while its answer streams: given back as idle when
+/// the answer is read to its end, forgotten when it is dropped before.
+struct Lease {
+    connections: Connections,
+    socket: SocketAddr,
+    ended: bool,
+}
+
+impl Drop for Lease {
+    fn drop(&mut self) {
+        let Ok(mut connections) = self.connections.lock() else {
+            return;
+        };
+        let at = connections.iter().position(|(s, _)| *s == self.socket);
+        match at {
+            Some(at) if self.ended => connections[at].1 = true,
+            Some(at) => {
+                connections.remove(at);
+            }
+            None => {}
+        }
+    }
+}
+
+/// The one warming in flight ([`Tts::warm`]): taken, or `None` while
+/// another is.
+struct Warming<'a>(&'a AtomicBool);
+
+impl<'a> Warming<'a> {
+    fn take(flag: &'a AtomicBool) -> Option<Self> {
+        (!flag.swap(true, Ordering::SeqCst)).then_some(Self(flag))
+    }
+}
+
+impl Drop for Warming<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
 /// Whose a piece of speech is, for the journal: its request, and when the
 /// words it answers were heard.
 #[derive(Clone, Copy, Debug)]
@@ -348,8 +399,11 @@ pub struct Tts {
     /// When a piece or a warming last went.
     used: Mutex<Option<Instant>>,
     /// The local sockets of the latest connections: a response on one of
-    /// them came on a connection reused from the pool.
-    sockets: Mutex<VecDeque<SocketAddr>>,
+    /// them came on a connection reused from the pool. Each says whether it
+    /// is known idle, for [`Tts::warm`].
+    sockets: Connections,
+    /// A warming is in flight: at most one is.
+    warming: AtomicBool,
     tally: Arc<Mutex<Tally>>,
     /// The speech socket opened ahead for a request
     /// (`LAMP_SECOND_SPEECH_SOCKET=on`, [`Tts::open_ahead`]).
@@ -402,7 +456,8 @@ impl Tts {
             voice: voice.map(str::to_owned),
             model: None,
             used: Mutex::new(None),
-            sockets: Mutex::new(VecDeque::with_capacity(SOCKETS)),
+            sockets: Arc::new(Mutex::new(VecDeque::with_capacity(SOCKETS))),
+            warming: AtomicBool::new(false),
             tally: Arc::default(),
             ahead: Mutex::new(None),
         })
@@ -518,47 +573,83 @@ impl Tts {
         }
     }
 
-    /// Whether `socket` was seen before, remembering it either way.
+    /// Whether `socket` was seen before, remembering it either way, as in
+    /// use now (not idle).
     // ponytail: a new connection the OS happens to give a recent local port
-    // reads as reused; ports are rarely handed out again within minutes.
+    // reads as reused; ports are rarely handed out again within minutes,
+    // and one whose connection was lost is forgotten.
     fn seen(&self, socket: Option<SocketAddr>) -> bool {
         let (Some(socket), Ok(mut sockets)) = (socket, self.sockets.lock()) else {
             return false;
         };
-        if sockets.contains(&socket) {
+        if let Some(known) = sockets.iter_mut().find(|(s, _)| *s == socket) {
+            known.1 = false;
             return true;
         }
         if sockets.len() == SOCKETS {
             sockets.pop_front();
         }
-        sockets.push_back(socket);
+        sockets.push_back((socket, false));
         false
+    }
+
+    /// A lease on `socket`'s connection while its answer is read; none when
+    /// the answer closes it.
+    fn lease(&self, socket: Option<SocketAddr>, keeps: bool) -> Option<Lease> {
+        Some(Lease {
+            connections: self.sockets.clone(),
+            socket: socket.filter(|_| keeps)?,
+            ended: false,
+        })
+    }
+
+    /// Whether a connection is known to be idle in the pool now.
+    fn idle_known(&self) -> bool {
+        self.sockets
+            .lock()
+            .is_ok_and(|sockets| sockets.iter().any(|(_, idle)| *idle))
     }
 
     /// The connection opened ahead, as a line begins, when no piece or
     /// warming went in the last [`WARM_AFTER`] (`LAMP_SECOND_SPEECH_WARM=on`,
-    /// #1712): a `GET` of the provider's `models` with the key, read whole,
-    /// so the answer's first piece goes on a connection already made. No
-    /// text is sent, so no characters are billed (ElevenLabs bills the text
-    /// of speech requests; `GET /v1/models` lists models). Its status and how
-    /// long it took; `None` when not due, or when it failed (the piece then
-    /// connects as before).
+    /// #1712), or when no connection is known to be idle though one went
+    /// lately: the last answer's pieces still stream on them, or one was
+    /// dropped mid-body at a cut-in and took its connection with it (#1722,
+    /// the first builder at 01:52 on 21 Oct: 13 of 20 first pieces on a new
+    /// connection came within 10 s of the piece before). A `GET` of the
+    /// provider's `models` with the key, read whole, so the answer's first
+    /// piece goes on a connection already made. No text is sent, so no
+    /// characters are billed (ElevenLabs bills the text of speech requests;
+    /// `GET /v1/models` lists models). At most one is in flight. Its status
+    /// and how long it took; `None` when not due, when one is in flight, or
+    /// when it failed (the piece then connects as before).
     pub async fn warm(&self) -> Option<(u16, Duration)> {
+        let _one = Warming::take(&self.warming)?;
         let models = format!(
             "{}/models",
             service_base(self.provider, &self.base_url).ok()?
         );
         let (header, value) = auth(self.provider, &self.key);
-        let (status, took, socket) = warm_get(
+        let after = if self.idle_known() {
+            WARM_AFTER
+        } else {
+            Duration::ZERO
+        };
+        let (status, took, socket, ended, keeps) = warm_get(
             &self.client,
             &self.used,
-            WARM_AFTER,
+            after,
             &models,
             (header, &value),
             WARM_BYTES,
         )
         .await?;
         self.seen(socket);
+        // Kept only when read to its end and not told to close, as a
+        // piece's is.
+        if let Some(mut lease) = self.lease(socket, keeps) {
+            lease.ended = ended;
+        }
         Some((status, took))
     }
 
@@ -612,7 +703,9 @@ impl Tts {
             &request.body,
         )
         .await?;
-        let reused = self.seen(local_socket(&response));
+        let socket = local_socket(&response);
+        let reused = self.seen(socket);
+        let lease = self.lease(socket, keeps_its_connection(&response));
         let piece = turn.zip(index).map(|(turn, index)| Piece {
             tally: self.tally.clone(),
             provider: self.provider.name(),
@@ -627,6 +720,7 @@ impl Tts {
         Ok(TtsStream {
             source: Some(Source::Http(response)),
             piece,
+            lease,
             ..TtsStream::default()
         })
     }
@@ -727,6 +821,9 @@ pub struct TtsStream {
     ready: VecDeque<Vec<i16>>,
     /// Journaled at the first audio byte.
     piece: Option<Piece>,
+    /// Its connection, over HTTP: given back at the answer's end, lost when
+    /// it is dropped before.
+    lease: Option<Lease>,
 }
 
 /// Where a piece's audio comes from: its HTTP answer's body, or the speech
@@ -778,6 +875,9 @@ impl TtsStream {
             }
             None => {
                 self.source = None;
+                if let Some(mut lease) = self.lease.take() {
+                    lease.ended = true;
+                }
                 self.ready.extend(self.packets.finish().map(louder));
             }
         }
@@ -920,6 +1020,19 @@ mod tests {
         pcm: Vec<u8>,
         hang_get: bool,
     ) -> (String, Arc<AtomicUsize>, Arc<Mutex<Vec<String>>>) {
+        serving(pcm, hang_get, false, None).await
+    }
+
+    /// As [`keeping`], but with `hold` each `POST` sends its head and its
+    /// first two bytes, then waits for one of `hold`'s permits before the
+    /// rest: a piece still streaming; and with `close_get` a `GET` is
+    /// answered whole with `connection: close`, and its connection closed.
+    async fn serving(
+        pcm: Vec<u8>,
+        hang_get: bool,
+        close_get: bool,
+        hold: Option<Arc<tokio::sync::Semaphore>>,
+    ) -> (String, Arc<AtomicUsize>, Arc<Mutex<Vec<String>>>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let connections = Arc::new(AtomicUsize::new(0));
@@ -928,7 +1041,7 @@ mod tests {
         tokio::spawn(async move {
             while let Ok((mut socket, _)) = listener.accept().await {
                 counted.fetch_add(1, Ordering::SeqCst);
-                let (seen, pcm) = (seen.clone(), pcm.clone());
+                let (seen, pcm, hold) = (seen.clone(), pcm.clone(), hold.clone());
                 tokio::spawn(async move {
                     let mut buffer = Vec::new();
                     let mut read = [0; 4096];
@@ -964,12 +1077,32 @@ mod tests {
                         } else {
                             pcm.clone()
                         };
-                        let answer =
-                            format!("HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n", body.len());
+                        let closing = get && close_get;
+                        let answer = format!(
+                            "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n{}\r\n",
+                            body.len(),
+                            if closing { "connection: close\r\n" } else { "" }
+                        );
+                        let held = match &hold {
+                            Some(_) if !get => 2.min(body.len()),
+                            _ => body.len(),
+                        };
                         if socket.write_all(answer.as_bytes()).await.is_err()
-                            || socket.write_all(&body).await.is_err()
+                            || socket.write_all(&body[..held]).await.is_err()
                         {
                             return;
+                        }
+                        if closing {
+                            let _ = socket.shutdown().await;
+                            return;
+                        }
+                        if held < body.len() {
+                            if let Some(hold) = &hold {
+                                hold.acquire().await.unwrap().forget();
+                            }
+                            if socket.write_all(&body[held..]).await.is_err() {
+                                return;
+                            }
                         }
                     }
                 });
@@ -1202,6 +1335,120 @@ mod tests {
         assert_eq!(samples, [10]);
         assert_eq!(connections.load(Ordering::SeqCst), 2);
         assert!(tts.told(3).unwrap().contains("0 on a reused connection"));
+        warming.abort();
+    }
+
+    /// Whether `stream`, a piece over HTTP, came on a reused connection.
+    /// (The servers count a connection before they answer on it, so a count
+    /// read after an answer came is final.)
+    fn on_a_kept_connection(stream: &TtsStream) -> bool {
+        stream.piece.as_ref().expect("a turn's piece").reused
+    }
+
+    /// #1722 (the first builder, 21 Oct 01:52): a line begun while the last
+    /// answer's piece still streams on the one kept connection finds no
+    /// idle one, so the warming opens one more though a piece went a moment
+    /// ago, and the next answer's first piece goes on it.
+    #[tokio::test]
+    async fn a_line_begun_while_the_last_answer_streams_finds_a_kept_connection() {
+        let hold = Arc::new(tokio::sync::Semaphore::new(0));
+        let (url, connections, _) = serving(vec![1, 0, 2, 0], false, false, Some(hold)).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap();
+        assert!(tts.warm().await.is_some(), "a quiet voice is warmed");
+        let streaming = tts.speak_for("The last answer.", turn(1)).await.unwrap();
+        assert!(on_a_kept_connection(&streaming));
+        assert_eq!(connections.load(Ordering::SeqCst), 1);
+        // The next line begins while that piece streams.
+        assert!(
+            tts.warm().await.is_some(),
+            "no idle connection is known, so one more is opened"
+        );
+        assert_eq!(connections.load(Ordering::SeqCst), 2);
+        let first = tts.speak_for("Hello.", turn(2)).await.unwrap();
+        assert!(on_a_kept_connection(&first), "the first piece reused one");
+        assert_eq!(connections.load(Ordering::SeqCst), 2, "and opened none");
+        drop(streaming);
+    }
+
+    /// A piece cut off mid-stream (a cut-in) takes its connection with it:
+    /// the next line's warming opens another, and its first piece reuses it.
+    #[tokio::test]
+    async fn a_cut_in_mid_stream_leaves_the_next_first_piece_a_kept_connection() {
+        let hold = Arc::new(tokio::sync::Semaphore::new(0));
+        let (url, connections, _) = serving(vec![1, 0, 2, 0], false, false, Some(hold)).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap();
+        assert!(tts.warm().await.is_some());
+        let mut streaming = tts.speak_for("The last answer.", turn(1)).await.unwrap();
+        assert!(on_a_kept_connection(&streaming));
+        // Its first bytes are read, then it is dropped mid-body.
+        assert!(streaming.read().await.unwrap());
+        drop(streaming);
+        assert!(
+            tts.warm().await.is_some(),
+            "the connection went with the cut piece, so one more is opened"
+        );
+        assert_eq!(connections.load(Ordering::SeqCst), 2);
+        let first = tts.speak_for("Hello.", turn(2)).await.unwrap();
+        assert!(on_a_kept_connection(&first));
+        assert_eq!(connections.load(Ordering::SeqCst), 2);
+    }
+
+    /// The reviewer's P3 1 on #2351: a warming whose `models` answer is read
+    /// to its end but says `connection: close` leaves no connection idle,
+    /// so the next line, within [`WARM_AFTER`], still warms one.
+    #[tokio::test]
+    async fn a_warming_told_to_close_leaves_the_next_line_its_warming() {
+        let (url, connections, asked) = serving(vec![1, 0], false, true, None).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap();
+        assert_eq!(tts.warm().await.map(|(status, _)| status), Some(200));
+        assert!(!tts.idle_known(), "its connection closed");
+        assert_eq!(
+            tts.warm().await.map(|(status, _)| status),
+            Some(200),
+            "the next line still warms"
+        );
+        assert_eq!(connections.load(Ordering::SeqCst), 2);
+        assert!(asked.lock().unwrap().iter().all(|l| l.starts_with("get")));
+    }
+
+    /// With `LAMP_SECOND_SPEECH_WARM` off nothing warms, and the pieces make
+    /// the connections they made before: a piece asked while another
+    /// streams opens its own, and so does one after a cut-in.
+    #[tokio::test]
+    async fn without_warming_the_pieces_open_the_connections_they_did() {
+        let hold = Arc::new(tokio::sync::Semaphore::new(0));
+        let (url, connections, asked) = serving(vec![1, 0, 2, 0], false, false, Some(hold)).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap();
+        let streaming = tts.speak_for("The last answer.", turn(1)).await.unwrap();
+        let first = tts.speak_for("Hello.", turn(2)).await.unwrap();
+        assert!(!on_a_kept_connection(&streaming) && !on_a_kept_connection(&first));
+        assert_eq!(connections.load(Ordering::SeqCst), 2);
+        drop((streaming, first));
+        let after_the_cut = tts.speak_for("Hello again.", turn(3)).await.unwrap();
+        assert!(!on_a_kept_connection(&after_the_cut));
+        assert_eq!(connections.load(Ordering::SeqCst), 3);
+        assert!(asked.lock().unwrap().iter().all(|l| l.starts_with("post")));
+    }
+
+    /// At most one warming is in flight: a line begun while one hangs, with
+    /// no idle connection known, sends no second.
+    #[tokio::test]
+    async fn at_most_one_warming_is_in_flight() {
+        let (url, _, asked) = keeping(vec![5, 0], true).await;
+        let tts = Arc::new(Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap());
+        let warming = tokio::spawn({
+            let tts = tts.clone();
+            async move { tts.warm().await }
+        });
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while asked.lock().unwrap().is_empty() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("the first warming went");
+        assert_eq!(tts.warm().await, None, "one is in flight");
+        assert_eq!(asked.lock().unwrap().len(), 1);
         warming.abort();
     }
 
