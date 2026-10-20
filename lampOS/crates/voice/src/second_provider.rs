@@ -679,6 +679,9 @@ struct Marks {
     /// Only the lamp's name, its call's wait run out
     /// (`ProviderInput::Called`, [`crate::provider_worker::CALLED_NOTE`]).
     called: AtomicBool,
+    /// Onboarding's sentence (#1803): its words are counted, never asked
+    /// of the model nor kept ([`ProviderInput::CountOnly`]).
+    count_only: AtomicBool,
 }
 
 /// What a line that was only the lamp's name is asked as when no words of
@@ -1338,6 +1341,8 @@ impl Engine {
                 // The voice's connection opened while the person speaks, not
                 // by the answer's first sentence (#1712).
                 tokio::spawn(self.shared.services.warm());
+                // A new line is not the sentence unless it is said to be.
+                crate::thread::count_only(None);
                 // Going on from a request whose end went early and was given
                 // up when the person spoke again: its words begin this one,
                 // as Gemini, which heard them, is told (`CUT_OFF_NOTE`). Only
@@ -1447,6 +1452,7 @@ impl Engine {
                     sound: sound.clone(),
                     called: AtomicBool::new(false),
                     privacy: privacy_generation,
+                    count_only: AtomicBool::new(false),
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
@@ -1569,6 +1575,14 @@ impl Engine {
             ProviderInput::Called { request, .. } => {
                 if let Some(turn) = self.turn.as_ref().filter(|turn| turn.request == request) {
                     turn.marks.called.store(true, Ordering::Release);
+                }
+            }
+            // Onboarding's sentence (#1803): set before the line's end, read
+            // by the turn's task once its words are in.
+            ProviderInput::CountOnly { request, .. } => {
+                if let Some(turn) = self.turn.as_ref().filter(|turn| turn.request == request) {
+                    turn.marks.count_only.store(true, Ordering::Release);
+                    crate::thread::count_only(Some(request));
                 }
             }
             ProviderInput::End {
@@ -2076,7 +2090,7 @@ async fn spoken(
                 }
             }
             Some(said) = next_early(&mut early) => {
-                prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, &cut_in);
+                prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, (&cut_in, &marks));
             }
         }
     }
@@ -2088,14 +2102,20 @@ async fn spoken(
         tokio::select! {
             finished = &mut finish => break finished,
             Some(said) = next_early(&mut early) => {
-                prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, &cut_in);
+                prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, (&cut_in, &marks));
             }
         }
     };
     // Every early word sent before the words were final counts: a
     // `TurnResumed` just before the end still takes them back.
     while let Some(said) = early.as_mut().and_then(|early| early.try_recv().ok()) {
-        prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, &cut_in);
+        prepared = prepared_on(
+            &shared,
+            (request, scope.as_ref()),
+            prepared,
+            said,
+            (&cut_in, &marks),
+        );
     }
     let text = match finished {
         Ok(text) => {
@@ -2143,6 +2163,28 @@ async fn spoken(
                 );
             }
         }
+    }
+    // Onboarding's sentence (#1803): its words go to the coordinator to
+    // be counted, and nowhere else. The model is never asked, so there is
+    // no answer to it to keep or say, and no later request begins with it.
+    if marks.count_only.load(Ordering::Acquire) {
+        drop(prepared.take());
+        if shared
+            .emit(ProviderOutput::Transcript {
+                request: None,
+                text,
+                finished: true,
+            })
+            .await
+        {
+            shared
+                .emit(ProviderOutput::TurnComplete {
+                    request,
+                    idle: true,
+                })
+                .await;
+        }
+        return;
     }
     if let Ok(mut last) = shared.heard_last.lock() {
         *last = Some((request, text.clone()));
@@ -2683,8 +2725,12 @@ fn prepared_on(
     (request, scope): (u64, Option<&crate::memory_scope::ScopeLease>),
     prepared: Option<Prepared>,
     said: net::Early,
-    notes: &[String],
+    (notes, marks): (&[String], &Marks),
 ) -> Option<Prepared> {
+    // Onboarding's sentence is never asked of the model, early or late.
+    if marks.count_only.load(Ordering::Acquire) {
+        return None;
+    }
     match said {
         net::Early::Words(words) => {
             if prepared

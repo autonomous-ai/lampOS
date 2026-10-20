@@ -439,7 +439,8 @@ fn run_with_notice_policy(
                                 Some(
                                     ProviderInput::Audio { .. }
                                     | ProviderInput::Written { .. }
-                                    | ProviderInput::Called { .. },
+                                    | ProviderInput::Called { .. }
+                                    | ProviderInput::CountOnly { .. },
                                 ) => {}
                                 None => break,
                             }

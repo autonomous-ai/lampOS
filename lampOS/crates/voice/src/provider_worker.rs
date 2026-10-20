@@ -577,6 +577,15 @@ pub enum ProviderInput {
         request: u64,
         privacy_generation: u64,
     },
+    /// The request in hand is onboarding's sentence (#1803), sent just
+    /// after its Start: its words are counted by the coordinator and kept
+    /// nowhere else, neither in the thread, the memory's journal nor a
+    /// later prompt, and no answer to it is kept either
+    /// ([`crate::thread::count_only`]).
+    CountOnly {
+        request: u64,
+        privacy_generation: u64,
+    },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.
     Written {
@@ -607,6 +616,7 @@ impl ProviderInput {
             | Self::Audio { request, .. }
             | Self::End { request, .. }
             | Self::Called { request, .. }
+            | Self::CountOnly { request, .. }
             | Self::Written { request, .. }
             | Self::Reminder { request, .. } => *request,
         }
@@ -623,6 +633,9 @@ impl ProviderInput {
                 privacy_generation, ..
             }
             | Self::Called {
+                privacy_generation, ..
+            }
+            | Self::CountOnly {
                 privacy_generation, ..
             }
             | Self::Written {
@@ -5256,6 +5269,8 @@ impl InputHandoff {
                 if self.submitted.is_some() {
                     return Err(io::Error::other("provider input already started").into());
                 }
+                // A new line is not the sentence unless it is said to be.
+                crate::thread::count_only(None);
                 let expected = SessionId::new(session)?;
                 // Read before the line is sent, so it is bound to the face
                 // the eyes named as it began, never a later one.
@@ -5405,6 +5420,12 @@ impl InputHandoff {
             ProviderInput::Called { .. } => {
                 self.require_open(request)?;
                 self.called = Some(request.get());
+            }
+            // Onboarding's sentence (#1803): from now its words and the
+            // answer to it are kept out of the thread.
+            ProviderInput::CountOnly { .. } => {
+                self.require_open(request)?;
+                crate::thread::count_only(Some(request.get()));
             }
             ProviderInput::End { sound, cut_in, .. } => {
                 self.require_open(request)?;
@@ -6352,6 +6373,56 @@ mod tests {
         fn has_room_for(&self, commands: usize) -> bool {
             self.room.get().is_none_or(|room| room >= commands)
         }
+    }
+
+    /// Jarvis on #2031 (#1803): on Live, `CountOnly` after the sentence's
+    /// Start keeps every piece of its words, and the lamp's answer to it,
+    /// out of the thread the transcripts go to (`thread.person`,
+    /// `thread.lamp`, as `process_event` calls them): nothing of a planted
+    /// marker is in the thread's file text or the exchange the next answer
+    /// opens. The next line's Start ends it, and that line is kept.
+    #[test]
+    fn the_sentence_after_count_only_never_reaches_the_live_thread() {
+        let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
+        let mut owner = controller();
+        let mut handoff = InputHandoff::default();
+        let sink = RecordingSink::default();
+        let request = authorize(&mut owner, &mut handoff);
+        handoff
+            .submit(start(request, &handoff), NOW, &sink)
+            .unwrap();
+        let count_only = ProviderInput::CountOnly {
+            request,
+            privacy_generation: generation(&handoff),
+        };
+        handoff.submit(count_only, NOW, &sink).unwrap();
+        let at = Instant::now();
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            for (piece, finished) in [
+                ("I sit by ", false),
+                ("the zebrafinch ", false),
+                ("window", true),
+            ] {
+                thread.person(piece, finished, at);
+            }
+            thread.lamp(request, "A zebrafinch window.", at);
+        }
+        handoff.submit(end(request, &handoff), NOW, &sink).unwrap();
+        // The next line: its Start clears the mark.
+        let next = authorize(&mut owner, &mut handoff);
+        handoff.submit(start(next, &handoff), NOW, &sink).unwrap();
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        thread.person("What should I drink?", true, at);
+        thread.lamp(next, "Try some tea.", at);
+        let file = thread
+            .save(at, std::time::SystemTime::now())
+            .expect("the next exchange is kept");
+        assert!(!file.contains("zebrafinch"), "{file}");
+        assert!(file.contains("What should I drink?") && file.contains("Try some tea."));
+        let told = thread.recall(at, 4_096).unwrap_or_default();
+        assert!(!told.contains("zebrafinch"), "{told}");
+        *thread = kept;
     }
 
     /// The reviewer on #992: a bare call's note goes with its End, and only
