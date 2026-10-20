@@ -1857,9 +1857,50 @@ after a take-over, but now for every turn:
   no-look note) leaves it out. In a turn the lamp wrote itself the look is
   dropped (`LookAsked` with why) and the turn goes on: the skill's answer
   goes to the model, whose next round's words are said, as with the
-  switch off. The journal says `request N called look_for: the look is
-  asked of the coordinator`. Off, the answer goes to the model as before
-  and its words are the look.
+  switch off, with one exception: a search's own turn. A skill's `LookAsked` says `search`; the coordinator
+  (`coordinator::look_note`) follows that search, begun in a turn the
+  person spoke, and marks its own written turns (its newest `lamp_looks`
+  turn and its note's turn: `Written`'s `search`), where the skill's next
+  look (`look_for` with the next place) is taken as in a heard turn. Every
+  other turn the lamp wrote (a hello, a "Sorry?", a skill's say, a
+  reminder, `take_a_look`'s look turn) still drops it, and `take_a_look`
+  is dropped even in a search's turn. #1146's rule was that pictures never
+  chain with nobody speaking; this chain begins only with a person's
+  request, lamp-skills ends it after its last look (look-for-things'
+  `[search]`: 5), and a person who speaks or a stop by hand ends it. The
+  voice keeps its own bound too, for an older lamp-skills or a skill that
+  answers `"look": true` with no `[search]`: a search takes at most 8
+  looks (`look_note::SEARCH_LOOKS_AT_MOST`, mirroring lamp-skills'
+  `SEARCH_LOOKS_AT_MOST`, "1 to 8"). The 8th look's turn is no longer the
+  search's own, so a 9th look asked there is dropped as in any turn the
+  lamp wrote, recorded as `look_dropped` with why "the search took its
+  looks", and no note follows it. The journal says `request N
+  called look_for: the look is asked of the coordinator`. Off, the answer
+  goes to the model as before and its words are the look.
+- **A note to a search left after a look, with `LAMP_SECOND_LOOK_NOTE=on`**
+  (off unless set; only with `LAMP_SECOND_SKILL_LOOK=on` and a full look;
+  step 2 of look-for-things on this route). A look's turn whose answer
+  called nothing in any round is told to the coordinator
+  (`LookNoCall`, before its `TurnComplete`; `Engine::noting_looks`). The
+  coordinator (`coordinator::look_note`) knows which look turns are a
+  skill's search: a skill's `LookAsked` (with `search`; `take_a_look`'s
+  has none) in a turn the person spoke begins a search, one in the
+  lamp's own turn goes on with it, and the search's newest `lamp_looks`
+  turn is the one a `LookNoCall` may be for. Then, once a search, after the
+  answer has played whole and a second of fresh quiet (the holding answer's
+  gates), it sends one written turn on the same session:
+  "Not found yet? Call look_for with the next place: left, right,
+  far_left, then far_right. If you can see it, say where and stop."
+  (`look_note::NOTE`), recorded as `look_note_sent`. It never goes if the
+  person speaks or another turn begins first, the answer was cut short,
+  the session changed, or 3 s pass without quiet; nor for a later look of
+  a search that had its note, nor for an answer that called anything
+  (the next place, or a found one): each is `look_note_dropped` with
+  `why`. A new search asked by the person may have its own note. Nothing
+  waits for it: the lamp's words are said as before, and the note comes
+  after them. The journal says `request N answered a look with nothing
+  called`. The next place the note asks for is looked at: the note's
+  turn is the search's own.
 - **Live route only, so not on this route:**
   the head tap for whom it answers, sight and camera facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).

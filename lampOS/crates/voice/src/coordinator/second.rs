@@ -1603,6 +1603,7 @@ mod tests {
             privacy_generation: 1,
             text: crate::holding_answer::NOTE.into(),
             look: false,
+            search: false,
         }
     }
 

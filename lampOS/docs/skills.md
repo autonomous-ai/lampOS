@@ -651,16 +651,22 @@ the calling session's: no session is renewed while it is owed (at most
 `LOOK_BEGINS_WITHIN` plus `STILL_WAIT`), and if another session is the
 ready one when its turn would go, it is dropped. A call in a turn the
 lamp wrote itself (the look's own turn, a hello) takes no look, nor does
-one whose answer never reached the model; every dropped look is
+one whose answer never reached the model (on the second route a skill's
+search's own turns are the exception: see below); every dropped look is
 recorded as `look_dropped` with `why`. The second route takes a tool's
 look only with `LAMP_SECOND_SKILL_LOOK=on`: its engine then sends
 `LookAsked` for a skills call answered with `"look": true`, says "Let me
 look." itself and ends the turn, and the look's turn goes to its own
 session with the say's note after "When the picture comes:" after its
 question; in a turn the lamp wrote itself the look is dropped and the turn
-goes on to its next round ([second-voice.md](second-voice.md)). Off, it answers the same
+goes on to its next round ([second-voice.md](second-voice.md)). There a search's own turns
+(its look's turn, its note's) take the skill's next look, so
+look-for-things looks at the next place; every other turn the lamp wrote
+still takes none. Off, it answers the same
 tools but sends no `LookAsked`, so there the model's words are the look,
-as before. When the turn is over the look's
+as before. With `LAMP_SECOND_LOOK_NOTE=on` too, a search whose look got an
+answer that called nothing is sent one note to call `look_for` with the
+next place, once a search ([second-voice.md](second-voice.md)). When the turn is over the look's
 written turn goes with the still. The still cannot go in the call's answer
 itself: a function's answer to Gemini Live is words, and the call is
 answered at once while the still takes up to 2.5 s. If no still with

@@ -72,6 +72,7 @@ pub mod early_finalize;
 mod endpoint;
 mod hand;
 mod holding;
+mod look_note;
 mod notices;
 mod second;
 mod service;
@@ -2820,6 +2821,16 @@ fn observe_provider_output(
                 }
             }
         }
+        ProviderOutput::LookNoCall { request, session } => {
+            if let Some(current) = reply.as_ref().filter(|r| r.owner.turn() == *request) {
+                current.cloud.require_output()?;
+                if current.cloud.session != *session {
+                    return Err(io::Error::other(
+                        "a look's answer belongs to another session",
+                    ));
+                }
+            }
+        }
         ProviderOutput::Ended { .. } => cloud.end_output()?,
         ProviderOutput::Started {
             request, session, ..
@@ -4040,6 +4051,8 @@ thread_local! {
     static TEST_MISHEARD_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_HOLDING_ANSWER=on`, without changing process-wide flags.
     static TEST_HOLDING_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_SECOND_LOOK_NOTE=on`, as `TEST_HOLDING_ANSWER`.
+    static TEST_LOOK_NOTE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's task news, in place of the tasks part, as
     /// `TEST_FULL_LOOK`: taken by the loop as it starts.
     static TEST_TASK_NEWS: std::cell::RefCell<Option<crate::task_news::TaskNews>> =
@@ -4452,6 +4465,15 @@ fn conversation_with_gate(
     #[cfg(not(test))]
     let holding_on = crate::holding_answer::on();
     let mut holding_answer = holding::Continuation::new(holding_on);
+    // A skill's search on the second route that the model left after a look
+    // is noted once to go on (`LAMP_SECOND_LOOK_NOTE=on`).
+    let look_note_on = std::env::var(crate::second_provider::LOOK_NOTE_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    #[cfg(test)]
+    let look_note_on = look_note_on || TEST_LOOK_NOTE.with(std::cell::Cell::get);
+    let mut look_note = look_note::LookNote::new(look_note_on);
     let policy_detector = match rig.turn_taking {
         // Duplex gates the scores this detector sees; its rule is unchanged.
         TurnTaking::V1Baseline | TurnTaking::Duplex => TurnDetector::v1_baseline(),
@@ -5038,6 +5060,7 @@ fn conversation_with_gate(
                 second_look =
                     crate::second_look::SecondLook::default().with_the_note(crate::called::on());
                 holding_answer.clear();
+                look_note.clear();
                 last_turn_us = monotonic_us();
                 speech_ended = None;
                 ended_turn = None;
@@ -5417,11 +5440,22 @@ fn conversation_with_gate(
                     request,
                     session,
                     dropped,
+                    search,
                 } => match dropped {
-                    Some(why) if look.full() => record(
-                        trace,
-                        json!({"kind":"look_dropped","turn":request,"by":"tool","why":why,"at_us":monotonic_us()}),
-                    )?,
+                    Some(why) if look.full() => {
+                        // Dropped in a search's last look's turn: the
+                        // search's bound, not only the lamp having
+                        // written the turn.
+                        let why = if look_note.took_its_looks(request) {
+                            "the search took its looks"
+                        } else {
+                            why.as_str()
+                        };
+                        record(
+                            trace,
+                            json!({"kind":"look_dropped","turn":request,"by":"tool","why":why,"at_us":monotonic_us()}),
+                        )?;
+                    }
                     Some(_) => {}
                     None => {
                         if record_tool_look(
@@ -5441,6 +5475,15 @@ fn conversation_with_gate(
                                 .as_ref()
                                 .is_some_and(second::Route::second_active);
                             look_held = Some((request, session, by_second));
+                            // A skill's look on the second route is a
+                            // search's: a new one if the person asked it,
+                            // or one going on in its own written turn.
+                            if search {
+                                let heard = reply.as_ref().is_some_and(|current| {
+                                    current.owner.turn() == request && current.input_sequence > 0
+                                });
+                                look_note.asked(request, heard);
+                            }
                         }
                     }
                 },
@@ -5452,6 +5495,23 @@ fn conversation_with_gate(
                 }
                 ProviderOutput::HoldingAnswer { request, session } => {
                     holding_answer.observed(request, session, rig.provider.boot, reply.as_ref());
+                }
+                ProviderOutput::LookNoCall { request, session } => {
+                    // Only the look's own turn, still in hand on its session.
+                    let current = reply.as_ref().is_some_and(|current| {
+                        current.owner.turn() == request && current.cloud.session == session
+                    });
+                    let owed = if current {
+                        look_note.answered(request, session, rig.provider.boot)
+                    } else {
+                        Err("its turn is not the one in hand")
+                    };
+                    if let Err(why) = owed {
+                        record(
+                            trace,
+                            json!({"kind":"look_note_dropped","turn":request,"why":why,"at_us":monotonic_us()}),
+                        )?;
+                    }
                 }
                 ProviderOutput::Transcript {
                     request,
@@ -5823,6 +5883,7 @@ fn conversation_with_gate(
             }
             last_capture = Some(frame.read_completed_at_us);
             holding_answer.observe_capture(&frame);
+            look_note.observe_capture(&frame);
             session_clock.capture_retained();
             owner.set_capture(
                 now(),
@@ -7329,13 +7390,16 @@ fn conversation_with_gate(
                 )?;
             }
             let sound_finished = current.notice.origin().unshown();
-            holding_answer.settled(
-                turn,
-                matches!(current.cloud.outcome, Some(RequestOutcome::Complete))
-                    && current.delivery_outcome() == "audio_written_unscored"
-                    && !sound_finished,
-                monotonic_us(),
-            );
+            let played_whole = matches!(current.cloud.outcome, Some(RequestOutcome::Complete))
+                && current.delivery_outcome() == "audio_written_unscored"
+                && !sound_finished;
+            holding_answer.settled(turn, played_whole, monotonic_us());
+            if let Some(why) = look_note.settled(turn, played_whole, monotonic_us()) {
+                record(
+                    trace,
+                    json!({"kind":"look_note_dropped","turn":turn,"why":why,"at_us":monotonic_us()}),
+                )?;
+            }
             if !sound_finished
                 && let Some(score) = second_look.finished(turn, said_nothing, monotonic_us())
             {
@@ -7669,6 +7733,14 @@ fn conversation_with_gate(
                             |state| rig.publish(state),
                         )?;
                         last_publish = monotonic_us();
+                        // A search's look's turn goes on with it: the
+                        // skill's next look may be taken there.
+                        if by_tool.is_some()
+                            && let Some(current) = reply.as_ref()
+                            && look_note.looked(turn, current.owner.turn())
+                        {
+                            look_note::mark_search(&mut provider_queue, current.owner.turn());
+                        }
                     }
                 }
             }
@@ -7873,6 +7945,34 @@ fn conversation_with_gate(
             &mut holding_answer,
             holding::Gates {
                 at_us: holding_now_us,
+                cycle_started_us: reminder_cycle_started_us,
+                last_speech_us,
+                last_capture_us: last_capture,
+                session: unasked_session(&cloud, paused),
+                worker: rig.provider.boot,
+                snapshot: &snapshot,
+                admission: &admission,
+                playback: &playback_mask,
+                speaker_pending: speaker_pending.is_some(),
+                submission_draining,
+            },
+            owner,
+            reply,
+            &mut provider_queue,
+            rig.playout_start,
+            trace,
+            |state| rig.publish(state),
+        )? {
+            snapshot = started;
+            last_publish = monotonic_us();
+        }
+        // A skill's search left after a look is noted once to go on, under
+        // the same gates; the person speaking or a new turn drops it.
+        let look_note_now_us = monotonic_us();
+        if let Some(started) = look_note::start(
+            &mut look_note,
+            holding::Gates {
+                at_us: look_note_now_us,
                 cycle_started_us: reminder_cycle_started_us,
                 last_speech_us,
                 last_capture_us: last_capture,
@@ -9829,6 +9929,7 @@ fn commit_written_turn(
         privacy_generation: snapshot.microphone_generation(),
         text: note.to_owned(),
         look,
+        search: false,
     });
     let current = Reply {
         owner: turn,

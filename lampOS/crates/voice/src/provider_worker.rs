@@ -602,6 +602,14 @@ pub enum ProviderInput {
         /// note, if they are open and this worker was told where it is.
         #[serde(default)]
         look: bool,
+        /// The turn goes on with a skill's search a person asked for on the
+        /// second route: its newest look's turn, or the look's note
+        /// (`coordinator::look_note`). A skill's look asked in it is taken,
+        /// though the lamp wrote it (`LAMP_SECOND_SKILL_LOOK`); every other
+        /// turn the lamp wrote takes none. Sent only when true, so the wire
+        /// is as before for every other turn and on the Live route.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        search: bool,
     },
     /// A due occurrence whose durable identity is owned by the coordinator's
     /// consumer. The provider receives data, never permission to run tools.
@@ -718,6 +726,22 @@ pub enum ProviderOutput {
         request: u64,
         session: u64,
         dropped: Option<String>,
+        /// A skill's look on the second route: a search the person asked
+        /// for, which may go on in the lamp's own turns after it
+        /// (`ProviderInput::Written`'s `search`). Never for the route's own
+        /// look call (`take_a_look`), nor on the Live route. Sent only when
+        /// true, so the wire is as before for every other look.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        search: bool,
+    },
+    /// The answer to a look's turn (`Written` with `look`) on the second
+    /// route ended with nothing called in any round
+    /// (`LAMP_SECOND_LOOK_NOTE`): the coordinator may note a skill's search
+    /// once that it can call for the next place. Sent before the request's
+    /// idle `TurnComplete`; no input or speech is granted by it.
+    LookNoCall {
+        request: u64,
+        session: u64,
     },
     /// `check_agent_task` answered `request` with a finished task's news, and
     /// the answer reached the model (#1390): the coordinator puts its `key` on
@@ -1089,6 +1113,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
             | ProviderOutput::HoldingAnswer { request, .. }
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
+        | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         };
@@ -1732,7 +1757,7 @@ async fn serve_with_visual<C: Connect>(
                     if dropped.is_none() {
                         look_owed_until = Some(Instant::now() + LOOK_OWED_AT_MOST);
                     }
-                    output.push_back(Outbound::Output(ProviderOutput::LookAsked { request, session, dropped }));
+                    output.push_back(Outbound::Output(ProviderOutput::LookAsked { request, session, dropped, search: false }));
                 }
                 for news in desk.news_answered() {
                     output.push_back(Outbound::Output(news));
@@ -10092,6 +10117,7 @@ pub(crate) mod tests {
                         request,
                         session,
                         dropped,
+                        ..
                     } => break (request, session, dropped),
                     _ => continue,
                 }

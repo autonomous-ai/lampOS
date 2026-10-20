@@ -1761,6 +1761,19 @@ pub fn serve(
             "lamp-voice second: a skill's answer that asks for a look takes the turn's full look (LAMP_SECOND_SKILL_LOOK)"
         );
         engine = engine.looking_for_skills(skill_call(skill_settings));
+        // A look's turn whose answer called nothing is told so, so that a
+        // skill's search the model left after one look gets one note to go
+        // on (`LAMP_SECOND_LOOK_NOTE=on`).
+        if std::env::var(crate::second_provider::LOOK_NOTE_ENVIRONMENT)
+            .ok()
+            .as_deref()
+            == Some("on")
+        {
+            eprintln!(
+                "lamp-voice second: a look's answer that calls nothing is told to the coordinator (LAMP_SECOND_LOOK_NOTE)"
+            );
+            engine = engine.noting_looks(true);
+        }
     } else if skill_look == Some("on") {
         eprintln!(
             "lamp-voice second: LAMP_SECOND_SKILL_LOOK is on, but there is no full look (LAMP_LOOK_FULL and LAMP_EYES_LOOK_FILE): a skill's look is not taken"
