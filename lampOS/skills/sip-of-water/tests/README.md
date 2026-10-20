@@ -14,7 +14,7 @@ its owner's yes, replaces the written one.
 lamp-skills`, which runs every skill's cases). The shared hour between the
 wellbeing skills, which a case of one skill cannot show, is
 `the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due` in
-`crates/skills/tests/skills.rs`.
+`crates/skills/tests/it/skills.rs`.
 
 | Case | What it holds | Result (`lamp-skills test`, #1685) |
 |---|---|---|

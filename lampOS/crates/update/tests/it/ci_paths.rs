@@ -93,7 +93,7 @@ fn every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths() {
     let mut read = Vec::new();
     for file in &files {
         // This file's own examples, in the test below, are not reads.
-        if file.ends_with("update/tests/ci_paths.rs") {
+        if file.ends_with("update/tests/it/ci_paths.rs") {
             continue;
         }
         let text = fs::read_to_string(file).unwrap_or_default();

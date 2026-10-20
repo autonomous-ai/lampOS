@@ -3,7 +3,7 @@
 The shipped manifest is disabled. No lamp recording has been collected for
 this routine, and this directory is not evidence of a successful lamp run.
 
-Host tests in `crates/skills/tests/daily_engine.rs` load the shipped disabled
+Host tests in `crates/skills/tests/it/daily_engine.rs` load the shipped disabled
 manifest and check its three daily triggers and absent model function. Separate
 test manifests exercise fresh presence and absence, daily claims, reload,
 restart and clock changes. `routine_service.rs` runs the real Skills binary

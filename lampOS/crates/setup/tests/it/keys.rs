@@ -287,7 +287,7 @@ fn only_lamp_clouds_processes_are_the_asker() {
 /// check, writing only the keys' folder, which the reset plan wipes whole.
 #[test]
 fn the_helpers_units_are_as_the_helper_reads_them() {
-    let unit = include_str!("../../../deploy/product/lamp-setup-keys@.service");
+    let unit = include_str!("../../../../deploy/product/lamp-setup-keys@.service");
     assert!(unit.contains(&format!(
         "lamp-setup keys --folder {} --bus-root /run/lampos-bus --enable\n",
         keys::FOLDER
@@ -298,7 +298,7 @@ fn the_helpers_units_are_as_the_helper_reads_them() {
     assert!(unit.contains("RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6\n"));
     assert!(!unit.contains("PrivateNetwork=yes"));
     assert!(!unit.contains("ReadWritePaths=/etc"));
-    let socket = include_str!("../../../deploy/product/lamp-setup-keys.socket");
+    let socket = include_str!("../../../../deploy/product/lamp-setup-keys.socket");
     assert!(socket.contains("ListenStream=/run/lampos-setup-keys/keys.sock\n"));
     assert!(socket.contains("SocketMode=0660\n"));
     assert_eq!(keys::ASKER_UNIT, "lamp-cloud.service");
@@ -309,7 +309,7 @@ fn the_helpers_units_are_as_the_helper_reads_them() {
 /// prefixes, so a moved `Slice=` would refuse every `keys.*` quietly.
 #[test]
 fn the_asker_cgroup_is_the_product_units_slice() {
-    const UNIT: &str = include_str!("../../../deploy/product/lamp-cloud.service");
+    const UNIT: &str = include_str!("../../../../deploy/product/lamp-cloud.service");
     let slice = UNIT
         .lines()
         .find_map(|line| line.strip_prefix("Slice="))

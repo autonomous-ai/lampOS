@@ -4,7 +4,7 @@ use lamp_body::{
     control::{BusPort, Clock, MotorControl, QualifiedEnvelope, Timing},
     runtime::{
         channel::Channels,
-        wire::{Command, Control, Event, Observation},
+        wire::{Command, Control, Event, Motion, Observation},
         worker::Worker,
     },
     trajectory::{JointEnvelope, RawProfile},
@@ -345,7 +345,7 @@ impl Rig {
     pub fn send(&mut self, c: &Command) {
         self.parent.data.send(c, self.clock.now()).unwrap()
     }
-    pub fn first_goal(&mut self) -> super::Motion {
+    pub fn first_goal(&mut self) -> Motion {
         for _ in 0..60 {
             self.step().unwrap();
             if let Some(m) = self.events.iter().find_map(|e| {

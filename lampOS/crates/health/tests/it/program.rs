@@ -2,7 +2,7 @@
 //! serve` on a bus of the test's own, reading a board made of files, with
 //! the test playing the lamp's parts; and `lamp-health` run against it as
 //! a person would run it, for what it prints and the status it ends with.
-mod tree;
+use crate::tree;
 
 use lamp_bus::{Bus, Kind, Notice, Publisher};
 use lamp_health::show;
