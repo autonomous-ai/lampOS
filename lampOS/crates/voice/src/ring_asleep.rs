@@ -159,6 +159,24 @@ pub struct Asleep {
     owed: Arc<Owed>,
     thread: Option<JoinHandle<()>>,
     done: Option<std::sync::mpsc::Receiver<()>>,
+    /// How long stopping waits for the painter: [`STOP_DEADLINE`].
+    stop_deadline: Duration,
+}
+
+/// How long the face waits before it opens the ring, and how long stopping
+/// waits for the painter: [`AFTER`] and [`STOP_DEADLINE`] on a lamp, shorter
+/// in a test, so that it needn't wait them out (#1806).
+#[derive(Clone, Copy)]
+struct Timing {
+    after: Duration,
+    stop_deadline: Duration,
+}
+
+impl Timing {
+    const LAMP: Self = Self {
+        after: AFTER,
+        stop_deadline: STOP_DEADLINE,
+    };
 }
 
 impl Asleep {
@@ -184,7 +202,17 @@ impl Asleep {
         S: FrameSink + 'static,
         F: FnOnce() -> io::Result<AsleepRing<S>> + Send + 'static,
     {
-        Self::spawn(move |stop, owed| paint(open, ceiling, (stop, owed), pulses))
+        Self::start_timed(open, ceiling, pulses, Timing::LAMP)
+    }
+
+    fn start_timed<S, F>(open: F, ceiling: ChannelCeiling, pulses: Pulses, timing: Timing) -> Self
+    where
+        S: FrameSink + 'static,
+        F: FnOnce() -> io::Result<AsleepRing<S>> + Send + 'static,
+    {
+        Self::spawn(timing.stop_deadline, move |stop, owed| {
+            paint(open, ceiling, (stop, owed), pulses, timing.after)
+        })
     }
 
     /// Where the muted wait tells the face of a reminder owed (#1545):
@@ -217,10 +245,15 @@ impl Asleep {
         S: FrameSink + 'static,
         F: FnOnce() -> io::Result<AsleepRing<S>> + Send + 'static,
     {
-        Self::spawn(move |stop, _| paint_tapped(open, ceiling, shows, stop))
+        Self::spawn(STOP_DEADLINE, move |stop, _| {
+            paint_tapped(open, ceiling, shows, stop)
+        })
     }
 
-    fn spawn(paint: impl FnOnce(&AtomicBool, &Owed) -> io::Result<()> + Send + 'static) -> Self {
+    fn spawn(
+        stop_deadline: Duration,
+        paint: impl FnOnce(&AtomicBool, &Owed) -> io::Result<()> + Send + 'static,
+    ) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let owed = Arc::new(Owed::default());
         let flag = stop.clone();
@@ -240,6 +273,7 @@ impl Asleep {
             owed,
             thread,
             done: Some(done),
+            stop_deadline,
         }
     }
 
@@ -261,13 +295,13 @@ impl Asleep {
         let finished = self
             .done
             .take()
-            .is_some_and(|done| done.recv_timeout(STOP_DEADLINE).is_ok());
+            .is_some_and(|done| done.recv_timeout(self.stop_deadline).is_ok());
         if finished || thread.is_finished() {
             let _ = thread.join();
         } else {
             eprintln!(
                 "lamp-voice ring: the asleep face did not stop within {} ms (a ring write is stuck); going on without it",
-                STOP_DEADLINE.as_millis()
+                self.stop_deadline.as_millis()
             );
         }
     }
@@ -279,7 +313,7 @@ impl Drop for Asleep {
     }
 }
 
-/// Wait [`AFTER`]; unless stopped by then, open the ring and paint the
+/// Wait `after` ([`AFTER`] on a lamp); unless stopped by then, open the ring and paint the
 /// breathing face until stopped, then black. While a reminder `owed` may
 /// show, one soft arc goes around it as `pulses` say (#1545).
 fn paint<S: FrameSink>(
@@ -287,8 +321,9 @@ fn paint<S: FrameSink>(
     ceiling: ChannelCeiling,
     (stop, owed): (&AtomicBool, &Owed),
     pulses: Pulses,
+    after: Duration,
 ) -> io::Result<()> {
-    if !wait(AFTER, stop) {
+    if !wait(after, stop) {
         return Ok(());
     }
     let mut ring = open()?;
@@ -416,12 +451,23 @@ mod tests {
         assert!(!opened.load(Ordering::SeqCst));
     }
 
+    /// The face's wait and stop in a test: short, so they aren't waited out.
+    const QUICK: Timing = Timing {
+        after: Duration::from_millis(150),
+        stop_deadline: Duration::from_millis(250),
+    };
+
     #[test]
     fn a_long_wait_paints_and_ends_black_with_the_painter_gone() {
         let frames = Frames::default();
         let sink = frames.clone();
-        let asleep = Asleep::start_with(move || AsleepRing::new(sink), ceiling(48));
-        std::thread::sleep(AFTER + Duration::from_millis(400));
+        let asleep = Asleep::start_timed(
+            move || AsleepRing::new(sink),
+            ceiling(48),
+            Pulses::OWED,
+            QUICK,
+        );
+        std::thread::sleep(QUICK.after + Duration::from_millis(400));
         asleep.stop();
         let frames = frames.0.lock().unwrap();
         // Black on opening, some faces, black on closing; nothing after.
@@ -454,7 +500,12 @@ mod tests {
     fn a_stuck_ring_write_never_keeps_the_wait_from_returning() {
         let stuck = Arc::new(AtomicBool::new(false));
         let flag = stuck.clone();
-        let asleep = Asleep::start_with(move || AsleepRing::new(Stuck(flag)), ceiling(48));
+        let asleep = Asleep::start_timed(
+            move || AsleepRing::new(Stuck(flag)),
+            ceiling(48),
+            Pulses::OWED,
+            QUICK,
+        );
         while !stuck.load(Ordering::SeqCst) {
             std::thread::sleep(Duration::from_millis(20));
         }
@@ -462,7 +513,7 @@ mod tests {
         asleep.stop();
         let took = began.elapsed();
         assert!(
-            took >= STOP_DEADLINE && took < STOP_DEADLINE * 2,
+            took >= QUICK.stop_deadline && took < QUICK.stop_deadline * 2,
             "{took:?}"
         );
     }
@@ -607,8 +658,8 @@ mod tests {
             every: Duration::from_secs(60),
             for_at_most: Duration::from_secs(60),
         };
-        let asleep = Asleep::start_pulsing_with(move || AsleepRing::new(sink), ceiling(48), pulses);
-        std::thread::sleep(AFTER + Duration::from_millis(300));
+        let asleep = Asleep::start_timed(move || AsleepRing::new(sink), ceiling(48), pulses, QUICK);
+        std::thread::sleep(QUICK.after + Duration::from_millis(300));
         let before = frames.0.lock().unwrap().len();
         assert!(before > 2, "{before}");
         asleep.owed().tell(Some(Instant::now()));
