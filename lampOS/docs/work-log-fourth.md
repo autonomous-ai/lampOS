@@ -4921,6 +4921,15 @@ A usage limit paused me from about 00:40 to 06:2x.
   - It times each step to the first audio and the piece's end, with `--kept` as well.
   - Commit `e77f7aa3a` on `fourth/probe-wire-speech`; its gate is running.
 
+## 2026-10-20, 09:36 ICT: claimed, what the lamp said kept as what was heard after a cut-in
+
+- **#2119** (`--wire --speech`): the reviewer found no P1 or P2 at 09:28. The P3 fix is `ecf07a85c` (ElevenLabs' own API by the route's host rule), and its gate is running.
+- **The speed row:** the lamp has no large cut left that isn't someone's already (my 09:28 on #1722). The relay doesn't pass ElevenLabs' websocket input (404); that's on #1934 for the backend.
+- **Claimed** (plan on #1712, 09:36), behind `LAMP_SAID_AS_HEARD=on`:
+  - **The fault:** after a cut-in, the second route's history holds every piece already sent, heard or not. The route sends faster than real time, and a reply holds 30 s of audio.
+  - **The fix:** the coordinator tells the cut-in's Start how much of the reply was played. The route then keeps only the pieces heard, with the piece playing at the cut kept to its played share and an em dash.
+  - Off unless set, with tests, onto #1712.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
