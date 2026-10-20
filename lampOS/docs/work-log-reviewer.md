@@ -1,9 +1,39 @@
 # Reviewer work log
 
+## 2026-10-21 (the same Claude session, after midnight)
+
+Newest first. Times from `date` (+07).
+
+- 01:01 Merged #2335 (#2328's P3s, guard-mode tests) as 81da23a03
+- 00:58 #2336 (#2334 refiled): my P2/P3 closed; first builder's
+- 00:44 #2334 (words only) first read: P2 forget_everything's description still waits for a yes; P3 refusal wording; first builder's
+- 00:39 Merged #2329 (routine_service reload test skips the clock) as a6df543f3
+- 00:33 #2305 at 5f9ca0557: my P3 closed; hook runs outside the switch (harmless, say in body); first builder's
+- 00:32 Merged #2328 (lamp-skills guard-mode tests wait on what they check) as 8cf2f7470
+- 00:25 #2327 (#2323 folded): same tree; first builder's
+- 00:18 #2332 first read: my #2322 P3s closed; first builder's
+- 00:15 #2257 at 0fb4f2a6c: rebase only; first builder's
+- 00:11 #2289 green; first builder's (privacy path), said so
+- 00:05 #2326 (#2324 refiled) read: my three P3s closed/narrowed; two P3s (anyone's yes in the session; any lamp question counts); first builder's
+- 00:03 #2305 at b4b6956f6: my P2 closed (one test line); P3 open; first builder's on green
+
 ## 2026-10-20 (the same Claude session, after midnight)
 
 Newest first. Times from `date` (+07).
 
+- 23:58 #2305 at b378309a9: P2 doesn't build on #1712 (Did::Said 2 args after #2301), P3 caller face ids outlive camera close; (a)/(b) right; first builder's
+- 23:51 #2323 at de61e870a: my P3 closed; fold the two commits
+- 23:49 #2325 first read: no P1/P2, closes my #2316 P3; first builder's
+- 23:48 #2304 first read: no P1/P2, agree Fourth's P3 + one doc P3; gate 307/0, mutation caught; first builder's
+- 23:44 #2323 first read: no P1/P2, closes my #2255 P3; P3 (density not coverage); first builder's
+- 23:40 Merged #2321 (privacy worker gap test, my #2267 P3) as 96a8b3c1a
+- 23:39 #2260 onto lamp-voice: same patch as my 18:07 read; first builder's on green
+- 23:36 #2313 at 89a9250c5: both my P3s closed; first builder's on green
+- 23:35 #2246 in as df9cfac18 (already merged when my call ran)
+- 23:29 #2324 (#2317 refiled) first read: my four in; three P3s on the yes rule (any yes-word, untested window/agrees, typed yes); first builder's
+- 23:29 #2248 at 8a39ab657: fix right; P3 its attention.rs doc comment differs from #2305's, they conflict; first builder's
+- 23:26 #1757 first read (part): no P1/P2 so far, one P3 (250 ms to PCM not sound); first builder's (new speaker/state topic, speaker boundary, needs a lamp)
+- 23:21 #2322 (#2308 refiled) first read: all four of mine in; two P3s (room's lone put-off stops the line; doc comment moved); first builder's
 - 23:18 Merged #2320 (hum deadline race, lamp-skills) as 8d56694ff
 - 23:16 #2301 at 1d7c53ef6: my two P3s closed; first builder's on green
 - 23:14 #2246 rebased onto lamp-voice, same patch; mine on green
