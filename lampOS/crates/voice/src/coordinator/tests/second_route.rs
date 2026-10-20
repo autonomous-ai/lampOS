@@ -105,6 +105,10 @@ struct Script {
     second_packets: usize,
     /// The second route's answers open with these words.
     second_says: Option<&'static str>,
+    /// The second route's first answer comes after a skill's look step
+    /// (`LAMP_SECOND_SKILL_LOOK`, #941): `LookAsked` for the session that
+    /// began it, before its audio.
+    second_looks: bool,
     /// Packets of a wait cue the second route plays before its words.
     second_cue: usize,
     /// What the second route heard the person say, as its recogniser
@@ -167,6 +171,7 @@ impl Script {
             live: vec![live],
             second_packets: 12,
             second_says: None,
+            second_looks: false,
             second_cue: 0,
             second_hears: None,
             speak_again: None,
@@ -374,6 +379,10 @@ struct Peers {
     live_ready_sent: bool,
     /// The capture frame at which the second route's worker exited.
     second_died_at: Option<u64>,
+    /// The session of the second route's last Start.
+    second_session: u64,
+    /// The second route has asked its look (`Script::second_looks`).
+    second_looked: bool,
 }
 
 impl Peers {
@@ -697,6 +706,9 @@ impl Peers {
                     if live || self.script.only {
                         self.live_requests.push(request);
                     }
+                    if !live {
+                        self.second_session = session;
+                    }
                     self.peers[index].queued.push_back(ProviderOutput::Started {
                         request,
                         session,
@@ -791,6 +803,17 @@ impl Peers {
                             });
                             self.finish(index, request);
                             continue;
+                        }
+                        if self.script.second_looks
+                            && !std::mem::replace(&mut self.second_looked, true)
+                        {
+                            self.peers[index]
+                                .queued
+                                .push_back(ProviderOutput::LookAsked {
+                                    request,
+                                    session: self.second_session,
+                                    dropped: None,
+                                });
                         }
                         // A wait cue first: audio with no words.
                         if self.script.second_cue > 0 {
@@ -1204,6 +1227,8 @@ fn run(script: Script) -> Run {
         link_back: false,
         live_ready_sent: false,
         second_died_at: None,
+        second_session: 0,
+        second_looked: false,
     };
     let started = crate::scenario_clock::instant();
     let mut reported = false;
@@ -1467,6 +1492,144 @@ fn the_second_route_s_own_phrase_asks_its_look_after_the_tool_s_is_dropped() {
             .filter(|e| e["kind"] == "look_full_asked")
             .count(),
         1
+    );
+}
+
+/// A skill's look step on the second route (`LAMP_SECOND_SKILL_LOOK`,
+/// #941): the look its worker asks for its own session is taken once the
+/// answer's first audio plays, never before it, and its still goes to that
+/// session as the `lamp_looks` written turn with the picture. Standing by
+/// with Gemini's link gone, and as the only route. Its answer plain, no
+/// look is asked.
+#[test]
+fn a_skills_look_on_the_second_route_takes_the_still_for_its_own_session() {
+    let _one = super::pilot_faults::one_session();
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-skill-{}.jpg",
+        std::process::id()
+    ));
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    let script = |only: bool, looks: bool| Script {
+        only,
+        second: !only,
+        second_looks: looks,
+        // The look's turn has time to go before the run ends.
+        mute_at_frame: Some(500),
+        written: Written::Said(6),
+        ..Script::question(if only {
+            Live::Answer(12)
+        } else {
+            Live::DropLink
+        })
+    };
+    let standing_by = run(script(false, true));
+    let alone = run(script(true, true));
+    let plain = run(script(false, false));
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    for (case, run) in [("standing by", &standing_by), ("alone", &alone)] {
+        let at = |kind: &str| {
+            run.trace
+                .iter()
+                .position(|e| e["kind"] == kind)
+                .unwrap_or_else(|| panic!("{case}: no {kind}: {}", run.summary()))
+        };
+        assert!(
+            run.trace
+                .iter()
+                .any(|e| e["kind"] == "look_asked" && e["by"] == "tool" && e["turn"] == 1),
+            "{case}"
+        );
+        let dropped: Vec<_> = run.events("look_dropped");
+        assert!(dropped.is_empty(), "{case}: {dropped:?}");
+        // Asked of the eyes once the answer is heard, not before.
+        assert!(at("speaker_first_write") < at("look_full_asked"), "{case}");
+        let still: Vec<_> = run.events("look_full_still");
+        assert_eq!(still.len(), 1, "{case}");
+        assert_eq!(still[0]["still"], true, "{case}");
+        // The look's written turn, on the second route's own session.
+        let session = run.seen.second.iter().find_map(|input| match input {
+            ProviderInput::Start { session, .. } => Some(*session),
+            _ => None,
+        });
+        let looks: Vec<_> = run
+            .seen
+            .second
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Written {
+                    session,
+                    text,
+                    look,
+                    ..
+                } => Some((Some(*session), text.as_str(), *look)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            looks,
+            [(session, crate::speak_up::LOOK_FULL_NOTE, true)],
+            "{case}"
+        );
+        assert!(
+            run.trace
+                .iter()
+                .any(|e| e["kind"] == "input_admitted" && e["admission_basis"] == "lamp_looks"),
+            "{case}"
+        );
+    }
+    assert!(plain.events("look_asked").is_empty());
+    assert!(plain.events("look_full_asked").is_empty());
+    assert!(
+        !plain
+            .seen
+            .second
+            .iter()
+            .any(|input| matches!(input, ProviderInput::Written { .. }))
+    );
+}
+
+/// The first builder on this change's plan (20 Oct): a skill's look on
+/// the second route is dropped the moment the person speaks, as every look
+/// is when someone speaking first takes the turn; no look's turn goes.
+#[test]
+fn a_skills_look_on_the_second_route_is_dropped_when_the_person_speaks() {
+    let _one = super::pilot_faults::one_session();
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-skill-cut-{}.jpg",
+        std::process::id()
+    ));
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_looks: true,
+        second_packets: 60,
+        speak_again: Some(When::Accepted(8)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        written: Written::Said(6),
+        ..Script::question(Live::Answer(60))
+    });
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    assert_eq!(run.finished(1)["outcome"], "user_interrupted");
+    let dropped: Vec<_> = run
+        .events("look_dropped")
+        .into_iter()
+        .map(|e| (e["turn"].clone(), e["by"].clone()))
+        .collect();
+    assert_eq!(dropped, [(json!(1), json!("tool"))], "{}", run.summary());
+    assert!(run.events("look_full_still").is_empty());
+    assert!(
+        !run.seen
+            .second
+            .iter()
+            .any(|input| matches!(input, ProviderInput::Written { look: true, .. }))
     );
 }
 

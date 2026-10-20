@@ -4207,6 +4207,307 @@ async fn a_look_asked_by_its_call_goes_to_the_coordinator_and_ends_the_turn() {
     );
 }
 
+/// `LAMP_SECOND_SKILL_LOOK` (#941 on the second route): a skill's call
+/// (`look_for`, `skills/look-for-things`) answered with `"look": true` asks
+/// the coordinator for the turn's full look, as on the Live route, and the
+/// turn ends with the lamp saying it will look, with no round after it. An
+/// answer without the look, a call that is not a skill's, and the switch
+/// off ask for none, and the model is asked again with the answer as before.
+#[tokio::test]
+async fn a_skill_answer_with_a_look_asks_the_coordinator_for_the_turns_look() {
+    let looking = r#"{"next":"Say only \"Let me take a look.\" now.","look":true}"#;
+    let plain = r#"{"next":"Done."}"#;
+    let cases = [
+        ("skill, look, switch on", "look_for", looking, true, true),
+        ("skill, no look, switch on", "look_for", plain, true, false),
+        (
+            "not a skill, look, switch on",
+            "light_on",
+            looking,
+            true,
+            false,
+        ),
+        ("skill, look, switch off", "look_for", looking, false, false),
+    ];
+    for (case, name, answer, on, looks) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Where are my keys?".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "c1",
+                            name,
+                            json!({"thing": "keys"}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("All done."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let answer: Value = serde_json::from_str(answer).unwrap();
+        let tools: ToolRunner = Arc::new(move |_, _, _, _| {
+            let answer = answer.clone();
+            Box::pin(async move { answer })
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .looking_by_call();
+        if on {
+            engine = engine.looking_for_skills(Arc::new(|name| name == "look_for"));
+        }
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let mut asked = None;
+        let mut said = Vec::new();
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+                .await
+                .expect("the turn ends");
+            match event {
+                ProviderOutput::LookAsked {
+                    request,
+                    session,
+                    dropped,
+                } => asked = Some((request, session, dropped)),
+                ProviderOutput::Transcript {
+                    request: Some(_),
+                    text,
+                    ..
+                } if !text.is_empty() => said.push(text),
+                ProviderOutput::TurnComplete { .. } => break,
+                _ => {}
+            }
+        }
+        let rounds = script.asked.lock().unwrap().len();
+        if looks {
+            // On the session that began the turn, for the coordinator's look.
+            assert_eq!(asked, Some((1, 1, None)), "{case}");
+            assert_eq!(said, [LOOKING], "{case}");
+            assert_eq!(rounds, 1, "{case}: no round after the look");
+        } else {
+            assert_eq!(asked, None, "{case}");
+            assert_eq!(said, ["All done."], "{case}");
+            assert_eq!(rounds, 2, "{case}");
+        }
+    }
+}
+
+/// An engine whose every tool answers `answer`, looking by its call and
+/// for `look_for`'s skill, with an eye that always has a picture.
+fn skill_looking(script: Arc<Script>, answer: &str) -> Engine {
+    let answer: Value = serde_json::from_str(answer).unwrap();
+    let tools: ToolRunner = Arc::new(move |_, _, _, _| {
+        let answer = answer.clone();
+        Box::pin(async move { answer })
+    });
+    Engine::with_clock(
+        script,
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .looking_by_call()
+    .looking_for_skills(Arc::new(|name| name == "look_for"))
+    .looking(Arc::new(|| Ok(vec![0xFF, 0xD8, 0xFF])))
+}
+
+/// The turn's `LookAsked` and words said, through its last event.
+async fn look_and_words(engine: &mut Engine) -> (Option<(u64, u64, Option<String>)>, Vec<String>) {
+    let mut asked = None;
+    let mut said = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the turn ends");
+        match event {
+            ProviderOutput::LookAsked {
+                request,
+                session,
+                dropped,
+            } => asked = Some((request, session, dropped)),
+            ProviderOutput::Transcript {
+                request: Some(_),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { .. } => break,
+            _ => {}
+        }
+    }
+    (asked, said)
+}
+
+/// The reviewer on #2218 (P2 1): a skill's say for its picture (`told`'s
+/// "When the picture comes: …") reaches the look turn's model, as it stays
+/// in Gemini's session on Live: after the look turn's question, in the same
+/// user message as the picture, once. The look turn after it has none, nor
+/// a look turn after another turn began.
+#[tokio::test]
+async fn a_skills_note_for_its_picture_goes_once_with_its_look_turn() {
+    const NOTE: &str = "say where it is by something near it.";
+    let looked = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                "look_for",
+                json!({"thing": "keys"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let said = |words: &str| vec![text(words), Ok(ChatEvent::Done)];
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Where are my keys?".to_owned()),
+                Ok("Where is my phone?".to_owned()),
+                Ok("Never mind.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                looked(),
+                said("By the mug."),
+                said("A desk."),
+                looked(),
+                said("All right."),
+                said("Nothing there."),
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let answer = format!(
+        r#"{{"next":"Say only \"Let me take a look.\" now, in those words. When the picture comes: {NOTE}","look":true}}"#
+    );
+    let mut engine = skill_looking(script.clone(), &answer);
+    let look = |request| ProviderInput::Written {
+        request,
+        session: 1,
+        privacy_generation: 1,
+        text: crate::speak_up::LOOK_FULL_NOTE.into(),
+        look: true,
+    };
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(look_and_words(&mut engine).await.0, Some((1, 1, None)));
+    engine.submit(look(2));
+    look_and_words(&mut engine).await;
+    engine.submit(look(3));
+    look_and_words(&mut engine).await;
+    // Another line begins between the look and its turn: the note goes.
+    engine.submit(start(4));
+    engine.submit(audio(4, 1));
+    engine.submit(end(4));
+    assert_eq!(look_and_words(&mut engine).await.0, Some((4, 1, None)));
+    engine.submit(start(5));
+    engine.submit(audio(5, 1));
+    engine.submit(end(5));
+    look_and_words(&mut engine).await;
+    engine.submit(look(6));
+    look_and_words(&mut engine).await;
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 6);
+    let jpeg = [0xFF, 0xD8, 0xFF];
+    assert_eq!(
+        asked[1].last(),
+        Some(&Message::user_seeing(
+            format!(
+                "{}\n\n(The skill you called for this look said what to do with the picture: {NOTE})",
+                crate::speak_up::LOOK_FULL_NOTE
+            ),
+            &jpeg
+        ))
+    );
+    let plain = Message::user_seeing(crate::speak_up::LOOK_FULL_NOTE, &jpeg);
+    assert_eq!(asked[2].last(), Some(&plain), "once");
+    assert_eq!(
+        asked[5].last(),
+        Some(&plain),
+        "let go as another turn began"
+    );
+}
+
+/// A skill's answer's note for its picture: the words after "When the
+/// picture comes:", bounded and cut at a character's end; none without them.
+#[test]
+fn a_skills_note_for_its_picture_is_read_from_its_answer() {
+    let next = |next: &str| json!({ "next": next, "look": true });
+    assert_eq!(
+        picture_note(&next(
+            "Say only \"Let me take a look.\" now. When the picture comes:  say what you see. "
+        )),
+        Some("say what you see.".to_owned())
+    );
+    assert_eq!(
+        picture_note(&next(
+            "Say only \"Let me take a look.\" now. The picture comes after it."
+        )),
+        None
+    );
+    assert_eq!(picture_note(&next("When the picture comes:   ")), None);
+    assert_eq!(picture_note(&json!({ "look": true })), None);
+    assert_eq!(picture_note(&json!({ "next": 3 })), None);
+    let long = picture_note(&next(&format!(
+        "When the picture comes: {}",
+        "é".repeat(800)
+    )))
+    .unwrap();
+    assert!(long.len() <= PICTURE_NOTE_MAX);
+    assert_eq!(long, "é".repeat(PICTURE_NOTE_MAX / 2));
+}
+
+/// The reviewer on #2218 (P2 2): in a turn the lamp wrote itself, a
+/// skill's look is dropped with its why, and the turn goes on: the next
+/// round's words are said, as with the switch off.
+#[tokio::test]
+async fn a_skills_look_dropped_in_a_written_turn_goes_on_to_the_next_round() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "look_for",
+                        json!({"thing": "keys"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("There, by the mug."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = skill_looking(
+        script.clone(),
+        r#"{"next":"Say only \"Let me take a look.\" now. When the picture comes: say where it is.","look":true}"#,
+    );
+    engine.submit(written(1, "(Tell them where the keys are.)"));
+    let (asked, said) = look_and_words(&mut engine).await;
+    assert_eq!(
+        asked,
+        Some((
+            1,
+            1,
+            Some("the turn is one the lamp wrote itself".to_owned())
+        ))
+    );
+    assert_eq!(said, ["There, by the mug."]);
+    assert_eq!(script.asked.lock().unwrap().len(), 2);
+}
+
 #[tokio::test]
 async fn memory_scope_is_bound_before_answer_and_revoked_with_the_turn() {
     use crate::memory_scope::{FaceCache, ScopeLease};
