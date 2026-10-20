@@ -630,10 +630,15 @@ that takes the light (`src/ring_light.rs`). Started with
   covered by the turn for its whole life. The face keeps its own motion,
   following the lamp's voice with its slow two-lobed turn, and takes 60% of
   its colour from the light and 40% from its own warm (`ring_face.rs`,
-  `SKILL_TINT_SHARE`); its least glow, with the voice quiet, becomes that
-  of the light's level, at least level 3 (`SKILL_LEVEL_LEAST`), since the
+  `SKILL_TINT_SHARE`); its least glow, with the voice quiet, becomes level
+  3's (0.44 of the ceiling, `SKILL_SPEAKING_LEVEL`) whatever the light's
+  level. Under it a level 1 or 2 is under Speaking's own least, and the
   ring can't tell a level the skill named from one `lamp-skills` filled in
-  from the light shown, and a level 1 or 2 is under Speaking's own least.
+  from the light shown; over it the voice would have only the gap to the
+  ceiling, 0.90 to 1.0 at level 5, the idle turn's own swing, and the face
+  would read as a lit disc rather than a mouth (Seventh on #2253). At 0.44
+  the colour shows over plain Speaking's 0.26 and the voice still moves it
+  0.44 to 1.0, three quarters of plain Speaking's 0.26 to 1.0.
   Only Speaking: listening, thinking (the amber point), offline, a tap's
   face and rest are as before, and a gesture's accent still rides over the
   tinted face. A self-test over the request, the person's own light, or a
