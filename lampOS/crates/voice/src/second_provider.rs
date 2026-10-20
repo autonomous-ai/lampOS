@@ -301,7 +301,7 @@ pub type NameNote = Arc<dyn Fn(u64) -> Option<&'static str> + Send + Sync>;
 /// request, to the note or nothing.
 pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
 /// Told, by request, that the request's answer began to be heard.
-pub type Heard = Arc<dyn Fn(u64) + Send + Sync>;
+pub type AnswerHeard = Arc<dyn Fn(u64) + Send + Sync>;
 /// What the lamp did, for the rule for whom it answers
 /// (`worker::Heeding::lamp_did`), as the Live worker tells its own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -414,7 +414,7 @@ struct Shared {
     task_waiting: Option<TaskNote>,
     /// With `LAMP_AIR_FACTS=on`: the air's note, when it is due, and what
     /// is told once that request's answer begins to be heard.
-    air: Option<(TaskNote, Heard)>,
+    air: Option<(TaskNote, AnswerHeard)>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
@@ -1254,7 +1254,7 @@ impl Engine {
     /// the request once its answer's first audio goes: only then is the
     /// note spent, so a line cut short before any word keeps it (the
     /// reviewer's P3 on #1960). Before any turn only.
-    pub fn noting_the_air(mut self, note: TaskNote, heard: Heard) -> Self {
+    pub fn noting_the_air(mut self, note: TaskNote, heard: AnswerHeard) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.air = Some((note, heard));
         }
