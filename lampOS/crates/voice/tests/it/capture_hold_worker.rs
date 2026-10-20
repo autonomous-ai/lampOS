@@ -43,6 +43,12 @@ const TICK: Duration = Duration::from_millis(10);
 /// speaker accepted it; the reference ring gives it to the canceller after
 /// five.
 const ECHO_TICKS: usize = 3;
+/// Blocks a run streams when its checks read the last 100 frames (the
+/// canceller's output, its linear part, what the render explains). The
+/// canceller settles within about 100 blocks (#823: the linear part fell
+/// from 3.3e7 to 2.3e5 a 25-block window by block 101 and held there), so
+/// the last 100 of 250 are settled, and 250 still gives `frames.len() >= 200`.
+const SETTLED_BLOCKS: usize = 250;
 
 fn now() -> MonoTime {
     MonoTime::from_micros(monotonic_us())
@@ -763,9 +769,9 @@ fn mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_he
     let name = Microphone::Mic1.device();
     let blocks = hold::blocks_for(name, ReferenceClock::Capture);
     assert_eq!(blocks, 4);
-    let signal = Signal::new(400);
+    let signal = Signal::new(SETTLED_BLOCKS);
     let mut rig = Rig::start(name);
-    rig.stream(&signal, 400);
+    rig.stream(&signal, SETTLED_BLOCKS);
     rig.settle(blocks);
     assert!(rig.started);
     // Four blocks have been read and not handed on. Stop now.
@@ -880,9 +886,9 @@ fn another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_
     warm_up();
     let name = Microphone::Mic2.device();
     assert_eq!(hold::blocks_for(name, ReferenceClock::Capture), 0);
-    let signal = Signal::new(400);
+    let signal = Signal::new(SETTLED_BLOCKS);
     let mut rig = Rig::start(name);
-    rig.stream(&signal, 400);
+    rig.stream(&signal, SETTLED_BLOCKS);
     rig.settle(0);
     assert_eq!(rig.frames.len(), rig.pushed_at.len());
     rig.end_with(Control::Stop);
@@ -927,9 +933,9 @@ fn stop_words_blocks_carry_what_was_asked_only_when_asked() {
     // The raw blocks' power, from the first run, for the linear run's.
     let mut raw_heard = None;
     for source in [Source::Raw, Source::Linear, Source::Processed] {
-        let signal = Signal::new(400);
+        let signal = Signal::new(SETTLED_BLOCKS);
         let mut rig = Rig::start_asking(name, 0, ReferenceRecovery::Off, source);
-        rig.stream(&signal, 400);
+        rig.stream(&signal, SETTLED_BLOCKS);
         rig.settle(blocks);
         rig.end_with(Control::Stop);
         let frames = rig.finish();
