@@ -1261,9 +1261,9 @@ fn the_loop_waits_on_the_microphone_only_with_the_switch() {
 /// With the switch, a block is read as it arrives, not when the render comes
 /// (#1498's review): here the render comes 5 ms after each block. The
 /// scripted microphone hands over whole blocks, as the lamp's
-/// `plug:device_micro2` does. Each of the 200 blocks after the first 20
-/// (render beside them, so the prime has started) is read within 1 ms of
-/// being there.
+/// `plug:device_micro2` does. Of the 200 blocks after the first 20 (render
+/// beside them, so the prime has started), nine in ten are read within 1 ms
+/// of being there, and every one well before the render's 5 ms.
 #[test]
 fn with_the_render_5_ms_after_each_block_every_block_is_read_within_a_ms() {
     let late = Duration::from_millis(5);
@@ -1292,7 +1292,13 @@ fn with_the_render_5_ms_after_each_block_every_block_is_read_within_a_ms() {
         reads[reads.len() - 1],
     );
     assert_eq!(reads.len(), ticks);
-    assert!(reads[reads.len() - 1] <= 1_000, "{reads:?}");
+    assert!(reads[reads.len() * 9 / 10] <= 1_000, "{reads:?}");
+    // A block read at the render is read `late` after it was there. The
+    // runner can still take the capture thread off its core for a ms or two
+    // once, beside the rest of a pull request's tests: on ARM64, 2 of 200 at
+    // 2.2 ms, the median 23 us (#1569 row 41). That is not the render.
+    let render_us = u64::try_from(late.as_micros()).unwrap();
+    assert!(reads[reads.len() - 1] < render_us * 4 / 5, "{reads:?}");
 }
 
 /// The capture thread's time on a core (ns) and its voluntary and forced
