@@ -25,24 +25,30 @@ pub const SIDE: usize = 256;
 /// was trained.
 const MARGIN: f32 = 0.25;
 /// The landmarks it gives, each x, y and z.
-const LANDMARKS: usize = 478;
+pub const LANDMARKS: usize = 478;
 /// The inner lips' middle, upper and lower, and the face's top and chin.
 const UPPER_LIP: usize = 13;
 const LOWER_LIP: usize = 14;
 const BROW: usize = 10;
 const CHIN: usize = 152;
 
-/// The face's box widened by the margin and turned so the eyes are level,
-/// as the model's input: `SIDE` square, red, green and blue from 0 to 1,
-/// row by row (NHWC). Outside the frame is black. `None` for a face whose
-/// eyes sit on one point.
-pub fn crop(picture: &Picture, face: &Face) -> Option<Vec<f32>> {
+/// The eye line's angle in the frame, as its sine and cosine: what [`crop`]
+/// turns the face by. `None` for eyes on one point.
+pub fn eye_line(face: &Face) -> Option<(f32, f32)> {
     let (eye, other) = (face.marks[0], face.marks[1]);
     let (dx, dy) = (other.0 - eye.0, other.1 - eye.1);
     if !(dx.is_finite() && dy.is_finite()) || dx.hypot(dy) < 1e-3 {
         return None;
     }
-    let (sin, cos) = dy.atan2(dx).sin_cos();
+    Some(dy.atan2(dx).sin_cos())
+}
+
+/// The face's box widened by the margin and turned so the eyes are level,
+/// as the model's input: `SIDE` square, red, green and blue from 0 to 1,
+/// row by row (NHWC). Outside the frame is black. `None` for a face whose
+/// eyes sit on one point.
+pub fn crop(picture: &Picture, face: &Face) -> Option<Vec<f32>> {
+    let (sin, cos) = eye_line(face)?;
     let centre = (face.x + face.width / 2.0, face.y + face.height / 2.0);
     let side = face.width.max(face.height) * (1.0 + 2.0 * MARGIN);
     let step = side / SIDE as f32;
@@ -194,6 +200,14 @@ impl Mesh {
 
     /// How open this face's mouth is in this picture.
     pub fn mouth_open(&mut self, picture: &Picture, face: &Face) -> Result<Option<f32>> {
+        Ok(self
+            .landmarks(picture, face)?
+            .and_then(|landmarks| mouth_open(&landmarks)))
+    }
+
+    /// This face's 478 landmarks, x, y and z each, in the crop's pixels
+    /// (0 to [`SIDE`], the eyes level). `None` for a face with no crop.
+    pub fn landmarks(&mut self, picture: &Picture, face: &Face) -> Result<Option<Vec<f32>>> {
         let Some(input) = crop(picture, face) else {
             return Ok(None);
         };
@@ -224,7 +238,7 @@ impl Mesh {
                 landmarks
             }
         };
-        Ok(mouth_open(&landmarks))
+        Ok(Some(landmarks))
     }
 }
 
