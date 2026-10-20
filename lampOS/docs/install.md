@@ -863,6 +863,11 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   not from the lamps, and lamp-4ace's `LAMP.md` and its unit files already
   disagree on builds (updates.md, "Most likely wrong").
 - Two lamps, one board. A third lamp may show another line as its own.
+- The camera's USB node rule (`99-lamp-device.rules`, #2126) gives `video`
+  write access to the ZVCAI camera's USB node, so lamp-eyes can reset a
+  stuck camera. An update reloads udev's rules but triggers nothing, so the
+  rule applies at the next boot or replug of the camera: until then each
+  reset says `not reset: Io(13)` and only the 15 s retry applies.
 - `lamp-cmedia-speaker.service` (the speaker's level, from V1) is the
   image's, not the product's: `robots/lamp/rootfs/etc/systemd/system/`, at
   step 9 (−28 dB), with the `pro` override at step 6 (−31 dB). udev starts it

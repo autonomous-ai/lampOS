@@ -199,7 +199,11 @@ location under `/run`, not another user's writable home. The camera opens with
 `O_RDWR | O_NONBLOCK | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW`; fstat rechecks the
 selected node and a second cooperative descriptor lock is taken. These locks
 do not exclude an unrelated program that ignores them. There are no USB power,
-unbind/rebind, discovery, fallback or camera-reset operations.
+unbind/rebind, discovery or fallback operations. The one reset is
+`linux::reset_usb` (#2126): `USBDEVFS_RESET` on the configured camera's own
+USB node, found by its topology and done only when its vendor and product
+are the expected ones, after its descriptor is closed; lamp-eyes calls it for
+a camera stuck after a privacy close ([eyes.md](eyes.md)).
 
 The node must support single-planar video capture and streaming. Format setting
 and readback must both report the exact requested MJPG dimensions, with a
