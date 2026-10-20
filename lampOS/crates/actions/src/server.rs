@@ -27,7 +27,10 @@ const MAX_REQUEST_BYTES: u64 = 8_192;
 /// How often what can be done is looked at again: a ring owner that starts
 /// or stops changes the list.
 pub const LOOK_AGAIN: Duration = Duration::from_secs(2);
-const IDLE: Duration = Duration::from_millis(50);
+/// The longest the server waits on its socket for a caller before it looks
+/// at the stop flag, its health report and what it can do. A caller is taken
+/// as soon as it connects, not at the end of this wait (#1806).
+pub const IDLE: Duration = Duration::from_millis(50);
 
 /// Write a file whole: beside its place, then moved into it.
 fn put(directory: &Path, name: &str, text: &str) -> io::Result<()> {
@@ -368,7 +371,13 @@ fn serve_configured<S: Mixer, L: Light>(
                     &mut ready,
                 )?;
             }
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => std::thread::sleep(IDLE),
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                // Nobody yet: wait for a caller, at most IDLE. A sleep here
+                // kept each caller waiting for the rest of it, up to 50 ms.
+                if lamp_ipc::readable(&listener, IDLE).is_err() {
+                    std::thread::sleep(IDLE);
+                }
+            }
             Err(error) => {
                 eprintln!("lamp-actions: accept failed: {error}");
                 std::thread::sleep(IDLE);
