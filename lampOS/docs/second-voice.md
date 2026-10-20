@@ -2040,6 +2040,18 @@ after a take-over, but now for every turn:
   read here. The rule's own text call (`attention::called`) still lets out
   a line opening with a stand-in, with or without the switch; for that,
   `LAMP_BUSY_CALLED_STRICT`, next.
+- **A busy room ends a minute after its talk** (`LAMP_BUSY_ENDS_SOONER=on`;
+  the first builder on Queue #1722, 04:00). The room this route keeps
+  (`keeping_room`) ends a busy room a minute after the last talk between
+  people when nothing since was talk or answered (lines held, sounds,
+  silence), not three minutes after (`RoomTold::end_busy_sooner`); a line
+  held only because the room is busy and it wasn't called (`BUSY_UNCALLED`,
+  `BUSY_NAMED_UNTURNED`) is talk with it, so people talking on keep it
+  busy; once the
+  lamp answers, a minute after its first answer since the talk
+  (`RoomTold::end_busy_once_answered`, which this route never turned on
+  before; Live turns it on with `LAMP_GOING_ON_ASKS`). attention.md, "A
+  busy room ends a minute after its talk".
 - **A busy room's call by the text, narrowed** (`LAMP_BUSY_CALLED_STRICT=on`;
   with `--attention`). On #1712's branch the busy room let out "Man, that
   meeting ran long.", "Plan the sprint for tomorrow.", "Mom, can you pick me

@@ -1910,6 +1910,8 @@ pub fn serve(
         engine = engine.keeping_room(keeping_room(
             files.attention && files.spoken_to,
             files.cut_ins_not_talk,
+            std::env::var(crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT)
+                .is_ok_and(|value| value == "on"),
             files.room_file.as_deref(),
             files.bus_root.as_deref(),
         ));
@@ -2630,10 +2632,15 @@ pub(crate) fn run_after(
 /// (`room/state`) at each tick, and kept in its file about once a second.
 /// With `spoken_to` (`--spoken-to` and `--attention`) only talk between
 /// people counts, and with `cut_ins_not_talk` a line said over the lamp is
-/// left out, as on the Live worker.
+/// left out, as on the Live worker. With `ends_sooner`
+/// (`LAMP_BUSY_ENDS_SOONER`) a busy room ends a minute after the last talk
+/// when nothing since was answered, and a minute after the lamp's first
+/// answer since the talk once it was, as Live's does with
+/// `LAMP_GOING_ON_ASKS`.
 pub(crate) fn keeping_room(
     spoken_to: bool,
     cut_ins_not_talk: bool,
+    ends_sooner: bool,
     room_file: Option<&Path>,
     bus_root: Option<&Path>,
 ) -> Box<dyn FnMut(u64) + Send> {
@@ -2641,6 +2648,8 @@ pub(crate) fn keeping_room(
     if let Ok(mut room) = crate::room_told::room().lock() {
         room.leave_cut_ins_out(cut_ins_not_talk);
         room.count_only_talk(spoken_to);
+        room.end_busy_sooner(ends_sooner);
+        room.end_busy_once_answered(ends_sooner);
         if let Some(path) = room_file {
             let (line, boot) = crate::room_told::start_from(
                 path,
@@ -7402,7 +7411,7 @@ mod tests {
         let path = dir.join("room.json");
         let first = path.clone();
         std::thread::spawn(move || {
-            let mut tick = super::keeping_room(false, false, Some(&first), None);
+            let mut tick = super::keeping_room(false, false, false, Some(&first), None);
             let now = monotonic_us();
             {
                 let mut room = crate::room_told::room().lock().unwrap();
@@ -7420,7 +7429,7 @@ mod tests {
         assert!(path.exists(), "the room went to its file");
         let second = path.clone();
         let taken = std::thread::spawn(move || {
-            let _tick = super::keeping_room(false, false, Some(&second), None);
+            let _tick = super::keeping_room(false, false, false, Some(&second), None);
             let mut room = crate::room_told::room().lock().unwrap();
             room.at(monotonic_us())
         })
@@ -8936,7 +8945,7 @@ mod tests {
         let _one = crate::provider_worker::tests::one_thread();
         let busy_after_three = |cut_ins_not_talk: bool| {
             std::thread::spawn(move || {
-                let _tick = super::keeping_room(false, cut_ins_not_talk, None, None);
+                let _tick = super::keeping_room(false, cut_ins_not_talk, false, None, None);
                 let mut room = crate::room_told::room().lock().unwrap();
                 let now = monotonic_us();
                 for request in 1..=3 {
@@ -8952,6 +8961,65 @@ mod tests {
         };
         assert!(!busy_after_three(true), "with the switch: not talk");
         assert!(busy_after_three(false), "without it: talk, and busy");
+    }
+
+    /// `LAMP_BUSY_ENDS_SOONER` on the second route as the only voice (the
+    /// first builder on Queue #1722, 04:00): the room this route keeps ends
+    /// a busy room a minute after the last talk when nothing since was
+    /// answered (`end_busy_sooner`), and a minute after the lamp's first
+    /// answer since the talk when it was, as Live's does
+    /// (`end_busy_once_answered`); without the switch, three minutes after
+    /// the talk either way.
+    #[test]
+    fn as_the_only_voice_an_answer_ends_a_busy_room_a_minute_later_with_the_switch() {
+        use crate::room_told::Room;
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
+        const S: u64 = 1_000_000;
+        // The room around `end` s after the talk, answered `answered` s
+        // after it or not at all.
+        let room_at = |ends_sooner: bool, answered: Option<u64>, end: u64| {
+            std::thread::spawn(move || {
+                let _tick = super::keeping_room(true, false, ends_sooner, None, None);
+                let mut room = crate::room_told::room().lock().unwrap();
+                let start = 1_000 * S;
+                for request in 1..=3 {
+                    room.heard(request, start);
+                    room.ended(request, start);
+                    room.unanswered(request, start);
+                }
+                assert_eq!(room.at(start), Room::Busy);
+                if let Some(answered) = answered {
+                    room.heard(4, start + answered * S);
+                    room.spoke(4, start + answered * S);
+                }
+                let at = [
+                    room.at(start + (end - 1) * S),
+                    room.at(start + (end + 1) * S),
+                ];
+                *room = crate::room_told::RoomTold::new();
+                at
+            })
+            .join()
+            .unwrap()
+        };
+        let ends = [Room::Busy, Room::Quiet];
+        // Not answered: a minute after the talk with the switch.
+        assert_eq!(room_at(true, None, 60), ends, "with, unanswered");
+        assert_eq!(
+            room_at(false, None, 60),
+            [Room::Busy; 2],
+            "without, unanswered"
+        );
+        // Answered 30 s after the talk: a minute after the answer with it.
+        assert_eq!(room_at(true, Some(30), 90), ends, "with, answered");
+        assert_eq!(
+            room_at(false, Some(30), 90),
+            [Room::Busy; 2],
+            "without, answered"
+        );
+        // Without the switch, three minutes after the talk either way.
+        assert_eq!(room_at(false, None, 180), ends, "without, 180 s");
     }
 
     /// Tests' map on #1712 (20:11), (2): `LAMP_SPOKEN_TO=day-and-night` on
@@ -9720,7 +9788,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("lamp-second-room-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
-        let mut tick = super::keeping_room(false, false, None, Some(&root));
+        let mut tick = super::keeping_room(false, false, false, None, Some(&root));
         tick(monotonic_us());
         let told = lamp_bus::Bus::new(&root)
             .unwrap()

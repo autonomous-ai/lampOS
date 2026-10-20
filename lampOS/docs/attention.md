@@ -2132,6 +2132,29 @@ With the switch (`Attention::waits_for_policy`, `Attention::first_output_busy`):
     room and its talk, not the answer, so a voice started again ends busy
     three minutes after the talk, as without the switch, unless it answers
     again (the first builder, 20:58, accepted it).
+- **A busy room ends a minute after its talk** (`LAMP_BUSY_ENDS_SOONER=on`,
+  the second route only; the first builder on Queue #1722, 04:00). "A room
+  is busy while people are talking, not for three minutes after: someone
+  who walks up a minute after a chat and says 'Hey Lamp, good morning!' is
+  talking to the lamp." With the switch, when nothing since the last talk
+  between people was talk or answered (only lines held, `Left::Held`,
+  sounds or silence), busy ends a minute after that talk, not three
+  (`RoomTold::end_busy_sooner`): two people talk to 36 s, and lines held at
+  120, 137 and 159 s are in a quiet room from 96 s, where without it they
+  are in a busy one until 216 s. More talk, a line left alone, keeps it busy
+  a minute from then. **Their talk held in the busy room is still talk:**
+  with the switch a line held only because the room is busy and it wasn't
+  called (`BUSY_UNCALLED`, `BUSY_NAMED_UNTURNED`) counts for the busy
+  room's clock and run, as a Policy hold as not the lamp's does
+  (`RoomTold::judged`; the reviewer's P2 on #2372, the first builder at
+  04:36). Without it, two people talking on in the room they made busy
+  were held line after line, and busy ended a minute after the run that
+  made it, while they talked. Now it stays busy while they talk, and the
+  minute runs from their last line. Once the lamp answers, it ends a minute after its
+  first answer since the talk, as above: the second route turns on
+  `end_busy_once_answered` with the switch, as Live does with
+  `LAMP_GOING_ON_ASKS`. The Live route is unchanged. Tests only
+  (`room_told`, `second_provider::worker`).
 - **When it waits:** the Policy decides as the line's words end, and
   Gemini's first output usually comes later, so the decision is often
   there already and nothing waits. If it is not, the line's first output,
