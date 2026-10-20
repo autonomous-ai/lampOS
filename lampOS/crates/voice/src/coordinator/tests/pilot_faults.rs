@@ -1436,6 +1436,7 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
         provider: spawn("provider"),
         privacy: spawn("privacy"),
         privacy_controls: false,
+        privacy_receipts: false,
         ring: ring.into(),
         camera,
         motor: None,

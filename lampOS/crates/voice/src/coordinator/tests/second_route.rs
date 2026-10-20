@@ -1088,6 +1088,7 @@ fn run(script: Script) -> Run {
         provider: spawn(workers.role),
         privacy: spawn("privacy"),
         privacy_controls: false,
+        privacy_receipts: false,
         ring: Some(spawn("ring")).into(),
         camera: None,
         motor: None,
