@@ -465,8 +465,9 @@ const QUESTION: &[&str] = &[
 ];
 
 /// What the person says just before their name, as a line's last words:
-/// the name still to come. Not "I'm" or "I am" alone: "Yes, I am." ends a
-/// line.
+/// the name still to come, in English and Vietnamese ("tên tôi là", "tôi
+/// tên là", "gọi tôi là", with "mình" or "em" for "tôi"; the reviewer's P3
+/// on #2355). Not "I'm" or "I am" alone: "Yes, I am." ends a line.
 const OPENS_A_NAME: &[&[&str]] = &[
     &["my", "name", "is"],
     &["my", "name's"],
@@ -475,14 +476,32 @@ const OPENS_A_NAME: &[&[&str]] = &[
     &["i", "am", "called"],
     &["the", "name", "is"],
     &["the", "name's"],
+    &["tên", "tôi", "là"],
+    &["tôi", "tên", "là"],
+    &["gọi", "tôi", "là"],
+    &["tên", "mình", "là"],
+    &["mình", "tên", "là"],
+    &["gọi", "mình", "là"],
+    &["tên", "em", "là"],
+    &["em", "tên", "là"],
+    &["gọi", "em", "là"],
 ];
 
-/// Said while a name is found: "My name is, um,".
-const FILLERS: &[&str] = &["um", "uh", "er", "erm", "ah", "eh", "hmm"];
+/// Said while a name is found: "My name is, um,", "Tên tôi là, ờ,".
+const FILLERS: &[&str] = &["um", "uh", "er", "erm", "ah", "eh", "hmm", "ờ", "ừm"];
 
 /// Words that, just before an opening, mean no name follows: "Don't call
 /// me.", "Never call me."
 const NO_NAME_AFTER: &[&str] = &["don't", "dont", "never", "not"];
+
+/// Words a line opens with that make "call me" a request to call them,
+/// whose "?" speech to text often drops: "Can you call me", "Please call
+/// me" (the reviewer's P3 on #2355). "You can call me" still opens a name.
+const CALL_ME_ASKS: &[&str] = &["can", "could", "will", "would", "please"];
+
+/// Words before what a line says: a greeting and the lamp's name, skipped
+/// to find the word it opens with ("Hey Lamp, can you call me").
+const BEFORE_A_LINE: &[&str] = &["hey", "hi", "hello", "ok", "okay", "lamp", "so"];
 
 /// Whether what the person said ends opening their name, the name still to
 /// come: "Hey Lamp, my name is", "You can call me, um,". A line the
@@ -490,7 +509,9 @@ const NO_NAME_AFTER: &[&str] = &["don't", "dont", "never", "not"];
 /// is" and 400 ms of quiet was `model_complete` (0.933), and the name came
 /// as the next line (#2135, the first builder on #1722 at 01:58). Never a
 /// question ("Do you know what my name is?", "Can you call me?"), one asking
-/// what it is ("Tell me what my name is."), or "Don't call me.".
+/// what it is ("Tell me what my name is."), "Don't call me.", or a line that
+/// opens with "can", "could" or "please" before "call me" ("Can you call
+/// me", a call asked for with its "?" lost).
 pub fn opens_a_name(said: &str) -> bool {
     let said = said.replace('\u{2019}', "'");
     if said.trim_end().ends_with('?') {
@@ -507,7 +528,21 @@ pub fn opens_a_name(said: &str) -> bool {
     {
         words.pop();
     }
+    // The word the last sentence opens with, past a greeting and the name.
+    let last_sentence = said
+        .split(['.', '!', '?'])
+        .rfind(|sentence| sentence.chars().any(char::is_alphanumeric))
+        .unwrap_or_default()
+        .to_lowercase();
+    let opens_with = last_sentence
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .find(|word| !word.is_empty() && !BEFORE_A_LINE.contains(word))
+        .unwrap_or_default()
+        .to_owned();
     OPENS_A_NAME.iter().any(|opening| {
+        if *opening == ["call", "me"] && CALL_ME_ASKS.contains(&opens_with.as_str()) {
+            return false;
+        }
         let Some(at) = words.len().checked_sub(opening.len()) else {
             return false;
         };
@@ -1506,6 +1541,11 @@ mod tests {
             "I am called",
             "The name is",
             "My name\u{2019}s",
+            "Chào Lamp, tên tôi là",
+            "Tôi tên là, ờ,",
+            "Lamp ơi, gọi em là",
+            "Hey Lamp, you can call me",
+            "Can you remember? Call me",
         ] {
             assert!(opens_a_name(open), "{open}");
             assert!(!gives_a_name(open), "{open}");
@@ -1522,6 +1562,12 @@ mod tests {
             "What's my name",
             "Remember my name.",
             "My name is Jim, and I'm",
+            "Tên tôi là Lan.",
+            "Tên bạn là gì?",
+            "Can you call me",
+            "Hey Lamp, could you call me.",
+            "Please call me",
+            "Lamp, will you call me",
             "",
         ] {
             assert!(!opens_a_name(not), "{not}");

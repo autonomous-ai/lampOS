@@ -9,12 +9,14 @@
 //! With the switch, once the second route's final words for the turn in
 //! hand end before a name (`known_faces::opens_a_name`), a sound that began
 //! within `second_provider::CARRY_AFTER_END` of the turn's end, before any of
-//! its answer was heard, goes on from it: no rule that keeps an awaited
-//! answer lets it go, and its Start says it goes on from the turn given up,
-//! so the second route asks the two as one line. That route holds the
-//! answer meanwhile (`Engine::waiting_for_a_name`). The keeper's pause
-//! still holds every sound. A sound let go before the words came is not
-//! brought back.
+//! its answer was heard, goes on from it. The answer wait (#1123, with its
+//! words) and the body's motors don't let it go, and its Start says it goes
+//! on from the turn given up, so the second route asks the two as one line.
+//! That route holds the answer meanwhile (`Engine::waiting_for_a_name`). The
+//! keeper's pause, the busy-room hold and asker-first still judge it: they
+//! keep the room's next voice, a colleague's line begun in those 1.5 s, from
+//! being taken as the name (the reviewer's P3 on #2355). A sound let go
+//! before the words came is not brought back.
 
 /// How long after a turn's end a sound may begin and still go on from it.
 const GOES_ON_WITHIN_US: u64 = crate::second_provider::CARRY_AFTER_END.as_micros() as u64;
