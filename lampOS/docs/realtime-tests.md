@@ -596,7 +596,7 @@ test under parallel build load (load average about 25), no failure.
 The reviewer's full serial gate on #844 failed six Expression tests on
 stale inputs (joints 1,263 ms and 2,301 ms old at the step):
 `real_service_subscribes_to_exactly_one_complete_voice_protocol`
-(`tests/rest_replay.rs`), and in `tests/runtime.rs`
+(`tests/it/rest_replay.rs`), and in `tests/runtime.rs`
 `enabled_output_uses_a_new_session_and_expires_after_input_loss`,
 `paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed`,
 `without_a_pause_said_expression_asks_exactly_as_before` and the two
@@ -1527,7 +1527,7 @@ the move fails it.
 The Policy says how it is on the bus once a second (`Diagnostic`, from
 `second()`), and in the same look it looks again for its decisions'
 publisher and for a part listening for the lamp's name. The judges rig
-(`tests/judges.rs`) waited for the next of those reports after publishing
+(`tests/it/judges.rs`) waited for the next of those reports after publishing
 its cues, so each of its seven tests waited about a second. Several of the
 `policy`, `hello` and `progress` tests wait for a report, too.
 

@@ -220,7 +220,7 @@ heard, so `someone` comes back and the skill's ask ends with it.
 
 ## Tests
 
-- `crates/msgs`: the type, its check and its declaration (`tests/presence.rs`);
+- `crates/msgs`: the type, its check and its declaration (`tests/it/presence.rs`);
   `fade_ms`'s bounds and an older request without it (`arbitration.rs`).
 - `crates/eyes`: `away.rs`'s judge (someone within 20 s, nobody counted from
   the last face or voice, nothing when the eyes stop, the count begun again

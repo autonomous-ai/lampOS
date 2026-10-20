@@ -86,7 +86,7 @@ last eight are new behavior coverage that did not exist off Linux:
 | `after_a_stall_a_muted_authority_keeps_the_microphone_closed` | After an overrun, a fresh snapshot that mutes the microphone: `prepare` refuses with `NotPermitted` and the device is not opened again |
 
 The existing Linux tests against ALSA's `null` plugin
-(`crates/audio/tests/capture_linux.rs`) still run through `AlsaCapture`.
+(`crates/audio/tests/it/capture_linux.rs`) still run through `AlsaCapture`.
 
 Results are in [Agent 1's status](../coordination/agent-1.md).
 

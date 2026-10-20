@@ -95,8 +95,8 @@ this build doesn't know, or whose offset newer zone rules gave, is kept unread
 `an_unknown_zone_falls_back_to_the_systems_and_reminders_still_ring`,
 `an_unknown_zone_falls_back_to_the_stored_utc_offset`,
 `with_no_known_zone_or_offset_a_clock_time_is_refused_and_minutes_still_work`
-(`crates/schedule/tests/engine.rs`), `an_unknown_zone_is_a_health_warning_not_a_stop`
-(`tests/runtime.rs`).
+(`crates/schedule/tests/it/engine.rs`), `an_unknown_zone_is_a_health_warning_not_a_stop`
+(`tests/it/runtime.rs`).
 
 `--dir`, `--socket`, and `--zone` are required when enabled. `--bus-root` defaults
 to `/run/lampos-bus` if omitted; supplying it explicitly
@@ -202,7 +202,7 @@ needs a `schema` bump, pinned by `a_new_stored_value_comes_with_a_schema_bump`
 `a_reminder_by_newer_rules_for_a_known_zone_is_kept_unread` and two beside
 it (`tests/forward.rs`),
 `a_stored_reminder_this_build_cannot_read_is_kept_and_the_part_serves`
-(`tests/runtime.rs`). Live
+(`tests/it/runtime.rs`). Live
 requests, clocks, public time descriptors and delivery-ledger inputs retain
 their strict deserializers. The tolerant deadline readers are private to this
 engine's stored items; they do not change a shared digest or wire shape.
@@ -243,7 +243,7 @@ health does for its own (#1554). The folder is listed once a second, at most,
 with the diagnostic, and a folder that can't be listed says nothing rather
 than stopping the part. Removing the file, once someone has looked, ends the
 warning. Test: `a_store_set_aside_is_said_in_health_until_it_is_gone`
-(`crates/schedule/tests/runtime.rs`).
+(`crates/schedule/tests/it/runtime.rs`).
 
 An existing archive name is never clobbered. Rename, sync or replacement failure
 refuses startup and poisons the owner; any already-renamed database remains
@@ -269,8 +269,8 @@ expect at 1, is still refused (corruption, not a newer build). Tests:
 `a_set_aside_cut_before_the_database_rename_joins_its_sidecars_again`,
 `a_stale_leftover_sidecar_is_not_taken_as_the_newer_databases`,
 `each_set_aside_at_the_same_version_keeps_its_own_stamp`
-(`tests/storage.rs`), `a_newer_schedule_database_is_set_aside_and_the_part_serves`
-(`tests/runtime.rs`). A future writer
+(`tests/it/storage.rs`), `a_newer_schedule_database_is_set_aside_and_the_part_serves`
+(`tests/it/runtime.rs`). A future writer
 must bump the JSON schema for new enum values, required fields, raised bounds,
 or optional fields whose omission could change scheduling or delivery behavior.
 
