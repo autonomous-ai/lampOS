@@ -1,6 +1,6 @@
 # The first five minutes
 
-`crates/voice/src/onboarding.rs`, #841. The privacy and near-call (#1803) steps remain behind
+`crates/voice/src/onboarding.rs`, #841. The privacy, near-call (#1803) and giving-way (#1800) steps remain behind
 the onboarding switch. Device qualification is outstanding; local evidence
 and rollout limitations are recorded with each PR.
 
@@ -27,12 +27,12 @@ ready, not paused) and a face is in front of it.
 | 3 | `how_you_sound` | the core onboarding skill requests a short prompt: stay in their usual seat and call the lamp's name once (#1803, below) | three accepted calls make a bar and its file is written: done; five prompts can't reach three, or the calls spread over 10 dB: failed | the prompts and accepted tries (`rise_db`, `score`); the bar in `/var/lib/lampOS/voice/near-call.json` |
 | 4 | `touch` | asks them, in a few words, to touch the top of its head gently, then stays quiet | a head-pad touch from Controls (`controls/touch`, `lamp_msgs/TouchEvent` from `controls`, `source: head`, enabled; `lamp-controls --touch`) after the ask: done. Short of that, after 8 s of quiet, one reminder; 60 s after the ask: failed. The model may only skip it. Not available without the voice's bus (`LAMP_BUS=on`) or the subscription to `controls/touch`; the base strip stays off (#1891) | the outcome only |
 | 5 | `privacy` | led first, before step 1, whenever it is available (see "Physical privacy step" below); the core onboarding skill requests a short invitation naming the verified switch location | a delivered invitation, fresh physical close, the voice's verified microphone cleanup, then a fresh same-source open and normal readiness; the camera's close is not checked | bounded attempt evidence and completion identity |
-| 6 | `giving_way` | placeholder | — | — |
+| 6 | `giving_way` | the core onboarding skill requests a short invitation: take its head gently, move it a little, let go (#1800, below) | in the minute after the invitation's playback, the body says a hand pushed it, a head joint moved more than the body's `HAND_MOVED` (15 counts) from where it was asked to be with its goal held there, and then the hand let go: done; two invitations without that: failed; no body, or the keeper's pause while it is led: `not_available` | the outcome only |
 | 7 | `preferences` | asks about quiet hours and whether it may say hello, one at a time; keeps each as a rule with `keep_rule` (#813) when the provider worker has both `LAMP_MEMORY_DAYS=on` and `LAMP_MEMORY_RULES=on` ([memory.md](memory.md), "What a person teaches and corrects"); without either, or with the legacy memory, there is no `keep_rule` and the model keeps them with `remember` if it has a memory at all and says that is everything | the model calls `setup_step` as soon as it has heard the second answer, before it says anything else (row 10 on lamp-52e6: asked and answered, never reported) | the rules, in memory |
 
-A placeholder is the step of a part another builder owns: whether the body
-gives way (fifth, #780). It is recorded as `not_available` and passed over
-without a word: repeated "that isn't ready yet" in a row would
+A placeholder is the step of a part another builder owns. It is recorded as
+`not_available` and passed over without a word: repeated "that isn't ready
+yet" in a row would
 sound like a machine. Each is marked `PLACEHOLDER (#841)` in the code.
 
 A step the model leads ends with `setup_step {step, outcome}`, outcome
@@ -40,9 +40,9 @@ A step the model leads ends with `setup_step {step, outcome}`, outcome
 done; the model then tells them what to try later). Only the step being
 led is taken; a report of any other is refused and recorded
 (`onboarding_report_refused`). `where_you_sit` is done only by what the
-eyes measure, `touch` only by what Controls feels, and `how_you_sound` and
-`privacy` only by their measured evidence: the model may only skip them, and
-the worker refuses any other
+eyes measure, `touch` only by what Controls feels, and `how_you_sound`,
+`privacy` and `giving_way` only by their measured evidence: the model may
+only skip them, and the worker refuses any other
 outcome with words it can say. Never reported, a step is
 failed after 90 s once the room has been quiet for 20 s, and the walk goes
 on. Nobody in front of the lamp for 30 s: the step being led is dropped and
@@ -52,11 +52,11 @@ paused, and the step being led is asked again afterwards.
 
 ## Movement during onboarding
 
-Onboarding does not request nods or gestures for placement, identity, touch, privacy
-or preferences. Only a future qualified giving-way step may move the body while
-the person is at the arm. That step remains unavailable until the body owner
-supplies its yield/release evidence; ordinary safety and physical controls
-continue to own their existing reactions.
+Onboarding does not request nods or gestures for placement, identity, touch,
+privacy or preferences. Only the giving-way step asks the body for one move, a `nod`, once
+it is done, after the hand has let go. The step itself asks the body for
+nothing: the body gives way to a hand by its own rule (`--give-way`,
+[body.md](body.md)); ordinary safety and physical controls keep their reactions.
 
 ## A step that was not ready, offered later
 
@@ -317,3 +317,67 @@ Tests: `onboarding::near_flow_tests`, `onboarding::storage::tests::the_near_call
 and the coordinator's held-write test; the record is in
 [verification/onboarding-near-call-host-20261019](verification/onboarding-near-call-host-20261019/README.md).
 Not shown: a lamp run with a person.
+
+## Giving way (#1800)
+
+The lamp invites its person to move its head gently by hand, gives way, and
+says so. The runner is `crates/voice/src/onboarding/giving_way.rs`, modelled on
+the near-call step: one exact invitation token on `onboarding/pending`
+(`step: giving_way`), asked for by the same core skill, and only the
+invitation's complete playback opens a try. It runs the same on Gemini Live and
+on the second route (`LAMP_VOICE_ROUTE=second`): the invitation is a written
+turn to the coordinator's `rig.provider`, whichever route that is.
+
+**The rule it uses is the body's** (Fifth's #780, [body.md](body.md), "Giving
+way to a hand" and "A hand on the bus"): a joint that gave way and is then more
+than `HAND_MOVED` counts (15, `lamp_body::HAND_MOVED`, used by
+`in_hand_after` in `crates/body/src/body.rs`) from where it gave way was moved
+by a hand; one within `HAND_MOVED` of its goal is not in a hand. No new number
+is made. From the bus, in the minute after the invitation's end (Unix
+milliseconds by the headers, as near-call's; the body's own `since_us` is its
+monotonic clock and is never read as a time):
+
+1. `body/joint_states` with no hand on it: each head joint's goal (`base_yaw`,
+   `head_pitch`, `head_roll`), where it was asked to be.
+2. `body/hand` says `pushed`.
+3. While it does, a head joint is more than `HAND_MOVED` from that goal and its
+   own goal is within `HAND_MOVED` of where it is: the hand moved it and the
+   body holds it there (it gave way, under `return` and `stay` alike; a body
+   that pushes back keeps its goal and is not counted).
+4. `body/hand` says not pushed: done, and the lamp says so.
+
+A push that does not move the head that far (a bump), a hand still on it when
+the minute ends, a reading from before the invitation ended, from another
+publisher, unparseable, non-finite or with a missing head joint, a body that
+began again or lost a message mid-push (that push is not judged), and a Unix
+clock more than 1 s apart from the monotonic one over the try, are not done. A
+minute without it asks once more; two invitations without it: failed, and the
+lamp says they can redo the setup later. The minute is the one "where you sit"
+gives (`SIT_GIVE_UP_US`), and two invitations are the privacy step's budget.
+
+The model can only skip it (`setup_step giving_way skipped`); a skip, a redo,
+nobody there for 30 s or the keeper's pause drops the try in flight, so later
+evidence is not counted. Without a body (`LAMP_BODY_MOOD_SOCKET` unset), the bus or the
+say service it is `not_available`, and the pause while it is led records
+`not_available` too; either is offered again later as any such step. The
+invitation budget is kept with the walk: `progress.json` gains
+`giving_way_tries` (at most 2, a file with more is refused whole), committed
+before each invitation is published, as near-call's prompts are; an offer
+never handed to the model gives its try back. So a voice restart or a mute's
+end, which rebuild the walk, cannot ask a third time: a walk rebuilt with both
+spent fails the step. A redo starts the count again. Evidence
+is judged as it is drained from the bus (at most 32 a topic every 20 ms, no
+waiting); the outcome is then kept by the storage worker like any other, and a
+held write neither holds the loop nor says done before it lands.
+
+Tests: `onboarding::giving_way_flow_tests` (a fake body on a scripted clock:
+done only by a hand that moves the head and lets go, the model refused; a hand
+still on, two unfelt tries failing; a bump, a body pushing back, a restart, a
+forged publisher and early evidence not done; a clock jump; no body and the
+pause `not_available`; a skip and a redo ignoring later evidence; a held
+progress write; a rebuilt walk not asking a third time; a corrupt kept count
+refused). The record is in
+[verification/onboarding-giving-way-host-20261019](verification/onboarding-giving-way-host-20261019/README.md).
+No coordinator test drives an onboarding invitation through the say service on
+either route (privacy and near-call have none either). Not shown: a lamp run
+with a person, and the latency from the hand letting go to the lamp's word.
