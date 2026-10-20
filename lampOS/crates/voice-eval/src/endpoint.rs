@@ -8,8 +8,17 @@
 //! it fails when the worker's newest state isn't `ready`, or when an end of
 //! speech fell back because the worker failed. Counts and states only: no
 //! words.
+//!
+//! A long session rotates its records, and the worker's states, written as it
+//! starts, can be rotated out (lamp-4ace, the first builder on #1722, 20 Oct
+//! 12:13: 52 ends `model_complete`, and "never started" said of a worker that
+//! ran). With no state in the records, an end the model decided shows the
+//! worker ran: it is taken as ready, and said to be inferred.
 use serde_json::Value;
 use std::{collections::BTreeMap, fmt};
+
+/// The bases of an end of speech the worker's model decided.
+pub const MODEL_BASES: [&str; 2] = ["model_complete", "model_uncertain"];
 
 /// A session's end of speech.
 #[derive(Debug, Default, PartialEq)]
@@ -73,10 +82,26 @@ impl Summary {
         self.bases.values().sum()
     }
 
+    /// The ends of speech the worker's model decided: only a worker that
+    /// ran decides one.
+    pub fn model_ends(&self) -> usize {
+        MODEL_BASES
+            .iter()
+            .filter_map(|basis| self.bases.get(*basis))
+            .sum()
+    }
+
+    /// No state in the records, but ends the model decided: the worker ran,
+    /// and its states were rotated out.
+    pub fn inferred_ready(&self) -> bool {
+        self.states.is_empty() && self.model_ends() > 0
+    }
+
     /// What is wrong, one line each; none when the end of speech worked.
     pub fn faults(&self) -> Vec<String> {
         let mut faults = Vec::new();
         match self.newest() {
+            None if self.inferred_ready() => {}
             None => faults.push(
                 "no state of the end-of-speech worker in the session: it never started".to_owned(),
             ),
@@ -103,15 +128,17 @@ impl fmt::Display for Summary {
             .iter()
             .map(|(_, state, _)| state.as_str())
             .collect();
-        writeln!(
-            out,
-            "end-of-speech worker: {}",
-            if states.is_empty() {
-                "none".to_owned()
-            } else {
-                states.join(", ")
-            }
-        )?;
+        let worker = if self.inferred_ready() {
+            format!(
+                "ready, inferred: no state in these records (rotated out), and {} ends decided by the model",
+                self.model_ends()
+            )
+        } else if states.is_empty() {
+            "none".to_owned()
+        } else {
+            states.join(", ")
+        };
+        writeln!(out, "end-of-speech worker: {worker}")?;
         let bases: Vec<String> = self
             .bases
             .iter()
@@ -223,6 +250,42 @@ mod tests {
         let summary = of(&lines, 50);
         assert_eq!(summary.ends(), 1);
         assert!(summary.faults().is_empty(), "{:?}", summary.faults());
+    }
+
+    #[test]
+    fn with_its_states_rotated_out_a_worker_whose_model_decided_ends_is_ready() {
+        // lamp-4ace, 20 Oct: the start records rotated out of a long session.
+        let lines = [
+            end(10, "model_complete", None),
+            end(20, "model_uncertain", None),
+            end(30, "silence_fallback", Some("short")),
+        ];
+        let summary = of(&lines, 0);
+        assert!(summary.inferred_ready());
+        assert!(summary.faults().is_empty(), "{:?}", summary.faults());
+        assert_eq!(
+            summary.to_string(),
+            "end-of-speech worker: ready, inferred: no state in these records (rotated out), \
+             and 2 ends decided by the model\n\
+             ends of speech: 3: model_complete 1, model_uncertain 1, silence_fallback 1 (short 1)\n"
+        );
+        // An end that fell back because the worker failed is still a fault.
+        let lines = [
+            end(10, "model_complete", None),
+            end(20, "silence_fallback", Some("failed")),
+        ];
+        assert_eq!(
+            of(&lines, 0).faults(),
+            ["1 of 2 ends of speech fell back because the worker failed"]
+        );
+        // Only the arm's ends count: one the model decided before it is not
+        // the worker running in it.
+        let lines = [
+            end(10, "model_complete", None),
+            end(100, "silence_fallback", Some("short")),
+        ];
+        assert!(!of(&lines, 50).inferred_ready());
+        assert_eq!(of(&lines, 50).faults().len(), 1);
     }
 
     #[test]

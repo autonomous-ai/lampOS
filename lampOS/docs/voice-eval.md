@@ -688,8 +688,13 @@ prints two lines: the end-of-speech worker's states in time order
 of speech by their basis (`local_endpoint`'s `endpoint`: `model_complete`,
 `model_uncertain`, `silence`, `silence_fallback` with each fallback's
 reason). It exits 1, with a `FAULT:` line each, when the worker's newest
-state isn't `ready`, when no state was recorded, or when an end of speech
-fell back because the worker failed. `N` is the arm's start on the voice's
+state isn't `ready`, when no state was recorded and no end was decided by the
+model, or when an end of speech fell back because the worker failed. A long
+session rotates its records, and the worker's states, written as it starts,
+can go with the oldest (lamp-4ace, the first builder on #1722, 20 Oct 12:13).
+With no state in the records but ends the model decided (`model_complete`,
+`model_uncertain`), the worker ran: it says `ready, inferred: no state in
+these records (rotated out)` and is no fault. `N` is the arm's start on the voice's
 clock (`at_us`): only the ends from it on are counted, while a worker state
 set before it still holds. Counts and states only, no words.
 

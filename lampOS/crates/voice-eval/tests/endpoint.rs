@@ -98,6 +98,66 @@ fn since_counts_only_the_arms_ends() {
     );
 }
 
+/// lamp-4ace, 20 Oct (the first builder on #1722, 12:13): a long session
+/// rotated its records to `events-2` and `events-3`, and the worker's states,
+/// written as it started, went with the first two. Its model decided ends, so
+/// it ran: ready, said as inferred, and no fault. With no end the model
+/// decided, it is a fault still.
+#[test]
+fn a_session_whose_worker_states_rotated_out_is_judged_by_its_ends() {
+    let end = |at: u64, basis: &str, fallback: &str| {
+        format!(
+            r#"{{"kind":"local_endpoint","turn":1,"at_us":{at},"endpoint":{{"basis":"{basis}","silence_ms":400,"probability":null,"fallback":{fallback}}}}}"#
+        )
+    };
+    let rotated = format!(
+        "{}\n{}\n",
+        end(9_000_000, "model_complete", "null"),
+        end(9_500_000, "model_complete", "null")
+    );
+    let later = format!(
+        "{}\n{}\n",
+        end(10_000_000, "model_uncertain", "null"),
+        end(11_000_000, "silence_fallback", "\"short\"")
+    );
+    let dir = session(
+        "rotated",
+        &[
+            ("metadata/events-2.jsonl", &rotated),
+            ("metadata/events-3.jsonl", &later),
+        ],
+    );
+    let output = run(&[dir.to_str().unwrap()]);
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(output.status.code(), Some(0), "{text}");
+    assert_eq!(
+        text,
+        "end-of-speech worker: ready, inferred: no state in these records (rotated out), \
+         and 3 ends decided by the model\n\
+         ends of speech: 4: model_complete 2, model_uncertain 1, silence_fallback 1 (short 1)\n"
+    );
+    // Rotated, and no end the model decided: still a fault.
+    let silent = format!(
+        "{}\n{}\n",
+        end(9_000_000, "silence_fallback", "\"short\""),
+        end(9_500_000, "silence_fallback", "\"failed\"")
+    );
+    let dir = session("rotated-silent", &[("metadata/events-3.jsonl", &silent)]);
+    let output = run(&[dir.to_str().unwrap()]);
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(output.status.code(), Some(1), "{text}");
+    assert!(
+        text.contains(
+            "FAULT: no state of the end-of-speech worker in the session: it never started"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains("FAULT: 1 of 2 ends of speech fell back because the worker failed"),
+        "{text}"
+    );
+}
+
 #[test]
 fn a_folder_with_no_records_fails_too() {
     // Nothing to show the end of speech worked: the arm fails, as every
