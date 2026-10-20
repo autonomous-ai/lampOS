@@ -4,6 +4,28 @@
 
 Newest first. Times from `date` (+07).
 
+- 21:50 #2311 first read: three P3s (text waits on the round; told twice for seconds; lost publish kept as told); for the first builder (privacy)
+- 21:51 #2309 first read: three P3s (10 s vs Harness's 60 s start wait; no failed-sign-in test; doc comment moved); mine on green + gate
+- 21:52 #2243 retargeted onto lamp-voice: same patch as my 16:21 read; first builder's (on by default, real lines)
+- 21:53 #2308 gate added: 48/0, mutation caught
+- 21:54 #2306 at ac7da1a5c: my two P3s closed (one path in both reset plans; session-only note); first builder's
+- 21:56 #2305 gate added: 427/0, mutation caught, batch with #2248 clean
+- 21:58 #2280 at e0a6b77bd: docs-only change, my 21:07 read stands; first builder's after #2218/#2266
+- 22:02 Merged #2307 (Devin Cloud stopped as done; written wait) as dfc5f73c0; #1854 stays open (part of)
+- 22:03 #2257 at ec1b22bd3: rebase onto #1712 after #2294 only; first builder's on green
+- 22:05 Merged #2278 (skill light tints Speaking at level 3's glow, #2253 follow-up) as bf5339971
+- 22:06 #2265 at b3f1342d7: mark fixed (answered aloud), P2 down to the named 8 s window, first builder's; one commit
+- 22:10 #2312 first read: no P1/P2, closes #2293's P3s; first builder's (worker end on stale authority, every lamp)
+- 23:04 #2301 re-read at a8f23c8ad: my P2 closed; two P3s (words'-end half untested, chain unbounded); needs rebase onto #1712; first builder's
+- 23:05 Merged #2309 (daemon start after sign-in by code) as 0a74d0906; P3: failed-sign-in half of the test doesn't pin (mutation passes)
+- 23:06 #2317 first read: P2 (guard refuses the yes forget_everything waits for), three P3s; first builder's (on by default)
+- 23:07 #2005 at 4e1dcb780: rebase only, peer read holds; first builder's on green
+- 23:08 #2313 first read: no P1/P2, two P3s (any turned face counts; name note still tells); first builder's
+- 23:09 #2320 first read: no finding, agree with peer read; mine on gate
+- 23:12 #2314/#2316 after-merge notes: no finding; #2316 P3 (read not bounded)
+- 23:14 #2246 rebased onto lamp-voice, same patch; mine on green
+- 23:16 #2301 at 1d7c53ef6: my two P3s closed; first builder's on green
+- 23:18 Merged #2320 (hum deadline race, lamp-skills) as 8d56694ff
 - 18:10 2283 (#2268 refiled): P2 fixed; new P2 (flaky test shares the global thread, 5 of 12 runs); first builder's
 - 18:13 2267 (merged) post-merge note: no P1/P2, one P3
 - 18:13 2289 ring lease reader resync: no P1/P2, one P3; first builder's
