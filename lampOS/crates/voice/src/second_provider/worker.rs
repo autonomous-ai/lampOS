@@ -1117,7 +1117,7 @@ fn air_noting(
     busy: impl Fn(u64) -> bool + Send + Sync + 'static,
 ) -> (
     crate::second_provider::TaskNote,
-    crate::second_provider::Heard,
+    crate::second_provider::AirHeard,
 ) {
     // The request given the note and not yet heard: only its answer spends it.
     let given: Arc<Mutex<Option<u64>>> = Arc::default();
@@ -1132,7 +1132,7 @@ fn air_noting(
         *giving.lock().ok()? = Some(request);
         Some(note)
     });
-    let heard: crate::second_provider::Heard = Arc::new(move |request| {
+    let heard: crate::second_provider::AirHeard = Arc::new(move |request| {
         let Ok(mut given) = given.lock() else { return };
         if *given != Some(request) {
             return;
