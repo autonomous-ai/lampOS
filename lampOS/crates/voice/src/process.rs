@@ -1225,6 +1225,7 @@ fn second_route_worker_environment(
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
+        crate::second_provider::LOOK_NOTE_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::speaking_faces::EYES_ENVIRONMENT,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
@@ -1279,6 +1280,7 @@ mod tests {
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
+            crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
             crate::speaking_faces::EYES_ENVIRONMENT,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
@@ -1662,6 +1664,7 @@ mod tests {
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
+                    || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
@@ -1757,6 +1760,7 @@ mod tests {
                     "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_KNOWN_NAMES=on",
+                    "LAMP_SECOND_LOOK_NOTE=on",
                     "LAMP_SECOND_MEMORY_HITS=on",
                     "LAMP_SECOND_OPEN_NAME=on",
                     "LAMP_SECOND_PREPARED=on",

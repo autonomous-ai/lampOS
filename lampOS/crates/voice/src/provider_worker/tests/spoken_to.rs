@@ -393,6 +393,7 @@ async fn after_the_lamps_own_turn(own: OwnTurn) -> bool {
             privacy_generation: rig.snapshot.microphone_generation(),
             text: "Tell them the task they gave you is done.".to_owned(),
             look: false,
+            search: false,
         })
         .unwrap();
     assert!(matches!(
@@ -489,6 +490,7 @@ async fn after_queued_news(cancelled: bool) -> bool {
             privacy_generation: rig.snapshot.microphone_generation(),
             text: "Tell them the task they gave you is done.".to_owned(),
             look: false,
+            search: false,
         })
         .unwrap();
     assert!(matches!(

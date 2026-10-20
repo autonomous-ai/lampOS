@@ -319,6 +319,25 @@ impl Drop for Pump {
     }
 }
 
+/// The sending end of [`HandControls::with_test_sender`].
+#[cfg(test)]
+pub(crate) struct TestControls {
+    sender: SyncSender<Queued>,
+    shared: Arc<Shared>,
+}
+
+#[cfg(test)]
+impl TestControls {
+    /// Queues one Controls state, as the bus pump does.
+    pub(crate) fn send(&self, state: ControlsState) {
+        assert!(enqueue(
+            &self.sender,
+            &self.shared,
+            Input::State(Box::new(state))
+        ));
+    }
+}
+
 pub struct HandControls {
     options: ControlsOptions,
     receiver: Receiver,
@@ -382,6 +401,30 @@ impl HandControls {
         )?;
         enqueue(&sender, &owner.shared, Input::State(Box::new(state)));
         Ok(owner)
+    }
+
+    /// As [`Self::with_test_state`], with nothing queued yet: the test
+    /// sends Controls' states through the returned end when it chooses,
+    /// as the bus pump queues them.
+    #[cfg(test)]
+    pub(crate) fn with_test_sender(
+        clock_id: &str,
+        started_us: u64,
+    ) -> io::Result<(Self, TestControls)> {
+        let (sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
+        let shared = Arc::new(Shared::default());
+        let owner = Self::from_parts(
+            ControlsOptions {
+                stop: true,
+                ..Default::default()
+            },
+            clock_id,
+            MuteRecord::new(clock_id)?,
+            input,
+            Arc::clone(&shared),
+            started_us,
+        )?;
+        Ok((owner, TestControls { sender, shared }))
     }
 
     /// As [`Self::with_test_state`], for the head pads: their state, then
