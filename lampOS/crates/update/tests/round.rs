@@ -2124,6 +2124,10 @@ impl lamp_update::install::Host for InstallHost {
         Ok(())
     }
 
+    fn harness_version(&mut self, _: &str, _: &str) -> Result<String, String> {
+        Ok(String::new())
+    }
+
     fn restart(&mut self, _: &str) -> Result<(), String> {
         Ok(())
     }
