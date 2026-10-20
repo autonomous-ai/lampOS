@@ -237,11 +237,11 @@ fn shadow_and_enable_change_only_existing_authority_not_electrical_evidence() {
 #[test]
 fn privacy_records_have_strict_payload_shape_and_inherit_replay_bounds() {
     let records =
-        touch_replay::read(include_bytes!("../fixtures/privacy-touch-replay.jsonl").as_slice())
+        touch_replay::read(include_bytes!("../../fixtures/privacy-touch-replay.jsonl").as_slice())
             .unwrap();
     assert_eq!(records.len(), 4);
     let mut value: serde_json::Value = serde_json::from_str(
-        include_str!("../fixtures/privacy-touch-replay.jsonl")
+        include_str!("../../fixtures/privacy-touch-replay.jsonl")
             .lines()
             .next()
             .unwrap(),

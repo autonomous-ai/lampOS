@@ -545,7 +545,7 @@ fn a_pause_in_a_reply_is_said_to_be_silent_at_the_echo() {
 /// -26 dBFS) before the lamp has spoken, and, after it has spoken and an
 /// alignment is held, in that room and in a quiet one, where no search runs
 /// but the held alignment is still fitted every block: `cargo test --release
-/// -p lamp-audio --test evidence measure_a_silent_render_block -- --ignored
+/// -p lamp-audio --test it evidence::measure_a_silent_render_block -- --ignored
 /// --nocapture`.
 #[test]
 #[ignore]

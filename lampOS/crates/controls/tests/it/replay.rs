@@ -6,9 +6,9 @@ use lamp_msgs::{ControlFault, ControlIntent, Gesture};
 use std::io::{self, Write};
 
 fn fixture() -> (Config, Vec<Record>) {
-    let config = serde_json::from_str(include_str!("../fixtures/controls.json")).unwrap();
+    let config = serde_json::from_str(include_str!("../../fixtures/controls.json")).unwrap();
     let records =
-        replay::read(include_bytes!("../fixtures/hand-controls.jsonl").as_slice()).unwrap();
+        replay::read(include_bytes!("../../fixtures/hand-controls.jsonl").as_slice()).unwrap();
     (config, records)
 }
 

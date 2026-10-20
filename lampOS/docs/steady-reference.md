@@ -132,7 +132,7 @@ nothing lost); and where the echo sits as the canceller sees it.
 
 ## The two measures, before and after
 
-`cargo test --release -p lamp-audio --test steady_reference -- --include-ignored --nocapture`,
+`cargo test --release -p lamp-audio --test it steady_reference:: -- --include-ignored --nocapture`,
 on the M2 Max (macOS) and on its Linux ARM64 virtual machine, one run each,
 the same figures to the last digit on both (the rig is deterministic); 60 s
 scenes, the first 6 s not measured.
@@ -170,7 +170,7 @@ What it shows:
   and the person's level against it is lower. The rig shows the direction
   and the size of the effect, not the lamp's.
 
-The default tests (`cargo test -p lamp-audio --test steady_reference`,
+The default tests (`cargo test -p lamp-audio --test it steady_reference::`,
 7 s in a debug build) hold the findings without the canceller: as given the
 echo moves over more than 40 ms; steadied it is within 1 ms of where it is
 held for more than 70% of a 45 s scene (82% measured) and within one step

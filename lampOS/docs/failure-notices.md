@@ -301,7 +301,7 @@ cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -
 cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-voice --lib options:: -- --test-threads=1
 cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-voice --lib playback:: -- --test-threads=1
 cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-voice --lib fixture_provider:: -- --test-threads=1
-cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-audio --test notice -- --test-threads=1
+cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-audio --test it notice:: -- --test-threads=1
 cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-voice --test process --test privacy_state -- --test-threads=1
 cargo build --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-voice --bin lamp-voice
 ```

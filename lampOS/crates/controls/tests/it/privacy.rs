@@ -98,7 +98,7 @@ fn only_exact_on_selects_the_separate_fixed_wiring() {
     }
     assert!(privacy::selected(Some(OsStr::new("on"))));
     let pins: lamp_controls::pins::PinsConfig =
-        serde_json::from_str(include_str!("../fixtures/privacy-pins.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/privacy-pins.json")).unwrap();
     pins.check(&Config::default()).unwrap();
     let original = pins.privacy.unwrap();
     for edit in 0..4 {
@@ -117,7 +117,7 @@ fn only_exact_on_selects_the_separate_fixed_wiring() {
 fn the_privacy_line_cannot_also_be_a_button_or_head_pad() {
     for head in [false, true] {
         let mut pins: lamp_controls::pins::PinsConfig =
-            serde_json::from_str(include_str!("../fixtures/privacy-pins.json")).unwrap();
+            serde_json::from_str(include_str!("../../fixtures/privacy-pins.json")).unwrap();
         pins.chip = "/dev/gpiochip1".into();
         let pin = lamp_controls::pins::Pin {
             name: "hand".into(),
@@ -350,7 +350,7 @@ fn base_only_touch_publishes_controls_state_and_strip_failure_is_independent() {
     let bus = root.bus();
     let (lines, _, _, _) = line(false);
     let wiring: TouchPinsConfig = serde_json::from_str(include_str!(
-        "../fixtures/strip-711-working-pins-example.json"
+        "../../fixtures/strip-711-working-pins-example.json"
     ))
     .unwrap();
     let config = Config {
@@ -401,7 +401,7 @@ fn with_privacy_attached_a_still_second_says_controls_state_fifty_times() {
     let bus = Bus::new(&root).unwrap();
     let (lines, _, _, _) = line(false);
     let wiring: TouchPinsConfig = serde_json::from_str(include_str!(
-        "../fixtures/strip-711-working-pins-example.json"
+        "../../fixtures/strip-711-working-pins-example.json"
     ))
     .unwrap();
     let config = Config {
@@ -476,7 +476,7 @@ fn legacy_bytes_omit_privacy_and_new_fields_reject_ambiguous_evidence() {
 #[test]
 fn authored_replay_is_deterministic_keeps_faults_and_never_grants_hand_authority() {
     let records =
-        replay::read(include_bytes!("../fixtures/privacy-replay.jsonl").as_slice()).unwrap();
+        replay::read(include_bytes!("../../fixtures/privacy-replay.jsonl").as_slice()).unwrap();
     let mut first = vec![];
     let mut second = vec![];
     for bytes in [&mut first, &mut second] {
@@ -631,7 +631,7 @@ fn synthetic_line_to_bus_latency_with_stalled_strip() {
     let root = Root::new();
     let bus = root.bus();
     let wiring: TouchPinsConfig = serde_json::from_str(include_str!(
-        "../fixtures/strip-711-working-pins-example.json"
+        "../../fixtures/strip-711-working-pins-example.json"
     ))
     .unwrap();
     let config = Config {
@@ -767,7 +767,7 @@ fn controls_says_the_switch_on_diagnostics_beside_its_own_report() {
         );
         if touch {
             let wiring: TouchPinsConfig = serde_json::from_str(include_str!(
-                "../fixtures/strip-711-working-pins-example.json"
+                "../../fixtures/strip-711-working-pins-example.json"
             ))
             .unwrap();
             let config = Config {
