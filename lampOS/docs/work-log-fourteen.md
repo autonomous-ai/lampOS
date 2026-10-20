@@ -215,3 +215,22 @@ lamp runs is on this branch)
   run is what ecm-sds-mobile#11's body reports.
 - `gh pr edit 11` with the three-piece body, gate numbers, both gaps named
   (piece 2's) and the found-not-mine note.
+
+## 2026-10-20 — #2094 — El's lamp side (#2167) read against ecm-sds-mobile#11
+
+Ready for lamp-voice: no (reading only; no code changed)
+
+- El's lamp side is up for review as
+  [#2167](https://github.com/autonomous-ai/lampOS/pull/2167). Read the
+  diff against my own three assumptions rather than take the prose alone:
+  `keys.get` really does ack `starting` (`online.rs` tests `KEYS_KINDS` for
+  all three kinds alike, no exception for `get` — confirms the
+  `_awaitTerminal`-for-`get` choice was needed, not a stray guard); the
+  setup field names match exactly (`deepseek_api_key`/`deepseek_base_url`/
+  `deepgram_api_key`); `keys.get`'s real `done` payload carries
+  `since`/`deepseek_host` beside the two flat strings, which
+  `LampOwnKeys.fromKeysGet` already ignores harmlessly. Posted at
+  [6283717118](https://github.com/autonomous-ai/lampOS/issues/2094#issuecomment-6283717118).
+- No change needed in ecm-sds-mobile#11 from this read. The one open gap
+  (setup's `own_keys` status readback) is confirmed real and precisely
+  specified (`setup/src/serve.rs`'s `Status.own_keys`), not a guess.
