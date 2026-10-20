@@ -4,6 +4,33 @@
 
 Newest first. Times from `date` (+07).
 
+- 17:21 2276 probe-cascade --sizes: no finding; first builder's
+- 17:20 2167 rebased, slice test in; first builder's
+- 17:20 2262 found out of turn: P2 (Reviewer-lead's, agreed), two P3s incl. rule 8 hold; mine once fixed
+- 17:19 Merged #2198 (memory expiry walk) as `d1a15d831` on green
+- 17:18 Merged #2272 (MQTT packet limit from the photo limit) as `026a36b7e` on green; Reviewer-lead's P3 for a follow-up
+- 17:16 2275 (#2269 refiled): P1 and P2 fixed, no new finding; first builder's
+- 17:12 2273 photos folder made at boot: no finding; first builder's (product units)
+- 17:08 2242 own line keeps: fold to one commit; P2 (a stop or not now before the line sounds is dropped); two P3s; first builder's
+- 17:08 2272 MQTT packet limit from the photo limit: no finding; mine on green
+- 17:04 2254 mood seems: no P1/P2, two P3s; Reviewer-lead's to merge
+- 17:04 2218 (row 3) at df52ab5be: Fourth's P2s fixed, no P1/P2; fold and rebase onto #1712, then the first builder's
+- 17:02 2269 P1 fixed; my P2 (apart on a plain repeat) open and leaned on more; first builder's
+- 16:57 2223 rebased, P3s in; mine on green once #2193's question is answered
+- 16:53 2239 P2 fixed (no Pet for a press over 3 s), P3s in; first builder's
+- 16:53 2255 (#2234 rebuilt): P2 and three P3s fixed, one small P3; first builder's
+- 16:52 2249 P2 fixed (body tools optional, tested); first builder's
+- 16:51 Merged #2240 (Devin Cloud for the lamp) as `aa00d3b3e` on green, Jarvis's items in
+- 16:49 2252 (merged f48bf580e): P1 left (SAME_PERSON keeps a stranger's prints), P2 apart; told the first builder on #1722
+- 16:46 2233 switch in (LAMP_CAMERA_FOLLOWS_EYES), off as before; P3 call site unpinned; first builder's
+- 16:45 2251 (#2229 fold): Fourth's P2 fixed; my P2 (scope not the session note's) and four P3s still open; first builder's
+- 16:45 2223 cloud reboot via keeper: no P1/P2, three P3s, needs a rebase; mine once rebased (#2193's question open)
+- 16:44 2226 re-read: P2 (thread kept across resume) still open and reached more; Reviewer-lead's P1 (rules path) agreed
+- 16:42 2264 down link checks every 5 s and at once on the route's return: no finding; first builder's
+- 16:38 2137 two P2s (same as Jarvis's; Eighth's plan covers them), five P3s; first builder's
+- 16:35 2253 merged past Seventh's 16:18 P2 (my slip: readall and merge in one step); follow-up asked
+- 16:35 Merged #2253 (skill light tints the Speaking face) as `eedcb58b2` on green
+- 16:34 2239 head pads pins: one P2 (a drifting line gives a Pet and wakes the lamp), two P3s; first builder's
 - 16:30 2240 P1 fixed with bus name devin_cloud, no msgs change; mine, merge on green
 - 16:28 1890 skills.remove: no P1/P2, four P3s (peer check missing among them), needs a rebase; first builder's
 - 16:22 2246 both P3s fixed; mine once onto lamp-voice
