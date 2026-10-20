@@ -1107,23 +1107,43 @@ async fn air_task(bus: lamp_bus::Bus, air: Arc<Mutex<crate::air_told::AirTold>>)
 }
 
 /// The air's note for a spoken request: due (stuffy ten minutes, not told
-/// in three hours) and the room not `busy` at that moment, then counted as
-/// told. In a busy room it is neither said nor counted.
+/// in three hours) and the room not `busy` at that moment. It is counted as
+/// told only once that request's answer begins to be heard (the second
+/// part), so a line cut short or retired before any word keeps it for the
+/// next (the reviewer's P3 on #1960). In a busy room it is neither said nor
+/// counted.
 fn air_noting(
     air: Arc<Mutex<crate::air_told::AirTold>>,
     busy: impl Fn(u64) -> bool + Send + Sync + 'static,
-) -> crate::second_provider::TaskNote {
-    Arc::new(move |request| {
+) -> (
+    crate::second_provider::TaskNote,
+    crate::second_provider::Heard,
+) {
+    // The request given the note and not yet heard: only its answer spends it.
+    let given: Arc<Mutex<Option<u64>>> = Arc::default();
+    let giving = given.clone();
+    let spent = air.clone();
+    let note: crate::second_provider::TaskNote = Arc::new(move |request| {
         let now = monotonic_us();
         if busy(now) {
             return None;
         }
-        let mut air = air.lock().ok()?;
-        let note = air.due(now)?;
-        air.told(now);
-        eprintln!("lamp-voice second: request {request} is told the air is stuffy");
+        let note = air.lock().ok()?.due(now)?;
+        *giving.lock().ok()? = Some(request);
         Some(note)
-    })
+    });
+    let heard: crate::second_provider::Heard = Arc::new(move |request| {
+        let Ok(mut given) = given.lock() else { return };
+        if *given != Some(request) {
+            return;
+        }
+        *given = None;
+        if let Ok(mut air) = spent.lock() {
+            air.told(monotonic_us());
+            eprintln!("lamp-voice second: request {request} is told the air is stuffy");
+        }
+    });
+    (note, heard)
 }
 
 async fn weather_task(place: String, weather: Weather) {
@@ -1536,7 +1556,8 @@ pub fn serve(
                 .lock()
                 .is_ok_and(|mut room| room.at(now) == crate::room_told::Room::Busy)
         };
-        engine = engine.noting_the_air(air_noting(told.clone(), busy));
+        let (note, heard) = air_noting(told.clone(), busy);
+        engine = engine.noting_the_air(note, heard);
     }
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
@@ -3953,14 +3974,15 @@ mod route_checks;
 #[cfg(test)]
 mod tests {
     /// #1712's map, item 6: the air's note is due after ten minutes of a
-    /// stuffy room, never in a busy one, told once, and not again within
-    /// three hours.
+    /// stuffy room, never in a busy one, spent only once its request's
+    /// answer is heard (a line cut short before any word keeps it; the
+    /// reviewer's P3 on #1960), and not again within three hours.
     #[test]
     fn the_airs_note_is_given_once_when_due() {
         let air = Arc::new(Mutex::new(crate::air_told::AirTold::default()));
         let busy = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let room_busy = busy.clone();
-        let note = super::air_noting(air.clone(), move |_| {
+        let (note, heard) = super::air_noting(air.clone(), move |_| {
             room_busy.load(std::sync::atomic::Ordering::Relaxed)
         });
         let now = monotonic_us();
@@ -3979,7 +4001,13 @@ mod tests {
         busy.store(false, std::sync::atomic::Ordering::Relaxed);
         let said = note(3).expect("due once the room is not busy");
         assert!(said.contains("1200"), "{said}");
-        assert_eq!(note(4), None, "told once");
+        // Request 3 cut short before any word: its note isn't spent.
+        heard(99);
+        assert!(note(4).is_some(), "not heard: still due for the next");
+        heard(4);
+        assert_eq!(note(5), None, "heard once: told");
+        heard(4);
+        assert_eq!(note(6), None, "and not again");
     }
 
     /// #1712, the first builder at 16:43: the route's lines are judged as

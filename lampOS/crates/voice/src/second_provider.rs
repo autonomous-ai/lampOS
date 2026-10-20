@@ -300,6 +300,8 @@ pub type NameNote = Arc<dyn Fn(u64) -> Option<&'static str> + Send + Sync>;
 /// for the person's yes (`crate::agent_tasks::pending_note`): with its
 /// request, to the note or nothing.
 pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
+/// Told, by request, that the request's answer began to be heard.
+pub type Heard = Arc<dyn Fn(u64) + Send + Sync>;
 /// What the lamp did, for the rule for whom it answers
 /// (`worker::Heeding::lamp_did`), as the Live worker tells its own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -410,8 +412,9 @@ struct Shared {
     name_sounded: Option<NameSounded>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
-    /// With `LAMP_AIR_FACTS=on`: the air's note, when it is due.
-    air: Option<TaskNote>,
+    /// With `LAMP_AIR_FACTS=on`: the air's note, when it is due, and what
+    /// is told once that request's answer begins to be heard.
+    air: Option<(TaskNote, Heard)>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
@@ -1247,10 +1250,13 @@ impl Engine {
 
     /// A spoken request is told, beside its words, that the air has been
     /// stuffy a while, when `note` says so (`LAMP_AIR_FACTS=on`,
-    /// `crate::air_told`, as the Live route tells it). Before any turn only.
-    pub fn noting_the_air(mut self, note: TaskNote) -> Self {
+    /// `crate::air_told`, as the Live route tells it), and `heard` is told
+    /// the request once its answer's first audio goes: only then is the
+    /// note spent, so a line cut short before any word keeps it (the
+    /// reviewer's P3 on #1960). Before any turn only.
+    pub fn noting_the_air(mut self, note: TaskNote, heard: Heard) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
-            shared.air = Some(note);
+            shared.air = Some((note, heard));
         }
         self
     }
@@ -2403,7 +2409,7 @@ async fn spoken(
         crate::provider_worker::CALLED_NOTE.to_owned()
     });
     // A stuffy room, told beside what a person says (#1712's map, item 6).
-    let air = shared.air.as_ref().and_then(|note| note(request));
+    let air = shared.air.as_ref().and_then(|(note, _)| note(request));
     // Let out only as the conversation going on: it may be people's talk.
     let alone = shared
         .conversation_alone
@@ -3416,6 +3422,11 @@ async fn answer(
                     if answering && !answered.swap(true, Ordering::Relaxed) {
                         if let Ok(mut last) = shared.answered_request.lock() {
                             *last = Some(request);
+                        }
+                        // The air's note, if this request was given it, is
+                        // spent now its answer is heard.
+                        if let Some((_, heard)) = &shared.air {
+                            heard(request);
                         }
                         // Some of its answer heard: no longer to be carried.
                         if let Ok(mut in_flight) = shared.in_flight.lock() {
