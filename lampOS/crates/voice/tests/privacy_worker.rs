@@ -21,8 +21,10 @@ use lamp_voice::{
     wire::{Control, WorkerEvent},
 };
 use std::{
+    cell::RefCell,
     fs, io,
     os::unix::fs::DirBuilderExt,
+    panic::{self, AssertUnwindSafe},
     path::{Path, PathBuf},
     sync::{
         Arc,
@@ -77,7 +79,77 @@ struct Producer {
     published: Arc<AtomicU64>,
     last_us: Arc<AtomicU64>,
     first_low_us: Arc<AtomicU64>,
+    /// How the host held the test up, as it went ([`on_time`]).
+    held_up: HeldUp,
     thread: Option<JoinHandle<io::Result<Production>>>,
+}
+
+/// What the host did to the test as it ran: the producer's longest gap
+/// between two samples, the samples dropped because the worker's queue was
+/// full, and when the rig last took a fresh lease from the worker (or
+/// started it), which a worker held up stops renewing.
+#[derive(Clone, Default)]
+struct HeldUp {
+    longest_gap_us: Arc<AtomicU64>,
+    dropped: Arc<AtomicU64>,
+    last_lease_us: Arc<AtomicU64>,
+}
+
+impl HeldUp {
+    /// Held up past what the production rules allow for, as seen now: the
+    /// producer's gap longer than the physical reading lasts, a sample the
+    /// worker didn't take, or no fresh lease for longer than one lasts.
+    /// Each by how much: (gap, dropped, the leases' silence), in µs.
+    fn past_the_rules(&self) -> Option<(u64, u64, u64)> {
+        let gap_us = self.longest_gap_us.load(Ordering::Acquire);
+        let dropped = self.dropped.load(Ordering::Acquire);
+        let silence_us = monotonic_us().saturating_sub(self.last_lease_us.load(Ordering::Acquire));
+        (gap_us > MICROPHONE_PRIVACY_FRESH_US
+            || dropped > 0
+            || silence_us > MICROPHONE_PRIVACY_FRESH_US)
+            .then_some((gap_us, dropped, silence_us))
+    }
+
+    /// The worker was started, or a fresh lease taken, now.
+    fn lease_now(&self) {
+        self.last_lease_us.store(monotonic_us(), Ordering::Release);
+    }
+}
+
+thread_local! {
+    /// The running scenario's producer, for [`on_time`] to read once the
+    /// scenario has failed and its rig is gone.
+    static RUNNING: RefCell<Option<HeldUp>> = const { RefCell::new(None) };
+}
+
+/// Runs `scenario`, and begins it again, three times at most in all, when
+/// it failed while the host held the test's own side up past the production
+/// rules ([`HeldUp::past_the_rules`]). Each of those makes the real worker
+/// say, rightly, that the switch can't be read: the physical reading
+/// expired, the worker ended as it does when Controls goes, or a gap in the
+/// envelope from a message that outlived its 300 ms in the worker's queue.
+/// On a loaded runner they came 2 of 150 runs beside twelve busy processes,
+/// and on ARM64 run 39375553918 (#1569 row 45). No bound is widened: a
+/// failure with the producer on time, nothing dropped and the worker's
+/// leases coming fails at once, and one that comes three times fails.
+fn on_time(name: &str, scenario: impl Fn()) {
+    for attempt in 1..=3 {
+        RUNNING.with(|running| running.borrow_mut().take());
+        let Err(failure) = panic::catch_unwind(AssertUnwindSafe(&scenario)) else {
+            return;
+        };
+        let held = RUNNING.with(|running| running.borrow_mut().take());
+        match held.as_ref().and_then(HeldUp::past_the_rules) {
+            Some((gap_us, dropped, silence_us)) if attempt < 3 => eprintln!(
+                "{name}: attempt {attempt} failed while the host held the test up \
+                 (the producer's longest gap {} ms, {dropped} samples dropped, \
+                 no fresh lease for {} ms): begun again",
+                gap_us / 1_000,
+                silence_us / 1_000
+            ),
+            _ => panic::resume_unwind(failure),
+        }
+    }
 }
 impl Producer {
     /// With `no_slide`, each state says no slide is wired and carries no
@@ -97,18 +169,21 @@ impl Producer {
             published: Arc::new(AtomicU64::new(0)),
             last_us: Arc::new(AtomicU64::new(0)),
             first_low_us: Arc::new(AtomicU64::new(0)),
+            held_up: HeldUp::default(),
             thread: None,
         };
-        let (muted, stop, published, last_us, first_low_us) = (
+        let (muted, stop, published, last_us, first_low_us, held_up) = (
             source.muted.clone(),
             source.stop.clone(),
             source.published.clone(),
             source.last_us.clone(),
             source.first_low_us.clone(),
+            source.held_up.clone(),
         );
         source.thread = Some(thread::spawn(move || {
             let deadline = Instant::now() + Duration::from_secs(10);
             let mut result = Production::default();
+            let mut previous_us = None;
             while !stop.load(Ordering::Acquire) {
                 if Instant::now() >= deadline {
                     return Err(io::Error::other(
@@ -117,6 +192,12 @@ impl Producer {
                 }
                 let began = Instant::now();
                 let at_us = monotonic_us();
+                if let Some(previous_us) = previous_us {
+                    held_up
+                        .longest_gap_us
+                        .fetch_max(at_us.saturating_sub(previous_us), Ordering::AcqRel);
+                }
+                previous_us = Some(at_us);
                 result.samples += 1;
                 let muted = muted.load(Ordering::Acquire);
                 if muted {
@@ -158,7 +239,9 @@ impl Producer {
                 state.check().map_err(io::Error::other)?;
                 // A cached path can disappear during verified worker stop.
                 // Active delivery gaps are checked by the real Voice fence.
-                result.dropped += publisher.publish_json(at_us, &state)?.dropped as u64;
+                let dropped = publisher.publish_json(at_us, &state)?.dropped as u64;
+                result.dropped += dropped;
+                held_up.dropped.fetch_add(dropped, Ordering::AcqRel);
                 last_us.store(at_us, Ordering::Release);
                 published.store(result.samples, Ordering::Release);
                 thread::sleep(SAMPLE.saturating_sub(began.elapsed()));
@@ -219,12 +302,14 @@ impl Rig {
         let clock = lamp_controls::runtime::clock_id(None).unwrap();
         let subscriber = Self::subscribe(&bus);
         let producer = Producer::start(&bus, clock.clone(), no_slide);
+        RUNNING.with(|running| *running.borrow_mut() = Some(producer.held_up.clone()));
         let boot = new_boot().unwrap();
         let mut controller = Controller::new(boot, now());
         controller
             .set_microphone_permission(now(), permission)
             .unwrap();
         let worker = Self::spawn(&root, boot, no_slide);
+        producer.held_up.lease_now();
         Self {
             worker: Some(worker),
             subscriber: Some(subscriber),
@@ -354,6 +439,7 @@ impl Rig {
             }
             self.last_lease = Some(value.clone());
             if fresh {
+                self.producer.held_up.lease_now();
                 values.push(value);
             }
             if count == 31 {
@@ -417,6 +503,7 @@ impl Rig {
         self.first_high = None;
         self.last_authority = None;
         self.worker = Some(Self::spawn(&self.root, self.boot, self.no_slide));
+        self.producer.held_up.lease_now();
     }
 }
 impl Drop for Rig {
@@ -434,53 +521,58 @@ impl Drop for Rig {
 
 #[test]
 fn selected_worker_requires_authority_latches_low_and_recovers_only_after_verified_stop() {
-    let mut rig = Rig::start(Permission::Denied);
-    rig.until(|value| value.physical_muted == Some(false));
-    // Refused by the missing authority, not by evidence gone stale: the
-    // worker still reads the switch as fresh and HIGH (#1241).
-    rig.observe(Duration::from_millis(80), |value| {
-        assert!(!value.permitted);
-        assert_eq!(value.physical_muted, Some(false));
-    });
-    rig.permission(Permission::Allowed);
-    let allowed = rig.until(|value| value.permitted);
-    assert!(allowed.stamp.at_us - rig.first_high.unwrap() >= REOPEN_STABLE_US);
-    rig.producer.muted.store(true, Ordering::Release);
-    let low = rig.until(|value| value.physical_muted == Some(true));
-    assert!(
-        !low.permitted,
-        "the first LOW lease must revoke without debounce"
+    on_time(
+        "selected_worker_requires_authority_latches_low_and_recovers_only_after_verified_stop",
+        || {
+            let mut rig = Rig::start(Permission::Denied);
+            rig.until(|value| value.physical_muted == Some(false));
+            // Refused by the missing authority, not by evidence gone stale: the
+            // worker still reads the switch as fresh and HIGH (#1241).
+            rig.observe(Duration::from_millis(80), |value| {
+                assert!(!value.permitted);
+                assert_eq!(value.physical_muted, Some(false));
+            });
+            rig.permission(Permission::Allowed);
+            let allowed = rig.until(|value| value.permitted);
+            assert!(allowed.stamp.at_us - rig.first_high.unwrap() >= REOPEN_STABLE_US);
+            rig.producer.muted.store(true, Ordering::Release);
+            let low = rig.until(|value| value.physical_muted == Some(true));
+            assert!(
+                !low.permitted,
+                "the first LOW lease must revoke without debounce"
+            );
+            assert_eq!(low.microphone_generation, allowed.microphone_generation);
+            let low_acquired = rig.producer.first_low_us.load(Ordering::Acquire);
+            assert!(low_acquired > 0);
+            assert!(
+                low.stamp.at_us - low_acquired < MICROPHONE_PRIVACY_FRESH_US,
+                "LOW publication must revoke within the original physical freshness window"
+            );
+            // Keep the old Allowed authority current: only the physical LOW retires
+            // capture, and subsequent stable HIGH must not revive this same child.
+            rig.producer.muted.store(false, Ordering::Release);
+            let high = rig.until(|value| value.physical_muted == Some(false));
+            assert!(!high.permitted);
+            assert!(
+                rig.last_low_event.is_some(),
+                "LOW must reach the private owner channel"
+            );
+            // Refused by the latch, not by evidence gone stale (#1241).
+            rig.observe(Duration::from_millis(100), |value| {
+                assert!(!value.permitted);
+                assert_eq!(value.physical_muted, Some(false));
+                assert_eq!(value.microphone_generation, allowed.microphone_generation);
+            });
+            rig.restart_verified();
+            let recovered = rig.until(|value| value.permitted);
+            assert_ne!(recovered.session_id, allowed.session_id);
+            assert!(recovered.stamp.at_us - rig.first_high.unwrap() >= REOPEN_STABLE_US);
+            rig.stop_worker();
+            let produced = rig.producer.finish();
+            eprintln!("synthetic Controls production including verified replacement: {produced:?}");
+            assert!(produced.samples > 20);
+        },
     );
-    assert_eq!(low.microphone_generation, allowed.microphone_generation);
-    let low_acquired = rig.producer.first_low_us.load(Ordering::Acquire);
-    assert!(low_acquired > 0);
-    assert!(
-        low.stamp.at_us - low_acquired < MICROPHONE_PRIVACY_FRESH_US,
-        "LOW publication must revoke within the original physical freshness window"
-    );
-    // Keep the old Allowed authority current: only the physical LOW retires
-    // capture, and subsequent stable HIGH must not revive this same child.
-    rig.producer.muted.store(false, Ordering::Release);
-    let high = rig.until(|value| value.physical_muted == Some(false));
-    assert!(!high.permitted);
-    assert!(
-        rig.last_low_event.is_some(),
-        "LOW must reach the private owner channel"
-    );
-    // Refused by the latch, not by evidence gone stale (#1241).
-    rig.observe(Duration::from_millis(100), |value| {
-        assert!(!value.permitted);
-        assert_eq!(value.physical_muted, Some(false));
-        assert_eq!(value.microphone_generation, allowed.microphone_generation);
-    });
-    rig.restart_verified();
-    let recovered = rig.until(|value| value.permitted);
-    assert_ne!(recovered.session_id, allowed.session_id);
-    assert!(recovered.stamp.at_us - rig.first_high.unwrap() >= REOPEN_STABLE_US);
-    rig.stop_worker();
-    let produced = rig.producer.finish();
-    eprintln!("synthetic Controls production including verified replacement: {produced:?}");
-    assert!(produced.samples > 20);
 }
 
 /// Losing Controls is a switch that cannot be read, not a crash (#795): the
@@ -570,28 +662,33 @@ fn losing_controls_ends_the_real_worker_cleanly_and_expires_its_lease() {
 /// physical level; Denied again revokes at once.
 #[test]
 fn the_real_worker_with_no_slide_grants_from_its_controller_alone() {
-    let mut rig = Rig::start_with(Permission::Denied, true);
-    rig.until(|value| value.no_slide);
-    rig.observe(Duration::from_millis(80), |value| {
-        assert!(!value.permitted);
-        assert!(value.no_slide);
-        assert_eq!(value.physical_muted, None);
-    });
-    rig.permission(Permission::Allowed);
-    let allowed = rig.until(|value| value.permitted);
-    assert!(allowed.no_slide);
-    assert_eq!(allowed.physical_muted, None);
-    assert!(allowed.observed_us > 0 && allowed.observed_us <= allowed.stamp.at_us);
-    assert!(allowed.expires_at_us <= allowed.observed_us + MICROPHONE_PRIVACY_FRESH_US);
-    assert!(allowed.stamp.at_us - rig.first_high.unwrap() >= REOPEN_STABLE_US);
-    rig.permission(Permission::Denied);
-    let muted = rig.until(|value| !value.permitted);
-    assert!(muted.no_slide);
-    assert!(
-        rig.last_low_event.is_none(),
-        "with no slide nothing is ever observed muted"
+    on_time(
+        "the_real_worker_with_no_slide_grants_from_its_controller_alone",
+        || {
+            let mut rig = Rig::start_with(Permission::Denied, true);
+            rig.until(|value| value.no_slide);
+            rig.observe(Duration::from_millis(80), |value| {
+                assert!(!value.permitted);
+                assert!(value.no_slide);
+                assert_eq!(value.physical_muted, None);
+            });
+            rig.permission(Permission::Allowed);
+            let allowed = rig.until(|value| value.permitted);
+            assert!(allowed.no_slide);
+            assert_eq!(allowed.physical_muted, None);
+            assert!(allowed.observed_us > 0 && allowed.observed_us <= allowed.stamp.at_us);
+            assert!(allowed.expires_at_us <= allowed.observed_us + MICROPHONE_PRIVACY_FRESH_US);
+            assert!(allowed.stamp.at_us - rig.first_high.unwrap() >= REOPEN_STABLE_US);
+            rig.permission(Permission::Denied);
+            let muted = rig.until(|value| !value.permitted);
+            assert!(muted.no_slide);
+            assert!(
+                rig.last_low_event.is_none(),
+                "with no slide nothing is ever observed muted"
+            );
+            rig.stop_worker();
+            let produced = rig.producer.finish();
+            assert!(produced.samples > 20);
+        },
     );
-    rig.stop_worker();
-    let produced = rig.producer.finish();
-    assert!(produced.samples > 20);
 }
