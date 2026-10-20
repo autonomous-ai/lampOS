@@ -44,7 +44,7 @@ const START_QUIET_US: u64 = 3_000_000;
 const HOLD_US: u64 = 3_000_000;
 /// ... and is given up on after this long, with a word on what to do later.
 const SIT_GIVE_UP_US: u64 = 60_000_000;
-/// A word on how to move the lamp at most this often, after this much quiet.
+/// One word on how to move the lamp, after this much quiet.
 const GUIDE_EVERY_US: u64 = 8_000_000;
 /// A step the model leads and never reports has failed after this long,
 /// once the room has been quiet for [`TIMED_OUT_QUIET_US`].
@@ -151,13 +151,13 @@ const OFFER_EVERY_S: u64 = 86_400;
 
 pub const SIT_NOTE: &str = "(Nobody has spoken. You are meeting the person you will live with for the first time. Say hello in a few warm words, then ask them to sit where they usually sit and look at you, so you learn where they are. Nothing more.)";
 pub const SIT_NO_FACE: &str = "(You cannot see their face. Ask them in a few words to sit where they usually sit and look at you.)";
-pub const SIT_CLOSER: &str = "(You can see them, but they are far from you. Ask them in a few words to bring you a bit closer.)";
-pub const SIT_TURN: &str = "(You can see them, but at the edge of what you see. Ask them in a few words to turn you a little toward them.)";
+pub const SIT_CLOSER: &str = "(You can see them, but they are far from you. Ask them in a few words to bring you a bit closer if they like, and that where they are is fine too.)";
+pub const SIT_TURN: &str = "(You can see them, but at the edge of what you see. Ask them in a few words to turn you a little toward them if they like, and that where they are is fine too.)";
 pub const SIT_DONE: &str =
     "(Now you can see them well where they sit. Tell them so in a few words.)";
 pub const SIT_FAILED: &str = "(You still cannot see them well where they sit. Tell them in a few light words that it is fine: they can turn you toward their seat later, or ask you to redo the setup.)";
 pub const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Then call setup_step with step \"who_you_are\": done, skipped if they would rather not, or failed if it could not be done, and then tell them in a few words what they can try later.)";
-pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask them two short things, one at a time: whether there are hours when you should keep quiet, and whether you may say hello when they sit down. Keep each answer as a rule if you can. Then call setup_step with step \"preferences\", and tell them in a few words that is everything, and that they can ask you to redo the setup any time.)";
+pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask them two short things, one at a time: whether there are hours when you should keep quiet, and whether you may say hello when they sit down. Keep each answer as a rule if you can. As soon as you have heard the second answer, call setup_step with step \"preferences\" before you say anything else, then tell them in a few words that is everything, and that they can ask you to redo the setup any time.)";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1467,8 +1467,11 @@ impl Onboarding {
         // Where you sit: what the eyes see ends it, and only while the head
         // is still and no hand is on the lamp: a lamp turning toward them,
         // or being turned, can pass through a good framing mid-move. Any
-        // motion starts the three seconds again.
-        match face.filter(|face| still && face.good()) {
+        // motion starts the three seconds again. After the one guide, any
+        // steady face is taken where it is: a person beside the lamp would
+        // just say "there's fine" (row 10 on lamp-52e6).
+        let settled = led.guided_us.is_some_and(|at| at > asked_us);
+        match face.filter(|face| still && (face.good() || settled)) {
             Some(framing) => {
                 let since = *led.held_since.get_or_insert(now_us);
                 if now_us.saturating_sub(since) >= HOLD_US {
@@ -1484,12 +1487,7 @@ impl Onboarding {
             self.owed = Some(SIT_FAILED);
             return None;
         }
-        if can_speak
-            && quiet_us >= GUIDE_EVERY_US
-            && led
-                .guided_us
-                .is_none_or(|at| now_us.saturating_sub(at) >= GUIDE_EVERY_US)
-        {
+        if can_speak && quiet_us >= GUIDE_EVERY_US && led.guided_us == Some(asked_us) {
             led.guided_us = Some(now_us);
             let note = match face {
                 None => SIT_NO_FACE,
@@ -1935,8 +1933,7 @@ mod tests {
             y: 0.0,
         };
         assert_eq!(room.wait(9 * S, Some(far)), [SIT_NOTE, SIT_CLOSER]);
-        assert_eq!(room.wait(9 * S, Some(SIDE)), [SIT_TURN]);
-        // Near and in the middle for three seconds: done, said, kept.
+        // Steady for three seconds after the guide: done, said, kept.
         assert_eq!(room.wait(3 * S + S / 2, Some(NEAR_MIDDLE)), [SIT_DONE]);
         let sat = &room.walk.kept().steps["where_you_sit"];
         assert_eq!(sat.outcome, Outcome::Done);
@@ -2320,6 +2317,31 @@ mod tests {
     }
 
     #[test]
+    fn a_seat_beside_the_lamp_is_taken_after_one_guide() {
+        // Row 10 on lamp-52e6: sitting beside the lamp, the face low in the
+        // picture.
+        let beside = Framing {
+            size: 0.2,
+            x: 0.12,
+            y: -0.63,
+        };
+        let mut room = Room::new("beside");
+        assert_eq!(room.wait(12 * S, Some(beside)), [SIT_NOTE, SIT_TURN]);
+        assert_eq!(room.wait(4 * S, Some(beside)), [SIT_DONE]);
+        let sat = &room.walk.kept().steps["where_you_sit"];
+        assert_eq!(sat.outcome, Outcome::Done);
+        assert_eq!(sat.framing, Some(beside));
+    }
+
+    #[test]
+    fn where_you_sit_guides_only_once() {
+        let mut room = Room::new("once");
+        room.still = false;
+        assert_eq!(room.wait(55 * S, Some(SIDE)), [SIT_NOTE, SIT_TURN]);
+        assert_eq!(room.outcome(Step::WhereYouSit), None);
+    }
+
+    #[test]
     fn a_failing_step_says_what_to_do_and_moves_on() {
         let mut room = Room::new("fail");
         let far = Framing {
@@ -2327,15 +2349,14 @@ mod tests {
             x: 0.0,
             y: 0.0,
         };
-        let notes = room.wait(64 * S, Some(far));
-        assert_eq!(notes.first(), Some(&SIT_NOTE));
-        assert_eq!(notes.last(), Some(&SIT_FAILED));
-        assert!(
-            notes[1..notes.len() - 1]
-                .iter()
-                .all(|note| *note == SIT_CLOSER)
+        // A face that never holds still: one guide, then given up on.
+        room.still = false;
+        assert_eq!(
+            room.wait(64 * S, Some(far)),
+            [SIT_NOTE, SIT_CLOSER, SIT_FAILED]
         );
         assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Failed));
+        room.still = true;
         assert_eq!(room.walk.kept().steps["where_you_sit"].framing, Some(far));
         assert_eq!(room.wait(4 * S, Some(far)), [WHO_NOTE]);
         // Never reported: failed after ninety seconds and a quiet room.
