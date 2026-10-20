@@ -74,8 +74,11 @@ const ENVIRONMENT: &[&str] = &[
 /// in `harness new --help` ("claude (default), codex, opencode, …"); its ask
 /// mode passes OpenCode no flag, so OpenCode asks as it does by default.
 /// `devin` (#1854) is Devin's own terminal program on the computer, read as
-/// the others are (openharness `cli/src/engines/devin/`); not Devin Cloud,
-/// which the CLI's `new` does not start.
+/// the others are (openharness `cli/src/engines/devin/`). `devin-cloud` is
+/// Devin Cloud, which Harness 0.4.27's `new` starts (openharness#1444): it
+/// runs in Devin's cloud, under the computer that holds the person's Devin
+/// connection, with no folder and no modes, and uses the secrets the person
+/// keeps in Devin (a Slack token among them); the lamp holds none.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum EngineKind {
@@ -83,6 +86,8 @@ pub enum EngineKind {
     Claude,
     Opencode,
     Devin,
+    #[serde(rename = "devin-cloud")]
+    DevinCloud,
 }
 
 impl EngineKind {
@@ -92,7 +97,22 @@ impl EngineKind {
             Self::Claude => "claude",
             Self::Opencode => "opencode",
             Self::Devin => "devin",
+            Self::DevinCloud => "devin-cloud",
         }
+    }
+
+    /// The engine's name on the bus (`tasks/status`), whose check takes
+    /// letters, digits and `_` only (`msgs::tasks`): `devin_cloud` for Devin
+    /// Cloud, whose name for Harness has a dash (the reviewer on #2240).
+    pub fn bus_name(self) -> String {
+        self.argument().replace('-', "_")
+    }
+
+    /// Whether the agent runs in its maker's cloud, not on the computer: no
+    /// folder is sent, its id is Harness's `cloud_…` one, and Harness closes
+    /// none of them.
+    pub fn cloud(self) -> bool {
+        matches!(self, Self::DevinCloud)
     }
 
     /// Whether the agent has Harness's permission modes. Devin has none:
@@ -100,7 +120,7 @@ impl EngineKind {
     /// (`INVALID_PERMISSION_MODE`; openharness `cli/src/lib/newCommand.ts`),
     /// so it opens in its own default.
     fn has_modes(self) -> bool {
-        !matches!(self, Self::Devin)
+        !matches!(self, Self::Devin | Self::DevinCloud)
     }
 }
 
@@ -205,6 +225,32 @@ fn machine_id(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+/// An agent's id as Harness gives it: a UUID for one on a computer, or
+/// `cloud_` and 16 hex digits for a cloud one (Harness 0.4.27).
+pub fn agent_id(value: &str) -> bool {
+    uuid(value)
+        || value.strip_prefix("cloud_").is_some_and(|hex| {
+            hex.len() == 16
+                && hex
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        })
+}
+
+/// What Harness's `state` for agent `id` means here: a cloud agent is
+/// `needs-input` once it has answered and waits for a next message, whether
+/// or not it asked anything, so it is read as `idle`, and its answer is told.
+/// A question it asked is in that answer. Only `needs-input`: a cloud agent
+/// `working` or `failed` is as Harness says. When openharness#1449 gives a
+/// way to tell a question from a finished answer, read that here instead.
+fn state_of(id: &str, state: String) -> String {
+    if id.starts_with("cloud_") && state == "needs-input" {
+        "idle".into()
+    } else {
+        state
+    }
+}
+
 fn uuid(value: &str) -> bool {
     value.len() == 36
         && value.bytes().enumerate().all(|(index, byte)| {
@@ -220,6 +266,14 @@ impl Target {
     pub fn validate(&self) -> Result<(), String> {
         if !machine_id(&self.machine_id) {
             return Err("invalid_machine".into());
+        }
+        // A cloud agent works in no folder: its target names none.
+        if self.engine.cloud() {
+            return if self.project.is_empty() {
+                Ok(())
+            } else {
+                Err("invalid_project".into())
+            };
         }
         let folder = self.project.starts_with('/') || self.project.starts_with("~/");
         let maximum = if folder { 512 } else { 128 };
@@ -440,10 +494,12 @@ impl Cli {
             launch.target.engine.argument().into(),
             "--machine".into(),
             launch.target.machine_id.clone().into(),
-            launch.target.project.clone().into(),
-            "--name".into(),
-            launch.name.clone().into(),
         ];
+        // A cloud agent is given no folder (openharness#1444).
+        if !launch.target.engine.cloud() {
+            args.push(launch.target.project.clone().into());
+        }
+        args.extend(["--name".into(), launch.name.clone().into()]);
         // Harness's default, approved by the owner on 2026-10-15: Claude
         // Code works in its own project folder without asking, and still
         // stops for anything risky. With `ask` it asked before every file
@@ -472,7 +528,7 @@ impl Cli {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
-        if !uuid(agent_id) {
+        if !self::agent_id(agent_id) {
             return Err("invalid_agent_id".into());
         }
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
@@ -509,8 +565,13 @@ impl Cli {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
-        if !uuid(agent_id) {
+        if !self::agent_id(agent_id) {
             return Err("invalid_agent_id".into());
+        }
+        // Harness closes no cloud harness (openharness#1444: "stop it in
+        // Harness"), so none is asked: refused, not to be asked again.
+        if agent_id.starts_with("cloud_") {
+            return Ok(Closed::Refused);
         }
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
         let reply = self
@@ -657,7 +718,7 @@ impl Cli {
         }
         if agents.is_empty()
             || agents.len() > MOST_WAITED
-            || agents.iter().any(|agent| !uuid(agent))
+            || agents.iter().any(|agent| !self::agent_id(agent))
         {
             return Err("invalid_agent_id".into());
         }
@@ -1213,7 +1274,7 @@ fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
     let Some(agent) = reply.agent else {
         return uncertain("invalid_reply");
     };
-    if !uuid(&agent.id)
+    if !agent_id(&agent.id)
         || agent.name != launch.name
         || agent.engine != launch.target.engine
         || !asked_permission(
@@ -1292,8 +1353,8 @@ fn parse_observation(bytes: &[u8], expected: &str) -> Result<Observation, &'stat
         _ => return Err("invalid_observation"),
     };
     Ok(Observation {
+        state: state_of(&reply.id, reply.state),
         agent_id: reply.id,
-        state: reply.state,
         ask,
         answer: reply.answer,
         truncated: reply.truncated,
@@ -1387,7 +1448,7 @@ pub fn parse_ps(bytes: &[u8]) -> Result<Vec<Listed>, &'static str> {
     }
     let mut listed = Vec::new();
     for row in reply.harnesses {
-        if !uuid(&row.id) {
+        if !agent_id(&row.id) {
             continue;
         }
         if !token(&row.state, 32) {
@@ -1401,8 +1462,8 @@ pub fn parse_ps(bytes: &[u8]) -> Result<Vec<Listed>, &'static str> {
             .map(|about| clip(about.trim(), MOST_ABOUT_BYTES))
             .filter(|about| !about.is_empty());
         listed.push(Listed {
+            state: state_of(&row.id, row.state),
             agent_id: row.id,
-            state: row.state,
             last_active_unix_ms,
             about,
         });
@@ -1448,8 +1509,8 @@ pub fn parse_wait(
             continue;
         }
         ended.push(Ended {
+            state: state_of(&row.id, row.state),
             agent_id: row.id,
-            state: row.state,
         });
     }
     // An exit that says one ended, with none of ours listed, is not read.
