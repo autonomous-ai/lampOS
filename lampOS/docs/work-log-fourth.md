@@ -5039,6 +5039,22 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#2242's second commit** `f2af6018f` is pushed (gate 3228/0). `LAMP_OWN_LINE_KEEPS` also covers the arrival hello, the setup walk's lines and news told unasked.
 - **#2218 re-read** at `df52ab5be`: both P2s fixed, no new finding.
 
+## 2026-10-20, 17:27 ICT: #2259 read clean; #2276 up for #2135; #2242 folded with its P3s
+
+- **#2259 (lamp-peek's one page):**
+  - The reviewer's P2: `Conflicts=lamp-setup.service` would drop setup at boot after a reset. It's gone.
+  - The P3: the units' read is now one read however many ask, under a lock held across it.
+  - Both are in `0fa563609`, gate green (20/0). The reviewer has no finding and merges on ARM64.
+  - **Follow-up promised:** a deadline on the units' `systemctl` and `journalctl`, so a hung one can't hold the page. I'll do it once #2259 merges.
+- **Claimed (16:42, the first builder's 16:30): #2135's first token against the request's size.** I have no lamp access, so I built the measure.
+  - **#2276** (`91f050f23`, into #1712): `probe-cascade … 10 --wire --sizes` asks the lamp's first request, its few-functions set and its character halved, in turn, with less-lamp lines.
+  - The reviewer has no finding. Whoever holds lamp-4ace runs the one command in its body.
+  - Gate: Clippy and build passed. 3247 passed and 4 failed under load, each passing alone. Two were new, and are now #1569 rows 47 and 48.
+- **#2242's read (17:08):**
+  - Fold the two commits: done, as `033bf749e` onto #1712's `7c912651a`, the same patch-id as the three commits. It's gating, then a new PR, and #2242 closes.
+  - **P3 1:** the answer wait's `heard` check. **P3 2:** the test's place and the "once" wording. Both done, with a mutation each.
+  - **The P2** ("not now" said before the line sounds doesn't stop it) is the first builder's call. I recommended way 1, the waited words with `LAMP_WAIT_KEEPS_ANSWER=words`. The doc now names the cost.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5061,7 +5077,8 @@ takes a cut answer as heard only with #2186. `LAMP_SECOND_SPEECH_SOCKET` and
 `probe-cascade --wire --socket` were not run on a lamp.
 `LAMP_OWN_LINE_KEEPS` is off unless set and was not run on a lamp.
 lamp-peek's one page (#2259) was not run on a lamp; its timings are this
-Mac's.
+Mac's. `probe-cascade --wire --sizes` (#2276) was not run anywhere with a
+real key.
 `probe-cascade --wire --speech` was tried only from this Mac with made-up
 keys (both targets answered 401), not on a lamp.
 Native Linux ARM64 execution so far is on GitHub runners, not on a lamp.
