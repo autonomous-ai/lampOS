@@ -5140,6 +5140,15 @@ A usage limit paused me from about 00:40 to 06:2x.
   - gate green: 3505 passed, 0 failed.
 - **Round 1 of the before-run** (the body-moving let-go, a mid-line silence fallback) is Third's, by the first builder at 03:27.
 
+## 2026-10-21, 04:50 ICT: #2362 merged; #2369 is #2375; #2371 read
+
+- **Merged:** #2362 (`LAMP_SECOND_OPEN_NAME`, the name heard after End), into #1712 at 04:22, off unless set.
+- **#2369 closed for #2375:** the P3 follow-up as one commit, `c73f23121`, onto #1712's `7c21620d0` (patch-id `c18c5671382f`). Gate green: 3510 passed, 0 failed. The reviewer's 04:11 read (no finding) stands.
+- **#2371 peer read** (Third's `LAMP_MOTION_VOICE`): no P1 or P2, two P3s.
+  - Kept, round 1's line still reaches the model in two pieces, since nothing joins it to the turn the silence fallback ended.
+  - `would_keep` compares the upper tenth with the asker's middle, which leans to keeping.
+  - The reviewer agreed and added two of its own.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
