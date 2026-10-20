@@ -159,6 +159,79 @@ const WAIT_KEEPS_WITHIN_US: u64 = 3_000_000;
 /// further apart than this are each let go.
 const AFTER_LET_GO_US: u64 = 1_000_000;
 
+/// `LAMP_OWN_LINE_KEEPS=on` (#2220, El on lamp-06c1, 20 Oct): a line the
+/// lamp starts on its own (a skill's say, a reminder) waiting for its first
+/// audio is not ended by room sound. On lamp-06c1 two of three of Welcome
+/// back's hellos were dropped as `user_interrupted` by a sound the room made
+/// about 2 s in, before any of their audio. Off unless set.
+pub const OWN_LINE_KEEPS_ENVIRONMENT: &str = "LAMP_OWN_LINE_KEEPS";
+
+fn own_line_keeps_from_environment() -> bool {
+    std::env::var(OWN_LINE_KEEPS_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// What a new sound does while a line the lamp started on its own waits for
+/// its first audio (`LAMP_OWN_LINE_KEEPS`, [`while_own_line_waits`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WhileOwnLineWaits {
+    /// Not such a line, it has sounded, or the switch is off: as before.
+    AsBefore,
+    /// The lamp's name was heard in it: decided as before, at once.
+    Decide,
+    /// Not yet: it stays pending.
+    Wait,
+    /// The line began to sound, or the sound's own deadline came: let go as
+    /// the room's, and the line goes on.
+    LetGo(&'static str),
+}
+
+/// A line the lamp started on its own: a skill's say or a reminder, with no
+/// person's words it answers.
+fn own_line(current: &Reply) -> bool {
+    current.input_sequence == 0 && (current.say.is_some() || current.reminder.is_some())
+}
+
+/// [`WhileOwnLineWaits`] for `candidate` at `at_us`, with `on`
+/// (`LAMP_OWN_LINE_KEEPS`): while a line the lamp started on its own has not
+/// sounded, a new sound waits, unless the lamp's name began in it (up to
+/// `CALL_BEFORE_US` before its trigger). One that waited is let go once the
+/// line sounds, or 100 ms before its own decision deadline. A sound that
+/// begins once the line sounds is a cut-in over the lamp's voice, judged as
+/// before, so words said over the lamp still stop it. `waited` says it
+/// waited before.
+fn while_own_line_waits(
+    on: bool,
+    reply: Option<&Reply>,
+    waited: bool,
+    candidate: &crate::admission::Candidate,
+    name_began_us: Option<u64>,
+    at_us: u64,
+) -> WhileOwnLineWaits {
+    let Some(current) = reply.filter(|current| on && own_line(current)) else {
+        return WhileOwnLineWaits::AsBefore;
+    };
+    if current.had_audio || current.playback.is_some() {
+        return if waited {
+            WhileOwnLineWaits::LetGo("sounded")
+        } else {
+            WhileOwnLineWaits::AsBefore
+        };
+    }
+    if name_began_us.is_some_and(|began| {
+        began.saturating_add(crate::activity::CALL_BEFORE_US) >= candidate.trigger_read_at_us
+    }) {
+        return WhileOwnLineWaits::Decide;
+    }
+    if at_us
+        >= candidate
+            .decision_deadline_us
+            .saturating_sub(WAIT_DECIDES_BEFORE_US)
+    {
+        return WhileOwnLineWaits::LetGo("deadline");
+    }
+    WhileOwnLineWaits::Wait
+}
+
 /// Whether `value`, the voice's `LAMP_WAIT_KEEPS_ANSWER`, turns the wait on:
 /// `on`, or `words`, and nothing else.
 fn wait_keeps_answer(value: Option<&str>) -> bool {
@@ -4056,6 +4129,11 @@ fn conversation_with_gate(
     // words are heard too.
     let (wait_keeps_answer, wait_hears_words) = wait_keeps_answer_from_environment();
     let mut answer_kept_for: Option<crate::admission::CandidateId> = None;
+    // A new sound waits while the lamp's own line has not sounded
+    // (`LAMP_OWN_LINE_KEEPS=on`, #2220), and the candidate it was last
+    // recorded for.
+    let own_line_keeps = own_line_keeps_from_environment();
+    let mut own_kept_for: Option<crate::admission::CandidateId> = None;
     // When the lamp's name was last heard beginning, and when the sound
     // last let go had stopped, for the wait.
     let mut name_began_us: Option<u64> = None;
@@ -6128,6 +6206,47 @@ fn conversation_with_gate(
                             )?;
                         }
                         continue;
+                    }
+                    // #2220: while a line the lamp started on its own has
+                    // not sounded, a sound the room makes doesn't end it.
+                    match while_own_line_waits(
+                        own_line_keeps,
+                        reply.as_ref(),
+                        own_kept_for == Some(candidate.id),
+                        &candidate,
+                        name_began_us,
+                        at_us,
+                    ) {
+                        WhileOwnLineWaits::AsBefore | WhileOwnLineWaits::Decide => {}
+                        WhileOwnLineWaits::Wait => {
+                            if own_kept_for != Some(candidate.id) {
+                                own_kept_for = Some(candidate.id);
+                                record(
+                                    trace,
+                                    json!({"kind":"own_line_waits","turn":reply.as_ref().map(|current| current.owner.turn()),
+                                        "candidate":candidate.id,"at_us":at_us}),
+                                )?;
+                            }
+                            continue;
+                        }
+                        WhileOwnLineWaits::LetGo(why) => {
+                            if let Some(rejection) = admission.release_prospective(monotonic_us())?
+                            {
+                                record_input_rejection(trace, rejection)?;
+                            }
+                            detector.clear_prospective();
+                            own_kept_for = None;
+                            eprintln!(
+                                "lamp-voice: a sound while the lamp's own line waited to sound was let go ({why}); the line goes on"
+                            );
+                            record(
+                                trace,
+                                json!({"kind":"input_let_go_own_line","turn":reply.as_ref().map(|current| current.owner.turn()),
+                                    "candidate":candidate.id,"why":why,"at_us":at_us,
+                                    "boundary":"a sound while a line the lamp started on its own had not sounded: the room's"}),
+                            )?;
+                            continue;
+                        }
                     }
                     // #1712's B: a new sound that began as the body moved a
                     // joint, while an answer is awaited, is the lamp's own

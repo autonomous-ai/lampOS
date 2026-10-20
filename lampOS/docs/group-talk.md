@@ -389,6 +389,37 @@ starts speaking just as the lamp moves, while it thinks, is let go at
 that start; the rest of what they say begins a new line once the move is
 over. A move is under a second.
 
+**A line the lamp starts on its own isn't ended by the room's sound
+(`LAMP_OWN_LINE_KEEPS=on`, #2220; off unless set).**
+- **The fault:** on lamp-06c1 on 20 Oct (El, #806's step 7), two of three of
+  Welcome back's hellos were dropped as `user_interrupted`. A sound the room
+  made about 2 s in was admitted before any of the hello's audio
+  (`provider_audio_seen: false`). The wait above is only for an answer to
+  someone, so any sound ended the lamp's own line.
+- **With the switch,** while a line the lamp started on its own has not
+  sounded, a new sound waits instead of taking the turn
+  (`while_own_line_waits` in `crates/voice/src/coordinator.rs`). Such a line
+  is a skill's say or a reminder: no person's words it answers, no audio
+  arrived, nothing playing.
+  - **The lamp's name** heard as the sound began (`name/rising`, up to
+    `CALL_BEFORE_US` before its trigger) takes the turn at once, as before.
+  - **Any other sound** is let go once the line begins to sound, or 100 ms
+    before the sound's own decision deadline (`WAIT_DECIDES_BEFORE_US`). The
+    line goes on. The record says `own_line_waits` once, then
+    `input_let_go_own_line` with `why` (`sounded` or `deadline`), and the
+    journal says it was let go.
+  - **A sound that begins once the line sounds** is a cut-in over the lamp's
+    voice, judged by the duplex rules as for any of its speech. So words said
+    over the hello still stop it.
+- **Its cost:** someone who answers the lamp before its hello sounds, without
+  its name, is let go with the room, and says it again over the hello or
+  after it.
+- **Tested** as a function
+  (`a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds`). The
+  loop's own call isn't driven by a test, as the wait's isn't. On a lamp:
+  played room noise over three hellos before and after, and the cut-in test
+  of a person speaking over one unchanged.
+
 **With `LAMP_ASKER_FIRST=on`, the person asked comes first while the
 answer is awaited** (`crates/voice/src/asker_first.rs`, #829; off unless
 set, and `record` to judge it without acting). On lamp-4ace in the busy
