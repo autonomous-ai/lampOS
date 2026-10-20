@@ -5370,6 +5370,32 @@ fn a_lines_words_are_counted_against_the_line_before_and_the_lamps_answer() {
     assert_eq!(super::shared_words("", "anything"), 0);
 }
 
+/// The reviewer's P3 on #2043: the journal's line as it is said, both
+/// parts, each alone, and nothing with no words or nothing to compare.
+#[test]
+fn the_whose_words_line_says_its_counts_in_its_own_words() {
+    let cut = || Some((4, "Hey Lamp, what time is it".to_owned()));
+    let said = || Some((3, "It's four in the morning.".to_owned()));
+    assert_eq!(
+        super::whose_words(5, "Hey Lamp, what time is it?", cut(), said()).as_deref(),
+        Some(
+            "lamp-voice second: request 5: of its 6 words, 6 in request 4's words it cut short, 0 in the lamp's answer to request 3 so far"
+        )
+    );
+    assert_eq!(
+        super::whose_words(5, "it's four in the morning", None, said()).as_deref(),
+        Some(
+            "lamp-voice second: request 5: of its 5 words, 5 in the lamp's answer to request 3 so far"
+        )
+    );
+    assert_eq!(
+        super::whose_words(5, "what time", cut(), None).as_deref(),
+        Some("lamp-voice second: request 5: of its 2 words, 2 in request 4's words it cut short")
+    );
+    assert_eq!(super::whose_words(5, "what time", None, None), None);
+    assert_eq!(super::whose_words(5, "  ", cut(), said()), None);
+}
+
 /// The words of the latest answer sent to the voice are kept with its
 /// request, for that count; a newer answer replaces them.
 #[tokio::test]
