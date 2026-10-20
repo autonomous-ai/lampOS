@@ -25,6 +25,7 @@ fn lease(sequence: u64, now: u64, permitted: bool) -> MicrophonePrivacy {
         expires_at_us: now + FRESH_US,
         permitted,
         physical_muted: Some(!permitted),
+        no_slide: false,
     }
 }
 
@@ -154,14 +155,96 @@ impl Fixture {
     }
 }
 
+/// A lamp with no slide: Voice's lease bound to the Controls publication
+/// that said so, with no physical level.
+fn no_slide(sequence: u64, now: u64, observed_us: u64, permitted: bool) -> MicrophonePrivacy {
+    MicrophonePrivacy {
+        observed_us,
+        expires_at_us: observed_us + FRESH_US,
+        physical_muted: None,
+        no_slide: true,
+        permitted,
+        ..lease(sequence, now, permitted)
+    }
+}
+
 #[test]
 fn only_exact_on_selects_the_new_boundary() {
     assert!(!enabled(None));
     assert!(!enabled(Some("off")));
     assert!(enabled(Some("on")));
-    for value in ["", "ON", "true", " on"] {
+    for value in ["", "ON", "true", " on", "NO-SLIDE", "no_slide", " no-slide"] {
         assert!(!enabled(Some(value)));
     }
+}
+
+/// `no-slide` selects the same boundary: Ears captures only under Voice's
+/// lease, with its lineage, epoch and fence, whatever grants it.
+#[test]
+fn no_slide_selects_the_same_boundary() {
+    assert!(enabled(Some("no-slide")));
+}
+
+/// A no-slide lease opens MIC1 and ends 50 ms after its Controls
+/// publication, as a slide's ends 50 ms after its reading.
+#[test]
+fn a_no_slide_lease_opens_capture_and_expires_at_its_observation() {
+    let mut fixture = Fixture::new();
+    let lease = no_slide(1, START, START - 10_000, true);
+    lease.check().unwrap();
+    fixture.observe(lease).unwrap();
+    assert!(fixture.tick(BLOCK, 0, 0, false, false).unwrap().is_some());
+    assert!(fixture.owner.is_open());
+    fixture.clock.set(START + 39_999);
+    assert!(
+        fixture
+            .owner
+            .maintain(fixture.clock.get())
+            .unwrap()
+            .is_some()
+    );
+    fixture.clock.set(START + 40_000);
+    assert!(
+        fixture
+            .owner
+            .maintain(fixture.clock.get())
+            .unwrap()
+            .is_none()
+    );
+    assert!(!fixture.owner.is_open());
+    assert_eq!(
+        fixture.kinds(),
+        [Event::Open, Event::Read, Event::Discard, Event::Drop]
+    );
+    // Denied by Voice (the software mute): nothing opens.
+    let mut denied = Fixture::new();
+    denied.observe(no_slide(1, START, START, false)).unwrap();
+    assert!(denied.tick(BLOCK, 0, 0, false, false).unwrap().is_none());
+    assert!(denied.kinds().is_empty());
+}
+
+/// A later no-slide lease cannot carry an older Controls publication than
+/// the last: its observation is fenced as a switch reading is.
+#[test]
+fn a_no_slide_observation_regression_is_refused() {
+    let mut fixture = Fixture::new();
+    fixture.observe(no_slide(1, START, START, true)).unwrap();
+    fixture.tick(BLOCK / 2, 0, 0, false, false).unwrap();
+    assert!(fixture.owner.is_open());
+    fixture.clock.set(START + 10_000);
+    let regressed = no_slide(2, START + 10_000, START - 1, true);
+    regressed.check().unwrap();
+    assert!(fixture.observe(regressed).is_err());
+    assert!(!fixture.owner.is_open());
+    assert!(fixture.tick(BLOCK, 0, 0, false, false).unwrap().is_none());
+    // The same publication renewed is no regression.
+    let mut renewed = Fixture::new();
+    renewed.observe(no_slide(1, START, START, true)).unwrap();
+    renewed.clock.set(START + 10_000);
+    renewed
+        .observe(no_slide(2, START + 10_000, START, true))
+        .unwrap();
+    assert!(renewed.tick(BLOCK, 0, 0, false, false).unwrap().is_some());
 }
 
 #[test]

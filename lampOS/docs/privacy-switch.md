@@ -7,9 +7,10 @@ accepts it on lamp-4ace, the default promotion belongs to First under
 direct-GPIO Voice path and original Ears loop; that older Ears loop does **not**
 close MIC1 in response to the physical switch. Updating only Voice therefore
 does not implement privacy for both microphones. Only the exact value `on`
-selects the route, in all three; any other value, an empty one included, is off.
-Without it, a pins file that has a `privacy` section is refused, as it was before
-the section existed.
+selects the route, in all three, or `no-slide` for a lamp with no slide (see
+[A lamp with no slide](#a-lamp-with-no-slide-no-slide)); any other value, an
+empty one included, is off. Without `on`, a pins file that has a `privacy`
+section is refused, as it was before the section existed.
 
 Controls takes the single GPIO request for `/dev/gpiochip1`, line 9, pull-up,
 electrical LOW = muted. A line it cannot take (another process still holds
@@ -97,10 +98,11 @@ for Ears, with this structure:
 | `session_id` | Sixteen-hex-character Bus publisher boot; matches the envelope |
 | `controller_boot` | 32-hex-character private IPC owner boot |
 | `microphone_generation` | Owner's nonzero microphone generation |
-| `observed_us` | Original physical acquisition; zero only for unknown state |
+| `observed_us` | Original physical acquisition (with `no_slide`, the Controls publication); zero only for unknown state |
 | `expires_at_us` | Monotonic deadline bounded by both acquisition and owner |
-| `permitted` | Fresh physical open and current Voice permission both allow capture |
+| `permitted` | Fresh physical open (or fresh `no_slide` publication) and current Voice permission both allow capture |
 | `physical_muted` | Observed LOW/HIGH, or unknown; never an inferred user action |
+| `no_slide` | Only with `no-slide`, and left out otherwise: the lamp has no slide and `physical_muted` is unknown |
 
 The topic is Latest, renewed on changes and at a 10 ms scheduling interval,
 with a 50 ms declared lifetime. A permit expires no later than 50 ms after its
@@ -122,6 +124,102 @@ pump. Slow Bus I/O cannot keep that handle alive; native ALSA open/configure,
 read/discard and process scheduling still require device timing measurements.
 Derived metadata already inside a Bus send cannot be retracted; its original
 timestamp is retained. See [Ears](ears.md) for that boundary.
+
+## A lamp with no slide (`no-slide`)
+
+No lamp's pins file has a `privacy` section, so with `on` the voice fails
+closed for good ("Controls has no selected privacy source") and the
+microphones never open. `LAMP_PRIVACY_CONTROLS=no-slide`, set in Controls,
+Voice and Ears together, runs the same route on a lamp with no slide.
+
+**What grants.** Controls reads no line, and its start line says `privacy
+route on, no slide: the voice grants from its mute alone`. It refuses to
+start if the pins file has a `privacy` section (a slide is wired: that lamp
+is `on`); its replay under `no-slide` is as off. Each
+`controls/state` it publishes carries `no_privacy_slide: true` and no
+`privacy`, at the route's cadence: every 20 ms, with the selected bus's 5 ms
+rescan and 1 ms step, as with a slide reader. The voice's privacy worker,
+told by its `--no-slide` argument (its environment is cleared), takes each
+fresh, ordered publication from the same Controls session as one observation,
+read as not muted, with every envelope, session, order and 50 ms freshness
+check a slide's state has. Its gate needs 60 ms of such steady observations,
+as for a slide read open. The lease then needs Voice's controller to allow
+the microphone. It says `no_slide: true`, `physical_muted` unknown,
+`observed_us` the publication's time, and expires no later than 50 ms after
+it. Ears captures only under that lease, with the same lineage, generation
+(`microphone_generation`), epoch and fence as with a slide; its observation
+regression check now applies to any lease with a nonzero `observed_us`.
+
+**What closes it.** The software mute: a long press, or a hand held on the
+head for sleep, sets Voice's controller to Denied, which revokes the lease and
+ends the cycle exactly as with a slide. Without a slide **the software mute
+is the only gate**. [controls/src/mute.rs](../crates/controls/src/mute.rs)
+says its record "never grants permission to open a worker", and this page
+calls the mute "a separate inhibit" beside the slide. Both stay true (a grant
+still needs the fresh Controls marker and the controller's own permission),
+but on a no-slide lamp nothing else can close the microphones. So the voice
+refuses to start with `no-slide` and no `--controls-mute` (the persisted
+record): a restart would forget a mute. Losing Controls, a
+stale, skipped or reordered publication, a publisher restart, or a state with
+slide evidence or without the marker ends the worker as unreadable, and the
+microphones stay closed until a fresh worker reads fresh markers again.
+
+**Both must agree, or it fails closed.** A missing `privacy` section is never
+read as "no slide": only `no-slide` in the voice together with the marker from
+Controls grants. A voice with `no-slide` refuses a state with `privacy` or
+without the marker; a voice with `on` refuses a state with the marker. A state
+with both is invalid (`ControlsState::check`). `physical_muted` is never
+inferred and no `PrivacySwitch` is ever made up: on a no-slide lamp
+`physical_muted` stays unknown, and `PrivacySwitch` stays an electrical
+observation only.
+
+**The ring.** Only a verified physical LOW paints the red breath, and a
+no-slide lamp has none, so its ring is as with the route off: the asleep face
+(`LAMP_RING_ASLEEP=on`), the tap face and the reminder pulse are allowed, and
+the wait never starts the muted indicator worker (`worker ring --privacy`), so
+the ring keeps one writer. Controls never opens microphones or clears a
+software mute.
+
+**Expression's head touch.** `lamp-expression serve --head-touch` reads
+`voice/privacy` and counts a valid lease as the switch open when it says
+`physical_muted: false`, or `no_slide` (`runtime::privacy_muted_in`): a lamp
+with no slide has no switch to close, so a head tap looks up as on a lamp
+without the route, muted by software or not. The unknown lease, with the
+Controls word stale, still counts as closed.
+
+**Classes stay off.** lamp-ears' room sound classes (#1923,
+`LAMP_EARS_CLASSES=on`) start only on `on`, a lamp with a slide
+(`privacy::slide`, `start_classes`): with `no-slide` no classifier runs,
+whatever that switch says, and the journal says so once (the reviewer's P2
+on #2086). The lead's decision (#1711, 07:33 on #1722): on a lamp with no
+slide they stay off until the person says yes in setup; that stored yes is
+read beside this check in lamp-ears (Sixth's).
+
+**Only for a board with no slide.** Controls refuses `no-slide` only when the
+pins file has a `privacy` section, and no pins file has one today. A slide
+that is fitted but not declared (the product's hardware contract gives it
+one on chip 1, line 9, `hardware-contract.md`) can't be detected here, and
+`no-slide` on such a lamp ignores it. Set it only on a lamp with none fitted,
+as lamp-4ace (`creature.md`).
+
+**Ears doesn't check its own route.** An Ears set to `on` takes a `no_slide`
+lease. That's safe: the voice makes one only on Controls' marker, which
+needs `no-slide` in Controls and no `privacy` section.
+
+**Rollback.** Builds before `no-slide` read it as off, in all three services.
+Rolling back the binaries with the units unchanged is today's behaviour
+exactly: the direct GPIO privacy worker, the original Ears loop (which does
+not close MIC1 for privacy) and Controls with no privacy route. An older Ears
+reading a no-slide lease finds it invalid (a permit with unknown physical
+state, or an acquisition with no level) and stays closed.
+
+Tests: `crates/controls/tests/no_slide.rs`, the no-slide tests in
+`crates/voice/tests/privacy_controls.rs` and `privacy_pipeline.rs`,
+`crates/msgs/tests/privacy.rs` and `controls.rs`, and Ears'
+`a_no_slide_lease_opens_capture_and_expires_at_its_observation` and
+`a_no_slide_observation_regression_is_refused`. The real worker's
+`the_real_worker_with_no_slide_grants_from_its_controller_alone`
+(`privacy_worker.rs`) runs on Linux only. No lamp was used.
 
 ## Muted appearance and timing
 

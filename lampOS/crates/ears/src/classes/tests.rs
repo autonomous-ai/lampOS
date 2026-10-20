@@ -433,3 +433,20 @@ fn a_lamp_muted_from_the_start_says_privacy() {
     stop.store(true, Ordering::Release);
     worker.join().unwrap();
 }
+
+/// The reviewer's P2 on #2086: the classifier starts only with its switch
+/// exactly `on` and on a lamp with a slide (`LAMP_PRIVACY_CONTROLS=on`).
+/// With `no-slide` it never runs, whatever the switch says, and that is
+/// said; with the switch off there is nothing to say.
+#[test]
+fn the_classifier_starts_only_on_a_lamp_with_a_slide() {
+    assert_eq!(start(Some("on"), Some("on")), Start::Start);
+    for route in [Some("no-slide"), None, Some(""), Some("off"), Some("ON")] {
+        assert_eq!(start(Some("on"), route), Start::NotOnThisRoute, "{route:?}");
+    }
+    for classes in [None, Some(""), Some("off"), Some("ON")] {
+        for route in [Some("on"), Some("no-slide"), None] {
+            assert_eq!(start(classes, route), Start::Off, "{classes:?} {route:?}");
+        }
+    }
+}

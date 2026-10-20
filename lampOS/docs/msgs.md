@@ -195,7 +195,9 @@ transition; the existing 100 ms topic declaration is unchanged.
 
 Absent/off omits the field from serialized state. Older messages without it
 still deserialize; a selected Voice treats absence as unknown and denies
-capture. [Privacy switch](privacy-switch.md) describes wiring, authority and
+capture. With `LAMP_PRIVACY_CONTROLS=no-slide` Controls reads no slide and
+says so instead: `no_privacy_slide: true`, left out when false, never beside
+`privacy` (`check()` refuses both). [Privacy switch](privacy-switch.md) describes wiring, authority and
 the coordinated opt-in across Controls, Voice and Ears.
 
 ## Optional microphone permission contract (#755)
@@ -210,8 +212,11 @@ seventeen. Only Voice's selected privacy worker publishes it.
 Version 1 of `lamp_msgs/MicrophonePrivacy` carries a publication `ClockStamp`,
 16-character hexadecimal Bus `session_id`, 32-character hexadecimal
 `controller_boot`, positive `microphone_generation`, `observed_us`,
-`expires_at_us`, `permitted`, and optional `physical_muted`. Unknown physical
-state uses `observed_us = 0` and cannot permit capture. A known sample's expiry
+`expires_at_us`, `permitted`, optional `physical_muted`, and `no_slide`, left
+out when false. Unknown physical state uses `observed_us = 0` and cannot permit
+capture, except that a `no_slide` lease (a lamp with no slide) may permit with
+`physical_muted` unknown: its `observed_us` is the Controls publication, held
+to the same rules as a switch reading, and it never has a physical level. A known sample's expiry
 cannot exceed acquisition plus 50 ms. Permission also expires with the
 controller snapshot; a fresh publication cannot extend either source.
 
@@ -409,7 +414,7 @@ topic catalogue. Neither carries any sound.
 |---|---|---|---|---|
 | `RoomSound` | `ears/level` | latest | 100 ms / none | The room microphone's last 100 ms in dBFS, the room's quiet (none for the first two seconds), whether the lamp's own voice is in it |
 | `SuddenSound` | `ears/sudden` | event | none / none | A sound that rose suddenly out of the quiet: its loudest 20 ms, the quiet, how long it stayed loud in 300 ms, whether that was short, how long ago it began |
-| `SoundClasses` | `ears/classes` | latest | 500 ms / 1,500 ms | Unavailable with no scores, or multi-label speech/music/laughter scores with original window times, completion, capture epoch, model id and own-voice evidence; Ears publishes it only with `LAMP_EARS_CLASSES=on` and `LAMP_PRIVACY_CONTROLS=on`, off by default (#1669, sound-events.md) |
+| `SoundClasses` | `ears/classes` | latest | 500 ms / 1,500 ms | Unavailable with no scores, or multi-label speech/music/laughter scores with original window times, completion, capture epoch, model id and own-voice evidence; Ears publishes it only with `LAMP_EARS_CLASSES=on` and `LAMP_PRIVACY_CONTROLS=on` (never with `no-slide`), off by default (#1669, sound-events.md) |
 
 Levels are dBFS from -120 (digital silence) to 0; `check()` refuses
 anything else, and a peak under its quiet.

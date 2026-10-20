@@ -244,6 +244,13 @@ pub struct ControlsState {
     /// Independent chip-1 evidence; absent when its explicit opt-in is off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub privacy: Option<PrivacySwitch>,
+    /// Controls runs the privacy route for a lamp with no slide
+    /// (`LAMP_PRIVACY_CONTROLS=no-slide`): no switch is wired, so none is
+    /// read. A positive statement, never inferred from `privacy` being
+    /// absent, and never with it. Not a permit: Voice grants from its own
+    /// controller. Left out when false, so other states are as before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub no_privacy_slide: bool,
 }
 
 impl ControlsState {
@@ -260,6 +267,11 @@ impl ControlsState {
     pub fn check(&self) -> Result<(), Invalid> {
         self.stamp.check()?;
         control_name(&self.session_id)?;
+        if self.no_privacy_slide && self.privacy.is_some() {
+            return Err(Invalid(
+                "a state that says no slide is wired carries no slide evidence".into(),
+            ));
+        }
         if let Some(privacy) = &self.privacy {
             privacy.check()?;
             if privacy.stamp.clock_id != self.stamp.clock_id

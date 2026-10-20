@@ -577,6 +577,7 @@ mod sleep_name {
                 expires_at_us: at + 30_000,
                 permitted: false,
                 physical_muted: Some(closed),
+                no_slide: false,
             };
             lease.check().unwrap();
             privacy.publish_json(987_654_321, &lease).unwrap();
@@ -983,6 +984,7 @@ fn a_closed_switch_reads_from_the_last_privacy_lease_said() {
         expires_at_us: 1_030_000,
         permitted: false,
         physical_muted,
+        no_slide: false,
     };
     for (sequence, physical_muted, closed) in [
         (1, Some(true), true),
@@ -1012,6 +1014,20 @@ fn a_closed_switch_reads_from_the_last_privacy_lease_said() {
     bad.microphone_generation = 0;
     assert!(bad.check().is_err());
     out.publish_json(6, &bad).unwrap();
+    assert!(runtime::privacy_muted_in(latest()));
+    // A lamp with no slide (`no-slide`): its valid lease is open, muted by
+    // software or not, since it has no switch to close, as a lamp without
+    // the route. Its unknown lease, with the Controls word stale, is closed.
+    for (sequence, permitted) in [(7, true), (8, false)] {
+        let mut no_slide = lease(sequence, None);
+        no_slide.no_slide = true;
+        no_slide.observed_us = 990_000;
+        no_slide.permitted = permitted;
+        no_slide.check().unwrap();
+        out.publish_json(sequence, &no_slide).unwrap();
+        assert!(!runtime::privacy_muted_in(latest()), "{permitted}");
+    }
+    out.publish_json(9, &lease(9, None)).unwrap();
     assert!(runtime::privacy_muted_in(latest()));
 }
 

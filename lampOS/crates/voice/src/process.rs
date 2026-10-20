@@ -1534,6 +1534,46 @@ mod tests {
         assert!(got.is_empty(), "the child got {:?}", names(&got));
     }
 
+    /// `LAMP_PRIVACY_CONTROLS=no-slide`: the privacy worker's environment is
+    /// cleared, so a started worker learns the route from its arguments,
+    /// exactly as the voice's own command line reads them back, and never
+    /// from the switch, which does not reach it.
+    #[test]
+    fn a_started_privacy_worker_learns_no_slide_from_its_arguments_only() {
+        use crate::privacy_bus::{Route, worker_arguments, worker_route};
+        use std::os::unix::fs::PermissionsExt;
+        let home = SessionDirectory::create().unwrap();
+        let script = home.path.join("worker.sh");
+        std::fs::write(
+            &script,
+            "#!/bin/sh\ndir=\"$3\"\nshift 5\nprintf '%s\\n' \"$@\" > \"$dir/args.txt\"\n/usr/bin/env > \"$dir/env.txt\"\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let root = Path::new("/run/lampos-bus");
+        let extra = worker_arguments(Some((root, Route::NoSlide))).unwrap();
+        let extra: Vec<&str> = extra.iter().map(String::as_str).collect();
+        let boot = new_boot().unwrap();
+        let status = status_of_fresh(&mut worker_command(
+            &script,
+            &home.path,
+            "privacy",
+            (boot, boot),
+            &extra,
+            |name| (name == crate::privacy_bus::ENVIRONMENT).then(|| "no-slide".into()),
+        ));
+        assert!(status.success());
+        let given: Vec<String> = std::fs::read_to_string(home.path.join("args.txt"))
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        assert_eq!(given, ["--controls-root", "/run/lampos-bus", "--no-slide"]);
+        assert_eq!(worker_route(&given).unwrap(), (root.into(), Route::NoSlide));
+        let environment = std::fs::read_to_string(home.path.join("env.txt")).unwrap();
+        assert!(!environment.contains(crate::privacy_bus::ENVIRONMENT));
+    }
+
     fn child_worker(directory: &SessionDirectory, script: &str) -> Worker {
         let parent = new_boot().unwrap();
         let boot = new_boot().unwrap();

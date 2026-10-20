@@ -16,7 +16,7 @@ use lamp_msgs::{
 use lamp_turn_owner::{BootId, Controller, MonoTime, Permission};
 use lamp_voice::{
     privacy::REOPEN_STABLE_US,
-    privacy_bus::{ROOT_FLAG, wall_ms},
+    privacy_bus::{NO_SLIDE_FLAG, ROOT_FLAG, wall_ms},
     process::{Worker, boot_text, new_boot},
     wire::{Control, WorkerEvent},
 };
@@ -80,7 +80,9 @@ struct Producer {
     thread: Option<JoinHandle<io::Result<Production>>>,
 }
 impl Producer {
-    fn start(bus: &Bus, clock: String) -> Self {
+    /// With `no_slide`, each state says no slide is wired and carries no
+    /// slide evidence, as Controls with `LAMP_PRIVACY_CONTROLS=no-slide`.
+    fn start(bus: &Bus, clock: String, no_slide: bool) -> Self {
         let mut publisher = bus
             .publisher_declared(
                 ControlsState::TOPIC,
@@ -145,12 +147,13 @@ impl Producer {
                     latest_mute: None,
                     event_sequence: 0,
                     rejected_inputs: 0,
-                    privacy: Some(PrivacySwitch {
+                    privacy: (!no_slide).then(|| PrivacySwitch {
                         stamp,
                         reader_session_id: "synthetic-slide".into(),
                         muted: Some(muted),
                         fault: None,
                     }),
+                    no_privacy_slide: no_slide,
                 };
                 state.check().map_err(io::Error::other)?;
                 // A cached path can disappear during verified worker stop.
@@ -202,21 +205,26 @@ struct Rig {
     last_low_event: Option<u64>,
     last_lease: Option<MicrophonePrivacy>,
     retired_session: Option<String>,
+    no_slide: bool,
     root: Root,
 }
 impl Rig {
     fn start(permission: Permission) -> Self {
+        Self::start_with(permission, false)
+    }
+
+    fn start_with(permission: Permission, no_slide: bool) -> Self {
         let root = Root::new();
         let bus = selected_bus(Bus::new(root.0.join("bus")).unwrap());
         let clock = lamp_controls::runtime::clock_id(None).unwrap();
         let subscriber = Self::subscribe(&bus);
-        let producer = Producer::start(&bus, clock.clone());
+        let producer = Producer::start(&bus, clock.clone(), no_slide);
         let boot = new_boot().unwrap();
         let mut controller = Controller::new(boot, now());
         controller
             .set_microphone_permission(now(), permission)
             .unwrap();
-        let worker = Self::spawn(&root, boot);
+        let worker = Self::spawn(&root, boot, no_slide);
         Self {
             worker: Some(worker),
             subscriber: Some(subscriber),
@@ -230,6 +238,7 @@ impl Rig {
             last_low_event: None,
             last_lease: None,
             retired_session: None,
+            no_slide,
             root,
         }
     }
@@ -239,13 +248,18 @@ impl Rig {
             .unwrap()
     }
 
-    fn spawn(root: &Root, boot: BootId) -> Worker {
+    fn spawn(root: &Root, boot: BootId, no_slide: bool) -> Worker {
+        let bus = root.0.join("bus");
+        let mut arguments = vec![ROOT_FLAG, bus.to_str().unwrap()];
+        if no_slide {
+            arguments.push(NO_SLIDE_FLAG);
+        }
         Worker::spawn(
             Path::new(env!("CARGO_BIN_EXE_lamp-voice")),
             &root.0.join("ipc"),
             "privacy",
             boot,
-            &[ROOT_FLAG, root.0.join("bus").to_str().unwrap()],
+            &arguments,
         )
         .unwrap()
     }
@@ -402,7 +416,7 @@ impl Rig {
         self.last_lease = None;
         self.first_high = None;
         self.last_authority = None;
-        self.worker = Some(Self::spawn(&self.root, self.boot));
+        self.worker = Some(Self::spawn(&self.root, self.boot, self.no_slide));
     }
 }
 impl Drop for Rig {
@@ -547,4 +561,37 @@ fn losing_controls_ends_the_real_worker_cleanly_and_expires_its_lease() {
     retained.check().unwrap();
     assert!(retained.expires_at_us <= last_acquired + MICROPHONE_PRIVACY_FRESH_US);
     assert!(!retained.fresh_at(&rig.clock, monotonic_us()));
+}
+
+/// `no-slide` through the real worker and its real argument: each fresh
+/// marker publication is an observation read as not muted. A Denied
+/// controller (the software mute) is never granted; an Allowed one is after
+/// 60 ms of steady markers, the lease bound to the publication with no
+/// physical level; Denied again revokes at once.
+#[test]
+fn the_real_worker_with_no_slide_grants_from_its_controller_alone() {
+    let mut rig = Rig::start_with(Permission::Denied, true);
+    rig.until(|value| value.no_slide);
+    rig.observe(Duration::from_millis(80), |value| {
+        assert!(!value.permitted);
+        assert!(value.no_slide);
+        assert_eq!(value.physical_muted, None);
+    });
+    rig.permission(Permission::Allowed);
+    let allowed = rig.until(|value| value.permitted);
+    assert!(allowed.no_slide);
+    assert_eq!(allowed.physical_muted, None);
+    assert!(allowed.observed_us > 0 && allowed.observed_us <= allowed.stamp.at_us);
+    assert!(allowed.expires_at_us <= allowed.observed_us + MICROPHONE_PRIVACY_FRESH_US);
+    assert!(allowed.stamp.at_us - rig.first_high.unwrap() >= REOPEN_STABLE_US);
+    rig.permission(Permission::Denied);
+    let muted = rig.until(|value| !value.permitted);
+    assert!(muted.no_slide);
+    assert!(
+        rig.last_low_event.is_none(),
+        "with no slide nothing is ever observed muted"
+    );
+    rig.stop_worker();
+    let produced = rig.producer.finish();
+    assert!(produced.samples > 20);
 }

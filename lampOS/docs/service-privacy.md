@@ -12,7 +12,12 @@ With `LAMP_PRIVACY_CONTROLS=on`, the selected privacy worker instead consumes
 the installed Controls privacy observations and publishes the typed Voice-only
 `voice/privacy` lease. This is an explicit experiment; unset retains the current
 direct-GPIO path. Permission still starts denied, and neither a Controls
-observation nor an indication can grant it independently of Voice.
+observation nor an indication can grant it independently of Voice. With
+`LAMP_PRIVACY_CONTROLS=no-slide` the same worker (told by `--no-slide`) takes
+each fresh Controls publication saying the lamp has no slide as an open
+observation, so the software mute alone closes the microphones; `serve`
+refuses to start without `--controls-mute`, and the wait never starts the
+muted indicator ([privacy-switch.md](privacy-switch.md#a-lamp-with-no-slide-no-slide)).
 
 During that mode's quiescent wait, a separate optional ring process starts only
 after a validated muted observation and may show a dark-red physical-mute

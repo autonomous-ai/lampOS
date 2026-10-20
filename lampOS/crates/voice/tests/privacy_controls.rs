@@ -3,7 +3,10 @@ use lamp_msgs::{ClockStamp, ControlFault, ControlsState, HoldTier, PrivacySwitch
 use lamp_turn_owner::MonoTime;
 use lamp_voice::{
     privacy::{PrivacyGate, PrivacyState},
-    privacy_bus::{SwitchFence, selected_root, worker_arguments},
+    privacy_bus::{
+        NO_SLIDE_FLAG, ROOT_FLAG, Route, SwitchFence, refuse_no_slide_without_mute, selected,
+        selected_root, worker_arguments, worker_route,
+    },
 };
 
 fn state(at_us: u64, sequence: u64, muted: bool) -> ControlsState {
@@ -36,6 +39,17 @@ fn state(at_us: u64, sequence: u64, muted: bool) -> ControlsState {
             muted: Some(muted),
             fault: None,
         }),
+        no_privacy_slide: false,
+    }
+}
+
+/// Controls on a lamp with no slide: no switch evidence, and its word that
+/// none is wired.
+fn marker(at_us: u64, sequence: u64) -> ControlsState {
+    ControlsState {
+        privacy: None,
+        no_privacy_slide: true,
+        ..state(at_us, sequence, false)
     }
 }
 
@@ -76,7 +90,7 @@ fn off_selects_original_worker_and_touches_no_path() {
     );
     assert!(selected_root(Some("on"), Some("relative")).is_err());
     assert_eq!(
-        worker_arguments(Some(std::path::Path::new("/tmp/test"))).unwrap(),
+        worker_arguments(Some((std::path::Path::new("/tmp/test"), Route::Slide))).unwrap(),
         ["--controls-root", "/tmp/test"]
     );
 }
@@ -265,4 +279,196 @@ fn low_retires_capture_lease_even_after_slow_drain_with_old_allowed_controller()
         .set_microphone_permission(at(290_001), Permission::Denied)
         .unwrap();
     assert!(!next.permitted(controller.snapshot(at(290_001)).unwrap(), 290_001));
+}
+
+/// `no-slide` selects the route for a lamp with no slide; any other value
+/// but `on` is off, as builds before it read `no-slide`.
+#[test]
+fn no_slide_selects_the_route_and_reaches_the_worker_only_as_an_argument() {
+    for switch in [
+        None,
+        Some("off"),
+        Some("NO-SLIDE"),
+        Some("no_slide"),
+        Some(""),
+    ] {
+        assert_eq!(Route::from_value(switch), None, "{switch:?}");
+        assert!(selected(switch, None).unwrap().is_none());
+    }
+    assert_eq!(Route::from_value(Some("on")), Some(Route::Slide));
+    assert_eq!(Route::from_value(Some("no-slide")), Some(Route::NoSlide));
+    let (root, route) = selected(Some("no-slide"), None).unwrap().unwrap();
+    assert_eq!(
+        (root.to_str(), route),
+        (Some("/run/lampos-bus"), Route::NoSlide)
+    );
+    assert_eq!(
+        selected_root(Some("no-slide"), Some("/tmp/b"))
+            .unwrap()
+            .unwrap()
+            .to_str(),
+        Some("/tmp/b")
+    );
+    assert!(selected(Some("no-slide"), Some("relative")).is_err());
+    // The worker's environment is cleared: the route is its argument, and
+    // the worker reads back exactly what it was given.
+    let root = std::path::Path::new("/tmp/test");
+    let arguments = worker_arguments(Some((root, Route::NoSlide))).unwrap();
+    assert_eq!(arguments, [ROOT_FLAG, "/tmp/test", NO_SLIDE_FLAG]);
+    assert_eq!(
+        worker_route(&arguments).unwrap(),
+        (root.into(), Route::NoSlide)
+    );
+    let arguments = worker_arguments(Some((root, Route::Slide))).unwrap();
+    assert_eq!(
+        worker_route(&arguments).unwrap(),
+        (root.into(), Route::Slide)
+    );
+    for wrong in [
+        vec![ROOT_FLAG, "relative"],
+        vec![ROOT_FLAG, "/tmp/test", "--slide"],
+        vec![ROOT_FLAG, "/tmp/test", NO_SLIDE_FLAG, NO_SLIDE_FLAG],
+        vec![NO_SLIDE_FLAG, ROOT_FLAG, "/tmp/test"],
+        vec![ROOT_FLAG],
+    ] {
+        let wrong: Vec<String> = wrong.into_iter().map(String::from).collect();
+        assert!(worker_route(&wrong).is_err(), "{wrong:?}");
+    }
+}
+
+/// With no slide the software mute alone closes the microphones: without
+/// its persisted record a restart would forget a mute, so the voice refuses.
+#[test]
+fn no_slide_without_the_persisted_mute_refuses_to_start() {
+    let error = refuse_no_slide_without_mute(Some(Route::NoSlide), false).unwrap_err();
+    assert!(error.to_string().contains("--controls-mute"), "{error}");
+    refuse_no_slide_without_mute(Some(Route::NoSlide), true).unwrap();
+    for route in [None, Some(Route::Slide)] {
+        refuse_no_slide_without_mute(route, false).unwrap();
+    }
+}
+
+/// Each fresh publication of the marker is an observation, read as not
+/// muted: the lease is permitted by an Allowed controller after the usual
+/// 60 ms of steady evidence, and never by a Denied one (the software mute).
+#[test]
+fn with_no_slide_a_fresh_marker_permits_only_with_an_allowed_controller() {
+    use lamp_turn_owner::{BootId, Controller, Permission};
+    use lamp_voice::privacy_bus::{CaptureLeaseGate, Observation, fresh, grants};
+    let at = MonoTime::from_micros;
+    for permission in [Permission::Allowed, Permission::Denied] {
+        let mut controller = Controller::new(BootId::new([1; 16]).unwrap(), at(100_000));
+        controller
+            .set_microphone_permission(at(100_000), permission)
+            .unwrap();
+        let mut fence = SwitchFence::no_slide("boot".into());
+        let mut gate = CaptureLeaseGate::default();
+        for (i, now) in [100_000, 120_000, 140_000, 160_000].into_iter().enumerate() {
+            let observed = fence
+                .observe(&message(&marker(now, i as u64 + 1)), now + 1, 1000)
+                .unwrap()
+                .unwrap();
+            assert_eq!(observed.physical_muted(), None);
+            assert!(!observed.muted().unwrap());
+            let Observation::NoSlide(stamp) = &observed else {
+                panic!("a no-slide fence gave {observed:?}");
+            };
+            assert_eq!((stamp.at_us, stamp.sequence), (now, i as u64 + 1));
+            gate.observe(stamp.sequence, stamp.at_us, now + 1, false);
+            let snapshot = controller.snapshot(at(now + 1)).unwrap();
+            let granted = now == 160_000 && permission == Permission::Allowed;
+            assert_eq!(gate.permitted(snapshot, now + 1), granted);
+            let observed = fresh(Some(&observed), now + 1);
+            assert_eq!(
+                grants(&gate, snapshot, observed, true, now + 1),
+                granted,
+                "{permission:?} {now}"
+            );
+            // An undrained queue or a stale observation grants nothing.
+            assert!(!grants(&gate, snapshot, observed, false, now + 1));
+            assert!(fresh(observed, now + 50_000).is_none());
+        }
+    }
+}
+
+/// A stale or future publication, a skipped one, a publisher restart or a
+/// changed session, slide evidence, or a state that does not say no slide
+/// is wired (a missing privacy section is never read as no slide): each
+/// ends a no-slide worker, which says the switch is unreadable.
+#[test]
+fn with_no_slide_stale_restarted_or_unmarked_states_are_refused() {
+    for mutation in 0..9 {
+        let mut fence = SwitchFence::no_slide("boot".into());
+        fence
+            .accept_no_slide(&message(&marker(100_000, 1)), 100_000, 1000)
+            .unwrap();
+        let mut next = marker(120_000, 2);
+        let mut now = 120_000;
+        match mutation {
+            0 => now = 170_000,
+            1 => now = 119_999,
+            2 => next.session_id = "fedcba9876543210".into(),
+            // Slide evidence beside the marker, which its own check refuses.
+            3 => next.privacy = state(120_000, 2, false).privacy,
+            // Neither marker nor evidence: a missing section is not no slide.
+            4 => next.no_privacy_slide = false,
+            5 => next.stamp.sequence = 1,
+            6 => next.stamp.at_us = 99_999,
+            _ => {}
+        }
+        let mut envelope = message(&next);
+        match mutation {
+            7 => envelope.publisher_restarted = true,
+            8 => envelope.header.seq = 3,
+            _ => {}
+        }
+        assert!(
+            fence.accept_no_slide(&envelope, now, 1000).is_err(),
+            "mutation {mutation}"
+        );
+    }
+    // The first publication must already be fresh and marked.
+    let mut fence = SwitchFence::no_slide("boot".into());
+    assert!(
+        fence
+            .accept_no_slide(&message(&marker(100_000, 1)), 150_000, 1000)
+            .is_err()
+    );
+    assert!(
+        fence
+            .accept_no_slide(&message(&state(100_000, 1, false)), 100_000, 1000)
+            .is_err()
+    );
+}
+
+/// `on` reads the slide: a marker-only state fails closed as a state
+/// without slide evidence always has. Neither fence reads the other kind.
+#[test]
+fn a_fence_never_reads_the_other_kind_of_state() {
+    let mut slide = SwitchFence::new("boot".into());
+    assert!(
+        slide
+            .accept(&message(&marker(100_000, 1)), 100_000, 1000)
+            .is_err()
+    );
+    assert!(
+        SwitchFence::new("boot".into())
+            .accept_no_slide(&message(&marker(100_000, 1)), 100_000, 1000)
+            .is_err()
+    );
+    assert!(
+        SwitchFence::no_slide("boot".into())
+            .accept(&message(&state(100_000, 1, false)), 100_000, 1000)
+            .is_err()
+    );
+    assert!(
+        SwitchFence::for_route("boot".into(), Route::Slide)
+            .observe(&message(&marker(100_000, 1)), 100_000, 1000)
+            .is_err()
+    );
+    assert!(
+        SwitchFence::for_route("boot".into(), Route::NoSlide)
+            .observe(&message(&state(100_000, 1, false)), 100_000, 1000)
+            .is_err()
+    );
 }

@@ -752,6 +752,13 @@ new runtime identities and input-readiness checks in
 the consumer's selected route must relinquish its direct GPIO request before
 Controls can own the line.
 
+With `LAMP_PRIVACY_CONTROLS=no-slide` (a lamp with no slide), Controls opens no
+chip 1 line and refuses a pins file with a `privacy` section. Each
+`controls/state` carries `no_privacy_slide: true` and no `privacy`, every
+20 ms with the 5 ms bus rescan and the 1 ms step, so the voice can grant from
+its software mute alone ([privacy-switch.md](privacy-switch.md#a-lamp-with-no-slide-no-slide)).
+The marker is a statement, never a permit, and replay under `no-slide` is as off.
+
 ### Separately selected physical slide, Task 755
 
 The producer requires both the exact environment value
