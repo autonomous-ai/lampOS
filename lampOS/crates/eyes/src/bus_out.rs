@@ -502,6 +502,7 @@ impl BusOut {
                     across: (face.xmin + face.xmax) / 2.0,
                     down: (face.ymin + face.ymax) / 2.0,
                     tall: face.ymax - face.ymin,
+                    wide: filled.0 as f32 / filled.1.max(1) as f32,
                 })
                 .collect();
             presence.away.looked_at(now_us, &faces);

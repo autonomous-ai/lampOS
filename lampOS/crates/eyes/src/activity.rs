@@ -42,7 +42,7 @@ const HOLD_US: [(Activity, u64); 3] = [
 ];
 /// The sitter is the near face nearest their last place, within this many of
 /// their face's heights of it; a near face further away is someone else.
-const REACH: f32 = 1.0;
+pub(crate) const REACH: f32 = 1.0;
 /// How often the journal says the sitter's look against the baseline.
 pub const JOURNAL_US: u64 = 2_000_000;
 /// With the eyes' recogniser (#1678's (d); the owner's yes, 19 Oct 15:57,

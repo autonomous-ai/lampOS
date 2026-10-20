@@ -82,20 +82,32 @@ the activity judge and the still places use) counts only:
   look (`still.rs`), and so does a steady face far behind. Each face is
   judged on its own, so two steady far faces taking turns as the tallest,
   or a face found for one look elsewhere, are not a move (the reviewer on
-  #2149).
+  #2149); or
+- while it's the sitter's at their place: within `activity::REACH` of the
+  last near face's heights of the place's centre, and at least half that
+  face's height (`AT_PLACE_TALL`), whatever its id. The place follows the
+  sitter's face look to look, as the activity judge's `sitter_in` follows
+  its sitter, and is forgotten 4 s after no such face is at it. That's the
+  sitter leaning back (0.6 to 0.95 of their seated height at lamp-75c9) or
+  sitting low (0.68). A small face far behind the chair, in line with the
+  camera, is under half and doesn't count (the reviewer on #2183).
 
 A near face always counts. The costs:
 - Someone sitting still far from the lamp, at another desk, is nobody,
   which is what the light wants.
-- **The line is the picture's 0.14, not the sitter's own height.** Leaning
-  back or sitting low, a sitter's face is 0.76 or 0.68 as tall as sat
-  (lamp-75c9, 20 Oct). Where the seated face is under about 0.18 of the
-  picture, a lamp further from the chair, leaning back drops it under 0.14,
-  so someone still and reading that way is nobody 24 s later, and Light out
-  puts the light out on them after its 10 minutes. At lamp-75c9 leaning
-  back stayed over 0.14. #1677's rerun with the switch includes a few still
-  minutes leaning back. Off unless
-set: unset, every face counts as before.
+- A steady face behind the chair that is at least half the sitter's height
+  (a big picture, or someone close behind them) keeps counting after they
+  leave, for as long as it stays found. A small far face there doesn't.
+
+**Why the place** (#1677's rerun, lamp-75c9, 20 Oct 11:55–12:04): sitting,
+the face was 0.146 to 0.2 of the picture tall. Leaning back still, it was
+0.12 to 0.14, under 0.14 in 242 of 341 looks, and its id changed from f1 to
+f10 while the place held (0.52 to 0.55 across, 0.37 to 0.40 down). Counted
+only by the line, presence said nobody 131 s into leaning back. The line
+itself stays at 0.14, since a lower one would let a bigger far face in (the
+first builder, 12:12 on #1677). Walking out, with the far face in view at
+0.73, it said nobody 23.8 s after the last near face. Off unless set:
+unset, every face counts as before.
 
 **Never "nobody" when it is not known.** Nothing is said while the eyes are
 not looking: the camera closed by the privacy switch, a mute or the voice
