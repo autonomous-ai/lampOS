@@ -40,12 +40,12 @@ fn a_newer_catalogues_fields_are_read_past_and_named_by_path() {
 #[test]
 fn the_speaking_section_reads_a_newer_key_too() {
     let mut newer: Value = serde_json::from_str(include_str!("../alive-behaviours.json")).unwrap();
-    // #1067's key, which this build may not know.
-    newer["speaking"]["sway_yaw"] = json!(0.08);
+    // A later release's speaking key, which this build does not know.
+    newer["speaking"]["sway_pitch"] = json!(0.02);
     newer["alive"]["glimmer"] = json!(true);
     let (_, unread) = read(&newer).unwrap();
     assert!(
-        unread.contains(&"speaking.sway_yaw".to_owned()),
+        unread.contains(&"speaking.sway_pitch".to_owned()),
         "{unread:?}"
     );
     assert!(unread.contains(&"alive.glimmer".to_owned()), "{unread:?}");

@@ -1178,6 +1178,16 @@ in the body's unit (and the bus on), the body listens to `expression/body`
   four and six degrees), whatever was asked. Nothing is added while a
   gesture plays, and a lamp at rest is not stirred by it (but see "A
   glance from rest" below).
+- **With the gaze.** The base's turn from Expression (#933's sway between
+  sentences, out at most about 52 counts from centre and back) is added to
+  the turn the body's own gaze has, never instead of it. While Speaking
+  the gaze corrects only a face more than 0.35 of a half-picture off the
+  middle, and only from a head still for 0.4 s. On lamp-52e6
+  (`--gaze 782,557`) 52 counts move a face about 0.07, so a face within
+  about 0.28 of the middle is never pushed past 0.35 and the sway is left
+  alone. A face further out than that is not corrected during a sway
+  either: the sway moves the goal through its whole 1.6 s, and the gaze
+  waits for a head still for 0.4 s. Expression's sway relies on this 0.35.
 - **Which request counts.** One that passes its own check, is of this
   start of the machine (the kernel's boot identity), has not run out, was
   not made ahead of the body's clock, lasts no longer than a request may
