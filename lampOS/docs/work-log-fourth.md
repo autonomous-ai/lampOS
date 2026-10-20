@@ -5149,6 +5149,17 @@ A usage limit paused me from about 00:40 to 06:2x.
   - `would_keep` compares the upper tenth with the asker's middle, which leans to keeping.
   - The reviewer agreed and added two of its own.
 
+## 2026-10-21, 05:44 ICT: #2380 up (short lines asked); #2375 is #2382; #2340 re-read
+
+- **Claimed at 04:59** (the first builder, 04:56): the endpoint's fallbacks. Tonight's 71 `silence_fallback` Ends (11%) were all `short`: lines under the 80-speech-block floor, never sent to the model.
+- **#2380, onto #1712** (`63c0275c3` on `a4757644a`, `LAMP_ENDPOINT_SHORT_VERDICT`, off unless set):
+  - short lines of 20+ blocks are asked too, and only an unfinished one waits to 1.5 s;
+  - gate green: 3572 passed, 0 failed;
+  - the reviewer: no P1 or P2, two P3s. Their follow-up (`536fd9186`, stacked) counts each short submission and adds a talkative-room heat check, and is in the gate.
+- **Round 1 of `open-name.sh`:** lamp-name missed the name (12 speech blocks), so it's #694's. Neither the call wait nor the short verdict reaches it.
+- **#2375 closed for #2382:** the same patch on `a4757644a` (the sixth landing). Gate green: 3571 passed, 0 failed. The reviewer's read stands.
+- **#2340 re-read:** my P2 and P3 are taken. One new P3: the question check accepts any forget word, so "Did you forget your keys?" keeps a held face forget. The reviewer found a P2 there too.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5172,6 +5183,7 @@ takes a cut answer as heard only with #2186. `LAMP_SECOND_SPEECH_SOCKET` and
 `LAMP_OWN_LINE_KEEPS` is off unless set and was not run on a lamp.
 The first line's socket opened before it (#2345) was not run on a lamp.
 `LAMP_SECOND_OPEN_NAME` (#2355) is off unless set and was not run on a lamp.
+`LAMP_ENDPOINT_SHORT_VERDICT` (#2380) is off unless set and was not run on a lamp.
 lamp-peek's one page (#2259) was not run on a lamp; its timings are this
 Mac's. `probe-cascade --wire --sizes` (#2276) was not run anywhere with a
 real key.
