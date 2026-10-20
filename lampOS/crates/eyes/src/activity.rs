@@ -403,6 +403,16 @@ impl Judge {
             return None;
         }
         self.journaled_at = Some(now_us);
+        // Not seen for a while (until Away, `AWAY_AFTER_US` on): say so, not
+        // the last look again, which reads as a face held still (lamp-75c9,
+        // 20 Oct: ten equal lines after the sitter had gone, #1678).
+        let unseen_us = self.last_face.map_or(0, |last| now_us.saturating_sub(last));
+        if unseen_us >= JOURNAL_US {
+            return Some(format!(
+                "sitter not seen for {} s, {state:?}",
+                unseen_us / 1_000_000
+            ));
+        }
         Some(format!(
             "sitter {:.2} as tall as sat, {:.2} of its height lower, pitch {:.2} (sat {:.2}), {state:?}",
             face.height / base.height.max(f32::EPSILON),
@@ -874,7 +884,15 @@ mod tests {
             )
         );
         assert_eq!(judge.journal(126 * S), None);
-        assert!(judge.journal(127 * S).is_some());
+        // No look since 125 s: not seen, never the last look again (#1678).
+        assert_eq!(
+            judge.journal(127 * S).as_deref(),
+            Some("sitter not seen for 2 s, AtDesk")
+        );
+        assert_eq!(
+            judge.journal(139 * S).as_deref(),
+            Some("sitter not seen for 14 s, AtDesk")
+        );
     }
 
     #[test]
