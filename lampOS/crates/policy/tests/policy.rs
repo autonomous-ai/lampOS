@@ -6,7 +6,7 @@ use lamp_msgs::{Decision, Diagnostic, Level, NameHeard, Speech, Voice, VoiceStat
 use lamp_policy::{
     attention::{self, Context, Room},
     decide::{Answer, Asked, Connection, Decider, Failed, Question, Usage},
-    policy::{self, Beside, Note, Options, Totals},
+    policy::{self, Beside, Note, Options, Timing, Totals},
 };
 use serde_json::{Value, json};
 use std::{
@@ -26,6 +26,14 @@ use std::{
 /// stalls the policy's thread for seconds (#1060).
 const WAIT: Duration = Duration::from_secs(20);
 const PAUSE: Duration = Duration::from_millis(300);
+/// The loop's own waits run short (#1806): the lamp's words waited for
+/// 400 ms after its first sound, not a second, and the eyes' list good for
+/// a second, not two. Both long enough beside the tests' own steps for a
+/// busy host's stall.
+const QUICK: Timing = Timing {
+    words_for: Duration::from_millis(400),
+    seen_for: Duration::from_secs(1),
+};
 /// The seven answers of the first measured example, in the order asked.
 const SEVEN: [f32; 7] = [0.07, 0.06, 0.28, 0.73, 0.06, 0.05, 0.09];
 
@@ -147,6 +155,18 @@ impl Rig {
     {
         let beside = || Beside {
             attention_next: true,
+            ..Beside::default()
+        };
+        Self::started(name, script, None, PAUSE, |_| {}, beside)
+    }
+
+    /// With the loop's own waits [`QUICK`].
+    fn quick<F>(name: &str, script: F) -> Self
+    where
+        F: FnMut(&Value) -> Result<Asked, Failed> + Send + 'static,
+    {
+        let beside = || Beside {
+            timing: QUICK,
             ..Beside::default()
         };
         Self::started(name, script, None, PAUSE, |_| {}, beside)
@@ -889,9 +909,23 @@ fn the_lamps_name_heard_while_someone_spoke_is_joined_to_what_they_said() {
     rig.stop();
 }
 
+/// The lamp keeps its own waits: only a test runs them short (#1806).
+#[test]
+fn the_loops_own_waits_are_the_lamps_unless_a_test_says_otherwise() {
+    assert_eq!(Beside::default().timing, Timing::LAMP);
+    assert_eq!(Timing::default(), Timing::LAMP);
+    assert_eq!(
+        Timing::LAMP,
+        Timing {
+            words_for: Duration::from_secs(1),
+            seen_for: Duration::from_secs(2),
+        }
+    );
+}
+
 #[test]
 fn what_the_lamp_did_after_each_decision_is_written_beside_it() {
-    let mut rig = Rig::new("outcome", |_| Ok(asked(SEVEN)));
+    let mut rig = Rig::quick("outcome", |_| Ok(asked(SEVEN)));
     // Said to someone else: the lamp does nothing about it.
     rig.voice(Voice::Listening);
     rig.voice(Voice::Thinking);
@@ -912,8 +946,8 @@ fn what_the_lamp_did_after_each_decision_is_written_beside_it() {
     rig.voice(Voice::Speaking);
     rig.say(" Easy one.", 31);
     let spoke = decided.elapsed();
-    // The first is closed by the second, and the second a second after
-    // the lamp's first sound.
+    // The first is closed by the second, and the second its words' wait
+    // after the lamp's first sound.
     let outcomes = rig.outcomes(2);
     let decisions = rig.log(2);
     let [silent, answered] = [&outcomes[0], &outcomes[1]];
@@ -977,7 +1011,7 @@ fn what_the_lamp_did_after_each_decision_is_written_beside_it() {
 #[test]
 fn a_lamp_that_spoke_before_it_was_decided_is_written_with_a_time_less_than_nothing() {
     // A model that takes 600 ms: the lamp is quicker.
-    let mut rig = Rig::new("outcome-late", |_| {
+    let mut rig = Rig::quick("outcome-late", |_| {
         thread::sleep(ms(600));
         Ok(asked(SEVEN))
     });
@@ -1020,7 +1054,7 @@ fn a_lamp_that_spoke_before_it_was_decided_is_written_with_a_time_less_than_noth
 /// was heard.
 #[test]
 fn a_piece_taken_up_after_the_lamps_sound_but_sent_before_it_is_answered_by_it() {
-    let mut rig = Rig::new("outcome-held-up", |_| {
+    let mut rig = Rig::quick("outcome-held-up", |_| {
         thread::sleep(ms(300));
         Ok(asked(SEVEN))
     });
@@ -1076,7 +1110,7 @@ fn a_sound_stamped_before_what_was_heard_is_no_answer_to_it() {
 /// its time from the decision would be minutes off.
 #[test]
 fn a_session_stamped_minutes_ago_is_timed_by_its_taking_up() {
-    let mut rig = Rig::new("outcome-replayed", |_| {
+    let mut rig = Rig::quick("outcome-replayed", |_| {
         thread::sleep(ms(300));
         Ok(asked(SEVEN))
     });
@@ -1261,7 +1295,7 @@ fn with_attention_next_a_second_judgement_is_written_beside_and_nothing_publishe
 #[test]
 fn how_the_room_is_and_who_the_eyes_see_are_taken_from_the_bus() {
     use lamp_msgs::{Face, Faces, RoomState};
-    let mut rig = Rig::new("room", |_| Ok(asked(SEVEN)));
+    let mut rig = Rig::quick("room", |_| Ok(asked(SEVEN)));
     // Before anything has been said of the room it is not known, and the
     // eyes have said nothing.
     rig.hear_as("Hello?", true, None);
@@ -1318,12 +1352,13 @@ fn how_the_room_is_and_who_the_eyes_see_are_taken_from_the_bus() {
     assert_eq!(line["seen"]["faces"], 3);
     assert_eq!(line["seen"]["near"], 2);
     assert_eq!(line["seen"]["facing"], 1);
-    assert!(line["seen"]["age_ms"].as_u64().unwrap() < 2_000);
+    assert!(line["seen"]["age_ms"].as_u64().unwrap() < 1_000);
     // The same answers count for more in a quiet room. What the eyes saw
     // is written down and changes nothing yet.
     assert!(second.probability > first.probability);
-    // A list older than two seconds says nothing about who is there now.
-    thread::sleep(ms(2_100));
+    // A list older than its time (two seconds on the lamp, one here) says
+    // nothing about who is there now.
+    thread::sleep(ms(1_100));
     rig.hear_as("Hello?", true, None);
     rig.decision();
     assert!(rig.log(3)[2].get("seen").is_none());
