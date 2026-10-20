@@ -929,24 +929,15 @@ fn ask_helper_journal(skills: &Path, line: &[u8]) -> (serde_json::Value, bool, S
 /// 200 ms here, so the test does not wait the lamp's 4 s out, #1806), then
 /// refuses in the words the app already shows, with nothing done, even
 /// once the folder is given back; a hold given back within it lets the
-/// remove go on (the reviewer's P3 1 on #1890).
+/// remove go on (the reviewer's P3 1 on #1890). That half asks the binary,
+/// which waits the lamp's 4 s: the 50 ms give-back ends it as soon, with
+/// about 3.95 s to spare on a loaded host, and a binary that did not wait
+/// would fail it.
 #[test]
 fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
     use std::time::{Duration, Instant};
     const WAIT: Duration = Duration::from_millis(200);
     const _: () = assert!(package::ASKED_LOCK_WAIT.as_millis() < 5_000);
-    let ask = |skills: &Path| {
-        let mut answer = Vec::new();
-        let ok = package::asked(
-            skills,
-            WAIT,
-            &b"{\"remove\": \"desk-tutor\"}\n"[..],
-            &mut answer,
-        )
-        .unwrap();
-        let answer: serde_json::Value = serde_json::from_slice(&answer).unwrap();
-        (answer, ok)
-    };
     let dir = tempfile::tempdir().unwrap();
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
@@ -954,8 +945,16 @@ fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
     let held = fs::File::open(&skills).unwrap();
     held.lock().unwrap();
     let asked = Instant::now();
-    let (answer, ok) = ask(&skills);
+    let mut answer = Vec::new();
+    let ok = package::asked(
+        &skills,
+        WAIT,
+        &b"{\"remove\": \"desk-tutor\"}\n"[..],
+        &mut answer,
+    )
+    .unwrap();
     let waited = asked.elapsed();
+    let answer: serde_json::Value = serde_json::from_slice(&answer).unwrap();
     assert!(!ok);
     assert_eq!(answer["refused"], package::BUSY);
     assert_eq!(package::BUSY, "the lamp's skills can't be changed now");
@@ -967,13 +966,13 @@ fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
     std::thread::sleep(Duration::from_millis(100));
     assert_eq!(left(&skills), ["desk-tutor"]);
 
-    // Given back within the wait, the remove goes on.
+    // Given back within the binary's own wait, the remove goes on.
     held.lock().unwrap();
     let giving_back = std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(50));
         held.unlock().unwrap();
     });
-    let (answer, ok) = ask(&skills);
+    let (answer, ok) = ask_helper(&skills, b"{\"remove\": \"desk-tutor\"}\n");
     giving_back.join().unwrap();
     assert!(ok, "{answer}");
     assert!(left(&skills).is_empty());
