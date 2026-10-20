@@ -65,6 +65,8 @@
 //!
 //! Nothing of what is said is logged: the skill's name, the priority and
 //! the outcome only.
+mod unplug_guard;
+
 use serde::Deserialize;
 use serde_json::json;
 use std::{
@@ -249,6 +251,8 @@ pub struct Request {
     pub task: Option<u64>,
     /// Exact onboarding invitation; never a wildcard or a task identifier.
     pub invitation: Option<u64>,
+    /// Correlated body readiness, rechecked until this say ends.
+    pub unplug_request: Option<String>,
 }
 
 impl Request {
@@ -285,6 +289,8 @@ struct Wire {
     recording: Option<String>,
     #[serde(default)]
     cue: Option<Cue>,
+    #[serde(default)]
+    unplug_request: Option<String>,
     #[serde(default)]
     priority: Option<u8>,
     expires_in_ms: u64,
@@ -401,6 +407,22 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     } else if wire.invitation.is_some() {
         return Err("invitation goes only with from onboarding".into());
     }
+    if let Some(request) = &wire.unplug_request {
+        if skill != "prepare-unplug"
+            || !matches!(words, Words::Note(_) | Words::Text(_))
+            || !(lamp_body::unplug::Request {
+                request: request.clone(),
+            })
+            .valid()
+        {
+            return Err(
+                "unplug_request requires prepare-unplug words and a valid request identifier"
+                    .into(),
+            );
+        }
+    } else if skill == "prepare-unplug" && matches!(words, Words::Text(_)) {
+        return Err("prepare-unplug text requires unplug_request".into());
+    }
     let priority = wire.priority.unwrap_or(NORMAL_PRIORITY);
     if priority > 9 {
         return Err("priority is 0 to 9".into());
@@ -416,6 +438,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
         start_before_us: wire.start_before_us,
         task: wire.task,
         invitation: wire.invitation,
+        unplug_request: wire.unplug_request,
     })
 }
 
@@ -429,6 +452,7 @@ struct Asked {
     request: Request,
     answer: mpsc::Sender<Answer>,
     read_at_us: u64,
+    guard: Option<unplug_guard::Guard>,
     expires_at_us: u64,
 }
 
@@ -436,6 +460,7 @@ struct Asked {
 struct Waiting {
     request: Request,
     answer: mpsc::Sender<Answer>,
+    guard: Option<unplug_guard::Guard>,
     expires_at_us: u64,
     order: u64,
 }
@@ -445,9 +470,15 @@ struct Waiting {
 pub struct Ticket {
     skill: String,
     answer: Option<mpsc::Sender<Answer>>,
+    guard: Option<unplug_guard::Guard>,
 }
 
 impl Ticket {
+    /// No bus I/O: a request-specific atomic deadline from the client worker.
+    pub fn authority_valid(&self, now_us: u64) -> bool {
+        self.guard.as_ref().is_none_or(|guard| guard.valid(now_us))
+    }
+
     pub fn skill(&self) -> &str {
         &self.skill
     }
@@ -484,6 +515,7 @@ pub(crate) fn ticket_for_test(skill: &str) -> (Ticket, mpsc::Receiver<Answer>) {
         Ticket {
             skill: skill.to_owned(),
             answer: Some(answer),
+            guard: None,
         },
         answered,
     )
@@ -507,9 +539,22 @@ impl LineForTest {
                 request: self.request,
                 answer: self.answer,
                 read_at_us,
+                guard: None,
             })
             .unwrap();
     }
+}
+
+#[cfg(test)]
+pub(crate) fn guarded_ticket_for_test() -> (
+    Ticket,
+    mpsc::Receiver<Answer>,
+    Arc<std::sync::atomic::AtomicU64>,
+) {
+    let (mut ticket, answered) = ticket_for_test("prepare-unplug");
+    let (guard, deadline) = unplug_guard::Guard::for_test(u64::MAX);
+    ticket.guard = Some(guard);
+    (ticket, answered, deadline)
 }
 
 /// The voice's side: what has been asked and waits to be said.
@@ -643,9 +688,11 @@ impl Says {
                 start_before_us: None,
                 task,
                 invitation: None,
+                unplug_request: None,
             },
             answer,
             read_at_us: expires_at_us.saturating_sub(60_000_000),
+            guard: None,
             expires_at_us,
         })
         .unwrap();
@@ -668,9 +715,11 @@ impl Says {
                 start_before_us: None,
                 task: None,
                 invitation: None,
+                unplug_request: None,
             },
             answer,
             read_at_us: 0,
+            guard: None,
             expires_at_us: u64::MAX,
         })
         .unwrap();
@@ -697,9 +746,11 @@ impl Says {
                 start_before_us: None,
                 task: None,
                 invitation: None,
+                unplug_request: None,
             },
             answer,
             read_at_us: 0,
+            guard: None,
             expires_at_us: u64::MAX,
         })
         .unwrap();
@@ -739,6 +790,7 @@ impl Says {
             self.waiting.push(Waiting {
                 request: asked.request,
                 answer: asked.answer,
+                guard: asked.guard,
                 expires_at_us,
                 order: self.order,
             });
@@ -794,6 +846,7 @@ impl Says {
             Ticket {
                 skill: waiting.request.skill,
                 answer: Some(waiting.answer),
+                guard: waiting.guard,
             },
         ))
     }
@@ -825,13 +878,26 @@ impl Says {
     /// on #954).
     pub fn take(&mut self, now_us: u64) -> Option<(String, u8, Ticket)> {
         self.expire(now_us);
-        let waiting = self.waiting.remove(self.next_index()?);
+        let waiting = loop {
+            let waiting = self.waiting.remove(self.next_index()?);
+            if waiting
+                .guard
+                .as_ref()
+                .is_none_or(|guard| guard.valid(now_us))
+            {
+                break waiting;
+            }
+            let _ = waiting.answer.send(Answer::Done(Outcome::Refused(
+                "unplug_authority_lost".into(),
+            )));
+        };
         Some((
             waiting.request.words.turn()?,
             waiting.request.priority,
             Ticket {
                 skill: waiting.request.skill,
                 answer: Some(waiting.answer),
+                guard: waiting.guard,
             },
         ))
     }
@@ -861,6 +927,7 @@ impl Says {
         Some(Ticket {
             skill: waiting.request.skill,
             answer: Some(waiting.answer),
+            guard: waiting.guard,
         })
     }
 
@@ -880,6 +947,7 @@ impl Says {
         Some(Ticket {
             skill: waiting.request.skill,
             answer: Some(waiting.answer),
+            guard: waiting.guard,
         })
     }
 
@@ -1021,14 +1089,28 @@ fn serve_client(
         ) {
             Err(why) => Outcome::Refused(why),
             Ok(request) => {
-                let (answer, answered) = mpsc::channel();
                 let read_at_us = lamp_ipc::monotonic_us();
                 let expires_at_us = request.expires_at_us(read_at_us);
+                let mut monitor =
+                    match unplug_guard::Monitor::for_request(request.unplug_request.as_deref()) {
+                        Ok(monitor) => monitor,
+                        Err(why) => {
+                            let _ = writeln!(stream, "{}", Outcome::Refused(why.into()).line());
+                            return;
+                        }
+                    };
+                let guard = monitor.as_ref().map(unplug_guard::Monitor::guard);
+                // A disconnected or non-reading client cannot hold the monitor in a write.
+                if monitor.is_some() {
+                    let _ = stream.set_write_timeout(Some(Duration::from_millis(50)));
+                }
+                let (answer, answered) = mpsc::channel();
                 if ask
                     .send(Asked {
                         request,
                         answer,
                         read_at_us,
+                        guard,
                         expires_at_us,
                     })
                     .is_err()
@@ -1039,12 +1121,25 @@ fn serve_client(
                     // begun, the turn may run on past its expiry, so the
                     // answer is waited for until it comes or the voice goes.
                     loop {
-                        match answered.recv() {
+                        if let Some(monitor) = monitor.as_mut() {
+                            monitor.refresh();
+                        }
+                        let answer = if monitor.is_some() {
+                            answered.recv_timeout(Duration::from_millis(20))
+                        } else {
+                            answered
+                                .recv()
+                                .map_err(|_| mpsc::RecvTimeoutError::Disconnected)
+                        };
+                        match answer {
                             Ok(Answer::Begun(at_us)) => {
                                 let _ = writeln!(stream, "{}", Answer::Begun(at_us).line());
                             }
                             Ok(Answer::Done(outcome)) => break outcome,
-                            Err(_) => break Outcome::Dropped("the voice has gone".into()),
+                            Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                                break Outcome::Dropped("the voice has gone".into());
+                            }
                         }
                     }
                 }
@@ -1810,13 +1905,70 @@ mod tests {
                     start_before_us: None,
                     task: None,
                     invitation: None,
+                    unplug_request: None,
                 },
                 answer,
                 read_at_us: expires_at_us.saturating_sub(60_000_000),
+                guard: None,
                 expires_at_us,
             },
             answered,
         )
+    }
+
+    #[test]
+    fn unplug_guard_is_checked_at_acceptance_and_retained_after_waiting_expiry() {
+        let (mut says, ask) = Says::by_hand();
+        let (mut ready, answered) = asked("prepare-unplug", 9, 500);
+        let (guard, deadline) = unplug_guard::Guard::for_test(2_000);
+        ready.guard = Some(guard);
+        ask.send(ready).unwrap();
+        says.poll(100);
+        let (_, _, ticket) = says.take(100).unwrap();
+        assert!(
+            ticket.authority_valid(1_000),
+            "waiting expiry does not end an active say"
+        );
+        deadline.store(0, std::sync::atomic::Ordering::Release);
+        assert!(
+            !ticket.authority_valid(1_000),
+            "body proof still gates the active say"
+        );
+        ticket.answer(Outcome::Dropped("unplug_authority_lost".into()));
+        assert_eq!(
+            answered.try_recv().unwrap(),
+            Answer::Done(Outcome::Dropped("unplug_authority_lost".into()))
+        );
+
+        let (mut stale, refused) = asked("prepare-unplug", 9, 500);
+        stale.guard = Some(unplug_guard::Guard::for_test(100).0);
+        let (ordinary, _) = asked("reminders", 5, 500);
+        ask.send(stale).unwrap();
+        ask.send(ordinary).unwrap();
+        says.poll(100);
+        assert_eq!(says.take(100).unwrap().2.skill(), "reminders");
+        assert_eq!(
+            refused.try_recv().unwrap(),
+            Answer::Done(Outcome::Refused("unplug_authority_lost".into()))
+        );
+    }
+
+    #[test]
+    fn unplug_readiness_words_require_a_correlated_guard_but_failure_notes_do_not() {
+        let ready = r#"{"skill":"prepare-unplug","text":"Ready.","expires_in_ms":500,"unplug_request":"request-1"}"#;
+        assert_eq!(
+            parse(ready).unwrap().unplug_request.as_deref(),
+            Some("request-1")
+        );
+        assert!(
+            parse(r#"{"skill":"prepare-unplug","text":"Ready.","expires_in_ms":500}"#).is_err()
+        );
+        assert!(
+            parse(r#"{"skill":"prepare-unplug","note":"Do not unplug.","expires_in_ms":500}"#)
+                .is_ok()
+        );
+        assert!(parse(&ready.replace("prepare-unplug", "other")).is_err());
+        assert!(parse(&ready.replace("request-1", "../wrong")).is_err());
     }
 
     #[test]
@@ -1835,6 +1987,7 @@ mod tests {
                 start_before_us: None,
                 task: None,
                 invitation: None,
+                unplug_request: None,
             }
         );
         let text =
@@ -1971,6 +2124,7 @@ mod tests {
                 request,
                 answer,
                 read_at_us,
+                guard: None,
             })
             .unwrap();
             says.poll(deadline - 1);
@@ -1997,6 +2151,7 @@ mod tests {
             request,
             answer,
             read_at_us,
+            guard: None,
         })
         .unwrap();
         says.poll(deadline - 1);
@@ -2058,6 +2213,7 @@ mod tests {
                 start_before_us: None,
                 task: None,
                 invitation: None,
+                unplug_request: None,
             }
         );
         assert_eq!(

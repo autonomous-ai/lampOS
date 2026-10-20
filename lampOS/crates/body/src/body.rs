@@ -70,6 +70,12 @@ const EASE_STEPS: u16 = 100;
 const EASES_ALLOWED: usize = 3;
 const EASE_MEMORY_STEPS: u64 = 3_000;
 const REST_SLACK: u16 = 24;
+/// At rest on its goal: within `REST_SLACK` of it. The same slack attests a
+/// fold for unplugging: lamp-52e6's elbow rests 13 counts past its folded
+/// goal (2082 against 2069) every time it folds (#1699 trial, 2026-10-20).
+fn rests_on(position: u16, goal: u16) -> bool {
+    position.abs_diff(goal) <= REST_SLACK
+}
 /// The most a joint it took hold of may have moved when its torque came on:
 /// a goal set where it is moves it by nothing a servo would notice.
 const TAKE_HOLD_SLACK: u16 = 12;
@@ -343,6 +349,8 @@ pub struct Asked {
     /// would to a face seen there (#1679, "light my book"). Only with a
     /// gaze (`--gaze`), which says how far a place in the picture is.
     pub toward: Option<f32>,
+    /// A latched unplug request: fold now and accept no new motion.
+    pub unplug: bool,
 }
 
 impl Asked {
@@ -358,6 +366,7 @@ impl Asked {
         still: true,
         paused: true,
         toward: None,
+        unplug: false,
     };
 }
 
@@ -783,6 +792,13 @@ pub struct Glimpse {
     /// body last wrote them, or else as found.
     pub stands: bool,
     pub stand: f32,
+    /// Fresh physical folded evidence, only after this step passed safety checks.
+    pub unplug_safe: bool,
+    /// Why this step is not folded evidence: an index into
+    /// `crate::unplug::UNPLUG_UNSAFE`.
+    pub unplug_unsafe: Option<u8>,
+    /// A read was missed since the last step: no evidence either way.
+    pub unplug_gap: bool,
     pub arm_goals: [u16; 2],
     pub arm_positions: [u16; 2],
     pub arm_loads: [u16; 2],
@@ -1942,6 +1958,9 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
         packet: &[u8],
         flagged: bool,
     ) -> Result<(), String> {
+        if packet == torque_write(joint, 1) && self.runtime.recovery_inhibited() {
+            return Err("unplug preparation inhibits torque-on".into());
+        }
         self.send(packet)?;
         let ping = ReadOnlyRequest::ping(joint);
         let mut tracker = if flagged {
@@ -1996,6 +2015,11 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
     fn write_patiently(&mut self, joint: Joint, packet: &[u8]) -> Result<(), String> {
         let mut tries = 1;
         loop {
+            // Patient writes belong only to take-hold. Do not retry a goal
+            // or torque-on after unplug intent arrived during an ACK wait.
+            if self.runtime.recovery_inhibited() {
+                return Err("unplug preparation inhibits automatic take-hold".into());
+            }
             match self.write_acknowledged(joint, packet, true) {
                 Err(_) if tries < TAKE_HOLD_TRIES => {
                     tries += 1;
@@ -2059,7 +2083,7 @@ fn wake<P: PortIo, R: Runtime>(
     loop {
         ticks += 1;
         let due = started + TICK * ticks;
-        if !matches!(bus.runtime.cancelled(), Ok(false)) {
+        if bus.runtime.recovery_inhibited() || !matches!(bus.runtime.cancelled(), Ok(false)) {
             report.woke = Some(woke_from(
                 (from, to, written),
                 report.last,
@@ -2466,6 +2490,9 @@ fn woke_from(
 fn glimpse_of(template: Glimpse, step: u64, now: &[Sample; 5], goals: [u16; 3]) -> Glimpse {
     Glimpse {
         step,
+        unplug_safe: false,
+        unplug_unsafe: None,
+        unplug_gap: false,
         mood: Mood::Resting,
         goals,
         positions: COMMANDED.map(|joint| now[joint.index()].position),
@@ -2496,16 +2523,25 @@ fn take_hold<P: PortIo, R: Runtime>(
 ) -> Result<[Sample; 5], Stop> {
     let mut outcome = Ok(());
     for joint in joints {
+        if bus.runtime.recovery_inhibited() {
+            return Err(Stop::Cancelled);
+        }
         let at = found[joint.index()].position;
         // A flag is read and judged with the rest afterwards.
         if outcome.is_ok() {
             outcome = bus.write_goal(*joint, at, true);
+        }
+        if bus.runtime.recovery_inhibited() {
+            return Err(Stop::Cancelled);
         }
         if outcome.is_ok() {
             report.torque_writes = report.torque_writes.saturating_add(1);
             report.torque_given.push(joint.name());
             outcome = bus.write_patiently(*joint, &torque_write(*joint, 1));
         }
+    }
+    if bus.runtime.recovery_inhibited() {
+        return Err(Stop::Cancelled);
     }
     // A few steps for a goal that was not taken to show.
     let now = match outcome.and_then(|()| {
@@ -2875,6 +2911,7 @@ pub(crate) fn run_looking(
         still: false,
         paused: false,
         toward: None,
+        unplug: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -3016,6 +3053,9 @@ fn run_on<P: PortIo, R: Runtime>(
     mut asked: impl FnMut() -> (Asked, Priority, Option<Source>),
     mut watch: impl FnMut(&Glimpse),
 ) -> BodyReport {
+    // Runtime home can shift after contact or a short wake. Only the
+    // explicitly configured folded target can attest unplug readiness.
+    let unplug_home = home;
     let mut standing = standing;
     let mut report = BodyReport {
         limits,
@@ -3539,9 +3579,13 @@ fn run_on<P: PortIo, R: Runtime>(
                     }
                 }
                 if let Err(detail) = outcome {
-                    report.stop = bus.refused.take().unwrap_or(Stop::Bus {
-                        detail: format!("clearing the overload of {joint}: {detail}"),
-                    });
+                    report.stop = if bus.runtime.recovery_inhibited() {
+                        Stop::Cancelled
+                    } else {
+                        bus.refused.take().unwrap_or(Stop::Bus {
+                            detail: format!("clearing the overload of {joint}: {detail}"),
+                        })
+                    };
                     return report;
                 }
                 if !flagged(&found) {
@@ -3968,6 +4012,9 @@ fn run_on<P: PortIo, R: Runtime>(
         awake_until = Some(started + up.awake);
     }
 
+    let mut unplug_latched = false;
+    let mut unplug_previous: Option<[u16; 5]> = None;
+    let mut unplug_missed = report.missed_reads;
     let stop = loop {
         report.steps += 1;
         let due = started + TICK * ((report.steps - first_step).min(u64::from(u32::MAX)) as u32);
@@ -3983,7 +4030,40 @@ fn run_on<P: PortIo, R: Runtime>(
             heard = Some((mood, level, now));
         }
         // What its eyes saw and a gesture asked of it, since the last step.
-        let (asked_now, asked_by, asked_source) = asked();
+        let (mut asked_now, asked_by, asked_source) = asked();
+        unplug_latched |= asked_now.unplug || bus.runtime.recovery_inhibited();
+        if unplug_latched {
+            asked_now = Asked {
+                unplug: true,
+                ..Asked::PAUSED
+            };
+            heard = None;
+            awake_until = None;
+            pending_window = None;
+            called_at = None;
+            if pending.is_some_and(|(clip, _)| !from_outside(clip)) {
+                pending = None;
+            }
+            // The fold for unplugging is to the configured home, not to
+            // where it last looked or was put: on lamp-52e6 on 2026-10-20
+            // the base rested 60 counts toward the person and the proof,
+            // which reads the configured home, never came (#1699).
+            if let Some(configured) = unplug_home {
+                if home != configured {
+                    home = configured;
+                    home_now = home_with(home, standing, stand);
+                    (low, high) = bounds(home_now, stand);
+                }
+                kept = [0.0; 3];
+                glance_from = None;
+                // Resting goals are kept where the joints came to rest only
+                // once that rest is the configured home.
+                if !(0..3).all(|index| rests_on(written[index], configured[index])) {
+                    relaxed = false;
+                    resting_steps = 0;
+                }
+            }
+        }
         // Somebody in front of it: a face in several looks running.
         match asked_now.seen {
             Some(Seen { face: Some(_) }) if looking.is_some() => {
@@ -4112,7 +4192,7 @@ fn run_on<P: PortIo, R: Runtime>(
             let tired = retreats >= Standing::RETREATS_ALLOWED
                 || tired_until.is_some_and(|until| now < until);
             let awake = awake_until.is_some_and(|until| now < until);
-            let wanted = if leaving.is_none() && awake && !tired {
+            let wanted = if leaving.is_none() && awake && !tired && !unplug_latched {
                 up.share
             } else {
                 0.0
@@ -4664,11 +4744,15 @@ fn run_on<P: PortIo, R: Runtime>(
             (Mood::Reading, Some(toward), Some(gaze)) if !asked_now.paused => gaze.toward(toward),
             _ => 0.0,
         };
-        let offsets = [
-            head_pitch,
-            roll * roll_reach + extra[1],
-            yaw * limits.yaw + look[0] + extra[2] + aim,
-        ];
+        let offsets = if unplug_latched {
+            [0.0; 3]
+        } else {
+            [
+                head_pitch,
+                roll * roll_reach + extra[1],
+                yaw * limits.yaw + look[0] + extra[2] + aim,
+            ]
+        };
         // A joint that met resistance is asked nothing for now, at rest or not.
         let held = easing.map(|left| left > 0);
         for left in &mut easing {
@@ -4909,6 +4993,7 @@ fn run_on<P: PortIo, R: Runtime>(
                 }
             }
         }
+        let bad_before = (bus.bad_reads, bus.bad_temperatures);
         let samples = match bus.samples() {
             Ok(samples) => {
                 misses = 0;
@@ -4966,8 +5051,7 @@ fn run_on<P: PortIo, R: Runtime>(
         if resting_steps >= REST_STEPS && !relaxed {
             let positions = COMMANDED.map(|joint| samples[joint.index()].position);
             let near = (0..3).all(|index| {
-                positions[index].abs_diff(written[index]) <= REST_SLACK
-                    && velocity[index].abs() < 3.0
+                rests_on(positions[index], written[index]) && velocity[index].abs() < 3.0
             });
             if near {
                 let sent = positions == written
@@ -5007,7 +5091,7 @@ fn run_on<P: PortIo, R: Runtime>(
                 0
             };
             let position = samples[COMMANDED[index].index()].position;
-            if arriving[index] >= ARRIVED_STEPS && position.abs_diff(written[index]) <= REST_SLACK {
+            if arriving[index] >= ARRIVED_STEPS && rests_on(position, written[index]) {
                 let at = f32::from(position).clamp(
                     low[index].min(commanded[index]),
                     high[index].max(commanded[index]),
@@ -5053,7 +5137,10 @@ fn run_on<P: PortIo, R: Runtime>(
             }
             None => unsent = 0,
         }
-        let glimpse = Glimpse {
+        let mut glimpse = Glimpse {
+            unplug_safe: false,
+            unplug_unsafe: None,
+            unplug_gap: false,
             step: report.steps,
             mood,
             goals: written,
@@ -5081,7 +5168,9 @@ fn run_on<P: PortIo, R: Runtime>(
             bad_reads: bus.bad_reads,
             retreats: retreats.into(),
         };
-        watch(&glimpse);
+        if !unplug_latched {
+            watch(&glimpse);
+        }
         // A joint pushing at a goal it does not reach, and not moving, is
         // told to stop: its goal becomes where it is. Never torque off.
         // The joints told so on this step, in servo order.
@@ -5480,17 +5569,27 @@ fn run_on<P: PortIo, R: Runtime>(
                 (false, true) => HAND_REST,
                 (false, false) => OVERLOAD_REST,
             };
+            let mut during_rest = || {
+                let next = asked();
+                unplug_latched |= next.0.unplug;
+                next
+            };
             let slumped_at = match let_go(
                 bus,
                 &mut report,
                 rest,
-                (&mut news, &mut asked),
+                (&mut news, &mut during_rest),
                 &mut watch,
                 template,
             ) {
                 Ok(now) => now,
                 Err(stop) => break stop,
             };
+            if unplug_latched || bus.runtime.recovery_inhibited() {
+                break Stop::Refused {
+                    why: "unplug preparation cannot recover automatically from a slump".into(),
+                };
+            }
             // Something that keeps fighting should be looked at.
             if again {
                 break Stop::Overload {
@@ -5780,6 +5879,65 @@ fn run_on<P: PortIo, R: Runtime>(
             if settled || now.saturating_sub(since) >= allowed {
                 break leave_for.take().unwrap_or(Stop::Cancelled);
             }
+        }
+        if unplug_latched {
+            let positions = samples.map(|sample| sample.position);
+            let stable = unplug_previous.is_some_and(|previous| {
+                positions
+                    .iter()
+                    .zip(previous)
+                    .all(|(at, was)| at.abs_diff(was) <= 2)
+            });
+            unplug_previous = Some(positions);
+            let arm_folded = standing.is_some_and(|up| {
+                ARM.into_iter()
+                    .zip(up.folded)
+                    .all(|(joint, target)| rests_on(samples[joint.index()].position, target))
+            });
+            let home = unplug_home.is_some_and(|home| {
+                COMMANDED
+                    .into_iter()
+                    .zip(home)
+                    .all(|(joint, target)| rests_on(samples[joint.index()].position, target))
+            });
+            // In the order of `crate::unplug::UNPLUG_UNSAFE`: the first that fails is why.
+            let checks: [bool; crate::unplug::UNPLUG_UNSAFE.len()] = [
+                arm_folded,
+                home,
+                !tipping,
+                stable,
+                stand == 0.0 && stand_velocity == 0.0,
+                playing.is_none() && pending.is_none(),
+                !slumped,
+                !held.iter().any(|held| *held),
+                !easing.iter().any(|left| *left > 0)
+                    && !stopped_pushing.iter().any(|stopped| *stopped),
+                leaving.is_none() && leave_for.is_none(),
+                bus.refused.is_none()
+                    && !bus.left.iter().any(|left| *left)
+                    && !bus.unjudged.iter().any(|value| *value),
+                bad_before == (bus.bad_reads, bus.bad_temperatures)
+                    && bus.bad_in_row == [0; 5]
+                    && unsent == 0,
+                samples.iter().all(|sample| {
+                    sample.status == 0 && sample.temperature < 55 && sample.load < 100
+                }),
+            ];
+            let unread = crate::unplug::UNREAD;
+            glimpse.unplug_unsafe = checks
+                .iter()
+                .enumerate()
+                .position(|(at, ok)| at != unread && !ok)
+                .map(|at| at as u8);
+            // A read missed or bad since the last sample, or a goal not yet
+            // sent, is a gap in the evidence, not evidence of movement: the
+            // step is not sampled, and the next read is judged as ever.
+            // lamp-52e6 on 2026-10-20 failed its unplug on one bad read while
+            // the readiness line played (#1699).
+            glimpse.unplug_gap = report.missed_reads != unplug_missed || !checks[unread];
+            glimpse.unplug_safe = glimpse.unplug_unsafe.is_none() && !glimpse.unplug_gap;
+            unplug_missed = report.missed_reads;
+            watch(&glimpse);
         }
         bus.sleep_until(due);
     };

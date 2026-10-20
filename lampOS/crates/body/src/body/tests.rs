@@ -103,6 +103,7 @@ struct Lamp {
 struct Clock {
     time: Rc<Cell<Duration>>,
     cancel_at: Duration,
+    inhibit_at: Option<Duration>,
 }
 impl Runtime for Clock {
     fn now(&self) -> Duration {
@@ -110,6 +111,9 @@ impl Runtime for Clock {
     }
     fn cancelled(&mut self) -> io::Result<bool> {
         Ok(self.time.get() >= self.cancel_at)
+    }
+    fn recovery_inhibited(&self) -> bool {
+        self.inhibit_at.is_some_and(|at| self.time.get() >= at)
     }
 }
 
@@ -168,7 +172,11 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             misreads: Vec::new(),
             read_times: Vec::new(),
         },
-        Clock { time, cancel_at },
+        Clock {
+            time,
+            cancel_at,
+            inhibit_at: None,
+        },
     )
 }
 
@@ -2331,6 +2339,7 @@ fn gesture_run(
                 called: false,
                 still: false,
                 paused: false,
+                unplug: false,
             }
         },
         |glimpse| {
@@ -2399,6 +2408,7 @@ fn expression_run_with(
             called: false,
             still: false,
             paused: false,
+            unplug: false,
         },
         |glimpse| seen.push((seen_at.get(), glimpse.goals)),
     );
@@ -2557,6 +2567,7 @@ fn speaking_run_with(
             called: false,
             still: false,
             paused: false,
+            unplug: false,
         },
         |glimpse| seen.push((seen_at.get(), *glimpse)),
     );
@@ -3317,6 +3328,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             called: false,
             still: false,
             paused: false,
+            unplug: false,
         },
         |glimpse| steps.push((glimpse.goals, glimpse.arm_goals, glimpse.stand)),
     );
@@ -3376,6 +3388,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             called: false,
             still: false,
             paused: false,
+            unplug: false,
         },
         |_| {},
     );
@@ -3453,6 +3466,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 called: false,
                 still: false,
                 paused: false,
+                unplug: false,
             }
         },
         |glimpse| {
@@ -3869,6 +3883,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     called: false,
                     still: false,
                     paused: false,
+                    unplug: false,
                 }
             },
             |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -3941,6 +3956,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 called: false,
                 still: false,
                 paused: false,
+                unplug: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -6034,6 +6050,7 @@ fn called_run(
                 called,
                 still: false,
                 paused: false,
+                unplug: false,
             }
         },
         |glimpse| {
@@ -7726,6 +7743,7 @@ fn a_standing_lamp_whose_elbow_temperature_is_unreadable_folds_then_lets_go() {
     let mut clock = Clock {
         time: lamp.time.clone(),
         cancel_at: again + Duration::from_secs(20),
+        inhibit_at: None,
     };
     let report = run_standing(
         &mut lamp,
@@ -8128,6 +8146,7 @@ fn a_lamp_found_standing_whose_start_is_refused_folds_then_lets_go() {
         let mut clock = Clock {
             time: lamp.time.clone(),
             cancel_at: again + Duration::from_secs(20),
+            inhibit_at: None,
         };
         let report = run(&mut lamp, &mut clock);
         assert!(matches!(report.stop, Stop::Refused { .. }), "{report:?}");
@@ -10689,4 +10708,429 @@ fn a_base_held_gently_by_a_hand_is_not_sent_back_into_it() {
         report.eased, report.released_by_hand
     );
     assert_eq!(pushed_back, 0, "{report:?}");
+}
+
+/// A single unplug request cancels the 90-second awake window and remains
+/// authoritative over later speaking, directed reading holds, name, face,
+/// expression and skill input.
+#[test]
+fn unplug_folds_now_and_latches_over_later_inputs() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(25));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.misreads = vec![(Duration::from_secs(21), Joint::BasePitch.index(), 4_000, 1)];
+    let time = clock.time.clone();
+    let watched = clock.time.clone();
+    let mood_at = clock.time.clone();
+    let mut requested = false;
+    let mut frames = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        Some(standing(100, 90)),
+        Some(Looking::new([727, 553], [480, 120]).unwrap()),
+        move || {
+            Some((
+                if mood_at.get() >= Duration::from_secs(16) {
+                    Mood::Reading
+                } else {
+                    Mood::Speaking
+                },
+                80,
+            ))
+        },
+        move || {
+            let unplug = !requested && time.get() >= Duration::from_secs(8);
+            requested |= unplug;
+            Asked {
+                unplug,
+                called: true,
+                toward: Some(-0.5),
+                expression: Some([20.0, 0.0, 0.0]),
+                gesture: (time.get() > Duration::from_secs(16)).then_some(&crate::clips::NOD),
+                ..Asked::default()
+            }
+        },
+        |glimpse| frames.push((watched.get(), *glimpse)),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(
+        frames
+            .iter()
+            .any(|(at, frame)| *at < Duration::from_secs(8) && frame.stand > 0.9)
+    );
+    let later: Vec<_> = frames
+        .iter()
+        .filter(|(at, _)| *at >= Duration::from_secs(20) && *at < Duration::from_secs(25))
+        .collect();
+    assert!(!later.is_empty());
+    assert!(later.iter().all(|(_, frame)| frame.stand == 0.0
+        && frame.gesture.is_none()
+        && frame.mood == Mood::Resting));
+    let rejected = frames
+        .windows(2)
+        .find(|pair| pair[1].1.bad_reads != pair[0].1.bad_reads)
+        .expect("injected read must be rejected");
+    assert!(
+        !rejected[1].1.unplug_safe,
+        "substituting an old good position cannot prove physical readiness"
+    );
+    assert!(
+        later.iter().any(|(_, frame)| frame.unplug_safe),
+        "no fresh physically folded evidence: {:?}",
+        later.last()
+    );
+}
+
+/// Commanded stand=0 cannot attest that a blocked physical arm is folded.
+#[test]
+fn unplug_never_attests_an_arm_stuck_away_from_its_fold() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(20));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.servos[Joint::BasePitch.index()].position += 40.0;
+    lamp.servos[Joint::BasePitch.index()].goal += 40;
+    lamp.short = Some((Joint::BasePitch.index(), 40.0));
+    let mut safe = false;
+    let _ = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        Some(standing(100, 90)),
+        None,
+        || Some((Mood::Resting, 0)),
+        || Asked {
+            unplug: true,
+            ..Asked::default()
+        },
+        |glimpse| safe |= glimpse.unplug_safe,
+    );
+    assert!(!safe);
+}
+
+/// lamp-52e6's elbow rests 13 counts past its folded goal every time it
+/// folds; the fold the body itself reports is a fold it can attest.
+#[test]
+fn unplug_attests_a_fold_whose_elbow_rests_a_few_counts_off() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(20));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let elbow = Joint::ElbowPitch.index();
+    lamp.servos[elbow].position += 13.0;
+    lamp.short = Some((elbow, 13.0));
+    let mut safe = false;
+    let _ = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        Some(standing(100, 90)),
+        None,
+        || Some((Mood::Resting, 0)),
+        || Asked {
+            unplug: true,
+            ..Asked::default()
+        },
+        |glimpse| safe |= glimpse.unplug_safe,
+    );
+    assert!(safe);
+}
+
+/// lamp-52e6 on 2026-10-20: asked to unplug with its base turned 60-odd
+/// counts toward the person, it folded and rested there, so its proof never
+/// came. The fold for unplugging brings the head and base to the configured
+/// home, from wherever they were turned (here by Expression), and attests.
+#[test]
+fn unplug_brings_a_base_looking_aside_home_before_it_attests() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(30));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let time = lamp.time.clone();
+    let asked_at = Duration::from_secs(8);
+    let mut safe = false;
+    let _ = run_alive(
+        &mut lamp,
+        &mut clock,
+        waking(),
+        Some(HOME),
+        Some(standing(100, 90)),
+        None,
+        || Some((Mood::Resting, 0)),
+        || {
+            if time.get() < asked_at {
+                Asked {
+                    expression: Some([0.0, 0.0, 70.0]),
+                    ..Asked::default()
+                }
+            } else {
+                Asked {
+                    unplug: true,
+                    ..Asked::default()
+                }
+            }
+        },
+        |glimpse| safe |= glimpse.unplug_safe,
+    );
+    let aside = lamp
+        .goals
+        .iter()
+        .flatten()
+        .filter(|(id, _)| *id == 1)
+        .map(|(_, goal)| goal.abs_diff(HOME[2]))
+        .max()
+        .unwrap_or(0);
+    assert!(
+        aside > 24,
+        "fixture must turn the base aside first ({aside})"
+    );
+    assert!(safe, "base at {}", lamp.servos[YAW].position);
+    assert!((lamp.servos[YAW].position - f32::from(HOME[2])).abs() <= 24.0);
+}
+
+/// lamp-52e6 on 2026-10-20 (#2069 try 1): folded and Ready, a second voice
+/// turn came while the readiness line played (listening, thinking,
+/// speaking), and Ready was lost for good. Nothing a turn sends (moods, a
+/// face to look at, Expression's offsets, a gesture) moves a latched lamp,
+/// and reads missed meanwhile are a gap, never a step judged unsafe.
+#[test]
+fn unplug_ready_stays_ready_through_a_second_turn() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(30));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let time = lamp.time.clone();
+    let turn = Duration::from_secs(15);
+    // The serial line busy for a moment as the turn begins: reads missed.
+    lamp.silent_from = Some(turn + Duration::from_millis(500));
+    lamp.silent_until = Some(turn + Duration::from_millis(560));
+    let mood_at = |at: Duration| match at.saturating_sub(turn).as_secs() {
+        _ if at < turn => Mood::Resting,
+        0..=1 => Mood::Listening,
+        2..=3 => Mood::Thinking,
+        _ => Mood::Speaking,
+    };
+    let looking = Looking::new([342, 200], [300, 120]).unwrap();
+    let (news_time, asked_time) = (time.clone(), time.clone());
+    let (mut ready_at, mut lost_at) = (None, None);
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        Some(standing(100, 90)),
+        Some(looking),
+        move || Some((mood_at(news_time.get()), 100)),
+        move || {
+            let late = asked_time.get() >= turn;
+            Asked {
+                unplug: true,
+                seen: late.then_some(Seen {
+                    face: Some(crate::gaze::Sight {
+                        x: 0.8,
+                        y: -0.3,
+                        size: 0.2,
+                        turned: 0.0,
+                    }),
+                }),
+                expression: late.then_some([40.0, 15.0, 60.0]),
+                gesture: late.then_some(&clips::DIP),
+                called: late,
+                ..Asked::default()
+            }
+        },
+        |glimpse| {
+            let now = time.get();
+            if glimpse.unplug_safe {
+                ready_at.get_or_insert(now);
+            } else if ready_at.is_some() && glimpse.unplug_unsafe.is_some() {
+                lost_at.get_or_insert((now, glimpse.unplug_unsafe));
+            }
+        },
+    );
+    assert!(report.missed_reads > 0, "fixture must miss reads");
+    let ready_at = ready_at.expect("never Ready");
+    assert!(ready_at < turn, "Ready only at {ready_at:?}");
+    assert_eq!(lost_at, None, "Ready lost");
+}
+
+/// lamp-52e6 on 2026-10-20 09:46 (#2069 retry): Ready, then while the
+/// readiness line played, "physical readiness was lost (a read was bad or a
+/// goal unsent)". A bad read is a gap in the evidence: never a step judged
+/// unsafe, and the next good read is folded evidence again.
+#[test]
+fn unplug_ready_survives_a_bad_read() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(25));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let time = lamp.time.clone();
+    let at = Duration::from_secs(15);
+    lamp.misreads = vec![(at, Joint::ElbowPitch.index(), 4_500, 1)];
+    let (mut ready_at, mut unsafe_after, mut gaps, mut last_safe) = (None, None, 0, None);
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        Some(standing(100, 90)),
+        None,
+        || Some((Mood::Resting, 0)),
+        || Asked {
+            unplug: true,
+            ..Asked::default()
+        },
+        |glimpse| {
+            let now = time.get();
+            if glimpse.unplug_safe {
+                ready_at.get_or_insert(now);
+                last_safe = Some(now);
+            } else if ready_at.is_some() {
+                if glimpse.unplug_unsafe.is_some() {
+                    unsafe_after.get_or_insert((now, glimpse.unplug_unsafe));
+                }
+                gaps += u32::from(glimpse.unplug_gap);
+            }
+        },
+    );
+    assert!(
+        report.bad_reads.iter().any(|bad| *bad > 0),
+        "fixture must read badly"
+    );
+    assert!(ready_at.expect("never Ready") < at);
+    assert_eq!(unsafe_after, None, "a bad read judged unsafe");
+    assert!(gaps > 0, "the bad read is a gap");
+    assert!(last_safe.expect("never safe") > at + Duration::from_secs(1));
+}
+
+#[test]
+fn unplug_during_startup_wake_stops_automatic_motion() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(30));
+    let at = Duration::from_millis(500);
+    clock.inhibit_at = Some(at);
+    lamp.servos[YAW].position = 2_315.0;
+    lamp.servos[YAW].goal = 2_315;
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        waking(),
+        Some(HOME),
+        || Some((Mood::Resting, 0)),
+        |_| {},
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.woke.as_ref().unwrap().seconds < 0.6);
+    assert!(clock.time.get() < at + Duration::from_millis(100));
+    assert!(
+        lamp.servos[YAW].goal > 2_300,
+        "the wake must not finish after unplug"
+    );
+}
+
+#[test]
+fn unplug_during_take_hold_retry_never_turns_torque_back_on() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(10));
+    clock.inhibit_at = Some(Duration::from_millis(10));
+    lamp.may_take_hold = true;
+    lamp.servos[ROLL].torque = 0;
+    lamp.servos[ROLL].goal = 2_074;
+    lamp.deaf = Some((ROLL, 3));
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            torque_on: true,
+            ..Limits::FOLDED
+        },
+        None,
+        || Some((Mood::Resting, 0)),
+        |_| {},
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(lamp.servos[ROLL].torque, 0);
+    assert!(
+        !lamp
+            .registers
+            .iter()
+            .any(|(_, address, bytes)| *address == 40 && bytes == &[1])
+    );
+}
+
+#[test]
+fn unplug_during_hand_recovery_wake_stops_before_it_finishes() {
+    let secs = Duration::from_secs_f32;
+    let (mut lamp, mut clock) = folded(secs(25.0));
+    let inhibit = secs(8.2);
+    clock.inhibit_at = Some(inhibit);
+    lamp.may_take_hold = true;
+    lamp.hand = Some((secs(1.5), secs(3.0), YAW, 2_045.0));
+    lamp.strains = vec![(secs(1.5), secs(3.0), YAW, 600)];
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            limp: true,
+            ..giving_way(GiveWay::Return)
+        },
+        Some(HOME),
+        || Some((Mood::Resting, 0)),
+        |_| {},
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.released.len(), 1, "{report:?}");
+    assert!(
+        report.released[0].woke.is_some(),
+        "inhibit must land during recovery wake"
+    );
+    assert!(
+        clock.time.get() < inhibit + Duration::from_millis(100),
+        "{:?}",
+        clock.time.get()
+    );
+    assert!(
+        lamp.servos[YAW].goal > HOME[2] + 10,
+        "the wake must not finish"
+    );
+}
+
+#[test]
+fn unplug_never_attests_a_shifted_runtime_home_as_the_configured_fold() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(10));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.servos[YAW].position = 2_600.0;
+    lamp.servos[YAW].goal = 2_600;
+    let mut safe = false;
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            limp: true,
+            ..waking()
+        },
+        Some(HOME),
+        Some(standing(100, 90)),
+        None,
+        || Some((Mood::Resting, 0)),
+        || Asked {
+            unplug: true,
+            ..Asked::default()
+        },
+        |glimpse| safe |= glimpse.unplug_safe,
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_ne!(
+        report.home.unwrap()[2],
+        HOME[2],
+        "fixture must shift runtime home"
+    );
+    assert!(
+        (lamp.servos[YAW].position - f32::from(HOME[2])).abs() <= 24.0,
+        "the fold brings the base to the configured home, not the shifted one: {}",
+        lamp.servos[YAW].position
+    );
+    assert!(
+        !safe,
+        "unplug target must remain the explicit calibrated home"
+    );
 }

@@ -448,12 +448,24 @@ pub struct Service {
     /// The last rest refusal said in the journal, so a renewal refused for
     /// the same reason is not said again.
     rest_refusal_said: Option<String>,
+    unplug: Option<crate::unplug::Unplug>,
     pub counts: Counts,
     _lock: File,
 }
 
 impl Service {
     pub fn new(bus: &Bus, catalogue: Catalogue, enabled: bool, clock: &str) -> io::Result<Self> {
+        Self::new_with_unplug(bus, catalogue, enabled, clock, lamp_body::unplug::enabled())
+    }
+
+    fn new_with_unplug(
+        bus: &Bus,
+        catalogue: Catalogue,
+        enabled: bool,
+        clock: &str,
+        unplug: bool,
+    ) -> io::Result<Self> {
+        let resting = catalogue.face_levels.resting;
         let resumable = catalogue.resumable_voice;
         // Make the root using the bus's directory permissions before locking.
         let state = bus.publisher_declared(
@@ -511,6 +523,9 @@ impl Service {
             paused: false,
             rest: None,
             rest_refusal_said: None,
+            unplug: unplug
+                .then(|| crate::unplug::Unplug::new(bus, resting))
+                .transpose()?,
             counts: Counts::default(),
             _lock: lock,
         })
@@ -809,10 +824,26 @@ impl Service {
             output.light = None;
             output.body = None;
         }
+        let unplug_request = self.unplug.as_mut().and_then(|unplug| {
+            unplug.apply(
+                &mut output,
+                at_us,
+                wall_ms.saturating_add(at_us.saturating_sub(began) / 1_000),
+            )
+        });
         // Publish face first. Consumers still enforce lease/time/ownership;
         // datagram order between topics is not a physical timing guarantee.
-        if let Some(light) = &output.light {
-            account(&mut self.counts, self.light.publish_json(at_us, light));
+        let published = output
+            .light
+            .as_ref()
+            .map(|light| self.light.publish_json(at_us, light));
+        if published.as_ref().is_none_or(Result::is_ok)
+            && let (Some(unplug), Some(request)) = (&mut self.unplug, unplug_request)
+        {
+            account(&mut self.counts, unplug.acknowledge(at_us, &request));
+        }
+        if let Some(published) = published {
+            account(&mut self.counts, published);
         }
         if let Some(body) = &output.body {
             account(&mut self.counts, self.body.publish_json(at_us, body));
@@ -945,5 +976,249 @@ impl Recorder {
                 self.lost.fetch_add(1, Ordering::Relaxed);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod unplug_tests {
+    use super::*;
+    use lamp_bus::Kind;
+    use lamp_msgs::{ExpressionFace, Voice, VoiceEvent, VoiceTiming};
+
+    struct Fixture {
+        root: std::path::PathBuf,
+        bus: Bus,
+        service: Service,
+    }
+    impl Fixture {
+        fn new(enabled: bool, unplug: bool) -> Self {
+            Self::with(enabled, unplug, Catalogue::builtin(), false)
+        }
+        /// `light_before`: the light was set before Expression started, as
+        /// on a lamp whose light was last changed long ago.
+        fn with(enabled: bool, unplug: bool, catalogue: Catalogue, light_before: bool) -> Self {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let root = std::path::Path::new("/tmp").join(format!(
+                "ex-u-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            let bus = Bus::new(&root).unwrap();
+            let light = || {
+                bus.publisher_declared(Light::TOPICS[0], &Light::declaration(), "test")
+                    .unwrap()
+                    .publish_json(1, &Light::new(true, "warm", 2).unwrap())
+                    .unwrap();
+            };
+            if light_before {
+                light();
+            }
+            let service =
+                Service::new_with_unplug(&bus, catalogue, enabled, "test", unplug).unwrap();
+            if !light_before {
+                light();
+            }
+            bus.publisher_declared(VoiceTiming::TOPIC, &VoiceTiming::declaration(), "voice")
+                .unwrap()
+                .publish_json(
+                    1,
+                    &VoiceTiming {
+                        stamp: ClockStamp {
+                            clock_id: "test".into(),
+                            at_us: 1_000_000,
+                            sequence: 1,
+                        },
+                        session_id: "voice".into(),
+                        turn: 1,
+                        request: 1,
+                        state: Voice::Speaking,
+                        accepting_input: false,
+                        event: VoiceEvent::State,
+                        first_audio_us: None,
+                    },
+                )
+                .unwrap();
+            Self { root, bus, service }
+        }
+        fn say(&self, topic: &str, value: serde_json::Value) {
+            let source = if topic == lamp_body::unplug::STATE_TOPIC {
+                "body"
+            } else {
+                "test"
+            };
+            let mut publisher = self.bus.publisher(topic, Kind::Latest, source).unwrap();
+            publisher.expires_after(Some(Duration::from_millis(500)));
+            publisher.publish_json(1_000_000, &value).unwrap();
+        }
+        fn request(&self, phase: &str, request: &str) {
+            self.say(
+                lamp_body::unplug::REQUEST_TOPIC,
+                serde_json::json!({"request":"r1"}),
+            );
+            self.say(
+                lamp_body::unplug::STATE_TOPIC,
+                serde_json::json!({"request":request,"phase":phase,"why":""}),
+            );
+        }
+        fn ack(&self) -> bool {
+            self.bus
+                .latest("expression/unplug_state")
+                .unwrap()
+                .is_some()
+        }
+        fn step(&mut self, wall: u64) -> Output {
+            self.service.step(|| 1_000_000, wall)
+        }
+    }
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[test]
+    fn ready_presents_sleep_even_while_voice_speaks_then_acknowledges() {
+        let mut fixture = Fixture::new(true, true);
+        fixture.request("ready", "r1");
+        let output = fixture.step(unix_ms());
+        assert_eq!(output.light.unwrap().face, ExpressionFace::Resting);
+        assert!(output.state.behaviours.contains(&"asleep".into()));
+        assert!(output.body.is_none());
+        let ack = fixture
+            .bus
+            .latest("expression/unplug_state")
+            .unwrap()
+            .unwrap();
+        assert_eq!(ack.header.expires_ms, Some(500));
+        assert_eq!(
+            ack.parse::<serde_json::Value>().unwrap(),
+            serde_json::json!({"request":"r1","asleep":true})
+        );
+    }
+
+    /// lamp-52e6 on 2026-10-20 (#1699 try 3): the body said Ready and
+    /// Expression never acknowledged asleep. Here everything comes as the
+    /// lamp's services send it: its catalogue, declared publishers, live
+    /// clocks, a light set before Expression started, and a voice whose
+    /// last turn was cancelled or that says nothing fresh.
+    #[test]
+    fn body_ready_from_the_real_publishers_is_acknowledged_asleep() {
+        for voice in [
+            Some(VoiceEvent::State),
+            Some(VoiceEvent::Cancelled),
+            Some(VoiceEvent::Finished),
+            None,
+        ] {
+            let catalogue = Catalogue::from_json(include_str!(
+                "../../../deploy/lamp-4ace/expression-alive-lamp-4ace.json"
+            ))
+            .unwrap();
+            let mut fixture = Fixture::with(true, true, catalogue, true);
+            let bus = fixture.bus.clone();
+            let now = lamp_ipc::monotonic_us();
+            if let Some(event) = voice {
+                bus.publisher_declared(
+                    lamp_msgs::VoiceProgress::TOPIC,
+                    &lamp_msgs::VoiceProgress::declaration(),
+                    "voice",
+                )
+                .unwrap()
+                .publish_json(
+                    now,
+                    &lamp_msgs::VoiceProgress {
+                        timing: VoiceTiming {
+                            stamp: ClockStamp {
+                                clock_id: "test".into(),
+                                at_us: now,
+                                sequence: 2,
+                            },
+                            session_id: "voice".into(),
+                            turn: 1,
+                            request: 1,
+                            state: Voice::Resting,
+                            accepting_input: false,
+                            event,
+                            first_audio_us: None,
+                        },
+                        audio_generation: 1,
+                        held: false,
+                    },
+                )
+                .unwrap();
+            }
+            bus.publisher_declared(
+                lamp_body::unplug::Request::TOPIC,
+                &lamp_body::unplug::Request::declaration(),
+                "skills",
+            )
+            .unwrap()
+            .publish_json(now, &serde_json::json!({"request": "boot-1"}))
+            .unwrap();
+            bus.publisher_declared(
+                lamp_body::unplug::State::TOPIC,
+                &lamp_body::unplug::State::declaration(),
+                "body",
+            )
+            .unwrap()
+            .publish_json(
+                lamp_ipc::monotonic_us(),
+                &serde_json::json!({"request": "boot-1", "phase": "ready", "why": ""}),
+            )
+            .unwrap();
+            let output = fixture.service.step(lamp_ipc::monotonic_us, unix_ms());
+            assert!(fixture.ack(), "{voice:?} {:?}", output.state);
+            assert!(output.body.is_none());
+            assert!(output.state.behaviours.contains(&"asleep".into()));
+            if let Some(light) = output.light {
+                assert_eq!(light.face, ExpressionFace::Resting);
+            }
+        }
+    }
+
+    #[test]
+    fn switch_off_shadow_failed_mismatch_and_stale_never_acknowledge() {
+        for (enabled, unplug, phase, request, age) in [
+            (true, false, "ready", "r1", 0),
+            (false, true, "ready", "r1", 0),
+            (true, true, "failed", "r1", 0),
+            (true, true, "folding", "r1", 0),
+            (true, true, "ready", "old", 0),
+            (true, true, "ready", "r1", 501),
+        ] {
+            let mut fixture = Fixture::new(enabled, unplug);
+            fixture.request(phase, request);
+            let output = fixture.step(unix_ms() + age);
+            assert!(!fixture.ack(), "{enabled} {unplug} {phase} {request} {age}");
+            assert!(!output.state.behaviours.contains(&"ready to unplug".into()));
+            if enabled && !unplug {
+                assert_eq!(output.light.unwrap().face, ExpressionFace::Speaking);
+            }
+        }
+    }
+
+    #[test]
+    fn closed_privacy_and_failed_light_publication_never_acknowledge() {
+        let mut fixture = Fixture::new(true, true);
+        fixture.request("ready", "r1");
+        fixture.say(
+            lamp_msgs::MicrophonePrivacy::TOPIC,
+            serde_json::json!({"physical_muted":true}),
+        );
+        assert!(
+            !fixture
+                .step(unix_ms())
+                .state
+                .behaviours
+                .contains(&"ready to unplug".into())
+        );
+        assert!(!fixture.ack());
+
+        let mut fixture = Fixture::new(true, true);
+        fixture.request("ready", "r1");
+        // A directory at the kept-file destination makes the atomic rename fail.
+        fs::create_dir(fixture.root.join("expression/light/latest")).unwrap();
+        fixture.step(unix_ms());
+        assert!(fixture.service.counts.output_errors > 0);
+        assert!(!fixture.ack());
     }
 }

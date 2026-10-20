@@ -2713,3 +2713,12 @@ in it: a hand on the arm makes the lamp sit down, which the body's report
 says. Two tests: steps say a hand only while one is on a joint, and never
 without one; the bus says it with each step passed on and keeps when the
 push began.
+
+## Preparing to unplug (#1674)
+
+With `LAMP_UNPLUG=on`, the body accepts the core skill's kept request,
+immediately closes the wake window and folds through its existing guarded
+trajectory. It reports Ready only from fresh physically settled samples, not
+from pause or the trajectory fraction. The inhibit lasts until reboot, including
+across a body-service restart. See [the protocol and proof](unplug.md); no lamp
+validation is claimed yet.
