@@ -9,7 +9,7 @@
 //! `unsure`, with a confidence ([`judge`]). No picture, print or name is
 //! kept or said: only the kind and the confidence.
 use crate::who::SIDE as ALIGNED;
-use lamp_msgs::{HumanSeems, SeemsKind};
+use lamp_msgs::{HumanSeems, SeemsKind, SeemsReader};
 use sha2::{Digest, Sha256};
 use std::{fs::File, io::Read, path::Path, sync::Arc, time::Duration};
 use tract_onnx::prelude::*;
@@ -103,6 +103,7 @@ pub fn judge(shares: &[f32; 8]) -> HumanSeems {
     HumanSeems {
         kind,
         confidence: confidence.clamp(0.0, 1.0),
+        from: SeemsReader::FerPlus,
     }
 }
 
@@ -206,6 +207,7 @@ mod tests {
         let happy = read([0.2, 0.7, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0]);
         assert_eq!(happy.kind, SeemsKind::Positive);
         assert!((happy.confidence - 0.7).abs() < 1e-6);
+        assert_eq!(happy.from, SeemsReader::FerPlus);
         // The five unhappy ones together.
         let low = read([0.3, 0.05, 0.0, 0.3, 0.15, 0.1, 0.05, 0.05]);
         assert_eq!(low.kind, SeemsKind::Negative);

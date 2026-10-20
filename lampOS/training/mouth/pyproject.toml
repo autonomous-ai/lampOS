@@ -1,7 +1,7 @@
 [project]
 name = "lamp-mouth-model"
 version = "0.1.0"
-description = "Converts Google's MediaPipe Face Mesh V2 landmarks model to ONNX for #720. Never runs on the lamp."
+description = "Converts Google's MediaPipe Face Mesh V2 landmarks model (#720) and its blendshapes model (#1671) to ONNX. Never runs on the lamp."
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "tf2onnx==1.16.1",

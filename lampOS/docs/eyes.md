@@ -1246,6 +1246,81 @@ only with the switch, from the eyes, as a kind and a confidence
 One read takes about 45 ms on an x86 laptop's release build. **The cost on a
 lamp is not measured yet**, and it is the first thing to measure.
 
+**FER+ is only for that measure, on our own lamps**, never on a customer's
+lamp: it was learnt from web-scraped pictures whose rights aren't cleared
+(the lead, 20 Oct 08:16, on the licence table in #1671). The product's
+reader is the next one.
+
+### The product's reader: Blendshape V2 (`--seems-blendshapes`, #1671)
+
+Off unless `lamp-eyes --seems-blendshapes
+/opt/lampOS/eyes/models/face_blendshapes.onnx` is given, with
+`--mouth-model` (the mesh it reads from). Everything said, journaled and
+kept is as for `--seems` above: a kind and a confidence, at most every 2 s,
+for the nearest face at or over `NEAR_ENOUGH`; no name, picture, point or
+score. Each read names its reader (`from`: `fer_plus` or `blendshapes`;
+a message without it is FER+'s), so with both flags the two run side by
+side on the same face for the measure (the first builder, 20 Oct 09:51),
+and the journal's once-a-minute line names its reader. The measure's
+logger takes the stream and splits it by `from`: `latest` holds only the
+newest, whichever reader that was.
+
+- **One reader a look.** A look where one reader has read leaves the other
+  for the next look, so a look waits for one read, never two.
+- **The 100 ms rule above holds here too.** A read with the mouth's pass to
+  reuse adds the blendshape model, about 13 ms on lamp-52e6 by the ratio
+  below. With no pass to reuse (`--mouth-on-heard on` between lines) it
+  adds a mesh pass too, about 98 ms under tract, right at the line. Before
+  anything turns this on, the read moves to its own thread, or the mesh
+  runs under ONNX Runtime (`--mouth-runtime`, 33 ms a pass).
+- **FER+ as before:** a face it can't cut out upright is not read, and its
+  clock doesn't start, so the next look tries again.
+
+- **The model:** Google's Blendshape V2 (`face_blendshapes.onnx`, Apache
+  2.0), 1,882,583 bytes, pinned by SHA-256 in `blendshapes.rs`, run under
+  tract. It comes from the same MediaPipe download as the mouth's mesh
+  (`models/blendshapes/SOURCE.md`, made by `training/mouth/make.sh`). No
+  build or release carries it yet.
+- **The read:** the mesh's 478 landmarks for that face, from the mouth's
+  pass if it read the same face on that look, else one mesh pass
+  (`Mesh::landmarks`). The 146 points MediaPipe's own graph takes
+  (`blendshapes::POINTS`) are turned back by the eye line's angle to the
+  frame's (`mesh::eye_line`), since the crop is turned so the eyes are
+  level and the model minds a turn but not where the face sits or how
+  large it is. The model scores 52 movements of the face.
+- **Movements, not feelings:** the reduction is ours (`blendshapes::judge`,
+  `NAMED_FROM` 0.5, authored, to be set from the measure). `positive` when
+  the two smiles' mean is at or over the line and over the other;
+  `negative` when the frowns' or the wrinkled nose's is; else `unsure`.
+  The brows drawn down aren't counted: on MediaPipe's own smiling test
+  portrait they score 0.84, beside the smiles' 0.95.
+- **Checked against MediaPipe** (on a laptop, not the lamp): the converted
+  model gives TFLite's 52 scores to 1.4e-6 (`blendshapes_parity.py`).
+  MediaPipe's own points through this pick give its own scores. On its two
+  test portraits, this mesh's crop and the turn back give MediaPipe's scores
+  to within 0.07 on the upright one (the smiles 0.95 and 0.93 against its
+  0.96 and 0.93) and 0.35 on the one turned a quarter, where MediaPipe's
+  own scores differ from its upright ones by as much. Without the turn
+  back, the turned one is 0.57 off.
+- **The cost:** the model takes about a sixth of a mesh pass (0.8 ms
+  against 5.1 on an x86 laptop's one thread). On lamp-52e6 a mesh pass was
+  85 ms under tract and 33 ms under ONNX Runtime (#720). So with the mouth
+  off, a read is about one mesh pass every 2 s. **Not measured on a lamp
+  yet.**
+
+Tests: a smile `positive`, a frown or a sneer `negative`, one side only or
+under the line `unsure`, exactly on the line named, a smile beside a
+stronger frown `negative`, MediaPipe's portrait's smile with the brows
+drawn down `positive`; scores that aren't 52 numbers give nothing; the 146
+points picked in order and turned by the eye line; a file that isn't the
+pinned model refused; with the model present, 52 scores from 0 to 1 that
+match ONNX Runtime's (`LAMP_BLENDSHAPES_GRID`, `blendshapes.rs`). The flag
+is off unless given, needs `--mouth-model`,
+and is a short absolute path, given once (`main.rs`); `--seems` beside
+it runs both. A read says its reader, a message without `from` reads as
+FER+'s, and a read is a kind, a confidence and its reader only
+(`msgs/seems.rs`, `bus_out.rs`).
+
 ### Whether anyone is at the lamp (`LAMP_PRESENCE=on`, #1677)
 
 With `LAMP_PRESENCE=on` beside `LAMP_BUS=on`, the eyes also say on
