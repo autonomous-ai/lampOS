@@ -1,5 +1,5 @@
 //! Final-drain audit on the production runner using a virtual clock; no audio.
-mod common;
+use crate::common;
 use lamp_voice_eval::{
     Result,
     events::{ClockDomain, EventKind, EventSource, RuntimeEvent},

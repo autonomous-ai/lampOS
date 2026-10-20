@@ -1,6 +1,6 @@
 //! Relay clock boundaries with an inert child and explicit event barriers.
 //! The clock advances only in the test driver; child/transport I/O stays real.
-mod common;
+use crate::common;
 
 use lamp_turn_owner::MonoTime;
 use lamp_voice_eval::physical::{

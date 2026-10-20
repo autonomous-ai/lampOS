@@ -3,7 +3,7 @@
 //! lamp-voice's own `CueSink`; "playback" goes to a fake room socket. This runs
 //! on an explicitly stepped fixture clock and plays no audio. Real processes,
 //! sockets, signal handling and cleanup stay in the path.
-mod common;
+use crate::common;
 
 use lamp_voice_eval::{
     evaluate::{self, FindingKind, Outcome},

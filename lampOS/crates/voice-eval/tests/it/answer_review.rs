@@ -1,6 +1,6 @@
 //! Reporting regressions use synthetic traces and a real, silent fixture WAV.
 //! They test evidence accounting, not listening quality or acoustic latency.
-mod common;
+use crate::common;
 
 use lamp_voice_eval::{
     annotations::{Annotations, AttemptAnnotation, StepAnnotation},

@@ -429,7 +429,7 @@ follow-up lost with `on` (it is let go unheard, so whether it had words is
 never known), and a stop the person went on from (#1352: it takes the turn
 as any word does, with no record of its own). Code:
 `crates/voice-eval/src/waiting_cuts.rs`; tested in
-`crates/voice-eval/tests/waiting_cuts.rs` on an invented journal excerpt and
+`crates/voice-eval/tests/it/waiting_cuts.rs` on an invented journal excerpt and
 sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
 
 **With `LAMP_ASKER_FIRST=on`, the person asked comes first while the

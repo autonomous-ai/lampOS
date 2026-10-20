@@ -10,7 +10,7 @@
 //! Every local endpoint reports a 1,200 ms silence wait. The observer metadata
 //! fragment carries the run's queue overflow. Other times are reconstructed;
 //! no recording is used and nothing here is acoustic evidence.
-mod common;
+use crate::common;
 
 use lamp_voice_eval::{
     annotations,

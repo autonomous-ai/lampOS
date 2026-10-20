@@ -1,6 +1,6 @@
 //! MAIN-021: offline verification of real lamp-voice diagnostics directories,
 //! written by lamp-voice's own `Recorder`, against a runtime trace.
-mod common;
+use crate::common;
 
 use lamp_turn_owner::BootId;
 use lamp_voice::{

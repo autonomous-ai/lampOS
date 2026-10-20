@@ -4,7 +4,7 @@
 //! never triggers a new stimulus. The drain path's `input_discarded_endpoint`
 //! is not a normal endpoint. (Provisional field names until the coordinator
 //! publishes its frozen cue schema.)
-mod common;
+use crate::common;
 use lamp_voice_eval::{
     evaluate::{self, AnswerOutcome, FindingKind},
     events::{EventKind, PROVIDER_FAILED, parse_cue, parse_trace},

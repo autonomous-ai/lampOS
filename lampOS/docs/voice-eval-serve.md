@@ -285,7 +285,7 @@ prepare. The first `input_availability` cue was refused as stale including
 clock uncertainty, and the runner stopped the runtime before readiness. Under
 the final mapping that cue was only ~21.5 ms old, so the refusal is proven but
 real staleness is not; the mapping used at the decision was not retained.
-`tests/serve_session.rs` reproduces this through the real relay with a 400 ms
+`tests/it/serve_session.rs` reproduces this through the real relay with a 400 ms
 transport start and a 2.3 s preparation. The old order fails with that exact
 refusal; the current order plays both prompts.
 
@@ -360,7 +360,7 @@ unchanged; no lease was widened.
 | Physical mute and new cycle | withheld at the new boot; continuity lost; restart verified from metadata |
 | SIGTERM ignored | forced kill after the 10 s grace; attempt aborted, never clean |
 | Room recorder ends early | `evidence_lost` (room recorder); rest withheld |
-| Recorder exits 0 with `invalid_capture` | `room_recording: invalid`, terminal report quoted; acoustics unscored; no listening template (`tests/report_validity.rs`) |
+| Recorder exits 0 with `invalid_capture` | `room_recording: invalid`, terminal report quoted; acoustics unscored; no listening template (`tests/it/report_validity.rs`) |
 | Relay: stop / transport closed / deadline / SIGTERM ignored | each cause, signal, exit, forced kill and reap recorded separately |
 
 ## Limits
@@ -415,7 +415,7 @@ writes a new evaluation beside the original. With the current rules:
 - turn 1's 30 ms supply gap remains a playback-gap defect;
 - the endpoint boundary states the runtime's 1,200 ms silence wait.
 
-`tests/report_validity.rs` holds the exact-order reconstruction, with negative
+`tests/it/report_validity.rs` holds the exact-order reconstruction, with negative
 controls: no admission, an admission 25 ms late, another boot, a stale
 generation, an earlier turn, a correction bound to another turn and an ordinary
 request.

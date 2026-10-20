@@ -3,9 +3,9 @@
 //! requests that each add a switch never touch the same line; each row says
 //! how it is counted, and this fails on a row that doesn't.
 //!
-//! To see the counts: `cargo test -p lamp-voice-eval --test switches -- --nocapture`.
+//! To see the counts: `cargo test -p lamp-voice-eval --test it switches:: -- --nocapture`.
 
-const PAGE: &str = include_str!("../../../docs/switches.md");
+const PAGE: &str = include_str!("../../../../docs/switches.md");
 
 /// The page's four tables, by the start of their headings, and the counts'
 /// name for each.

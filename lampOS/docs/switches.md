@@ -56,10 +56,10 @@ says how the switch is counted:
 To see the counts, by table and in all:
 
 ```sh
-cargo test -p lamp-voice-eval --test switches -- --nocapture
+cargo test -p lamp-voice-eval --test it switches:: -- --nocapture
 ```
 
-`lamp-voice-eval`'s `tests/switches.rs` fails if a row in the four tables
+`lamp-voice-eval`'s `tests/it/switches.rs` fails if a row in the four tables
 below has no **Counted as**, or one that isn't one of the five.
 
 **Proposed to turn on now**, with its newest lamp-4ace record a pass:

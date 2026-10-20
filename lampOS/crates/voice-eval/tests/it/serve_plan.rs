@@ -1,6 +1,6 @@
 //! The cached serve-conversation example and the plan rules it relies on.
 //! Existing plan bytes, and so their hashes, stay unchanged.
-mod common;
+use crate::common;
 
 use lamp_voice_eval::{
     plan::{DEFAULT_PLAN, LoadedPlan, MAX_STEPS, SERVE_PLAN, TriggerEvent},

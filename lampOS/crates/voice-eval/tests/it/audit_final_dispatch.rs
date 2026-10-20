@@ -1,5 +1,5 @@
 //! Audit regression: actual PhysicalBackend dispatch with a recording Player; no audio.
-mod common;
+use crate::common;
 use lamp_voice_eval::{
     Result,
     events::EventKind,

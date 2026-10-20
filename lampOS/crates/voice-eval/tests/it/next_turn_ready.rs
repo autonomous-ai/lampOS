@@ -1,7 +1,7 @@
 //! `next_turn_ready`: plan rules and the fake runtime end to end. The runner's
 //! scripted cases (late reopen, extra input, terminal link, owner faults) are
 //! in `runner::occurrence_tests`. No audio, device or cloud is involved.
-mod common;
+use crate::common;
 
 use lamp_voice_eval::{
     events::EventKind,
