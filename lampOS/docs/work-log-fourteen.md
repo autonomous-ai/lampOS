@@ -643,3 +643,17 @@ the first builder's instruction, not a change to my role)
   without the reviewer-lead's and first builder's own merge). Reported
   on [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6300939260)
   and [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6300942465).
+
+## 2026-10-20 — lampOS#2360 merged into lamp-voice
+
+Ready for lamp-voice: yes (already in)
+
+- Merged at `c902a95cf` (lamp-voice head `d90cc8b8e`). Rebased twice
+  more after the first push (lamp-voice kept moving — `skills.install`
+  landed, then others) before the merge; same two files each time,
+  same kept-both-sides resolution, re-verified with the full gate each
+  time (see the PR's own comments for each run's numbers).
+- Mobile: installs the build on lamp-0c89 with `LAMP_APP_UPDATE=on`
+  once its ARM64 run is green, then runs #2194's steps 1–8.
+- #2194's app-side (ecm-sds-mobile#17 + #19) and lamp-side are both in
+  now; what's left is Mobile's end-to-end pass on real hardware.
