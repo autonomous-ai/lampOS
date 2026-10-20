@@ -27,6 +27,11 @@ use std::{
 
 /// How often the program looks at its folder for a change.
 const RELOAD: Duration = Duration::from_secs(2);
+/// One pass of the program's main loop, which waits at most 250 ms and then
+/// takes in every topic, the ring's words and its watches. A check that
+/// nothing came waits this long: what the program would wrongly send comes
+/// in the pass that took in its cause (#1806).
+const ONE_PASS: Duration = Duration::from_millis(300);
 
 /// The program's clock as a test drives it (`--clock-control`,
 /// `docs/skills.md`): the host's, and what this test skipped of it. The
@@ -9089,8 +9094,8 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
             },
         )
         .unwrap();
-    // Taken in before the call.
-    std::thread::sleep(Duration::from_millis(300));
+    // Taken in before the call: the skip's answer says so.
+    clock.skip(Duration::ZERO);
     let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
     writeln!(
         &stream,
@@ -9118,7 +9123,7 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
     // The ring has not said yet that the mark shows (reviewer-two on
     // #1937): a visit is not counted.
     visit(&mut presence);
-    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    assert!(next(&mut texts, ONE_PASS).is_none());
     // The old claim's renewals while the clock went on: not the test's.
     while next(&mut requests, Duration::from_millis(300)).is_some() {}
     // Another program's light over it: given back, and asked for anew.
@@ -9131,8 +9136,15 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
             },
         )
         .unwrap();
+    // The two asked: read until both have come, not until 2 s of quiet.
+    let until = Instant::now() + Duration::from_secs(5);
     let mut asked = Vec::new();
-    while let Some(message) = next(&mut requests, Duration::from_secs(2)) {
+    while asked.len() < 2
+        && let Some(message) = next(
+            &mut requests,
+            until.saturating_duration_since(Instant::now()),
+        )
+    {
         asked.push(message.parse::<LightRequest>().unwrap());
     }
     let now = lamp_ipc::monotonic_us();
@@ -9145,7 +9157,7 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
     );
     // Not yet said shown again: a visit is not counted.
     visit(&mut presence);
-    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    assert!(next(&mut texts, ONE_PASS).is_none());
     // Shown: the next visit is.
     reached
         .publish_json(
@@ -9279,7 +9291,8 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
                 },
             )
             .unwrap();
-        std::thread::sleep(Duration::from_millis(300));
+        // Taken in before the call: the skip's answer says so.
+        clock.skip(Duration::ZERO);
     };
     let turn_on = || {
         let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
@@ -9324,12 +9337,12 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
         .unwrap();
     assert_eq!(paused.text, "I've paused watching while your light is off.");
     assert!(
-        next(&mut requests, Duration::from_millis(1_500)).is_none(),
+        next(&mut requests, ONE_PASS).is_none(),
         "no claim over the person's light"
     );
     // Paused: a visit is not counted.
     visit(&mut presence);
-    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    assert!(next(&mut texts, ONE_PASS).is_none());
     // Their light on again, unasked: still paused, no claim, no counting.
     state
         .publish_json(1, &Light::new(true, "white", 5).unwrap())
@@ -9337,7 +9350,7 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
     std::thread::sleep(Duration::from_millis(500));
     clock.skip(Duration::from_secs(600));
     visit(&mut presence);
-    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    assert!(next(&mut texts, ONE_PASS).is_none());
     let since: Vec<LightRequest> = std::iter::from_fn(|| next(&mut requests, Duration::ZERO))
         .map(|message| message.parse().unwrap())
         .collect();
@@ -9353,18 +9366,27 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
     speak(&mut heard);
     let again = turn_on();
     assert!(again.contains("again"), "{again}");
-    let mut asked = Vec::new();
-    while let Some(message) = next(&mut requests, Duration::from_secs(2)) {
-        asked.push(message.parse::<LightRequest>().unwrap());
-    }
-    let now = lamp_ipc::monotonic_us();
-    assert!(
+    // Read until both have come, not until 2 s of quiet.
+    let given_back_and_asked = |asked: &[LightRequest], now| {
         asked
             .iter()
             .any(|asked| !asked.claim.holds_at("boot-test", now))
             && asked
                 .last()
-                .is_some_and(|last| last.claim.holds_at("boot-test", now)),
+                .is_some_and(|last| last.claim.holds_at("boot-test", now))
+    };
+    let until = Instant::now() + Duration::from_secs(5);
+    let mut asked = Vec::new();
+    while !given_back_and_asked(&asked, lamp_ipc::monotonic_us())
+        && let Some(message) = next(
+            &mut requests,
+            until.saturating_duration_since(Instant::now()),
+        )
+    {
+        asked.push(message.parse::<LightRequest>().unwrap());
+    }
+    assert!(
+        given_back_and_asked(&asked, lamp_ipc::monotonic_us()),
         "given back and asked anew: {asked:?}"
     );
     reached
@@ -9482,7 +9504,8 @@ fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s()
             },
         )
         .unwrap();
-    std::thread::sleep(Duration::from_millis(300));
+    // Taken in before the call: the skip's answer says so.
+    clock.skip(Duration::ZERO);
     let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
     writeln!(
         &stream,
@@ -9523,7 +9546,7 @@ fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s()
     // A visit now: not counted, nothing texted.
     say(&mut presence, true);
     say(&mut presence, false);
-    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    assert!(next(&mut texts, ONE_PASS).is_none());
     // The ring's word again: the next visit is counted.
     still_shows(&mut reached, &mark);
     say(&mut presence, true);
