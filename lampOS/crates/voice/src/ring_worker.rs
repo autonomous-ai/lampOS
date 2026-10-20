@@ -68,6 +68,7 @@ pub struct Senses {
     /// The lamp's inner state, for the eye's pace at rest
     /// ([`crate::ring_mood`]).
     pub mood: Option<crate::ring_mood::RingMood>,
+    pub unplug: Option<crate::ring_unplug::RingUnplug>,
 }
 
 /// Startup Ready is emitted only after the sink accepted its initial black frame.
@@ -243,8 +244,13 @@ pub fn run_continuous(
             None
         }
     });
+    let unplug = bus_root
+        .filter(|_| lamp_body::unplug::enabled())
+        .map(crate::ring_unplug::RingUnplug::on)
+        .transpose()?;
     let senses = Senses {
         caps,
+        unplug,
         light,
         eye,
         eye_strong,
@@ -540,6 +546,7 @@ fn service(
         mut sight,
         mut head,
         mut mood,
+        mut unplug,
     } = senses;
     let mut light = light.map(|(light, begins)| {
         face.light(begins);
@@ -671,17 +678,32 @@ fn service(
                             face.toward(sight.tick(monotonic_us()));
                         }
                         face.accent(frame.accent, frame.accent_at_us);
-                        let pixels = draw(&mut face, &frame, monotonic_us(), ceiling.get());
+                        let at = monotonic_us();
+                        let presentation = unplug
+                            .as_ref()
+                            .filter(|_| face.lit().on)
+                            .and_then(|unplug| unplug.prepare(at));
+                        let pixels = presentation.as_ref().map_or_else(
+                            || draw(&mut face, &frame, at, ceiling.get()),
+                            |presentation| presentation.pixels,
+                        );
                         match ring.show(&pixels, ceiling, frame.permit) {
-                            Ok(write) => link.publish(WorkerEvent::Ring {
-                                report: RingFeedback::Presented {
-                                    owner: frame.permit.owner(),
-                                    phase: frame.phase,
-                                    requested_at_us: frame.requested_at_us,
-                                    write_started_at_us: write.started_at().as_micros(),
-                                    write_finished_at_us: write.finished_at().as_micros(),
-                                },
-                            })?,
+                            Ok(write) => {
+                                if let (Some(unplug), Some(presentation)) =
+                                    (unplug.as_mut(), presentation.as_ref())
+                                {
+                                    unplug.drew(write.finished_at().as_micros(), presentation)?;
+                                }
+                                link.publish(WorkerEvent::Ring {
+                                    report: RingFeedback::Presented {
+                                        owner: frame.permit.owner(),
+                                        phase: frame.phase,
+                                        requested_at_us: frame.requested_at_us,
+                                        write_started_at_us: write.started_at().as_micros(),
+                                        write_finished_at_us: write.finished_at().as_micros(),
+                                    },
+                                })?;
+                            }
                             Err(error) => match error.cause {
                                 Failure::Authority(reason)
                                     if error.cleanup_error.is_none() && !ring.is_faulted() =>
@@ -723,9 +745,22 @@ fn service(
             rested_at = at;
             let ceiling = ChannelCeiling::new(u16::from(ceiling.get()).min(cap_ceiling))
                 .map_err(io::Error::other)?;
-            let pixels = face.render(Mood::Resting, 0, at, ceiling.get());
-            let own_light = face.rests_on_its_light(at);
-            rest(ring, &pixels, ceiling, own_light, light.as_mut())?;
+            let presentation = unplug
+                .as_ref()
+                .filter(|_| face.lit().on)
+                .and_then(|unplug| unplug.prepare(at));
+            if let (Some(unplug), Some(presentation)) = (unplug.as_mut(), presentation.as_ref()) {
+                if let Some(receipt) = ring
+                    .show_resting(&presentation.pixels, ceiling)
+                    .map_err(io::Error::other)?
+                {
+                    unplug.drew(receipt.finished_at().as_micros(), presentation)?;
+                }
+            } else {
+                let pixels = face.render(Mood::Resting, 0, at, ceiling.get());
+                let own_light = face.rests_on_its_light(at);
+                rest(ring, &pixels, ceiling, own_light, light.as_mut())?;
+            }
         }
         stall_pass.done();
         if let Some(wait) = TICK_US.checked_sub(monotonic_us().saturating_sub(tick)) {

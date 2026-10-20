@@ -197,12 +197,13 @@ voice's own hello is off, as lamp-4ace now has it too.
 **19 October: every behaviour that has a skill runs as the skill** (the
 owner: "everything is a skill"). Install puts every product skill in
 `/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`):
-nine folders are installed, with eight enabled. Welcome back, Reminders,
-Task news, Onboarding, Stretch break, Stuffy air, Dance and Not feeling well
-keep their enabled defaults. Not feeling well (#1681) came with the product
-after its lamp check, row 8 on lamp-52e6 with the lead (20 Oct 11:35): one
-slow droop for a failed part, and the light back after; it adds no
-function.
+ten folders are installed, nine enabled, one of them hidden unless
+`LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
+break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
+Not feeling well (#1681) came with the product after its lamp check, row 8
+on lamp-52e6 with the lead (20 Oct 11:35): one slow droop for a failed
+part, and the light back after; it adds no function. Prepare-to-unplug is
+enabled but stays hidden and inactive unless `LAMP_UNPLUG=on`.
 Bedtime and Morning is included with `enabled = false`, awaiting its lamp
 comparison (#1672); it adds no active trigger or advertised tool. Each
 folder is installed whole but for its `tests/`. The voice's own paths still
@@ -1068,3 +1069,10 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   declare their private durable paths without enabling any new switch.
   The directories' creation by systemd and the routine's behavior on a lamp
   still need the comparison recorded in [bedtime-morning.md](bedtime-morning.md).
+
+## Prepare-to-unplug core skill (#1674)
+
+Install includes `skills/prepare-unplug/{SKILL.md,skill.toml}`. It stays hidden
+and inactive unless `LAMP_UNPLUG=on` is set on Skills, Body, Expression and
+Voice after the lamp checks in [unplug.md](unplug.md). The product does not set
+that switch yet. This skill prepares the physical arm; it is not OS shutdown.

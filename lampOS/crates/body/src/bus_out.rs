@@ -742,6 +742,9 @@ mod tests {
 
     fn glimpse(step: u64) -> Glimpse {
         Glimpse {
+            unplug_safe: false,
+            unplug_unsafe: None,
+            unplug_gap: false,
             step,
             mood: Mood::Listening,
             // Pitch, roll, yaw.

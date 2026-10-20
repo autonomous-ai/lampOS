@@ -663,6 +663,8 @@ const BUS_TOPICS: &[&str] = &[
     "body/gesture",
     "body/hand",
     "body/joint_states",
+    "body/unplug_request",
+    "body/unplug_state",
     "camera/image",
     "chat/in",
     "chat/out",
@@ -679,6 +681,7 @@ const BUS_TOPICS: &[&str] = &[
     "expression/rest_request",
     "expression/rest_state",
     "expression/state",
+    "expression/unplug_state",
     "humans/faces/tracked",
     "humans/familiar",
     "humans/seems",
@@ -703,6 +706,7 @@ const BUS_TOPICS: &[&str] = &[
     "policy/decisions",
     "reports/request",
     "reports/state",
+    "ring/unplug_state",
     "room/activity",
     "room/presence",
     "room/state",
@@ -1973,6 +1977,61 @@ mod tests {
             ] {
                 assert!(!kept.contains(topic), "{topic} exported in {name}");
             }
+        }
+    }
+
+    #[test]
+    fn unplug_topics_are_counted_by_name_without_exporting_their_payloads() {
+        let dir = temp("unplug");
+        let (sessions, _) = fixture(&dir.0);
+        let mut options = options(&dir.0, sessions, None);
+        options.wall_offset_us = Some(OFFSET_US as i64);
+        let topics = [
+            "body/unplug_request",
+            "body/unplug_state",
+            "expression/unplug_state",
+            "ring/unplug_state",
+        ];
+        let payload = json!({
+            "request": "private-unplug-request-identifier",
+            "phase": "failed",
+            "why": "private-unplug-failure-explanation",
+            "asleep": false,
+        });
+        let encoded = base64(payload.to_string().as_bytes());
+        let lines: Vec<_> = topics
+            .iter()
+            .flat_map(|topic| {
+                // The out-of-window duplicate must not inflate the omission count.
+                [BASE_MS + 1_000, BASE_MS - 1].map(|wall| {
+                    json!({"header": {"topic": topic, "at_us": 5_001_000_000u64,
+                    "at_unix_ms": wall}, "payload_b64": encoded})
+                    .to_string()
+                })
+            })
+            .collect();
+        let recording = dir.0.join("unplug.jsonl");
+        fs::write(&recording, lines.join("\n")).unwrap();
+        options.bus = vec![recording];
+        export(&options).unwrap();
+        let left: Value =
+            serde_json::from_str(&fs::read_to_string(options.out.join("left-out.json")).unwrap())
+                .unwrap();
+        for topic in topics {
+            assert_eq!(left["bus_messages_by_topic"][topic], 1, "{topic}");
+        }
+        assert_eq!(left["bus_messages_by_topic"].as_object().unwrap().len(), 4);
+        let output = all_output(&options.out);
+        for secret in [
+            "private-unplug-request-identifier",
+            "private-unplug-failure-explanation",
+            encoded.as_str(),
+        ] {
+            assert!(!output.contains(secret), "unplug payload leaked: {secret}");
+        }
+        for file in fs::read_dir(options.out.join("case")).unwrap() {
+            let file = file.unwrap();
+            assert!(!file.file_name().to_string_lossy().contains("unplug"));
         }
     }
 

@@ -26,6 +26,7 @@ pub mod known;
 pub mod limits;
 pub mod package;
 pub mod routine;
+pub mod unplug;
 pub mod visits;
 pub mod watch;
 
@@ -617,6 +618,8 @@ fn say_step(say: toml::Value) -> Result<Call, String> {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct BodyFile {
+    /// Request the body's guarded, latched fold before unplugging.
+    prepare_unplug: Option<bool>,
     look_at: Option<String>,
     gesture: Option<GestureFile>,
     /// The flag's name: the gesture is played twice when the call sets it.
@@ -771,6 +774,19 @@ pub struct Permissions {
 impl Permissions {
     /// Why a skill with these permissions may not make `call`, if not.
     pub fn refuses(&self, call: &Call) -> Option<String> {
+        // The composite unplug operation moves the body, reads completion
+        // evidence and speaks separately; none of those can be undeclared.
+        if *call == Call::PrepareUnplug {
+            if !self.body || !self.speak {
+                return Some(
+                    "body.prepare_unplug needs body = true and speak = true in [permissions]"
+                        .into(),
+                );
+            }
+            return unplug::READ_TOPICS
+                .iter()
+                .find_map(|topic| self.refuses_reading(topic));
+        }
         let (key, given) = match call {
             Call::Gaze { .. }
             | Call::Gesture(_)
@@ -785,6 +801,7 @@ impl Permissions {
             }
             Call::Look => ("look", self.look),
             Call::Text(_) => ("messages", self.messages),
+            Call::PrepareUnplug => unreachable!("handled above"),
             Call::AfterSay | Call::Ends => return None,
         };
         (!given).then(|| {
@@ -997,6 +1014,13 @@ impl Skill {
         if self.watch.is_some() {
             reads.push((watch::PRIVACY.to_owned(), "a watch"));
         }
+        if self.prepares_unplug() {
+            for topic in unplug::READ_TOPICS {
+                if !reads.iter().any(|(read, _)| read == topic) {
+                    reads.push((topic.to_owned(), "unplug preparation"));
+                }
+            }
+        }
         for (_, step) in &self.steps {
             if let Step::Call(Call::SayFrom(source, _)) = step
                 && !reads.iter().any(|(topic, _)| topic == source.topic())
@@ -1097,6 +1121,13 @@ impl Skill {
             args[&choice.name] = json!(default);
         }
         Ok(args)
+    }
+
+    /// The core unplug skill is not advertised until all parts are enabled.
+    pub fn prepares_unplug(&self) -> bool {
+        self.steps
+            .iter()
+            .any(|(_, step)| *step == Step::Call(Call::PrepareUnplug))
     }
 
     /// Whether a step holds something until its trigger stops holding.
@@ -1282,6 +1313,8 @@ fn enabled_by_default() -> bool {
 /// One call a step makes, as the program sends it and a test expects it.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Call {
+    /// The body folds and proves it is safe before the skill says ready.
+    PrepareUnplug,
     /// To the body's gaze socket, as the eyes send a face: its centre from
     /// the middle of the picture (-1 to 1) and its height as a share of it.
     /// Before a run it names no face.
@@ -1469,6 +1502,7 @@ impl Call {
     /// The call's name and its arguments, as a test names them.
     pub fn named(&self) -> (&'static str, Value) {
         match self {
+            Self::PrepareUnplug => ("body.prepare_unplug", json!({})),
             Self::Gaze { face } => {
                 let mut args = json!({ "look_at": "face" });
                 if let Some((x, y, size)) = face {
@@ -2325,6 +2359,23 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             }
         }
         if let Some(body) = step.body {
+            if let Some(prepare) = body.prepare_unplug {
+                if !prepare || file.tool.is_none() || !triggers.is_empty() {
+                    return Err("prepare_unplug = true needs a tool and no trigger".into());
+                }
+                if !unplug::core_identity(&name, file.tool.as_deref().unwrap_or_default()) {
+                    return Err(
+                        "prepare_unplug belongs only to prepare-unplug / prepare_to_unplug".into(),
+                    );
+                }
+                if SkillKind::read(file.kind.as_deref())? != SkillKind::Core {
+                    return Err(
+                        "prepare_unplug requires kind = core; it cannot be installed as a package"
+                            .into(),
+                    );
+                }
+                steps.push(Step::Call(Call::PrepareUnplug));
+            }
             match body.look_at.as_deref() {
                 None => {}
                 Some("face") => steps.push(Step::Call(Call::Gaze { face: None })),
@@ -2532,6 +2583,13 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             "keep = true goes with no light given back, dim, out or show in the same skill: its run would give back the light from before it over the one kept"
                 .into(),
         );
+    }
+    if steps
+        .iter()
+        .any(|(_, step)| *step == Step::Call(Call::PrepareUnplug))
+        && (steps.len() != 1 || file.choice.is_some() || file.flag.is_some())
+    {
+        return Err("prepare_unplug is the skill's only step, without choice or flag".into());
     }
     // One say or sound a run: for each trigger, its own steps and those for
     // all. A step for some choices makes none.
@@ -5046,6 +5104,12 @@ pub fn tools_file(skills: &[Skill]) -> Value {
 /// its full look itself, whatever the model says (#941): the still comes in
 /// the model's next turn. With a say, the note, for its answer.
 pub fn told(calls: &[Call]) -> Value {
+    if calls.contains(&Call::PrepareUnplug) {
+        return json!({
+            "ready": false,
+            "next": "Say only that you are preparing to fold and they must wait. Do not say it is safe to unplug yet. The skill will speak again only after checking the body."
+        });
+    }
     let note = calls.iter().find_map(|call| match call {
         Call::Say(note) => Some(note.as_str()),
         _ => None,

@@ -956,6 +956,10 @@ fn worker_command(
             role,
             var(crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT).as_deref(),
         ))
+        .envs(unplug_worker_environment(
+            role,
+            var(lamp_body::unplug::ENVIRONMENT).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1221,6 +1225,16 @@ fn second_route_worker_environment(
     .filter(|_| role == "second")
     .filter_map(|name| var(name).map(|value| (name, value)))
     .collect()
+}
+
+// The unplug switch (#1674), passed the same narrow way: the exact `on`, to
+// the ring only, which draws the asleep picture and says its receipt.
+fn unplug_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((lamp_body::unplug::ENVIRONMENT, "on"))
 }
 
 #[cfg(test)]
@@ -1517,8 +1531,9 @@ mod tests {
     /// the environment it got: the provider has the memory's two switches,
     /// the clock and the typed name's file, the second route the memory's
     /// days, the clock, the name's file (#1323) and its scoped context
-    /// (#1839), and capture the quiet
-    /// evidence switch (#1285) and the detector's input (#828). With every other variable set to a secret,
+    /// (#1839), capture the quiet
+    /// evidence switch (#1285) and the detector's input (#828), and the ring
+    /// the unplug switch (#1674, the reviewer on #1699). With every other variable set to a secret,
     /// nothing else reaches any of them but the shell's own.
     #[test]
     fn a_started_worker_gets_its_roles_switches_and_nothing_else() {
@@ -1550,6 +1565,7 @@ mod tests {
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
                     crate::memory_scope::GAP_ENVIRONMENT,
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
+                    lamp_body::unplug::ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -1685,6 +1701,8 @@ mod tests {
                     "LAMP_VAD_INPUT=linear",
                 ],
             ),
+            ("ring", vec!["LAMP_UNPLUG=on"]),
+            ("speaker", vec![]),
         ] {
             let status = status_of_fresh(&mut worker_command(
                 &script,
