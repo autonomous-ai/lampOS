@@ -447,3 +447,6 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   exchange made before one; a stop hands held answers on before the session
   closes. `e31557c7d` on `twelve/heard-to-memory`, 4 tests each with a
   mutation; lamp-voice green. The PR waits for Fourth's folded heads.
+- #2186 opened onto #1712 (stacked on #2173 and Fourth's `410a563cf`): the
+  held hand-on's memory side. #2063's next head `cdb21e020`: the preference
+  line first in the use note.
