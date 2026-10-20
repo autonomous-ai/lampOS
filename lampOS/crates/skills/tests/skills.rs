@@ -321,8 +321,10 @@ fn repo_skill_with(dir: &Path, name: &str, from: &str, to: &str) -> PathBuf {
 /// look in the product. Every one says its version.
 #[test]
 fn every_skill_folder_says_its_kind_and_version() {
-    let (skills, errors) = load_all(&skills_root());
-    assert!(errors.is_empty(), "{errors:?}");
+    let skills: Vec<_> = lamp_skills::load_each(&skills_root())
+        .into_iter()
+        .map(|(folder, skill)| skill.unwrap_or_else(|why| panic!("{}: {why}", folder.display())))
+        .collect();
     let named = |kind| -> Vec<&str> {
         skills
             .iter()
@@ -333,6 +335,7 @@ fn every_skill_folder_says_its_kind_and_version() {
     assert_eq!(
         named(SkillKind::Core),
         [
+            "bedtime-morning",
             "dance",
             "dusty-air",
             "laugh-glance",
@@ -369,6 +372,62 @@ fn every_skill_folder_says_its_kind_and_version() {
     for skill in &skills {
         assert_eq!(skill.version.as_deref(), Some("1.0.0"), "{}", skill.name);
     }
+    assert_eq!(
+        skills
+            .iter()
+            .filter(|skill| !skill.enabled)
+            .map(|skill| skill.name.as_str())
+            .collect::<Vec<_>>(),
+        ["bedtime-morning"],
+        "every existing scene and skill retains its enabled default"
+    );
+}
+
+#[test]
+fn disabled_skills_enter_neither_tools_nor_body_metadata() {
+    let dir = tempfile::tempdir().unwrap();
+    let bedtime = load(&skills_root().join("bedtime-morning")).unwrap();
+    assert!(!bedtime.enabled && bedtime.permissions.body);
+    let disabled = load(&skill_with(
+        dir.path(),
+        "disabled-body",
+        "enabled = false\ntool = \"disabled_stretch\"\n[permissions]\nbody = true\n[[do]]\nbody = { gesture = \"stretching\" }\n",
+    ))
+    .unwrap();
+    let quiet = load(&skill_with(
+        dir.path(),
+        "quiet-tool",
+        "tool = \"quiet_note\"\n[permissions]\nspeak = true\n[[do]]\nsay = \"Answer briefly.\"\n",
+    ))
+    .unwrap();
+    let moving = load(&skill_with(
+        dir.path(),
+        "moving-tool",
+        "tool = \"small_stretch\"\n[permissions]\nbody = true\n[[do]]\nbody = { gesture = \"stretching\" }\n",
+    ))
+    .unwrap();
+    // Passing the full inventory directly must not advertise disabled
+    // tools or include their body grant in the text-origin restriction.
+    let mut inventory = vec![bedtime, disabled];
+    assert_eq!(tools_file(&inventory), serde_json::json!({"tools":[]}));
+    inventory.push(quiet);
+    assert_eq!(
+        tools_file(&inventory),
+        serde_json::json!({"tools":[{"name":"quiet_note","description":"A test."}]}),
+        "a catalogue with no enabled body tool keeps its original shape"
+    );
+    inventory.push(moving);
+    assert_eq!(
+        tools_file(&inventory),
+        serde_json::json!({
+            "tools":[
+                {"name":"quiet_note","description":"A test."},
+                {"name":"small_stretch","description":"A test."}
+            ],
+            "body":["small_stretch"]
+        }),
+        "the enabled body tool remains identified for text refusal"
+    );
 }
 
 /// `kind` is core or installable, installable when it says none; a version
@@ -648,6 +707,29 @@ fn a_tool_is_one_skills_a_core_skills_first() {
         line.contains("not loaded: its tool \"dance\" is the core skill dance's"),
         "{listed}"
     );
+    // Disabled core inventory still reserves its name ahead of the
+    // alphabetically earlier installable copy, without exposing a tool.
+    let path = skills.join("dance/skill.toml");
+    fs::write(
+        &path,
+        format!("enabled = false\n{}", fs::read_to_string(&path).unwrap()),
+    )
+    .unwrap();
+    let (live, errors) = load_all(&skills);
+    assert_eq!(
+        live.iter()
+            .map(|skill| skill.name.as_str())
+            .collect::<Vec<_>>(),
+        ["b-wiggle"]
+    );
+    assert_eq!(errors.len(), 2);
+    let inventory = lamp_skills::load_each(&skills);
+    assert!(inventory.iter().any(|(_, result)| {
+        result
+            .as_ref()
+            .is_ok_and(|skill| skill.name == "dance" && !skill.enabled)
+    }));
+    assert_eq!(tools_file(&live)["tools"].as_array().unwrap().len(), 1);
 }
 
 /// The gate itself, as the program asks it where each call leaves: the
@@ -687,7 +769,24 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
             },
             "light",
         ),
+        (
+            Call::Show {
+                name: "calm".into(),
+                frames: Vec::new(),
+            },
+            "light",
+        ),
         (Call::Say("Hello.".into()), "speak"),
+        (
+            Call::Words(lamp_skills::Words {
+                words: "Hello.".into(),
+                exact: true,
+                priority: 8,
+                expires_ms: 3_600_000,
+            }),
+            "speak",
+        ),
+        (Call::Cue, "speak"),
         (Call::SayFrom(lamp_skills::Source::Tasks, Some(3)), "speak"),
         (
             Call::Sound {
@@ -697,6 +796,27 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
             "speak",
         ),
         (Call::Look, "look"),
+        (
+            Call::Rest(lamp_skills::routine::Rest {
+                op: lamp_msgs::ExpressionRestOp::Rest,
+                during: Some(lamp_skills::daily::Window::parse("22:00", "06:00").unwrap()),
+            }),
+            "body",
+        ),
+        (
+            Call::Rest(lamp_skills::routine::Rest {
+                op: lamp_msgs::ExpressionRestOp::Wake,
+                during: None,
+            }),
+            "body",
+        ),
+        (
+            Call::Rest(lamp_skills::routine::Rest {
+                op: lamp_msgs::ExpressionRestOp::Cancel,
+                during: None,
+            }),
+            "body",
+        ),
     ];
     for (call, key) in &calls {
         let why = none.refuses(call).unwrap();
@@ -743,6 +863,90 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
     assert!(named.refuses_action("light_colour").is_some());
     assert_eq!(none.said(), "nothing");
     assert_eq!(lit.said(), "reads voice/state; light");
+    assert!(
+        none.refuses_output_limits()
+            .unwrap()
+            .contains("output_limits = true")
+    );
+    assert!(
+        lit.refuses_output_limits().is_some(),
+        "light is not a cap grant"
+    );
+    let capped = Permissions {
+        output_limits: true,
+        ..Permissions::default()
+    };
+    assert_eq!(capped.refuses_output_limits(), None);
+    assert_eq!(capped.said(), "output_limits");
+    for (call, _) in &calls {
+        assert!(
+            capped.refuses(call).is_some(),
+            "a cap grant allowed {call:?}"
+        );
+    }
+    assert!(capped.refuses_action("caps_put").is_some());
+}
+
+#[test]
+fn routines_need_each_output_grant_and_their_implicit_voice_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let text = r#"
+enabled = false
+[trigger]
+topic = "fixture/routine"
+field = "ready"
+equals = true
+[ask]
+policy = "nudge"
+[permissions]
+topics = ["fixture/routine", "voice/state"]
+speak = true
+body = true
+output_limits = true
+[limits]
+during = { from = "22:00", to = "06:00" }
+volume_raw_max = 35
+[[do]]
+rest = { op = "wake" }
+cue = "hum"
+"#;
+    let folder = skill_with(dir.path(), "routine-check", text);
+    let skill = load(&folder).unwrap();
+    assert!(!skill.enabled);
+    assert_eq!(
+        skill.reads(),
+        [
+            ("fixture/routine".into(), "a trigger"),
+            ("voice/state".into(), "a routine's quiet gate")
+        ]
+    );
+    for (from, to, why) in [
+        ("speak = true", "speak = false", "needs speak = true"),
+        ("body = true", "body = false", "needs body = true"),
+        (
+            "output_limits = true",
+            "output_limits = false",
+            "needs output_limits = true",
+        ),
+        (
+            "topics = [\"fixture/routine\", \"voice/state\"]",
+            "topics = [\"fixture/routine\"]",
+            "a routine's quiet gate reads voice/state",
+        ),
+        (
+            "output_limits = true",
+            "output_limits = true\noutputs = true",
+            "unknown field `outputs`",
+        ),
+    ] {
+        fs::write(folder.join("skill.toml"), text.replacen(from, to, 1)).unwrap();
+        let error = load(&folder).unwrap_err();
+        assert!(error.contains(why), "{from}: {error}");
+    }
+    let loaded = text.replace("enabled = false", "enabled = true");
+    fs::write(folder.join("skill.toml"), loaded).unwrap();
+    let engine = Engine::new(vec![load(&folder).unwrap()], true);
+    assert_eq!(engine.topics(), ["fixture/routine", "voice/state"]);
 }
 
 /// A WAV of `frames` frames of a steady `level`, as `spec` says.
@@ -6584,6 +6788,14 @@ fn the_loader_holds_kept_lights_shows_turns_and_choices_to_their_rules() {
             "body, light or show",
         ),
         (
+            format!("{TOOL}[[do]]\nif_choice = [\"a\"]\ncue = \"hum\"\n"),
+            "body, light or show",
+        ),
+        (
+            format!("{TOOL}[[do]]\nif_choice = [\"a\"]\nrest = {{ op = \"wake\" }}\n"),
+            "body, light or show",
+        ),
+        (
             "tool = \"t\"\n[[do]]\nif_choice = [\"a\"]\nlight = { colour = \"warm\" }\n".into(),
             "needs a [choice]",
         ),
@@ -9916,4 +10128,230 @@ fn who_was_here_names_only_who_said_yes_and_only_to_a_skill_with_known_faces() {
             && !later.contains("Alpha"),
         "{later}"
     );
+}
+
+#[test]
+fn daily_rise_revalidation_keeps_window_and_reload_fences() {
+    use lamp_skills::daily::Journal;
+    use std::os::unix::fs::PermissionsExt;
+
+    const MORNING: u64 = 1_767_225_600_000 + 6 * 3_600_000;
+    for boundary in ["rise ended", "window ended", "reloaded"] {
+        let dir = tempfile::tempdir().unwrap();
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let path = skill_with(
+            dir.path(),
+            "daily-rise",
+            r#"
+[permissions]
+topics = ["air/state", "clock/local"]
+speak = true
+[trigger]
+name = "morning"
+topic = "air/state"
+field = "pm2_5"
+rise = { by = 100, within = "3s" }
+during = { from = "06:00", to = "06:01" }
+once_per_day = true
+[ask]
+policy = "nudge"
+[[do]]
+say = { text = "Please check the room.", priority = 8, expires = "2m" }
+"#,
+        );
+        let skill = load(&path).unwrap();
+        let journal = dir.path().join("daily.json");
+        let mut engine = Engine::new(vec![skill.clone()], false)
+            .asking_the_policy()
+            .with_daily_journal(Journal::open(&journal).unwrap());
+        engine.clock(0, 0, MORNING);
+        assert!(
+            engine
+                .observe("air/state", 0, br#"{"pm2_5":20}"#, None)
+                .is_empty()
+        );
+        let run = engine
+            .observe("air/state", 1_000_000, br#"{"pm2_5":200}"#, None)
+            .pop()
+            .expect("the rise asks once within its daily window");
+        assert!(run.ask.is_some());
+        let calls = engine.still(&run, 2_000_000).unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0].named().1,
+            serde_json::json!({"text":"Please check the room.", "priority":8, "expires_ms":120_000})
+        );
+        match boundary {
+            "rise ended" => {
+                engine.observe("air/state", 5_000_000, br#"{"pm2_5":200}"#, None);
+                assert!(engine.still(&run, 5_000_000).is_none());
+            }
+            "window ended" => {
+                engine.clock(0, 2_000_000, MORNING + 60_000);
+                assert!(engine.still(&run, 2_000_000).is_none());
+            }
+            "reloaded" => {
+                engine.replace(vec![skill.clone()]);
+                for (at, reading) in [(2, 200), (3, 20), (4, 200)] {
+                    assert!(
+                        engine
+                            .observe(
+                                "air/state",
+                                at * 1_000_000,
+                                format!(r#"{{"pm2_5":{reading}}}"#).as_bytes(),
+                                None,
+                            )
+                            .is_empty(),
+                        "reload resets readings but cannot refund the day's claim"
+                    );
+                }
+                // A fresh rise on the next day is valid. The earlier
+                // pending answer must still fail on its old generation.
+                engine.clock(0, 5_000_000, MORNING + 86_400_000 - 60_000);
+                engine.observe("air/state", 5_000_000, br#"{"pm2_5":20}"#, None);
+                engine.clock(0, 6_000_000, MORNING + 86_400_000);
+                engine.observe("air/state", 6_000_000, br#"{"pm2_5":20}"#, None);
+                let fresh = engine
+                    .observe("air/state", 7_000_000, br#"{"pm2_5":200}"#, None)
+                    .pop()
+                    .unwrap();
+                assert!(engine.still(&fresh, 7_000_000).is_some());
+                assert!(engine.still(&run, 7_000_000).is_none());
+            }
+            _ => unreachable!(),
+        }
+        drop(engine);
+        // Losing the pending answer never restores its durable chance,
+        // even when a new process sees a fresh rise in the same window.
+        let mut restarted =
+            Engine::new(vec![skill], true).with_daily_journal(Journal::open(&journal).unwrap());
+        restarted.clock(0, 0, MORNING);
+        restarted.observe("air/state", 0, br#"{"pm2_5":20}"#, None);
+        assert!(
+            restarted
+                .observe("air/state", 1_000_000, br#"{"pm2_5":200}"#, None)
+                .is_empty(),
+            "{boundary} cannot replay the consumed daily chance"
+        );
+    }
+}
+
+/// A scheduled held dim ends on lost clock trust. Its daily chance stays
+/// consumed across reload and restart, using this branch's existing dim owner.
+#[test]
+fn daily_held_dim_keeps_clock_reload_and_restart_fences() {
+    use lamp_skills::daily::Journal;
+    use std::os::unix::fs::PermissionsExt;
+
+    const MORNING: u64 = 1_767_225_600_000 + 6 * 3_600_000;
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let daily = load(&skill_with(
+        dir.path(),
+        "daily-dim",
+        r#"
+[permissions]
+topics = ["air/indoor", "clock/local"]
+light = true
+[trigger]
+name = "morning"
+topic = "air/indoor"
+field = "co2"
+above = 1000
+rearm = "ends"
+during = { from = "06:00", to = "09:00" }
+once_per_day = true
+[ask]
+policy = "nudge"
+[[do]]
+light = { dim = 1, until = "ends" }
+"#,
+    ))
+    .unwrap();
+    let journal = dir.path().join("daily.json");
+    let mut engine =
+        Engine::new(vec![daily.clone()], true).with_daily_journal(Journal::open(&journal).unwrap());
+    let local = lamp_local_time::LocalTime::Offset(0);
+    engine.clock_in_with_trust(&local, 0, MORNING, false);
+    assert!(
+        engine
+            .observe("air/indoor", 0, br#"{"co2":1200}"#, None)
+            .is_empty(),
+        "an untrusted clock cannot consume or start the daily chance"
+    );
+    engine.clock_in_with_trust(&local, 1, MORNING, true);
+    let run = engine
+        .observe("air/indoor", 1, br#"{"co2":1200}"#, None)
+        .pop()
+        .expect("clock refusal must not consume the daily claim");
+    assert_eq!(run.skill, "daily-dim");
+    assert!(run.calls.iter().any(Call::held_until_ends));
+    assert!(engine.still(&run, 1).is_some());
+
+    engine.clock_in_with_trust(&local, 2, MORNING, false);
+    let ended = engine.tick(2);
+    assert_eq!(ended.len(), 1);
+    assert_eq!(ended[0].skill, "daily-dim");
+    assert!(matches!(ended[0].calls.as_slice(), [Call::Ends]));
+    assert!(engine.still(&run, 2).is_none());
+    assert!(engine.replace(vec![daily.clone()]).is_empty());
+    engine.clock_in_with_trust(&local, 3, MORNING, true);
+    assert!(engine.still(&run, 3).is_none());
+    assert!(
+        engine
+            .observe("air/indoor", 3, br#"{"co2":1200}"#, None)
+            .is_empty()
+    );
+    drop(engine);
+
+    let mut restarted =
+        Engine::new(vec![daily], true).with_daily_journal(Journal::open(&journal).unwrap());
+    restarted.clock(0, 0, MORNING);
+    assert!(
+        restarted
+            .observe("air/indoor", 0, br#"{"co2":1200}"#, None)
+            .is_empty(),
+        "the claim survives restart"
+    );
+    restarted.clock(0, 1_000, MORNING + 86_400_000);
+    assert!(
+        restarted
+            .observe("air/indoor", 1_000, br#"{"co2":800}"#, None)
+            .is_empty()
+    );
+    let runs = restarted.observe("air/indoor", 2_000, br#"{"co2":1200}"#, None);
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].skill, "daily-dim");
+    assert!(runs[0].calls.iter().any(Call::held_until_ends));
+}
+
+#[test]
+fn exact_say_and_routine_cue_share_one_speech_slot() {
+    let dir = tempfile::tempdir().unwrap();
+    for form in ["text", "note"] {
+        let definition = format!(
+            "[trigger]\ntopic = \"humans/faces/tracked\"\npresent = false\n\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nrest = {{ op = \"wake\" }}\n\
+             say = {{ {form} = \"Good morning.\", priority = 8, expires = \"1h\" }}\n"
+        );
+        let path = skill_with(dir.path(), "routine-words", &definition);
+        let loaded = load(&path).unwrap();
+        assert!(loaded.is_routine());
+        let mut engine = Engine::new(vec![loaded], true);
+        engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+        let calls: Vec<_> = engine
+            .observe(Faces::TOPIC, 0, NOBODY.as_bytes(), None)
+            .into_iter()
+            .flat_map(|run| run.calls)
+            .collect();
+        assert!(calls.iter().any(|call| matches!(call, Call::Rest(_))));
+        assert!(calls.iter().any(|call| matches!(call, Call::Words(_))));
+        let path = skill_with(
+            dir.path(),
+            "routine-words",
+            &format!("{definition}\n[[do]]\ncue = \"hum\"\n"),
+        );
+        let why = load(&path).unwrap_err();
+        assert!(why.contains("one say or sound a skill"), "{form}: {why}");
+    }
 }

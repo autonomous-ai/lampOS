@@ -8,6 +8,281 @@ use std::time::Duration;
 pub const EXPRESSION_LEASE_US: u64 = 200_000;
 pub const EXPRESSION_MAX_OFFSET_RAD: f64 = 0.35;
 pub const EXPRESSION_MAX_FUTURE_US: u64 = 2_000_000;
+pub const EXPRESSION_REST_LEASE_US: u64 = 3_000_000;
+pub const EXPRESSION_REST_FRESH_US: u64 = 500_000;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExpressionRestOp {
+    Rest,
+    Wake,
+    Cancel,
+}
+
+/// A skill's bounded intent, never an actuator command or microphone permit.
+/// Episode numbers increase within one request publisher. Renewals keep the
+/// episode and operation, with a fresh source observation and sequence.
+/// Additive fields are ignored; an unknown operation is still refused.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExpressionRestRequest {
+    pub stamp: ClockStamp,
+    pub skill: String,
+    pub skill_session_id: String,
+    /// The current expression/state publisher's boot, not the host boot.
+    pub expression_session_id: String,
+    pub episode: u64,
+    pub op: ExpressionRestOp,
+    pub valid_until_us: u64,
+}
+
+impl ExpressionRestRequest {
+    pub const TYPE: &str = "lamp_msgs/ExpressionRestRequest";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "expression/rest_request";
+    /// One Skills publisher carries every generic skill's independent episode.
+    pub const SOURCE: &str = "skills";
+
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+            .every(Duration::from_secs(1))
+            .lasting(Duration::from_micros(EXPRESSION_REST_FRESH_US))
+    }
+
+    pub fn check(&self) -> Result<(), Invalid> {
+        self.stamp.check()?;
+        identifier(&self.skill_session_id, "skill_session_id")?;
+        identifier(&self.expression_session_id, "expression_session_id")?;
+        if self.skill.is_empty()
+            || self.skill.len() > 64
+            || !self
+                .skill
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"_-".contains(&byte))
+            || self.episode == 0
+            || self.stamp.sequence == 0
+            || self.valid_until_us <= self.stamp.at_us
+            || self.valid_until_us - self.stamp.at_us > EXPRESSION_REST_LEASE_US
+        {
+            return Err(Invalid("rest needs a short skill name, positive episode/sequence and a lease of at most three seconds".into()));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExpressionRestPhase {
+    Idle,
+    Resting,
+    Waking,
+    Completed,
+    Cancelled,
+    Refused,
+}
+
+/// Current planning receipt. It does not prove the body moved, stood up or
+/// unfolded; the body's own pause/fold/range guards remain authoritative.
+/// Additive fields are ignored, including in the echoed request and stamp.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExpressionRestState {
+    pub stamp: ClockStamp,
+    pub expression_session_id: String,
+    pub enabled: bool,
+    pub request: Option<ExpressionRestRequest>,
+    pub phase: ExpressionRestPhase,
+    /// Why the request was refused, only beside `Refused`: a short English
+    /// line for the lamp's journal and a person reading the bus. Absent from
+    /// the JSON when none, so an older reader is unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// The longest refusal reason a receipt carries, in bytes.
+pub const EXPRESSION_REST_REASON_MAX: usize = 160;
+
+impl ExpressionRestState {
+    pub const TYPE: &str = "lamp_msgs/ExpressionRestState";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "expression/rest_state";
+
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+            .every(Duration::from_millis(200))
+            .lasting(Duration::from_millis(500))
+    }
+
+    pub fn check(&self) -> Result<(), Invalid> {
+        self.stamp.check()?;
+        identifier(&self.expression_session_id, "expression_session_id")?;
+        if (self.phase == ExpressionRestPhase::Idle) != self.request.is_none()
+            || (!self.enabled
+                && matches!(
+                    self.phase,
+                    ExpressionRestPhase::Resting | ExpressionRestPhase::Waking
+                ))
+        {
+            return Err(Invalid(
+                "rest receipt identity and enabled phase disagree".into(),
+            ));
+        }
+        if let Some(reason) = &self.reason
+            && (self.phase != ExpressionRestPhase::Refused
+                || reason.is_empty()
+                || reason.len() > EXPRESSION_REST_REASON_MAX
+                || reason.chars().any(char::is_control))
+        {
+            return Err(Invalid(
+                "a rest reason is a short line beside a refusal only".into(),
+            ));
+        }
+        if let Some(request) = &self.request {
+            request.check()?;
+            if request.expression_session_id != self.expression_session_id
+                || request.stamp.clock_id != self.stamp.clock_id
+            {
+                return Err(Invalid(
+                    "rest receipt belongs to another clock or Expression session".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod rest_contract_tests {
+    use super::*;
+
+    fn request() -> ExpressionRestRequest {
+        ExpressionRestRequest {
+            stamp: ClockStamp {
+                clock_id: "clock".into(),
+                at_us: 10,
+                sequence: 1,
+            },
+            skill: "sample-routine".into(),
+            skill_session_id: "publisher".into(),
+            expression_session_id: "expression".into(),
+            episode: 1,
+            op: ExpressionRestOp::Rest,
+            valid_until_us: 10 + EXPRESSION_REST_LEASE_US,
+        }
+    }
+
+    #[test]
+    fn rest_request_reads_additive_fields_but_refuses_unknown_operations() {
+        let request = request();
+        request.check().unwrap();
+        let value = serde_json::to_value(&request).unwrap();
+        assert_eq!(
+            serde_json::from_value::<ExpressionRestRequest>(value.clone()).unwrap(),
+            request
+        );
+        let mut changed = value;
+        changed["added_later"] = serde_json::json!({"detail": true});
+        changed["stamp"]["added_later"] = serde_json::json!([1, 2]);
+        let read: ExpressionRestRequest = serde_json::from_value(changed.clone()).unwrap();
+        assert_eq!(read, request);
+        read.check().unwrap();
+        changed["op"] = serde_json::json!("unfold");
+        assert!(serde_json::from_value::<ExpressionRestRequest>(changed).is_err());
+    }
+
+    #[test]
+    fn rest_receipt_reads_nested_additions_without_guessing_operations_or_phases() {
+        let request = request();
+        let state = ExpressionRestState {
+            stamp: request.stamp.clone(),
+            expression_session_id: request.expression_session_id.clone(),
+            enabled: true,
+            request: Some(request),
+            phase: ExpressionRestPhase::Resting,
+            reason: None,
+        };
+        let mut value = serde_json::to_value(&state).unwrap();
+        value["added_later"] = serde_json::json!({"detail": true});
+        value["stamp"]["added_later"] = serde_json::json!(1);
+        value["request"]["added_later"] = serde_json::json!([1, 2]);
+        value["request"]["stamp"]["added_later"] = serde_json::json!(true);
+        let read: ExpressionRestState = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(read, state);
+        read.check().unwrap();
+        // No reason, no key: an older reader sees the receipt it knew.
+        assert!(value.get("reason").is_none());
+
+        let mut changed = value.clone();
+        changed["request"]["op"] = serde_json::json!("unfold");
+        assert!(serde_json::from_value::<ExpressionRestState>(changed).is_err());
+        let mut changed = value.clone();
+        changed["phase"] = serde_json::json!("applied");
+        assert!(serde_json::from_value::<ExpressionRestState>(changed).is_err());
+        let mut changed = value;
+        changed["request"]["stamp"]
+            .as_object_mut()
+            .unwrap()
+            .remove("clock_id");
+        assert!(serde_json::from_value::<ExpressionRestState>(changed).is_err());
+    }
+
+    #[test]
+    fn rest_lease_and_identity_are_bounded() {
+        for kind in 0..7 {
+            let mut request = request();
+            match kind {
+                0 => request.valid_until_us += 1,
+                1 => request.valid_until_us = request.stamp.at_us,
+                2 => request.episode = 0,
+                3 => request.stamp.sequence = 0,
+                4 => request.skill = "../other".into(),
+                5 => request.skill = "a".repeat(65),
+                _ => request.skill_session_id.clear(),
+            }
+            assert!(request.check().is_err(), "case {kind}");
+        }
+        let declaration = ExpressionRestRequest::declaration();
+        assert_eq!(declaration.kind, Kind::Event);
+        assert_eq!(declaration.lifespan_ms, Some(500));
+    }
+
+    #[test]
+    fn rest_receipt_binds_identity_and_cannot_claim_active_shadow() {
+        let request = request();
+        let mut state = ExpressionRestState {
+            stamp: request.stamp.clone(),
+            expression_session_id: request.expression_session_id.clone(),
+            enabled: true,
+            request: Some(request),
+            phase: ExpressionRestPhase::Resting,
+            reason: None,
+        };
+        state.check().unwrap();
+        state.enabled = false;
+        assert!(state.check().is_err());
+        state.phase = ExpressionRestPhase::Refused;
+        state.check().unwrap();
+        state.reason = Some("rest owner is unavailable or another routine owns it".into());
+        state.check().unwrap();
+        let read: ExpressionRestState =
+            serde_json::from_value(serde_json::to_value(&state).unwrap()).unwrap();
+        assert_eq!(read, state);
+        for wrong in ["", "a\nb"] {
+            state.reason = Some(wrong.into());
+            assert!(state.check().is_err(), "{wrong:?}");
+        }
+        state.reason = Some("x".repeat(EXPRESSION_REST_REASON_MAX + 1));
+        assert!(state.check().is_err());
+        state.reason = Some("refused".into());
+        state.phase = ExpressionRestPhase::Cancelled;
+        assert!(state.check().is_err());
+        state.phase = ExpressionRestPhase::Refused;
+        state.reason = None;
+        state.expression_session_id = "different".into();
+        assert!(state.check().is_err());
+        let mut value = serde_json::to_value(&state).unwrap();
+        value["phase"] = serde_json::json!("applied");
+        assert!(serde_json::from_value::<ExpressionRestState>(value).is_err());
+    }
+}
 
 /// Microseconds on this machine's CLOCK_MONOTONIC, never a publisher's
 /// private process clock or Unix time. `clock_id` identifies the machine boot.
@@ -566,6 +841,14 @@ pub fn expression_topics() -> Vec<(&'static str, Declaration)> {
         (ExpressionBody::TOPIC, ExpressionBody::declaration()),
         (ExpressionLight::TOPIC, ExpressionLight::declaration()),
         (ExpressionState::TOPIC, ExpressionState::declaration()),
+        (
+            ExpressionRestRequest::TOPIC,
+            ExpressionRestRequest::declaration(),
+        ),
+        (
+            ExpressionRestState::TOPIC,
+            ExpressionRestState::declaration(),
+        ),
     ];
     topics.sort_by_key(|(name, _)| *name);
     topics

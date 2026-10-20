@@ -468,6 +468,27 @@ enum Phase {
         from: BodyOffsets,
         kept: f64,
     },
+    Releasing {
+        since: u64,
+        from: BodyOffsets,
+        kept: f64,
+    },
+}
+
+/// Who decides when the routine rests or wakes. Reflexes and manual sleep
+/// remain local in either mode; the default preserves the original schedule.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Scheduling {
+    #[default]
+    Autonomous,
+    Skills,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RestOwner {
+    Autonomous,
+    Routine,
+    Manual,
 }
 
 /// A small history of already validated source observations. No transcript,
@@ -597,6 +618,10 @@ pub(crate) struct Life {
     nobody_since: Option<u64>,
     daytime: Option<(u64, u16)>,
     phase: Phase,
+    scheduling: Scheduling,
+    /// Retained through a routine's wake so a lost lease can end its clip.
+    /// A reflex or manual sleep takes this ownership away immediately.
+    rest_owner: Option<RestOwner>,
     called: bool,
     name_called: bool,
     name_wake: NameWake,
@@ -695,6 +720,8 @@ impl Life {
             nobody_since: None,
             daytime: None,
             phase: Phase::Awake,
+            scheduling: Scheduling::default(),
+            rest_owner: None,
             called: false,
             name_called: false,
             name_wake: NameWake::new(name_age_us, delivery_us),
@@ -721,6 +748,149 @@ impl Life {
 
     fn asleep(&self) -> bool {
         matches!(self.phase, Phase::Asleep { .. })
+    }
+
+    /// Select the source of routine decisions, dropping the old scheduler's
+    /// pose without a wake clip. A manual sleep is never released here.
+    pub(crate) fn set_scheduling(&mut self, scheduling: Scheduling, now_us: u64) {
+        if self.scheduling == scheduling {
+            return;
+        }
+        self.scheduling = scheduling;
+        self.nobody_since = None;
+        if matches!(
+            self.rest_owner,
+            Some(RestOwner::Autonomous | RestOwner::Routine)
+        ) {
+            if self.called || self.name_called || self.sleep_asked {
+                self.rest_owner = None;
+            } else {
+                self.release_rest(now_us);
+            }
+        }
+    }
+
+    /// The caller owns request identity, freshness, lease and cancellation
+    /// fences. These checks only admit an already validated routine intent
+    /// against the planner's current posture and Voice context.
+    pub(crate) fn routine_allowed(&self, now_us: u64, context: &Context) -> bool {
+        self.scheduling == Scheduling::Skills
+            && self.alive.sleep.is_some()
+            && context.free
+            && context.voice == Some(Voice::Resting)
+            && !self.muted()
+            && self.voice_asleep(now_us) != Some(true)
+            && self.hand.is_none()
+            && self.lean == 0.0
+            && !self.looking_up()
+            && !self.called
+            && !self.name_called
+            && !self.sleep_asked
+    }
+
+    /// Begin routine rest, or renew the same rest without restarting its
+    /// settling. No request can take over an existing manual/automatic sleep
+    /// or a wake/release already in progress.
+    pub(crate) fn request_routine_rest(&mut self, now_us: u64, context: &Context) -> bool {
+        if !self.routine_allowed(now_us, context) {
+            return false;
+        }
+        if self.routine_owned() && self.asleep() {
+            return true;
+        }
+        if self.phase != Phase::Awake {
+            return false;
+        }
+        self.phase = Phase::Asleep { since: now_us };
+        self.rest_owner = Some(RestOwner::Routine);
+        self.nobody_since = None;
+        self.name_wake.clear(false);
+        true
+    }
+
+    /// Start one stretch from routine-owned rest. A repeated wake cannot
+    /// restart it; manual/privacy sleep and a pending reflex remain stronger.
+    pub(crate) fn wake_routine(&mut self, now_us: u64, context: &Context) -> bool {
+        if !self.routine_owned() || !self.routine_allowed(now_us, context) {
+            return false;
+        }
+        let Phase::Asleep { since } = self.phase else {
+            return false;
+        };
+        self.begin_wake(now_us, since);
+        true
+    }
+
+    /// Release only this routine's rest or stretch, preserving the pose at
+    /// cancellation and easing it away without sampling any more wake frames.
+    /// This never changes the Voice's mute or a physical privacy setting.
+    pub(crate) fn release_routine(&mut self, now_us: u64) -> bool {
+        self.routine_owned() && self.release_rest(now_us)
+    }
+
+    /// The engine can spend an episode as soon as a reflex takes it over,
+    /// even before the next planner tick starts that reflex's wake.
+    pub(crate) fn routine_owned(&self) -> bool {
+        self.rest_owner == Some(RestOwner::Routine)
+    }
+
+    fn supersede_routine(&mut self) {
+        if self.routine_owned() {
+            self.rest_owner = None;
+        }
+    }
+
+    fn called(&mut self) {
+        self.supersede_routine();
+        self.called |= self.asleep();
+    }
+
+    /// Observe the stronger conversation before a routine lease is cancelled,
+    /// so that cancellation cannot take the normal conversational wake away.
+    pub(crate) fn observe_routine_voice(&mut self, voice: Option<Voice>) {
+        if matches!(voice, Some(Voice::Thinking | Voice::Speaking)) {
+            self.called();
+        }
+    }
+
+    fn voice_asleep(&self, now_us: u64) -> Option<bool> {
+        self.voice_said
+            .filter(|(at, _)| now_us.saturating_sub(*at) < VOICE_MUTE_KEPT_US)
+            .map(|(_, asleep)| asleep)
+    }
+
+    fn begin_wake(&mut self, now_us: u64, since: u64) {
+        self.nobody_since = None;
+        let (from, settled) = self.sleeping(now_us, since);
+        self.phase = Phase::Waking {
+            since: now_us,
+            from,
+            kept: 1.0 - settled,
+        };
+        self.name_wake.clear(false);
+    }
+
+    fn release_rest(&mut self, now_us: u64) -> bool {
+        let (from, kept) = match self.phase {
+            Phase::Asleep { since } => {
+                let (from, settled) = self.sleeping(now_us, since);
+                (from, 1.0 - settled)
+            }
+            Phase::Waking { since, from, kept } => {
+                let (from, kept, _) = self.waking(now_us, since, from, kept);
+                (from, kept)
+            }
+            Phase::Awake | Phase::Releasing { .. } => return false,
+        };
+        self.phase = Phase::Releasing {
+            since: now_us,
+            from,
+            kept,
+        };
+        self.rest_owner = None;
+        self.nobody_since = None;
+        self.name_wake.clear(false);
+        true
     }
 
     /// The local time of day (minutes since local midnight) at `stamp_us`.
@@ -806,8 +976,8 @@ impl Life {
         self.nobody_since = None;
         // Morning: the first person seen after the night wakes it. At
         // night a face does not: only its name, a touch or a reminder.
-        if self.asleep() && !self.night(stamp_us) {
-            self.called = true;
+        if self.scheduling == Scheduling::Autonomous && self.asleep() && !self.night(stamp_us) {
+            self.called();
         }
         let area = |face: &&lamp_msgs::Face| (face.xmax - face.xmin) * (face.ymax - face.ymin);
         let close = seen
@@ -845,8 +1015,11 @@ impl Life {
         }
         if self.name_requires_speech() {
             self.name_called |= self.name_wake.name(now_us, stamp_us, ago_ms);
+            if self.name_called {
+                self.supersede_routine();
+            }
         } else {
-            self.called = true;
+            self.called();
         }
     }
 
@@ -854,6 +1027,9 @@ impl Life {
     pub(crate) fn person_speech(&mut self, stamp_us: u64) {
         if self.asleep() && self.name_requires_speech() {
             self.name_called |= self.name_wake.speech(stamp_us);
+            if self.name_called {
+                self.supersede_routine();
+            }
         }
     }
 
@@ -883,7 +1059,7 @@ impl Life {
     /// not wake it.
     pub(crate) fn touch(&mut self, gesture: &ControlGesture) {
         if gesture.enabled && gesture.gesture != Gesture::LongPress {
-            self.called |= self.asleep();
+            self.called();
         }
     }
 
@@ -906,13 +1082,18 @@ impl Life {
                 }
             }
             // Asleep, a tap wakes it; awake, it looks up at it.
-            TouchGesture::Tap if self.asleep() => self.called = true,
-            TouchGesture::Tap => self.looking_until_us = Some(stamp_us + LOOK_UP_FOR_US),
+            TouchGesture::Tap if self.asleep() => self.called(),
+            TouchGesture::Tap => {
+                self.supersede_routine();
+                self.looking_until_us = Some(stamp_us + LOOK_UP_FOR_US);
+            }
             TouchGesture::Stroke if !self.asleep() => {
+                self.supersede_routine();
                 self.hand = Some(event.contact_id);
                 self.hand_seen_us = Some(stamp_us);
             }
             TouchGesture::Hold if !self.asleep() => {
+                self.supersede_routine();
                 self.sleep_asked = true;
                 self.hand = None;
             }
@@ -925,6 +1106,11 @@ impl Life {
     /// sleeps, and nothing but the voice opening again wakes it.
     pub(crate) fn voice_mute(&mut self, stamp_us: u64, mute: &VoiceMute) {
         self.voice_said = Some((stamp_us, mute.asleep()));
+        if mute.asleep() && self.phase != Phase::Awake {
+            // Transfer ownership when the authoritative word arrives, not
+            // on the next tick: cancellation between them cannot undo it.
+            self.rest_owner = Some(RestOwner::Manual);
+        }
         let muted = mute.muted && !mute.asleep();
         let recent = |at: u64| stamp_us.saturating_sub(at) < TAP_OPENS_US;
         if muted {
@@ -938,7 +1124,7 @@ impl Life {
             let tapped = self.tapped_muted_us.take();
             if self.voice_muted && !self.privacy_muted && tapped.is_some_and(recent) {
                 if self.asleep() {
-                    self.called = true;
+                    self.called();
                 } else {
                     self.looking_until_us = Some(stamp_us + LOOK_UP_FOR_US);
                 }
@@ -1008,7 +1194,7 @@ impl Life {
         let key = (notice.id, notice.delivery);
         if self.last_due != Some(key) {
             self.last_due = Some(key);
-            self.called |= self.asleep();
+            self.called();
         }
     }
 
@@ -1074,18 +1260,14 @@ impl Life {
             self.nobody_since = None;
         }
         // Thinking or speaking, it has been spoken to: it is awake.
-        if self.asleep() && matches!(context.voice, Some(Voice::Thinking | Voice::Speaking)) {
-            self.called = true;
-        }
+        self.observe_routine_voice(context.voice);
         // Where the voice says its mute (#711), sleep from the head is the
         // voice's: asleep while it says so, whatever calls; awake when it
         // opens. A hold it did not take as sleep is not one here either.
-        let voice_asleep = self
-            .voice_said
-            .filter(|(at, _)| now_us.saturating_sub(*at) < VOICE_MUTE_KEPT_US)
-            .map(|(_, asleep)| asleep);
+        let voice_asleep = self.voice_asleep(now_us);
         match voice_asleep {
             Some(true) => {
+                self.rest_owner = Some(RestOwner::Manual);
                 self.called = false;
                 self.name_called = false;
                 self.sleep_asked = false;
@@ -1093,7 +1275,7 @@ impl Life {
             Some(false) => {
                 self.sleep_asked = false;
                 if self.voice_slept {
-                    self.called |= self.asleep();
+                    self.called();
                 }
             }
             None => {}
@@ -1103,14 +1285,7 @@ impl Life {
         }
         if let (Phase::Asleep { since }, true) = (self.phase, self.called || self.name_called) {
             // Woken, it sleeps again only after nobody again for as long.
-            self.nobody_since = None;
-            let (from, settled) = self.sleeping(now_us, since);
-            self.phase = Phase::Waking {
-                since: now_us,
-                from,
-                kept: 1.0 - settled,
-            };
-            self.name_wake.clear(false);
+            self.begin_wake(now_us, since);
         }
         self.called = false;
         self.name_called = false;
@@ -1122,9 +1297,11 @@ impl Life {
             && self.alive.sleep.is_some()
         {
             self.phase = Phase::Asleep { since: now_us };
+            self.rest_owner = Some(RestOwner::Manual);
             self.name_wake.clear(false);
         }
         if let (Phase::Awake, Some(sleep)) = (self.phase, &self.alive.sleep)
+            && self.scheduling == Scheduling::Autonomous
             && context.free
             && context.voice == Some(Voice::Resting)
             && self.night(now_us)
@@ -1133,6 +1310,7 @@ impl Life {
                 .is_some_and(|since| now_us.saturating_sub(since) >= sleep.nobody_us)
         {
             self.phase = Phase::Asleep { since: now_us };
+            self.rest_owner = Some(RestOwner::Autonomous);
             self.name_wake.clear(false);
         }
         match self.phase {
@@ -1152,21 +1330,27 @@ impl Life {
                     });
             }
             Phase::Waking { since, from, kept } => {
-                let elapsed = now_us.saturating_sub(since);
-                let length = match &self.alive.wake {
-                    Some(wake) => wake.duration_us() as f64 * pace,
-                    None => self.alive.sleep.map_or(1.0, |sleep| sleep.settle_us as f64),
-                };
-                let share = elapsed as f64 / length;
-                let stretch = self.alive.wake.as_ref().map_or(BodyOffsets::ZERO, |wake| {
-                    let at = (elapsed as f64 / pace) as u64;
-                    add(BodyOffsets::ZERO, wake.sample(at), size)
-                });
-                planned.offsets = add(stretch, from, 1.0 - ease(share));
-                planned.keep = kept + (1.0 - kept) * ease(share);
+                let (offsets, keep, finished) = self.waking(now_us, since, from, kept);
+                planned.offsets = offsets;
+                planned.keep = keep;
                 planned.names.push("waking");
+                if finished {
+                    self.phase = Phase::Awake;
+                    self.rest_owner = None;
+                }
+            }
+            Phase::Releasing { since, from, kept } => {
+                let length = self
+                    .alive
+                    .sleep
+                    .map_or(self.alive.blend_us, |sleep| sleep.settle_us);
+                let share = now_us.saturating_sub(since) as f64 / length as f64;
+                planned.offsets = add(BodyOffsets::ZERO, from, 1.0 - ease(share));
+                planned.keep = kept + (1.0 - kept) * ease(share);
+                planned.names.push("releasing rest");
                 if share >= 1.0 {
                     self.phase = Phase::Awake;
+                    self.rest_owner = None;
                 }
             }
         }
@@ -1322,5 +1506,423 @@ impl Life {
         // ring's: it keeps the boot clock.
         let pose = add(sleep.pose, sleep.breath.at(now_us, 1.0, None), 1.0);
         (add(BodyOffsets::ZERO, pose, settled), settled)
+    }
+
+    /// The current stretch and its contribution, shared with cancellation so
+    /// switching to release preserves both the pose and the other layer's weight.
+    fn waking(
+        &self,
+        now_us: u64,
+        since: u64,
+        from: BodyOffsets,
+        kept: f64,
+    ) -> (BodyOffsets, f64, bool) {
+        let elapsed = now_us.saturating_sub(since);
+        let pace = pace(self.alive.energy);
+        let length = match &self.alive.wake {
+            Some(wake) => wake.duration_us() as f64 * pace,
+            None => self.alive.sleep.map_or(1.0, |sleep| sleep.settle_us as f64),
+        };
+        let share = elapsed as f64 / length;
+        let stretch = self.alive.wake.as_ref().map_or(BodyOffsets::ZERO, |wake| {
+            let at = (elapsed as f64 / pace) as u64;
+            add(BodyOffsets::ZERO, wake.sample(at), size(self.alive.energy))
+        });
+        (
+            add(stretch, from, 1.0 - ease(share)),
+            kept + (1.0 - kept) * ease(share),
+            share >= 1.0,
+        )
+    }
+}
+
+#[cfg(test)]
+mod routine_tests {
+    use super::*;
+    use lamp_msgs::{
+        ClockStamp, ControlIntent, ControlSource, Face, MuteReason, ScheduleNotice, TouchIntent,
+    };
+
+    const SECOND: u64 = 1_000_000;
+    const START: u64 = 100 * SECOND;
+
+    fn life() -> Life {
+        let catalogue =
+            crate::Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+        Life::new(catalogue.alive.unwrap(), 2 * SECOND, SECOND)
+    }
+
+    fn resting() -> Context {
+        Context {
+            voice: Some(Voice::Resting),
+            free: true,
+        }
+    }
+
+    fn routine() -> Life {
+        let mut life = life();
+        life.set_scheduling(Scheduling::Skills, START);
+        assert!(life.request_routine_rest(START, &resting()));
+        life.step(START, &resting());
+        life
+    }
+
+    fn stamp(now_us: u64) -> ClockStamp {
+        ClockStamp {
+            clock_id: "routine-test".into(),
+            at_us: now_us,
+            sequence: 1,
+        }
+    }
+
+    fn faces(present: bool) -> Faces {
+        Faces {
+            faces: if present {
+                vec![Face {
+                    id: "face".into(),
+                    xmin: 0.1,
+                    ymin: 0.1,
+                    xmax: 0.2,
+                    ymax: 0.2,
+                    confidence: 0.9,
+                    yaw: None,
+                    facing: None,
+                    speaking: None,
+                }]
+            } else {
+                vec![]
+            },
+        }
+    }
+
+    fn night(life: &mut Life) -> u64 {
+        let until = START + life.alive.sleep.unwrap().nobody_us;
+        for now in (START..=until).step_by(SECOND as usize) {
+            life.daytime(now, 23 * 60 + 30);
+            life.faces(now, &faces(false), 0.5);
+            life.step(now, &resting());
+        }
+        until
+    }
+
+    fn head(gesture: TouchGesture, now_us: u64) -> TouchEvent {
+        let tap = gesture == TouchGesture::Tap;
+        let intent = if tap {
+            TouchIntent::Attend
+        } else {
+            TouchIntent::Sleep
+        };
+        let event = TouchEvent {
+            stamp: stamp(now_us),
+            session_id: "controls".into(),
+            reader_session_id: "reader".into(),
+            enabled: true,
+            source: TouchSource::Head,
+            name: "head".into(),
+            contact_id: 1,
+            gesture,
+            when_speaking: intent,
+            when_quiet: intent,
+            when_asleep: tap.then_some(TouchIntent::Wake),
+            began_us: now_us - if tap { 200_000 } else { 3 * SECOND },
+            observed_us: now_us,
+            released_us: tap.then_some(now_us),
+            active_mask: u16::from(!tap),
+            active_names: if tap { vec![] } else { vec!["head-1".into()] },
+            position: None,
+            toward_pad: None,
+            distance: 0.0,
+            speed: 0.0,
+        };
+        event.check().unwrap();
+        event
+    }
+
+    #[test]
+    fn autonomous_night_and_morning_are_still_the_default() {
+        let mut life = life();
+        let now = night(&mut life);
+        assert!(life.asleep());
+        assert!(!life.routine_owned());
+        life.daytime(now + SECOND, 7 * 60);
+        life.faces(now + SECOND, &faces(true), 0.5);
+        assert!(
+            life.step(now + SECOND, &resting())
+                .names
+                .contains(&"waking")
+        );
+    }
+
+    #[test]
+    fn skill_scheduling_removes_both_automatic_decisions() {
+        let mut life = life();
+        life.set_scheduling(Scheduling::Skills, START);
+        let now = night(&mut life);
+        assert_eq!(life.phase, Phase::Awake);
+        assert!(life.request_routine_rest(now, &resting()));
+        life.daytime(now + SECOND, 7 * 60);
+        life.faces(now + SECOND, &faces(true), 0.5);
+        assert!(life.step(now + SECOND, &resting()).asleep);
+        assert!(life.routine_owned());
+    }
+
+    #[test]
+    fn routine_rest_and_wake_require_the_current_free_resting_context() {
+        let mut life = life();
+        assert!(!life.request_routine_rest(START, &resting()));
+        life.set_scheduling(Scheduling::Skills, START);
+        for context in [
+            Context {
+                voice: None,
+                free: true,
+            },
+            Context {
+                voice: Some(Voice::Resting),
+                free: false,
+            },
+            Context {
+                voice: Some(Voice::Listening),
+                free: true,
+            },
+            Context {
+                voice: Some(Voice::Speaking),
+                free: true,
+            },
+        ] {
+            assert!(!life.request_routine_rest(START, &context));
+        }
+        life.set_privacy_muted(true);
+        assert!(!life.request_routine_rest(START, &resting()));
+        life.set_privacy_muted(false);
+        assert!(life.request_routine_rest(START, &resting()));
+        life.set_privacy_muted(true);
+        assert!(!life.wake_routine(START + SECOND, &resting()));
+        life.set_privacy_muted(false);
+        assert!(!life.wake_routine(
+            START + SECOND,
+            &Context {
+                voice: None,
+                free: true
+            }
+        ));
+        assert!(!life.wake_routine(
+            START + SECOND,
+            &Context {
+                voice: Some(Voice::Resting),
+                free: false
+            }
+        ));
+        life.voice_mute(
+            START + SECOND,
+            &VoiceMute {
+                muted: true,
+                reason: None,
+            },
+        );
+        assert!(!life.wake_routine(START + SECOND, &resting()));
+        assert!(life.asleep());
+    }
+
+    #[test]
+    fn renewing_rest_does_not_restart_it_and_wake_is_once() {
+        let mut life = routine();
+        assert!(life.request_routine_rest(START + SECOND, &resting()));
+        assert_eq!(life.phase, Phase::Asleep { since: START });
+        let now = START + 5 * SECOND;
+        assert!(life.wake_routine(now, &resting()));
+        assert!(life.routine_owned());
+        assert!(!life.wake_routine(now + SECOND, &resting()));
+        assert!(!life.request_routine_rest(now + SECOND, &resting()));
+        assert!(
+            life.step(now + SECOND, &resting())
+                .names
+                .contains(&"waking")
+        );
+        life.step(now + 4 * SECOND, &resting());
+        assert_eq!(life.phase, Phase::Awake);
+        assert!(!life.routine_owned());
+    }
+
+    #[test]
+    fn a_new_routine_does_not_replace_feedback_to_a_hand() {
+        let mut life = life();
+        life.set_scheduling(Scheduling::Skills, START);
+        life.step(START, &resting());
+        life.head_touch(START, &head(TouchGesture::Tap, START));
+        assert!(life.looking_up());
+        assert!(!life.request_routine_rest(START, &resting()));
+        assert!(
+            life.step(START + 20_000, &resting())
+                .names
+                .contains(&"looking up at a tap")
+        );
+    }
+
+    #[test]
+    fn releasing_rest_or_a_stretch_is_continuous_and_never_runs_more_wake_frames() {
+        for stretching in [false, true] {
+            let mut life = routine();
+            let mut now = START + 5 * SECOND;
+            if stretching {
+                assert!(life.wake_routine(now, &resting()));
+                now += SECOND;
+            }
+            let before = life.step(now, &resting());
+            assert!(life.release_routine(now));
+            let after = life.step(now, &resting());
+            assert_eq!(after.offsets, before.offsets);
+            assert_eq!(after.keep, before.keep);
+            assert!(!life.routine_owned());
+            assert!(!life.release_routine(now));
+            assert!(!life.request_routine_rest(now, &resting()));
+            let mut previous = after.offsets;
+            for elapsed in (20_000..=4 * SECOND).step_by(20_000) {
+                let next = life.step(now + elapsed, &resting());
+                assert!(!next.names.contains(&"waking"));
+                assert!(
+                    next.offsets
+                        .values()
+                        .iter()
+                        .zip(previous.values())
+                        .all(|(a, b)| (a - b).abs() < 0.01)
+                );
+                previous = next.offsets;
+            }
+            assert_eq!(life.phase, Phase::Awake);
+        }
+    }
+
+    #[test]
+    fn voice_sleep_takes_ownership_before_the_next_tick_and_keeps_it_after_staleness() {
+        for stretching in [false, true] {
+            let mut life = routine();
+            let now = START + 5 * SECOND;
+            if stretching {
+                assert!(life.wake_routine(now, &resting()));
+            }
+            life.voice_mute(
+                now,
+                &VoiceMute {
+                    muted: true,
+                    reason: Some(MuteReason::Sleep),
+                },
+            );
+            assert!(!life.routine_owned());
+            assert!(!life.wake_routine(now, &resting()));
+            assert!(!life.release_routine(now));
+            assert!(life.step(now, &resting()).asleep);
+            let stale = now + VOICE_MUTE_KEPT_US + SECOND;
+            assert!(!life.wake_routine(stale, &resting()));
+            assert!(!life.release_routine(stale));
+            assert!(life.step(stale, &resting()).asleep);
+        }
+    }
+
+    #[test]
+    fn a_manual_head_sleep_cannot_be_taken_or_released_by_the_routine() {
+        let mut life = life();
+        life.set_scheduling(Scheduling::Skills, START);
+        life.head_touch(START, &head(TouchGesture::Hold, START));
+        assert!(!life.request_routine_rest(START, &resting()));
+        assert!(life.step(START, &resting()).asleep);
+        assert!(!life.request_routine_rest(START + SECOND, &resting()));
+        assert!(!life.wake_routine(START + SECOND, &resting()));
+        assert!(!life.release_routine(START + SECOND));
+        life.head_touch(START + SECOND, &head(TouchGesture::Tap, START + SECOND));
+        assert!(
+            life.step(START + SECOND, &resting())
+                .names
+                .contains(&"waking")
+        );
+    }
+
+    #[test]
+    fn name_touch_reminder_and_conversation_wakes_supersede_routine_ownership() {
+        for reflex in 0..5 {
+            let mut life = routine();
+            let now = START + 5 * SECOND;
+            let mut context = resting();
+            match reflex {
+                0 => life.name(now, now, 0),
+                1 => life.head_touch(now, &head(TouchGesture::Tap, now)),
+                2 => life.touch(&ControlGesture {
+                    stamp: stamp(now),
+                    session_id: "controls".into(),
+                    source: ControlSource::Base,
+                    name: "base".into(),
+                    gesture: Gesture::Tap,
+                    intent: ControlIntent::Stop,
+                    duration_us: 100_000,
+                    released_us: now,
+                    enabled: true,
+                }),
+                3 => life.due(&ScheduleDue {
+                    stamp: stamp(now),
+                    store_id: "0123456789abcdef0123456789abcdef".into(),
+                    revision: 1,
+                    enabled: true,
+                    ready: true,
+                    pending: 1,
+                    waiting_for_clock: 0,
+                    oldest: Some(ScheduleNotice {
+                        id: 1,
+                        delivery: 1,
+                        due_unix_ms: 1_000,
+                        late_by_ms: None,
+                        late: false,
+                    }),
+                }),
+                _ => context.voice = Some(Voice::Thinking),
+            }
+            assert!(
+                life.step(now, &context).names.contains(&"waking"),
+                "reflex {reflex}"
+            );
+            assert!(!life.routine_owned(), "reflex {reflex}");
+            assert!(!life.release_routine(now), "reflex {reflex}");
+            assert!(!life.wake_routine(now, &resting()), "reflex {reflex}");
+        }
+    }
+
+    #[test]
+    fn an_uncorroborated_name_does_not_take_the_routine_but_confirmed_speech_does() {
+        let mut life = routine();
+        life.alive.sleep.as_mut().unwrap().name_requires_speech = true;
+        let now = START + SECOND;
+        life.name(now, now, 0);
+        assert!(life.routine_owned());
+        assert!(life.step(now, &resting()).asleep);
+        life.person_speech(now);
+        assert!(!life.routine_owned());
+        assert!(!life.release_routine(now));
+        assert!(life.step(now, &resting()).names.contains(&"waking"));
+    }
+
+    #[test]
+    fn changing_schedulers_releases_only_the_previous_schedulers_rest() {
+        let mut automatic = life();
+        let now = night(&mut automatic);
+        automatic.set_scheduling(Scheduling::Skills, now);
+        assert!(
+            automatic
+                .step(now, &resting())
+                .names
+                .contains(&"releasing rest")
+        );
+        let mut routine = routine();
+        routine.set_scheduling(Scheduling::Autonomous, START + SECOND);
+        assert!(!routine.routine_owned());
+        assert!(
+            routine
+                .step(START + SECOND, &resting())
+                .names
+                .contains(&"releasing rest")
+        );
+        let mut manual = life();
+        manual.head_touch(START, &head(TouchGesture::Hold, START));
+        assert!(manual.step(START, &resting()).asleep);
+        manual.set_scheduling(Scheduling::Skills, START + SECOND);
+        assert!(manual.step(START + SECOND, &resting()).asleep);
+        assert!(!manual.release_routine(START + SECOND));
     }
 }

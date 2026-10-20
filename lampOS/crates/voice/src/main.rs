@@ -724,7 +724,19 @@ fn run() -> Result<()> {
                 )?;
             }
         }
-        // worker ring DIR PARENT WORKER --continuous [--resting CEILING] [--bus-root DIR] [--eye] [--head-touch] [--light-requests]
+        #[cfg(target_os = "linux")]
+        [command, role, dir, parent, worker, mode, flags @ ..] if command == "worker" && role == "ring" && mode == lamp_voice::ring_caps::FLAG => {
+            let parent = parse_boot(parent)?;
+            let worker = parse_boot(worker)?;
+            let (bus_root, flags) = lamp_voice::bus_out::take_root(flags)?;
+            if !flags.is_empty() {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput, "unknown capped ring worker option").into());
+            }
+            let mut channels = WorkerChannels::bind(Path::new(dir), role, parent, worker, true)?;
+            channels.connect(Path::new(dir), role, true)?;
+            lamp_voice::ring_worker::run_with_caps(channels, parent, bus_root.as_deref())?;
+        }
+        // worker ring DIR PARENT WORKER --continuous [--resting CEILING] [--bus-root DIR] [--eye] [--head-touch] [--light-requests] [--output-caps]
         #[cfg(target_os = "linux")]
         [command, role, dir, parent, worker, mode, flags @ ..] if command == "worker" && role == "ring" && mode == "--continuous" => {
             let parent = parse_boot(parent)?;
@@ -743,6 +755,7 @@ fn run() -> Result<()> {
             let (light_requests, flags) = lamp_voice::ring_light::take(flags);
             let (skill_light_speaking, flags) = lamp_voice::ring_light::take_speaking(flags);
             let (light_keep, flags) = lamp_voice::ring_light::take_keep(flags);
+            let (output_caps, flags) = lamp_voice::ring_caps::take(flags);
             if !flags.is_empty() {
                 return Err(io::Error::new(io::ErrorKind::InvalidInput, "unknown ring worker option").into());
             }
@@ -760,6 +773,7 @@ fn run() -> Result<()> {
                     light_requests,
                     skill_light_speaking,
                     light_keep,
+                    output_caps,
                 },
             )?;
         }
