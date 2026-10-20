@@ -117,3 +117,59 @@ only, no app code written)
   bodies. Those depend on El's exact `keys.*` field names and answer
   strings, still not posted; a guess there would be thrown away the moment
   the shape differs, so none is committed.
+
+## 2026-10-20 — #2094, the app side — two pieces built and pushed
+
+Ready for lamp-voice: no (the app side only; nothing here changes
+`lampOS`'s own crates or docs beyond this log)
+
+- El posted the `keys.*` contract on #2094 at 11:11, then the authoritative
+  table at 11:13 ("where this differs from your 10:39 summary, the table
+  above is the one the lamp takes"), with a two-minute overlap between the
+  two: 11:11's `keys.get` success is a nested `{"uses","since","host"}` per
+  service, 11:13's is a flat `"own"|"lamp"` string with "never a key". Built
+  against 11:13. El's 11:24 then confirmed it in so many words: "The 11:13
+  table is the shape", with the nested fields added on top, additively, not
+  replacing it.
+- Cloned `ecm-sds-mobile`, branch `fourteen/own-keys` from `v3` at
+  `712f8c8e`. Opened
+  [ecm-sds-mobile#11](https://github.com/autonomous-ai/ecm-sds-mobile/pull/11),
+  not a draft, two commits:
+  1. The setup wizard's three optional fields (`deepseek_api_key`,
+     `deepseek_base_url`, `deepgram_api_key`), asked right after the wizard
+     learns a device is a Lamp 2, added to `buildSetupPayload` the same way
+     `share_reports` (lampOS #1683) was: included only when non-empty, so a
+     blank sheet changes nothing in the body.
+  2. `LampOwnKeysNotifier`: `keys.set`/`keys.remove`/`keys.get` over the
+     device's own MQTT channel (`BuddyMqttDataSource`, the same transport
+     `LampSettingsNotifier` uses for #1982). Treated all three as two-phase
+     (`starting` then `success`/`failure`), including `keys.get` — the
+     11:13 table shows it with only a `success` row, but El's 11:24 confirms
+     it also acks `starting`; using `request()` there would have read that
+     ack as the final answer and silently reported both services as the
+     lamp's own. `LampOwnKeysReply.from`, a pure envelope-to-reply function
+     mirroring `LampSettingsResult.from`, is what the tests exercise — the
+     MQTT socket itself is not unit-tested here, same as every other kind
+     in this codebase.
+- Not in #11, named there as the next piece: the settings-tab row and the
+  dedicated page. Both touch `autonomous_os_detail_page.dart` and its
+  settings tab, which Mobile's unmerged `lamp-v2-settings`/`lamp-v2-skills`/
+  `lamp-v2-reports` are all editing right now (each adds its own `part of`
+  file and a conditional row). Starting that once at least one has landed,
+  rather than adding a fourth concurrent edit to the same few lines.
+- Also named as known, deliberate gaps in #11: `keys.get`'s `since`/
+  `deepseek_host` and `keys.set`'s success `code` (El's 11:24 additions)
+  aren't surfaced in `LampOwnKeys` yet; setup's `GET /api/device/setup/
+  status`'s `own_keys` readback isn't wired into the setup success screen.
+  Both are additive, not reshapes, per how `LampOwnKeys.fromKeysGet` reads
+  only the two fields it knows.
+- Gate, against clean `v3` at `712f8c8e`: `flutter analyze` 29/29, identical
+  to `v3` line for line, 0 in any file this touches. `flutter test` 704
+  passed / 1 skipped / 1 failed, the one failure the same pre-existing
+  `test/features/brick/key_insight_period_test.dart` load error as clean
+  `v3` (also in Mobile's #1396 log). My 19 new tests are part of the 704.
+  Ran the full suite three times across both pieces (once showed two extra
+  failures that did not reproduce in isolation or on a second run — full-
+  suite flakiness under load, not a regression; the two reruns both matched
+  baseline exactly).
+- Not shown: a real Lamp 2. No lamp is Fourteen's.
