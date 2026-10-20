@@ -165,6 +165,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         changes: None,
         photos: None,
         faces: None,
+        schedule: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -264,6 +265,7 @@ fn the_faces_page_reads_names_and_removes_one() {
             socket,
             memory: None,
         }),
+        schedule: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -307,6 +309,151 @@ fn the_faces_page_reads_names_and_removes_one() {
     for kind in ["face.list", "face.remove"] {
         let refused = reply(&mut real, kind, json!({"name": "Lan"}));
         assert_ne!(refused["status"], "success", "{kind}: {refused}");
+    }
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// A stand-in lamp-schedule answering each request with `replies[op]`, in
+/// its own one-line protocol, for as many requests as `replies` holds.
+fn schedule(socket: &PathBuf, replies: Vec<(&'static str, Value)>) -> std::thread::JoinHandle<()> {
+    let listener = UnixListener::bind(socket).unwrap();
+    std::thread::spawn(move || {
+        for (op, reply) in replies {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            let asked: Value = serde_json::from_str(&line).unwrap();
+            assert_eq!(asked["op"], op, "{asked}");
+            stream.write_all(format!("{reply}\n").as_bytes()).unwrap();
+        }
+    })
+}
+
+/// #2195 (Mobile on #1396): with `LAMP_APP_SCHEDULE=on`, the app's Lamp 2
+/// page reads the lamp's timers and reminders, each as the lamp keeps it,
+/// and cancels one, through lamp-schedule (a stand-in here) and the client
+/// the voice's own reminder functions use. Its refusals are its fixed
+/// sentences. Without the switch, neither kind is here.
+#[test]
+fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
+    const STORE: &str = "0123456789abcdef0123456789abcdef";
+    let root = PathBuf::from(format!("/tmp/lcs-{}", std::process::id()));
+    let places = lamp(&root);
+    let socket = root.join("schedule.sock");
+    let sample = lamp_schedule::time::ClockSample {
+        unix_ms: 1_791_964_800_000,
+        boot_ms: 0,
+        boot_id: "cloud-fixture".into(),
+        wall_trusted: true,
+    };
+    let resolved = lamp_schedule::time::resolve(
+        &lamp_schedule::time::When::After { seconds: 600 },
+        &sample,
+        "Etc/UTC",
+    )
+    .unwrap();
+    let item = json!({"id": 1, "delivery": 1, "text": "stretch", "kind": "reminder",
+        "state": "scheduled", "due_unix_ms": resolved.unix_ms, "local": resolved.local,
+        "repeat": null, "snoozed": false, "late": false});
+    let serving = schedule(
+        &socket,
+        vec![
+            (
+                "list",
+                json!({"ok": true, "store_id": STORE, "revision": 0, "items": [item], "next_after_id": null}),
+            ),
+            (
+                "status",
+                json!({"ok": true, "store_id": STORE, "revision": 0}),
+            ),
+            (
+                "cancel",
+                json!({"ok": true, "store_id": STORE, "revision": 1, "id": 1, "delivery": 1, "cancelled": true}),
+            ),
+            (
+                "status",
+                json!({"ok": true, "store_id": STORE, "revision": 1}),
+            ),
+            (
+                "cancel",
+                json!({"ok": false, "error": "not_found", "message": "no such item"}),
+            ),
+        ],
+    );
+    let mut real = Real {
+        places,
+        bus: None,
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: Some(lamp_actions::schedule::Adapter::new(socket.clone()).unwrap()),
+    };
+    let me = Identity {
+        device: "lamp".into(),
+        version: "812+460a1a1aa2b3".into(),
+        id: "d-42".into(),
+        mac: "lamp-7f72".into(),
+        ..Identity::default()
+    };
+    let replied = |real: &mut Real, kind: &str, data: Value| -> Value {
+        let result = answer(real, kind, &data);
+        let sent = me.data("2026-10-20T13:00:00Z", kind, &result).to_string();
+        serde_json::from_str(&sent).unwrap()
+    };
+    let listed = replied(&mut real, "schedule.list", json!({}));
+    assert_eq!(listed["status"], "success", "{listed}");
+    let page = &listed["data"];
+    let first = &page["items"][0];
+    for (within, path, kind_of_value) in [
+        (first, "id", Type::Whole),
+        (first, "kind", Type::Text),
+        (first, "text", Type::Text),
+        (first, "state", Type::Text),
+        (first, "local", Type::Text),
+        (first, "due_unix_ms", Type::Whole),
+        (first, "snoozed", Type::Flag),
+        (first, "late", Type::Flag),
+        (page, "complete", Type::Flag),
+    ] {
+        let value = field(within, path);
+        assert!(
+            value.is_some_and(|value| is(value, kind_of_value)),
+            "schedule.list {path}: the app takes {kind_of_value:?}, lamp-cloud said {value:?}"
+        );
+    }
+    assert_eq!(page["items"][0]["text"], "stretch");
+    assert!(page["next_after_id"].is_null(), "{page}");
+    let cancelled = replied(&mut real, "schedule.cancel", json!({"id": 1}));
+    assert_eq!(cancelled["status"], "success", "{cancelled}");
+    assert_eq!(cancelled["data"], json!({"cancelled": true, "id": 1}));
+    let refused = replied(&mut real, "schedule.cancel", json!({"id": 1}));
+    assert_ne!(refused["status"], "success", "{refused}");
+    assert!(
+        refused
+            .to_string()
+            .contains("That reminder or timer is no longer active."),
+        "{refused}"
+    );
+    serving.join().unwrap();
+    // A bad id is refused before lamp-schedule is asked.
+    assert!(answer(&mut real, "schedule.cancel", &json!({"id": 0})).is_err());
+    assert!(answer(&mut real, "schedule.list", &json!({"after_id": "x"})).is_err());
+    // Without the switch, neither kind is here.
+    real.schedule = None;
+    for kind in ["schedule.list", "schedule.cancel"] {
+        assert!(
+            answer(&mut real, kind, &json!({"id": 1})).is_err(),
+            "{kind}"
+        );
     }
     let _ = std::fs::remove_dir_all(root);
 }

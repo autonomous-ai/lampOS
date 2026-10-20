@@ -80,6 +80,9 @@ pub struct Real {
     /// The eyes asked for the faces they know and to forget one, with
     /// `LAMP_FACES_PAGE=on` (#2192, `crate::faces`).
     pub faces: Option<crate::faces::Eyes>,
+    /// The lamp's timers and reminders for the app, with
+    /// `LAMP_APP_SCHEDULE=on` (#2195, `crate::schedule`).
+    pub schedule: Option<lamp_actions::schedule::Adapter>,
 }
 
 /// Texts from the app (`crate::chat`, #1673): whether they are taken, the
@@ -552,6 +555,10 @@ impl Lamp for Real {
         self.faces.clone()
     }
 
+    fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
+        self.schedule.as_ref()
+    }
+
     fn new_run(&mut self, now_ms: u64) -> String {
         self.texts.stream.new_run(now_ms)
     }
@@ -692,6 +699,7 @@ mod tests {
             changes: None,
             photos: None,
             faces: None,
+            schedule: None,
         };
         let level = Volume {
             volume: 35,
@@ -816,6 +824,7 @@ mod tests {
             changes: None,
             photos: None,
             faces: None,
+            schedule: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.

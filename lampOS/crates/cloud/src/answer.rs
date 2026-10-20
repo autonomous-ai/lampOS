@@ -97,6 +97,12 @@ pub trait Lamp {
     fn faces(&self) -> Option<crate::faces::Eyes> {
         None
     }
+
+    /// The lamp's timers and reminders (`LAMP_APP_SCHEDULE=on`, #2195,
+    /// `crate::schedule`): there only with the switch.
+    fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
+        None
+    }
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -214,6 +220,16 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         "face.remove" if lamp.faces().is_some() => {
             let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
             crate::faces::remove(&eyes, data).map(Some)
+        }
+        // The lamp's timers and reminders, for the app's Lamp 2 page
+        // (#2195): only with `LAMP_APP_SCHEDULE=on`.
+        "schedule.list" | "schedule.cancel" if lamp.schedule().is_some() => {
+            let adapter = lamp.schedule().ok_or_else(|| not_here(kind))?;
+            if kind == "schedule.list" {
+                crate::schedule::list(adapter, data)
+            } else {
+                crate::schedule::cancel(adapter, data)
+            }
         }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the

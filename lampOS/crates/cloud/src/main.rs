@@ -175,6 +175,8 @@ fn main() -> ExitCode {
         photos: lamp_cloud::photos::Place::from_environment(),
         // The faces it knows, and removing one (#2192): only with LAMP_FACES_PAGE=on.
         faces: lamp_cloud::faces::Eyes::from_environment(),
+        // The lamp's timers and reminders for the app (#2195): only with LAMP_APP_SCHEDULE=on.
+        schedule: lamp_cloud::schedule::from_environment(),
     };
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -201,6 +203,7 @@ fn main() -> ExitCode {
         changes: None,
         photos: None,
         faces: None,
+        schedule: None,
     };
     runtime.block_on(async move {
         let looks = async move {

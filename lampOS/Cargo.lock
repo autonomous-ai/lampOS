@@ -1774,9 +1774,11 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "lamp-actions",
  "lamp-bus",
  "lamp-ipc",
  "lamp-msgs",
+ "lamp-schedule",
  "lamp-setup",
  "lamp-skills",
  "lamp-voice",

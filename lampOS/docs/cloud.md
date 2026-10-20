@@ -81,6 +81,7 @@ face the lamp knows.
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules. `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
+| `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
@@ -243,6 +244,22 @@ said. `tests/app_contract.rs` pins what the page reads of both (`memory`,
 and `reason` with `kept`), in V1's envelope, and both refused without the
 switch. `online.rs`: only the lamp's own account channel commands it
 (`commanded`).
+
+## The lamp's timers and reminders (#2195, `schedule.list`, `schedule.cancel`)
+
+Off unless `LAMP_APP_SCHEDULE=on` in lamp-cloud's unit. lamp-schedule keeps
+every timer and reminder (`/run/lampos-schedule/call.sock`, 0600, the parts'
+own user, which lamp-cloud runs as; `LAMP_SCHEDULE_SOCKET` names another).
+lamp-cloud asks it through `lamp_actions::schedule::Adapter`, the client the
+voice's `list_reminders` and `cancel_reminder` go through: a cancel first
+reads the store's identity and revision, and is sent with them as its
+compare-and-set guard; every page is checked; and its failures are fixed
+sentences that never carry a reminder's words (`crate::schedule`). The
+reminders are the household's: anyone at the lamp can already list them or
+cancel one by voice. With the switch the owner's app can too, and their
+words then pass through the broker to the app, where before they left the
+lamp only to the voice's model. Tests: `app_contract.rs`'s
+`schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without`.
 
 ## The skills page (#1722, `skills.list`)
 
