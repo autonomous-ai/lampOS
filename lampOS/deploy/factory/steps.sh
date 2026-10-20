@@ -10,7 +10,8 @@
 #   3. the update key's public half: /etc/lampOS/update/key.pub
 #   4. the self-test: lamp-selftest --occasion factory, the lamp first stood
 #      up by its running lamp-body ("listening" on its mood socket) so
-#      that head_move is checked whether or not the voice is up (#2232)
+#      that head_move is checked whether or not the voice is up (#2232),
+#      with lamp-expression stopped for the run and started again after
 # Run on the lamp, as root. Every step is dry unless --write: it reads and
 # says what it would write, and nothing is written to /etc. A step that
 # fails stops the rest and says which. Written, steps 1, 2 and 4 need a
@@ -29,10 +30,11 @@
 # For a test, MEASURE_BIN, BODY_BIN, MOOD_BIN, CONTROLS_BIN, SELFTEST_BIN,
 # SYSTEMCTL, JQ and ETC_ROOT (a folder standing for /) replace them;
 # STAND_WAIT is the seconds a stand is given (34), HEAD_STAND_WAIT the
-# seconds the running body is given to stand before the self-test (9).
+# seconds the running body is given to stand before the self-test (9), and
+# QUIET_WAIT the seconds waited after lamp-expression stops (61).
 set -uo pipefail
 
-usage() { sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//'; }
 
 ROOT=${ETC_ROOT:-}
 MEASURE_BIN=${MEASURE_BIN:-/opt/lampOS/body/current/lamp-body-measure}
@@ -40,6 +42,7 @@ BODY_BIN=${BODY_BIN:-/opt/lampOS/body/current/lamp-body}
 MOOD_BIN=${MOOD_BIN:-/opt/lampOS/body/current/lamp-body-mood}
 STAND_WAIT=${STAND_WAIT:-34}
 HEAD_STAND_WAIT=${HEAD_STAND_WAIT:-9}
+QUIET_WAIT=${QUIET_WAIT:-61}
 CONTROLS_BIN=${CONTROLS_BIN:-/opt/lampOS/controls/current/lamp-controls}
 SELFTEST_BIN=${SELFTEST_BIN:-/opt/lampOS/selftest/current/lamp-selftest}
 SYSTEMCTL=${SYSTEMCTL:-systemctl}
@@ -110,7 +113,15 @@ controls_back() {
   CONTROLS_STOPPED=0
   "$SYSTEMCTL" start lamp-controls || fail "could not start lamp-controls again"
 }
-trap 'ease_back; controls_back' EXIT
+# lamp-expression is stopped while the self-test moves the head (#2232); it is
+# started again however the step or the script ends.
+EXPRESSION_STOPPED=0
+expression_back() {
+  [[ $EXPRESSION_STOPPED == 1 ]] || return 0
+  EXPRESSION_STOPPED=0
+  "$SYSTEMCTL" start lamp-expression || fail "could not start lamp-expression again"
+}
+trap 'ease_back; controls_back; expression_back' EXIT
 # A wait the traps can cut short: bash runs a trap only once a foreground
 # command ends, and a wait ends at once.
 pause() {
@@ -375,6 +386,12 @@ step_key() {
 # (MOOD_STALE), standing, and folds by itself --awake-seconds (90) after it,
 # however this script ends. Said a few times: a voice that is up tells it
 # "resting" every 40 ms, and the body keeps the newest in each step.
+# lamp-expression asks the body on expression/body all the time (its resting
+# breath), and the body keeps only the newest request, so head_move stays
+# not_checked while it runs, and needs a minute with nobody else asking
+# (lamp-52e6 on #2238: "asked to move 0 s ago by someone else"). So it is
+# stopped, the minute waited, and then the lamp stood: the stand comes after
+# the minute, so that the lamp has not folded again (--awake-seconds 90).
 BODY_MOOD=$ROOT/run/lampos-body/mood.sock
 HEAD_STOOD=0
 stand_for_head() {
@@ -383,6 +400,12 @@ stand_for_head() {
   if [[ $body_state != active ]]; then
     say "lamp-body is $body_state: the lamp is not stood up, and head_move says why"
     return 0
+  fi
+  if [[ $("$SYSTEMCTL" is-active lamp-expression 2>/dev/null) == active ]]; then
+    "$SYSTEMCTL" stop lamp-expression || { fail "could not stop lamp-expression"; return 1; }
+    EXPRESSION_STOPPED=1
+    say "lamp-expression stopped for the head's small move; waiting ${QUIET_WAIT} s for the body to be left alone"
+    pause "$QUIET_WAIT"
   fi
   say "standing the lamp up for the head's small move"
   local _
@@ -404,6 +427,7 @@ step_selftest() {
   stand_for_head || return 1
   "$SELFTEST_BIN" --occasion factory
   local status=$?
+  expression_back
   [[ $HEAD_STOOD == 1 ]] && say "the lamp folds by itself within 90 s of standing (lamp-body's --awake-seconds)"
   # Exit 3, a part not checked, counts as the unit's success (selftest.md).
   [[ $status == 0 || $status == 3 ]] || { fail "the self-test found a part that failed (exit $status)"; return 1; }

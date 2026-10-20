@@ -22,6 +22,7 @@ mkdir -p "$T/bin"
 cat >"$T/bin/systemctl" <<'EOF'
 #!/usr/bin/env bash
 echo "systemctl $*" >>"$FAKE_LOG"
+[[ $1 == is-active && $2 == lamp-expression ]] && { echo "${FAKE_EXPRESSION_STATE:-inactive}"; [[ ${FAKE_EXPRESSION_STATE:-inactive} == active ]]; exit; }
 [[ $1 == is-active ]] && { echo "${FAKE_BODY_STATE:-inactive}"; [[ ${FAKE_BODY_STATE:-inactive} == active ]]; exit; }
 [[ $1 == show ]] && { echo "Environment=${FAKE_CONTROLS_ENV:-}"; exit 0; }
 exit 0
@@ -95,7 +96,7 @@ lamp() {
   rm -f "$T/log.let-go"
 }
 run() {
-  ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood STAND_WAIT=0 HEAD_STAND_WAIT=0 \
+  ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood STAND_WAIT=0 HEAD_STAND_WAIT=0 QUIET_WAIT=0 \
     CONTROLS_BIN=$T/bin/controls SELFTEST_BIN=$T/bin/selftest SYSTEMCTL=$T/bin/systemctl \
     FAKE_LOG=$T/log bash "$STEPS" --unit-id lamp-test "$@" </dev/null >"$T/out" 2>&1
 }
@@ -141,6 +142,10 @@ check "--from 4 runs only step 4" '! grep -q "^measure" "$T/log" && grep -q "ste
 # is told listening on its own socket before the self-test, after the yes.
 lamp; FAKE_BODY_STATE=active ASK_ANSWER=y run --write --from 4; status=$?
 check "step 4 stands the running body up before the self-test" '[[ $status == 0 ]] && [[ $(grep -c "^mood --socket $T/root/run/lampos-body/mood.sock --mood listening --level 128$" "$T/log") == 5 ]] && [[ $(grep "^mood\|^selftest" "$T/log" | tail -1) == "selftest --occasion factory" ]] && grep -q "folds by itself" "$T/out"'
+lamp; FAKE_BODY_STATE=active FAKE_EXPRESSION_STATE=active ASK_ANSWER=y run --write --from 4; status=$?
+check "step 4 stops lamp-expression before the stand and starts it after the self-test" '[[ $status == 0 ]] && [[ $(grep "lamp-expression\|^mood\|^selftest" "$T/log" | grep -v is-active | sed "s/ --.*//" | uniq | tr "\n" "|") == "systemctl stop lamp-expression|mood|selftest|systemctl start lamp-expression|" ]]'
+lamp; FAKE_BODY_STATE=active FAKE_EXPRESSION_STATE=active FAKE_SELFTEST_EXIT=1 ASK_ANSWER=y run --write --from 4; status=$?
+check "a failed self-test still starts lamp-expression again" '[[ $status == 1 ]] && [[ $(grep -c "systemctl start lamp-expression" "$T/log") == 1 ]]'
 lamp; FAKE_BODY_STATE=inactive ASK_ANSWER=y run --write --from 4; status=$?
 check "step 4 with lamp-body down: nothing stood, the self-test says why" '[[ $status == 0 ]] && ! grep -q "^mood" "$T/log" && grep -q "lamp-body is inactive: the lamp is not stood up" "$T/out" && grep -q "^selftest" "$T/log"'
 lamp; FAKE_BODY_STATE=active ASK_ANSWER=n run --write --from 4; status=$?
@@ -259,6 +264,17 @@ kill -INT -- -"$script"
 wait "$script"; status=$?
 took=$(($(date +%s) - started))
 check "Ctrl-C mid-stand eases the arm back at once and stops the steps" '[[ $status == 130 && $took -le 3 ]] && grep -q "^body eased back" "$T/log" && grep -q "the arm was eased back" "$T/out" && [[ $(grep -c "^body --device" "$T/log") == 1 ]] && [[ ! -e $T/root/$ENV ]] && [[ ! -e $T/root/etc/lampOS/update/key.pub ]]'
+
+# Ctrl-C while the body is left alone: lamp-expression is started again.
+lamp; set -m
+ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood QUIET_WAIT=30 HEAD_STAND_WAIT=0 \
+  CONTROLS_BIN=$T/bin/controls SELFTEST_BIN=$T/bin/selftest SYSTEMCTL=$T/bin/systemctl FAKE_BODY_STATE=active FAKE_EXPRESSION_STATE=active \
+  FAKE_LOG=$T/log ASK_ANSWER=y bash "$STEPS" --unit-id lamp-test --write --from 4 </dev/null >"$T/out" 2>&1 &
+script=$!
+set +m
+for _ in $(seq 100); do grep -q "systemctl stop lamp-expression" "$T/log" && break; sleep 0.1; done
+kill -INT -- -"$script"; wait "$script"; status=$?
+check "Ctrl-C while the body is left alone starts lamp-expression again" '[[ $status == 130 ]] && grep -q "systemctl start lamp-expression" "$T/log" && ! grep -q "^selftest" "$T/log"'
 
 check "no stand-in body outlives its stand" '! pgrep -f "$T/bin/body" >/dev/null'
 echo "$failures failed"

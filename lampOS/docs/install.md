@@ -493,7 +493,13 @@ ends, and dry it only says what it would run, without stopping
 `lamp-controls`. Written, step 4 stands the lamp up for the
 self-test's `head_move`, which checks only a lamp at rest and standing and
 never stands one itself (#2232): after the yes (a hand by the arm as it
-rises, not on it), the running `lamp-body` is told `listening` on its own
+rises, not on it), `lamp-expression`, if it runs, is stopped: it asks the
+body on `expression/body` all the time (its resting breath), the body keeps
+only the newest request, and `head_move` wants nobody else asking for a
+minute (lamp-52e6 on #2238: "asked to move 0 s ago by someone else"). So
+61 s (`QUIET_WAIT`) are waited, and it is started again after the self-test
+however the step or the script ends, Ctrl-C included. Then the running
+`lamp-body` is told `listening` on its own
 mood socket, `/run/lampos-body/mood.sock`, with `lamp-body-mood`, five times
 0.2 s apart (an up voice tells it `resting` every 40 ms), and given 9 s
 (`HEAD_STAND_WAIT`) to stand and rest again, standing, before the self-test
