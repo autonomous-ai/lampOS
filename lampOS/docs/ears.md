@@ -36,7 +36,7 @@ The voice keeps mic2 to itself; the two parts never share a device.
 | `ears/level` | `RoomSound` | latest, every 100 ms | The last 100 ms in dBFS; the room's quiet (the tenth percentile of the last 30 s heard while the lamp was not speaking; none for the first two seconds); whether the lamp's own voice is in it |
 | `ears/sudden` | `SuddenSound` | event | Its loudest 20 ms, the quiet it rose out of, how long it stayed 10 dB over the quiet in the 300 ms it was watched, whether that was under 200 ms ("short": a knock, a clap) or not (a voice, a chair, music), and how long ago it began |
 | `diagnostics` | `Diagnostic` | every second | `ears`: ok, or an error with why the microphone does not open; the quiet now, how many sudden sounds, overruns |
-| `ears/classes` | `SoundClasses` | latest, every 500 ms | Only with `LAMP_EARS_CLASSES=on` and `LAMP_PRIVACY_CONTROLS=on` (never with `no-slide`): speech, music and laughter scores of the last patch, or why there are none (below, and [sound-events.md](sound-events.md)) |
+| `ears/classes` | `SoundClasses` | latest, every 500 ms | Only with `LAMP_EARS_CLASSES=on` and `LAMP_PRIVACY_CONTROLS=on`, or `no-slide` with the person's stored yes ([privacy-switch.md](privacy-switch.md)): speech, music and laughter scores of the last patch, or why there are none (below, and [sound-events.md](sound-events.md)) |
 
 **When a sound is sudden.** A 20 ms block at least 30 dB over the quiet
 (`--rise-db`, 10 to 60) and at least -40 dBFS, after 200 ms that averaged under 10 dB over the quiet.
