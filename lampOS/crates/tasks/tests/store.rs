@@ -7,23 +7,72 @@ use std::{
     io::{self, Write},
     os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt, symlink},
     path::{Path, PathBuf},
-    process::{self, Command},
+    process::{self, Command, Output, Stdio},
+    sync::{PoisonError, RwLock, RwLockReadGuard},
     time::{Duration, SystemTime},
 };
 
 const DATABASE: &str = "tasks.sqlite3";
 const INITIALIZING: &str = ".tasks.sqlite3.init";
 
+/// A spawn and a test letting go of a store take turns (#1569 row 43, row
+/// 27's case: schedule's `tests/runtime.rs`, update's `tests/round.rs`). A
+/// child spawned by one test thread holds a copy of every descriptor, a
+/// store's directory lock among them, until its exec closes them, and
+/// `spawn` returns only after that. A store let go of and opened again in
+/// that moment finds its directory `already owned`: 2 of 30 runs of this
+/// file beside fourteen busy processes on a Mac, 20 Oct (Eighth on #1722,
+/// 12:33). So a spawn takes the turn alone ([`output_alone`]), and a test
+/// shares it while it opens and lets go of stores ([`Scratch::new`]).
+/// nextest, a process for each test, is not affected.
+static SPAWNS: RwLock<()> = RwLock::new(());
+
+fn share() -> RwLockReadGuard<'static, ()> {
+    SPAWNS.read().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// `command`'s output, as `Command::output` gives it, spawned alone in the
+/// turn ([`SPAWNS`]).
+fn output_alone(command: &mut Command) -> Output {
+    let child = {
+        let _turn = SPAWNS.write().unwrap_or_else(PoisonError::into_inner);
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap()
+    };
+    child.wait_with_output().unwrap()
+}
+
 struct Scratch {
     root: tempfile::TempDir,
     dir: PathBuf,
+    /// The turn's share, held for the whole test, so that every store it
+    /// opens is let go of in it ([`SPAWNS`]). `None` for a test that spawns:
+    /// it shares the turn around its own stores, and spawns alone.
+    _turn: Option<RwLockReadGuard<'static, ()>>,
 }
 
 impl Scratch {
     fn new() -> Self {
+        Self::with(Some(share()))
+    }
+
+    /// For a test that spawns ([`output_alone`]).
+    fn spawning() -> Self {
+        Self::with(None)
+    }
+
+    fn with(turn: Option<RwLockReadGuard<'static, ()>>) -> Self {
         let root = tempfile::tempdir().unwrap();
         let dir = root.path().join("private");
-        Self { root, dir }
+        Self {
+            root,
+            dir,
+            _turn: turn,
+        }
     }
 
     fn open(&self) -> Store {
@@ -149,22 +198,24 @@ fn exclusive_ownership_blocks_another_process_and_is_released_on_drop() {
         );
         process::exit(73);
     }
-    let scratch = Scratch::new();
+    let scratch = Scratch::spawning();
     let mut store = scratch.open();
     store.commit(b"owned").unwrap();
     assert_eq!(
         Store::open(&scratch.dir).err().unwrap().kind(),
         io::ErrorKind::WouldBlock
     );
-    let child = Command::new(std::env::current_exe().unwrap())
-        .args([
-            "--exact",
-            "exclusive_ownership_blocks_another_process_and_is_released_on_drop",
-        ])
-        .env(CHILD, &scratch.dir)
-        .output()
-        .unwrap();
+    // The store is held through the spawn, and let go of in the turn.
+    let child = output_alone(
+        Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "exclusive_ownership_blocks_another_process_and_is_released_on_drop",
+            ])
+            .env(CHILD, &scratch.dir),
+    );
     assert_eq!(child.status.code(), Some(73), "{child:?}");
+    let _turn = share();
     drop(store);
     assert_eq!(
         scratch.open().load().unwrap().as_deref(),
@@ -711,20 +762,24 @@ fn interrupted_transaction_recovers_the_last_committed_snapshot() {
         // page cache makes the uncommitted update spill to the database file.
         process::exit(91);
     }
-    let scratch = Scratch::new();
+    let scratch = Scratch::spawning();
     // Replacing a full snapshot journals the old pages, so this covers
     // recovery of an eight-MiB value rather than only database growth.
     let previous = vec![0x11; MAX_STATE_BYTES];
-    scratch.open().commit(&previous).unwrap();
-    let child = Command::new(std::env::current_exe().unwrap())
-        .args([
-            "--exact",
-            "interrupted_transaction_recovers_the_last_committed_snapshot",
-        ])
-        .env(CHILD, &scratch.dir)
-        .output()
-        .unwrap();
+    {
+        let _turn = share();
+        scratch.open().commit(&previous).unwrap();
+    }
+    let child = output_alone(
+        Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "interrupted_transaction_recovers_the_last_committed_snapshot",
+            ])
+            .env(CHILD, &scratch.dir),
+    );
     assert_eq!(child.status.code(), Some(91), "{child:?}");
+    let _turn = share();
     let journal = scratch.dir.join(format!("{DATABASE}-journal"));
     assert!(fs::metadata(&journal).unwrap().len() >= MAX_STATE_BYTES as u64);
     assert_eq!(
