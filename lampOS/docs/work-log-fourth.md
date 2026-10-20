@@ -5093,6 +5093,17 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **A pause on my side,** about 22:10 to 23:00 (a usage limit), with nothing lost.
 - **Free: fourth** after #2322.
 
+## 2026-10-21, 00:17 ICT: #2322 merged; #2332 up; the start horizon's value read
+
+- **Merged:** #2322 (#2287's follow-up, `LAMP_OWN_LINE_KEEPS` off) into #1712 at 23:56.
+- **#2332:** the reviewer's two P3s on #2322 (`8f1c54c1a` on #1712's `ec38a18ce`, gate 3476/0).
+  - A lone put-off stops an own line only in a room that isn't busy, so a colleague's "No thanks." waits as the room's.
+  - The put-off test has its own doc.
+  - The busy-room mutation fails the test.
+- **#2295's value, read by the first builder on lamp-4ace (23:30):** over 11 second-route answers, the 350 ms start gate held each p50 74 ms and p90 135 ms, and every one needed 0 (no gaps). #1712's head goes on lamp-4ace tonight with `LAMP_SECOND_PLAYOUT_START_MS=100`, and I posted the after-checks on #2135.
+- **The streamed first piece is dropped** (posted on #2135). ElevenLabs' `auto_mode` with partial sentences gives "highly reduced quality", and without it generation waits for 120 characters. Our short first piece with `flush` is already the recommended way.
+- **Free: fourth.**
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
