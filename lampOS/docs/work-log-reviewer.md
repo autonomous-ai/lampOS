@@ -4,6 +4,48 @@
 
 Newest first. Times from `date` (+07).
 
+- 04:40 #2374 (sixth landing) read: no finding, every conflict keeps both sides; first builder's
+- 04:34 Merged #2370 (voice-eval one test binary) as d4f50491e; told builders on #1722 about --test it switches::
+- 04:33 #2372 first read: P2 busy ends while people still talk (held lines not counted), P3 wiring untested; first builder's
+- 04:26 #2371 first read: no P1/P2, two P3s (re-judged each pass under on; level choice unpinned); first builder's
+- 04:25 Merged #2364 (schedule/audio/controls one test binary each) as 822826f29
+- 04:18 Merged #2363 (expression/memory one test binary each) as 595b9cf07
+- 04:17 #2368 first read: no P1/P2, two P3s (cost at 0.30 not given; evidence README says 0.45); first builder's
+- 04:16 #2367 first read: no P1/P2, P3 switch wiring untested; first builder's
+- 04:11 #2369 (my #2355 P3s): closed; fold after #2362; first builder's
+- 04:11 #2365 first read: P2 switch never reaches the second worker (env_clear); two P3s; first builder's
+- 04:04 #2366 (score_wav example): no finding; first builder's
+- 03:58 Merged #2359 (manage helper wait pinned) as 85834de84
+- 03:55 #2362 (#2355 rebased): same patch; first builder's
+- 03:51 Merged #2357 (msgs/policy/surround one test binary each) as 17e582ce5; P3 doc paths
+- 03:38 #2360 (#2271 rebased): same patch, first builder's; #2359 read: no finding, mine on green
+- 03:36 Merged #2356 (capture-hold warm-up 20 blocks) as f264259de
+- 03:36 #2351 at 9f795926a: my P3 1 closed; first builder's
+- 03:17 #2355 first read: no P1/P2 (mute/privacy/hand stop still win), three P3s; first builder's
+- 03:15 Merged #2350 (held-up speaker + wait switch tests shorter) as 3350133bf
+- 03:10 #2339/#2341 docs-only moves; link needs #2354 first
+- 03:07 #2354 (#2352 folded): same tree; first builder's
+- 03:05 #2352 P3 closed, fold 2 commits; #2339/#2341 rebase only
+- 03:03 Merged #2349 (capture-hold tests 250 blocks) as 988ea568a
+- 03:01 #2351 first read: no P1/P2, two P3s (warm-up's own closed conn marked idle; no lamp before/after yet); first builder's (on in product)
+- 03:00 #2352 (same-voice evidence, docs): no P1/P2, P3 blank cell; first builder's
+- 02:56 Merged #2348 (#2344's P3 margin half) as 96838d525; binary-wait pin half still open
+- 02:56 #2339/#2341 re-read (0.30 voice bar): no P1/P2; P3 the 0.30 check can't fire under #829's 0.45; first builder's
+- 02:49 Merged #2347 (two pads touched together found, test + doc) as ce66986c0
+- 02:35 #2348 read: no finding, mine on green; #2339 at c21615d33: rebase + docs
+- 02:28 #2347 first read: no finding; mine on green
+- 02:23 #2345 first read: no finding; first builder's (cloud STT socket while mic allowed)
+- 02:20 Merged #2344 (manage helper lock wait as a value, tests ~4 s shorter) as d87febb93
+- 02:19 #2346 (revert #2337): exact inverse; first builder's
+- 02:15 #2341 at e9340f7b1: my P2 closed (ways 1+2); two P3s; fold after #2339; first builder's
+- 02:10 #2277 at 3067ca2c3: rebase + stop words; no finding; first builder's
+- 02:00 #2344 first read: no finding; mine on green
+- 01:57 #2342 (docs, speech socket measured): no finding; first builder's
+- 01:45 #2339 at a78e73561: my two P3s closed; conflicts in intent with #2341 (same guard)
+- 01:44 #2341 first read: P2 (no caller face seen -> any speaking face is someone else; caller's own follow-up held), P3 two commits; first builder's
+- 01:40 #2340 first read: no P1/P2, two P3s (any yes while A's face in view; #2265 gap hold widens it); first builder's
+- 01:31 #2339 first read: no P1/P2, two P3s (1.5 s face id, no-face-at-call untested); first builder's
+- 01:18 #2337 first read: no P1/P2; first builder's
 - 01:01 Merged #2335 (#2328's P3s, guard-mode tests) as 81da23a03
 - 00:58 #2336 (#2334 refiled): my P2/P3 closed; first builder's
 - 00:44 #2334 (words only) first read: P2 forget_everything's description still waits for a yes; P3 refusal wording; first builder's
