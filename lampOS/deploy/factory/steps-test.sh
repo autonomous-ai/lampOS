@@ -196,6 +196,7 @@ check "LAMP_CONTROLS_STRIP=off is off" 'grep -q "the base strip is off" "$T/out"
 PINSF=etc/lampOS/controls/controls-pins.json
 lamp; ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "the head pads found are written with their polarity and baseline, the rest kept" '[[ $status == 0 ]] && [[ $(jq -c .head_pads "$T/root/$PINSF") == "[{\"name\":\"head-1\",\"line\":97,\"active_low\":false,\"pull\":\"down\"},{\"name\":\"head-2\",\"line\":98,\"active_low\":false,\"pull\":\"down\"}]" ]] && [[ $(jq -c .head_rest "$T/root/$PINSF") == "[{\"name\":\"head-1\",\"rest\":\"low\",\"reads\":\"level\"},{\"name\":\"head-2\",\"rest\":\"low\",\"reads\":\"pulses\"}]" ]] && [[ $(jq -r .chip "$T/root/$PINSF") == /dev/gpiochip0 ]] && ls "$T/root/etc/lampOS/controls/" | grep -q "controls-pins.json.before-factory-"'
+check "each pad is named as it was found (thirteen-P4)" 'grep -q "a head pad on line 97: rests low, level under a hand" "$T/out" && grep -q "a head pad on line 98: rests low, pulses under a hand" "$T/out"'
 check "lamp-controls is stopped for the read, started again, then restarted on the new pins" '[[ $(grep "lamp-controls" "$T/log" | tr "\n" "|") == "systemctl stop lamp-controls|systemctl start lamp-controls|systemctl restart lamp-controls|" ]] && grep -q "^controls discover-head --seconds 40 --rest-seconds 10$" "$T/log"'
 pulled() { printf '{"line":%s,"high_with_pull_down":%s,"high_with_pull_up":%s,"idle_high":%s,"completed_pulses":%s,"longest_pulse_us":1,"active_low_candidate":%s}' "$@"; }
 lamp; before=$(cat "$T/root/$PINSF")

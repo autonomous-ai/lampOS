@@ -478,9 +478,12 @@ First's on-lamp sequence is:
    then replay the record with the saved pins file. It must show no touch
    event. Verify any excluded pad does not cause a global chip fault.
 2. With hands away initially, run `lamp-controls discover-head --seconds 30
-   --rest-seconds 10`, keep hands away 11 s, then touch and release each
-   physical pad twice. It probes pull-down/up, counts each line's changes at
-   rest, requires driven idle and two complete ≥20 ms pulses, prints
+   --rest-seconds 10`, keep hands away 11 s, then hold each physical pad
+   about 2 s, or touch and release it twice. It probes pull-down/up, counts
+   each line's changes at rest, requires driven idle and either two complete
+   ≥20 ms pulses or one press of 500 ms or more (`HELD_US`, read as a level:
+   a person's two touches often merge into one, as on lamp-c0a4 three runs
+   in a row, thirteen-P4; a lone short press still finds nothing), prints
    candidate polarity and how each reads, and installs nothing. A floating, untested or startup-held line
    is not a pad mapping. Set the actual observed candidates in the pins file;
    remove the nonexistent primary from lamp-4ace's configuration, not all lamps.

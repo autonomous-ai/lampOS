@@ -247,11 +247,11 @@ step_body() {
 # holds its level or pulses), which lamp-controls reads it by (#711).
 step_head_pads() {
   if [[ $WRITE != 1 ]]; then
-    say "would stop lamp-controls, run $CONTROLS_BIN discover-head --seconds 40 --rest-seconds 10 with a person's hands away for 11 s, then touching each head pad twice, write the two pads' lines, polarity and rest into $PINS and start lamp-controls again (dry)"
+    say "would stop lamp-controls, run $CONTROLS_BIN discover-head --seconds 40 --rest-seconds 10 with a person's hands away for 11 s, then holding each head pad about 2 s, write the two pads' lines, polarity and rest into $PINS and start lamp-controls again (dry)"
     return 0
   fi
   command -v "$JQ" >/dev/null || { fail "$JQ is not installed: the head pads step reads discover-head's report with it"; return 1; }
-  ask "the head pads: for 40 s, hands away from the lamp for the first 11 s (count them), then touch and release head pad 1 twice, then head pad 2 twice, about a second each (the button is off meanwhile)." || return 1
+  ask "the head pads: for 40 s, hands away from the lamp for the first 11 s (count them), then hold head pad 1 about 2 s and let go, then head pad 2 the same; a hand on both at once is fine (the button is off meanwhile)." || return 1
   local report=$ROOT/var/tmp/factory-head-pads-$STAMP.json out=$PINS.factory-$STAMP pads
   mkdir -p "$(dirname "$report")"
   "$SYSTEMCTL" stop lamp-controls || { fail "could not stop lamp-controls"; return 1; }
@@ -265,6 +265,12 @@ step_head_pads() {
     | {line, active_low: .active_low_candidate, pull: (if .active_low_candidate then "up" else "down" end),
        rest_changes, reads}]' "$report") \
     || { fail "the head pads report could not be read"; return 1; }
+  # Each pad as it was found, so the person hears which touches counted
+  # (thirteen-P4).
+  local found
+  while read -r found; do
+    [[ -n $found ]] && say "$found"
+  done < <("$JQ" -r '.[] | "a head pad on line \(.line): rests \(if .active_low then "high" else "low" end), \(.reads // "touch not told") under a hand"' <<<"$pads")
   local restless
   restless=$("$JQ" -c '[.[] | select((.rest_changes // 0) > 0) | .line]' <<<"$pads")
   if [[ $restless != "[]" ]]; then
@@ -274,11 +280,11 @@ step_head_pads() {
   local unread
   unread=$("$JQ" -c '[.[] | select(.rest_changes != null and .reads == null) | .line]' <<<"$pads")
   if [[ $unread != "[]" ]]; then
-    fail "head pad lines $unread were neither held half a second nor pulsing under the hand: touch each pad about a second, and run the step again (report: $report)"
+    fail "head pad lines $unread were neither held half a second nor pulsing under the hand: hold each pad about 2 s, and run the step again (report: $report)"
     return 1
   fi
   if [[ $("$JQ" length <<<"$pads") != 2 ]]; then
-    fail "head pads found on $("$JQ" -c '[.[].line]' <<<"$pads") lines, not two, each touched twice: the pins are not changed (report: $report)"
+    fail "head pads found on $("$JQ" -c '[.[].line]' <<<"$pads") lines, not two, each held or touched twice: the pins are not changed (report: $report)"
     return 1
   fi
   # The baseline only from a discover-head that measured it (rest and reads),
