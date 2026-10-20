@@ -104,6 +104,12 @@ struct Counts {
     sign_in_lines: Arc<Mutex<std::collections::VecDeque<SignInRead>>>,
     sign_in_answers: Arc<Mutex<Vec<bool>>>,
     sign_in_starts: AtomicUsize,
+    /// How many times Harness's daemon was started (openharness#1463).
+    daemon_starts: AtomicUsize,
+    /// Each launch and daemon start, in the order they ran, and a launch
+    /// held on the job lane while set (the reviewer-lead's P2 on #2309).
+    order: Mutex<Vec<&'static str>>,
+    hold_launch: AtomicBool,
 }
 type SignInRead = Result<lamp_tasks::sign_in::Event, &'static str>;
 /// A sign-in that reads the script's lines and keeps its answers.
@@ -152,6 +158,10 @@ impl Adapter for Script {
     }
     fn launch(&self, _: &Launch) -> LaunchOutcome {
         self.counts.launches.fetch_add(1, Ordering::SeqCst);
+        self.counts.order.lock().unwrap().push("launch");
+        while self.counts.hold_launch.load(Ordering::SeqCst) && !self.stop.load(Ordering::Acquire) {
+            thread::sleep(Duration::from_millis(5));
+        }
         if self.slow {
             while !self.stop.load(Ordering::Acquire) {
                 thread::sleep(Duration::from_millis(5));
@@ -209,6 +219,11 @@ impl Adapter for Script {
     fn machines(&self) -> Result<Vec<AccountMachine>, String> {
         self.counts.machine_reads.fetch_add(1, Ordering::SeqCst);
         Ok(self.counts.machines.lock().unwrap().clone())
+    }
+    fn start_daemon(&self) -> Result<(), String> {
+        self.counts.daemon_starts.fetch_add(1, Ordering::SeqCst);
+        self.counts.order.lock().unwrap().push("daemon");
+        Ok(())
     }
     fn sign_in_starter(&self) -> Option<lamp_tasks::sign_in::Starter> {
         let counts = self.counts.clone();
@@ -1558,7 +1573,21 @@ fn the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end() {
         .push_back(Ok(Event::Result(Done::Success {
             email: Some("someone@example.com".into()),
         })));
+    // Not before the sign-in has succeeded.
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 0);
     assert_eq!(until("done")["result"], "success");
+    // Harness's own sign-in stops its daemon (openharness#1463): started
+    // once after it, and not again.
+    let start = Instant::now();
+    while s.counts.daemon_starts.load(Ordering::SeqCst) == 0 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "the daemon was never started"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    thread::sleep(Duration::from_millis(200));
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 1);
     // Done: kept for the voice, and a start begins anew.
     assert_eq!(
         s.trusted(json!({"op":"sign_in_state"}))["result"],
@@ -1566,6 +1595,77 @@ fn the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end() {
     );
     assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["id"], id + 1);
     assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 2);
+}
+
+/// openharness#1463, the reviewer-lead's P2 on #2309: a hand-over waiting
+/// when a sign-in by code succeeds goes to Harness only after its daemon
+/// was started again, and a sign-in that fails starts nothing (the
+/// reviewer's P3 2).
+#[test]
+fn after_a_sign_in_the_daemon_is_started_before_a_waiting_hand_over() {
+    use lamp_tasks::sign_in::{Done, Event};
+    let mut s = Running::new(false);
+    s.stop();
+    s.config.sign_in_by_code = true;
+    s.start();
+    let state = |s: &Running, want: &str| {
+        let start = Instant::now();
+        loop {
+            let state = s.trusted(json!({"op":"sign_in_state"}));
+            if state["sign_in"] == want {
+                return state;
+            }
+            assert!(start.elapsed() < Duration::from_secs(5), "{state}");
+            thread::sleep(Duration::from_millis(10));
+        }
+    };
+    // Refused or cancelled: nothing is started.
+    for code in ["DENIED", "CANCELLED"] {
+        s.counts
+            .sign_in_lines
+            .lock()
+            .unwrap()
+            .push_back(Ok(Event::Result(Done::Error { code: code.into() })));
+        assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["ok"], true);
+        let ended = state(&s, "done");
+        assert_eq!(ended["result"], "error", "{ended}");
+    }
+    thread::sleep(Duration::from_millis(200));
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 0);
+    // A first hand-over holds the job lane while the sign-in succeeds and
+    // a second is confirmed.
+    s.counts.hold_launch.store(true, Ordering::SeqCst);
+    let first = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&first))["ok"], true);
+    let start = Instant::now();
+    while s.counts.launches.load(Ordering::SeqCst) == 0 {
+        assert!(start.elapsed() < Duration::from_secs(5));
+        thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["ok"], true);
+    s.counts
+        .sign_in_lines
+        .lock()
+        .unwrap()
+        .push_back(Ok(Event::Result(Done::Success { email: None })));
+    assert_eq!(state(&s, "done")["result"], "success");
+    let second = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&second))["ok"], true);
+    thread::sleep(Duration::from_millis(100));
+    s.counts.hold_launch.store(false, Ordering::SeqCst);
+    let start = Instant::now();
+    while s.counts.launches.load(Ordering::SeqCst) < 2 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "{:?}",
+            s.counts.order
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(
+        *s.counts.order.lock().unwrap(),
+        ["launch", "daemon", "launch"]
+    );
 }
 
 /// Without `serve --set-up-later` nothing of it is said, and the targets

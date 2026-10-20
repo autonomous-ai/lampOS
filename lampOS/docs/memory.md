@@ -262,6 +262,14 @@ their provenance; `forget` returns a count after removal and index checks.
 The base `remember` may also name the person's own exchanges it came from,
 `{"op":"remember",…,"source_ids":[3]}` (#1693); forgetting it then removes
 them, one step back. The legacy store ignores them.
+With `"once":true` (#2176, the voice's `LAMP_MEMORY_REMEMBER_ONCE`), a text
+the same person already keeps, active and the same words, ignoring case,
+spacing and a final punctuation mark, is answered
+`{"ok":true,"id":24,"existing":true}` with that kept thing's id, and no
+entry is written; it gains this conversation's `source_ids`, so forgetting
+it with `LAMP_MEMORY_FORGET_ALL` removes both conversations' exchanges
+([the rule](memory-days.md#request-contract)). The
+legacy store ignores `once` and keeps the text again.
 `session_open` returns a frozen `snapshot`; default `conversation_end`
 returns bounded model `input`, without invoking a model. With `submit:true`,
 the current build validates references and returns
@@ -287,6 +295,8 @@ for fields, errors, retries, invalidation and caller responsibilities.
   at most 16384; more is lowered, not refused. Bytes are of text; the first
   entry that does not fit whole ends the answer. A query's words are those of
   two characters or more, the first 16. `kept`: 4096 bytes unless given.
+  The Days memory also takes `day_from`/`day_to` and `recall_v2` here
+  (#2176, memory-days.md); this legacy store refuses them as unknown fields.
 - `at_unix_ms` outside the years 1970 to 9999: `bad_time`.
 
 ## How the voice uses it
@@ -333,6 +343,40 @@ the unchanged legacy client, used unless the new Days client is selected.
 - **Asking it to keep or forget something is not itself kept.** The
   exchange in which `remember` or `forget` was called stays out of the
   journal: the kept list is the record of that.
+- **What is kept is what was said** (#2176, row 10;
+  `LAMP_MEMORY_KEEP_HEARD=on`, both voice routes and both clients; off
+  unless set). The model writes the sentence `remember {text}` keeps, and
+  nothing checked it: on lamp-06c1 on 20 Oct "please remember that my
+  favourite tea is jasmine" and, later, "... my favourite fruit is mango"
+  were both kept as "My favorite food is jasmine." With the switch, a
+  `remember` for a line heard at the lamp is held against the words heard
+  in that line, from the conversation thread both routes keep
+  (`Thread::heard_for`: the line's exchange once the lamp has begun to
+  answer, else what was heard in the last 20 s).
+  - **The rule:** the model's key words are its words that are not common
+    (a short list, `remember::heard::COMMON`, compared lower-cased with
+    accents kept, as the ranked search's) and have three letters or more,
+    or a digit. If one of them is not among the words heard, compared
+    lower-cased and without accents (đ as d), the heard line is kept
+    instead: without its lead-in ("please remember that", "remember",
+    "hãy nhớ là", "nhớ rằng" …), as "They said: my favourite tea is
+    jasmine", cut to the store's 300 bytes. The model's answer then says
+    `"kept"` with that text and asks it to say it back.
+  - **Unchanged:** with the same words ("Their favourite tea is jasmine"),
+    with nothing heard (a text from the app, a line the lamp wrote) or with
+    the switch off, the model's text is kept exactly as before. Whose
+    memory it goes to is unchanged. Speech to text may mishear too: the
+    heard words are what the person said as far as the lamp knows. The
+    check compares words, so a word the model changes in form or language
+    (likes/like, 5/five, an English sentence for Vietnamese speech, a
+    spelling such as "favorite") also keeps what was heard: never less than
+    was said.
+  - **With `LAMP_MEMORY_REMEMBER_ONCE`:** an answer that already carries a
+    `note` or `"existing": true` (nothing new written) is left as it is;
+    the "kept what they said" note is added only when the store wrote a
+    new entry.
+  - Tests: `remember::heard::tests` (the two lamp-06c1 lines, a paraphrase,
+    off, nothing heard, the lead-in, the cap, the line's own words).
 - **A note for each new session.** Every session is told that it has a
   memory and when to consult it ("when someone asks about an earlier
   conversation, or about something they told you before that you do not
@@ -404,6 +448,158 @@ the unchanged legacy client, used unless the new Days client is selected.
     (requests and scopes, the switch off), and `crates/memory/tests/voice_forget.rs`
     (through the voice's Days client against the real store: what recall
     gave goes and something else stays; everything goes, journal included).
+
+- **Recall's second version** (#2176, `LAMP_MEMORY_RECALL_V2=on`, with
+  the Days client only; off unless set; both voice routes).
+  - **Words that match everything:** the memory leaves common English and
+    Vietnamese words ("what", "is", "my", "của", "tôi", "là" …) out of a
+    recall's query. "What is my drink order" searches "drink" and "order"
+    only, and a question of nothing else finds nothing. A known limit:
+    Vietnamese words that only differ by accents from a common word
+    (chó/cho, đỏ/đó, má/mà, lá/là) are kept as key words, but the index
+    folds accents, so they also match entries with the common word, and
+    ranking does not put the exact word first; folding before the check
+    would drop the real word instead.
+  - **A span of days:** `recall` also takes `days_ago_from` and
+    `days_ago_to`, both ends counted, at most 14 days: "last week" is 7 to
+    1. The function's description tells the model so. The voice sends the
+    memory `day_from` and `day_to`.
+  - **Kept things by day:** a day or a span also finds what was kept on
+    those days, not only the conversations.
+  - **Off:** the function and every request are as before.
+  - Tests: `remember::tests::with_the_switch_recall_asks_a_span_of_days_and_the_second_version`
+    (the requests, the clamp, the function, the switch off) and
+    `crates/memory/tests/days_recall.rs` (the store: the drink order, common
+    words only, a keyword beside them, an accented word matching its
+    common fold, 7 to 1 finding three days ago and
+    not nine, a kept thing by span, bad spans, and without the option the
+    same answers).
+
+- **Kept once** (#2176, `LAMP_MEMORY_REMEMBER_ONCE=on`, with the Days
+  client only; off unless set; both voice routes). `remember` asks the
+  store with `"once":true`. A held turn whose words were answered a second
+  time called `remember` again with the same text (lamp-06c1, the second
+  route, build 4142: kept ids 24 and 25). Now a text the person already
+  keeps (the same words, ignoring case, spacing and a final punctuation
+  mark) is that kept thing, no entry is written, it gains this
+  conversation's exchanges as sources (so forgetting it with
+  `LAMP_MEMORY_FORGET_ALL` removes both conversations'), and the model is told
+  `{"remembered":true,"note":"That was already kept."}`, so it doesn't
+  promise to remember it a second time. Off, the request is as before.
+  Tests: `days_protocol::tests::a_remember_once_the_same_person_already_keeps_word_for_word_is_that_kept_thing`,
+  `days::tests::a_remember_once_passes_over_a_kept_thing_no_longer_active`,
+  `days::tests::a_remember_once_links_its_sources_to_the_kept_thing_it_finds`,
+  `protocol::tests::the_legacy_store_ignores_once` and
+  `remember::tests::with_the_switch_remember_asks_once_and_says_what_was_kept_already`.
+
+- **Forgetting what a thing was about** (#2176, `LAMP_MEMORY_FORGET_ABOUT=on`,
+  with the Days client only; off unless set; both voice routes).
+  - **Why:** on lamp-06c1 (second route, 20 Oct 14:28), "never mind, forget
+    what I said about my bicycle" called `forget {}`, which sent
+    `forget_last`: it removed the newest kept thing, a coffee preference,
+    and the three bicycle things stayed.
+  - **What the model gets:** `forget` also takes `about`, one to four key
+    words. It is told to give it when the person names what to forget, and
+    to call with nothing for the last thing kept. With
+    `LAMP_MEMORY_FORGET_ALL` on as well it takes `source_id` too, and an id
+    wins when both are given. It is told to say what is gone as "I've
+    forgotten the two things about your bicycle", without repeating them.
+  - **What is sent:** one `kept` listing (`max_bytes` 16,384, the store's
+    most) of one scope: the person's own when someone known is at the lamp,
+    else the room's. The voice matches locally, so no match is left out of
+    a ranked top few. The store keeps at most 200 kept things of a person,
+    each at most 300 bytes, and lists newest first until the next does not
+    fit. A listing with less than 300 bytes of room left may have dropped
+    older ones, so it forgets nothing and the model is told it keeps too
+    much to look through. Then one `forget {id}` for each match, in the
+    same scope. Nobody's is listed for another person.
+  - **Someone known, and the room's:** recall gives someone known theirs
+    and then the room's (`recall_both`). So when their own has no match,
+    the room's is listed too. A match there was kept before the lamp knew
+    who was talking. It is forgotten under the room's rule below, and the
+    model is told it was from before the lamp knew who was talking. If the
+    rule leaves it, nothing is forgotten and the model is told it is there
+    and stays, never "nothing".
+  - **The room's: only what this conversation had.** With nobody known
+    (and for the room's matches above), only kept things this session was
+    shown (its told note, what recall or search gave) or kept are
+    forgotten. The voice already holds those ids as the session's sources.
+    The room's memory is everyone's in the house, so a guest or the TV
+    must not remove the rest of it, as `forget_everything` is guarded on
+    #1723. The rest stay, and the model is told how many (`left`, with a
+    note that they were not from this conversation). A known person's own
+    scope keeps the rule as it was: all their own kept things.
+  - **What matches:** kept things only, never exchanges or observations.
+    The key words of `about` are its words of two or more letters or
+    digits, without a few that name no topic. English: my, the, a, an,
+    our, your, his, her, their, its, this, that, these, those, i, me, we,
+    you, is, are, was, of, to, about, what, said, told, forget.
+    Vietnamese: của, là, tôi, và, có, không, này, đó, thì, mà, những, các,
+    một, cho, với, được, quên, chuyện, đi. So the whole line given as
+    `about` ("forget what I told you about my bicycle", "quên chuyện cà phê
+    đi") keeps only its topic ("bicycle", "cà phê"). Those are compared with their accents kept (NFC, lower-cased, `đ`
+    as `d`), since without them they are other words: "tôi" is not "tối",
+    "có" is not "cỏ", "cho" is not "chó", and "đỏ" stays a key word. Then
+    both sides are folded as the memory's search folds them
+    (`crates/memory/src/search.rs`: NFC, lower-cased, `đ` as `d`, accents
+    removed), so "xe đạp" matches "Xe dap mau do". A kept thing matches
+    when it has every key word. It matches words, not synonyms or plurals:
+    "my bicycle" matches "Their bicycle is red" (as lamp-06c1's second
+    route wrote it) and "Ossa's bicycle is red", not "The bike is blue"
+    and not "My coffee is black". No key word left, as in "my the",
+    forgets nothing, and the model is told so.
+  - **What the model is told:** `{"forgotten":true,"count":2,"about":"bicycle"}`:
+    how many went and the person's own `about`. The kept texts are never
+    sent: they would go to the route's model at the moment the person asked
+    for them to be gone, and be read out to whoever is in the room.
+  - **More than one match:** all matches are forgotten, at most eight. The
+    person named the topic, so versions of one fact ("red", then "blue")
+    all go, which is what was asked. Asking the person to choose one would
+    leave the others to come back. Requiring every key word keeps a broad
+    word from reaching other things.
+  - **Nothing forgotten when unsure:** no match, more than eight matches, a
+    listing that may not be whole, or no key word in `about` forgets
+    nothing, and the model is told so ("I forgot nothing"). It never falls
+    back to `forget_last`. A listing that fails forgets nothing too
+    ("My memory is not answering right now").
+  - **Stopped part way:** if a later `forget {id}` gets no reply or one
+    that is not `ok`, or the scope lapses or the time runs out after some
+    were removed, the model is told how many went with `"all":false` and
+    "Some of it may be forgotten", not "I could not do that". With none
+    removed it is "My memory is not answering right now", as before.
+  - **Guards, as for `forget`:** the call counts as an uncertain write until
+    every removal is acknowledged; a reply that is lost or not `ok` leaves
+    it counted, which keeps journalling stopped. A confirmed forget stops
+    journalling until a fresh worker (`inhibit(Stopped::Forgotten)`, its
+    line said once the context's lock is dropped), clears the
+    conversation's ids and ends the writer's conversation, as `forget`
+    does. The context lock is held only to count, to check the session's
+    sources and to record, never across a request.
+  - **Off:** every function the model is told of is the same as before, and
+    an `about` sent anyway is passed over: `forget` sends `forget_last`.
+  - **Tests:** in `remember::tests`,
+    `with_the_about_switch_forget_removes_the_kept_things_it_is_about`
+    (requests, scopes, no match, stop words alone, too many, journalling),
+    `forget_about_drops_words_that_name_no_topic`,
+    `forget_about_my_bicycle_forgets_their_bicycle_and_never_tells_its_words`,
+    `forget_about_matches_without_accents_as_search_does`,
+    `forget_about_lists_every_kept_thing_and_forgets_nothing_from_a_cut_list`,
+    `forget_about_in_the_room_reaches_only_what_this_session_had`,
+    `forget_about_for_someone_known_tells_of_the_rooms_from_before`,
+    `forget_about_that_stops_part_way_says_some_may_be_forgotten` and
+    `without_the_about_switch_forget_is_as_before`. And
+    `crates/memory/tests/voice_forget_about.rs`, the voice's client against
+    the real store: both bicycle things go, coffee stays, another person's
+    bicycle stays; in the room's, what this conversation kept goes, matched
+    without accents, and one kept by an earlier session stays.
+  - **`conversation_end` refused after a forget:** on lamp-06c1 at 14:28
+    the `conversation_end` right after `forget_last` was refused
+    `bad_request`. The conversation's exchanges were linked to the coffee
+    preference (the session had been shown it), so forgetting it removed
+    them too. The writer then ended its conversation naming exchanges the
+    store no longer had, and the store refused. That conversation is not
+    tidied, which is right: its evidence was forgotten. #2176 does not
+    change this.
 
 - **Kept without being asked** (#1693 (2), `LAMP_MEMORY_OBSERVE=on`,
   with the Days client, on the second route only; off unless set).
@@ -517,6 +713,45 @@ then use that person's scope:
   lower-cased name (`remember::person_id`): "Minh" is `p-be9688998f085098`.
   It fits `[a-z0-9_-]{1,32}`, so no name is ever in a path or a log line.
   The name itself stays between the eyes and the voice.
+- **One id through a rename** (`LAMP_MEMORY_STABLE_ID=on`, read by the
+  eyes and the voice; off unless set; #2176 row 3; `lamp_msgs::known`).
+  Off, a rename (`replace`, A to B) moves the person's memory: B's scope
+  is `person_id("B")`, and what they told the lamp as A is left under A's.
+  With the switch, the eyes give each person a memory id when first
+  remembered and keep it in `people.json` (`id`) through every later
+  remembering and a rename, which carries A's id to B; the known file
+  holds it on the line after the name ([eyes.md](eyes.md#who-is-there)),
+  and the voice keys their memory on it (`known_faces::person_of`, the
+  one resolver every scope goes through; a file of the name alone is
+  `person_id` of the name, as before). **Nobody's memory moves:** a new
+  person's id, and that of anyone remembered before the switch (no `id`
+  yet), is exactly `person_id` of their name, written the next time their
+  record is written. **Two people never share one:** a new "Minh" after
+  the first Minh was renamed is given Minh's id with `-2`. **Ids already
+  held go first:** as the file is read, every id a record holds is kept
+  (of two with one, the earlier keeps it), and only then is each record
+  without one given `person_id` of its name or the lowest free `-N`, so a
+  record from an older build never takes a later record's id. **One
+  switch, the voice follows the eyes:** the voice uses an id only when its
+  own switch is on and the eyes give one (an id line in the known file);
+  when the two differ (on here and no id, or an id and off here) it uses
+  no ids, `person_id` of the name, and says so once in the journal
+  (`lamp-voice: ... memory uses no ids`, no name and no id). The eyes'
+  answer to a forget says the id (`"id"`), and the app's remove
+  (`lamp-cloud` `face.remove`) forgets the memory kept under it and,
+  when it is not the name's own, `person_id` of the name too, each with
+  its `r-` rules, so whichever the voice keyed on, nothing of the person
+  is left half-removed. `person_id` of the name goes only when the eyes'
+  answer says it is free (`"name_id_free":true`, #2330): no other person
+  they keep holds it. "Lan" renamed "Mai" keeps `p-` of "Lan"; when a
+  later "Minh" renamed "Lan" is removed, only `p-` of "Minh" and its rules
+  go, and Mai's memory and rules stay. lamp-cloud can't know the voice's
+  switch, so the eyes' word alone decides; with the eyes on and the voice
+  off in that chain, memory the voice kept under the removed person's
+  name stays, which is the safe side. With no id said, the name is the
+  only key, and it goes. An older build of the eyes reads past `id` and its next
+  save drops it: a renamed person's memory is then under the old name's
+  id until the switch is on again with this build.
 - **`remember`** and **`forget`** go to their scope: `forget` removes the
   last thing *they* asked to keep, and nothing of the room's.
 - **`recall`** (and Days' `search`) asks their scope first and then the
@@ -536,6 +771,41 @@ then use that person's scope:
   and links records within one person; a different person at the lamp ends
   the conversation being collected, which is sent to `conversation_end` in
   its own scope.
+- **What was said before the face was known** (`LAMP_MEMORY_EARLY_WORDS=on`,
+  with Days, the Live route only; off unless set; #2176, 5a;
+  `crates/voice/src/early_words.rs`). The eyes take a few seconds to know a
+  face, and what is said until then is the room's: on lamp-4ace a
+  conversation began the room's at 11:30 and became the owner's at 11:35,
+  its first part left in the room. With the switch, when the Days writer's
+  conversation began the room's and its next exchange is one known
+  person's, before the conversation ended (45 s idle or an end), the room
+  exchanges and the things kept in that conversation are moved to that
+  person's scope by the memory's `adopt` ([memory-days.md](memory-days.md#request-contract)),
+  on the writer's thread, never a turn's. The conversation then goes on as
+  theirs: its end sends the moved exchanges with theirs, and the provider
+  context's sources for them become theirs.
+  - **Only when nobody else could have said them.** The Live route reads
+    the eyes' `humans/faces/tracked` with the known file, twice a second.
+    Nothing moves when, from the conversation's first words (a thing kept
+    first: the 45 s before it) to that moment, any look had two faces or
+    more, more than one face track id was seen, a face had no readable
+    track id, another known person was named, or any moment was not looked
+    at (the camera not allowed, no look fresh within 2 s, two looks more
+    than 2 s apart). Two people known one after the other is another face
+    too. Each face is told apart by its passing track id (`Face.id`, the
+    same while it stays in view), so one unknown face that leaves and
+    another that sits down, never both in one look, is two faces: nothing
+    moves. The limit is the other way: a track id can't be re-identified
+    after a gap over 2 s, and the same person who leaves and comes back has
+    a new id, so a gap, or their own return, means no move.
+  - **Never another conversation's or another worker's.** Only the ids this
+    writer journalled or kept in this conversation; a conversation ended
+    first, a forget, or a fresh worker tracks nothing. A refused or
+    unanswered `adopt` leaves everything the room's and ends the room's
+    conversation as before.
+  - **The journal** says counts only: `is theirs now: exchanges=N kept=N
+    moved=N`, or `stays the room's: why=another_face|cant_tell|incomplete|not_adopted
+    exchanges=N kept=N`.
 - **Seeing someone speak** (`LAMP_SECOND_SPEAKING_FACE=on`, the second
   route only, off unless set; `crates/voice/src/speaking_faces.rs`). It needs
   `LAMP_SECOND_SCOPED_CONTEXT=on` too, which tells and files each turn for

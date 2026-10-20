@@ -216,6 +216,14 @@ internet, not the relay, and nothing in #830 depends on the relay.
   offline face never shows before the probe has spoken. With the link up
   again what was found is forgotten, so the next outage asks at once.
   Refused without `--online on`. Off unless set.
+- **`--reach-idle on`** (with `--reach-probe on`, #1844): the probe asks
+  with the link up too, every 30 s, and every 5 s (`PROBE_EVERY_DOWN`) once
+  the internet doesn't answer, and not answering is `online: false`, from
+  `reach`, with the link still ready (`parts::with_idle_reach`). Why: on the
+  second route as the only voice its link goes down only when a turn fails
+  on the network, so a Wi-Fi cut nobody spoke in left `lamp/online` true:
+  38 s and 13 s at lamp-06c1 on 20 Oct, until a turn failed. Off unless
+  set.
 - **Never port 53** (the reviewer on #1247): a router that forces its own
   name server (OpenWrt's "force DNS", several ISP routers) redirects port 53
   to itself, and that server answers with the WAN down, so a dead network

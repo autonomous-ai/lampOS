@@ -192,6 +192,10 @@ pub struct Ended {
 /// much longer than that the adapter allows it before it is killed.
 pub const WAIT_HELD: Duration = Duration::from_secs(600);
 const WAIT_SLACK: Duration = Duration::from_secs(30);
+/// How long `harness start` is given: Harness itself waits up to 60 s for
+/// the daemon it started to claim its pid file (`PLATFORM_START_WAIT_MS`),
+/// longer than [`Config::read_timeout`] may be (the reviewer's P3 on #2309).
+pub const DAEMON_START_TIMEOUT: Duration = Duration::from_secs(75);
 /// No more agents than this are waited on in one `wait`.
 pub const MOST_WAITED: usize = 64;
 
@@ -237,17 +241,23 @@ pub fn agent_id(value: &str) -> bool {
         })
 }
 
-/// What Harness's `state` for agent `id` means here: a cloud agent is
-/// `needs-input` once it has answered and waits for a next message, whether
-/// or not it asked anything, so it is read as `idle`, and its answer is told.
-/// A question it asked is in that answer. Only `needs-input`: a cloud agent
-/// `working` or `failed` is as Harness says. When openharness#1449 gives a
-/// way to tell a question from a finished answer, read that here instead.
-fn state_of(id: &str, state: String) -> String {
-    if id.starts_with("cloud_") && state == "needs-input" {
-        "idle".into()
-    } else {
-        state
+/// What Harness's `state` for agent `id` means here, with its `answer` when
+/// it was read (`show`; `None` for `wait` and `ps`, which only wake and list).
+/// A cloud agent is `needs-input` once it has answered and waits for a next
+/// message, whether or not it asked anything, so it is read as `idle`, and
+/// its answer is told; a question it asked is in that answer. A Devin Cloud
+/// session that has finished ends `stopped` (lamp-75c9, 20 Oct 18:19: it
+/// had replied in Slack), so a cloud agent `stopped` with an answer is read
+/// as `idle` too; one stopped with none is as Harness says, so it is told as
+/// stopped and never waited on. `working` and `failed` are as Harness says.
+/// When openharness#1449 gives a way to tell a question from a finished
+/// answer, read that here instead.
+fn state_of(id: &str, state: String, answer: Option<&str>) -> String {
+    let answered = answer.is_none_or(|answer| !answer.trim().is_empty());
+    match state.as_str() {
+        "needs-input" if id.starts_with("cloud_") => "idle".into(),
+        "stopped" if id.starts_with("cloud_") && answered => "idle".into(),
+        _ => state,
     }
 }
 
@@ -646,6 +656,24 @@ impl Cli {
             return Err("machines_failed".into());
         }
         parse_machines(&reply.stdout).map_err(str::to_string)
+    }
+
+    /// Start Harness's daemon (`harness start`; with `harness service
+    /// install`, through systemd, as on a lamp): after a sign-in by code,
+    /// which stops it while its user service doesn't start it again
+    /// (openharness#1463). It starts nothing else and answers nothing; one
+    /// already running is left as it is. It has [`DAEMON_START_TIMEOUT`],
+    /// and holds the job lane that long at most: no hand-over can work
+    /// until the daemon is up.
+    pub fn start_daemon(&self) -> Result<(), String> {
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run(&["start".into()], DAEMON_START_TIMEOUT)
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("start_failed".into());
+        }
+        Ok(())
     }
 
     /// Harness's own sign-in by a spoken code (`harness login --code
@@ -1353,7 +1381,7 @@ fn parse_observation(bytes: &[u8], expected: &str) -> Result<Observation, &'stat
         _ => return Err("invalid_observation"),
     };
     Ok(Observation {
-        state: state_of(&reply.id, reply.state),
+        state: state_of(&reply.id, reply.state, Some(&reply.answer)),
         agent_id: reply.id,
         ask,
         answer: reply.answer,
@@ -1462,7 +1490,7 @@ pub fn parse_ps(bytes: &[u8]) -> Result<Vec<Listed>, &'static str> {
             .map(|about| clip(about.trim(), MOST_ABOUT_BYTES))
             .filter(|about| !about.is_empty());
         listed.push(Listed {
-            state: state_of(&row.id, row.state),
+            state: state_of(&row.id, row.state, None),
             agent_id: row.id,
             last_active_unix_ms,
             about,
@@ -1509,7 +1537,7 @@ pub fn parse_wait(
             continue;
         }
         ended.push(Ended {
-            state: state_of(&row.id, row.state),
+            state: state_of(&row.id, row.state, None),
             agent_id: row.id,
         });
     }

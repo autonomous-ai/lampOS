@@ -64,6 +64,8 @@ pub fn tellable_in(path: &Path) -> Vec<String> {
 }
 
 /// The name in the known file at `path`, if it is no older than `fresh`.
+/// A memory id on the line after it (`LAMP_MEMORY_STABLE_ID=on` in the
+/// eyes, #2176) is passed over: never kept here.
 pub fn name_in(path: &Path, fresh: Duration) -> Option<String> {
     let age = std::fs::metadata(path)
         .and_then(|meta| meta.modified())
@@ -72,10 +74,9 @@ pub fn name_in(path: &Path, fresh: Duration) -> Option<String> {
     if age > fresh {
         return None;
     }
-    let name = std::fs::read_to_string(path).ok()?;
-    let name = name.trim();
-    (!name.is_empty() && name.len() <= MOST_NAME_BYTES && !name.contains('\n'))
-        .then(|| name.to_owned())
+    let text = std::fs::read_to_string(path).ok()?;
+    let (name, _) = lamp_msgs::known::read_known(&text)?;
+    (name.len() <= MOST_NAME_BYTES).then(|| name.to_owned())
 }
 
 #[cfg(test)]
@@ -94,6 +95,9 @@ mod tests {
         assert_eq!(name_in(&known, fresh), None, "empty");
         std::fs::write(&known, "Alpha\nBeta\n").unwrap();
         assert_eq!(name_in(&known, fresh), None, "two lines");
+        // The eyes' memory id after the name (#2176): the name is read.
+        std::fs::write(&known, "Alpha\np-be9688998f085098\n").unwrap();
+        assert_eq!(name_in(&known, fresh).as_deref(), Some("Alpha"));
         std::fs::write(&known, "Alpha\n").unwrap();
         let old = SystemTime::now() - Duration::from_secs(3);
         std::fs::File::options()

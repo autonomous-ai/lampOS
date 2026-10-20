@@ -41,6 +41,8 @@ lamp-voice = { path = "../voice" }
 lamp-actions = { path = "../actions" }
 lamp-skills = { path = "../skills" }
 lamp-gemini = { path = "../gemini" }
+# Controls' own check of the pins and settings install leaves (#1798).
+lamp-controls = { path = "../controls" }
 
 [lints]
 workspace = true

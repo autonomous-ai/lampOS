@@ -627,7 +627,7 @@ async fn ask_observations(
 }
 
 /// How the journal names where DeepSeek is asked: never a URL.
-fn deepseek_where(hosted: &crate::second_config::Hosted) -> &'static str {
+pub(crate) fn deepseek_where(hosted: &crate::second_config::Hosted) -> &'static str {
     if hosted.deepseek_base_url.is_some() {
         "through the relay with its credential (deepseek_base_url, LAMP_SECOND_DEEPSEEK_BASE_URL)"
     } else {
@@ -1851,6 +1851,19 @@ pub fn serve(
         );
     }
     engine = engine.saying_once(said_once);
+    // The lamp's own written turns, news above all, may begin later than a
+    // spoken one (`LAMP_SECOND_WRITTEN_WAIT=on`; #1854's follow-up).
+    let written_wait = std::env::var(crate::second_provider::WRITTEN_WAIT_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if written_wait {
+        eprintln!(
+            "lamp-voice second: a turn the lamp wrote itself may begin as late as {} ms (LAMP_SECOND_WRITTEN_WAIT)",
+            crate::second_provider::WRITTEN_BEGIN_WITHIN.as_millis()
+        );
+    }
+    engine = engine.waiting_for_written(written_wait);
     // A line lost on the network is asked once more when a service host
     // answers again, the link's own check (`LAMP_RESEND_LOST_LINE=on`; the
     // first builder's 00:02 on #1722). As the only voice, with its hosts.
@@ -4401,7 +4414,7 @@ impl Sessions {
     ) -> (bool, Option<String>, Option<String>) {
         let known = who
             .and_then(crate::known_faces::known_now)
-            .map(|name| crate::remember::person_id(&name));
+            .map(|name| crate::known_faces::memory_person(&name));
         let whose = who.and(self.presence.seen(known.clone(), now).map(str::to_owned));
         let Ok(mut thread) = crate::thread::THREAD.lock() else {
             return (false, known, None);

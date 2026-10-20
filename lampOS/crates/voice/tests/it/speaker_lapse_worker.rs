@@ -62,8 +62,23 @@ struct Rig {
     faults: Vec<String>,
 }
 
+/// A control message the parent had sent before the worker first looked,
+/// stamped this many µs before the worker starts: as when a worker starts
+/// slowly and its control messages queue meanwhile (#1569 row 42).
+#[derive(Clone, Copy)]
+enum Queued {
+    Authority(u64),
+    ConnectReference(u64),
+}
+
 impl Rig {
     fn start() -> Self {
+        Self::start_queued(&[])
+    }
+
+    /// With `queued`, those are sent before the worker starts, in their
+    /// order, and stand for the start's own authority and reference link.
+    fn start_queued(queued: &[Queued]) -> Self {
         let directory = SessionDirectory::create().unwrap();
         let (parent_boot, worker_boot, capture_boot) = (
             new_boot().unwrap(),
@@ -81,10 +96,6 @@ impl Rig {
         let capture =
             ReferenceChannels::bind(&directory.path, "capture", capture_boot, worker_boot).unwrap();
         let path = directory.path.clone();
-        let worker = std::thread::spawn(move || {
-            speaker(channels, parent_boot, worker_boot, &path, "null", None)
-                .map_err(|error| error.to_string())
-        });
         let mut controller = Controller::new(parent_boot, now());
         controller
             .set_microphone_permission(now(), Permission::Allowed)
@@ -95,7 +106,7 @@ impl Rig {
             parent,
             capture,
             capture_boot,
-            worker: Some(worker),
+            worker: None,
             renewing: true,
             authority_at: None,
             privacy: 0,
@@ -107,14 +118,57 @@ impl Rig {
         // A turn owns the lamp, its leases a turn's.
         rig.renew_leases();
         rig.controller.admit(now(), AdmittedInput::NewTurn).unwrap();
-        rig.service();
-        rig.parent
-            .control
-            .send(Control::ConnectReference {
-                peer: rig.capture_boot,
-            })
-            .unwrap();
+        let at_us = monotonic_us();
+        for queued in queued {
+            let (control, age_us) = match *queued {
+                Queued::Authority(age_us) => (
+                    Control::Authority {
+                        snapshot: rig.controller.snapshot(now()).unwrap(),
+                    },
+                    age_us,
+                ),
+                Queued::ConnectReference(age_us) => (
+                    Control::ConnectReference {
+                        peer: rig.capture_boot,
+                    },
+                    age_us,
+                ),
+            };
+            rig.parent
+                .control
+                .send_with(control, || at_us - age_us)
+                .unwrap();
+        }
+        rig.worker = Some(std::thread::spawn(move || {
+            speaker(channels, parent_boot, worker_boot, &path, "null", None)
+                .map_err(|error| error.to_string())
+        }));
+        if queued.is_empty() {
+            rig.service();
+            rig.parent
+                .control
+                .send(Control::ConnectReference {
+                    peer: rig.capture_boot,
+                })
+                .unwrap();
+        } else {
+            rig.authority_at = Some(Instant::now());
+        }
         rig
+    }
+
+    /// Wait until the worker has ended, up to a second, sending nothing:
+    /// its error, or `None` if it is still running then.
+    fn until_ended(&mut self) -> Option<String> {
+        let from = Instant::now();
+        while from.elapsed() < Duration::from_secs(1) {
+            if self.worker.as_ref().unwrap().is_finished() {
+                self.take_events();
+                return self.worker.take().unwrap().join().unwrap().err();
+            }
+            sleep(Duration::from_millis(2));
+        }
+        None
     }
 
     fn renew_leases(&mut self) {
@@ -291,4 +345,54 @@ fn a_late_prime_from_before_a_lapse_is_dropped() {
     rig.run_for(Duration::from_millis(150), "a late prime");
     assert!(rig.faults.is_empty(), "{:?}", rig.faults);
     assert_eq!(rig.stop(), Ok(()));
+}
+
+/// #1569 row 42 (the first builder on #1722, 20 Oct 17:46): a worker that
+/// starts slowly finds its control messages queued, the third a renewal
+/// more than 100 ms old, past the first message's grace and the one late
+/// message a channel takes. With the next renewal behind it, that one is
+/// passed over and the worker goes on: it links its reference and plays.
+/// Before, this ended it ("sequence 3 after 2 … stale"), three times on
+/// ARM64 after #2118 gave the test every core.
+#[test]
+fn a_stale_renewal_with_a_fresh_one_behind_it_keeps_the_speaker_going() {
+    let mut rig = Rig::start_queued(&[
+        Queued::Authority(300_000),
+        Queued::ConnectReference(290_000),
+        Queued::Authority(200_000),
+        Queued::Authority(10_000),
+    ]);
+    rig.connect();
+    rig.run_for(Duration::from_millis(150), "after the stale renewal");
+    assert!(rig.faults.is_empty(), "{:?}", rig.faults);
+    assert_eq!(rig.stop(), Ok(()));
+}
+
+/// The rule's other side: a stale renewal with nothing behind it, and a
+/// stale message of another kind with a fresh renewal behind it, still end
+/// the worker, as before.
+#[test]
+fn a_stale_renewal_alone_or_a_stale_connect_reference_still_ends_the_speaker() {
+    let mut alone = Rig::start_queued(&[
+        Queued::Authority(300_000),
+        Queued::ConnectReference(290_000),
+        Queued::Authority(200_000),
+    ]);
+    alone.renewing = false;
+    let ended = alone
+        .until_ended()
+        .expect("a stale renewal alone ends the worker");
+    assert!(ended.contains("stale"), "{ended}");
+
+    let mut connect = Rig::start_queued(&[
+        Queued::Authority(300_000),
+        Queued::Authority(290_000),
+        Queued::ConnectReference(200_000),
+        Queued::Authority(10_000),
+    ]);
+    connect.renewing = false;
+    let ended = connect
+        .until_ended()
+        .expect("a stale ConnectReference ends the worker");
+    assert!(ended.contains("stale"), "{ended}");
 }

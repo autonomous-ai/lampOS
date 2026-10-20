@@ -19,6 +19,7 @@ use std::{
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
 };
+use unicode_normalization::UnicodeNormalization;
 
 pub const DATABASE: &str = "memory-days.sqlite3";
 /// A follow-up's observation is at least this old: not the same conversation.
@@ -115,6 +116,18 @@ pub struct Note {
     pub note: String,
     pub source_ids: Vec<u64>,
     pub invalidated: bool,
+}
+
+/// What a recall or search asks beside its [`Ask`] (#2176). The default
+/// asks what it always did.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Wider {
+    /// The last day of a span that begins on the ask's day, inclusive.
+    pub last_day: Option<Day>,
+    /// The second version (`recall_v2`): a question's common words match
+    /// nothing ([`search::query_with`]), and a day or span finds what was
+    /// kept on it, not only exchanges.
+    pub second: bool,
 }
 
 /// No service thread, network client or model belongs to this store.
@@ -397,6 +410,24 @@ impl Days {
         text: &str,
         from: &[u64],
     ) -> Result<u64> {
+        self.remember_once_from(person, at, text, from, false)
+            .map(|(id, _)| id)
+    }
+
+    /// [`Self::remember_from`]; with `once` (#2176,
+    /// `LAMP_MEMORY_REMEMBER_ONCE`), a text this person already keeps, active
+    /// and the same words ignoring case, spacing and a final punctuation mark
+    /// ([`same_text`]), is that kept thing: its id, `true`, and no entry is
+    /// written; it gains `from` as sources, so forgetting it removes both
+    /// conversations' exchanges. Without `once`, as before.
+    pub fn remember_once_from(
+        &mut self,
+        person: &Person,
+        at: u64,
+        text: &str,
+        from: &[u64],
+        once: bool,
+    ) -> Result<(u64, bool)> {
         for id in from {
             let exchange: bool = self.db.query_row(
                 "SELECT EXISTS(SELECT 1 FROM entries WHERE person=? AND id=? AND kind='exchange')",
@@ -413,6 +444,10 @@ impl Days {
         if text.is_empty() {
             return Err(Error::new("empty", "there is no text to remember"));
         }
+        if once && let Some(id) = self.kept_already(person, &text)? {
+            self.link_sources(person, id, from)?;
+            return Ok((id, true));
+        }
         let count: u64 = self.db.query_row(
             "SELECT count(*) FROM entries WHERE person=? AND kind='kept'",
             [person.as_str()],
@@ -425,6 +460,43 @@ impl Days {
             ));
         }
         self.add(person, at, "", "", &text, from, &[])
+            .map(|id| (id, false))
+    }
+
+    /// The id of this person's active kept thing with `text`, the same by
+    /// [`same_text`].
+    fn kept_already(&self, person: &Person, text: &str) -> Result<Option<u64>> {
+        let wanted = same_text(text);
+        let mut statement = self.db.prepare(
+            "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 ORDER BY id",
+        )?;
+        let mut rows = statement.query([person.as_str()])?;
+        while let Some(row) = rows.next()? {
+            let kept: String = row.get(1)?;
+            if same_text(&kept) == wanted {
+                return Ok(Some(row.get(0)?));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Links `from`, validated as a new remember's are, to the kept thing
+    /// `id` that `once` found (#2176): forgetting it then removes this
+    /// conversation's exchanges too. Links it already has stay one.
+    fn link_sources(&mut self, person: &Person, id: u64, from: &[u64]) -> Result<()> {
+        if from.is_empty() {
+            return Ok(());
+        }
+        let tx = self.db.transaction()?;
+        validate_sources(&tx, person, from, false)?;
+        for source in from {
+            tx.execute(
+                "INSERT OR IGNORE INTO sources(child,parent) SELECT c.rid,p.rid FROM entries c JOIN entries p ON p.person=c.person WHERE c.person=?1 AND c.id=?2 AND p.id=?3",
+                params![person.as_str(), id, source],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
     }
     // The one private writer of an exchange or a kept entry: each argument
     // is a column or its links.
@@ -526,8 +598,14 @@ impl Days {
     }
 
     pub fn recall(&self, person: &Person, ask: &Ask<'_>) -> Result<Vec<Entry>> {
+        self.recall_wider(person, ask, Wider::default())
+    }
+
+    /// [`Self::recall`], with a span of days and the second version's
+    /// rules ([`Wider`], #2176).
+    pub fn recall_wider(&self, person: &Person, ask: &Ask<'_>, wider: Wider) -> Result<Vec<Entry>> {
         let mut entries: Vec<Entry> = self
-            .find(person, ask, false, false)?
+            .find(person, ask, false, false, wider)?
             .into_iter()
             .filter_map(|r| r.legacy())
             .collect();
@@ -538,10 +616,25 @@ impl Days {
     /// Ranked data, never an answer. No overlap means no memory. A caller must
     /// still judge whether any returned record actually answers its question.
     pub fn search(&mut self, person: &Person, ask: &Ask<'_>, history: bool) -> Result<Vec<Record>> {
-        if ask.query.is_none_or(|query| search::query(query).is_none()) {
+        self.search_wider(person, ask, history, Wider::default())
+    }
+
+    /// [`Self::search`], with a span of days and the second version's
+    /// rules ([`Wider`], #2176).
+    pub fn search_wider(
+        &mut self,
+        person: &Person,
+        ask: &Ask<'_>,
+        history: bool,
+        wider: Wider,
+    ) -> Result<Vec<Record>> {
+        if ask
+            .query
+            .is_none_or(|query| search::query_with(query, wider.second).is_none())
+        {
             return Ok(Vec::new());
         }
-        let records = self.find(person, ask, true, history)?;
+        let records = self.find(person, ask, true, history, wider)?;
         let tx = self.db.transaction()?;
         for record in &records {
             if record.kind == "observation" {
@@ -557,17 +650,21 @@ impl Days {
         ask: &Ask<'_>,
         observations: bool,
         history: bool,
+        wider: Wider,
     ) -> Result<Vec<Record>> {
         let query = ask.query.filter(|q| !q.trim().is_empty());
-        let expression = query.and_then(search::query);
+        let expression = query.and_then(|query| search::query_with(query, wider.second));
         if query.is_some() && expression.is_none() {
             return Ok(vec![]);
         }
         let day = ask.day.map(|d| d.to_string());
+        // One day is a span from it to itself; `day_to` without a first day
+        // is never asked ([`crate::days_protocol`]).
+        let last = wider.last_day.or(ask.day).map(|d| d.to_string());
         let sql = if expression.is_some() {
-            "SELECT e.id FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND (?3 IS NULL OR (e.kind='exchange' AND e.day=?3)) AND (?4 OR e.kind!='observation') AND (?5 OR e.active=1) ORDER BY search.rank,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+            "SELECT e.id FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND (?3 IS NULL OR ((e.kind='exchange' OR (?8 AND e.kind='kept')) AND e.day BETWEEN ?3 AND ?7)) AND (?4 OR e.kind!='observation') AND (?5 OR e.active=1) ORDER BY search.rank,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
         } else {
-            "SELECT e.id FROM entries e WHERE ?1 IS NULL AND e.person=?2 AND (?3 IS NULL OR e.day=?3) AND ((?4 AND e.kind!='kept') OR e.kind='exchange') AND (?5 OR e.active=1) ORDER BY e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+            "SELECT e.id FROM entries e WHERE ?1 IS NULL AND e.person=?2 AND (?3 IS NULL OR e.day BETWEEN ?3 AND ?7) AND ((?4 AND e.kind!='kept') OR e.kind='exchange' OR (?8 AND ?3 IS NOT NULL AND e.kind='kept')) AND (?5 OR e.active=1) ORDER BY e.at_unix_ms DESC,e.id DESC LIMIT ?6"
         };
         let mut statement = self.db.prepare(sql)?;
         let ids = statement
@@ -578,7 +675,9 @@ impl Days {
                     day,
                     observations,
                     history,
-                    ask.limit.min(50)
+                    ask.limit.min(50),
+                    last,
+                    wider.second
                 ],
                 |r| r.get::<_, u64>(0),
             )?
@@ -1248,6 +1347,126 @@ impl Days {
         tx.commit()?;
         Ok(ids)
     }
+
+    /// The room's exchanges and kept things `ids` (1 to 64, distinct, each
+    /// the room's own and active) become `to`'s, someone known, in one
+    /// transaction (#2176, 5a): what was said before a lone face was known
+    /// follows that person. With them goes anything in the room's scope
+    /// derived only from them. Each keeps its row, so its search row and
+    /// its links go with it; each gets the next id in `to`'s numbering.
+    /// The room's generation moves on and its notes and jobs are dropped,
+    /// as when something of it is forgotten. Anything refused moves
+    /// nothing. Gives each moved entry's room id and its new id.
+    pub fn adopt(&mut self, from: &Person, to: &Person, ids: &[u64]) -> Result<Vec<(u64, u64)>> {
+        if from.as_str() != Person::EVERYONE {
+            return Err(Error::new(
+                "bad_person",
+                "only the room's entries can be adopted",
+            ));
+        }
+        if to.as_str() == Person::EVERYONE || to.as_str().starts_with("r-") {
+            return Err(Error::new(
+                "bad_person",
+                "entries are adopted by someone known, never the room or a rules scope",
+            ));
+        }
+        if ids.is_empty()
+            || ids.len() > 64
+            || ids.iter().collect::<BTreeSet<_>>().len() != ids.len()
+        {
+            return Err(bad("adopted IDs must be unique, with 1 to 64"));
+        }
+        let tx = self.db.transaction()?;
+        tx.execute_batch(
+            "CREATE TEMP TABLE IF NOT EXISTS adopting(rid INTEGER PRIMARY KEY); DELETE FROM adopting;",
+        )?;
+        for id in ids {
+            let listed: Option<i64> = tx
+                .query_row(
+                    "SELECT rid FROM entries WHERE person=?1 AND id=?2 AND active=1 AND kind IN ('exchange','kept')",
+                    params![from.as_str(), id],
+                    |r| r.get(0),
+                )
+                .optional()?;
+            let Some(rid) = listed else {
+                return Err(bad(
+                    "only the room's own active exchanges and kept things can be adopted",
+                ));
+            };
+            tx.execute("INSERT INTO adopting(rid) VALUES(?)", [rid])?;
+        }
+        // Derived only from what moves: every parent of it moves too. A
+        // version (a replacement either way) stays where it is.
+        while tx.execute(
+            "INSERT OR IGNORE INTO adopting SELECT DISTINCT s.child FROM sources s JOIN entries e ON e.rid=s.child WHERE s.parent IN (SELECT rid FROM adopting) AND e.person=?1 AND e.rid NOT IN (SELECT rid FROM adopting) AND NOT EXISTS (SELECT 1 FROM replacements r WHERE r.newer=e.rid OR r.older=e.rid) AND NOT EXISTS (SELECT 1 FROM sources o WHERE o.child=e.rid AND o.parent NOT IN (SELECT rid FROM adopting))",
+            [from.as_str()],
+        )? > 0
+        {}
+        ensure_person(&tx, to)?;
+        for (kind, most) in [
+            ("kept", store::KEPT_ENTRIES as u64),
+            ("observation", MAX_OBSERVATIONS),
+        ] {
+            let after: u64 = tx.query_row(
+                "SELECT count(*) FROM entries WHERE kind=?2 AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
+                params![to.as_str(), kind],
+                |r| r.get(0),
+            )?;
+            if after > most {
+                return Err(Error::new(
+                    "full",
+                    "the person's memory has no room for them",
+                ));
+            }
+        }
+        let moving: Vec<(i64, u64)> = tx
+            .prepare(
+                "SELECT rid,id FROM entries WHERE rid IN (SELECT rid FROM adopting) ORDER BY rid",
+            )?
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        let mut moved = Vec::with_capacity(moving.len());
+        for (rid, old) in moving {
+            let new = next_id(&tx, to)?;
+            tx.execute(
+                "UPDATE entries SET person=?2,id=?3 WHERE rid=?1",
+                params![rid, to.as_str(), new],
+            )?;
+            moved.push((old, new));
+        }
+        // A moved observation asked about once is still asked about once,
+        // now as `to`'s: their pacing counts it.
+        tx.execute(
+            "UPDATE follow_ups SET person=?1 WHERE rid IN (SELECT rid FROM adopting)",
+            [to.as_str()],
+        )?;
+        tx.execute(
+            "UPDATE people SET generation=generation+1 WHERE person=?",
+            [from.as_str()],
+        )?;
+        tx.execute(
+            "UPDATE sessions SET note='',ids='[]',invalidated=1 WHERE person=?",
+            [from.as_str()],
+        )?;
+        tx.execute("DELETE FROM jobs WHERE person=?", [from.as_str()])?;
+        tx.execute("DELETE FROM adopting", [])?;
+        tx.commit()?;
+        Ok(moved)
+    }
+}
+
+/// What two kept things are compared by (#2176): NFC, lower case, white
+/// space trimmed and collapsed, and punctuation at the end dropped.
+fn same_text(text: &str) -> String {
+    let lower: String = text.nfc().flat_map(char::to_lowercase).nfc().collect();
+    let words = lower.split_whitespace().collect::<Vec<_>>().join(" ");
+    words
+        .trim_end_matches(|c: char| c.is_whitespace() || is_punctuation(c))
+        .to_owned()
+}
+
+fn is_punctuation(c: char) -> bool {
+    c.is_ascii_punctuation() || matches!(c, '…' | '。' | '！' | '？' | '，' | '、' | '；' | '：')
 }
 
 fn identifier(value: &str) -> Result<()> {
@@ -1590,6 +1809,240 @@ mod tests {
             drop(reopened);
             fs::remove_dir_all(dir).unwrap();
         }
+    }
+
+    /// #2176: a kept thing no longer active (replaced) is not what `once`
+    /// finds; the same text is kept anew.
+    #[test]
+    fn a_remember_once_passes_over_a_kept_thing_no_longer_active() {
+        let dir = std::env::temp_dir().join(format!("lamp-days-once-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let now = 1_791_892_800_000;
+        let options = Options {
+            dir: dir.clone(),
+            keep_days: 30,
+            local: LocalTime::Offset(0),
+        };
+        let mut store = Days::open(options, now).unwrap();
+        let everyone = Person::everyone();
+        let first = store.remember_once_from(&everyone, now, "coffee black", &[], true);
+        assert_eq!(first.unwrap(), (1, false));
+        let again = store.remember_once_from(&everyone, now, "Coffee black!", &[], true);
+        assert_eq!(again.unwrap(), (1, true));
+        store
+            .db
+            .execute("UPDATE entries SET active=0 WHERE id=1", [])
+            .unwrap();
+        let anew = store.remember_once_from(&everyone, now, "coffee black", &[], true);
+        assert_eq!(anew.unwrap(), (2, false));
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #2176: a remember `once` that finds the kept thing links the new
+    /// conversation's exchanges to it, so forgetting it removes both.
+    #[test]
+    fn a_remember_once_links_its_sources_to_the_kept_thing_it_finds() {
+        let dir = std::env::temp_dir().join(format!("lamp-days-once-src-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let now = 1_791_892_800_000;
+        let options = Options {
+            dir: dir.clone(),
+            keep_days: 30,
+            local: LocalTime::Offset(0),
+        };
+        let mut store = Days::open(options, now).unwrap();
+        let mai = Person::new("p-0123456789abcdef").unwrap();
+        let a = store
+            .append(&mai, now, "I take coffee black", "noted", &[])
+            .unwrap();
+        let b = store
+            .append(&mai, now, "coffee black, remember", "sure", &[])
+            .unwrap();
+        let other = store.append(&mai, now, "nice day", "it is", &[]).unwrap();
+        let (k, existing) = store
+            .remember_once_from(&mai, now, "coffee black", &[a], true)
+            .unwrap();
+        assert!(!existing);
+        let again = store.remember_once_from(&mai, now, "Coffee black.", &[b], true);
+        assert_eq!(again.unwrap(), (k, true));
+        assert_eq!(
+            store.record(&mai, k).unwrap().unwrap().source_ids,
+            vec![a, b]
+        );
+        // A source that isn't the person's exchange is refused, nothing linked.
+        assert!(
+            store
+                .remember_once_from(&mai, now, "coffee black", &[k], true)
+                .is_err()
+        );
+        assert_eq!(store.kept(&mai, 16384).unwrap().len(), 1);
+        store.forget(&mai, k).unwrap();
+        for id in [k, a, b] {
+            assert!(store.record(&mai, id).unwrap().is_none(), "{id}");
+        }
+        assert!(store.record(&mai, other).unwrap().is_some());
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #2176 (5a): the room's exchange and kept thing become A's, with the
+    /// link between them, their search rows, and an exchange derived only
+    /// from them; one also derived from something staying stays, its link
+    /// kept, so forgetting either still reaches it. Another person's ids,
+    /// an inactive one, or any refused id move nothing.
+    #[test]
+    fn the_rooms_early_words_are_adopted_whole_and_nothing_else_is() {
+        let dir = std::env::temp_dir().join(format!("lamp-days-adopt-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let now = 1_791_892_800_000;
+        let mut store = Days::open(
+            Options {
+                dir: dir.clone(),
+                keep_days: 30,
+                local: LocalTime::Offset(0),
+            },
+            now,
+        )
+        .unwrap();
+        let room = Person::everyone();
+        let a = Person::new("p-a").unwrap();
+        let b = Person::new("p-b").unwrap();
+        let older = store
+            .remember(&room, now, "the room's older thing")
+            .unwrap();
+        assert_eq!(
+            store.append(&a, now, "theirs before", "yes", &[]).unwrap(),
+            1
+        );
+        assert_eq!(store.append(&a, now, "and again", "yes", &[]).unwrap(), 2);
+        let said = store
+            .append(&room, now, "my sister marries in june", "lovely", &[])
+            .unwrap();
+        let kept = store
+            .remember_from(&room, now, "sister marries in june", &[said])
+            .unwrap();
+        let derived = store
+            .append(&room, now, "about june", "noted", &[kept])
+            .unwrap();
+        let mixed = store
+            .append(&room, now, "both", "ok", &[kept, older])
+            .unwrap();
+        let mut bs = 0;
+        for _ in 0..10 {
+            bs = store.append(&b, now, "b's own", "fine", &[]).unwrap();
+        }
+        let inactive = store.append(&room, now, "gone quiet", "ok", &[]).unwrap();
+        store
+            .db
+            .execute(
+                "UPDATE entries SET active=0 WHERE person='everyone' AND id=?",
+                [inactive],
+            )
+            .unwrap();
+        // A follow-up row on what moves goes with it; one on what stays,
+        // stays the room's.
+        let follow_up = |store: &Days, rid_of: u64| {
+            store
+                .db
+                .execute(
+                    "INSERT INTO follow_ups(rid,person,asked_unix_ms) SELECT rid,'everyone',?2 FROM entries WHERE person='everyone' AND id=?1",
+                    params![rid_of, now],
+                )
+                .unwrap()
+        };
+        assert_eq!(follow_up(&store, derived), 1);
+        assert_eq!(follow_up(&store, mixed), 1);
+        let followed = |store: &Days, who: &str| -> u64 {
+            store
+                .db
+                .query_row(
+                    "SELECT count(*) FROM follow_ups WHERE person=?",
+                    [who],
+                    |r| r.get(0),
+                )
+                .unwrap()
+        };
+        let generation = super::generation(&store.db, &room).unwrap();
+        for (ids, why) in [
+            (vec![said, 999], "an id the room hasn't"),
+            (vec![said, bs], "an id only another has"),
+            (vec![said, inactive], "an inactive one"),
+            (vec![said, said], "twice"),
+            (vec![], "none"),
+        ] {
+            assert_eq!(
+                store.adopt(&room, &a, &ids).unwrap_err().code,
+                "bad_request",
+                "{why}"
+            );
+        }
+        assert_eq!(store.adopt(&b, &a, &[bs]).unwrap_err().code, "bad_person");
+        assert_eq!(
+            store.adopt(&room, &room, &[said]).unwrap_err().code,
+            "bad_person"
+        );
+        assert_eq!(
+            store
+                .adopt(&room, &a.rules().unwrap(), &[said])
+                .unwrap_err()
+                .code,
+            "bad_person"
+        );
+        assert!(
+            store.record(&room, said).unwrap().is_some(),
+            "nothing moved"
+        );
+        assert_eq!(super::generation(&store.db, &room).unwrap(), generation);
+
+        assert_eq!(followed(&store, "everyone"), 2, "nothing moved");
+        let moved = store.adopt(&room, &a, &[said, kept]).unwrap();
+        assert_eq!(moved, [(said, 3), (kept, 4), (derived, 5)]);
+        assert_eq!(
+            (followed(&store, "everyone"), followed(&store, "p-a")),
+            (1, 1)
+        );
+        for id in [said, kept, derived] {
+            assert!(store.record(&room, id).unwrap().is_none(), "{id}");
+        }
+        let theirs = store.record(&a, 4).unwrap().unwrap();
+        assert_eq!((theirs.kind.as_str(), theirs.source_ids), ("kept", vec![3]));
+        assert_eq!(store.record(&a, 5).unwrap().unwrap().source_ids, [4]);
+        let ask = Ask {
+            query: Some("june sister"),
+            day: None,
+            limit: 8,
+            max_bytes: 4096,
+        };
+        let found = |store: &mut Days, who: &Person| -> Vec<u64> {
+            let mut ids: Vec<u64> = store
+                .search(who, &ask, false)
+                .unwrap()
+                .iter()
+                .map(|r| r.id)
+                .collect();
+            ids.sort_unstable();
+            ids
+        };
+        assert_eq!(found(&mut store, &a), [3, 4, 5]);
+        assert!(found(&mut store, &room).is_empty());
+        assert_eq!(
+            store.kept(&a, 4096).unwrap()[0].text,
+            "sister marries in june"
+        );
+        // The room's generation moved on, as for anything of it gone.
+        assert_eq!(super::generation(&store.db, &room).unwrap(), generation + 1);
+        // Still the room's, still linked: forgetting A's kept thing takes it.
+        assert!(store.record(&room, mixed).unwrap().is_some());
+        assert_eq!(
+            store.adopt(&room, &a, &[derived]).unwrap_err().code,
+            "bad_request"
+        );
+        assert_eq!(store.forget(&a, 4).unwrap(), 4);
+        assert!(store.record(&room, mixed).unwrap().is_none());
+        assert!(store.record(&room, older).unwrap().is_some());
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

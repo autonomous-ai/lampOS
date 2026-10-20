@@ -139,13 +139,16 @@ fn a_bounce_or_a_line_that_settles_slowly_is_no_touch() {
 
 #[test]
 fn a_pulse_pad_arms_on_a_line_resting_high_from_the_start() {
-    // Read by its level, a line that rests active never arms the head.
+    // Read by its level, a line that rests active is left out (#1798): the
+    // head arms on head-2 alone, and head-1 counts for nothing.
     let mut level = Rig::new(false);
     level.run(0, 1_000_000, |_| true);
-    assert!(!level.engine.tick(1_000_000).state.sources[0].armed);
+    assert!(level.engine.tick(1_000_000).state.sources[0].armed);
+    assert_eq!(level.engine.head_left_out(), ["head-1"]);
     let mut pulse = Rig::new(true);
     pulse.run(0, 1_000_000, |_| true);
     assert!(pulse.engine.tick(1_000_000).state.sources[0].armed);
+    assert!(pulse.engine.head_left_out().is_empty());
 }
 
 #[test]

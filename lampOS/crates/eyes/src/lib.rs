@@ -22,6 +22,7 @@
 //! faces and the voice's lines, on `room/presence` (#1677).
 pub mod activity;
 pub mod away;
+pub mod blendshapes;
 pub mod bus_out;
 pub mod change;
 pub mod faces;

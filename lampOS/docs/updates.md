@@ -504,6 +504,13 @@ done
 sudo systemctl restart lamp-voice lamp-body   # each unit in previous/ that was running
 ```
 
+Going back across #1798 on a lamp whose pins the factory step wrote: a
+Controls from before it wants `controls.json` to name exactly the pins'
+head pads, and install's `controls.json` now names four. Name the pins' own
+pads in it (`"head_pads": ["head-1", "head-2"]` for two) before restarting
+`lamp-controls`, or it won't start, and on the privacy route the lamp then
+hears nothing (install.md).
+
 ### The second route's services in a round
 
 A round places `/etc/lampOS/voice/second.json` when the build's voice unit

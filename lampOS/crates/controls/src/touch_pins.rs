@@ -184,6 +184,11 @@ impl TouchPinsConfig {
                 return Err("touch input names and GPIO lines must be unique".into());
             }
         }
+        // The head pads are the pins file's: a lamp's own settings file
+        // naming two and the product's pins naming four (#1798), or the
+        // reverse, still start, as long as each pad both name is named
+        // alike and in the same place. Controls refusing to start would
+        // close the microphones on the privacy route.
         if self
             .buttons
             .iter()
@@ -192,8 +197,8 @@ impl TouchPinsConfig {
             || self
                 .head_pads
                 .iter()
-                .map(|pin| &pin.name)
-                .ne(config.head_pads.iter())
+                .zip(&config.head_pads)
+                .any(|(pin, name)| pin.name != *name)
         {
             return Err(
                 "touch pins must name configured primary/head inputs in the same order".into(),
@@ -334,6 +339,106 @@ impl TouchPinsConfig {
             .check()?;
         Ok(true)
     }
+}
+
+/// The item health shows for the head pads' lines (#1798).
+pub const HEAD_ITEM: &str = "head pads";
+
+/// What one probe at Controls' start found on each head pad's line
+/// (#1798): a pad drives its line, so it reads the same with a pull-down and
+/// a pull-up; a line with nothing on it follows the pull
+/// ([`crate::pins::GpioLines::probe`], as `discover-head` and `probe` read
+/// them). Pins naming lines with no pad, as lamp-52e6's 37 and 96 were,
+/// read no touch and said nothing; this says so.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct HeadLines {
+    /// The lines a pad drives, in the pins' order.
+    pub wired: Vec<u32>,
+    /// The lines that follow the pull: nothing on them.
+    pub bare: Vec<u32>,
+    /// The lines that couldn't be probed (held by another program).
+    pub unprobed: Vec<u32>,
+}
+
+impl HeadLines {
+    /// Each pad as `probe` reads its line: high with a pull-down, high with
+    /// a pull-up ([`crate::pins::GpioLines::probe_ending`], ending on the
+    /// pad's own pull).
+    pub fn probed(pads: &[Pin], mut probe: impl FnMut(&Pin) -> io::Result<(bool, bool)>) -> Self {
+        let mut lines = Self::default();
+        for pad in pads {
+            match probe(pad) {
+                Ok((down, up)) if down == up => lines.wired.push(pad.line),
+                Ok(_) => lines.bare.push(pad.line),
+                Err(_) => lines.unprobed.push(pad.line),
+            }
+        }
+        lines
+    }
+
+    /// The journal's line at start, and health's message while no pad is
+    /// left out.
+    pub fn said(&self) -> String {
+        let mut parts = Vec::new();
+        if self.wired.is_empty() {
+            if !self.bare.is_empty() {
+                parts.push(format!(
+                    "nothing wired on {}: the head reads no touch",
+                    named(&self.bare)
+                ));
+            }
+        } else {
+            parts.push(format!("wired on {}", named(&self.wired)));
+            if !self.bare.is_empty() {
+                parts.push(format!("nothing on {}", list(&self.bare, ", ")));
+            }
+        }
+        if !self.unprobed.is_empty() {
+            parts.push(format!("{} not probed", named(&self.unprobed)));
+        }
+        parts.join("; ")
+    }
+
+    /// What health says ([`HEAD_ITEM`]): well while a pad drives one of
+    /// the lines; a warning when none does, or none could be told, or a pad
+    /// has read touched since the head was first read and is left out
+    /// (`left_out`, its lines; [`crate::touch::TouchEngine::head_left_out`]).
+    pub fn health(&self, left_out: &[u32]) -> lamp_msgs::Diagnostic {
+        let mut message = self.said();
+        if !left_out.is_empty() {
+            // Since the head's lines were first read: Controls' start, or the
+            // reader's return after a fault.
+            message = format!(
+                "{message}; {} touched since the head was first read: left out until let go",
+                named(left_out)
+            );
+        }
+        let level = if self.wired.is_empty() || !left_out.is_empty() {
+            lamp_msgs::Level::Warn
+        } else {
+            lamp_msgs::Level::Ok
+        };
+        lamp_msgs::Diagnostic::new(level, HEAD_ITEM, &message)
+            .with("wired", list(&self.wired, ","))
+            .with("bare", list(&self.bare, ","))
+            .with("unprobed", list(&self.unprobed, ","))
+            .with("left_out", list(left_out, ","))
+    }
+}
+
+/// `lines`, joined by `between`.
+fn list(lines: &[u32], between: &str) -> String {
+    lines
+        .iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(between)
+}
+
+/// "line 97" or "lines 97, 98".
+fn named(lines: &[u32]) -> String {
+    let word = if lines.len() == 1 { "line" } else { "lines" };
+    format!("{word} {}", list(lines, ", "))
 }
 
 /// No configured GPIO is absence, not a failed optional strip or a made-up

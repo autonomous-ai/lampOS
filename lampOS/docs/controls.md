@@ -193,6 +193,62 @@ pads (First, #711):
 
 ### Each lamp's own head pads (#711)
 
+**Every lamp's pads are wired to its own lines.** Each lamp's pads are on any
+of lines 37, 96, 97 and 98, and the hardware team's bench test passes when two
+or more read a touch (the hardware lead, #2182). Known so far:
+
+- lamp-4ace: 37 and 96 (below, "The board's reader");
+- lamp-52e6 and lamp-cb94: 97 and 98 (#1362, #1764);
+- lamp-c0a4: 37 and 97 (#2151);
+- lamp-dbda: 37, 96 and 97 (#2182).
+
+So **the product's pins read all four lines**, active-high and pulled down,
+until the factory step writes the unit's own (#1798). A line with no pad
+rests low under the pull-down, so it reads as no touch. Before, the product
+named 37 and 96, and on lamp-52e6 the head read nothing: under `--touch`,
+`event_sequence` stayed at 0 through five touches (the lead, #1798). Install
+moves a lamp's own pins file off that old guess (install.md). The factory
+step writes the two to four lines it finds, with their baseline (below).
+
+**Said when no pad is there (#1798).** Pins naming lines with no pad read no
+touch, and nothing said so. Now `serve --touch` probes each head pad's line
+once at start, before it takes the lines: with a pull-down and a pull-up,
+10 ms each, as `probe` and `discover-head` read them
+(`GpioLines::probe_ending`). The pad's own pull comes last, so a bare line is
+left where its pins leave it: a line the file leaves floating (`none`) keeps
+the last read's charge, and a pull-up last would read it touched
+(`probe_order`, the reviewer's P3 on #2243). A line a pad drives reads the
+same both ways, and a line with nothing on it follows the pull. That's about 20 ms a line, 80 ms for the
+product's four, and what is read stays the pins file's. The journal says it
+once (`lamp-controls: head pads: wired on lines 97, 98; nothing on 37, 96`),
+and so does the `head pads` item on `diagnostics`, once a second beside
+Controls' own report (`HeadLines::health`):
+
+- `ok` while a pad drives one of the lines: `wired on lines 97, 98; nothing
+  on 37, 96`;
+- `warn` when none does: `nothing wired on lines 37, 96: the head reads no
+  touch`, which is what lamp-52e6's old pins would have said;
+- a line another program holds is `not probed`, and with no line told it
+  warns too.
+
+**A pad touched from the start is left out (#1798).** The head arms only
+once every pad reads released after the 500 ms settle. So one line stuck
+active, such as a pad resting high read as active-high, kept the whole head
+from ever arming, and nothing said so. Now a pad read touched from the first
+acquisition, never released since, is left out until it reads released: the
+others arm and count, and a touch on them is told without it. The `head
+pads` item warns while it lasts (`line 97 touched since the head was first
+read: left out until let go`, `left_out`; first read at Controls' start, or
+when the reader comes back after a fault). A hand that lands after the first
+acquisition is not left out: the head waits for it to go, as before. With
+every pad left out, the head is not armed. Tests: `tests/touch.rs`
+(`a_pad_touched_from_the_start_is_left_out_and_the_other_arms`),
+`tests/touch_pins.rs` (`the_probe_at_start_says_which_head_lines_a_pad_drives`)
+and `tests/touch_runtime.rs`
+(`controls_says_the_head_lines_and_a_pad_left_out_on_diagnostics`). Not shown:
+the probe on a lamp. It's Linux GPIO, so ARM64 builds it, and lamp-52e6 is
+where it would be seen.
+
 Each unit's head pads rest and read differently (#1764): lamp-4ace's rest low
 and are held high by a hand; lamp-cb94's line 97 flipped at rest and read
 touched for 77 s with no hand on it, a stroke and a sleep from nobody; and
@@ -281,9 +337,17 @@ The new pins schema has `chip`, `buttons`, `head_pads`, `every_ms`, optional
 `reset`, optional `base` and optional `legacy_head` (false unless set; see
 above). Only chip 0 is allowed. Optional primary is line 99; reset is
 active-low line 100, pulled up, in its own field. Head candidates are
-37/96/97/98, selected and polarized per unit. Names/lines are unique and
-match the Controls configuration. The privacy switch, chip 1 line 9, remains
-Voice's. A base requires `base_selected_mask` to exactly match its working
+37/96/97/98, selected and polarized per unit. Names/lines are unique. The
+buttons match the Controls configuration's. The head pads are the pins
+file's: each pad the configuration names too must have the same name in the
+same place, but either may name more (#1798). So a lamp's own
+`controls.json` naming two pads, kept by install, still starts beside the
+product's pins naming four. The pins decide the head pads; the settings
+only check the names both give. So a settings file naming none no longer
+keeps the head off beside pins that name some. A Controls that refused to
+start would close the microphones on the privacy route. The privacy
+switch, chip 1 line 9, remains Voice's. A base requires `base_selected_mask`
+to exactly match its working
 electrodes (4095 for all twelve, 3823/0x0EEF for lamp-4ace's ten), and a complete
 explicit profile: twelve independently specified touch thresholds and twelve
 release thresholds, baseline filters, FFI/SFI/ESI, global/per-pad CDC/CDT,
@@ -486,7 +550,11 @@ First's on-lamp sequence is:
    ≥20 ms pulses or one press of 500 ms or more (`HELD_US`, read as a level:
    a person's two touches often merge into one, as on lamp-c0a4 three runs
    in a row, thirteen-P4; a lone short press still finds nothing), prints
-   candidate polarity and how each reads, and installs nothing. A floating, untested or startup-held line
+   candidate polarity and how each reads, and installs nothing. Each line is
+   its own contact, so a hand on two pads at once is a press on each: two
+   pads touched together and then held one by one, or held together only,
+   are both found (`two_pads_touched_together_then_held_one_by_one_are_both_found`,
+   the first builder on #1722, 21 Oct). A floating, untested or startup-held line
    is not a pad mapping. Set the actual observed candidates in the pins file;
    remove the nonexistent primary from lamp-4ace's configuration, not all lamps.
 3. Run `lamp-controls serve --touch --config <unit-controls.json>
@@ -612,8 +680,17 @@ once (`discover-head`, above), and Controls never probes or learns pins as it
 runs; V1's 20 ms LOW rule was for learning an unknown pad, not for
 every touch. Both edges extend the 200 ms contact timer, and each completed
 session restarts the 1.2 s decision timer. An isolated pulse resolves as Pet
-1.4 s after its last edge. Directional labels, early reversal classification,
-the first-session chirp and spoken phrases are not ported. State publishes
+1.4 s after its last edge. A cycle with a press longer than 3 s gives no Pet
+(`HEAD_PAT_LONGEST_US`, as the touch path's hold). A line that drifts high
+at rest and back, as lamp-cb94's 97 did for 77 s with no hand on it (#1764),
+is no pat. A Pet wakes a sleeping lamp (Expression), and waking at night
+with nobody there isn't a living thing (the reviewer's P2 on #2239, rule
+8). A press runs from the first pad touched until none is, so a real pat on
+another pad while one line drifts high is part of that long press, and no
+Pet is given either. That errs on the quiet side. Tests: `tests/engine.rs`
+(`a_press_longer_than_a_pat_gives_no_pet_and_a_pat_still_does`).
+Directional labels, early reversal classification, the first-session chirp
+and spoken phrases are not ported. State publishes
 head-active edges promptly for an optional small visual reaction; it cannot
 establish listening readiness. Any brain notification must remain limited to
 one per 60 s by its consumer, as in V1; the Pet event is not permission to speak.

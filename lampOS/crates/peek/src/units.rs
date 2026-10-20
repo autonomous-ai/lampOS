@@ -4,15 +4,60 @@
 use serde_json::Value;
 use std::{
     fs,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Read},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
 
 /// What `systemctl show` is asked about each unit.
 const PROPERTIES: &str = "--property=Id,ActiveState,SubState,ExecStart,MainPID";
 /// The longest error line shown.
 const MOST_ERROR_CHARS: usize = 200;
+
+/// How long one read of the units may take in all (the reviewer on #2259):
+/// one read runs while every `/status` and every stream's push waits for
+/// it, so a hung `systemctl` or `journalctl` is killed at this deadline,
+/// and the rows not read by then say no last error.
+pub const READ_WITHIN: Duration = Duration::from_secs(10);
+/// How often a command's end is looked for.
+const LOOK_EVERY: Duration = Duration::from_millis(5);
+
+/// `command`'s standard output when it ends by `deadline`; `None` when it
+/// could not start, or ran past `deadline` and was killed. Its output is
+/// read as it comes, so a long one never fills its pipe and stalls it.
+pub fn output_by(mut command: Command, deadline: Instant) -> Option<Vec<u8>> {
+    if Instant::now() >= deadline {
+        return None;
+    }
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut stdout = child.stdout.take()?;
+    let reading = thread::spawn(move || {
+        let mut out = Vec::new();
+        let _ = stdout.read_to_end(&mut out);
+        out
+    });
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return reading.join().ok(),
+            Ok(None) if Instant::now() < deadline => thread::sleep(LOOK_EVERY),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                // Not joined: if anything else still held the pipe, the
+                // read would wait on it. It ends with the pipe.
+                drop(reading);
+                return None;
+            }
+        }
+    }
+}
 
 /// One unit as the page shows it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -83,18 +128,19 @@ fn program_of(exec_start: &str) -> Option<&str> {
     exec_start.split("path=").nth(1)?.split([' ', ';']).next()
 }
 
-/// The units on this lamp, from systemd: the keeper's own patterns.
+/// The units on this lamp, from systemd: the keeper's own patterns, all
+/// within [`READ_WITHIN`].
 pub fn read() -> Vec<UnitRow> {
-    let Ok(output) = Command::new("systemctl")
-        .arg("show")
+    let deadline = Instant::now() + READ_WITHIN;
+    let mut show = Command::new("systemctl");
+    show.arg("show")
         .arg(PROPERTIES)
-        .args(lamp_keeper::units::PATTERNS)
-        .output()
-    else {
+        .args(lamp_keeper::units::PATTERNS);
+    let Some(output) = output_by(show, deadline) else {
         return Vec::new();
     };
     rows(
-        &String::from_utf8_lossy(&output.stdout),
+        &String::from_utf8_lossy(&output),
         &|program| fs::canonicalize(program).ok(),
         &|pid| {
             // A program replaced since it started reads "<path> (deleted)":
@@ -103,25 +149,25 @@ pub fn read() -> Vec<UnitRow> {
             let text = link.to_string_lossy();
             Some(PathBuf::from(text.trim_end_matches(" (deleted)")))
         },
-        &journal_error,
+        &|unit| journal_error(unit, deadline),
     )
 }
 
-/// The unit's last line at priority error or worse, cut short.
-fn journal_error(unit: &str) -> Option<String> {
-    let output = Command::new("journalctl")
-        .args([
-            "--no-pager",
-            "--quiet",
-            "--output=cat",
-            "--priority=err",
-            "--lines=1",
-            "--unit",
-            unit,
-        ])
-        .output()
-        .ok()?;
-    let text = String::from_utf8_lossy(&output.stdout);
+/// The unit's last line at priority error or worse, cut short; nothing
+/// once `deadline` has passed.
+fn journal_error(unit: &str, deadline: Instant) -> Option<String> {
+    let mut journal = Command::new("journalctl");
+    journal.args([
+        "--no-pager",
+        "--quiet",
+        "--output=cat",
+        "--priority=err",
+        "--lines=1",
+        "--unit",
+        unit,
+    ]);
+    let output = output_by(journal, deadline)?;
+    let text = String::from_utf8_lossy(&output);
     let line = text.lines().last()?.trim();
     (!line.is_empty()).then(|| line.chars().take(MOST_ERROR_CHARS).collect())
 }
@@ -179,6 +225,35 @@ pub fn endpoint_worker(sessions: &Path) -> Option<(String, u64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A command that ends tells its output; one past its deadline is
+    /// killed and tells nothing, at the deadline, not when it would have
+    /// ended; and once the deadline has passed none is started (the
+    /// reviewer on #2259: one read holds every `/status` and stream).
+    #[test]
+    fn a_command_past_its_deadline_is_killed_and_tells_nothing() {
+        let mut echo = Command::new("echo");
+        echo.arg("units");
+        let told = output_by(echo, Instant::now() + Duration::from_secs(5));
+        assert_eq!(told.as_deref(), Some(&b"units\n"[..]));
+        let mut hung = Command::new("sleep");
+        hung.arg("30");
+        let started = Instant::now();
+        assert_eq!(output_by(hung, started + Duration::from_millis(200)), None);
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "{:?}",
+            started.elapsed()
+        );
+        let mut late = Command::new("echo");
+        late.arg("late");
+        let started = Instant::now();
+        assert_eq!(
+            output_by(late, Instant::now() - Duration::from_millis(1)),
+            None
+        );
+        assert!(started.elapsed() < Duration::from_millis(100));
+    }
 
     const SHOW: &str = "Id=lamp-body.service\nActiveState=active\nSubState=running\n\
         ExecStart={ path=/opt/lampOS/body/current/lamp-body ; argv[]=/opt/lampOS/body/current/lamp-body ; }\n\

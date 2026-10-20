@@ -80,11 +80,22 @@ sees the list (`lamp-skills list`), and so will the Store.
 | Key | Gives |
 |---|---|
 | `topics` | The topics it reads: each one a trigger or a `[[while]]` names, `humans/faces/tracked` for `body = { look_at = "face" }`, `voice/heard` for a tool's `[again]`, `schedule/due` for `say = { from = "schedule" }` and `tasks/status` for `say = { from = "tasks" }` |
-| `speak` | `say` (a note or `{ from = ... }`) and `sound` |
+| `speak` | `say` (a note or `{ from = ... }`), `sound`, and the fixed `cue = "hum"` |
 | `light` | `light` steps |
-| `body` | `look_at`, `gesture`, `move`, `mood` |
+| `body` | `look_at`, `gesture`, `move`, `mood`, and leased `rest`/`wake`/`cancel` intents |
+| `output_limits` | Private declarative `[limits]` on light and volume; independent of presentation grants |
 | `look` | `look = true`: the camera's picture goes to the model |
 | `actions` | The actions part's functions called by name. No step calls one yet: leave it out |
+
+A routine must also declare its implicit `voice/state` read. An internal
+`clock/local` trigger declares that read but does not subscribe to an external
+publisher. Rest and accompanying hum permissions are checked before any
+request is sent. Limits require their separate grant; cleanup of an already
+owned restriction remains possible after that grant is removed.
+
+`enabled = false` keeps a folder installed and validated, with no active
+trigger, subscription or tool. It remains visible in `lamp-skills list`;
+core protection and reserved tool names still apply.
 
 `kind` is `installable` for every skill an owner makes (leave it out, or
 write it). `core` is for the skills that come with the lamp; the runtime's

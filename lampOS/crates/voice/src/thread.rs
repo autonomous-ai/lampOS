@@ -258,7 +258,7 @@ impl Thread {
     /// renewed for them the moment it was ready: the 4 `server_go_away`
     /// drops 0 s after a start on lamp-52e6 on 15 October.
     pub fn at_start(&mut self, known: Option<&str>) {
-        let id = known.map(crate::remember::person_id);
+        let id = known.map(crate::known_faces::memory_person);
         self.whose.clone_from(&id);
         self.named = id;
     }
@@ -516,6 +516,27 @@ impl Thread {
         add(&mut self.heard, text, PERSON_BYTES);
         self.heard_at = Some(now);
         self.heard_done = finished;
+    }
+
+    /// The words heard in the line `request` answers, as far as the thread
+    /// knows them: its exchange's, once the lamp has begun answering it,
+    /// else what has been heard since the last answer, within the time an
+    /// answer counts as asked. `None` for nothing heard (#2176, row 10).
+    pub fn heard_for(&self, request: u64, now: Instant) -> Option<String> {
+        let heard = match self.exchanges.iter().rev().find(|e| e.request == request) {
+            Some(exchange) => exchange.person.trim(),
+            None if self
+                .heard_at
+                .is_some_and(|at| now.saturating_duration_since(at) <= ASKED_WITHIN) =>
+            {
+                self.heard.trim()
+            }
+            None => "",
+        };
+        heard
+            .chars()
+            .any(char::is_alphanumeric)
+            .then(|| heard.to_owned())
     }
 
     /// The note of written request `request`: kept with the answer to that

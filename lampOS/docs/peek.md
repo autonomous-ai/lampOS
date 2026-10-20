@@ -194,6 +194,15 @@ page's Overview and Health use the same rows, kept the same 30 s, and one
 read runs while the others wait for it (the reviewer on #2259), so an open
 page reads them twice a minute however many tabs show it.
 
+**A read has a deadline** (`units::READ_WITHIN`, 10 s in all; the reviewer
+on #2259). While it runs, every `/status` and every push of the one page
+waits for it, so a hung `systemctl` or `journalctl` would hold them all.
+Each command is killed at the read's deadline (`units::output_by`), and
+then tells nothing. The rows not read by then have no last error, and a
+`systemctl show` past it gives no rows. So the page waits at most 10 s,
+then goes on. A command's output is read as it comes, so a long one never
+fills its pipe and stalls.
+
 ## Tests
 
 `cargo test -p lamp-peek` runs the page on a real bus in a directory of its
@@ -243,3 +252,6 @@ own, and asks for it over HTTP:
   setup condition, no `Conflicts=` with setup, and its one capability.
 - `the_units_are_read_once_however_many_ask_at_once`: four asking at once
   while the rows have run out make one read.
+- `units::tests::a_command_past_its_deadline_is_killed_and_tells_nothing`:
+  a command that ends tells its output; `sleep 30` with a 200 ms deadline
+  tells nothing, well within 5 s; past the deadline none is started.

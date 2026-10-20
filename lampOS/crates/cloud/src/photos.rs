@@ -182,13 +182,13 @@ mod tests {
             }
         };
         assert_eq!(
-            Place::from(env("on", "/run/lampos-eyes/photos")),
+            Place::from(env("on", "/run/lampos-photos")),
             Some(Place {
-                dir: "/run/lampos-eyes/photos".into(),
+                dir: "/run/lampos-photos".into(),
                 socket: "/run/lampos-eyes/who.sock".into()
             })
         );
-        assert_eq!(Place::from(env("off", "/run/lampos-eyes/photos")), None);
+        assert_eq!(Place::from(env("off", "/run/lampos-photos")), None);
         assert_eq!(Place::from(env("on", "photos")), None);
         assert_eq!(Place::from(|_| None), None);
     }

@@ -13,6 +13,8 @@ publish.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 lamp-bus = { path = "../bus" }
+# The memory's person id (`known::person_id`), as the voice made it (#2176).
+sha2.workspace = true
 
 [lints]
 workspace = true

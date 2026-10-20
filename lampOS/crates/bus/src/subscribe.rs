@@ -70,6 +70,9 @@ pub struct Statistics {
     /// Messages passed over because their header named another type than
     /// the one this subscriber expects.
     pub wrong_type: u64,
+    /// Of `received`, those that came as datagrams, not from the topic's
+    /// `latest` file: none until a publisher has found this subscriber.
+    pub datagrams: u64,
     /// The mean time between `recv` taking one message from its socket and
     /// taking the next, by this process's monotonic clock: the stream's own
     /// rhythm for a subscriber that reads as fast as messages come, and the
@@ -89,6 +92,7 @@ struct Counts {
     gaps: u64,
     expired: u64,
     wrong_type: u64,
+    datagrams: u64,
     intervals: u64,
     interval_sum: Duration,
     largest_interval: Duration,
@@ -341,6 +345,7 @@ impl Subscriber {
             gaps: counts.gaps,
             expired: counts.expired,
             wrong_type: counts.wrong_type,
+            datagrams: counts.datagrams,
             mean_interval: (counts.intervals > 0)
                 .then(|| mean(counts.interval_sum, counts.intervals)),
             largest_interval: (counts.intervals > 0).then_some(counts.largest_interval),
@@ -563,6 +568,7 @@ impl Subscriber {
     /// `sent_ms`: its distance from the one before, and the end of a
     /// silence that was too long.
     fn came(&mut self, now: Instant, sent_ms: u64) {
+        self.counts.datagrams += 1;
         if let Some(before) = self.arrived {
             let interval = now.saturating_duration_since(before);
             self.counts.intervals += 1;
@@ -876,6 +882,8 @@ mod tests {
         }
         assert!(subscriber.recv(Duration::ZERO).unwrap().is_none());
         assert_eq!(subscriber.repeated(), 0);
+        // All three came as datagrams.
+        assert_eq!(subscriber.statistics().datagrams, 3);
 
         // With the queue empty the file is all there is. This publisher
         // looks once, before the other subscriber is there, and its second
@@ -891,6 +899,10 @@ mod tests {
         assert_eq!((message.header.seq, message.gap), (2, 0));
         assert_eq!(message.parse::<u64>().unwrap(), 5);
         assert!(other.recv(Duration::ZERO).unwrap().is_none());
+        // A value read from the file is received, and is no datagram: the
+        // privacy fence resyncs until its first (#1569 row 45).
+        let read = other.statistics();
+        assert_eq!((read.received, read.datagrams), (1, 0));
         drop((subscriber, other));
         fs::remove_dir_all(&root).unwrap();
     }

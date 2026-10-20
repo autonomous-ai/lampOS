@@ -370,6 +370,12 @@ pub trait Adapter: Send + 'static {
     fn sign_in_starter(&self) -> Option<Starter> {
         None
     }
+    /// Start Harness's daemon (`harness start`), once a sign-in by code has
+    /// succeeded: the sign-in stops it, and its user service doesn't start
+    /// it again (openharness#1463). An adapter without it says so.
+    fn start_daemon(&self) -> Result<(), String> {
+        Err("unsupported".into())
+    }
 }
 impl Adapter for Cli {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
@@ -407,6 +413,9 @@ impl Adapter for Cli {
                 None
             }
         }
+    }
+    fn start_daemon(&self) -> Result<(), String> {
+        Cli::start_daemon(self)
     }
 }
 
@@ -471,6 +480,12 @@ impl Adapter for Production {
             Self::Absent => Some(Box::new(|| Err("no_harness".into()))),
         }
     }
+    fn start_daemon(&self) -> Result<(), String> {
+        match self {
+            Self::Cli(cli) => Adapter::start_daemon(cli),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
 }
 
 /// Read the agent, then close it only if it is still idle on the very turn
@@ -523,6 +538,8 @@ enum Job {
     Close(CloseJob),
     SignIn,
     Machines,
+    /// `harness start` after a sign-in by code (openharness#1463).
+    StartDaemon,
 }
 enum Outcome {
     Launch(u64, LaunchOutcome),
@@ -531,6 +548,7 @@ enum Outcome {
     Close(CloseJob, Result<Closed, String>),
     SignIn(Result<SignIn, String>),
     Machines(Result<Vec<AccountMachine>, String>),
+    StartDaemon(Result<(), String>),
 }
 struct Binding {
     path: PathBuf,
@@ -692,6 +710,8 @@ fn owner<C: Clock>(
     let mut machines_said = String::new();
     // `serve --sign-in-by-code`: the sign-in open, or the last one, done.
     let mut sign_in: Option<SignInSession> = None;
+    // A sign-in by code succeeded: Harness's daemon is started once.
+    let mut start_daemon_due = false;
     // The last sign-in's id. Counted from the clock, so a sign-in after a
     // restart isn't taken for one before it (the reviewer's P3 on #2174).
     let mut sign_ins: u64 = std::time::SystemTime::now()
@@ -713,6 +733,11 @@ fn owner<C: Clock>(
             {
                 sign_in_due = Instant::now();
                 machines_due = Instant::now();
+                // Harness's own sign-in stops its daemon, and its user
+                // service doesn't start it again, so every hand-over after
+                // it says "Harness is not running here" (lamp-75c9, 20 Oct;
+                // openharness#1463): started once, here.
+                start_daemon_due = true;
             }
         }
         if looked_aside.elapsed() >= LOOK_ASIDE_EVERY {
@@ -772,6 +797,17 @@ fn owner<C: Clock>(
                             eprintln!("tasks: {said}");
                             machines_said = said;
                         }
+                    }
+                    Ok(())
+                }
+                Outcome::StartDaemon(started) => {
+                    match started {
+                        Ok(()) => eprintln!(
+                            "tasks: Harness's daemon started after the sign-in (openharness#1463)"
+                        ),
+                        Err(code) => eprintln!(
+                            "tasks: Harness's daemon not started after the sign-in: {code}"
+                        ),
                     }
                     Ok(())
                 }
@@ -877,8 +913,20 @@ fn owner<C: Clock>(
         }
         if !busy && !stop.load(Ordering::Acquire) {
             let now = clock.sample()?;
-            let next = match engine.begin_launch(&now).map_err(io::Error::other)? {
-                Some(job) => Some(Job::Launch(job)),
+            // Harness's daemon first, once, after a sign-in by code
+            // succeeded (openharness#1463): a hand-over already waiting
+            // would go to the daemon the sign-in stopped, and fail (the
+            // reviewer-lead's P2 on #2309).
+            let daemon = std::mem::take(&mut start_daemon_due).then_some(Job::StartDaemon);
+            let launch = match daemon {
+                Some(job) => Some(job),
+                None => engine
+                    .begin_launch(&now)
+                    .map_err(io::Error::other)?
+                    .map(Job::Launch),
+            };
+            let next = match launch {
+                Some(job) => Some(job),
                 None => {
                     // An agent Harness's `wait` says ended is read first,
                     // and its idle answer kept at once.
@@ -2048,6 +2096,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                             }
                             Job::SignIn => Outcome::SignIn(adapter.signed_in()),
                             Job::Machines => Outcome::Machines(adapter.machines()),
+                            Job::StartDaemon => Outcome::StartDaemon(adapter.start_daemon()),
                         };
                         if outcomes_tx.try_send(result).is_err() {
                             break;

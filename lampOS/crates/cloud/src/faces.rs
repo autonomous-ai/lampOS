@@ -18,7 +18,6 @@
 //! does. Off unless `LAMP_FACES_PAGE=on`, with the eyes' request socket
 //! (`LAMP_EYES_WHO_SOCKET`).
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use std::{path::PathBuf, time::Duration};
 
 pub const ENVIRONMENT: &str = "LAMP_FACES_PAGE";
@@ -119,21 +118,46 @@ pub fn removed(name: &str, answer: &Value) -> Result<Value, String> {
 /// the lower-cased name. Their rules are kept under `r-` and the same
 /// digits (`rules::scope`).
 pub fn person_id(name: &str) -> String {
-    let digest = Sha256::digest(name.trim().to_lowercase().as_bytes());
-    digest[..8]
-        .iter()
-        .fold(String::from("p-"), |id, byte| id + &format!("{byte:02x}"))
+    lamp_msgs::known::person_id(name)
 }
 
 /// The memory's requests for `name`: everything kept for the person, then
-/// their rules, as the voice's `forget_everything` asks.
-pub fn memory_asks(name: &str) -> [Value; 2] {
-    let person = person_id(name);
-    let rules = format!("r-{}", &person[2..]);
-    [
-        json!({"op": "forget_all", "person": person}),
-        json!({"op": "forget_all", "person": rules}),
-    ]
+/// their rules, as the voice's `forget_everything` asks. `id` is the memory
+/// id the eyes said they kept for them (`LAMP_MEMORY_STABLE_ID=on`, #2176):
+/// a renamed person's memory is under their first name's id. The voice
+/// keys on that id only when its own switch agrees with the eyes', else on
+/// `person_id` of the name, so when the two may differ both are forgotten,
+/// with both rule scopes, and nothing of the person is left half-removed.
+///
+/// But the by-name id goes only when it can be nobody else's (the
+/// reviewer-lead's P2 on #2330): `name_id_free`, the eyes' word that no
+/// other person they keep holds it. "Lan" renamed "Mai" keeps `p-` of
+/// "Lan"; a later "Minh" renamed "Lan" removed must not take Mai's memory.
+/// lamp-cloud can't know the voice's switch, so the eyes' word alone
+/// decides. Without an id, `person_id` of the name alone, as before: the
+/// name is then the only key there is.
+pub fn memory_asks(name: &str, id: Option<&str>, name_id_free: bool) -> Vec<Value> {
+    let by_name = person_id(name);
+    let mut people = vec![];
+    match id.filter(|id| lamp_msgs::known::is_person_id(id)) {
+        Some(id) if id == by_name => people.push(by_name),
+        Some(id) => {
+            people.push(id.to_owned());
+            if name_id_free {
+                people.push(by_name);
+            }
+        }
+        None => people.push(by_name),
+    }
+    people
+        .iter()
+        .flat_map(|person| {
+            [
+                json!({"op": "forget_all", "person": person}),
+                json!({"op": "forget_all", "person": format!("r-{}", &person[2..])}),
+            ]
+        })
+        .collect()
 }
 
 /// What memory's answers mean for the app: `forgotten` only when every
@@ -164,13 +188,20 @@ pub fn list(eyes: &Eyes) -> Result<Value, String> {
 /// everything it keeps for them and their rules.
 pub fn remove(eyes: &Eyes, data: &Value) -> Result<Value, String> {
     let name = asked(data)?;
-    let mut told = match crate::photos::exchange(&eyes.socket, &json!({"forget": name}), DEADLINE) {
-        Some(answer) => removed(&name, &answer)?,
-        None => return Err("the lamp's eyes did not answer".to_owned()),
-    };
+    let (mut told, id, name_id_free) =
+        match crate::photos::exchange(&eyes.socket, &json!({"forget": name}), DEADLINE) {
+            Some(answer) => {
+                let id = answer["id"].as_str().map(str::to_owned);
+                // Eyes that say no word (an older build) said no id either:
+                // the name is then theirs alone.
+                let free = answer["name_id_free"].as_bool().unwrap_or(id.is_none());
+                (removed(&name, &answer)?, id, free)
+            }
+            None => return Err("the lamp's eyes did not answer".to_owned()),
+        };
     let memory = match &eyes.memory {
         Some(socket) => {
-            let answers: Vec<Option<Value>> = memory_asks(&name)
+            let answers: Vec<Option<Value>> = memory_asks(&name, id.as_deref(), name_id_free)
                 .iter()
                 .map(|ask| crate::photos::exchange(socket, ask, DEADLINE))
                 .collect();
@@ -322,11 +353,46 @@ mod tests {
         assert_eq!(person_id("Lan"), "p-094a367b026246fb");
         assert_eq!(person_id(" lAN "), "p-094a367b026246fb");
         assert_eq!(
-            memory_asks("Lan"),
+            memory_asks("Lan", None, true),
             [
                 json!({"op": "forget_all", "person": "p-094a367b026246fb"}),
                 json!({"op": "forget_all", "person": "r-094a367b026246fb"}),
             ]
+        );
+        // The eyes said the id they kept (#2176): a renamed Lan, first Minh,
+        // has Minh's memory forgotten, never her new name's.
+        let minh = person_id("Minh");
+        assert_eq!(
+            memory_asks("Lan", Some(&minh), true),
+            [
+                json!({"op": "forget_all", "person": minh}),
+                json!({"op": "forget_all", "person": format!("r-{}", &minh[2..])}),
+                json!({"op": "forget_all", "person": "p-094a367b026246fb"}),
+                json!({"op": "forget_all", "person": "r-094a367b026246fb"}),
+            ]
+        );
+        // Someone else holds the name's own id (Mai, renamed from Lan, #2330):
+        // only the eyes' id and its rules are asked.
+        assert_eq!(
+            memory_asks("Lan", Some(&minh), false),
+            [
+                json!({"op": "forget_all", "person": minh}),
+                json!({"op": "forget_all", "person": format!("r-{}", &minh[2..])}),
+            ]
+        );
+        // No id said: the name is the only key there is.
+        assert_eq!(
+            memory_asks("Lan", None, false),
+            memory_asks("Lan", None, true)
+        );
+        assert_eq!(
+            memory_asks("Lan", Some("../x"), true),
+            memory_asks("Lan", None, true)
+        );
+        // The eyes' id is the name's own (never renamed): asked once.
+        assert_eq!(
+            memory_asks("Lan", Some("p-094a367b026246fb"), true),
+            memory_asks("Lan", None, true)
         );
     }
 
@@ -388,7 +454,97 @@ mod tests {
             json!({"removed": "Lan", "memory": "forgotten"})
         );
         assert_eq!(eyes_side.join().unwrap(), [json!({"forget": "Lan"})]);
-        assert_eq!(memory_side.join().unwrap(), memory_asks("Lan"));
+        assert_eq!(memory_side.join().unwrap(), memory_asks("Lan", None, true));
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A remove of "Lan" against eyes that answer `told`, and a memory that
+    /// keeps the scopes `kept`: what memory keeps after.
+    fn kept_after_removing_lan(
+        label: &str,
+        told: Value,
+        kept: std::collections::HashSet<String>,
+    ) -> std::collections::HashSet<String> {
+        use std::io::{BufRead, BufReader, Write};
+        let dir = std::env::temp_dir().join(format!("cloud-faces-{label}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (who, memory) = (dir.join("who.sock"), dir.join("memory.sock"));
+        let eyes_listener = std::os::unix::net::UnixListener::bind(&who).unwrap();
+        let eyes_side = std::thread::spawn(move || {
+            let (stream, _) = eyes_listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            writeln!(&stream, "{told}").unwrap();
+        });
+        let memory_listener = std::os::unix::net::UnixListener::bind(&memory).unwrap();
+        let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+        let memory_side = std::thread::spawn(move || {
+            let mut kept = kept;
+            memory_listener.set_nonblocking(true).unwrap();
+            let until = std::time::Instant::now() + Duration::from_secs(5);
+            while std::time::Instant::now() < until && done_rx.try_recv().is_err() {
+                match memory_listener.accept() {
+                    Ok((stream, _)) => {
+                        stream.set_nonblocking(false).unwrap();
+                        let mut line = String::new();
+                        BufReader::new(&stream).read_line(&mut line).unwrap();
+                        let ask: Value = serde_json::from_str(line.trim()).unwrap();
+                        let gone = kept.remove(ask["person"].as_str().unwrap());
+                        writeln!(
+                            &stream,
+                            "{}",
+                            json!({"ok": true, "removed": u8::from(gone)})
+                        )
+                        .unwrap();
+                    }
+                    Err(_) => std::thread::sleep(Duration::from_millis(5)),
+                }
+            }
+            kept
+        });
+        let eyes = Eyes {
+            socket: who,
+            memory: Some(memory),
+        };
+        assert_eq!(
+            remove(&eyes, &json!({"name": "Lan"})).unwrap(),
+            json!({"removed": "Lan", "memory": "forgotten"})
+        );
+        done_tx.send(()).unwrap();
+        eyes_side.join().unwrap();
+        let left = memory_side.join().unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+        left
+    }
+
+    fn with_rules(ids: &[&str]) -> std::collections::HashSet<String> {
+        ids.iter()
+            .flat_map(|id| [(*id).to_owned(), format!("r-{}", &id[2..])])
+            .collect()
+    }
+
+    /// Eyes on, voice off (#2176): Minh was renamed Lan, the eyes keep
+    /// Minh's id and say it, while the voice, its switch off, kept Lan's
+    /// memory under `p-` of "Lan". Nobody else holds that, so the remove
+    /// forgets both, and their rules: nothing of hers is left.
+    #[test]
+    fn a_remove_with_the_eyes_on_and_the_voice_off_leaves_nothing_half_removed() {
+        let (minh, lan) = (person_id("Minh"), person_id("Lan"));
+        let told = json!({"forgot": true, "id": minh, "name_id_free": true});
+        let left = kept_after_removing_lan("mixed", told, with_rules(&[&lan, &minh]));
+        assert!(left.is_empty(), "something was left: {left:?}");
+    }
+
+    /// The reviewer-lead's chain on #2330: "Lan" renamed "Mai" keeps `p-` of
+    /// "Lan"; then "Minh" renamed "Lan" keeps `p-` of "Minh". Removing "Lan"
+    /// forgets `p-` of "Minh" and its rules only: the eyes say the name's id
+    /// is held, and Mai's memory and rules stay.
+    #[test]
+    fn a_remove_never_takes_the_memory_of_someone_renamed_from_the_name() {
+        let (minh, lan) = (person_id("Minh"), person_id("Lan"));
+        let told = json!({"forgot": true, "id": minh, "name_id_free": false});
+        let left = kept_after_removing_lan("chain", told, with_rules(&[&lan, &minh]));
+        assert_eq!(left, with_rules(&[&lan]), "Mai's memory and rules stay");
     }
 }

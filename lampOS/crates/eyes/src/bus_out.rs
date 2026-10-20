@@ -1223,7 +1223,11 @@ mod tests {
             .subscribe_typed(HumanSeems::TOPIC, "test", HumanSeems::TYPE)
             .unwrap();
         let mut out = BusOut::on(&bus).unwrap();
-        let read = |kind, confidence| HumanSeems { kind, confidence };
+        let read = |kind, confidence| HumanSeems {
+            kind,
+            confidence,
+            from: lamp_msgs::SeemsReader::FerPlus,
+        };
         out.seems(read(SeemsKind::Positive, 0.9), 1_000_000);
         assert!(hears.recv(Duration::ZERO).unwrap().is_none());
         out.say_seems(&bus).unwrap();
@@ -1234,7 +1238,8 @@ mod tests {
             assert_eq!(message.header.source, "eyes");
             assert_eq!(message.header.expires_ms, Some(5_000));
             let text = String::from_utf8_lossy(&message.payload).into_owned();
-            assert_eq!(text.matches(':').count(), 2, "{text}");
+            // A kind, a confidence and which reader said it: nothing else.
+            assert_eq!(text.matches(':').count(), 3, "{text}");
             said.push(message.parse::<HumanSeems>().unwrap());
         }
         assert_eq!(

@@ -554,6 +554,116 @@ fn a_core_skill_is_never_installed_replaced_or_removed() {
     assert_eq!(read_folder(&skills.join("welcome-back")).unwrap(), before);
 }
 
+#[test]
+fn a_disabled_core_stays_in_inventory_and_cannot_be_packaged_replaced_or_removed() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir(&skills).unwrap();
+    let core = copied(&dir.path().join("source"), "bedtime-morning", "", "");
+    assert!(!load(&core).unwrap().enabled);
+    assert!(
+        package::pack(&core, &dir.path().join("out"))
+            .unwrap_err()
+            .contains("core skill")
+    );
+    assert!(
+        package::install(&skills, &core)
+            .unwrap_err()
+            .contains("says kind = \"core\"")
+    );
+    copy(&core, &skills.join("bedtime-morning"));
+    let before = read_folder(&skills.join("bedtime-morning")).unwrap();
+    let listed = package::list(&skills).unwrap();
+    let row = listed
+        .lines()
+        .find(|line| line.starts_with("bedtime-morning "))
+        .unwrap();
+    assert_eq!(
+        row.split_whitespace().take(4).collect::<Vec<_>>(),
+        ["bedtime-morning", "core", "1.0.0", "disabled;"]
+    );
+    assert!(listed.ends_with("The skills here give the model no function.\n"));
+    assert_eq!(lamp_skills::load_each(&skills).len(), 1);
+    let (live, errors) = lamp_skills::load_all(&skills);
+    assert!(live.is_empty());
+    assert!(errors.is_empty());
+    let replacement = copied(
+        &dir.path().join("replacement"),
+        "bedtime-morning",
+        "kind = \"core\"",
+        "kind = \"installable\"",
+    );
+    assert!(
+        package::install(&skills, &replacement)
+            .unwrap_err()
+            .contains("is a core skill on this lamp")
+    );
+    assert!(
+        package::remove(&skills, "bedtime-morning")
+            .unwrap_err()
+            .contains("can't be removed")
+    );
+    assert_eq!(
+        read_folder(&skills.join("bedtime-morning")).unwrap(),
+        before
+    );
+}
+
+#[test]
+fn a_disabled_installable_reserves_its_tool_but_adds_no_live_function() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    let disabled = copied(
+        &skills,
+        "desk-tutor",
+        "kind = \"installable\"",
+        "enabled = false\nkind = \"installable\"",
+    );
+    let listed = package::list(&skills).unwrap();
+    assert!(
+        listed
+            .lines()
+            .any(|line| line.starts_with("desk-tutor ") && line.contains("disabled;"))
+    );
+    assert!(listed.ends_with("The skills here give the model no function.\n"));
+    let (live, errors) = lamp_skills::load_all(&skills);
+    assert!(live.is_empty());
+    assert!(errors.is_empty());
+
+    let duplicate = dir.path().join("source/tutor-copy");
+    fs::create_dir_all(&duplicate).unwrap();
+    fs::write(
+        duplicate.join("SKILL.md"),
+        "---\nname: tutor-copy\ndescription: A tool reservation check.\n---\n",
+    )
+    .unwrap();
+    fs::write(
+        duplicate.join("skill.toml"),
+        "tool = \"check_my_work\"\n[permissions]\nspeak = true\n[[do]]\nsay = \"Ready.\"\n",
+    )
+    .unwrap();
+    let why = package::install(&skills, &duplicate).unwrap_err();
+    assert!(why.contains("the installable skill desk-tutor's"), "{why}");
+
+    // Disabling does not hide validation failures, and an invalid installed
+    // definition still reserves its raw-manifest tool for install purposes.
+    let path = disabled.join("skill.toml");
+    let text = fs::read_to_string(&path).unwrap();
+    // Revoke the grant alone; the later [[do]] still asks for a look.
+    fs::write(&path, text.replacen("look = true", "look = false", 1)).unwrap();
+    let why = load(&disabled).unwrap_err();
+    assert!(why.contains("needs look = true"), "{why}");
+    let listed = package::list(&skills).unwrap();
+    assert!(listed.contains("not loaded: not permitted: look needs look = true"));
+    assert!(
+        package::install(&skills, &duplicate)
+            .unwrap_err()
+            .contains("the installable skill desk-tutor's")
+    );
+    package::remove(&skills, "desk-tutor").unwrap();
+    assert!(left(&skills).is_empty());
+}
+
 /// The reviewer's probe on #1698 (08:39): an installable `a-dance` with
 /// `tool = "dance"` installed beside core Dance and took its function.
 /// A function the model calls is one skill's: an install whose tool's name
@@ -772,7 +882,24 @@ fn a_list_says_each_skills_name_kind_version_and_what_it_may_use() {
 /// asked`, its standard input and output one end of a Unix socket, asked
 /// `line` straight, with nobody before it to check the request (#1722).
 fn ask_helper(skills: &Path, line: &[u8]) -> (serde_json::Value, bool) {
-    use std::io::{BufRead, Write};
+    let (answer, ok, _) = ask_helper_journal(skills, line);
+    (answer, ok)
+}
+
+/// [`ask_helper`], with what the helper wrote to its journal (its standard
+/// error) as well.
+fn ask_helper_journal(skills: &Path, line: &[u8]) -> (serde_json::Value, bool, String) {
+    ask_helper_while(skills, line, |_| {})
+}
+
+/// [`ask_helper_journal`], `meanwhile` given the running helper once its
+/// request is written, before its answer is read.
+fn ask_helper_while(
+    skills: &Path,
+    line: &[u8],
+    meanwhile: impl FnOnce(&mut std::process::Child),
+) -> (serde_json::Value, bool, String) {
+    use std::io::{BufRead, Read, Write};
     use std::os::unix::net::UnixStream;
     use std::process::{Command, Stdio};
     let (mut ours, theirs) = UnixStream::pair().unwrap();
@@ -783,17 +910,173 @@ fn ask_helper(skills: &Path, line: &[u8]) -> (serde_json::Value, bool) {
             theirs.try_clone().unwrap(),
         )))
         .stdout(Stdio::from(std::os::fd::OwnedFd::from(theirs)))
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .unwrap();
     ours.write_all(line).unwrap();
     ours.shutdown(std::net::Shutdown::Write).unwrap();
+    meanwhile(&mut child);
     let mut answer = String::new();
     std::io::BufReader::new(&ours)
         .read_line(&mut answer)
         .unwrap();
+    let mut journal = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut journal)
+        .unwrap();
     let status = child.wait().unwrap();
-    (serde_json::from_str(&answer).unwrap(), status.success())
+    (
+        serde_json::from_str(&answer).unwrap(),
+        status.success(),
+        journal,
+    )
+}
+
+/// While another run holds the skills folder, the helper waits at most
+/// its lock wait (`ASKED_LOCK_WAIT`, under `lamp-cloud`'s 5 s, on the lamp;
+/// 200 ms here, so the test does not wait the lamp's 4 s out, #1806), then
+/// refuses in the words the app already shows, with nothing done, even
+/// once the folder is given back; a hold given back within it lets the
+/// remove go on (the reviewer's P3 1 on #1890). That half asks the binary,
+/// which waits the lamp's 4 s, and gives the folder back only 300 ms after
+/// the binary is seen with it open, which it opens only to wait for its
+/// lock: a binary that did not wait has refused by then, however late it
+/// started (a first start takes up to 5 s on a Mac, #2348).
+#[test]
+fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
+    use std::time::{Duration, Instant};
+    const WAIT: Duration = Duration::from_millis(200);
+    const _: () = assert!(package::ASKED_LOCK_WAIT.as_millis() < 5_000);
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    tutor(&skills, "1.0.0");
+    let held = fs::File::open(&skills).unwrap();
+    held.lock().unwrap();
+    let asked = Instant::now();
+    let mut answer = Vec::new();
+    let ok = package::asked(
+        &skills,
+        WAIT,
+        &b"{\"remove\": \"desk-tutor\"}\n"[..],
+        &mut answer,
+    )
+    .unwrap();
+    let waited = asked.elapsed();
+    let answer: serde_json::Value = serde_json::from_slice(&answer).unwrap();
+    assert!(!ok);
+    assert_eq!(answer["refused"], package::BUSY);
+    assert_eq!(package::BUSY, "the lamp's skills can't be changed now");
+    assert!(
+        waited >= WAIT && waited < Duration::from_secs(5),
+        "{waited:?}"
+    );
+    held.unlock().unwrap();
+    std::thread::sleep(Duration::from_millis(100));
+    assert_eq!(left(&skills), ["desk-tutor"]);
+
+    // Given back within the binary's own wait, the remove goes on.
+    held.lock().unwrap();
+    let folder = skills.canonicalize().unwrap();
+    let (answer, ok, journal) =
+        ask_helper_while(&skills, b"{\"remove\": \"desk-tutor\"}\n", |helper| {
+            let started = Instant::now();
+            while !has_open(helper.id(), &folder) {
+                if let Some(status) = helper.try_wait().unwrap() {
+                    panic!(
+                        "the helper ended ({status}) before it was seen waiting for the held folder"
+                    );
+                }
+                // A first start on a Mac takes up to 5 s.
+                assert!(
+                    started.elapsed() < Duration::from_secs(20),
+                    "the helper never opened the skills folder"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            std::thread::sleep(Duration::from_millis(300));
+            held.unlock().unwrap();
+        });
+    assert!(ok, "{answer}: {journal}");
+    assert!(left(&skills).is_empty());
+}
+
+/// Whether the process `pid` has `folder` open: `/proc` on Linux, `lsof`
+/// on a Mac.
+fn has_open(pid: u32, folder: &Path) -> bool {
+    if let Ok(fds) = fs::read_dir(format!("/proc/{pid}/fd")) {
+        return fds
+            .flatten()
+            .any(|fd| fs::read_link(fd.path()).is_ok_and(|to| to == folder));
+    }
+    std::process::Command::new("lsof")
+        .args(["-a", "-p", &pid.to_string(), "-Fn"])
+        .output()
+        .is_ok_and(|listed| {
+            String::from_utf8_lossy(&listed.stdout)
+                .lines()
+                .any(|line| line.strip_prefix('n').map(Path::new) == Some(folder))
+        })
+}
+
+/// A skill renamed aside whose `.removed-NAME-PID` could not then be
+/// deleted is gone for the running program, so it is answered done; where
+/// it was set aside goes to the journal alone, never into the answer (the
+/// reviewer's P3 2 on #1890).
+#[test]
+fn a_skill_renamed_aside_but_not_deleted_is_answered_done_its_path_in_the_journal_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    let skill = tutor(&skills, "1.0.0");
+    // A folder inside it whose file can't be deleted: the rename goes, the
+    // delete after it does not.
+    let stuck = skill.join("stuck");
+    fs::create_dir(&stuck).unwrap();
+    fs::write(stuck.join("kept"), "x").unwrap();
+    fs::set_permissions(&stuck, fs::Permissions::from_mode(0o555)).unwrap();
+
+    let (answer, ok, journal) = ask_helper_journal(&skills, b"{\"remove\": \"desk-tutor\"}\n");
+    let names = left(&skills);
+    for name in &names {
+        let _ = fs::set_permissions(
+            skills.join(name).join("stuck"),
+            fs::Permissions::from_mode(0o755),
+        );
+    }
+    assert!(ok, "{answer}");
+    assert_eq!(
+        answer["done"],
+        "removed desk-tutor: a running lamp-skills lets it go within 2 s"
+    );
+    assert_eq!(answer.as_object().unwrap().len(), 1, "{answer}");
+    let said = answer.to_string();
+    assert!(
+        !said.contains(".removed-") && !said.contains(&*skills.to_string_lossy()),
+        "{said}"
+    );
+    assert_eq!(names.len(), 1, "{names:?}");
+    assert!(names[0].starts_with(".removed-desk-tutor-"), "{names:?}");
+    assert!(journal.contains(&names[0]), "{journal}");
+    assert!(journal.contains("was not deleted"), "{journal}");
+    // By hand, the same is said as not finished, its path with it.
+    let skill = tutor(&skills, "1.0.0");
+    let stuck = skill.join("stuck");
+    fs::create_dir(&stuck).unwrap();
+    fs::write(stuck.join("kept"), "x").unwrap();
+    fs::set_permissions(&stuck, fs::Permissions::from_mode(0o555)).unwrap();
+    let why = package::remove(&skills, "desk-tutor").unwrap_err();
+    for name in left(&skills) {
+        let _ = fs::set_permissions(
+            skills.join(name).join("stuck"),
+            fs::Permissions::from_mode(0o755),
+        );
+    }
+    assert!(why.starts_with("removed desk-tutor, but "), "{why}");
+    assert!(why.contains(".removed-desk-tutor-"), "{why}");
 }
 
 /// The helper checks each request itself, whoever connects: a core skill

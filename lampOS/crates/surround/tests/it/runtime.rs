@@ -17,12 +17,12 @@ fn dir() -> tempfile::TempDir {
         .unwrap()
 }
 fn fixture() -> serde_json::Value {
-    serde_json::from_str(include_str!("../fixtures/surround.json")).unwrap()
+    serde_json::from_str(include_str!("../../fixtures/surround.json")).unwrap()
 }
 
 #[test]
 fn sample_is_disabled_and_no_board_fact_is_invented() {
-    let config = Config::parse(include_bytes!("../fixtures/surround.json")).unwrap();
+    let config = Config::parse(include_bytes!("../../fixtures/surround.json")).unwrap();
     assert!(!config.enabled);
     assert!(config.owner_socket.is_none());
     assert!(config.network.is_none());
@@ -126,7 +126,7 @@ fn private_config_read_refuses_symlinks_and_public_files() {
     let path = root.path().join("config.json");
     atomic::write(
         &path,
-        include_bytes!("../fixtures/surround.json"),
+        include_bytes!("../../fixtures/surround.json"),
         MAX_CONFIG_BYTES,
     )
     .unwrap();

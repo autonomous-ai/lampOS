@@ -24,6 +24,7 @@ second, and the next ask's first look where it asks
 with no words leaving it going (`a_line_with_no_words_does_not_end_a_search`); the asking line's late
 words leaving it going too (`the_asking_lines_late_words_do_not_end_its_search`);
 and a pause
-ending it the same way (`a_pause_ends_a_search_its_pose_and_its_light`). Whether the
+ending it the same way (`a_pause_ends_a_search_its_pose_and_its_light`). A call with `found` keeps the head on the place it was seen and takes
+no look (`a_search_told_found_keeps_its_pose_and_takes_no_look`). Whether the
 model finds a thing in the working frame from the reading pose, and whether
 the turns read as a glance around rather than a scan, is for a lamp (#1685).

@@ -693,7 +693,7 @@ fn wrong_arguments_print_the_usage_and_end_with_2_for_serve_and_64_for_show() {
             .output()
             .unwrap()
     };
-    let usage = "\nusage: lamp-health serve [--bus-root ABSOLUTE_DIR] [--expect NAME]... [--stale-ms N] [--judge-zone BEGINNING]... [--proc DIR] [--sys DIR] [--run DIR] [--disk PATH] [--clock timesync|kernel] [--online on|off] [--reach-probe on|off] [--needs NAME=PATH]...\n       lamp-health [show] [--bus-root ABSOLUTE_DIR] [--json]\n       lamp-health --help\n";
+    let usage = "\nusage: lamp-health serve [--bus-root ABSOLUTE_DIR] [--expect NAME]... [--stale-ms N] [--judge-zone BEGINNING]... [--proc DIR] [--sys DIR] [--run DIR] [--disk PATH] [--clock timesync|kernel] [--online on|off] [--reach-probe on|off] [--reach-idle on|off] [--needs NAME=PATH]...\n       lamp-health [show] [--bus-root ABSOLUTE_DIR] [--json]\n       lamp-health --help\n";
     for (arguments, ends) in [
         (&["serve", "--bus-root", "relative"][..], 2),
         (&["serve", "--stale-ms", "99"], 2),
@@ -704,6 +704,7 @@ fn wrong_arguments_print_the_usage_and_end_with_2_for_serve_and_64_for_show() {
         (&["serve", "--loud", "yes"], 2),
         (&["serve", "--json"], 2),
         (&["serve", "--reach-probe", "on"], 2),
+        (&["serve", "--online", "on", "--reach-idle", "on"], 2),
         (&["show", "--loud"], 64),
         (&["show", "--bus-root", "relative"], 64),
         (&["show", "--bus-root"], 64),

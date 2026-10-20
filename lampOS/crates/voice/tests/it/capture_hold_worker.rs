@@ -43,6 +43,16 @@ const TICK: Duration = Duration::from_millis(10);
 /// speaker accepted it; the reference ring gives it to the canceller after
 /// five.
 const ECHO_TICKS: usize = 3;
+/// Blocks a run streams when its checks read the last 100 frames (the
+/// canceller's output, its linear part, what the render explains). The
+/// canceller settles within about 100 blocks (#823: the linear part fell
+/// from 3.3e7 to 2.3e5 a 25-block window by block 101 and held there), so
+/// the last 100 of 250 are settled, and 250 still gives `frames.len() >= 200`.
+const SETTLED_BLOCKS: usize = 250;
+/// Blocks in the session [`warm_up`] throws away: the canceller runs from
+/// the first frame, so 20 of its blocks are run before the first that counts
+/// (it was 100, a second each test, #823).
+const WARM_BLOCKS: usize = 20;
 
 fn now() -> MonoTime {
     MonoTime::from_micros(monotonic_us())
@@ -672,14 +682,18 @@ impl Rig {
 /// than that, and the session ends on the first frame. What a session does
 /// once the process is running is what these tests are about, so up to three
 /// are spent first, until one runs through. How many it took is printed.
+///
+/// [`WARM_BLOCKS`] long: natively the canceller runs from the first frame, so
+/// a short session pays its first use. nextest runs each test in its own
+/// process, so every test here pays this once (#823).
 fn warm_up() {
     static WARM: Once = Once::new();
     WARM.call_once(|| {
-        let signal = Signal::new(100);
+        let signal = Signal::new(WARM_BLOCKS);
         for attempt in 1..=3 {
             let ran = catch_unwind(AssertUnwindSafe(|| {
                 let mut rig = Rig::start("scripted warm-up");
-                rig.stream(&signal, 100);
+                rig.stream(&signal, WARM_BLOCKS);
                 rig.settle(0);
                 rig.end_with(Control::Stop);
                 rig.finish();
@@ -763,9 +777,9 @@ fn mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_he
     let name = Microphone::Mic1.device();
     let blocks = hold::blocks_for(name, ReferenceClock::Capture);
     assert_eq!(blocks, 4);
-    let signal = Signal::new(400);
+    let signal = Signal::new(SETTLED_BLOCKS);
     let mut rig = Rig::start(name);
-    rig.stream(&signal, 400);
+    rig.stream(&signal, SETTLED_BLOCKS);
     rig.settle(blocks);
     assert!(rig.started);
     // Four blocks have been read and not handed on. Stop now.
@@ -880,9 +894,9 @@ fn another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_
     warm_up();
     let name = Microphone::Mic2.device();
     assert_eq!(hold::blocks_for(name, ReferenceClock::Capture), 0);
-    let signal = Signal::new(400);
+    let signal = Signal::new(SETTLED_BLOCKS);
     let mut rig = Rig::start(name);
-    rig.stream(&signal, 400);
+    rig.stream(&signal, SETTLED_BLOCKS);
     rig.settle(0);
     assert_eq!(rig.frames.len(), rig.pushed_at.len());
     rig.end_with(Control::Stop);
@@ -927,9 +941,9 @@ fn stop_words_blocks_carry_what_was_asked_only_when_asked() {
     // The raw blocks' power, from the first run, for the linear run's.
     let mut raw_heard = None;
     for source in [Source::Raw, Source::Linear, Source::Processed] {
-        let signal = Signal::new(400);
+        let signal = Signal::new(SETTLED_BLOCKS);
         let mut rig = Rig::start_asking(name, 0, ReferenceRecovery::Off, source);
-        rig.stream(&signal, 400);
+        rig.stream(&signal, SETTLED_BLOCKS);
         rig.settle(blocks);
         rig.end_with(Control::Stop);
         let frames = rig.finish();
@@ -1188,14 +1202,17 @@ fn a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded() {
         0,
         ReferenceRecovery::Bounded,
     );
-    rig.stream(&signal, 100);
+    // Running before the pause and after it, each long enough for the
+    // reference to be primed and trusted: with recovery taken as off, this
+    // half ends on `ReferenceLate` as the first does (#823).
+    rig.stream(&signal, 30);
     rig.speaker_quiet(&signal, 10);
-    rig.stream(&signal, 200);
+    rig.stream(&signal, 50);
     rig.settle(0);
     assert_eq!(rig.frames.len(), rig.pushed_at.len());
     rig.end_with(Control::Stop);
     let frames = rig.finish();
-    assert_eq!(frames.len(), 310);
+    assert_eq!(frames.len(), 30 + 10 + 50);
 }
 
 /// #1359: the worker ends on `Stop` and is gone before the controller looks
@@ -1230,14 +1247,16 @@ fn the_loop_waits_on_the_microphone_only_with_the_switch() {
     warm_up();
     for wait in [false, true] {
         let name = Microphone::Mic2.device();
-        let signal = Signal::new(200);
+        let signal = Signal::new(62);
         let mut rig = Rig::start_waiting(name, wait);
-        rig.stream(&signal, 100);
+        // Past the prime's start (20 blocks with render, as the next test
+        // says), then the two quiet blocks and as many again (#823).
+        rig.stream(&signal, 30);
         // Two blocks with no render beside them: only the microphone wakes
         // the loop, so it is waited on (with render, the speaker's socket
         // mostly wakes it first).
         rig.speaker_quiet(&signal, 2);
-        rig.stream(&signal, 98);
+        rig.stream(&signal, 30);
         rig.settle(0);
         let waits = rig.device.waits();
         rig.end_with(Control::Stop);

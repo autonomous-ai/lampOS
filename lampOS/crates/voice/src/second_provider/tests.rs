@@ -2740,6 +2740,83 @@ async fn the_only_voice_never_says_it_sounds_different() {
     assert_eq!(turn(&mut engine).await, expected(2));
 }
 
+/// A routine's optional exact speech is a Say written turn, not a due
+/// reminder. The second route sends its instruction to chat and its answer
+/// to speech with the reminder switch either way; it never opens STT.
+#[tokio::test]
+async fn bedtime_words_use_the_second_routes_written_path_independently_of_reminders() {
+    for reminders in [false, true] {
+        for words in ["Good evening.", "Good morning."] {
+            let mut chats = VecDeque::from([vec![text(words), Ok(ChatEvent::Done)]]);
+            if reminders {
+                chats.push_back(vec![text("Time to stretch."), Ok(ChatEvent::Done)]);
+            }
+            let script = Arc::new(Script {
+                chats: Mutex::new(chats),
+                // A written turn must never ask this empty STT script.
+                ..Script::default()
+            });
+            let (engine, calls, _) = scripted(script.clone());
+            let mut engine = engine.announcing(false).saying_reminders(reminders);
+            let request = crate::say::parse(
+                &json!({
+                    "skill": "bedtime-morning",
+                    "text": words,
+                    "priority": 8,
+                    "expires_in_ms": 3_600_000,
+                })
+                .to_string(),
+            )
+            .expect("the routine's exact-word Say request");
+            let instruction = request.words.turn().expect("a written turn");
+            assert_eq!(instruction, format!("{} {words}", crate::say::AS_WRITTEN));
+            engine.submit(written(1, &instruction));
+            assert_eq!(
+                tokio::time::timeout(Duration::from_secs(3), turn(&mut engine))
+                    .await
+                    .expect("the routine's written turn completes"),
+                [
+                    "started:1".to_owned(),
+                    format!("said:{words}"),
+                    format!("audio:{}", words.len()),
+                    "generated".into(),
+                    "complete".into(),
+                ],
+                "reminders={reminders}, words={words}"
+            );
+            assert_eq!(
+                script.asked.lock().unwrap()[0].last(),
+                Some(&Message::user(&instruction))
+            );
+            assert_eq!(script.samples_heard.load(Ordering::Relaxed), 0);
+            assert!(calls.lock().unwrap().is_empty());
+
+            // A real reminder still obeys its separate opt-in. This control
+            // catches accidentally treating the routine as a reminder.
+            engine.submit(reminder(2, "stretch"));
+            let reminder_output = tokio::time::timeout(Duration::from_secs(3), turn(&mut engine))
+                .await
+                .expect("the reminder is completed or deferred");
+            if reminders {
+                assert_eq!(
+                    reminder_output,
+                    [
+                        "started:2",
+                        "said:Time to stretch.",
+                        "audio:16",
+                        "generated",
+                        "complete",
+                    ]
+                );
+                assert_eq!(script.asked.lock().unwrap().len(), 2);
+            } else {
+                assert_eq!(reminder_output, ["deferred:Disabled"]);
+                assert_eq!(script.asked.lock().unwrap().len(), 1);
+            }
+        }
+    }
+}
+
 #[tokio::test]
 async fn a_turn_spoken_over_stops_its_chat_and_speech_and_sends_nothing_more() {
     let script = Arc::new(Script {
@@ -3155,6 +3232,49 @@ async fn a_checked_sound_with_a_word_right_after_the_lamps_question_is_answered(
         );
         assert_eq!(asked, 0, "{heard} {lamp_asked:?}");
     }
+}
+
+/// #1854's follow-up (lamp-75c9, 20 Oct 18:19): with
+/// `LAMP_SECOND_WRITTEN_WAIT=on` a turn the lamp wrote itself, such as task
+/// news, is said though its chat begins at 5 s, past `BEGIN_WITHIN`; one that
+/// never begins ends unanswered at `WRITTEN_BEGIN_WITHIN`. A spoken line is
+/// bounded as before. Without the switch, the written turn ends at 3 s
+/// (`a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered`).
+#[tokio::test(start_paused = true)]
+async fn with_its_switch_a_written_turn_waits_seven_seconds_to_begin() {
+    async fn said(first_event_after: Duration, input: ProviderInput) -> (Vec<String>, Duration) {
+        let script = Arc::new(Script {
+            chats: Mutex::new([vec![text("Devin finished."), Ok(ChatEvent::Done)]].into()),
+            first_event_after: Some(first_event_after),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.waiting_for_written(true);
+        engine.submit(input);
+        let begun = tokio::time::Instant::now();
+        let mut said = Vec::new();
+        loop {
+            match engine.next().await {
+                ProviderOutput::Transcript {
+                    request: Some(_),
+                    text,
+                    ..
+                } if !text.is_empty() => said.push(text),
+                ProviderOutput::TurnComplete { .. } => return (said, begun.elapsed()),
+                ProviderOutput::TurnFailed { .. } => panic!("failed"),
+                _ => {}
+            }
+        }
+    }
+    let news = || written(1, "(Nobody has spoken. News from work you handed over.)");
+    let (slow, _) = said(Duration::from_secs(5), news()).await;
+    assert_eq!(slow, ["Devin finished."]);
+    let (never, after) = said(Duration::from_secs(60), news()).await;
+    assert!(never.is_empty(), "{never:?}");
+    assert!(
+        after >= WRITTEN_BEGIN_WITHIN && after < WRITTEN_BEGIN_WITHIN + Duration::from_millis(100),
+        "{after:?}"
+    );
 }
 
 /// The first builder, 21:25: a look's first round may take 5 s, not 3 s;
@@ -6474,4 +6594,15 @@ async fn each_answer_asks_for_its_speech_socket_as_it_begins() {
     engine.submit(written(2, "Say ORCHID."));
     turn(&mut engine).await;
     assert_eq!(*script.sockets_asked.lock().unwrap(), [1, 2]);
+}
+
+/// #1854's follow-up: with `LAMP_SECOND_WRITTEN_WAIT=on` a turn the
+/// lamp wrote itself may begin as late as 7 s; a spoken one, or any
+/// without the switch, as before.
+#[test]
+fn a_written_turn_waits_longer_only_with_its_switch() {
+    assert_eq!(begin_within(false, true), WRITTEN_BEGIN_WITHIN);
+    assert_eq!(begin_within(true, true), BEGIN_WITHIN);
+    assert_eq!(begin_within(false, false), BEGIN_WITHIN);
+    assert!(WRITTEN_BEGIN_WITHIN > BEGIN_WITHIN && WRITTEN_BEGIN_WITHIN < Duration::from_secs(8));
 }

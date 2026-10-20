@@ -21,7 +21,9 @@
 
 mod clock;
 pub mod log_relay;
+mod wait;
 pub use clock::clock_synced;
+pub use wait::readable;
 
 use std::fs::{self, Permissions};
 use std::io;

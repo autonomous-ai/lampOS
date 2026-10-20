@@ -218,7 +218,7 @@ pulled() { printf '{"line":%s,"high_with_pull_down":%s,"high_with_pull_up":%s,"i
 lamp; before=$(cat "$T/root/$PINSF")
 FAKE_DISCOVERY="{\"lines\":[$(pulled 37 true true true 2 true),$(pulled 96 true true true 1 null),$(pulled 97 false false false 0 null),$(pulled 98 false true null 0 null)],\"hardware_mapping_installed\":false}" \
   ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
-check "one pad touched twice is not a pair: nothing written, controls started again" '[[ $status == 1 ]] && grep -q "head pads found on \[37\] lines, not two" "$T/out" && [[ $(cat "$T/root/$PINSF") == "$before" ]] && grep -q "systemctl start lamp-controls" "$T/log" && ! grep -q "systemctl restart" "$T/log"'
+check "one pad touched twice is not a pair: nothing written, controls started again" '[[ $status == 1 ]] && grep -q "head pads found on \[37\] lines, not two or more" "$T/out" && [[ $(cat "$T/root/$PINSF") == "$before" ]] && grep -q "systemctl start lamp-controls" "$T/log" && ! grep -q "systemctl restart" "$T/log"'
 # A pad whose line changed with hands away (lamp-cb94's 97, #1764) is
 # refused; a report from an older discover-head writes no baseline.
 lamp; before=$(cat "$T/root/$PINSF")
@@ -233,6 +233,17 @@ lamp
 FAKE_DISCOVERY="{\"lines\":[$(pulled 97 false false false 2 false),$(pulled 98 false false false 2 false)],\"hardware_mapping_installed\":false}" \
   ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "an older report without the rest: the pads are written, no baseline" '[[ $status == 0 ]] && [[ $(jq -c "[.head_pads[].line]" "$T/root/$PINSF") == "[97,98]" ]] && [[ $(jq -c .head_rest "$T/root/$PINSF") == null ]] && grep -q "rest: \"not measured\"" "$T/out"'
+# lamp-dbda's three (#2182, #2208 item 4): each is written, as the hardware
+# team's test passes at two or more.
+lamp
+FAKE_DISCOVERY="{\"lines\":[$(pulled 37 false false false 3 false | sed 's/}$/,"rest_changes":0,"reads":"level"}/'),$(pulled 96 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":"level"}/'),$(pulled 97 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":"pulses"}/'),$(pulled 98 false true null 0 null)],\"hardware_mapping_installed\":false}" \
+  ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
+check "three pads found: all three written, each with its baseline" '[[ $status == 0 ]] && [[ $(jq -c "[.head_pads[] | [.name, .line]]" "$T/root/$PINSF") == "[[\"head-1\",37],[\"head-2\",96],[\"head-3\",97]]" ]] && [[ $(jq -c "[.head_rest[] | [.name, .reads]]" "$T/root/$PINSF") == "[[\"head-1\",\"level\"],[\"head-2\",\"level\"],[\"head-3\",\"pulses\"]]" ]] && grep -q "systemctl restart lamp-controls" "$T/log"'
+# All four lines with a pad on each: all four written.
+lamp
+FAKE_DISCOVERY="{\"lines\":[$(pulled 37 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":"level"}/'),$(pulled 96 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":"level"}/'),$(pulled 97 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":"level"}/'),$(pulled 98 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":"level"}/')],\"hardware_mapping_installed\":false}" \
+  ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
+check "four pads found: all four written" '[[ $status == 0 ]] && [[ $(jq -c "[.head_pads[] | [.name, .line]]" "$T/root/$PINSF") == "[[\"head-1\",37],[\"head-2\",96],[\"head-3\",97],[\"head-4\",98]]" ]] && [[ $(jq -c "[.head_rest[].name]" "$T/root/$PINSF") == "[\"head-1\",\"head-2\",\"head-3\",\"head-4\"]" ]]'
 lamp; JQ=/nonexistent/jq ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "no jq: the head pads step says so, before stopping anything" '[[ $status == 1 ]] && grep -q "/nonexistent/jq is not installed" "$T/out" && ! grep -q "systemctl stop" "$T/log"'
 lamp; FAKE_DISCOVERY_EXIT=1 ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?

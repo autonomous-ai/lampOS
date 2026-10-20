@@ -36,7 +36,7 @@ fn roundtrip<T: Serialize + DeserializeOwned + Debug + PartialEq>(value: &T) {
 #[test]
 fn optional_expression_topics_have_own_types_and_do_not_replace_light_setting() {
     let topics = expression_topics();
-    assert_eq!(topics.len(), 9);
+    assert_eq!(topics.len(), 11);
     assert_eq!(first_topics().len(), 17);
     for (topic, declaration) in &topics {
         assert_eq!(declaration_of(topic).as_ref(), Some(declaration));

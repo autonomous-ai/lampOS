@@ -23,8 +23,35 @@ pub fn text(value: &str) -> String {
 /// characters. A question never supplies FTS operators, columns, prefixes,
 /// or phrases. Bind the returned value as a SQL parameter, not SQL text.
 pub fn query(value: &str) -> Option<String> {
+    query_with(value, false)
+}
+
+/// Words nearly every question has, which on their own match nearly every
+/// exchange: "what is my drink order" found one on "my" alone (#2176). In
+/// [`text`]'s form, accents kept: "chó" (a dog) is not "cho" (for), nor
+/// "đỏ" (red) "đó" (that). No Vietnamese given name: "an" is "An".
+const COMMON: &[&str] = &[
+    "the", "and", "or", "but", "of", "to", "in", "on", "at", "for", "with", "from", "by", "about",
+    "as", "is", "are", "was", "were", "be", "been", "am", "it", "its", "my", "me", "mine", "you",
+    "your", "yours", "we", "our", "us", "he", "him", "his", "she", "her", "they", "them", "their",
+    "what", "which", "who", "when", "where", "why", "how", "that", "this", "these", "those", "do",
+    "does", "did", "have", "has", "had", "can", "could", "would", "should", "will", "any", "some",
+    "not", "no", "so", "if", "there", "tell", "told", "remember", "please", "của", "là", "tôi",
+    "và", "có", "không", "này", "đó", "thì", "mà", "những", "các", "một", "cho", "với", "được",
+    "gì", "nào",
+];
+
+/// Whether this word, in [`text`]'s form, is one of [`COMMON`].
+fn common(word: &str) -> bool {
+    COMMON.iter().any(|known| text(known) == word)
+}
+
+/// [`query`], or with `skip_common` the same OR without [`COMMON`] words,
+/// the first sixteen of the rest: a question of only those searches
+/// nothing.
+pub fn query_with(value: &str, skip_common: bool) -> Option<String> {
     let normalized = text(value);
-    let words = collect_words(&normalized);
+    let words = collect_words_with(&normalized, skip_common);
     if words.is_empty() {
         return None;
     }
@@ -44,9 +71,16 @@ pub fn words(value: &str) -> Vec<String> {
 }
 
 fn collect_words(value: &str) -> Vec<String> {
+    collect_words_with(value, false)
+}
+
+fn collect_words_with(value: &str, skip_common: bool) -> Vec<String> {
     let mut words = Vec::new();
     for word in value.split(|character: char| !character.is_alphanumeric()) {
-        if word.chars().count() >= 2 && !words.iter().any(|known| known == word) {
+        if word.chars().count() >= 2
+            && !words.iter().any(|known| known == word)
+            && !(skip_common && common(word))
+        {
             words.push(word.to_owned());
             if words.len() == QUERY_WORDS {
                 break;

@@ -41,8 +41,8 @@ memory's typed rules, and `name_topics()` the first sign of a hearing of the
 lamp's name (`name/rising`), and `presence_topics()` whether anyone is at
 the lamp (`room/presence`). Touch, Schedule, Ears and privacy have separate
 additive catalogues. `logging_topics()` adds the optional operational log
-stream. `declaration_of()` recognizes every catalogue without changing
-`first_topics()`.
+stream, and `output_caps_topics()` the Actions-owned output restrictions.
+`declaration_of()` recognizes every catalogue without changing `first_topics()`.
 
 ## The types
 
@@ -53,7 +53,7 @@ stream. `declaration_of()` recognizes every catalogue without changing
 | `JointState` | `body/joint_states` | latest | 100 ms | ROS's `sensor_msgs/JointState`: `name`, `position` (rad), `velocity` (rad/s), and `effort`, which here is the share of its full strength each servo reports (0 to 1) and not ROS's newton metres. And `commanded` (rad), which ROS's has not |
 | `Faces` | `humans/faces/tracked` | latest | none | A list of faces: a passing id, a box in fractions of the picture as in ROS4HRI, confidence, yaw if it was estimated, whether it faces the lamp if that was judged, and with `LAMP_EYES_SPEAKING=on` whether its mouth is speaking (`speaking`: `state` yes/no/unknown, a `score`, and `from`, `corners` or `mesh` with `--mouth-model`, whose scale the score is on; `from` absent from eyes before #1470), absent otherwise |
 | `HumanFamiliar` | `humans/familiar` | latest | 2 s, good for 5 s | How familiar the remembered person at the lamp is: `level` `new`, `regular` or `close`, or `null` for nobody near, someone not remembered or not recognised. No name (#1670, [eyes.md](eyes.md)) |
-| `HumanSeems` | `humans/seems` | latest | 2 s, good for 5 s | How the near face seems: `kind` `positive`, `negative` or `unsure`, and a `confidence` from 0 to 1. No name, print or picture, and nothing reads it yet (#1671, [eyes.md](eyes.md)) |
+| `HumanSeems` | `humans/seems` | latest | 2 s, good for 5 s | How the near face seems: `kind` `positive`, `negative` or `unsure`, and a `confidence` from 0 to 1. `from`: `fer_plus` or `blendshapes`, the reader that said it; without it, `fer_plus` (the one reader before it). With both readers on, a consumer that wants one takes the stream, not `latest`, and splits by `from`. No name, print or picture, and nothing reads it yet (#1671, [eyes.md](eyes.md)) |
 | `Speech` | `voice/heard`, `voice/said` | event | none | Text, whether it is finished, and the locale and the request's number if known. After `hri_msgs/LiveSpeech` |
 | `VoiceState` | `voice/state` | latest | 1 s | Resting, listening, thinking or speaking |
 | `VoiceLink` | `voice/link` | latest | 1 s | Ready, or unavailable with one of seven kinds of reason |
@@ -141,6 +141,8 @@ at the crate root. Their new topics do not change any existing type:
 | `ExpressionBody` | `expression/body` | latest | 20 / 200 ms | Relative radian offsets, hold or a normalized calibrated-owner gaze request |
 | `ExpressionLight` | `expression/light` | latest | 20 / 200 ms | Face and brightness multiplier preserving the lasting `Light` setting |
 | `ExpressionState` | `expression/state` | latest | 200 / 500 ms | Planned behaviors, shadow/enabled status, missing facts and warnings |
+| `ExpressionRestRequest` | `expression/rest_request` | event | 1,000 / 500 ms | Skills' leased rest, wake or cancel intent, bound to the host clock, publisher, Expression session and episode |
+| `ExpressionRestState` | `expression/rest_state` | latest | 200 / 500 ms | Expression's correlated planning receipt: idle, resting, waking, completed, cancelled or refused, a refusal with its optional `reason` (at most 160 bytes, absent otherwise) |
 
 `ClockStamp` identifies the host boot and shared `CLOCK_MONOTONIC` time in
 microseconds. It is distinct from the bus header's private `at_us`.
@@ -159,6 +161,37 @@ keeps that generation. Terminal retirement and freshness still take priority.
 New generation messages require First's Voice publisher integration; this
 task changes no hardware owner. See
 [Expression](expression.md) for exact integration and evidence limits.
+
+The rest contracts are included in `expression_topics()`. Admission or lease
+extension requires an original observation fresh within 500 ms, and a lease
+is at most three seconds. A stale, unexpired same-episode Rest renewal may
+be discarded while the prior lease and receipt stay unchanged; it adds no
+time. A new receipt is not a renewal of its request. A completed
+receipt reports planning completion, not physical movement. The rest
+request, receipt, nested echoed request and clock stamps follow the common
+additive-field rule above. Unknown `op` or `phase` values are refused;
+required identities, clocks and lease bounds are still checked. See
+[Bedtime and Morning](bedtime-morning.md) for the default-off switches and
+owner cancellation rules.
+
+## Optional output restrictions
+
+`output_caps_topics()` adds one complete Actions snapshot:
+
+| Type | Topic | Kind | Period / lifespan | Meaning |
+|---|---|---|---|---|
+| `OutputCaps` | `output/caps` | latest | 1,000 / 3,000 ms | Actions session, persisted revision and up to eight source-owned light/volume ceilings |
+
+The snapshot, nested `OutputCap` entries and clock stamp accept additive
+fields. Required fields, scalar bounds, identities, duplicate sources,
+envelope identity and freshness remain checked. Snapshot freshness controls
+admission, not a restriction's lifetime: a missing heartbeat cannot release
+an accepted ceiling. Unknown wall time retains restrictions; a newer valid
+complete snapshot may explicitly release them. A ceiling grants no output
+authority and combines with other ceilings by minimum. Actions' private
+`caps_put`, `caps_remove` and `caps_get` socket commands retain their separate
+strict schemas, including rejection of unknown fields and operations. See
+[Bedtime and Morning](bedtime-morning.md) for clock and consumer limits.
 
 ## Optional controls contracts
 

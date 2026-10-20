@@ -290,13 +290,16 @@ pub fn remove(places: &Places, data: &Value) -> Result<Value, String> {
 }
 
 /// What the app is told when the manage helper can't be reached or does
-/// not answer.
-pub const NOT_CHANGED: &str = "the lamp's skills can't be changed now";
+/// not answer: the helper's own words when another run holds the folder.
+pub const NOT_CHANGED: &str = lamp_skills::package::BUSY;
 
 /// The longest `skills.remove` waits for the manage helper's answer: a
 /// remove takes milliseconds, but it waits for the folder's lock while an
-/// install by hand runs.
+/// install by hand runs. The helper waits for that lock at most
+/// [`lamp_skills::package::ASKED_LOCK_WAIT`], under this, then refuses with
+/// nothing done, so no remove is finished after `lamp-cloud` gave up.
 pub const ASK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const _: () = assert!(lamp_skills::package::ASKED_LOCK_WAIT.as_millis() < ASK_TIMEOUT.as_millis());
 
 /// Why the manage helper did not remove a skill.
 enum Asked {
@@ -484,14 +487,21 @@ pub mod tests {
     /// The manage helper on `places.manage`, a real Unix socket on a short
     /// `/tmp` path: each connection answered by `lamp_skills::package::asked`
     /// over the folder, as systemd's `Accept=yes` hands one to `lamp-skills
-    /// asked`. Only the process starting differs.
+    /// asked`, with the lamp's wait for the folder. Only the process
+    /// starting differs.
     pub fn helper(places: &Places) {
+        helper_waiting(places, lamp_skills::package::ASKED_LOCK_WAIT);
+    }
+
+    /// [`helper`], waiting at most `lock_wait` for the folder, in place of
+    /// any helper there before.
+    pub fn helper_waiting(places: &Places, lock_wait: std::time::Duration) {
         let _ = fs::remove_file(&places.manage);
         let listener = std::os::unix::net::UnixListener::bind(&places.manage).unwrap();
         let folder = places.folder.clone();
         std::thread::spawn(move || {
             for stream in listener.incoming().flatten() {
-                let _ = lamp_skills::package::asked(&folder, &stream, &stream);
+                let _ = lamp_skills::package::asked(&folder, lock_wait, &stream, &stream);
             }
         });
     }
@@ -969,6 +979,34 @@ pub mod tests {
             Err(NOT_CHANGED.to_owned())
         );
         assert_eq!(folder_holds(&places), ["dance", "plant-water", "tutor"]);
+    }
+
+    /// While another run holds the skills folder past the helper's wait (an
+    /// install by hand), the helper refuses with nothing done before
+    /// `lamp-cloud` stops waiting, and never removes the skill afterwards
+    /// (the reviewer's P3 1 on #1890). The helper here waits 200 ms, not the
+    /// lamp's 4 s, so the test does not wait the lamp's time out (#1806).
+    #[test]
+    fn a_remove_held_past_the_helpers_wait_is_refused_and_never_done_later() {
+        let wait = std::time::Duration::from_millis(200);
+        let places = three("rm-held");
+        helper_waiting(&places, wait);
+        let held = fs::File::open(&places.folder).unwrap();
+        held.lock().unwrap();
+        let asked = std::time::Instant::now();
+        assert_eq!(
+            remove(&places, &json!({"name": "tutor"})),
+            Err(NOT_CHANGED.to_owned())
+        );
+        let waited = asked.elapsed();
+        assert!(waited >= wait && waited < ASK_TIMEOUT, "{waited:?}");
+        held.unlock().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        assert_eq!(folder_holds(&places), ["dance", "plant-water", "tutor"]);
+        // Given back, the next ask removes it.
+        let page = remove(&places, &json!({"name": "tutor"})).unwrap();
+        assert_eq!(folder_holds(&places), ["dance", "plant-water"]);
+        assert_eq!(page, list(&places).unwrap());
     }
 
     #[test]

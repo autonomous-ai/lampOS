@@ -23,6 +23,8 @@
 //! is to be replaced by a colour and a level when the ring's owner is
 //! built.
 
+pub mod caps;
+pub mod caps_service;
 pub mod light;
 pub mod schedule;
 pub mod server;

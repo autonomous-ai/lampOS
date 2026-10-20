@@ -1787,7 +1787,6 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
- "sha2",
  "tokio",
  "toml",
  "webpki-roots 1.0.9",
@@ -1974,6 +1973,7 @@ dependencies = [
  "lamp-bus",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]
@@ -2103,6 +2103,7 @@ version = "0.1.0"
 dependencies = [
  "lamp-air",
  "lamp-bus",
+ "lamp-controls",
  "lamp-ipc",
  "lamp-msgs",
  "serde",
@@ -2154,6 +2155,7 @@ dependencies = [
  "lamp-ipc",
  "lamp-local-time",
  "lamp-msgs",
+ "lamp-schedule",
  "lamp-voice",
  "libc",
  "serde",
@@ -2275,6 +2277,7 @@ dependencies = [
  "httparse",
  "lamp-actions",
  "lamp-bus",
+ "lamp-controls",
  "lamp-gemini",
  "lamp-msgs",
  "lamp-skills",
@@ -2333,6 +2336,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "toml",
+ "unicode-normalization",
  "webpki-roots 1.0.9",
 ]
 

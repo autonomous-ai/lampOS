@@ -206,6 +206,7 @@ instance, is said with the next message handed over.
 | Field | What it counts |
 |---|---|
 | `received` | Messages `recv` handed over |
+| `datagrams` | Of `received`, those that came as datagrams, not from the topic's `latest` file: none until a publisher has found this subscriber |
 | `gaps` | Messages known to have been sent and not received |
 | `expired`, `wrong_type` | Messages passed over for either reason |
 | `mean_interval`, `largest_interval` | The time between taking one message and the next, by the subscriber's monotonic clock. The stream's rhythm for a subscriber that reads as fast as messages come, the reader's for one that does not |
@@ -357,7 +358,7 @@ of each, and its kind and period as a declaration, are in
 | `body/joint_states` | Each joint: where it is, how fast, how loaded (ROS's `JointState`) | latched | Body | 10 to 20 a second |
 | `humans/faces/tracked` | The faces in view: a passing id, where, and whether it is turned to the lamp | latched | Eyes | With each look |
 | `humans/familiar` | How familiar the remembered person at the lamp is, as a level, with no name | latched | Eyes, with `--visits on` (#1670) | At each recognition, every 2 s |
-| `humans/seems` | How the near face seems, as a kind and a confidence, for measuring; nothing reads it yet | latched | Eyes, with `--seems` (#1671) | At most every 2 s while a face is near |
+| `humans/seems` | How the near face seems, as a kind and a confidence, for measuring; nothing reads it yet | latched | Eyes, with `--seems` or `--seems-blendshapes` (#1671) | At most every 2 s while a face is near |
 | `voice/heard`, `voice/said` | What was heard and what was said, as text | stream | Voice | With each thing said |
 | `voice/state` | Resting, listening, thinking or speaking | latched | Voice | When it changes, and once a second |
 | `voice/turn` | A turn's verdict: its request, and whether it was `answered` or its answer `held_back` as not said to the lamp, as the voice's journal says it (#1155, [policy.md](policy.md#the-quiet-counts-talk-to-the-lamp-1155)) | stream | Voice, on the bus as `room/state` is | Once for each turn the rule judged, as its answer is let out or held back; again, `held_back`, when the model declines the line (`not_for_me`) |
@@ -424,6 +425,9 @@ that owns it:
 | `room/presence` | the eyes, with `LAMP_PRESENCE=on`, from their looks and `voice/heard` ([presence.md](presence.md)) | `lamp-skills` (Light out when you leave; Who was here's record, #1685); Messages (#1673) |
 | `room/activity`, `room/stood_up` | the eyes, with `LAMP_ACTIVITY=on`, from their looks ([eyes.md](eyes.md)) | `lamp-skills` (Stretch break waits for a look up); "watches you leave" (#1669) |
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
+| `expression/rest_request` | `lamp-skills`, with `LAMP_SKILL_ROUTINES=on` and an enabled routine | Expression, with `LAMP_REST_REQUESTS=on` |
+| `expression/rest_state` | `lamp-expression`, with `LAMP_REST_REQUESTS=on` | Skills' routine manager |
+| `output/caps` | `lamp-actions`, with `LAMP_OUTPUT_CAPS=on` | Voice's ring worker, with `LAMP_OUTPUT_CAPS=on` |
 | `policy/decisions` | the policy ([policy.md](policy.md)) | nothing yet |
 | `body/joint_states` | the body ([body.md](body.md), "On the bus") | nothing yet; recorded to measure how the lamp moves |
 | `light/command` | the actions program ([actions.md](actions.md)); `lamp-cloud`, the app's Light row ([cloud.md](cloud.md)) | the voice's ring worker |
@@ -472,6 +476,32 @@ The new payload timestamps explicitly use the shared host monotonic clock
 and boot identity. This does not change the meaning of existing bus header
 `at_us`: that remains a publisher-private timestamp. Expression's replay
 importer warns when it estimates a shared timeline from legacy wall stamps.
+
+`expression_topics()` also declares `expression/rest_request` (event,
+one-second period, 500 ms lifespan) and `expression/rest_state` (latest,
+200 ms period, 500 ms lifespan). Skills' request is a clock/session/episode
+bound rest, wake or cancel intent with at most a three-second lease.
+Expression publishes the correlated planning receipt; completed does not
+prove that an actuator moved. The feature switches default off. Both
+messages accept additive fields, including nested requests and stamps, but
+refuse unknown operation or phase values. The owners still enforce freshness,
+privacy and cancellation; declaring a topic grants no actuator authority.
+
+## Optional output restrictions
+
+`output_caps_topics()` declares `output/caps`, an Actions-owned latest
+`OutputCaps` snapshot every second with a three-second admission lifespan.
+It contains a persisted revision and up to eight source-owned light/volume
+ceilings. With `LAMP_OUTPUT_CAPS=on`, Actions publishes the full set, including
+an empty set after release, and Voice's ring worker consumes it for ordinary
+light output. Actions applies the volume ceiling itself. A lost heartbeat
+does not release an admitted restriction; unknown wall time retains it.
+Ceilings combine by minimum and do not grant output authority. Snapshot and
+nested entry fields are additive; the separate private Actions socket
+commands stay strict. See [msgs.md](msgs.md#optional-output-restrictions)
+and [Bedtime and Morning](bedtime-morning.md) for the validation and clock
+boundaries. These declarations are recognized by `declaration_of()` and
+leave the original seventeen topics unchanged.
 
 ## Optional Controls topics (Third, 2026-10-14)
 

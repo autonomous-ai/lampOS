@@ -179,3 +179,47 @@ fn one_long_hold_finds_a_pad_and_a_lone_short_press_does_not() {
     assert_eq!(lines[1].active_low_candidate, None, "a lone short press");
     assert_eq!(lines[3].active_low_candidate, None);
 }
+
+/// The first builder on #1722 (21 Oct, 02:17), thirteen-P4's case with a
+/// hand on two pads at once: the step says "a hand on both at once is
+/// fine". Each line is its own contact, so a touch on two pads together is
+/// a press on each. Here 37 and 97 are touched together for 300 ms, then
+/// held one by one: both are found, read as a level, each with its two
+/// presses. The bare 96 and 98 aren't. Held together only, once, both are
+/// found too.
+#[test]
+fn two_pads_touched_together_then_held_one_by_one_are_both_found() {
+    use lamp_controls::touch_pins::Reads;
+    let mut scan = Discovery::with_rest(0, [(false, false); 4], 1_000_000).unwrap();
+    feed(&mut scan, 0, 1_995_000, 0);
+    // 37 and 97 together, briefly.
+    feed(&mut scan, 2_000_000, 2_295_000, 0b0101);
+    feed(&mut scan, 2_300_000, 2_995_000, 0);
+    // 37 held alone, then 97.
+    feed(&mut scan, 3_000_000, 4_295_000, 0b0001);
+    feed(&mut scan, 4_300_000, 4_995_000, 0);
+    feed(&mut scan, 5_000_000, 7_995_000, 0b0100);
+    feed(&mut scan, 8_000_000, 8_995_000, 0);
+    let lines = &scan.report().lines;
+    for found in [0, 2] {
+        assert_eq!(lines[found].active_low_candidate, Some(false), "{found}");
+        assert_eq!(lines[found].reads, Some(Reads::Level), "{found}");
+        assert_eq!(lines[found].completed_pulses, 2, "{found}");
+        assert_eq!(lines[found].rest_changes, Some(0), "{found}");
+    }
+    for bare in [1, 3] {
+        assert_eq!(lines[bare].active_low_candidate, None, "{bare}");
+    }
+
+    // One hand on both, held 2 s, and nothing more.
+    let mut together = Discovery::with_rest(0, [(false, false); 4], 1_000_000).unwrap();
+    feed(&mut together, 0, 1_995_000, 0);
+    feed(&mut together, 2_000_000, 3_995_000, 0b0101);
+    feed(&mut together, 4_000_000, 4_995_000, 0);
+    let lines = &together.report().lines;
+    for found in [0, 2] {
+        assert_eq!(lines[found].active_low_candidate, Some(false), "{found}");
+        assert_eq!(lines[found].reads, Some(Reads::Level), "{found}");
+    }
+    assert_eq!(lines[1].active_low_candidate, None);
+}

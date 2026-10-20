@@ -137,6 +137,60 @@ fn configuration_is_bounded_unique_explicit_and_strict() {
     assert!(serde_json::from_value::<TouchConfig>(value).is_err());
 }
 
+/// #1798: a pad read touched from the first acquisition, never released
+/// (a line stuck active, or a pad resting high read as active-high), is
+/// left out until it reads released. The other pad arms, and a touch on it
+/// is told without the stuck one. Before, the whole head never armed and
+/// nothing said so. Once it reads released, it counts again.
+#[test]
+fn a_pad_touched_from_the_start_is_left_out_and_the_other_arms() {
+    let mut rig = Rig::new(head());
+    assert!(rig.run(0, 600_000, 0b01).is_empty());
+    assert_eq!(rig.engine.head_left_out(), ["pad37"]);
+    let touched = rig.run(600_000, 800_000, 0b11);
+    let touch = touched
+        .iter()
+        .find(|event| event.gesture == TouchGesture::Touch)
+        .unwrap_or_else(|| panic!("pad96's touch: {touched:?}"));
+    assert_eq!(
+        (touch.active_mask, &touch.active_names[..]),
+        (0b10, &["pad96".to_owned()][..])
+    );
+    let let_go = rig.run(800_000, 1_000_000, 0b01);
+    assert!(
+        let_go
+            .iter()
+            .any(|event| event.gesture == TouchGesture::Tap),
+        "{let_go:?}"
+    );
+    assert_eq!(rig.engine.head_left_out(), ["pad37"]);
+    assert!(rig.run(1_000_000, 1_200_000, 0).is_empty());
+    assert!(rig.engine.head_left_out().is_empty());
+    let again = rig.run(1_200_000, 1_400_000, 0b01);
+    assert!(
+        again
+            .iter()
+            .any(|event| event.gesture == TouchGesture::Touch && event.active_names == ["pad37"]),
+        "{again:?}"
+    );
+    // With its only pad left out, the head is not armed: nothing on it can
+    // count.
+    let mut one = Rig::new(TouchConfig {
+        head_pads: vec!["pad97".into()],
+        ..head()
+    });
+    assert!(one.run(0, 600_000, 0b1).is_empty());
+    assert_eq!(one.engine.head_left_out(), ["pad97"]);
+    assert!(!one.engine.tick(600_000).state.sources[0].armed);
+    // A hand that comes after the first acquisition is not left out: the
+    // head waits for it to go, as before.
+    let mut rig = Rig::new(head());
+    assert!(rig.gpio(0, false, false, 0).is_empty());
+    assert!(rig.run(10_000, 600_000, 0b01).is_empty());
+    assert!(rig.engine.head_left_out().is_empty());
+    assert!(rig.run(600_000, 800_000, 0b11).is_empty(), "not armed");
+}
+
 fn working_strip() -> TouchConfig {
     TouchConfig {
         strip_pads: Some(vec![0, 1, 2, 3, 5, 6, 7, 9, 10, 11]),
@@ -475,8 +529,12 @@ fn same_polarity_button_debounce_cancels_bounce_hold_evidence() {
 #[test]
 fn head_needs_startup_settle_and_a_released_baseline() {
     let mut rig = Rig::new(head());
-    assert!(rig.hold(0, 1_000_000, false, false, 1).is_empty());
-    assert!(!rig.engine.tick(1_000_000).state.sources[0].armed);
+    assert!(rig.hold(0, 400_000, false, false, 1).is_empty());
+    assert!(!rig.engine.tick(400_000).state.sources[0].armed, "settling");
+    assert!(rig.hold(450_000, 1_000_000, false, false, 1).is_empty());
+    // pad37, touched from the start, is left out; pad96 arms (#1798).
+    assert!(rig.engine.tick(1_000_000).state.sources[0].armed);
+    assert_eq!(rig.engine.head_left_out(), ["pad37"]);
     rig.gpio(1_010_000, false, false, 0);
     rig.gpio(1_020_000, false, false, 1);
     let e = rig.gpio(1_040_000, false, false, 1).pop().unwrap();

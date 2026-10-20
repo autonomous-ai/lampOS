@@ -23,7 +23,7 @@ voice's lease, which a closed switch withdraws. The first builder turns it on
 by default once lamp-52e6 has run it for an hour. A lamp's own pins file
 (the factory's head pads, a calibration), which an update keeps, gains the
 build's `privacy` section when it has none, with everything else in it kept
-(`install::pins_gain_privacy`; the reviewer's P1 on #2143). Without it the
+(`install::own_pins_follow_build`; the reviewer's P1 on #2143). Without it the
 units would select the route with no switch evidence, and the lamp would
 never hear. New lamps keep the section through the factory's steps, which
 change only the head pads or calibrate through the typed profile. On an update, Controls
@@ -56,8 +56,17 @@ The selected publishers and subscribers rescan Bus registrations and retained
 state every 5 ms; the ordinary 200 ms discovery interval exceeds this route's
 50 ms freshness limit. Unselected services retain their existing cadence.
 Invalid types, publisher or reader changes, future/stale evidence, reordered
-messages, skipped Bus publications and receive overflow end this worker. It
-ends cleanly, telling the voice the switch is unreadable (a fault beginning
+messages, skipped Bus publications and receive overflow end this worker,
+with one allowance: until Controls' publisher finds the worker's new socket
+(the 5 ms rescan), the worker reads the topic's kept value, and a publication
+in between reaches only that file. So each message up to and including the
+worker's first datagram, within the worker's first second, resyncs the order
+rather than continuing it; the publisher, its clock and the order going
+forward are still checked. From the second datagram on, or after that first
+second, datagrams or not, a skipped publication ends the worker (#1569 row
+45). One that hears no datagram at all ends sooner: after twice
+`controls/state`'s declared 100 ms the bus says Controls is late.
+It ends cleanly, telling the voice the switch is unreadable (a fault beginning
 `privacy switch unreadable: `), and the voice keeps the microphones closed and
 reads again with a fresh worker each second instead of exiting (#795). Any
 other failure of the worker is still an abnormal exit that ends the service.
@@ -181,7 +190,7 @@ still needs the fresh Controls marker and the controller's own permission),
 but on a no-slide lamp nothing else can close the microphones. So the voice
 refuses to start with `no-slide` and no `--controls-mute` (the persisted
 record): a restart would forget a mute. Losing Controls, a
-stale, skipped or reordered publication, a publisher restart, or a state with
+stale, skipped (past the first datagram, as above) or reordered publication, a publisher restart, or a state with
 slide evidence or without the marker ends the worker as unreadable, and the
 microphones stay closed until a fresh worker reads fresh markers again.
 
@@ -294,6 +303,18 @@ bus passes over any number of messages it refuses, so a flood of them on
   failure kept) and
   `stop_during_refused_input_on_the_lease_topic_is_served_at_once` (the
   writer's real step, Stop served in under 10 ms, nothing red written).
+- **At its start the reader resyncs as the worker's fence does** (#1569 row
+  45, Third's note on #2244). Until the voice's publisher finds its new
+  socket, it reads the topic's kept lease, and a lease published in between
+  reaches only that file. So before its first datagram, in its first second
+  (`resyncs`), a lease may follow a gap and skip sequence numbers. Its
+  session, controller, order, time and generation are checked as ever, and
+  after either bound a gap ends it as before. Before this, the first
+  datagram's gap ended it, so the writer blanked and the red was lost at the
+  start. Tests:
+  `the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second`
+  and, once a lease has come as a datagram, a gap ending it inside its first
+  second: `after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second`.
 
 Design targets, not measured lamp results: actual line read to Controls
 publication within 50 ms; accepted mute to both capture gates closed within

@@ -21,5 +21,9 @@ lamp-msgs = { path = "../msgs" }
 serde.workspace = true
 serde_json.workspace = true
 
+[dev-dependencies]
+# The head pads' item name, as lamp-controls sends it (#1798).
+lamp-controls = { path = "../controls" }
+
 [lints]
 workspace = true

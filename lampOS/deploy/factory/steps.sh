@@ -4,8 +4,8 @@
 #      arm stood at 30% and 100% to take where this arm stops, into
 #      /etc/lampOS/body/lamp.env
 #   2. the touch pads: on GPIO head pads, which lines this unit's pads are on
-#      and which way they read (lamp-controls discover-head, a person touching
-#      each pad twice), into the pins file; on an MPR121, calibrate-touch
+#      and which way they read (lamp-controls discover-head, a person holding
+#      each pad), into the pins file; on an MPR121, calibrate-touch
 #      only while lamp-controls runs with LAMP_CONTROLS_STRIP=on
 #   3. the update key's public half: /etc/lampOS/update/key.pub
 #   4. the self-test: lamp-selftest --occasion factory, the lamp first stood
@@ -248,13 +248,15 @@ step_body() {
   cat "$LAMP_ENV"
 }
 
-# GPIO head pads differ by unit: the hardware team's test reads four candidate
-# lines, and lamp-52e6's pads were on 97 and 98, not the product's default 37
-# and 96, driven high while touched (#1362). discover-head samples the four
-# with both pulls and counts complete pulses; a line driven at idle that gave
-# two or more is a pad, and its idle level gives its polarity. Exactly two such
-# lines, or nothing is written. The pull follows the polarity, so a line with
-# nothing on it reads as not touched. Each unit's pads also rest and read
+# GPIO head pads differ by unit: each lamp's are on any of lines 37, 96, 97
+# and 98, and the hardware team's test passes when two or more read a touch
+# (the hardware lead, #2182): lamp-52e6's and lamp-cb94's on 97 and 98,
+# lamp-dbda's on 37, 96 and 97. The product's pins read all four until this
+# step writes the unit's own (#1798). discover-head samples the four with
+# both pulls and counts complete pulses; a line driven at idle that gave two
+# or more, or one long hold, is a pad, and its idle level gives its polarity.
+# Two to four such lines, or nothing is written. The pull follows the
+# polarity, so a line with nothing on it reads as not touched. Each unit's pads also rest and read
 # differently (#1764): lamp-cb94's line 97 flipped at rest and read touched
 # for 77 s, lamp-c0a4's pulsed under a hand. So the read begins with 10 s of
 # hands away, a pad whose line changed then is refused, and each pad's own
@@ -262,11 +264,11 @@ step_body() {
 # holds its level or pulses), which lamp-controls reads it by (#711).
 step_head_pads() {
   if [[ $WRITE != 1 ]]; then
-    say "would stop lamp-controls, run $CONTROLS_BIN discover-head --seconds 40 --rest-seconds 10 with a person's hands away for 11 s, then holding each head pad about 2 s, write the two pads' lines, polarity and rest into $PINS and start lamp-controls again (dry)"
+    say "would stop lamp-controls, run $CONTROLS_BIN discover-head --seconds 40 --rest-seconds 10 with a person's hands away for 11 s, then holding each head pad about 2 s, write the pads' lines, polarity and rest into $PINS and start lamp-controls again (dry)"
     return 0
   fi
   command -v "$JQ" >/dev/null || { fail "$JQ is not installed: the head pads step reads discover-head's report with it"; return 1; }
-  ask "the head pads: for 40 s, hands away from the lamp for the first 11 s (count them), then hold head pad 1 about 2 s and let go, then head pad 2 the same; a hand on both at once is fine (the button is off meanwhile)." || return 1
+  ask "the head pads: for 40 s, hands away from the lamp for the first 11 s (count them), then hold head pad 1 about 2 s and let go, then head pad 2 the same, and any other head pad the same; a hand on two at once is fine (the button is off meanwhile)." || return 1
   local report=$ROOT/var/tmp/factory-head-pads-$STAMP.json out=$PINS.factory-$STAMP pads
   mkdir -p "$(dirname "$report")"
   "$SYSTEMCTL" stop lamp-controls || { fail "could not stop lamp-controls"; return 1; }
@@ -298,8 +300,8 @@ step_head_pads() {
     fail "head pad lines $unread were neither held half a second nor pulsing under the hand: hold each pad about 2 s, and run the step again (report: $report)"
     return 1
   fi
-  if [[ $("$JQ" length <<<"$pads") != 2 ]]; then
-    fail "head pads found on $("$JQ" -c '[.[].line]' <<<"$pads") lines, not two, each held or touched twice: the pins are not changed (report: $report)"
+  if (( $("$JQ" length <<<"$pads") < 2 )); then
+    fail "head pads found on $("$JQ" -c '[.[].line]' <<<"$pads") lines, not two or more, each held or touched twice: the pins are not changed (report: $report)"
     return 1
   fi
   # The baseline only from a discover-head that measured it (rest and reads),
