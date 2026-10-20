@@ -588,9 +588,20 @@ order is kept. A written turn is the same from the chat on.
   (off unless set; `Engine::keeping_a_listener_ready`). As a line takes its
   socket, the next is opened in the background and kept with `KeepAlive`
   (every 5 s, `KEEP_ALIVE`). The next line takes it at once, so its sound
-  goes live from its first block. Its bounds (the first builder at 00:31):
+  goes live from its first block. The first line's is opened before it
+  (#2135, the first builder on #1722 at 01:15: on lamp-4ace the first
+  request after a start waited 753 ms for its socket, with 1,050 ms of its
+  sound waiting). At an authority the worker installs with listening
+  allowed and nothing kept, `Engine::listening` opens one, once a privacy
+  generation, so the first line after the voice starts, or after listening
+  comes back, takes it (its journal line says `kept ready`); the journal
+  says `speech to text's socket opened before the first line` when it
+  does. Its bounds (the first builder at 00:31):
   - **at most 3 minutes** (`KEPT_FOR`), then it is closed, so a lamp
-    nobody talks to keeps nothing open; a line after that opens its own;
+    nobody talks to keeps nothing open; a line after that opens its own.
+    The opened-before-the-first-line one is no exception: the authorities
+    that keep coming don't open another in the same generation, so the
+    first line after 3 quiet minutes is still cold;
   - **closed at once when listening stops** (the privacy switch, a mute)
     or the microphone's privacy generation changes (`Engine::listening`,
     from each authority the worker installs), and never used for a line of
@@ -598,8 +609,13 @@ order is kept. A written turn is the same from the chat on.
   - **one found closed** (`Listener::open`, `SttStream::still_open`) is
     dropped without a word, and the line opens its own as before.
 
-  The cost is one idle socket to the relay's proxy during a conversation:
-  Deepgram bills the audio sent, and `KeepAlive` sends none.
+  The cost is one idle socket to the relay's proxy during a conversation,
+  and for the first 3 minutes after the voice starts: Deepgram bills the
+  audio sent, and `KeepAlive` sends none. Tests:
+  `the_next_lines_listener_is_kept_ready_and_one_closed_since_is_not_used`,
+  `a_kept_listener_goes_after_its_time_or_when_listening_stops` and
+  `the_first_line_after_a_start_goes_to_a_socket_opened_before_it` (with
+  `no_listener_is_opened_before_a_line_outside_a_runtime`).
 - **With `LAMP_SECOND_EARLY_FINALIZE=on` a line's words are asked for at a
   pause** (off unless set; the first builder on #1722, 20 Oct 07:20 and
   07:36). On lamp-4ace Deepgram never ends a line itself: the lamp's quiet

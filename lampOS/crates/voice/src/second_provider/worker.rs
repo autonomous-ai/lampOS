@@ -1795,14 +1795,15 @@ pub fn serve(
             "lamp-voice second: LAMP_SECOND_SKILL_LOOK is on, but there is no full look (LAMP_LOOK_FULL and LAMP_EYES_LOOK_FILE): a skill's look is not taken"
         );
     }
-    // The next line's speech to text kept connected (#1712).
+    // The next line's speech to text kept connected (#1712), and the first
+    // line's opened before it (#2135).
     if std::env::var(crate::second_provider::STT_WARM_ENVIRONMENT)
         .ok()
         .as_deref()
         == Some("on")
     {
         eprintln!(
-            "lamp-voice second: speech to text's socket for the next line is kept open (LAMP_SECOND_STT_WARM)"
+            "lamp-voice second: speech to text's socket for the next line is kept open, the first line's opened before it (LAMP_SECOND_STT_WARM)"
         );
         engine = engine.keeping_a_listener_ready(true);
     }

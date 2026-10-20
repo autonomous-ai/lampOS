@@ -529,6 +529,9 @@ struct Shared {
     keep_listener: bool,
     spare: Mutex<Option<Kept>>,
     spares: AtomicU64,
+    /// The privacy generation one was opened under before any line
+    /// ([`Engine::listening`]); `None` again when listening stops.
+    warmed: Mutex<Option<u64>>,
     /// The request begun last, with its session, for a look asked by a call.
     begun: Mutex<Option<(u64, u64)>>,
     /// What a skill's answer said to do with the picture of the look it
@@ -941,6 +944,7 @@ impl Engine {
                 keep_listener: false,
                 spare: Mutex::new(None),
                 spares: AtomicU64::new(0),
+                warmed: Mutex::new(None),
                 begun: Mutex::new(None),
                 look_note: Mutex::new(None),
                 in_flight: Mutex::new(None),
@@ -1164,6 +1168,16 @@ impl Engine {
     /// goes at once when listening stops (the privacy switch, a mute) or
     /// the generation changes, before any line's sound could reach it
     /// (#1712, the first builder at 00:31).
+    ///
+    /// And with [`Self::keeping_a_listener_ready`], the first line's is
+    /// opened here, once a generation, when listening is allowed and none
+    /// is kept: the first line after the voice starts, or after listening
+    /// comes back, goes to a socket already open. Each line opened the
+    /// next one's, so the first had none: on lamp-4ace the first request
+    /// after a start waited 753 ms for its socket, with 1,050 ms of its
+    /// sound waiting (#2135, the first builder on #1722 at 01:15). It is
+    /// kept [`KEPT_FOR`], as the next line's is. Outside a runtime, nothing
+    /// is opened.
     pub fn listening(&self, allowed: bool, generation: u64) {
         if let Ok(mut spare) = self.shared.spare.lock()
             && spare
@@ -1172,6 +1186,27 @@ impl Engine {
             && let Some(kept) = spare.take()
         {
             kept.opening.abort();
+        }
+        if !self.shared.keep_listener {
+            return;
+        }
+        let Ok(mut warmed) = self.shared.warmed.lock() else {
+            return;
+        };
+        if !allowed {
+            *warmed = None;
+            return;
+        }
+        if *warmed == Some(generation) || tokio::runtime::Handle::try_current().is_err() {
+            return;
+        }
+        *warmed = Some(generation);
+        drop(warmed);
+        if self.shared.spare.lock().is_ok_and(|spare| spare.is_none()) {
+            keep_a_listener(&self.shared, generation);
+            eprintln!(
+                "lamp-voice second: speech to text's socket opened before the first line (LAMP_SECOND_STT_WARM)"
+            );
         }
     }
 
@@ -1182,7 +1217,9 @@ impl Engine {
     /// its sound waited until the socket was open, then went at once: on
     /// lamp-4ace 8 of 12 lines' words waited 0.9 to 2.3 s for Deepgram to
     /// hear the burst. A kept socket found closed is not used, and the line
-    /// opens its own as before. Before any turn only.
+    /// opens its own as before. The first line's is opened before it, as
+    /// listening is allowed ([`Self::listening`], #2135). Before any turn
+    /// only.
     pub fn keeping_a_listener_ready(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.keep_listener = on;
@@ -2373,30 +2410,9 @@ async fn spoken(
         begun.elapsed().as_millis(),
         heard.len() * 10
     );
-    // And the next line's, opened while this one is heard, kept at most
-    // [`KEPT_FOR`]: a lamp nobody talks to keeps nothing open.
+    // And the next line's, opened while this one is heard.
     if shared.keep_listener {
-        let number = shared.spares.fetch_add(1, Ordering::Relaxed) + 1;
-        if let Ok(mut spare) = shared.spare.lock()
-            && let Some(old) = spare.replace(Kept {
-                number,
-                generation: marks.privacy,
-                opening: tokio::spawn(shared.services.listen()),
-            })
-        {
-            old.opening.abort();
-        }
-        let expiring = Arc::downgrade(&shared);
-        tokio::spawn(async move {
-            tokio::time::sleep(KEPT_FOR).await;
-            if let Some(shared) = expiring.upgrade()
-                && let Ok(mut spare) = shared.spare.lock()
-                && spare.as_ref().is_some_and(|kept| kept.number == number)
-                && let Some(kept) = spare.take()
-            {
-                kept.opening.abort();
-            }
-        });
+        keep_a_listener(&shared, marks.privacy);
     }
     // The words before they are final, for a chat begun on them.
     let mut early = if shared.prepare {
@@ -2828,6 +2844,33 @@ pub const STT_WARM_ENVIRONMENT: &str = "LAMP_SECOND_STT_WARM";
 /// lines come seconds apart, and after this the lamp keeps nothing open
 /// (#1712, the first builder at 00:31: "at most a few minutes").
 pub const KEPT_FOR: Duration = Duration::from_secs(180);
+
+/// Opens a listener for the next line under privacy `generation` and keeps
+/// it, in place of any kept before, at most [`KEPT_FOR`]: a lamp nobody
+/// talks to keeps nothing open ([`Engine::keeping_a_listener_ready`]).
+fn keep_a_listener(shared: &Arc<Shared>, generation: u64) {
+    let number = shared.spares.fetch_add(1, Ordering::Relaxed) + 1;
+    if let Ok(mut spare) = shared.spare.lock()
+        && let Some(old) = spare.replace(Kept {
+            number,
+            generation,
+            opening: tokio::spawn(shared.services.listen()),
+        })
+    {
+        old.opening.abort();
+    }
+    let expiring = Arc::downgrade(shared);
+    tokio::spawn(async move {
+        tokio::time::sleep(KEPT_FOR).await;
+        if let Some(shared) = expiring.upgrade()
+            && let Ok(mut spare) = shared.spare.lock()
+            && spare.as_ref().is_some_and(|kept| kept.number == number)
+            && let Some(kept) = spare.take()
+        {
+            kept.opening.abort();
+        }
+    });
+}
 
 /// A listener opening, or open, for the next line
 /// ([`Engine::keeping_a_listener_ready`]): which one it is, the privacy
