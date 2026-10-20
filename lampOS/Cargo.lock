@@ -2333,6 +2333,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "toml",
+ "unicode-normalization",
  "webpki-roots 1.0.9",
 ]
 

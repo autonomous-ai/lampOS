@@ -53,6 +53,8 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+pub mod heard;
+
 /// Where the coordinator reads the memory's socket: an absolute path.
 pub const ENVIRONMENT: &str = "LAMP_MEMORY_SOCKET";
 /// The provider worker's flag for it, followed by the path.

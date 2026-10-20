@@ -509,6 +509,27 @@ impl Thread {
         self.heard_done = finished;
     }
 
+    /// The words heard in the line `request` answers, as far as the thread
+    /// knows them: its exchange's, once the lamp has begun answering it,
+    /// else what has been heard since the last answer, within the time an
+    /// answer counts as asked. `None` for nothing heard (#2176, row 10).
+    pub fn heard_for(&self, request: u64, now: Instant) -> Option<String> {
+        let heard = match self.exchanges.iter().rev().find(|e| e.request == request) {
+            Some(exchange) => exchange.person.trim(),
+            None if self
+                .heard_at
+                .is_some_and(|at| now.saturating_duration_since(at) <= ASKED_WITHIN) =>
+            {
+                self.heard.trim()
+            }
+            None => "",
+        };
+        heard
+            .chars()
+            .any(char::is_alphanumeric)
+            .then(|| heard.to_owned())
+    }
+
     /// The note of written request `request`: kept with the answer to that
     /// request alone, for the person it is answered for, apart from what
     /// anyone said. An answer to any later request drops it unused (the

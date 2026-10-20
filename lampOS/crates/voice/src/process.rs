@@ -895,6 +895,10 @@ fn worker_command(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_keep_heard_worker_environment(
+            role,
+            var(crate::remember::heard::ENVIRONMENT).as_deref(),
+        ))
         .envs(kernel_clock_worker_environment(
             role,
             var(crate::local_time::KERNEL_CLOCK_ENVIRONMENT).as_deref(),
@@ -1008,6 +1012,16 @@ fn memory_observe_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::OBSERVE_ENVIRONMENT, "on"))
+}
+
+// Keeping a fact as it was heard (#2176), passed the same narrow way: the
+// exact `on`, to the two routes that run `remember` for a heard line.
+fn memory_keep_heard_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::heard::ENVIRONMENT, "on"))
 }
 
 // The open threads' switch (#1693 (3)), passed the same narrow way: the
@@ -1304,6 +1318,12 @@ mod tests {
                         "LAMP_MEMORY_RECALL_V2",
                         ["provider", "second"].as_slice(),
                     ),
+                    // So does keeping a fact as heard (#2176).
+                    (
+                        memory_keep_heard_worker_environment,
+                        "LAMP_MEMORY_KEEP_HEARD",
+                        ["provider", "second"].as_slice(),
+                    ),
                     // The observation pass, the route with a model (#1693 (2)).
                     (
                         memory_observe_worker_environment,
@@ -1440,6 +1460,7 @@ mod tests {
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
                     crate::remember::RECALL_V2_ENVIRONMENT,
+                    crate::remember::heard::ENVIRONMENT,
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
                     crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1522,6 +1543,7 @@ mod tests {
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
@@ -1536,6 +1558,7 @@ mod tests {
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_OBSERVE=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_RULES=on",
