@@ -464,6 +464,73 @@ async fn a_tool_call_is_run_and_its_result_answered() {
     );
 }
 
+/// lamp-4ace, 20 Oct 21:31: "Lamp, what's my name?" was answered with
+/// `recall`, then `forget_my_face` and `forget`. A forget of either kind
+/// the person's words don't ask for is not run, and the model is told so;
+/// one they ask for runs as before.
+#[tokio::test]
+async fn a_forget_nobody_asked_for_is_not_run() {
+    for (name, said, runs) in [
+        (crate::remember::FORGET, "What's my name?", false),
+        (crate::known_faces::FORGET, "Lamp, what's my name?", false),
+        (crate::remember::FORGET, "Please forget my name.", true),
+        (crate::known_faces::FORGET, "Delete my face, please.", true),
+    ] {
+        let asked = call("c1", name, json!({}));
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![asked.clone()])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Okay."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (mut engine, calls, _) = scripted(script.clone());
+        engine.submit(written(1, said));
+        turn(&mut engine).await;
+        assert_eq!(
+            calls.lock().unwrap().len(),
+            usize::from(runs),
+            "{name}: {said}"
+        );
+        let told = script.asked.lock().unwrap()[1].last().cloned().unwrap();
+        let refused = Message::tool(
+            "c1",
+            json!({"error": crate::remember::NOT_ASKED_TO_FORGET}).to_string(),
+        );
+        assert_eq!(told == refused, !runs, "{name}: {said}");
+    }
+}
+
+#[test]
+fn only_words_that_ask_to_forget_let_a_forget_run() {
+    for asks in [
+        "Please forget my name.",
+        "Forget it.",
+        "Can you delete my face?",
+        "Erase that.",
+        "stop remembering that",
+        "Quên tên tôi đi.",
+        "Xóa nó.",
+    ] {
+        assert!(crate::remember::asks_to_forget(asks), "{asks}");
+    }
+    for not in [
+        "What's my name?",
+        "Remember my face.",
+        "I don't remember.",
+        "Forgetful me.",
+        "",
+    ] {
+        assert!(!crate::remember::asks_to_forget(not), "{not}");
+    }
+}
+
 /// The route A/B of 19 Oct: three hand-overs asked of the second route
 /// alone, none handed over. A spoken request naming Claude Code is asked
 /// with the Live route's staff note beside its words (`LAMP_STAFF_NOTE=on`,

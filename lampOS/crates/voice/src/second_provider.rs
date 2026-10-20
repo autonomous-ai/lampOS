@@ -3387,6 +3387,9 @@ async fn answer(
     // The picture of a look goes in round 1 only: a later round after a
     // tool is asked with the words alone (the reviewer on #1075).
     let mut seeing = picture.is_some();
+    // A forget runs only when the turn's words ask for it (lamp-4ace, 20
+    // Oct 21:31: a question was answered with two forgets).
+    let forget_may_run = crate::remember::forget_may_run(&said);
     let words = Message::user(said.clone());
     let prepared_for = prepared.map(|prepared| (prepared, said.clone()));
     let question = match picture {
@@ -3753,6 +3756,19 @@ async fn answer(
                     && let Some(did) = &shared.did
                 {
                     did(Did::Worked(monotonic_us()));
+                }
+                if crate::remember::is_forget(&call.name) && !forget_may_run {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: nothing they said asks to forget ({})",
+                        call.name,
+                        crate::remember::FORGET_ASKED_ENVIRONMENT
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        serde_json::json!({"error": crate::remember::NOT_ASKED_TO_FORGET})
+                            .to_string(),
+                    ));
+                    continue;
                 }
                 acted.store(true, Ordering::Relaxed);
                 let mut result = run_tool(shared, request, heard, call, scope.as_ref()).await;

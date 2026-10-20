@@ -70,6 +70,60 @@ pub const FORGET_EVERYTHING: &str = "forget_everything";
 /// something recalled, and `forget_everything` is offered (#1693). Off, the
 /// functions are as before.
 pub const FORGET_ALL_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_ALL";
+/// `off` lets a forget run whatever the person said; any other value, or
+/// none, runs one only when the turn's own words ask to forget
+/// ([`asks_to_forget`]).
+pub const FORGET_ASKED_ENVIRONMENT: &str = "LAMP_FORGET_ASKED";
+/// What the model is told of a forget nobody asked for (lamp-4ace, 20 Oct
+/// 21:31: "Lamp, what's my name?" was answered with `recall`, then
+/// `forget_my_face` and `forget`).
+pub const NOT_ASKED_TO_FORGET: &str = "They did not ask you to forget anything, so nothing was forgotten. Forget only when what they say asks you to. Answer what they asked.";
+
+/// Whether `name` is a call that forgets: a kept thing, everything, or a
+/// face.
+pub fn is_forget(name: &str) -> bool {
+    matches!(
+        name,
+        FORGET | FORGET_EVERYTHING | crate::known_faces::FORGET
+    )
+}
+
+/// Whether a forget may run for a turn whose words were `said`: only when
+/// they ask for it ("forget", "delete", "erase", "remove", "wipe", "clear",
+/// "stop remembering", "quên", "xóa"), unless `LAMP_FORGET_ASKED=off`. A
+/// forget that removes someone's face or what they told the lamp is not
+/// undone, so a word too few costs a repeat ("forget it"), and a guess
+/// costs what was kept.
+pub fn forget_may_run(said: &str) -> bool {
+    std::env::var(FORGET_ASKED_ENVIRONMENT).as_deref() == Ok("off") || asks_to_forget(said)
+}
+
+/// Whether `said` asks to forget, by its words.
+pub fn asks_to_forget(said: &str) -> bool {
+    const ASKS: &[&str] = &[
+        "forget",
+        "forgets",
+        "forgetting",
+        "delete",
+        "erase",
+        "remove",
+        "wipe",
+        "clear",
+        "unremember",
+        "quên",
+        "xóa",
+        "xoá",
+    ];
+    let words: Vec<String> = said
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    words.iter().any(|word| ASKS.contains(&word.as_str()))
+        || words
+            .windows(2)
+            .any(|pair| pair[0] == "stop" && pair[1] == "remembering")
+}
 static FORGET_ALL: OnceLock<bool> = OnceLock::new();
 
 /// Whether `forget` takes an id and `forget_everything` is offered.
