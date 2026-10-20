@@ -381,6 +381,9 @@ rest = {{ op = "wake" }}
                 );
             }
         };
+        // On macOS an accepted socket inherits the listener's O_NONBLOCK,
+        // so the read below would fail with WouldBlock instead of waiting.
+        stream.set_nonblocking(false).unwrap();
         stream.set_read_timeout(Some(WAIT)).unwrap();
         stream.set_write_timeout(Some(WAIT)).unwrap();
         let mut line = String::new();
