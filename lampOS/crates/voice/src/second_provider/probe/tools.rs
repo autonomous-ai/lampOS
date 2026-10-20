@@ -28,7 +28,7 @@
 //! called first, or `none` for an answer in words. Never the character, a
 //! key, a URL or what the model said.
 use super::super::net::{self, Chat, ChatEvent, Message, ToolCall};
-use crate::second_config::{CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, unit_credential};
+use crate::second_config::{CREDENTIALS_ENV, DEEPSEEK_BASE_URL, Key, SecondConfig};
 use serde_json::json;
 use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
@@ -248,12 +248,31 @@ pub fn verdict(counts: &Counts) -> Vec<String> {
     lines
 }
 
+/// DeepSeek's base URL and key for the probe, chosen as the live second
+/// route chooses them (#2176): through the relay with its credential when
+/// `deepseek_base_url` (or `LAMP_SECOND_DEEPSEEK_BASE_URL`, applied by
+/// [`SecondConfig::with_environment`]) is set, else DeepSeek's own API with
+/// the unit's `deepseek.key`.
+fn deepseek_route(
+    config: &SecondConfig,
+    credentials: Option<&std::ffi::OsStr>,
+) -> io::Result<(String, Key)> {
+    let key = super::super::worker::deepseek_key(config, credentials)?;
+    let base = config
+        .hosted
+        .deepseek_base_url
+        .clone()
+        .unwrap_or_else(|| DEEPSEEK_BASE_URL.to_owned());
+    Ok((base, key))
+}
+
 pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io::Result<()> {
     let provider = crate::config::ProviderConfig::load(provider_config)?;
     let character = provider.instruction(false)?;
-    let config = crate::second_config::load_from_path(second_config)?;
+    let config = crate::second_config::load_from_path(second_config)?
+        .with_environment(|name| std::env::var_os(name))?;
     let credentials = std::env::var_os(CREDENTIALS_ENV);
-    let key = unit_credential(credentials.as_deref(), DEEPSEEK_CREDENTIAL)?;
+    let (base, key) = deepseek_route(&config, credentials.as_deref())?;
     let model = &config.hosted.deepseek_model;
     let actions = std::env::var_os(crate::tools::ACTIONS_ENVIRONMENT)
         .filter(|dir| !dir.is_empty())
@@ -273,12 +292,14 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
         .iter()
         .any(|tool| tool.name == "set_reminder");
     let declare: net::Declare = Arc::new(move || declared.clone());
-    let today =
-        Chat::deepseek(model, key.expose(), declare.clone(), false).map_err(io::Error::other)?;
-    let few = Chat::deepseek(model, key.expose(), declare, false).map_err(io::Error::other)?;
+    let today = Chat::deepseek_at(&base, model, key.expose(), declare.clone(), false)
+        .map_err(io::Error::other)?;
+    let few =
+        Chat::deepseek_at(&base, model, key.expose(), declare, false).map_err(io::Error::other)?;
     few.narrowing(Arc::new(super::super::worker::few_tools));
     println!(
-        "tools: DeepSeek's {model}, thinking off, {count} functions, {} lines, {runs} runs of each arm",
+        "tools: DeepSeek's {model} {}, thinking off, {count} functions, {} lines, {runs} runs of each arm",
+        super::super::worker::deepseek_where(&config.hosted),
         LINES.len()
     );
     for line in verdict(&ask([&today, &few], &character, runs).await) {
@@ -300,7 +321,7 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
     }
     if schedule_declared {
         let heeding_declare: net::Declare = Arc::new(move || heeding_declared.clone());
-        let heeding = Chat::deepseek(model, key.expose(), heeding_declare, false)
+        let heeding = Chat::deepseek_at(&base, model, key.expose(), heeding_declare, false)
             .map_err(io::Error::other)?;
         println!(
             "tools: the heeding's {} lines (#2054), with the schedule's functions, {runs} runs each",
@@ -1035,6 +1056,76 @@ pub fn said_once_verdict(counts: &SaidOnceCounts) -> Vec<String> {
 mod tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// #2176: a route file with only the relay's credential, at `dir`.
+    fn relay_only_route(dir: &std::path::Path) -> std::path::PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::remove_dir_all(dir);
+        std::fs::create_dir_all(dir).unwrap();
+        let private = |path: std::path::PathBuf, text: &str| {
+            std::fs::write(&path, text).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            path
+        };
+        let llm = private(dir.join("llm.key"), "relay-key");
+        std::fs::create_dir_all(dir.join("credentials")).unwrap();
+        private(dir.join("credentials").join("deepseek.key"), "own-key");
+        private(
+            dir.join("second.json"),
+            &format!(
+                r#"{{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"{}"}}"#,
+                llm.display()
+            ),
+        )
+    }
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "lamp-probe-tools-{name}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ))
+    }
+
+    /// #2176: with `LAMP_SECOND_DEEPSEEK_BASE_URL` set and no `deepseek.key`
+    /// given, the probe asks at that base with the relay's credential, as
+    /// the live second route does; its chat builds there.
+    #[test]
+    fn through_the_relay_the_probe_takes_the_base_url_and_the_relay_key() {
+        let dir = scratch("relay");
+        let second = relay_only_route(&dir);
+        let relay = "https://relay.example.invalid/deepseek";
+        let config = crate::second_config::load_from_path(&second)
+            .unwrap()
+            .with_environment(|name| {
+                (name == crate::second_config::DEEPSEEK_BASE_URL_ENV).then(|| relay.into())
+            })
+            .unwrap();
+        let (base, key) = deepseek_route(&config, None).unwrap();
+        assert_eq!(base, relay);
+        assert_eq!(key.expose(), "relay-key");
+        Chat::deepseek_at(&base, "m", key.expose(), Arc::new(Vec::new), false).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #2176: without the variable, the probe is as before: DeepSeek's own
+    /// API with the unit's `deepseek.key`, and without that key it refuses.
+    #[test]
+    fn without_the_base_url_the_probe_takes_deepseeks_api_and_its_own_key() {
+        let dir = scratch("own");
+        let second = relay_only_route(&dir);
+        let config = crate::second_config::load_from_path(&second)
+            .unwrap()
+            .with_environment(|_| None)
+            .unwrap();
+        let credentials = dir.join("credentials");
+        let (base, key) = deepseek_route(&config, Some(credentials.as_os_str())).unwrap();
+        assert_eq!(base, DEEPSEEK_BASE_URL);
+        assert_eq!(key.expose(), "own-key");
+        let error = deepseek_route(&config, None).err().unwrap().to_string();
+        assert!(error.contains("CREDENTIALS_DIRECTORY"), "{error}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     fn text(message: &Message) -> String {
         message
