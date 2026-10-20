@@ -524,6 +524,15 @@ const NOT_HEARD: &str = "You did not hear that name in what they said. Say the n
 /// What the model is told when it would replace a name before the person
 /// agreed to the new one.
 const NOT_AGREED: &str = "They have not said yes to that name yet. Say the new name back and ask whether they want to be known by it instead. Only if they say yes, call this again with the new name and replace true.";
+/// What the model is told when the face is near someone known by a name one
+/// letter from the one heard (#2176 row 4): the name may be misheard, so
+/// they spell it, and no known name is said back.
+const NEAR_TO: &str = "You may have misheard their name. Do not say any name you know. Ask them to spell their name, letter by letter, then call this again with the name as they spelled it. If they spell the name you already called this with, call it with that name and apart true.";
+/// What the model is told when the face can't be kept under that name (it
+/// is someone's the lamp knows, and this face isn't near theirs). It says
+/// nothing of who the lamp knows, and no yes changes it (the reviewer's P1
+/// and P2 on #2211).
+const NOT_LIKE_THEM: &str = "You cannot keep this face under that name. Do not say why, and do not say whether you know anyone by it. Ask them for another name they would like to be known by. The lamp's owner can remove an old face in the app.";
 /// Remembering looks for up to four seconds.
 pub const DEADLINE: Duration = Duration::from_secs(6);
 /// The known file counts while it is this fresh: the eyes renew it every
@@ -562,7 +571,8 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
                     "type": "object",
                     "properties": {
                         "name": {"type": "string", "description": "Their name, as they said or spelled it."},
-                        "replace": {"type": "boolean", "description": "Only when you were told this face is known by another name, and they said yes to being known by this one instead."}
+                        "replace": {"type": "boolean", "description": "Only when you were told this face is known by another name, and they said yes to being known by this one instead."},
+                        "apart": {"type": "boolean", "description": "Only when you were told you may have misheard their name, and they spelled the same name again."}
                     },
                     "required": ["name"]
                 })
@@ -634,7 +644,13 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
     if checked && call.name == REMEMBER && replace && !agreed_to(name, said) {
         return (json!({"error": NOT_AGREED}), true);
     }
+    let apart = call.args.get("apart").and_then(Value::as_bool) == Some(true);
     let line = match call.name.as_str() {
+        // `apart` only when true: eyes from before #2176 row 4 refuse a
+        // field they don't know.
+        REMEMBER if checked && apart => {
+            json!({"remember": name, "one_face": true, "replace": replace, "apart": true})
+        }
         REMEMBER if checked => json!({"remember": name, "one_face": true, "replace": replace}),
         REMEMBER => json!({"remember": name}),
         FORGET => json!({"forget": name}),
@@ -687,6 +703,14 @@ fn told(answer: &Value) -> Value {
         (Some(true), _) => return json!({"ok": true, "note": FORGOTTEN_SOME_KEPT_APART}),
         (Some(false), _) => return json!({"error": NOT_KNOWN_SOME_KEPT_APART}),
         (None, _) => {}
+    }
+    // No name the lamp knows is said back: the face may be someone else's
+    // who only looks alike (the reviewer's P1 and P2 on #2202).
+    if answer.get("error").and_then(Value::as_str) == Some("near_to") {
+        return json!({"error": NEAR_TO});
+    }
+    if answer.get("error").and_then(Value::as_str) == Some("not_like_them") {
+        return json!({"error": NOT_LIKE_THEM});
     }
     if answer.get("error").and_then(Value::as_str) == Some("known_as")
         && let Some(known) = answer.get("known_as").and_then(Value::as_str)
@@ -1496,6 +1520,84 @@ mod tests {
                 json!({"remember": "Jim", "one_face": true, "replace": false}),
                 json!({"remember": "Jim", "one_face": true, "replace": true}),
                 json!({"remember": "B"}),
+            ]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+    /// #2176 row 4, lamp-4ace 20 Oct: a person known by their face was
+    /// saved again under their name misheard. A near face with a near name
+    /// gets a spelling asked, with no known name said back; a yes to a known
+    /// name the lamp said never stands in for hearing it (the reviewer's P1
+    /// on #2202); the spelled name goes to the eyes; the same name spelled
+    /// again goes with `apart`; a known name with a face not theirs is asked
+    /// about before it replaces theirs.
+    #[test]
+    fn a_near_name_is_spelled_and_no_yes_stands_in_for_it() {
+        let call = |args: Value| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args,
+        };
+        let (socket, asked) = eyes(vec![
+            json!({"error": "near_to", "near_to": "Minh"}),
+            json!({"remembered": "Minh"}),
+            json!({"remembered": "Linh"}),
+            json!({"error": "not_like_them"}),
+        ]);
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Linh"})),
+            true,
+            &Said::now("Remember my face, I'm Linh."),
+        );
+        let told = words["error"].as_str().unwrap();
+        assert!(told.contains("spell") && !told.contains("Minh"), "{told}");
+        // "Are you Minh?" "Yes." is not Minh's name heard.
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Minh"})),
+            true,
+            &Said {
+                this: "Yes.".into(),
+                before: vec![("Remember my face, I'm Linh.".into(), "Are you Minh?".into())],
+            },
+        );
+        assert!(
+            words["error"].as_str().unwrap().contains("spell"),
+            "{words}"
+        );
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Minh"})),
+            true,
+            &Said::now("M I N H."),
+        );
+        assert_eq!(words, json!({"ok": true, "remembered": "Minh"}));
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Linh", "apart": true})),
+            true,
+            &Said::now("L I N H."),
+        );
+        assert_eq!(words, json!({"ok": true, "remembered": "Linh"}));
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Minh"})),
+            true,
+            &Said::now("I'm Minh."),
+        );
+        let refused = words["error"].as_str().unwrap();
+        assert!(
+            refused.contains("another name") && !refused.contains("replace"),
+            "{refused}"
+        );
+        assert_eq!(
+            asked.join().unwrap(),
+            [
+                json!({"remember": "Linh", "one_face": true, "replace": false}),
+                json!({"remember": "Minh", "one_face": true, "replace": false}),
+                json!({"remember": "Linh", "one_face": true, "replace": false, "apart": true}),
+                json!({"remember": "Minh", "one_face": true, "replace": false}),
             ]
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
