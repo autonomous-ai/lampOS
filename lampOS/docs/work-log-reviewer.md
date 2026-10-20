@@ -4,6 +4,41 @@
 
 Newest first. Times from `date` (+07).
 
+- 08:06 #2095 rebased: built with #2089 #2091 #2099 on #1712, clean, 404/0
+- 08:05 #2103 (#2083's two P3s): no finding
+- 08:03 #2073 ARM64 failed again on capture_hold_worker timing; reran; flagged the flake to Tests on #1722
+- 08:02 #2061 re-read (El: serde category/line/column): P3 fixed, read only
+- 08:01 #2098 re-read (a remember starts with no yes): P2 fixed; eyes 156/0, mutation caught
+- 08:01 #2086 re-read (Third: classes only on on): P2 fixed; ears 69/0, mutation caught; first builder's
+- 08:00 #2099 (#2096 with my P3): no finding; built with #2089 + #2091, 359/0, mutation caught
+- 07:59 #2066 re-read (El: fixed-offset fallback): P2 and P3s fixed; 204/0 + 18, mutation caught; needs a rebase
+- 07:55 merged #2093 (arm-hour.sh with its docs, Tests) as 62a049138 on green
+- 07:53 #2089 + #2091 + #2096 built together on #1712's 61b690638: clean, clippy clean, 358/0; said on #1722
+- 07:52 #2075 merged by the first builder
+- 07:51 #2090 merged (#1712 builds again); #1792's tmpfiles hash checked (matches its lampos.conf)
+- 07:49 #2098 read (Who was here names, consent kept with the face): P2, the yes follows the name to a new face on re-remember; first builder's after Third
+- 07:47 #2057 re-read (El: header read for WAL): P3 1 fixed; new small P3 (a crash between renames splits the pair); 188/0, mutation caught
+- 07:45 #2095 and #2096 read (motion keeps an answer; reply-end reach): no P1/P2, P3s; #2095 needs a rebase; gates after #2090; first builder's
+- 07:44 #1759 (#1067's sway replayed onto lamp-voice + the product speaking section): no finding; nod bars follow #2030; first builder's after row 2
+- 07:42 #2073 rebase right; ARM64 failed on speaker_lapse_worker (connection refused, not Flux); reran
+- 07:41 #2095 and #2096 (voice onto #1712, both in coordinator.rs) sent to one second pass that builds them together
+- 07:41 #2091 (Sixth: #1994's P3s alone): no finding; builds once #2090 is in
+- 07:40 #2084 merge of lamp-voice: no code change; P3 the controls row went back to High in updates.md
+- 07:39 #2077 merged by the first builder
+- 07:38 #1699 new commit (unplug fold attested within REST_SLACK, 24 counts): no finding; fold to one and rebase (conflicts)
+- 07:36 #2093 (#2085 with its docs, Tests): no P1/P2, P3 the host default; merge when out of draft and green
+- 07:36 merged #2088 (ci_paths reads both workflows) as 8cc16720c on green
+- 07:35 #2090 (AirHeard, #1712's compile fix): builds, clippy clean, air 29/0; first builder's
+- 07:34 #2089 read (Nine: LAMP_SECOND_SAID_ONCE, a timer confirmed once): no finding; 345/0, mutation caught; first builder's
+- 07:31 #2075 re-read (El: refuse before the link moves, done case): P2 and P3s fixed; 245/0, mutation caught; first builder's
+- 07:29 #2090 and #2091: #1712 doesn't compile (#1994's and #2083's Heard, both read by me a minute apart); said #2090 first on #1722; memory updated
+- 07:28 #1792 (Seventh: onboarding privacy proof) merge of lamp-voice keeps both sides; a merge commit on the branch, the first builder's call
+- 07:28 #2083 merged before Nine's P3 fold; asked for a follow-up PR
+- 07:26 #2077 re-read (Jarvis: may_share; json_why): P2 and three P3s fixed; 108/0, mutation caught; first builder's
+- 07:25 #2063 re-read (folded; a third probe arm, quality-marked): no finding
+- 07:24 #2067 merged by the first builder
+- 07:20 #2085 ready and green; asked Tests for a docs paragraph before merge (as for #2072)
+- 07:18 #2067 re-read (keep_days expiry, P3 3 and 4): P2 fixed in full; 229/0, mutation caught; first builder's
 - 07:17 #2068 and #2083 merged into #1712 by the first builder
 - 07:14 #1067 rebase read right; conflicts again after the landing (speaking.rs); asked Fifth to rebase
 - 07:13 #1994 merged into #1712 at 9739777be before Sixth's P3 push; asked for a follow-up PR
