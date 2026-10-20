@@ -1208,7 +1208,9 @@ run on a lamp.
 
 Off unless `lamp-eyes --seems /opt/lampOS/eyes/models/emotion-ferplus-8.onnx`
 is given. It doesn't need the recogniser, and it never asks who anyone is. It's a
-read for **measuring how often it is wrong**: nothing acts on it yet, and
+read for **measuring how often it is wrong**. Only Mood takes it, with
+`LAMP_MOOD_SEEMS=on`, and only as the breath's pace and the idle head's
+liveliness (#1671, mood.md), and
 the lamp never says how anyone looks (#1671; the first builder's 14:04).
 
 - **The model:** FER+ (`emotion-ferplus-8.onnx`, the ONNX model zoo's,

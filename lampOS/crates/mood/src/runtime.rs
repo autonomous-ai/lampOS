@@ -39,6 +39,8 @@ fn invalid(message: impl Into<String>) -> io::Error {
 #[derive(Clone, Debug)]
 pub struct Config {
     pub enabled: bool,
+    /// How the near face seems taken as an input (#1671, `LAMP_MOOD_SEEMS`).
+    pub seems: bool,
     pub bus_root: PathBuf,
     pub zone: Option<String>,
     pub clock_id: Option<String>,
@@ -49,6 +51,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             enabled: false,
+            seems: false,
             bus_root: PathBuf::from(lamp_bus::DEFAULT_ROOT),
             zone: None,
             clock_id: None,
@@ -176,7 +179,8 @@ pub trait Transport: Send + 'static {
 
 struct BusTransport<C> {
     clock: Arc<C>,
-    inputs: Vec<Subscriber>,
+    /// One for each of `INPUTS`; `humans/seems` only with `LAMP_MOOD_SEEMS`.
+    inputs: Vec<Option<Subscriber>>,
     adapter: InputAdapter,
     output: Publisher,
     diagnostic: Publisher,
@@ -210,7 +214,7 @@ fn owner_lock(root: &Path) -> io::Result<File> {
 }
 
 impl<C: Clock> BusTransport<C> {
-    fn new(root: &Path, clock: Arc<C>) -> io::Result<Self> {
+    fn new(root: &Path, clock: Arc<C>, seems: bool) -> io::Result<Self> {
         let owner = owner_lock(root)?;
         let bus = Bus::new(root)?;
         let output = bus.publisher_declared(MoodState::TOPIC, &MoodState::declaration(), "mood")?;
@@ -218,9 +222,17 @@ impl<C: Clock> BusTransport<C> {
             bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), "mood")?;
         let inputs = INPUTS
             .iter()
-            .map(|spec| bus.subscribe_typed(spec.topic, "mood", spec.type_name))
+            .map(|spec| {
+                if spec.topic == lamp_msgs::HumanSeems::TOPIC && !seems {
+                    return Ok(None);
+                }
+                bus.subscribe_typed(spec.topic, "mood", spec.type_name)
+                    .map(Some)
+            })
             .collect::<io::Result<Vec<_>>>()?;
-        let adapter = InputAdapter::new(clock.clock_id().to_owned()).map_err(io::Error::other)?;
+        let adapter = InputAdapter::new(clock.clock_id().to_owned())
+            .map_err(io::Error::other)?
+            .with_seems(seems);
         Ok(Self {
             _owner: owner,
             clock,
@@ -242,6 +254,9 @@ impl<C: Clock> Transport for BusTransport<C> {
         self.adapter.expire(self.clock.sample()?.now_us);
         let mut events = Vec::with_capacity(INPUTS.len() * DRAIN_PER_TOPIC);
         for (input, spec) in self.inputs.iter_mut().zip(INPUTS.iter()) {
+            let Some(input) = input else {
+                continue;
+            };
             for _ in 0..DRAIN_PER_TOPIC {
                 // recv may internally skip an invalid flood. Isolation keeps
                 // the engine alive, but this is not a hard syscall deadline.
@@ -492,7 +507,7 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
         .as_deref()
         .ok_or_else(|| invalid("--zone is required when enabled"))?;
     let clock = Arc::new(SystemClock::new(zone, config.clock_id.as_deref())?);
-    let transport = BusTransport::new(&config.bus_root, clock.clone())?;
+    let transport = BusTransport::new(&config.bus_root, clock.clone(), config.seems)?;
     run(&config, clock, transport, stop)
 }
 
@@ -507,7 +522,7 @@ mod tests {
             .tempdir_in("/tmp")
             .unwrap();
         let clock = Arc::new(SystemClock::new("UTC", Some("diagnostic-test")).unwrap());
-        let mut transport = BusTransport::new(root.path(), clock.clone()).unwrap();
+        let mut transport = BusTransport::new(root.path(), clock.clone(), false).unwrap();
         let obstruction = root.path().join(Diagnostic::TOPIC).join("subs");
         if obstruction.is_dir() {
             fs::remove_dir_all(&obstruction).unwrap();

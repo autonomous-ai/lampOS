@@ -1062,3 +1062,45 @@ fn reminder_flood_cannot_expand_history_or_repeat_an_old_delivery() {
     assert_eq!(input.counts().accepted, MAX_REMINDER_IDENTITIES as u64);
     assert_eq!(input.counts().rejected, 20);
 }
+
+/// #1671: how the near face seems is taken only with `LAMP_MOOD_SEEMS=on`
+/// (`with_seems`), from the eyes only, good for five seconds, as its kind:
+/// `unsure` is no kind, and the confidence stays the reader's.
+#[test]
+fn how_a_face_seems_is_taken_only_when_switched_on_and_as_its_kind() {
+    use lamp_msgs::SeemsKind;
+    let read = |kind: &str| message(10, &serde_json::json!({"kind": kind, "confidence": 0.8}));
+    let mut off = adapter();
+    assert!(off.ingest(&read("positive"), NOW, WALL).unwrap().is_empty());
+    assert_eq!(off.counts().accepted, 0);
+    for (kind, taken) in [
+        ("positive", Some(SeemsKind::Positive)),
+        ("negative", Some(SeemsKind::Negative)),
+        ("unsure", None),
+    ] {
+        let events = adapter()
+            .with_seems(true)
+            .ingest(&read(kind), NOW, WALL)
+            .unwrap();
+        assert_eq!(events[0].kind, EventKind::Seems(taken));
+        assert_eq!(events[0].valid_until_us, NOW + 5_000_000);
+    }
+    let mut other = read("positive");
+    other.header.source = "replay".into();
+    assert!(
+        adapter()
+            .with_seems(true)
+            .ingest(&other, NOW, WALL)
+            .is_err()
+    );
+    let wrong = message(
+        10,
+        &serde_json::json!({"kind": "positive", "confidence": 1.5}),
+    );
+    assert!(
+        adapter()
+            .with_seems(true)
+            .ingest(&wrong, NOW, WALL)
+            .is_err()
+    );
+}

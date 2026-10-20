@@ -2,7 +2,7 @@
 //! by the caller; this module performs no I/O and owns no output permission.
 use lamp_msgs::{
     AttentionTarget, ClockStamp, FamiliarLevel, Familiarity, MOOD_BREATH_US, MoodBreath, MoodState,
-    mood_pace, plain_breath_phase,
+    SeemsKind, mood_pace, plain_breath_phase,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -29,7 +29,21 @@ const WARMTH_CAP: f64 = 0.85;
 const AIR_REDUCTION: f64 = 0.08;
 const SLEEP_THRESHOLD: f64 = 0.25;
 const CHANGE_DELTA: f64 = 0.01;
-const EVENT_STREAMS: usize = 12;
+const EVENT_STREAMS: usize = 13;
+/// How someone near seems (#1671, `LAMP_MOOD_SEEMS`): small, like a pet's,
+/// and nothing kept of anyone. A smile is two `positive` reads in a row
+/// (about 4 s); someone low, three `negative` (about 6 s).
+pub const SMILE_READS: u8 = 2;
+pub const LOW_READS: u8 = 3;
+/// Smiled at: half an accepted bang's energy, with its own cooldown, and
+/// warmth as laughter's.
+const SMILE_ENERGY: f64 = 0.10;
+const SMILE_WARMTH: f64 = 0.03;
+pub const SMILE_COOLDOWN_US: u64 = 120 * SECOND_US;
+/// Someone low: the lamp keeps them company quietly for two minutes, its
+/// energy a step lower, unless they smile or nobody is near.
+pub const QUIET_US: u64 = 2 * MINUTE_US;
+const QUIET_REDUCTION: f64 = 0.10;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FaceTarget {
@@ -76,6 +90,9 @@ pub enum EventKind {
     /// How familiar the remembered person at the lamp is, or nobody
     /// remembered (#1670, the eyes' `humans/familiar`).
     Familiar(Option<FamiliarLevel>),
+    /// One read of how the near face seems (#1671, the eyes'
+    /// `humans/seems`), `None` for `unsure`.
+    Seems(Option<SeemsKind>),
 }
 
 impl EventKind {
@@ -93,6 +110,7 @@ impl EventKind {
             Self::Heard => 9,
             Self::Air(_) => 10,
             Self::Familiar(_) => 11,
+            Self::Seems(_) => 12,
         }
     }
 }
@@ -203,6 +221,11 @@ pub struct Engine {
     last_observed: [Option<u64>; EVENT_STREAMS],
     last_sudden_us: Option<u64>,
     last_warmth_us: Option<u64>,
+    /// The reads in a row of one kind (#1671): only a count, never whose.
+    seems_run: Option<(SeemsKind, u8)>,
+    last_smile_us: Option<u64>,
+    /// Until when the lamp keeps someone low company quietly.
+    quiet_until_us: Option<u64>,
     /// The lamp's one breath, from 0 to 1 (#1670): begun where the plain
     /// breath is, moved on at the pace whenever time does, never jumped.
     breath_phase: f64,
@@ -239,6 +262,9 @@ impl Engine {
             last_observed: [None; EVENT_STREAMS],
             last_sudden_us: None,
             last_warmth_us: None,
+            seems_run: None,
+            last_smile_us: None,
+            quiet_until_us: None,
             breath_phase: plain_breath_phase(now_us),
         })
     }
@@ -351,7 +377,18 @@ impl Engine {
     }
 
     fn energy(&self) -> f64 {
-        (BASE_ENERGY - self.air_reduction + self.energy_pulse).clamp(0.0, ENERGY_CAP)
+        let quiet = if self.quiet_at(self.now_us) {
+            QUIET_REDUCTION
+        } else {
+            0.0
+        };
+        (BASE_ENERGY - self.air_reduction - quiet + self.energy_pulse).clamp(0.0, ENERGY_CAP)
+    }
+
+    /// Keeping someone low company: while its two minutes last and a face
+    /// is near.
+    fn quiet_at(&self, at_us: u64) -> bool {
+        self.face.is_some() && self.quiet_until_us.is_some_and(|until| at_us < until)
     }
 
     fn warmth(&self) -> f64 {
@@ -469,6 +506,11 @@ impl Engine {
                 }
             }
             EventKind::Faces(face) => {
+                // Nobody near: how they seemed goes with them.
+                if face.is_none() {
+                    self.seems_run = None;
+                    self.quiet_until_us = None;
+                }
                 let arrival = self.face != face;
                 if arrival {
                     self.clear_face_focus();
@@ -496,6 +538,7 @@ impl Engine {
             EventKind::Familiar(level) => {
                 self.familiar = level.map(|level| (level, event.valid_until_us));
             }
+            EventKind::Seems(kind) => self.seems(now_us, observed, kind),
             EventKind::Air(co2) => {
                 let high_since_us = co2.filter(|ppm| *ppm >= 1_200).map(|_| {
                     self.air
@@ -507,6 +550,41 @@ impl Engine {
                     high_since_us,
                 });
             }
+        }
+    }
+
+    /// One read of how the near face seems (#1671). A smile brightens the
+    /// lamp a little for some seconds; someone low quiets it for two
+    /// minutes. Only the count of reads in a row is kept, never a read.
+    fn seems(&mut self, now_us: u64, observed: u64, kind: Option<SeemsKind>) {
+        if self.asleep {
+            self.seems_run = None;
+            return;
+        }
+        let kind = kind.filter(|kind| *kind != SeemsKind::Unsure);
+        self.seems_run = kind.map(|kind| match self.seems_run {
+            Some((previous, reads)) if previous == kind => (kind, reads.saturating_add(1)),
+            _ => (kind, 1),
+        });
+        match self.seems_run {
+            Some((SeemsKind::Positive, SMILE_READS)) => {
+                self.quiet_until_us = None;
+                if self
+                    .last_smile_us
+                    .is_none_or(|last| observed.saturating_sub(last) >= SMILE_COOLDOWN_US)
+                {
+                    self.last_smile_us = Some(observed);
+                    self.energy_pulse = (self.energy_pulse
+                        + SMILE_ENERGY * decay(now_us - observed, ENERGY_HALF_LIFE_US))
+                    .min(ENERGY_CAP - BASE_ENERGY + self.air_reduction);
+                    self.warm(observed, SMILE_WARMTH);
+                }
+            }
+            Some((SeemsKind::Negative, LOW_READS)) => {
+                self.quiet_until_us = Some(observed.saturating_add(QUIET_US));
+                self.energy_pulse = 0.0;
+            }
+            _ => {}
         }
     }
 
@@ -543,6 +621,8 @@ impl Engine {
         self.attention = None;
         self.company = [None; 3];
         self.face = None;
+        self.seems_run = None;
+        self.quiet_until_us = None;
     }
 
     fn maybe_sleep(&mut self, at_us: u64) {
@@ -565,6 +645,9 @@ impl Engine {
         if self.company[0].is_some_and(|lease| at_us >= lease.until_us) {
             self.face = None;
             self.clear_face_focus();
+            // Nobody near: how they seemed goes with them (#1671).
+            self.seems_run = None;
+            self.quiet_until_us = None;
         }
         for company in &mut self.company {
             if company.is_some_and(|lease| at_us >= lease.until_us) {

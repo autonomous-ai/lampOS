@@ -58,6 +58,8 @@ no history of anyone.
 | Calm energy | Baseline 0.30. An accepted bang adds 0.25 to a transient component with a 15-second half-life and 120-second cooldown. Total energy is capped at 0.70, including the air offset. |
 | Warmth | Baseline 0.60. Kindly touch adds 0.05 to an excess capped at 0.25; the excess has a 20-minute half-life and a 10-second cooldown. |
 | Future explicit feedback | While awake, typed thanks adds 0.04 and laughter 0.03, within the same warmth bound and cooldown. These are not inferred from words or available as live semantic observations. |
+| Smiled at (#1671, `LAMP_MOOD_SEEMS=on`) | Two `positive` reads in a row of the near face (about 4 s) add 0.10 energy, half an accepted bang's, with the same 15-second half-life, and 0.03 warmth, as laughter, within its bound and cooldown. At most once in 120 seconds; a smile held on doesn't add again. Seen only as the resting ring's breath a touch quicker and the idle head a touch livelier for some seconds: nothing turns to the person and nothing is said. |
+| Someone low (#1671, `LAMP_MOOD_SEEMS=on`) | Three `negative` reads in a row (about 6 s) let go energy's transient and lower energy 0.10 for two minutes while a face is near: a slower breath and fewer idle moves, keeping them company quietly. A smile, or nobody near (said, or the face's lease lapsing), ends it, and it doesn't come back with the face. It doesn't renew while they stay low: after two minutes the lamp is its usual self beside them. A change of near face doesn't end it or a run of reads, since one person's passing id changes often; a second person who sits down beside someone low finds the lamp quiet for the rest of those two minutes. |
 | Air | Fresh CO2 at or above 1,200 ppm must remain uninterrupted for ten minutes before an energy offset can grow toward -0.08, with a five-minute half-life. Freshness loss or clear air ends the sustained qualification. |
 
 These values are authored starting values, not thresholds fitted to this
@@ -211,6 +213,7 @@ shape, age and ordering checks before the pure engine accepts an event.
 | `air/state` / `AirState` | `air` | 15 s | Fresh CO2 metadata for the sustained air offset. |
 | `schedule/due` / `ScheduleDue` | `schedule` | 3 s | A user-created due-item token, not reminder text, delivery acknowledgement or speech permission. |
 | `humans/familiar` / `HumanFamiliar` | `eyes` | 5 s | The level of the remembered person recognised at the lamp, or none; no name (#1670, `lamp-eyes --visits on`). Held for its lease, never kept. |
+| `humans/seems` / `HumanSeems` | `eyes` | 5 s | How the near face seems, as its kind only (`unsure` is none, the confidence stays the reader's), with `LAMP_MOOD_SEEMS=on`; without it Mood doesn't subscribe to it, and the adapter drops any before it is read (#1671, `lamp-eyes --seems` or `--seems-blendshapes`). Only the count of reads in a row of one kind is kept, never a read or whose face. Every read counts, whichever reader said it (`from`), so with both of the eyes' readers on a run would mix them at twice the rate: a lamp trying it runs one reader. |
 
 **On the second voice route** (`LAMP_VOICE_ROUTE=second`, the owner's rule
 of 19 Oct that a voice feature works there too). Only the first two inputs
