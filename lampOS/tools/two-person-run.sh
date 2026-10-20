@@ -33,8 +33,9 @@
 # VOICE_A (Samantha), VOICE_B (Daniel), WAIT_S (25, the most to wait for an
 # answer), PAUSE_S (5, between lines), and on the lamp RUN_DIR
 # (/run/lampos-two-person), THREAD (/run/lampos-voice/thread.json), UNIT_DIR
-# (/run/systemd/system); for the tests, WORKER_ENVIRON (a file holding the
-# worker's environment, NUL-separated, instead of /proc) and SLEEP (sleep).
+# (/run/systemd/system); for the tests, WORKER_PROC (a folder holding the
+# worker's `environ` and `cmdline`, NUL-separated, instead of /proc/PID) and
+# SLEEP (sleep).
 set -uo pipefail
 
 SAY=${SAY:-say}
@@ -63,26 +64,49 @@ STAND_IN='while [ -d "$1" ]; do
 done'
 
 put_back() {
-  on_lamp "rm -rf '$RUN_DIR'; rm -f '$DROPIN'; systemctl daemon-reload; systemctl restart lamp-voice" >/dev/null 2>&1
+  # Once, and not cut short by a second ^C or the terminal closing.
+  trap '' INT TERM HUP
+  trap - EXIT
+  on_lamp "systemctl stop lamp-two-person-who 2>/dev/null; rm -rf '$RUN_DIR'; rm -f '$DROPIN'; systemctl daemon-reload; systemctl restart lamp-voice" >/dev/null 2>&1
   echo "put back: the drop-in and the stand-in removed, lamp-voice restarted"
 }
 trap put_back EXIT
-trap 'exit 130' INT TERM
+trap 'exit 130' INT TERM HUP
 
 on_lamp "mkdir -p '$RUN_DIR' && chmod 0755 '$RUN_DIR' && : >'$RUN_DIR/who' && mkdir -p '$(dirname "$DROPIN")' && printf '[Service]\nEnvironment=LAMP_SECOND_SCOPED_CONTEXT=on\nEnvironment=LAMP_EYES_WHO_SOCKET=$RUN_DIR/who.sock\n' >'$DROPIN' && systemctl daemon-reload && systemctl restart lamp-voice" ||
   { echo "the drop-in could not be set" >&2; exit 3; }
+# A unit of its own, so it outlives the ssh session that starts it (a
+# background job under `ssh sudo` ends with it: Fifth's run on #2165).
 on_lamp "cat >'$RUN_DIR/stand-in.sh' <<'STAND_IN'
 $STAND_IN
 STAND_IN
-nohup sh '$RUN_DIR/stand-in.sh' '$RUN_DIR' </dev/null >/dev/null 2>&1 &"
+systemd-run --unit=lamp-two-person-who --collect sh '$RUN_DIR/stand-in.sh' '$RUN_DIR' >/dev/null" ||
+  { echo "the stand-in could not be started" >&2; exit 3; }
 "$SLEEP" 5
-environ=$(on_lamp "if [ -n '${WORKER_ENVIRON:-}' ]; then cat '${WORKER_ENVIRON:-}'; else P=\$(pgrep -f '[l]amp-voice worker second' | head -1); [ -n \"\$P\" ] && cat /proc/\$P/environ; fi" | tr '\0' '\n')
+# The second worker's own environment and arguments: the switch is in its
+# environment, the sockets are its arguments (Fifth's run on #2212).
+worker() { # worker environ|cmdline
+  on_lamp "if [ -n '${WORKER_PROC:-}' ]; then cat '${WORKER_PROC:-}/$1'; else P=\$(pgrep -f '[l]amp-voice worker second' | head -1); [ -n \"\$P\" ] && cat /proc/\$P/$1; fi" | tr '\0' '\n'
+}
+environ=$(worker environ)
+cmdline=$(worker cmdline)
 grep -qx LAMP_SECOND_SCOPED_CONTEXT=on <<<"$environ" ||
   { echo "the second worker runs without LAMP_SECOND_SCOPED_CONTEXT=on (not the second route?); nothing measured" >&2; exit 4; }
+# Whose a turn is comes from `known` beside this socket, read every 200 ms
+# while it is under 3 s old, and only with the memory's socket.
+grep -A1 -x -- --who-socket <<<"$cmdline" | grep -qx "$RUN_DIR/who.sock" ||
+  { echo "the second worker's --who-socket is not the stand-in's (another drop-in sets LAMP_EYES_WHO_SOCKET?); nothing measured" >&2; exit 4; }
+grep -qx -- --memory-socket <<<"$cmdline" ||
+  { echo "the second worker has no --memory-socket (LAMP_MEMORY_SOCKET), so no turn is anyone's; nothing measured" >&2; exit 4; }
 
 who() { on_lamp "printf '%s' '$1' >'$RUN_DIR/who'"; }
-# The number of exchanges in the thread now.
-count() { on_lamp "jq length '$THREAD' 2>/dev/null || echo 0"; }
+# The stand-in is alive and names A: its file, removed, is back within 2 s.
+on_lamp "rm -f '$RUN_DIR/known'"; who "$NAME_A"; "$SLEEP" 2
+[[ $(on_lamp "cat '$RUN_DIR/known' 2>/dev/null") == "$NAME_A" ]] ||
+  { echo "the stand-in keeps no known file; nothing measured" >&2; exit 4; }
+# When the thread's newest exchange began: the thread keeps each person's
+# last eight, so a full one keeps its length as answers come (Fifth).
+count() { on_lamp "jq 'map(.at_unix_ms) | max // 0' '$THREAD' 2>/dev/null || echo 0"; }
 # The newest exchange: "whose codes", the codes said in its answer, as
 # digits, by word or figure; never its words.
 NEWEST='max_by(.at_unix_ms)
