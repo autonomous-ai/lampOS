@@ -2594,9 +2594,13 @@ set; #2135's row, the first builder on #1722, 20 Oct 10:37), the change
   after it.
 - **The worker** reads `LAMP_SECOND_SPEECH_SOCKET` (`=on` only), which the
   voice passes to the second worker as it passes `LAMP_SECOND_SPEECH_WARM`.
-- **Not measured on a lamp.** `--wire --socket` says whether it saves a
-  piece anything over the kept HTTP connection. If it doesn't, the switch
-  stays off.
+- **Measured on lamp-4ace (21 Oct 01:50, voice `af7a83a5bb0b`, through
+  the relay, 10 runs): the socket never spoke.**
+  - Each socket closed `1011` before any audio, 10 of 10.
+  - The same piece on the kept HTTP connection had its first audio at p50
+    270 ms, p90 393 ms.
+  - So the switch stays off. It's tried again only once the relay's `/ws/`
+    carries ElevenLabs' `stream-input`.
 
 ### How much the prompt cache holds (`probe-cache`)
 
