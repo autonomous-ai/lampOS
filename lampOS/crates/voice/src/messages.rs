@@ -330,7 +330,16 @@ pub async fn answer(
         for call in calls {
             // Typed, not heard: a task asked for here is started only by a
             // "yes" typed in the same chat (`agent_tasks::may_confirm`).
-            let result = tools(request, false, call.name.clone(), call.args.clone()).await;
+            // A forget runs only when the typed text asks for it, as a
+            // spoken turn's words must (the reviewer's P3 on #2317).
+            let result = if crate::remember::is_forget(&call.name)
+                && !crate::remember::forget_unguarded()
+                && !crate::remember::asks_to_forget(&text.text)
+            {
+                serde_json::json!({"error": crate::remember::NOT_ASKED_TO_FORGET})
+            } else {
+                tools(request, false, call.name.clone(), call.args.clone()).await
+            };
             messages.push(Message::tool(call.id, result.to_string()));
         }
     }
