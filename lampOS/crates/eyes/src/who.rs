@@ -64,8 +64,11 @@ pub fn known_face_of(known: &Path) -> PathBuf {
 
 /// The name of the one known at the lamp (`--known-file`), replaced whole,
 /// or no file; and while speaking is judged, their face's passing id in
-/// [`known_face_of`], which goes with the name.
-pub fn keep_known(path: &Path, name: Option<&str>, face: Option<&str>) {
+/// [`known_face_of`], which goes with the name. With
+/// `LAMP_MEMORY_STABLE_ID=on` ([`People::id_of`] gives `id`), their memory
+/// id on the line after the name ([`lamp_msgs::known::known_text`]);
+/// without it, the name alone, as before.
+pub fn keep_known(path: &Path, name: Option<&str>, id: Option<&str>, face: Option<&str>) {
     let beside = known_face_of(path);
     let Some(name) = name else {
         let _ = std::fs::remove_file(&beside);
@@ -77,7 +80,7 @@ pub fn keep_known(path: &Path, name: Option<&str>, face: Option<&str>) {
     // beside the old face, which matches nobody and narrows a line to the
     // room. The other order could pair the old name with the new face and
     // keep a newcomer's line as the one before's.
-    replace_line(path, name);
+    replace_line(path, &lamp_msgs::known::known_text(name, id));
     match face {
         Some(face) => replace_line(&beside, face),
         None => {
@@ -332,6 +335,15 @@ pub struct Person {
     /// save drops it, which only ever narrows what is told.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tell_visits: Option<bool>,
+    /// Their memory id (#2176, `LAMP_MEMORY_STABLE_ID=on`): given when they
+    /// are first remembered, and to someone remembered before it was on as
+    /// `person_id` of their name, so nobody's memory moves; kept through
+    /// every later remembering and a rename, never another's. An optional
+    /// field under the rule above: an older build reads past it, and its
+    /// next save drops it, which leaves a renamed person's memory under
+    /// their old name's id until it is on again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -470,6 +482,9 @@ pub struct People {
     /// the file nor its time says when anyone came (the reviewer on #1763).
     /// A restart before then loses them.
     unscored: Vec<String>,
+    /// With `LAMP_MEMORY_STABLE_ID=on`: each person keeps one memory id
+    /// ([`Person::id`]), told beside their name in the known file.
+    stable_ids: bool,
 }
 
 impl People {
@@ -497,6 +512,7 @@ impl People {
                     scored_at: None,
                     counted: Vec::new(),
                     unscored: Vec::new(),
+                    stable_ids: lamp_msgs::known::stable_ids(),
                 });
             }
             Err(error) => return Err(error.into()),
@@ -514,6 +530,7 @@ impl People {
                 scored_at: None,
                 counted: Vec::new(),
                 unscored: Vec::new(),
+                stable_ids: lamp_msgs::known::stable_ids(),
             })
         };
         if bytes.len() as u64 > MOST_FILE_BYTES {
@@ -557,6 +574,7 @@ impl People {
             scored_at,
             counted: Vec::new(),
             unscored: Vec::new(),
+            stable_ids: false,
         };
         if !aside.is_empty() {
             let kept = write_set_aside(
@@ -578,7 +596,68 @@ impl People {
         if let Err(error) = opened.finish_pending() {
             eprintln!("lamp-eyes: the forgets that wait could not be finished now: {error}");
         }
-        Ok(opened)
+        Ok(opened.with_stable_ids(lamp_msgs::known::stable_ids()))
+    }
+
+    /// The same people, each keeping one memory id or not
+    /// (`LAMP_MEMORY_STABLE_ID`, read by [`Self::open`]). On, everyone
+    /// without one is given `person_id` of their name now, in memory, so
+    /// their memory stays where it is; it reaches the file with its next
+    /// write. Ids already held go first, in file order, so a record from an
+    /// older build with no id never takes the id a later record holds; of
+    /// two with one id, the later is given another. Then each without one
+    /// is given `person_id` of their name, or it with the lowest free `-N`.
+    #[must_use]
+    pub fn with_stable_ids(mut self, on: bool) -> Self {
+        self.stable_ids = on;
+        if on {
+            let mut taken: Vec<String> = Vec::new();
+            for person in &mut self.people {
+                match person.id.take() {
+                    Some(id) if !taken.contains(&id) => {
+                        taken.push(id.clone());
+                        person.id = Some(id);
+                    }
+                    _ => {}
+                }
+            }
+            for person in &mut self.people {
+                if person.id.is_none() {
+                    let id = fresh_id(&person.name, &taken);
+                    taken.push(id.clone());
+                    person.id = Some(id);
+                }
+            }
+        }
+        self
+    }
+
+    /// The memory id told beside this person's name in the known file:
+    /// only with `LAMP_MEMORY_STABLE_ID=on`, else `None`, as before.
+    pub fn id_of(&self, name: &str) -> Option<String> {
+        if !self.stable_ids {
+            return None;
+        }
+        self.people
+            .iter()
+            .find(|person| same_name(&person.name, name))
+            .and_then(|person| person.id.clone())
+    }
+
+    /// Whether memory's by-name id for `name` (`person_id` of it, the voice's
+    /// key without the stable id) is nobody else's: false only with
+    /// `LAMP_MEMORY_STABLE_ID=on` when a record not called `name` holds it,
+    /// a person renamed from `name` who kept its memory (the reviewer-lead's
+    /// P2 on #2330). Asked after a forget, so the app's remove never forgets
+    /// a renamed person's memory with the name they no longer have.
+    pub fn name_id_free(&self, name: &str) -> bool {
+        if !self.stable_ids {
+            return true;
+        }
+        let by_name = lamp_msgs::known::person_id(name);
+        !self.people.iter().any(|person| {
+            !same_name(&person.name, name) && person.id.as_deref() == Some(by_name.as_str())
+        })
     }
 
     pub fn names(&self) -> Vec<String> {
@@ -647,11 +726,36 @@ impl People {
         {
             return Err("no prints, too many, or of the wrong length".into());
         }
+        self.remember_as(&name, prints, now_unix_s, None)
+    }
+
+    /// [`Self::remember`], carrying `carried`, a renamed person's memory id
+    /// (#2176), to the name: else the id the name already has, else, with
+    /// the stable id on, a new one ([`fresh_id`]).
+    fn remember_as(
+        &mut self,
+        name: &str,
+        prints: Vec<Vec<f32>>,
+        now_unix_s: u64,
+        carried: Option<String>,
+    ) -> Result<String> {
+        let name = name.to_owned();
+        let had = self
+            .people
+            .iter()
+            .find(|person| same_name(&person.name, &name))
+            .and_then(|person| person.id.clone());
         let mut next = self.people.clone();
         next.retain(|person| !same_name(&person.name, &name));
         if next.len() >= MOST_PEOPLE {
             return Err("the lamp already knows as many people as it keeps".into());
         }
+        let id = carried.or(had).or_else(|| {
+            self.stable_ids.then(|| {
+                let taken: Vec<String> = next.iter().filter_map(|other| other.id.clone()).collect();
+                fresh_id(&name, &taken)
+            })
+        });
         next.push(Person {
             name: name.clone(),
             prints,
@@ -662,6 +766,7 @@ impl People {
             // and the yes was another face's (the reviewer's P2 on #2098).
             // The voice asks again.
             tell_visits: None,
+            id,
         });
         self.save(&next)?;
         self.people = next;
@@ -822,17 +927,32 @@ impl People {
                 return Err(Refused::NearTo(person.name.clone()));
             }
         }
+        let mut carried = None;
         if !known.is_empty() {
             if !replace {
                 return Err(Refused::KnownAs(known.join(" and ")));
             }
+            // A rename (#2176): the new name keeps the memory id of the
+            // likeliest name it replaces, `known`'s first, so what they
+            // told the lamp stays theirs. Only with the stable id on.
+            carried = self
+                .stable_ids
+                .then(|| {
+                    known.first().and_then(|first| {
+                        self.people
+                            .iter()
+                            .find(|person| same_name(&person.name, first))
+                            .and_then(|person| person.id.clone())
+                    })
+                })
+                .flatten();
             let mut next = self.people.clone();
             next.retain(|person| !known.iter().any(|other| same_name(other, &person.name)));
             self.save(&next)
                 .map_err(|error| Refused::Store(error.to_string()))?;
             self.people = next;
         }
-        self.remember(&kept, prints, now_unix_s)
+        self.remember_as(&kept, prints, now_unix_s, carried)
             .map_err(|error| Refused::Store(error.to_string()))
     }
 
@@ -1718,6 +1838,15 @@ pub fn set_aside_count(path: &Path) -> usize {
         .sum()
 }
 
+/// A new memory id for `name` (#2176): `person_id` of it, the voice's id for
+/// the name before the stable id, unless another already has that (a new
+/// "Minh" after the one before was renamed), then the same with the lowest
+/// free `-N`.
+fn fresh_id(name: &str, taken: &[String]) -> String {
+    let taken: Vec<&str> = taken.iter().map(String::as_str).collect();
+    lamp_msgs::known::unique_id(&lamp_msgs::known::person_id(name), &taken)
+}
+
 fn valid(people: &[Person]) -> bool {
     people.len() <= MOST_PEOPLE
         && people.iter().enumerate().all(|(index, person)| {
@@ -1726,6 +1855,10 @@ fn valid(people: &[Person]) -> bool {
                 && person.prints.iter().all(|print| {
                     print.len() == PRINT && print.iter().all(|value| value.is_finite())
                 })
+                && person
+                    .id
+                    .as_deref()
+                    .is_none_or(lamp_msgs::known::is_person_id)
                 && !people[..index]
                     .iter()
                     .any(|other| same_name(&other.name, &person.name))
@@ -1897,7 +2030,7 @@ mod tests {
         let known = file("known-face").with_file_name("known");
         let beside = known_face_of(&known);
         assert_eq!(beside.file_name().unwrap(), "known-face");
-        keep_known(&known, Some("Lan"), Some("f3"));
+        keep_known(&known, Some("Lan"), None, Some("f3"));
         assert_eq!(std::fs::read_to_string(&known).unwrap(), "Lan\n");
         assert_eq!(std::fs::read_to_string(&beside).unwrap(), "f3\n");
         for path in [&known, &beside] {
@@ -1905,11 +2038,11 @@ mod tests {
             assert_eq!(mode & 0o777, 0o600);
         }
         // Speaking not judged: the name only, and no older face beside it.
-        keep_known(&known, Some("Minh"), None);
+        keep_known(&known, Some("Minh"), None, None);
         assert_eq!(std::fs::read_to_string(&known).unwrap(), "Minh\n");
         assert!(!beside.exists());
-        keep_known(&known, Some("Minh"), Some("f4"));
-        keep_known(&known, None, Some("f4"));
+        keep_known(&known, Some("Minh"), None, Some("f4"));
+        keep_known(&known, None, None, Some("f4"));
         assert!(!known.exists() && !beside.exists());
         std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
     }
@@ -2908,5 +3041,192 @@ mod tests {
         assert!(People::open(path.clone()).is_err());
         assert!(path.exists(), "nothing moved through the link");
         assert_eq!(std::fs::read_dir(&elsewhere).unwrap().count(), 0);
+    }
+
+    /// #2176 row 3: with `LAMP_MEMORY_STABLE_ID=on`, a person keeps one
+    /// memory id from their first remembering, through a later one and a
+    /// rename (A to B carries A's id), and the known file has it on the line
+    /// after the name.
+    #[test]
+    fn a_rename_keeps_the_memory_id_and_the_known_file_tells_it() {
+        use lamp_msgs::known::person_id;
+        let path = file("stable-rename");
+        let mut people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        people.remember("Minh", vec![print(0.3)], 1).unwrap();
+        assert_eq!(people.id_of("Minh"), Some(person_id("Minh")));
+        // Remembered again: the same id.
+        assert_eq!(
+            people.remember_one("minh", vec![print(0.31)], 2, false, false),
+            Ok("minh".into())
+        );
+        assert_eq!(people.id_of("Minh"), Some(person_id("Minh")));
+        // Renamed, said yes to: Sam keeps Minh's id, in the file too.
+        assert_eq!(
+            people.remember_one("Sam", vec![print(0.31)], 3, true, false),
+            Ok("Sam".into())
+        );
+        assert_eq!(people.names(), vec!["Sam".to_owned()]);
+        assert_eq!(people.id_of("Sam"), Some(person_id("Minh")));
+        let reopened = People::open(path.clone()).unwrap().with_stable_ids(true);
+        assert_eq!(reopened.id_of("Sam"), Some(person_id("Minh")));
+        // The known file: the name, then the id.
+        let known = path.with_file_name("known");
+        let id = people.id_of("Sam");
+        keep_known(&known, Some("Sam"), id.as_deref(), None);
+        assert_eq!(
+            std::fs::read_to_string(&known).unwrap(),
+            format!("Sam\n{}\n", person_id("Minh"))
+        );
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// Nobody's memory moves: a record from before the stable id, with no
+    /// id, is given exactly `person_id` of its name, written with its next
+    /// write; until then the file is as it was.
+    #[test]
+    fn an_old_record_with_no_id_keeps_its_memory_key() {
+        let path = file("stable-old");
+        let old = format!(
+            r#"{{"version":1,"people":[{{"name":"Lan","prints":[{:?}],"added_unix_s":1}}]}}"#,
+            print(0.3)
+        );
+        std::fs::write(&path, &old).unwrap();
+        let mut people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        assert_eq!(
+            people.id_of("Lan"),
+            Some(lamp_msgs::known::person_id("Lan"))
+        );
+        assert_eq!(people.id_of("Lan").unwrap(), "p-094a367b026246fb");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), old, "only read");
+        people.tell_visits("Lan", true).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains(r#""id":"p-094a367b026246fb""#), "{text}");
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// Two people never share one id: a new "Minh" after the first was
+    /// renamed Sam (who keeps Minh's id) is given Minh's id with `-2`; and
+    /// of two records with one id in the file, the later is given another.
+    #[test]
+    fn two_people_never_share_one_memory_id() {
+        use lamp_msgs::known::person_id;
+        let path = file("stable-two");
+        let mut people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        people.remember("Minh", vec![print(0.3)], 1).unwrap();
+        people
+            .remember_one("Sam", vec![print(0.3)], 2, true, false)
+            .unwrap();
+        // Prints apart from Sam's: someone new.
+        assert_eq!(
+            people.remember_one("Minh", vec![print(1.7)], 3, false, true),
+            Ok("Minh".into())
+        );
+        let minh = person_id("Minh");
+        assert_eq!(people.id_of("Sam"), Some(minh.clone()));
+        assert_eq!(people.id_of("Minh"), Some(format!("{minh}-2")));
+        // A file where two share one: the later is given another.
+        let shared = format!(
+            r#"{{"version":1,"people":[{{"name":"Sam","prints":[{:?}],"added_unix_s":1,"id":"{minh}"}},{{"name":"Minh","prints":[{:?}],"added_unix_s":1,"id":"{minh}"}}]}}"#,
+            print(0.3),
+            print(1.7)
+        );
+        std::fs::write(&path, shared).unwrap();
+        let people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        assert_eq!(people.id_of("Sam"), Some(minh.clone()));
+        assert_eq!(people.id_of("Minh"), Some(format!("{minh}-2")));
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// Ids already held go first: a file an older eyes build saved, a new
+    /// "Minh" with no id before Sam (renamed from Minh, holding Minh's id).
+    /// Sam keeps the id, so Sam's memory stays; the new Minh gets `-2`.
+    #[test]
+    fn a_held_id_is_kept_before_an_earlier_record_with_none_is_given_one() {
+        use lamp_msgs::known::person_id;
+        let path = file("stable-order");
+        let minh = person_id("Minh");
+        let older = format!(
+            r#"{{"version":1,"people":[{{"name":"Minh","prints":[{:?}],"added_unix_s":1}},{{"name":"Sam","prints":[{:?}],"added_unix_s":1,"id":"{minh}"}}]}}"#,
+            print(1.7),
+            print(0.3)
+        );
+        std::fs::write(&path, older).unwrap();
+        let people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        assert_eq!(people.id_of("Sam"), Some(minh.clone()));
+        assert_eq!(people.id_of("Minh"), Some(format!("{minh}-2")));
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// The reviewer-lead's chain on #2330: "Lan" renamed "Mai" keeps `p-` of
+    /// "Lan"; then "Minh" renamed "Lan" keeps `p-` of "Minh". Forgetting
+    /// "Lan" says her by-name id is not free (Mai holds it), so the app's
+    /// remove leaves Mai's memory. One person never renamed, forgotten, is
+    /// free; and off, the name is always the only key, so free.
+    #[test]
+    fn a_forget_says_whether_the_names_memory_id_is_someone_elses() {
+        use lamp_msgs::known::person_id;
+        let path = file("stable-chain");
+        let mut people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        people.remember("Lan", vec![print(0.3)], 1).unwrap();
+        people
+            .remember_one("Mai", vec![print(0.3)], 2, true, false)
+            .unwrap();
+        people
+            .remember_one("Minh", vec![print(1.7)], 3, false, true)
+            .unwrap();
+        people
+            .remember_one("Lan", vec![print(1.7)], 4, true, false)
+            .unwrap();
+        assert_eq!(people.id_of("Mai"), Some(person_id("Lan")));
+        assert_eq!(people.id_of("Lan"), Some(person_id("Minh")));
+        people.forget_at("Lan", 5).unwrap();
+        assert!(!people.name_id_free("Lan"), "Mai holds Lan's by-name id");
+        assert_eq!(people.id_of("Mai"), Some(person_id("Lan")));
+        // Mai herself, forgotten: her name's id is nobody's.
+        people.forget_at("Mai", 6).unwrap();
+        assert!(people.name_id_free("Mai"));
+        assert!(people.name_id_free("Lan"));
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        // One person, never renamed: free once forgotten.
+        let path = file("stable-plain");
+        let mut people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        people.remember("Lan", vec![print(0.3)], 1).unwrap();
+        people.forget_at("Lan", 2).unwrap();
+        assert!(people.name_id_free("Lan"));
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        // Off: free, whatever ids an earlier run left in the file.
+        let path = file("stable-chain-off");
+        let held = format!(
+            r#"{{"version":1,"people":[{{"name":"Mai","prints":[{:?}],"added_unix_s":1,"id":"{}"}}]}}"#,
+            print(0.3),
+            person_id("Lan")
+        );
+        std::fs::write(&path, held).unwrap();
+        let people = People::open(path.clone()).unwrap().with_stable_ids(false);
+        assert!(people.name_id_free("Lan"));
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// Off (the default), nothing changes: no id in the people file or the
+    /// known file, byte for byte as before, and a rename carries nothing.
+    #[test]
+    fn without_the_stable_id_the_files_are_as_before() {
+        let path = file("stable-off");
+        let mut people = People::open(path.clone()).unwrap().with_stable_ids(false);
+        people.remember("Minh", vec![print(0.3)], 1).unwrap();
+        people
+            .remember_one("Sam", vec![print(0.3)], 2, true, false)
+            .unwrap();
+        assert_eq!(people.id_of("Sam"), None);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("\"id\""), "{text}");
+        let kept: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let keys: Vec<&String> = kept["people"][0].as_object().unwrap().keys().collect();
+        assert_eq!(keys, ["added_unix_s", "name", "prints"]);
+        assert_eq!(kept["people"].as_array().unwrap().len(), 1);
+        let known = path.with_file_name("known");
+        keep_known(&known, Some("Sam"), people.id_of("Sam").as_deref(), None);
+        assert_eq!(std::fs::read_to_string(&known).unwrap(), "Sam\n");
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 }

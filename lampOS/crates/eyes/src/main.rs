@@ -948,7 +948,15 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             }
                             None => Ok(false),
                         };
+                        // Their memory id, said with the answer so the app's
+                        // remove forgets their memory, kept under it since a
+                        // rename (#2176): only with LAMP_MEMORY_STABLE_ID=on.
+                        let id = who.people.id_of(&name);
                         let forgot = who.people.forget(&name).map_err(|error| error.to_string());
+                        // Whether memory's by-name id for the name is nobody
+                        // else's now: a person renamed from it keeps it, and
+                        // the app's remove then leaves it (#2330).
+                        let name_id_free = who.people.name_id_free(&name);
                         match let_go.and_then(|let_go| {
                             forgot.map(|forgot| lamp_eyes::who::Forgot {
                                 forgot: forgot.forgot || let_go,
@@ -962,12 +970,20 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     "lamp-eyes: asked to forget a face; forgotten: {forgot}; {unsearched} set-aside files could not be searched, and the forget waits for them"
                                 );
                                 who.known = None;
-                                serde_json::json!({"forgot": forgot, "unsearched": unsearched})
+                                let mut answer = serde_json::json!({"forgot": forgot, "unsearched": unsearched, "name_id_free": name_id_free});
+                                if let Some(id) = id {
+                                    answer["id"] = id.into();
+                                }
+                                answer
                             }
                             Ok(lamp_eyes::who::Forgot { forgot, .. }) => {
                                 eprintln!("lamp-eyes: asked to forget a face; forgotten: {forgot}");
                                 who.known = None;
-                                serde_json::json!({"forgot": forgot})
+                                let mut answer = serde_json::json!({"forgot": forgot, "name_id_free": name_id_free});
+                                if let Some(id) = id {
+                                    answer["id"] = id.into();
+                                }
+                                answer
                             }
                             Err(error) => {
                                 eprintln!("lamp-eyes: could not forget a face: {error}");
@@ -1750,16 +1766,19 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     }
                                 }
                                 if let Some(path) = &arguments.known_file {
+                                    let name = who.known.as_ref().map(|known| known.0.as_str());
+                                    let id = name.and_then(|name| who.people.id_of(name));
                                     lamp_eyes::who::keep_known(
                                         path,
-                                        who.known.as_ref().map(|known| known.0.as_str()),
+                                        name,
+                                        id.as_deref(),
                                         near_id.as_deref(),
                                     );
                                 }
                             } else {
                                 // Nobody near: nobody known at the lamp.
                                 if let Some(path) = &arguments.known_file {
-                                    lamp_eyes::who::keep_known(path, None, None);
+                                    lamp_eyes::who::keep_known(path, None, None, None);
                                 }
                                 if who.visits
                                     && let Some(bus) = bus_out.as_mut()

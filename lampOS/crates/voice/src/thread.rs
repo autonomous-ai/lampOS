@@ -250,7 +250,7 @@ impl Thread {
     /// renewed for them the moment it was ready: the 4 `server_go_away`
     /// drops 0 s after a start on lamp-52e6 on 15 October.
     pub fn at_start(&mut self, known: Option<&str>) {
-        let id = known.map(crate::remember::person_id);
+        let id = known.map(crate::known_faces::memory_person);
         self.whose.clone_from(&id);
         self.named = id;
     }

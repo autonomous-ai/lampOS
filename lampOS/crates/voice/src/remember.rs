@@ -833,20 +833,19 @@ static KNOWN_FILE: OnceLock<PathBuf> = OnceLock::new();
 /// The memory's person id for a name the eyes know: `p-` and the first 16
 /// hex digits of SHA-256 of the lower-cased name. It fits the memory's
 /// `[a-z0-9_-]{1,32}`, and no name is ever in a path or a log line.
+/// With `LAMP_MEMORY_STABLE_ID=on` a known person's memory is keyed on the
+/// eyes' id instead ([`crate::known_faces::person_of`]), which is this for
+/// everyone remembered before it, so nobody's memory moves (#2176).
 pub fn person_id(name: &str) -> String {
-    use sha2::{Digest, Sha256};
-    let digest = Sha256::digest(name.trim().to_lowercase().as_bytes());
-    digest[..8]
-        .iter()
-        .fold(String::from("p-"), |id, byte| id + &format!("{byte:02x}"))
+    lamp_msgs::known::person_id(name)
 }
 
 /// Whose memory the person at the lamp now has: `None` for the room's.
 fn person_now() -> Option<String> {
     KNOWN_FILE
         .get()
-        .and_then(|path| crate::known_faces::known_now(path))
-        .map(|name| person_id(&name))
+        .and_then(|path| crate::known_faces::FaceObservation::read(path))
+        .map(|observation| observation.person())
 }
 
 /// What a session is told, after who is at the lamp, when it has a memory.
