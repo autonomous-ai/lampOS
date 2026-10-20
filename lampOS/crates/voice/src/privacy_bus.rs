@@ -470,6 +470,9 @@ pub struct LeaseReader {
     clock: String,
     current: Option<MicrophonePrivacy>,
     last_now: Option<u64>,
+    /// When it was opened: its reads before the first datagram, in its first
+    /// second, may follow a gap ([`resyncs`]), as the privacy worker's.
+    opened_us: u64,
 }
 
 impl LeaseReader {
@@ -488,9 +491,18 @@ impl LeaseReader {
             clock,
             current: None,
             last_now: None,
+            opened_us: lamp_ipc::monotonic_us(),
         })
     }
 
+    /// Until the first datagram, in its first second, a value read may follow
+    /// a gap and skip sequence numbers, as the privacy worker's fence does
+    /// (#1569 row 45, Third's note on #2244): before the voice's publisher
+    /// finds this reader's socket it reads the topic's kept value, and a
+    /// lease published in between reaches only that file. Each lease is
+    /// whole, so the newest is the truth. Its session, controller, order,
+    /// time and generation are checked as ever. Before, the first datagram's
+    /// gap ended the reader, and the muted ring lost its red at the start.
     pub fn poll(&mut self) -> io::Result<Option<MicrophonePrivacy>> {
         let now_us = lamp_ipc::monotonic_us();
         if self.last_now.is_some_and(|last| now_us < last) {
@@ -499,6 +511,11 @@ impl LeaseReader {
         self.last_now = Some(now_us);
         for count in 0..DRAIN_LIMIT {
             let before = counters(&self.subscriber);
+            let resync = resyncs(
+                self.subscriber.statistics().datagrams,
+                self.opened_us,
+                lamp_ipc::monotonic_us(),
+            );
             let message = self.subscriber.recv(Duration::ZERO)?;
             let now_us = lamp_ipc::monotonic_us();
             if before != counters(&self.subscriber) {
@@ -514,12 +531,15 @@ impl LeaseReader {
             };
             let value = MicrophonePrivacy::from_message(&message, &self.clock, now_us, wall_ms())
                 .map_err(io::Error::other)?;
-            if message.gap != 0
+            if (message.gap != 0 && !resync)
                 || message.publisher_restarted
                 || self.current.as_ref().is_some_and(|old| {
                     old.session_id != value.session_id
                         || old.controller_boot != value.controller_boot
-                        || value.stamp.sequence != old.stamp.sequence.saturating_add(1)
+                        // A backstop: `from_message` already ties it to the
+                        // bus's own sequence.
+                        || value.stamp.sequence <= old.stamp.sequence
+                        || (!resync && value.stamp.sequence != old.stamp.sequence.saturating_add(1))
                         || value.stamp.at_us < old.stamp.at_us
                         || value.microphone_generation < old.microphone_generation
                 })
@@ -955,6 +975,227 @@ pub(crate) mod tests {
             }
         }
         panic!("the host stalled past the lease's freshness in 5 of 5 attempts");
+    }
+
+    /// Third's note on #2244 (#1569 row 45): the muted ring's reader takes
+    /// the kept lease past a gap before its first datagram, in its first
+    /// second, as the worker's fence does. This publisher never finds the
+    /// reader, so the reader has only the topic's kept value, and two leases
+    /// put down at once skip one there. Past its first second the same gap
+    /// ends it, as a lost value. (A lease from another session, or going
+    /// back, `from_message` refuses before the reader's own checks, as a
+    /// lease's session and sequence must be the bus's own.)
+    #[test]
+    fn the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second()
+    {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        const LOST: &str = "privacy lease stream changed or lost a value";
+        let sequence = |reader: &LeaseReader| reader.current.as_ref().map(|l| l.stamp.sequence);
+        // The kept file is looked at once a rescan at most: read until the
+        // newest lease is taken, or the reader ends, within 500 ms.
+        let read_on = |reader: &mut LeaseReader, newest: u64| -> io::Result<()> {
+            let until = std::time::Instant::now() + Duration::from_millis(500);
+            while sequence(reader) != Some(newest) {
+                reader.poll()?;
+                assert!(std::time::Instant::now() < until, "never read {newest}");
+                thread::sleep(Duration::from_millis(2));
+            }
+            Ok(())
+        };
+        // A lease lives 50 ms, and the topic beats every 10 ms. An attempt in
+        // which the host stalled past either before the reader took a lease
+        // (the bus counts it expired, the lease reads stale, or the bus says
+        // its publisher is late, as with no datagram it soon does) says
+        // nothing, so it is made again on a new bus, up to ten times (#1569).
+        let stalled = |error: &io::Error| {
+            let text = error.to_string();
+            text.contains("discarded") || text.contains("stale") || text.contains("unavailable")
+        };
+        let attempt = |past_first_second: bool| -> io::Result<()> {
+            let root = Root(PathBuf::from(format!(
+                "/tmp/vpl-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            )));
+            std::fs::create_dir(&root.0).unwrap();
+            // Looks for subscribers at its first publication only.
+            let never_looks = Bus::new(&root.0)
+                .unwrap()
+                .rescan_every(Duration::from_secs(3_600));
+            let mut publisher = never_looks
+                .publisher_declared(
+                    MicrophonePrivacy::TOPIC,
+                    &MicrophonePrivacy::declaration(),
+                    "voice",
+                )
+                .unwrap();
+            let session = publisher.boot().to_owned();
+            let mut lease = |sequence: u64| {
+                let at = lamp_ipc::monotonic_us();
+                let lease = MicrophonePrivacy {
+                    stamp: ClockStamp {
+                        clock_id: "host_fixture".into(),
+                        at_us: at,
+                        sequence,
+                    },
+                    session_id: session.clone(),
+                    controller_boot: "1".repeat(32),
+                    microphone_generation: 1,
+                    observed_us: at,
+                    expires_at_us: at + PRIVACY_FRESH_US,
+                    permitted: false,
+                    physical_muted: Some(true),
+                    no_slide: false,
+                };
+                publisher.publish_json(at, &lease).unwrap();
+            };
+            // Its one look, before the reader is there.
+            lease(1);
+            let mut reader =
+                LeaseReader::with_clock(&root.0, INDICATOR_SUBSCRIBER, "host_fixture".into())
+                    .unwrap();
+            // Each lease read just after it is put down, so it is fresh.
+            lease(2);
+            read_on(&mut reader, 2)?;
+            if past_first_second {
+                reader.opened_us = lamp_ipc::monotonic_us().saturating_sub(RESYNC_FOR_US);
+            }
+            lease(3);
+            lease(4);
+            let read = read_on(&mut reader, 4);
+            assert_eq!(reader.subscriber.statistics().datagrams, 0);
+            match read {
+                Ok(()) => assert!(!past_first_second, "a gap taken past the first second"),
+                Err(error) if stalled(&error) => return Err(error),
+                Err(error) => {
+                    assert!(past_first_second, "{error}");
+                    assert!(error.to_string().contains(LOST), "{error}");
+                }
+            }
+            Ok(())
+        };
+        for past_first_second in [false, true] {
+            let mut tries = 0;
+            loop {
+                match attempt(past_first_second) {
+                    Ok(()) => break,
+                    Err(error) => {
+                        assert!(stalled(&error), "{error}");
+                        tries += 1;
+                        assert!(tries < 10, "the host stalled in 10 of 10 attempts: {error}");
+                    }
+                }
+            }
+        }
+    }
+
+    /// The reviewer's P3 on #2289: once a lease has come as a datagram, a gap
+    /// ends the reader as a lost value, even inside its first second. Here
+    /// the voice's publisher finds the reader, so leases flow as datagrams,
+    /// and then one comes a sequence ahead: a valid lease written straight to
+    /// the reader's socket, as a lost one would leave it.
+    #[test]
+    fn after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second() {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        const LOST: &str = "privacy lease stream changed or lost a value";
+        // As the kept-lease test: a host stall past a lease's 50 ms, or past
+        // the topic's 10 ms beat, says nothing, and is tried again.
+        let stalled = |error: &io::Error| {
+            let text = error.to_string();
+            text.contains("discarded") || text.contains("stale") || text.contains("unavailable")
+        };
+        let attempt = || -> io::Result<()> {
+            let root = Root(PathBuf::from(format!(
+                "/tmp/vpd-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            )));
+            std::fs::create_dir(&root.0).unwrap();
+            let mut reader =
+                LeaseReader::with_clock(&root.0, INDICATOR_SUBSCRIBER, "host_fixture".into())
+                    .unwrap();
+            let bus = lamp_controls::privacy::selected_bus(Bus::new(&root.0).unwrap());
+            let mut publisher = bus
+                .publisher_declared(
+                    MicrophonePrivacy::TOPIC,
+                    &MicrophonePrivacy::declaration(),
+                    "voice",
+                )
+                .unwrap();
+            let session = publisher.boot().to_owned();
+            let lease = |sequence: u64| {
+                let at = lamp_ipc::monotonic_us();
+                MicrophonePrivacy {
+                    stamp: ClockStamp {
+                        clock_id: "host_fixture".into(),
+                        at_us: at,
+                        sequence,
+                    },
+                    session_id: session.clone(),
+                    controller_boot: "1".repeat(32),
+                    microphone_generation: 1,
+                    observed_us: at,
+                    expires_at_us: at + PRIVACY_FRESH_US,
+                    permitted: false,
+                    physical_muted: Some(true),
+                    no_slide: false,
+                }
+            };
+            // Leases, each read just after it is put down, until one has
+            // come as a datagram.
+            let mut sequence = 0;
+            let until = std::time::Instant::now() + Duration::from_millis(500);
+            while reader.subscriber.statistics().datagrams == 0 {
+                sequence += 1;
+                let next = lease(sequence);
+                publisher.publish_json(next.stamp.at_us, &next).unwrap();
+                thread::sleep(Duration::from_millis(2));
+                reader.poll()?;
+                assert!(std::time::Instant::now() < until, "no datagram came");
+            }
+            assert!(lamp_ipc::monotonic_us() - reader.opened_us < RESYNC_FOR_US);
+            // One a sequence ahead, straight to the reader's socket.
+            let ahead = lease(sequence + 2);
+            let header = lamp_bus::Header {
+                topic: MicrophonePrivacy::TOPIC.into(),
+                kind: Kind::Latest,
+                enc: lamp_bus::JSON.into(),
+                type_name: Some(MicrophonePrivacy::TYPE.into()),
+                source: "voice".into(),
+                boot: session.clone(),
+                seq: sequence + 2,
+                at_us: ahead.stamp.at_us,
+                at_unix_ms: wall_ms(),
+                expires_ms: Some(50),
+            };
+            let mut datagram = serde_json::to_vec(&header).unwrap();
+            datagram.push(b'\n');
+            datagram.extend_from_slice(&serde_json::to_vec(&ahead).unwrap());
+            let socket = std::os::unix::net::UnixDatagram::unbound().unwrap();
+            for entry in std::fs::read_dir(root.0.join("voice/privacy/subs")).unwrap() {
+                socket.send_to(&datagram, entry.unwrap().path()).unwrap();
+            }
+            let until = std::time::Instant::now() + Duration::from_millis(500);
+            loop {
+                match reader.poll() {
+                    Ok(_) => {
+                        assert!(std::time::Instant::now() < until, "the gap was taken");
+                        thread::sleep(Duration::from_millis(2));
+                    }
+                    Err(error) if stalled(&error) => return Err(error),
+                    Err(error) => {
+                        assert!(error.to_string().contains(LOST), "{error}");
+                        return Ok(());
+                    }
+                }
+            }
+        };
+        let mut tries = 0;
+        while let Err(error) = attempt() {
+            assert!(stalled(&error), "{error}");
+            tries += 1;
+            assert!(tries < 10, "the host stalled in 10 of 10 attempts: {error}");
+        }
     }
 
     /// Messages that look right but say another type, written straight to

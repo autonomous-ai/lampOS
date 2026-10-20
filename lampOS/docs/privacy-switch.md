@@ -298,6 +298,18 @@ bus passes over any number of messages it refuses, so a flood of them on
   failure kept) and
   `stop_during_refused_input_on_the_lease_topic_is_served_at_once` (the
   writer's real step, Stop served in under 10 ms, nothing red written).
+- **At its start the reader resyncs as the worker's fence does** (#1569 row
+  45, Third's note on #2244). Until the voice's publisher finds its new
+  socket, it reads the topic's kept lease, and a lease published in between
+  reaches only that file. So before its first datagram, in its first second
+  (`resyncs`), a lease may follow a gap and skip sequence numbers. Its
+  session, controller, order, time and generation are checked as ever, and
+  after either bound a gap ends it as before. Before this, the first
+  datagram's gap ended it, so the writer blanked and the red was lost at the
+  start. Tests:
+  `the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second`
+  and, once a lease has come as a datagram, a gap ending it inside its first
+  second: `after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second`.
 
 Design targets, not measured lamp results: actual line read to Controls
 publication within 50 ms; accepted mute to both capture gates closed within
