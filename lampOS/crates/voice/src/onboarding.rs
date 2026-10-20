@@ -8,8 +8,9 @@
 //! model calls [`STEP`]; the provider worker writes that into a small
 //! mailbox file beside the onboarding file, and only the runner writes the
 //! onboarding file itself. "Where you sit" is ended by what the eyes
-//! measure. The steps other builders own are placeholders: recorded as not
-//! available, not spoken, and passed over.
+//! measure, and "touch" by Controls' head-pad event on the bus. The steps
+//! other builders own are placeholders: recorded as not available, not
+//! spoken, and passed over.
 //!
 //! Off unless `LAMP_ONBOARDING=on` and `LAMP_ONBOARDING_FILE` names an
 //! absolute path: then nothing here runs, no function is declared and no
@@ -53,6 +54,10 @@ const NEAR: f32 = 0.14;
 const MIDDLE: f32 = 0.25;
 /// A look on the bus older than this says nothing of now.
 const FRESH_MS: u64 = 700;
+/// "Touch": no touch on the head this long after the ask has failed.
+const TOUCH_GIVE_UP_US: u64 = 60_000_000;
+/// The name the walk reads Controls' touches under.
+const SUBSCRIBER: &str = "voice_onboarding";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Step {
@@ -94,12 +99,13 @@ impl Step {
 
     /// PLACEHOLDER (#841): the steps whose parts other builders own. Each
     /// is passed over until its part can be measured from here: hearing
-    /// (fourth, #753), head touch (third, #711), the privacy switch (third,
-    /// #795), and whether the body gives way (fifth, #780).
+    /// (fourth, #753), the privacy switch (third, #795), and whether the
+    /// body gives way (fifth, #780). Touch needs Controls' head pads on the
+    /// bus as well ([`Onboarding::has`]).
     fn available(self) -> bool {
         matches!(
             self,
-            Step::WhereYouSit | Step::WhoYouAre | Step::Preferences
+            Step::WhereYouSit | Step::WhoYouAre | Step::Touch | Step::Preferences
         )
     }
 
@@ -107,16 +113,19 @@ impl Step {
     /// it was skipped.
     fn reportable(self, outcome: Outcome) -> bool {
         match self {
-            Step::WhereYouSit => outcome == Outcome::Skipped,
+            Step::WhereYouSit | Step::Touch => outcome == Outcome::Skipped,
             _ => outcome != Outcome::NotAvailable,
         }
     }
 
-    /// What the model is given to begin the step.
-    fn note(self) -> &'static str {
+    /// What the model is given to begin the step, `again` when it is
+    /// offered after the walk.
+    fn note(self, again: bool) -> &'static str {
         match self {
             Step::WhereYouSit => SIT_NOTE,
             Step::WhoYouAre => WHO_NOTE,
+            Step::Touch if again => TOUCH_OFFER,
+            Step::Touch => TOUCH_NOTE,
             Step::Preferences => PREFERENCES_NOTE,
             // PLACEHOLDER (#841): each owner words its own step's note,
             // opening with "one more thing I can do now" for the re-offer.
@@ -148,6 +157,9 @@ pub const SIT_DONE: &str =
     "(Now you can see them well where they sit. Tell them so in a few words.)";
 pub const SIT_FAILED: &str = "(You still cannot see them well where they sit. Tell them in a few light words that it is fine: they can turn you toward their seat later, or ask you to redo the setup.)";
 pub const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Then call setup_step with step \"who_you_are\": done, skipped if they would rather not, or failed if it could not be done, and then tell them in a few words what they can try later.)";
+pub const TOUCH_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, to touch the top of your head gently, then stay quiet.)";
+pub const TOUCH_OFFER: &str = "(Nobody has spoken. Tell them in a few words that there is one more thing you can do now: feel a touch on the top of your head. Ask them to touch it gently, then stay quiet.)";
+pub const TOUCH_REMIND: &str = "(You have not felt a touch yet. Ask them once more, in a few words, to touch the top of your head gently, then stay quiet.)";
 pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask them two short things, one at a time: whether there are hours when you should keep quiet, and whether you may say hello when they sit down. Keep each answer as a rule if you can. As soon as you have heard the second answer, call setup_step with step \"preferences\" before you say anything else, then tell them in a few words that is everything, and that they can ask you to redo the setup any time.)";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -233,6 +245,9 @@ pub struct Onboarding {
     available: fn(Step) -> bool,
     /// The move asked of the body for a step just done, until taken.
     gesture: Option<&'static str>,
+    /// Controls' touches (`controls/touch`), with the bus on: without them
+    /// "touch" is not available.
+    touches: Option<lamp_bus::Subscriber>,
 }
 
 /// What a read of a body topic found: nothing ever, a message
@@ -293,6 +308,18 @@ impl Onboarding {
         )?;
         let mut walk = Self::at(file);
         walk.eyes = lamp_bus::Bus::from_environment().ok();
+        // The head pads' touches, from `--touch` Controls, only with the
+        // voice's bus on.
+        if std::env::var(crate::bus_out::ENVIRONMENT).ok().as_deref() == Some("on") {
+            walk.touches = walk.eyes.as_ref().and_then(|bus| {
+                bus.subscribe_typed(
+                    lamp_msgs::TouchEvent::TOPIC,
+                    SUBSCRIBER,
+                    lamp_msgs::TouchEvent::TYPE,
+                )
+                .ok()
+            });
+        }
         Some(walk)
     }
 
@@ -318,7 +345,36 @@ impl Onboarding {
             felt: None,
             goals: None,
             body_heard: false,
+            touches: None,
         }
+    }
+
+    /// Whether this voice has the step now: touch only with Controls'
+    /// touches to read.
+    fn has(&self, step: Step) -> bool {
+        (self.available)(step) && (step != Step::Touch || self.touches.is_some())
+    }
+
+    /// Whether Controls said a touch on the head pads since the last look.
+    /// Never waits; what is read is only this, never kept.
+    fn head_touched(&mut self) -> bool {
+        let Some(touches) = self.touches.as_mut() else {
+            return false;
+        };
+        let mut touched = false;
+        for _ in 0..8 {
+            let Ok(Some(message)) = touches.recv(std::time::Duration::ZERO) else {
+                break;
+            };
+            touched |= !message.expired
+                && message.header.source == "controls"
+                && message.parse::<lamp_msgs::TouchEvent>().is_ok_and(|event| {
+                    event.check().is_ok()
+                        && event.enabled
+                        && event.source == lamp_msgs::TouchSource::Head
+                });
+        }
+        touched
     }
 
     pub fn kept(&self) -> &Progress {
@@ -444,6 +500,8 @@ impl Onboarding {
             self.read_us = Some(now_us);
             self.read_mailbox(now_us);
         }
+        // Read every tick, so what came before the ask is never taken.
+        let touched = self.head_touched();
         if face.is_some() {
             self.seen_us = Some(now_us);
         }
@@ -471,7 +529,7 @@ impl Onboarding {
                 }
                 return None;
             };
-            if (self.available)(step) {
+            if self.has(step) {
                 break step;
             }
             self.finish(step, Outcome::NotAvailable, None, now_us);
@@ -502,7 +560,7 @@ impl Onboarding {
                 if again.is_some() {
                     self.save();
                 }
-                return Some(step.note());
+                return Some(step.note(again.is_some()));
             }
             return None;
         };
@@ -511,6 +569,20 @@ impl Onboarding {
             self.records.push(
                 json!({"kind":"onboarding_stopped","why":"nobody_there","step":step.name(),"at_us":now_us}),
             );
+            return None;
+        }
+        if step == Step::Touch {
+            // Done only by a touch Controls felt; one reminder, then failed.
+            if touched {
+                self.finish(step, Outcome::Done, None, now_us);
+            } else if now_us.saturating_sub(asked_us) >= TOUCH_GIVE_UP_US {
+                self.finish(step, Outcome::Failed, None, now_us);
+            } else if can_speak && quiet_us >= GUIDE_EVERY_US && led.guided_us == Some(asked_us) {
+                led.guided_us = Some(now_us);
+                self.records
+                    .push(json!({"kind":"onboarding_guide","step":step.name(),"at_us":now_us}));
+                return Some(TOUCH_REMIND);
+            }
             return None;
         }
         if step != Step::WhereYouSit {
@@ -575,7 +647,7 @@ impl Onboarding {
             })
             .or_else(|| {
                 Step::ALL.into_iter().find(|step| {
-                    (self.available)(*step)
+                    self.has(*step)
                         && self.kept.steps.get(step.name()).is_some_and(|kept| {
                             kept.outcome == Outcome::NotAvailable
                                 && kept
@@ -667,7 +739,8 @@ impl Onboarding {
                 continue;
             };
             // Only the step being led, and a measured step only skipped:
-            // "where you sit" is done by what the eyes see, never by a word.
+            // "where you sit" is done by what the eyes see and "touch" by
+            // what Controls feels, never by a word.
             let led = self
                 .led
                 .as_ref()
@@ -768,7 +841,8 @@ pub fn tools() -> Vec<Tool> {
                           to lead has ended: done, skipped because they asked to skip it, or failed. If \
                           they want to skip the rest, call it skipped for the step you are on. Then go on \
                           talking as the step asked. Only for the step you are leading now; \
-                          where_you_sit can only be skipped, since you finish it by seeing them."
+                          where_you_sit and touch can only be skipped, since you finish them by seeing \
+                          them and by feeling their touch."
                 .into(),
             parameters: Some(json!({
                 "type": "object",
@@ -810,6 +884,12 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
                 (Some(Step::WhereYouSit), Some(_)) => {
                     return (
                         json!({"error": "Where they sit is done when you can see them well. You can only skip it, if they ask."}),
+                        true,
+                    );
+                }
+                (Some(Step::Touch), Some(_)) => {
+                    return (
+                        json!({"error": "The touch is done when you feel it on your head. You can only skip it, if they ask."}),
                         true,
                     );
                 }
@@ -1406,6 +1486,107 @@ mod tests {
                 None
             );
         }
+    }
+
+    /// A walk led to "touch", with Controls' touches on a bus of its own.
+    fn at_touch(name: &str) -> (Room, lamp_bus::Publisher, PathBuf) {
+        use lamp_msgs::TouchEvent;
+        // Short, for the sockets' path limit.
+        let root = PathBuf::from(format!("/tmp/lvo-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut room = Room::new(name);
+        room.walk.touches = Some(
+            bus.subscribe_typed(TouchEvent::TOPIC, SUBSCRIBER, TouchEvent::TYPE)
+                .unwrap(),
+        );
+        let says = bus
+            .publisher_declared(TouchEvent::TOPIC, &TouchEvent::declaration(), "controls")
+            .unwrap();
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.walk.take_gesture(), Some("nod"));
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [TOUCH_NOTE]);
+        assert_eq!(room.walk.take_gesture(), Some("greeting"));
+        (room, says, root)
+    }
+
+    /// Ticks at the same moment until "touch" has an outcome, or for up to
+    /// two seconds while the bus delivers.
+    fn until_touch_ends(room: &mut Room) {
+        let since = std::time::Instant::now();
+        while room.outcome(Step::Touch).is_none()
+            && since.elapsed() < std::time::Duration::from_secs(2)
+        {
+            room.walk.tick(
+                room.at,
+                room.at - room.said,
+                true,
+                false,
+                Some(NEAR_MIDDLE),
+                true,
+            );
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+    }
+
+    #[test]
+    fn a_touch_on_the_head_after_the_ask_is_done() {
+        let (mut room, mut says, root) = at_touch("touched");
+        let (_, touches) = crate::hand_controls::test_head_touch("boot", lamp_ipc::monotonic_us());
+        assert!(!touches.is_empty());
+        for (at, touch) in touches.iter().enumerate() {
+            says.publish_json(at as u64 + 1, touch).unwrap();
+        }
+        until_touch_ends(&mut room);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Done));
+        assert_eq!(room.walk.take_gesture(), Some("nod"));
+        // Only the outcome is kept.
+        assert_eq!(room.walk.kept().steps["touch"].framing, None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn touch_is_done_only_by_what_controls_feels() {
+        let (mut room, _says, root) = at_touch("touch-forged");
+        let done = ToolCall {
+            id: "c".into(),
+            name: STEP.into(),
+            args: json!({"step": "touch", "outcome": "done"}),
+        };
+        assert!(run(&room.walk.file, &done).0.get("error").is_some());
+        std::fs::write(
+            mailbox_of(&room.walk.file),
+            "{\"step\":\"touch\",\"outcome\":\"done\"}\n",
+        )
+        .unwrap();
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::Touch), None);
+        // Skipped is theirs to ask.
+        report(&room.walk, "touch", "skipped");
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Skipped));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn no_touch_is_reminded_once_then_failed() {
+        let (mut room, _says, root) = at_touch("untouched");
+        assert_eq!(
+            room.wait(61 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_REMIND, PREFERENCES_NOTE]
+        );
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Failed));
+        assert_eq!(room.walk.take_gesture(), None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn touch_is_not_available_without_the_bus() {
+        let room = walked("touch-no-bus");
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::NotAvailable));
     }
 
     #[test]

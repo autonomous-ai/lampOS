@@ -24,15 +24,15 @@ ready, not paused) and a face is in front of it.
 | 1 | `where_you_sit` | asks them to sit where they usually sit and look at it | the eyes' largest fresh face (`humans/faces/tracked`) is at least 0.14 of the picture's height with its centre within 0.25 of the middle, held 3 s while the head is still and no hand is on the lamp (every head joint, `base_yaw`, `head_pitch`, `head_roll` on `body/joint_states`, within 6 counts of its goal, slower than 25 counts a second, and the same goals as the last reading; `body/hand` not pushed; each reading fresh, within 0.7 s; any motion, or a reading stale or missing once there is any sign of a body, starts the 3 s again, and a hand not freshly released counts as still there. Any sign stays: either topic present at all (fresh, stale, unparseable, or a read that failed) or any `body/` topic or declaration on the bus. Only a lamp with no body at all goes without that gate): done, and the lamp says so. Short of that, after 8 s of quiet, one note (only one, ever) says what is missing: no face, or "a bit closer" / "turn me a little toward you" with "where you are is fine too". After that note any face held 3 s the same way is done where it is, its framing kept: a person sitting beside the lamp (row 10 on lamp-52e6, the face at x 0.12, y -0.63) would just say "there's fine". After 60 s: failed, and the lamp says they can turn it toward their seat later or redo the setup | the framing (size, centre) |
 | 2 | `who_you_are` | asks what to call them; after a clear yes, `remember_my_face` ([eyes.md](eyes.md)) | the model calls `setup_step` | the face in the eyes' people file |
 | 3 | `how_you_sound` | placeholder | — | — |
-| 4 | `touch` | placeholder | — | — |
+| 4 | `touch` | asks them, in a few words, to touch the top of its head gently, then stays quiet | a head-pad touch from Controls (`controls/touch`, `lamp_msgs/TouchEvent` from `controls`, `source: head`, enabled; `lamp-controls --touch`) after the ask: done. Short of that, after 8 s of quiet, one reminder; 60 s after the ask: failed. The model may only skip it. Not available without the voice's bus (`LAMP_BUS=on`) or the subscription to `controls/touch`; the base strip stays off (#1891) | the outcome only |
 | 5 | `privacy` | placeholder | — | — |
 | 6 | `giving_way` | placeholder | — | — |
 | 7 | `preferences` | asks about quiet hours and whether it may say hello, one at a time; keeps each as a rule with `keep_rule` (#813) when the provider worker has both `LAMP_MEMORY_DAYS=on` and `LAMP_MEMORY_RULES=on` ([memory.md](memory.md), "What a person teaches and corrects"); without either, or with the legacy memory, there is no `keep_rule` and the model keeps them with `remember` if it has a memory at all and says that is everything | the model calls `setup_step` as soon as it has heard the second answer, before it says anything else (row 10 on lamp-52e6: asked and answered, never reported) | the rules, in memory |
 
 A placeholder is the step of a part another builder owns: hearing (fourth,
-#753), head touch (third, #711), the privacy switch (third, #795), and
-whether the body gives way (fifth, #780). It is recorded as `not_available`
-and passed over without a word: four "that isn't ready yet" in a row would
+#753), the privacy switch (third, #795), and whether the body gives way
+(fifth, #780). It is recorded as `not_available` and passed over without a
+word: three "that isn't ready yet" in a row would
 sound like a machine. Each is marked `PLACEHOLDER (#841)` in the code.
 
 A step the model leads ends with `setup_step {step, outcome}`, outcome
@@ -40,7 +40,8 @@ A step the model leads ends with `setup_step {step, outcome}`, outcome
 done; the model then tells them what to try later). Only the step being
 led is taken; a report of any other is refused and recorded
 (`onboarding_report_refused`). `where_you_sit` is done only by what the
-eyes measure: the model may only skip it, and the worker refuses any other
+eyes measure and `touch` only by what Controls feels: the model may only
+skip them, and the worker refuses any other
 outcome with words it can say. Never reported, a step is
 failed after 90 s once the room has been quiet for 20 s, and the walk goes
 on. Nobody in front of the lamp for 30 s: the step being led is dropped and
