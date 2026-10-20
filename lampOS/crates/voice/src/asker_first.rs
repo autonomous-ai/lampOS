@@ -87,7 +87,7 @@ pub const LINE_MOST_US: u64 = 2_000_000;
 
 /// Fewer speech blocks than this say nothing of a level: as many as begin
 /// an utterance.
-const ENOUGH_BLOCKS: usize = 6;
+pub const ENOUGH_BLOCKS: usize = 6;
 
 /// A speech block this soon after the lamp's sound may be its echo, and is
 /// not the asker's level.
@@ -152,6 +152,17 @@ struct Asker {
 /// middle and upper tenth, and how many of its blocks were judged.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Kept {
+    pub asker: u8,
+    pub heard: u8,
+    pub upper: u8,
+    pub blocks: usize,
+}
+
+/// How loud new speech has been against the asker: the asker's level, the
+/// speech's middle and upper tenth, and how many of its blocks were heard
+/// (`motion_voice`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Levels {
     pub asker: u8,
     pub heard: u8,
     pub upper: u8,
@@ -298,6 +309,31 @@ impl AskerFirst {
         }
     }
 
+    /// How loud the speech that began at `from_us`, heard by `now_us`, has
+    /// been against `turn`'s asker: none without the asker's level for that
+    /// turn, or with no speech block of its own yet. It judges nothing and
+    /// keeps nothing (`motion_voice`, #1712's B).
+    pub fn levels_since(&self, turn: u64, from_us: u64, now_us: u64) -> Option<Levels> {
+        let asker = self.asker.filter(|asker| asker.turn == turn)?;
+        let levels: Vec<u8> = self
+            .since
+            .iter()
+            .filter(|(at, _)| *at >= from_us && *at <= now_us)
+            .map(|(_, level)| *level)
+            .collect();
+        if levels.is_empty() {
+            return None;
+        }
+        let blocks = levels.len();
+        let (heard, upper) = middle_and_upper(levels);
+        Some(Levels {
+            asker: asker.level,
+            heard,
+            upper,
+            blocks,
+        })
+    }
+
     /// Whether the rule has not yet said it kept `turn`; after this, it has.
     pub fn first_for(&mut self, turn: u64) -> bool {
         self.kept.replace(turn) != Some(turn)
@@ -324,6 +360,34 @@ mod tests {
             rule.asking(turn, level);
         }
         assert_eq!(rule.asked(turn, ended_ms * MS), Some(level));
+    }
+
+    /// `motion_voice`'s reading (#1712's B): the levels of speech begun at
+    /// a time against the turn's asker, only its own blocks, judging
+    /// nothing; none for another turn, before the asker's level, or with no
+    /// block of its own yet.
+    #[test]
+    fn levels_since_reads_its_own_blocks_against_the_asker() {
+        let mut rule = AskerFirst::default();
+        assert_eq!(rule.levels_since(1, 0, 10_000 * MS), None);
+        asked(&mut rule, 1, 150, 1_000);
+        assert_eq!(rule.levels_since(1, 1_100 * MS, 2_000 * MS), None);
+        // Room talk before it, then its own blocks.
+        speech(&mut rule, 1_100, 10, 60);
+        let end = speech(&mut rule, 1_300, 10, 140);
+        let levels = rule.levels_since(1, 1_300 * MS, end).unwrap();
+        assert_eq!(
+            levels,
+            Levels {
+                asker: 150,
+                heard: 140,
+                upper: 140,
+                blocks: 10
+            }
+        );
+        assert_eq!(rule.levels_since(2, 1_300 * MS, end), None);
+        // It judges nothing: the rule's own record is untouched.
+        assert!(rule.first_for(1));
     }
 
     #[test]

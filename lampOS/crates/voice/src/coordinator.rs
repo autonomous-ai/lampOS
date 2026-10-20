@@ -519,6 +519,27 @@ fn body_heard(
     }
 }
 
+/// `LAMP_MOTION_VOICE` (#1712's B, the first builder at 03:27 on 21 Oct):
+/// what becomes of `candidate`, a sound [`body_heard`] found begun as the
+/// body moved. Its own speech blocks, from its first read to `at_us`,
+/// against the asker's level as the asker-first rule keeps it, and the
+/// levels it was judged on ([`crate::motion_voice`]).
+fn motion_voice_heard(
+    mode: crate::motion_voice::Mode,
+    asker_first: Option<&crate::asker_first::AskerFirst>,
+    reply: Option<&Reply>,
+    candidate: &crate::admission::Candidate,
+    at_us: u64,
+) -> (
+    crate::motion_voice::Decision,
+    Option<crate::asker_first::Levels>,
+) {
+    let levels = asker_first.zip(reply).and_then(|(rule, current)| {
+        rule.levels_since(current.owner.turn(), candidate.first_read_at_us, at_us)
+    });
+    (crate::motion_voice::decide(mode, levels.as_ref()), levels)
+}
+
 /// [`WhileAnswerWaits`] for `candidate` at `at_us`: `ended` if its sound is
 /// over, and the detector's pause in blocks.
 fn while_answer_waits(
@@ -4687,6 +4708,28 @@ fn conversation_with_gate(
             "lamp-voice: motion keeps the answer: while an answer is awaited, a sound that begins as the body moves a joint (4 servo counts or more a message) is the lamp's own, unless its name is heard"
         );
     }
+    // Such a sound about as loud as the asker is theirs (`LAMP_MOTION_VOICE`).
+    let motion_voice = crate::motion_voice::Mode::from_environment();
+    // The sound the motion rule last found the asker's: decided once, so a
+    // later rule that holds it doesn't have it judged again on more blocks,
+    // and perhaps let go then (the reviewer's P3 1 on #2371).
+    let mut motion_kept_for: Option<crate::admission::CandidateId> = None;
+    if motion_in.is_some() && motion_voice != crate::motion_voice::Mode::Off {
+        eprintln!(
+            "lamp-voice: motion voice{}: a sound begun as the body moves is the asker's when its own speech is no more than {:.0} dB under theirs{}",
+            if motion_voice == crate::motion_voice::Mode::Record {
+                ", recorded only"
+            } else {
+                ""
+            },
+            f32::from(crate::motion_voice::MARGIN) / 7.5,
+            if asker_mode.applies() {
+                ""
+            } else {
+                "; LAMP_ASKER_FIRST is off, so no asker's level is known and nothing changes"
+            }
+        );
+    }
     if asker_first.is_some() {
         eprintln!(
             "lamp-voice: asker first{}: for {} s while an answer is awaited, speech more than {:.0} dB under the asker's takes no turn; {}",
@@ -6756,10 +6799,11 @@ fn conversation_with_gate(
                     // joint, while an answer is awaited, is the lamp's own
                     // motors: let go, and the answer goes on. Until the
                     // body has said where it was then, it waits.
-                    if let Some(motion) = motion_in
-                        .as_mut()
-                        .filter(|_| !own_theirs_now && !goes_on_from_name)
-                    {
+                    if let Some(motion) = motion_in.as_mut().filter(|_| {
+                        !own_theirs_now
+                            && !goes_on_from_name
+                            && motion_kept_for != Some(candidate.id)
+                    }) {
                         let waits_until_us = candidate
                             .trigger_read_at_us
                             .saturating_add(crate::body_motion::WAITS_US)
@@ -6780,25 +6824,68 @@ fn conversation_with_gate(
                             &candidate,
                         ) {
                             crate::body_motion::Judged::Moved { began, ended } => {
-                                if let Some(rejection) =
-                                    admission.release_prospective(monotonic_us())?
-                                {
-                                    record_input_rejection(trace, rejection)?;
-                                }
-                                detector.clear_prospective();
-                                eprintln!(
-                                    "lamp-voice: a sound that began as the body moved a joint was let go; the answer goes on"
+                                let (decision, levels) = motion_voice_heard(
+                                    motion_voice,
+                                    asker_first.as_ref(),
+                                    reply.as_ref(),
+                                    &candidate,
+                                    at_us,
                                 );
-                                record(
-                                    trace,
-                                    json!({"kind":"input_let_go_body_moving","at_us":at_us,
-                                        "turn":reply.as_ref().map(|current| current.owner.turn()),
-                                        "onset_from_us":candidate.first_read_at_us,
-                                        "onset_to_us":candidate.trigger_read_at_us,
-                                        "moved_from_us":began,"moved_until_us":ended,
-                                        "boundary":"a new sound began as the body moved a joint while an answer was awaited: the lamp's own motors"}),
-                                )?;
-                                continue;
+                                let mut moving = json!({"at_us":at_us,
+                                    "turn":reply.as_ref().map(|current| current.owner.turn()),
+                                    "onset_from_us":candidate.first_read_at_us,
+                                    "onset_to_us":candidate.trigger_read_at_us,
+                                    "moved_from_us":began,"moved_until_us":ended});
+                                if motion_voice != crate::motion_voice::Mode::Off {
+                                    moving["candidate"] = json!(candidate.id);
+                                    moving["motion_voice"] = json!(motion_voice.as_str());
+                                    moving["margin"] = json!(crate::motion_voice::MARGIN);
+                                    moving["asker_level"] =
+                                        json!(levels.map(|levels| levels.asker));
+                                    moving["heard_level"] =
+                                        json!(levels.map(|levels| levels.heard));
+                                    moving["heard_upper_tenth"] =
+                                        json!(levels.map(|levels| levels.upper));
+                                    moving["blocks"] =
+                                        json!(levels.map_or(0, |levels| levels.blocks));
+                                }
+                                if let crate::motion_voice::Decision::LetGo { would_keep } =
+                                    decision
+                                {
+                                    if let Some(rejection) =
+                                        admission.release_prospective(monotonic_us())?
+                                    {
+                                        record_input_rejection(trace, rejection)?;
+                                    }
+                                    detector.clear_prospective();
+                                    eprintln!(
+                                        "lamp-voice: a sound that began as the body moved a joint was let go; the answer goes on"
+                                    );
+                                    moving["kind"] = json!("input_let_go_body_moving");
+                                    moving["boundary"] = json!(
+                                        "a new sound began as the body moved a joint while an answer was awaited: the lamp's own motors"
+                                    );
+                                    if motion_voice != crate::motion_voice::Mode::Off {
+                                        moving["would_keep"] = json!(would_keep);
+                                        moving["boundary"] = json!(
+                                            "a new sound began as the body moved a joint while an answer was awaited: the lamp's own motors; levels on the face's scale, 7.5 to a decibel; would_keep: LAMP_MOTION_VOICE=on would have taken it for the asker's"
+                                        );
+                                    }
+                                    record(trace, moving)?;
+                                    continue;
+                                }
+                                // About as loud as the asker: theirs. It goes
+                                // on to the rules after this one, as if the
+                                // body were still.
+                                eprintln!(
+                                    "lamp-voice: a sound that began as the body moved a joint is about as loud as the asker: theirs, not the motors"
+                                );
+                                motion_kept_for = Some(candidate.id);
+                                moving["kind"] = json!("input_kept_body_moving");
+                                moving["boundary"] = json!(
+                                    "a new sound began as the body moved a joint while an answer was awaited, its own speech no more than the margin under the asker's: the asker's, judged on as if the body were still; levels on the face's scale, 7.5 to a decibel"
+                                );
+                                record(trace, moving)?;
                             }
                             crate::body_motion::Judged::Waits => continue,
                             crate::body_motion::Judged::Still => {}
