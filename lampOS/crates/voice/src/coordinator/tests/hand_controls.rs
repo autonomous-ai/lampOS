@@ -1979,3 +1979,32 @@ fn a_head_touch_while_the_lamp_is_still_thinking_asks_nothing() {
     assert!(!trace.iter().any(|row| row["kind"] == "hand_control_cancel"));
     assert!(trace.iter().any(|row| row["kind"] == "head_touch_noticed"));
 }
+
+/// #2233: with `LAMP_CAMERA_FOLLOWS_EYES=on`, a voice whose camera is the
+/// eyes' permits it with the microphone, and a mute by hand denies it with
+/// the microphone, as the eyes are told no at once.
+#[test]
+fn the_eyes_camera_follows_the_microphone_and_a_mute_denies_it() {
+    let directory = SessionDirectory::create().unwrap();
+    let (mut speaker, mut peer) = pair(&directory, "speaker");
+    let (mut owner, mut reply) = current_input();
+    super::super::eyes_look_with_the_microphone(&mut owner, true, false).unwrap();
+    assert!(owner.snapshot(now()).unwrap().camera_allowed(now()));
+    let observed = monotonic_us();
+    hand::cancel(
+        &mut owner,
+        &mut reply,
+        &mut speaker.control,
+        &mut None,
+        &mut VecDeque::new(),
+        &mut InputAdmission::default(),
+        &mut TurnDetector::default(),
+        true,
+        observed,
+        || observed,
+    )
+    .unwrap();
+    let received = received_authority(&mut peer);
+    assert_eq!(received.camera_permission(), Permission::Denied);
+    assert_eq!(received.microphone_permission(), Permission::Denied);
+}

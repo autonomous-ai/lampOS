@@ -5129,6 +5129,17 @@ fn conversation_with_gate(
         }
         if can_open && !permitted {
             owner.set_microphone_permission(now(), Permission::Allowed)?;
+            // The eyes, a process of their own, may look exactly while the
+            // microphone is permitted (`EyesLink`): the authority says so,
+            // so what is read from them (whose a turn is) counts. With no
+            // camera of the voice's own it was never said, and every second
+            // route turn was the room's (#1895, lamp-52e6 20 Oct). A mute
+            // denies both (`hand.rs`).
+            eyes_look_with_the_microphone(
+                owner,
+                eyes_link.is_some() && camera_follows_eyes(),
+                rig.camera.is_some(),
+            )?;
             permitted = true;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -9348,6 +9359,32 @@ fn record_look_intent(
     Ok(())
 }
 
+/// `LAMP_CAMERA_FOLLOWS_EYES`: exactly `on`; off unless set (the first
+/// builder on #2233). On, a voice whose camera is the eyes' says so in its
+/// authority, which starts per-person memory and #764's per-person Live
+/// sessions on a product lamp.
+pub const CAMERA_FOLLOWS_EYES: &str = "LAMP_CAMERA_FOLLOWS_EYES";
+
+fn camera_follows_eyes() -> bool {
+    std::env::var(CAMERA_FOLLOWS_EYES).ok().as_deref() == Some("on")
+}
+
+/// With the microphone just permitted: the eyes (`lamp-eyes`, a process of
+/// their own, `eyes`, with `LAMP_CAMERA_FOLLOWS_EYES=on`) look exactly while
+/// it is (`EyesLink`), so with no camera of the voice's own (`own_camera`)
+/// the camera is permitted too, and what is read from them counts (#1895).
+/// A mute denies both (`hand.rs`).
+fn eyes_look_with_the_microphone(
+    owner: &mut Controller,
+    eyes: bool,
+    own_camera: bool,
+) -> std::result::Result<(), lamp_turn_owner::Error> {
+    if eyes && !own_camera {
+        owner.set_camera_permission(now(), Permission::Allowed)?;
+    }
+    Ok(())
+}
+
 /// The eyes asked for a full look's still, once a turn (#836): whether
 /// they were asked now.
 fn ask_for_still(
@@ -11135,6 +11172,38 @@ mod tests {
     mod turn_taking;
 
     use super::*;
+
+    /// #1895 on lamp-52e6: with the eyes their own process and no camera of
+    /// the voice's own, the camera is permitted with the microphone, so the
+    /// second route's turns can be the person's and not always the room's.
+    /// A voice with its own camera keeps deciding it there; no eyes, none.
+    #[test]
+    fn the_eyes_camera_is_permitted_with_the_microphone_when_the_voice_has_none() {
+        for (eyes, own_camera, allowed) in [
+            (true, false, true),
+            (true, true, false),
+            (false, false, false),
+        ] {
+            let mut owner = Controller::new(new_boot().unwrap(), now());
+            owner
+                .set_microphone_permission(now(), Permission::Allowed)
+                .unwrap();
+            eyes_look_with_the_microphone(&mut owner, eyes, own_camera).unwrap();
+            assert_eq!(
+                owner.snapshot(now()).unwrap().camera_allowed(now()),
+                allowed,
+                "eyes {eyes}, own camera {own_camera}"
+            );
+            // A mute denies both, as `hand.rs` does: the eyes' camera with it.
+            owner
+                .set_microphone_permission(now(), Permission::Denied)
+                .unwrap();
+            owner
+                .set_camera_permission(now(), Permission::Denied)
+                .unwrap();
+            assert!(!owner.snapshot(now()).unwrap().camera_allowed(now()));
+        }
+    }
     use crate::{
         admission::{Evidence, Verdict},
         wire::CaptureTiming,
