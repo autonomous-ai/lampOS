@@ -1696,7 +1696,9 @@ pub fn serve(
         )));
         // The same-voice check (#829), as the Live worker starts it: its
         // child loads its model now, and only beside `LAMP_SPOKEN_TO=on`.
-        match (files.spoken_to, files.same_voice.clone()) {
+        // Only as the lamp's only voice: a standby beside Live loads none.
+        let same_voice = files.same_voice.clone().filter(|_| route.only_voice);
+        match (files.spoken_to, same_voice) {
             (true, Some(model)) => match crate::same_voice::Prints::beside_voice(model) {
                 Ok(prints) => {
                     if let Ok(mut heeding) = heeding.lock() {
@@ -1815,8 +1817,10 @@ pub fn serve(
             }));
         }
         // Before the levels' sampling begins, which reads the eyes beside
-        // them for it.
+        // them for it. Only as the lamp's only voice, so a standby beside
+        // Live adds no second `attention/addressed` publisher.
         if files.addressed
+            && route.only_voice
             && let (Ok(mut heeding), Some(root)) = (heeding.lock(), files.bus_root.as_deref())
         {
             heeding.judging_addressed(root);

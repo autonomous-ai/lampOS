@@ -1443,10 +1443,12 @@ after a take-over, but now for every turn:
   going on (`LAMP_GOING_ON_ASKS`, which also ends a busy room sooner once
   answered). The busy-room battery on lamp-4ace is its check.
 - **The same-voice check** (`LAMP_SAME_VOICE_MODEL`, beside
-  `LAMP_SPOKEN_TO=on`, [same-voice.md](same-voice.md)): as on Live. The
-  worker starts the same `lamp-same-voice` child, gives it each spoken
-  line's first samples (`Engine::hearing`; a line begun over the lamp's
-  voice is not printed), and at the line's verdict (`Heeding::judge`) a
+  `LAMP_SPOKEN_TO=on`, [same-voice.md](same-voice.md)): as on Live, and
+  only as the lamp's only voice (a standby beside Live loads none). The
+  worker starts the same `lamp-same-voice` child; the engine hands it every
+  chunk of a spoken line (`Engine::hearing`), of which `Voices` keeps the
+  first ones to print (a line begun over the lamp's voice is not printed),
+  and at the line's verdict (`Heeding::judge`) a
   line in another voice than the conversation's is no part of it: "request
   N: another voice than the conversation's (cosine …): no conversation is
   going on for it", and the room counts it as talk past the lamp. A late
@@ -2273,7 +2275,8 @@ Reported by the builders:
   close faces turned to the lamp (`humans/faces/tracked`), both sampled
   every 100 ms, over the line's sound. Each spoken line is judged once as
   it is judged for whom it answers, published on `attention/addressed`, and
-  in a busy room it lets the line out. Off unless set; off on lamp-4ace.
+  in a busy room it lets the line out. Only as the lamp's only voice (a
+  standby beside Live publishes nothing). Off unless set; off on lamp-4ace.
 - **The name signal (`LAMP_NAME_SIGNAL=on`)** offers spoken turns
   `heard_my_name`, as the Live route's sessions are offered it, given at
   once with `LAMP_SECOND_FEW_TOOLS`. Its call is answered as declined and
