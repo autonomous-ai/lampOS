@@ -5026,6 +5026,19 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#2242 widened** (`f2af6018f`, a second commit, local until its gate passes). `LAMP_OWN_LINE_KEEPS` now also covers the lamp's hello to someone arriving (`lamp_speaks_first`), a setup walk line (`lamp_leads_setup`) and news it tells (`lamp_tells_news`), not only a skill's say or a reminder. A written turn after a person's, a look's or a "Sorry?", is as before. Two mutations each fail the test. It merges clean onto #1712's `c03e4dfc4`.
 - **A pause on my side,** about 15:25 to 16:00 (a usage limit), with nothing lost.
 
+## 2026-10-20, 16:29 ICT: lamp-peek's second step claimed and up as #2259; #2242's second commit pushed
+
+- **Claimed (16:07, the first builder's 16:03): lamp-peek's second step.** The lead's proposal on #1711. My plan is on #1722.
+- **#2259** (`96b6b360e`, onto lamp-voice): `/` is one page with a sidebar (Overview, Turns, Camera, Body, Health), kept fresh by one event stream.
+  - **Turns:** V1's Flow from the voice's own records, final words, first token and first audio with the slowest marked. Named kinds and fields only, never a `transcript`.
+  - **Body:** the joints against `commanded`, and the body's own word.
+  - **Health:** each part's item.
+  - **Port 80:** the unit has `CAP_NET_BIND_SERVICE` alone, only once setup is done (`Conflicts=lamp-setup.service`).
+  - **Gate:** green (lamp-peek 19 passed, 0 failed). Four mutations each fail a test.
+  - **Timings on this Mac:** the first read of a 63 MB session took 7.5 ms, a read on 0.26 ms.
+- **#2242's second commit** `f2af6018f` is pushed (gate 3228/0). `LAMP_OWN_LINE_KEEPS` also covers the arrival hello, the setup walk's lines and news told unasked.
+- **#2218 re-read** at `df52ab5be`: both P2s fixed, no new finding.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5047,6 +5060,8 @@ with unfitted weights and no proof that it improves the busy-room floor.
 takes a cut answer as heard only with #2186. `LAMP_SECOND_SPEECH_SOCKET` and
 `probe-cascade --wire --socket` were not run on a lamp.
 `LAMP_OWN_LINE_KEEPS` is off unless set and was not run on a lamp.
+lamp-peek's one page (#2259) was not run on a lamp; its timings are this
+Mac's.
 `probe-cascade --wire --speech` was tried only from this Mac with made-up
 keys (both targets answered 401), not on a lamp.
 Native Linux ARM64 execution so far is on GitHub runners, not on a lamp.
