@@ -428,7 +428,11 @@ mod tests {
         tokio::time::pause();
         // The 3 s itself, not `WITHIN`, so a changed bound fails here.
         let bound = Duration::from_secs(3);
-        let short_of_it = bound - began.elapsed() - Duration::from_millis(10);
+        // Saturating: a request that took nearly 3 s of real time to reach
+        // the server can't underflow it (the reviewer's P3 on #2121).
+        let short_of_it = bound
+            .saturating_sub(began.elapsed())
+            .saturating_sub(Duration::from_millis(10));
         tokio::time::advance(short_of_it).await;
         for _ in 0..10 {
             tokio::task::yield_now().await;
