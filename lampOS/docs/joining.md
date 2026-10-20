@@ -566,6 +566,31 @@ the lamp.
   ten). Do what they agree to and write the difference in the log.
 - **Photographs only of the lamp**, with no person, face or screen.
 
+## The arm hour (`tools/arm-hour.sh`)
+
+A morning's rows on a real lamp, each with its run sheet's steps, run row
+by row from the Mac by the builder at the keyboard, so the person at the
+arm never reads a pull request (the first builder, #1722, 20 Oct 2026). The
+rows are the table at the top of the script; `--dry` prints them, and
+`lampOS/tools/arm-hour-test.sh` tests it with no lamp.
+
+- **What runs where:** `lamp` steps on the lamp through `ARM_LAMP`, `mac`
+  steps on the Mac, `trial` steps as `tools/trials.sh` rows on the lamp from
+  `ARM_TRIALS` (the build's own copy, with its `skills/` beside it). `ARM_LAMP`
+  and `ARM_TRIALS` are the builder's own command and path: the script holds
+  no address and no credential. `ARM_LAMP_HOST` is the lamp for a file sent
+  from the Mac.
+- **`--preflight` first, read-only:** each running part's build, the voice's
+  end-of-speech worker, then one line a row, ready or what is missing. It
+  runs none of a row's steps.
+- **Nothing moves without a hand:** a row that moves the body asks "Hand near
+  the arm? (y)", and anything but `y` runs nothing.
+- **Every exit puts the lamp back:** a pass, a fail, a failed step, `q`, the
+  input ending or ^C runs the row's put-back before the next row, once. A
+  stopped `trials.sh` row is ended on the lamp and its own put-back runs.
+- **The log** (`ARM_LOG`) is one line a row, to post from. Proofs go to the
+  screen only.
+
 ## The voice to build and test with (the owner, 19 Oct 2026)
 
 Every builder builds and tests the voice on the second route
