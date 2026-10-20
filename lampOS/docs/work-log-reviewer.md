@@ -4,6 +4,25 @@
 
 Newest first. Times from `date` (+07).
 
+- 11:20 Merged #2154 (health says the privacy switch's reading) on green
+- 11:17 Merged #2151 (factory head pads from one long hold, thirteen-P4) on green
+- 11:17 #2155 (fourth landing, #1712 onto lamp-voice) checked: merge right, the privacy_bus clash fix right; two P3s (no-slide still told a receipt source; the receipt untested); gate 1100/0; first builder's
+- 11:13 #2148 (harness-on updates its own older Harness) read: no P1/P2, two P3s; merged as `e40d89a68` on green (run by hand, not a round)
+- 11:11 #2137 (voice side of sign-in) read at `efa755e16`: two P2s (code and email kept in events.jsonl and sent on voice/said and voice/heard; a quick end told twice), a pair finding with #2145; first builder's; Jarvis also asks changes (P1 Live pieces)
+- 11:11 #2131 (Harness sign-in by code, lamp-tasks) read at `24d7d9a41`: no P1/P2, four P3s; checked against Harness's own program; mine on green ARM64 (Jarvis approved)
+- 11:09 Merged #2153 (setup waking face test on short fades, #1806) as `54139217c` on green
+- 11:07 #2149 (far face counts only while moving) read: P2 movement judged on the tallest far face, so two steady far faces keep someone; P3 fixed 0.14 line; gate 159/0/2; mine after the P2
+- 11:06 #2147 re-read at `edefda358`: both P3s in, no new finding
+- 11:03 #2110, #2123, #2031 moves onto lamp-voice / the fold checked: read code kept, only the expected merges with lamp-voice's touch step
+- 11:02 #2084 merge of lamp-voice (`08c328f20`): docs only, updates.md = lamp-voice + this PR's controls row
+- 11:00 #2154 (health says the privacy switch's reading) read: no finding; I merge on green
+- 10:58 #2147 (pause Finalize after the end) read: no P1/P2; P3 one answer per pause assumed, P3 docs format; gate 108/0, 2 mutations; first builder's
+- 10:58 #1998 rebase onto #1964's fold (`1fa5cdb09`) checked: merges right, 08:35 read stands
+- 10:57 #1964 fold onto lamp-voice (`e1b996be8`) checked: read code plus my P3s, onboarding merges right; first builder's
+- 10:56 #1964: asked Seventh to delete and repost the 10:1x comment, whose edit history keeps a person's name
+- 10:54 #2152 (onboarding nudge, steady seat) read: P2 the hand gate is dropped after the guide; P3 who nudge after one line cuts the face question; conflicts with #2122
+- 10:51 #2132 re-read at `3d1410ceb`: three P3s in, no new finding; first builder's
+- 10:51 #2151 (factory head pads from one long hold) read: no finding; I merge on green
 - 10:47 #2145 (said-as-heard) read: P2 a line before any of the answer plays drops the person's question from history; three P3s; gate 215/0/1; batch with five #1712 PRs clean; first builder's
 - 10:47 #1340 re-read at `461e2a071` (`off_the_way` for the lift lead): reads right; still waits on its lamp run
 - 10:47 Merged #2140 (task_news woken read test on a 200 ms gap, #1806) as `fc50782cf` and #2142 (light grace test, #1806) as `f524712bf`, both on green
