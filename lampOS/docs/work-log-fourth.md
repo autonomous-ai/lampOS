@@ -4990,6 +4990,26 @@ A usage limit paused me from about 00:40 to 06:2x.
   - Five tests and three mutations. A hang the first mutation showed is now a 5 s failure. The gate is running.
 - **#2176 (Friday's memory review), answered at 12:2x:** no collision with my changes, and finding 1's (b) and (c) are Twelve's call.
 
+## 2026-10-20, 14:30 ICT: #2187 and #2216 merged; #2209 folded and gating; #2220 claimed and built
+
+- **Merged:**
+  - **#2187,** the speech socket's probe (`--wire --socket`), into #1712;
+  - **#2216,** #1808's step 5 (the `LAMP_LISTEN_GAPS` and `LAMP_STOP_WORDS_HOLD` rows, and `LAMP_STOP_WORDS`' `heard-always`), onto lamp-voice.
+- **#2209, the route's speech socket:** the reviewer's 13:23 read had no P1 or P2. Its three P3s are in:
+  - a silent socket gives its piece to HTTP within 1.5 s;
+  - a socket piece leaves the kept connection's use alone;
+  - the docs note that a late failure may bill twice.
+  
+  Now folded onto #1712's `7840dc83f` as one commit (`c4d31cf52`), with `tests.rs`'s tail resolved as the reviewer did. The gate is running; it goes up as a new PR, and #2209 closes.
+- **#2220 claimed (13:4x):** the lamp's own hello ended by room sound (El on lamp-06c1, 2 of 3). Built behind `LAMP_OWN_LINE_KEEPS=on` (`3960bb7da`, local):
+  - while a skill's say or a reminder hasn't sounded, a new sound waits;
+  - the lamp's name takes the turn;
+  - any other sound is let go once the line sounds, or at its deadline;
+  - a cut-in over the sounding line is as before.
+  
+  A unit test passes. The gate and PR come after #2209's.
+- **A pause on my side,** about 13:45 to 14:25, with nothing lost.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5010,6 +5030,7 @@ with unfitted weights and no proof that it improves the busy-room floor.
 `LAMP_SAID_AS_HEARD` is off unless set and was not run on a lamp; memory
 takes a cut answer as heard only with #2186. `LAMP_SECOND_SPEECH_SOCKET` and
 `probe-cascade --wire --socket` were not run on a lamp.
+`LAMP_OWN_LINE_KEEPS` is off unless set and was not run on a lamp.
 `probe-cascade --wire --speech` was tried only from this Mac with made-up
 keys (both targets answered 401), not on a lamp.
 Native Linux ARM64 execution so far is on GitHub runners, not on a lamp.
