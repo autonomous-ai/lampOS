@@ -320,7 +320,7 @@ tell | Run 1: sit 2 minutes, then leave view and earshot for 10 minutes, then co
 mac | p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && SECONDS_FOR=960 ./presence-check.sh "${ARM_LAMP_HOST:?the lamp, as scp and ssh take it}" quiet
 tell | Run 2: sit 30 s, leave within earshot; once the light is out, say "Hey Lamp, what time is it?" from out of view.
 mac | p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && NOBODY_S=60 SECONDS_FOR=300 ./presence-check.sh "${ARM_LAMP_HOST:?the lamp, as scp and ssh take it}" quiet
-back | mac: p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && ./presence-check.sh "${ARM_LAMP_HOST:?the lamp, as scp and ssh take it}" restore
+back | mac: if [ -z "${ARM_PRESENCE_CHECK:-}" ] || [ -z "${ARM_LAMP_HOST:-}" ]; then echo "nothing to put back: presence-check.sh can't have run without ARM_PRESENCE_CHECK and ARM_LAMP_HOST"; exit 0; fi; cd "$(dirname "$ARM_PRESENCE_CHECK")" && ./presence-check.sh "$ARM_LAMP_HOST" restore
 end
 ROWS
 [[ -n ${ARM_ROWS_FILE:-} ]] && ROWS_TABLE=$(cat "$ARM_ROWS_FILE")
