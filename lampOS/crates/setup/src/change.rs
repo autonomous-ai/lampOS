@@ -230,6 +230,10 @@ pub fn wait_for_quiet(ears: &mut impl Ears, most: Duration) -> Result<(), String
     }
 }
 
+/// The bus name the helper subscribes under. The bus refuses a `-`
+/// (`[a-z][a-z0-9_]{0,31}`), and refused, quiet can never be judged.
+pub const SUBSCRIBER: &str = "setup_change";
+
 /// The real bus: `voice/state`, `voice/heard` and `voice/said`.
 pub struct BusEars {
     state: Option<lamp_bus::Subscriber>,
@@ -238,15 +242,13 @@ pub struct BusEars {
 }
 
 impl BusEars {
-    /// Subscribes under `setup-change`; a topic that can't be subscribed to
+    /// Subscribes under [`SUBSCRIBER`]; a topic that can't be subscribed to
     /// is said and left out, and quiet then cannot be judged.
     pub fn new(bus: &lamp_bus::Bus, say: &mut dyn FnMut(&str)) -> Self {
         use lamp_msgs::{Speech, VoiceState};
-        let mut subscribe = |topic: &str, type_name: &str| match bus.subscribe_typed(
-            topic,
-            "setup-change",
-            type_name,
-        ) {
+        let mut subscribe = |topic: &str, type_name: &str| match bus
+            .subscribe_typed(topic, SUBSCRIBER, type_name)
+        {
             Ok(subscriber) => Some(subscriber),
             Err(error) => {
                 say(&format!("{topic} cannot be subscribed to: {error}"));

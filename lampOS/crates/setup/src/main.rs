@@ -16,7 +16,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const NAME: &str = "setup";
+const NAME: &str = lamp_setup::SUBSCRIBER;
 
 const USAGE: &str = "\
 usage: lamp-setup COMMAND [OPTIONS]
