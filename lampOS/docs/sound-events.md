@@ -144,9 +144,14 @@ holds. It is the model on the file's own sound, with no room or microphone, so
 a lamp run's numbers are read against it, never replaced by it. On 21 October,
 three free-to-use tracks (solo piano, a jazz vocal, an upbeat instrumental)
 held music over 0.6 for 57 to 59 s of 60. A spoken line over the upbeat track
-dropped it under 0.6 in a few windows, never past Music sway's 5 s gap. Three laughter clips peaked at 0.39, 0.38 and
-0.61 on `Laughter` alone, never two windows in a row over Laugh glance's 0.5
-(the table is on the pull request that added the example).
+dropped it under 0.6 in a few windows, never past Music sway's 5 s gap.
+Nine free-to-use laughs peaked at 0.00 to 0.61 on `Laughter`, which tops the
+whole laughing family (Giggle, Snicker, Belly laugh, Chuckle) in every one. A
+laugh lands high in one 0.96 s window and rarely in two, so only one of them
+ever held two windows in a row over 0.3. In 16.8 minutes of people talking
+(a read article, two conversations, an interview), laughter never went over
+0.09. So Laugh glance takes **one window over 0.3**, no longer two over 0.5:
+5 of the 9 laughs, and none of the talk (the tables are on #1669).
 
 The first of them, the music sway, is built and held out of the product
 (`skills/music-sway`, `install::NOT_PRODUCT_SKILLS`); it reads
