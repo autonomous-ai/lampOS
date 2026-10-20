@@ -702,6 +702,78 @@ fn news_asked_by_voice_through_this_route_is_put_on_the_turn() {
     assert_eq!(told["answer"], "Lumi, Sunny and Archie.");
 }
 
+/// `LAMP_SECOND_SAID_ONCE` (the first builder at 06:56 on #1722): on
+/// lamp-4ace "Set a timer for one minute." got "A minute, starting now. One
+/// minute, counting from now". With the switch, a round that said words
+/// before its call tells the next round, after the call's result, that they
+/// were heard; one that said nothing before it, or without the switch,
+/// tells nothing.
+#[test]
+fn words_said_before_a_call_are_told_to_the_next_round_with_the_switch() {
+    for (on, before, noted) in [
+        (true, Some("A minute, starting now."), true),
+        (false, Some("A minute, starting now."), false),
+        (true, None, false),
+    ] {
+        let mut first: Vec<net::Result<ChatEvent>> = before.map(text).into_iter().collect();
+        first.push(Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            "set_timer",
+            json!({"seconds": 60}),
+        )])));
+        first.push(Ok(ChatEvent::Done));
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Set a timer for one minute.".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    first,
+                    vec![text("It goes off at six forty-five."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, calls, _) = scripted(script.clone());
+        let mut engine = engine.announcing(false).saying_once(on);
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                engine.submit(start(1));
+                engine.submit(audio(1, 1));
+                engine.submit(end(1));
+                turn(&mut engine).await
+            });
+        assert_eq!(calls.lock().unwrap().len(), 1, "{on} {before:?}");
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), 2, "{on} {before:?}");
+        let second = &asked[1];
+        let note = before.map(super::said_once_note);
+        // After the call's result, last before the round is asked.
+        let result_at = second.len() - 1 - usize::from(noted);
+        assert_eq!(second[result_at].role, "tool", "{on} {before:?}");
+        let last = second.last().unwrap();
+        assert_eq!(
+            note.is_some_and(|note| *last == Message::system(note)),
+            noted,
+            "{on} {before:?}"
+        );
+        assert_eq!(
+            second
+                .iter()
+                .filter(|message| message
+                    .content
+                    .as_ref()
+                    .and_then(|content| content.as_str())
+                    .is_some_and(|content| content.contains("already said aloud")))
+                .count(),
+            usize::from(noted),
+            "{on} {before:?}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn not_for_me_ends_the_turn_in_silence() {
     let script = Arc::new(Script {
