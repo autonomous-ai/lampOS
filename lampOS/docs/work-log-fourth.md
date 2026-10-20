@@ -5119,6 +5119,17 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#2340 peer read** (the held forget): one P2 (the yes ran the forget whatever the lamp asked) and one P3 (asked twice when the model confirms first). The first builder told the author to take both before merging.
 - **Names:** I'd quoted the name said at the lamp in three Queue comments; it's replaced by a placeholder.
 
+## 2026-10-21, 03:07 ICT: #2345 merged; #2355 up (a line that ends before its name waits for it)
+
+- **Merged:** #2345 (the first line's socket opened before it), into #1712 at 02:43 as `19e32397d`. The reviewer had no P1, P2 or P3.
+- **Claimed at 02:19** (the first builder, 02:16): part 2 of the cut first line. The name began 9 ms after "my name is" ended, and the rules refused it while the answer was awaited.
+- **#2355, onto #1712** (`15dd2f447` on `19e32397d`, `LAMP_SECOND_OPEN_NAME`, off unless set):
+  - a line whose final words end before a name waits up to 1.5 s for its answer;
+  - a sound begun within 1.5 s of its end skips the rules that keep an awaited answer, and goes on from it as one line;
+  - five mutations each fail a test, one of them through the real loop;
+  - gate green: 3502 passed, 0 failed.
+- **Free: fourth.** I've asked the first builder for the next task.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5141,6 +5152,7 @@ takes a cut answer as heard only with #2186. `LAMP_SECOND_SPEECH_SOCKET` and
 `probe-cascade --wire --socket` were not run on a lamp.
 `LAMP_OWN_LINE_KEEPS` is off unless set and was not run on a lamp.
 The first line's socket opened before it (#2345) was not run on a lamp.
+`LAMP_SECOND_OPEN_NAME` (#2355) is off unless set and was not run on a lamp.
 lamp-peek's one page (#2259) was not run on a lamp; its timings are this
 Mac's. `probe-cascade --wire --sizes` (#2276) was not run anywhere with a
 real key.
