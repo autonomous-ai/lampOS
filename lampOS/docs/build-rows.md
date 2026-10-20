@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-20 18:28 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-21 03:35 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 83.0% over 72 rows. Quality 66.6% over 16 rows.**
+**Build 83.2% over 72 rows. Quality 66.6% over 16 rows.**
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -25,7 +25,7 @@ Written by the first builder from the team's review page at 2026-10-20 18:28 (+0
 | Sleep, and waking on its name | 1.00 | #749 #714 | fourth, second |  |
 | Reminders, timers, memory across days | 1.00 | #748 #743 | — |  |
 | Setup for a home, 5 s reset | 0.90 | #806 #1209 | first | 20 Oct 13:3x, up from 0.65: lamp-06c1 done end to end with its person (El, #806): the 5 s reset wiped it and rebooted, it was set up again from the app (connected, the link and keys kept 600), “Hey Lamp” heard and answer… |
-| Touch strip and head pads | 0.70 | #711 | first | 20 Oct 10:1x, up from 0.50: on lamp-c0a4 with its person (Thirteen), every head-pad touch read as touch, stroke, sleep with the pads’ real lines (37 and 97), and nothing came in 20 s hands away; |
+| Touch strip and head pads | 0.80 | #711 | first | 21 Oct 02:2x, up from 0.70: the factory step that finds the pads is covered (Third): one long hold finds a pad, two to four pads are written and fewer than two refused with the reason, pads that don’t read say so, and to… |
 | Two people at the lamp | 1.00 | #829 #1158 #1278 | fourth | All merged: day and night bars (#1158, 11:49) and a follow-up within 20 s told it may follow on (#1278, 13:57). |
 | “Stop” over its own voice | 1.00 | #828 #1047 #1264 | fourth | Built: stop words heard over its voice (#1047, 09:11) and listening gaps in its pauses (#1264, 11:52), both off until measured. |
 | Skills: say service, Reminders, Task news | 1.00 | #939 #1042 #1237 #1253 | second | All merged: the say service and the Policy gate, Reminders (with #1253’s fix), Task news as a skill (#1042, 11:44) |
@@ -61,7 +61,7 @@ Written by the first builder from the team's review page at 2026-10-20 18:28 (+0
 | “Look for my keys”, an installable skill | 0.50 | #1685 #1738 | first | Built and merged 19 Oct 18:01 (#1871), installable, not in the product: the desk first unless you name a place, then a few places to either side, saying what it found; |
 | The light dims and goes out when nobody is there, a core skill | 1.00 | #1677 #1721 #1747 | nine | Built and tried on lamp-4ace 20 Oct 01:23 (trials.sh with Tests’ #1999 stages, lamp-skills at 782e6ef34): with nobody there the light-out skill asked the ring to fade the light over 30 s, held it while nobody was there, … |
 | What you teach it (“don’t say hello in the morning”) is kept and honoured | 1.00 | #813 | seventh | Built |
-| Forgets on request: that, everything, my face, and everything it came from | 0.75 | #1586 #1693 | fourth, twelve | Tried on lamp-4ace 20 Oct 03:14 on the cheaper voice (trials.sh forget, #1712 026728a70): “remember my violet umbrella…” kept, then “please forget that” forgot it (#2007 + #2025’s note: “forget it, never mind” about the … |
+| Forgets on request: that, everything, my face, and everything it came from | 0.80 | #1586 #1693 | fourth, twelve | 21 Oct 03:0x, up from 0.75: “forget what I said about my bicycle” forgets only that, and nothing when nothing matches (#2277, Friday, merged, off until it is tried); |
 | Remembers what matters without being asked (“how was the wedding?”) | 0.40 | #1693 | twelve | Built 19 Oct 23:1x (#1974, Twelve), merged into #1712, off behind LAMP_MEMORY_OBSERVE: at a conversation’s end the model proposes what to keep and the memory checks it. |
 | Keeps going when one part fails | 1.00 | — | — | Built: each part its own unit, restarted alone, health says how the lamp is |
 | Change the Wi-Fi, name or time zone after setup, without a reset | 0.75 | #1982 #1995 #2038 | nine | 20 Oct 04:46–05:08: the Wi-Fi from the app is merged (#1995, #2033: kept only once the broker is reached, else back on the old network; |
@@ -87,16 +87,16 @@ Written by the first builder from the team's review page at 2026-10-20 18:28 (+0
 
 | Row | Now | Target | Where it is |
 |---|---|---|---|
-| Fast answers | 0.75 | 0.85 | 18 Oct 19:2x, settled over two days of lamp-4ace (Twelve’s tables): the slow tail is short, unsure asks (one or two words: 42% and 29% over 2 s), and it is the model’s own time: our end of the person’s turn reaches it at… |
+| Fast answers | 0.75 | 0.85 | 21 Oct 02:0x, the cheaper voice on lamp-4ace since 21:23, 227 answered turns (turn-times): from the lamp deciding you had finished to its first sound, median 1.87 s (p90 2.63 s), above Live’s 1.60 s. |
 | Knows when you have finished | 0.80 | 0.85 | 20 Oct 07:25, back to 0.80: the matching end-of-speech helper is on lamp-4ace (ready 2.3 s after the voice starts); |
 | Cutting in | 0.50 | 0.75 | 20 Oct 03:45 on the cheaper voice, lamp-4ace: two lines played over a long story each made the lamp pause and then go on, and after two such pauses it no longer lets anyone cut in on that story, so a third line 30 s late… |
 | Stop words | 0.50 | 0.75 | 19 Oct 01:3x: why a played “Stop.” is often missed: the sound the lamp sends to be written down for stop words is the microphone before the echo canceller, where its own voice is loudest, so what comes back is mostly its… |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
-| Not spoken to | 0.65 | 0.90 | 20 Oct 18:2x, the same on you: talking to another device, the lamp took a word in your talk for its name (18:20) and then answered four of your lines as a conversation with it, until the busy-room rule held it and you mu… |
-| Several people | 0.60 | 0.85 | 19 Oct 02:33, telling two people apart by voice, with its main fault fixed (#1627): it now does its job, the second person’s umbrella line answered 0 of 3 with it against 3 of 3 without; |
+| Not spoken to | 0.65 | 0.90 | 21 Oct 03:0x, on tonight’s newest build the lamp joined two people’s talk more than in any run before (replies in the three scenes 3, 4 and 8, against 2 to 7 before), while answering every line meant for it and every han… |
+| Several people | 0.60 | 0.85 | 21 Oct 02:3x, telling one person from another by voice, on lamp-4ace’s own microphone with the lamp answering: another voice never once sounded like the same person (56 of 56), and a person’s own voice was only mistaken … |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.80 | 0.85 | 18 Oct 15:39, everything the lamp said unasked since midnight (Jarvis’s readout, 14 sessions): 17 reminders and timers, a median 0.98 s after they were due (16 within 5 s, one held back by the link), and 17 pieces of tas… |
-| Remembers you: your name and what you told it | 0.40 | 0.90 | 20 Oct 13:2x, new row after the owner’s report that the lamp forgot their name: they said it while their face wasn’t recognised, so it was kept in the room’s memory, not theirs; |
+| Remembers you: your name and what you told it | 0.40 | 0.90 | 21 Oct 02:1x, why “my name is …” lost the name at 21:25: the lamp heard the name 9 ms after it decided the line had ended, and refused it as an interruption of its own answer, so it answered “my name is” alone; |
 | A good companion | 0.85 | 0.90 | 18 Oct 16:40: asked the time in London it gave Ho Chi Minh City’s (twenty to five, when London’s was 10:40); |
 | Both microphones | 0.60 | 0.80 | Voice on one, the room on the other (ears). |
 | Body | 0.70 | 0.80 | 17 Oct: the guarded body (#1192) on lamp-4ace since 07:34: stands for a question, turns to the voice, gestures and folds, with no refused or bad-read stop; |
