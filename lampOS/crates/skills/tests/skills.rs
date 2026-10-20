@@ -6938,6 +6938,119 @@ if_choice = ["right"]
 body = { mood = "reading", for = "10s", toward = 0.5 }
 "#;
 
+/// The search of three looks, with a `found` the model calls once it sees
+/// the thing (#1871).
+fn search_with_found() -> String {
+    SEARCH
+        .replace(
+            r#"one_of = ["desk", "left", "right"]"#,
+            r#"one_of = ["desk", "left", "right", "found"]"#,
+        )
+        .replace(
+            "give_up = \"Say kindly you can't see it from here.\"\n",
+            "give_up = \"Say kindly you can't see it from here.\"\nfound = \"Say where it is.\"\n",
+        )
+}
+
+/// #1871: the model says it found the thing by calling with `found`. Nothing
+/// is looked at again, nothing moves, no look is counted and the light stays:
+/// the head stays held on the place it was seen, and the model is told what
+/// to say. A look after it is still one of the search's looks.
+#[test]
+fn a_search_told_found_keeps_its_pose_and_takes_no_look() {
+    let program = ToolProgram::with("look", &search_with_found(), &[]);
+    let left = r#"{"level":0,"mood":"reading","toward":-0.5}"#;
+    let right = r#"{"level":0,"mood":"reading","toward":0.5}"#;
+    assert_eq!(program.call("look_for", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    assert_eq!(program.call("look_for", r#"{"place":"left"}"#)["ok"], true);
+    assert!(program.said().iter().any(|pose| pose == left));
+    let found = program.call("look_for", r#"{"place":"found"}"#);
+    assert_eq!(found["ok"], true, "{found}");
+    assert_eq!(found["result"]["next"], "Say where it is.", "{found}");
+    assert!(found["result"].get("look").is_none(), "{found}");
+    // Still on the left, still lit: nothing given back.
+    let held = program.poses(Duration::from_secs(2));
+    assert!(
+        !held.is_empty() && held.iter().all(|pose| pose == left),
+        "{held:?}"
+    );
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        Vec::<String>::new()
+    );
+    // `found` took none of the three looks: the third is still there.
+    assert_eq!(program.call("look_for", r#"{"place":"right"}"#)["ok"], true);
+    assert!(program.said().iter().any(|pose| pose == right));
+    let fourth = program.call("look_for", r#"{"place":"left"}"#);
+    assert_eq!(fourth["error"], "Say kindly you can't see it from here.");
+}
+
+/// The reviewer-lead on #2262 (P2): `found` with no look held is refused,
+/// before the search's first look and after someone speaking ended it, so
+/// the lamp never says it is looking at a thing it is not.
+#[test]
+fn a_found_with_no_look_held_is_refused() {
+    let program = ToolProgram::with("look", &search_with_found(), &[]);
+    let first = program.call("look_for", r#"{"place":"found"}"#);
+    assert_eq!(first["ok"], false, "{first}");
+    assert_eq!(first["error"], lamp_skills::FOUND_BEFORE_A_LOOK);
+    assert!(program.poses(Duration::from_secs(1)).is_empty());
+    assert_eq!(program.call("look_for", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    program.heard("stop");
+    program.clock.skip(Duration::from_millis(300));
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        ["blue"]
+    );
+    let after = program.call("look_for", r#"{"place":"found"}"#);
+    assert_eq!(after["ok"], false, "{after}");
+    assert_eq!(after["error"], lamp_skills::FOUND_BEFORE_A_LOOK);
+}
+
+/// #1871: `found` is told only of a call with the choice `found`, in a
+/// search that has one, and a skill says it only with `found` in its
+/// choice's `one_of` and in a few words.
+#[test]
+fn a_searchs_found_is_held_to_its_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    let with = load(&skill_with(dir.path(), "look", &search_with_found())).unwrap();
+    let found = serde_json::json!({"place": "found"});
+    let left = serde_json::json!({"place": "left"});
+    assert_eq!(with.search_found(&found), Some("Say where it is."));
+    assert_eq!(with.search_found(&left), None);
+    assert_eq!(with.search_found(&serde_json::json!({})), None);
+    // The recorded tests' path never takes `found` as a look (#2262, P3 2).
+    let mut engine = Engine::new(vec![with.clone()], true);
+    assert_eq!(
+        engine.tool("look_for", &found, 1_000_000).err().as_deref(),
+        Some(lamp_skills::FOUND_BEFORE_A_LOOK)
+    );
+    let without = load(&skill_with(dir.path(), "plain", SEARCH)).unwrap();
+    assert_eq!(without.search_found(&found), None);
+    for (number, (from, to, why)) in [
+        (
+            r#"one_of = ["desk", "left", "right", "found"]"#,
+            r#"one_of = ["desk", "left", "right"]"#,
+            "one_of names it",
+        ),
+        (
+            "found = \"Say where it is.\"",
+            "found = \" \"",
+            "at most 256 bytes",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let toml = search_with_found().replace(from, to);
+        assert_ne!(toml, search_with_found(), "{from}");
+        let error = load(&skill_with(dir.path(), &format!("badfound{number}"), &toml)).unwrap_err();
+        assert!(error.contains(why), "{to}: {error}");
+    }
+}
+
 /// #1685: a search's first look is at the desk when the call names no
 /// place, each look after it where it is asked, and none past its looks:
 /// the model is told to give up kindly and nothing more moves. (A first

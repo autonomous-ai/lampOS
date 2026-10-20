@@ -315,6 +315,8 @@ struct FlagFile {
 struct SearchFile {
     looks: u32,
     give_up: String,
+    #[serde(default)]
+    found: Option<String>,
 }
 
 /// A search a person asked for, as loaded: its calls are the looks of one
@@ -326,7 +328,21 @@ pub struct Search {
     /// What the model is told, as an error, of a look past the last: to say
     /// kindly that it cannot see the thing from here.
     pub give_up: String,
+    /// What the model is told when it calls with the choice [`FOUND`]:
+    /// the thing is seen, so nothing is looked at again, nothing moves and
+    /// nothing is counted, and the head stays held where it found it.
+    pub found: Option<String>,
 }
+
+/// The choice a search's model calls with once it sees the thing (#1871):
+/// a place that is no place, so the search can tell "found" from a look
+/// that was not made.
+pub const FOUND: &str = "found";
+
+/// What the model is told of a `found` with no look held (#2262): before
+/// the search's first look, or after it ended.
+pub const FOUND_BEFORE_A_LOOK: &str =
+    "Nothing is being looked at now: look first, with a place, and say found only once you see it.";
 
 /// The most looks a search may say it takes: a living thing looks at a few
 /// places and lets it go (CLAUDE.md's rule 8).
@@ -1045,6 +1061,15 @@ impl Skill {
             new
         });
         reads
+    }
+
+    /// What the model is told of a call that says the search found the
+    /// thing (`[search]`'s `found`, #1871): its choice [`FOUND`]. None for
+    /// any other call, or a skill with no search or no `found`.
+    pub fn search_found(&self, args: &Value) -> Option<&str> {
+        let found = self.search.as_ref()?.found.as_deref()?;
+        let choice = self.choice.as_ref()?;
+        (args.get(&choice.name).and_then(Value::as_str) == Some(FOUND)).then_some(found)
     }
 
     /// The arguments a search's next look is made with, after `looked` of
@@ -2614,9 +2639,26 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                     "[search] give_up is what the model is told, in at most 256 bytes".into(),
                 );
             }
+            if let Some(found) = &search.found {
+                if found.trim().is_empty() || found.len() > 256 {
+                    return Err(
+                        "[search] found is what the model is told, in at most 256 bytes".into(),
+                    );
+                }
+                if file
+                    .choice
+                    .as_ref()
+                    .is_none_or(|choice| !choice.one_of.iter().any(|one| one == FOUND))
+                {
+                    return Err(format!(
+                        "[search] found is called with the choice {FOUND:?}: one_of names it"
+                    ));
+                }
+            }
             Some(Search {
                 looks: search.looks,
                 give_up: search.give_up,
+                found: search.found,
             })
         }
     };
@@ -4576,6 +4618,16 @@ impl Engine {
     /// of the newest thing heard (its pieces joined, as the voice joins
     /// them) if it began after that run began; the model reads its `told`.
     pub fn tool(&mut self, name: &str, args: &Value, now_us: u64) -> Result<Run, String> {
+        // A search's `found` is the program's to answer, never a run: here
+        // (the skill folders' recorded tests) it is refused, so it is never
+        // taken as a look at the desk (#2262).
+        if self
+            .skills
+            .iter()
+            .any(|skill| skill.tool.as_deref() == Some(name) && skill.search_found(args).is_some())
+        {
+            return Err(FOUND_BEFORE_A_LOOK.into());
+        }
         // Before a record is told, only the names the eyes still say said
         // yes are kept: a no, a forget or a reset lets the rest go (#1997).
         if self.naming

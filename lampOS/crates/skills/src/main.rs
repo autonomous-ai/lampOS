@@ -1770,6 +1770,37 @@ fn tool_call(
             let _ = reply.send(json!({ "error": why }));
         }
     };
+    // A search that found the thing (#1871): nothing is looked at again,
+    // nothing moves and no look is counted; the pose the last look holds
+    // stays on the place it was seen, until someone speaks, a push or a
+    // pause, as before. The model is told what to say of it. Only while
+    // the search is under way with a look made: a found before any look,
+    // or after the search ended (given up, or let go by speech, a push or
+    // a pause), is refused, so the lamp never says it is looking at a
+    // thing it is not (the reviewer-lead's P2 on #2262). It makes nothing,
+    // so no condition or stop is asked and no SkillEvent is said of it.
+    let found = engine
+        .skills()
+        .iter()
+        .find(|skill| skill.tool.as_deref() == Some(name.as_str()))
+        .and_then(|skill| {
+            skill
+                .search_found(&args)
+                .map(|told| (skill.name.clone(), told.to_owned()))
+        });
+    if let Some((skill, told)) = found {
+        let looked =
+            busy.contains(&skill) && runner.looks.borrow().get(&skill).copied().unwrap_or(0) > 0;
+        if !looked {
+            eprintln!("lamp-skills: {name} with {args} not run: {skill}'s search has no look held");
+            return refuse(lamp_skills::FOUND_BEFORE_A_LOOK);
+        }
+        eprintln!("lamp-skills: {name} with {args}: {skill}'s search found it");
+        if admission.commit() {
+            let _ = reply.send(json!({ "next": told }));
+        }
+        return;
+    }
     // A run with no pose to hold, under way: refused before it is a run,
     // so nothing moves, the line is not said again, and `[again]`'s while
     // still runs from the run under way (#999: "again!" mid-dance).
