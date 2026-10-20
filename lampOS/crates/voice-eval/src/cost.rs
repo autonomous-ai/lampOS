@@ -6,14 +6,11 @@
 //! are read and printed: no words a person said.
 //!
 //! What is counted, by the line that says it:
-//! - **a request:** the second route's `request N heard W words, …`, and
-//!   any Live `provider: request N` line; known by its process
-//!   (`lamp-voice[PID]`) and number, as in `score`;
-//! - **answered:** the second route's `first answer audio` for a request,
-//!   and Live's that began, less those held back: Live's first sound (said
-//!   only with `LAMP_NAME_SIGNAL`) or its answer judged played (`its answer
-//!   is played: …`, said whenever attention judges, as with
-//!   `LAMP_SPOKEN_TO`), so either switch counts them;
+//! - **a request** and **answered:** as `score` counts them, by the one
+//!   matcher both read ([`crate::voice_lines`]): the second route's words
+//!   heard and its first answer audio; Live's lines that begin with their
+//!   request, and those whose answer began (a first sound or judged
+//!   played), less those held back;
 //! - **DeepSeek:** each `chat answer: …; P prompt tokens, H from the cache,
 //!   M not; C completion tokens`;
 //! - **searches:** each `web_search` in a chat round's `called …` list, and
@@ -36,6 +33,7 @@
 //! requests at the arm's own cost a request (the research's model: 4
 //! answered and 1 not, as `cost-night1.py` has it).
 
+use crate::voice_lines::{Answers, Request, Route, VoiceLine};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -134,16 +132,11 @@ pub struct VoiceEstimate {
     pub chars_per_token: f64,
 }
 
-/// A request: its route (second or Live), its process and its number.
-type Request = (bool, u64, u64);
-
 /// What one arm used.
 #[derive(Debug, Default)]
 struct Usage {
-    requests: BTreeSet<Request>,
-    answered: BTreeSet<Request>,
-    sounded: BTreeSet<Request>,
-    held: BTreeSet<Request>,
+    /// Requests asked and answered, as `score` reads them.
+    answers: Answers,
     prompt: u64,
     cached: u64,
     uncached: u64,
@@ -163,33 +156,14 @@ struct Usage {
 
 impl Usage {
     fn read(&mut self, line: &str) {
-        let process = number_after(line, "lamp-voice[").unwrap_or(0);
-        let second = line.contains("lamp-voice second:");
-        let live = line.contains("lamp-voice provider:");
-        let request = number_after(line, "request ");
-        if second
-            && line.contains(" words, the last ")
-            && let Some(number) = request
-        {
-            self.requests.insert((true, process, number));
+        let voice = VoiceLine::of(line);
+        if let Some(voice) = &voice {
+            self.answers.read(voice);
         }
-        if live && let Some(number) = request {
-            self.requests.insert((false, process, number));
-            // Live's answer began: its first sound (with the name signal), or
-            // its first output judged played (whenever attention judges).
-            if line.contains(": first sound") || line.contains("its answer is played: ") {
-                self.sounded.insert((false, process, number));
-            }
-            if line.contains("its answer is held back: ") {
-                self.held.insert((false, process, number));
-            }
-        }
-        if second
-            && line.contains("first answer audio ")
-            && let Some(number) = request
-        {
-            self.answered.insert((true, process, number));
-        }
+        let route = voice.map(|voice| voice.route);
+        let second = route == Some(Route::Second);
+        let live = route == Some(Route::Live);
+        let request = voice.and_then(|voice| voice.request());
         if line.contains("chat answer: ")
             && let Some(tokens) = line.split("after it was asked; ").nth(1)
         {
@@ -216,8 +190,8 @@ impl Usage {
         }
         if let Some((voice, characters)) = voice_characters(line) {
             *self.characters.entry(voice).or_default() += characters;
-            if let Some(number) = request {
-                self.voiced.insert((true, process, number));
+            if second {
+                self.voiced.extend(request);
             }
         }
         if live && line.contains("provider: usage total=") {
@@ -264,12 +238,6 @@ impl Usage {
         self.cached += cached;
         self.uncached += missed;
         self.completion += completion;
-    }
-
-    /// Requests answered: the second route's with a first answer audio,
-    /// and Live's that made a first sound and were not held back.
-    fn answered(&self) -> usize {
-        self.answered.len() + self.sounded.difference(&self.held).count()
     }
 
     fn second_route(&self) -> bool {
@@ -396,9 +364,10 @@ pub fn cost(
                     *characters as f64 * rate
                 ));
             }
-            let unvoiced = used.answered.difference(&used.voiced).count();
+            let second_answered = &used.answers.second_answered;
+            let unvoiced = second_answered.difference(&used.voiced).count();
             if unvoiced > 0 {
-                let answered = used.answered.len();
+                let answered = second_answered.len();
                 let estimate = estimate.ok_or_else(|| {
                     format!(
                         "{}: {unvoiced} of {answered} answered lines have no summary of their \
@@ -452,8 +421,8 @@ pub fn cost(
         } else {
             rows.push(("list".into(), live));
         }
-        let requests = used.requests.len();
-        let answered = used.answered();
+        let requests = used.answers.asked.len();
+        let answered = used.answers.answered().len();
         for (tier, total) in rows {
             let per_request = total / requests.max(1) as f64;
             table.push_str(&format!(
@@ -507,14 +476,12 @@ mod tests {
 2026-10-19T20:30:01+0700 lamp-4ace lamp-voice[200]: lamp-voice second: chat answer: its first words or call 700 ms and its end 1200 ms after it was asked; 4000 prompt tokens, 4000 from the cache, 0 not; 50 completion tokens
 2026-10-19T20:30:02+0700 lamp-4ace lamp-voice[200]: lamp-voice second: request 1 first answer audio 800 ms after its words
 2026-10-19T20:30:03+0700 lamp-4ace lamp-voice[200]: lamp-voice second: request 1 ElevenLabs: 1 of 1 pieces began, 0 on a reused connection, 100 chars; the first piece's first audio byte 280 ms after it went, the slowest 280 ms
-2026-10-19T21:00:01+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 1 began
-2026-10-19T21:00:02+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 1: first sound 640 ms after the line ended
+2026-10-19T21:00:02+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 1: first sound 640 ms after the model said it heard its name
 2026-10-19T21:00:03+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: usage total=Some(1500) prompt=Some(1000) prompt_audio=Some(400) response=Some(500) response_audio=Some(300) thoughts=None cached=None
-2026-10-19T21:00:30+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 2 began
-2026-10-19T21:00:30+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 2: first sound 500 ms after the line ended
-2026-10-19T21:00:31+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 2: its answer is held back: said to someone else
+2026-10-19T21:00:30+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 2: first sound, and the model has not said it heard its name
+2026-10-19T21:00:31+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 2: its answer is held back: a busy room, and nothing shows it was called or that anyone is turned to the lamp
 2026-10-19T21:00:31+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: usage total=Some(200) prompt=Some(200) prompt_audio=None response=None response_audio=None thoughts=None cached=None
-2026-10-19T22:00:00+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 3 began, after every arm
+2026-10-19T22:00:00+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 3 got no answer in 4000 ms; closed as unanswered, connection kept
 ";
 
     fn arms() -> Vec<Arm> {
@@ -592,7 +559,7 @@ mod tests {
         let journal = "\
 2026-10-19T21:00:01+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 1: its answer is played: its name was heard close to the lamp
 2026-10-19T21:00:30+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 2: its answer is played: a conversation with the lamp is going on
-2026-10-19T21:01:00+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 3: its answer is held back: said to someone else
+2026-10-19T21:01:00+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 3: its answer is held back: a busy room, and nothing shows it was called or that anyone is turned to the lamp
 2026-10-19T21:01:30+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 4: first sound, and the model has not said it heard its name
 2026-10-19T21:01:31+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 4: its answer is played: its name was heard close to the lamp
 2026-10-19T21:01:32+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: usage total=Some(100) prompt=Some(100) prompt_audio=None response=None response_audio=None thoughts=None cached=None
@@ -601,6 +568,136 @@ mod tests {
         let table = cost(journal, &arm, &prices(), None).unwrap();
         let live = row(&table, "live", "list");
         assert_eq!(&live[2..4], ["4", "3"], "{table}");
+    }
+
+    /// `score`'s answered row for each arm, by the arms' names.
+    fn scored(journal: &str, arms: &[(&str, &str, &str)]) -> Vec<String> {
+        let arms: Vec<crate::score::Arm> = arms
+            .iter()
+            .map(|(name, from, to)| crate::score::Arm::parse(name, from, to).unwrap())
+            .collect();
+        let table = crate::score::score(journal, &arms);
+        table
+            .lines()
+            .find(|line| line.starts_with("| answered ("))
+            .unwrap_or_else(|| panic!("no answered row in\n{table}"))
+            .split('|')
+            .map(str::trim)
+            .filter(|cell| !cell.is_empty())
+            .skip(1)
+            .map(str::to_owned)
+            .collect()
+    }
+
+    /// The first builder on #1712 (19 Oct 23:29): `cost` read 34 of Live's
+    /// requests and 0 answered. Live's own lines, 34 requests: 20 judged
+    /// played with a first sound, 6 with a first sound only (no attention
+    /// judging), 4 begun but held back and 4 closed unanswered; a sound's,
+    /// a reminder's and a picture's lines are no requests. 26 answered, as
+    /// `score` counts them, and a conversation minute is 5 of the 34.
+    #[test]
+    fn live_counts_its_requests_and_first_sounds_as_score_does() {
+        let mut journal = String::new();
+        let mut line = |second: u32, said: String| {
+            journal.push_str(&format!(
+                "2026-10-19T21:{:02}:{:02}+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: {said}\n",
+                second / 60,
+                second % 60
+            ));
+        };
+        for n in 1..=34u32 {
+            let at = n * 20;
+            match n {
+                1..=20 => {
+                    line(
+                        at,
+                        format!(
+                            "request {n}: its answer is played: its name was heard close to the lamp"
+                        ),
+                    );
+                    line(
+                        at + 1,
+                        format!(
+                            "request {n}: first sound 300 ms after the model said it heard its name"
+                        ),
+                    );
+                }
+                21..=26 => line(
+                    at,
+                    format!(
+                        "request {n}: first sound, and the model has not said it heard its name"
+                    ),
+                ),
+                27..=30 => {
+                    line(
+                        at,
+                        format!(
+                            "request {n}: first sound, and the model has not said it heard its name"
+                        ),
+                    );
+                    line(
+                        at + 1,
+                        format!(
+                            "request {n}: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on"
+                        ),
+                    );
+                }
+                _ => line(
+                    at,
+                    format!(
+                        "request {n} got no answer in 4000 ms; closed as unanswered, connection kept"
+                    ),
+                ),
+            }
+        }
+        line(700, "a sound (request 35) got no answer in 900 ms, as a sound should; closed, connection kept".into());
+        line(
+            701,
+            "reminder request 36 got no answer in 900 ms; closed, connection kept".into(),
+        );
+        line(
+            702,
+            "sight: a picture of 41230 bytes, 120 ms old, went with request 37 (look 2)".into(),
+        );
+        line(703, "usage total=Some(1500000) prompt=Some(1000000) prompt_audio=Some(800000) response=Some(500000) response_audio=Some(300000) thoughts=None cached=None".into());
+
+        let table = cost(
+            &journal,
+            &[Arm::parse("live", "21:00", "21:15").unwrap()],
+            &prices(),
+            None,
+        )
+        .unwrap();
+        let live = row(&table, "live", "list");
+        assert_eq!(&live[2..4], ["34", "26"], "{table}");
+        let total = 0.2 * 0.75 + 0.8 * 3.0 + 0.2 * 4.5 + 0.3 * 12.0;
+        assert_eq!(live[5], format!("${:.5}", total / 34.0));
+        assert_eq!(live[6], format!("${:.5}", total / 26.0));
+        assert_eq!(live[7], format!("${:.4}", 5.0 * total / 34.0));
+        assert_eq!(scored(&journal, &[("live", "21:00", "21:15")]), ["26"]);
+    }
+
+    /// Every route's answered lines, as `cost` and `score` count them, are
+    /// the same: Deepgram, Flux (the cascade) and Live.
+    #[test]
+    fn cost_and_score_count_each_routes_answered_lines_alike() {
+        let table = cost(JOURNAL, &arms(), &prices(), None).unwrap();
+        let costed: Vec<&str> = ["deepgram", "flux", "live"]
+            .iter()
+            .map(|arm| row(&table, arm, if *arm == "live" { "list" } else { "peak" })[3])
+            .collect();
+        assert_eq!(costed, ["1", "1", "1"], "{table}");
+        assert_eq!(
+            scored(
+                JOURNAL,
+                &[
+                    ("deepgram", "20:00", "20:15"),
+                    ("flux", "20:30", "20:45"),
+                    ("live", "21:00", "21:15")
+                ]
+            ),
+            costed
+        );
     }
 
     #[test]
