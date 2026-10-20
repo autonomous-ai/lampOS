@@ -428,7 +428,12 @@ nobody there for 30 s or the keeper's pause drops the try in flight, so later
 evidence is not counted. Without a body (`LAMP_BODY_MOOD_SOCKET` unset), the bus or the
 say service it is `not_available`, and the pause while it is led records
 `not_available` too; either is offered again later as any such step. The
-invitation budget is kept in memory: a voice restart may ask again. Evidence
+invitation budget is kept with the walk: `progress.json` gains
+`giving_way_tries` (at most 2, a file with more is refused whole), committed
+before each invitation is published, as near-call's prompts are; an offer
+never handed to the model gives its try back. So a voice restart or a mute's
+end, which rebuild the walk, cannot ask a third time: a walk rebuilt with both
+spent fails the step. A redo starts the count again. Evidence
 is judged as it is drained from the bus (at most 32 a topic every 20 ms, no
 waiting); the outcome is then kept by the storage worker like any other, and a
 held write neither holds the loop nor says done before it lands.
@@ -438,7 +443,8 @@ done only by a hand that moves the head and lets go, the model refused; a hand
 still on, two unfelt tries failing; a bump, a body pushing back, a restart, a
 forged publisher and early evidence not done; a clock jump; no body and the
 pause `not_available`; a skip and a redo ignoring later evidence; a held
-progress write). The record is in
+progress write; a rebuilt walk not asking a third time; a corrupt kept count
+refused). The record is in
 [verification/onboarding-giving-way-host-20261019](verification/onboarding-giving-way-host-20261019/README.md).
 No coordinator test drives an onboarding invitation through the say service on
 either route (privacy and near-call have none either). Not shown: a lamp run

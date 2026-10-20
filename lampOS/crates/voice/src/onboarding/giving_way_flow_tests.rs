@@ -264,6 +264,92 @@ fn a_hand_still_on_the_head_is_not_done_and_two_tries_unfelt_fail() {
 }
 
 #[test]
+fn a_rebuilt_walk_keeps_its_invitations_and_does_not_ask_a_third_time() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let played = play(&mut walk, 10 * S, 1);
+    // A mute's end or a restart rebuilds the walk mid-try: the next
+    // invitation is the second, not the first again.
+    drop(walk);
+    let mut walk = store.cycle(played.at(1_000));
+    assert_eq!(walk.kept().giving_way_tries, 1);
+    let now = played.at(2_000);
+    offer(&mut walk, now);
+    assert_eq!(walk.pending().invitations[0].attempt, 2);
+    let played = play(&mut walk, now, 2);
+    assert_eq!(walk.kept().giving_way_tries, 2);
+    // Rebuilt again with both spent: failed, and never asked a third time.
+    drop(walk);
+    let now = played.at(1_000);
+    let mut walk = store.cycle(now);
+    assert_eq!(settle(&mut walk, now), [GIVE_FAILED]);
+    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    assert!(walk.pending().invitations.is_empty());
+    assert_eq!(walk.kept().giving_way_tries, 2);
+}
+
+#[test]
+fn an_offer_never_taken_gives_its_try_back() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    offer(&mut walk, 10 * S);
+    assert_eq!(walk.kept().giving_way_tries, 1);
+    // Nobody there for 30 s before it was taken.
+    for _ in 0..2 {
+        walk.tick(45 * S, START_QUIET_US, true, false, None, true);
+        walk.drain_storage_for_test(45 * S);
+    }
+    assert!(walk.pending().invitations.is_empty());
+    assert_eq!(walk.kept().giving_way_tries, 0);
+}
+
+#[test]
+fn a_kept_count_over_the_budget_is_refused_whole() {
+    let spent = Progress {
+        giving_way_tries: 2,
+        ..Progress::default()
+    };
+    assert!(spent.check().is_ok());
+    let spoiled = Progress {
+        giving_way_tries: 3,
+        ..Progress::default()
+    };
+    assert!(spoiled.check().is_err());
+    // A hand-edited file fails storage's load: nothing runs on it, so it
+    // grants no invitation.
+    let path = std::env::temp_dir().join(format!(
+        "onboarding-giving-load-{}",
+        crate::process::boot_text(crate::process::new_boot().unwrap())
+    ));
+    std::fs::create_dir(&path).unwrap();
+    std::fs::write(
+        path.join("progress.json"),
+        br#"{"steps":{},"giving_way_tries":200}"#,
+    )
+    .unwrap();
+    let mut owner = storage::ServiceStorage::start(storage::Paths {
+        progress: path.join("progress.json"),
+        checkpoint: path.join("privacy-pending.json"),
+        mailbox: path.join("progress.json.told"),
+        near_call: path.join("near-call.json"),
+    })
+    .unwrap();
+    let client = owner.client();
+    let until = Instant::now() + Duration::from_secs(5);
+    let state = loop {
+        let state = client.snapshot().unwrap();
+        if !state.busy {
+            break state;
+        }
+        assert!(Instant::now() < until);
+        std::thread::sleep(Duration::from_millis(1));
+    };
+    assert!(state.failed.is_some() && state.progress.is_none());
+    owner.finish(Duration::from_secs(2)).unwrap();
+    let _ = std::fs::remove_dir_all(&path);
+}
+
+#[test]
 fn a_head_not_moved_far_or_not_held_where_the_hand_put_it_is_not_done() {
     let store = Store::new(None);
     let mut walk = store.cycle(S);

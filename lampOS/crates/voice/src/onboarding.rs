@@ -231,6 +231,10 @@ pub struct Progress {
     /// the count: nothing of the sentence is kept.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub sentence_prompts: u8,
+    /// Giving-way invitations committed this setup/redo, before each is
+    /// published (#1800): at most two, so a rebuilt walk cannot ask again.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub giving_way_tries: u8,
 }
 
 fn is_zero(value: &u8) -> bool {
@@ -241,7 +245,10 @@ impl Progress {
     /// The storage executor accepts only the bounded onboarding schema.
     pub(crate) fn check(&self) -> io::Result<()> {
         let invalid = || io::Error::new(io::ErrorKind::InvalidData, "invalid onboarding progress");
-        if self.steps.len() > Step::ALL.len() || self.privacy_invitation_tries > 2 {
+        if self.steps.len() > Step::ALL.len()
+            || self.privacy_invitation_tries > 2
+            || self.giving_way_tries > giving_way::MOST_TRIES
+        {
             return Err(invalid());
         }
         for (name, kept) in &self.steps {

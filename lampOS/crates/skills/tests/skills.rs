@@ -8952,7 +8952,7 @@ fn onboarding_pending_snapshot_is_asked_once_and_retry_is_an_explicit_edge() {
         send(
             &mut restarted,
             10,
-            message(83, true).replace("privacy", "giving_way")
+            message(83, true).replace("privacy", "a_newer_step")
         ),
         vec![Call::SayFrom(lamp_skills::Source::Onboarding, Some(83))]
     );
