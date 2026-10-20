@@ -529,6 +529,9 @@ struct Shared {
     /// ([`Engine::keeping_a_listener_ready`]): the one kept, and how many
     /// have been opened, so an expiry takes only its own.
     keep_listener: bool,
+    /// A line whose words end before a name waits for it
+    /// ([`Engine::waiting_for_a_name`]).
+    open_name: bool,
     spare: Mutex<Option<Kept>>,
     spares: AtomicU64,
     /// The privacy generation one was opened under before any line
@@ -944,6 +947,7 @@ impl Engine {
                 skill_look: None,
                 prepare: false,
                 keep_listener: false,
+                open_name: false,
                 spare: Mutex::new(None),
                 spares: AtomicU64::new(0),
                 warmed: Mutex::new(None),
@@ -1225,6 +1229,22 @@ impl Engine {
     pub fn keeping_a_listener_ready(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.keep_listener = on;
+        }
+        self
+    }
+
+    /// A spoken line whose words end before a name ("Hey Lamp, my name
+    /// is", [`crate::known_faces::opens_a_name`]) is answered no sooner
+    /// than [`CARRY_AFTER_END`] after its end (`LAMP_SECOND_OPEN_NAME=on`,
+    /// #2135): the name said next then goes on from it, and the two are
+    /// answered as one line. On lamp-4ace "my name is" and 400 ms of quiet
+    /// ended a line, the name came 9 ms after, and the lamp answered "my
+    /// name is" alone (the first builder on #1722 at 02:16). A newer line
+    /// ends the wait with the request; with none, it is answered as it is.
+    /// Before any turn only.
+    pub fn waiting_for_a_name(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.open_name = on;
         }
         self
     }
@@ -2546,6 +2566,19 @@ async fn spoken(
     } else {
         text
     };
+    // Its words end before a name: answered no sooner than
+    // [`CARRY_AFTER_END`] after the line's end, so the name said next goes
+    // on from it (`LAMP_SECOND_OPEN_NAME`). A newer line drops this request,
+    // and this wait with it.
+    if shared.open_name && crate::known_faces::opens_a_name(&text) {
+        let left = CARRY_AFTER_END.saturating_sub(finishing.elapsed());
+        eprintln!(
+            "lamp-voice second: request {request}: its words end before a name: its answer waits {} ms for it (LAMP_SECOND_OPEN_NAME)",
+            left.as_millis()
+        );
+        tokio::time::sleep(left).await;
+        eprintln!("lamp-voice second: request {request}: no name came after it: answered as it is");
+    }
     let empty = text.trim().is_empty();
     let marked = checked.is_some_and(|sound| sound.load(Ordering::Acquire))
         && !crate::not_speech::short_word(&text);
@@ -2885,6 +2918,11 @@ struct Kept {
 
 /// Where the worker reads [`Engine::preparing`]: `on`, and nothing else.
 pub const PREPARED_ENVIRONMENT: &str = "LAMP_SECOND_PREPARED";
+
+/// Where the worker reads [`Engine::waiting_for_a_name`], and the
+/// coordinator whether a sound after such a line's end goes on from it:
+/// `on`, and nothing else.
+pub const OPEN_NAME_ENVIRONMENT: &str = "LAMP_SECOND_OPEN_NAME";
 
 /// Round 1 of a spoken turn's chat begun on the line's early words
 /// (`LAMP_SECOND_PREPARED`, #1712, the first builder at 17:02: the route's

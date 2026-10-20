@@ -90,6 +90,8 @@ enum Written {
 enum When {
     /// This many turns have been settled by the coordinator.
     Settled(usize),
+    /// The coordinator has sent this many requests' End.
+    Ended(usize),
     /// The speaker has accepted this many chunks.
     Accepted(usize),
 }
@@ -154,6 +156,13 @@ struct Script {
     /// The second route answers nothing at End: its chat is still
     /// streaming (#1620 on the second route).
     second_holds: bool,
+    /// The second route's first request is told at End with its words
+    /// (`second_hears`) and nothing else, its answer held, as that route
+    /// holds a line that ends before its name (`LAMP_SECOND_OPEN_NAME`);
+    /// the requests after it are answered as usual.
+    second_waits_first: bool,
+    /// `LAMP_SECOND_OPEN_NAME` in the rig.
+    open_name: bool,
     /// The second route fails each turn before any audio, as its worker
     /// does when its speech to text or chat cannot be reached.
     second_fails: Option<Fault>,
@@ -190,6 +199,8 @@ impl Script {
             second_shape: None,
             expression: false,
             second_holds: false,
+            second_waits_first: false,
+            open_name: false,
             second_fails: None,
             ignores_stop: None,
             limit: LIMIT,
@@ -402,6 +413,7 @@ impl Peers {
         if let Some(when) = self.script.speak_again {
             let due = match when {
                 When::Settled(count) => self.settled >= count,
+                When::Ended(count) => self.ended.len() >= count,
                 When::Accepted(count) => self.accepted >= count,
             };
             if due {
@@ -754,6 +766,18 @@ impl Peers {
                     if !live && self.script.second_holds {
                         continue;
                     }
+                    if !live && self.script.second_waits_first && self.ended.len() == 1 {
+                        if let Some(text) = self.script.second_hears {
+                            self.peers[index]
+                                .queued
+                                .push_back(ProviderOutput::Transcript {
+                                    request: None,
+                                    text: text.into(),
+                                    finished: true,
+                                });
+                        }
+                        continue;
+                    }
                     if !live && let Some(reason) = self.script.second_fails {
                         self.peers[index]
                             .queued
@@ -820,7 +844,12 @@ impl Peers {
                         if self.script.second_cue > 0 {
                             self.audio(index, request, self.script.second_cue, CUE);
                         }
-                        if let Some(text) = self.script.second_hears {
+                        // The first request's words only, when it waits.
+                        if let Some(text) = self
+                            .script
+                            .second_hears
+                            .filter(|_| !self.script.second_waits_first)
+                        {
                             self.peers[index]
                                 .queued
                                 .push_back(ProviderOutput::Transcript {
@@ -1107,6 +1136,7 @@ fn run(script: Script) -> Run {
         end_silence_blocks: None,
         early_end_blocks: None,
         early_finalize: false,
+        open_name: script.open_name,
         faint_level: None,
         speaker: spawn("speaker"),
         capture: spawn("capture"),
@@ -3024,5 +3054,68 @@ fn with_the_switch_the_eyes_camera_is_permitted_with_the_microphone_through_the_
         for install in &installs {
             assert_eq!(install.2, on && install.1, "on {on}: {installs:?}");
         }
+    }
+}
+
+/// #2135 (`LAMP_SECOND_OPEN_NAME`, the first builder on #1722 at 02:16):
+/// with the second route alone, a line whose words end before a name ("Hey
+/// Lamp, my name is"), its answer held, and speech again as soon as its End
+/// is sent. With the switch the new line goes on from it: its Start says so
+/// (`continues_cut_off`), so the route asks the two as one, and its record
+/// says why. Without it, the new line is one of its own, as before. With
+/// `LAMP_WAIT_KEEPS_ANSWER=on` too, as on lamp-4ace, the name first waits as
+/// a sound while the answer is awaited (`answer_waits`; there it was let
+/// go), and with the switch it goes on at once, never waiting.
+#[test]
+fn a_name_said_just_after_a_line_that_ended_before_it_goes_on_from_it() {
+    let _one = super::pilot_faults::one_session();
+    for (on, waits) in [(false, false), (true, false), (false, true), (true, true)] {
+        TEST_WAIT_KEEPS_ANSWER.with(|wait| wait.set(waits));
+        let run = run(Script {
+            second: false,
+            only: true,
+            open_name: on,
+            second_hears: Some("Hey Lamp, my name is"),
+            second_waits_first: true,
+            speak_again: Some(When::Ended(1)),
+            turns: 2,
+            turn_taking: TurnTaking::VadOnly,
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_WAIT_KEEPS_ANSWER.with(|wait| wait.set(false));
+        run.assert_clean();
+        assert_eq!(
+            run.events("answer_waits").is_empty(),
+            !waits || on,
+            "on {on}, waits {waits}: {}",
+            run.summary()
+        );
+        let continues: Vec<(u64, bool)> = run
+            .seen
+            .second
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Start {
+                    request,
+                    continues_cut_off,
+                    ..
+                } => Some((*request, *continues_cut_off)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            continues,
+            [(1, false), (2, on)],
+            "on {on}: {}",
+            run.summary()
+        );
+        assert_eq!(run.events("open_name").len(), usize::from(on), "on {on}");
+        let went_on = run
+            .events("input_admitted")
+            .into_iter()
+            .filter(|admitted| admitted["goes_on_from_its_name"] == true)
+            .count();
+        assert_eq!(went_on, usize::from(on), "on {on}: {}", run.summary());
+        assert_eq!(run.finished(1)["outcome"], "user_interrupted", "on {on}");
     }
 }

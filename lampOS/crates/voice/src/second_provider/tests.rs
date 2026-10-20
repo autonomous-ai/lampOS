@@ -6202,6 +6202,95 @@ fn no_listener_is_opened_before_a_line_outside_a_runtime() {
     assert_eq!(script.listened.load(Ordering::Relaxed), 0);
 }
 
+/// #2135 (`LAMP_SECOND_OPEN_NAME`, the first builder on #1722 at 02:16): a
+/// line whose words end before a name is not answered until
+/// [`CARRY_AFTER_END`] after its end. The name said as the next line in
+/// that time goes on from it, and the two are asked as one; with none, it is
+/// asked as it is. A line that gives its name, or the switch off, is asked
+/// at once.
+#[tokio::test(start_paused = true)]
+async fn a_line_ending_before_its_name_waits_for_it() {
+    let begin = |request, continues_cut_off| ProviderInput::Start {
+        request,
+        session: 1,
+        privacy_generation: 1,
+        continues: false,
+        continues_cut_off,
+        over_the_lamp: false,
+        after_stop: false,
+        follows_on: false,
+        over_the_lamps_voice: false,
+        heard_of_cut: None,
+    };
+    let script = |heard: &[&str]| {
+        Arc::new(Script {
+            heard: Mutex::new(heard.iter().map(|line| Ok((*line).to_owned())).collect()),
+            chats: Mutex::new(
+                heard
+                    .iter()
+                    .map(|_| vec![text("Nice to meet you."), Ok(ChatEvent::Done)])
+                    .collect(),
+            ),
+            ..Script::default()
+        })
+    };
+    let asked = |script: &Script| -> Vec<Option<Message>> {
+        script
+            .asked
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|asked| asked.last().cloned())
+            .collect()
+    };
+    // The name goes on from it, 1 s after its end: asked once, as one line.
+    let played = script(&["Hey Lamp, my name is", "Jim. Please remember it."]);
+    let (engine, _, _) = scripted(played.clone());
+    let mut engine = engine.waiting_for_a_name(true);
+    engine.submit(begin(1, false));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    tokio::time::sleep(Duration::from_millis(1_000)).await;
+    assert!(asked(&played).is_empty(), "nothing asked before the name");
+    engine.submit(begin(2, true));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let heard = turn(&mut engine).await;
+    assert_eq!(heard.last().unwrap(), "complete", "{heard:?}");
+    assert_eq!(
+        asked(&played),
+        [Some(Message::user(
+            "Hey Lamp, my name is Jim. Please remember it."
+        ))]
+    );
+    // No name comes: asked as it is, 1.5 s after its end, not before.
+    let alone = script(&["Hey Lamp, my name is"]);
+    let (engine, _, _) = scripted(alone.clone());
+    let mut engine = engine.waiting_for_a_name(true);
+    engine.submit(begin(1, false));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    tokio::time::sleep(Duration::from_millis(1_400)).await;
+    assert!(asked(&alone).is_empty(), "still waiting at 1.4 s");
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(asked(&alone), [Some(Message::user("Hey Lamp, my name is"))]);
+    // A line that gives its name, or the switch off: asked at once.
+    for (on, line) in [
+        (true, "Hey Lamp, my name is Jim."),
+        (false, "Hey Lamp, my name is"),
+    ] {
+        let at_once = script(&[line]);
+        let (engine, _, _) = scripted(at_once.clone());
+        let mut engine = engine.waiting_for_a_name(on);
+        engine.submit(begin(1, false));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(asked(&at_once), [Some(Message::user(line))], "{line}");
+        turn(&mut engine).await;
+    }
+}
+
 /// #1712 (the first builder at 03:48): the journal counts a line's words in
 /// the line it cut short and in the lamp's own answer, as plain words, any
 /// case and punctuation, never the words.
