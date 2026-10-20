@@ -7043,21 +7043,23 @@ fn conversation_with_gate(
                         .ok_or_else(|| io::Error::other("speech end lost its owner"))?;
                     let input_end_us = audio.captured_at_us;
                     // The sentence's line ending (begun in its window,
-                    // count-only): its speech and whether it was said close,
-                    // numbers only. Onboarding takes it if it ends in the
+                    // count-only): its speech and the room microphone's
+                    // largest rise during it, numbers only. Onboarding takes it if it ends in the
                     // window too.
                     if sentence_turn == Some(current.owner.turn()) {
                         let turn = current.owner.turn();
                         let speech_ms =
                             speech_levels.len() as u64 * u64::from(lamp_audio::BLOCK_MS);
-                        let close = said_close(&speech_levels, &loud_blocks, &rise).is_some();
+                        let rise_db = speech_levels
+                            .front()
+                            .and_then(|(began, _)| rise.most_since(*began));
                         if let Some(walk) = onboarding.as_mut() {
-                            walk.sentence_line(speech_ms, close, monotonic_us());
+                            walk.sentence_line(speech_ms, rise_db, monotonic_us());
                         }
                         record(
                             trace,
                             json!({"kind":"onboarding_sentence_line","turn":turn,
-                                "speech_ms":speech_ms,"said_close":close,"at_us":monotonic_us()}),
+                                "speech_ms":speech_ms,"rise_db":rise_db,"at_us":monotonic_us()}),
                         )?;
                     }
                     // The lamp is sure the person has finished. A request

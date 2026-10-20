@@ -21,10 +21,10 @@
 //! first builder's ruling (a), 20 October): the person says a sentence from
 //! where they sit, in their own words. It is done only on the voice's own
 //! evidence: a line ended in the window ([`SENTENCE_WINDOW_US`]) with words
-//! come back for it, said close (the room microphone rose the near rule's bar,
-//! `crate::attention::near_rise_db`, over its quiet during the line: the
-//! level at which the voice takes a line as said to it from close by,
-//! `crate::room_floor::Rise::close_since`), and its words covering it (at
+//! come back for it, said close (the room microphone rose over its quiet
+//! during the line as far as this person's own calls from the seat did, less
+//! 3 dB, never over the near rule's bar nor under 3 dB: `sentence_bar`), and
+//! its words covering it (at
 //! least one for each second of the line's speech, [`MS_A_WORD`]). Short of
 //! that it is coached once, "a little louder" for the level, "a little
 //! closer" for the words, then done or failed. Only counts are kept. The
@@ -62,6 +62,22 @@ const MOST_AGO_MS: u64 = 10_000;
 const MOST_SEEN: usize = 256;
 /// The bus is read at most this often.
 const LOOK_EVERY_US: u64 = 20_000;
+/// A call may begin this long before the prompt's end, over its last word,
+/// if its name ended after it: people start answering as the lamp finishes
+/// (lamp-52e6, row 10: names begun 237 to 478 ms before the end). Its rise is
+/// read from the prompt's end, where the ears no longer flag the lamp's own
+/// voice; the prompt's echo can only raise it, so the bar errs high (fewer
+/// calls let through), never low. The detector's own allowance,
+/// `crate::activity::CALL_BEFORE_US`.
+const OVER_PROMPT_MS: u64 = crate::activity::CALL_BEFORE_US / 1_000;
+/// A prompt cut before it played whole (someone spoke over it) is offered
+/// again with its own number, this many times in a step at most.
+const MOST_REOFFERS: u8 = 2;
+/// The sentence's level bar is never under this rise over the room's quiet
+/// (a doubling of its power): in a loud office, where the person's own
+/// calls rose only 3.9 dB (lamp-52e6, row 10), a line under it is not told
+/// from the room's own swing.
+const SENTENCE_LOWEST_DB: f32 = 3.0;
 /// The sentence part's prompts: the first, and one coached.
 pub(crate) const SENTENCE_PROMPTS: u8 = 2;
 /// A line said for the sentence ends within this long of the prompt's end:
@@ -109,7 +125,8 @@ impl Short {
 #[derive(Clone, Copy)]
 struct Line {
     speech_ms: u64,
-    close: bool,
+    /// The room microphone's largest rise over its quiet during it, in dB.
+    rise_db: Option<f32>,
     words: Option<usize>,
 }
 
@@ -117,7 +134,8 @@ struct Line {
 /// milliseconds.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Seen {
-    Hearing(Hearing),
+    /// A final hearing, and when it was sent: its name had ended by then.
+    Hearing(Hearing, u64),
     Level(Level),
     /// `voice/state` at this time: speaking or not.
     Speaking {
@@ -144,10 +162,13 @@ impl Seen {
         {
             return Self::Invalid;
         }
-        Self::Hearing(Hearing {
-            began_ms: at_unix_ms - ago,
-            score: heard.score,
-        })
+        Self::Hearing(
+            Hearing {
+                began_ms: at_unix_ms - ago,
+                score: heard.score,
+            },
+            at_unix_ms,
+        )
     }
 
     /// An `ears/level` reading sent at `at_unix_ms`.
@@ -165,7 +186,7 @@ impl Seen {
 
     fn at_ms(&self) -> Option<u64> {
         match self {
-            Self::Hearing(hearing) => Some(hearing.began_ms),
+            Self::Hearing(hearing, _) => Some(hearing.began_ms),
             Self::Level(level) => Some(level.at_ms),
             Self::Speaking { at_ms, .. } => Some(*at_ms),
             Self::Restart | Self::Invalid => None,
@@ -213,6 +234,8 @@ pub(crate) struct NearFlow {
     named: Option<Outcome>,
     line: Option<Line>,
     short: Option<Short>,
+    /// Prompts offered again after being cut ([`MOST_REOFFERS`]).
+    reoffered: u8,
 }
 
 impl NearFlow {
@@ -227,12 +250,14 @@ impl NearFlow {
             && at_us >= listening.ended_us
             && at_us - listening.ended_us <= COLLECT_MS * 1_000
             && self.seen.iter().any(|seen| match seen {
-                // The hearing's Unix start on the coordinator's clock, by the
+                // The call's Unix start on the coordinator's clock, by the
                 // prompt's end read on both.
-                Seen::Hearing(hearing) if hearing.began_ms >= listening.ended_ms => {
-                    let heard_us = listening.ended_us
-                        + (hearing.began_ms - listening.ended_ms).saturating_mul(1_000);
-                    heard_us.saturating_add(crate::activity::CALL_BEFORE_US) >= began_us
+                Seen::Hearing(hearing, heard_ms) => {
+                    call_began_ms(hearing, *heard_ms, listening.ended_ms).is_some_and(|began| {
+                        let heard_us =
+                            listening.ended_us + (began - listening.ended_ms).saturating_mul(1_000);
+                        heard_us.saturating_add(crate::activity::CALL_BEFORE_US) >= began_us
+                    })
                 }
                 _ => false,
             })
@@ -252,10 +277,13 @@ impl NearFlow {
             seen: names_ms
                 .iter()
                 .map(|&began_ms| {
-                    Seen::Hearing(Hearing {
-                        began_ms,
-                        score: 0.98,
-                    })
+                    Seen::Hearing(
+                        Hearing {
+                            began_ms,
+                            score: 0.98,
+                        },
+                        began_ms + 600,
+                    )
                 })
                 .collect(),
             ..Self::default()
@@ -277,14 +305,26 @@ impl NearFlow {
         self.named
     }
 
-    fn take_evidence(&mut self) -> (Vec<Hearing>, Vec<Level>, Vec<Spoke>, Option<&'static str>) {
+    /// The try's evidence for `near_try`, the prompt having ended at
+    /// `ended_ms`: a call begun over the prompt's last word is measured from
+    /// the prompt's end ([`call_began_ms`]), and the lamp's speech that began
+    /// before that end and stopped within [`OVER_PROMPT_MS`] of it is the
+    /// prompt itself, not an answer.
+    fn take_evidence(
+        &mut self,
+        ended_ms: u64,
+    ) -> (Vec<Hearing>, Vec<Level>, Vec<Spoke>, Option<&'static str>) {
         let mut hearings = Vec::new();
         let mut levels = Vec::new();
         let mut spoke: Vec<Spoke> = Vec::new();
         let mut open: Option<u64> = None;
         for seen in self.seen.drain(..) {
             match seen {
-                Seen::Hearing(hearing) => hearings.push(hearing),
+                Seen::Hearing(hearing, heard_ms) => hearings.push(Hearing {
+                    began_ms: call_began_ms(&hearing, heard_ms, ended_ms)
+                        .unwrap_or(hearing.began_ms),
+                    ..hearing
+                }),
                 Seen::Level(level) => levels.push(level),
                 Seen::Speaking { at_ms, speaking } => match (speaking, open) {
                     (true, None) => open = Some(at_ms),
@@ -306,6 +346,12 @@ impl NearFlow {
                 ended_ms: None,
             });
         }
+        spoke.retain(|spoke| {
+            spoke.began_ms >= ended_ms
+                || spoke
+                    .ended_ms
+                    .is_none_or(|end| end > ended_ms + OVER_PROMPT_MS)
+        });
         (hearings, levels, spoke, self.spoiled.take())
     }
 }
@@ -482,10 +528,12 @@ impl Onboarding {
             *self.prompts(sentence) = prompt - 1;
             self.save();
         }
-        // The name part's stored bar stands: the sentence part goes on.
-        let named = self.near.named;
+        // The name part's stored bar stands: the sentence part goes on. The
+        // prompts offered again stay counted, so absence can't renew them.
+        let (named, reoffered) = (self.near.named, self.near.reoffered);
         self.forget_near();
         self.near.named = named;
+        self.near.reoffered = reoffered;
     }
 
     /// The committed-to-be prompt count of a part.
@@ -509,6 +557,7 @@ impl Onboarding {
         self.near.named = None;
         self.near.line = None;
         self.near.short = None;
+        self.near.reoffered = 0;
     }
 
     pub(super) fn near_pending(&self) -> Option<lamp_msgs::OnboardingInvitation> {
@@ -609,8 +658,19 @@ impl Onboarding {
             } else {
                 "onboarding_near_try"
             };
+            // Someone spoke over it (an office's voices, or the person
+            // answering early): it is offered again with its own number and
+            // spends none of the budget, twice in a step at most.
+            let again = self.near.reoffered < MOST_REOFFERS
+                && *self.prompts(offer.sentence) == offer.prompt;
+            if again {
+                self.near.reoffered += 1;
+                *self.prompts(offer.sentence) = offer.prompt - 1;
+                self.save();
+            }
             self.records.push(json!({"kind":kind,"prompt":offer.prompt,
-                "accepted":false,"why":"the prompt was not played whole","at_us":now_us}));
+                "accepted":false,"why":"the prompt was not played whole",
+                "offered_again":again,"at_us":now_us}));
             return;
         }
         // History from before the prompt's end is kept (the echo guard); a
@@ -648,17 +708,39 @@ impl Onboarding {
         })
     }
 
-    /// A line ended at `at_us`: its speech in milliseconds, and whether it
-    /// was said close. Taken only in the sentence window; a later line
-    /// replaces it.
-    pub(crate) fn sentence_line(&mut self, speech_ms: u64, close: bool, at_us: u64) {
+    /// A line ended at `at_us`: its speech in milliseconds, and the room
+    /// microphone's largest rise over its quiet during it (none without the
+    /// bus). Taken only in the sentence window; a later line replaces it.
+    pub(crate) fn sentence_line(&mut self, speech_ms: u64, rise_db: Option<f32>, at_us: u64) {
         if self.sentence_window(at_us) {
             self.near.line = Some(Line {
                 speech_ms,
-                close,
+                rise_db,
                 words: None,
             });
         }
+    }
+
+    /// The rise a sentence said close reaches: this person's quietest
+    /// accepted call from the seat less `UNDER_QUIETEST_DB`, as their bar is
+    /// made, so it is relative to this room's quiet at this hour; never over
+    /// the near rule's bar (`crate::attention::near_rise_db`, 18 dB unless
+    /// calibrated), which also stands with no call accepted, and never under
+    /// [`SENTENCE_LOWEST_DB`]. People farther off rose 9.8 to 15.1 dB in a
+    /// quiet room, under a quiet room's bar of 18 dB and under the calls'
+    /// own less 3 dB.
+    fn sentence_bar(&self) -> f32 {
+        let bar = crate::attention::near_rise_db();
+        self.desired
+            .near_call_tries
+            .iter()
+            .map(|done| done.rise_db)
+            .reduce(f32::min)
+            .map_or(bar, |quietest| {
+                (quietest - lamp_near_call::UNDER_QUIETEST_DB)
+                    .min(bar)
+                    .max(SENTENCE_LOWEST_DB)
+            })
     }
 
     /// How many words came back for the line, never the words. Taken once,
@@ -689,13 +771,15 @@ impl Onboarding {
         let listening = self.near.listening.take().expect("open");
         let line = self.near.line.take();
         self.near.seen.clear();
+        let bar = self.sentence_bar();
+        let close = |line: &Line| line.rise_db.is_some_and(|rise| rise >= bar);
         let short = match line {
             None => Some(Short::Level),
             Some(line) => {
                 let words = line.words.unwrap_or(0) as u64;
                 if words == 0 {
                     Some(Short::Coverage)
-                } else if !line.close {
+                } else if !close(&line) {
                     Some(Short::Level)
                 } else if words * MS_A_WORD < line.speech_ms {
                     Some(Short::Coverage)
@@ -708,7 +792,8 @@ impl Onboarding {
             "prompt":listening.prompt,"accepted":short.is_none(),
             "short":short.map(Short::name),"words":line.and_then(|line| line.words),
             "speech_ms":line.map(|line| line.speech_ms),
-            "said_close":line.map(|line| line.close),"at_us":now_us}));
+            "rise_db":line.and_then(|line| line.rise_db),"bar_db":bar,
+            "said_close":line.as_ref().map(close),"at_us":now_us}));
         let outcome = match short {
             None => Outcome::Done,
             Some(short) if self.desired.sentence_prompts < SENTENCE_PROMPTS => {
@@ -749,12 +834,10 @@ impl Onboarding {
             return;
         }
         let listening = self.near.listening.take().expect("due");
-        let (hearings, levels, mut spoke, spoiled) = self.near.take_evidence();
-        // The prompt itself: the lamp spoke until its end.
-        spoke.push(Spoke {
-            began_ms: listening.ended_ms.saturating_sub(1),
-            ended_ms: Some(listening.ended_ms),
-        });
+        // The prompt's own speech is left out: a call may begin over its
+        // last word, and its rise is read from the prompt's end on, where
+        // the ears no longer flag the lamp's own voice.
+        let (hearings, levels, spoke, spoiled) = self.near.take_evidence(listening.ended_ms);
         let expected_ms = listening.ended_ms + now_us.saturating_sub(listening.ended_us) / 1_000;
         let judged = if (self.unix_clock)().abs_diff(expected_ms) > CLOCK_SLACK_MS {
             Err("the clock jumped".to_owned())
@@ -915,6 +998,20 @@ impl Onboarding {
             "state":"offered","part":if sentence { "sentence" } else { "name" },
             "prompt":prompt,"at_us":now_us}),
         );
+    }
+}
+
+/// When a hearing's call began, for a try whose prompt ended at `ended_ms`:
+/// its own start, or the prompt's end for a name begun at most
+/// [`OVER_PROMPT_MS`] before it that ended after it (its final hearing,
+/// sent at `heard_ms`, came after the end). None for one begun earlier.
+fn call_began_ms(hearing: &Hearing, heard_ms: u64, ended_ms: u64) -> Option<u64> {
+    if hearing.began_ms >= ended_ms {
+        Some(hearing.began_ms)
+    } else if hearing.began_ms + OVER_PROMPT_MS >= ended_ms && heard_ms > ended_ms {
+        Some(ended_ms)
+    } else {
+        None
     }
 }
 

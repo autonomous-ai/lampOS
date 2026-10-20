@@ -281,6 +281,11 @@ asked for by the same core skill (a step it does not know, from a newer voice,
 is read as `unknown` and its token still asked for: the say service decides), and only the prompt's complete playback opens
 a try. A prompt counts once its budget commit lands, before it is published;
 one dropped before the model took it (nobody there, the pause) is given back.
+One cut before it played whole (someone spoke over it: an office's voices, or
+the person answering early, as on lamp-52e6's row 10, try 1) is offered again
+with its own number and spends nothing, twice in a step at most
+(`MOST_REOFFERS`, kept through absence); a third cut one counts. Its record
+says `offered_again`.
 
 **A try.** At the moment the prompt's whole playback is known, the runner reads
 the Unix clock: that is the prompt's end. The coordinator's monotonic clock is
@@ -295,8 +300,22 @@ before a hearing is known; the try is judged 0.3 s after that for delivery.
 `lamp_near_call::near_try` judges it: one hearing in the 6 s at 0.95 or more,
 mic1's largest rise over its quiet in the second after it began, and the lamp
 not speaking from 0.5 s before the hearing to 1 s after (speech elsewhere in
-the window does not spoil it). The prompt itself counts as the lamp speaking
-until its end.
+the window does not spoil it).
+
+**A call begun over the prompt's last word counts.** People start answering
+as the lamp finishes: on lamp-52e6 (row 10, tries 2 and 4) the name began 237
+to 478 ms before the prompt's end and the try said "the name wasn't heard".
+A name begun up to 0.5 s before the end (`OVER_PROMPT_MS`, the call wait's
+`CALL_BEFORE_US`) whose final hearing came after it is the call, measured as
+beginning at the prompt's end (`call_began_ms`); one begun earlier, or over
+before the end, is not. So the prompt's own speech is not an answer: the
+lamp's `voice/state` speaking that began before the prompt's end and stopped
+within 0.5 s of it is left out, and a name just after the end counts too (it
+used to be refused as the prompt's echo). The rise is still read only from
+levels the ears didn't flag as the lamp's own; the prompt's echo can only
+raise it, so the bar errs high (fewer calls let through), never low. The
+lamp speaking past that, or again, still spoils the try. Test:
+`a_name_begun_over_the_prompts_last_word_counts_from_its_end`.
 
 A try is refused, and the person asked again, when the Unix clock moved more
 than 1 s apart from the monotonic one over the try, when a source began again
@@ -357,12 +376,19 @@ evidence (`near.rs`, `sentence_judge`):
 
 - **heard with words**: its finished transcript has at least one word that
   asks something (`wait_words::words_in`: fillers, "okay" and hums don't count);
-- **at a level the lamp answers**: said close, the room microphone's rise over
-  its quiet during the line at the near rule's bar or more
-  (`room_floor::Rise::close_since` with `attention::near_rise_db()`: 18 dB, or
-  this home's bar when `LAMP_ATTENTION_NEAR_CALIBRATED` is on), the level at
-  which the voice takes a short line as said to it from close by on either
-  route (`said_close`, `not_speech::scrap`);
+- **said close, for this room**: the room microphone's largest rise over its
+  quiet during the line (`room_floor::Rise::most_since`, the record's
+  `rise_db`) at the sentence's bar or more (`sentence_bar`, the record's
+  `bar_db`): this person's quietest accepted call from the seat less 3 dB, as
+  their bar is made, so it is relative to this room's quiet at this hour;
+  never over the near rule's bar (`attention::near_rise_db()`: 18 dB, or this
+  home's bar when `LAMP_ATTENTION_NEAR_CALIBRATED` is on), which also stands
+  when no call was accepted, and never under 3 dB (`SENTENCE_LOWEST_DB`). On
+  lamp-52e6 in an office (row 10) the call rose 3.9 dB and a normal sentence
+  (8 words in 1.95 s) fell short of the flat 18 dB; there the bar is 3 dB. A
+  far, quiet line still falls short: people farther off rose 9.8 to 15.1 dB in
+  a quiet room, under its 18 dB, and a line under 3 dB in the office. Test:
+  `in_a_loud_room_the_sentence_is_judged_against_the_persons_own_calls`;
 - **its words covering it**: at least one word for each second of the line's
   speech (`MS_A_WORD`, half the pace of ordinary speech; the line's speech is
   its blocks the detector scored as speech, 10 ms each). Fewer is a fragment.
@@ -396,9 +422,9 @@ was heard, and the lamp's answer to it, out of the conversation thread: so
 out of its file, the memory's journal (`remember`), the next line's
 exchange and every later prompt and history built from the thread. The
 second route also never asks its model for it, and a line going on from it
-does not begin with its words. The session record has `onboarding_sentence_line` (`speech_ms`, `said_close`),
+does not begin with its words. The session record has `onboarding_sentence_line` (`speech_ms`, `rise_db`),
 `onboarding_sentence_words` (`words`, a count) and `onboarding_sentence_try`
-(`accepted`, `short`, the same numbers); `progress.json` keeps only
+(`accepted`, `short`, the same numbers, `bar_db` and `said_close`); `progress.json` keeps only
 `sentence_prompts`. Tests:
 `coordinator::tests::second_route::a_sentence_in_its_window_is_counted_and_not_answered_on_either_route`,
 `coordinator::tests::second_route::the_sentences_words_and_its_answer_are_counted_only_on_either_route`,
