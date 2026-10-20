@@ -1594,9 +1594,18 @@ installed or started: `lamp-cloud` connects to the company broker, is opt-in and
 must not share V1 os-server's MQTT client ID, and `lamp-skills` also needs the
 product skills and settings that this ZIP does not carry yet.
 `lamp-body-measure` is a factory/provisioning tool that writes one lamp's
-`BODY_POSES` at rest. No unit starts it; the generic ZIP carries it as
-`tools/lamp-body-measure`, for the V1 migration script below, and poses are never
-shipped or copied from another lamp. `lamp-memory-fixture`,
+`BODY_POSES` at rest. The generic ZIP carries it as `tools/lamp-body-measure`,
+for the V1 migration script below, and poses are never shipped or copied from
+another lamp. Built from a lampOS source that has
+`deploy/units/lamp-body-measure.service` (lampOS #2163), the generic ZIP also
+carries that oneshot and puts the tool beside `lamp-body`
+(`runtime/body/<sha>/`). On a lamp with neither `/etc/lampOS/body/lamp.env` nor
+`/var/lib/lampos-body/measured.env`, it reads the lamp at rest after cutover,
+seated (`--home`, the pitch window and `--torque on`, no stand), before the
+first body start. The body then moves the head and base only until a person
+confirms its first stand. A read it refuses (torque on) keeps the body from
+starting, and it never turns torque off. From an older source the ZIP is as
+before. `lamp-memory-fixture`,
 `lamp-records-fixture`, `lamp-policy-replay` and the current
 `lamp-same-voice pairs` measurement CLI are development tools and are excluded.
 Unknown binaries still fail packaging so a new runtime cannot be silently

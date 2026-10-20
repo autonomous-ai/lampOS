@@ -1539,9 +1539,16 @@ build chúng; thêm executable không tự bật service hay chạy self-test/re
 được cài hay bật: `lamp-cloud` kết nối broker công ty, là opt-in và không được dùng
 chung MQTT client ID với os-server V1; `lamp-skills` còn cần skills và settings sản
 phẩm mà ZIP này chưa mang. `lamp-body-measure` là công cụ nhà máy/provisioning ghi
-`BODY_POSES` của từng lamp lúc đứng yên. Không unit nào chạy nó; ZIP chung mang nó ở
+`BODY_POSES` của từng lamp lúc đứng yên. ZIP chung mang nó ở
 `tools/lamp-body-measure` cho script migrate V1 bên dưới, và pose không bao giờ được
-ship hay chép từ lamp khác.
+ship hay chép từ lamp khác. Khi build từ source lampOS có
+`deploy/units/lamp-body-measure.service` (lampOS #2163), ZIP chung mang thêm unit
+oneshot đó và đặt công cụ cạnh `lamp-body` (`runtime/body/<sha>/`). Trên lamp chưa có
+cả `/etc/lampOS/body/lamp.env` lẫn `/var/lib/lampos-body/measured.env`, sau cutover
+nó đọc lamp đứng yên ở tư thế ngồi (`--home`, pitch window và `--torque on`, không
+stand) trước lần chạy body đầu tiên. Body chỉ cử động đầu và đế cho tới khi có người
+xác nhận lần đứng đầu tiên. Lần đọc bị từ chối (torque đang bật) giữ body không
+chạy, và nó không bao giờ tắt torque. Build từ source cũ thì ZIP như trước.
 `lamp-memory-fixture`, `lamp-records-fixture`, `lamp-policy-replay` và CLI đo
 `lamp-same-voice pairs` hiện là công cụ phát triển nên không đưa vào gói. Binary
 chưa phân loại vẫn làm packaging báo lỗi để không âm thầm bỏ sót runtime mới.

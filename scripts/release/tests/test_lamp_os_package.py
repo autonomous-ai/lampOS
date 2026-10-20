@@ -103,6 +103,33 @@ class PackageTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'nonsecret setting template'):
             self.build_generic()
 
+    def test_generic_runs_the_seated_measure_when_the_source_has_it(self):
+        # An older source has no seated measure: the package is as before.
+        self.write_generic_units()
+        manifest = self.build_generic()
+        self.assertNotIn(pkg.SEATED_MEASURE_UNIT, manifest['units'])
+        # lampOS #2163: the oneshot reads a lamp without poses, seated, with
+        # the tool beside lamp-body, and joins no bus.
+        self.write_source('deploy/units/' + pkg.SEATED_MEASURE_UNIT, (
+            '[Unit]\nConditionHost=@UNIT_ID@\n[Service]\nType=oneshot\nUser=@LAMP_USER@\n'
+            "ExecStart=/bin/sh -c 'exec /opt/lampOS/body/@BODY_SHA256@/lamp-body-measure "
+            "--device @SERVO_DEVICE@ --unit-id @UNIT_ID@ --lock-directory @MOTOR_LOCK_DIR@ --seated "
+            "--write /var/lib/lampos-body/measured.env'\n").encode())
+        manifest = self.build_generic()
+        self.assertIn(pkg.SEATED_MEASURE_UNIT, manifest['units'])
+        body = manifest['binaries']['lamp-body']
+        with zipfile.ZipFile(self.output) as archive:
+            names = archive.namelist()
+            unit = archive.read('units/' + pkg.SEATED_MEASURE_UNIT).decode()
+            placeholders = json.loads(archive.read('package-manifest.json'))['placeholders']
+            mode = archive.getinfo(f'runtime/body/{body}/lamp-body-measure').external_attr >> 16 & 0o777
+        self.assertIn('tools/lamp-body-measure', names)
+        self.assertEqual(mode, 0o755)
+        self.assertIn(f'@RELEASE_ROOT@/runtime/body/{body}/lamp-body-measure --device @SERVO_DEVICE@', unit)
+        self.assertNotIn('LAMP_BUS', unit)
+        self.assertNotIn('lamp-body-measure', manifest['binaries'])
+        self.assertTrue({'SERVO_DEVICE', 'MOTOR_LOCK_DIR', 'LAMP_USER'} <= set(placeholders))
+
     def build_generic(self):
         return pkg.package(self.source, self.binaries, self.assets, None, '1.2.3', self.output, self.adapter, self.libraries, 'a' * 40)
 
