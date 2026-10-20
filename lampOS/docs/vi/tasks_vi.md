@@ -27,3 +27,24 @@ Cờ `--tasks-make-skill` của worker, sau `--tasks-needs`, cho mô hình hàm
 - **Khi đặt lại đèn,** `/var/lib/lampOS/voice/made-skills` bị xóa cùng các kho
   khác của người dùng.
 - **Khi tắt,** một lời gọi `make_skill` không làm gì.
+
+## Nhiều tác tử: nhờ đèn giao việc, không phải nói với người khác (#1722)
+
+Trên lamp-4ace lúc 00:06 ngày 2026-10-21, khi luồng thứ hai đã đọc hai tác tử
+(Claude Code và Codex), chỉ 1 trong 3 lần giao việc được chuẩn bị (trước đó là
+3 trong 3): "ask Claude Code to …" bị trả lời bằng `not_for_me`, hoặc đèn nói
+đó không phải việc của nó. Văn bản cho hai tác tử nói "Claude Code and Codex"
+cùng nhau, "one of the person's agents" (nghe như một người), "it is theirs to
+do, not yours", và "neither Claude Code or Codex nor", một câu sai ngữ pháp.
+
+Khi đọc được từ hai tác tử trở lên:
+- `start_agent_task` nói "asks to have Claude Code or Codex do something";
+- ghi chú của phiên mở đầu bằng "Claude Code and Codex are the person's agents
+  on their office computer, never anyone in the room: … they are asking you to
+  hand it over, not talking to someone else, so never call not_for_me for it.";
+  ngoại lệ của nó nói "names neither Claude Code nor Codex nor …".
+
+Khi chưa đọc tác tử nào hoặc chỉ có một, cả hai văn bản giữ nguyên từng byte.
+Đánh đổi: "ask Claude Code to …" nói giữa hai người trong phòng sẽ được coi là
+giao việc, và đèn vẫn hỏi trước khi bắt đầu (`LAMP_TASKS_ASKED`). Bật cùng
+`LAMP_TASKS_WHO=on`, không có công tắc riêng. Chưa chạy thử trên đèn.
