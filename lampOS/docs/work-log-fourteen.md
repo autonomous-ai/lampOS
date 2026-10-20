@@ -429,3 +429,16 @@ branch)
   [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6285339069).
 - #2094's app side (ecm-sds-mobile#11, four pieces) still awaits review.
   #2194 stays blocked on #2188/#2189, both still open.
+
+## 2026-10-20 — #2094 — ecm-sds-mobile#11 merged
+
+Ready for lamp-voice: no (the app side; nothing a lamp runs is on this
+branch)
+
+- ecm-sds-mobile#11 merged into `v3` at 14:21, by its person. The app side
+  of #2094 is live: setup's three fields, `LampOwnKeysNotifier`, the API
+  keys screen, and the `not_kept` fix, all in one piece now.
+- The issue stays open: the lamp side (#2167, El) is not merged yet, and
+  #2094 isn't done end to end until both are. Said so on
+  [#2094](https://github.com/autonomous-ai/lampOS/issues/2094#issuecomment-6285673215)
+  rather than close it myself — not my call, and only half the task is in.
