@@ -1,13 +1,20 @@
 //! Streamed speech as 24 kHz mono 16-bit PCM from OpenAI or ElevenLabs, as
 //! V1's `hal/drivers/voice/tts/{openai,elevenlabs}.py` ask for it.
-use super::{Error, Result, chunk, http_client, local_socket, openai_base, post, warm_get};
+use super::{
+    CONNECT, Error, Result, STALL, chunk, http_client, local_socket, openai_base, post, warm_get,
+};
 use crate::second_config::{SecondConfig, TtsProvider};
+use futures_util::{SinkExt, StreamExt};
 use serde_json::{Value, json};
 use std::{
     collections::VecDeque,
     net::SocketAddr,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
+};
+use tokio_tungstenite::{
+    Connector, MaybeTlsStream, WebSocketStream, connect_async_tls_with_config,
+    tungstenite::{Message as Frame, client::IntoClientRequest, http::HeaderValue},
 };
 
 pub const TTS_SAMPLE_RATE: u32 = 24_000;
@@ -344,6 +351,28 @@ pub struct Tts {
     /// them came on a connection reused from the pool.
     sockets: Mutex<VecDeque<SocketAddr>>,
     tally: Arc<Mutex<Tally>>,
+    /// The speech socket opened ahead for a request
+    /// (`LAMP_SECOND_SPEECH_SOCKET=on`, [`Tts::open_ahead`]).
+    ahead: Mutex<Option<Ahead>>,
+}
+
+/// A speech socket, ElevenLabs' `stream-input`.
+type Socket = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+
+/// The longest a piece waits on the speech socket for its first audio before
+/// it goes over HTTP instead: about twice a kept HTTP connection's (420 to
+/// 690 ms on lamp-4ace), so a socket open but silent costs the piece at most
+/// this, never the stream's 30 s (the reviewer's P3 on #2209).
+pub const SOCKET_FIRST_AUDIO_WITHIN: Duration = Duration::from_millis(1_500);
+
+/// The speech socket opened ahead of a request's answer (#2135's row; the
+/// first builder on #1722, 20 Oct 10:37): opened as its chat is asked, so
+/// its first piece goes to a socket already open. A piece that finds it
+/// still opening goes over HTTP as before.
+enum Ahead {
+    Opening(u64),
+    /// Open for the request since then, told the voice's settings.
+    Open(u64, Box<Socket>, Instant),
 }
 
 impl Tts {
@@ -375,7 +404,118 @@ impl Tts {
             used: Mutex::new(None),
             sockets: Mutex::new(VecDeque::with_capacity(SOCKETS)),
             tally: Arc::default(),
+            ahead: Mutex::new(None),
         })
+    }
+
+    /// With `LAMP_SECOND_SPEECH_SOCKET=on`, a speech socket opened now for
+    /// `request`'s answer, its voice's settings sent, for the first of its
+    /// pieces that finds it open ([`Self::speak_for`]). ElevenLabs only; one
+    /// opened before, for an older request, is closed. Nothing on failure:
+    /// the pieces go over HTTP as before.
+    pub async fn open_ahead(&self, request: u64) {
+        if self.provider != TtsProvider::ElevenLabs {
+            return;
+        }
+        let Ok(socket) = socket_request(
+            &self.base_url,
+            &self.key,
+            self.voice.as_deref(),
+            self.model.as_deref(),
+        ) else {
+            return;
+        };
+        self.open_ahead_on(request, &socket).await;
+    }
+
+    async fn open_ahead_on(&self, request: u64, socket: &SocketRequest) {
+        if let Ok(mut ahead) = self.ahead.lock() {
+            *ahead = Some(Ahead::Opening(request));
+        }
+        let from = Instant::now();
+        let opened = open_socket(socket).await;
+        let Ok(mut ahead) = self.ahead.lock() else {
+            return;
+        };
+        // Only if it is still this request's: a newer one's is left alone.
+        if !matches!(*ahead, Some(Ahead::Opening(of)) if of == request) {
+            return;
+        }
+        match opened {
+            Ok(socket) => {
+                eprintln!(
+                    "lamp-voice second: request {request}: the speech socket is open, {} ms after it was asked",
+                    from.elapsed().as_millis()
+                );
+                *ahead = Some(Ahead::Open(request, Box::new(socket), Instant::now()));
+            }
+            Err(error) => {
+                eprintln!(
+                    "lamp-voice second: request {request}: the speech socket didn't open ({error}); its pieces go over HTTP"
+                );
+                *ahead = None;
+            }
+        }
+    }
+
+    /// The socket opened ahead for `request`, when it is open: taken, so one
+    /// piece speaks on it.
+    fn take_ahead(&self, request: u64) -> Option<(Socket, Instant)> {
+        let mut ahead = self.ahead.lock().ok()?;
+        match ahead.take() {
+            Some(Ahead::Open(of, socket, at)) if of == request => Some((*socket, at)),
+            other => {
+                *ahead = other;
+                None
+            }
+        }
+    }
+
+    /// `text` as `turn`'s piece on `socket`, opened at `opened`; `None` when
+    /// nothing in it would be spoken. It is handed on once its first audio
+    /// came, so a socket closed or failed before it is told to the caller,
+    /// which sends the piece over HTTP instead.
+    async fn speak_on(
+        &self,
+        mut socket: Socket,
+        opened: Instant,
+        text: &str,
+        turn: Turn,
+    ) -> Result<Option<TtsStream>> {
+        let Some(piece) = socket_piece(text) else {
+            return Ok(None);
+        };
+        let sent = Instant::now();
+        for message in [piece, socket_end()] {
+            socket
+                .send(Frame::Text(message.to_string().into()))
+                .await
+                .map_err(|_| Error::Transport("speech socket"))?;
+        }
+        // Not `used`: that says the kept HTTP connection went lately, for
+        // `warm` (the reviewer's P3 on #2209).
+        let index = self.asked(turn.request);
+        let mut stream = TtsStream {
+            source: Some(Source::Socket(Box::new(socket))),
+            piece: Some(Piece {
+                tally: self.tally.clone(),
+                provider: self.provider.name(),
+                request: turn.request,
+                index,
+                sent_ms: sent.duration_since(turn.heard_at).as_millis(),
+                sent,
+                reused: true,
+                ahead_ms: Some(sent.duration_since(opened).as_millis()),
+                chars: text.chars().count(),
+            }),
+            ..TtsStream::default()
+        };
+        match tokio::time::timeout(SOCKET_FIRST_AUDIO_WITHIN, stream.first_audio()).await {
+            Ok(Ok(true)) => Ok(Some(stream)),
+            Ok(Ok(false)) => Err(Error::Transport("speech socket closed before its audio")),
+            Ok(Err(error)) => Err(error),
+            Err(_) => Err(Error::Timeout("speech socket's first audio")),
+        }
     }
 
     /// Whether `socket` was seen before, remembering it either way.
@@ -437,6 +577,18 @@ impl Tts {
     }
 
     async fn speak_in(&self, text: &str, turn: Option<Turn>) -> Result<TtsStream> {
+        if let Some(turn) = turn
+            && let Some((socket, opened)) = self.take_ahead(turn.request)
+        {
+            match self.speak_on(socket, opened, text, turn).await {
+                Ok(Some(stream)) => return Ok(stream),
+                Ok(None) => return Ok(TtsStream::default()),
+                Err(error) => eprintln!(
+                    "lamp-voice second: request {}: the speech socket failed before its first audio ({error}); the piece goes over HTTP",
+                    turn.request
+                ),
+            }
+        }
         let Some(request) = request(
             self.provider,
             &self.base_url,
@@ -469,10 +621,11 @@ impl Tts {
             sent_ms: sent.duration_since(turn.heard_at).as_millis(),
             sent,
             reused,
+            ahead_ms: None,
             chars: text.chars().count(),
         });
         Ok(TtsStream {
-            response: Some(response),
+            source: Some(Source::Http(response)),
             piece,
             ..TtsStream::default()
         })
@@ -526,6 +679,8 @@ struct Piece {
     sent_ms: u128,
     sent: Instant,
     reused: bool,
+    /// On the speech socket, opened this long before the piece went.
+    ahead_ms: Option<u128>,
     chars: usize,
 }
 
@@ -533,14 +688,16 @@ impl Piece {
     /// The piece in the journal's words, its first audio byte `first_ms`
     /// after it went: never its words.
     fn told(&self, first_ms: u128) -> String {
+        let on = match self.ahead_ms {
+            Some(ahead) => format!("the speech socket opened {ahead} ms before"),
+            None => format!(
+                "a {} connection",
+                if self.reused { "reused" } else { "new" }
+            ),
+        };
         format!(
-            "request {} {} piece {}: {} chars, sent {} ms after the words were heard on a {} connection; its first audio byte {first_ms} ms after it went",
-            self.request,
-            self.provider,
-            self.index,
-            self.chars,
-            self.sent_ms,
-            if self.reused { "reused" } else { "new" },
+            "request {} {} piece {}: {} chars, sent {} ms after the words were heard on {on}; its first audio byte {first_ms} ms after it went",
+            self.request, self.provider, self.index, self.chars, self.sent_ms,
         )
     }
 
@@ -565,11 +722,18 @@ impl Piece {
 
 #[derive(Default)]
 pub struct TtsStream {
-    response: Option<reqwest::Response>,
+    source: Option<Source>,
     packets: Packets,
     ready: VecDeque<Vec<i16>>,
     /// Journaled at the first audio byte.
     piece: Option<Piece>,
+}
+
+/// Where a piece's audio comes from: its HTTP answer's body, or the speech
+/// socket's messages.
+enum Source {
+    Http(reqwest::Response),
+    Socket(Box<Socket>),
 }
 
 impl TtsStream {
@@ -579,22 +743,111 @@ impl TtsStream {
             if let Some(packet) = self.ready.pop_front() {
                 return Ok(Some(packet));
             }
-            let Some(response) = &mut self.response else {
+            if !self.read().await? && self.ready.is_empty() {
                 return Ok(None);
-            };
-            match chunk(response).await? {
-                Some(bytes) => {
-                    if let Some(piece) = self.piece.take() {
-                        piece.began();
-                    }
-                    self.ready
-                        .extend(self.packets.push(&bytes).into_iter().map(louder));
+            }
+        }
+    }
+
+    /// Whether audio came before the end: read until it did.
+    async fn first_audio(&mut self) -> Result<bool> {
+        loop {
+            if !self.ready.is_empty() {
+                return Ok(true);
+            }
+            if !self.read().await? {
+                return Ok(!self.ready.is_empty());
+            }
+        }
+    }
+
+    /// The next of its audio read into packets; false at the end.
+    async fn read(&mut self) -> Result<bool> {
+        let bytes = match &mut self.source {
+            None => return Ok(false),
+            Some(Source::Http(response)) => chunk(response).await?,
+            Some(Source::Socket(socket)) => socket_audio(socket).await?,
+        };
+        match bytes {
+            Some(bytes) => {
+                if let Some(piece) = self.piece.take() {
+                    piece.began();
                 }
-                None => {
-                    self.response = None;
-                    self.ready.extend(self.packets.finish().map(louder));
+                self.ready
+                    .extend(self.packets.push(&bytes).into_iter().map(louder));
+            }
+            None => {
+                self.source = None;
+                self.ready.extend(self.packets.finish().map(louder));
+            }
+        }
+        Ok(true)
+    }
+}
+
+/// A speech socket opened with `socket`'s key, its voice's settings sent.
+/// `wss` only, but `ws` in tests.
+async fn open_socket(socket: &SocketRequest) -> Result<Socket> {
+    let mut request = socket
+        .url
+        .as_str()
+        .into_client_request()
+        .map_err(|_| Error::Url)?;
+    let mut key = HeaderValue::from_str(&socket.value).map_err(|_| Error::Protocol("key"))?;
+    key.set_sensitive(true);
+    request.headers_mut().insert(socket.header, key);
+    let connector = if socket.url.starts_with("wss://") {
+        Some(Connector::Rustls(Arc::new(super::tls()?)))
+    } else if cfg!(test) {
+        None
+    } else {
+        return Err(Error::Url);
+    };
+    let (mut opened, _) = tokio::time::timeout(
+        CONNECT,
+        connect_async_tls_with_config(request, None, true, connector),
+    )
+    .await
+    .map_err(|_| Error::Timeout("speech socket connect"))?
+    .map_err(|error| match error {
+        tokio_tungstenite::tungstenite::Error::Http(response) => {
+            Error::Status(response.status().as_u16())
+        }
+        _ => Error::Transport("speech socket connect"),
+    })?;
+    opened
+        .send(Frame::Text(socket_opening().to_string().into()))
+        .await
+        .map_err(|_| Error::Transport("speech socket"))?;
+    Ok(opened)
+}
+
+/// A speech socket's next audio, `None` at its last message or its close.
+/// A message that isn't one of its answers is the service's own words: told
+/// by its kind only.
+async fn socket_audio(socket: &mut Socket) -> Result<Option<Vec<u8>>> {
+    loop {
+        let message = tokio::time::timeout(STALL, socket.next())
+            .await
+            .map_err(|_| Error::Timeout("speech socket"))?;
+        match message {
+            None | Some(Ok(Frame::Close(_))) => return Ok(None),
+            Some(Err(_)) => return Err(Error::Transport("speech socket")),
+            Some(Ok(Frame::Text(text))) => {
+                let answer =
+                    socket_answer(text.as_str()).ok_or(Error::Protocol("speech socket answer"))?;
+                if !answer.audio.is_empty() {
+                    if answer.last {
+                        let _ = socket.close(None).await;
+                    }
+                    return Ok(Some(answer.audio));
+                }
+                if answer.last {
+                    let _ = socket.close(None).await;
+                    return Ok(None);
                 }
             }
+            Some(Ok(_)) => {}
         }
     }
 }
@@ -741,6 +994,151 @@ mod tests {
         samples
     }
 
+    /// A local speech socket: it reads the voice's settings, the piece and
+    /// the end, then sends `answers`, each a message's text, and "close"
+    /// closes it there. Its address, and on join what it read.
+    async fn socket_serving(
+        answers: Vec<&'static str>,
+    ) -> (String, tokio::task::JoinHandle<Vec<Value>>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap().to_string();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+            let mut read = Vec::new();
+            while read.len() < 3 {
+                match ws.next().await {
+                    Some(Ok(Frame::Text(text))) => {
+                        read.push(serde_json::from_str(text.as_str()).unwrap());
+                    }
+                    Some(Ok(_)) => {}
+                    _ => return read,
+                }
+            }
+            for answer in answers {
+                if answer == "close" {
+                    let _ = ws.close(None).await;
+                    return read;
+                }
+                if answer == "hang" {
+                    std::future::pending::<()>().await;
+                }
+                ws.send(Frame::Text(answer.into())).await.unwrap();
+            }
+            read
+        });
+        (address, server)
+    }
+
+    /// What a local socket read, within 5 s: one never sent its messages
+    /// fails the test rather than hanging it.
+    async fn served(server: tokio::task::JoinHandle<Vec<Value>>) -> Vec<Value> {
+        tokio::time::timeout(Duration::from_secs(5), server)
+            .await
+            .expect("the socket was sent its messages")
+            .unwrap()
+    }
+
+    fn local_socket(address: &str) -> SocketRequest {
+        SocketRequest {
+            url: format!("ws://{address}/v1/ws/elevenlabs/text-to-speech/x/stream-input"),
+            header: "authorization",
+            value: "Bearer k".to_owned(),
+        }
+    }
+
+    /// `LAMP_SECOND_SPEECH_SOCKET` (#2135's row): the socket opened ahead
+    /// for a request is taken by its first piece that finds it open. Its
+    /// audio comes as packets, as loud as over HTTP, and it is used once. A
+    /// piece of another request finds nothing.
+    #[tokio::test]
+    async fn the_first_piece_speaks_on_the_socket_opened_ahead() {
+        let (address, server) = socket_serving(vec![
+            r#"{"audio":"AQACAA==","isFinal":false}"#,
+            r#"{"audio":"AwA=","isFinal":false}"#,
+            r#"{"audio":null,"isFinal":true}"#,
+        ])
+        .await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, PROXY, "k", None).unwrap();
+        tts.open_ahead_on(7, &local_socket(&address)).await;
+        assert!(tts.take_ahead(6).is_none(), "another request's");
+        assert_eq!(said(&tts, "Hello there.", 7).await, [2, 4, 6]);
+        assert_eq!(
+            served(server).await,
+            [
+                socket_opening(),
+                socket_piece("Hello there.").unwrap(),
+                socket_end()
+            ]
+        );
+        assert!(tts.take_ahead(7).is_none(), "used once");
+        assert!(
+            tts.used.lock().unwrap().is_none(),
+            "the kept HTTP connection wasn't used"
+        );
+        let told = tts.told(7).unwrap();
+        assert!(told.contains("1 of 1 pieces began"), "{told}");
+    }
+
+    /// A socket closed before any audio: the piece goes over HTTP instead,
+    /// and is said.
+    #[tokio::test]
+    async fn a_piece_goes_over_http_when_its_socket_closes_before_any_audio() {
+        let (address, server) = socket_serving(vec!["close"]).await;
+        let (url, _, asked) = keeping(vec![5, 0, 6, 0], false).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap();
+        tts.open_ahead_on(8, &local_socket(&address)).await;
+        assert_eq!(said(&tts, "Hello there.", 8).await, [10, 12]);
+        assert_eq!(served(server).await.len(), 3);
+        assert_eq!(asked.lock().unwrap().len(), 1, "one piece over HTTP");
+    }
+
+    /// A socket open but silent after its piece costs it at most
+    /// `SOCKET_FIRST_AUDIO_WITHIN`, then the piece goes over HTTP (the
+    /// reviewer's P3 on #2209); and a socket piece doesn't mark the kept
+    /// HTTP connection as used, so `warm` still opens it.
+    #[tokio::test]
+    async fn a_silent_socket_gives_its_piece_to_http_within_its_bound() {
+        let (address, _server) = socket_serving(vec!["hang"]).await;
+        let (url, _, asked) = keeping(vec![5, 0, 6, 0], false).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap();
+        tts.open_ahead_on(12, &local_socket(&address)).await;
+        let from = Instant::now();
+        assert_eq!(said(&tts, "Hello there.", 12).await, [10, 12]);
+        assert!(
+            from.elapsed() >= SOCKET_FIRST_AUDIO_WITHIN
+                && from.elapsed() < SOCKET_FIRST_AUDIO_WITHIN + Duration::from_secs(1),
+            "{:?}",
+            from.elapsed()
+        );
+        assert_eq!(asked.lock().unwrap().len(), 1);
+    }
+
+    /// A piece that finds its socket still opening goes over HTTP and
+    /// leaves it for a later piece; a socket that can't open leaves
+    /// nothing; a newer request's opening isn't touched by an older one's.
+    #[tokio::test]
+    async fn a_socket_still_opening_or_not_opened_leaves_its_pieces_to_http() {
+        let tts = Tts::with(TtsProvider::ElevenLabs, PROXY, "k", None).unwrap();
+        *tts.ahead.lock().unwrap() = Some(Ahead::Opening(9));
+        assert!(tts.take_ahead(9).is_none());
+        assert!(matches!(
+            *tts.ahead.lock().unwrap(),
+            Some(Ahead::Opening(9))
+        ));
+        let refused = SocketRequest {
+            url: "ws://127.0.0.1:9/x".to_owned(),
+            header: "authorization",
+            value: "Bearer k".to_owned(),
+        };
+        tts.open_ahead_on(10, &refused).await;
+        assert!(tts.ahead.lock().unwrap().is_none());
+        // OpenAI's voice has no socket.
+        let openai = Tts::with(TtsProvider::OpenAi, PROXY, "k", None).unwrap();
+        openai.open_ahead(11).await;
+        assert!(openai.ahead.lock().unwrap().is_none());
+    }
+
     /// #1712, the first builder at 19:57: as a line begins after a quiet
     /// minute, the configured voice's connection is opened with a `GET` of
     /// `models`, and the answer's first piece goes on it; one used lately,
@@ -819,11 +1217,21 @@ mod tests {
             sent_ms: 2185,
             sent: Instant::now(),
             reused: true,
+            ahead_ms: None,
             chars: 42,
         };
         assert_eq!(
             piece.told(690),
             "request 2 ElevenLabs piece 1: 42 chars, sent 2185 ms after the words were heard on a reused connection; its first audio byte 690 ms after it went"
+        );
+        // On the speech socket opened ahead (`LAMP_SECOND_SPEECH_SOCKET`).
+        let on_socket = Piece {
+            ahead_ms: Some(820),
+            ..piece
+        };
+        assert_eq!(
+            on_socket.told(410),
+            "request 2 ElevenLabs piece 1: 42 chars, sent 2185 ms after the words were heard on the speech socket opened 820 ms before; its first audio byte 410 ms after it went"
         );
     }
 

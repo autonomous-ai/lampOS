@@ -1109,6 +1109,7 @@ fn second_route_worker_environment(
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
         crate::second_provider::SPEECH_WARM_ENVIRONMENT,
+        crate::second_provider::SPEECH_SOCKET_ENVIRONMENT,
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
@@ -1413,6 +1414,7 @@ mod tests {
                     || name == crate::second_provider::STT_WARM_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
+                    || name == crate::second_provider::SPEECH_SOCKET_ENVIRONMENT
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
@@ -1491,6 +1493,7 @@ mod tests {
                     "LAMP_SECOND_SCOPED_CONTEXT=on",
                     "LAMP_SECOND_SPEAKING_FACE=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
+                    "LAMP_SECOND_SPEECH_SOCKET=on",
                     "LAMP_SECOND_SPEECH_WARM=on",
                     "LAMP_SECOND_STEADY_FIRST=on",
                     "LAMP_SECOND_STT_WARM=on",

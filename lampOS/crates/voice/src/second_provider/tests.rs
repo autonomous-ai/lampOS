@@ -43,6 +43,8 @@ struct Script {
     /// Each listener's stream drops after this many samples sent, as a
     /// connection lost mid-line does (#1844's D); `None`, never.
     drops_after: Mutex<VecDeque<Option<usize>>>,
+    /// The requests a speech socket was asked for ([`Services::open_speech_ahead`]).
+    sockets_asked: Mutex<Vec<u64>>,
     /// How many times a listener was asked for its words so far, at a pause
     /// ([`Listener::flush`], `LAMP_SECOND_EARLY_FINALIZE`).
     flushed: Arc<AtomicUsize>,
@@ -181,6 +183,10 @@ impl Services for Script {
     fn warm(&self) -> BoxFuture<'static, ()> {
         self.warmed.fetch_add(1, Ordering::Relaxed);
         Box::pin(async {})
+    }
+
+    fn open_speech_ahead(&self, request: u64) {
+        self.sockets_asked.lock().unwrap().push(request);
     }
 }
 
@@ -5597,4 +5603,29 @@ async fn a_call_written_in_the_answer_is_left_out_of_what_was_heard() {
     }
     let kept = thread.recent(now, Duration::from_secs(300), 6);
     assert_eq!(kept[0].lamp, heard(3_000));
+}
+
+/// `LAMP_SECOND_SPEECH_SOCKET` (#2135's row): the speech socket is asked for
+/// as each answer begins, while its chat thinks, once a request.
+#[tokio::test]
+async fn each_answer_asks_for_its_speech_socket_as_it_begins() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What time is it?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![text("It is noon."), Ok(ChatEvent::Done)],
+                vec![text("ORCHID."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script.clone());
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    engine.submit(written(2, "Say ORCHID."));
+    turn(&mut engine).await;
+    assert_eq!(*script.sockets_asked.lock().unwrap(), [1, 2]);
 }

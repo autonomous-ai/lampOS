@@ -59,6 +59,12 @@ pub trait Services: Send + Sync + 'static {
     fn warm(&self) -> BoxFuture<'static, ()> {
         Box::pin(async {})
     }
+    /// `request`'s answer begins: nothing, unless its voice opens a speech
+    /// socket for it ahead of its first piece ([`Tts::open_ahead`],
+    /// `LAMP_SECOND_SPEECH_SOCKET=on`).
+    fn open_speech_ahead(&self, request: u64) {
+        let _ = request;
+    }
 }
 
 /// One open utterance.
@@ -118,6 +124,9 @@ pub struct Net {
     /// `LAMP_SECOND_SPEECH_WARM=on`: the configured voice's connection is
     /// opened as a line begins ([`Tts::warm`]).
     warm_speech: bool,
+    /// `LAMP_SECOND_SPEECH_SOCKET=on`: a speech socket is opened as each
+    /// answer begins, for its first piece ([`Tts::open_ahead`]).
+    speech_socket: bool,
 }
 
 /// Where the worker reads whether the chat's connection is opened as a line
@@ -126,6 +135,9 @@ pub const CHAT_WARM_ENVIRONMENT: &str = "LAMP_SECOND_CHAT_WARM";
 /// Where the worker reads whether the configured voice's connection is
 /// opened as a line begins: `on`, and nothing else.
 pub const SPEECH_WARM_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_WARM";
+/// Where the worker reads whether a speech socket is opened as each answer
+/// begins (#2135's row): `on`, and nothing else.
+pub const SPEECH_SOCKET_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_SOCKET";
 
 /// Gemini's API as the route calls it: where, with which key and model.
 pub struct GeminiCall<'a> {
@@ -144,6 +156,7 @@ impl Net {
             declare,
             warm_chat: false,
             warm_speech: false,
+            speech_socket: false,
             config: Arc::new(config),
         })
     }
@@ -164,6 +177,15 @@ impl Net {
     /// Gemini's voice is warmed whenever it is the lamp's.
     pub fn warming_the_speech(mut self, on: bool) -> Self {
         self.warm_speech = on;
+        self
+    }
+
+    /// A speech socket is opened as each answer begins, while its chat
+    /// thinks, and the first of its pieces that finds it open speaks on it
+    /// ([`Tts::open_ahead`], `LAMP_SECOND_SPEECH_SOCKET=on`, #2135's row).
+    /// Only the configured voice, and only ElevenLabs.
+    pub fn speaking_on_a_socket(mut self, on: bool) -> Self {
+        self.speech_socket = on;
         self
     }
 
@@ -412,6 +434,15 @@ impl Services for Net {
 
     fn sees(&self) -> bool {
         self.chat.sees()
+    }
+
+    fn open_speech_ahead(&self, request: u64) {
+        // The configured voice only when it is the lamp's one voice.
+        if !self.speech_socket || self.gemini_tts.is_some() {
+            return;
+        }
+        let tts = self.tts.clone();
+        tokio::spawn(async move { tts.open_ahead(request).await });
     }
 
     fn warm(&self) -> BoxFuture<'static, ()> {
