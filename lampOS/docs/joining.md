@@ -578,8 +578,10 @@ rows are the table at the top of the script; `--dry` prints them, and
   steps on the Mac, `trial` steps as `tools/trials.sh` rows on the lamp from
   `ARM_TRIALS` (the build's own copy, with its `skills/` beside it). `ARM_LAMP`
   and `ARM_TRIALS` are the builder's own command and path: the script holds
-  no address and no credential. `ARM_LAMP_HOST` is the lamp for a file sent
-  from the Mac.
+  no address and no credential. `ARM_LAMP_HOST` (`user@host`) is the lamp
+  for a file sent from the Mac and for `presence-check.sh`; it is the
+  builder's own too, with no default, and `--preflight` names it when a row
+  needs it unset.
 - **`--preflight` first, read-only:** each running part's build, the voice's
   end-of-speech worker, then one line a row, ready or what is missing. It
   runs none of a row's steps.

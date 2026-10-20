@@ -439,6 +439,24 @@ preflight --only 1; check "--preflight, no end-of-speech event" 1 $?
 has "--preflight: none said" "$T/out" "the voice's end-of-speech worker: MISSING: none"
 { endpoint_event 100 loading; endpoint_event 200 ready; } >"$T/sessions/4242/metadata/events-0.jsonl"
 
+# ARM_LAMP_HOST has no default: a row that sends a file names it when unset.
+reset
+cat >"$T/rows-host" <<'EOF'
+row | 1 | Sends a file | still | 1 min
+do | a
+watch | b
+sheet | s
+mac | scp f "${ARM_LAMP_HOST:?the lamp}":/tmp/
+end
+EOF
+env -u ARM_LAMP_HOST ARM_LAMP=$T/lamp-exec ARM_TRIALS=$T/tr/trials.sh ARM_ROWS_FILE=$T/rows-host PATH=$T/bin:$PATH \
+  "$SCRIPT" --preflight >"$T/out" 2>&1 </dev/null; check "--preflight, ARM_LAMP_HOST unset" 1 $?
+has "--preflight: ARM_LAMP_HOST named" "$T/out" "ARM_LAMP_HOST: MISSING (rows 1 copy files or run presence-check.sh with it)"
+ARM_LAMP_HOST=u@lamp ARM_LAMP=$T/lamp-exec ARM_TRIALS=$T/tr/trials.sh ARM_ROWS_FILE=$T/rows-host PATH=$T/bin:$PATH \
+  "$SCRIPT" --preflight >"$T/out" 2>&1 </dev/null; check "--preflight, ARM_LAMP_HOST set" 0 $?
+hasnt "--preflight: ARM_LAMP_HOST set, not named" "$T/out" "ARM_LAMP_HOST: MISSING"
+hasnt "--preflight sent no file" "$T/calls" "scp"
+
 # A trial's skill not beside trials.sh, and its switched unit not running.
 reset
 rm -rf "$T/skills/rest-your-eyes"; echo lamp-body >"$T/active"
