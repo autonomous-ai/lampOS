@@ -465,3 +465,4 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   ok that is no acknowledgement stays uncertain again. #2265: #2176 row 5b,
   a known face lost a few seconds with no face in view keeps its memory
   scope (`LAMP_FACE_GAP_HOLD`, off), tested through the request's lease.
+- #2186 merged into #1712.
