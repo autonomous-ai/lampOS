@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 
 const BIN: &str = env!("CARGO_BIN_EXE_lamp-cloud");
 const UNIT: &str = include_str!("../../../deploy/product/lamp-cloud.service");
+const TMPFILES: &str = include_str!("../../../deploy/product/lampos.conf");
 
 /// A `CREDENTIALS_DIRECTORY` as the unit's `LoadCredential=` makes it, with
 /// the broker at `port` on this host. No backend base, so no ping is made.
@@ -167,4 +168,27 @@ fn lamp_4aces_cloud_on_writes_the_units_whole_drop_in() {
         ),
         "{line}"
     );
+}
+
+/// Reviewer-lead's P3 on #2273: the photo folder lamp-cloud's unit may
+/// write is the one the product's tmpfiles makes at boot, `lampos`'s at
+/// 0700 as the eyes require, and no unit's own runtime folder.
+#[test]
+fn the_photo_folder_the_unit_may_write_is_the_one_made_at_boot() {
+    let writable: Vec<&str> = UNIT
+        .lines()
+        .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        .flat_map(str::split_whitespace)
+        .collect();
+    assert!(writable.contains(&"-/run/lampos-photos"), "{writable:?}");
+    let made: Vec<Vec<&str>> = TMPFILES
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>())
+        .filter(|fields| fields.get(1) == Some(&"/run/lampos-photos"))
+        .collect();
+    assert_eq!(
+        made,
+        [["d", "/run/lampos-photos", "0700", "lampos", "lampos", "-"]]
+    );
+    assert!(!UNIT.contains("RuntimeDirectory=lampos-photos"));
 }

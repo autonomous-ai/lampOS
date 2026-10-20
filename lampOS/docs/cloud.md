@@ -166,37 +166,47 @@ is the same light. Two differences from V1 the page should know:
 
 ## A face from the app's photo (#1968, `faces.add_photo`)
 
-Off unless `LAMP_PHOTO_FACES=on`, with the eyes' photo folder
-(`LAMP_EYES_PHOTO_DIR`, the folder given to `lamp-eyes --photo-dir`, for
-example `/run/lampos-eyes/photos`) and their request socket
-(`LAMP_EYES_WHO_SOCKET`). lamp-cloud's unit is `ProtectSystem=strict`, so a
-lamp switching it on also gives the unit, in the same drop-in, the folder
-and an order after the eyes:
+Off unless `LAMP_PHOTO_FACES=on`, with the photo folder
+(`LAMP_EYES_PHOTO_DIR`, the folder given to `lamp-eyes --photo-dir`) and
+the eyes' request socket (`LAMP_EYES_WHO_SOCKET`).
 
-    [Unit]
-    After=lamp-eyes.service
-    [Service]
-    ReadWritePaths=-/run/lampos-eyes/photos
+- **The folder is `/run/lampos-photos`**, `lampos`'s at 0700, made at boot
+  by the product's tmpfiles (`deploy/product/lampos.conf`), and lamp-cloud's
+  unit may write it (`ReadWritePaths=-/run/lampos-photos`). It belongs to
+  neither unit, so it is there before both start, and an eyes or lamp-cloud
+  stop, crash or update removes it from under neither (Reviewer-lead on
+  #2263). A folder in the eyes' own `/run/lampos-eyes` was made by the eyes
+  after lamp-cloud's namespace could be set up, and went with every eyes
+  restart: then read-only to lamp-cloud under `ProtectSystem=strict`, and
+  every `faces.add_photo` failed until lamp-cloud restarted (reviewer-two
+  and Reviewer-lead on #2263, Mobile on lamp-0c89).
+- **A lamp switching it on** sets both units, each in a drop-in. lamp-cloud's
+  takes the three variables:
 
-- **The folder is made by the eyes** when they start (`photo::ready`), and
-  under `ProtectSystem=strict` lamp-cloud can write only the paths there
-  when its own namespace was set up. Without the `-`, systemd refuses to
-  start lamp-cloud when the folder isn't there yet ("Failed to set up mount
-  namespacing", Mobile on lamp-0c89, #1396, 20 Oct 16:2x). With it, the
-  entry is skipped, and the folder that comes later is **read-only** to
-  lamp-cloud: `faces.add_photo` then fails until lamp-cloud restarts
-  (reviewer-two on #2263).
-- **`After=lamp-eyes.service`** starts lamp-cloud after the eyes. The eyes
-  are `Type=exec`, so that is once their program has started, not once it
-  made the folder, and a slow eyes start can still lose the race. The `-` stays,
-  as a guard against the start failure.
-- **So after a boot, check once:** an add-photo from the app writes, or
-  `ExecMainStartTimestamp` (`systemctl show -p ExecMainStartTimestamp`) of
-  lamp-cloud is after the eyes'. If an add fails with a read-only folder,
-  restart lamp-cloud once the eyes are up.
+      [Service]
+      Environment=LAMP_PHOTO_FACES=on
+      Environment=LAMP_EYES_PHOTO_DIR=/run/lampos-photos
+      Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
 
-lamp-cloud and the eyes are both `lampos`; the eyes make the folder theirs
-at 0700 and refuse one open to others (`photo::ready`).
+  The eyes' unit gives `--photo-dir` on its command line, so its drop-in
+  clears `ExecStart=` and repeats the product's line (`systemctl cat
+  lamp-eyes`) with `--photo-dir /run/lampos-photos` at its end:
+
+      [Service]
+      ExecStart=
+      ExecStart=/opt/lampOS/eyes/current/lamp-eyes ... --photo-dir /run/lampos-photos
+
+  The voice's asking at the lamp is its own switch (`LAMP_PHOTO_FACES` on
+  lamp-voice, `docs/switches.md`).
+- **On a lamp whose tmpfiles aren't yet the update's**, the folder isn't
+  there: the `-` lets lamp-cloud start anyway, the eyes start without photos
+  (they answer `photos_off`, and their camera, presence and recognition run
+  as before), and `systemd-tmpfiles --create /etc/tmpfiles.d/lampos.conf`
+  then a restart of lamp-cloud makes it work. Run that before setting the
+  eyes' `--photo-dir`.
+
+lamp-cloud and the eyes are both `lampos`; the eyes refuse a folder open
+to others, and make it at 0700 if it is missing (`photo::ready`).
 
 - **Only the lamp's own account:** the kind comes over the lamp's `fa_channel`
   like every other, which only its signed-in account may publish to
