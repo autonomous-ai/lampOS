@@ -17,10 +17,13 @@ against lamp-06c1.
   `mqtt://{mqtt_endpoint}:{mqtt_port}` with the account's login, V1's client
   id `os-server-{device_id}`, a clean start and a 60 s session expiry, as V1.
   The keepalive is 60 s (V1 asks 65,535 s, which never notices a dead link).
-  It takes, and tells the broker it takes, packets of up to about 11 MiB
+  It takes, and tells the broker it takes, packets of up to about 11.7 MiB
   (`MOST_PACKET_BYTES`): a `faces.add_photo` with the largest photo, in
-  base64. `rumqttc`'s own limit, 10 KiB, dropped the connection on every
-  photo (Mobile on lamp-0c89, 20 Oct).
+  base64, and 1 MiB more for the envelope and a sender writing `/` as
+  `\/`. `rumqttc`'s own limit, 10 KiB, dropped the connection on every
+  photo (Mobile on lamp-0c89, 20 Oct). The broker holds back a packet past
+  it, so a photo that large gets no answer, not the "at most 8 MiB"
+  refusal; the app sends at most 1 MiB.
   On every connection it subscribes to `fa_channel` at QoS 1 and says `info`
   unasked on `fd_channel`, so the backend sees it at once. A connection that
   fails, or a login the broker refuses, is tried again after a wait that
