@@ -5017,6 +5017,15 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#2136 brought up to date** with my rows: `LAMP_SAID_AS_HEARD` (#2173, merged; its memory side is Twelve's #2186), `LAMP_OWN_LINE_KEEPS` (#2242) and `LAMP_REPLY_END_REACH` (#2099, merged).
 - **Free: fourth** said on #1722 at 15:08. Next is what the first builder names, or else an unowned row of #2136 or #2135, claimed with a plan before code.
 
+## 2026-10-20, 16:01 ICT: #2236 merged; #2218 and #2229 read; #2242 widened
+
+- **Merged:** #2236, the route's speech socket (`LAMP_SECOND_SPEECH_SOCKET`), into #1712 as `c03e4dfc4`.
+- **Peer reads, while free:**
+  - **#2218** (Thirteen, the second route takes a skill's look): two P2s and a P3. The skill's "when the picture comes" note never reached the look turn. A skill's look dropped in a turn the lamp wrote itself ended that turn with nothing said; a scratch test on its head showed it (one round, nothing said). Thirteen is fixing both with tests.
+  - **#2229** (the first builder, memory told on each spoken turn): one P2 and two P3s. With `LAMP_SECOND_PREPARED` on, a turn memory tells something drops its prepared chat (`misfit`), so I'd ask memory on the early words. The P3s: a 60 ms blocking call on the worker's current-thread runtime, and a moved doc comment.
+- **#2242 widened** (`f2af6018f`, a second commit, local until its gate passes). `LAMP_OWN_LINE_KEEPS` now also covers the lamp's hello to someone arriving (`lamp_speaks_first`), a setup walk line (`lamp_leads_setup`) and news it tells (`lamp_tells_news`), not only a skill's say or a reminder. A written turn after a person's, a look's or a "Sorry?", is as before. Two mutations each fail the test. It merges clean onto #1712's `c03e4dfc4`.
+- **A pause on my side,** about 15:25 to 16:00 (a usage limit), with nothing lost.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
