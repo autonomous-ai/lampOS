@@ -466,6 +466,14 @@ impl Button {
 #[derive(Default)]
 struct Head {
     mask: u16,
+    /// The pads read touched from the first acquisition on, never released
+    /// since: left out until each reads released, so one line stuck active
+    /// (a pad resting high read as active-high) no longer keeps the whole
+    /// head from arming (#1798). None before the first acquisition.
+    from_start: Option<u16>,
+    /// Every head pad's bit: with all of them left out, the head is not
+    /// armed, as nothing on it can count.
+    all: u16,
     armed: bool,
     settle_start: Option<u64>,
     contact: Option<Contact>,
@@ -495,6 +503,7 @@ impl Head {
             counter: self.counter,
             pushed: self.pushed,
             timing: self.timing,
+            all: self.all,
             ..Self::default()
         };
     }
@@ -503,11 +512,15 @@ impl Head {
         self.run_began = None;
         self.released = None;
     }
-    fn observe(&mut self, mask: u16, at: u64) -> Result<Vec<HeadEffect>, InputError> {
+    fn observe(&mut self, raw: u16, at: u64) -> Result<Vec<HeadEffect>, InputError> {
+        let from_start = self.from_start.get_or_insert(raw);
+        *from_start &= raw;
+        let left_out = *from_start;
+        let mask = raw & !left_out;
         let started = *self.settle_start.get_or_insert(at);
         self.mask = mask;
         if at - started < HEAD_SETTLE_US || !self.armed {
-            self.armed = at - started >= HEAD_SETTLE_US && mask == 0;
+            self.armed = at - started >= HEAD_SETTLE_US && mask == 0 && left_out != self.all;
             self.end();
             return Ok(Vec::new());
         }
@@ -653,6 +666,7 @@ impl TouchEngine {
             .fold(0, |mask, &pad| mask | (1 << pad));
         let head = Head {
             timing: config.head_timing(),
+            all: (0..config.head_pads.len()).fold(0, |all, index| all | 1 << index),
             ..Head::default()
         };
         let pulse_pads = config
@@ -862,8 +876,9 @@ impl TouchEngine {
             for (contact, gesture, released) in self.head.observe(mask, at)? {
                 let mut event = self.event_for(TouchSource::Head, contact, at, now);
                 event.gesture = gesture;
-                event.active_mask = mask;
-                event.active_names = self.head_names(mask);
+                // Without the pads left out (#1798).
+                event.active_mask = self.head.mask;
+                event.active_names = self.head_names(self.head.mask);
                 event.released_us = released;
                 let (speaking, quiet, asleep) = match gesture {
                     TouchGesture::Tap => (
@@ -950,6 +965,11 @@ impl TouchEngine {
             self.emit(event)?;
         }
         Ok(())
+    }
+    /// The head pads left out because they have read touched since the
+    /// first acquisition, never released (#1798): health names them.
+    pub fn head_left_out(&self) -> Vec<String> {
+        self.head_names(self.head.from_start.unwrap_or(0))
     }
     fn head_names(&self, mask: u16) -> Vec<String> {
         self.config

@@ -641,6 +641,27 @@ fn touch_reader(
     )?))
 }
 
+/// Before Controls takes the lines: which head pad lines a pad drives, read
+/// once with each pull (#1798), about 20 ms a line. Pins naming bare lines
+/// read no touch and said nothing.
+#[cfg(target_os = "linux")]
+fn head_lines(
+    wiring: &lamp_controls::touch_pins::TouchPinsConfig,
+) -> Option<lamp_controls::touch_pins::HeadLines> {
+    (!wiring.head_pads.is_empty()).then(|| {
+        lamp_controls::touch_pins::HeadLines::probed(&wiring.head_pads, |line| {
+            lamp_controls::pins::GpioLines::probe(&wiring.chip, line)
+        })
+    })
+}
+
+#[cfg(not(target_os = "linux"))]
+fn head_lines(
+    _: &lamp_controls::touch_pins::TouchPinsConfig,
+) -> Option<lamp_controls::touch_pins::HeadLines> {
+    None
+}
+
 #[cfg(not(target_os = "linux"))]
 fn touch_reader(
     _: &lamp_controls::touch_pins::TouchPinsConfig,
@@ -736,6 +757,7 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
         None if no_slide_selected() => PrivacyRoute::NoSlide,
         None => PrivacyRoute::None,
     };
+    let head_lines = head_lines(&wiring);
     let gpio = touch_reader(&wiring, clock)?;
     let bus = if let Some(root) = args.bus_root {
         Bus::new(root)?
@@ -749,6 +771,10 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
     };
     let mut service =
         touch_runtime::Service::new(&bus, config, wiring.clone(), gpio, None::<Worker>, clock)?;
+    if let Some(lines) = head_lines {
+        eprintln!("lamp-controls: head pads: {}", lines.said());
+        service.head_probed(lines);
+    }
     say_privacy(&privacy);
     match privacy {
         PrivacyRoute::Slide(pins) => service.attach_privacy(&bus, privacy_source(&pins, clock)?)?,

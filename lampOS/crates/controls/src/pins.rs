@@ -2,7 +2,9 @@
 //! (`docs/controls.md`, "The board's reader").
 //!
 //! Which lines, and which way each is wired, is data in one file for the
-//! board; nothing is guessed or probed while serving. Every configured line
+//! board; nothing is guessed or probed while serving. The touch path probes
+//! the head pads' lines once at start, before it takes them, only to say
+//! which a pad drives (#1798); what is read stays the file's. Every configured line
 //! is read together every few milliseconds and given as one complete
 //! [`Observation`], stamped with the moment of the reading. A press or a
 //! touch shorter than that is not seen, which the recognition's own

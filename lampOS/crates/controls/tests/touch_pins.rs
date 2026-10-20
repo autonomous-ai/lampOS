@@ -3,7 +3,7 @@ use lamp_controls::{
     input::{Level, Observation, PinReader},
     mpr121,
     pins::{Pin, PinsConfig, Pull},
-    touch_pins::{HEAD_CANDIDATES, NoGpio, TouchPinsConfig},
+    touch_pins::{HEAD_CANDIDATES, HEAD_ITEM, HeadLines, NoGpio, TouchPinsConfig},
 };
 use lamp_msgs::{ClockStamp, ControlFault};
 use serde_json::json;
@@ -193,6 +193,76 @@ fn the_head_pads_are_the_pins_and_the_settings_may_name_fewer_or_more() {
     let mut moved = four.clone();
     moved.head_pads.swap(1, 2);
     assert!(moved.check(&two).is_err());
+}
+
+/// #1798: the probe at Controls' start tells a line a pad drives (the same
+/// with either pull) from one with nothing on it (it follows the pull).
+/// lamp-52e6's old pins, 37 and 96, are bare there: a warning that the head
+/// reads no touch, where before nothing was said. The four lines with its
+/// pads on 97 and 98 are well, and say which. A line that couldn't be
+/// probed, or a pad left out since the start, is named; the latter warns.
+#[test]
+fn the_probe_at_start_says_which_head_lines_a_pad_drives() {
+    // lamp-52e6: 97 and 98 driven low at rest; 37 and 96 follow the pull.
+    let lamp_52e6 = |line: u32| -> std::io::Result<(bool, bool)> {
+        Ok(if [97, 98].contains(&line) {
+            (false, false)
+        } else {
+            (false, true)
+        })
+    };
+    let pads = |lines: &[u32]| -> Vec<Pin> {
+        lines
+            .iter()
+            .enumerate()
+            .map(|(i, &line)| pin(&format!("head-{}", i + 1), line))
+            .collect()
+    };
+    let value = |report: &lamp_msgs::Diagnostic, key: &str| {
+        report
+            .values
+            .iter()
+            .find(|value| value.key == key)
+            .map(|value| value.value.clone())
+            .unwrap()
+    };
+    let old = HeadLines::probed(&pads(&[37, 96]), lamp_52e6);
+    assert_eq!((old.wired.len(), &old.bare[..]), (0, &[37, 96][..]));
+    let report = old.health(&[]);
+    assert_eq!(report.name, HEAD_ITEM);
+    assert_eq!(report.level, lamp_msgs::Level::Warn);
+    assert_eq!(
+        report.message,
+        "nothing wired on lines 37, 96: the head reads no touch"
+    );
+    let four = HeadLines::probed(&pads(&HEAD_CANDIDATES), lamp_52e6);
+    let report = four.health(&[]);
+    assert_eq!(report.level, lamp_msgs::Level::Ok);
+    assert_eq!(report.message, "wired on lines 97, 98; nothing on 37, 96");
+    assert_eq!(value(&report, "wired"), "97,98");
+    assert_eq!(value(&report, "bare"), "37,96");
+    // A pad drives its line high under a hand too: still wired.
+    let touched = HeadLines::probed(&pads(&[97]), |_| Ok((true, true)));
+    assert_eq!(touched.wired, [97]);
+    // Held by another program: not probed, and said.
+    let held = HeadLines::probed(&pads(&[97, 98]), |line| {
+        if line == 98 {
+            Err(std::io::Error::other("busy"))
+        } else {
+            lamp_52e6(line)
+        }
+    });
+    assert_eq!(held.said(), "wired on lines 97; lines 98 not probed");
+    let none = HeadLines::probed(&pads(&[97]), |_| Err(std::io::Error::other("busy")));
+    assert_eq!(none.health(&[]).level, lamp_msgs::Level::Warn);
+    // A pad left out since the start warns, with its line.
+    let report = four.health(&[97]);
+    assert_eq!(report.level, lamp_msgs::Level::Warn);
+    assert_eq!(
+        report.message,
+        "wired on lines 97, 98; nothing on 37, 96; line 97 touched since Controls started: left out until let go"
+    );
+    assert_eq!(value(&report, "left_out"), "97");
 }
 
 #[test]

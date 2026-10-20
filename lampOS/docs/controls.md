@@ -210,6 +210,41 @@ named 37 and 96, and on lamp-52e6 the head read nothing: under `--touch`,
 moves a lamp's own pins file off that old guess (install.md). The factory
 step writes the two to four lines it finds, with their baseline (below).
 
+**Said when no pad is there (#1798).** Pins naming lines with no pad read no
+touch, and nothing said so. Now `serve --touch` probes each head pad's line
+once at start, before it takes the lines: with a pull-down and then a
+pull-up, 10 ms each (`GpioLines::probe`, as `probe` and `discover-head`
+read them). A line a pad drives reads the same both ways, and a line with
+nothing on it follows the pull. That's about 20 ms a line, 80 ms for the
+product's four, and what is read stays the pins file's. The journal says it
+once (`lamp-controls: head pads: wired on lines 97, 98; nothing on 37, 96`),
+and so does the `head pads` item on `diagnostics`, once a second beside
+Controls' own report (`HeadLines::health`):
+
+- `ok` while a pad drives one of the lines: `wired on lines 97, 98; nothing
+  on 37, 96`;
+- `warn` when none does: `nothing wired on lines 37, 96: the head reads no
+  touch`, which is what lamp-52e6's old pins would have said;
+- a line another program holds is `not probed`, and with no line told it
+  warns too.
+
+**A pad touched from the start is left out (#1798).** The head arms only
+once every pad reads released after the 500 ms settle. So one line stuck
+active, such as a pad resting high read as active-high, kept the whole head
+from ever arming, and nothing said so. Now a pad read touched from the first
+acquisition, never released since, is left out until it reads released: the
+others arm and count, and a touch on them is told without it. The `head
+pads` item warns while it lasts (`line 97 touched since Controls started:
+left out until let go`, `left_out`). A hand that lands after the first
+acquisition is not left out: the head waits for it to go, as before. With
+every pad left out, the head is not armed. Tests: `tests/touch.rs`
+(`a_pad_touched_from_the_start_is_left_out_and_the_other_arms`),
+`tests/touch_pins.rs` (`the_probe_at_start_says_which_head_lines_a_pad_drives`)
+and `tests/touch_runtime.rs`
+(`controls_says_the_head_lines_and_a_pad_left_out_on_diagnostics`). Not shown:
+the probe on a lamp. It's Linux GPIO, so ARM64 builds it, and lamp-52e6 is
+where it would be seen.
+
 Each unit's head pads rest and read differently (#1764): lamp-4ace's rest low
 and are held high by a hand; lamp-cb94's line 97 flipped at rest and read
 touched for 77 s with no hand on it, a stroke and a sleep from nobody; and
