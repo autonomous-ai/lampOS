@@ -316,6 +316,40 @@ the unchanged legacy client, used unless the new Days client is selected.
 - **Asking it to keep or forget something is not itself kept.** The
   exchange in which `remember` or `forget` was called stays out of the
   journal: the kept list is the record of that.
+- **What is kept is what was said** (#2176, row 10;
+  `LAMP_MEMORY_KEEP_HEARD=on`, both voice routes and both clients; off
+  unless set). The model writes the sentence `remember {text}` keeps, and
+  nothing checked it: on lamp-06c1 on 20 Oct "please remember that my
+  favourite tea is jasmine" and, later, "... my favourite fruit is mango"
+  were both kept as "My favorite food is jasmine." With the switch, a
+  `remember` for a line heard at the lamp is held against the words heard
+  in that line, from the conversation thread both routes keep
+  (`Thread::heard_for`: the line's exchange once the lamp has begun to
+  answer, else what was heard in the last 20 s).
+  - **The rule:** the model's key words are its words that are not common
+    (a short list, `remember::heard::COMMON`, compared lower-cased with
+    accents kept, as the ranked search's) and have three letters or more,
+    or a digit. If one of them is not among the words heard, compared
+    lower-cased and without accents (đ as d), the heard line is kept
+    instead: without its lead-in ("please remember that", "remember",
+    "hãy nhớ là", "nhớ rằng" …), as "They said: my favourite tea is
+    jasmine", cut to the store's 300 bytes. The model's answer then says
+    `"kept"` with that text and asks it to say it back.
+  - **Unchanged:** with the same words ("Their favourite tea is jasmine"),
+    with nothing heard (a text from the app, a line the lamp wrote) or with
+    the switch off, the model's text is kept exactly as before. Whose
+    memory it goes to is unchanged. Speech to text may mishear too: the
+    heard words are what the person said as far as the lamp knows. The
+    check compares words, so a word the model changes in form or language
+    (likes/like, 5/five, an English sentence for Vietnamese speech, a
+    spelling such as "favorite") also keeps what was heard: never less than
+    was said.
+  - **With `LAMP_MEMORY_REMEMBER_ONCE`:** an answer that already carries a
+    `note` or `"existing": true` (nothing new written) is left as it is;
+    the "kept what they said" note is added only when the store wrote a
+    new entry.
+  - Tests: `remember::heard::tests` (the two lamp-06c1 lines, a paraphrase,
+    off, nothing heard, the lead-in, the cap, the line's own words).
 - **A note for each new session.** Every session is told that it has a
   memory and when to consult it ("when someone asks about an earlier
   conversation, or about something they told you before that you do not

@@ -1025,13 +1025,21 @@ fn run_call_with_scope(
     }
     let deadline = ASK_DEADLINE;
     let result = match route {
-        Route::Memory(socket) => (
-            "the memory",
-            match lease {
+        Route::Memory(socket) => {
+            // With `LAMP_MEMORY_KEEP_HEARD`, a `remember` whose sentence has
+            // words the line did not keeps that line instead (#2176).
+            let as_heard = crate::remember::heard::call_as_heard(call, request, heard);
+            let call = as_heard.as_ref().map_or(call, |(call, _)| call);
+            let (told, answered) = match lease {
                 Some(lease) => crate::remember::run_scoped(socket, call, deadline, lease),
                 None => crate::remember::run(socket, call, deadline),
-            },
-        ),
+            };
+            let told = match &as_heard {
+                Some((_, kept)) => crate::remember::heard::told(told, kept),
+                None => told,
+            };
+            ("the memory", (told, answered))
+        }
         Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),
         Route::Tasks(place) => (
             "the tasks part",
