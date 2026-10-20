@@ -87,3 +87,33 @@ Ready for lamp-voice: no (nothing to build)
   [6282779089](https://github.com/autonomous-ai/lampOS/issues/1396#issuecomment-6282779089):
   I take neither, so nothing is handed over before Mobile's 11:30. In the
   app I work on `fourteen/*` only.
+
+## 2026-10-20 — #2094, the app side — scouted the convention
+
+Ready for lamp-voice: no (nothing on `lamp-voice` yet; this repository's log
+only, no app code written)
+
+- The first builder, 11:05 on #2094, to both El and Fourteen ("quiet since
+  10:39"): asked El to post the `keys.*` messages' exact shape, and said
+  Fourteen then builds the app's screen against it, with a fake lamp in the
+  app's tests, while El builds the lamp side.
+- Cloned `autonomous-ai/ecm-sds-mobile` at `v3` into scratch (outside this
+  repository, per joining.md: the app side is not committed here).
+- Read `mobile/lamp-v2-settings`'s `LampSettingsNotifier` as the convention
+  to mirror: `BuddyMqttDataSource` over the device's own MQTT channel, a
+  riverpod notifier whose `build()` probes each kind and whose `change()`
+  waits for the lamp's result, "not on this lamp" already a first-class
+  case, and `lamp_settings_test.dart` driving it against a fake data
+  source. Posted the match at
+  [6283169318](https://github.com/autonomous-ai/lampOS/issues/2094#issuecomment-6283169318):
+  a `LampOwnKeysNotifier` the same shape, `"keys.set"`/`"keys.remove"`/
+  `"keys.get"` as its kinds, a `lamp_own_keys_test.dart` against a fake
+  lamp.
+- Also read `mobile/lamp-v2-reports`'s change to `autonomous_os_setup_page.dart`
+  (`_askShareReports`, a modal sheet, `shareReports` added to the setup
+  payload) as the pattern for the setup wizard's three optional fields, once
+  their own UI placement is agreed.
+- Not written: the entity's fields and the notifier's `change()`/`build()`
+  bodies. Those depend on El's exact `keys.*` field names and answer
+  strings, still not posted; a guess there would be thrown away the moment
+  the shape differs, so none is committed.
