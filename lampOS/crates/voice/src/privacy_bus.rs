@@ -196,6 +196,9 @@ pub struct SwitchFence {
     header_sequence: u64,
     publication: Option<ClockStamp>,
     last: Option<PrivacySwitch>,
+    /// The next message resyncs the order rather than continues it
+    /// ([`SwitchFence::resync`]).
+    resync: bool,
 }
 
 impl SwitchFence {
@@ -208,7 +211,23 @@ impl SwitchFence {
             header_sequence: 0,
             publication: None,
             last: None,
+            resync: false,
         }
+    }
+
+    /// Takes the next message as a resync, not a continuation: a gap before it,
+    /// or since the last message taken, is not a discontinuity. For what the
+    /// worker reads before its first datagram, that one included, in its first
+    /// second ([`resyncs`]). Until Controls' publisher finds the worker's new
+    /// socket (every 5 ms, `selected_bus`), the worker reads the topic's kept
+    /// value, and a state published in between reaches only that file. Controls
+    /// sends the switch's whole state each time, so the newest is the truth (the
+    /// first builder on #1722, 20 Oct 14:42; #1569 row 45: `gap 1 at seq 5` in 4
+    /// of a probing build's 5 failures under load). The publisher, its clock and
+    /// the order going forward are checked as ever, and from the second datagram
+    /// on a gap fails closed.
+    pub fn resync(&mut self) {
+        self.resync = true;
     }
 
     /// For `no-slide`: each state must say no slide is wired and carry no
@@ -293,6 +312,7 @@ impl SwitchFence {
         self.header_sequence = h;
         self.publication = Some(state.stamp);
         self.last = Some(value.clone());
+        self.resync = false;
         Ok(changed.then_some(value))
     }
 
@@ -318,6 +338,7 @@ impl SwitchFence {
         self.session = Some(state.session_id);
         self.header_sequence = h;
         self.publication = Some(state.stamp.clone());
+        self.resync = false;
         Ok(state.stamp)
     }
 
@@ -343,7 +364,7 @@ impl SwitchFence {
             || message.expired
             || h.expired_at(unix_ms)
             || h.at_unix_ms > unix_ms.saturating_add(lamp_bus::EXPIRY_GRACE_MS)
-            || message.gap != 0
+            || (message.gap != 0 && !self.resync)
             || message.publisher_restarted
         {
             return Err(invalid(
@@ -362,7 +383,9 @@ impl SwitchFence {
                 .as_ref()
                 .is_some_and(|session| *session != state.session_id)
             || h.seq <= self.header_sequence
-            || (self.header_sequence != 0 && self.header_sequence.checked_add(1) != Some(h.seq))
+            || (!self.resync
+                && self.header_sequence != 0
+                && self.header_sequence.checked_add(1) != Some(h.seq))
             || self.publication.as_ref().is_some_and(|old| {
                 state.stamp.sequence <= old.sequence || state.stamp.at_us < old.at_us
             })
@@ -696,6 +719,21 @@ fn receipt(
     }
 }
 
+/// How long after the worker starts its reads may still resync the fence's
+/// order: its first second (the first builder on #2244). Controls'
+/// publisher finds a new subscriber within 5 ms (`selected_bus`), and with
+/// no datagram for twice `controls/state`'s declared 100 ms the bus says
+/// its publisher is late and the worker ends anyway.
+const RESYNC_FOR_US: u64 = 1_000_000;
+
+/// Whether the next message read resyncs the fence's order
+/// ([`SwitchFence::resync`]): none has come as a datagram yet, and the
+/// worker started under [`RESYNC_FOR_US`] ago. After either, a gap fails
+/// closed as before, datagrams or not.
+fn resyncs(datagrams: u64, began_us: u64, now_us: u64) -> bool {
+    datagrams == 0 && now_us.saturating_sub(began_us) < RESYNC_FOR_US
+}
+
 fn serve(
     channels: &mut WorkerChannels,
     controller: BootId,
@@ -734,6 +772,13 @@ fn serve(
         let mut empty = false;
         for _ in 0..DRAIN_LIMIT {
             let before = counters(&subscriber);
+            // Until the first datagram, in the worker's first second, the
+            // order begins again with each message ([`resyncs`]).
+            let resync = resyncs(
+                subscriber.statistics().datagrams,
+                began,
+                lamp_ipc::monotonic_us(),
+            );
             let message = subscriber.recv(Duration::ZERO).map_err(unreadable)?;
             if before != counters(&subscriber) {
                 return Err(unreadable("invalid Controls message discarded"));
@@ -743,6 +788,9 @@ fn serve(
                 break;
             };
             let now = lamp_ipc::monotonic_us();
+            if resync {
+                fence.resync();
+            }
             // With no slide each new publication is fed as not muted, so the
             // owner's gate, generation and Denied-while-muted rules run as
             // for a slide read open: only the controller closes it.
@@ -817,6 +865,19 @@ pub(crate) mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+
+    /// #1569 row 45: the order begins again only before the worker's first
+    /// datagram and within its first second (Third and the first builder on
+    /// #2244).
+    #[test]
+    fn the_order_begins_again_only_before_the_first_datagram_in_the_first_second() {
+        assert!(super::resyncs(0, 5_000, 5_000));
+        assert!(super::resyncs(0, 5_000, 5_000 + super::RESYNC_FOR_US - 1));
+        assert!(!super::resyncs(0, 5_000, 5_000 + super::RESYNC_FOR_US));
+        assert!(!super::resyncs(1, 5_000, 5_001));
+        // A clock read before the start is the start.
+        assert!(super::resyncs(0, 5_000, 4_000));
     }
 
     #[test]

@@ -224,6 +224,71 @@ fn malformed_foreign_missing_future_stale_and_discontinuous_messages_are_rejecte
     }
 }
 
+/// #1569 row 45 (the first builder on #1722, 20 Oct 14:42): before the
+/// worker's first datagram it reads Controls' kept value, and a state sent
+/// while the publisher had not yet found the worker's socket reaches only
+/// that file. What it reads until then, the first datagram included, is a
+/// resync: a gap is not a discontinuity. From the second datagram on, a gap
+/// fails closed, and a resync never takes the order back, another
+/// publisher or a restarted one.
+#[test]
+fn up_to_the_first_datagram_a_fence_resyncs_and_after_it_a_gap_fails_closed() {
+    let mut fence = SwitchFence::new("boot".into());
+    // The kept value, then the next kept value with one sent in between.
+    fence.resync();
+    fence
+        .accept(&message(&state(100_000, 3, false)), 100_000, 1000)
+        .unwrap();
+    let mut skipped = message(&state(110_000, 5, false));
+    skipped.gap = 1;
+    fence.resync();
+    fence.accept(&skipped, 110_000, 1000).unwrap();
+    // The first datagram, past another one only the file had.
+    let mut first = message(&state(120_000, 7, false));
+    first.gap = 1;
+    fence.resync();
+    fence.accept(&first, 120_000, 1000).unwrap();
+    // From the second datagram on: in order is taken, a gap fails closed.
+    fence
+        .accept(&message(&state(130_000, 8, false)), 130_000, 1000)
+        .unwrap();
+    let mut later = message(&state(150_000, 10, false));
+    later.gap = 1;
+    assert!(fence.accept(&later, 150_000, 1000).is_err());
+    // Without a resync asked, a first message's gap fails closed, as ever.
+    let mut fresh = message(&state(100_000, 3, false));
+    fresh.gap = 1;
+    assert!(
+        SwitchFence::new("boot".into())
+            .accept(&fresh, 100_000, 1000)
+            .is_err()
+    );
+    // A resync goes forward only, from the same publisher, not restarted.
+    for mutation in 0..3 {
+        let mut fence = SwitchFence::new("boot".into());
+        fence.resync();
+        fence
+            .accept(&message(&state(100_000, 3, false)), 100_000, 1000)
+            .unwrap();
+        let mut next = state(110_000, 5, false);
+        if mutation == 1 {
+            next.session_id = "fedcba9876543210".into();
+        }
+        let mut next = message(&next);
+        next.gap = 1;
+        match mutation {
+            0 => next.header.seq = 3,
+            2 => next.publisher_restarted = true,
+            _ => {}
+        }
+        fence.resync();
+        assert!(
+            fence.accept(&next, 110_000, 1000).is_err(),
+            "mutation {mutation}"
+        );
+    }
+}
+
 #[test]
 fn publisher_and_reader_restart_cannot_rebind_an_active_worker() {
     for mutation in 0..6 {
