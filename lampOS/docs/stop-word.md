@@ -745,6 +745,11 @@ With the switch:
   that ends as the lamp yields the commit comes about 0.65 s after it: the
   lamp is silent from the yield, and only the decision comes later (the
   reviewer on #970).
+- **The words wait for `CloseStream` when `Finalize`'s answer is short**,
+  whatever is left after it (`SttStream::finished`). A request's line may
+  end on the answer when what it leaves is quiet ([second-voice.md](second-voice.md),
+  #1993), but over the lamp the canceller can take a stop word under any
+  level bar: 51 of 88 had nothing over -28 dBFS left (#828).
 - **A hand Stop, a head touch, mute or privacy closes it** (`close`): the
   duplex rule's yield, which a hand Stop leaves in force, is let be until
   it ends, not begun again and called unheard (the reviewer on #970).

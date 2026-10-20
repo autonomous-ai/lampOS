@@ -2442,7 +2442,9 @@ fn the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken() {
         "../../../../../deploy/product/settings/expression.json"
     ))
     .unwrap();
-    catalogue.timing.body_lag_us = Some(0);
+    // The catalogue's own body lag (300 ms), past the 200 ms the voice
+    // says its sound ahead: the speaking motion takes the farthest piece
+    // said (#1759, 20 Oct). At 0 here, it once hid that no lamp nodded.
     if catalogue.speaking.is_none() {
         catalogue.speaking = lamp_expression::Catalogue::from_json(include_str!(
             "../../../../expression/alive-behaviours.json"
@@ -2493,10 +2495,10 @@ fn the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken() {
     };
     let nods = starts("nodding on a stressed word");
     let sways = starts("swaying between sentences");
-    // A stressed word about every 1.1 s over 8 s, a nod for most of them:
-    // even a start that loses the first sentence nods more than a flat answer
-    // (`second_shape: None`), which nods once, at its onset, and never sways.
-    assert!(nods >= 3, "{nods} nods ({sounds} pieces, {lost} lost)");
+    // A stressed word about every 1.1 s over 8 s in three sentences: a nod
+    // on one in each, never two within 4 s (the first builder on #2030),
+    // so two; a flat answer (`second_shape: None`) never sways.
+    assert!(nods >= 2, "{nods} nods ({sounds} pieces, {lost} lost)");
     assert!(sways >= 1, "{sways} sways ({sounds} pieces, {lost} lost)");
 }
 
@@ -2754,7 +2756,7 @@ fn a_stop_during_a_slow_tool_call_lets_the_second_worker_exit_within_its_deadlin
         drop((call, stream));
     });
     runtime.block_on(async move {
-        let runner = crate::second_provider::worker::tool_runner(settings, None, None);
+        let runner = crate::second_provider::worker::tool_runner(settings, None, None, false);
         tokio::spawn(runner(1, false, "light_on".into(), serde_json::json!({})));
         tokio::spawn(async move {
             use tokio::io::AsyncReadExt;

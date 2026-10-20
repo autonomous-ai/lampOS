@@ -3473,13 +3473,12 @@ impl ToolDesk {
                 // Nor does one when the lamp has not spoken lately: out of
                 // conversation it follows no line of the lamp's (the reviewer
                 // on #1054).
-                .map(|verdict| match verdict {
-                    crate::policy_holds::Verdict::StayQuietFollowing
-                        if parked.turn.after_unanswered || !parked.turn.lamp_spoke_lately =>
-                    {
-                        crate::policy_holds::Verdict::StayQuiet
-                    }
-                    verdict => verdict,
+                .map(|verdict| {
+                    crate::policy_holds::for_turn(
+                        verdict,
+                        parked.turn.after_unanswered,
+                        parked.turn.lamp_spoke_lately,
+                    )
                 });
             let waited = Duration::from_micros(now.saturating_sub(parked.called_us));
             let route = crate::tools::route(&self.settings, &parked.call.name);
@@ -3495,22 +3494,11 @@ impl ToolDesk {
             match crate::policy_holds::gate(verdict, parked.turn.name_heard, waited, on_a_reply) {
                 crate::policy_holds::Gate::Wait => self.parked.push(parked),
                 crate::policy_holds::Gate::Run => {
-                    let why = match verdict {
-                        _ if parked.turn.name_heard => "its name was heard",
-                        Some(crate::policy_holds::Verdict::StayQuietFollowing)
-                            if !crate::policy_holds::sets(
-                                &crate::tools::route(&self.settings, &parked.call.name),
-                                &parked.call.name,
-                            ) =>
-                        {
-                            "the turn follows the lamp's last line, and its light and its volume are not held from it"
-                        }
-                        Some(crate::policy_holds::Verdict::StayQuietFollowing) => {
-                            "the turn follows the lamp's last line, and what it sets on the schedule is not held from it"
-                        }
-                        Some(_) => "the Policy took the turn as the lamp's",
-                        None => "no decision came in time",
-                    };
+                    let why = crate::policy_holds::why_run(
+                        verdict,
+                        parked.turn.name_heard,
+                        crate::policy_holds::sets(&route, &parked.call.name),
+                    );
                     eprintln!(
                         "lamp-voice provider: request {request} asked for {}; run after {} ms: {why}",
                         parked.call.name,

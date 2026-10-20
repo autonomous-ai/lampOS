@@ -235,15 +235,40 @@ degree.
 A catalogue with a `speaking` section (`crates/expression/src/speaking.rs`;
 in `alive-behaviours.json` since #933) adds three things from the lamp's own
 sound, as the body meets it: the playout said ahead, sampled at
-`body_lag_us`. All are head only, within the catalogue's limits, in any room
+`body_lag_us`, or, when the voice has not said that far, the farthest piece
+it has said that is still to end. The voice says its sound 200 ms ahead
+(`FORETELL_US`) and the catalogues' lag is 300 ms, so until 20 Oct no piece
+was ever at the lag: the speaking motion took level 0, and a story on
+lamp-4ace nodded and swayed never and only settled (#1759; the coordinator
+test, which set the lag to 0, hid it). Now a move lands at most 100 ms early,
+under one nod's 360 ms. Tests: `speaking_engine.rs`'s
+`an_answer_said_200_ms_ahead_nods_and_sways_at_the_catalogues_own_lag` (0
+nods without it), and the second route's coordinator test at the
+catalogue's own lag. The old playout clip still takes the level at the lag
+only. All are head only, within the catalogue's limits, in any room
 (it is the lamp's own speech). None runs while the body is held, while
 concentrating, asleep, or once someone has cut in, and nothing is owed after.
 - **A nod on a stressed word.** A dip of `nod` (0.035 rad of head pitch, about
   2°) over `nod_us` (0.36 s), in and out smoothly. It comes when the level is
   at least `stress_level` (0.35) and `stress_rise` (1.5) times the recent
-  level, which follows the sound with a 0.25 s time constant. Never within
-  `nod_gap_us` (0.9 s) of the last nod's start, and each between 70% and
-  100% of `nod`, so no two are alike.
+  level, which follows the sound with a 0.25 s time constant, and at least
+  0.15 (about 5 dB) over its own sentence's mean level so far
+  (`STRESS_STEP`), past the sentence's first 0.3 s (its onset, not a
+  stress). **At most one nod a sentence, and never two within 4 s**
+  (`NOD_SPACING_US`, or `nod_gap_us` if longer), each between 70% and 100%
+  of `nod`, so no two are alike. People nod on a few stressed words and are
+  still in between: lamp-4ace's 150 s story in the second route's
+  ElevenLabs voice, loud all the time (a mean of 0.73), asked for 75 nods,
+  one every 2 s, before this (the first builder on #2030, 20 Oct 03:22).
+  `speaking_engine.rs`'s
+  `a_loud_story_nods_a_handful_of_times_not_every_two_seconds` draws a story
+  from that voice's measured spread: 12 nods in 150 s, 156 without the
+  rule. Each is a catalogue key, so the arm hour can compare two rates from one
+  build (the first builder on #2030, 03:32): `sentence_nods` (1 without
+  it; 0 is no limit, up to 10), `stress_step` (0.15; 0 to 0.5) and
+  `nod_spacing_us` (4 s; up to 10 s). All three at 0 nod as before the rule
+  (`the_catalogue_can_turn_the_nod_limits_off_for_a_dense_arm`: 156 nods
+  against 12).
 - **A sway between sentences.** After `pause_us` (0.35 s) of the lamp silent
   (level under 0.06), as the next sentence begins (level back over 0.12),
   the head rolls over `sway_us` (0.6 s) to the other side: `sway_roll`
@@ -286,7 +311,7 @@ answer settles and a short one does not; held or cut in on, nothing moves;
 poses outside the limits are refused). `crates/expression/tests/speaking_engine.rs`
 runs an eight-second answer with stressed words every 1.1 s and a half-second
 pause every 3 s through the engine, in a quiet and a busy room. It expects
-5 to 8 nods, the head rolled both ways by more than 0.015 rad, over 0.02 rad
+2 or 3 nods (one a sentence), the head rolled both ways by more than 0.015 rad, over 0.02 rad
 of pitch range, the settle, and what speaking adds never stepping more than
 0.007 rad of pitch or 0.003 of roll in a 20 ms tick. Without `speaking`, the
 same answer plans none of it. It also checks the fences: a new turn, or a
@@ -294,11 +319,11 @@ cancelled answer, carries none of the old answer's motion (the offsets equal
 a catalogue without speaking on every tick), and a finished answer is
 settled after.
 The same answer from a voice a third as loud (0.33 times), and a fifth
-louder (1.2 times), gives 5 to 8 nods, a sway and the settle alike. On the
+louder (1.2 times), gives 2 or 3 nods, a sway and the settle alike. On the
 old fixed bars the quiet one failed. At 0.01 times, all hiss, it nods and
-sways never. A voice that fills the meter (1.0 through every sentence) nods as
-each of its three sentences begins, where without the ceiling it nodded
-never.
+sways never. A voice that fills the meter (1.0 through every sentence) has no
+word standing out of its sentence: it nods at most once a sentence and still
+sways.
 
 **Measuring it on a lamp** (`lampOS/tools/`, run from the computer beside
 the lamp; each needs sudo on the lamp, its password taken from

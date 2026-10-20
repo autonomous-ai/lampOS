@@ -1,0 +1,9 @@
+# From 10:00, music (0.85) for five minutes, then quiet: one sway at 20 s,
+# and none again while the same music goes on (rearm).
+clock = "10:00"
+
+[[expect]]
+at = "20s"
+within = "1s"
+call = "body.move"
+args = { move = "sway" }
