@@ -419,7 +419,10 @@ units stopped:
    `--torque on`. It refuses, with why, where the body would refuse the
    poses, and when any joint has torque on (the lamp is then held, not at
    rest). `--gaze` is not in it: it is measured with a face and the camera
-   ([body.md](body.md)), and the body runs without it until then. Without
+   ([body.md](body.md)), and the body runs without it until then: the
+   product unit's `--gaze-socket` and `--gaze-reach` without `--gaze` are
+   gaze off, said in the body's first line (thirteen-P1; before it, the body
+   refused them and never started on a factory `lamp.env`). Without
    `--write` it only prints, so a lamp can be read first and written later.
 2. **The touch pads**, `/etc/lampOS/controls/controls-pins.json`, with a
    person at the lamp. GPIO head pads differ by unit: the hardware team's test
