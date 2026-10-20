@@ -1357,6 +1357,22 @@ fn a_harness_without_the_code_sign_in_is_told_apart_and_a_dropped_one_stops() {
     assert!(!alive);
 }
 
+/// openharness#1463: after a sign-in by code, Harness's daemon is started
+/// with `harness start`, the CLI's own (through systemd where `harness
+/// service install` put it, as on a lamp), and a failure is said, not hidden.
+#[test]
+fn the_daemon_is_started_with_harness_start() {
+    let rig = Rig::new();
+    rig.plan(json!({"start":step(json!({}))}));
+    assert_eq!(rig.cli().start_daemon(), Ok(()));
+    let calls = rig.calls();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0]["args"], json!(["start"]));
+    let rig = Rig::new();
+    rig.plan(json!({"start":{"exit":1}}));
+    assert_eq!(rig.cli().start_daemon(), Err("start_failed".into()));
+}
+
 /// #1676: the sign-in is one `auth status --json`, read as Harness gives it
 /// (openharness `authStatusCommand`): signed in, signed in and offline, or
 /// not, with the other fields passed over. A failed or unreadable reply is

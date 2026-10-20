@@ -821,6 +821,21 @@ credential of its own.
   minutes) or `no_harness`. Kept for the voice until another
   starts. Signed in, the part looks at the sign-in and the machines at once
   (with `--set-up-later`), not a minute later.
+- **Harness's daemon, started again.** Harness's own sign-in stops its
+  running daemon, and the user service `harness service install` set up
+  doesn't start it again (openharness#1463). So every hand-over after a
+  sign-in failed in under 3 s, `new_failed`, with Harness saying "Harness is
+  not running here" (lamp-75c9, 20 October, two voice hand-overs to Devin
+  Cloud). Once a sign-in by code succeeds, the part runs `harness start`
+  once (`Cli::start_daemon`, through systemd where the service is
+  installed). It's the next job on the lane, ahead of a hand-over already
+  waiting, which would otherwise go to the stopped daemon. It's given 75 s
+  (`DAEMON_START_TIMEOUT`), past Harness's own 60 s wait for the daemon,
+  and the part journals `Harness's daemon started after the sign-in` or why
+  not. A sign-in that fails or is cancelled starts nothing. **Known limit:**
+  the start is tried once; if it fails, it isn't tried again until the next
+  sign-in, and hand-overs fail as before. Until openharness#1463 is
+  answered.
 
 The journal says `tasks: sign-in 1: started`, `code given (good for 120 s)`,
 `approved in Harness: asking whether to sign in`, `question told in request
@@ -835,7 +850,11 @@ the CLI's
 `the_sign_in_by_code_reads_harness_lines_and_writes_the_answer` and
 `a_harness_without_the_code_sign_in_is_told_apart_and_a_dropped_one_stops`
 against a scripted program, and the service's
-`the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end`. The
+`the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end` (the
+daemon started once after the sign-in succeeded, not before),
+`after_a_sign_in_the_daemon_is_started_before_a_waiting_hand_over` (ahead
+of a hand-over waiting, and never after a sign-in that failed) and
+`the_daemon_is_started_with_harness_start`. The
 voice's side (`sign_in_computer`, `sign_in_answer`) is its own PR.
 
 ## Devin (#1854)
