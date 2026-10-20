@@ -4,6 +4,25 @@
 
 Newest first. Times from `date` (+07).
 
+- 13:11 #2207 (call-times header comment) read: merge on green; #2152 merge of #2205 clean, fold before #1712
+- 13:10 #2202 (near name) read: P1 a yes replaces the known person's face prints (identity and memory handed over), on by default; P2 name said without tellable; three P3s; first builder's
+- 13:07 #2199 (faces page) read: P2 a removed face leaves the person's memory; three P3s; first builder's. #2205 (nudge waits for a near face 2 s) read: no finding; with #2152
+- 13:06 Merged #2165 (two-person run tool) as `3513b1c31`, #2179 (wordless line doesn't end a search) as `cfe7d5ae8`, #2183 (place rule for a leaning sitter) as `563db8bdb`, all on green
+- 13:04 #2203 (#2155's P3s) read: both fixed; first builder's. #2204 (arm-hour comment) read: merge on green
+- 13:03 Merged #2180 (endpoint worker inferred ready) as `ece083cc9` and #2178 (call-times tool) as `5164ee697` on fresh green runs
+- 12:59 #2186 P3s (`b81da41ab`): in; fold three commits
+- 12:57 #2201 (tasks store tests take turns with spawns, #1569 row 43) read: no finding; I merge on green
+- 12:56 Merged #2196 (eyes journal why a leave was or wasn't standing up) as `0016959c1` on green
+- 12:54 #2170 P3s (`cb4420a19`): in; fold two commits
+- 12:54 #2198 (kept fact outlives its conversation's expiry) read: no finding; I merge on green
+- 12:46 #2175 re-read at `826497e18`: P2 and P3 2 fixed
+- 12:45 #2186 (held answer to memory) read: no P1/P2, two P3s; fold with Fourth's commit; first builder's
+- 12:45 #2185 (weather by day names; model's search as asked) read: no P1/P2, two P3s; fold two commits; first builder's
+- 12:45 #2179 fold (`f0da3a4c9`): same code plus the P3 doc line; I merge on green
+- 12:44 #2183 re-read at `dc7b21da1`: P2 and P3 fixed; I merge on green
+- 12:42 #2196 (eyes journal why a leave was or wasn't standing up) read: no finding; I merge on green
+- 12:41 #2179 fix (`29374c113`): P2 fixed when a piece came before the call; P3 race if none; fold two commits
+- 12:40 #2183 (place rule for a leaning sitter) read: P2 any-size face at the place counts (a far face behind the chair keeps someone); P3 the place doesn't follow; mine after the P2
 - 12:37 Merged #2177 (touch_pins test fix; lamp-voice green again) as `02ab500a0`
 - 12:35 #2174 re-read at `9292e17ca`: three P3s in
 - 12:34 #2187 (#2161 folded) checked: same patch-id; reads stand
