@@ -136,7 +136,7 @@ struct Listening {
 }
 
 #[derive(Default)]
-pub(super) struct NearFlow {
+pub(crate) struct NearFlow {
     /// The coordinator can deliver an invitation and read the bus.
     available: bool,
     pub(super) generation: u64,
@@ -151,6 +151,48 @@ pub(super) struct NearFlow {
 }
 
 impl NearFlow {
+    /// [`Onboarding::near_holds_reply`]'s rule, on this step's own evidence.
+    pub(crate) fn holds_reply(&self, began_us: u64, at_us: u64) -> bool {
+        let Some(listening) = self.listening.as_ref() else {
+            return false;
+        };
+        at_us >= listening.ended_us
+            && at_us - listening.ended_us <= COLLECT_MS * 1_000
+            && self.seen.iter().any(|seen| match seen {
+                // The hearing's Unix start on the coordinator's clock, by the
+                // prompt's end read on both.
+                Seen::Hearing(hearing) if hearing.began_ms >= listening.ended_ms => {
+                    let heard_us = listening.ended_us
+                        + (hearing.began_ms - listening.ended_ms).saturating_mul(1_000);
+                    heard_us.saturating_add(crate::activity::CALL_BEFORE_US) >= began_us
+                }
+                _ => false,
+            })
+    }
+
+    /// A loop test's try window, open since `ended_us` (`ended_ms` on the
+    /// Unix clock), with the name heard beginning at these Unix times.
+    #[cfg(test)]
+    pub(crate) fn listening_for_test(ended_ms: u64, ended_us: u64, names_ms: &[u64]) -> Self {
+        Self {
+            listening: Some(Listening {
+                prompt: 1,
+                ended_ms,
+                ended_us,
+            }),
+            seen: names_ms
+                .iter()
+                .map(|&began_ms| {
+                    Seen::Hearing(Hearing {
+                        began_ms,
+                        score: 0.98,
+                    })
+                })
+                .collect(),
+            ..Self::default()
+        }
+    }
+
     #[cfg(test)]
     pub(super) fn seen(&self) -> &[Seen] {
         &self.seen
@@ -474,14 +516,15 @@ impl Onboarding {
         });
     }
 
-    /// Whether a try's window is open at `at_us`, from the prompt's end to
-    /// the end of its collection (7 s): the voice holds its reply to what is
-    /// said in it, since an answer within a second of the name spoils the
-    /// try (#1803).
-    pub(crate) fn near_holds_reply(&self, at_us: u64) -> bool {
-        self.near.listening.as_ref().is_some_and(|listening| {
-            at_us >= listening.ended_us && at_us - listening.ended_us <= COLLECT_MS * 1_000
-        })
+    /// Whether the voice holds its reply to an utterance whose speech began
+    /// at `began_us`, at `at_us` (#1803): a try's window is open, from the
+    /// prompt's end to the end of its collection (7 s), and the lamp's name
+    /// was heard in the window as the utterance began, since an answer within
+    /// a second of the name spoils the try. Something said without the name
+    /// ("skip that") is not held; the coordinator lets one with more said
+    /// than a call through too.
+    pub(crate) fn near_holds_reply(&self, began_us: u64, at_us: u64) -> bool {
+        self.near.holds_reply(began_us, at_us)
     }
 
     /// Judge the try being listened for, once its evidence is all in. Pure

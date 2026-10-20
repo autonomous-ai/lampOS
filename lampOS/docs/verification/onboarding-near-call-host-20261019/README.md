@@ -123,3 +123,29 @@ conflict. Same toolchain and environment as above.
 | 3 | `cargo +1.96.0 test -j2 -p lamp-skills onboarding -- --test-threads=1` | 3 passed |
 | 4 | `cargo +1.96.0 test -j2 -p lamp-voice -- --test-threads=1` | 2431 passed, 0 failed, 12 ignored (lib 2191) |
 | 5 | `cargo +1.96.0 build -j2 --workspace` | pass |
+
+## The reviewer's P3s on #1964 (2026-10-20)
+
+- The hold keeps only the name. `NearFlow::holds_reply` (behind
+  `Onboarding::near_holds_reply`) needs the window open and the name heard in
+  it, beginning no more than 0.5 s before the utterance's first speech; the
+  coordinator also lets through an utterance with more speech than a call
+  (`CALL_SPEECH_BLOCKS`, 1.2 s). "skip that" with no name, and "Lamp, can we
+  skip this?", are answered.
+- The coordinator test runs the step's rule: `TEST_NEAR` holds a
+  `NearFlow::listening_for_test` (window and name hearing), in place of
+  `TEST_NEAR_WINDOW`'s bare range.
+  `a_line_that_is_more_than_the_name_is_answered_in_the_near_call_window`
+  covers no name (0.6 s) and the name with 1.8 s of speech, on both routes.
+  Mutations, each reverted: `holds_reply` forced false fails
+  `a_call_in_the_near_call_window_is_not_answered_on_either_route`; the length
+  check removed, or the name requirement removed, fails
+  `a_line_that_is_more_than_the_name_is_answered_in_the_near_call_window`.
+  The closed-window coordinator case is gone; the window's bounds are pinned by
+  `the_reply_is_held_only_in_the_try_window_and_the_held_call_counts`, which
+  also pins the name and its 0.5 s lead.
+- `lamp_msgs::OnboardingStep` reads a step it does not know as `Unknown`
+  (`#[serde(other)]`), so an older lamp-skills beside a newer voice still asks
+  for the invitation; the say service checks the token.
+  `onboarding_pending_snapshot_is_asked_once_and_retry_is_an_explicit_edge`
+  asks for a `giving_way` invitation.

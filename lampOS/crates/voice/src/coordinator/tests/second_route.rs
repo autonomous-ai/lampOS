@@ -157,9 +157,15 @@ struct Script {
     ignores_stop: Option<&'static str>,
     /// The scenario's own bound, past which capture reports a fault.
     limit: Duration,
-    /// Onboarding's near-call try window is open over these milliseconds
-    /// from the scenario's start (#1803).
-    near_window_ms: Option<(u64, u64)>,
+    /// Onboarding's near-call try window opens this many milliseconds from
+    /// the scenario's start, for its 7 s (#1803).
+    near_window_ms: Option<u64>,
+    /// The lamp's name is heard beginning this many milliseconds from the
+    /// scenario's start, as that step reads it (#1803).
+    near_name_ms: Option<u64>,
+    /// Capture frames of speech in the person's first utterance, from frame
+    /// 20 (60: 0.6 s, as long as a call).
+    speech_frames: u64,
 }
 
 impl Script {
@@ -192,6 +198,8 @@ impl Script {
             ignores_stop: None,
             limit: LIMIT,
             near_window_ms: None,
+            near_name_ms: None,
+            speech_frames: 60,
         }
     }
 }
@@ -385,7 +393,7 @@ impl Peers {
     }
 
     fn speech(&self, frame: u64) -> bool {
-        (20..80).contains(&frame)
+        (20..20 + self.script.speech_frames).contains(&frame)
             || self
                 .speech_offset
                 .is_some_and(|offset| (offset..offset + 60).contains(&frame))
@@ -1167,12 +1175,21 @@ fn run(script: Script) -> Run {
     let limit = script.limit;
     let clock_scope = crate::scenario_clock::Scope::enter(limit * 2).unwrap();
     let origin = monotonic_us();
-    TEST_NEAR_WINDOW.with(|window| {
-        window.set(
-            script
-                .near_window_ms
-                .map(|(from, to)| (origin + from * 1_000, origin + to * 1_000)),
-        )
+    // The step's own rule, on the step's own evidence: its Unix clock is
+    // the scenario's origin at `UNIX`.
+    const UNIX: u64 = 1_760_000_000_000;
+    TEST_NEAR.with(|near| {
+        *near.borrow_mut() = script.near_window_ms.map(|from| {
+            crate::onboarding::near::NearFlow::listening_for_test(
+                UNIX + from,
+                origin + from * 1_000,
+                &script
+                    .near_name_ms
+                    .map(|at| UNIX + at)
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+            )
+        })
     });
     let mut owner = Controller::new(new_boot().unwrap(), now());
     let boot = owner.snapshot(now()).unwrap().boot();
@@ -1255,7 +1272,7 @@ fn run(script: Script) -> Run {
     let result = finish_active_run(
         &mut rig, &mut owner, &mut reply, &mut trace, &mut None, result,
     );
-    TEST_NEAR_WINDOW.with(|window| window.set(None));
+    TEST_NEAR.with(|near| near.borrow_mut().take());
     let mut exits = vec![
         ("speaker", matches!(rig.speaker.try_exit(), Ok(Some(_)))),
         ("capture", matches!(rig.capture.try_exit(), Ok(Some(_)))),
@@ -2828,9 +2845,10 @@ fn the_second_route_alone_gives_mood_what_was_heard_and_the_voices_phases() {
 
 /// #1803: in onboarding's near-call try window the person calls the lamp's
 /// name for the measurement, and an answer within a second of it spoils the
-/// try. The voice holds its reply to it, on Gemini Live and on the second
-/// route alone: the turn ends unanswered, nothing is played, and it is not
-/// counted as a sound. Past the window the same call is answered.
+/// try. The voice holds its reply to that call, on Gemini Live and on the
+/// second route alone: the turn ends unanswered, nothing is played, and it is
+/// not counted as a sound. The hold is the step's own rule
+/// (`Onboarding::near_holds_reply`), read on its evidence.
 #[test]
 fn a_call_in_the_near_call_window_is_not_answered_on_either_route() {
     let _one = super::pilot_faults::one_session();
@@ -2838,7 +2856,8 @@ fn a_call_in_the_near_call_window_is_not_answered_on_either_route() {
         let held = run(Script {
             second: false,
             only,
-            near_window_ms: Some((0, 7_000)),
+            near_window_ms: Some(0),
+            near_name_ms: Some(200),
             mute_at_frame: Some(300),
             ..Script::question(Live::Answer(12))
         });
@@ -2849,22 +2868,36 @@ fn a_call_in_the_near_call_window_is_not_answered_on_either_route() {
         assert_eq!(endpoint.len(), 1, "{endpoint:?}");
         assert!(endpoint[0]["onboarding_near_call"].is_string());
         assert!(endpoint[0].get("not_speech").is_none());
-        let after = run(Script {
-            second: false,
-            only,
-            near_window_ms: Some((0, 1)),
-            ..Script::question(Live::Answer(12))
-        });
-        after.assert_clean();
-        assert_eq!(
-            after.played(1),
-            vec![if only { SECOND } else { LIVE }; 48],
-            "{only}"
-        );
-        assert!(
-            after.events("local_endpoint")[0]
-                .get("onboarding_near_call")
-                .is_none()
-        );
+    }
+}
+
+/// #1803, the reviewer on #1964: in the same window only the name is held.
+/// A line with no name heard ("skip that") and one with more said than a
+/// call ("Lamp, can we skip this?", 1.8 s) are answered as any other.
+#[test]
+fn a_line_that_is_more_than_the_name_is_answered_in_the_near_call_window() {
+    let _one = super::pilot_faults::one_session();
+    for only in [false, true] {
+        for (name, speech_frames) in [(None, 60), (Some(200), 180)] {
+            let answered = run(Script {
+                second: false,
+                only,
+                near_window_ms: Some(0),
+                near_name_ms: name,
+                speech_frames,
+                ..Script::question(Live::Answer(12))
+            });
+            answered.assert_clean();
+            assert_eq!(
+                answered.played(1),
+                vec![if only { SECOND } else { LIVE }; 48],
+                "{only} {name:?} {speech_frames}"
+            );
+            assert!(
+                answered.events("local_endpoint")[0]
+                    .get("onboarding_near_call")
+                    .is_none()
+            );
+        }
     }
 }
