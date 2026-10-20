@@ -4,6 +4,23 @@
 
 Newest first. Times from `date` (+07).
 
+- 15:07 2167 re-read: P2 and five P3s fixed, one small P3 (slice not pinned by a test); first builder's
+- 15:05 2238 factory stands the lamp for head_move: no P1/P2, P3 (the voice's resting may win); first builder's
+- 15:03 Merged #2237 (account-channel test) as `7b9277fb5` on green
+- 15:02 2241 purge of 7ea9382cb not needed in my read (test lines only); new head to read
+- 15:00 Merged #2224 (standing up without the shrink) as `1fb3a4a84` on green
+- 15:00 Merged #2222 (sitter not seen journal line) as `c68532af4` on green
+- 14:56 2237 test pins the account-channel check; no finding; merge on green
+- 14:55 2236 (#2209 refiled, folded): three P3s in, no new finding; first builder's
+- 14:54 2215 P3s in at a88bf318e, no new finding; first builder's
+- 14:52 Merged #2212 (two-person-run.sh reads the worker's cmdline) as `46d8351c5` on green
+- 14:38 2199 P3 fold checked, no new finding; names question to #1722
+- 14:38 Merged #2174 (sign-in answer only after the question is told) as `7299526a0` on green, approved
+- 14:37 2227 needs a rebase to one commit (#1848's old commit still in it); then the first builder's (needs a lamp)
+- 14:33 2215 no P1/P2, two P3s (eyes.md reset port; no node never resets); first builder's
+- 14:33 2214 clean, two test-gap P3s; owner cancel of another's reminder is a design call; first builder's
+- 14:31 Merged #2213 (row 44 test fix) as `e5ea92bc2` on green
+- 13:40 2186 fold checked: two commits plus my two P3s, no new finding; first builder's
 - 13:36 2211 two P1s (three replace paths; a team member's name in tests), one P2
 - 13:36 2210 P2: common-word stand-ins plus any face overrule not_for_me in a busy room; two P3s
 - 13:36 2199 re-read: P2 and P3s fixed, two small P3s, (b) for memory access; first builder's
