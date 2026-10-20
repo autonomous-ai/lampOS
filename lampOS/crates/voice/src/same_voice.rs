@@ -79,28 +79,28 @@ pub const MOST_SAMPLES: usize = RATE * 3;
 pub const ASKED_AT: usize =
     LEAST_SAMPLES + crate::activity::PRE_ROLL_BLOCKS * lamp_audio::CAPTURE_SAMPLES;
 const _: () = assert!(ASKED_AT <= MOST_SAMPLES);
-/// Two prints with a cosine under this are taken for two voices: the
-/// equal-error bar of lamp-4ace's labelled set, 89 clips of three played
-/// voices on mic2 with the lamp quiet, cut as the worker prints them
-/// (`docs/verification/same-voice-20261018`, the first builder on #1445,
-/// 12:2x). There it is wrong about 1 in 13 times each way (7.5% at 0.455),
-/// and no same-voice pair fell under 0.27. Its lines are all 1.5 s or
-/// longer: on the older recordings with the lamp quiet, cut the same way,
-/// it takes 31 of the 38 same-voice pairs with a line under 1.5 s for two
-/// voices (`docs/verification/same-voice-early-20261018`, the reviewer on
-/// #1508). The bar of 0.25 before it, set
-/// on clean clips off the lamp, let 43% of different voices pass as the
-/// same. With the lamp's voice in a print it is at chance, so the check
-/// stays off, and is at most one weak sign beside a face, lips and the
-/// name (#829).
-pub const DIFFERENT_BELOW: f32 = 0.45;
-/// Under this, a line's print against the caller's is surely someone else's,
-/// for the rules that hold or chain a line as another person's
-/// (`LAMP_GOING_ON_NOT_OWN`, `LAMP_QUIET_GOING_ON_SAME_ONE`); the
-/// conversation's own check keeps [`DIFFERENT_BELOW`]. On lamp-4ace's mic2
-/// (21 Oct, 02:29, the first builder at 02:33 on Queue #1722) the same voice
-/// in a quiet room scored down to 0.35 and other voices up to 0.29.
-pub const SOMEONE_ELSE_BELOW: f32 = 0.30;
+/// Two prints with a cosine under this are taken for two voices, the one
+/// bar for every rule that reads a voice: the conversation's own check
+/// (#829) and the rules that hold or chain a line as another person's
+/// (`LAMP_GOING_ON_NOT_OWN`, `LAMP_QUIET_GOING_ON_SAME_ONE`). Two bars for
+/// one question would let the older check hold what the newer rules let
+/// through (the first builder at 03:50 on Queue #1722). On lamp-4ace's mic2
+/// (21 Oct, 02:29, the first builder at 02:33) the same voice in a quiet
+/// room scored down to 0.35 and other voices up to 0.29
+/// (`docs/verification/same-voice-20261021`, #2354); on 18 October's
+/// labelled set, 89 clips of three played voices on mic2 with the lamp
+/// quiet, cut as the worker prints them (`docs/verification/same-voice-20261018`),
+/// 1 of 950 same-voice pairs fell under it (lowest 0.27), where #829's
+/// earlier bar of 0.45, that set's equal-error bar, held about 1 in 13. The
+/// trade: more other voices taken for the same, so more talk between people
+/// answered, the case #829 was made for. That set's pairs of two at or over
+/// 0.30 are not recountable (only its summary is kept): between about 220
+/// (at 0.455, its 7.5% equal error) and 1,269 (at 0.25) of 2,966. Tonight's
+/// 0.29 top for other voices is two synthetic voices in one room. Lines
+/// under 1.5 s mostly read low (`docs/verification/same-voice-early-20261018`).
+/// With the lamp's voice in a print it is at chance, so the check stays off, and is at most
+/// one weak sign beside a face, lips and the name (#829).
+pub const DIFFERENT_BELOW: f32 = 0.30;
 /// A child that has ended is started again after this long.
 pub const RESTART_AFTER: Duration = Duration::from_secs(5);
 /// A child that ends this many times in a row before it is ready is not
@@ -816,9 +816,11 @@ mod tests {
                 // A's voice, a little off: 0.90 against A's, 0.07 against
                 // the mixed one, under the bar.
                 3 => Ok(vec![0.9, 0.0, -0.436]),
-                // Another voice at 0.35 against A's: between the bar of 0.25
-                // set off the lamp and the labelled set's 0.45.
-                4 => Ok(vec![0.35, 0.0, 0.937]),
+                // Another voice at 0.20 against A's, under the bar.
+                4 => Ok(vec![0.2, 0.0, 0.98]),
+                // A's voice at 0.35 against A's: another under the bar of
+                // 0.45 before this one, the same voice at 0.30.
+                5 => Ok(vec![0.35, 0.0, 0.937]),
                 _ => Err("refused: none".into()),
             };
             self.waiting.push_back((request, print));
@@ -1341,19 +1343,17 @@ exec sleep 30"#,
         assert_eq!(voices.likeness(6), Some(1.0));
     }
 
-    /// The bar is the labelled set's 0.45 (#1485; the reviewer on #1508):
-    /// a voice at 0.35 against the conversation's is another, whether its
-    /// print is back at its verdict or comes after it. At the bar of 0.25
-    /// before it, it was the conversation's voice.
+    /// A voice at 0.20 against the conversation's is another, whether its
+    /// print is back at its verdict or comes after it.
     #[test]
-    fn a_voice_at_0_35_against_the_conversations_is_another() {
+    fn a_voice_at_0_20_against_the_conversations_is_another() {
         let mut voices = Voices::new(StandIn::default());
         said(&mut voices, 1, 1, 48_000);
         voices.decided(1, true, false);
         said(&mut voices, 2, 4, 48_000);
         assert!(
             voices.likeness(2).is_some_and(
-                |likeness| (likeness - 0.35).abs() < 0.01 && likeness < DIFFERENT_BELOW
+                |likeness| (likeness - 0.20).abs() < 0.01 && likeness < DIFFERENT_BELOW
             )
         );
         // Late, and let out as the conversation going on: known after its
@@ -1367,8 +1367,31 @@ exec sleep 30"#,
         assert!(
             voices
                 .likeness(4)
-                .is_some_and(|likeness| (likeness - 0.35).abs() < 0.01)
+                .is_some_and(|likeness| (likeness - 0.20).abs() < 0.01)
         );
+    }
+
+    /// One bar for the voice (the first builder at 03:50 on Queue #1722): a
+    /// print at 0.35 against the conversation's, another voice under #829's
+    /// bar of 0.45, is the conversation's own at 0.30. Late too, it is kept
+    /// and ends nothing. On lamp-4ace's mic2 one voice in a quiet room read
+    /// down to 0.35 against itself (`docs/verification/same-voice-20261021`).
+    #[test]
+    fn a_voice_at_0_35_was_another_at_0_45_and_is_the_conversations_at_0_30() {
+        let mut voices = Voices::new(StandIn::default());
+        said(&mut voices, 1, 1, 48_000);
+        voices.decided(1, true, false);
+        said(&mut voices, 2, 5, 48_000);
+        assert!(
+            voices.likeness(2).is_some_and(
+                |likeness| (likeness - 0.35).abs() < 0.01 && likeness >= DIFFERENT_BELOW
+            )
+        );
+        voices.printer.slow = true;
+        said(&mut voices, 3, 5, 48_000);
+        voices.decided(3, true, true);
+        voices.printer.slow = false;
+        assert_eq!(voices.take_late_other(), None);
     }
 
     #[test]

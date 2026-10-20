@@ -3,7 +3,7 @@
 The evidence for the bar the same-one rules hold on (`LAMP_GOING_ON_NOT_OWN`,
 `LAMP_QUIET_GOING_ON_SAME_ONE`; #2339, #2341): a line is held as someone
 else's only on a print **under 0.30** against the caller's, not under the
-conversation check's 0.45 (`DIFFERENT_BELOW`, [same-voice.md](../../same-voice.md)).
+conversation check's 0.45 (0.30 since #2368) (`DIFFERENT_BELOW`, [same-voice.md](../../same-voice.md)).
 All voices are synthetic (`say`), played from the office Mac's loudspeaker in
 an empty room. No person's voice is in any recording. The cut clips were
 removed after scoring, and only the numbers are kept here

@@ -1106,8 +1106,8 @@ async fn with_a_voice_check_a_question_in_the_conversations_voice_goes_on_after_
 }
 
 /// Voice prints as [`TwoVoices`] makes them, but the other voice's at a
-/// cosine of 0.35 against the first's: between the bar of 0.25 set off the
-/// lamp and the labelled set's 0.45 (#1485).
+/// cosine of 0.35 against the first's: under #829's old bar of 0.45, over
+/// the one bar of 0.30 (`DIFFERENT_BELOW`).
 struct NearVoices(std::collections::VecDeque<(u64, std::result::Result<Vec<f32>, String>)>);
 
 impl crate::same_voice::Printer for NearVoices {
@@ -1125,13 +1125,15 @@ impl crate::same_voice::Printer for NearVoices {
     }
 }
 
-/// The bar is the labelled set's 0.45 (`DIFFERENT_BELOW`, #1485; the
-/// reviewer on #1508), through the worker's own loop: after A's call, an
-/// unnamed follow-up in a voice at 0.35 against A's is held as another
-/// voice's. At the bar of 0.25 before it, it was A's and answered, as A's
-/// own follow-up is. On the logical clock, as its sibling above is.
+/// One bar for the voice, 0.30 (`DIFFERENT_BELOW`; the first builder at
+/// 03:50 on Queue #1722), through the worker's own loop: after A's call, an
+/// unnamed follow-up in a voice at 0.35 against A's, held as another voice's
+/// under #829's old bar of 0.45, is the conversation's and answered, as A's
+/// own follow-up is. On lamp-4ace's mic2 one voice in a quiet room read
+/// down to 0.35 against itself (`docs/verification/same-voice-20261021`).
+/// On the logical clock, as its sibling above is.
 #[tokio::test(start_paused = true)]
-async fn with_the_switch_and_a_voice_check_a_voice_at_0_35_against_the_conversations_is_held() {
+async fn with_the_switch_and_a_voice_check_a_voice_at_0_35_held_at_0_45_is_answered_at_0_30() {
     let _clock = logical_clock();
     const CALL: &str = "Hey Lamp, what is the weather like in Hanoi today?";
     const FOLLOW_UP: &str = "And what about tomorrow?";
@@ -1162,7 +1164,7 @@ async fn with_the_switch_and_a_voice_check_a_voice_at_0_35_against_the_conversat
         rig.stop().await;
         played
     };
-    assert!(!follow_up_by(-1).await);
+    assert!(follow_up_by(-1).await);
     assert!(follow_up_by(1).await);
 }
 
