@@ -258,6 +258,17 @@ pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 /// six forty-four and change.", 2 of the last 4 runs).
 pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 
+/// Where the worker reads whether a line that begins with the lamp's name,
+/// said to a face turned to the lamp, is always answered (#2191): `on`, and
+/// nothing else. In a busy room the rule does not hold it, and the model's
+/// `not_for_me` on it is not taken ([`Engine::answering_named_to_a_face`]).
+pub const NAMED_ALWAYS_ENVIRONMENT: &str = "LAMP_NAMED_ALWAYS";
+
+/// What a `not_for_me` is answered in a turn named to a face
+/// ([`NAMED_ALWAYS_ENVIRONMENT`]): the model is asked once more.
+pub(crate) const NAMED_TO_A_FACE_ANSWER: &str =
+    "Not taken: they called you by name while facing you, so this is said to you. Answer them.";
+
 /// The note after a round's call results, when that round said `said`
 /// before its calls: the person heard it, so the next round says only what
 /// the results add ([`Engine::saying_once`]).
@@ -434,6 +445,9 @@ struct Shared {
     /// Whether a request was judged in a busy room ([`Engine::judging_busy`]):
     /// a line that may follow on from the lamp is not told so there.
     busy: Option<Busy>,
+    /// Whether a request began with the lamp's name said to a face turned
+    /// to the lamp ([`Engine::answering_named_to_a_face`]).
+    named_to_a_face: Option<Busy>,
     /// The Policy's decision for a line that waits for it
     /// ([`Engine::asking_the_policy`], [`WAITS_FOR_POLICY`]).
     policy_now: Option<PolicyNow>,
@@ -846,6 +860,7 @@ impl Engine {
                 name_note: None,
                 conversation_alone: None,
                 busy: None,
+                named_to_a_face: None,
                 policy_now: None,
                 call_note: None,
                 name_sounded: None,
@@ -1017,6 +1032,17 @@ impl Engine {
     pub fn judging_busy(mut self, busy: Busy) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.busy = Some(busy);
+        }
+        self
+    }
+
+    /// Whether a request began with the lamp's name said to a face turned
+    /// to the lamp (`LAMP_NAMED_ALWAYS=on`, #2191): the model's `not_for_me`
+    /// on it is not taken, and it is asked once more, told it was called
+    /// ([`NAMED_TO_A_FACE_ANSWER`]). Before any turn only.
+    pub fn answering_named_to_a_face(mut self, named: Busy) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.named_to_a_face = Some(named);
         }
         self
     }
@@ -3171,6 +3197,8 @@ async fn answer(
         // line lost on the network (`LAMP_RESEND_LOST_LINE`).
         let mut from = begun;
         let mut resent = false;
+        // A `not_for_me` not taken, once (#2191).
+        let mut named_asked_again = false;
         let mut round = 0;
         while round < MAX_ROUNDS {
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -3350,7 +3378,33 @@ async fn answer(
                 called.store(true, Ordering::Relaxed);
             }
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
-                return Err(Stop::Silent);
+                let named = heard
+                    && shared
+                        .named_to_a_face
+                        .as_ref()
+                        .is_some_and(|named| named(request));
+                if !named || std::mem::replace(&mut named_asked_again, true) {
+                    return Err(Stop::Silent);
+                }
+                // Called by name while faced (#2191): the decline is not
+                // taken, and the model is asked once more. Every call of
+                // the round is answered so, none run: the next round calls
+                // again what it needs.
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: not_for_me not taken: it began with the lamp's name said to a face turned to the lamp (LAMP_NAMED_ALWAYS); asked once more"
+                );
+                messages.push(Message::assistant_calls_with(
+                    Some(std::mem::take(&mut text)),
+                    &calls,
+                    reasoning.take(),
+                ));
+                for call in &calls {
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        NAMED_TO_A_FACE_ANSWER.to_owned(),
+                    ));
+                }
+                continue;
             }
             // A look asked by its own call (#1712): the coordinator takes the
             // turn's full look, and the turn ends here; its picture comes in

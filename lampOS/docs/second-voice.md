@@ -1763,6 +1763,34 @@ after a take-over, but now for every turn:
   words. With `LAMP_NAME_NOTE_BUSY=face`, in a busy room only with someone
   turned to the lamp or the name heard surely; the journal says why not.
   So is the staff note (`LAMP_STAFF_NOTE`).
+- **Named to a face, answered** (`LAMP_NAMED_ALWAYS=on`, #2191; with
+  `--attention`). On a production floor (#1722, hw-first-P1 finding 4) the
+  name was heard at 0.976 to 0.978 and a face seen in 36 to 40 of 40 looks,
+  yet every such line was held as a busy room or declined by the model. One
+  predicate, `worker::named_to_a_face`: the line begins with the lamp's name
+  (a `lamp-name` hearing at `called::LEAST_SCORE` or more from
+  `called::BEFORE_US` before the line to `NAME_STARTS_WITHIN_US`, 1 s, into
+  it; or its words open with "Lamp" or "Lamb" set off as a call, after a
+  greeting or before a pause, `attention::begins_with_the_name`, since on
+  lamp-52e6 `lamp-name` heard none of three such lines; never a stand-in
+  such as "man", "plan" or "mom", and not "Lamp is broken, …") and the
+  eyes' newest fresh look has a face turned to the lamp (the rule's
+  `turned`, not any face in view). The face is what tells a call from
+  office talk heard as the name at 0.9 to 0.997, so only with the speaker
+  facing the lamp is the model overruled. Then, in a busy room, a hold of
+  the strict busy rule (`attention::BUSY_NAMED_UNTURNED`, `BUSY_UNCALLED`)
+  or of `busy_bar` (`BUSY_SHORT`, `BUSY_TURNED`) becomes a play
+  (`Heeding::verdict`), journaled `held as "…" no longer`, and the line is
+  asked with the by-name note; any other hold stands (`LONE_WORDS`, a line
+  heard in another script). A `not_for_me` the model calls on it is not
+  taken once (`Engine::answering_named_to_a_face`, `NAMED_TO_A_FACE_ANSWER`
+  as each call's result, the calls not run): asked again, a second decline
+  ends the turn in silence. Without a face turned to the lamp, with the
+  name later in the line, or without the name, nothing changes. Not yet:
+  `not_for_me{}` written as words still ends such a turn, the Live route is
+  unchanged, and the speaking face (`LAMP_SECOND_SPEAKING_FACE`) is not
+  read here. The rule's own text call (`attention::called`) still lets out
+  a line opening with a stand-in, with or without the switch.
 - **The look by its own call.** With a full look (`LAMP_EYES_LOOK_FILE` and
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::with_look`; texts are not) and
