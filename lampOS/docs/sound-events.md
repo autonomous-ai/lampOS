@@ -136,6 +136,18 @@ lamp playback, music with vocals, instrumental music and laughter as separate
 labelled conditions. Training/calibration and held-out evaluation recordings
 must not overlap. A zero observation duration is unmeasured, not zero false rate.
 
+**Off the lamp** (#1669): `cargo run --release -p lamp-ears --example
+score_wav -- yamnet.onnx FILE.wav...` scores 16 kHz mono files through this
+publisher's own frontend and pinned model, every 500 ms, and says per file how
+many windows clear Music sway's and Laugh glance's bars and how long music
+holds. It is the model on the file's own sound, with no room or microphone, so
+a lamp run's numbers are read against it, never replaced by it. On 21 October,
+three free-to-use tracks (solo piano, a jazz vocal, an upbeat instrumental)
+held music over 0.6 for 57 to 59 s of 60. A spoken line over the upbeat track
+dropped it under 0.6 in a few windows, never past Music sway's 5 s gap. Three laughter clips peaked at 0.39, 0.38 and
+0.61 on `Laughter` alone, never two windows in a row over Laugh glance's 0.5
+(the table is on the pull request that added the example).
+
 The first of them, the music sway, is built and held out of the product
 (`skills/music-sway`, `install::NOT_PRODUCT_SKILLS`); it reads
 `scores.music` and does nothing without this topic.
