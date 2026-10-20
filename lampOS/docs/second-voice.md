@@ -1884,10 +1884,17 @@ opening hours, the weather: a question, or "tell me", "check", "look up")
 starts its search from the words heard, the lamp's name left off and the
 month and year after them, as its chat begins (`worker::early_query`,
 `Engine::hearing_words`). The request's first `web_search` takes that
-search's answer, whatever query the model gives (`worker::Early`); a
-later one runs as asked. The journal says `request N: a search begins
-from the words heard (<n> characters)` and `request N web_search answered
-by the search begun <ms> ms before the call`. So the search runs while
+search's answer when the model's query asks nothing the heard words did
+not: it may drop words or change their order, and small words ("the",
+"in", "for", …) don't count (`worker::early_adds`). A query with words the
+heard ones lacked is searched as asked, and so is a later search
+(`worker::Early`). On lamp-4ace on 20 Oct a "what's the weather this
+weekend" named no place, so its early search found American towns'
+forecasts, and these answered the model's own query for the lamp's city
+(#2185). The journal says `request N: a search begins from the words
+heard (<n> characters)`, then either `request N web_search answered by the
+search begun <ms> ms before the call` or `request N web_search asks <n>
+words the search begun from its words did not: searched as asked`. So the search runs while
 the model's first round does, which took 0.74 to 0.92 s to its first
 event on lamp-4ace on 19 Oct; the search test's first audio was 2.6 to
 4.4 s.
@@ -1896,12 +1903,16 @@ event on lamp-4ace on 19 Oct; the search test's first audio was 2.6 to
 the first builder on #1712, 15:18). The lamp's place (`LAMP_PLACE`, or else
 the place its zone names) is looked up once by its first part at
 Open-Meteo's geocoding (`geocoding-api.open-meteo.com`), then the weather
-now, today and tomorrow is asked of `api.open-meteo.com` every 15 minutes,
+now and for 7 days is asked of `api.open-meteo.com` every 15 minutes,
 with no key (`net::weather`). While it is under an hour old the model is
 told it beside the time: "The weather where you are, as of N minutes ago:
 In Hanoi now: 31°C, partly cloudy, feels like 36°C, humidity 70%. Today
-26 to 33°C, … Use it when someone asks about the weather here; never bring
-it up unasked." So "what's the weather" needs no search. Only the place's
+26 to 33°C, … Tomorrow …. Thursday 25 to 32°C, overcast. … Use it when
+someone asks about the weather here; never bring it up unasked." The days
+after tomorrow go by their weekday names, worked out from the forecast's
+own dates (#2185: it was today and tomorrow only, so "this weekend" on a
+Tuesday couldn't be answered). So "what's the weather" and "will it rain
+this weekend" need no search. Only the place's
 name and its coordinates leave the lamp. The journal: `the weather in
 Hanoi, Vietnam is asked of Open-Meteo every 15 minutes`, `the weather in
 … came in N ms` on the first and after a failure, and a failure once until
