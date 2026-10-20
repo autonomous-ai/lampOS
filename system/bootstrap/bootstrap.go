@@ -827,11 +827,9 @@ func (b *Bootstrap) applyUpdate(ctx context.Context, key string, component domai
 		return err
 	}
 	if _, ok := registry.Components[key]; ok {
-		runCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-		defer cancel()
-		out, err := system.Run(runCtx, "software-update", key)
+		out, err := runUpdater(ctx, installTimeout, key)
 		if err != nil {
-			return fmt.Errorf("software-update %s: %w: %s", key, err, out)
+			return fmt.Errorf("software-update %s: %w: %s", key, err, updaterOutputTail(out))
 		}
 		return nil
 	}
@@ -839,11 +837,9 @@ func (b *Bootstrap) applyUpdate(ctx context.Context, key string, component domai
 	case domain.OTAKeyOSServer, domain.OTAKeyWeb, domain.OTAKeyHal, domain.OTAKeyBuddy, domain.OTAKeyOpenClaw, domain.OTAKeyDevice,
 		domain.OTAKeyCodex, domain.OTAKeyClaudeCode, domain.OTAKeyOpenCode, domain.OTAKeyPicoClaw, domain.OTAKeyHermes:
 		// Non-bootstrap components delegate to the on-device `software-update <key>`.
-		runCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-		defer cancel()
-		out, err := system.Run(runCtx, "software-update", key)
+		out, err := runUpdater(ctx, installTimeout, key)
 		if err != nil {
-			return fmt.Errorf("software-update %s: %w", key, err)
+			return fmt.Errorf("software-update %s: %w: %s", key, err, updaterOutputTail(out))
 		}
 		slog.Info("update output", "component", "bootstrap", "key", key, "output", out)
 		return nil

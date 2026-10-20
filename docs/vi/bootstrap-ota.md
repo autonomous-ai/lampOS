@@ -744,7 +744,7 @@ resolve từ `metadata.devices.<device_type>` lồng nhau thay vì danh sách co
 
 | Thành phần | Các bước |
 |---|---|
-| `os-server` | Chạy `software-update os-server` (block tối đa 10 phút) |
+| `os-server` | Chạy `software-update os-server` (block tối đa 30 phút, xem bên dưới) |
 | `bootstrap` | Spawn detached `software-update bootstrap` (tự cập nhật, sống sót sau restart) |
 | `web` | Chạy `software-update web` |
 | `device` | Chạy `software-update device` cho profile `devices.<device_type>` đã resolve; rootfs overlay được áp dụng nhưng vẫn giữ `.env` HAL local của thiết bị |
@@ -752,6 +752,34 @@ resolve từ `metadata.devices.<device_type>` lồng nhau thay vì danh sách co
 | `hal` | Chạy `software-update hal` → `systemctl restart hal` |
 | `codex` / `claudecode` / `opencode` / `picoclaw` | Chạy `software-update <key>` — CHỈ trên thiết bị có `agent_runtime` đúng bằng runtime đó |
 | `hermes` | Chạy `software-update hermes` — chỉ khi `agent_runtime` là hermes, entry metadata có `commit`, VÀ updater trên máy là bản biết pin (`updaterSupportsHermesPin`: có đọc `.hermes.commit`). Entry chưa pin (không có `commit`) bị cả loop lẫn `/versions` bỏ qua, nên nút trên web không hiện — `hermes update` sẽ lên upstream HEAD và không bao giờ đạt sàn. |
+
+**Giới hạn thời gian cài đặt.** Mỗi lần cài `software-update <key>` do
+bootstrap chạy (poll tự động, force update, kích hoạt service được promote) được
+tối đa 30 phút; cài từ một phiên bản cũ hơn nhiều có thể thực sự cần chừng đó
+thời gian. `software-update recover` vẫn giữ giới hạn 10 phút. Khi hết giới hạn,
+bootstrap dừng updater thay vì bỏ mặc nó:
+
+1. Gửi SIGTERM tới mọi process của updater: unit tạm
+   `software-update-<key>-<pid>` nếu updater chạy dưới dạng unit, nếu không thì
+   process group riêng của updater. Trap EXIT của updater khôi phục bản cài trước
+   đó, và các bước con chạy lâu (tải về, cài package) kết thúc.
+2. Sau 3 phút ân hạn, đủ cho bước khôi phục và health check của nó, gửi SIGKILL
+   tới chính các process đó, để không process sót lại nào còn giữ update lock.
+3. Nếu bước khôi phục chưa xong, journal vẫn còn và lần poll bootstrap tiếp theo
+   sẽ chạy `software-update recover`.
+
+Dừng hoặc restart chính bootstrap không hủy lần cài đang chạy; chỉ giới hạn thời
+gian mới hủy. Watcher báo hoàn tất `system.software_update` của os-server chờ tối
+đa 40 phút, đủ cho giới hạn cộng thời gian ân hạn.
+
+**Lý do thất bại.** Output của updater nằm trong journal của unit tạm. Khi unit
+lỗi, updater in lại 40 dòng cuối của journal đó ra stderr, và bootstrap đưa
+2.000 byte cuối của output updater vào lỗi của nó (`software-update <key>: exit
+status 1: …`), nên đọc được lý do ngay trong log của bootstrap mà không cần mở
+journal trên thiết bị. Lần cài HAL ghi rõ bước bị lỗi: `using uv <version> at
+<path>` hoặc `uv <version> at <path> is older than <min>` (khi đó cài uv được
+pin), `HAL staging failed: unzip exited <n>`, hoặc `HAL staging failed: uv sync
+exited <n>` kèm phiên bản và đường dẫn uv, cờ lock và dung lượng trống.
 
 Cập nhật OpenClaw thủ công và force update chạy `software-update openclaw`.
 Trước khi cài phiên bản trong OTA metadata, updater đọc `engines.node` của

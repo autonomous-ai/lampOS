@@ -10,10 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 
 	"go.autonomous.ai/os/system/domain"
-	"go.autonomous.ai/os/system/lib/core/system"
 )
 
 // recoverPendingUpdate runs before version detection: a power loss can leave the
@@ -194,11 +192,9 @@ func recoverPendingUpdateAt(ctx context.Context, journalPath, halPath string) er
 	return recoverWithInstallerLock(ctx, false)
 }
 func runPendingRecovery(ctx context.Context) error {
-	runCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
-	out, err := system.Run(runCtx, "software-update", "recover")
+	out, err := runUpdater(ctx, recoverTimeout, "recover")
 	if err != nil {
-		return fmt.Errorf("recover interrupted OTA: %w: %s", err, out)
+		return fmt.Errorf("recover interrupted OTA: %w: %s", err, updaterOutputTail(out))
 	}
 	return nil
 }

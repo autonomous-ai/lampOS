@@ -7,11 +7,9 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
-	"time"
 
 	"go.autonomous.ai/os/system/bootstrap/state"
 	"go.autonomous.ai/os/system/domain"
-	"go.autonomous.ai/os/system/lib/core/system"
 )
 
 // activationPlan accepts decoded service metadata from the configured trust mode. It
@@ -184,12 +182,10 @@ func (b *Bootstrap) activatePromotedServices(ctx context.Context, meta domain.OT
 			return changed, fmt.Errorf("activation %q version %q blocked after rollback", key, c.Version)
 		}
 		b.announceUpdateStart()
-		runCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 		// The updater revalidates the fresh signed promotion under its update lock.
-		out, runErr := system.Run(runCtx, "software-update", key, "--activate-promoted")
-		cancel()
+		out, runErr := runUpdater(ctx, installTimeout, key, "--activate-promoted")
 		if runErr != nil {
-			return changed, fmt.Errorf("activate %s: %w: %s", key, runErr, out)
+			return changed, fmt.Errorf("activate %s: %w: %s", key, runErr, updaterOutputTail(out))
 		}
 		r, err := b.serviceRegistry()
 		if err != nil {

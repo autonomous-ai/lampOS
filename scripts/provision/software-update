@@ -873,12 +873,16 @@ uv_at_least_min() {
 # Print a uv new enough for HAL. When the device's own uv is missing or too old,
 # install the pinned uv into HAL_UV_HOME without touching the device's own uv.
 ensure_hal_uv() {
-  local candidate installer
+  local candidate installer version
   for candidate in "$(find_hal_uv 2>/dev/null || true)" "$HAL_UV_HOME/uv"; do
-    if [ -n "$candidate" ] && [ -x "$candidate" ] && uv_at_least_min "$candidate"; then
+    [ -n "$candidate" ] && [ -x "$candidate" ] || continue
+    version=$("$candidate" --version 2>/dev/null | cli_semver || true)
+    if uv_at_least_min "$candidate"; then
+      echo "[software-update] using uv ${version:-unknown} at $candidate (HAL needs >= $HAL_UV_MIN)" >&2
       printf '%s\n' "$candidate"
       return 0
     fi
+    echo "[software-update] uv ${version:-unknown} at $candidate is older than $HAL_UV_MIN" >&2
   done
   echo "[software-update] uv is missing or older than $HAL_UV_MIN; installing uv $HAL_UV_PIN into $HAL_UV_HOME" >&2
   installer=$(mktemp) || return 1
@@ -1537,9 +1541,17 @@ if [ -z "${SOFTWARE_UPDATE_DETACHED:-}" ] && command -v systemd-run >/dev/null 2
       [ -z "${!v:-}" ] || SU_ENV+=("--setenv=$v=${!v}")
     done
     echo "[software-update] running as $SU_UNIT.service — follow with: journalctl -fu $SU_UNIT"
-    exec systemd-run --unit="$SU_UNIT" --collect --quiet --wait \
+    SU_STATUS=0
+    systemd-run --unit="$SU_UNIT" --collect --quiet --wait \
       --service-type=oneshot --setenv=SOFTWARE_UPDATE_DETACHED=1 \
-      "${SU_ENV[@]}" -- "$SELF" "$@"
+      "${SU_ENV[@]}" -- "$SELF" "$@" || SU_STATUS=$?
+    if [ "$SU_STATUS" -ne 0 ]; then
+      # The run's output only reaches the unit's journal; repeat its end so the caller sees why.
+      journalctl --sync >/dev/null 2>&1 || true
+      echo "[software-update] $SU_UNIT failed (exit $SU_STATUS); last output:" >&2
+      journalctl -u "$SU_UNIT" -n 40 --no-pager -o cat 2>/dev/null | tail -c 4000 >&2 || true
+    fi
+    exit "$SU_STATUS"
   fi
   echo "[software-update] transient units unavailable — running inline" >&2
 fi
@@ -2012,13 +2024,17 @@ elif [ "$APP" = "hal" ]; then
   export UV_CACHE_DIR="$HAL_UV_CACHE" UV_HTTP_TIMEOUT=180
   if ! (
     progress_report installing 0 0 "Extracting HAL files"
-    unzip -o -q "$ZIP_TMP" -d "$DIR_TMP" || exit 1
+    unzip -o -q "$ZIP_TMP" -d "$DIR_TMP" || { echo "HAL staging failed: unzip exited $?" >&2; exit 1; }
     if [ -f "$ROLLBACK_DIR/hal.previous/.env" ]; then cp -a "$ROLLBACK_DIR/hal.previous/.env" "$DIR_TMP/.env" || exit 1; fi
     find "$UV_CACHE_DIR" -name "lerobot.egg-info" -type d 2>/dev/null | xargs rm -rf
     cd "$DIR_TMP" || exit 1
     HAL_LOCK_ARGS=()
     [ ! -f uv.lock ] || HAL_LOCK_ARGS+=(--locked)
-    run_uv_with_activity "$UV_BIN" sync --python 3.12 --extra hardware "${HAL_EXTRA_ARGS[@]}" "${HAL_LOCK_ARGS[@]}" || exit 1
+    run_uv_with_activity "$UV_BIN" sync --python 3.12 --extra hardware "${HAL_EXTRA_ARGS[@]}" "${HAL_LOCK_ARGS[@]}" || {
+      status=$?
+      echo "HAL staging failed: uv sync exited $status (uv $("$UV_BIN" --version 2>/dev/null | cli_semver || true) at $UV_BIN, ${HAL_LOCK_ARGS[*]:-no lock}, $(df -Pk "$DIR_TMP" 2>/dev/null | awk 'NR == 2 { print int($4 / 1024) " MiB free" }'))" >&2
+      exit 1
+    }
   ); then
     echo "HAL staging failed; restoring known-good runtime" >&2
     cd /

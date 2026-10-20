@@ -769,7 +769,7 @@ the MQTT `data` kind `system.ota_versions` (both via `system/ota`; the cloud's
 
 | Component | Update Steps |
 |---|---|
-| `os-server` | Run `software-update os-server` (blocks up to 10 min) |
+| `os-server` | Run `software-update os-server` (blocks up to 30 min, see below) |
 | `bootstrap` | Spawn detached `software-update bootstrap` (self-update, survives restart) |
 | `web` | Run `software-update web` |
 | `device` | Run `software-update device` for `devices.<device_type>`; apply any explicitly selected hardware override, then install rootfs including generated HAL `.env` |
@@ -777,6 +777,35 @@ the MQTT `data` kind `system.ota_versions` (both via `system/ota`; the cloud's
 | `hal` | Run `software-update hal` → `systemctl restart hal` |
 | `codex` / `claudecode` / `opencode` / `picoclaw` | Run `software-update <key>` — only on the device whose `agent_runtime` IS that runtime |
 | `hermes` | Run `software-update hermes` — only when `agent_runtime` is hermes, the metadata entry carries `commit`, AND the on-device updater is the pinning one (`updaterSupportsHermesPin`: it reads `.hermes.commit`). An unpinned entry (no `commit`) is skipped by both the loop and `/versions`, so the web button never appears for it — `hermes update` would land on upstream HEAD and the floor could never be met. |
+
+**Install time limit.** Every `software-update <key>` install that bootstrap
+runs (automatic poll, force update, promoted service activation) may take up to
+30 minutes; an install that starts from a much older version can legitimately
+need that long. `software-update recover` keeps a 10-minute limit. When a limit
+passes, bootstrap stops the updater rather than abandoning it:
+
+1. SIGTERM goes to every updater process: the transient
+   `software-update-<key>-<pid>` unit when the updater runs as one, otherwise
+   the updater's own process group. The updater's EXIT trap restores the previous
+   installation, and long-running child steps (downloads, package installs) end.
+2. After a 3-minute grace, enough for the restore and its health check, SIGKILL
+   goes to the same processes, so no leftover process keeps holding the update lock.
+3. If the restore did not finish, its journal remains and the next bootstrap poll
+   runs `software-update recover`.
+
+Stopping or restarting bootstrap itself does not abort an install in progress;
+only the time limit does. The os-server `system.software_update` completion
+watcher waits up to 40 minutes, which covers the limit plus the grace.
+
+**Failure reasons.** The updater's own output goes to its transient unit's
+journal. When the unit fails, the updater repeats the last 40 lines of that
+journal on stderr, and bootstrap puts the last 2,000 bytes of the updater's
+output into its error (`software-update <key>: exit status 1: …`), so the
+reason is in bootstrap's log without opening the device journal. The HAL
+install names the step that failed: `using uv <version> at <path>` or
+`uv <version> at <path> is older than <min>` (then the pinned uv is installed),
+`HAL staging failed: unzip exited <n>`, or `HAL staging failed: uv sync exited <n>`
+with the uv version and path, the lock flag and the free space.
 
 Manual and force OpenClaw updates run `software-update openclaw`. Before
 installing the version selected by OTA metadata, the updater reads that npm
