@@ -91,6 +91,7 @@ name=pathlib.Path(sys.argv[0]).name
 root=pathlib.Path(os.environ["TEST_ROOT"])
 a=sys.argv[1:]
 if name == "id": print("0")
+elif name == "uv" and a == ["--version"]: print("uv 0.12.23")
 elif name == "uv": sys.exit(1 if os.environ["FAILURE"] == "sync" else 0)
 elif name == "systemctl":
  with (root/"full-events").open("a") as f: f.write(" ".join(a)+"\\n")

@@ -65,6 +65,81 @@ class HALUpdateTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("uv not found", result.stderr)
 
+    def run_ensure(self, curl_body):
+        script = SCRIPT.read_text()
+        functions = "\n".join(
+            re.search(rf"^{name}\(\) \{{\n.*?^\}}$", script, re.M | re.S).group(0)
+            for name in ("cli_semver", "find_hal_uv", "uv_at_least_min", "ensure_hal_uv")
+        )
+        for path in ("/root/.local/bin/uv", "/home/pollen/.local/bin/uv"):
+            functions = functions.replace(path, str(self.root / path.lstrip("/")))
+        # Keep the script's own floor, so the tests follow a change to it.
+        floor = re.search(r"^HAL_UV_MIN=.*$", script, re.M).group(0)
+        curl = self.bin / "curl"
+        curl.write_text("#!/bin/sh\n" + curl_body)
+        curl.chmod(0o755)
+        for name in ("sort", "head", "mktemp", "rm", "sh", "mkdir", "chmod"):
+            if not (self.bin / name).exists():
+                (self.bin / name).symlink_to(shutil.which(name))
+        return subprocess.run(
+            ["/bin/bash", "-c", "set -e\n" + floor + "\n" + functions + "\nensure_hal_uv"],
+            env={**os.environ, "PATH": str(self.bin),
+                 "HAL_UV_HOME": str(self.root / "pinned"), "HAL_UV_PIN": "0.12.23"},
+            capture_output=True, text=True,
+        )
+
+    def make_versioned_uv(self, path, version):
+        candidate = self.root / path
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+        candidate.write_text(f"#!/bin/sh\necho 'uv {version} (aarch64-unknown-linux-gnu)'\n")
+        candidate.chmod(0o755)
+        return candidate
+
+    # The installer stub writes a uv into UV_UNMANAGED_INSTALL, like astral's script.
+    INSTALLER = (
+        'out=""; while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done\n'
+        'printf \'%s\\n\' \'mkdir -p "$UV_UNMANAGED_INSTALL"\' '
+        '\'printf "#!/bin/sh\\necho uv 0.12.23\\n" > "$UV_UNMANAGED_INSTALL/uv"\' '
+        '\'chmod 755 "$UV_UNMANAGED_INSTALL/uv"\' > "$out"\n'
+    )
+
+    def test_new_enough_device_uv_is_kept(self):
+        device = self.make_versioned_uv("root/.local/bin/uv", "0.6.6")
+        result = self.run_ensure("echo curl must not run >&2; exit 1\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), str(device))
+
+    def test_old_device_uv_gets_pinned_uv_beside_it(self):
+        device = self.make_versioned_uv("bin/uv", "0.4.20")
+        before = device.read_text()
+        result = self.run_ensure(self.INSTALLER)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), str(self.root / "pinned/uv"))
+        self.assertIn("older than 0.6.6", result.stderr)
+        self.assertEqual(device.read_text(), before)
+
+    def test_missing_uv_gets_pinned_uv(self):
+        result = self.run_ensure(self.INSTALLER)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), str(self.root / "pinned/uv"))
+
+    def test_installed_pinned_uv_is_reused(self):
+        self.make_versioned_uv("bin/uv", "0.5.31")
+        pinned = self.make_versioned_uv("pinned/uv", "0.12.23")
+        result = self.run_ensure("echo curl must not run >&2; exit 1\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), str(pinned))
+
+    def test_failed_install_stops_before_hal(self):
+        self.make_versioned_uv("bin/uv", "0.4.20")
+        result = self.run_ensure("exit 22\n")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("uv 0.12.23 install failed", result.stderr)
+        script = SCRIPT.read_text()
+        branch = script.index('elif [ "$APP" = "hal" ]; then')
+        self.assertLess(script.index('UV_BIN="$(ensure_hal_uv)" || exit 1', branch),
+                        script.index("  systemctl stop hal", branch))
+
     def test_device_env_selects_reachy_and_preserves_other_devices(self):
         for device, expected in (("reachy-mini", "reachy"), ("lamp", "aec"),
                                  ("intern-v2", "aec")):

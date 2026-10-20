@@ -942,8 +942,21 @@ core-failure gating). Uploading HAL alone does not distribute these changes.
 ### HAL Case
 
 The updater finds `uv` on `PATH`, then at `/root/.local/bin/uv`, then at
-`/home/pollen/.local/bin/uv` (Reachy's installer location). Before stopping HAL,
-it selects Python extras from `DEVICE_TYPE` in `/opt/hal/.env`, falling back to
+`/home/pollen/.local/bin/uv` (Reachy's installer location).
+
+HAL's `pyproject.toml` and `uv.lock` need uv 0.6.6 or newer (`HAL_UV_MIN`).
+Older images can ship an older uv:
+- uv 0.4.x fails with `unknown field required-environments`.
+- uv 0.5.31 to 0.6.5 report that the lockfile needs updating under `--locked`.
+
+Either way the sync fails, and the device stays on its old HAL. When the found
+uv is missing or older than the floor, the updater uses `/usr/local/lib/autonomous/uv/uv`
+if that one is new enough. Otherwise it installs the pinned uv (`HAL_UV_PIN`,
+0.12.23) there with astral's installer for that version and
+`UV_UNMANAGED_INSTALL`, which writes no receipt and changes no PATH. The device's
+own uv is left as it is. A failed install stops the update before HAL is stopped.
+
+Before stopping HAL, the updater selects Python extras from `DEVICE_TYPE` in `/opt/hal/.env`, falling back to
 `device_type` in `/root/config/config.json`: `reachy-mini` uses `hardware + reachy`
 to retain the Pollen SDK; every other device uses `hardware + aec + pipecat`.
 

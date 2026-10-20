@@ -911,8 +911,21 @@ profile khi core lỗi). Chỉ upload HAL sẽ không phân phối các thay đ�
 ### Xử lý HAL
 
 Updater tìm `uv` trong `PATH`, rồi `/root/.local/bin/uv`, rồi
-`/home/pollen/.local/bin/uv` (vị trí bộ cài Reachy sử dụng). Trước khi dừng HAL,
-script chọn Python extras theo `DEVICE_TYPE` trong `/opt/hal/.env`, fallback sang
+`/home/pollen/.local/bin/uv` (vị trí bộ cài Reachy sử dụng).
+
+`pyproject.toml` và `uv.lock` của HAL cần uv 0.6.6 trở lên (`HAL_UV_MIN`). Ảnh
+máy cũ có thể mang uv cũ hơn:
+- uv 0.4.x báo `unknown field required-environments`.
+- uv từ 0.5.31 đến 0.6.5 báo lockfile cần cập nhật khi chạy `--locked`.
+
+Cả hai trường hợp sync đều lỗi và máy vẫn ở HAL cũ. Khi uv tìm được bị thiếu
+hoặc cũ hơn mức tối thiểu, updater dùng `/usr/local/lib/autonomous/uv/uv` nếu
+bản đó đủ mới. Nếu không, nó cài uv ghim sẵn (`HAL_UV_PIN`, 0.12.23) vào đó
+bằng bộ cài của astral cho đúng bản này, với `UV_UNMANAGED_INSTALL`: không ghi
+receipt và không sửa PATH. uv có sẵn của máy giữ nguyên. Nếu cài lỗi, cập nhật
+dừng trước khi HAL bị dừng.
+
+Trước khi dừng HAL, script chọn Python extras theo `DEVICE_TYPE` trong `/opt/hal/.env`, fallback sang
 `device_type` trong `/root/config/config.json`: `reachy-mini` dùng `hardware + reachy`
 để giữ Pollen SDK; các thiết bị khác dùng `hardware + aec + pipecat`.
 
