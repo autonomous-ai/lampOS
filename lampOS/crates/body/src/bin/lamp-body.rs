@@ -1640,6 +1640,55 @@ mod tests {
         "/run/lampos-body/mood.sock",
     ];
 
+    /// #2163 (Fifth on #2228): a seated lamp.env (lamp-body-measure
+    /// --seated) is for the generic package's unit, a V1 lamp moved to V2:
+    /// from that unit's own ExecStart it starts a body that may not stand
+    /// and holds the head and base. The product unit passes the stand's
+    /// own options, so it takes only a standing file (the factory's, after
+    /// its watched stand) and refuses a seated one: a product lamp is never
+    /// seated. Read from the unit files, so neither can drift from this.
+    #[test]
+    fn a_seated_poses_line_starts_the_generic_unit_and_never_stands() {
+        const SEATED: &str = "--home 1772,2052,2038 --pitch-window 1740,2030 --torque on";
+        let start = |unit: &str| {
+            let exec = unit
+                .lines()
+                .find_map(|line| line.strip_prefix("ExecStart="))
+                .expect("the unit has an ExecStart");
+            let words: Vec<String> = exec
+                .split_whitespace()
+                .skip(1)
+                .flat_map(|word| match word {
+                    "@BODY_POSES@" | "$BODY_POSES" => {
+                        SEATED.split_whitespace().map(str::to_owned).collect()
+                    }
+                    "@SERVO_DEVICE@" => vec!["/dev/ttyACM0".to_owned()],
+                    "@MOTOR_LOCK_DIR@" => vec!["/var/lib/lampos-locks/motor".to_owned()],
+                    "@UNIT_ID@" | "%H" => vec!["lamp-a63e".to_owned()],
+                    word => vec![word.to_owned()],
+                })
+                .collect();
+            assert!(
+                !words.iter().any(|word| word.contains('@')),
+                "a placeholder this test does not fill: {words:?}"
+            );
+            parse(words.iter().map(OsString::from))
+        };
+        let generic = start(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/units/lamp-body.service"
+        )))
+        .expect("the generic unit starts a seated body")
+        .unwrap();
+        assert!(generic.standing.is_none());
+        assert!(generic.torque_on);
+        let product = start(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/product/lamp-body.service"
+        )));
+        assert!(product.is_err(), "a product lamp is never seated");
+    }
+
     #[test]
     fn every_path_is_explicit_and_nothing_else_is_accepted() {
         let value = parse(args(&FULL)).unwrap().unwrap();

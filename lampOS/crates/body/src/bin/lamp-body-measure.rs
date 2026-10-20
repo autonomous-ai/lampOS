@@ -5,7 +5,7 @@
 use lamp_body::calibration::UnitId;
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-body-measure --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY [--write ABSOLUTE_FILE]\n\nThe factory's per-lamp body step: reads the lamp at rest with torque off (lamp-body-inspect's\nread-only plan: no register writes, no torque, no motion) and prints this lamp's own\nlamp.env (BODY_POSES: --home, --folded-arm, --stand, --pitch-window, --torque). With --write\nit also writes that file, which must not exist yet (/etc/lampOS/body/lamp.env on the product).\nRefused, with why, where the body would refuse the poses. --gaze is not measured here (body.md).\nStop the body and every other bus owner first. Linux only.\n";
+const USAGE: &str = "lamp-body-measure --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY [--write ABSOLUTE_FILE] [--seated]\n\nThe factory's per-lamp body step: reads the lamp at rest with torque off (lamp-body-inspect's\nread-only plan: no register writes, no torque, no motion) and prints this lamp's own\nlamp.env (BODY_POSES: --home, --folded-arm, --stand, --pitch-window, --torque). With --write\nit also writes that file, which must not exist yet (/etc/lampOS/body/lamp.env on the product).\nRefused, with why, where the body would refuse the poses. --gaze is not measured here (body.md).\nWith --seated the file holds only --home, --pitch-window and --torque on: a lamp whose first stand\nno person has confirmed yet, whose body then holds and moves the head and base only, never the arm (#2163).\nStop the body and every other bus owner first. Linux only.\n";
 
 #[derive(Debug)]
 struct Arguments {
@@ -13,6 +13,8 @@ struct Arguments {
     unit_id: UnitId,
     lock_directory: PathBuf,
     write: Option<PathBuf>,
+    /// Only the head's poses: no stand, no folded arm (#2163).
+    seated: bool,
 }
 
 fn bounded(path: &std::path::Path) -> bool {
@@ -28,9 +30,21 @@ fn bounded(path: &std::path::Path) -> bool {
 fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, &'static str> {
     let mut args = args.into_iter();
     let (mut device, mut unit_id, mut lock_directory, mut write) = (None, None, None, None);
+    let mut seated = false;
     while let Some(key) = args.next() {
+        if key == "--seated" {
+            if seated {
+                return Err("unknown or duplicate option");
+            }
+            seated = true;
+            continue;
+        }
         if key == "--help" {
-            if device.is_some() || unit_id.is_some() || lock_directory.is_some() || write.is_some()
+            if device.is_some()
+                || unit_id.is_some()
+                || lock_directory.is_some()
+                || write.is_some()
+                || seated
             {
                 return Err("--help must be used alone");
             }
@@ -61,6 +75,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         unit_id: unit_id.ok_or("--unit-id is required")?,
         lock_directory: lock_directory.ok_or("--lock-directory is required")?,
         write,
+        seated,
     };
     if ![&result.device, &result.lock_directory]
         .into_iter()
@@ -137,7 +152,12 @@ fn finish(
     report: &lamp_body::inspection::InspectionReport,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let read = lamp_body::poses::rest_read(report)?;
-    let text = lamp_body::poses::lamp_env(arguments.unit_id.as_str(), &read, &measured_at())?;
+    let form = if arguments.seated {
+        lamp_body::poses::seated_lamp_env
+    } else {
+        lamp_body::poses::lamp_env
+    };
+    let text = form(arguments.unit_id.as_str(), &read, &measured_at())?;
     print!("{text}");
     if let Some(path) = &arguments.write {
         write_new(path, &text).map_err(|error| format!("{}: {error}", path.display()))?;
@@ -153,6 +173,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error>> {
     let _ = (
         arguments.unit_id,
         arguments.write,
+        arguments.seated,
         write_new as fn(&std::path::Path, &str) -> std::io::Result<()>,
         measured_at as fn() -> String,
     );
@@ -210,6 +231,42 @@ mod tests {
             assert!(parse(args(&bad)).is_err(), "{bad:?}");
         }
         assert!(parse(args(&["--help"])).unwrap().is_none());
+    }
+
+    /// #2163: `--seated` takes no value, once, anywhere; the plain form stays the default.
+    #[test]
+    fn seated_is_a_flag_given_once() {
+        let base = [
+            "--device",
+            "/dev/ttyACM0",
+            "--unit-id",
+            "lamp-a63e",
+            "--lock-directory",
+            "/var/lib/lampos-locks/motor",
+        ];
+        assert!(!parse(args(&base)).unwrap().unwrap().seated);
+        let seated = parse(args(
+            &[
+                &["--seated"][..],
+                &base[..],
+                &["--write", "/var/lib/lampos-body/measured.env"],
+            ]
+            .concat(),
+        ))
+        .unwrap()
+        .unwrap();
+        assert!(seated.seated);
+        assert_eq!(
+            seated.write.as_deref(),
+            Some(std::path::Path::new("/var/lib/lampos-body/measured.env"))
+        );
+        for bad in [
+            [&base[..], &["--seated", "--seated"]].concat(),
+            vec!["--seated", "--help"],
+            vec!["--seated"],
+        ] {
+            assert!(parse(args(&bad)).is_err(), "{bad:?}");
+        }
     }
 
     #[test]

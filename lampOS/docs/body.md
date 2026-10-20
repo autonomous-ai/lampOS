@@ -1768,6 +1768,25 @@ own measurement. It writes the file only with `--write`, never over one
 already there, and refuses a read taken with torque on (install.md, "At the
 factory, once per lamp").
 
+With `--seated` (#2163) the same read makes a seated file: `--home` as found,
+the default `--pitch-window` (checked the same way) and `--torque on`, and
+nothing else. It has no `--stand` and no `--folded-arm`, so a body given it
+commands the head and the base only. Without a stand, `--torque on` takes hold
+of those three only. The body never writes a goal to the shoulder or the
+elbow, and writes torque to them only to let go (off on all five, at a
+surprise, an overload or a limp), as V1 does. `--torque on` is needed: the
+lamp was read with torque off, and a body without it refuses to start.
+The seated file is for the generic package's `lamp-body` unit, which is how a
+V1 lamp moves to V2. The product unit passes the stand's own options
+(`--stand-share`, `--stand-seconds`, `--awake-seconds`, `--idle`), which need
+a `--stand`, so it refuses a seated file. A product lamp is never seated: its
+file is the factory's, written after its watched stand. Both are tested from
+the unit files themselves. That file is for a lamp moved to V2 whose first stand
+no person has confirmed yet. Its standing file comes later, from the
+factory's watched stand. A read with torque on is refused here too: the tool
+never turns torque off to get a read, since an arm that is up would drop
+(Fifth on #2163).
+
 The body does **not** read that file one release forward, on purpose
 (#1680's one exception, a safety rule): an option a newer measure wrote that
 this build does not read still stops the body, and the journal names it and
