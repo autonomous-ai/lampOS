@@ -66,6 +66,8 @@ impl Store {
             checkpoint: path.join("privacy-pending.json"),
             mailbox: path.join("progress.json.told"),
             near_call: path.join("near-call.json"),
+            room_sounds: path.join("room-sounds.json"),
+            room_sounds_group: None,
         };
         let owner = match hook {
             Some(hook) => storage::ServiceStorage::start_with_hook(paths, hook).unwrap(),
@@ -530,6 +532,8 @@ fn persisted_samples_are_validated_on_load() {
         checkpoint: path.join("privacy-pending.json"),
         mailbox: path.join("progress.json.told"),
         near_call: path.join("near-call.json"),
+        room_sounds: path.join("room-sounds.json"),
+        room_sounds_group: None,
     })
     .unwrap();
     let client = owner.client();

@@ -74,17 +74,19 @@ pub enum Step {
     Touch,
     Privacy,
     GivingWay,
+    RoomSounds,
     Preferences,
 }
 
 impl Step {
-    pub const ALL: [Step; 7] = [
+    pub const ALL: [Step; 8] = [
         Step::WhereYouSit,
         Step::WhoYouAre,
         Step::HowYouSound,
         Step::Touch,
         Step::Privacy,
         Step::GivingWay,
+        Step::RoomSounds,
         Step::Preferences,
     ];
 
@@ -96,6 +98,7 @@ impl Step {
             Step::Touch => "touch",
             Step::Privacy => "privacy",
             Step::GivingWay => "giving_way",
+            Step::RoomSounds => ROOM_SOUNDS,
             Step::Preferences => "preferences",
         }
     }
@@ -135,6 +138,7 @@ impl Step {
             Step::WhoYouAre => WHO_NOTE,
             Step::Touch if again => TOUCH_OFFER,
             Step::Touch => TOUCH_NOTE,
+            Step::RoomSounds => ROOM_SOUNDS_NOTE,
             Step::Preferences => PREFERENCES_NOTE,
             // PLACEHOLDER (#841): each owner words its own step's note,
             // opening with "one more thing I can do now" for the re-offer.
@@ -165,6 +169,20 @@ pub const SIT_DONE: &str =
     "(Now you can see them well where they sit. Tell them so in a few words.)";
 pub const SIT_FAILED: &str = "(You still cannot see them well where they sit. Tell them in a few light words that it is fine: they can turn you toward their seat later, or ask you to redo the setup.)";
 pub const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Then call setup_step with step \"who_you_are\": done, skipped if they would rather not, or failed if it could not be done, and then tell them in a few words what they can try later.)";
+/// The room sounds step (#1722 item 1): asked only on a lamp with no
+/// privacy slide (`LAMP_PRIVACY_CONTROLS=no-slide`), where music and
+/// laughter are off until a yes. A yes (`done`) is kept as [`ROOM_SOUNDS_PATH`]
+/// for lamp-ears; no (`skipped`) or silence (`failed`) keeps only the step's
+/// outcome, so it is asked once and stays off.
+pub const ROOM_SOUNDS: &str = "room_sounds";
+/// Outside the voice's 0700 folder, so that lamp-ears (`lampos`) can read
+/// it: `deploy/product/lampos.conf` makes the folder 0750 root:lampos.
+pub const ROOM_SOUNDS_PATH: &str = "/var/lib/lampOS/consent/room-sounds.json";
+/// The group, by name in `/etc/group`, that may read [`ROOM_SOUNDS_PATH`].
+pub const ROOM_SOUNDS_GROUP: &str = "lampos";
+/// The only value of `LAMP_PRIVACY_CONTROLS` that offers the step.
+pub const NO_SLIDE: &str = "no-slide";
+pub const ROOM_SOUNDS_NOTE: &str = "(Nobody has spoken. Ask them once, in a few words, whether you may notice music and laughter in the room, and say just this about it: the lamp notices music and laughter, nothing is recorded. Then call setup_step with step \"room_sounds\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)";
 pub const TOUCH_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, to touch the top of your head gently, then stay quiet.)";
 pub const TOUCH_OFFER: &str = "(Nobody has spoken. Tell them in a few words that there is one more thing you can do now: feel a touch on the top of your head. Ask them to touch it gently, then stay quiet.)";
 pub const TOUCH_REMIND: &str = "(You have not felt a touch yet. Ask them once more, in a few words, to touch the top of your head gently, then stay quiet.)";
@@ -247,13 +265,14 @@ impl Progress {
     /// The storage executor accepts only the bounded onboarding schema.
     pub(crate) fn check(&self) -> io::Result<()> {
         let invalid = || io::Error::new(io::ErrorKind::InvalidData, "invalid onboarding progress");
-        if self.steps.len() > Step::ALL.len() || self.privacy_invitation_tries > 2 {
+        if self.privacy_invitation_tries > 2 {
             return Err(invalid());
         }
-        for (name, kept) in &self.steps {
-            if Step::named(name).is_none() {
-                return Err(invalid());
-            }
+        // A step this build doesn't know (a later build's, rolled back) is
+        // read past and kept as it is, never a refused file: the walk goes
+        // on with the steps it knows (#2110). The file's 16 KiB bound holds
+        // how many there may be.
+        for kept in self.steps.values() {
             if let Some(frame) = kept.framing
                 && (!(0.0..=1.0).contains(&frame.size)
                     || !(-1.0..=1.0).contains(&frame.x)
@@ -393,6 +412,9 @@ pub struct Onboarding {
     near: near::NearFlow,
     /// Unix milliseconds, for evidence dated by the bus (tests set their own).
     unix_clock: fn() -> u64,
+    /// A lamp with no privacy slide (`LAMP_PRIVACY_CONTROLS=no-slide`):
+    /// only then is the room sounds step offered.
+    no_slide: bool,
 }
 
 /// What a read of a body topic found: nothing ever, a message
@@ -439,6 +461,11 @@ pub fn switched_on(switch: Option<&str>, file: Option<&str>) -> Option<PathBuf> 
         .filter(|path| path.is_absolute() && path.file_name().is_some())
 }
 
+/// A lamp with no privacy slide: `LAMP_PRIVACY_CONTROLS` exactly `no-slide`.
+pub fn no_slide(privacy_controls: Option<&str>) -> bool {
+    privacy_controls == Some(NO_SLIDE)
+}
+
 pub fn mailbox_of(file: &Path) -> PathBuf {
     let mut name = file.as_os_str().to_owned();
     name.push(".told");
@@ -466,6 +493,11 @@ impl Onboarding {
                 .ok()
             });
         }
+        walk.no_slide = no_slide(
+            std::env::var(crate::privacy_bus::ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        );
         Some(walk)
     }
 
@@ -500,6 +532,7 @@ impl Onboarding {
             privacy_flow: PrivacyFlow::default(),
             near: near::NearFlow::default(),
             unix_clock: unix_ms,
+            no_slide: false,
             looked: None,
             felt: None,
             goals: None,
@@ -538,6 +571,8 @@ impl Onboarding {
             checkpoint: file.parent().unwrap().join("privacy-pending.json"),
             mailbox: mailbox_of(&file),
             near_call: file.parent().unwrap().join("near-call.json"),
+            room_sounds: file.parent().unwrap().join("room-sounds.json"),
+            room_sounds_group: None,
         })
         .unwrap();
         let mut walk = Self::with_storage(file, owner.client());
@@ -814,6 +849,7 @@ impl Onboarding {
         match step {
             Step::Privacy => self.privacy_available(),
             Step::HowYouSound => self.near_available(),
+            Step::RoomSounds => self.no_slide,
             Step::Touch => (self.available)(step) && self.touches.is_some(),
             _ => (self.available)(step),
         }
@@ -1759,7 +1795,8 @@ pub fn tools() -> Vec<Tool> {
                           talking as the step asked. Only for the step you are leading now; \
                           where_you_sit, how_you_sound, touch and privacy can only be skipped; the \
                           runner requires physical evidence: seeing them, hearing their call, feeling \
-                          their touch, the switch's receipt."
+                          their touch, the switch's receipt. \
+                          room_sounds is done only after a clear yes."
                 .into(),
             parameters: Some(json!({
                 "type": "object",
@@ -1984,7 +2021,7 @@ mod tests {
         }
         report(&room.walk, "preferences", "done");
         assert_eq!(room.wait(120 * S, Some(NEAR_MIDDLE)), NONE);
-        assert_eq!(room.walk.kept().steps.len(), 7);
+        assert_eq!(room.walk.kept().steps.len(), 8);
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
         // Kept across a restart: nothing is asked again.
         let mut again = Room {
@@ -2009,7 +2046,7 @@ mod tests {
         assert_eq!(room.wait(4 * S, Some(SIDE)), [PREFERENCES_NOTE]);
         report(&room.walk, "preferences", "skipped");
         assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
-        assert_eq!(room.walk.kept().steps.len(), 7);
+        assert_eq!(room.walk.kept().steps.len(), 8);
         // "Lamp, let's redo the setup."
         let redo = ToolCall {
             id: "c".into(),
@@ -2155,7 +2192,7 @@ mod tests {
     #[test]
     fn completed_setup_steps_do_not_move_the_body() {
         let mut room = walked("gesture");
-        assert_eq!(room.walk.kept().steps.len(), 7);
+        assert_eq!(room.walk.kept().steps.len(), 8);
         assert_eq!(room.walk.take_gesture(), None);
     }
 
@@ -2529,6 +2566,137 @@ mod tests {
     fn touch_is_not_available_without_the_bus() {
         let room = walked("touch-no-bus");
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::NotAvailable));
+    }
+
+    fn room_sounds_file(room: &Room) -> PathBuf {
+        room.walk.file.parent().unwrap().join("room-sounds.json")
+    }
+
+    /// A no-slide lamp's walk up to the room sounds question.
+    fn asked_room_sounds(name: &str) -> Room {
+        let mut room = Room::new(name);
+        room.walk.no_slide = true;
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [ROOM_SOUNDS_NOTE]);
+        room
+    }
+
+    #[test]
+    fn room_sounds_is_offered_only_on_a_lamp_with_no_slide() {
+        assert!(no_slide(Some("no-slide")));
+        for value in [None, Some("on"), Some("off"), Some(""), Some("no-slide ")] {
+            assert!(!no_slide(value), "{value:?}");
+        }
+        // A slide lamp, or the switch unset: passed over unspoken.
+        let room = walked("room-sounds-slide");
+        assert_eq!(room.outcome(Step::RoomSounds), Some(Outcome::NotAvailable));
+        assert!(!room_sounds_file(&room).exists());
+        assert!(
+            ROOM_SOUNDS_NOTE.contains("the lamp notices music and laughter, nothing is recorded")
+        );
+    }
+
+    #[test]
+    fn a_yes_to_room_sounds_is_kept_once_and_redo_wipes_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let mut room = asked_room_sounds("room-sounds-yes");
+        report(&room.walk, "room_sounds", "done");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        let path = room_sounds_file(&room);
+        let kept: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let at = room.walk.kept().steps["room_sounds"].at_unix_s;
+        assert_eq!(
+            kept,
+            json!({"version":1,"room_sounds":"yes","at_unix_s":at})
+        );
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        report(&room.walk, "preferences", "done");
+        room.wait(4 * S, Some(NEAR_MIDDLE));
+        // A walk rebuilt (a restart, a mute) does not ask again.
+        let mut again = Room {
+            walk: Onboarding::at(room.walk.file.clone()),
+            at: 0,
+            said: 0,
+            still: true,
+            body_on_bus: false,
+        };
+        again.walk.no_slide = true;
+        assert_eq!(again.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(path.exists());
+        // "Let's redo the setup": the yes goes with every other outcome.
+        let redo = ToolCall {
+            id: "c".into(),
+            name: REDO.into(),
+            args: json!({}),
+        };
+        assert!(run(&again.walk.file, &redo).1);
+        assert_eq!(again.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        assert!(again.walk.kept().steps.is_empty());
+        assert!(!path.exists());
+    }
+
+    /// Roll-back safety (#2110): a progress file with a step a later build
+    /// added loads here; the known steps are intact, the walk does not ask
+    /// them again, and the unknown one is kept as it was.
+    #[test]
+    fn a_step_this_build_does_not_know_is_read_past_and_kept() {
+        let mut room = asked_room_sounds("unknown-step");
+        report(&room.walk, "room_sounds", "skipped");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        report(&room.walk, "preferences", "done");
+        room.wait(4 * S, Some(NEAR_MIDDLE));
+        let file = room.walk.file.clone();
+        let mut written: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        written["steps"]["a_later_step"] = json!({"outcome":"done","at_unix_s":9});
+        std::fs::write(&file, serde_json::to_vec(&written).unwrap()).unwrap();
+        let known = room.walk.kept().steps.clone();
+        let mut again = Room {
+            walk: Onboarding::at(file.clone()),
+            at: 0,
+            said: 0,
+            still: true,
+            body_on_bus: false,
+        };
+        again.walk.no_slide = true;
+        assert_eq!(again.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        let loaded = again.walk.kept().steps.clone();
+        for (name, kept) in &known {
+            assert_eq!(loaded.get(name), Some(kept), "{name}");
+        }
+        assert_eq!(loaded["a_later_step"].outcome, Outcome::Done);
+        assert_eq!(loaded.len(), known.len() + 1);
+    }
+
+    #[test]
+    fn no_or_silence_to_room_sounds_leaves_it_off_and_is_not_asked_again() {
+        // No: skipped, kept as an outcome only.
+        let mut room = asked_room_sounds("room-sounds-no");
+        report(&room.walk, "room_sounds", "skipped");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::RoomSounds), Some(Outcome::Skipped));
+        assert!(!room_sounds_file(&room).exists());
+        // Silence: failed after ninety seconds and a quiet room.
+        let mut room = asked_room_sounds("room-sounds-silence");
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::RoomSounds), Some(Outcome::Failed));
+        assert!(!room_sounds_file(&room).exists());
+        report(&room.walk, "preferences", "done");
+        room.wait(4 * S, Some(NEAR_MIDDLE));
+        let mut again = Room {
+            walk: Onboarding::at(room.walk.file.clone()),
+            at: 0,
+            said: 0,
+            still: true,
+            body_on_bus: false,
+        };
+        again.walk.no_slide = true;
+        assert_eq!(again.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(!room_sounds_file(&again).exists());
     }
 
     #[test]

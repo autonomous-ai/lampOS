@@ -2915,6 +2915,8 @@ fn held_onboarding_storage_at(near_call: bool) -> (SessionState, HeldOnboardingS
             checkpoint: directory.join("privacy.json"),
             mailbox: directory.join("mailbox"),
             near_call: directory.join("near-call.json"),
+            room_sounds: directory.join("room-sounds.json"),
+            room_sounds_group: None,
         },
         Box::new(move |tag| {
             if tag.revision == 2 {
