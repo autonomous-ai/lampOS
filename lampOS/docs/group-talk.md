@@ -454,6 +454,52 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
   before.
   - **The lamp's name** heard as the sound began (`name/rising`, up to
     `CALL_BEFORE_US` before its trigger) takes the turn at once, as before.
+  - **A face turned to the lamp and speaking** (#2287's follow-up, the first
+    builder at 17:49 on 20 Oct): a sound the eyes saw a face speak through,
+    turned to the lamp, is decided as before, at once.
+    - **What counts:** speaking and `facing` in at least half of the eyes'
+      looks from the sound's first read to its last speech, plus 300 ms for
+      the eyes' lag (`OWN_LINE_EYES_LAG_US`), and at least three looks
+      (`SpeakingFaces::turned_speakers`). The looks after a short line
+      don't count against it (the reviewer's P3 on #2308).
+    - **Whose it is:** any face turned to the lamp and speaking, not
+      checked as the person the line is for. At the desk that is almost
+      always them, and their "not now" is no room's talk. The record says
+      `own_line_theirs` once, and the journal says so.
+    - **The body's motors:** a sound decided this way isn't taken for the
+      body's motors by the rule after it (`LAMP_MOTION_KEEPS_ANSWER`), as
+      the lamp's name isn't. Welcome back turns the head before its hello,
+      so a "not now" begun as it turns would otherwise be lost there.
+    - **The eyes' rate:** with a face in view they look about four times a
+      second. A 0.6 s "Not now." then has two or three looks, at the edge
+      of the three it needs. So a very short line may still wait as the
+      room's; the lamp run should note the eyes' rate.
+    - **The reader:** the coordinator reads the eyes' faces every 100 ms off
+      the audio path (`speaking_faces::read_from`), only with the switch.
+      It keeps passing ids and two booleans, and nothing past 30 s.
+    - **It needs the eyes to judge speaking while the sound waits:**
+      `LAMP_EYES_SPEAKING=on` with the mouth model running. With
+      `--mouth-on-heard on` they judge it only once the voice hears a line,
+      and a sound waiting here isn't heard yet. Without that reading, the
+      person's sound waits as the room's does.
+  - **With `LAMP_WAIT_KEEPS_ANSWER=words`,** a waiting sound's words are heard
+    as the answer's wait hears them (`own_line_with_words`, through
+    `with_waited_words`; the stream is kept ready while an own line hasn't
+    sounded, `own_line_awaited`).
+    - A lone stop ("Stop.", "Wait.") or a lone put-off ("Not now.",
+      "Later.", "Not yet.", "No thanks."; `wait_words::only_a_put_off`) is
+      let go, never asked of the model, and the line is stopped
+      (`input_let_go_own_line` with `why` `stop_said`).
+    - Any other words are the room's: the sound waits and is let go as
+      before. In a busy office two colleagues' talk has words too, and it
+      mustn't end the hello (the reviewer's P2 on #2308). A face turned to
+      the lamp and speaking is still decided as before, above.
+    - The record's `wait_words` says `"for":"own_line"`, with the count of
+      words only.
+    - **Privacy:** with both switches, a waiting sound's audio before every
+      hello, reminder, news and walk line goes to the relay for its words,
+      room talk included. That is the line `switches.md` already names for
+      `words`, still to be decided, now reached by more sounds.
   - **Any other sound** is let go once the line begins to sound, or 100 ms
     before the sound's own decision deadline (`WAIT_DECIDES_BEFORE_US`). The
     line goes on. The record says `own_line_waits` once for each sound
@@ -467,14 +513,27 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
     block is kept only among the mask's last reads, so a sound held longer
     couldn't be held whole (the reviewer on #2242).
 - **Its cost:** someone who answers the lamp before its hello sounds, without
-  its name, is let go with the room, and says it again over the hello or
-  after it. That includes "not now" and "stop": said before the line sounds,
-  they don't stop it, and the line plays; said over it, they do.
-- **Tested** as a function
-  (`a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds`). The
-  loop's own call isn't driven by a test, as the wait's isn't. On a lamp:
-  played room noise over three hellos before and after, and the cut-in test
-  of a person speaking over one unchanged.
+  its name, and not seen speaking to it, is let go with the room. Without
+  `words`, that includes "not now" and "stop", unless the eyes saw them
+  speaking turned to the lamp. They then say it again over the line or after
+  it, and said over it, it stops it. So the first builder keeps the switch
+  off until a lamp shows the person's own "not now" ends the hello.
+- **Tested** as functions:
+  - `a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds`, with
+    the person's case;
+  - `with_words_a_stop_said_before_the_own_line_sounds_stops_it`: a stop and
+    a put-off stop the line; a colleague's words wait;
+  - `wait_words`' `a_put_off_is_only_what_puts_the_lamp_off`;
+  - `speaking_faces`' `a_face_speaking_turned_to_the_lamp_is_told_apart_from_the_room`.
+
+  The loop's own calls aren't driven by a test, as the wait's aren't. On a
+  lamp:
+  - played room noise over three hellos, before and after;
+  - the person at the lamp saying "not now" before a hello sounds, with the
+    eyes judging speaking: the hello ends;
+  - with `words`, "stop" or "not now" before it sounds stops it, and two
+    colleagues talking nearby don't;
+  - the cut-in test of a person speaking over one, unchanged.
 
 **With `LAMP_ASKER_FIRST=on`, the person asked comes first while the
 answer is awaited** (`crates/voice/src/asker_first.rs`, #829; off unless

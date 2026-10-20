@@ -46,6 +46,9 @@ struct Look {
     at: Instant,
     /// The passing ids that read speaking in this look.
     speaking: Vec<String>,
+    /// Of those, the ones turned to the lamp (`facing`), for a line the lamp
+    /// began itself (#2287's follow-up, [`SpeakingFaces::turned_speakers`]).
+    turned: Vec<String>,
 }
 
 #[derive(Default)]
@@ -94,7 +97,7 @@ impl SpeakingFaces {
                 looks.frame = None;
             }
         }
-        let speaking = frame
+        let speaking_faces: Vec<_> = frame
             .map(|(_, faces)| {
                 faces
                     .faces
@@ -104,10 +107,15 @@ impl SpeakingFaces {
                             .as_ref()
                             .is_some_and(|speaking| speaking.state == SpeakingState::Yes)
                     })
-                    .map(|face| face.id.clone())
                     .collect()
             })
             .unwrap_or_default();
+        let speaking = speaking_faces.iter().map(|face| face.id.clone()).collect();
+        let turned = speaking_faces
+            .iter()
+            .filter(|face| face.facing == Some(true))
+            .map(|face| face.id.clone())
+            .collect();
         let kept = &mut looks.kept;
         while kept
             .front()
@@ -116,12 +124,29 @@ impl SpeakingFaces {
         {
             kept.pop_front();
         }
-        kept.push_back(Look { at, speaking });
+        kept.push_back(Look {
+            at,
+            speaking,
+            turned,
+        });
     }
 
     /// The faces that read speaking in at least half of the looks from
     /// `from` to `to`.
     pub fn speakers(&self, from: Instant, to: Instant) -> Speakers {
+        self.counted(from, to, |look| &look.speaking)
+    }
+
+    /// The faces that read speaking and turned to the lamp in at least half
+    /// of the looks from `from` to `to`: someone at the lamp talking to it,
+    /// not the room (#2287's follow-up).
+    pub fn turned_speakers(&self, from: Instant, to: Instant) -> Speakers {
+        self.counted(from, to, |look| &look.turned)
+    }
+
+    /// The ids `of` each look gives in at least half of the looks from
+    /// `from` to `to`, and none with fewer than [`FEWEST_LOOKS`].
+    fn counted(&self, from: Instant, to: Instant, of: impl Fn(&Look) -> &Vec<String>) -> Speakers {
         let Ok(looks) = self.looks.lock() else {
             return Speakers::new();
         };
@@ -134,7 +159,7 @@ impl SpeakingFaces {
             return Speakers::new();
         }
         let mut counts: Vec<(&str, usize)> = Vec::new();
-        for id in during.iter().flat_map(|look| &look.speaking) {
+        for id in during.iter().flat_map(|look| of(look)) {
             match counts.iter_mut().find(|(seen, _)| *seen == id.as_str()) {
                 Some((_, count)) => *count += 1,
                 None => counts.push((id, 1)),
@@ -287,6 +312,34 @@ mod tests {
     }
 
     use SpeakingState::{No, Unknown, Yes};
+
+    /// #2287's follow-up: of the faces speaking, only those turned to the
+    /// lamp in at least half the looks are its own person's; one turned away,
+    /// or not said, is the room's. The speakers are as before.
+    #[test]
+    fn a_face_speaking_turned_to_the_lamp_is_told_apart_from_the_room() {
+        let eyes = SpeakingFaces::default();
+        let from = Instant::now();
+        for index in 0..4u32 {
+            let mut seen = faces(&[("f1", Yes), ("f2", Yes), ("f3", Yes)]);
+            seen.faces[0].facing = Some(true);
+            seen.faces[1].facing = Some(false);
+            // f3 is turned to the lamp in one look of four only.
+            seen.faces[2].facing = (index == 0).then_some(true);
+            eyes.look(from + EVERY * index, Some((("b", u64::from(index)), &seen)));
+        }
+        let to = from + EVERY * 4;
+        assert_eq!(eyes.turned_speakers(from, to), ["f1"]);
+        assert_eq!(eyes.speakers(from, to), ["f1", "f2", "f3"]);
+        // Turned to the lamp but not speaking is no one's line.
+        let quiet = SpeakingFaces::default();
+        for index in 0..3u32 {
+            let mut seen = faces(&[("f1", No)]);
+            seen.faces[0].facing = Some(true);
+            quiet.look(from + EVERY * index, Some((("b", u64::from(index)), &seen)));
+        }
+        assert!(quiet.turned_speakers(from, from + EVERY * 3).is_empty());
+    }
 
     /// A face speaking in at least half of the line's looks spoke through
     /// it; one under half did not; two faces doing so are several.

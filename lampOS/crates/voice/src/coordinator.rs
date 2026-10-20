@@ -209,19 +209,32 @@ fn own_line_keeps_from_environment() -> bool {
     std::env::var(OWN_LINE_KEEPS_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// How long after a sound's last speech the eyes' looks still count for it
+/// ([`OwnLineWait::theirs`]): their mouth reading comes after the sound.
+const OWN_LINE_EYES_LAG_US: u64 = 300_000;
+
 /// What a new sound does while a line the lamp started on its own waits for
 /// its first audio (`LAMP_OWN_LINE_KEEPS`, [`while_own_line_waits`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum WhileOwnLineWaits {
     /// Not such a line, it has sounded, or the switch is off: as before.
     AsBefore,
-    /// The lamp's name was heard in it: decided as before, at once.
+    /// The lamp's name was heard in it, or with `LAMP_WAIT_KEEPS_ANSWER=words`
+    /// its words ask something: decided as before, at once.
     Decide,
+    /// The eyes saw a face speaking through it, turned to the lamp: the
+    /// person the line is for, not the room (#2287's follow-up). Decided as
+    /// before, at once.
+    Theirs,
     /// Not yet: it stays pending.
     Wait,
     /// The line began to sound, or the sound's own deadline came: let go as
     /// the room's, and the line goes on.
     LetGo(&'static str),
+    /// With `LAMP_WAIT_KEEPS_ANSWER=words`, its words only told the lamp to
+    /// stop: let go, never asked of the model, and the line is stopped, as a
+    /// stop said before an answer stops it (#2287's follow-up).
+    Stop,
 }
 
 /// A line the lamp started on its own, with no person's words it answers: a
@@ -251,15 +264,30 @@ struct OwnLineWait {
     heard: bool,
     /// When the lamp's name was last heard beginning.
     name_began_us: Option<u64>,
+    /// The eyes saw a face speaking, turned to the lamp, in at least half of
+    /// their looks since the sound's first read
+    /// ([`crate::speaking_faces::SpeakingFaces::turned_speakers`]).
+    theirs: bool,
+}
+
+/// Whether `current` is a line the lamp started on its own that hasn't
+/// sounded, with `on`: a sound may wait for it, so a stream for a waited
+/// sound's words is kept ready (`LAMP_WAIT_KEEPS_ANSWER=words`).
+fn own_line_awaited(current: Option<&Reply>, on: bool, lamp_began: Option<u64>) -> bool {
+    current.is_some_and(|current| {
+        on && own_line(current, lamp_began) && !current.had_audio && current.playback.is_none()
+    })
 }
 
 /// [`WhileOwnLineWaits`] for `candidate` at `at_us` (`LAMP_OWN_LINE_KEEPS`):
 /// while a line the lamp started on its own has not sounded, a new sound
 /// heard with echo evidence waits, unless the lamp's name began in it (up
-/// to `CALL_BEFORE_US` before its trigger). One that waited is let go once
-/// the line sounds, or 100 ms before its own decision deadline. A sound
-/// that begins once the line sounds is a cut-in over the lamp's voice,
-/// judged as before, so words said over the lamp still stop it.
+/// to `CALL_BEFORE_US` before its trigger) or the eyes saw a face speaking
+/// through it turned to the lamp: that is the person the line is for, and
+/// their "not now" is no room's talk. One that waited is let go once the
+/// line sounds, or 100 ms before its own decision deadline. A sound that
+/// begins once the line sounds is a cut-in over the lamp's voice, judged as
+/// before, so words said over the lamp still stop it.
 fn while_own_line_waits(
     wait: OwnLineWait,
     reply: Option<&Reply>,
@@ -272,6 +300,7 @@ fn while_own_line_waits(
         waited,
         heard,
         name_began_us,
+        theirs,
     } = wait;
     let Some(current) = reply.filter(|current| on && own_line(current, lamp_began)) else {
         return WhileOwnLineWaits::AsBefore;
@@ -291,6 +320,9 @@ fn while_own_line_waits(
     }) {
         return WhileOwnLineWaits::Decide;
     }
+    if theirs {
+        return WhileOwnLineWaits::Theirs;
+    }
     if at_us
         >= candidate
             .decision_deadline_us
@@ -299,6 +331,66 @@ fn while_own_line_waits(
         return WhileOwnLineWaits::LetGo("deadline");
     }
     WhileOwnLineWaits::Wait
+}
+
+/// `own`, [`while_own_line_waits`] for `candidate`, with its words
+/// (`LAMP_WAIT_KEEPS_ANSWER=words`) as the answer's wait hears them
+/// ([`with_waited_words`]): a sound that waits or is let go is judged by
+/// them too. A lone stop, or a lone put-off ("Not now.", "Later.",
+/// [`crate::wait_words::only_a_put_off`]), stops the line, never asked of
+/// the model. Any other words are as `own` has them: in a busy office two
+/// colleagues' talk has words too, and is the room's (the reviewer's P2 on
+/// #2308). Any other `own` is as it is.
+#[allow(clippy::too_many_arguments)]
+fn own_line_with_words(
+    words: &mut crate::wait_words::WaitWords,
+    own: WhileOwnLineWaits,
+    candidate: &crate::admission::Candidate,
+    audio: &[ObservedAudio],
+    ended: bool,
+    pause_blocks: u16,
+    last_speech_us: u64,
+    at_us: u64,
+) -> (WhileOwnLineWaits, Option<WordsTold>) {
+    let as_answer = match own {
+        WhileOwnLineWaits::Wait => WhileAnswerWaits::Wait,
+        WhileOwnLineWaits::LetGo(why) => WhileAnswerWaits::LetGo(why),
+        _ => return (own, None),
+    };
+    let (then, told) = with_waited_words(
+        words,
+        as_answer,
+        candidate,
+        audio,
+        ended,
+        pause_blocks,
+        last_speech_us,
+        false,
+        at_us,
+    );
+    let (own, told) = match then {
+        // Words that ask something: a put-off stops the line as a stop does;
+        // anything else is the room's, and the sound is as it was.
+        WhileAnswerWaits::Decide if words.put_off(candidate.id) => (
+            WhileOwnLineWaits::Stop,
+            told.map(|told| WordsTold {
+                took: false,
+                stop: true,
+                ..told
+            }),
+        ),
+        WhileAnswerWaits::Decide => (
+            own,
+            told.map(|told| WordsTold {
+                took: false,
+                ..told
+            }),
+        ),
+        WhileAnswerWaits::Wait => (WhileOwnLineWaits::Wait, told),
+        WhileAnswerWaits::LetGo(why) => (WhileOwnLineWaits::LetGo(why), told),
+        WhileAnswerWaits::Stop => (WhileOwnLineWaits::Stop, told),
+    };
+    (own, told)
 }
 
 /// Whether `value`, the voice's `LAMP_WAIT_KEEPS_ANSWER`, turns the wait on:
@@ -4268,6 +4360,17 @@ fn conversation_with_gate(
     // The newest turn the lamp began itself with no ticket or news on it:
     // its hello to someone arriving, or a line of the setup walk.
     let mut lamp_began: Option<u64> = None;
+    // The eyes' faces, for the person an own line is for (#2287's
+    // follow-up): read every 100 ms off the audio path, only with the
+    // switch; passing ids and booleans, nothing kept past 30 s.
+    let own_line_eyes = own_line_keeps
+        .then(|| std::sync::Arc::new(crate::speaking_faces::SpeakingFaces::default()));
+    let _own_line_reader = own_line_eyes.as_ref().and_then(|eyes| {
+        let root = lamp_bus::Bus::from_environment().ok()?.root().to_path_buf();
+        crate::speaking_faces::read_from(std::sync::Arc::clone(eyes), &root)
+    });
+    // The candidate last decided as the own line's person, recorded once.
+    let mut own_theirs_for: Option<crate::admission::CandidateId> = None;
     // When the lamp's name was last heard beginning, and when the sound
     // last let go had stopped, for the wait.
     let mut name_began_us: Option<u64> = None;
@@ -6346,7 +6449,8 @@ fn conversation_with_gate(
                     })
                     .map(|(_, at)| at);
                 let awaited = snapshot.microphone_permission() == Permission::Allowed
-                    && words_awaited(reply.as_ref(), asked_until_us, monotonic_us());
+                    && (words_awaited(reply.as_ref(), asked_until_us, monotonic_us())
+                        || own_line_awaited(reply.as_ref(), own_line_keeps, lamp_began));
                 words.follow(awaited, still_pending);
             }
             let step = match update.step {
@@ -6454,9 +6558,97 @@ fn conversation_with_gate(
                         waited: own_kept_for == Some(candidate.id),
                         heard: !playback_mask.is_duplex() || frame.echo.is_some(),
                         name_began_us,
+                        // A face seen speaking through the sound, turned to
+                        // the lamp: from its first read to its last speech
+                        // and the eyes' lag after it, so the looks after a
+                        // short "Not now." don't count against it (the
+                        // reviewer's P3 on #2308).
+                        theirs: own_line_eyes.as_ref().is_some_and(|eyes| {
+                            let (now, now_us) = (Instant::now(), monotonic_us());
+                            let back = |at_us: u64| {
+                                now.checked_sub(Duration::from_micros(now_us.saturating_sub(at_us)))
+                            };
+                            let until_us = if last_speech_us >= candidate.first_read_at_us {
+                                last_speech_us
+                                    .saturating_add(OWN_LINE_EYES_LAG_US)
+                                    .min(now_us)
+                            } else {
+                                now_us
+                            };
+                            back(candidate.first_read_at_us)
+                                .zip(back(until_us))
+                                .is_some_and(|(from, to)| {
+                                    !eyes.turned_speakers(from, to).is_empty()
+                                })
+                        }),
                     };
-                    match while_own_line_waits(own_wait, reply.as_ref(), &candidate, at_us) {
+                    let own = while_own_line_waits(own_wait, reply.as_ref(), &candidate, at_us);
+                    // Decided as the line's person's: no rule after it takes
+                    // it for the body's motors, as the lamp's name isn't.
+                    let mut own_theirs_now = false;
+                    // With `words`, its words too, as the answer's wait
+                    // hears them (#2287's follow-up).
+                    let own = match wait_words.as_mut() {
+                        Some(words) => {
+                            let (own, told) = own_line_with_words(
+                                words,
+                                own,
+                                &candidate,
+                                admission.pending_audio(candidate.id).unwrap_or_default(),
+                                admission.pending_ended(),
+                                detector.pause_blocks(),
+                                last_speech_us,
+                                at_us,
+                            );
+                            if let Some(told) = told {
+                                // The count of its words only, never the words.
+                                record(
+                                    trace,
+                                    json!({"kind":"wait_words","turn":reply.as_ref().map(|current| current.owner.turn()),
+                                        "candidate":candidate.id,"words":told.words,"took":told.took,
+                                        "stop":told.stop,"asked_at_us":told.asked_at_us,"at_us":at_us,
+                                        "for":"own_line"}),
+                                )?;
+                            }
+                            own
+                        }
+                        None => own,
+                    };
+                    match own {
                         WhileOwnLineWaits::AsBefore | WhileOwnLineWaits::Decide => {}
+                        WhileOwnLineWaits::Theirs => {
+                            own_theirs_now = true;
+                            if own_theirs_for != Some(candidate.id) {
+                                own_theirs_for = Some(candidate.id);
+                                eprintln!(
+                                    "lamp-voice: a sound while the lamp's own line waited to sound was its person's, turned to the lamp and speaking: decided as before"
+                                );
+                                record(
+                                    trace,
+                                    json!({"kind":"own_line_theirs","turn":reply.as_ref().map(|current| current.owner.turn()),
+                                        "candidate":candidate.id,"at_us":at_us}),
+                                )?;
+                            }
+                        }
+                        WhileOwnLineWaits::Stop => {
+                            // Only a stop, said before the line sounded:
+                            // never asked of the model, and the line is
+                            // stopped on the next pass, as a stop said before
+                            // an answer is.
+                            if let Some(rejection) = admission.release_prospective(monotonic_us())?
+                            {
+                                record_input_rejection(trace, rejection)?;
+                            }
+                            detector.clear_prospective();
+                            own_kept_for = None;
+                            waited_stop = true;
+                            record(
+                                trace,
+                                json!({"kind":"input_let_go_own_line","turn":reply.as_ref().map(|current| current.owner.turn()),
+                                    "candidate":candidate.id,"why":"stop_said","at_us":at_us}),
+                            )?;
+                            continue;
+                        }
                         WhileOwnLineWaits::Wait => {
                             if own_kept_for != Some(candidate.id) {
                                 own_kept_for = Some(candidate.id);
@@ -6491,7 +6683,7 @@ fn conversation_with_gate(
                     // joint, while an answer is awaited, is the lamp's own
                     // motors: let go, and the answer goes on. Until the
                     // body has said where it was then, it waits.
-                    if let Some(motion) = motion_in.as_mut() {
+                    if let Some(motion) = motion_in.as_mut().filter(|_| !own_theirs_now) {
                         let waits_until_us = candidate
                             .trigger_read_at_us
                             .saturating_add(crate::body_motion::WAITS_US)
