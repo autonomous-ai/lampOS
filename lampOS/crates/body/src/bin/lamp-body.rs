@@ -2159,6 +2159,53 @@ mod tests {
         }
     }
 
+    /// #2188: the product unit's own `ExecStart`, with the poses a freshly
+    /// measured lamp has (lamp-body-measure writes no `--gaze`), starts with
+    /// gaze off; with this lamp's `--gaze` added once measured, gaze is on.
+    /// Read from the unit file, so a unit and this rule cannot drift apart.
+    #[test]
+    fn the_product_unit_starts_a_fresh_lamp_with_gaze_off_and_on_once_measured() {
+        const UNIT: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/product/lamp-body.service"
+        ));
+        let exec = UNIT
+            .lines()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .expect("the product unit has an ExecStart");
+        // lamp-a63e's lamp.env as lamp-body-measure wrote it (19 Oct): no --gaze.
+        let measured = "--home 1772,2052,2038 --folded-arm 2047,2046 --stand 1772,2052,2038,2657,2602 --pitch-window 1740,2030 --torque on";
+        assert!(!measured.contains("--gaze "), "{measured}");
+        // systemd splits an unquoted $BODY_POSES on whitespace, and %H is the host.
+        let start = |poses: &str| {
+            let words: Vec<String> = exec
+                .split_whitespace()
+                .skip(1)
+                .flat_map(|word| match word {
+                    "$BODY_POSES" => poses.split_whitespace().map(str::to_owned).collect(),
+                    "%H" => vec!["lamp-a63e".to_owned()],
+                    word => vec![word.to_owned()],
+                })
+                .collect();
+            parse(words.iter().map(OsString::from))
+        };
+        let fresh = start(measured)
+            .expect("a freshly measured lamp's body starts")
+            .unwrap();
+        assert!(fresh.gaze.is_none());
+        assert_eq!(
+            fresh.unmeasured_gaze_socket,
+            Some(PathBuf::from("/run/lampos-body/gaze.sock"))
+        );
+        let looked = start(&format!("{measured} --gaze 755,555"))
+            .expect("a lamp with its gaze measured starts")
+            .unwrap();
+        let gaze = looked.gaze.expect("gaze is on once measured");
+        assert_eq!(gaze.turn, [755, 555]);
+        assert_eq!(gaze.reach, [480, 120], "the unit's own --gaze-reach");
+        assert!(looked.unmeasured_gaze_socket.is_none());
+    }
+
     #[test]
     fn a_gesture_is_asked_for_by_the_name_of_a_clip_and_nothing_else() {
         const WIGGLE: lamp_body::clips::Clip = lamp_body::clips::Clip {
