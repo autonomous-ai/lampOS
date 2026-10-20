@@ -77,3 +77,8 @@ lamp-tasks = { path = "../tasks" }
 # Paused runtime clock, as `lamp-gemini`'s: speech to text's wait for its
 # last words measured without the wait.
 tokio = { version = "=1.53.1", features = ["test-util"] }
+
+# Its checks are tested by `cargo test`; it renders only when named (#1844).
+[[example]]
+name = "render_line_second"
+test = true
