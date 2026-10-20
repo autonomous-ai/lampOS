@@ -295,7 +295,12 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   does not stop the voice on a product lamp, #1167). A pins file changed by
   hand is kept, and must pass the touch path's checks, which are stricter
   than the old reader's (chip 0, the button on line 99, head pads on 37,
-  96, 97 or 98), or Controls does not start, and the button with it. `/etc/lampOS` is made 0755 and each of these
+  96, 97 or 98), or Controls does not start, and the button with it. A
+  lamp's own pins file with no `privacy` section gains the build's, and
+  only that key; the rest and its mode are kept, and install says so
+  (`pins_gain_privacy`). The product's units select the privacy route, and
+  without the section Controls has no privacy source and the lamp never
+  hears (the reviewer on #2143). `/etc/lampOS` is made 0755 and each of these
   folders 0755, files 0644: readable by `lampos`. A default found with install's own bytes but another mode is install's, and is given its mode (lamp-cb94's settings were there before any install at 0600, and Controls and Expression could not read them, #705); a lamp's own setting found closed is kept as it is, and said. lamp-4ace's `/etc/lampOS`
   is root's alone; `install` does not open one made closed (credentials may
   be below it) and says so. The voice's turn-end model and ONNX

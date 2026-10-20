@@ -176,12 +176,64 @@ fn speech(
 
 /// Band-limited reading of a 24 kHz signal at a fractional frame, cut at
 /// 7 kHz as the microphone's own filter would before 16 kHz.
+///
+/// Each tap's distance from the frame is the frame's fraction less a whole
+/// number of taps, so the sine of its sinc and the cosine of its window come
+/// by angle addition from the fraction's and a table's: four sines and
+/// cosines a reading rather than sixty-four. Building a 45 s scene took about
+/// 2.3 s of the two moving-echo tests on ARM64 before (#1806).
+/// `the_tabled_reader_reads_as_the_direct_one` holds it to the direct sum.
 struct Reader {
     taps: i64,
     cut: f64,
+    /// For each tap from `1 - taps` to `taps`: the sine and cosine of
+    /// `PI * cut * tap`, and of `PI * tap / taps`.
+    sinc_turns: Vec<(f64, f64)>,
+    window_turns: Vec<(f64, f64)>,
 }
 impl Reader {
+    fn new(taps: i64, cut: f64) -> Self {
+        let turns = |scale: f64| {
+            (-taps + 1..=taps)
+                .map(|tap| (scale * tap as f64).sin_cos())
+                .collect()
+        };
+        Self {
+            taps,
+            cut,
+            sinc_turns: turns(PI * cut),
+            window_turns: turns(PI / taps as f64),
+        }
+    }
+
     fn at(&self, signal: &[f64], position: f64) -> f64 {
+        let whole = position.floor() as i64;
+        let fraction = position - whole as f64;
+        let (sin_a, cos_a) = (PI * self.cut * fraction).sin_cos();
+        let (sin_w, cos_w) = (PI * fraction / self.taps as f64).sin_cos();
+        let mut sum = 0.0;
+        for (slot, tap) in (-self.taps + 1..=self.taps).enumerate() {
+            let index = whole + tap;
+            if index < 0 || index as usize >= signal.len() {
+                continue;
+            }
+            let x = position - index as f64;
+            // sin(a - b) and cos(w - v), with b and v the tap's.
+            let (sin_b, cos_b) = self.sinc_turns[slot];
+            let sinc = if x.abs() < 1e-9 {
+                1.0
+            } else {
+                (sin_a * cos_b - cos_a * sin_b) / (PI * self.cut * x)
+            };
+            let (sin_v, cos_v) = self.window_turns[slot];
+            let window = 0.5 + 0.5 * (cos_w * cos_v + sin_w * sin_v);
+            sum += signal[index as usize] * self.cut * sinc * window;
+        }
+        sum
+    }
+
+    /// The same sum, each tap's sine and cosine taken directly.
+    fn at_directly(&self, signal: &[f64], position: f64) -> f64 {
         let whole = position.floor() as i64;
         let mut sum = 0.0;
         for tap in -self.taps + 1..=self.taps {
@@ -200,6 +252,25 @@ impl Reader {
         }
         sum
     }
+}
+
+#[test]
+fn the_tabled_reader_reads_as_the_direct_one() {
+    let reader = Reader::new(16, 7_000.0 / 12_000.0);
+    let signal = speech(RENDER_RATE, 2.0, 205.0, 0x1a4b, &|_| true);
+    let mut worst: f64 = 0.0;
+    // Whole frames, fractions, both ends and a step past them.
+    for step in 0..20_000 {
+        let position = -20.0 + step as f64 * 2.4037;
+        let tabled = reader.at(&signal, position);
+        let direct = reader.at_directly(&signal, position);
+        worst = worst.max((tabled - direct).abs());
+    }
+    for position in [0.0, 1.0, 100.0, 100.5, signal.len() as f64 - 1.0] {
+        worst =
+            worst.max((reader.at(&signal, position) - reader.at_directly(&signal, position)).abs());
+    }
+    assert!(worst < 1e-12, "{worst}");
 }
 
 /// The echo's delay after the speaker plays a frame, in seconds, at `t`.
@@ -281,10 +352,7 @@ impl Sound {
         let person_talks = move |t: f64| overlapping(t) || (t >= seconds - 1.5 && t < seconds);
         let lamp = speech(RENDER_RATE, seconds + 1.0, 205.0, 0x1a4b, &lamp_talks);
         let person = speech(CAPTURE_RATE, seconds + 1.0, 118.0, 0x77e1, &person_talks);
-        let reader = Reader {
-            taps: 16,
-            cut: 7_000.0 / 12_000.0,
-        };
+        let reader = Reader::new(16, 7_000.0 / 12_000.0);
         let reflections = [
             (0.0, 1.0),
             (0.0012, 0.5),

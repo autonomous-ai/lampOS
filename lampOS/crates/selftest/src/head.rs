@@ -32,6 +32,12 @@ pub const PITCH_COUNTS: f64 = 40.0;
 pub const ROLL_COUNTS: f64 = 20.0;
 /// The body's own take-hold tolerance, in counts; its tracking stop is 30.
 pub const NEAR: f64 = 12.0;
+/// An axis whose goal the body moves less than this, either way, is not
+/// fitted to move: lamp-4ace's and lamp-c0a4's units give the head's roll
+/// a reach of one count (`--reach 150,15,1,250`). It is named in the
+/// report and the head move is judged on the other axis (the first
+/// builder on #1340, 20 Oct 11:09).
+pub const FITTED_FROM: f64 = 5.0;
 /// The goal must be met within this of being asked.
 pub const REACH_WITHIN: Duration = Duration::from_secs(2);
 /// The joint must be back within this of the move being let go.
@@ -52,8 +58,11 @@ const STEP: Duration = Duration::from_millis(20);
 const STEADY: Duration = Duration::from_millis(200);
 /// A servo's turn is 4,096 counts.
 const COUNTS_A_RADIAN: f64 = 4096.0 / TAU;
-/// What one move takes at most, with the margin of a renewal or two.
-const ONE_MOVE: Duration = Duration::from_millis(5_600);
+/// How long a joint may take to hold still before a move reads its start.
+const SETTLE_WITHIN: Duration = Duration::from_secs(1);
+/// What one move takes at most, with the margin of a renewal or two, and
+/// the wait for the joint to hold still first.
+const ONE_MOVE: Duration = Duration::from_millis(6_600);
 
 /// Which joint a move asks of.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -207,9 +216,21 @@ pub fn expected(goal_moved: f64, asked: f64) -> f64 {
     goal_moved.min(asked)
 }
 
+/// How far `position` is from anywhere between where the joint was asked
+/// to go (`wanted_at`) and the goal the body wrote (`goal`). Lifting a
+/// relaxed head, the body writes its goal 40 counts past the pose
+/// (`GLANCE_LIFT_LEAD`): lamp-52e6's head stops about 30 short of it, and
+/// lamp-c0a4's, a head that follows, goes all the way, 80 counts from
+/// where it began (Thirteen on #1340, 20 Oct 10:31). Both followed.
+pub fn off_the_way(position: f64, wanted_at: f64, goal: f64) -> f64 {
+    let (low, high) = (wanted_at.min(goal), wanted_at.max(goal));
+    (low - position).max(position - high).max(0.0)
+}
+
 /// When the move was met: the body's goal moved the asked way and has held
 /// still for a moment, and the joint is within [`NEAR`] of where it was
-/// asked to go from `start` ([`expected`]). That move in counts beside it.
+/// asked to go from `start` ([`expected`]), or of the goal the body wrote
+/// past it, or between ([`off_the_way`]). That move in counts beside it.
 pub fn reached(
     start: f64,
     goal_was: f64,
@@ -223,7 +244,7 @@ pub fn reached(
             continue;
         }
         let wanted = expected(moved, asked);
-        if (sample.position - (start + sign * wanted)).abs() > NEAR {
+        if off_the_way(sample.position, start + sign * wanted, sample.commanded) > NEAR {
             continue;
         }
         // Unchanged since the last reading at least `STEADY` before.
@@ -341,18 +362,64 @@ pub fn judge(tried: &[Tried], interrupted: Option<&str>) -> PartResult {
             .iter()
             .any(|t| t.joint == joint && t.sign == sign && matches!(t.moved, Moved::Done { .. }))
     };
-    let missing: Vec<String> = MOVES
-        .iter()
-        .filter(|(joint, sign)| !done(*joint, *sign))
-        .map(|(joint, sign)| format!("{} {}", joint.name(), way(*joint, *sign)))
-        .collect();
-    if missing.len() == MOVES.len() {
+    let taken = |t: &Tried| !matches!(t.moved, Moved::NotTaken);
+    if !tried.iter().any(taken) {
         return PartResult::new(
             PART,
             Verdict::NotChecked,
             "the body took no move: it runs without LAMP_EXPRESSION_BODY=on, or with --rest-glance off",
         );
     }
+    // An axis the body moved under `FITTED_FROM` either way isn't fitted
+    // to move: named, never silently skipped, and not judged.
+    let unfitted: Vec<(Joint, f64)> = [Joint::Pitch, Joint::Roll]
+        .into_iter()
+        .filter_map(|joint| {
+            let most = tried
+                .iter()
+                .filter(|t| t.joint == joint)
+                .map(|t| match t.moved {
+                    Moved::NotTaken => 0.0,
+                    Moved::Done { goal, .. }
+                    | Moved::NotReached { goal, .. }
+                    | Moved::NotBack { goal, .. } => goal,
+                })
+                .fold(0.0f64, f64::max);
+            (most < FITTED_FROM).then_some((joint, most))
+        })
+        .collect();
+    for (joint, most) in &unfitted {
+        values.push((
+            format!("{}_fitted", joint.name()),
+            format!(
+                "no: its goal moved at most {most:.0} {}",
+                if most.round() == 1.0 {
+                    "count"
+                } else {
+                    "counts"
+                }
+            ),
+        ));
+    }
+    let with_values = |mut result: PartResult| {
+        for (key, value) in &values {
+            result = result.with(key, value);
+        }
+        result
+    };
+    let fitted = |joint: Joint| !unfitted.iter().any(|(other, _)| *other == joint);
+    if !fitted(Joint::Pitch) && !fitted(Joint::Roll) {
+        return with_values(PartResult::new(
+            PART,
+            Verdict::NotChecked,
+            "the body moved neither head_pitch nor head_roll 5 counts",
+        ));
+    }
+    let missing: Vec<String> = MOVES
+        .iter()
+        .filter(|(joint, sign)| fitted(*joint) && !done(*joint, *sign))
+        .map(|(joint, sign)| format!("{} {}", joint.name(), way(*joint, *sign)))
+        .collect();
     if !missing.is_empty() {
         return with_values(PartResult::new(
             PART,
@@ -360,7 +427,68 @@ pub fn judge(tried: &[Tried], interrupted: Option<&str>) -> PartResult {
             &format!("the body did not move the goal for {}", missing.join(", ")),
         ));
     }
-    with_values(PartResult::new(PART, Verdict::Pass, ""))
+    let passed = match unfitted.first() {
+        Some((joint, _)) => format!(
+            "{} is not fitted to move: judged on {} alone",
+            joint.name(),
+            if *joint == Joint::Roll {
+                Joint::Pitch.name()
+            } else {
+                Joint::Roll.name()
+            }
+        ),
+        None => String::new(),
+    };
+    with_values(PartResult::new(PART, Verdict::Pass, &passed))
+}
+
+/// A joint's position and goal once its position has held within half a
+/// count for [`STEADY`], as [`reached`] asks of a goal; `Err` if it does not
+/// within [`SETTLE_WITHIN`], or something ends the check meanwhile.
+fn settled(bus: &Bus, watch: &mut Watch, joint: Joint) -> Result<(f64, f64), String> {
+    let began = Instant::now();
+    let mut still: Option<(Instant, f64)> = None;
+    let mut last_seq = None;
+    loop {
+        if let Some(why) = watch.interruption(bus) {
+            return Err(why);
+        }
+        let Some((seq, position, goal)) = read(bus, joint) else {
+            return Err(format!(
+                "{} is not read on {}",
+                joint.name(),
+                JointState::TOPIC
+            ));
+        };
+        if last_seq != Some(seq) {
+            last_seq = Some(seq);
+            match still {
+                Some((since, at)) if (position - at).abs() < 0.5 => {
+                    if since.elapsed() >= STEADY {
+                        return Ok((position, goal));
+                    }
+                }
+                _ => still = Some((Instant::now(), position)),
+            }
+        }
+        if began.elapsed() >= SETTLE_WITHIN {
+            // A body that stopped saying its joints is named as such, as
+            // before a move (the reviewer on #1340).
+            if let Some(age) = newest_age(bus).filter(|age| *age > listen::FAST_FRESH) {
+                return Err(format!(
+                    "lamp-body is not publishing {} (newest {:.1} s old)",
+                    JointState::TOPIC,
+                    age.as_secs_f64()
+                ));
+            }
+            return Err(format!(
+                "{} did not hold still within {} s before its move",
+                joint.name(),
+                SETTLE_WITHIN.as_secs()
+            ));
+        }
+        std::thread::sleep(STEP);
+    }
 }
 
 /// A joint's position and goal, in counts, from the body's newest reading.
@@ -567,13 +695,11 @@ fn one_move(
             age.unwrap_or_default().as_secs_f64()
         ));
     }
-    let Some((_, start, goal_was)) = read(bus, joint) else {
-        return Err(format!(
-            "{} is not read on {}",
-            joint.name(),
-            JointState::TOPIC
-        ));
-    };
+    // From where the joint holds still, not from where the last move's
+    // return was counted while it was still settling: the next return is
+    // judged against this start (Tests on #1329: the merged test passed by
+    // 0.1 count of `NEAR`, and a head settling a little slower fails).
+    let (start, goal_was) = settled(bus, watch, joint)?;
     let target = joint.counts() * sign;
     let began = Instant::now();
     let mut samples: Vec<Sample> = Vec::new();
@@ -621,9 +747,9 @@ fn one_move(
             return Ok(Moved::NotTaken);
         }
         let wanted = expected(moved, joint.counts());
-        let gap = samples
-            .last()
-            .map_or(f64::NAN, |s| (s.position - (start + sign * wanted)).abs());
+        let gap = samples.last().map_or(f64::NAN, |s| {
+            off_the_way(s.position, start + sign * wanted, s.commanded)
+        });
         return Ok(Moved::NotReached { goal: wanted, gap });
     };
     let mut away = f64::NAN;
@@ -816,6 +942,30 @@ mod tests {
             reached(1700.0, 1700.0, -1.0, 40.0, &lifted),
             Some((Duration::from_millis(800), 40.0))
         );
+        // A head that follows the lifted goal all the way, as lamp-c0a4's
+        // (Thirteen on #1340, 10:31): 80 counts up for the asked 40, and
+        // met. One that stays where it began is not.
+        let followed = [
+            at(0, 1700.0, 1700.0),
+            at(300, 1660.0, 1650.0),
+            at(600, 1622.0, 1620.0),
+            at(700, 1620.0, 1620.0),
+            at(800, 1620.0, 1620.0),
+            at(900, 1620.0, 1620.0),
+        ];
+        assert_eq!(
+            reached(1700.0, 1700.0, -1.0, 40.0, &followed),
+            Some((Duration::from_millis(800), 40.0))
+        );
+        let stayed = followed.map(|sample| Sample {
+            position: 1700.0,
+            ..sample
+        });
+        assert_eq!(reached(1700.0, 1700.0, -1.0, 40.0, &stayed), None);
+        // Past the goal it wrote is not on the way.
+        assert_eq!(off_the_way(1605.0, 1660.0, 1620.0), 15.0);
+        assert_eq!(off_the_way(1640.0, 1660.0, 1620.0), 0.0);
+        assert_eq!(off_the_way(1672.0, 1660.0, 1620.0), 12.0);
         // A relaxed head sits a few counts off its goal: judged from where
         // the joint began.
         let off = [
@@ -960,11 +1110,90 @@ mod tests {
         assert_eq!(cut.reason, "stopped: a hand was put on the lamp");
     }
 
+    /// The first builder on #1340 (11:09): lamp-c0a4's and lamp-4ace's
+    /// units give the roll a reach of one count. Its goal moves one count
+    /// one way and not at all the other: the roll is named not fitted, and
+    /// the head move passes on its pitch. Both axes under it: not checked.
+    #[test]
+    fn a_roll_that_reaches_one_count_is_not_fitted_and_pitch_alone_passes() {
+        let roll = |sign, moved| Tried {
+            joint: Joint::Roll,
+            sign,
+            moved,
+        };
+        let one_count = Moved::Done {
+            reached: Duration::from_millis(300),
+            goal: 1.0,
+            back: Duration::from_millis(400),
+        };
+        let tried = [
+            done(Joint::Pitch, -1.0),
+            done(Joint::Pitch, 1.0),
+            roll(1.0, one_count.clone()),
+            roll(-1.0, Moved::NotTaken),
+        ];
+        let result = judge(&tried, None);
+        assert_eq!(result.verdict, Verdict::Pass, "{result:?}");
+        assert_eq!(
+            result.reason,
+            "head_roll is not fitted to move: judged on head_pitch alone"
+        );
+        assert!(result.values.iter().any(
+            |v| v.key == "head_roll_fitted" && v.value == "no: its goal moved at most 1 count"
+        ));
+        // Pitch still has to pass: a pitch not followed fails.
+        let mut pitch_failed = tried.clone();
+        pitch_failed[0].moved = Moved::NotReached {
+            goal: 40.0,
+            gap: 30.0,
+        };
+        assert_eq!(judge(&pitch_failed, None).verdict, Verdict::Fail);
+        // A roll that moves 5 counts is fitted, and judged.
+        let fitted = [
+            done(Joint::Pitch, -1.0),
+            done(Joint::Pitch, 1.0),
+            roll(
+                1.0,
+                Moved::Done {
+                    reached: Duration::from_millis(300),
+                    goal: FITTED_FROM,
+                    back: Duration::from_millis(400),
+                },
+            ),
+            roll(-1.0, Moved::NotTaken),
+        ];
+        assert_eq!(judge(&fitted, None).verdict, Verdict::NotChecked);
+        // Neither axis fitted: nothing to judge.
+        let neither = [
+            Tried {
+                joint: Joint::Pitch,
+                sign: -1.0,
+                moved: one_count.clone(),
+            },
+            Tried {
+                joint: Joint::Pitch,
+                sign: 1.0,
+                moved: Moved::NotTaken,
+            },
+            roll(1.0, one_count),
+            roll(-1.0, Moved::NotTaken),
+        ];
+        let result = judge(&neither, None);
+        assert_eq!(result.verdict, Verdict::NotChecked);
+        assert_eq!(
+            result.reason,
+            "the body moved neither head_pitch nor head_roll 5 counts"
+        );
+    }
+
     /// How a fake body treats what it is asked.
     #[cfg(target_os = "linux")]
     #[derive(Clone, Copy)]
     enum Fake {
         Follows,
+        /// A head that follows a lifted goal all the way, lead and all, as
+        /// lamp-c0a4's (Thirteen on #1340, 10:31).
+        FollowsTheLead,
         PitchStuck,
         TakesNothing,
         /// Starts to fold a little over a second in.
@@ -1043,7 +1272,11 @@ mod tests {
                 let goal_wanted = [wanted[0] - lead, wanted[1]];
                 for joint in 0..2 {
                     goal[joint] += (goal_wanted[joint] - goal[joint]).clamp(-2.4, 2.4);
-                    let short = if joint == 0 { lead * 0.75 } else { 0.0 };
+                    let short = if joint == 0 && !matches!(fake, Fake::FollowsTheLead) {
+                        lead * 0.75
+                    } else {
+                        0.0
+                    };
                     if joint == 1 || !matches!(fake, Fake::PitchStuck) {
                         position[joint] += (goal[joint] + short - position[joint]) * 0.5;
                     }
@@ -1116,6 +1349,14 @@ mod tests {
     fn a_body_that_follows_passes_and_one_that_does_not_fails_or_is_not_checked() {
         let follows = run_against(Fake::Follows, "follows");
         assert_eq!(follows.verdict, Verdict::Pass, "{follows:?}");
+        // Its roll, cut to one count as lamp-52e6's, is named not fitted.
+        assert!(
+            follows.reason.starts_with("head_roll is not fitted"),
+            "{follows:?}"
+        );
+        // lamp-c0a4's head, which follows the lift's lead all the way.
+        let led = run_against(Fake::FollowsTheLead, "follows-lead");
+        assert_eq!(led.verdict, Verdict::Pass, "{led:?}");
         let value = |key: &str| {
             follows
                 .values
@@ -1151,6 +1392,76 @@ mod tests {
         let late = run_against(Fake::FoldsLettingGoLast, "late");
         assert_eq!(late.verdict, Verdict::NotChecked, "{late:?}");
         assert!(late.reason.contains("began to fold"), "{}", late.reason);
+    }
+
+    /// Tests on #1329: a move's start is read where the joint holds still,
+    /// not where it still moves after the last return. A head pitch
+    /// settling from 1768 toward 1771 gives 1771; one that drifts a count
+    /// every 100 ms never holds still, and gives why within its second.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_moves_start_is_read_once_the_joint_holds_still() {
+        let root = std::path::PathBuf::from(format!("/tmp/hm-settle-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        // A head pitch going to 1771 by a third of the way each 20 ms, or
+        // drifting a count every 100 ms for ever.
+        let head = |root: std::path::PathBuf,
+                    shakes: bool,
+                    stop: std::sync::Arc<std::sync::atomic::AtomicBool>| {
+            std::thread::spawn(move || {
+                let bus = Bus::new(&root).unwrap();
+                let mut joints = bus
+                    .publisher_declared(JointState::TOPIC, &JointState::declaration(), "body")
+                    .unwrap();
+                let (mut pitch, began) = (1768.0f64, std::time::Instant::now());
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    // Drifting a count every 100 ms by the clock can never hold
+                    // still for 200 ms, however the readings are seen (the reviewer
+                    // on #1340).
+                    pitch = if shakes {
+                        1771.0 + (began.elapsed().as_millis() / 100) as f64
+                    } else {
+                        pitch + (1771.0 - pitch) * 0.3
+                    };
+                    let radians = |counts: f64| counts / COUNTS_A_RADIAN;
+                    let state = JointState {
+                        name: ["base_yaw", "shoulder", "elbow", "head_roll", "head_pitch"]
+                            .map(str::to_owned)
+                            .to_vec(),
+                        position: [2035.0, 2657.0, 2602.0, 2035.0, pitch]
+                            .map(radians)
+                            .to_vec(),
+                        velocity: Vec::new(),
+                        effort: Vec::new(),
+                        commanded: [2035.0, 2657.0, 2602.0, 2035.0, 1771.0]
+                            .map(radians)
+                            .to_vec(),
+                    };
+                    joints
+                        .publish_json(lamp_ipc::monotonic_us(), &state)
+                        .unwrap();
+                    std::thread::sleep(STEP);
+                }
+            })
+        };
+        let bus = Bus::new(&root).unwrap();
+        let mut watch = Watch::on(&bus).unwrap();
+        for shakes in [false, true] {
+            let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let moving = head(root.clone(), shakes, stop.clone());
+            std::thread::sleep(Duration::from_millis(30));
+            let got = settled(&bus, &mut watch, Joint::Pitch);
+            stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            moving.join().unwrap();
+            if shakes {
+                assert!(got.unwrap_err().contains("did not hold still"));
+            } else {
+                let (start, _) = got.unwrap();
+                assert!((start - 1771.0).abs() < 0.5, "{start}");
+            }
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// A body that said its joints once and stopped is named, not taken for

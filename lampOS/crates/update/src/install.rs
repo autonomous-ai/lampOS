@@ -1078,6 +1078,7 @@ pub fn install(
         say,
         &mut |state| save(&records, state),
     )?;
+    pins_gain_privacy(config, &defaults, &mut changed, say)?;
     // The voice's service and the user's key, private. Each is install's
     // while it is still what an install wrote, so a newer provider, or a key
     // V1 rotated in its config, reaches the lamp; one setup wrote, or one
@@ -1280,6 +1281,65 @@ pub fn settings(
     persist: &mut dyn FnMut(&State) -> Result<(), String>,
 ) -> Result<(), String> {
     settings_with_mode(config, defaults, 0o644, state, changed, say, persist)
+}
+
+/// Where the product's units read Controls' pins.
+const PINS_PATH: &str = "/etc/lampOS/controls/controls-pins.json";
+
+/// A lamp's own pins file, which [`settings`] keeps (the factory's head
+/// pads, a calibration), gains the build's `privacy` section when it has
+/// none. The product's units select the privacy route
+/// (`LAMP_PRIVACY_CONTROLS=on`), and without the section Controls has no
+/// privacy source, so Voice and Ears never open a microphone (the
+/// reviewer's P1 on #2143). Only that one key is added; everything else is
+/// kept, the file's mode too. A file that already has the section, a build
+/// without one, a file that isn't there (the default was just written) or
+/// one that isn't a JSON object is left, the last said.
+fn pins_gain_privacy(
+    config: &Install,
+    defaults: &[(&str, &str)],
+    changed: &mut Vec<String>,
+    say: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    let Some(section) = defaults
+        .iter()
+        .find(|(path, _)| *path == PINS_PATH)
+        .and_then(|(_, text)| serde_json::from_str::<serde_json::Value>(text).ok())
+        .and_then(|default| default.get("privacy").cloned())
+    else {
+        return Ok(());
+    };
+    let at = config.on(PINS_PATH);
+    let text = match fs::read_to_string(&at) {
+        Ok(text) => text,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(format!("{PINS_PATH}: {error}")),
+    };
+    let mut pins = match serde_json::from_str::<serde_json::Value>(&text) {
+        Ok(serde_json::Value::Object(pins)) => pins,
+        _ => {
+            say(&format!(
+                "{PINS_PATH} is not a JSON object: its privacy section is not added, and Controls will say so"
+            ));
+            return Ok(());
+        }
+    };
+    if pins.contains_key("privacy") {
+        return Ok(());
+    }
+    pins.insert("privacy".into(), section);
+    let mode = fs::metadata(&at)
+        .map(|meta| meta.permissions().mode() & 0o777)
+        .map_err(|error| format!("{PINS_PATH}: {error}"))?;
+    let mut bytes = serde_json::to_vec_pretty(&serde_json::Value::Object(pins))
+        .map_err(|error| format!("{PINS_PATH}: {error}"))?;
+    bytes.push(b'\n');
+    write_whole(&at, &bytes, mode).map_err(|error| format!("{PINS_PATH}: {error}"))?;
+    changed.push(format!("wrote {PINS_PATH}"));
+    say(&format!(
+        "added the privacy section to {PINS_PATH}: this lamp's own pins are kept otherwise"
+    ));
+    Ok(())
 }
 
 /// [`settings`], written with `mode`: the voice's service and the device

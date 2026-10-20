@@ -66,6 +66,37 @@ is that much slower; a face brings it back at once, and "Hey Lamp" from a
 dark doorway is still answered. Off unless set: unset, it is `voice/heard`
 as before.
 
+**A far face counts only while it moves (`LAMP_PRESENCE_FAR=moving`, the
+first builder on #1678, 20 Oct).** By default any face counts, near or far.
+At lamp-75c9 on 20 Oct at 10:17 a steady face far behind the sitter, 0.06
+of the picture tall at its right (someone in the office, or a picture),
+held `room/presence` at someone for about 37 s after the sitter had left. At
+home that keeps the light on. With `LAMP_PRESENCE_FAR=moving` in the eyes'
+unit, a face under 0.14 of the picture's height (`away::NEAR_TALL`, the line
+the activity judge and the still places use) counts only:
+- within 4 s of a near face (`NEAR_LATELY_US`): the sitter the detector
+  missed for a look, or someone walking away; or
+- while its own centre, by its passing id, has moved 0.05 of the picture,
+  across or down, within 10 s (`MOVED`, `MOVED_WITHIN_US`): someone walking
+  past or coming to the lamp. A false face's box moves 0.01 to 0.02 look to
+  look (`still.rs`), and so does a steady face far behind. Each face is
+  judged on its own, so two steady far faces taking turns as the tallest,
+  or a face found for one look elsewhere, are not a move (the reviewer on
+  #2149).
+
+A near face always counts. The costs:
+- Someone sitting still far from the lamp, at another desk, is nobody,
+  which is what the light wants.
+- **The line is the picture's 0.14, not the sitter's own height.** Leaning
+  back or sitting low, a sitter's face is 0.76 or 0.68 as tall as sat
+  (lamp-75c9, 20 Oct). Where the seated face is under about 0.18 of the
+  picture, a lamp further from the chair, leaning back drops it under 0.14,
+  so someone still and reading that way is nobody 24 s later, and Light out
+  puts the light out on them after its 10 minutes. At lamp-75c9 leaning
+  back stayed over 0.14. #1677's rerun with the switch includes a few still
+  minutes leaning back. Off unless
+set: unset, every face counts as before.
+
 **Never "nobody" when it is not known.** Nothing is said while the eyes are
 not looking: the camera closed by the privacy switch, a mute or the voice
 gone, or no look for 5 s (`away::BLIND_AFTER_US`, Expression's

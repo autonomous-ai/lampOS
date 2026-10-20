@@ -661,6 +661,45 @@ fn a_kept_session_replays_to_the_same_report_without_a_chip() {
     assert_eq!(report["pads"][0]["coupling"], 7);
     let pins: serde_json::Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
     assert_eq!(pins["base"]["profile"]["touch_thresholds"][0], 13);
+    assert!(
+        !String::from_utf8_lossy(&result.stderr).contains("not in it"),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    // From a newer build's pins file, the new file is this build's: what it
+    // doesn't read is not carried over, and its line says so (the reviewer
+    // on #2076).
+    let mut newer: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture("strip-711-working-pins-example.json")).unwrap())
+            .unwrap();
+    newer["head_hold_ms"] = 900.into();
+    let newer_pins = scratch("newer-pins.json");
+    fs::write(&newer_pins, serde_json::to_vec(&newer).unwrap()).unwrap();
+    let from_newer = scratch("from-newer-pins.json");
+    let result = program(&[
+        "calibrate-touch",
+        "--pins",
+        newer_pins.to_str().unwrap(),
+        "--output",
+        from_newer.to_str().unwrap(),
+        "--replay",
+        file.to_str().unwrap(),
+    ]);
+    let said = String::from_utf8_lossy(&result.stderr);
+    assert!(result.status.success(), "{said}");
+    assert!(
+        said.contains("fields this build does not read, ignored: head_hold_ms"),
+        "{said}"
+    );
+    assert!(
+        said.contains("; the fields this build does not read, named above, are not in it"),
+        "{said}"
+    );
+    let written: serde_json::Value =
+        serde_json::from_slice(&fs::read(&from_newer).unwrap()).unwrap();
+    assert!(written.get("head_hold_ms").is_none());
+    fs::remove_file(&newer_pins).unwrap();
+    fs::remove_file(&from_newer).unwrap();
     // A kept file is never written over, and record and replay do not mix.
     let again = program(&[
         "calibrate-touch",

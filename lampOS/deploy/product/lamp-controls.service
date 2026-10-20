@@ -19,6 +19,10 @@ User=lampos
 Group=lampos
 Slice=lampos-parts.slice
 Nice=5
+# The privacy route (docs/privacy-switch.md): Controls reads the lamp's privacy switch (chip 1 line 9, the pins file's
+# privacy section), Voice leases the microphones from it and Ears captures only under that lease. Set in Controls,
+# Voice and Ears together (the lead on #1711, 20 Oct 09:33: the lamps have the switch; the first builder at 09:51).
+Environment=LAMP_PRIVACY_CONTROLS=on
 ExecStart=/opt/lampOS/controls/current/lamp-controls serve --touch --config /etc/lampOS/controls/controls.json --pins /etc/lampOS/controls/controls-pins.json --bus-root /run/lampos-bus --enable
 Restart=on-failure
 RestartSec=5s

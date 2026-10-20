@@ -8,6 +8,7 @@ use std::{
     os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt, symlink},
     path::{Path, PathBuf},
     process::{self, Command},
+    time::{Duration, SystemTime},
 };
 
 const DATABASE: &str = "tasks.sqlite3";
@@ -373,6 +374,149 @@ fn a_newer_database_in_wal_mode_is_set_aside_with_its_sidecars() {
         Some(&b"after"[..])
     );
     assert_eq!(fs::read(scratch.dir.join(&kept)).unwrap(), original);
+}
+
+/// The reviewer's P3 on #2057: a crash after the sidecars' renames and
+/// before the database's leaves `-wal` and `-shm` at `newer-db2-<s1>`. The
+/// next start keeps the database under that same `<s1>`, not a new one, so
+/// the WAL is beside its database again.
+#[test]
+fn a_set_aside_cut_before_the_database_rename_joins_its_sidecars_again() {
+    let scratch = Scratch::new();
+    scratch.populated();
+    let wal = scratch.dir.join(format!("{DATABASE}-wal"));
+    let shm = scratch.dir.join(format!("{DATABASE}-shm"));
+    let (wal_bytes, shm_bytes) = {
+        let db = Connection::open(scratch.database()).unwrap();
+        db.execute_batch("PRAGMA user_version=2; PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE state SET snapshot=x'0102'")
+            .unwrap();
+        (fs::read(&wal).unwrap(), fs::read(&shm).unwrap())
+    };
+    private_file(&wal, &wal_bytes);
+    private_file(&shm, &shm_bytes);
+    // The cut: the sidecars renamed under an earlier stamp, the database not.
+    let kept = format!("{DATABASE}.newer-db2-1000");
+    fs::rename(&wal, scratch.dir.join(format!("{kept}-wal"))).unwrap();
+    fs::rename(&shm, scratch.dir.join(format!("{kept}-shm"))).unwrap();
+    let original = fs::read(scratch.database()).unwrap();
+    let store = Store::open(&scratch.dir).expect("the cut does not stop the part");
+    assert_eq!(store.kept_aside().unwrap().as_deref(), Some(kept.as_str()));
+    for (name, bytes) in [
+        (kept.clone(), &original),
+        (format!("{kept}-wal"), &wal_bytes),
+        (format!("{kept}-shm"), &shm_bytes),
+    ] {
+        assert_eq!(&fs::read(scratch.dir.join(&name)).unwrap(), bytes, "{name}");
+    }
+}
+
+/// Turns the store's database into a newer build's at version 2 in WAL
+/// mode, with its `-wal` and `-shm` beside it as a crash leaves them, or
+/// none when it closed cleanly. Returns each file's suffix and bytes.
+fn newer_wal_database(scratch: &Scratch, sidecars: bool) -> Vec<(&'static str, Vec<u8>)> {
+    let wal = scratch.dir.join(format!("{DATABASE}-wal"));
+    let shm = scratch.dir.join(format!("{DATABASE}-shm"));
+    let bytes = {
+        let db = Connection::open(scratch.database()).unwrap();
+        db.execute_batch("PRAGMA user_version=2; PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE state SET snapshot=x'0102'")
+            .unwrap();
+        (fs::read(&wal).unwrap(), fs::read(&shm).unwrap())
+    };
+    let mut files = vec![("", fs::read(scratch.database()).unwrap())];
+    if sidecars {
+        private_file(&wal, &bytes.0);
+        private_file(&shm, &bytes.1);
+        files.push(("-wal", bytes.0));
+        files.push(("-shm", bytes.1));
+    }
+    files
+}
+
+/// Sets the database's mtime, as a write at that time would.
+fn written_at(path: &Path, at: SystemTime) {
+    OpenOptions::new()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(at)
+        .unwrap();
+}
+
+/// The reviewer's P3 on #2138: a stale `newer-db2-1000-wal`, left by an
+/// older crash, beside a version-2 database written after it, with and
+/// without the database's own `-wal`. The part starts, the database takes a
+/// new stamp with its own sidecars, and the stale file is left as it is.
+#[test]
+fn a_stale_leftover_sidecar_is_not_taken_as_the_newer_databases() {
+    for sidecars in [true, false] {
+        let scratch = Scratch::new();
+        scratch.populated();
+        let stale = scratch.dir.join(format!("{DATABASE}.newer-db2-1000-wal"));
+        private_file(&stale, b"an older crash's wal");
+        let files = newer_wal_database(&scratch, sidecars);
+        written_at(
+            &scratch.database(),
+            SystemTime::now() + Duration::from_secs(2),
+        );
+        let store = Store::open(&scratch.dir)
+            .unwrap_or_else(|error| panic!("own -wal {sidecars}: {error}"));
+        let kept = store.kept_aside().unwrap().expect("the kept store is said");
+        assert!(kept.starts_with("tasks.sqlite3.newer-db2-"), "{kept}");
+        assert_ne!(kept, "tasks.sqlite3.newer-db2-1000", "own -wal {sidecars}");
+        for (suffix, bytes) in &files {
+            assert_eq!(
+                &fs::read(scratch.dir.join(format!("{kept}{suffix}"))).unwrap(),
+                bytes,
+                "own -wal {sidecars}: {suffix}"
+            );
+        }
+        assert_eq!(fs::read(&stale).unwrap(), b"an older crash's wal");
+    }
+}
+
+/// Two flips at the same version, each with a `-wal`: the earlier
+/// set-aside is complete, so the second takes its own stamp. And with a
+/// clock behind (a board with no RTC), a second database closed cleanly and
+/// dated before the first set-aside still takes its own stamp.
+#[test]
+fn each_set_aside_at_the_same_version_keeps_its_own_stamp() {
+    for clock_behind in [false, true] {
+        let scratch = Scratch::new();
+        scratch.populated();
+        let first = newer_wal_database(&scratch, true);
+        let earlier = format!("{DATABASE}.newer-db2-1000");
+        for (suffix, _) in &first {
+            fs::rename(
+                scratch.dir.join(format!("{DATABASE}{suffix}")),
+                scratch.dir.join(format!("{earlier}{suffix}")),
+            )
+            .unwrap();
+        }
+        scratch.populated();
+        let second = newer_wal_database(&scratch, !clock_behind);
+        written_at(
+            &scratch.database(),
+            if clock_behind {
+                SystemTime::UNIX_EPOCH + Duration::from_secs(1000)
+            } else {
+                SystemTime::now() + Duration::from_secs(2)
+            },
+        );
+        let store = Store::open(&scratch.dir)
+            .unwrap_or_else(|error| panic!("clock behind {clock_behind}: {error}"));
+        let kept = store.kept_aside().unwrap().expect("the kept store is said");
+        assert!(kept.starts_with("tasks.sqlite3.newer-db2-"), "{kept}");
+        assert_ne!(kept, earlier, "clock behind {clock_behind}");
+        for (name, files) in [(&earlier, &first), (&kept, &second)] {
+            for (suffix, bytes) in files {
+                assert_eq!(
+                    &fs::read(scratch.dir.join(format!("{name}{suffix}"))).unwrap(),
+                    bytes,
+                    "clock behind {clock_behind}: {name}{suffix}"
+                );
+            }
+        }
+    }
 }
 
 #[test]

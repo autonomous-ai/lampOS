@@ -17,7 +17,7 @@
 //! voice's lines on `voice/heard`, said once a second while the eyes look.
 use crate::{
     activity::{Judge, Look},
-    away::Away,
+    away::{Away, Seen},
     faces, facing, speaking,
 };
 use lamp_bus::{Bus, Publisher, Subscriber};
@@ -36,6 +36,10 @@ pub const PRESENCE_ENVIRONMENT: &str = "LAMP_PRESENCE";
 /// `addressed`, only a turn the voice answered as said to the lamp
 /// (`voice/turn`); otherwise every line heard (`voice/heard`).
 pub const PRESENCE_VOICE_ENVIRONMENT: &str = "LAMP_PRESENCE_VOICE";
+/// Where the eyes read whether a face far from the lamp counts (#1678):
+/// `moving`, a face under `away::NEAR_TALL` only while it moves or just
+/// after a near one ([`Away::far_moving`]); otherwise every face.
+pub const PRESENCE_FAR_ENVIRONMENT: &str = "LAMP_PRESENCE_FAR";
 
 /// Where the eyes read whether to say what the person at the desk is doing
 /// (#1678), with the bus on. `on` only.
@@ -404,7 +408,19 @@ impl BusOut {
     pub fn say_presence(&mut self, bus: &Bus) -> io::Result<()> {
         let addressed =
             std::env::var(PRESENCE_VOICE_ENVIRONMENT).ok().as_deref() == Some("addressed");
-        self.say_presence_by(bus, addressed)
+        self.say_presence_by(bus, addressed)?;
+        if std::env::var(PRESENCE_FAR_ENVIRONMENT).ok().as_deref() == Some("moving") {
+            self.judge_far_faces();
+        }
+        Ok(())
+    }
+
+    /// With presence said, a face far from the lamp counts only while it
+    /// moves or just after a near one (`LAMP_PRESENCE_FAR=moving`, #1678).
+    pub fn judge_far_faces(&mut self) {
+        if let Some(presence) = self.presence.as_mut() {
+            presence.away = Away::far_moving();
+        }
     }
 
     /// As [`BusOut::say_presence`], with which voice counts given.
@@ -476,14 +492,19 @@ impl BusOut {
         self.alive_at_us = now_us;
         let _ = self.faces.publish_json(now_us, &seen);
         if let Some(presence) = self.presence.as_mut() {
-            // The tallest face as published, clamped to the picture, so the
+            // The faces as published, clamped to the picture, so the
             // journal's height matches `humans/faces/tracked`.
-            let tall = seen
+            let faces: Vec<Seen> = seen
                 .faces
                 .iter()
-                .map(|face| face.ymax - face.ymin)
-                .reduce(f32::max);
-            presence.away.looked(now_us, tall);
+                .map(|face| Seen {
+                    id: face.id.clone(),
+                    across: (face.xmin + face.xmax) / 2.0,
+                    down: (face.ymin + face.ymax) / 2.0,
+                    tall: face.ymax - face.ymin,
+                })
+                .collect();
+            presence.away.looked_at(now_us, &faces);
         }
         if let Some(activity) = self.activity.as_mut() {
             activity.judge.looked(now_us, &Look::all(found, filled));
@@ -971,6 +992,44 @@ mod tests {
                 by: Some(lamp_msgs::SeenBy::Voice),
             })
         );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// #1678: with far faces judged, a small steady face (0.06 of the
+    /// picture tall, its box moving a pixel or two) is nobody; a near one is
+    /// someone.
+    #[test]
+    fn with_far_faces_judged_a_small_steady_face_is_nobody() {
+        let root = std::path::PathBuf::from(format!("/tmp/lpf-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(RoomPresence::TOPIC, "test", RoomPresence::TYPE)
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        out.say_presence_by(&bus, false).unwrap();
+        out.judge_far_faces();
+        let s = 1_000_000u64;
+        let mut last = None;
+        for look in 0..60u64 {
+            let at = s + look * s / 2;
+            // 29 of 480 tall, at the picture's right, a pixel back and forth.
+            let x = 540.0 + (look % 2) as f32;
+            out.saw(&[face(x, 200.0, 24.0, 29.0, 0.0)], &[], PICTURE, at);
+            out.tick(at);
+            while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+                last = Some(message.parse::<RoomPresence>().unwrap());
+            }
+        }
+        assert_eq!(last.map(|now| now.someone), Some(false), "{last:?}");
+        // A face 96 of 480 tall is near: someone at once.
+        out.saw(&[face(300.0, 200.0, 80.0, 96.0, 0.0)], &[], PICTURE, 32 * s);
+        out.tick(32 * s);
+        while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+            last = Some(message.parse::<RoomPresence>().unwrap());
+        }
+        assert_eq!(last.map(|now| now.someone), Some(true), "{last:?}");
         std::fs::remove_dir_all(&root).unwrap();
     }
 

@@ -15,9 +15,43 @@
 //! after that, the count of nobody begins again from then: what happened
 //! while the eyes were shut is not known.
 use lamp_msgs::{RoomPresence, SeenBy};
+use std::collections::{HashMap, VecDeque};
 
 /// No look for this long: the eyes are not looking.
 pub const BLIND_AFTER_US: u64 = 5_000_000;
+
+/// With far faces judged ([`Away::far_moving`], `LAMP_PRESENCE_FAR=moving`,
+/// #1678): a face this tall, as a share of the picture, is at the lamp, the
+/// line the activity judge and the still places use (`activity::NEAR`,
+/// `still::PERSON_HEIGHT`).
+pub const NEAR_TALL: f32 = 0.14;
+/// A smaller face counts while a near one was seen this lately: the sitter
+/// the detector missed for a look, or someone walking away.
+pub const NEAR_LATELY_US: u64 = 4_000_000;
+/// Or while its own centre (by its passing id) has moved this far, across or
+/// down, as a share of the picture, within [`MOVED_WITHIN_US`]: a false
+/// face's box moves 0.01 to 0.02 look to look (`still`), and so does a
+/// steady face far behind.
+pub const MOVED: f32 = 0.05;
+pub const MOVED_WITHIN_US: u64 = 10_000_000;
+
+/// A face in a look: its passing id (`humans/faces/tracked`'s), its centre
+/// across and down and its height, each as a share of the picture.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Seen {
+    pub id: String,
+    pub across: f32,
+    pub down: f32,
+    pub tall: f32,
+}
+
+/// Where each far face has been, by its passing id, and when a near face
+/// last was.
+#[derive(Debug, Default)]
+struct Far {
+    near_at: Option<u64>,
+    centres: HashMap<String, VecDeque<(u64, f32, f32)>>,
+}
 
 /// The evidence so far, and what was last said.
 #[derive(Debug, Default)]
@@ -31,9 +65,75 @@ pub struct Away {
     face_tall: Option<f32>,
     /// Whether someone was said to be there, and when it was said.
     said: Option<(bool, u64)>,
+    /// With far faces judged, what they are judged from.
+    far: Option<Far>,
 }
 
 impl Away {
+    /// A face smaller than [`NEAR_TALL`] counts only while it moves, or just
+    /// after a near one (#1678: a steady far face, someone behind in the
+    /// office or a picture, held lamp-75c9 at someone ~37 s after its sitter
+    /// left).
+    pub fn far_moving() -> Self {
+        Self {
+            far: Some(Far::default()),
+            ..Self::default()
+        }
+    }
+
+    /// A look at `now_us` with the faces in it: the tallest that counts is
+    /// someone ([`Self::looked`]). Every face counts unless far faces are
+    /// judged ([`Self::far_moving`]).
+    pub fn looked_at(&mut self, now_us: u64, faces: &[Seen]) {
+        let tallest = |faces: &mut dyn Iterator<Item = &Seen>| {
+            faces.map(|face| face.tall).max_by(|a, b| a.total_cmp(b))
+        };
+        let counted = match self.far.as_mut() {
+            None => tallest(&mut faces.iter()),
+            Some(far) => {
+                if let Some(near) = tallest(&mut faces.iter().filter(|face| face.tall >= NEAR_TALL))
+                {
+                    far.near_at = Some(now_us);
+                    far.centres.clear();
+                    Some(near)
+                } else {
+                    // Each far face's own centres, so two steady faces taking
+                    // turns as the tallest, or a face found once elsewhere,
+                    // never read as a move; a new id starts with none.
+                    for centres in far.centres.values_mut() {
+                        while centres
+                            .front()
+                            .is_some_and(|(at, ..)| now_us.saturating_sub(*at) > MOVED_WITHIN_US)
+                        {
+                            centres.pop_front();
+                        }
+                    }
+                    far.centres.retain(|_, centres| !centres.is_empty());
+                    let mut moving = Vec::new();
+                    for face in faces {
+                        let centres = far.centres.entry(face.id.clone()).or_default();
+                        if centres.iter().any(|(_, across, down)| {
+                            (face.across - across).abs() >= MOVED
+                                || (face.down - down).abs() >= MOVED
+                        }) {
+                            moving.push(face);
+                        }
+                        centres.push_back((now_us, face.across, face.down));
+                    }
+                    let lately = far
+                        .near_at
+                        .is_some_and(|at| now_us.saturating_sub(at) < NEAR_LATELY_US);
+                    if lately {
+                        tallest(&mut faces.iter())
+                    } else {
+                        tallest(&mut moving.into_iter())
+                    }
+                }
+            }
+        };
+        self.looked(now_us, counted);
+    }
+
     /// A look at `now_us`, with the height of its largest face as a share
     /// of the picture if it found one.
     pub fn looked(&mut self, now_us: u64, face: Option<f32>) {
@@ -194,6 +294,146 @@ mod tests {
         looks(&mut seen, 0, 10, true);
         looks(&mut seen, 16, 20, false);
         assert_eq!(seen.now(20 * S), present(false, 4));
+    }
+
+    /// #1678 (lamp-75c9, 20 Oct 10:17): the sitter leaves, and a steady far
+    /// face behind (0.06 tall, its box moving 0.01 look to look) stays in
+    /// view. Judged as far, it is nobody 20 s after the near face plus
+    /// [`NEAR_LATELY_US`]; without, someone for as long as it stays.
+    #[test]
+    fn a_steady_far_face_with_nobody_near_ends_in_nobody() {
+        let sitter = Seen {
+            id: "f1".into(),
+            across: 0.4,
+            down: 0.45,
+            tall: 0.16,
+        };
+        let behind = |at: u64| Seen {
+            id: "f2".into(),
+            across: 0.73 + if at.is_multiple_of(2) { 0.01 } else { 0.0 },
+            down: 0.42,
+            tall: 0.06,
+        };
+        for judged in [true, false] {
+            let mut away = if judged {
+                Away::far_moving()
+            } else {
+                Away::default()
+            };
+            let mut at = 0;
+            // The sitter, with the far face behind, for a minute.
+            while at < 60 * S {
+                away.looked_at(at, &[sitter.clone(), behind(at / (S / 2))]);
+                at += S / 2;
+            }
+            // The sitter gone at 60 s; the far face stays, for two minutes.
+            while at < 180 * S {
+                away.looked_at(at, &[behind(at / (S / 2))]);
+                at += S / 2;
+            }
+            let now = away.now(at);
+            if judged {
+                // Last counted look 63 s (under 4 s after 59.5): nobody from 83 s.
+                assert_eq!(now, present(false, 117), "{now:?}");
+            } else {
+                assert_eq!(now, present(true, 0), "{now:?}");
+            }
+        }
+    }
+
+    /// Judged as far, a small face that moves (someone walking past, or
+    /// coming to the lamp) is someone, and a near face always is.
+    #[test]
+    fn a_far_face_that_moves_is_someone_and_a_near_one_always_is() {
+        let mut away = Away::far_moving();
+        let mut at = 0;
+        // Nobody, then a small face walking across: 0.01 a look.
+        while at < 30 * S {
+            away.looked_at(at, &[]);
+            at += S / 2;
+        }
+        let mut across = 0.2;
+        while at < 40 * S {
+            away.looked_at(
+                at,
+                &[Seen {
+                    id: "f3".into(),
+                    across,
+                    down: 0.4,
+                    tall: 0.07,
+                }],
+            );
+            across += 0.01;
+            at += S / 2;
+        }
+        assert_eq!(away.now(at), present(true, 0));
+        // The same face standing still for a minute: nobody, 20 s after it
+        // last moved 0.05 within 10 s.
+        while at < 100 * S {
+            away.looked_at(
+                at,
+                &[Seen {
+                    id: "f3".into(),
+                    across,
+                    down: 0.4,
+                    tall: 0.07,
+                }],
+            );
+            at += S / 2;
+        }
+        assert!(!away.now(at).unwrap().someone);
+        // A near face, however still, is someone at once.
+        away.looked_at(
+            at,
+            &[Seen {
+                id: "f4".into(),
+                across: 0.5,
+                down: 0.5,
+                tall: NEAR_TALL,
+            }],
+        );
+        assert_eq!(away.now(at), present(true, 0));
+    }
+
+    /// The reviewer on #2149: each far face's movement is its own, by its
+    /// passing id. Two steady far faces taking turns as the tallest, or a
+    /// face found for one look elsewhere every 25 s, are not a move: nobody.
+    #[test]
+    fn steady_far_faces_taking_turns_or_one_found_once_elsewhere_are_nobody() {
+        let far = |id: &str, across: f32, tall: f32| Seen {
+            id: id.into(),
+            across,
+            down: 0.4,
+            tall,
+        };
+        let mut turns = Away::far_moving();
+        let mut stray = Away::far_moving();
+        let mut at = 0;
+        let mut look = 0u64;
+        while at < 180 * S {
+            // ±0.001 of height a look, so the tallest changes every look.
+            let wobble = if look.is_multiple_of(2) {
+                0.001
+            } else {
+                -0.001
+            };
+            turns.looked_at(
+                at,
+                &[
+                    far("f1", 0.30, 0.060 + wobble),
+                    far("f2", 0.75, 0.060 - wobble),
+                ],
+            );
+            let mut seen = vec![far("f3", 0.73, 0.06)];
+            if look.is_multiple_of(50) {
+                seen.push(far(&format!("f{}", 10 + look), 0.20, 0.07));
+            }
+            stray.looked_at(at, &seen);
+            at += S / 2;
+            look += 1;
+        }
+        assert_eq!(turns.now(at), present(false, 180), "taking turns");
+        assert_eq!(stray.now(at), present(false, 180), "found once elsewhere");
     }
 
     #[test]
