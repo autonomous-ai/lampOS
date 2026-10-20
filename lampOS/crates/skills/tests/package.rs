@@ -889,6 +889,16 @@ fn ask_helper(skills: &Path, line: &[u8]) -> (serde_json::Value, bool) {
 /// [`ask_helper`], with what the helper wrote to its journal (its standard
 /// error) as well.
 fn ask_helper_journal(skills: &Path, line: &[u8]) -> (serde_json::Value, bool, String) {
+    ask_helper_while(skills, line, |_| {})
+}
+
+/// [`ask_helper_journal`], `meanwhile` given the running helper once its
+/// request is written, before its answer is read.
+fn ask_helper_while(
+    skills: &Path,
+    line: &[u8],
+    meanwhile: impl FnOnce(&mut std::process::Child),
+) -> (serde_json::Value, bool, String) {
     use std::io::{BufRead, Read, Write};
     use std::os::unix::net::UnixStream;
     use std::process::{Command, Stdio};
@@ -905,6 +915,7 @@ fn ask_helper_journal(skills: &Path, line: &[u8]) -> (serde_json::Value, bool, S
         .unwrap();
     ours.write_all(line).unwrap();
     ours.shutdown(std::net::Shutdown::Write).unwrap();
+    meanwhile(&mut child);
     let mut answer = String::new();
     std::io::BufReader::new(&ours)
         .read_line(&mut answer)
@@ -930,9 +941,10 @@ fn ask_helper_journal(skills: &Path, line: &[u8]) -> (serde_json::Value, bool, S
 /// refuses in the words the app already shows, with nothing done, even
 /// once the folder is given back; a hold given back within it lets the
 /// remove go on (the reviewer's P3 1 on #1890). That half asks the binary,
-/// which waits the lamp's 4 s: the 50 ms give-back ends it as soon, with
-/// about 3.95 s to spare on a loaded host, and a binary that did not wait
-/// would fail it.
+/// which waits the lamp's 4 s, and gives the folder back only 300 ms after
+/// the binary is seen with it open, which it opens only to wait for its
+/// lock: a binary that did not wait has refused by then, however late it
+/// started (a first start takes up to 5 s on a Mac, #2348).
 #[test]
 fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
     use std::time::{Duration, Instant};
@@ -968,14 +980,46 @@ fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
 
     // Given back within the binary's own wait, the remove goes on.
     held.lock().unwrap();
-    let giving_back = std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(50));
-        held.unlock().unwrap();
-    });
-    let (answer, ok) = ask_helper(&skills, b"{\"remove\": \"desk-tutor\"}\n");
-    giving_back.join().unwrap();
-    assert!(ok, "{answer}");
+    let folder = skills.canonicalize().unwrap();
+    let (answer, ok, journal) =
+        ask_helper_while(&skills, b"{\"remove\": \"desk-tutor\"}\n", |helper| {
+            let started = Instant::now();
+            while !has_open(helper.id(), &folder) {
+                if let Some(status) = helper.try_wait().unwrap() {
+                    panic!(
+                        "the helper ended ({status}) before it was seen waiting for the held folder"
+                    );
+                }
+                // A first start on a Mac takes up to 5 s.
+                assert!(
+                    started.elapsed() < Duration::from_secs(20),
+                    "the helper never opened the skills folder"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            std::thread::sleep(Duration::from_millis(300));
+            held.unlock().unwrap();
+        });
+    assert!(ok, "{answer}: {journal}");
     assert!(left(&skills).is_empty());
+}
+
+/// Whether the process `pid` has `folder` open: `/proc` on Linux, `lsof`
+/// on a Mac.
+fn has_open(pid: u32, folder: &Path) -> bool {
+    if let Ok(fds) = fs::read_dir(format!("/proc/{pid}/fd")) {
+        return fds
+            .flatten()
+            .any(|fd| fs::read_link(fd.path()).is_ok_and(|to| to == folder));
+    }
+    std::process::Command::new("lsof")
+        .args(["-a", "-p", &pid.to_string(), "-Fn"])
+        .output()
+        .is_ok_and(|listed| {
+            String::from_utf8_lossy(&listed.stdout)
+                .lines()
+                .any(|line| line.strip_prefix('n').map(Path::new) == Some(folder))
+        })
 }
 
 /// A skill renamed aside whose `.removed-NAME-PID` could not then be
