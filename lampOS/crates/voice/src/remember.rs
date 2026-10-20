@@ -817,6 +817,15 @@ const TEXTS_DAYS: &str = "\n\nYour memory\nFor questions about earlier conversat
 /// opened for ([`person_id`], `None` for the room): the one its thread is
 /// told of too ([`crate::thread::Thread::opening`]). The legacy path uses
 /// its existing cache; the opt-in path obtains one frozen note within 300 ms.
+/// At a worker's stop: the Days session it has open is closed, within the
+/// stop's own time (the coordinator gives a worker 300 ms), so a restart
+/// leaves none behind (#1722, D). Nothing without the Days client.
+pub fn close_at_exit() {
+    if let Some(client) = DAYS.get().and_then(Option::as_ref) {
+        client.close_open_session(Duration::from_millis(150));
+    }
+}
+
 pub fn told_for_session(socket: &Path, session: u64, person: Option<&str>) -> String {
     if DAYS_MODE.get() != Some(&true) {
         return theirs_too(socket, told(), person, FIRST_READ);
@@ -1165,6 +1174,36 @@ impl DaysClient {
         person: Option<&str>,
     ) -> Option<(Value, Option<Value>)> {
         self.open_session_within(session, deadline.min(FIRST_READ), person)
+    }
+
+    /// Closes the Days session this client has open, the room's and the
+    /// person's beside it, within `deadline`, straight to the memory (not
+    /// through the writer's queue, which a stopping process may not drain):
+    /// a voice that stops leaves none open (#1722, D). The store keeps 32 a
+    /// person; one left by each restart filled the room's, after which every
+    /// session was told no note. Nothing when none is open.
+    pub fn close_open_session(&self, deadline: Duration) {
+        let until = Instant::now() + deadline;
+        let Ok(mut context) = self.context.try_lock() else {
+            return;
+        };
+        let Some(name) = context.session.take() else {
+            return;
+        };
+        let person = context.session_person.take();
+        drop(context);
+        // The room's, then the person's beside it when someone was known.
+        let whose = std::iter::once(None).chain(person.as_deref().map(Some));
+        for whose in whose {
+            let Some(left) = until.checked_duration_since(Instant::now()) else {
+                return;
+            };
+            let _ = bounded_exchange(
+                &self.socket,
+                &for_person(json!({"op":"session_close","session":name}), whose),
+                left,
+            );
+        }
     }
 
     /// [`Self::open_session_for`] within `deadline` instead of the voice's
@@ -2870,6 +2909,48 @@ mod tests {
                 .unwrap()
                 .iter()
                 .all(|line| line["op"] == "session_open")
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #1722 (D): at a worker's stop, the Days session it has open is closed
+    /// straight to the memory, the room's and the known person's, and only
+    /// once; with none open nothing is sent. A restart then leaves none.
+    #[test]
+    fn a_stopping_voice_closes_the_days_session_it_has_open() {
+        const MINH: &str = "p-be9688998f085098";
+        let answer = |request: &Value| match request["op"].as_str() {
+            Some("session_open") => {
+                let mut snapshot = snapshot(request["session"].as_str().unwrap());
+                if request["person"].is_string() {
+                    snapshot["note"] = json!(
+                        json!({"scope":PERSON_SCOPE,"untrusted":true,
+                        "facts":[{"id":7,"kind":"preference","text":"coffee black"}]})
+                        .to_string()
+                    );
+                }
+                json!({"ok":true,"snapshot":snapshot})
+            }
+            Some("session_close") => json!({"ok":true}),
+            _ => json!({"ok":false}),
+        };
+        let (socket, served) = memory("close-at-stop", 4, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        assert!(
+            client
+                .open_session_within(1, Duration::from_secs(2), Some(MINH))
+                .is_some()
+        );
+        client.close_open_session(Duration::from_secs(2));
+        // Closed already: nothing more is sent.
+        client.close_open_session(Duration::from_secs(2));
+        let read = served.join().unwrap();
+        let session = read[0]["session"].clone();
+        assert_eq!(read[2], json!({"op":"session_close","session":session}));
+        assert_eq!(
+            read[3],
+            json!({"op":"session_close","session":session,"person":MINH})
         );
         drop(client);
         std::fs::remove_file(&socket).unwrap();

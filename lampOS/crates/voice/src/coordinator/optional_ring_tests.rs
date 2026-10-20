@@ -25,6 +25,7 @@ fn fixture_with_command(directory: &SessionDirectory, command: &str) -> (Rig, Pe
             microphone: crate::options::Microphone::Mic2,
             end_silence_blocks: None,
             early_end_blocks: None,
+            early_finalize: false,
             faint_level: None,
             speaker,
             capture,

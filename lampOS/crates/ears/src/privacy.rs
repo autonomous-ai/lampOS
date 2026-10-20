@@ -17,9 +17,18 @@ fn invalid(message: &str) -> io::Error {
 }
 
 /// The feature is deliberately absent from CLI defaults and file analysis.
-/// Only an exact `on` selects it, as in Controls and Voice; any other value,
-/// an empty one included, keeps the existing loop rather than stopping Ears.
+/// Only an exact `on`, or `no-slide` (the route on a lamp with no slide,
+/// whose leases Voice grants from its mute alone), selects it, as in
+/// Controls and Voice; any other value, an empty one included, keeps the
+/// existing loop rather than stopping Ears.
 pub fn enabled(value: Option<&str>) -> bool {
+    matches!(value, Some("on" | "no-slide"))
+}
+
+/// The route on a lamp with a slide (`on` exactly), the only one the room's
+/// sound classes run under (#1669): with `no-slide` the classifier never
+/// starts, whatever `LAMP_EARS_CLASSES` says (the reviewer's P2 on #2086).
+pub fn slide(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
@@ -71,6 +80,12 @@ impl PublicationGate {
             self.epoch.store(permit.epoch, Ordering::Release);
             self.until_us.store(permit.until_us, Ordering::Release);
         }
+    }
+
+    /// Whether any lease is live at `now`: none while muted, lapsed or
+    /// before the first grant.
+    pub fn live(&self, now: u64) -> bool {
+        now < self.until_us.load(Ordering::Acquire)
     }
 
     pub fn allows(&self, permit: Permit, generation: u64, now: u64) -> bool {
@@ -189,7 +204,7 @@ impl LeaseGate {
             && old.session == next.session
             && old.controller == next.controller
             && (next.generation < old.generation
-                || lease.physical_muted.is_some() && lease.observed_us < self.observed_us)
+                || lease.observed_us != 0 && lease.observed_us < self.observed_us)
         {
             return Err(invalid("privacy observation or generation regressed"));
         }
@@ -216,7 +231,9 @@ impl LeaseGate {
         self.lineage = Some(next);
         self.sequence = Some(lease.stamp.sequence);
         self.at_us = lease.stamp.at_us;
-        if lease.physical_muted.is_some() {
+        // A switch reading, or with no slide the Controls publication that
+        // said so: either is fenced against regression the same way.
+        if lease.observed_us != 0 {
             self.observed_us = lease.observed_us;
         }
         if lease.physical_muted == Some(true) {

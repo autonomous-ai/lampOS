@@ -29,13 +29,14 @@ pub(crate) fn wait_selected(
     mut on_state: impl FnMut(PrivacyState, BootId, u64) -> Result<()>,
     mut additional_gate: impl FnMut() -> Result<bool>,
 ) -> Result<WaitOutcome> {
-    let Some(root) = privacy_bus::root_from_environment()? else {
+    let Some((root, route)) = privacy_bus::from_environment()? else {
         return service_privacy::wait_with_gate(executable, termination, on_state, additional_gate);
     };
     unreadable_retried(termination, UNREADABLE_RETRY, || {
         wait(
             executable,
             &root,
+            route,
             termination,
             &mut on_state,
             &mut additional_gate,
@@ -79,6 +80,7 @@ fn unreadable_retried(
 fn wait(
     executable: &Path,
     root: &Path,
+    route: privacy_bus::Route,
     termination: &Termination,
     on_state: impl FnMut(PrivacyState, BootId, u64) -> Result<()>,
     mut additional_gate: impl FnMut() -> Result<bool>,
@@ -90,7 +92,7 @@ fn wait(
     termination.check()?;
     let directory = SessionDirectory::create()?;
     let boot = new_boot()?;
-    let args = privacy_bus::worker_arguments(Some(root))?;
+    let args = privacy_bus::worker_arguments(Some((root, route)))?;
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
     let worker =
         Worker::spawn_with_tick(executable, &directory.path, "privacy", boot, &args, || {
@@ -118,11 +120,21 @@ fn wait(
         termination,
         on_state,
         additional_gate,
+        indicator_started(route),
         start_ring,
     )
 }
 
+/// Whether the wait may start the muted indicator (`worker ring --privacy`),
+/// which paints only a verified physical LOW. A lamp with no slide has no
+/// LOW to paint, so its ring stays as with the route off, with one writer:
+/// the asleep and tap faces, never this worker.
+fn indicator_started(route: privacy_bus::Route) -> bool {
+    route == privacy_bus::Route::Slide
+}
+
 /// The muted wait itself, with the optional ring's start injected.
+#[allow(clippy::too_many_arguments)]
 fn run(
     mut worker: Worker,
     directory: SessionDirectory,
@@ -130,6 +142,7 @@ fn run(
     termination: &Termination,
     mut on_state: impl FnMut(PrivacyState, BootId, u64) -> Result<()>,
     mut additional_gate: impl FnMut() -> Result<bool>,
+    indicator_allowed: bool,
     mut start_ring: impl FnMut(&mut dyn FnMut() -> io::Result<()>) -> io::Result<RingStartup>,
 ) -> Result<WaitOutcome> {
     let mut waiting = Waiting::new(boot)?;
@@ -156,7 +169,7 @@ fn run(
             if state.allowed {
                 return Ok(WaitOutcome::Allowed);
             }
-            if state.physical == PrivacyState::Muted && !attempted {
+            if indicator_allowed && state.physical == PrivacyState::Muted && !attempted {
                 attempted = true;
                 let started = start_ring(&mut || {
                     termination.check()?;
@@ -744,6 +757,7 @@ mod tests {
             &Termination::inactive(),
             |_, _, _| Ok(()),
             || Ok(true),
+            true,
             |tick| {
                 starts += 1;
                 tick()?;
@@ -755,6 +769,41 @@ mod tests {
         );
         assert!(matches!(outcome, Ok(WaitOutcome::Allowed)), "{outcome:?}");
         assert_eq!(starts, 1, "one attempt per muted wait");
+        assert!(peer.join().unwrap().received_stop);
+    }
+
+    /// A lamp with no slide (`no-slide`) has no LOW for the muted indicator
+    /// to paint, so its wait never starts that worker, even through a muted
+    /// observation, and the ring keeps one writer: the asleep and tap faces,
+    /// as with the route off.
+    #[test]
+    fn with_no_slide_the_wait_never_starts_the_muted_indicator() {
+        assert!(indicator_started(privacy_bus::Route::Slide));
+        assert!(!indicator_started(privacy_bus::Route::NoSlide));
+        let fixtures = SessionDirectory::create().unwrap();
+        let directory = SessionDirectory::create().unwrap();
+        let muted_seen = Arc::new(AtomicBool::new(false));
+        let (worker, peer) = mock(&fixtures.path, Script::Unmute, muted_seen.clone());
+        let mut starts = 0;
+        let outcome = run(
+            worker,
+            directory,
+            new_boot().unwrap(),
+            &Termination::inactive(),
+            |_, _, _| Ok(()),
+            || Ok(true),
+            indicator_started(privacy_bus::Route::NoSlide),
+            |_| {
+                starts += 1;
+                Ok(RingStartup::Unavailable {
+                    worker: None,
+                    error: io::Error::other("never started"),
+                })
+            },
+        );
+        assert!(matches!(outcome, Ok(WaitOutcome::Allowed)), "{outcome:?}");
+        assert!(muted_seen.load(std::sync::atomic::Ordering::SeqCst));
+        assert_eq!(starts, 0);
         assert!(peer.join().unwrap().received_stop);
     }
 
@@ -777,6 +826,7 @@ mod tests {
                 &Termination::inactive(),
                 |_, _, _| Ok(()),
                 || Ok(true),
+                true,
                 |_| {
                     Ok(RingStartup::Unavailable {
                         worker: ring.take(),

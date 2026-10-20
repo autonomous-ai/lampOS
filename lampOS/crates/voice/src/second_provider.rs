@@ -247,6 +247,23 @@ pub const STEADY_FIRST_ENVIRONMENT: &str = "LAMP_SECOND_STEADY_FIRST";
 /// (`worker::few_tools`): `on`, and nothing else (#1712, the first builder
 /// at 18:56).
 pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
+
+/// Where the worker reads whether a round that said words before its calls
+/// tells the next round so ([`Engine::saying_once`]): `on`, and nothing else
+/// (the first builder at 06:56 on #1722: on lamp-4ace "Set a timer for one
+/// minute." got "A minute, starting now. One minute, counting from now —
+/// six forty-four and change.", 2 of the last 4 runs).
+pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
+
+/// The note after a round's call results, when that round said `said`
+/// before its calls: the person heard it, so the next round says only what
+/// the results add ([`Engine::saying_once`]).
+pub(crate) fn said_once_note(said: &str) -> String {
+    format!(
+        "(For you to know, not to answer: before these calls you already said aloud \"{}\", and the person heard it. Do not say it again in other words or confirm twice. Say only what the results add that you have not said, such as the time it is set for or that it failed, in a few words, or nothing if they add nothing.)",
+        said.trim()
+    )
+}
 /// Whether a spoken turn's words were said to the lamp, judged before they
 /// are answered: `(request, (began_us, ended_us), heard)` to why it is not
 /// answered, or nothing. The window is the microphone's read time of the
@@ -271,6 +288,16 @@ pub type AskAgain = Arc<dyn Fn(u64) -> Option<(&'static str, bool)> + Send + Syn
 /// Whether the link is back: any service host takes a bare connection
 /// (`link::any_answers`), for a line lost on the network ([`Engine::resending`]).
 pub type LinkBack = Arc<dyn Fn() -> BoxFuture<'static, bool> + Send + Sync>;
+/// A spoken line's sound as this route takes it, for the same-voice check
+/// (`LAMP_SAME_VOICE_MODEL`, `worker::Heeding::hear`): its start, said over
+/// the lamp's voice or not, its samples, and its end.
+pub enum Heard<'a> {
+    Began { over_the_lamps_voice: bool },
+    Samples(&'a [i16]),
+    Ended,
+}
+/// What hears each spoken line's sound, by its request.
+pub type Hearing = Arc<dyn Fn(u64, Heard<'_>) + Send + Sync>;
 /// Whether the lamp's own last line before `request` was a question, in a
 /// conversation going on (`worker::lamp_just_asked`): then a checked sound
 /// with a word in it is the person's answer, as on the Live route.
@@ -293,6 +320,8 @@ pub type NameNote = Arc<dyn Fn(u64) -> Option<&'static str> + Send + Sync>;
 /// for the person's yes (`crate::agent_tasks::pending_note`): with its
 /// request, to the note or nothing.
 pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
+/// Told, by request, that the request's answer began to be heard.
+pub type AirHeard = Arc<dyn Fn(u64) + Send + Sync>;
 /// What the lamp did, for the rule for whom it answers
 /// (`worker::Heeding::lamp_did`), as the Live worker tells its own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -363,9 +392,13 @@ struct Shared {
     /// [`Engine::holding_answers`]: a spoken turn answered only with a
     /// holding phrase sends `HoldingAnswer`.
     holding_answer: bool,
+    /// [`Engine::saying_once`]: a round that said words before its calls
+    /// tells the next one so ([`said_once_note`]).
+    said_once: bool,
     /// [`Engine::resending`]: a spoken line whose chat was lost on the
     /// network is asked once more when the link is back.
     resend: Option<LinkBack>,
+    hearing: Option<Hearing>,
     asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
@@ -404,8 +437,9 @@ struct Shared {
     name_sounded: Option<NameSounded>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
-    /// With `LAMP_AIR_FACTS=on`: the air's note, when it is due.
-    air: Option<TaskNote>,
+    /// With `LAMP_AIR_FACTS=on`: the air's note, when it is due, and what
+    /// is told once that request's answer begins to be heard.
+    air: Option<(TaskNote, AirHeard)>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
@@ -623,10 +657,18 @@ fn soft(mut clip: Vec<i16>) -> Vec<i16> {
     clip
 }
 
+/// What a line's task is given while the line goes on: its sound, or that
+/// it has gone quiet for a moment (`ProviderInput::Paused`,
+/// `LAMP_SECOND_EARLY_FINALIZE`).
+enum LinePart {
+    Sound(Vec<i16>),
+    Pause,
+}
+
 struct Turn {
     request: u64,
     /// Open until the request's End; `None` after it.
-    audio: Option<mpsc::Sender<Vec<i16>>>,
+    audio: Option<mpsc::Sender<LinePart>>,
     /// The End came marked as a short sound let through; set before the
     /// audio queue closes, read by the turn's task after.
     sound: Arc<AtomicBool>,
@@ -783,7 +825,9 @@ impl Engine {
                 ask_again: None,
                 misheard_at_us: Mutex::new(None),
                 holding_answer: false,
+                said_once: false,
                 resend: None,
+                hearing: None,
                 asked: None,
                 cues: None,
                 down: None,
@@ -1034,6 +1078,18 @@ impl Engine {
         self
     }
 
+    /// `LAMP_SECOND_SAID_ONCE=on` ([`SAID_ONCE_ENVIRONMENT`]): a round that
+    /// said words before its calls ("A minute, starting now." with
+    /// `set_timer`) tells the next round, after the calls' results, that the
+    /// person heard them ([`said_once_note`]), so it adds only what is new,
+    /// such as the time. Before any turn only.
+    pub fn saying_once(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.said_once = on;
+        }
+        self
+    }
+
     /// `LAMP_RESEND_LOST_LINE=on`, as on Live (the first builder's 00:02 on
     /// #1722): a spoken line whose chat was lost on the network
     /// ([`link::lost`]) before any word was said or anything called is asked
@@ -1067,6 +1123,15 @@ impl Engine {
     pub fn asking_again(mut self, cut_in: CutIn, ask: AskAgain) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.ask_again = Some((cut_in, ask));
+        }
+        self
+    }
+
+    /// Each spoken line's sound is heard by `hearing` too, as the Live
+    /// worker gives it to the same-voice check. Before any turn only.
+    pub fn hearing(mut self, hearing: Hearing) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.hearing = Some(hearing);
         }
         self
     }
@@ -1241,10 +1306,13 @@ impl Engine {
 
     /// A spoken request is told, beside its words, that the air has been
     /// stuffy a while, when `note` says so (`LAMP_AIR_FACTS=on`,
-    /// `crate::air_told`, as the Live route tells it). Before any turn only.
-    pub fn noting_the_air(mut self, note: TaskNote) -> Self {
+    /// `crate::air_told`, as the Live route tells it), and `heard` is told
+    /// the request once its answer's first audio goes: only then is the
+    /// note spent, so a line cut short before any word keeps it (the
+    /// reviewer's P3 on #1960). Before any turn only.
+    pub fn noting_the_air(mut self, note: TaskNote, heard: AirHeard) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
-            shared.air = Some(note);
+            shared.air = Some((note, heard));
         }
         self
     }
@@ -1335,6 +1403,14 @@ impl Engine {
                         room.began_over_the_lamp(request);
                     }
                 });
+                if let Some(hearing) = &self.shared.hearing {
+                    hearing(
+                        request,
+                        Heard::Began {
+                            over_the_lamps_voice,
+                        },
+                    );
+                }
                 // The voice's connection opened while the person speaks, not
                 // by the answer's first sentence (#1712).
                 tokio::spawn(self.shared.services.warm());
@@ -1476,7 +1552,8 @@ impl Engine {
                                 kept.request,
                                 kept.samples.len() / 16
                             );
-                            let _ = audio.try_send(kept.samples.iter().copied().collect());
+                            let _ = audio
+                                .try_send(LinePart::Sound(kept.samples.iter().copied().collect()));
                         }
                         // The line began with the sound carried: the name
                         // heard in it is this line's.
@@ -1536,6 +1613,9 @@ impl Engine {
                     return;
                 };
                 room(|room| room.hearing(monotonic_us()));
+                if let Some(hearing) = &self.shared.hearing {
+                    hearing(request, Heard::Samples(&samples));
+                }
                 if let Ok(mut said) = turn.said.lock() {
                     if said.0 == 0 {
                         said.0 = read_completed_at_us;
@@ -1550,7 +1630,7 @@ impl Engine {
                     let over = kept.samples.len().saturating_sub(KEPT_SAMPLES);
                     kept.samples.drain(..over);
                 }
-                match audio.try_send(samples) {
+                match audio.try_send(LinePart::Sound(samples)) {
                     Ok(()) => {}
                     // The task already failed the turn itself.
                     Err(mpsc::error::TrySendError::Closed(_)) => turn.audio = None,
@@ -1562,6 +1642,19 @@ impl Engine {
                             reason: Fault::Local,
                         });
                     }
+                }
+            }
+            // The line has gone quiet for a moment: its words so far are
+            // asked for, the stream kept open (`LAMP_SECOND_EARLY_FINALIZE`).
+            // A pause that can't be queued only loses the time it saves.
+            ProviderInput::Paused { request, .. } => {
+                if let Some(audio) = self
+                    .turn
+                    .as_ref()
+                    .filter(|turn| turn.request == request)
+                    .and_then(|turn| turn.audio.as_ref())
+                {
+                    let _ = audio.try_send(LinePart::Pause);
                 }
             }
             // Only the lamp's name: told with the line's words, as Gemini's
@@ -1596,6 +1689,9 @@ impl Engine {
                     turn.sound.store(sound, Ordering::Release);
                     // Closing the queue is the end of input for the task.
                     turn.audio = None;
+                    if let Some(hearing) = &self.shared.hearing {
+                        hearing(request, Heard::Ended);
+                    }
                 }
             }
             ProviderInput::Written {
@@ -1982,7 +2078,7 @@ impl Shared {
 async fn spoken(
     shared: Arc<Shared>,
     context: (u64, Option<crate::memory_scope::ScopeLease>, Arc<Marks>),
-    mut heard: mpsc::Receiver<Vec<i16>>,
+    mut heard: mpsc::Receiver<LinePart>,
     checked: Option<Arc<AtomicBool>>,
     said: Arc<Mutex<(u64, u64)>>,
     before: Option<String>,
@@ -2068,13 +2164,21 @@ async fn spoken(
     let mut prepared: Option<Prepared> = None;
     loop {
         tokio::select! {
-            samples = heard.recv() => {
-                let Some(samples) = samples else { break };
-                if let Err(error) = listener.send(&samples) {
-                    shared.stages(request, &Times::new(begun)).await;
-                    return shared.fail(request, FailedStage::InputOpen, &error).await;
+            part = heard.recv() => match part {
+                None => break,
+                Some(LinePart::Sound(samples)) => {
+                    if let Err(error) = listener.send(&samples) {
+                        shared.stages(request, &Times::new(begun)).await;
+                        return shared.fail(request, FailedStage::InputOpen, &error).await;
+                    }
                 }
-            }
+                // Only time is lost if it can't go: the End asks anyway.
+                Some(LinePart::Pause) => {
+                    if listener.flush().is_ok() {
+                        eprintln!("lamp-voice second: request {request}: a pause: its words so far are asked for");
+                    }
+                }
+            },
             Some(said) = next_early(&mut early) => {
                 prepared = prepared_on(&shared, (request, scope.as_ref()), prepared, said, &cut_in);
             }
@@ -2392,7 +2496,7 @@ async fn spoken(
         crate::provider_worker::CALLED_NOTE.to_owned()
     });
     // A stuffy room, told beside what a person says (#1712's map, item 6).
-    let air = shared.air.as_ref().and_then(|note| note(request));
+    let air = shared.air.as_ref().and_then(|(note, _)| note(request));
     // Let out only as the conversation going on: it may be people's talk.
     let alone = shared
         .conversation_alone
@@ -3259,6 +3363,13 @@ async fn answer(
             if std::mem::take(&mut seeing) {
                 messages[asked_at] = words.clone();
             }
+            // Words said before the calls, for the next round's note
+            // (`LAMP_SECOND_SAID_ONCE`): never a call written as words, which
+            // is not said.
+            let said_once = (shared.said_once
+                && text.chars().any(char::is_alphanumeric)
+                && !crate::not_speech::names_a_function(&text))
+            .then(|| said_once_note(&text));
             messages.push(Message::assistant_calls_with(
                 Some(text),
                 &calls,
@@ -3361,6 +3472,12 @@ async fn answer(
                 );
                 return Err(Stop::Held);
             }
+            if let Some(note) = said_once {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round} said words before its calls: the next round is told they were heard"
+                );
+                messages.push(Message::system(note));
+            }
         }
         // ponytail: a model still calling tools after MAX_ROUNDS ends the
         // turn with what it has said; a spoken "I could not finish" if seen.
@@ -3415,6 +3532,11 @@ async fn answer(
                         if let Ok(mut last) = shared.answered_request.lock() {
                             *last = Some(request);
                         }
+                        // The air's note, if this request was given it, is
+                        // spent now its answer is heard.
+                        if let Some((_, heard)) = &shared.air {
+                            heard(request);
+                        }
                         // Some of its answer heard: no longer to be carried.
                         if let Ok(mut in_flight) = shared.in_flight.lock() {
                             in_flight.take_if(|carried| carried.request == request);
@@ -3439,6 +3561,9 @@ async fn answer(
                             "lamp-voice second: request {request} first answer audio {} ms after the words were heard",
                             began.elapsed().as_millis()
                         );
+                        if asked == Asker::Spoken {
+                            worker::name_sounded(request);
+                        }
                     }
                     if let Ok(mut at) = shared.answered_at.lock() {
                         *at = Some((shared.clock)());

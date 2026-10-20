@@ -769,6 +769,7 @@ impl Setup {
             microphone: crate::options::Microphone::Mic2,
             end_silence_blocks: self.end_silence_blocks,
             early_end_blocks: self.early_ms.map(|ms| ms / 10),
+            early_finalize: false,
             faint_level: None,
             provider,
             capture,

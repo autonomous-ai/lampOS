@@ -161,6 +161,10 @@ impl Gate {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::Paused {
+                request,
+                privacy_generation,
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,
@@ -214,7 +218,11 @@ impl Gate {
         let mut drained = Drain::Deferred;
         for _ in 0..CONTROL_SLICE {
             match control.receive()? {
-                Some(Control::Stop) => return Ok(Drain::Stopped),
+                Some(Control::Stop) => {
+                    // Its Days session closed, so a restart leaves none (#1722, D).
+                    crate::remember::close_at_exit();
+                    return Ok(Drain::Stopped);
+                }
                 Some(Control::Authority { snapshot }) => {
                     self.install(monotonic_us(), snapshot, engine)?
                 }
@@ -1102,24 +1110,53 @@ async fn air_task(bus: lamp_bus::Bus, air: Arc<Mutex<crate::air_told::AirTold>>)
     }
 }
 
+/// The most requests remembered as given the air's note and not yet heard.
+const AIR_GIVEN_MOST: usize = 4;
+
 /// The air's note for a spoken request: due (stuffy ten minutes, not told
-/// in three hours) and the room not `busy` at that moment, then counted as
-/// told. In a busy room it is neither said nor counted.
+/// in three hours) and the room not `busy` at that moment. It is counted as
+/// told only once that request's answer begins to be heard (the second
+/// part), so a line cut short or retired before any word keeps it for the
+/// next (the reviewer's P3 on #1960). In a busy room it is neither said nor
+/// counted.
 fn air_noting(
     air: Arc<Mutex<crate::air_told::AirTold>>,
     busy: impl Fn(u64) -> bool + Send + Sync + 'static,
-) -> crate::second_provider::TaskNote {
-    Arc::new(move |request| {
+) -> (
+    crate::second_provider::TaskNote,
+    crate::second_provider::AirHeard,
+) {
+    // The requests given the note and not yet heard, the newest last: any of
+    // their answers spends it (two can be given it before the first's answer
+    // plays; the reviewer's P3 on #2083). A few at most.
+    let given: Arc<Mutex<std::collections::VecDeque<u64>>> = Arc::default();
+    let giving = given.clone();
+    let spent = air.clone();
+    let note: crate::second_provider::TaskNote = Arc::new(move |request| {
         let now = monotonic_us();
         if busy(now) {
             return None;
         }
-        let mut air = air.lock().ok()?;
-        let note = air.due(now)?;
-        air.told(now);
-        eprintln!("lamp-voice second: request {request} is told the air is stuffy");
+        let note = air.lock().ok()?.due(now)?;
+        let mut giving = giving.lock().ok()?;
+        if giving.len() == AIR_GIVEN_MOST {
+            giving.pop_front();
+        }
+        giving.push_back(request);
         Some(note)
-    })
+    });
+    let heard: crate::second_provider::AirHeard = Arc::new(move |request| {
+        let Ok(mut given) = given.lock() else { return };
+        if !given.contains(&request) {
+            return;
+        }
+        given.clear();
+        if let Ok(mut air) = spent.lock() {
+            air.told(monotonic_us());
+            eprintln!("lamp-voice second: request {request} is told the air is stuffy");
+        }
+    });
+    (note, heard)
 }
 
 async fn weather_task(place: String, weather: Weather) {
@@ -1300,6 +1337,15 @@ pub fn serve(
         Arc::new(move || with_look(declare()))
     } else {
         declare.clone()
+    };
+    // With `LAMP_NAME_SIGNAL=on`, spoken turns are offered `heard_my_name`
+    // as the Live route's sessions are, and the journal says how long
+    // before a line's first sound the model said it heard its name. Texts,
+    // which nobody said, are not offered it.
+    let spoken_declare = if files.name_signal {
+        with_name_signal(spoken_declare)
+    } else {
+        spoken_declare
     };
     let net = services(
         config,
@@ -1531,7 +1577,8 @@ pub fn serve(
                 .lock()
                 .is_ok_and(|mut room| room.at(now) == crate::room_told::Room::Busy)
         };
-        engine = engine.noting_the_air(air_noting(told.clone(), busy));
+        let (note, heard) = air_noting(told.clone(), busy);
+        engine = engine.noting_the_air(note, heard);
     }
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
@@ -1642,6 +1689,18 @@ pub fn serve(
     // A holding-only answer is asked to go on, as on Live
     // (`LAMP_HOLDING_ANSWER=on`; the first builder's 22:54 on #1722).
     engine = engine.holding_answers(files.holding_answer);
+    // Words said before a call are not said again after it
+    // (`LAMP_SECOND_SAID_ONCE=on`; the first builder at 06:56 on #1722).
+    let said_once = std::env::var(crate::second_provider::SAID_ONCE_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if said_once {
+        eprintln!(
+            "lamp-voice second: a round's words said before its calls are told to the next round, which adds only what is new (LAMP_SECOND_SAID_ONCE)"
+        );
+    }
+    engine = engine.saying_once(said_once);
     // A line lost on the network is asked once more when a service host
     // answers again, the link's own check (`LAMP_RESEND_LOST_LINE=on`; the
     // first builder's 00:02 on #1722). As the only voice, with its hosts.
@@ -1668,6 +1727,32 @@ pub fn serve(
             files.bus_root.as_deref(),
             thread.clone(),
         )));
+        // The same-voice check (#829), as the Live worker starts it: its
+        // child loads its model now, and only beside `LAMP_SPOKEN_TO=on`.
+        // Only as the lamp's only voice: a standby beside Live loads none.
+        let same_voice = files.same_voice.clone().filter(|_| route.only_voice);
+        match (files.spoken_to, same_voice) {
+            (true, Some(model)) => match crate::same_voice::Prints::beside_voice(model) {
+                Ok(prints) => {
+                    if let Ok(mut heeding) = heeding.lock() {
+                        heeding.checking_the_voice(Box::new(prints));
+                    }
+                    let heeding = heeding.clone();
+                    engine = engine.hearing(Arc::new(move |request, heard| {
+                        if let Ok(mut heeding) = heeding.lock() {
+                            heeding.hear(request, heard);
+                        }
+                    }));
+                }
+                Err(error) => {
+                    eprintln!("lamp-voice second: the same voice is not judged: {error}");
+                }
+            },
+            (false, Some(_)) => eprintln!(
+                "lamp-voice second: the same voice is judged only with LAMP_SPOKEN_TO=on: not judged"
+            ),
+            (_, None) => {}
+        }
         // The name note, as the Live route gives it (`LAMP_NAME_NOTE=on`).
         if files.name_note
             && let Ok(mut heeding) = heeding.lock()
@@ -1764,10 +1849,19 @@ pub fn serve(
                 }
             }));
         }
+        // Before the levels' sampling begins, which reads the eyes beside
+        // them for it. Only as the lamp's only voice, so a standby beside
+        // Live adds no second `attention/addressed` publisher.
+        if files.addressed
+            && route.only_voice
+            && let (Ok(mut heeding), Some(root)) = (heeding.lock(), files.bus_root.as_deref())
+        {
+            heeding.judging_addressed(root);
+        }
         if files.attention_near
             && let (Ok(mut heeding), Some(root)) = (heeding.lock(), files.bus_root.as_deref())
         {
-            heeding.hear_levels(root);
+            heeding.hear_levels(root, true);
         }
         // In a busy room, a line going on waits for the Policy (#1522), as
         // on the Live route: with the rule and the bus.
@@ -1977,6 +2071,7 @@ pub(crate) fn given_at_once(name: &str) -> bool {
         || crate::agent_tasks::is_tool(name)
         || [
             crate::tools::NOT_FOR_ME,
+            crate::attention::HEARD_MY_NAME,
             crate::use_skill::NAME,
             crate::onboarding::STEP,
             crate::onboarding::REDO,
@@ -2050,6 +2145,10 @@ async fn run_call(
     args: serde_json::Value,
     scope: Option<crate::memory_scope::ScopeLease>,
 ) -> serde_json::Value {
+    if name == crate::attention::HEARD_MY_NAME {
+        named(request);
+        return crate::tools::declined();
+    }
     if name == MORE {
         eprintln!(
             "lamp-voice second: request {request} called {MORE}: its next round is given every function"
@@ -2144,6 +2243,55 @@ pub(crate) fn policy_verdicts(
             );
         })
         .ok()
+}
+
+/// Whether spoken turns are offered `heard_my_name` (`LAMP_NAME_SIGNAL=on`).
+static NAME_SIGNAL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// The request whose model said last that it heard its name, and when, by
+/// this process's clock.
+static NAMED: Mutex<Option<(u64, u64)>> = Mutex::new(None);
+
+/// `declare`'s functions and `heard_my_name` (`LAMP_NAME_SIGNAL=on`), whose
+/// calls are journaled from now on.
+fn with_name_signal(
+    declare: crate::second_provider::net::Declare,
+) -> crate::second_provider::net::Declare {
+    NAME_SIGNAL.store(true, std::sync::atomic::Ordering::Relaxed);
+    Arc::new(move || {
+        let mut declared = declare();
+        declared.push(crate::attention::name_tool());
+        declared
+    })
+}
+
+/// The model said it heard its name in `request`: answered, nothing done,
+/// and journaled as the Live route journals it. On this route the call
+/// comes in a chat round before the answer's, so before its first sound.
+fn named(request: u64) {
+    if let Ok(mut named) = NAMED.lock() {
+        *named = Some((request, monotonic_us()));
+    }
+    eprintln!("lamp-voice second: request {request}: the model said it heard its name");
+}
+
+/// The first sound of `request`'s answer, with `LAMP_NAME_SIGNAL=on`: how
+/// long after the model said it heard its name, if it did, as the Live
+/// route says it (`provider_worker`'s `sound`), the count that decides
+/// whether the sign can be used. Once per request, from the line that says
+/// the first answer audio.
+pub(crate) fn name_sounded(request: u64) {
+    if !NAME_SIGNAL.load(std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+    match NAMED.lock().ok().and_then(|named| *named) {
+        Some((named, at)) if named == request => eprintln!(
+            "lamp-voice second: request {request}: first sound {} ms after the model said it heard its name",
+            monotonic_us().saturating_sub(at) / 1_000
+        ),
+        _ => eprintln!(
+            "lamp-voice second: request {request}: first sound, and the model has not said it heard its name"
+        ),
+    }
 }
 
 /// The journal's line for a call the Live route would hold for the Policy
@@ -2296,9 +2444,15 @@ pub(crate) fn health_fact(
 ///
 /// With `--attention-near`, also how far the room microphone rose over its
 /// quiet during the line (`room/sound`), sampled as the Live worker samples
-/// it. Not given: a tap on the head and whether it was said from close
-/// (`--addressed`), so a line in a busy room that only those would let
-/// through on the Live route is held here. Each turn is judged as a session's first: this
+/// it. With `--addressed` (`LAMP_ADDRESSED=on`), whether the line was said
+/// to the lamp from close to it ([`crate::addressed`]): the room
+/// microphone's rise and the eyes' close faces turned to the lamp over the
+/// line's sound, judged once for each request and published on
+/// `attention/addressed`, as on the Live route. Not given: a tap on the
+/// head, so a line in a busy room that only that would let through on the
+/// Live route is held here. With `LAMP_SAME_VOICE_MODEL`, the line's voice
+/// against the conversation's, as on Live ([`Self::checking_the_voice`]).
+/// Each turn is judged as a session's first: this
 /// route keeps no session that has heard enough to be trusted.
 pub(crate) struct Heeding {
     attention: crate::attention::Attention,
@@ -2311,12 +2465,21 @@ pub(crate) struct Heeding {
     bus: Option<(lamp_bus::Bus, lamp_bus::Subscriber)>,
     thread: Option<PathBuf>,
     /// The room microphone's rise over its quiet, by when it was sampled,
-    /// with `--attention-near`: the last [`LEVELS_KEPT_US`].
+    /// with `--attention-near` or `--addressed`: the last [`LEVELS_KEPT_US`].
     levels: Option<Levels>,
+    /// Whether the rise is the rule's own sign of a line said near
+    /// (`--attention-near`), as on the Live route: with `--addressed` alone
+    /// it is sampled for that judgement only.
+    near_sign: bool,
+    /// With `--addressed`: the eyes' looks, sampled beside the levels, and
+    /// where each request's judgement is published, if the bus can be used.
+    addressed: Option<(Looked, Option<crate::addressed::AddressedOut>)>,
     /// The request the rule judged last, the session it is judged in, which
-    /// a request going on from it keeps, and the words it was judged with,
-    /// which are stripped from the front of that request's.
-    judged: Option<(u64, u64, String)>,
+    /// a request going on from it keeps, the words it was judged with,
+    /// which are stripped from the front of that request's, and the whole
+    /// chain's words, the first half's included, which name what it asks
+    /// for (Eighth on #2054: "Remind me" | "in two minutes to stretch").
+    judged: Option<(u64, u64, String, String)>,
     /// This route is the lamp's only voice ([`Self::as_the_only_voice`]):
     /// the room is the one it keeps itself, not Gemini's worker's.
     keeps_room: bool,
@@ -2364,6 +2527,9 @@ pub(crate) struct Heeding {
     misheard_hum: bool,
     /// The request last ended as a cut-in over the lamp's answer.
     cut_in: Option<u64>,
+    /// The same-voice check (`LAMP_SAME_VOICE_MODEL`, #829,
+    /// [`Self::checking_the_voice`]), as the Live worker keeps it.
+    voices: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
 }
 
 /// What let a line out, as the journal says it: the sign itself where the
@@ -2508,6 +2674,8 @@ pub(crate) const RENEW_AT_MOST_EVERY: Duration = Duration::from_secs(900);
 
 /// The room microphone's rise over its quiet, dB, by when it was sampled.
 type Levels = Arc<Mutex<std::collections::VecDeque<(u64, f32)>>>;
+/// The eyes' looks of the last 30 s ([`crate::addressed::Looks`]).
+type Looked = Arc<Mutex<crate::addressed::Looks>>;
 
 /// Told beside a line the rule let out only as the conversation going on
 /// (`attention::Attention::played_on_the_conversation_alone`), with
@@ -2526,6 +2694,9 @@ struct Seen {
     busy: bool,
     lamp_asked: bool,
     heard: String,
+    /// Held as another voice than the conversation's (#829), which the
+    /// room counts as talk past the lamp.
+    other_voice: bool,
 }
 
 /// A line that waits for the Policy's decision: its request, since when,
@@ -2535,6 +2706,11 @@ struct Waiting {
     since: Instant,
     seen: Seen,
 }
+
+/// Words that ask the lamp to remember or forget something: with the
+/// schedule's words, a line let out only as the conversation going on is
+/// then not told it may be people's talk (`Heeding::asks_its_work`).
+const MEMORY_WORDS: [&str; 2] = ["remember", "forget"];
 
 /// What the bus and the thread say as a spoken turn is judged.
 pub(crate) struct Signs {
@@ -2596,6 +2772,8 @@ impl Heeding {
             bus,
             thread,
             levels: None,
+            near_sign: false,
+            addressed: None,
             judged: None,
             keeps_room: false,
             name_note: None,
@@ -2614,6 +2792,108 @@ impl Heeding {
             policed: None,
             misheard_hum: false,
             cut_in: None,
+            voices: None,
+        }
+    }
+
+    /// A line in another voice than the conversation's is no part of it
+    /// (#829), judged by `printer` as the Live worker judges it: with
+    /// `LAMP_SAME_VOICE_MODEL`, only beside `LAMP_SPOKEN_TO=on`.
+    pub(crate) fn checking_the_voice(&mut self, printer: Box<dyn crate::same_voice::Printer>) {
+        self.voices = Some(crate::same_voice::Voices::new(printer));
+    }
+
+    /// A spoken line's sound, for the same-voice check: judged only if it
+    /// began with the lamp quiet, as on Live.
+    pub(crate) fn hear(&mut self, request: u64, heard: crate::second_provider::Heard<'_>) {
+        use crate::second_provider::Heard;
+        let Some(voices) = self.voices.as_mut() else {
+            return;
+        };
+        match heard {
+            Heard::Began {
+                over_the_lamps_voice,
+            } => voices.began(request, !over_the_lamps_voice),
+            Heard::Samples(samples) => voices.heard(request, samples),
+            Heard::Ended => voices.ended(request),
+        }
+    }
+
+    /// Whether a conversation goes on for `request`, `going_on` as the rule
+    /// read it, with the same-voice check, as the Live worker judges it
+    /// (`provider_worker.rs`, #829): a line in another voice than the
+    /// conversation's is no part of it; a late "another voice" from the line
+    /// before ends it; after another voice's line held, a question in the
+    /// conversation's own voice goes on, a statement in it is talk past the
+    /// lamp. The second field: held as another voice.
+    fn voice_going_on(&mut self, request: u64, going_on: bool) -> (bool, bool) {
+        let Some(voices) = self.voices.as_mut() else {
+            return (going_on, false);
+        };
+        let attention = &self.attention;
+        let under_the_mark = !going_on
+            && crate::room_told::room()
+                .lock()
+                .is_ok_and(|room| room.ended_only_by_another_voice())
+            && crate::thread::current(self.thread.as_deref(), |thread| {
+                thread.going_on(Instant::now())
+            })
+            .unwrap_or_default();
+        let at = voices.at_verdict(
+            request,
+            going_on || under_the_mark,
+            attention.called_for_itself(),
+        );
+        if let Some(late) = at.late_other {
+            eprintln!(
+                "lamp-voice second: request {request}: no conversation is going on for it: request {late}'s voice, known after its answer, was another's"
+            );
+            if let Ok(mut told) = crate::room_told::room().lock() {
+                told.another_voice_held(late);
+            }
+        }
+        if let Some(why) = at
+            .unjudged
+            .filter(|_| at.late_other.is_none() && (going_on || under_the_mark))
+        {
+            voices.judged_without(request, why);
+        }
+        let talked_past = |why: &str| {
+            eprintln!("lamp-voice second: request {request}: {why}");
+            if let Ok(mut told) = crate::room_told::room().lock() {
+                told.own_voice_talked();
+            }
+            (false, false)
+        };
+        match at.likeness {
+            _ if at.late_other.is_some() => (false, false),
+            Some(likeness) if likeness < crate::same_voice::DIFFERENT_BELOW => {
+                eprintln!(
+                    "lamp-voice second: request {request}: another voice than the conversation's (cosine {likeness:.2}): no conversation is going on for it"
+                );
+                (false, true)
+            }
+            Some(likeness) if under_the_mark && attention.asks_a_question() => {
+                eprintln!(
+                    "lamp-voice second: request {request}: the conversation's voice (cosine {likeness:.2}), a question after another voice's line: the conversation goes on"
+                );
+                (true, false)
+            }
+            Some(likeness) if under_the_mark => talked_past(&format!(
+                "the conversation's voice (cosine {likeness:.2}), no question after another voice's line: talk past the lamp, and the conversation is over"
+            )),
+            None if under_the_mark && !attention.asks_a_question() && at.unjudged.is_some() => {
+                talked_past(
+                    "no question after another voice's line, its voice not known in time: taken for talk past the lamp, and the conversation is over",
+                )
+            }
+            Some(likeness) => {
+                eprintln!(
+                    "lamp-voice second: request {request}: the conversation's voice (cosine {likeness:.2})"
+                );
+                (true, false)
+            }
+            None => (going_on, false),
         }
     }
 
@@ -2728,16 +3008,42 @@ impl Heeding {
         self.attention.judge_by_day(by_day);
     }
 
+    /// Judge whether each spoken line was said to the lamp from close to it
+    /// (`--addressed`, [`crate::addressed`]), as the Live worker does, and
+    /// publish it on `attention/addressed` under the bus at `root`. In a
+    /// busy room it lets a line out ([`crate::attention::ADDRESSED`]).
+    pub(crate) fn judging_addressed(&mut self, root: &Path) {
+        let out = crate::addressed::AddressedOut::on(root)
+            .inspect_err(|error| {
+                eprintln!(
+                    "lamp-voice second: whether a request was said to the lamp is not published on the bus: {error}"
+                );
+            })
+            .ok();
+        self.addressed = Some((Looked::default(), out));
+        self.hear_levels(root, false);
+    }
+
     /// Sample the room microphone's rise over its quiet from now on, on a
     /// thread of its own: the turn's task cannot, since the line is judged
     /// only after it has been heard.
-    fn hear_levels(&mut self, root: &Path) {
+    fn hear_levels(&mut self, root: &Path, near: bool) {
+        self.near_sign |= near;
+        if self.levels.is_some() {
+            return;
+        }
         let Ok(bus) = lamp_bus::Bus::new(root) else {
             return;
         };
         let levels: Levels = Arc::default();
         // Weak: the thread ends once this `Heeding` is gone (Second on #1028).
         let kept = Arc::downgrade(&levels);
+        // The eyes' looks, read beside the levels as the Live worker reads
+        // them, with `--addressed` only.
+        let looked = self
+            .addressed
+            .as_ref()
+            .map(|(looks, _)| Arc::downgrade(looks));
         let started = std::thread::Builder::new()
             .name("second-levels".into())
             .spawn(move || {
@@ -2755,6 +3061,12 @@ impl Heeding {
                         .and_then(|message| message.parse::<lamp_msgs::RoomSound>().ok())
                         .filter(|level| !level.own_voice)
                         .and_then(|level| Some(level.level_db - level.floor_db?));
+                    if let Some(looks) = looked.as_ref().and_then(std::sync::Weak::upgrade)
+                        && let Ok(Some(message)) = bus.latest(lamp_msgs::Faces::TOPIC)
+                        && let Ok(mut looks) = looks.lock()
+                    {
+                        looks.read(&message, now_us);
+                    }
                     let Some(levels) = kept.upgrade() else { return };
                     let Ok(mut levels) = levels.lock() else {
                         return;
@@ -2845,6 +3157,7 @@ impl Heeding {
             near: self
                 .levels
                 .as_ref()
+                .filter(|_| self.near_sign)
                 .and_then(|levels| levels.lock().ok())
                 .is_some_and(|levels| {
                     levels.iter().any(|(at, rise)| {
@@ -2909,6 +3222,9 @@ impl Heeding {
         signs: Signs,
     ) -> Option<&'static str> {
         let attention = &mut self.attention;
+        // What the engine gave: a request going on from one cut short has
+        // that one's words in front of its own (#1168).
+        let whole = heard;
         // Each turn is its own session here. One going on from the request
         // begun just before it, when the rule judged that one last, keeps
         // what the rule knew of it (its name, the words so far, whether it
@@ -2917,9 +3233,9 @@ impl Heeding {
         let (session, heard) = match self
             .judged
             .as_ref()
-            .filter(|(last, _, _)| signs.continues_from == Some(*last))
+            .filter(|(last, _, _, _)| signs.continues_from == Some(*last))
         {
-            Some((_, session, before)) => {
+            Some((_, session, before, _)) => {
                 attention.continued_at(request, *session, began_us);
                 // The engine put the words going on from in front of these
                 // (#1168); the rule keeps them already, so it is given only
@@ -2937,7 +3253,7 @@ impl Heeding {
                 (self.session, heard)
             }
         };
-        self.judged = Some((request, session, heard.to_owned()));
+        self.judged = Some((request, session, heard.to_owned(), whole.to_owned()));
         attention.ended(request, ended_us);
         if self.cut_in == Some(request) {
             attention.ended_as_cut_in(request);
@@ -2949,6 +3265,37 @@ impl Heeding {
         attention.lamp_asked(signs.lamp_asked);
         let (busy, lamp_asked) = (signs.room == crate::room_told::Room::Busy, signs.lamp_asked);
         attention.set_near(signs.near);
+        // Said to the lamp from close to it, over the line's sound, judged
+        // once as the Live worker judges it as the sound ends.
+        if let Some((looks, out)) = self.addressed.as_mut()
+            && let Some(in_hand) = attention.in_hand()
+        {
+            let now = monotonic_us();
+            let none = std::collections::VecDeque::new();
+            let rises = self.levels.as_ref().and_then(|levels| levels.lock().ok());
+            let looks = looks.lock().ok();
+            let said = crate::addressed::judge(
+                in_hand,
+                rises.as_deref().unwrap_or(&none),
+                looks
+                    .as_deref()
+                    .unwrap_or(&crate::addressed::Looks::default()),
+                now,
+            );
+            attention.set_addressed(said.addressed);
+            if said.addressed {
+                eprintln!(
+                    "lamp-voice second: request {request}: said to the lamp from close to it"
+                );
+            }
+            if let Some(out) = out.as_mut()
+                && let Err(error) = out.tell(&said, now)
+            {
+                eprintln!(
+                    "lamp-voice second: request {request}: whether it was said to the lamp was not published: {error}"
+                );
+            }
+        }
         // The night's bars, as the Live worker reads them before each
         // verdict (`provider_worker.rs`): only with the day's own bars, and
         // otherwise every hour was judged as day (Tests and the first
@@ -2957,9 +3304,12 @@ impl Heeding {
             attention.set_night((self.night)());
         }
         let turned = signs.turned.filter(|_| self.strict);
+        let (going_on, other_voice) = self.voice_going_on(request, signs.going_on);
+        let attention = &mut self.attention;
         let seen = Seen {
             room: signs.room,
-            going_on: signs.going_on,
+            going_on,
+            other_voice,
             turned,
             busy,
             lamp_asked,
@@ -3082,10 +3432,20 @@ impl Heeding {
         }
         let played = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
         let called = played && (attention.called_for_itself() || turned == Some(true));
+        // Let out as the conversation going on, or for itself: a line that
+        // called the lamp begins a conversation of its own (Eighth on #829).
+        if let (Some(voices), Some(_)) = (self.voices.as_mut(), verdict) {
+            voices.decided(
+                request,
+                played,
+                seen.going_on && !attention.called_for_itself(),
+            );
+        }
         // The verdict for the room this route keeps (`super::room`), and a
-        // call let out, which ends the count of talk past the lamp.
+        // call let out, which ends the count of talk past the lamp; a line
+        // held as another voice is talk past it too (#829).
         if let Ok(mut room) = crate::room_told::room().lock() {
-            room.judged(request, verdict, false);
+            room.judged(request, verdict, seen.other_voice);
             if called {
                 room.called(request);
             }
@@ -3153,8 +3513,40 @@ impl Heeding {
     /// or takes it away (`policy_holds::SCHEDULE_HELD`) in a request let out
     /// only as the conversation going on, as the Live route's busy-room rule
     /// holds the schedule's (#1522, #1712).
+    ///
+    /// Not when its words name a timer, a reminder or the lamp, as Live's
+    /// busy-room rule lets those set it (#1522, the first builder at 19:04):
+    /// on lamp-4ace on 20 Oct "Remind me in two minutes to stretch." was
+    /// held on this route, the person told to say it again, and set on Live
+    /// (the first builder at 04:54 and their yes at 05:01). A line answering
+    /// the lamp's own question is never let out only as the conversation
+    /// going on, so it sets what it asks for, as on Live.
     pub(crate) fn holds_call(&self, request: u64, name: &str) -> bool {
-        self.alone == Some(request) && crate::policy_holds::SCHEDULE_HELD.contains(&name)
+        self.alone == Some(request)
+            && crate::policy_holds::SCHEDULE_HELD.contains(&name)
+            && !self.names_the_schedule(request)
+    }
+
+    /// Whether `request`'s words name a timer, a reminder or the lamp
+    /// (`going_on_asks::names_the_schedule`): the whole chain's, for a
+    /// request going on from one cut short.
+    fn names_the_schedule(&self, request: u64) -> bool {
+        self.judged.as_ref().is_some_and(|(of, _, _, whole)| {
+            *of == request && crate::going_on_asks::names_the_schedule(whole)
+        })
+    }
+
+    /// Whether `request`'s words ask for the lamp's own work: the
+    /// schedule's words, or to remember or forget something. The whole
+    /// chain's, as [`Self::names_the_schedule`].
+    fn asks_its_work(&self, request: u64) -> bool {
+        self.names_the_schedule(request)
+            || self.judged.as_ref().is_some_and(|(of, _, _, whole)| {
+                *of == request
+                    && whole
+                        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+                        .any(|word| MEMORY_WORDS.contains(&word.to_lowercase().as_str()))
+            })
     }
 
     /// Whether the lamp's name was heard (`name/heard`, at
@@ -3184,9 +3576,13 @@ impl Heeding {
     }
 
     /// The note for `request` if the rule let it out only as the
-    /// conversation going on ([`CONVERSATION_ALONE`]).
+    /// conversation going on ([`CONVERSATION_ALONE`]): not for a line whose
+    /// words ask for the lamp's own work ([`Self::asks_its_work`]), which is
+    /// said to the lamp. On lamp-4ace on 20 Oct, told the note, "Remember
+    /// that my favourite colour is green." got `not_for_me` and nothing was
+    /// kept (the first builder at 04:54 and their yes at 05:01).
     pub(crate) fn conversation_note_for(&self, request: u64) -> Option<&'static str> {
-        (self.alone == Some(request)).then_some(CONVERSATION_ALONE)
+        (self.alone == Some(request) && !self.asks_its_work(request)).then_some(CONVERSATION_ALONE)
     }
 
     /// Whether `request` was judged in a busy room: a line that may follow
@@ -3646,14 +4042,15 @@ mod route_checks;
 #[cfg(test)]
 mod tests {
     /// #1712's map, item 6: the air's note is due after ten minutes of a
-    /// stuffy room, never in a busy one, told once, and not again within
-    /// three hours.
+    /// stuffy room, never in a busy one, spent only once its request's
+    /// answer is heard (a line cut short before any word keeps it; the
+    /// reviewer's P3 on #1960), and not again within three hours.
     #[test]
     fn the_airs_note_is_given_once_when_due() {
         let air = Arc::new(Mutex::new(crate::air_told::AirTold::default()));
         let busy = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let room_busy = busy.clone();
-        let note = super::air_noting(air.clone(), move |_| {
+        let (note, heard) = super::air_noting(air.clone(), move |_| {
             room_busy.load(std::sync::atomic::Ordering::Relaxed)
         });
         let now = monotonic_us();
@@ -3672,7 +4069,23 @@ mod tests {
         busy.store(false, std::sync::atomic::Ordering::Relaxed);
         let said = note(3).expect("due once the room is not busy");
         assert!(said.contains("1200"), "{said}");
-        assert_eq!(note(4), None, "told once");
+        // Request 3 cut short before any word: its note isn't spent.
+        heard(99);
+        assert!(note(4).is_some(), "not heard: still due for the next");
+        heard(4);
+        assert_eq!(note(5), None, "heard once: told");
+        heard(4);
+        assert_eq!(note(6), None, "and not again");
+        // Two given it before the first's answer plays (the reviewer's P3 on
+        // #2083): the earlier one's answer heard still spends it.
+        let air = Arc::new(Mutex::new(crate::air_told::AirTold::default()));
+        let (note, heard) = super::air_noting(air.clone(), |_| false);
+        air.lock()
+            .unwrap()
+            .seen(true, Some(1180), now.saturating_sub(11 * 60_000_000));
+        assert!(note(7).is_some() && note(8).is_some(), "due for both");
+        heard(7);
+        assert_eq!(note(9), None, "the earlier one's answer spent it");
     }
 
     /// #1712, the first builder at 16:43: the route's lines are judged as
@@ -3912,6 +4325,84 @@ mod tests {
         }
         assert_eq!(heeding.attention.sign(Some(true)), Some(TURNED));
         assert_eq!(heeding.attention.sign(Some(false)), None);
+    }
+
+    /// #829 on the second route (#1712, Tests' map item 1): with
+    /// `LAMP_SAME_VOICE_MODEL`, a line in another voice than the
+    /// conversation's, going on from it, is held as no part of it; after
+    /// it, a question in the conversation's own voice goes on, as on Live.
+    #[test]
+    fn another_voice_going_on_is_held_and_the_conversations_own_goes_on() {
+        use crate::second_provider::Heard;
+        /// Prints by a line's first sample, answered at once: 1 is A's
+        /// voice, -1 B's.
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        {
+            let mut room = crate::room_told::room().lock().unwrap();
+            *room = crate::room_told::RoomTold::new();
+            room.count_only_talk(true);
+        }
+        let said = (10_000_000, 11_000_000);
+        let mut heeding = Heeding::new(true, true, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.checking_the_voice(Box::new(Voice::default()));
+        let line = |heeding: &mut Heeding, request: u64, voice: i16, words: &str| {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+            heeding.hear(request, Heard::Ended);
+            let held = heeding.heed(request, said, words, None);
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.person(words, true, Instant::now());
+            if held.is_none() {
+                thread.lamp(request, "Sure.", Instant::now());
+            }
+            held
+        };
+        // A calls the lamp: A's voice is the conversation's.
+        assert_eq!(line(&mut heeding, 1, 1, "Lamp, what time is it?"), None);
+        // B, going on from it in another voice: held.
+        assert!(
+            line(&mut heeding, 2, -1, "And what about tomorrow?").is_some(),
+            "another voice is no part of the conversation"
+        );
+        // A again, a question: the conversation goes on.
+        assert_eq!(line(&mut heeding, 3, 1, "And what about tomorrow?"), None);
+        // Without the check, B's line would have gone on.
+        let mut unchecked = Heeding::new(true, true, None, None);
+        unchecked.as_the_only_voice(false, true, false);
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+        crate::room_told::room()
+            .lock()
+            .unwrap()
+            .count_only_talk(true);
+        assert_eq!(line(&mut unchecked, 1, 1, "Lamp, what time is it?"), None);
+        assert_eq!(
+            line(&mut unchecked, 2, -1, "And what about tomorrow?"),
+            None
+        );
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 
     /// #1712, the first builder at 17:26: a call the lamp never answered
@@ -4585,7 +5076,7 @@ mod tests {
             )
             .unwrap();
         let mut heeding = super::Heeding::new(true, false, None, None);
-        heeding.hear_levels(&root);
+        heeding.hear_levels(&root, true);
         let floor = -50.0;
         // A line begins once its first level is the bus's newest, so no
         // sample taken in it can be the line's before.
@@ -4610,6 +5101,153 @@ mod tests {
         assert!(!heeding.signs(10, own).near, "its own voice: not near");
         assert!(!heeding.signs(11, quiet).near, "quiet: not near");
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Tests' map on #1712 (20:11), (1): `LAMP_ADDRESSED` on the second
+    /// route. In a busy room a line with no name, no conversation going on
+    /// and nobody seen turned to the lamp is held; with `--addressed`, the
+    /// same line said loud at the desk while a close face was turned to the
+    /// lamp is let out as said to it, and the judgement is published once on
+    /// `attention/addressed`, as on the Live route. Said from close with the
+    /// face turned away, it is still held. On the real clock, about two
+    /// seconds.
+    #[test]
+    fn with_addressed_a_line_said_close_and_facing_is_let_out_in_a_busy_room() {
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/lsa-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut ears = bus
+            .publisher_declared(
+                lamp_msgs::RoomSound::TOPIC,
+                &lamp_msgs::RoomSound::declaration(),
+                "ears",
+            )
+            .unwrap();
+        let mut eyes = bus
+            .publisher_declared(
+                lamp_msgs::Faces::TOPIC,
+                &lamp_msgs::Faces::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        let mut told = bus
+            .subscribe_typed(
+                lamp_msgs::Addressed::TOPIC,
+                "test",
+                lamp_msgs::Addressed::TYPE,
+            )
+            .unwrap();
+        let face = |facing: bool| lamp_msgs::Faces {
+            faces: vec![lamp_msgs::Face {
+                id: "f".into(),
+                xmin: 0.4,
+                ymin: 0.0,
+                xmax: 0.7,
+                ymax: 0.3,
+                confidence: 0.9,
+                yaw: None,
+                facing: Some(facing),
+                speaking: None,
+            }],
+        };
+        let busy = || super::Signs {
+            room: crate::room_told::Room::Busy,
+            going_on: false,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let heard = "what time is it in Tokyo now";
+        let mut addressed = super::Heeding::new(true, false, None, None);
+        addressed.judging_addressed(&root);
+        let mut without = super::Heeding::new(true, false, None, None);
+        // A line said 3 dB over the near mark, a face turned to the lamp or
+        // away from it in every look.
+        let mut line = |facing: bool| {
+            let level = lamp_msgs::RoomSound {
+                level_db: -50.0 + crate::attention::NEAR_RISE_DB + 3.0,
+                floor_db: Some(-50.0),
+                own_voice: false,
+            };
+            let began = monotonic_us();
+            for _ in 0..8 {
+                ears.publish_json(monotonic_us(), &level).unwrap();
+                eyes.publish_json(monotonic_us(), &face(facing)).unwrap();
+                std::thread::sleep(Duration::from_millis(120));
+            }
+            (began, monotonic_us())
+        };
+        let away = line(false);
+        assert!(
+            addressed.judge(1, away, heard, busy()).is_some(),
+            "said close, turned away: held"
+        );
+        // Past the looks taken before a line, which count for it.
+        std::thread::sleep(Duration::from_micros(crate::addressed::LEAD_US + 200_000));
+        let facing = line(true);
+        assert!(
+            without.judge(2, facing, heard, busy()).is_some(),
+            "without the switch: held"
+        );
+        assert_eq!(
+            addressed.judge(2, facing, heard, busy()),
+            None,
+            "said close, facing: let out"
+        );
+        let published: Vec<lamp_msgs::Addressed> = std::iter::from_fn(|| {
+            told.recv(Duration::from_millis(200))
+                .ok()
+                .flatten()
+                .and_then(|message| message.parse().ok())
+        })
+        .collect();
+        let judged: Vec<(u64, bool)> = published
+            .iter()
+            .map(|said| (said.request, said.addressed))
+            .collect();
+        assert_eq!(judged, [(1, false), (2, true)], "each published once");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Tests' map on #1712 (20:11), (1): `LAMP_NAME_SIGNAL` on the second
+    /// route. Spoken turns are offered `heard_my_name` beside the lamp's
+    /// functions, at once even with `LAMP_SECOND_FEW_TOOLS`; its call is
+    /// answered as declined with nothing run, and kept for the line that
+    /// says the answer's first sound.
+    #[tokio::test]
+    async fn with_the_name_signal_a_spoken_turn_is_offered_heard_my_name_and_its_call_does_nothing()
+    {
+        let name = crate::attention::HEARD_MY_NAME;
+        let settings = crate::tools::Settings {
+            decline: true,
+            ..Default::default()
+        };
+        let declared = crate::tools::declared(&settings);
+        let lamps: Vec<String> = declared.iter().map(|tool| tool.name.clone()).collect();
+        let declare = super::with_name_signal(Arc::new(move || declared.clone()));
+        let offered: Vec<String> = declare().into_iter().map(|tool| tool.name).collect();
+        assert_eq!(offered, [lamps, vec![name.to_owned()]].concat());
+        assert!(super::given_at_once(name), "given with the few tools too");
+        let answered = super::run_call(
+            crate::tools::Settings::default(),
+            None,
+            None,
+            (41, true, false),
+            name.to_owned(),
+            serde_json::json!({}),
+            None,
+        )
+        .await;
+        assert_eq!(answered, crate::tools::declined());
+        assert_eq!(
+            super::NAMED.lock().unwrap().map(|(request, _)| request),
+            Some(41),
+            "kept for the first sound's line"
+        );
     }
 
     #[test]
@@ -5744,6 +6382,98 @@ mod tests {
             None
         );
         assert!(!heeding.holds_call(10, "set_timer"), "called by name");
+        // #1712 (the first builder at 04:54): a line that names the
+        // schedule sets it, as Live's busy-room rule lets it, and isn't told
+        // it may be people's talk; nor is one that asks to remember.
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.judge(
+                11,
+                line,
+                "Remind me in two minutes to stretch.",
+                signs(true, false)
+            ),
+            None
+        );
+        assert!(!heeding.holds_call(11, "set_reminder"));
+        assert_eq!(heeding.conversation_note_for(11), None);
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.judge(
+                12,
+                line,
+                "Remember that my favourite colour is green.",
+                signs(true, false)
+            ),
+            None
+        );
+        assert_eq!(heeding.conversation_note_for(12), None);
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.judge(14, line, "Forget my favourite colour.", signs(true, false)),
+            None
+        );
+        assert_eq!(heeding.conversation_note_for(14), None);
+        // An answer to the lamp's own question sets what it asks for.
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.judge(15, line, "Yes, give me five minutes.", signs(true, true)),
+            None
+        );
+        assert!(!heeding.holds_call(15, "set_timer"));
+        // Eighth on #2054: a request going on from one cut short is judged
+        // on the whole chain's words, so a first half naming the reminder,
+        // or asking to remember, counts.
+        for (first, then, call) in [
+            (
+                "Remind me",
+                "in two minutes to stretch.",
+                Some("set_reminder"),
+            ),
+            ("Remember that", "my favourite colour is green.", None),
+        ] {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.judge(16, line, first, signs(true, false));
+            let going_on = super::Signs {
+                continues_from: Some(16),
+                ..signs(true, false)
+            };
+            assert_eq!(
+                heeding.judge(17, next, &format!("{first} {then}"), going_on),
+                None,
+                "{first}"
+            );
+            if let Some(call) = call {
+                assert!(!heeding.holds_call(17, call), "{first}");
+            }
+            assert_eq!(heeding.conversation_note_for(17), None, "{first}");
+        }
+        // Talk going on from talk still gets the note.
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.judge(16, line, "I saved", signs(true, false));
+        let going_on = super::Signs {
+            continues_from: Some(16),
+            ..signs(true, false)
+        };
+        assert_eq!(heeding.judge(17, next, talk, going_on), None);
+        assert_eq!(
+            heeding.conversation_note_for(17),
+            Some(super::CONVERSATION_ALONE)
+        );
+        // Talk that names neither still gets the note.
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(heeding.judge(13, line, talk, signs(true, false)), None);
+        assert_eq!(
+            heeding.conversation_note_for(13),
+            Some(super::CONVERSATION_ALONE)
+        );
     }
 
     /// #1712: spoken turns are told how to take what they heard; the

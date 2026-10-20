@@ -33,7 +33,8 @@
 //! with the audio's length. Then the median and the 90th percentile of each.
 //!
 //! With `--wire`, only where a chat request's time goes between the lamp
-//! and DeepSeek, through the relay and on its own API ([`wire`]).
+//! and DeepSeek, through the relay and on its own API, and with `--speech`
+//! a piece of speech's between the lamp and ElevenLabs ([`wire`]).
 use super::net::{self, Chat, ChatEvent, GeminiTts, Message, Sentences, Tts, search::Search};
 
 pub mod cache;

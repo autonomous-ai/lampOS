@@ -384,6 +384,7 @@ mod tests {
             expires_at_us: at + crate::privacy::PRIVACY_FRESH_US,
             permitted: false,
             physical_muted: Some(true),
+            no_slide: false,
         };
         let going = Arc::new(AtomicBool::new(true));
         let flood = crate::privacy_bus::tests::refused_flood(&root, going.clone(), &lease);

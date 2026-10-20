@@ -15,6 +15,17 @@ fn lease() -> MicrophonePrivacy {
         expires_at_us: 145_000,
         permitted: true,
         physical_muted: Some(false),
+        no_slide: false,
+    }
+}
+
+/// A lamp with no slide: the Controls publication saying so stands for the
+/// acquisition, and the physical state stays unknown.
+fn no_slide() -> MicrophonePrivacy {
+    MicrophonePrivacy {
+        physical_muted: None,
+        no_slide: true,
+        ..lease()
     }
 }
 
@@ -153,4 +164,52 @@ fn topic_is_additive_and_json_roundtrips() {
             "missing {field}"
         );
     }
+}
+
+#[test]
+fn a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation() {
+    let good = no_slide();
+    good.check().unwrap();
+    assert!(good.fresh_at("boot", 144_999));
+    assert!(!good.fresh_at("boot", 145_000));
+    MicrophonePrivacy::from_message(&message(&good), "boot", 100_000, 1000).unwrap();
+    // Closed by the controller: still a valid lease with its observation.
+    let mut denied = good.clone();
+    denied.permitted = false;
+    denied.check().unwrap();
+    for mutation in 0..7 {
+        let mut value = good.clone();
+        match mutation {
+            // The marker never comes with a physical level.
+            0 => value.physical_muted = Some(false),
+            1 => value.physical_muted = Some(true),
+            // Its observation is fenced as a switch reading is.
+            2 => value.observed_us = 0,
+            3 => value.observed_us = 100_001,
+            4 => value.observed_us = 50_000,
+            5 => {
+                value.observed_us = 90_000;
+                value.expires_at_us = 140_001;
+            }
+            // Unknown physical state without the marker is no permit.
+            _ => value.no_slide = false,
+        }
+        assert!(value.check().is_err(), "mutation {mutation}");
+    }
+    let mut unknown = good.clone();
+    unknown.no_slide = false;
+    unknown.observed_us = 0;
+    assert!(unknown.check().is_err(), "a permit with nothing observed");
+    unknown.permitted = false;
+    unknown.check().unwrap();
+    // A slide lamp's lease says nothing of it; a no-slide lease says so.
+    let slide = serde_json::to_value(lease()).unwrap();
+    assert!(slide.get("no_slide").is_none());
+    let wire = serde_json::to_value(&good).unwrap();
+    assert_eq!(wire["no_slide"], serde_json::json!(true));
+    assert_eq!(wire["physical_muted"], serde_json::Value::Null);
+    assert_eq!(
+        serde_json::from_value::<MicrophonePrivacy>(wire).unwrap(),
+        good
+    );
 }

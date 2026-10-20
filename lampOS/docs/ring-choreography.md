@@ -266,7 +266,10 @@ look is the physical-mute indication below instead, and the asleep face stays
 off whatever `LAMP_RING_ASLEEP` says: the ring has one writer at a time (the
 first builder on #795, 2026-10-16 13:50). So with the route on, the red breath
 is the hardware switch and sleep or a software mute leaves the ring dark; the
-warm asleep face is the route-off look.
+warm asleep face is the route-off look. A lamp with no slide
+(`LAMP_PRIVACY_CONTROLS=no-slide`) has no red breath to show, so its ring is
+as with the route off: the asleep face, the tap face and the pulse, and no
+indicator worker ([privacy-switch.md](privacy-switch.md#a-lamp-with-no-slide-no-slide)).
 
 ### Physical mute indication (#755)
 
@@ -384,9 +387,10 @@ software mute, so its last state (`PrivacyState::Muted`) counts too, and a
 closed slide with the mute open still gets the face (`may_hear`, the
 reviewer on #1288). The face is drawn only where it is the muted look:
 - head touch on (`LAMP_HEAD_TOUCH=on`, which brings the taps);
-- not the Controls privacy route, whose ring is the switch's own indication
-  and has one writer (#755): there a software mute stays dark, rather than
-  show a look that claims the switch;
+- not the Controls privacy route with a slide (`on`), whose ring is the
+  switch's own indication and has one writer (#755): there a software mute
+  stays dark, rather than show a look that claims the switch (with
+  `no-slide` the face shows, as with the route off);
 - not `LAMP_RING_ASLEEP=on`, which shows the face the whole time already.
 
 It is stopped, black and closed, before the wait returns, as the long face

@@ -577,6 +577,14 @@ pub enum ProviderInput {
         request: u64,
         privacy_generation: u64,
     },
+    /// The request's line has gone quiet for a moment
+    /// (`LAMP_SECOND_EARLY_FINALIZE=on`, `coordinator::early_finalize`):
+    /// the second route asks its speech to text for the words so far, the
+    /// stream kept open. The Live worker takes nothing from it.
+    Paused {
+        request: u64,
+        privacy_generation: u64,
+    },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.
     Written {
@@ -607,6 +615,7 @@ impl ProviderInput {
             | Self::Audio { request, .. }
             | Self::End { request, .. }
             | Self::Called { request, .. }
+            | Self::Paused { request, .. }
             | Self::Written { request, .. }
             | Self::Reminder { request, .. } => *request,
         }
@@ -623,6 +632,9 @@ impl ProviderInput {
                 privacy_generation, ..
             }
             | Self::Called {
+                privacy_generation, ..
+            }
+            | Self::Paused {
                 privacy_generation, ..
             }
             | Self::Written {
@@ -4274,6 +4286,8 @@ impl ProviderIntake {
             match command {
                 Control::Stop => {
                     self.stop();
+                    // Its Days session closed, so a restart leaves none (#1722, D).
+                    crate::remember::close_at_exit();
                     return Ok(ControlDrain::Stopped);
                 }
                 Control::Authority { snapshot } => {
@@ -5187,7 +5201,12 @@ impl InputHandoff {
         {
             return Err(io::Error::other("provider input lost privacy authority").into());
         }
-        if !matches!(command, ProviderInput::Audio { .. }) {
+        // A pause is the second route's, and ignored here: it isn't input
+        // the session acts on, so it moves no clock (the reviewer on #2102).
+        if !matches!(
+            command,
+            ProviderInput::Audio { .. } | ProviderInput::Paused { .. }
+        ) {
             SUBMITTED_AT_US.store(now_us, std::sync::atomic::Ordering::Relaxed);
         }
         let generation = command.privacy_generation();
@@ -5406,6 +5425,9 @@ impl InputHandoff {
                 self.require_open(request)?;
                 self.called = Some(request.get());
             }
+            // The second route's (`LAMP_SECOND_EARLY_FINALIZE`): Live's
+            // service ends its own turns.
+            ProviderInput::Paused { .. } => {}
             ProviderInput::End { sound, cut_in, .. } => {
                 self.require_open(request)?;
                 if self.called.take() == Some(request.get()) {

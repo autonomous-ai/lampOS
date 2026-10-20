@@ -354,6 +354,41 @@ sounds the lamp's own sound may count as speech after the ask, and such a
 stop then goes as `on` decided. The rig drives that clock only from the
 person's score, so only the lamp shows it (the reviewer's P3 on #1352).
 
+**The lamp's own motors take no turn (`LAMP_MOTION_KEEPS_ANSWER=on`, #1712's
+B; off unless set, and it needs `LAMP_BUS=on`).** A joint that moves makes a
+sound the microphone takes for a voice. On lamp-4ace at 04:34 on 20 Oct the
+thinking pose's elbow sank 2.5 s into a slow first answer, a line with no
+words began with it, and it took the turn from the request in flight: the
+answer was cut, and the 0-word line was held. That sound goes on for as
+long as the joint moves, so the wait above takes it as a line that goes
+on. With the switch, the voice reads the body's joints (`body/joint_states`,
+about 12.5 times a second, `crate::body_motion`):
+- a joint that moves, or is sent, 4 servo counts or more between two of the
+  body's messages (50 counts a second) is moving, from the message before
+  the one that showed it (`MOVED_RADIANS`; the thinking head moves at 50 a
+  second and the base at 100, a held servo's jitter is a count or two);
+- while an answer is awaited and none of it has sounded (the person's
+  input ended, no provider audio), a new sound whose start (its first block
+  to its trigger) began within a move, or 100 ms after one (`MARGIN_US`), is
+  the lamp's own sound and is let go, as its playout would be. The answer
+  goes on, and the service records `input_let_go_body_moving` with the
+  move's span (`body_heard` in `crates/voice/src/coordinator.rs`);
+- a move that began after the sound's start is not its: the lamp turning
+  to a voice is the voice's;
+- the lamp's name heard with it is still a call, as for the wait above;
+- until the body has said where it was at the sound's trigger, the sound
+  waits, at most 120 ms after it (`WAITS_US`), under the 200 ms the
+  admission has to decide. A body silent 300 ms (not running, or no arm)
+  holds nothing, and a line is heard as before;
+- not while the lamp sounds: there the duplex hears what is its own, and a
+  person cutting in over a nod still yields it.
+
+Each message is dated by its wall-clock time on the voice's clock, since
+the body's own `at_us` counts from its start. The cost: a person who
+starts speaking just as the lamp moves, while it thinks, is let go at
+that start; the rest of what they say begins a new line once the move is
+over. A move is under a second.
+
 **Counting it** (#1866). On lamp-4ace after a played test, for both routes,
 with `lamp-voice-eval` from the ARM64 build:
 
