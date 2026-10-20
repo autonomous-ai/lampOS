@@ -188,7 +188,8 @@ inspection evidence, not a playback grant.
 | `ack_speech` | `guard`, `id`, `observation_id`, `claim_id`, `text_digest`, `session_id`, `played:true` | Trusted completed-playout attestation |
 | `sign_in_start` | none | With `serve --sign-in-by-code` only, trusted: start Harness's sign-in by a spoken code, or give back the one open (["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)) |
 | `sign_in_state` | none | With `serve --sign-in-by-code` only, trusted: the sign-in's code, the email it asks about, or how it ended; `none` before any |
-| `sign_in_answer` | `answer`: `yes` or `no` | With `serve --sign-in-by-code` only, trusted: the person's spoken answer, passed on only while Harness asks (`not_asking` otherwise) |
+| `sign_in_asked` | `id`, `request` | With `serve --sign-in-by-code` only, trusted: the voice heard the question "Sign in as …?" said whole for sign-in `id`, in its request `request` (`not_asking`, `not_this_sign_in` otherwise) |
+| `sign_in_answer` | `answer`: `yes` or `no`; `request` | With `serve --sign-in-by-code` only, trusted: the person's spoken answer, in the voice's request `request`, passed on only while Harness asks (`not_asking`), once the question was told in an earlier request (`not_told`) and within two minutes of it (`too_late`) |
 | `told` | `guard`, `id`, `observation_id`, `session_id` | Trusted: the voice's news of this observation was heard whole, in its model's own words ([#1390](#closing-a-finished-harness-1390-serve---close-told-off-unless-set)); once only, `already_told` after. Without `--close-told`, `told:false` and nothing written |
 
 The [protocol](../crates/tasks/src/protocol.rs) and
@@ -777,8 +778,13 @@ credential of its own.
   [`sign_in::MOST_LIFE`](../crates/tasks/src/sign_in.rs) (11 minutes; Harness
   keeps a code alive for 10). It never takes the operation lane, so tasks
   and reads go on beside a sign-in waiting on its person. A start while one
-  is open gives that one back.
-- **The code.** `{"sign_in":"code","code":"12345678","expires_in":…}`: the
+  is open gives that one back. Each sign-in has an `id`, in every view, for the
+  voice's news to key on: counted from the clock (unix ms, then one more a
+  sign-in), so one after a restart isn't taken for one before it.
+- **The code.** `{"sign_in":"code","code":"12345678","expires_in":…,"code_told":…}`:
+  `code_told` is true once a `sign_in_start` answer gave that code, which
+  the voice says itself; a code that came later is its news's to tell. The
+  code given is forgotten once the state leaves `code`. The
   voice says the digits, and where to type them (Harness on the computer,
   Machines ▸ Approve a device, or harness.autonomous.ai). The same code
   kept alive is no change.
@@ -786,25 +792,44 @@ credential of its own.
   `{"sign_in":"asking","email":"…"}`: the voice asks "Sign in as …?", the
   email read back clearly, as Harness asks. No session exists before the
   answer, so a stranger who heard the code gains nothing.
-- **The answer.** `sign_in_answer` with `yes` or `no`, written to Harness's
-  stdin only while it asks (`not_asking` otherwise). One answer only: a
-  question after it is passed over. The sign-in's `Debug` hides the digits
-  and the email.
+- **The question told.** The voice sends `sign_in_asked` with the
+  sign-in's `id` and the number of the request whose turn said the question,
+  once that turn was heard whole. A question cut off, refused or never said
+  opens nothing; the first telling counts, except that one in a lower
+  request is a restarted voice's, whose numbers began again, and replaces
+  it. The voice's news runs in its
+  coordinator and its tools in a worker, two processes: this state is kept
+  here, the one place both reach.
+- **The answer.** `sign_in_answer` with `yes` or `no` and the voice's
+  request number, written to Harness's stdin only while it asks
+  (`not_asking`), in a request after the one the question was told in
+  (`not_told`: a yes said before the lamp asked is for something else), and
+  within [`sign_in::ANSWER_WINDOW`](../crates/tasks/src/sign_in.rs) of the
+  first telling (two minutes; `too_late`). An answer too soon leaves the
+  question open; past the window the sign-in ends as `too_late`, by a late
+  answer or by the clock, so the person can start again and isn't left
+  with one open that can't be answered until its 11 minutes are up. One answer only: a question after it is passed over. The
+  sign-in's `Debug` hides the digits and the email.
 - **The end.** `{"sign_in":"done","result":"success"}` (the email is kept
   only for the question), or
   `"error"` with Harness's code (`DENIED`, `EXPIRED`, `CANCELLED`,
   `BACKEND_ERROR`) or the part's own: `harness_too_old` (a Harness before
   0.4.23, which doesn't know `--code`), `ended` (it stopped with no result),
-  `unreadable`, `timeout`, or `no_harness`. Kept for the voice until another
+  `unreadable`, `timeout`, `too_late` (its question went unanswered for two
+  minutes) or `no_harness`. Kept for the voice until another
   starts. Signed in, the part looks at the sign-in and the machines at once
   (with `--set-up-later`), not a minute later.
 
-The journal says `tasks: sign-in: started`, `code given (good for 120 s)`,
-`approved in Harness: asking whether to sign in`, `answered yes`, and
-`signed in` or `not signed in: CODE`: never the digits or the email.
+The journal says `tasks: sign-in 1: started`, `code given (good for 120 s)`,
+`approved in Harness: asking whether to sign in`, `question told in request
+3`, `answered yes` (or `yes not taken: not_told`), and `signed in` or `not
+signed in: CODE`: never the digits or the email.
 
 Tests: `sign_in::tests` (Harness's lines read strictly; a sign-in from its
-code to its end; ended, too old, timed out), the CLI's
+code to its end; ended, too old, timed out;
+`an_answer_is_taken_only_in_a_later_request_soon_after_the_question_was_told`,
+`the_code_given_is_forgotten_once_the_code_is_spent`),
+the CLI's
 `the_sign_in_by_code_reads_harness_lines_and_writes_the_answer` and
 `a_harness_without_the_code_sign_in_is_told_apart_and_a_dropped_one_stops`
 against a scripted program, and the service's

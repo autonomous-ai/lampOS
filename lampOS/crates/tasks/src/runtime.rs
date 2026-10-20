@@ -692,11 +692,16 @@ fn owner<C: Clock>(
     let mut machines_said = String::new();
     // `serve --sign-in-by-code`: the sign-in open, or the last one, done.
     let mut sign_in: Option<SignInSession> = None;
+    // The last sign-in's id. Counted from the clock, so a sign-in after a
+    // restart isn't taken for one before it (the reviewer's P3 on #2174).
+    let mut sign_ins: u64 = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64);
     while !stop.load(Ordering::Acquire) {
         if let Some(session) = sign_in.as_mut() {
             let was_open = session.open();
             for said in session.tend(Instant::now()) {
-                eprintln!("tasks: sign-in: {said}");
+                eprintln!("tasks: sign-in {}: {said}", session.id());
             }
             // Signed in: the sign-in and the machines are looked at at
             // once, not a minute later.
@@ -819,6 +824,7 @@ fn owner<C: Clock>(
                         work.request,
                         Request::SignInStart {}
                             | Request::SignInState {}
+                            | Request::SignInAsked { .. }
                             | Request::SignInAnswer { .. }
                     ),
                 ) {
@@ -827,6 +833,7 @@ fn owner<C: Clock>(
                         work.trusted,
                         starter,
                         &mut sign_in,
+                        &mut sign_ins,
                         Instant::now(),
                     )
                     .and_then(|body| engine.identified(body));
@@ -981,6 +988,7 @@ fn sign_in_operation(
     trusted: bool,
     starter: &mut Starter,
     sign_in: &mut Option<SignInSession>,
+    sign_ins: &mut u64,
     now: Instant,
 ) -> Result<Value, EngineError> {
     if !trusted {
@@ -992,48 +1000,90 @@ fn sign_in_operation(
     match request {
         Request::SignInStart {} => {
             if !sign_in.as_ref().is_some_and(SignInSession::open) {
+                *sign_ins += 1;
                 let session = match starter() {
                     Ok(link) => {
-                        eprintln!("tasks: sign-in: started");
-                        SignInSession::new(link, now)
+                        eprintln!("tasks: sign-in {sign_ins}: started");
+                        SignInSession::new(*sign_ins, link, now)
                     }
                     Err(code) => {
-                        eprintln!("tasks: sign-in: not started: {code}");
-                        SignInSession::failed(&code)
+                        eprintln!("tasks: sign-in {sign_ins}: not started: {code}");
+                        SignInSession::failed(*sign_ins, &code)
                     }
                 };
                 *sign_in = Some(session);
             }
             let session = sign_in.as_mut().expect("just set");
             for said in session.tend(now) {
-                eprintln!("tasks: sign-in: {said}");
+                eprintln!("tasks: sign-in {}: {said}", session.id());
             }
+            session.code_given();
             Ok(session.view(now))
         }
         Request::SignInState {} => Ok(sign_in
             .as_ref()
             .map_or_else(|| json!({"sign_in": "none"}), |session| session.view(now))),
-        Request::SignInAnswer { answer } => {
+        Request::SignInAsked { id, request } => {
             let session = sign_in.as_mut().ok_or(EngineError {
                 code: "not_asking",
                 message: "No sign-in is asking for an answer.",
             })?;
-            match session.answer(*answer == Answer::Yes) {
+            for said in session.tend(now) {
+                eprintln!("tasks: sign-in {}: {said}", session.id());
+            }
+            match session.asked(*id, *request, now) {
                 Ok(()) => {
-                    eprintln!(
-                        "tasks: sign-in: answered {}",
-                        if *answer == Answer::Yes { "yes" } else { "no" }
-                    );
+                    eprintln!("tasks: sign-in {id}: question told in request {request}");
                     Ok(session.view(now))
                 }
-                Err("not_asking") => Err(EngineError {
+                Err("not_this_sign_in") => Err(EngineError {
+                    code: "not_this_sign_in",
+                    message: "That sign-in is not the one open.",
+                }),
+                Err(_) => Err(EngineError {
                     code: "not_asking",
                     message: "The sign-in is not asking for an answer now.",
                 }),
-                Err(_) => Err(EngineError {
-                    code: "ended",
-                    message: "Harness's sign-in ended before the answer reached it.",
-                }),
+            }
+        }
+        Request::SignInAnswer { answer, request } => {
+            let session = sign_in.as_mut().ok_or(EngineError {
+                code: "not_asking",
+                message: "No sign-in is asking for an answer.",
+            })?;
+            for said in session.tend(now) {
+                eprintln!("tasks: sign-in {}: {said}", session.id());
+            }
+            let said = if *answer == Answer::Yes { "yes" } else { "no" };
+            match session.answer(*answer == Answer::Yes, *request, now) {
+                Ok(()) => {
+                    eprintln!("tasks: sign-in {}: answered {said}", session.id());
+                    Ok(session.view(now))
+                }
+                Err(code) => {
+                    // A refusal leaves the question open: journalled, so a
+                    // yes the lamp didn't take can be told from one never
+                    // heard.
+                    eprintln!("tasks: sign-in {}: {said} not taken: {code}", session.id());
+                    Err(match code {
+                        "not_asking" => EngineError {
+                            code: "not_asking",
+                            message: "The sign-in is not asking for an answer now.",
+                        },
+                        "not_told" => EngineError {
+                            code: "not_told",
+                            message: "The question was not heard before this request.",
+                        },
+                        "too_late" => EngineError {
+                            code: "too_late",
+                            message: "The question was told more than two minutes ago.",
+                        },
+                        _ => EngineError {
+                            code: "ended",
+                            message: "Harness's sign-in ended before the answer reached it.",
+                        },
+                    })
+                }
             }
         }
         _ => unreachable!("only the sign-in's operations"),

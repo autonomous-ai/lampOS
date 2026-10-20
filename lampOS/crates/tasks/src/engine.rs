@@ -1472,7 +1472,10 @@ impl<P: Persistence> Engine<P> {
             }
             // The sign-in, too, is held by the service, and only with
             // `--sign-in-by-code` (#1676).
-            Request::SignInStart {} | Request::SignInState {} | Request::SignInAnswer { .. } => {
+            Request::SignInStart {}
+            | Request::SignInState {}
+            | Request::SignInAsked { .. }
+            | Request::SignInAnswer { .. } => {
                 return Err(err(
                     "sign_in_off",
                     "Signing in by a spoken code is off; the service runs without --sign-in-by-code.",
