@@ -466,3 +466,8 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   a known face lost a few seconds with no face in view keeps its memory
   scope (`LAMP_FACE_GAP_HOLD`, off), tested through the request's lease.
 - #2186 merged into #1712.
+- #2265: the reviewer's three P3s (the closed camera ends a hold by the
+  look's expiry, the generation guard tested, the row in order); merges on
+  its run. #2226: Friday's re-read: both routes' choices tested through
+  `opens_anew`/`presents_resumption` in child processes, Live drops its
+  resumption only after a stop, a failed fresh open backs off 30 s.
