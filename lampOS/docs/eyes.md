@@ -711,6 +711,25 @@ this room" until someone asks to be recognised.
   The voice reads it as it reads `known`, so whatever access a deploy gives
   the voice to `known` it needs to `known-face` too (the voice runs as root
   on lamp-4ace and in the product unit).
+- **Named in Who was here, only with their yes** (#1997, the lead's yes on
+  20 Oct; nothing asks it until the voice's question is built):
+  - `{"visits_yes":NAME}` keeps a remembered person's yes to being named to
+    others: `tell_visits` on their record, absent for no, an optional field
+    that an older build drops (which only narrows). It's taken only from
+    the known face at the lamp now (`photo::is_here`'s rule, `not_here`
+    otherwise), so nothing elsewhere can say yes for someone.
+  - `{"visits_no":NAME}` takes it back, at any time, since a no only narrows.
+  - Answers: `{"visits":"yes"|"no"}`, or `not_known`, `tellable_off` (no
+    `--known-file`) or `storage`. The journal says yes or no, never the name.
+  - With `--known-file`, `tellable` beside it (mode 0600) holds the names of
+    those who said yes, one a line, rewritten at start and after every
+    request on the socket. So a no, a forget or a rename is there at once.
+    There's no file when nobody said yes. A new remembering, even under a
+    name that had a yes, starts without one: the prints are whoever is at
+    the lamp then, so the voice asks again. The reset wipes their record,
+    and `tellable` lives in `/run`.
+  - lamp-skills reads `tellable`, read-only, for Who was here's names
+    ([skills.md](skills.md)).
 - **The voice** (`crates/voice/src/known_faces.rs`, when
   `LAMP_EYES_WHO_SOCKET` names the socket):
   - The model has two functions, `remember_my_face` and `forget_my_face`,
