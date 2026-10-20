@@ -1979,14 +1979,14 @@ pub fn serve(
             .is_ok_and(|value| value == "on")
         {
             eprintln!(
-                "lamp-voice second: in a quiet room, a line let out only as the conversation going on is held unless it answers the lamp's question or is in the conversation's voice (LAMP_QUIET_GOING_ON_SAME_ONE)"
+                "lamp-voice second: in a quiet room, a line let out only as the conversation going on is held when another voice or another face than the caller's is heard or seen speaking it (LAMP_QUIET_GOING_ON_SAME_ONE)"
             );
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.going_on_quiet_only_for_the_same_one();
                 // The eyes' speaking faces (`LAMP_EYES_SPEAKING` on
-                // lamp-eyes): the answered caller's face seen speaking
-                // through a line lets it go on. Without them nothing reads
-                // speaking, and nothing changes.
+                // lamp-eyes): another face than the answered caller's seen
+                // speaking a line holds it. Without them nothing reads
+                // speaking, and only another voice holds.
                 heeding.opening_the_eyes(files.bus_root.as_deref());
             }
         }
@@ -2914,7 +2914,8 @@ fn shown(why: &'static str, sign: Option<&'static str>) -> &'static str {
 /// talk; DeepSeek declines far less than Gemini). In a quiet room it goes
 /// on [`crate::thread::GOING_ON_FOR`], as on Live.
 /// The faces `eyes` saw speaking from `began_us` to `ended_us`, by this
-/// process's clock, each with the eyes' boot (`boot/f3`); none without them.
+/// process's clock, each with the eyes' boot (`boot/f3`), and of those the
+/// ones turned to the lamp; none without them.
 fn speakers_between(
     eyes: Option<&(
         Arc<crate::speaking_faces::SpeakingFaces>,
@@ -2922,9 +2923,12 @@ fn speakers_between(
     )>,
     began_us: u64,
     ended_us: u64,
-) -> crate::speaking_faces::Speakers {
+) -> (
+    crate::speaking_faces::Speakers,
+    crate::speaking_faces::Speakers,
+) {
     let Some((eyes, _)) = eyes else {
-        return Vec::new();
+        return Default::default();
     };
     let (now, now_us) = (Instant::now(), monotonic_us());
     let at = |us: u64| {
@@ -2935,29 +2939,14 @@ fn speakers_between(
         }
     };
     match (at(began_us), at(ended_us)) {
-        (Some(from), Some(to)) => eyes.speakers_with_boot(from, to),
-        _ => Vec::new(),
+        (Some(from), Some(to)) => (
+            eyes.speakers_with_boot(from, to),
+            eyes.turned_speakers_with_boot(from, to),
+        ),
+        _ => Default::default(),
     }
 }
 
-/// Whether a line from `began_us` to `ended_us` is too short for a likeness
-/// ([`crate::same_voice::LEAST_SAMPLES`]) and begun within
-/// [`SHORT_GOES_ON_FOR`] of the lamp's last words, played until `said_until_us`.
-/// ponytail: the line's length stands for its samples; its sound's own count
-/// if a pause at its end ever makes a short line read long.
-fn short_after(began_us: u64, ended_us: u64, said_until_us: Option<u64>) -> bool {
-    let least_us =
-        crate::same_voice::LEAST_SAMPLES as u64 * 1_000_000 / crate::same_voice::RATE as u64;
-    ended_us.saturating_sub(began_us) < least_us
-        && said_until_us.is_some_and(|until| {
-            began_us <= until.saturating_add(SHORT_GOES_ON_FOR.as_micros() as u64)
-        })
-}
-
-/// With `LAMP_QUIET_GOING_ON_SAME_ONE`, a line too short for a likeness goes
-/// on only this long from the lamp's last words (the first builder at 23:01
-/// on #2305): in a quiet room those are its answer to the one it answered.
-pub(crate) const SHORT_GOES_ON_FOR: Duration = Duration::from_secs(20);
 pub(crate) const BUSY_GOING_ON_FOR: Duration = Duration::from_secs(15);
 /// Held in a busy room: let out only as the conversation going on, and
 /// neither a question, nor three words, nor an answer to the lamp's own
@@ -3109,9 +3098,8 @@ struct Seen {
     /// The faces the eyes saw speaking through it, with
     /// [`Heeding::seeing_speaking_faces`].
     speakers: crate::speaking_faces::Speakers,
-    /// Too short for a likeness ([`crate::same_voice::LEAST_SAMPLES`]), and
-    /// begun within [`SHORT_GOES_ON_FOR`] of the lamp's last words.
-    short_after_the_lamp: bool,
+    /// Of those, the ones turned to the lamp.
+    turned_speakers: crate::speaking_faces::Speakers,
     heard: String,
     /// Begun with the lamp's name said to a face turned to the lamp, with
     /// the switch ([`named_to_a_face`]).
@@ -3420,11 +3408,10 @@ impl Heeding {
     }
 
     /// In a quiet room, a line let out only as the conversation going on is
-    /// held unless it answers the lamp's own question or the same-voice
-    /// check found it in the conversation's voice
-    /// (`LAMP_QUIET_GOING_ON_SAME_ONE=on`, the first builder at 21:03 on
-    /// Queue #1722): #2191's busy-room rule, in the quiet room right after a
-    /// call.
+    /// held when it is surely someone else's ([`Self::someone_else`]) and
+    /// answers no question of the lamp's (`LAMP_QUIET_GOING_ON_SAME_ONE=on`,
+    /// the first builder at 21:03 and 01:21 on Queue #1722). With no voice
+    /// model and no speaking face nothing is held.
     pub(crate) fn going_on_quiet_only_for_the_same_one(&mut self) {
         self.quiet_same_one = true;
     }
@@ -3461,18 +3448,24 @@ impl Heeding {
 
     /// Whether `seen` shows a line surely someone else's than the answered
     /// caller's: its print scored under [`crate::same_voice::SOMEONE_ELSE_BELOW`]
-    /// (0.30) against the caller's, or faces seen speaking both, none of the
-    /// line's the caller's. No print (begun over the lamp, too short) is no
-    /// voice told; nothing seen is nothing told.
+    /// (0.30) against the caller's, or the eyes saw a face speaking it not
+    /// turned to the lamp, none of them the caller's, whether or not the
+    /// caller's face is known. No print (begun over the lamp, too short) is
+    /// no voice told. A face turned to the lamp is talking to it, so a
+    /// caller back with a new passing id is not someone else; people
+    /// talking to each other face each other (the first builder at 01:51 on
+    /// #2341). Nothing seen, nothing told: the same person. One check for
+    /// `LAMP_GOING_ON_NOT_OWN` and `LAMP_QUIET_GOING_ON_SAME_ONE` (the first
+    /// builder at 01:02 and 01:21 on Queue #1722).
     fn someone_else(&self, seen: &Seen) -> bool {
+        let callers = |face: &String| self.caller_faces.contains(face);
         seen.likeness
             .is_some_and(|likeness| likeness < crate::same_voice::SOMEONE_ELSE_BELOW)
-            || (!seen.speakers.is_empty()
-                && !self.caller_faces.is_empty()
-                && !seen
+            || (!seen.speakers.iter().any(callers)
+                && seen
                     .speakers
                     .iter()
-                    .any(|face| self.caller_faces.contains(face)))
+                    .any(|face| !seen.turned_speakers.contains(face)))
     }
 
     /// The camera closed or reopened, or the microphone was muted or
@@ -3948,6 +3941,7 @@ impl Heeding {
         let turned = signs.turned.filter(|_| self.strict);
         let (going_on, other_voice, same_voice, likeness) =
             self.voice_going_on(request, signs.going_on);
+        let (speakers, turned_speakers) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
         let attention = &mut self.attention;
         let seen = Seen {
             room: signs.room,
@@ -3957,8 +3951,8 @@ impl Heeding {
             turned,
             busy,
             lamp_asked,
-            speakers: speakers_between(self.eyes.as_ref(), began_us, ended_us),
-            short_after_the_lamp: short_after(began_us, ended_us, self.said_until_us),
+            speakers,
+            turned_speakers,
             heard: heard.to_owned(),
             named_faced,
             likeness,
@@ -4131,22 +4125,20 @@ impl Heeding {
             verdict = Some(crate::attention::Verdict::Play(NAMED_TO_A_FACE));
         }
         // In a quiet room, a conversation going on is the one the lamp
-        // answered (`LAMP_QUIET_GOING_ON_SAME_ONE`): two people talking just
-        // after one of them called it are not talking to it. Let out only as
-        // the conversation going on already means no name, no call, no face
-        // turned, not said close to it; not `alone`, which needs
-        // `LAMP_SPOKEN_TO` (lamp-52e6 runs without it).
+        // answered (`LAMP_QUIET_GOING_ON_SAME_ONE`): a line surely someone
+        // else's, just after the caller was answered, is not to the lamp.
+        // With no sign of someone else it is the caller's follow-up and goes
+        // on (the first builder at 01:21 on Queue #1722: lamp-4ace's day
+        // lines, one person's, 6/12 when no sign was read as someone else).
+        // Let out only as the conversation going on already means no name,
+        // no call, no face turned, not said close to it; not `alone`, which
+        // needs `LAMP_SPOKEN_TO` (lamp-52e6 runs without it).
         if self.quiet_same_one
             && !busy
             && attention.played_only_as_going_on()
             && matches!(verdict, Some(crate::attention::Verdict::Play(_)))
             && !lamp_asked
-            && !seen.same_voice
-            && !seen.short_after_the_lamp
-            && !seen
-                .speakers
-                .iter()
-                .any(|face| self.caller_faces.contains(face))
+            && someone_else
         {
             verdict = Some(crate::attention::Verdict::Hold(
                 crate::second_provider::QUIET_GOING_ON_HELD,
@@ -4202,6 +4194,11 @@ impl Heeding {
         if called {
             self.called_at = Some(Instant::now());
             self.caller_faces = seen.speakers.clone();
+        } else if played && seen.going_on && self.caller_faces.is_empty() {
+            // After a call no face was seen speaking, the first face seen
+            // speaking a line going on turned to the lamp is the caller's
+            // (the first builder at 01:51 on #2341).
+            self.caller_faces = seen.turned_speakers.clone();
         }
         // Held in a row, as Live counts its unanswered: a new session.
         self.held_run = if played {
@@ -5561,16 +5558,17 @@ mod tests {
                    lines: &[(u64, &str, &str)]|
          -> Vec<bool> {
             use lamp_msgs::{Face, Faces, Speaking, SpeakingState};
+            // ">f2": f2 turned to the lamp.
             let speaking = |id: &str| Faces {
                 faces: vec![Face {
-                    id: id.to_owned(),
+                    id: id.trim_start_matches('>').to_owned(),
                     xmin: 0.2,
                     ymin: 0.2,
                     xmax: 0.4,
                     ymax: 0.5,
                     confidence: 1.0,
                     yaw: None,
-                    facing: None,
+                    facing: id.starts_with('>').then_some(true),
                     speaking: Some(Speaking {
                         state: SpeakingState::Yes,
                         score: 0.9,
@@ -5821,13 +5819,27 @@ mod tests {
             [true; 4],
             "on: the caller's own face speaking each"
         );
-        // The reviewer's P3 on #2339: the call seen spoken by no face, then
-        // a face speaking each follow-up: nothing to compare it with, so
-        // nothing is another's.
+        // The reviewer's P3 on #2339 and the first builder at 01:51 on
+        // #2341: the call seen spoken by no face, then the caller seen
+        // speaking each follow-up turned to the lamp, the last after looking
+        // away, with a new id: theirs. Not turned to the lamp, someone
+        // else's: the window from its answer is left out.
+        assert_eq!(
+            run(
+                true,
+                false,
+                None,
+                Some(&["", ">f2", ">f2", ">f3"]),
+                None,
+                &day
+            ),
+            [true; 4],
+            "on: the caller never seen speaking the call, turned to the lamp"
+        );
         assert_eq!(
             run(true, false, None, Some(&["", "f2", "f2", "f2"]), None, &day),
-            [true; 4],
-            "on: the caller never seen speaking"
+            [true, true, true, false],
+            "on: no caller face, a face not turned to the lamp"
         );
         // A busy room goes on 15 s from the end of the lamp's words.
         let busy = [
@@ -5981,7 +5993,7 @@ mod tests {
             busy: false,
             lamp_asked: false,
             speakers: Vec::new(),
-            short_after_the_lamp: false,
+            turned_speakers: Vec::new(),
             heard: String::new(),
             named_faced: false,
             other_voice: false,
@@ -6086,12 +6098,15 @@ mod tests {
     /// (`docs/verification/two-people-20261015/two-people-scene.txt`): on
     /// lamp-52e6 at 20:1x (#2301) the talk lines right after "Hey Lamp, what
     /// time is it?" were answered as the conversation going on, before the
-    /// room was judged busy. With `LAMP_QUIET_GOING_ON_SAME_ONE=on` they are
-    /// held; the addressed lines, a face turned to the lamp and a reply to
-    /// its question are answered. Without the voice model the follow-up
-    /// said looking away is held too: the trade.
+    /// room was judged busy. With `LAMP_QUIET_GOING_ON_SAME_ONE=on` but
+    /// neither the voice model nor a speaking face, nothing tells the two
+    /// people apart, so nothing is held, as without the switch (the first
+    /// builder at 01:21 on Queue #1722): the rule does nothing then. With
+    /// another voice or another face, see
+    /// `quiet_going_on_plays_the_callers_voice` and
+    /// `quiet_going_on_plays_the_callers_speaking_face`.
     #[test]
-    fn quiet_going_on_holds_the_scenes_talk_after_a_call() {
+    fn quiet_going_on_holds_nothing_without_a_sign_of_someone_else() {
         let _one = crate::provider_worker::tests::one_thread();
         use crate::room_told::Room;
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
@@ -6106,7 +6121,6 @@ mod tests {
             continues_from: None,
         };
         let said = (10_000_000, 11_000_000);
-        let held = Some(crate::second_provider::QUIET_GOING_ON_HELD);
         let talk = [
             "So did you send the report to Maria yesterday?",
             "I did, but she has not replied yet. I think she is travelling this week.",
@@ -6141,8 +6155,8 @@ mod tests {
         };
         assert_eq!(
             scene(true),
-            [None, held, held, held, None, held, None, None],
-            "on: the talk held, the calls, a turned face and a reply answered; the follow-up looking away held"
+            [None; 8],
+            "on, no voice model, no face: nothing held"
         );
         assert_eq!(scene(false), [None; 8], "off: as before");
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
@@ -6153,12 +6167,31 @@ mod tests {
     /// heard in its sound, and the talk lines begun over the lamp's answer
     /// to it. The three talk lines were played as the conversation going on
     /// with the switch on: the hold read `alone`, which is only ever true
-    /// with `LAMP_SPOKEN_TO`.
+    /// with `LAMP_SPOKEN_TO`. The call is seen spoken by no face, the talk by
+    /// one not turned to the lamp: someone else's.
     #[test]
     fn quiet_going_on_holds_the_talk_without_spoken_to() {
         let _one = crate::provider_worker::tests::one_thread();
         use crate::room_told::Room;
         use crate::second_provider::Heard;
+        use lamp_msgs::{Face, Faces, Speaking, SpeakingState};
+        let other = Faces {
+            faces: vec![Face {
+                id: "f2".to_owned(),
+                xmin: 0.2,
+                ymin: 0.2,
+                xmax: 0.4,
+                ymax: 0.5,
+                confidence: 1.0,
+                yaw: None,
+                facing: None,
+                speaking: Some(Speaking {
+                    state: SpeakingState::Yes,
+                    score: 0.9,
+                    from: None,
+                }),
+            }],
+        };
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
         let held = Some(crate::second_provider::QUIET_GOING_ON_HELD);
@@ -6168,21 +6201,24 @@ mod tests {
             "Right. Well, we need her numbers before Friday.",
         ];
         let scene = |on: bool| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, base) = (Instant::now(), monotonic_us());
             let mut heeding = Heeding::new(true, true, None, None);
             heeding.as_the_only_voice(false, false, false);
             if on {
                 heeding.going_on_quiet_only_for_the_same_one();
+                heeding.seeing_speaking_faces(eyes.clone(), None);
             }
             let mut verdicts = vec![heeding.judge(
                 1,
-                (10_000_000, 11_000_000),
+                (base, base + 1_000_000),
                 "Hey Lamp, what time is it?",
                 Signs {
                     room: Room::Quiet,
                     going_on: false,
                     lamp_asked: false,
                     turned: Some(false),
-                    names: vec![(10_100_000, 0.95)],
+                    names: vec![(base + 100_000, 0.95)],
                     near: false,
                     continues_from: None,
                 },
@@ -6194,7 +6230,14 @@ mod tests {
                         over_the_lamps_voice: true,
                     },
                 );
-                let began = 10_000_000 + 8_000_000 * (request - 1);
+                let after = 8_000_000 * (request - 1);
+                for look in 0..4u64 {
+                    eyes.look(
+                        now + Duration::from_micros(after + 200_000 + look * 600_000),
+                        Some((("b", request * 10 + look), &other)),
+                    );
+                }
+                let began = base + after;
                 verdicts.push(heeding.judge(
                     request,
                     (began, began + 3_000_000),
@@ -6305,10 +6348,98 @@ mod tests {
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 
+    /// The first builder at 01:51 on #2341: after a call no face was seen
+    /// speaking, the caller's follow-up seen speaking turned to the lamp goes
+    /// on and its face becomes the caller's, so said looking away it still
+    /// goes on; after looking away 2 s the caller comes back with a new id,
+    /// turned to the lamp, and goes on; another face not turned to the lamp
+    /// is held.
+    #[test]
+    fn quiet_going_on_takes_a_face_turned_to_the_lamp_for_the_callers() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::room_told::Room;
+        use lamp_msgs::{Face, Faces, Speaking, SpeakingState};
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+        let speaking = |id: &str, turned: bool| Faces {
+            faces: vec![Face {
+                id: id.to_owned(),
+                xmin: 0.2,
+                ymin: 0.2,
+                xmax: 0.4,
+                ymax: 0.5,
+                confidence: 1.0,
+                yaw: None,
+                facing: turned.then_some(true),
+                speaking: Some(Speaking {
+                    state: SpeakingState::Yes,
+                    score: 0.9,
+                    from: None,
+                }),
+            }],
+        };
+        let signs = |going_on| Signs {
+            room: Room::Quiet,
+            going_on,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+        let (now, now_us) = (Instant::now(), monotonic_us());
+        // Each line 2 s long, 3 s apart; `face` speaking through it, none
+        // for "".
+        let mut seq = 0;
+        let mut line = |index: u64, face: &str, turned: bool| {
+            for look in (0..4u64).filter(|_| !face.is_empty()) {
+                seq += 1;
+                eyes.look(
+                    now + Duration::from_millis(index * 3_000 + 200 + look * 400),
+                    Some((("b", seq), &speaking(face, turned))),
+                );
+            }
+            let began = now_us + index * 3_000_000;
+            (began, began + 2_000_000)
+        };
+        let lines = [
+            line(0, "", false),
+            line(1, "f1", true),
+            line(2, "f1", false),
+            line(3, "f3", true),
+            line(4, "f2", false),
+        ];
+        let mut heeding = Heeding::new(true, true, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.going_on_quiet_only_for_the_same_one();
+        heeding.seeing_speaking_faces(eyes, None);
+        let held = Some(crate::second_provider::QUIET_GOING_ON_HELD);
+        let verdicts: Vec<_> = [
+            "Hey Lamp, what time is it?",
+            "And what about tomorrow?",
+            "Will it rain in the evening?",
+            "Remind me to take an umbrella then.",
+            "Did you see the game last night?",
+        ]
+        .into_iter()
+        .zip(lines)
+        .zip(1..)
+        .map(|((words, said), request)| heeding.judge(request, said, words, signs(request > 1)))
+        .collect();
+        assert_eq!(
+            verdicts,
+            [None, None, None, None, held],
+            "the call unseen; turned: the caller's; looking away: still theirs; back with a new id turned: goes on; another face not turned: held"
+        );
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
     /// #2305's review: the caller's face ids go with a privacy change (and
     /// the eyes' looks with them), when its conversation is over, and when
     /// the eyes start again: each time the same passing id speaking a line
-    /// let out only as the conversation going on is held.
+    /// let out only as the conversation going on, not turned to the lamp,
+    /// is held.
     #[test]
     fn the_callers_face_goes_with_privacy_the_window_and_the_eyes_boot() {
         let _one = crate::provider_worker::tests::one_thread();
@@ -6388,11 +6519,17 @@ mod tests {
             "the same id after the eyes start again: someone else"
         );
         assert_eq!(scene("a", &nothing).1, ["f1"]);
-        let (verdict, call_seen) = scene("a", &|heeding| heeding.privacy_changed());
+        // Gone, the caller's id matches nothing: a face not turned to the
+        // lamp is someone else's.
+        let (verdict, call_seen) = scene("a", &|heeding| {
+            heeding.privacy_changed();
+            assert!(heeding.caller_faces.is_empty());
+        });
         assert_eq!(verdict, held, "after a privacy change");
         assert!(call_seen.is_empty(), "the looks before it are gone");
         let window_over = |heeding: &mut Heeding| {
             heeding.judge(2, (1, 2), "Nice weather today.", signs(false));
+            assert!(heeding.caller_faces.is_empty());
         };
         assert_eq!(
             scene("a", &window_over).0,
@@ -6402,59 +6539,13 @@ mod tests {
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 
-    /// The first builder's 23:01 on #2305, (b): a line too short for a
-    /// likeness goes on within 20 s of the lamp's last words, and is held
-    /// at 25 s; a long one is held at 10 s.
+    /// The first builder's 01:21 on Queue #1722: lamp-4ace's 01:03 played
+    /// test, with no voice model and no face, played 6/12 day lines with
+    /// `LAMP_QUIET_GOING_ON_SAME_ONE`, one person's own follow-ups held.
+    /// With no sign of someone else they are the same person's: all go on,
+    /// each 15 s after the lamp's last words, short or long.
     #[test]
-    fn quiet_going_on_plays_a_short_line_only_soon_after_the_lamp() {
-        let _one = crate::provider_worker::tests::one_thread();
-        use crate::room_told::Room;
-        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
-        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
-        let signs = |going_on| Signs {
-            room: Room::Quiet,
-            going_on,
-            lamp_asked: false,
-            turned: Some(false),
-            names: Vec::new(),
-            near: false,
-            continues_from: None,
-        };
-        let held = Some(crate::second_provider::QUIET_GOING_ON_HELD);
-        // The lamp's answer to the call ends at 20 s; then a line begun
-        // `after` s later, `long` ms long.
-        let judge = |after: u64, long: u64, words: &str| {
-            let mut heeding = Heeding::new(true, true, None, None);
-            heeding.as_the_only_voice(false, true, false);
-            heeding.going_on_quiet_only_for_the_same_one();
-            heeding.judge(
-                1,
-                (10_000_000, 11_000_000),
-                "Hey Lamp, what time is it?",
-                signs(false),
-            );
-            heeding.lamp_did(crate::second_provider::Did::Said(1, 20_000_000));
-            let began = 20_000_000 + after * 1_000_000;
-            heeding.judge(2, (began, began + long * 1_000), words, signs(true))
-        };
-        assert_eq!(judge(10, 900, "And tomorrow?"), None, "short, at 10 s");
-        assert_eq!(judge(25, 900, "And tomorrow?"), held, "short, at 25 s");
-        assert_eq!(
-            judge(10, 3_000, "So did you send the report to Maria yesterday?"),
-            held,
-            "long, at 10 s"
-        );
-        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
-    }
-
-    /// The first builder's 01:02 on Queue #1722: with no voice model and no
-    /// face (lamp-4ace's 00:32 played test), does
-    /// `LAMP_QUIET_GOING_ON_SAME_ONE` keep one person's follow-ups without
-    /// the name, each 15 s after the lamp's last words? A short one goes on
-    /// (`SHORT_GOES_ON_FOR`); a long one, "Remember that my favourite colour
-    /// is green.", is held as anyone's talk.
-    #[test]
-    fn quiet_going_on_without_voice_or_face_holds_one_persons_long_follow_up() {
+    fn quiet_going_on_without_voice_or_face_plays_one_persons_follow_ups() {
         let _one = crate::provider_worker::tests::one_thread();
         use crate::room_told::Room;
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
@@ -6479,11 +6570,13 @@ mod tests {
             signs(false),
         )];
         heeding.lamp_did(crate::second_provider::Did::Said(1, 14 * s));
-        // Each line: begun 15 s after the lamp's words, that long, answered.
         let mut until = 14 * s;
         for (request, (long, words)) in (2..).zip([
+            (2_200_000, "Can you make your light a little warmer?"),
             (1_400_000, "What do you see right now?"),
             (2_500_000, "Remember that my favourite colour is green."),
+            (2_000_000, "Remind me in two minutes to stretch."),
+            (1_300_000, "What's my favourite colour?"),
             (1_000_000, "What time is it?"),
         ]) {
             let began = until + 15 * s;
@@ -6494,8 +6587,7 @@ mod tests {
             }
             verdicts.push(verdict);
         }
-        let held = Some(crate::second_provider::QUIET_GOING_ON_HELD);
-        assert_eq!(verdicts, [None, None, held, None]);
+        assert_eq!(verdicts, [None; 7]);
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 

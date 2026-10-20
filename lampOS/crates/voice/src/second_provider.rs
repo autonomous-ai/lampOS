@@ -246,14 +246,15 @@ impl Told {
 pub const STEADY_FIRST_ENVIRONMENT: &str = "LAMP_SECOND_STEADY_FIRST";
 
 /// Where the worker reads whether, in a quiet room, a line let out only as
-/// the conversation going on holds only for the one the lamp answered: `on`,
-/// and nothing else (the first builder at 21:03 on Queue #1722,
+/// the conversation going on is held when it is surely someone else's than
+/// the one the lamp answered: `on`, and nothing else (the first builder at
+/// 21:03 and 01:21 on Queue #1722,
 /// `Heeding::going_on_quiet_only_for_the_same_one`).
 pub const QUIET_GOING_ON_SAME_ONE_ENVIRONMENT: &str = "LAMP_QUIET_GOING_ON_SAME_ONE";
 
 /// Why that rule holds such a line, as its journal says it after "held
 /// back: ".
-pub(crate) const QUIET_GOING_ON_HELD: &str = "a quiet room: a conversation with the lamp is going on, but nothing shows the line is from the one it answered: not a reply to its question, not the conversation's voice, no face turned to it";
+pub(crate) const QUIET_GOING_ON_HELD: &str = "a quiet room: a conversation with the lamp is going on, but the line is someone else's: another voice than the conversation's, or a face speaking it, not turned to the lamp, that is not the one it answered";
 
 /// Where the worker reads whether a spoken turn's chat is given only the
 /// functions a spoken turn mostly needs, and the rest behind one call
