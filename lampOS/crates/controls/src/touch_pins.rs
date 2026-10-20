@@ -341,6 +341,106 @@ impl TouchPinsConfig {
     }
 }
 
+/// The item health shows for the head pads' lines (#1798).
+pub const HEAD_ITEM: &str = "head pads";
+
+/// What one probe at Controls' start found on each head pad's line
+/// (#1798): a pad drives its line, so it reads the same with a pull-down and
+/// a pull-up; a line with nothing on it follows the pull
+/// ([`crate::pins::GpioLines::probe`], as `discover-head` and `probe` read
+/// them). Pins naming lines with no pad, as lamp-52e6's 37 and 96 were,
+/// read no touch and said nothing; this says so.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct HeadLines {
+    /// The lines a pad drives, in the pins' order.
+    pub wired: Vec<u32>,
+    /// The lines that follow the pull: nothing on them.
+    pub bare: Vec<u32>,
+    /// The lines that couldn't be probed (held by another program).
+    pub unprobed: Vec<u32>,
+}
+
+impl HeadLines {
+    /// Each pad's line as `probe` reads it: high with a pull-down, high
+    /// with a pull-up.
+    pub fn probed(pads: &[Pin], mut probe: impl FnMut(u32) -> io::Result<(bool, bool)>) -> Self {
+        let mut lines = Self::default();
+        for pad in pads {
+            match probe(pad.line) {
+                Ok((down, up)) if down == up => lines.wired.push(pad.line),
+                Ok(_) => lines.bare.push(pad.line),
+                Err(_) => lines.unprobed.push(pad.line),
+            }
+        }
+        lines
+    }
+
+    /// The journal's line at start, and health's message while no pad is
+    /// left out.
+    pub fn said(&self) -> String {
+        let list = |lines: &[u32]| {
+            lines
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let mut parts = Vec::new();
+        if self.wired.is_empty() {
+            if !self.bare.is_empty() {
+                parts.push(format!(
+                    "nothing wired on lines {}: the head reads no touch",
+                    list(&self.bare)
+                ));
+            }
+        } else {
+            parts.push(format!("wired on lines {}", list(&self.wired)));
+            if !self.bare.is_empty() {
+                parts.push(format!("nothing on {}", list(&self.bare)));
+            }
+        }
+        if !self.unprobed.is_empty() {
+            parts.push(format!("lines {} not probed", list(&self.unprobed)));
+        }
+        parts.join("; ")
+    }
+
+    /// What health says ([`HEAD_ITEM`]): well while a pad drives one of
+    /// the lines; a warning when none does, or none could be told, or a pad
+    /// has read touched since Controls started and is left out
+    /// (`left_out`, its lines; [`crate::touch::TouchEngine::head_left_out`]).
+    pub fn health(&self, left_out: &[u32]) -> lamp_msgs::Diagnostic {
+        let list = |lines: &[u32]| {
+            lines
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let mut message = self.said();
+        if !left_out.is_empty() {
+            message = format!(
+                "{message}; {} touched since Controls started: left out until let go",
+                left_out
+                    .iter()
+                    .map(|line| format!("line {line}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+        let level = if self.wired.is_empty() || !left_out.is_empty() {
+            lamp_msgs::Level::Warn
+        } else {
+            lamp_msgs::Level::Ok
+        };
+        lamp_msgs::Diagnostic::new(level, HEAD_ITEM, &message)
+            .with("wired", list(&self.wired))
+            .with("bare", list(&self.bare))
+            .with("unprobed", list(&self.unprobed))
+            .with("left_out", list(left_out))
+    }
+}
+
 /// No configured GPIO is absence, not a failed optional strip or a made-up
 /// released input. The touch state contains only explicitly configured sources.
 pub struct NoGpio;

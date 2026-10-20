@@ -152,6 +152,11 @@ time go in, a `Health` comes out):
 - **The privacy switch** is its own item, `privacy switch`, sent by Controls
   when the switch is attached: `open` or `closed`, with `, not moved since
   Controls started` until it has moved ([privacy-switch.md](privacy-switch.md#the-switch-in-the-lamps-health)).
+- **The head pads** are their own item, `head pads`, sent by Controls on the
+  touch path: which of the pins' head lines a pad drives, from a probe at
+  its start. `warn` when none does ("the head reads no touch") or while a pad
+  touched since the start is left out (controls.md, "Said when no pad is
+  there").
 - **The lamp's level** is the worst item's, and `stale` at least when a
   part is missing.
 - **The lamp's message** is empty when the level is ok. Otherwise it is

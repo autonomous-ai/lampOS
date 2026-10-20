@@ -80,6 +80,9 @@ pub struct Service<G: PinReader, S: StripReader> {
     privacy: Option<crate::privacy::Source>,
     /// The privacy route on a lamp with no slide ([`Self::mark_no_slide`]).
     no_slide: bool,
+    /// What the probe at start found on the head pads' lines
+    /// ([`Self::head_probed`]).
+    head_lines: Option<crate::touch_pins::HeadLines>,
     /// When the head's state and `controls/state` were last said, and what.
     touch_said: Said<TouchState>,
     primary_said: Said<ControlsState>,
@@ -304,6 +307,7 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
             },
             privacy: None,
             no_slide: false,
+            head_lines: None,
             touch_said: Said::default(),
             primary_said: Said::default(),
             _lock: lock,
@@ -342,6 +346,13 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
         self.ensure_primary(bus, source.monitor.clock())?;
         self.privacy = Some(source);
         Ok(())
+    }
+
+    /// What the probe at start found on the head pads' lines (#1798):
+    /// health says it beside Controls' own report, with any pad left out
+    /// since.
+    pub fn head_probed(&mut self, lines: crate::touch_pins::HeadLines) {
+        self.head_lines = Some(lines);
     }
 
     /// The privacy route on a lamp with no slide (`LAMP_PRIVACY_CONTROLS=no-slide`):
@@ -683,6 +694,22 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
                 account(
                     &mut self.counts,
                     self.diagnostic.publish_json(at_us, &switch),
+                );
+            }
+            // The head pads' lines, and any left out (#1798).
+            if let Some(lines) = &self.head_lines {
+                let left_out = self.engine.head_left_out();
+                let left_out: Vec<u32> = self
+                    .wiring
+                    .head_pads
+                    .iter()
+                    .filter(|pin| left_out.contains(&pin.name))
+                    .map(|pin| pin.line)
+                    .collect();
+                let report = lines.health(&left_out);
+                account(
+                    &mut self.counts,
+                    self.diagnostic.publish_json(at_us, &report),
                 );
             }
             self.last_report_us = Some(at_us);

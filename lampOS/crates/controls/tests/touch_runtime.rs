@@ -8,7 +8,7 @@ use lamp_controls::{
     receiver::Receiver,
     strip_worker::StripReader,
     touch::{StripSample, TouchOutput},
-    touch_pins::TouchPinsConfig,
+    touch_pins::{HEAD_ITEM, HeadLines, TouchPinsConfig},
     touch_receiver::TouchReceiver,
     touch_runtime::{DRAIN_LIMIT, Service},
 };
@@ -249,6 +249,61 @@ fn diagnostic_value<'a>(report: &'a Diagnostic, key: &str) -> &'a str {
         .find(|value| value.key == key)
         .unwrap()
         .value
+}
+
+/// #1798: what the probe at start found on the head pads' lines goes on
+/// `diagnostics` beside Controls' own report, once a second, where
+/// lamp-health reads it. A pad read touched from the first acquisition is
+/// named as left out, a warning, until it is let go. Without a probe there
+/// is no item.
+#[test]
+fn controls_says_the_head_lines_and_a_pad_left_out_on_diagnostics() {
+    let said = |reports: &mut lamp_bus::Subscriber| {
+        let mut said = Vec::new();
+        while let Ok(Some(message)) = reports.recv(Duration::from_millis(50)) {
+            let report: Diagnostic = message.parse().unwrap();
+            if report.name == HEAD_ITEM {
+                said.push((report.level, report.message));
+            }
+        }
+        said
+    };
+    let mut rig = Rig::new(true);
+    let mut reports = rig
+        .bus
+        .subscribe_typed(Diagnostic::TOPIC, "test", Diagnostic::TYPE)
+        .unwrap();
+    rig.service.head_probed(HeadLines {
+        wired: vec![37],
+        bare: vec![],
+        unprobed: vec![],
+    });
+    rig.gpio(0, false, false, true);
+    rig.step(0);
+    assert_eq!(
+        said(&mut reports),
+        [(
+            Level::Warn,
+            "wired on lines 37; line 37 touched since Controls started: left out until let go"
+                .to_owned()
+        )]
+    );
+    rig.gpio(500_000, false, false, false);
+    rig.step(500_000);
+    rig.gpio(1_000_000, false, false, false);
+    rig.step(1_000_000);
+    assert_eq!(
+        said(&mut reports),
+        [(Level::Ok, "wired on lines 37".to_owned())]
+    );
+    let mut quiet = Rig::new(true);
+    let mut reports = quiet
+        .bus
+        .subscribe_typed(Diagnostic::TOPIC, "test", Diagnostic::TYPE)
+        .unwrap();
+    quiet.gpio(0, false, false, false);
+    quiet.step(0);
+    assert_eq!(said(&mut reports), []);
 }
 
 #[test]
