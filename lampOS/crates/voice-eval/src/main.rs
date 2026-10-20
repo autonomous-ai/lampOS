@@ -64,6 +64,10 @@ const USAGE: &str = "usage:
   lamp-voice-eval lamp-session --runtime LAMP_LIVE --work NEW_ABS_DIR --seconds N
       (--fixture-reply WAV --fixture-sha256 SHA | --provider-config FILE | --serve-config FILE)
       [--noise-suppression on|off] [--diagnostics] [--allowance-seconds N]
+  lamp-voice-eval endpoint SESSION [--since-us N]
+      (whether the voice's end of speech worked: its worker's states and each end of speech's
+      basis, from the session's records under SESSION; fails when the worker isn't ready or an
+      end of speech fell back because it failed; N is the arm's start on the voice's clock)
   lamp-voice-eval score JOURNAL --arm NAME FROM TO [--arm NAME FROM TO]...
       [--scenes DIR --date YYYY-MM-DD --utc-offset +HH:MM]
       (JOURNAL is `journalctl -u lamp-voice` text of the run alone; FROM and TO are
@@ -276,6 +280,51 @@ fn named(path: &Path) -> impl FnOnce(std::io::Error) -> Box<dyn std::error::Erro
     move |error| invalid(&format!("{path}: {error}"))
 }
 
+/// `endpoint SESSION [--since-us N]`: the session's end of speech, printed;
+/// 1 when it didn't work (the first builder on #1722, 20 Oct 07:20).
+fn endpoint(all: &[String]) -> Result<i32> {
+    let (session, rest) = all.split_first().ok_or_else(|| invalid(USAGE))?;
+    let since_us = match rest {
+        [] => 0,
+        [flag, value] if flag == "--since-us" => value
+            .parse::<u64>()
+            .map_err(|_| invalid("--since-us is a whole number of microseconds"))?,
+        _ => return Err(invalid(USAGE)),
+    };
+    let mut files = Vec::new();
+    session_records(Path::new(session), &mut files)?;
+    if files.is_empty() {
+        return Err(invalid(&format!("{session}: no events-*.jsonl under it")));
+    }
+    let mut lines = String::new();
+    for file in &files {
+        lines.push_str(&String::from_utf8_lossy(
+            &fs::read(file).map_err(named(file))?,
+        ));
+        lines.push('\n');
+    }
+    let summary = lamp_voice_eval::endpoint::summarize(lines.lines(), since_us);
+    print!("{summary}");
+    Ok(if summary.faults().is_empty() { 0 } else { 1 })
+}
+
+/// Every `events-*.jsonl` under `dir`, at any depth.
+fn session_records(dir: &Path, found: &mut Vec<PathBuf>) -> Result<()> {
+    for entry in fs::read_dir(dir).map_err(named(dir))? {
+        let path = entry.map_err(named(dir))?.path();
+        if path.is_dir() {
+            session_records(&path, found)?;
+        } else if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("events-") && name.ends_with(".jsonl"))
+        {
+            found.push(path);
+        }
+    }
+    Ok(())
+}
+
 /// `score JOURNAL --arm NAME FROM TO ...`: the routes' table, printed.
 fn score(all: &[String]) -> Result<i32> {
     let (journal, rest) = all.split_first().ok_or_else(|| invalid(USAGE))?;
@@ -387,6 +436,7 @@ fn run() -> Result<i32> {
         "fake-room-recorder" => return fake_lamp::room_recorder(&all),
         "fake-slow-transport" => return fake_lamp::slow_transport(&all),
         "cost" => return cost(&all),
+        "endpoint" => return endpoint(&all),
         "score" => return score(&all),
         _ => {}
     }
