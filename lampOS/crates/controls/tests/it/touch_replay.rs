@@ -460,7 +460,7 @@ fn authored_adaptation(text: &str) -> Vec<Record> {
 
 #[test]
 fn issue711_changed_only_adaptation_has_explicit_stale_faults_and_no_actions() {
-    let records = authored_adaptation(include_str!("../fixtures/strip-711-changes.jsonl"));
+    let records = authored_adaptation(include_str!("../../fixtures/strip-711-changes.jsonl"));
     let (summary, output) = run(config(true), &records, Some(19_948_000));
     assert_eq!(summary.records, 57);
     assert_eq!(summary.events, 0);
@@ -481,7 +481,9 @@ fn issue711_changed_only_adaptation_has_explicit_stale_faults_and_no_actions() {
 
 #[test]
 fn issue711_reconstructed_continuity_has_one_contact_and_no_slide_end_tap() {
-    let records = authored_adaptation(include_str!("../fixtures/strip-711-reconstruction.jsonl"));
+    let records = authored_adaptation(include_str!(
+        "../../fixtures/strip-711-reconstruction.jsonl"
+    ));
     let (summary, output) = run(config(true), &records, Some(19_948_000));
     assert_eq!(
         (
@@ -548,7 +550,9 @@ fn issue711_reconstructed_continuity_has_one_contact_and_no_slide_end_tap() {
 
 #[test]
 fn issue711_working_set_keeps_the_reconstructed_trace_and_full_span_coordinates() {
-    let records = authored_adaptation(include_str!("../fixtures/strip-711-reconstruction.jsonl"));
+    let records = authored_adaptation(include_str!(
+        "../../fixtures/strip-711-reconstruction.jsonl"
+    ));
     let mut complete = Vec::new();
     let mut working = Vec::new();
     touch_replay::run(
@@ -574,10 +578,11 @@ fn issue711_working_set_keeps_the_reconstructed_trace_and_full_span_coordinates(
 #[test]
 fn cli_ready_replay_is_the_exact_labelled_reconstruction_with_authored_clock_and_sequence() {
     let records =
-        touch_replay::read(include_bytes!("../fixtures/strip-711-replay.jsonl").as_slice())
+        touch_replay::read(include_bytes!("../../fixtures/strip-711-replay.jsonl").as_slice())
             .unwrap();
-    let reconstruction =
-        authored_adaptation(include_str!("../fixtures/strip-711-reconstruction.jsonl"));
+    let reconstruction = authored_adaptation(include_str!(
+        "../../fixtures/strip-711-reconstruction.jsonl"
+    ));
     assert_eq!(records.len(), 1052);
     for (index, (record, reference)) in records.iter().zip(&reconstruction).enumerate() {
         assert_eq!(record.now_us, reference.now_us);

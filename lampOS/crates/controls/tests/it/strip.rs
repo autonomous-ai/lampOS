@@ -932,8 +932,10 @@ fn rows(raw: &str) -> Vec<TraceRow> {
 
 #[test]
 fn issue711_reconstruction_preserves_every_original_row_and_labels_all_fill_frames() {
-    let changes = rows(include_str!("../fixtures/strip-711-changes.jsonl"));
-    let full = rows(include_str!("../fixtures/strip-711-reconstruction.jsonl"));
+    let changes = rows(include_str!("../../fixtures/strip-711-changes.jsonl"));
+    let full = rows(include_str!(
+        "../../fixtures/strip-711-reconstruction.jsonl"
+    ));
     assert_eq!(changes.len(), 57);
     assert_eq!(full.len(), 1052);
     assert_eq!(
@@ -978,7 +980,7 @@ fn issue711_reconstruction_preserves_every_original_row_and_labels_all_fill_fram
 fn issue711_changed_rows_alone_cannot_prove_continuous_touch_hold_or_slide() {
     let mut strip = StripRecognizer::new(ORDER).unwrap();
     let mut faults = Vec::new();
-    for row in rows(include_str!("../fixtures/strip-711-changes.jsonl")) {
+    for row in rows(include_str!("../../fixtures/strip-711-changes.jsonl")) {
         match strip.update(row.at_us, row.at_us, Some(row.mask)) {
             Ok(out) => assert!(out.effects.is_empty()),
             Err(error) => faults.push(error),
@@ -994,7 +996,9 @@ fn issue711_authored_reconstruction_is_one_hold_with_reversing_slides_not_multip
     let mut effects = Vec::new();
     let mut directions = Vec::new();
     let mut positions = Vec::new();
-    for row in rows(include_str!("../fixtures/strip-711-reconstruction.jsonl")) {
+    for row in rows(include_str!(
+        "../../fixtures/strip-711-reconstruction.jsonl"
+    )) {
         let out = strip.update(row.at_us, row.at_us, Some(row.mask)).unwrap();
         assert!(!out.state.ambiguous);
         assert!(out.effects.len() <= MAX_EFFECTS);
@@ -1035,7 +1039,9 @@ fn issue711_authored_reconstruction_is_one_hold_with_reversing_slides_not_multip
 fn issue711_reconstruction_has_identical_geometry_and_effects_with_explicit_working_pads() {
     let mut complete = StripRecognizer::new(ORDER).unwrap();
     let mut sparse = StripRecognizer::new(WORKING).unwrap();
-    for row in rows(include_str!("../fixtures/strip-711-reconstruction.jsonl")) {
+    for row in rows(include_str!(
+        "../../fixtures/strip-711-reconstruction.jsonl"
+    )) {
         let expected = complete
             .update(row.at_us, row.at_us, Some(row.mask))
             .unwrap();
