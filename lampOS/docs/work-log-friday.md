@@ -59,3 +59,30 @@ Ready for lamp-voice: yes (#2198, #2206, #2197)
 - Clippy under 1.99 trips lints new in 1.99, in untouched crates; each PR's
   ARM64 and clippy runs are the 1.96 gate.
 - Not shown on a lamp yet: lamp-06c1 is El's until about 14:00.
+
+## 2026-10-20 evening: #2176 rows, lamp checks, the probe
+
+Ready for lamp-voice: yes (#2298, #2277, #2319)
+
+- Merged today: #2197 (docs), #2198 (row 2), #2206 (row 1a), #2241 (lamp
+  readings), #2279 (probe-tools through the relay), #2282 (row 3r), #2299
+  (row 10).
+- Open: #2298 (row 11, ready), #2277 (row 6, the first builder's to merge:
+  the privacy path), #2319 (row 5a, Live only; the second route reads no
+  faces between turns: asked on #2176).
+- Reviews of twelve's #2226 (rows 1b/1c, 13): five reads; the blocking
+  Live P2 and row 13 are fixed; the call sites stay untested (P3).
+- Finding 9 was built twice (#2233 by sixth landed): dropped mine. Now a
+  duplicate check (open PRs, branches, #1722) comes before every row.
+- lamp-06c1, second route, build 4142: today, correction and a used
+  preference pass by voice; "never mind" forgot the wrong kept thing (row
+  6); journalling stopped after a forget (row 1). Readings:
+  docs/verification/memory-review-lamp-06c1-20261020/ (#2241).
+- probe-tools on lamp-06c1, 10 runs through the relay: preference-used
+  8/10, correction-first 0/10, correction-kept 10/10, earlier-today 10/10,
+  earlier-today-said 0/10, never-mind 10/10; "what do you remember about
+  …" called recall 0/10. #2063 targets the two 0/10 arms.
+- Row 3 waits on the first builder's choice: the eyes have no stable
+  person key.
+- The Mac reached load ~400 with six agents running full suites: now
+  targeted tests only, ARM64 is the full gate.
