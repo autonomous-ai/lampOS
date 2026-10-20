@@ -216,31 +216,45 @@ struct Rig {
     no_slide: bool,
     root: Root,
 }
+/// The Controls a rig's worker reads.
+#[derive(Clone, Copy)]
+enum Controls {
+    /// One state each 5 ms, on the selected bus: the worker is found at once.
+    Steady,
+    /// Two states at a time on a bus that never looks for subscribers again
+    /// after its first publication, before the worker starts: it never sends
+    /// the worker a datagram, and each kept value the worker reads after its
+    /// first skips one.
+    KeptOnly,
+    /// Two states at a time on the selected bus: the worker is found, and has
+    /// both of each pair as datagrams.
+    Paired,
+}
+
 impl Rig {
     fn start(permission: Permission) -> Self {
         Self::start_with(permission, false)
     }
 
     fn start_with(permission: Permission, no_slide: bool) -> Self {
-        Self::start_from(permission, no_slide, false)
+        Self::start_from(permission, no_slide, Controls::Steady)
     }
 
-    /// With `kept_only`, Controls' publisher is on a bus that never looks for
-    /// subscribers again after its first publication, before the worker
-    /// starts, so it never sends the worker a datagram: the worker has only
-    /// the topic's kept value, and its two states at a time skip one there.
-    fn start_from(permission: Permission, no_slide: bool, kept_only: bool) -> Self {
+    /// Starts the worker beside the Controls `controls` says ([`Controls`]).
+    fn start_from(permission: Permission, no_slide: bool, controls: Controls) -> Self {
         let root = Root::new();
         let bus = selected_bus(Bus::new(root.0.join("bus")).unwrap());
         let clock = lamp_controls::runtime::clock_id(None).unwrap();
         let subscriber = Self::subscribe(&bus);
-        let producer = if kept_only {
-            let never_looks = Bus::new(root.0.join("bus"))
-                .unwrap()
-                .rescan_every(Duration::from_secs(3_600));
-            Producer::start_paired(&never_looks, clock.clone(), no_slide, true)
-        } else {
-            Producer::start(&bus, clock.clone(), no_slide)
+        let producer = match controls {
+            Controls::Steady => Producer::start(&bus, clock.clone(), no_slide),
+            Controls::KeptOnly => {
+                let never_looks = Bus::new(root.0.join("bus"))
+                    .unwrap()
+                    .rescan_every(Duration::from_secs(3_600));
+                Producer::start_paired(&never_looks, clock.clone(), no_slide, true)
+            }
+            Controls::Paired => Producer::start_paired(&bus, clock.clone(), no_slide, true),
         };
         let boot = new_boot().unwrap();
         let mut controller = Controller::new(boot, now());
@@ -516,7 +530,7 @@ fn selected_worker_requires_authority_latches_low_and_recovers_only_after_verifi
 /// counted, its second read would end it as discontinuous.
 #[test]
 fn before_any_datagram_the_worker_reads_the_kept_value_past_gaps_until_controls_is_late() {
-    let mut rig = Rig::start_from(Permission::Denied, false, true);
+    let mut rig = Rig::start_from(Permission::Denied, false, Controls::KeptOnly);
     let mut observed = std::collections::BTreeSet::new();
     let deadline = Instant::now() + WAIT;
     loop {
@@ -552,6 +566,68 @@ fn before_any_datagram_the_worker_reads_the_kept_value_past_gaps_until_controls_
         observed.len() >= 3,
         "only {} switch readings were taken: {observed:?}",
         observed.len()
+    );
+}
+
+/// The reviewer on #2267 (P3, pinning the datagram count at `serve`'s
+/// `resyncs`): once a datagram has come, a gap ends the worker as
+/// discontinuous, in its first second as after it. Controls puts two states
+/// down at a time and finds the worker; then the worker's socket is moved out
+/// of the topic's `subs/`, so Controls forgets it (its send finds no file)
+/// and the worker has only the kept value, one past the last each time.
+/// Taken as from a worker with no datagram yet, that gap would pass, and the
+/// worker would end only when Controls is late, 200 ms on.
+#[test]
+fn after_its_first_datagram_a_gap_ends_the_worker_as_discontinuous() {
+    let mut rig = Rig::start_from(Permission::Denied, false, Controls::Paired);
+    rig.until(|value| value.observed_us > 0);
+    // Datagrams flowing, both states of each pair.
+    rig.observe(Duration::from_millis(50), |_| {});
+    let subs = rig
+        .root
+        .0
+        .join("bus")
+        .join(ControlsState::TOPIC)
+        .join("subs");
+    let mut moved = 0;
+    for entry in fs::read_dir(&subs).unwrap() {
+        let path = entry.unwrap().path();
+        fs::rename(&path, rig.root.0.join(format!("aside-{moved}"))).unwrap();
+        moved += 1;
+    }
+    assert!(moved > 0, "no worker socket in {subs:?}");
+    let aside = Instant::now();
+    let mut said = Vec::new();
+    loop {
+        if rig.worker.as_mut().unwrap().check_running().is_err() {
+            break;
+        }
+        if let Err(error) = rig.tick() {
+            said.push(error.to_string());
+        }
+        assert!(aside.elapsed() < WAIT, "the worker read on past the gap");
+        thread::sleep(Duration::from_millis(1));
+    }
+    let ended_after = aside.elapsed();
+    let mut worker = rig.worker.take().unwrap();
+    // A fault said just before the exit may still be queued, and fresh.
+    while let Ok(Some(event)) = worker.channels.control.receive::<WorkerEvent>() {
+        said.push(format!("{event:?}"));
+    }
+    drop(worker);
+    assert!(
+        !said
+            .iter()
+            .any(|text| text.contains("publisher unavailable")),
+        "{said:?}"
+    );
+    // The fault can age out before it is read on a loaded runner (the exit
+    // seen first), so an end well before Controls would be late is taken
+    // for it too.
+    assert!(
+        said.iter().any(|text| text.contains("discontinuous"))
+            || ended_after < Duration::from_millis(150),
+        "ended {ended_after:?} after the gap, saying {said:?}"
     );
 }
 
