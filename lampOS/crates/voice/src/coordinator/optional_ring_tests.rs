@@ -577,6 +577,7 @@ fn optional_ring_incomplete_cleanup_blocks_physical_mute_reopen() {
         &mut trace,
         &mut None,
         Err(Box::new(PhysicalMute {
+            onboarding: None,
             observed_at_us: monotonic_us(),
         })),
     )
