@@ -424,6 +424,9 @@ struct Shared {
     though_held: bool,
     /// With `LAMP_STAFF_NOTE=on`: the note for words that name the staff.
     staff: Option<StaffNote>,
+    /// What memory holds that may fit a spoken request's words
+    /// ([`Engine::remembering`]).
+    remembered: Option<StaffNote>,
     /// With `LAMP_NAME_NOTE=on`: the note for a line the lamp's name began.
     name_note: Option<NameNote>,
     /// The note for a line let out only as the conversation going on.
@@ -840,6 +843,7 @@ impl Engine {
                 stop_untold: Mutex::new(None),
                 though_held: false,
                 staff: None,
+                remembered: None,
                 name_note: None,
                 conversation_alone: None,
                 busy: None,
@@ -1145,6 +1149,17 @@ impl Engine {
     pub fn noting_staff(mut self, staff: StaffNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.staff = Some(staff);
+        }
+        self
+    }
+
+    /// A spoken request is asked with what memory holds that may fit its
+    /// words (`LAMP_SECOND_MEMORY_HITS=on`, #2176 row 5c,
+    /// `crate::remember::hits_note`), computed as its notes are, within a
+    /// short bound. Before any turn only.
+    pub fn remembering(mut self, note: StaffNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.remembered = Some(note);
         }
         self
     }
@@ -2486,6 +2501,10 @@ async fn spoken(
         .staff
         .as_ref()
         .and_then(|staff| staff(request, &text));
+    let remembered = shared
+        .remembered
+        .as_ref()
+        .and_then(|note| note(request, &text));
     // Its name heard as it began: told as the Live route tells it (#1712:
     // without it this route missed two calls this morning).
     let named = shared
@@ -2549,6 +2568,7 @@ async fn spoken(
         .chain(cut_in)
         .chain(misheard)
         .chain(staff)
+        .chain(remembered)
         .chain(named)
         .chain(call)
         .chain(alone)
