@@ -1,0 +1,37 @@
+Oct 20 12:15:30 lamp-06c1 systemd[1]: Started lamp-memory.service - lampOS memory (lamp-memory).
+Oct 20 12:15:34 lamp-06c1 lamp-memory[2377]: lamp-memory: started memory_days=true zone=system; the model adapter is not configured
+Oct 20 12:15:34 lamp-06c1 lamp-memory[2377]: lamp-memory: kept person=r-everyone ok entries=0
+Oct 20 12:15:34 lamp-06c1 lamp-memory[2377]: lamp-memory: a client left before its answer
+Oct 20 12:15:34 lamp-06c1 lamp-memory[2377]: lamp-memory: session_open person=everyone ok entries=0
+Oct 20 12:15:34 lamp-06c1 lamp-memory[2377]: lamp-memory: a client left before its answer
+Oct 20 12:15:34 lamp-06c1 lamp-memory[2377]: lamp-memory: session_close person=everyone ok entries=0
+Oct 20 12:15:35 lamp-06c1 lamp-memory[2377]: lamp-memory: kept person=r-everyone ok entries=0
+Oct 20 12:15:36 lamp-06c1 lamp-memory[2377]: lamp-memory: session_open person=everyone ok entries=0
+Oct 20 12:15:36 lamp-06c1 lamp-memory[2377]: lamp-memory: session_close person=everyone ok entries=0
+Oct 20 12:15:36 lamp-06c1 lamp-memory[2377]: lamp-memory: kept person=r-everyone ok entries=0
+Oct 20 12:18:32 lamp-06c1 lamp-memory[2377]: lamp-memory: append_linked person=everyone ok entries=0
+Oct 20 12:19:10 lamp-06c1 lamp-memory[2377]: lamp-memory: append_linked person=everyone ok entries=0
+Oct 20 12:19:26 lamp-06c1 lamp-memory[2377]: lamp-memory: append_linked person=everyone ok entries=0
+Oct 20 12:20:11 lamp-06c1 lamp-memory[2377]: lamp-memory: conversation_end person=everyone ok entries=0
+Oct 20 12:23:05 lamp-06c1 lamp-memory[2377]: lamp-memory: append_linked person=everyone ok entries=0
+Oct 20 12:23:50 lamp-06c1 lamp-memory[2377]: lamp-memory: conversation_end person=everyone ok entries=0
+Oct 20 12:32:35 lamp-06c1 lamp-memory[2377]: lamp-memory: append_linked person=everyone ok entries=0
+Oct 20 12:33:20 lamp-06c1 lamp-memory[2377]: lamp-memory: conversation_end person=everyone ok entries=0
+Oct 20 12:37:47 lamp-06c1 lamp-memory[2377]: lamp-memory: session_open person=everyone ok entries=0
+Oct 20 12:37:47 lamp-06c1 lamp-memory[2377]: lamp-memory: session_close person=everyone ok entries=0
+Oct 20 12:37:47 lamp-06c1 lamp-memory[2377]: lamp-memory: kept person=r-everyone ok entries=0
+Oct 20 12:42:08 lamp-06c1 lamp-memory[2377]: lamp-memory: append_linked person=everyone ok entries=0
+Oct 20 12:42:14 lamp-06c1 lamp-memory[2377]: lamp-memory: append_linked person=everyone ok entries=0
+Oct 20 12:42:59 lamp-06c1 lamp-memory[2377]: lamp-memory: conversation_end person=everyone ok entries=0
+Oct 20 12:58:53 lamp-06c1 lamp-memory[2377]: lamp-memory: session_open person=everyone ok entries=0
+Oct 20 12:58:53 lamp-06c1 lamp-memory[2377]: lamp-memory: session_close person=everyone ok entries=0
+Oct 20 12:58:53 lamp-06c1 lamp-memory[2377]: lamp-memory: kept person=r-everyone ok entries=0
+Oct 20 13:03:10 lamp-06c1 lamp-memory[2377]: lamp-memory: append_linked person=everyone ok entries=0
+Oct 20 13:03:55 lamp-06c1 lamp-memory[2377]: lamp-memory: conversation_end person=everyone ok entries=0
+---
+total 112
+drwx------  2 lampos-memory lampos-memory   4096 Oct 20 13:03 .
+drwxr-xr-x 50 root          root            4096 Oct 20 12:21 ..
+-rw-------  1 lampos-memory lampos-memory 102400 Oct 20 13:03 memory-days.sqlite3
+
+/memory-days.sqlite3

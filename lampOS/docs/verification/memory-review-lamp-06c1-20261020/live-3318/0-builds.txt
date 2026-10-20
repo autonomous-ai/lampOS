@@ -1,0 +1,28 @@
+total 44
+drwxr-xr-x 10 root root 4096 Oct 20 12:08 .
+drwxr-xr-x 22 root root 4096 Oct 20 12:08 ..
+drwxr-xr-x  2 root root 4096 Oct 16 23:56 15ca4bad3f97b238723369c45f82d07a4ae6c05dea065b25cbc048b46c09fed5
+drwxr-xr-x  2 root root 4096 Oct 16 12:04 6d5fbb6d4f2ae8da3a2ee9b07c97c6b3008a065f76e23f3f3e28cb442b834ab7
+drwxr-xr-x  2 root root 4096 Oct 16 15:57 795
+drwxr-xr-x  2 root root 4096 Oct 16 13:13 8320db12e97708f6ce712daec2fa9915e00b9a26a3e35e8ff545d50c80bb786a
+drwxr-xr-x  2 root root 4096 Oct 17 02:57 9360c5d25daf99ebadc689520b6ee2a8bb7b2afab57bdf118c60a33b62cfc26e
+drwxr-xr-x  2 root root 4096 Oct 17 03:31 a338f9b12c0ceba709dad6fb085863e5f78663e68a0e48553578729c1bb7d0fe
+lrwxrwxrwx  1 root root   64 Oct 20 12:08 current -> d6089a6a38f98682c48c615ebd241fd8ca48e51bc4b9d152510468b101c152c0
+/opt/lampOS/voice/d6089a6a38f98682c48c615ebd241fd8ca48e51bc4b9d152510468b101c152c0
+d6089a6a38f98682c48c615ebd241fd8ca48e51bc4b9d152510468b101c152c0  /opt/lampOS/voice/d6089a6a38f98682c48c615ebd241fd8ca48e51bc4b9d152510468b101c152c0/lamp-voice
+total 20
+drwxr-xr-x  4 root root 4096 Oct 20 12:08 .
+drwxr-xr-x 22 root root 4096 Oct 20 12:08 ..
+drwxr-xr-x  2 root root 4096 Oct 20 12:08 0ce3bbfa071d2d2416cf135f16ff84804b549d295e1417102df85b7cba237f80
+drwxr-xr-x  2 root root 4096 Oct 16 11:58 820774300293638c35d4c6c7bd69b52050212602fc7adcc1dc5c3dffb8959a88
+lrwxrwxrwx  1 root root   64 Oct 20 12:08 current -> 0ce3bbfa071d2d2416cf135f16ff84804b549d295e1417102df85b7cba237f80
+/opt/lampOS/memory/0ce3bbfa071d2d2416cf135f16ff84804b549d295e1417102df85b7cba237f80
+0ce3bbfa071d2d2416cf135f16ff84804b549d295e1417102df85b7cba237f80  /opt/lampOS/memory/0ce3bbfa071d2d2416cf135f16ff84804b549d295e1417102df85b7cba237f80/lamp-memory
+ls: cannot access '/etc/systemd/system/lamp-voice.service.d': No such file or directory
+ls: cannot access '/etc/systemd/system/lamp-memory.service.d': No such file or directory
+ActiveEnterTimestamp=Tue 2026-10-20 12:15:30 +07
+
+ActiveEnterTimestamp=Tue 2026-10-20 12:15:30 +07
+/usr/bin/nc
+/usr/bin/python3
+ls: cannot open directory '/run/lampos-bus': Permission denied
