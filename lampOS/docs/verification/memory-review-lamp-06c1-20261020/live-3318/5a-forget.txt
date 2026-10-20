@@ -1,0 +1,8 @@
+Oct 20 13:47:23.344429 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 90: the model is told the lamp's name was heard
+Oct 20 13:47:24.971869 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 90: told the session inside it (For you to know, not to answer: the room around you has gone quiet.)
+Oct 20 13:47:27.229310 lamp-06c1 lamp-memory[2377]: lamp-memory: conversation_end person=everyone ok entries=0
+Oct 20 13:47:27.605001 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 90: its answer is played: the room is not known to be busy (the room microphone 8.2 dB over its quiet)
+Oct 20 13:47:27.606544 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(5401) prompt=Some(5397) prompt_audio=Some(280) response=Some(4) response_audio=None thoughts=None cached=None
+Oct 20 13:47:27.633753 lamp-06c1 lamp-memory[2377]: lamp-memory: forget_last person=everyone ok entries=0
+Oct 20 13:47:27.636052 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 90 asked for forget; the memory answered in 28 ms; the answer was sent
+Oct 20 13:47:30.372924 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(5465) prompt=Some(5414) prompt_audio=Some(280) response=Some(51) response_audio=Some(51) thoughts=None cached=None

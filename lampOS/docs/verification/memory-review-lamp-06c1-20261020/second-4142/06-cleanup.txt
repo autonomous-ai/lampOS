@@ -1,0 +1,17 @@
+{"ok":true,"removed":3}
+
+{"ok":true,"removed":1}
+
+{"ok":true,"removed":1}
+
+{"entries":[{"at_unix_ms":1792479839346,"id":17},{"at_unix_ms":1792480135353,"id":18}],"ok":true}
+
+{"entries":[],"ok":true}
+
+{"ok":true,"people":[{"bytes":655,"exchanges":14,"kept":2,"newest_day":"2026-10-20","oldest_day":"2026-10-20","person":"everyone","skipped_lines":0}]}
+Oct 20 14:30:02.425650 lamp-06c1 lamp-memory[20478]: lamp-memory: forget person=everyone ok entries=0
+Oct 20 14:30:04.473419 lamp-06c1 lamp-memory[20478]: lamp-memory: forget person=everyone ok entries=0
+Oct 20 14:30:06.518953 lamp-06c1 lamp-memory[20478]: lamp-memory: forget person=everyone ok entries=0
+Oct 20 14:30:08.546792 lamp-06c1 lamp-memory[20478]: lamp-memory: kept person=everyone ok entries=2
+Oct 20 14:30:10.572574 lamp-06c1 lamp-memory[20478]: lamp-memory: search person=everyone ok entries=0
+Oct 20 14:30:12.596429 lamp-06c1 lamp-memory[20478]: lamp-memory: status person=everyone ok entries=0

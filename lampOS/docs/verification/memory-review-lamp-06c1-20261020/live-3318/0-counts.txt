@@ -1,0 +1,12 @@
+{"ok": true}
+{'person': 'everyone', 'exchanges': 8, 'kept': 0, 'bytes': 455, 'oldest_day': '2026-10-20'}
+---known
+total 24
+drwxr-xr-x  2 lampos lampos   120 Oct 20 13:30 .
+drwxr-xr-x 40 root   root    1040 Oct 20 13:30 ..
+srwxr-xr-x  1 lampos lampos     0 Oct 20 12:15 permit.sock
+-rw-r--r--  1 lampos lampos     6 Oct 20 13:29 present
+-rw-------  1 lampos lampos 20020 Oct 20 13:30 sight.jpg
+srwxr-xr-x  1 lampos lampos     0 Oct 20 12:15 who.sock
+sh: 1: cannot open /run/lampos-eyes/known: No such file
+--known-file /run/lampos-eyes/known

@@ -1,0 +1,11 @@
+{"ok":true,"removed":2}
+kept total 0 []
+[('everyone', 8, 0)]
+rules 0
+Oct 20 13:48:41 lamp-06c1 lamp-memory[2377]: lamp-memory: kept person=everyone ok entries=1
+Oct 20 13:48:41 lamp-06c1 lamp-memory[2377]: lamp-memory: status person=everyone ok entries=0
+Oct 20 13:48:53 lamp-06c1 lamp-memory[2377]: lamp-memory: forget person=everyone ok entries=0
+Oct 20 13:48:54 lamp-06c1 lamp-memory[2377]: lamp-memory: kept person=everyone ok entries=0
+Oct 20 13:48:54 lamp-06c1 lamp-memory[2377]: lamp-memory: status person=everyone ok entries=0
+Oct 20 13:48:55 lamp-06c1 lamp-memory[2377]: lamp-memory: search person=everyone ok entries=0
+Oct 20 13:48:56 lamp-06c1 lamp-memory[2377]: lamp-memory: kept person=r-everyone ok entries=0

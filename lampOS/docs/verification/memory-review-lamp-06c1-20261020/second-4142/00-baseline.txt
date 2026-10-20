@@ -1,0 +1,178 @@
+lamp-06c1
+ExecStart=/opt/lampOS/voice/current/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery bounded --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast --call-wait-ms 2000 --failure-notice-dir /etc/lampOS/voice/notices --failure-notice-language en-US
+# Environment=LAMP_VOICE_ROUTE=gemini. It needs two files in /etc/lampOS/voice, both placed by install and the
+Environment=LAMP_VOICE_ROUTE=second
+Environment=LAMP_SECOND_CHAT=deepseek
+Environment=LAMP_SECOND_SEARCH=deepseek
+Environment=LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo
+Environment=LAMP_SECOND_DEEPSEEK_BASE_URL=<redacted>
+Environment=LAMP_SECOND_DOWN_LINE=on
+Environment=LAMP_SECOND_WAIT_CUE=on
+Environment=LAMP_SECOND_LOOK=on
+Environment=LAMP_MEMORY_RULES=on
+Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock
+Environment=LAMP_MEMORY_DAYS=on
+0
+/opt/lampOS/voice/4549abfcb6eebb8984d7f6ad773bb7e0891a03422ce380f37d5ee54ef5b625c7
+total 92
+drwxr-xr-x 23 root root 4096 Oct 20 14:13 .
+drwxrwxrwx 14 root root 4096 Oct 16 11:58 ..
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 actions
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 air
+drwxr-xr-x  9 root root 4096 Oct 20 14:13 body
+drwxr-xr-x  4 root root 4096 Oct 20 14:13 cloud
+drwxr-xr-x  6 root root 4096 Oct 20 14:13 controls
+drwxr-xr-x  6 root root 4096 Oct 20 14:13 ears
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 expression
+drwxr-xr-x  6 root root 4096 Oct 20 14:13 eyes
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 health
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 memory
+drwxr-xr-x  3 root root 4096 Oct 20 14:13 mood
+drwxr-xr-x  6 root root 4096 Oct 20 14:13 name
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 policy
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 records
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 schedule
+drwxr-xr-x  4 root root 4096 Oct 20 14:13 selftest
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 setup
+drwxr-xr-x 14 root root 4096 Oct 20 14:13 skills
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 tasks
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 update
+drwxr-xr-x 11 root root 4096 Oct 20 14:13 voice
+total 24
+drwxr-xr-x  5 root root 4096 Oct 20 14:13 .
+drwxr-xr-x 23 root root 4096 Oct 20 14:13 ..
+drwxr-xr-x  2 root root 4096 Oct 20 12:08 0ce3bbfa071d2d2416cf135f16ff84804b549d295e1417102df85b7cba237f80
+drwxr-xr-x  2 root root 4096 Oct 16 11:58 820774300293638c35d4c6c7bd69b52050212602fc7adcc1dc5c3dffb8959a88
+lrwxrwxrwx  1 root root   64 Oct 20 14:13 current -> f6fad265f98f29000c9fa9c9c82c0a181e3e622d56b5ecc51c8a7c0507abd365
+drwxr-xr-x  2 root root 4096 Oct 20 14:13 f6fad265f98f29000c9fa9c9c82c0a181e3e622d56b5ecc51c8a7c0507abd365
+4549abfcb6eebb8984d7f6ad773bb7e0891a03422ce380f37d5ee54ef5b625c7
+f6fad265f98f29000c9fa9c9c82c0a181e3e622d56b5ecc51c8a7c0507abd365
+ExecStart=/opt/lampOS/memory/current/lamp-memory --dir /var/lib/lampos-memory --socket /run/lampos-memory/memory.sock --keep-days 30 --zone system --memory-days --bus-root /run/lampos-bus
+total 4
+drwxr-xr-x  2 lampos-memory lampos-memory   80 Oct 20 14:14 .
+drwxr-xr-x 40 root          root          1040 Oct 20 14:17 ..
+srw-------  1 lampos-memory lampos-memory    0 Oct 20 14:14 memory.sock
+-rw-------  1 lampos-memory lampos-memory    6 Oct 20 14:14 ready
+/usr/bin/nc
+/usr/bin/python3
+○ lamp-selftest.service - lampOS self-test, passive (lamp-selftest)
+     Loaded: loaded (/etc/systemd/system/lamp-selftest.service; static)
+     Active: inactive (dead) since Tue 2026-10-20 13:37:40 +07; 39min ago
+TriggeredBy: ● lamp-selftest.timer
+   Main PID: 10575 (code=exited, status=3)
+        CPU: 65ms
+
+Oct 20 13:37:40 lamp-06c1 lamp-selftest[10575]: head_roll  pass
+Oct 20 13:37:40 lamp-06c1 lamp-selftest[10575]: head_pitch pass
+Oct 20 13:37:40 lamp-06c1 lamp-selftest[10575]: ring       not checked listened only: the ring's owner runs, and what it draws cannot be read back
+Oct 20 13:37:40 lamp-06c1 lamp-selftest[10575]: speaker    not checked asked only at the factory and on demand: a passive run asks the voice nothing
+Oct 20 13:37:40 lamp-06c1 lamp-selftest[10575]: head_move  not checked never moved at first boot: only at the factory and when asked
+Oct 20 13:37:40 lamp-06c1 lamp-selftest[10575]: storage    not checked no fault in the kernel's log, but it no longer holds all of this boot (first record kept: 45541)
+Oct 20 13:37:40 lamp-06c1 lamp-selftest[10575]: selftest   not checked in 2 s
+Oct 20 13:37:40 lamp-06c1 lamp-selftest[10575]: lamp-selftest: kept /var/lib/lamp-selftest/1792478258.json
+  UNIT                  LOAD   ACTIVE   SUB     DESCRIPTION
+  lamp-selftest.service loaded inactive dead    lampOS self-test, passive (lamp-selftest)
+  lamp-selftest.timer   loaded active   waiting lampOS self-test, five minutes after the lamp starts and every six hours
+
+LOAD   = Reflects whether the unit definition was properly loaded.
+ACTIVE = The high-level unit activation state, i.e. generalization of SUB.
+SUB    = The low-level unit activation state, values depend on unit type.
+2 loaded units listed.
+To show all installed unit files use 'systemctl list-unit-files'.
+light
+skills
+voice
+Oct 20 12:21:16 lamp-06c1 lamp-selftest[3007]: lamp-selftest: kept /var/lib/lamp-selftest/1792473674.json
+Oct 20 13:37:40 lamp-06c1 lamp-selftest[10575]: lamp-selftest: kept /var/lib/lamp-selftest/1792478258.json
+-rw-r--r--  1 lampos lampos 4706 Oct 20 13:37 1792478258.json
+-rw-r--r--  1 lampos lampos 4706 Oct 20 13:37 latest.json
+-rw-r--r--  1 lampos lampos  743 Oct 20 13:37 latest.txt
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/usr/lib/python3.11/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+cat: /var/lib/lamp-selftest/latest.txt: Permission denied
+grep: /var/lib/lamp-selftest/latest.json: Permission denied
+Oct 20 12:21:16 lamp-06c1 lamp-selftest[3007]: voice_mic  pass
+Oct 20 12:21:16 lamp-06c1 lamp-selftest[3007]: speaker    not checked asked only at the factory and on demand: a passive run asks the voice nothing
+Oct 20 13:37:40 lamp-06c1 lamp-selftest[10575]: voice_mic  pass
+Oct 20 13:37:40 lamp-06c1 lamp-selftest[10575]: speaker    not checked asked only at the factory and on demand: a passive run asks the voice nothing
+voice_mic  pass
+room_mic   pass
+air        not fitted  no air sensor has answered since lamp-air started (lamp-air: not fitted: no air sensor has answered since start)
+touch      pass        idle
+board      pass
+camera     pass
+base_yaw   pass
+shoulder   pass
+elbow      pass
+head_roll  pass
+head_pitch pass
+ring       not checked listened only: the ring's owner runs, and what it draws cannot be read back
+speaker    not checked asked only at the factory and on demand: a passive run asks the voice nothing
+head_move  not checked never moved at first boot: only at the factory and when asked
+storage    not checked no fault in the kernel's log, but it no longer holds all of this boot (first record kept: 45541)
+selftest   not checked in 2 s
+0
+usage: lamp-selftest [--occasion factory|first-boot|on-demand] [--dir ABSOLUTE] [--bus-root ABSOLUTE]
+
+Checks each part of the lamp within two minutes and says pass, fail,
+not fitted or not checked for each, with one reason. The report is kept in
+--dir (default /var/lib/lampOS/selftest) and published on lamp/selftest.
+
+Exit status: 0 every part passed or is not fitted, 1 a part failed,
+3 a part could not be checked, 2 the arguments were wrong.
+4382b6c2c551409797a4b19614a27349a3c83eff7b993531bc9df0a3940f2594
+5f97cebbf882aa8b01763bd43cc905edced4d10b109ce0de0f6949cf104aecb5
+current
+4382b6c2c551409797a4b19614a27349a3c83eff7b993531bc9df0a3940f2594
+8
+NEXT                        LEFT          LAST PASSED UNIT                ACTIVATES
+Tue 2026-10-20 14:19:37 +07 1min 33s left -    -      lamp-selftest.timer lamp-selftest.service
+
+{"ok":true,"people":[{"bytes":655,"exchanges":14,"kept":2,"newest_day":"2026-10-20","oldest_day":"2026-10-20","person":"everyone","skipped_lines":0}]}
+17 1792479839346
+18 1792480135353
+Oct 20 14:15:32 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 2: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+Oct 20 14:15:32 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 2: the model is told the lamp's name was heard
+Oct 20 14:15:32 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 2: its answer is played: its name was heard in the room's sound
+Oct 20 14:15:32 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 2: only the lamp's name was said, and the model is told so
+Oct 20 14:15:32 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat request 22196 bytes, 5 messages, 32 tools; its answer began in 859 ms; the first request of this client
+Oct 20 14:15:33 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 2 chat round 1 first event in 1372 ms
+Oct 20 14:15:33 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat answer: its first words or call 1348 ms and its end 1415 ms after it was asked; 5552 prompt tokens, 128 from the cache, 5424 not; 2 completion tokens
+Oct 20 14:15:33 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 2 first piece to the voice 1439 ms after the words were heard, 1 words
+Oct 20 14:15:34 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 2 ElevenLabs piece 1: 4 chars, sent 1439 ms after the words were heard on a new connection; its first audio byte 643 ms after it went
+Oct 20 14:15:34 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 2 first answer audio 2084 ms after the words were heard
+Oct 20 14:15:34 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 2 ElevenLabs: 1 of 1 pieces began, 0 on a reused connection, 4 chars; the first piece's first audio byte 643 ms after it went, the slowest 643 ms
+Oct 20 14:15:34 lamp-06c1 lamp-voice[20485]: lamp-voice provider: Days memory is answering
+Oct 20 14:15:34 lamp-06c1 lamp-voice[20485]: lamp-voice second: the down line is 2720 ms
+Oct 20 14:15:47 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 3: speech to text opened in 783 ms, 1080 ms of the line's sound waiting
+Oct 20 14:15:49 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 3 at the line's end: settled=false, speech_final=false, finals cover none of 1830 ms sent, pending=speech_started 160 ms after the last final, last final none, finalize answered in 261 ms to 1120 ms, results 0 with words, 3 without, words from=close_stream
+Oct 20 14:15:49 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 3 heard 0 words, the last 811 ms after the line ended
+Oct 20 14:15:51 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 4: speech to text opened in 733 ms, 980 ms of the line's sound waiting
+Oct 20 14:15:52 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 4 at the line's end: settled=false, speech_final=false, finals cover none of 980 ms sent, pending=none, last final none, finalize answered in 438 ms to 290 ms, results 0 with words, 2 without, words from=close_stream
+Oct 20 14:15:52 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 4 heard 0 words, the last 1000 ms after the line ended
+Oct 20 14:16:03 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 5: speech to text opened in 716 ms, 1010 ms of the line's sound waiting
+Oct 20 14:16:07 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 5 at the line's end: settled=false, speech_final=false, finals cover none of 4920 ms sent, pending=speech_started 150 ms after the last final, last final none, finalize answered in 243 ms to 4920 ms, results 0 with words, 5 without, words from=finalize
+Oct 20 14:16:07 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 5 heard 0 words, the last 243 ms after the line ended
+Oct 20 14:17:12 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 6: speech to text opened in 676 ms, 950 ms of the line's sound waiting
+Oct 20 14:17:13 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 6 at the line's end: settled=false, speech_final=false, finals cover none of 950 ms sent, pending=none, last final none, finalize answered in 310 ms to 230 ms, results 0 with words, 3 without, words from=close_stream
+Oct 20 14:17:13 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 6 heard 0 words, the last 887 ms after the line ended
+Oct 20 14:20:19 lamp-06c1 lamp-selftest[22534]: voice_route fail        the second route's configuration /etc/lampOS/voice/second.json cannot be looked at: the voice does not start on the second route
+ls: cannot open directory '/etc/lampOS/voice/'User=lampos
+Group=lampos
+ProtectSystem=strict
+ProtectHome=yes
+: Permission denied
+Oct 20 14:14:09 lamp-06c1 lamp-voice[20485]: lamp-voice: the voice route is second only (LAMP_VOICE_ROUTE=second): speech to text, a text model and speech answer every turn; Gemini Live is not used
+Oct 20 14:14:09 lamp-06c1 lamp-voice[20485]: lamp-voice second: due reminders are said on this route, the lamp's only voice

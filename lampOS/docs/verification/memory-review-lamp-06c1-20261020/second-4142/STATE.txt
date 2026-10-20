@@ -1,0 +1,9 @@
+PAUSED 14:24 by main session (lamp speaker was off by accident; the first correction lines may not have played).
+Ran: step0 baseline; step1 remember (kept id 22, 14:20:53) + recall (req13: chat round 1 had not begun in 4500 ms, said it can't think right now; req15: recall -> search entries=1, answered, exchange id 23, append_linked);
+step2 correction said twice (req17 heard 0 words; req18 + req19 both called remember -> kept ids 24, 25: added, not replaced).
+Test's own kept ids so far: 22, 24, 25. Room entries NOT to touch: 17, 18.
+RESUMED 14:25. step2 recall req20: no memory call, answered (exchange 26), first audio 1729 ms after the words / ~3.2 s after say end.
+step3 remember req21 -> kept 27; conversation_end at 14:25:58 (1.3 s after answer, not after idle); no session_open logged; 74 s silence; req23/24 suggestion: no memory call, answered (exchange 28, 0 words heard).
+step4 forget req26 -> forget_last (removed 27, the step3 entry, not 22/24/25); then conversation_end refused bad_request ("memory conversation end was not acknowledged"); 22/24/25 remained. Neutral req27, req28 answered, 0 append/append_linked. "memory journal stopped" count 0.
+step5 probe-tools needs deepseek.key (direct API); lamp has relay credential only -> not run.
+step6 forget 22 (removed 3), 24 (1), 25 (1). status = baseline: kept 2 (17, 18), exchanges 14. Volume 50.
