@@ -453,6 +453,52 @@ a week.
   `/var/lib/lampos-cloud` (the later choice and the queue); the next setup
   asks again, default off.
 
+### Its files, one release forward (#2052)
+
+A build put back after a newer one ran reads what that build wrote
+([updates.md](updates.md), "Every part's saved data, one version ahead").
+Each case below is said once in the journal, as `lamp-cloud reports: …`.
+
+- **The choice, for privacy: what it can't read is off, never on.** Its own
+  `reports.json` with a field it doesn't know (only `share`, `at`, `by`,
+  `held` are), a `by` it doesn't know or a `held` that isn't a boolean
+  reads as off, whatever its `share` says, and is kept as it is, so a roll
+  forward reads it again. A newer record whose `share` isn't a boolean is
+  not kept in place: this build can't read it, so at start it is set aside
+  and an off written, as below. That fails safe; a roll forward reads the
+  off. Setup's with a field beyond `share`, `asked` and
+  `at` reads as off too; `asked` above 1 is still the re-ask, as before. A
+  file it can't read at all (not JSON, cut short, no boolean `share`, can't
+  be opened) reads as off: its own never falls through to setup's older
+  yes. At start its own is set aside whole as `reports.json.unread-<s>` and
+  an off (`by` null) written in its place; nothing is sent for it, not even
+  `stopped`. Setup's is root's in `/etc`, which `lamp-cloud` can't write,
+  so it is left there.
+- **A no over a record it can't settle:** a newer build's record or one
+  spoiled while running reads as off here, but may be a yes to the build
+  that wrote it, so it is not taken for a no already given. The voice's
+  and the app's no are both written, delete what waits (the newer build's
+  kept reports too) and queue `stopped`, sent twice as any no's.
+- **The queue:** a report under `lamp-report/1` with a field it doesn't
+  know is sent as is, the newer build's own report under the schema the
+  backend agreed. A higher `schema`, or a `kind` it doesn't have, is kept
+  where it is and **not sent**: the backend has agreed only `lamp-report/1`'s
+  kinds, and one it can't take would be acknowledged by the broker and
+  lost all the same; the newer build sends it when it is back. A no deletes
+  those too. A file it can't read (not JSON, cut short, over 4 KiB, no
+  `sent_at`) is set aside whole as `<seq>.json.unread-<s>`, never sent, and
+  the rest are read. `state.json` reads a field added or gone; one it can't
+  read is set aside whole as `state.json.unread-<s>`, and the next `seq`
+  goes past every report still on flash. With the queue empty too, `seq`
+  starts again at 1, so a seq can be used again; that is harmless, since
+  the backend drops a duplicate by `(device, seq, sent_at)` and `sent_at`
+  differs.
+- **The exit notes:** a field added reads; a note it can't read is skipped
+  and left whole, since the folder is root's and goes at the next boot.
+- **The journal** names the file and why, and a JSON error by its kind,
+  line and column only (#2061's rule): never a value from the file, a
+  newer `by`, `schema` or `kind` included.
+
 On the bus: `reports/request` (`ReportsRequest {share}`, an event) and
 `reports/state` (`ReportsState {share, queued, by, held, at_s}`, kept,
 every 5 s, lasting 15 s), in [msgs.md](msgs.md). `lamp-cloud` keeps `by`,
@@ -661,6 +707,17 @@ line; the lists against the product's units; `reports.get` and
 report on `fd/…/report` with `info`'s id leaving the queue on the ack, and
 sent again after a dropped connection. `tests/report_contract.rs` pins the
 fields by name and type, the topic, and `sent_at` kept on a send again.
+One release forward (#2052): a choice it can't read (cut short, garbage,
+empty, no boolean `share`, spoiled while running) is off, kept whole and
+said once; a newer build's choice, own or setup's, reads off and is left
+as it is; queued reports with a newer field (sent), a newer schema or kind
+(kept, not sent, deleted by a no), cut short or garbage (set aside whole),
+with the next `seq` past them all; `state.json` with a field added or gone,
+or unreadable (set aside); exit notes unreadable (skipped once, left whole)
+or with a newer field (taken). A no, the voice's and the app's, over a
+newer build's yes or a choice spoiled while running is written, deletes
+what waits and sends `stopped` twice; a value planted in `state.json`, a
+queued report, an exit note and a newer `by` never reaches the journal.
 
 The skills page (#1722): the reply's shape; a core skill never removable
 and an installed one removable; a skill made here in its own group; each
