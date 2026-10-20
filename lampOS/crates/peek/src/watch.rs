@@ -1,9 +1,10 @@
 //! What the page keeps of the bus's events: a count and the last time for
-//! each topic, a short tail of what came, and the eyes' last word on the
-//! camera. Of each message it keeps only what [`what`] says of it: never
-//! the words of `voice/heard` or `voice/said`, never a diagnostic's message.
+//! each topic, a short tail of what came, the eyes' last word on the
+//! camera and the body's on itself. Of each message it keeps only what
+//! [`what`] says of it: never the words of `voice/heard` or `voice/said`,
+//! and of the diagnostics only the body's own sentence ([`body_of`]).
 use lamp_bus::{Bus, Message};
-use lamp_msgs::{Diagnostic, Speech, VoiceTurn};
+use lamp_msgs::{Diagnostic, Level, Speech, VoiceTurn};
 use std::{
     collections::{BTreeMap, VecDeque},
     io,
@@ -35,6 +36,68 @@ const CAMERA: &str = "camera";
 /// The camera's states as the eyes say them (`crates/eyes/src/bus_out.rs`,
 /// `health`). Any other value is not taken.
 const CAMERA_STATES: [&str; 4] = ["open", "closed", "not opening", "failed"];
+/// The part whose diagnostics say how the body is.
+const BODY: &str = "body";
+/// The body's values the page shows, by key, and nothing else of them.
+pub const BODY_VALUES: [&str; 7] = [
+    lamp_keeper::STATE,
+    "mood",
+    "standing",
+    "warmest_joint",
+    "warmest_reading",
+    "resisted_last_minute",
+    "resisted_since_start",
+];
+/// The body's state when the report is its last, as it stops.
+const STOPPING: &str = "stopping";
+
+/// The body's own word on how it is (`diagnostics`, sent by the body,
+/// about the body): its level and sentence, the values of
+/// [`BODY_VALUES`], and its last stop with when it came.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BodyReport {
+    pub level: Level,
+    pub message: String,
+    pub values: Vec<(String, String)>,
+    pub last_stop: Option<(String, u64)>,
+}
+
+/// The body's report in `message`, when it is one: sent by the body,
+/// about the body. `before` is the report it replaces, whose last stop it
+/// keeps.
+pub fn body_of(message: &Message, before: Option<&BodyReport>) -> Option<BodyReport> {
+    if message.header.source != BODY {
+        return None;
+    }
+    let diagnostic = message.parse::<Diagnostic>().ok()?;
+    if diagnostic.name != BODY {
+        return None;
+    }
+    let values: Vec<(String, String)> = BODY_VALUES
+        .iter()
+        .filter_map(|key| {
+            diagnostic
+                .values
+                .iter()
+                .find(|value| value.key == *key)
+                .map(|value| ((*key).to_owned(), plain(&value.value)))
+        })
+        .collect();
+    let stopping = values
+        .iter()
+        .any(|(key, value)| key == lamp_keeper::STATE && value == STOPPING);
+    let last_stop = if stopping {
+        Some((diagnostic.message.clone(), message.header.at_unix_ms))
+    } else {
+        before.and_then(|before| before.last_stop.clone())
+    };
+    Some(BodyReport {
+        level: diagnostic.level,
+        message: diagnostic.message,
+        values,
+        last_stop,
+    })
+}
 
 /// One message of the tail, as the page shows it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,6 +122,8 @@ pub struct Seen {
     pub tail: VecDeque<Line>,
     /// The eyes' last word on the camera, and when it came.
     pub camera: Option<(String, Instant)>,
+    /// The body's last word on itself.
+    pub body: Option<BodyReport>,
 }
 
 impl Seen {
@@ -72,6 +137,11 @@ impl Seen {
             && let Some(state) = camera_of(message)
         {
             self.camera = Some((state, now));
+        }
+        if header.topic == Diagnostic::TOPIC
+            && let Some(report) = body_of(message, self.body.as_ref())
+        {
+            self.body = Some(report);
         }
         self.tail.push_back(Line {
             at_unix_ms: header.at_unix_ms,

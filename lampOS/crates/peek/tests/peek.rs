@@ -2,16 +2,17 @@
 //! HTTP as a browser asks it: the test plays the eyes and the voice.
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{
-    BodyOffsets, Diagnostic, ExpressionBody, ExpressionGaze, ExpressionLease, Face, Faces, Level,
-    RoomPresence, Speech, VoiceState,
+    BodyOffsets, Diagnostic, ExpressionBody, ExpressionGaze, ExpressionLease, Face, Faces, Health,
+    HealthItem, JointState, Level, RoomPresence, Speech, VoiceState,
 };
 use lamp_peek::{
+    page,
     serve::{self, Peek},
     units::UnitRow,
     watch::{self, Seen},
 };
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     io::{Read, Write},
     net::TcpStream,
@@ -596,4 +597,233 @@ fn ended(mut command: Command) -> (Option<i32>, String) {
         output.status.code(),
         String::from_utf8_lossy(&output.stderr).into_owned(),
     )
+}
+
+/// The one page's stream, read as a browser's `EventSource` reads it,
+/// until every section has come at least once since `wanted` was first in
+/// one: each section's newest HTML, by its name.
+fn stream_until(rig: &Rig, headers: &str, wanted: &str) -> BTreeMap<String, String> {
+    let mut stream = TcpStream::connect(("127.0.0.1", rig.port)).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_millis(200)))
+        .unwrap();
+    write!(
+        stream,
+        "GET /events HTTP/1.1\r\nHost: localhost\r\n{headers}\r\n"
+    )
+    .unwrap();
+    let started = Instant::now();
+    let mut text = String::new();
+    let mut buffer = [0; 8192];
+    loop {
+        match stream.read(&mut buffer) {
+            Ok(0) => panic!("the stream ended: {text}"),
+            Ok(read) => text.push_str(&String::from_utf8_lossy(&buffer[..read])),
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) => {}
+            Err(error) => panic!("{error}"),
+        }
+        let sections = sections_in(&text);
+        let done = sections.values().any(|html| html.contains(wanted))
+            && page::SECTIONS
+                .iter()
+                .all(|(id, _)| sections.contains_key(*id));
+        if done {
+            return sections;
+        }
+        assert!(
+            started.elapsed() < WAIT,
+            "the stream never held {wanted:?}: {text}"
+        );
+    }
+}
+
+/// Each event's newest data in a stream's text, by the event's name.
+fn sections_in(text: &str) -> BTreeMap<String, String> {
+    let mut sections = BTreeMap::new();
+    let body = text.split_once("\r\n\r\n").map_or("", |(_, body)| body);
+    for event in body.split("\n\n") {
+        let mut name = None;
+        let mut data = Vec::new();
+        for line in event.lines() {
+            // A chunk's size line, between the stream's chunks.
+            if let Some(value) = line.strip_prefix("event: ") {
+                name = Some(value.to_owned());
+            } else if let Some(value) = line.strip_prefix("data: ") {
+                data.push(value);
+            }
+        }
+        if let Some(name) = name {
+            sections.insert(name, data.join("\n"));
+        }
+    }
+    sections
+}
+
+fn record(file: &Path, line: &str) {
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(file)
+        .unwrap();
+    writeln!(file, "{line}").unwrap();
+}
+
+/// #2141's second step (the lead on #1711, 20 Oct): the one page's stream
+/// carries every section, each turn's steps from the voice's own records
+/// with the slowest marked and why a turn held, the joints against where
+/// they were asked to be, the body's own word, and each part's health as
+/// it says it, escaped. A word heard, said, or in a record never reaches
+/// it; another part speaking as the body is not taken.
+#[test]
+fn the_one_page_streams_each_section_and_never_a_word() {
+    const WORD: &str = "Ossifrage";
+    let rig = Rig::new("one", None);
+    let session = rig.root.join("sessions/s1/metadata");
+    fs::create_dir_all(&session).unwrap();
+    let events = session.join("events-1.jsonl");
+    for line in [
+        r#"{"kind":"input_admitted","turn":4,"admission_basis":"local_speech","at_us":1}"#,
+        r#"{"kind":"transcript","turn":4,"text":"Ossifrage","at_us":2}"#,
+        r#"{"kind":"answer_stages","turn":4,"words_ms":300,"cue_ms":null,"chat_first_ms":900,"first_answer_audio_ms":1400}"#,
+        r#"{"kind":"turn_finished","turn":4,"outcome":"audio_written_unscored"}"#,
+        r#"{"kind":"input_admitted","turn":5,"admission_basis":"lamp_speaks_first","at_us":1}"#,
+        r#"{"kind":"floor_held","turn":5,"at_us":3}"#,
+    ] {
+        record(&events, line);
+    }
+    let mut heard = rig.publisher(Speech::TOPICS[0], &Speech::declaration(), "voice");
+    heard
+        .publish_json(
+            1,
+            &Speech {
+                text: WORD.into(),
+                finished: true,
+                request: Some(4),
+                locale: Some("en-US".into()),
+            },
+        )
+        .unwrap();
+    let mut diagnostics = rig.publisher(Diagnostic::TOPIC, &Diagnostic::declaration(), "eyes");
+    eyes_say(&mut diagnostics, "open");
+    let mut joints = rig.publisher(JointState::TOPIC, &JointState::declaration(), "body");
+    joints
+        .publish_json(
+            1,
+            &JointState {
+                name: vec!["base_yaw".into(), "elbow".into()],
+                position: vec![0.10, 1.00],
+                velocity: Vec::new(),
+                effort: vec![0.05, 0.40],
+                commanded: vec![0.10, 0.80],
+            },
+        )
+        .unwrap();
+    let mut body = rig.publisher(Diagnostic::TOPIC, &Diagnostic::declaration(), "body");
+    body.publish_json(
+        1,
+        &Diagnostic::new(
+            Level::Warn,
+            "body",
+            "a joint met resistance and stopped pushing, 1 time in the last minute",
+        )
+        .with("state", "ready")
+        .with("standing", "0.95")
+        .with("resisted_last_minute", 1)
+        .with("note", WORD),
+    )
+    .unwrap();
+    // Another part saying it is the body is not taken.
+    let mut other = rig.publisher(Diagnostic::TOPIC, &Diagnostic::declaration(), "voice");
+    other
+        .publish_json(1, &Diagnostic::ok("body").with("standing", "0.11"))
+        .unwrap();
+    let mut health = rig.publisher(Health::TOPIC, &Health::declaration(), "health");
+    health
+        .publish_json(
+            1,
+            &Health {
+                level: Level::Warn,
+                message: "controls: head pads 97 of 98 wired".into(),
+                items: vec![
+                    HealthItem {
+                        name: "controls".into(),
+                        level: Level::Warn,
+                        message: "head pads 97 of 98 wired <script>alert(1)</script>".into(),
+                        age_ms: 1_200,
+                    },
+                    HealthItem {
+                        name: "voice".into(),
+                        level: Level::Ok,
+                        message: String::new(),
+                        age_ms: 300,
+                    },
+                ],
+                missing: vec!["eyes2".into()],
+                quiet_ms: 0,
+            },
+        )
+        .unwrap();
+    let sections = stream_until(&rig, "", "ready");
+    let all = format!("{sections:?}");
+    assert!(!all.contains(WORD), "{all}");
+    assert!(!all.contains("<script>"), "{all}");
+    let turns = &sections["turns"];
+    // Turn 4: 300, then 600 to the first token, the slowest, then 500.
+    assert!(
+        turns.contains("300 ms") && turns.contains("900 ms (600)"),
+        "{turns}"
+    );
+    assert!(
+        turns.contains("<td class=\"slow\" title=\"first token\">"),
+        "{turns}"
+    );
+    assert!(turns.contains("played"), "{turns}");
+    assert!(
+        turns.contains("lamp_speaks_first") && turns.contains("the busy room held the floor"),
+        "{turns}"
+    );
+    let body = &sections["body"];
+    assert!(body.contains("<td>elbow</td>"), "{body}");
+    assert!(body.contains("0.200"), "the elbow is off by 0.2: {body}");
+    assert!(body.contains("0.95") && !body.contains("0.11"), "{body}");
+    assert!(body.contains("met resistance"), "{body}");
+    let health = &sections["health"];
+    assert!(
+        health.contains("head pads 97 of 98 wired &lt;script&gt;"),
+        "{health}"
+    );
+    assert!(health.contains("Never heard from: eyes2"), "{health}");
+    let overview = &sections["overview"];
+    assert!(overview.contains("camera open"), "{overview}");
+    assert!(overview.contains("newest 1400 ms"), "{overview}");
+    assert!(
+        sections["camera"].contains("<svg"),
+        "{:?}",
+        sections["camera"]
+    );
+    // The one page, asked for as a browser does, is only the frame the
+    // stream fills.
+    let (status, page) = rig.get("/");
+    assert_eq!(status, 200);
+    assert!(page.contains("new EventSource('/events')"), "{page}");
+    assert!(!page.contains(WORD), "{page}");
+}
+
+/// The stream answers only GET, and with a token only with it.
+#[test]
+fn the_stream_reads_only_and_asks_for_the_token() {
+    let rig = Rig::new("stream", Some(TOKEN));
+    for method in ["POST", "PUT", "DELETE", "PATCH"] {
+        let (status, _, _) = rig.ask(method, "/events", &format!("Cookie: peek={TOKEN}\r\n"), "");
+        assert_eq!(status, 405, "{method}");
+    }
+    let (status, _, body) = rig.ask("GET", "/events", "", "");
+    assert_eq!(status, 401, "{body}");
+    assert!(!body.contains("event:"), "{body}");
+    let sections = stream_until(&rig, &format!("Cookie: peek={TOKEN}\r\n"), "<th>voice</th>");
+    assert!(sections.contains_key("overview"));
 }

@@ -1,12 +1,14 @@
-//! The server: four views, each read-only and asked for with GET, and the
-//! token's one form. With a token, every view asks for it: in the
-//! `Authorization` header, or once in the form's body and then in a cookie,
-//! never in the address (the first builder on #2141, 10:26: an address
-//! lands in a browser's history and a proxy's log). Without one, it answers
-//! only to this machine's own names in `Host`, so that no other page in
-//! the browser can reach it under a name of its own (DNS rebinding; the
-//! reviewer on #2150, P3 6).
+//! The server: the one page and its event stream, and three views, each
+//! read-only and asked for with GET, and the token's one form. With a
+//! token, every view asks for it: in the `Authorization` header, or once
+//! in the form's body and then in a cookie, never in the address (the
+//! first builder on #2141, 10:26: an address lands in a browser's history
+//! and a proxy's log). Without one, it answers only to this machine's own
+//! names in `Host`, so that no other page in the browser can reach it
+//! under a name of its own (DNS rebinding; the reviewer on #2150, P3 6).
 use crate::{
+    page,
+    turns::{Turn, Turns},
     units::{self, UnitRow},
     view,
     watch::Seen,
@@ -17,11 +19,16 @@ use axum::{
     extract::{Request, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     middleware::{self, Next},
-    response::{Html, IntoResponse, Redirect, Response},
+    response::{
+        Html, IntoResponse, Redirect, Response,
+        sse::{Event, Sse},
+    },
     routing::{get, post},
 };
+use futures_util::stream::{self, Stream, StreamExt};
 use lamp_bus::Bus;
 use std::{
+    convert::Infallible,
     path::PathBuf,
     sync::{Arc, Mutex, PoisonError},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -39,10 +46,13 @@ const LOCAL: [&str; 3] = ["127.0.0.1", "localhost", "[::1]"];
 /// `/status`'s rows and the end-of-speech worker's state, as read.
 type Status = (Vec<UnitRow>, Option<(String, u64)>);
 
-/// What the server holds: what the views read, and `/status` as last read.
+/// What the server holds: what the views read, `/status` as last read, and
+/// the turns read so far with when they were last read on.
 struct Served {
     peek: Arc<Peek>,
     status: Mutex<Option<(Instant, Status)>>,
+    turns: Arc<Mutex<Turns>>,
+    turns_read: Mutex<Option<Instant>>,
 }
 
 /// What the views read.
@@ -62,9 +72,12 @@ pub fn router(peek: Arc<Peek>) -> Router {
     let served = Arc::new(Served {
         peek,
         status: Mutex::new(None),
+        turns: Arc::default(),
+        turns_read: Mutex::new(None),
     });
     Router::new()
         .route("/", get(index))
+        .route("/events", get(events))
         .route("/cam", get(cam))
         .route("/cam.svg", get(cam_svg))
         .route("/bus", get(bus))
@@ -228,7 +241,7 @@ fn form_decoded(value: &str) -> String {
 }
 
 async fn index() -> Html<String> {
-    Html(view::index_page())
+    Html(page::main_page())
 }
 
 async fn cam() -> Html<String> {
@@ -236,23 +249,11 @@ async fn cam() -> Html<String> {
 }
 
 async fn cam_svg(State(served): State<Arc<Served>>) -> Response {
-    let peek = &served.peek;
-    let camera = {
-        let seen = peek.seen.lock().unwrap_or_else(PoisonError::into_inner);
-        view::camera(seen.camera.as_ref(), Instant::now())
-    };
-    let read = |topic| peek.bus.latest(topic).ok().flatten();
-    let svg = match camera {
-        Ok(()) => view::cam_svg(
-            Ok(()),
-            read(lamp_msgs::Faces::TOPIC).as_ref(),
-            read(lamp_msgs::ExpressionBody::TOPIC).as_ref(),
-            read(lamp_msgs::RoomPresence::TOPIC).as_ref(),
-        ),
-        // With the camera not open, nothing of what it saw is read.
-        Err(why) => view::cam_svg(Err(why), None, None, None),
-    };
-    ([(header::CONTENT_TYPE, "image/svg+xml")], svg).into_response()
+    (
+        [(header::CONTENT_TYPE, "image/svg+xml")],
+        frame(&served.peek),
+    )
+        .into_response()
 }
 
 async fn bus(State(served): State<Arc<Served>>, request: Request) -> Html<String> {
@@ -279,29 +280,172 @@ async fn bus(State(served): State<Arc<Served>>, request: Request) -> Html<String
     ))
 }
 
-/// The units as last read, read again once they are [`STATUS_KEPT`] old.
 async fn status(State(served): State<Arc<Served>>) -> Html<String> {
+    let (at, (rows, endpoint)) = status_now(&served).await;
+    Html(view::status_page(&rows, endpoint.as_ref(), at.elapsed()))
+}
+
+/// How often the stream pushes the camera's frame; the other sections go
+/// with every [`SECTIONS_EVERY`]th push, once a second.
+pub const PUSH_EVERY: Duration = Duration::from_millis(250);
+pub const SECTIONS_EVERY: u32 = 4;
+
+/// The units as last read, read again once they are [`STATUS_KEPT`] old.
+async fn status_now(served: &Arc<Served>) -> (Instant, Status) {
     let kept = served
         .status
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clone()
         .filter(|(at, _)| at.elapsed() < STATUS_KEPT);
-    let (at, (rows, endpoint)) = match kept {
-        Some(kept) => kept,
-        None => {
-            let (units, sessions) = (Arc::clone(&served.peek.units), served.peek.sessions.clone());
-            let read =
-                tokio::task::spawn_blocking(move || (units(), units::endpoint_worker(&sessions)))
-                    .await
-                    .unwrap_or_default();
-            let at = Instant::now();
-            *served.status.lock().unwrap_or_else(PoisonError::into_inner) =
-                Some((at, read.clone()));
-            (at, read)
+    if let Some(kept) = kept {
+        return kept;
+    }
+    let (units, sessions) = (Arc::clone(&served.peek.units), served.peek.sessions.clone());
+    let read = tokio::task::spawn_blocking(move || (units(), units::endpoint_worker(&sessions)))
+        .await
+        .unwrap_or_default();
+    let at = Instant::now();
+    *served.status.lock().unwrap_or_else(PoisonError::into_inner) = Some((at, read.clone()));
+    (at, read)
+}
+
+/// The turns, read on in the newest session first, at most once a second
+/// whoever asks.
+async fn turns_now(served: &Arc<Served>) -> Vec<Turn> {
+    let due = {
+        let mut read = served
+            .turns_read
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let due = read.is_none_or(|at| at.elapsed() >= Duration::from_secs(1));
+        if due {
+            *read = Some(Instant::now());
         }
+        due
     };
-    Html(view::status_page(&rows, endpoint.as_ref(), at.elapsed()))
+    if due {
+        let (turns, sessions) = (Arc::clone(&served.turns), served.peek.sessions.clone());
+        let _ = tokio::task::spawn_blocking(move || {
+            turns
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .read_on(&sessions);
+        })
+        .await;
+    }
+    served
+        .turns
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .newest()
+}
+
+/// The camera's frame now, as `/cam.svg` draws it.
+fn frame(peek: &Peek) -> String {
+    let camera = {
+        let seen = peek.seen.lock().unwrap_or_else(PoisonError::into_inner);
+        view::camera(seen.camera.as_ref(), Instant::now())
+    };
+    let read = |topic| peek.bus.latest(topic).ok().flatten();
+    match camera {
+        Ok(()) => view::cam_svg(
+            Ok(()),
+            read(lamp_msgs::Faces::TOPIC).as_ref(),
+            read(lamp_msgs::ExpressionBody::TOPIC).as_ref(),
+            read(lamp_msgs::RoomPresence::TOPIC).as_ref(),
+        ),
+        // With the camera not open, nothing of what it saw is read.
+        Err(why) => view::cam_svg(Err(why), None, None, None),
+    }
+}
+
+/// One push of the stream: the camera's frame, and with every
+/// [`SECTIONS_EVERY`]th the other sections.
+async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
+    let peek = &served.peek;
+    let mut events = vec![
+        Event::default()
+            .event("camera")
+            .data(page::camera(&frame(peek))),
+    ];
+    if !count.is_multiple_of(SECTIONS_EVERY) {
+        return events;
+    }
+    let turns = turns_now(served).await;
+    let (_, (units, _)) = status_now(served).await;
+    let read = |topic| peek.bus.latest(topic).ok().flatten();
+    let camera = {
+        let seen = peek.seen.lock().unwrap_or_else(PoisonError::into_inner);
+        view::camera(seen.camera.as_ref(), Instant::now())
+    };
+    // With the camera not open, nothing of what it saw is read.
+    let (faces, body, presence) = match camera {
+        Ok(()) => (
+            read(lamp_msgs::Faces::TOPIC),
+            read(lamp_msgs::ExpressionBody::TOPIC),
+            read(lamp_msgs::RoomPresence::TOPIC),
+        ),
+        Err(_) => (None, None, None),
+    };
+    let (voice, health, joints) = (
+        read(lamp_msgs::VoiceState::TOPIC),
+        read(lamp_msgs::Health::TOPIC),
+        read(lamp_msgs::JointState::TOPIC),
+    );
+    let report = peek
+        .seen
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .body
+        .clone();
+    let overview = page::overview(&page::Glance {
+        voice: voice.as_ref(),
+        faces: faces.as_ref(),
+        body: body.as_ref(),
+        presence: presence.as_ref(),
+        camera: &camera,
+        health: health.as_ref(),
+        turns: &turns,
+        units: &units,
+    });
+    events.push(Event::default().event("overview").data(overview));
+    events.push(Event::default().event("turns").data(page::turns(&turns)));
+    events.push(Event::default().event("body").data(page::body(
+        joints.as_ref(),
+        report.as_ref(),
+        now_unix_ms(),
+    )));
+    events.push(
+        Event::default()
+            .event("health")
+            .data(page::health(health.as_ref(), &units)),
+    );
+    events
+}
+
+fn now_unix_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64)
+}
+
+/// The one page's stream: a push now, then every [`PUSH_EVERY`], for as
+/// long as the page is open.
+async fn events(
+    State(served): State<Arc<Served>>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let pushes = stream::unfold((served, 0u32), |(served, count)| async move {
+        if count > 0 {
+            tokio::time::sleep(PUSH_EVERY).await;
+        }
+        let events = push(&served, count).await;
+        Some((
+            stream::iter(events.into_iter().map(Ok)),
+            (served, count.wrapping_add(1)),
+        ))
+    });
+    Sse::new(pushes.flatten())
 }
 
 #[cfg(test)]
