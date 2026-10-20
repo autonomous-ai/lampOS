@@ -80,7 +80,7 @@ differs. Folders are what the unit makes or names.
 | eyes | `lamp-eyes` | orangepi, `video` | `/var/lib/lampos-eyes/` (0700, `people.json`); `/run/lampos-eyes/` (0755); the camera lock folder | two models, `/opt/lampOS/eyes/*.onnx`, outside the build's folder | `permit.sock`, `who.sock`, `present`, `known`, `sight.jpg` |
 | name | `lamp-name` | orangepi | none | models, `/opt/lampOS/name/models`, outside the build's folder | the bus |
 | expression | `lamp-expression serve` | orangepi | none | a catalogue, `/opt/lampOS/expression/catalogues/*.json` | the bus |
-| actions | `lamp-actions` | orangepi, `audio` | `/run/lampos-actions/` (0755) | none | its folder; the bus |
+| actions | `lamp-actions` | orangepi, `audio` (product: lampos, `audio`) | `/run/lampos-actions/` (0755); product: `/var/lib/lampos-output-caps/` (0700) | none | its folder; the bus |
 | memory | `lamp-memory` | orangepi (`@MEMORY_USER@`: its own) | `/var/lib/lampos-memory/` (0700); `/run/lampos-memory/` | none | `memory.sock` |
 | policy | `lamp-policy` | orangepi (template: `DynamicUser=yes`) | `/var/lib/lampos-policy/` (0700) | the judge's key, `/etc/lampOS/policy/jev.key`, as a systemd credential | the bus |
 | health | `lamp-health serve` | orangepi | none | none: what it expects is options | the bus |
@@ -96,7 +96,7 @@ differs. Folders are what the unit makes or names.
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
 | update | `lamp-update serve` | root | `/var/lib/lampos-update/` (0700) | `/etc/lampOS/update/key.pub` | none |
 | keeper | `lamp-keeper serve` | root | its service data folder | none | `lampos.target.d/keeper.conf`; the bus root |
-| skills | `lamp-skills` | lampos (product unit, #811) | `/run/lampos-skills/` (0755) | the skill folders, `/var/lib/lampOS/skills/` (every product skill from install) | its tools for the voice, `tools.json` and `call.sock` in its folder |
+| skills | `lamp-skills` | lampos (product unit, #811) | `/var/lib/lampos-skills-state/` (0700, `daily.json`); `/run/lampos-skills/` (0755, runtime) | the skill folders, `/var/lib/lampOS/skills/` (every product skill from install) | its tools for the voice, `tools.json` and `call.sock` in its runtime folder |
 | surround | `lamp-surround serve` | `@SURROUND_USER@` | not read for this page | `/etc/lampos/surround.json` (lower case, unlike every other part) | not read |
 
 The bus root, `/run/lampos-bus`, is made by the keeper (root, the parts'
@@ -197,9 +197,13 @@ voice's own hello is off, as lamp-4ace now has it too.
 **19 October: every behaviour that has a skill runs as the skill** (the
 owner: "everything is a skill"). Install puts every product skill in
 `/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`):
-Welcome back, Reminders, Task news, Stretch break, Stuffy air and Dance,
-each folder whole but for its `tests/`. The voice's own paths for them give
-way in the product's `lamp-voice.service`: its hello stays off
+eight folders are installed, with seven enabled. Welcome back, Reminders,
+Task news, Onboarding, Stretch break, Stuffy air and Dance keep their enabled
+defaults.
+Bedtime and Morning is included with `enabled = false`, awaiting its lamp
+comparison (#1672); it adds no active trigger or advertised tool. Each
+folder is installed whole but for its `tests/`. The voice's own paths still
+give way in the product's `lamp-voice.service`: its hello stays off
 (`LAMP_SPEAK_FIRST` unset), and `LAMP_SCHEDULE_SPEAK=skill` and
 `LAMP_TASK_NEWS=skill` make a due reminder and the news of a task wait up
 to 10 s for the skill's ask (`from = "schedule"`, `from = "tasks"`). The
@@ -236,6 +240,10 @@ or the count changes). The voice leaves out by order, without a word, what
 is past 32, so Desk tutor's two would push its marks' `show_verdict` out. lamp-4ace's
 own unit keeps `LAMP_SCHEDULE_SPEAK=on` and the voice's own news until the
 skills have run there; the voice's own code for them is removed after.
+
+Light scenes, Point the light and Light show (#1679) also stay out pending
+lamp qualification and room for their tools in the product session.
+
 Install only writes skills, never removes one: a skill later moved out of
 `PRODUCT_SKILLS`, or a file dropped from a skill's folder, stays on every
 lamp installed before and keeps running. Taking a skill out is the removal
@@ -248,6 +256,24 @@ onboarding switch, Controls' privacy receipts (`LAMP_PRIVACY_CONTROLS=on`,
 which the product unit doesn't set), valid hardware profile and pending
 invitation. Private progress lives under `/var/lib/lampOS/voice/onboarding/`;
 factory reset wipes that state, not the skill package.
+
+The product units also name private durable stores for
+[Bedtime and Morning](bedtime-morning.md). Skills is given
+`Environment=LAMP_SKILLS_DAILY_FILE=/var/lib/lampos-skills-state/daily.json`
+with `StateDirectory=lampos-skills-state`; Actions is given
+`Environment=LAMP_OUTPUT_CAPS_DIR=/var/lib/lampos-output-caps` with
+`StateDirectory=lampos-output-caps`. Both declare
+`StateDirectoryMode=0700` and run as `lampos`; systemd creates and owns these
+directories when their services start. Install writes the unit declarations,
+not the runtime journals. The paths do not enable a feature:
+`LAMP_SKILL_ROUTINES`, `LAMP_REST_REQUESTS` and `LAMP_OUTPUT_CAPS` remain
+unset in the product units, and the new skill remains disabled. Actions
+requires its caps directory only when `LAMP_OUTPUT_CAPS=on`.
+The paths come as `Environment=` lines, not as the binaries' `--daily-state`
+and `--caps-dir` options, so an older Actions or Skills from the channel
+ignores them and starts as before (#2157). Factory reset empties both durable directories, including
+interrupted writes and state kept aside, while retaining the private
+directories ([setup.md](setup.md)).
 
 **17 October: lamp-4ace's switches of that day became the product's** (joining.md's rule), taken from lamp-4ace's unit as it ran that day; most were switched on there on 16 or 17 October, several only as part of the groups of #1238's census, so their lamp record is that day's running, not a run of their own. They're the switch groups (lead-in to a tool, a waited answer kept, the stop told, the asker first only recorded, names checked, the staff note, task news at a pause, memory rules), the light requests (the voice's ring and the skills' half, `lamp-skills.service`), the quiet pace, starting offline, the asleep ring, a sorry in another language, the lamp's name in passing ignored, first words kept, tasks asked and who asked, a cut keeping the name, the self-test's speaker, the stall recorder, the strong ring eye, and short sounds judged in a quiet room after a check. Not taken: those that need the second voice's configuration (stop words, its down-line and wait cue, the voice link), which a product lamp doesn't have; the office's own (its Harness target, its say group); head touch, which needs Controls' and Expression's flags as well (#711); those that need another part's flag the product doesn't pass (the Policy holding actions needs `lamp-policy --act attention`, its hello and progress news need `--hello` and `--progress`, the full look needs the eyes' `--full-look`, a restored mute needs `--controls-mute`); and "that was weird", a builder's review tool whose marks (`/var/lib/lampOS/voice/marked/`) the reset doesn't wipe. Expression's catalogue differs too (`expression-alive-name-speech` on
 lamp-4ace, `expression-alive` on lamp-52e6): the product takes lamp-4ace's, plus the `speaking` section (#933): the nods on stressed words, the base's sway between sentences (#1067) and the settle at the end, which no catalogue in `deploy/` had, so a product lamp only leaned while it spoke (the body's lean, #1010, needs no catalogue). `speaking_engine`'s `the_products_catalogue_nods_sways_and_settles_as_the_alive_one_does` holds the product's to the alive catalogue's.
@@ -809,6 +835,16 @@ The product units and settings are carried inside the program
 (`include_str!` of `deploy/product/`), so they are those of the commit the
 program was built from; the binaries are the channel's newest build.
 
+So a unit can meet a binary older than itself. `lamp-actions` and
+`lamp-skills` exit 2 on an option they don't know, and with
+`Restart=on-failure` they would loop, so their product units pass a new
+setting as an `Environment=` line, which an older binary ignores: the
+Bedtime and Morning stores come as `LAMP_SKILLS_DAILY_FILE` and
+`LAMP_OUTPUT_CAPS_DIR` (#2157). `lamp-update`'s
+`product_units_pass_only_options_an_older_binary_takes` holds both units'
+`ExecStart` to the options their binaries took before; a new option joins
+that list only once every channel carries a binary that takes it.
+
 ## Checking a lamp runs the product's units (`lamp-update check-units`)
 
 After an install (Sunday's B8 on #806), whether the owner tests what
@@ -1009,3 +1045,9 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   `LAMP_SKILLS_ASK=skip` until the Policy's gate (#939). Only in tests: no
   lamp has run the product unit with them yet, and Reminders and Task news
   have not run as skills on any lamp.
+- Bedtime and Morning (#1672): the seventh installed skill is disabled.
+  Host installation tests check that only six skills are active, the new
+  skill is absent from the live catalog, and the Skills and Actions units
+  declare their private durable paths without enabling any new switch.
+  The directories' creation by systemd and the routine's behavior on a lamp
+  still need the comparison recorded in [bedtime-morning.md](bedtime-morning.md).

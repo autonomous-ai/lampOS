@@ -260,6 +260,45 @@ is judged before anything is carried over. For V1's intent component
 | Six scenes (the seventh of the count may be the command that turns one off) | Rebuilt as a skill | Light scenes (`skills/light-scenes`, #1679): V1's six names and their order of brightness on the five levels, set as the person's own light through `light_colour` and the level steps, kept; reading and focus bring the head over the desk. Never the microphone, the camera or the speaker. Not in the product yet |
 | Following, music, "stop talking" | Not yet judged | Each when it is built |
 
+## Optional output ceilings (#1672)
+
+With exact `LAMP_OUTPUT_CAPS=on`, Actions also requires a caps directory,
+`LAMP_OUTPUT_CAPS_DIR=ABS` (as the product unit gives it) or `--caps-dir ABS`,
+which wins when both are given, and `--bus-root ABS`. The cap directory is durable and private, separate
+from the runtime socket directory. With the switch absent, it is not opened.
+The strict private socket operations are `caps_get`, `caps_put` with a `cap`
+object, and `caps_remove` with `source` and `token`. They are separate from
+`call`, have no model catalogue entry, and cannot be reached by `use_skill`.
+
+A cap has a source, token, issued Unix milliseconds, exclusive deadline,
+and at least one ceiling: `light_channel_max` (12–120) or `volume_raw_max`
+(1–100). At most eight source identities, including tombstones, are kept.
+A new request must be at most five seconds old; its lifetime is at most
+24 hours. Exact retries are idempotent, removed tokens cannot revive, and
+a replacement must be newer. Removal must name the current token.
+
+The existing Schedule store commits the complete cap state before success.
+Added fields in schema 1 are tolerated; unknown enum values, unsupported
+schemas and invalid state are preserved and refused. A storage error makes
+later snapshots unavailable until reopen. Initialized time means 2020–2099;
+it is a sanity check, not proof of synchronization. Unknown time retains
+restored restrictions and refuses new caps; an explicit token removal works.
+
+Startup restores and applies the volume restriction before readiness.
+Effective volume is the minimum of the product ceiling and active caps.
+Every setter obeys it. Entry never raises a quieter mixer or unmutes it;
+release never restores a saved volume. The reply separates durable acceptance,
+mixer readback and `output/caps` publication. Publishing does not prove ring
+output. Mixer failure keeps the restriction and retries no more often than
+once a second after the previous attempt. Successful `caps_get` reads are
+quiet in the journal; mutations report acceptance.
+
+The full `output/caps` Latest snapshot is published every second. The ring
+accepts only a fresh matching host/publisher stamp and persisted revision;
+silence or malformed input cannot remove an admitted restriction. Its startup
+stays dark until a valid snapshot arrives. See [Bedtime and Morning](bedtime-morning.md)
+for the skill, switches and the unperformed physical check.
+
 ## Not shown
 
 The 2026-10-14 Mac x86_64 checks passed 33 Actions tests, including 14 new

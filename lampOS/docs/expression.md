@@ -996,3 +996,90 @@ and observation; Fifth now owns Body and its separate lamp qualification.
 The recent-level addendum does not establish how the 100 ms tail looks, or
 validate First's planned earlier Voice publication. Its normalized levels
 remain speaker-owner reports.
+
+## Leased skill rest requests
+
+`LAMP_REST_REQUESTS=on` enables generic skill-owned rest intake. It is off
+for every other value. In this mode Skills chooses routine timing and
+Expression stops its automatic night/absence sleep and morning/face wake
+decisions. The existing renderer, name/touch/reminder/conversation reflexes,
+manual sleep and privacy behavior remain. `--enable` still independently
+controls actuator requests; the rest switch adds no writer or raw-joint
+interface. See [Bedtime and Morning](bedtime-morning.md) for the disabled
+core skill and its pending lamp comparison.
+
+`expression/rest_request` is a typed `Event`
+(`lamp_msgs/ExpressionRestRequest`, version 1), sent by one publisher named
+`skills`. The payload and nested stamp tolerate additive fields. Unknown
+`op` values are refused; required identities, clocks and lease bounds remain
+checked.
+
+| Field | Binding |
+|---|---|
+| `stamp` | Original host-monotonic `clock_id`, `at_us`, and global publisher `sequence`; never replaced by receive time. |
+| `skill` | Generic bounded skill identity. |
+| `skill_session_id` | Request header's publisher boot. |
+| `expression_session_id` | Current `expression/state` header's publisher boot, not the host boot or the receipt publisher boot. |
+| `episode` | Positive increasing episode within that skill and publisher session. |
+| `op` | Exactly `rest`, `wake`, or `cancel`. |
+| `valid_until_us` | After issue time and at most three seconds later. |
+
+Intake requires the expected topic, type, Event kind, source, publisher boot
+and matching header/payload sequence. Messages are bounded to 4 KiB. Admission
+and lease extension require a source age strictly less than 500 ms, with no
+future stamp; transport freshness never rejuvenates the payload. Skills renews at one-second
+intervals. Rest renewals preserve settling, wake renewals preserve the
+single running stretch, and cancellation releases only routine-owned rest
+without starting a wake clip.
+
+A delayed same-episode `rest` renewal that is at least 500 ms old, but not
+future or expired, is discarded while its original accepted Rest lease
+remains valid. Its source order is consumed, but the exact prior request,
+expiry and `resting` receipt remain unchanged. It grants no extra time;
+a later fresh renewal must arrive before the original lease expires. New
+episodes, `wake`, `cancel`, request-stream gaps and owner or privacy changes
+retain their normal checks and cancellation behavior.
+
+Admission needs fresh resting Voice and measured joints, free of pause,
+concentration, privacy or manual sleep. Idle Voice need not already be in
+a retained Listening turn. The current Voice session/turn/request is pinned
+for the episode. A stronger reflex, ownership change, loss of fresh inputs,
+lease expiry or pause cancels it. A request-stream gap detected when the next
+valid request arrives also cancels it; silence or malformed traffic is bounded
+by the existing lease rather than a separate stream-gap notification. A routine cannot release hand
+or privacy sleep. Existing Body fold, pause, range and motor guards remain
+authoritative; Expression does not infer unfolding from joint angles.
+
+Each accepted or refused episode leaves a tombstone. Cancelled or completed
+episodes cannot be renewed into activity. New publisher boots retire old
+Skills sessions across all skills. The planner remembers at most 32
+skill/session identities without evicting old fences; exhaustion fails
+quiet until a new Expression session. With one routine this permits at most
+32 distinct Skills publisher sessions before Expression must restart. A
+definition reload fences old run threads and cancels pending transitions,
+but retains an already-admitted rest if its complete enabled owning definition
+is unchanged. An edited, disabled or removed owner loses its rest.
+
+The optional `expression/rest_state` Latest topic
+(`lamp_msgs/ExpressionRestState`, version 1) publishes every 200 ms with a
+500 ms transport lifetime. It contains `stamp`, `expression_session_id`,
+`enabled`, the correlated `request` or null, and `phase`: `idle`, `resting`,
+`waking`, `completed`, `cancelled`, or `refused`. A `refused` receipt also
+carries `reason`, a short line of why (lost input, a stale, future or expired
+observation, the owner unavailable or privacy-muted, or the transition
+unavailable), absent from the JSON otherwise, so an older reader is
+unchanged; the journal says `lamp-expression: refused a rest (N so far):
+<why>` once for each new reason, not at every renewal. It is a planning receipt,
+not proof of applied motion or unfolding. Cancelled and completed receipts
+can retain their last accepted operation, so consumers correlate terminals
+by skill, publisher session, target session and episode rather than requiring a
+newer renewal's sequence or operation. Morning waits for `completed` before
+requesting sound; Say would otherwise change Voice ownership mid-stretch.
+
+The deterministic integration surface is `Engine::with_rest_requests`,
+`ingest_rest`, `set_rest_paused`, and `rest_state`; live intake uses
+`runtime::Service::with_rest_requests`. The switch leaves existing
+`ExpressionState` messages unchanged. Host tests cover leases, source age,
+strict transport, replay, publisher and Voice changes, privacy/manual sleep,
+reflex precedence, stream loss, and the real bus receipt path. Physical
+behavior and end-to-end lamp latency remain unmeasured for this addition.

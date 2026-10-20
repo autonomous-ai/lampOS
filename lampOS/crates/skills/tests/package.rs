@@ -554,6 +554,116 @@ fn a_core_skill_is_never_installed_replaced_or_removed() {
     assert_eq!(read_folder(&skills.join("welcome-back")).unwrap(), before);
 }
 
+#[test]
+fn a_disabled_core_stays_in_inventory_and_cannot_be_packaged_replaced_or_removed() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir(&skills).unwrap();
+    let core = copied(&dir.path().join("source"), "bedtime-morning", "", "");
+    assert!(!load(&core).unwrap().enabled);
+    assert!(
+        package::pack(&core, &dir.path().join("out"))
+            .unwrap_err()
+            .contains("core skill")
+    );
+    assert!(
+        package::install(&skills, &core)
+            .unwrap_err()
+            .contains("says kind = \"core\"")
+    );
+    copy(&core, &skills.join("bedtime-morning"));
+    let before = read_folder(&skills.join("bedtime-morning")).unwrap();
+    let listed = package::list(&skills).unwrap();
+    let row = listed
+        .lines()
+        .find(|line| line.starts_with("bedtime-morning "))
+        .unwrap();
+    assert_eq!(
+        row.split_whitespace().take(4).collect::<Vec<_>>(),
+        ["bedtime-morning", "core", "1.0.0", "disabled;"]
+    );
+    assert!(listed.ends_with("The skills here give the model no function.\n"));
+    assert_eq!(lamp_skills::load_each(&skills).len(), 1);
+    let (live, errors) = lamp_skills::load_all(&skills);
+    assert!(live.is_empty());
+    assert!(errors.is_empty());
+    let replacement = copied(
+        &dir.path().join("replacement"),
+        "bedtime-morning",
+        "kind = \"core\"",
+        "kind = \"installable\"",
+    );
+    assert!(
+        package::install(&skills, &replacement)
+            .unwrap_err()
+            .contains("is a core skill on this lamp")
+    );
+    assert!(
+        package::remove(&skills, "bedtime-morning")
+            .unwrap_err()
+            .contains("can't be removed")
+    );
+    assert_eq!(
+        read_folder(&skills.join("bedtime-morning")).unwrap(),
+        before
+    );
+}
+
+#[test]
+fn a_disabled_installable_reserves_its_tool_but_adds_no_live_function() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    let disabled = copied(
+        &skills,
+        "desk-tutor",
+        "kind = \"installable\"",
+        "enabled = false\nkind = \"installable\"",
+    );
+    let listed = package::list(&skills).unwrap();
+    assert!(
+        listed
+            .lines()
+            .any(|line| line.starts_with("desk-tutor ") && line.contains("disabled;"))
+    );
+    assert!(listed.ends_with("The skills here give the model no function.\n"));
+    let (live, errors) = lamp_skills::load_all(&skills);
+    assert!(live.is_empty());
+    assert!(errors.is_empty());
+
+    let duplicate = dir.path().join("source/tutor-copy");
+    fs::create_dir_all(&duplicate).unwrap();
+    fs::write(
+        duplicate.join("SKILL.md"),
+        "---\nname: tutor-copy\ndescription: A tool reservation check.\n---\n",
+    )
+    .unwrap();
+    fs::write(
+        duplicate.join("skill.toml"),
+        "tool = \"check_my_work\"\n[permissions]\nspeak = true\n[[do]]\nsay = \"Ready.\"\n",
+    )
+    .unwrap();
+    let why = package::install(&skills, &duplicate).unwrap_err();
+    assert!(why.contains("the installable skill desk-tutor's"), "{why}");
+
+    // Disabling does not hide validation failures, and an invalid installed
+    // definition still reserves its raw-manifest tool for install purposes.
+    let path = disabled.join("skill.toml");
+    let text = fs::read_to_string(&path).unwrap();
+    // Revoke the grant alone; the later [[do]] still asks for a look.
+    fs::write(&path, text.replacen("look = true", "look = false", 1)).unwrap();
+    let why = load(&disabled).unwrap_err();
+    assert!(why.contains("needs look = true"), "{why}");
+    let listed = package::list(&skills).unwrap();
+    assert!(listed.contains("not loaded: not permitted: look needs look = true"));
+    assert!(
+        package::install(&skills, &duplicate)
+            .unwrap_err()
+            .contains("the installable skill desk-tutor's")
+    );
+    package::remove(&skills, "desk-tutor").unwrap();
+    assert!(left(&skills).is_empty());
+}
+
 /// The reviewer's probe on #1698 (08:39): an installable `a-dance` with
 /// `tool = "dance"` installed beside core Dance and took its function.
 /// A function the model calls is one skill's: an install whose tool's name

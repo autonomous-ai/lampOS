@@ -157,6 +157,10 @@ struct Script {
     ignores_stop: Option<&'static str>,
     /// The scenario's own bound, past which capture reports a fault.
     limit: Duration,
+    /// No person's input: only authored skill output is under test.
+    silent: bool,
+    /// One parsed Say request, read at this capture frame's scenario time.
+    say_at_frame: Option<(u64, crate::say::LineForTest)>,
 }
 
 impl Script {
@@ -188,6 +192,8 @@ impl Script {
             second_fails: None,
             ignores_stop: None,
             limit: LIMIT,
+            silent: false,
+            say_at_frame: None,
         }
     }
 }
@@ -196,6 +202,7 @@ impl Script {
 struct Chunk {
     turn: u64,
     value: i16,
+    samples: Vec<i16>,
     accepted: bool,
 }
 
@@ -382,13 +389,27 @@ impl Peers {
     }
 
     fn speech(&self, frame: u64) -> bool {
-        (20..80).contains(&frame)
-            || self
-                .speech_offset
-                .is_some_and(|offset| (offset..offset + 60).contains(&frame))
+        !self.script.silent
+            && ((20..80).contains(&frame)
+                || self
+                    .speech_offset
+                    .is_some_and(|offset| (offset..offset + 60).contains(&frame)))
     }
 
     fn tick(&mut self, deadline: Option<Instant>) -> io::Result<()> {
+        if self
+            .script
+            .say_at_frame
+            .as_ref()
+            .is_some_and(|(frame, _)| self.frames >= *frame)
+        {
+            self.script
+                .say_at_frame
+                .take()
+                .unwrap()
+                .1
+                .read_at(monotonic_us());
+        }
         if let Some(when) = self.script.speak_again {
             let due = match when {
                 When::Settled(count) => self.settled >= count,
@@ -948,6 +969,7 @@ impl Peers {
         self.seen.lock().unwrap().chunks.push(Chunk {
             turn: owner.turn(),
             value: chunk.samples[0],
+            samples: chunk.samples.clone(),
             accepted,
         });
         let channels = &mut self.peers[index].channels;
@@ -1040,6 +1062,7 @@ impl PrivacyPeer {
 }
 
 fn run(script: Script) -> Run {
+    let limit = script.limit;
     let directory = SessionDirectory::create().unwrap();
     let mut peers = Vec::new();
     let mut spawn = |role| {
@@ -1163,7 +1186,6 @@ fn run(script: Script) -> Run {
     });
     // The clock starts once every child has crossed its startup barrier;
     // the coordinator and the peers share it from here.
-    let limit = script.limit;
     let clock_scope = crate::scenario_clock::Scope::enter(limit * 2).unwrap();
     let mut owner = Controller::new(new_boot().unwrap(), now());
     let boot = owner.snapshot(now()).unwrap().boot();
@@ -2159,6 +2181,166 @@ fn a_holding_answer_is_asked_to_go_on_once_on_the_second_route_as_on_live() {
         );
         assert!(off.events("holding_answer_nudged").is_empty());
     }
+}
+
+/// Supply a real Say protocol line to the production loop at a quiet moment.
+/// The sender stands in for Skills; no Skills process or provider service runs.
+fn second_only_skill_line(
+    line: &str,
+    at_frame: u64,
+    limit: Duration,
+) -> (Run, Vec<crate::say::Answer>) {
+    let (says, line, answered) = crate::say::Says::line_for_test(line);
+    TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+    let run = run(Script {
+        second: false,
+        only: true,
+        silent: true,
+        say_at_frame: Some((at_frame, line)),
+        written: Written::Said(12),
+        mute_at_frame: Some(at_frame + 200),
+        limit,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_SAYS.with(|given| given.borrow_mut().take());
+    (run, answered.try_iter().collect())
+}
+
+fn assert_only_second_worker(run: &Run) {
+    run.assert_clean();
+    assert!(run.seen.live.is_empty(), "{:?}", run.seen.live);
+    assert!(run.exits.iter().all(|(role, _)| *role != "provider"));
+    assert!(run.exits.contains(&("second", true)));
+    assert!(run.events("voice_route_switched").is_empty());
+}
+
+/// A custom scheduled action may request exact words. SecondOnly receives
+/// the same AS_WRITTEN instruction as Live, and completes the Say ticket only
+/// after the guarded speaker has accepted and retired the answer.
+#[test]
+fn a_scheduled_exact_say_uses_only_the_second_route_and_finishes_spoken() {
+    use crate::say::{AS_WRITTEN, Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    const WORDS: &str = "Good morning. The day can start slowly.";
+    let (run, answered) = second_only_skill_line(
+        &json!({
+            "skill":"custom-morning", "text":WORDS, "priority":8,
+            "expires_in_ms":60_000,
+        })
+        .to_string(),
+        200,
+        LIMIT,
+    );
+    assert_only_second_worker(&run);
+    let [ProviderInput::Written { request, text, .. }] = run.seen.second.as_slice() else {
+        panic!(
+            "one exact written turn, no captured input: {:?}",
+            run.seen.second
+        );
+    };
+    assert_eq!(text, &format!("{AS_WRITTEN} {WORDS}"));
+    assert_eq!(run.played(*request), vec![SECOND; 48]);
+    assert!(
+        run.seen
+            .chunks
+            .iter()
+            .all(|chunk| chunk.turn == *request && chunk.accepted)
+    );
+    assert!(run.seen.installs.contains(&(Some(*request), true)));
+    assert!(
+        matches!(
+            answered.as_slice(),
+            [Answer::Begun(_), Answer::Done(Outcome::Spoken)]
+        ),
+        "{answered:?}"
+    );
+    assert_eq!(run.events("skill_says").len(), 1);
+    assert_eq!(run.events("skill_says")[0]["skill"], "custom-morning");
+    assert!(run.events("skill_sound").is_empty());
+}
+
+/// The authored Bedtime morning action is cue="hum", not a spoken line.
+/// After the unchanged 15-second quiet gate, its parsed fixed PCM reaches
+/// the guarded speaker without any text, STT input, or chat request.
+#[test]
+fn the_bedtime_morning_hum_plays_on_second_only_without_provider_input() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    let (run, answered) = second_only_skill_line(
+        r#"{"skill":"bedtime-morning","cue":"hum","expires_in_ms":60000}"#,
+        1_600,
+        Duration::from_secs(20),
+    );
+    assert_only_second_worker(&run);
+    assert!(run.seen.second.is_empty(), "{:?}", run.seen.second);
+    let turn = run.seen.chunks.first().expect("hum reached speaker").turn;
+    assert!(
+        run.seen
+            .chunks
+            .iter()
+            .all(|chunk| chunk.turn == turn && chunk.accepted)
+    );
+    let played: Vec<i16> = run
+        .seen
+        .chunks
+        .iter()
+        .flat_map(|chunk| chunk.samples.iter().copied())
+        .collect();
+    assert_eq!(played, crate::head_cue::hum(crate::head_cue::DBFS));
+    assert!(run.seen.installs.contains(&(Some(turn), true)));
+    assert!(
+        matches!(
+            answered.as_slice(),
+            [Answer::Begun(_), Answer::Done(Outcome::Spoken)]
+        ),
+        "{answered:?}"
+    );
+    let sounds = run.events("skill_sound");
+    assert_eq!(sounds.len(), 1);
+    assert_eq!(sounds[0]["skill"], "bedtime-morning");
+    assert_eq!(sounds[0]["plays"], true);
+    assert!(run.events("skill_says").is_empty());
+}
+
+/// Missing the original start deadline never turns either payload into a
+/// late morning output. A still-live cue also keeps the normal quiet gate.
+#[test]
+fn an_expired_scheduled_say_or_an_early_hum_sends_nothing_on_second_only() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    for payload in [json!({"text":"Good morning."}), json!({"cue":"hum"})] {
+        let mut line = json!({
+            "skill":"bedtime-morning", "expires_in_ms":60_000,
+            "start_before_us":0,
+        });
+        line.as_object_mut()
+            .unwrap()
+            .extend(payload.as_object().unwrap().clone());
+        let (run, answered) = second_only_skill_line(&line.to_string(), 200, LIMIT);
+        assert_only_second_worker(&run);
+        assert_eq!(answered, [Answer::Done(Outcome::Expired)]);
+        assert!(run.seen.second.is_empty(), "{:?}", run.seen.second);
+        assert!(run.seen.chunks.is_empty());
+        assert!(run.events("skill_says").is_empty());
+        assert!(run.events("skill_sound").is_empty());
+    }
+    let (run, answered) = second_only_skill_line(
+        r#"{"skill":"bedtime-morning","cue":"hum","expires_in_ms":60000}"#,
+        200,
+        LIMIT,
+    );
+    assert_only_second_worker(&run);
+    assert_eq!(
+        answered,
+        [Answer::Done(Outcome::Refused(
+            "the lamp spoke a moment ago".into()
+        ))]
+    );
+    assert!(run.seen.second.is_empty());
+    assert!(run.seen.chunks.is_empty());
+    assert!(run.events("skill_says").is_empty());
+    assert_eq!(run.events("skill_sound").len(), 1);
+    assert_eq!(run.events("skill_sound")[0]["plays"], false);
 }
 
 /// (p) #960, lamp-4ace (`server_go_away`): Gemini's link drops with no turn

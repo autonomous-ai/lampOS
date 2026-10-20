@@ -32,7 +32,9 @@ Output files are created new, never overwritten. Live --record is bounded to 64 
 --long lets replay and import take an hour (docs/alive.md). --utc-offset-minutes is the\n\
 local time's minutes east of UTC (420 in Vietnam), the same all year; --zone system reads the\n\
 lamp's own time zone (or names one), follows its daylight saving and takes up a zone setup\n\
-changes without a restart. A catalogue with sleep needs one.\n\
+changes without a restart. A catalogue with autonomous sleep needs one.\n\
+LAMP_REST_REQUESTS=on selects leased skill rest/wake requests instead of the automatic\n\
+night/presence schedule; off otherwise. It does not enable actuator output without --enable.\n\
 --kernel-clock gives the time of day only while the kernel says the clock is set.\n\
 --head-touch reads the head's requests from --touch Controls: a hand kept on the head is leaned\n\
 into, a three-second hold puts it to sleep, a tap wakes it (docs/alive.md, #711).\n\
@@ -289,7 +291,13 @@ fn run(args: Arguments) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     let catalogue = catalogue(args.catalogue.as_ref())?;
+    let rest_requests = runtime::rest_requests_on(
+        std::env::var(runtime::REST_REQUESTS_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    );
     if args.command == "serve"
+        && !rest_requests
         && catalogue
             .alive
             .as_ref()
@@ -336,6 +344,9 @@ fn run(args: Arguments) -> Result<(), Box<dyn std::error::Error>> {
     }
     if args.head_touch {
         service = service.with_head_touch(&bus)?;
+    }
+    if rest_requests {
+        service = service.with_rest_requests(&bus)?;
     }
     if args.offline_face {
         service = service.with_offline_face(&bus);

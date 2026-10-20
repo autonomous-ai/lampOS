@@ -86,6 +86,8 @@ mod arbitration;
 pub use arbitration::*;
 mod privacy;
 pub use privacy::*;
+mod output_caps;
+pub use output_caps::*;
 mod chat;
 pub use chat::*;
 mod presence;
@@ -1374,6 +1376,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
     first_topics()
         .into_iter()
         .chain(expression_topics())
+        .chain(output_caps_topics())
         .chain(controls_topics())
         .chain(touch_topics())
         .chain(schedule_topics())
@@ -2099,6 +2102,40 @@ mod tests {
                  \"answers\":{},\"by\":\"rule\",\"took_ms\":0,\"shadow\":true}"
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn routine_topics_are_discoverable_without_changing_the_original_catalogue() {
+        for (topic, type_name, kind, period_ms, lifespan_ms) in [
+            (
+                "expression/rest_request",
+                ExpressionRestRequest::TYPE,
+                Kind::Event,
+                1_000,
+                500,
+            ),
+            (
+                "expression/rest_state",
+                ExpressionRestState::TYPE,
+                Kind::Latest,
+                200,
+                500,
+            ),
+            ("output/caps", OutputCaps::TYPE, Kind::Latest, 1_000, 3_000),
+        ] {
+            let declared = declaration_of(topic).unwrap();
+            assert_eq!(declared.type_name, type_name);
+            assert_eq!(declared.version, 1);
+            assert_eq!(declared.kind, kind);
+            assert_eq!(declared.period_ms, Some(period_ms));
+            assert_eq!(declared.lifespan_ms, Some(lifespan_ms));
+            assert!(!first_topics().iter().any(|(name, _)| *name == topic));
+        }
+        assert_eq!(first_topics().len(), 17);
+        assert_eq!(
+            output_caps_topics(),
+            vec![(OutputCaps::TOPIC, OutputCaps::declaration())]
         );
     }
 

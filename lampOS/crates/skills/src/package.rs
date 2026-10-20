@@ -540,12 +540,14 @@ fn tool_holder(skills: &Path, name: &str, tool: &str) -> Option<(String, SkillKi
     })
 }
 
-/// What the loaded `skills` give the model: their functions, and what a
-/// session does past its room (`docs/tools.md`).
+/// What the enabled `skills` give the model: their functions, and what a
+/// session does past its room (`docs/tools.md`). Inventory may include
+/// disabled skills that still reserve a name but offer no function.
 fn functions_said(skills: &[Skill]) -> String {
     // A skill's `[stop]` is one function more (#1685).
     let tools: Vec<&str> = skills
         .iter()
+        .filter(|skill| skill.enabled)
         .flat_map(|skill| {
             skill
                 .tool
@@ -853,7 +855,11 @@ pub fn list(skills: &Path) -> Result<String, String> {
                     skill.name.clone(),
                     skill.kind.name().to_owned(),
                     skill.version.clone().unwrap_or_else(|| "-".into()),
-                    skill.permissions.said(),
+                    if skill.enabled {
+                        skill.permissions.said()
+                    } else {
+                        format!("disabled; {}", skill.permissions.said())
+                    },
                 ];
                 loaded.push(skill);
                 row

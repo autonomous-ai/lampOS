@@ -11,6 +11,9 @@ use lamp_msgs::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, VecDeque};
 
+#[path = "rest.rs"]
+mod rest;
+
 pub const MAX_PLAYOUT_FRAMES: usize = 128;
 /// How many retired Voice sessions are remembered, so that a stale heartbeat
 /// from one cannot revive it. The oldest is forgotten when another retires.
@@ -359,6 +362,9 @@ pub struct Engine {
     /// The internet cannot be reached (`lamp/online` false, #830): the
     /// listening face is not drawn as ready.
     offline: bool,
+    routine: Option<rest::Rest>,
+    routine_paused: bool,
+    privacy_muted: bool,
 }
 
 impl Engine {
@@ -422,6 +428,9 @@ impl Engine {
             rejected: 0,
             life,
             offline: false,
+            routine: None,
+            routine_paused: false,
+            privacy_muted: false,
         })
     }
 
@@ -444,6 +453,129 @@ impl Engine {
 
     pub fn clock_id(&self) -> &str {
         &self.clock_id
+    }
+
+    /// Opt into leased skill scheduling; the default keeps autonomous sleep.
+    pub fn with_rest_requests(mut self) -> Self {
+        if self.routine.is_some() {
+            return self;
+        }
+        if let Some(life) = &mut self.life {
+            life.set_scheduling(alive::Scheduling::Skills, self.now.unwrap_or(0));
+        }
+        self.routine = Some(rest::Rest::default());
+        self
+    }
+
+    fn routine_gate(&self, now_us: u64) -> rest::Gate {
+        let voice = self.voice.as_ref().filter(|voice| {
+            voice.stamp.at_us <= now_us
+                && now_us - voice.stamp.at_us < self.catalogue.timing.voice_stale_us
+        });
+        let free = !self.held()
+            && self.joints_fresh(now_us)
+            && !self
+                .concentration
+                .as_ref()
+                .is_some_and(|value| value.concentrating);
+        rest::Gate {
+            eligible: self.enabled
+                && self.fault.is_none()
+                && !self.cancelled
+                && !self.routine_paused
+                && !self.privacy_muted
+                && free
+                // Idle Voice need not retain a Listening turn. Its explicit
+                // manual mute and the physical privacy route are separate gates.
+                && voice.is_some_and(|voice| voice.state == Voice::Resting),
+            owner: voice.map(|voice| rest::Owner {
+                session: voice.session_id.clone(),
+                turn: voice.turn,
+                request: voice.request,
+            }),
+            context: alive::Context {
+                voice: voice.map(|voice| voice.state),
+                free,
+            },
+        }
+    }
+
+    fn sync_routine(&mut self, now_us: u64) {
+        if self.routine.is_none() {
+            return;
+        }
+        let gate = self.routine_gate(now_us);
+        if let Some(life) = &mut self.life {
+            life.observe_routine_voice(gate.context.voice);
+        }
+        self.routine
+            .as_mut()
+            .unwrap()
+            .sync(now_us, &gate, &mut self.life);
+    }
+
+    /// The keeper's current pause is checked before intake and again before
+    /// planning. A resume never revives an episode cancelled by that pause.
+    pub fn set_rest_paused(&mut self, now_us: u64, paused: bool) {
+        self.routine_paused = paused;
+        self.sync_routine(now_us);
+    }
+
+    /// Transport has checked declared type, publisher source/boot/sequence.
+    /// The original monotonic stamp is retained; this method never retimes it.
+    pub fn ingest_rest(
+        &mut self,
+        now_us: u64,
+        request: lamp_msgs::ExpressionRestRequest,
+    ) -> Result<(), Error> {
+        self.ingest_rest_with_gap(now_us, request, false)
+    }
+
+    pub(crate) fn ingest_rest_with_gap(
+        &mut self,
+        now_us: u64,
+        request: lamp_msgs::ExpressionRestRequest,
+        lost_input: bool,
+    ) -> Result<(), Error> {
+        self.advance(now_us)?;
+        request.check()?;
+        if request.stamp.clock_id != self.clock_id
+            || request.expression_session_id != self.session_id
+        {
+            return Err(Error(
+                "rest request is for another boot or Expression session".into(),
+            ));
+        }
+        let gate = self.routine_gate(now_us);
+        let routine = self
+            .routine
+            .as_mut()
+            .ok_or_else(|| Error("rest requests are off".into()))?;
+        routine.offer(now_us, request, &gate, &mut self.life, lost_input)
+    }
+
+    /// A fresh planning receipt, never proof of applied motion. The existing
+    /// body owner still enforces its folded/paused and local motor guards.
+    pub fn rest_state(&mut self, now_us: u64) -> Option<lamp_msgs::ExpressionRestState> {
+        let _ = self.advance(now_us);
+        self.sync_routine(now_us);
+        self.routine
+            .as_ref()
+            .map(|routine| lamp_msgs::ExpressionRestState {
+                stamp: ClockStamp {
+                    clock_id: self.clock_id.clone(),
+                    at_us: now_us,
+                    sequence: self.sequence,
+                },
+                expression_session_id: self.session_id.clone(),
+                enabled: self.enabled && self.fault.is_none(),
+                request: routine.request.clone(),
+                phase: routine.phase,
+                reason: routine
+                    .reason
+                    .filter(|_| routine.phase == lamp_msgs::ExpressionRestPhase::Refused)
+                    .map(str::to_owned),
+            })
     }
 
     pub fn rejected_inputs(&self) -> u64 {
@@ -486,6 +618,7 @@ impl Engine {
         }
         if let Some(fault) = self.fault {
             self.fence_sleep_name(now_us);
+            self.sync_routine(now_us);
             return Err(Error(fault.into()));
         }
         self.now = Some(now_us);
@@ -546,6 +679,7 @@ impl Engine {
             }
         }
         self.update_rest_eligibility(now_us);
+        self.sync_routine(now_us);
         Ok(())
     }
 
@@ -651,6 +785,7 @@ impl Engine {
     /// Whether the privacy switch is closed, as `voice/privacy` says at a
     /// request from the head (#711): a tap then gets no look up.
     pub fn set_privacy_muted(&mut self, muted: bool) {
+        self.privacy_muted = muted;
         if let Some(life) = &mut self.life {
             life.set_privacy_muted(muted);
         }
@@ -878,6 +1013,7 @@ impl Engine {
         }
         self.update_rest_eligibility(now_us);
         self.marks[stream] = Some((stamp.at_us, stamp.sequence));
+        self.sync_routine(now_us);
         Ok(())
     }
 
@@ -1368,6 +1504,9 @@ impl Engine {
                 },
             )
         });
+        if let Some(routine) = &mut self.routine {
+            routine.after_tick(now_us, &mut self.life);
+        }
         let asleep = planned.as_ref().is_some_and(|planned| planned.asleep);
         let mut offsets = self.catalogue.postures.for_voice(body_mode);
         let return_scale = self.first_audio.map_or(1.0, |first| {
