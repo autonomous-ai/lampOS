@@ -161,6 +161,10 @@ impl Gate {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::CountOnly {
+                request,
+                privacy_generation,
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,
@@ -4881,6 +4885,127 @@ mod tests {
             theirs.contains("Mine is 9.") && !theirs.contains("417"),
             "{theirs}"
         );
+    }
+
+    /// Jarvis on #2031 (#1803): onboarding's sentence is count-only. Its
+    /// words, a planted marker among them, and the lamp's answer to it
+    /// reach neither the thread, its file, the memory's journal nor the
+    /// next turn's prompt; the next line is kept as ever, with none of it
+    /// attached. In a child process, as `a_turn_is_kept_and_told_to_the_next`.
+    #[test]
+    fn the_sentence_is_kept_nowhere_and_the_next_line_carries_none_of_it() {
+        use std::io::{BufRead, BufReader, Write};
+        const CHILD: &str = "LAMP_SECOND_SENTENCE_TEST_CHILD";
+        const MARKER: &str = "zebrafinch";
+        if std::env::var(CHILD).ok().as_deref() != Some("1") {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "second_provider::worker::tests::the_sentence_is_kept_nowhere_and_the_next_line_carries_none_of_it",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .env_remove(crate::remember::DAYS_ENVIRONMENT)
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                output.status.success() && stdout.contains("1 passed"),
+                "{stdout}\n{stderr}"
+            );
+            // Nor in what the worker wrote to its journal.
+            assert!(!stdout.contains(MARKER) && !stderr.contains(MARKER));
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("lv-sentence-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        let socket = dir.join("memory.sock");
+        let file = dir.join("thread.json");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        // The memory: every request until the journal's first append.
+        let memory = std::thread::spawn(move || {
+            let mut seen = Vec::new();
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                seen.push(line.clone());
+                writeln!(stream, "{}", serde_json::json!({"ok":true,"entries":[]})).unwrap();
+                if line.contains("\"append\"") {
+                    return seen;
+                }
+            }
+            unreachable!()
+        });
+        crate::remember::start(socket.clone(), None);
+        // The sentence, request 7: its Start, then `CountOnly`.
+        crate::thread::count_only(None);
+        crate::thread::count_only(Some(7));
+        for event in [
+            ProviderOutput::Transcript {
+                request: None,
+                text: format!("I sit by the {MARKER} window"),
+                finished: true,
+            },
+            ProviderOutput::Transcript {
+                request: Some(7),
+                text: format!("A {MARKER} window, lovely."),
+                finished: false,
+            },
+            ProviderOutput::TurnComplete {
+                request: 7,
+                idle: true,
+            },
+        ] {
+            keep(&event, Some(&file));
+        }
+        // The next line, request 8: a Start clears it.
+        crate::thread::count_only(None);
+        for event in [
+            ProviderOutput::Transcript {
+                request: None,
+                text: "What should I drink?".into(),
+                finished: true,
+            },
+            ProviderOutput::Transcript {
+                request: Some(8),
+                text: "Try some tea.".into(),
+                finished: false,
+            },
+            ProviderOutput::TurnComplete {
+                request: 8,
+                idle: true,
+            },
+        ] {
+            keep(&event, Some(&file));
+        }
+        let written = std::fs::read_to_string(&file).unwrap();
+        assert!(!written.contains(MARKER), "{written}");
+        assert!(written.contains("What should I drink?") && written.contains("Try some tea."));
+        let seen = memory.join().unwrap();
+        assert!(seen.iter().all(|line| !line.contains(MARKER)), "{seen:?}");
+        let journalled: serde_json::Value = serde_json::from_str(seen.last().unwrap()).unwrap();
+        assert_eq!(journalled["heard"], "What should I drink?");
+        assert_eq!(journalled["said"], "Try some tea.");
+        let told = system_message("You are a lamp.", None, "", Some(&file), None);
+        assert!(!told.text.contains(MARKER), "{}", told.text);
+        assert!(
+            told.history
+                .iter()
+                .all(|message| !format!("{message:?}").contains(MARKER)),
+            "{:?}",
+            told.history
+        );
+        assert_eq!(
+            told.history,
+            [
+                Message::user("What should I drink?"),
+                Message::assistant("Try some tea.")
+            ]
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     /// The reviewer on #1713: a text's answer is never told what was said at

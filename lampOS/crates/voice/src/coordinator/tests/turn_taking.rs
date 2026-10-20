@@ -389,6 +389,7 @@ impl Harness {
             cut_in,
             after_stop.then_some((1, 1)),
             follows_on,
+            false,
             PlayoutStart::default(),
             &mut self.trace,
             |_| Ok(()),

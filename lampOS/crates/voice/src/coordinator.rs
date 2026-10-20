@@ -2757,6 +2757,7 @@ fn flush_provider_input_with(
             | ProviderInput::Audio { request, .. }
             | ProviderInput::End { request, .. }
             | ProviderInput::Called { request, .. }
+            | ProviderInput::CountOnly { request, .. }
             | ProviderInput::Reminder { request, .. }
             | ProviderInput::Written { request, .. } => *request,
         };
@@ -3903,6 +3904,10 @@ thread_local! {
     /// A loop test's near-call try (#1803), in place of onboarding's own.
     static TEST_NEAR: std::cell::RefCell<Option<crate::onboarding::near::NearFlow>> =
         const { std::cell::RefCell::new(None) };
+    /// A loop test's open sentence window (#1803), in the scenario's
+    /// monotonic microseconds, in place of onboarding's own.
+    static TEST_SENTENCE_WINDOW: std::cell::Cell<Option<(u64, u64)>> =
+        const { std::cell::Cell::new(None) };
 }
 
 /// Whether onboarding's near-call step holds the reply to the utterance
@@ -3927,6 +3932,19 @@ fn near_call_window(
         return held;
     }
     onboarding.is_some_and(|walk| walk.near_holds_reply(began_us, at_us))
+}
+
+/// Whether the sentence part's window of onboarding's `how_you_sound` is
+/// open at `at_us` (#1803): a line that ends in it is the person's sentence.
+/// Unlike a name in the near-call window, its End goes on, so the words
+/// come back; its answer is held (the turn ends as its words arrive, or as
+/// its first answer audio does), and the words are counted, never kept.
+fn sentence_window(onboarding: Option<&crate::onboarding::Onboarding>, at_us: u64) -> bool {
+    #[cfg(test)]
+    if let Some((from, to)) = TEST_SENTENCE_WINDOW.with(std::cell::Cell::get) {
+        return (from..to).contains(&at_us);
+    }
+    onboarding.is_some_and(|walk| walk.sentence_window(at_us))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4113,6 +4131,13 @@ fn conversation_with_gate(
     // unanswered, however long it runs past the window, if it is no more
     // than a call.
     let mut near_call_turn: Option<u64> = None;
+    // The turn whose line began in the sentence window (#1803): marked
+    // count-only to the provider, its words are counted for onboarding and
+    // kept nowhere, and its answer is neither played, published nor kept.
+    let mut sentence_turn: Option<u64> = None;
+    // Its words as they come, in memory only, until the last piece: on
+    // Live they come in pieces, all of which are counted.
+    let mut sentence_heard: Option<String> = None;
     // The answer whose words are arriving, and whether any of them has been
     // a word yet.
     let mut answer_words: Option<(u64, bool)> = None;
@@ -5297,6 +5322,20 @@ fn conversation_with_gate(
                     {
                         return Err(io::Error::other("invalid provider audio frame").into());
                     }
+                    // An answer to the sentence whose words have not come
+                    // back first (Gemini Live) ends before it is played.
+                    if sentence_turn == Some(request)
+                        && reply
+                            .as_ref()
+                            .is_some_and(|current| current.owner.turn() == request)
+                    {
+                        cancel_reply(owner, reply, trace, "onboarding_sentence")?;
+                        speaker_pending = None;
+                        provider_queue.clear();
+                        snapshot = owner.snapshot(now())?;
+                        rig.publish(snapshot)?;
+                        last_publish = monotonic_us();
+                    }
                     if let Some(current) = reply.as_mut().filter(|r| r.owner.turn() == request) {
                         if current.pcm.len() + samples.len() > MAX_REPLY_SAMPLES {
                             return Err(io::Error::other(
@@ -5406,6 +5445,59 @@ fn conversation_with_gate(
                 }
                 ProviderOutput::HoldingAnswer { request, session } => {
                     holding_answer.observed(request, session, rig.provider.boot, reply.as_ref());
+                }
+                // Onboarding's sentence (#1803): every piece of its words is
+                // gathered in memory and only their count goes to onboarding,
+                // once the last piece is in. None of them, and nothing of the
+                // model's answer to it, is published, put in the trace or
+                // played: the answer ends as soon as it shows, or as the
+                // words are in.
+                ProviderOutput::Transcript {
+                    request,
+                    text,
+                    finished,
+                } if (request.is_none() && sentence_heard.is_some())
+                    || (request.is_some() && request == sentence_turn) =>
+                {
+                    let done = match request {
+                        Some(_) => true,
+                        None => {
+                            let heard = sentence_heard.as_mut().expect("guarded");
+                            // ponytail: past 4 KiB a line's words are not
+                            // counted; a sentence is far shorter.
+                            if heard.len() + text.len() <= 4_096 {
+                                heard.push_str(&text);
+                            }
+                            finished
+                        }
+                    };
+                    if request.is_none()
+                        && finished
+                        && let Some(heard) = sentence_heard.take()
+                    {
+                        let words = crate::wait_words::words_in(&heard);
+                        if let Some(walk) = onboarding.as_mut() {
+                            walk.sentence_words(words);
+                        }
+                        record(
+                            trace,
+                            json!({"kind":"onboarding_sentence_words","turn":sentence_turn,
+                                "words":words,"at_us":monotonic_us()}),
+                        )?;
+                    }
+                    if done
+                        && let Some(turn) = sentence_turn
+                        && reply
+                            .as_ref()
+                            .is_some_and(|current| current.owner.turn() == turn)
+                    {
+                        cancel_reply(owner, reply, trace, "onboarding_sentence")?;
+                        speaker_pending = None;
+                        provider_queue.clear();
+                        snapshot = owner.snapshot(now())?;
+                        rig.publish(snapshot)?;
+                        last_publish = monotonic_us();
+                    }
                 }
                 ProviderOutput::Transcript {
                     request,
@@ -6536,6 +6628,9 @@ fn conversation_with_gate(
                         lamp_words_ended_us,
                         accepted.candidate.trigger_read_at_us,
                     );
+                    // A line begun in onboarding's sentence window is the
+                    // sentence (#1803): count-only from its Start.
+                    let count_only = sentence_window(onboarding.as_ref(), monotonic_us());
                     snapshot = commit_admitted_input(
                         owner,
                         reply,
@@ -6547,6 +6642,7 @@ fn conversation_with_gate(
                         took_over,
                         stop_untold.take_for(provider_session, monotonic_us()),
                         follows_on,
+                        count_only,
                         rig.playout_start,
                         trace,
                         |state| rig.publish(state),
@@ -6558,6 +6654,12 @@ fn conversation_with_gate(
                     if let Some(current) = reply.as_ref() {
                         second_look.request_began(current.owner.turn(), monotonic_us());
                     }
+                    // Words heard from now are this line's: counted only
+                    // when it is the sentence.
+                    if count_only {
+                        sentence_turn = reply.as_ref().map(|current| current.owner.turn());
+                    }
+                    sentence_heard = count_only.then(String::new);
                     // The sound just before a turn began is the turn's.
                     turn_blocks.extend(loose_blocks.drain(..).map(|(_, level)| level));
                 }
@@ -6683,6 +6785,7 @@ fn conversation_with_gate(
                                     opening,
                                     provider_session,
                                     rig.cut_keeps_name,
+                                    sentence_heard.is_some(),
                                     rig.playout_start,
                                     trace,
                                     |state| rig.publish(state),
@@ -6693,6 +6796,10 @@ fn conversation_with_gate(
                                 }
                                 if let Some(current) = reply.as_ref() {
                                     second_look.request_began(current.owner.turn(), monotonic_us());
+                                }
+                                if sentence_heard.is_some() {
+                                    sentence_turn =
+                                        reply.as_ref().map(|current| current.owner.turn());
                                 }
                             }
                             None => {
@@ -6824,6 +6931,24 @@ fn conversation_with_gate(
                         .as_mut()
                         .ok_or_else(|| io::Error::other("speech end lost its owner"))?;
                     let input_end_us = audio.captured_at_us;
+                    // The sentence's line ending (begun in its window,
+                    // count-only): its speech and whether it was said close,
+                    // numbers only. Onboarding takes it if it ends in the
+                    // window too.
+                    if sentence_turn == Some(current.owner.turn()) {
+                        let turn = current.owner.turn();
+                        let speech_ms =
+                            speech_levels.len() as u64 * u64::from(lamp_audio::BLOCK_MS);
+                        let close = said_close(&speech_levels, &loud_blocks, &rise).is_some();
+                        if let Some(walk) = onboarding.as_mut() {
+                            walk.sentence_line(speech_ms, close, monotonic_us());
+                        }
+                        record(
+                            trace,
+                            json!({"kind":"onboarding_sentence_line","turn":turn,
+                                "speech_ms":speech_ms,"said_close":close,"at_us":monotonic_us()}),
+                        )?;
+                    }
                     // The lamp is sure the person has finished. A request
                     // whose end went early sends nothing more: what it
                     // waited for was this moment, and from here its answer
@@ -9874,6 +9999,9 @@ fn commit_admitted_input(
     after_stop: Option<(u64, u64)>,
     // Begun soon after the lamp's words finished (`crate::follows_on`).
     follows_on: bool,
+    // Begun in onboarding's sentence window (#1803): its Start is followed
+    // at once by `CountOnly`, before any of its sound.
+    count_only: bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
@@ -9931,6 +10059,12 @@ fn commit_admitted_input(
         // Begun while the lamp's answer could be heard (#828).
         over_the_lamps_voice,
     });
+    if count_only {
+        provider_queue.push_back(ProviderInput::CountOnly {
+            request: turn.turn(),
+            privacy_generation: snapshot.microphone_generation(),
+        });
+    }
     let mut current = Reply {
         owner: turn,
         cloud: CloudRequest::new(provider_session)?,
@@ -9956,8 +10090,9 @@ fn commit_admitted_input(
         need: StartNeed::default(),
     };
     // One candidate's audio, already bounded by the admission's hold. The
-    // standard hold's prefix fits the standing bound as it always has.
-    let bound = PROVIDER_QUEUE_BOUND.max(prefix.len() + 2);
+    // standard hold's prefix fits the standing bound as it always has, and
+    // the sentence's `CountOnly` has a slot of its own.
+    let bound = PROVIDER_QUEUE_BOUND.max(prefix.len() + 2) + usize::from(count_only);
     for audio in prefix {
         queue_input(
             provider_queue,
@@ -10246,6 +10381,8 @@ fn continue_after_early_end(
     opening: Vec<ObservedAudio>,
     provider_session: u64,
     cut_keeps_name: bool,
+    // The sentence going on (#1803): count-only, as its first part was.
+    count_only: bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
@@ -10283,6 +10420,12 @@ fn continue_after_early_end(
         follows_on: false,
         over_the_lamps_voice: false,
     });
+    if count_only {
+        provider_queue.push_back(ProviderInput::CountOnly {
+            request: turn.turn(),
+            privacy_generation: snapshot.microphone_generation(),
+        });
+    }
     let mut current = Reply {
         owner: turn,
         cloud: CloudRequest::new(provider_session)?,
@@ -10308,7 +10451,7 @@ fn continue_after_early_end(
         need: StartNeed::default(),
     };
     // At most a pre-roll, as a new candidate's opening is.
-    let bound = PROVIDER_QUEUE_BOUND.max(opening.len() + 2);
+    let bound = PROVIDER_QUEUE_BOUND.max(opening.len() + 2) + usize::from(count_only);
     for audio in opening {
         queue_input(
             provider_queue,
