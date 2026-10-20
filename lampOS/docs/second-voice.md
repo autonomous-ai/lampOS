@@ -1704,6 +1704,45 @@ after a take-over, but now for every turn:
   DeepSeek answered what the rule let out where Gemini declined, and at
   17:56 it declined "Lamp, what time is it?". The count on played lines is
   `called not_for_me` against `first answer audio`.
+- **Only the one it answered, in a quiet room too**
+  (`LAMP_QUIET_GOING_ON_SAME_ONE=on`, `Heeding::going_on_quiet_only_for_the_same_one`,
+  the first builder at 21:03 on Queue #1722; off unless set): #2191's
+  busy-room rule (`LAMP_GOING_ON_SAME_ONE`) in a quiet room. A line let out
+  only as the conversation going on (no name, no call, no face turned, not
+  said close to it) is held unless it answers the lamp's own question or,
+  with `LAMP_SAME_VOICE_MODEL`, the same-voice check found it in the
+  conversation's voice, `held back: a quiet room: a conversation with the
+  lamp is going on, but nothing shows the line is from the one it answered:
+  not a reply to its question, not the conversation's voice, no face turned
+  to it`. On lamp-52e6 at 20:1x (#2301's runs), #829's two-people scene
+  opened by "Hey Lamp, what time is it?" had its first three or four talk
+  lines answered as the conversation going on before the room was judged
+  busy. With or without `LAMP_SPOKEN_TO` (`Attention::played_only_as_going_on`):
+  lamp-52e6's first run with the switch at 22:4x, without it, still played
+  the talk, the rule having read a mark only `LAMP_SPOKEN_TO` sets. A face
+  turned to the lamp counts only in `LAMP_ATTENTION`'s busy forms (`strict`,
+  `busy-near`); with plain `on` it lets no line out here. Two more ways the
+  caller's own line goes on (the first builder at 23:01 on #2305): with the
+  eyes' speaking faces (`LAMP_EYES_SPEAKING=on` on lamp-eyes, read from
+  `humans/faces/tracked` on the bus), a line the face seen speaking through
+  the call let out is seen speaking through again; and a line too short for
+  a likeness (under `same_voice::LEAST_SAMPLES`, 1.5 s: "And tomorrow?")
+  begun within 20 s of the lamp's last words (`SHORT_GOES_ON_FOR`). The
+  caller's face ids are passing ids kept in memory only, each with the
+  eyes' boot (`SpeakingFaces::speakers_with_boot`), so an id from before
+  lamp-eyes started again matches nobody; they go when a line comes with no
+  conversation going on, and on a privacy change (the camera closed or
+  opened, a mute or unmute, or either's privacy generation changing, as the
+  worker installs each authority: `Engine::forgetting_on_privacy`,
+  `Heeding::privacy_changed`), with the eyes' looks kept for them. No face
+  id outlives a camera close. The trade left: with neither the voice model nor the speaking face, the
+  answered person's longer follow-up said looking away ("And what would
+  you drink with that?" with no face turned), or a short one 20 s after the
+  lamp's words, is held too; another person's short line soon after the
+  lamp's words goes on. The lamp run that turns it on passes only if, with
+  the scene's talk held, the caller's follow-up said looking away is
+  answered and a second person's line to the lamp is answered. The second
+  route only; the Live route is unchanged.
 - **A line going on from the last one hears its sound first.** The
   coordinator ends a line at a short pause, so the owner's "Lamp, … what's
   the weather?" came as pieces of about 1.3 s, each a speech-to-text stream
