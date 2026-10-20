@@ -1177,7 +1177,8 @@ fn credentials_worker_environment(
 
 // The second route's Gemini endpoint and voice, its key terms and the
 // lamp's place (#1712), and whether it listens for the names the lamp knows
-// (#753), to its worker only, as set: the worker checks them, and says so.
+// (#753), and whether a named ask is a hand-over (#1722, read by `serve`
+// there), to its worker only, as set: the worker checks them, and says so.
 fn second_route_worker_environment(
     role: &str,
     var: impl Fn(&str) -> Option<std::ffi::OsString>,
@@ -1209,6 +1210,7 @@ fn second_route_worker_environment(
         crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
+        crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
     ]
@@ -1260,6 +1262,7 @@ mod tests {
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
+            crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             assert_eq!(
@@ -1272,6 +1275,48 @@ mod tests {
                     "{role}"
                 );
             }
+        }
+    }
+
+    /// The reviewer on #2365: with only `LAMP_TASKS_NAMED_ASK=on` set, the
+    /// started second worker gets it, since `serve` reads it there; no other
+    /// worker does.
+    #[test]
+    fn the_named_ask_switch_alone_reaches_the_started_second_worker() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = SessionDirectory::create().unwrap();
+        let script = home.path.join("worker.sh");
+        std::fs::write(&script, "#!/bin/sh\n/usr/bin/env > \"$3/env-$2.txt\"\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let only = |name: &str| {
+            (name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT)
+                .then(|| std::ffi::OsString::from("on"))
+        };
+        let boot = new_boot().unwrap();
+        for (role, expected) in [
+            ("second", true),
+            ("provider", false),
+            ("capture", false),
+            ("speaker", false),
+        ] {
+            let status = status_of_fresh(&mut worker_command(
+                &script,
+                &home.path,
+                role,
+                (boot, boot),
+                &[],
+                only,
+            ));
+            assert!(status.success(), "{role}");
+            let written =
+                std::fs::read_to_string(home.path.join(format!("env-{role}.txt"))).unwrap();
+            assert_eq!(
+                written
+                    .lines()
+                    .any(|line| line == "LAMP_TASKS_NAMED_ASK=on"),
+                expected,
+                "{role}"
+            );
         }
     }
 
@@ -1591,6 +1636,7 @@ mod tests {
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
+                    || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                 {
                     "on"
                 } else if name == crate::remember::FORGET_ASKED_ENVIRONMENT {
@@ -1693,6 +1739,7 @@ mod tests {
                     "LAMP_SECOND_STT_WARM=on",
                     "LAMP_SECOND_WEATHER=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
+                    "LAMP_TASKS_NAMED_ASK=on",
                 ],
             ),
             (

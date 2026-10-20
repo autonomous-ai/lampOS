@@ -2105,6 +2105,71 @@ Codex.
 receipt or answer from Codex or OpenCode was seen. Nothing was run on a lamp.
 How often the model names the right one from speech is not measured.
 
+### A named ask is a hand-over (off unless `LAMP_TASKS_NAMED_ASK=on`, #1722)
+
+On lamp-4ace on 2026-10-21, with two of the staff read (Claude Code and Codex,
+#2297), played asks such as "Hey Lamp, ask Claude Code to write a two-line poem
+about the rain." went to `not_for_me` or were answered by the lamp itself
+("poetry's mine to write, no need to ask anyone"), 0 to 3 of 3 per run. The
+person named who should do it; the lamp refused anyway.
+
+With `LAMP_TASKS_NAMED_ASK=on` (the voice passes it to the second route's
+worker only, through `second_route_worker_environment`, and that worker reads
+it; with the tasks part on), a spoken turn's first chat round whose last message is the person's words,
+and whose words ask one of the staff by name to do something, is sent with
+`tool_choice: {"type": "function", "function": {"name": "start_agent_task"}}`
+(`agent_tasks::named_ask`, `second_provider::worker::named_asks`,
+`net::Chat::forcing`). The model still writes the task and `who`; it can't
+decline the hand-over or do the work itself. A round after a call ends with the
+call's result and is asked as before.
+
+- **Asks:** "ask", "tell", "get" or "have" right before the agent's whole name
+  with "to" after it ("ask Claude Code to …", "tell Codex to …"), or "can",
+  "could", "would" or "will" "you ask/get <name> …".
+- **Not asks:** a mention ("I told Claude Code yesterday", "is Codex done?",
+  "what did Claude Code say?", "did you ask Codex to …", "tell Claude Code I'm
+  late"), a negation right before the verb ("don't ask Claude Code to …",
+  "do not tell …", "never ask Codex to …", "not get …"), a question the person
+  asks themself ("should I ask Claude Code to …", "shall I …", "do I …"), a name not of the staff ("ask Devin to …" when Devin isn't set up), a
+  garbled name ("Claude Co", "cloud code"; the staff's note still hears those).
+  With none of the staff read, only Claude Code.
+- **The trade:** the rules can let through a line said to someone else (in a
+  quiet room without `LAMP_SPOKEN_TO`, or as a conversation going on). Today the
+  model can still say such a line wasn't for the lamp (`not_for_me`). When it
+  names an agent ("…, ask Claude Code to fix the build"), forcing takes that
+  away: it becomes a prepared hand-over and a question to the room. The heard
+  yes still guards the start: `start_agent_task` only prepares, and nothing
+  runs without a later yes heard within 120 s.
+- **Off:** the request is the same as before, word for word (a test compares
+  the bodies). `tool_choice` is never sent with a held line's named functions.
+- **The relay:** checked on lamp-06c1 on 2026-10-21 at 03:4x: the relay's
+  DeepSeek chat, thinking off, called the function `tool_choice` named on "What's two plus two?"
+  3 of 3, and none of 3 without it.
+
+**The probe** (`cargo run -p lamp-voice --example probe_handover`, run where
+the voice runs, as root, with the voice unit's tasks switches): each played ask
+as a spoken turn's first round, the system message, staff note, call note,
+functions and chat the second worker builds, with two of the staff held as the
+tasks part would answer. With `PROBE_HANDOVER_HISTORY=on`, each run first asks
+"tell me a story about a clever fox, at least eight sentences" and keeps the
+real answer in the thread as an exchange. It prints counts only. On lamp-06c1
+on 2026-10-21, 10 runs per line:
+
+| Wording | Story first | Rain poem | Sea poem | Haiku (Codex) |
+|---|---|---|---|---|
+| A (today's note) | no | 10/10 | 10/10 | 10/10 |
+| B (#2337, reverted) | no | 10/10 | 9/10 (1 self) | 10/10 |
+| C (rule first) | no | 10/10 | 10/10 | 10/10 |
+| A | yes | 10/10 | 10/10 | 10/10 |
+| B | yes | 10/10 | 10/10 | 9/10 (1 self) |
+| C | yes | 10/10 | 10/10 | 10/10 |
+| D (A, `LAMP_TASKS_NAMED_ASK=on`) | yes | 10/10 | 10/10 | 10/10 |
+
+So the probe doesn't reproduce lamp-4ace's 0 of 3: what the played run sends
+beyond it (the memory's notes, the skills' lines, the web search's functions,
+the name heard) isn't in it. D makes the hand-over not depend on that. Not
+played on a lamp yet.
+
 ## Progress on the bus (`serve --progress`, #732)
 
 Built by the second builder on 2026-10-15 (`second-P2`). **Off unless
