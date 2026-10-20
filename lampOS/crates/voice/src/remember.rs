@@ -880,16 +880,20 @@ impl DaysClient {
             };
             // What this session's provider is told is what its exchanges
             // follow: a rule forgotten in an earlier one is not among them.
-            match self.context.lock() {
+            let said = match self.context.lock() {
                 Ok(mut context) => {
                     context.rules.clear();
-                    context.rule(None, room.iter().map(|rule| rule.id));
-                    if let (Some(person), Some(theirs)) = (person, &theirs) {
-                        context.rule(Some(person), theirs.iter().map(|rule| rule.id));
+                    let said = context.rule(None, room.iter().map(|rule| rule.id));
+                    match (person, &theirs) {
+                        (Some(person), Some(theirs)) => {
+                            said.or(context.rule(Some(person), theirs.iter().map(|rule| rule.id)))
+                        }
+                        _ => said,
                     }
                 }
                 Err(_) => return UNAVAILABLE.into(),
-            }
+            };
+            say(said);
             note.push_str(&crate::rules::note(&room, theirs.as_deref()));
         }
         if let Some(person) = person.filter(|_| self.threads.load(Ordering::Acquire)) {
@@ -920,10 +924,11 @@ impl DaysClient {
         ) else {
             return String::new();
         };
-        match self.context.lock() {
+        let said = match self.context.lock() {
             Ok(mut context) => context.include(Some(person), &[id]),
             Err(_) => return String::new(),
-        }
+        };
+        say(said);
         // Counts only, never the thread's words: the trial's proof
         // (`trials.sh thread`) and a lamp's record that it was told. Said
         // when the memory has given it and it joins the note; a session
@@ -1028,6 +1033,14 @@ struct DaysContext {
     /// A write whose acknowledgement is not known may have committed. Keep
     /// journalling inhibited after an ambiguous response; never invent its ID.
     uncertain_writes: u64,
+    /// Why `journal_inhibited` was first set, said in the journal once
+    /// (#2176). It changes nothing that is journalled.
+    stopped_by: Option<Stopped>,
+    /// Exchanges not journalled because journalling was inhibited or a
+    /// write was unacknowledged, since the worker started (#2176). Those
+    /// lost otherwise (too long, a busy context, a full queue) are not
+    /// counted here; all of them are in [`DaysClient::lost`] as before.
+    held_back: u64,
     /// The rules ([`crate::rules`]) the provider's context may hold, each
     /// with whose rules scope it is in (`None` for the room's): those the
     /// session was told, and those kept or listed in it. An exchange is
@@ -1037,32 +1050,114 @@ struct DaysContext {
     rules: Vec<(Option<String>, u64)>,
 }
 
+/// Why memory's journal stopped until a fresh worker (#2176): said in the
+/// journal with no word said or kept, and no person's id.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Stopped {
+    /// A confirmed `forget` or `forget_everything`.
+    Forgotten,
+    /// A rule forgotten (`forget_rule`).
+    RuleForgotten,
+    /// The rules keeping the light on, forgotten.
+    LightRuleForgotten,
+    /// More than [`SOURCE_IDS`] sources in the provider's context.
+    SourcesLimit,
+    /// More than [`SOURCE_IDS`] rules in the provider's context.
+    RulesLimit,
+    /// The context's lock was poisoned while a rule was linked.
+    Poisoned,
+}
+
+impl Stopped {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Forgotten => "forgotten",
+            Self::RuleForgotten => "rule_forgotten",
+            Self::LightRuleForgotten => "light_rule_forgotten",
+            Self::SourcesLimit => "sources_limit",
+            Self::RulesLimit => "rules_limit",
+            Self::Poisoned => "poisoned",
+        }
+    }
+}
+
+/// The journal line said once, as journalling first stops.
+fn stopped_line(why: Stopped) -> String {
+    format!(
+        "lamp-voice provider: memory journal stopped until a fresh worker: why={}",
+        why.as_str()
+    )
+}
+
+/// Says a line built under the context's lock, once its guard is dropped:
+/// that lock is never held across I/O (#2186).
+fn say(line: Option<String>) {
+    if let Some(line) = line {
+        eprintln!("{line}");
+    }
+}
+
 impl DaysContext {
-    fn include(&mut self, person: Option<&str>, ids: &[u64]) {
+    /// Journalling stops until a fresh worker, as before; the first reason
+    /// is kept, and its line returned for the caller to [`say`] once the
+    /// guard is dropped (#2176).
+    #[must_use = "the line is said after the context's guard is dropped"]
+    fn inhibit(&mut self, why: Stopped) -> Option<String> {
+        self.journal_inhibited = true;
+        if self.stopped_by.is_some() {
+            return None;
+        }
+        self.stopped_by = Some(why);
+        Some(stopped_line(why))
+    }
+
+    /// An exchange held back by a stop is counted; the line to say, at the
+    /// 1st, 2nd, 4th, 8th … so a long stop says little (#2176).
+    fn held_back_line(&self) -> Option<String> {
+        if !self.held_back.is_power_of_two() {
+            return None;
+        }
+        let why = match self.stopped_by {
+            Some(why) => why.as_str(),
+            None if self.journal_inhibited => "unknown",
+            None => "unacknowledged_write",
+        };
+        Some(format!(
+            "lamp-voice provider: memory journal stopped: why={why} unacknowledged_writes={} not_journalled={}",
+            self.uncertain_writes, self.held_back
+        ))
+    }
+
+    /// Sources now in the provider's context; a stop's line, as
+    /// [`Self::inhibit`].
+    #[must_use = "the line is said after the context's guard is dropped"]
+    fn include(&mut self, person: Option<&str>, ids: &[u64]) -> Option<String> {
         for id in ids {
             let source = (person.map(str::to_owned), *id);
             if !self.sources.contains(&source) {
                 if self.sources.len() == SOURCE_IDS {
-                    self.journal_inhibited = true;
-                    return;
+                    return self.inhibit(Stopped::SourcesLimit);
                 }
                 self.sources.push(source);
             }
         }
+        None
     }
 
-    /// Rules now in the provider's context, of this person's rules scope.
-    fn rule(&mut self, person: Option<&str>, ids: impl IntoIterator<Item = u64>) {
+    /// Rules now in the provider's context, of this person's rules scope;
+    /// a stop's line, as [`Self::inhibit`].
+    #[must_use = "the line is said after the context's guard is dropped"]
+    fn rule(&mut self, person: Option<&str>, ids: impl IntoIterator<Item = u64>) -> Option<String> {
         for id in ids {
             let rule = (person.map(str::to_owned), id);
             if !self.rules.contains(&rule) {
                 if self.rules.len() == SOURCE_IDS {
-                    self.journal_inhibited = true;
-                    return;
+                    return self.inhibit(Stopped::RulesLimit);
                 }
                 self.rules.push(rule);
             }
         }
+        None
     }
 
     /// This person's own rules, for a write to their scope.
@@ -1253,18 +1348,20 @@ impl DaysClient {
         let until = started + deadline;
         let (snapshot, ids) = self.open_one(&name, None, until)?;
         let theirs = person.and_then(|person| self.open_one(&name, Some(person), until));
+        let mut said = None;
         let accepted = match self.context.try_lock() {
             Ok(mut context)
                 if context.session.as_ref() == Some(&name) && started.elapsed() < deadline =>
             {
-                context.include(None, &ids);
+                said = context.include(None, &ids);
                 if let Some((_, ids)) = &theirs {
-                    context.include(person, ids);
+                    said = said.or(context.include(person, ids));
                 }
                 true
             }
             _ => false,
         };
+        say(said);
         if !accepted {
             let _ = self.jobs.try_send(DaysJob::Close(name.clone(), None));
             if theirs.is_some() {
@@ -1501,10 +1598,11 @@ impl DaysClient {
         let Ok(mut context) = self.context.try_lock() else {
             return (gone(), false);
         };
+        let mut said = None;
         if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) && told["forgotten"] == true {
             // Already-delivered provider context cannot be retracted here.
             // Do not let later prose recreate forgotten material unlinked.
-            context.journal_inhibited = true;
+            said = context.inhibit(Stopped::Forgotten);
             // The conversation's turns may be gone with it, and journalling
             // has stopped: a later "remember …" names none of them, or the
             // store refuses it for ids it no longer has (Second on #2003).
@@ -1518,11 +1616,13 @@ impl DaysClient {
             let _ = self.jobs.try_send(DaysJob::End);
         }
         for (whose, id) in ids {
-            context.include(whose.as_deref(), &[id]);
+            said = said.or(context.include(whose.as_deref(), &[id]));
         }
         if writes {
             context.uncertain_writes = context.uncertain_writes.saturating_sub(1);
         }
+        drop(context);
+        say(said);
         (told, true)
     }
 
@@ -1583,14 +1683,19 @@ impl DaysClient {
         said: &str,
         person: Option<&str>,
     ) -> bool {
-        let Ok(context) = self.context.try_lock() else {
+        let Ok(mut context) = self.context.try_lock() else {
             self.lost.fetch_add(1, Ordering::Relaxed);
             return false;
         };
-        if context.journal_inhibited
-            || context.uncertain_writes != 0
-            || heard.len().saturating_add(said.len()) > 60_000
-        {
+        if context.journal_inhibited || context.uncertain_writes != 0 {
+            self.lost.fetch_add(1, Ordering::Relaxed);
+            context.held_back = context.held_back.saturating_add(1);
+            let said = context.held_back_line();
+            drop(context);
+            say(said);
+            return false;
+        }
+        if heard.len().saturating_add(said.len()) > 60_000 {
             self.lost.fetch_add(1, Ordering::Relaxed);
             return false;
         }
@@ -1732,26 +1837,30 @@ impl DaysClient {
             _ => vec![],
         };
         // The rule is linked before the fence is lifted.
-        match self.context.lock() {
+        let said = match self.context.lock() {
             Ok(mut context) => {
-                context.rule(owner, shown);
+                let said = context.rule(owner, shown);
                 if writes {
                     context.uncertain_writes = context.uncertain_writes.saturating_sub(1);
                 }
+                said
             }
             // Without the link nothing said now may be journalled.
-            Err(poisoned) => poisoned.into_inner().journal_inhibited = true,
-        }
+            Err(poisoned) => poisoned.into_inner().inhibit(Stopped::Poisoned),
+        };
+        say(said);
         if changed {
             if call.name == crate::rules::FORGET_RULE {
                 // The store removed what was said under the rule. As for
                 // `forget`: the next session's recap is not told it, and
                 // already-delivered context could recreate it unlinked, so
                 // journalling stops until a fresh worker.
-                self.context
+                let said = self
+                    .context
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .journal_inhibited = true;
+                    .inhibit(Stopped::RuleForgotten);
+                say(said);
                 FORGET_THREAD.store(true, Ordering::Release);
                 if let Ok(mut thread) = crate::thread::THREAD.try_lock() {
                     clear_forgotten_thread(&mut thread);
@@ -1813,8 +1922,9 @@ impl DaysClient {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         context.uncertain_writes = context.uncertain_writes.saturating_sub(1);
-        context.journal_inhibited = true;
+        let said = context.inhibit(Stopped::LightRuleForgotten);
         drop(context);
+        say(said);
         FORGET_THREAD.store(true, Ordering::Release);
         if let Ok(mut thread) = crate::thread::THREAD.try_lock() {
             clear_forgotten_thread(&mut thread);
@@ -2712,6 +2822,10 @@ mod tests {
         let (told, _) = run(FORGET, json!({"source_id":8}));
         assert_eq!(told, json!({"forgotten": true}));
         assert!(client.context.lock().unwrap().journal_inhibited);
+        assert_eq!(
+            client.context.lock().unwrap().stopped_by,
+            Some(Stopped::Forgotten)
+        );
         // With nobody known, everything is refused here: the room's memory
         // is the household's (the reviewer on #1723), and nothing is sent.
         let (told, answered) = run(FORGET_EVERYTHING, json!({}));
@@ -2741,7 +2855,7 @@ mod tests {
         });
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_all.store(true, Ordering::Release);
-        client.context.lock().unwrap().include(None, &[8]);
+        assert_eq!(client.context.lock().unwrap().include(None, &[8]), None);
         let (told, _) = client.run_at(
             &call(FORGET, json!({"source_id":8})),
             FIRST_READ,
@@ -3002,10 +3116,13 @@ mod tests {
     #[test]
     fn conservative_context_and_conversation_are_bounded_without_silent_truncation() {
         let mut context = DaysContext::default();
-        context.include(None, &(1..=64).collect::<Vec<_>>());
-        context.include(None, &[64]);
+        assert_eq!(context.include(None, &(1..=64).collect::<Vec<_>>()), None);
+        assert_eq!(context.include(None, &[64]), None);
         assert!(!context.journal_inhibited);
-        context.include(None, &[65]);
+        assert_eq!(
+            context.include(None, &[65]),
+            Some(stopped_line(Stopped::SourcesLimit))
+        );
         assert!(context.journal_inhibited);
         assert_eq!(context.sources.len(), 64);
         let mut conversation = Conversation::default();
@@ -3016,6 +3133,120 @@ mod tests {
         assert!(conversation.overflow);
         assert_eq!(conversation.sources.len(), 64);
         assert_eq!(conversation.finished, Some(now));
+    }
+
+    /// A Days client that does no memory I/O, with this context, and its
+    /// queue. Made by [`DaysClient::new`] and then changed, so a field
+    /// added to the client needs nothing here: its own writer ends, with
+    /// nothing written, as its queue is replaced by the test's.
+    fn client_with(context: DaysContext) -> (DaysClient, Receiver<DaysJob>) {
+        let mut client = DaysClient::new(PathBuf::from("/unused-no-io")).unwrap();
+        let (jobs, work) = sync_channel(4);
+        client.jobs = jobs;
+        client.context = Mutex::new(context);
+        client.threads = AtomicBool::new(false);
+        client.forget_all = AtomicBool::new(false);
+        (client, work)
+    }
+
+    /// #2176 (a): journalling that stops says why the first time, and how
+    /// many exchanges it has held back since, on a doubling count. What
+    /// stops it and what it drops are as before.
+    #[test]
+    fn a_stopped_journal_says_why_and_how_many_it_held_back() {
+        let mut context = DaysContext::default();
+        // The reason's line is returned, to be said once the context's
+        // guard is dropped (#2186), not said under it.
+        assert_eq!(
+            context.include(None, &(1..=65).collect::<Vec<_>>()),
+            Some(stopped_line(Stopped::SourcesLimit))
+        );
+        assert!(context.journal_inhibited);
+        assert_eq!(context.stopped_by, Some(Stopped::SourcesLimit));
+        // A later reason does not replace the first, and says nothing.
+        assert_eq!(context.inhibit(Stopped::Forgotten), None);
+        assert_eq!(context.stopped_by, Some(Stopped::SourcesLimit));
+        let (client, work) = client_with(context);
+        let mut said = vec![];
+        for _ in 0..5 {
+            assert!(!client.finished_exchange(NOW, "heard", "said"));
+            said.push(client.context.lock().unwrap().held_back_line());
+        }
+        assert!(work.try_recv().is_err());
+        assert_eq!(client.lost.load(Ordering::Relaxed), 5);
+        let line = |n| {
+            Some(format!(
+                "lamp-voice provider: memory journal stopped: why=sources_limit unacknowledged_writes=0 not_journalled={n}"
+            ))
+        };
+        assert_eq!(said, [line(1), line(2), None, line(4), None]);
+        assert_eq!(client.context.lock().unwrap().held_back, 5);
+
+        let mut rules = DaysContext::default();
+        assert_eq!(
+            rules.rule(None, 1..=65),
+            Some(stopped_line(Stopped::RulesLimit))
+        );
+        assert_eq!(rules.stopped_by, Some(Stopped::RulesLimit));
+        assert_eq!(
+            stopped_line(Stopped::RulesLimit),
+            "lamp-voice provider: memory journal stopped until a fresh worker: why=rules_limit"
+        );
+        let names: Vec<_> = [
+            Stopped::Forgotten,
+            Stopped::RuleForgotten,
+            Stopped::LightRuleForgotten,
+            Stopped::SourcesLimit,
+            Stopped::RulesLimit,
+            Stopped::Poisoned,
+        ]
+        .map(Stopped::as_str)
+        .into();
+        assert_eq!(
+            names,
+            [
+                "forgotten",
+                "rule_forgotten",
+                "light_rule_forgotten",
+                "sources_limit",
+                "rules_limit",
+                "poisoned"
+            ]
+        );
+
+        // A write not yet acknowledged holds exchanges back too, and is
+        // said as that, with no reason of its own kept.
+        let (client, work) = client_with(DaysContext {
+            uncertain_writes: 2,
+            ..DaysContext::default()
+        });
+        assert!(!client.finished_exchange(NOW, "heard", "said"));
+        assert!(work.try_recv().is_err());
+        let context = client.context.lock().unwrap();
+        assert_eq!(context.stopped_by, None);
+        assert_eq!(
+            context.held_back_line().as_deref(),
+            Some(
+                "lamp-voice provider: memory journal stopped: why=unacknowledged_write unacknowledged_writes=2 not_journalled=1"
+            )
+        );
+    }
+
+    /// #2176 (a): journalling that never stopped says nothing and counts
+    /// nothing, and an exchange too long, as before, is not counted as
+    /// held back by a stop.
+    #[test]
+    fn a_journal_that_never_stopped_says_nothing_new() {
+        let (client, work) = client_with(DaysContext::default());
+        assert!(client.finished_exchange(NOW, "heard", "said"));
+        assert!(matches!(work.try_recv(), Ok(DaysJob::Exchange { .. })));
+        assert!(!client.finished_exchange(NOW, &"x".repeat(60_001), "said"));
+        assert_eq!(client.lost.load(Ordering::Relaxed), 1);
+        let context = client.context.lock().unwrap();
+        assert!(!context.journal_inhibited);
+        assert_eq!(context.stopped_by, None);
+        assert_eq!(context.held_back, 0);
+        assert_eq!(context.held_back_line(), None);
     }
 
     #[test]
@@ -4166,7 +4397,7 @@ mod tests {
         let (jobs, work) = sync_channel(4);
         let mut context = DaysContext::default();
         for (index, whose) in expected.into_iter().enumerate() {
-            context.include(whose, &[index as u64 + 10]);
+            assert_eq!(context.include(whose, &[index as u64 + 10]), None);
         }
         let client = DaysClient {
             socket: PathBuf::from("/unused-no-io"),

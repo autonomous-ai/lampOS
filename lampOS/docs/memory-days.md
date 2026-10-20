@@ -136,6 +136,32 @@ this code cannot retract words already delivered to a cloud provider.
 Conservative links may delete more derived exchanges than exact citations
 would. Exchanges that use remember/forget still stay out of the journal.
 
+The stop is said in the voice's journal (#2176); nothing else about it
+changes. When journalling first stops, one line names why:
+
+    lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+
+`why` is `forgotten` (a confirmed `forget` or `forget_everything`),
+`rule_forgotten`, `light_rule_forgotten` (the rules keeping the light on
+forgotten), `sources_limit` or `rules_limit` (a 65th distinct source or rule
+in the provider's context) or `poisoned` (the context's lock poisoned while a
+rule was linked). Only the first reason is kept. Then each exchange held back
+by the stop, or by a write not yet acknowledged, is counted, and the 1st,
+2nd, 4th, 8th and so on say the count:
+
+    lamp-voice provider: memory journal stopped: why=forgotten unacknowledged_writes=0 not_journalled=4
+
+With only an unacknowledged write holding exchanges back, `why` is
+`unacknowledged_write`. Exchanges lost otherwise (longer than 60,000 bytes, a
+busy context, a full queue) are not in `not_journalled`. After `poisoned` the
+lock stays poisoned, so every later exchange finds the context busy and none
+is counted. The lines carry no
+word said or kept and no person's id. A journal that never stopped says
+nothing new (`remember::tests::a_journal_that_never_stopped_says_nothing_new`,
+`remember::tests::a_stopped_journal_says_why_and_how_many_it_held_back`).
+These lines come from the provider worker, a process apart from the one
+that publishes the voice's `diagnostics`, so they are not on the bus.
+
 One worker owns a bounded queue of 32 exchanges and cleanup requests. Live
 Voice only attempts to enqueue; full queues drop new work. The worker
 collects IDs from acknowledged appends and sends `conversation_end` with
