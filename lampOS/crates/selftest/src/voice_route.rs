@@ -111,7 +111,10 @@ pub enum Looked {
     Ok,
     Missing,
     Empty,
-    /// Not a regular file (a folder, say).
+    /// A folder: never a key, but a unit's credential may be one, which
+    /// systemd loads file by file (`own-keys-voice.conf`, #2094).
+    Folder,
+    /// Not a regular file nor a folder.
     NotAFile,
     /// It could not be looked at (its folder is closed to this user).
     Closed,
@@ -120,6 +123,7 @@ pub enum Looked {
 /// How the file at `path` looks.
 pub fn look(path: &Path) -> Looked {
     match fs::metadata(path) {
+        Ok(meta) if meta.is_dir() => Looked::Folder,
         Ok(meta) if !meta.is_file() => Looked::NotAFile,
         Ok(meta) if meta.len() == 0 => Looked::Empty,
         Ok(_) => Looked::Ok,
@@ -161,7 +165,7 @@ fn fault(path: &str, what: &str, looked: Looked) -> Option<String> {
         Looked::Ok => return None,
         Looked::Missing => "is missing",
         Looked::Empty => "is empty",
-        Looked::NotAFile => "is not a file",
+        Looked::Folder | Looked::NotAFile => "is not a file",
         Looked::Closed => "cannot be looked at",
     };
     Some(format!("{what} {path} {wrong}"))
@@ -225,12 +229,19 @@ pub fn judge(
             )),
         }
     }
+    let named = keys.len();
     for (id, path) in &unit.credentials {
         keys.push((path.clone(), format!("the unit's credential {id}")));
     }
     let checked = keys.len();
-    for (path, what) in &keys {
-        wrong.extend(fault(path, what, look(Path::new(path))));
+    for (at, (path, what)) in keys.iter().enumerate() {
+        let looked = look(Path::new(path));
+        // A credential's folder is loaded file by file, an empty one as
+        // none: the person's own keys (#2094), there or not.
+        if at >= named && looked == Looked::Folder {
+            continue;
+        }
+        wrong.extend(fault(path, what, looked));
     }
     if wrong.is_empty() {
         PartResult::new(
@@ -372,6 +383,38 @@ mod tests {
         );
     }
 
+    /// #2094: the own keys' drop-in loads a folder, which passes, empty or
+    /// not; a key a configuration names that is a folder still fails.
+    #[test]
+    fn a_credentials_folder_passes_and_a_key_that_is_a_folder_does_not() {
+        let with = Unit::read(&[
+            PRODUCT.to_owned(),
+            include_str!("../../../deploy/product/own-keys-voice.conf").to_owned(),
+        ]);
+        assert_eq!(
+            with.credentials,
+            [("own".into(), "/etc/lampOS/voice/own".into())]
+        );
+        let config = r#"{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"/etc/lampOS/voice/credential"}"#;
+        let files = [
+            ("/etc/lampOS/voice/second.json", Looked::Ok),
+            (RELAY_KEY, Looked::Ok),
+            ("/etc/lampOS/voice/own", Looked::Folder),
+        ];
+        let passed = judged(&with, &files, Ok(config));
+        assert_eq!(passed.verdict, Verdict::Pass, "{passed:?}");
+        let folder_key = judged(
+            &with,
+            &[
+                ("/etc/lampOS/voice/second.json", Looked::Ok),
+                (RELAY_KEY, Looked::Folder),
+                ("/etc/lampOS/voice/own", Looked::Folder),
+            ],
+            Ok(config),
+        );
+        assert_eq!(folder_key.verdict, Verdict::Fail, "{folder_key:?}");
+    }
+
     #[test]
     fn run_as_lampos_the_relay_key_is_looked_at_and_the_units_credentials_too() {
         let with = Unit::read(&[format!(
@@ -426,7 +469,7 @@ mod tests {
         fs::write(&empty, "").unwrap();
         assert_eq!(look(&key), Looked::Ok);
         assert_eq!(look(&empty), Looked::Empty);
-        assert_eq!(look(&directory), Looked::NotAFile);
+        assert_eq!(look(&directory), Looked::Folder);
         assert_eq!(look(&directory.join("gone")), Looked::Missing);
         assert_eq!(
             named_keys(

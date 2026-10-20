@@ -55,6 +55,9 @@ fn default_reports() -> PathBuf {
 fn default_display_name() -> PathBuf {
     "/etc/lampOS/setup/display-name".into()
 }
+fn default_own_keys() -> PathBuf {
+    crate::keys::FOLDER.into()
+}
 
 /// The server's written configuration.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -115,6 +118,11 @@ pub struct Config {
     /// changes what the lamp answers to.
     #[serde(default = "default_display_name")]
     pub display_name: PathBuf,
+    /// The folder of the person's own DeepSeek and Deepgram keys (#2094,
+    /// `crate::keys`), with `LAMP_OWN_KEYS=on`: root's, 0700, each key
+    /// 0600, loaded whole by the voice's unit. The reset's plan removes it.
+    #[serde(default = "default_own_keys")]
+    pub own_keys: PathBuf,
     /// Run once the hotspot is up and once serving ends: V1's nginx, which
     /// serves V1's page and passes `/api/` here, is on only during setup.
     #[serde(default)]
@@ -136,7 +144,7 @@ pub struct Config {
 }
 
 /// The configuration's fields, as [`read`] knows them.
-pub const FIELDS: [&str; 20] = [
+pub const FIELDS: [&str; 21] = [
     "listen",
     "marker",
     "credential",
@@ -153,6 +161,7 @@ pub const FIELDS: [&str; 20] = [
     "backend",
     "reports",
     "display_name",
+    "own_keys",
     "web_start",
     "web_stop",
     "free_port",
@@ -187,6 +196,7 @@ impl Config {
             &self.backend,
             &self.reports,
             &self.display_name,
+            &self.own_keys,
         ] {
             if !path.is_absolute() {
                 return Err(format!("{} is not absolute", path.display()));
@@ -241,6 +251,12 @@ pub struct Status {
     /// last setup (#1683), so the app can show it after a reconnect. Read
     /// only: the app sets it later through `lamp-cloud`, not here.
     pub share_reports: bool,
+    /// With `LAMP_OWN_KEYS=on` (#2094): for each own key the last setup was
+    /// given, by service, `{"code", "answer"}`: `works`, `refused`,
+    /// `unreached` or `bad_field`, and the plain words. Never a key; absent
+    /// when none was given.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub own_keys: std::collections::BTreeMap<&'static str, Value>,
 }
 
 /// The `generation` a V2 lamp's setup reports; V1's server has no such field.
@@ -258,6 +274,7 @@ impl Status {
             runtime_phase: String::new(),
             generation: GENERATION,
             share_reports: false,
+            own_keys: Default::default(),
         }
     }
 }
@@ -301,6 +318,15 @@ pub struct SetupRequest {
     /// app that does not ask, V1's page and this crate's own all mean no.
     #[serde(default, deserialize_with = "only_true")]
     pub share_reports: bool,
+    /// A person's own keys (#2094), each optional, read only with
+    /// `LAMP_OWN_KEYS=on`: DeepSeek's endpoint (absent: DeepSeek's own API)
+    /// and key, and Deepgram's key.
+    #[serde(default, deserialize_with = "text")]
+    pub deepseek_api_key: String,
+    #[serde(default, deserialize_with = "text")]
+    pub deepseek_base_url: String,
+    #[serde(default, deserialize_with = "text")]
+    pub deepgram_api_key: String,
 }
 
 /// Whether the field is the JSON `true`, and nothing else.
@@ -424,6 +450,9 @@ pub struct Accepted {
     pub backend: Option<Backend>,
     /// Whether the person said yes to health and crash reports (#1683).
     pub share_reports: bool,
+    /// The person's own keys given (#2094), each fitted or why not; checked
+    /// against its service only after the join, and kept only if it works.
+    pub own_keys: Vec<Result<crate::keys::Given, (crate::keys::Service, &'static str)>>,
 }
 
 /// Shown in place of a secret, so a debug line never logs the Wi-Fi password
@@ -447,6 +476,9 @@ impl fmt::Debug for SetupRequest {
             .field("fa_channel", &self.fa_channel)
             .field("fd_channel", &self.fd_channel)
             .field("share_reports", &self.share_reports)
+            .field("deepseek_api_key", &HIDDEN)
+            .field("deepseek_base_url", &self.deepseek_base_url)
+            .field("deepgram_api_key", &HIDDEN)
             .finish()
     }
 }
@@ -461,6 +493,7 @@ impl fmt::Debug for Accepted {
             .field("timezone", &self.timezone)
             .field("backend", &self.backend)
             .field("share_reports", &self.share_reports)
+            .field("own_keys", &self.own_keys)
             .finish()
     }
 }
@@ -510,7 +543,28 @@ pub fn check(request: &SetupRequest, config: &Config) -> Result<Accepted, String
         timezone: zone_known(timezone, &config.zoneinfo).then(|| timezone.to_owned()),
         backend: backend_link(request).ok(),
         share_reports: request.share_reports,
+        own_keys: own_keys(request),
     })
+}
+
+/// The own keys a request names (#2094), each fitted or why not. A key that
+/// doesn't fit never fails setup: its answer says so, and the relay stays.
+pub fn own_keys(
+    request: &SetupRequest,
+) -> Vec<Result<crate::keys::Given, (crate::keys::Service, &'static str)>> {
+    use crate::keys::{Service, given};
+    [
+        (
+            Service::DeepSeek,
+            &request.deepseek_api_key,
+            Some(request.deepseek_base_url.as_str()),
+        ),
+        (Service::Deepgram, &request.deepgram_api_key, None),
+    ]
+    .into_iter()
+    .filter(|(_, key, _)| !key.trim().is_empty())
+    .map(|(service, key, base_url)| given(service, key, base_url).map_err(|why| (service, why)))
+    .collect()
 }
 
 /// An IANA name such as `Asia/Ho_Chi_Minh` whose file, links followed, is a
@@ -554,12 +608,28 @@ pub trait Save {
         Ok(())
     }
     fn marker(&mut self) -> io::Result<()>;
+    /// Whether a person's own keys are taken (#2094, `LAMP_OWN_KEYS=on`).
+    /// Off by default: nothing is checked, kept or said.
+    fn own_keys_on(&self) -> bool {
+        false
+    }
+    /// A person's own key, checked once and kept only if it works. Asked
+    /// only when [`Save::own_keys_on`].
+    fn own_key(&mut self, _given: &crate::keys::Given) -> crate::keys::Verdict {
+        crate::keys::Verdict::Unreached
+    }
 }
 
 /// The temporary files a setup that crashed mid-write may have left, each of
 /// which may hold a secret, the user's key among them: removed at every
 /// start (Thirteen on #1016).
 pub fn leftover_temporaries(config: &Config) -> Vec<PathBuf> {
+    // The person's own keys too (#2094), which their helper writes the same way.
+    let own: Vec<PathBuf> = crate::keys::Service::ALL
+        .iter()
+        .map(|service| config.own_keys.join(service.key_file()))
+        .chain([config.own_keys.join(crate::keys::DEEPSEEK_URL_FILE)])
+        .collect();
     [
         &config.name,
         &config.marker,
@@ -568,6 +638,7 @@ pub fn leftover_temporaries(config: &Config) -> Vec<PathBuf> {
         &config.backend,
     ]
     .into_iter()
+    .chain(own.iter())
     .map(|path| path.with_extension("lamp-setup-tmp"))
     .collect()
 }
@@ -631,6 +702,11 @@ pub const REPORTS_ASKED: u64 = 1;
 
 /// What setup keeps of the person's answer on reports, at `at`.
 pub fn reports_record(share: bool, at: SystemTime) -> Value {
+    json!({"share": share, "asked": REPORTS_ASKED, "at": rfc3339(at)})
+}
+
+/// `at` as RFC 3339 UTC, whole seconds.
+pub fn rfc3339(at: SystemTime) -> String {
     let seconds = at.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let (days, rest) = ((seconds / 86_400) as i64, seconds % 86_400);
     // Howard Hinnant's civil-from-days.
@@ -649,7 +725,7 @@ pub fn reports_record(share: bool, at: SystemTime) -> Value {
         rest / 60 % 60,
         rest % 60
     );
-    json!({"share": share, "asked": REPORTS_ASKED, "at": at})
+    at
 }
 
 /// The files named in the configuration.
@@ -739,6 +815,18 @@ impl Save for Files<'_> {
     }
     fn marker(&mut self) -> io::Result<()> {
         write_private(&self.0.marker, b"")
+    }
+    fn own_keys_on(&self) -> bool {
+        crate::keys::on(std::env::var(crate::keys::ENVIRONMENT).ok().as_deref())
+    }
+    fn own_key(&mut self, given: &crate::keys::Given) -> crate::keys::Verdict {
+        use crate::keys;
+        keys::check_and_keep(
+            given,
+            &keys::Store(self.0.own_keys.clone()),
+            &mut keys::HttpCheck::default(),
+        )
+        .0
     }
 }
 
@@ -845,6 +933,7 @@ pub fn run(
         Joined::Failed { reason } => Some(reason.detail().to_owned()),
         Joined::Connected => {
             let mut reports_kept = false;
+            let mut own_answers = std::collections::BTreeMap::new();
             // The key last, just before the marker, so a name or zone that
             // cannot be saved leaves the key there as it was (the reviewer on
             // #1120).
@@ -879,8 +968,34 @@ pub fn run(
                 Some(key) => save.credential(key),
                 None => Ok(()),
             })
+            .map(|()| {
+                // The person's own keys (#2094), now that the lamp is online:
+                // each checked once and kept only if it works, before the
+                // marker so the voice's first start takes them. None fails
+                // setup: the relay stays, and the answer says why.
+                let given = if save.own_keys_on() {
+                    accepted.own_keys.as_slice()
+                } else {
+                    &[]
+                };
+                for given in given {
+                    let (service, code, words) = match given {
+                        Ok(given) => {
+                            let verdict = save.own_key(given);
+                            (given.service, verdict.code(), verdict.words(given))
+                        }
+                        Err((service, why)) => (*service, "bad_field", (*why).to_owned()),
+                    };
+                    eprintln!("lamp-setup: the person's {} key: {words}", service.name());
+                    own_answers.insert(service.id(), json!({"code": code, "answer": words}));
+                }
+            })
             .and_then(|()| save.marker());
-            status.lock().unwrap().share_reports = saved.is_ok() && reports_kept;
+            {
+                let mut status = status.lock().unwrap();
+                status.share_reports = saved.is_ok() && reports_kept;
+                status.own_keys = own_answers;
+            }
             match saved {
                 Ok(()) => None,
                 Err(_) => {

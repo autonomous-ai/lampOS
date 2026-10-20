@@ -454,6 +454,18 @@ during the fade out not opened after the marker (the reviewer's probe on
 never dark; and with the switch off no ring opened. Not shown on a lamp: the colours, the
 brightness in a room and the timing on the ring itself are a lamp check.
 
+## A person's own keys (#2094, built, off unless set)
+
+With `LAMP_OWN_KEYS=on`, the setup request may carry a person's own
+DeepSeek endpoint and key and Deepgram key (`deepseek_api_key`,
+`deepseek_base_url`, `deepgram_api_key`). Each is checked once against its
+service after the join and before the marker, and kept only if it works, in
+`/etc/lampOS/voice/own/` (root's, 0700, each key 0600), which the reset
+wipes. None fails setup: the status's `own_keys` gives each answer. After
+setup the app changes them through root's keys helper,
+`lamp-setup keys` on `lamp-setup-keys.socket`. All of it is in
+[own-keys.md](own-keys.md).
+
 ## Changed after setup (#1959, built, off unless set)
 
 The person changes their name, the lamp's name in the app or the time zone

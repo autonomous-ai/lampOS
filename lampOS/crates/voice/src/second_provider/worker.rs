@@ -544,7 +544,8 @@ pub fn gemini_key(
     }
 }
 
-/// DeepSeek's key for its chat and search: the relay's credential
+/// DeepSeek's key for its chat and search: the person's own when the
+/// route has it (`LAMP_OWN_KEYS`, #2094), else the relay's credential
 /// (`llm_credential_file`) when they go through the relay
 /// (`deepseek_base_url`, #1934), else the voice unit's `deepseek.key`.
 pub fn deepseek_key(
@@ -552,6 +553,9 @@ pub fn deepseek_key(
     credentials: Option<&std::ffi::OsStr>,
 ) -> io::Result<crate::second_config::Key> {
     use crate::second_config::{DEEPSEEK_CREDENTIAL, unit_credential};
+    if let Some(own) = &config.hosted.own_deepseek {
+        return Ok(own.clone());
+    }
     match config.hosted.deepseek_base_url {
         Some(_) => Ok(config.llm_key.clone()),
         None => unit_credential(credentials, DEEPSEEK_CREDENTIAL),
@@ -624,12 +628,101 @@ async fn ask_observations(
     crate::remember::observe_output(&text)
 }
 
-/// How the journal names where DeepSeek is asked: never a URL.
-pub(crate) fn deepseek_where(hosted: &crate::second_config::Hosted) -> &'static str {
-    if hosted.deepseek_base_url.is_some() {
+/// The status the person's own DeepSeek key was last refused with, 0 while
+/// it never was in this run (#2094): what `voice-keys` tells lamp-health.
+static OWN_KEY_REFUSED: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
+
+/// The health part that says whether the person's own key still works.
+pub const OWN_KEY_HEALTH: &str = "voice-keys";
+/// Its publisher's name on the bus, which takes `[a-z][a-z0-9_]{0,31}`
+/// only: `voice-keys` itself is refused there, so the part never reported
+/// (found by the test of the reviewer's P2 on #2167).
+pub const OWN_KEY_PUBLISHER: &str = "voice_keys";
+
+/// The warning lamp-health shows once the person's key was refused.
+pub const OWN_KEY_REFUSED_WORDS: &str = "your DeepSeek key was refused, using the lamp's own";
+
+/// A request the person's own key was refused for: one journal line, and
+/// the health warning from then on. Never the key.
+fn own_key_refused(status: u16) {
+    OWN_KEY_REFUSED.store(status, std::sync::atomic::Ordering::Relaxed);
+    eprintln!(
+        "lamp-voice second: DeepSeek: the person's own key was refused (HTTP {status}); this request goes through the relay (LAMP_OWN_KEYS)"
+    );
+}
+
+/// `voice-keys`' report: well, with whose DeepSeek key it uses (`uses`:
+/// `own` or `lamp`), or the warning once the person's own key (`own`) was
+/// refused. Without the person's key it is well, `uses=lamp`, so a part
+/// that reported once never goes quiet when the key is removed (the
+/// reviewer's P2 on #2167).
+pub fn own_key_health(own: bool, refused: u16) -> lamp_msgs::Diagnostic {
+    match (own, refused) {
+        (false, _) => lamp_msgs::Diagnostic::ok(OWN_KEY_HEALTH).with("uses", "lamp"),
+        (true, 0) => lamp_msgs::Diagnostic::ok(OWN_KEY_HEALTH).with("uses", "own"),
+        (true, status) => lamp_msgs::Diagnostic::new(
+            lamp_msgs::Level::Warn,
+            OWN_KEY_HEALTH,
+            OWN_KEY_REFUSED_WORDS,
+        )
+        .with("status", status),
+    }
+}
+
+/// `voice-keys`' report at this worker's start, if it reports at all:
+/// whenever the switch is on, with the person's DeepSeek key (`own`) or
+/// without it (the reviewer's P2 on #2167). Off, none.
+pub fn own_key_report(switch_on: bool, own: bool) -> Option<lamp_msgs::Diagnostic> {
+    switch_on.then(|| own_key_health(own, 0))
+}
+
+/// With `LAMP_OWN_KEYS=on` and a bus: `voice-keys` reported to lamp-health
+/// every second, as a running part reports, for as long as this worker
+/// runs, with the person's DeepSeek key (`own`) or without it. A key kept
+/// and then removed restarts the voice without one, and the part goes on
+/// reporting, so it is never stale for good. Without a bus, nothing.
+fn report_own_key(bus_root: Option<&Path>, own: bool) {
+    let Some(mut health) = bus_root
+        .and_then(|root| lamp_bus::Bus::new(root).ok())
+        .and_then(|bus| {
+            bus.publisher_declared(
+                lamp_msgs::Diagnostic::TOPIC,
+                &lamp_msgs::Diagnostic::declaration(),
+                OWN_KEY_PUBLISHER,
+            )
+            .ok()
+        })
+    else {
+        return;
+    };
+    std::thread::spawn(move || {
+        loop {
+            let refused = OWN_KEY_REFUSED.load(std::sync::atomic::Ordering::Relaxed);
+            let _ = health.publish_json(lamp_ipc::monotonic_us(), &own_key_health(own, refused));
+            std::thread::sleep(Duration::from_secs(1));
+        }
+    });
+}
+
+/// How the journal names where DeepSeek is asked: never a URL. With the
+/// person's own key, its host, so a changed endpoint shows in every start's
+/// line, not only the day it was set (Third's P3 on #2167).
+pub(crate) fn deepseek_where(hosted: &crate::second_config::Hosted) -> String {
+    if hosted.own_deepseek.is_some() {
+        format!(
+            "with the person's own key, at {} (LAMP_OWN_KEYS)",
+            crate::second_config::host(
+                hosted
+                    .deepseek_base_url
+                    .as_deref()
+                    .unwrap_or(crate::second_config::DEEPSEEK_BASE_URL)
+            )
+        )
+    } else if hosted.deepseek_base_url.is_some() {
         "through the relay with its credential (deepseek_base_url, LAMP_SECOND_DEEPSEEK_BASE_URL)"
+            .to_owned()
     } else {
-        "on DeepSeek's own API"
+        "on DeepSeek's own API".to_owned()
     }
 }
 
@@ -708,6 +801,16 @@ pub fn services(
             if let Some(key) = &deepseek {
                 net = net
                     .chatting_with_deepseek(key.expose())
+                    .map_err(io::Error::other)?;
+            }
+            // The person's own key refused later (a rotation, #2094): that
+            // request goes through the relay it went over, never a failed
+            // answer, said in the journal and to lamp-health.
+            if hosted.own_deepseek.is_some()
+                && let Some(relay) = &hosted.relay_deepseek_base_url
+            {
+                net = net
+                    .falling_back_to_the_relay(relay, Arc::new(own_key_refused))
                     .map_err(io::Error::other)?;
             }
             eprintln!(
@@ -1251,6 +1354,22 @@ pub fn serve(
     // The unit's Gemini endpoint and voice over the file's (#1712).
     let config = crate::second_config::load_from_path(second_config)?
         .with_environment(|name| std::env::var_os(name))?;
+    // The person's own keys over the relay, with LAMP_OWN_KEYS=on (#2094).
+    let own_keys_on =
+        std::env::var_os(crate::second_config::OWN_KEYS_ENV).is_some_and(|value| value == "on");
+    let (config, lines) = config.with_own_keys(
+        own_keys_on,
+        std::env::var_os(crate::second_config::CREDENTIALS_ENV).as_deref(),
+    );
+    for line in lines {
+        eprintln!("lamp-voice second: {line}");
+    }
+    if own_key_report(own_keys_on, config.hosted.own_deepseek.is_some()).is_some() {
+        report_own_key(
+            files.bus_root.as_deref(),
+            config.hosted.own_deepseek.is_some(),
+        );
+    }
     // As the lamp's only voice, its link follows whether the services'
     // hosts answer (#1844, `link.rs`): the hosts checked.
     let probe_targets = route.only_voice.then(|| probe_targets(&config));
@@ -7192,12 +7311,208 @@ mod tests {
             "{searched}"
         );
         assert!(searched.contains("authorization: bearer relay-key"));
+        // #2094: the person's own key goes over the relay's, and the
+        // journal's words name it, never the key.
+        let mut theirs = config.clone();
+        theirs.hosted.own_deepseek = crate::second_config::credential(&private(
+            dir.join("own_deepseek.key"),
+            "sk-planted-2094",
+        ))
+        .ok();
+        assert_eq!(
+            super::deepseek_key(&theirs, None).unwrap().expose(),
+            "sk-planted-2094"
+        );
+        // Its host, not its path, at each start (Third's P3 on #2167).
+        let said = super::deepseek_where(&theirs.hosted);
+        let at = crate::second_config::host(theirs.hosted.deepseek_base_url.as_deref().unwrap());
+        assert!(!at.is_empty());
+        assert!(
+            said.contains("person's own key")
+                && said.contains(&format!("at {at} "))
+                && !said.contains("sk-")
+                && !said.contains("://"),
+            "{said}"
+        );
         // Without a base URL, DeepSeek's own API still needs deepseek.key.
         let mut own = config;
         own.hosted.deepseek_base_url = None;
         let error = super::deepseek_key(&own, None).err().unwrap().to_string();
         assert!(error.contains("CREDENTIALS_DIRECTORY"), "{error}");
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #2094: a request the person's own key is refused for (401, after a
+    /// rotation) goes through the relay with the relay's key, never a failed
+    /// answer, and `voice-keys` warns from then on; neither the journal's
+    /// words nor the warning hold the key.
+    #[tokio::test]
+    async fn a_refused_own_key_sends_that_request_through_the_relay() {
+        use super::super::services::Services;
+        use super::{ChatRoute, RouteFlags};
+        use futures_util::StreamExt;
+        use std::os::unix::fs::PermissionsExt;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-second-own-refused-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let private = |path: std::path::PathBuf, text: &str| {
+            std::fs::write(&path, text).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            path
+        };
+        let llm = private(dir.join("llm.key"), "relay-key");
+        let second = private(
+            dir.join("second.json"),
+            &format!(
+                r#"{{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"{}"}}"#,
+                llm.display()
+            ),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let mut seen = Vec::new();
+            for answer in [
+                "HTTP/1.1 401 Unauthorized\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+                "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\ndata: {\"choices\":[{\"delta\":{\"content\":\"Hi.\"}}]}\n\ndata: [DONE]\n\n",
+            ] {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut request = Vec::new();
+                let mut buffer = [0; 65_536];
+                loop {
+                    let n = socket.read(&mut buffer).await.unwrap();
+                    request.extend_from_slice(&buffer[..n]);
+                    let text = String::from_utf8_lossy(&request).to_string();
+                    if let Some((head, body)) = text.split_once("\r\n\r\n") {
+                        let length: usize = head
+                            .lines()
+                            .find_map(|line| {
+                                line.to_lowercase()
+                                    .strip_prefix("content-length: ")
+                                    .map(|n| n.trim().parse().unwrap())
+                            })
+                            .unwrap_or(0);
+                        if body.len() >= length {
+                            break;
+                        }
+                    }
+                }
+                seen.push(String::from_utf8(request).unwrap());
+                socket.write_all(answer.as_bytes()).await.unwrap();
+            }
+            seen
+        });
+        let mut config = crate::second_config::load_from_path(&second).unwrap();
+        config.hosted.deepseek_base_url = Some(format!("http://{address}/own"));
+        config.hosted.relay_deepseek_base_url = Some(format!("http://{address}/relay"));
+        config.hosted.own_deepseek = crate::second_config::credential(&private(
+            dir.join("own_deepseek.key"),
+            "sk-planted-2094-own",
+        ))
+        .ok();
+        let provider: crate::config::ProviderConfig = serde_json::from_str(&format!(
+            r#"{{"endpoint":"wss://relay.example.invalid/ws","model":"m","voice":"Kore","credential_file":"{}"}}"#,
+            llm.display()
+        ))
+        .unwrap();
+        let none: super::super::net::Declare = std::sync::Arc::new(Vec::new);
+        let route = RouteFlags {
+            chat: Some(ChatRoute::DeepSeek),
+            ..RouteFlags::default()
+        };
+        let net = super::services(config, &provider, route, None, none).unwrap();
+        let events: Vec<_> = net
+            .chat(vec![super::super::net::Message::user("hello")])
+            .collect()
+            .await;
+        assert!(events.iter().all(Result::is_ok), "{events:?}");
+        let seen = server.await.unwrap();
+        let own = seen[0].to_lowercase();
+        assert!(own.starts_with("post /own/chat/completions"), "{own}");
+        assert!(own.contains("authorization: bearer sk-planted-2094-own"));
+        let relay = seen[1].to_lowercase();
+        assert!(relay.starts_with("post /relay/chat/completions"), "{relay}");
+        assert!(relay.contains("authorization: bearer relay-key"));
+        assert!(!relay.contains("sk-planted"));
+        assert_eq!(
+            super::OWN_KEY_REFUSED.load(std::sync::atomic::Ordering::Relaxed),
+            401
+        );
+        let warned = serde_json::to_string(&super::own_key_health(true, 401)).unwrap();
+        assert!(warned.contains(super::OWN_KEY_REFUSED_WORDS), "{warned}");
+        assert!(warned.contains("\"warn\""), "{warned}");
+        assert!(!warned.contains("sk-"), "{warned}");
+        let well = serde_json::to_string(&super::own_key_health(true, 0)).unwrap();
+        assert!(well.contains("\"ok\""), "{well}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The reviewer's P2 on #2167: with the switch on, `voice-keys` reports
+    /// whether the person's key is kept or not, so a key kept and then
+    /// removed (the voice restarted without it) leaves a part that goes on
+    /// saying `ok`, the lamp's own key, never one quiet for good. Off, the
+    /// part never starts. On the bus, as lamp-health reads it.
+    #[test]
+    fn a_removed_own_key_leaves_voice_keys_reporting() {
+        // Kept: well. Removed: still reported, well, the lamp's own key.
+        let kept = super::own_key_report(true, true).unwrap();
+        assert_eq!(kept.level, lamp_msgs::Level::Ok);
+        let uses = |said: &lamp_msgs::Diagnostic| {
+            said.values
+                .iter()
+                .find(|value| value.key == "uses")
+                .map(|value| value.value.clone())
+        };
+        assert_eq!(uses(&kept).as_deref(), Some("own"));
+        let removed = super::own_key_report(true, false).unwrap();
+        assert_eq!(removed.level, lamp_msgs::Level::Ok);
+        assert_eq!(uses(&removed).as_deref(), Some("lamp"));
+        // Without the person's key nothing can be refused for it.
+        assert_eq!(
+            super::own_key_health(false, 401).level,
+            lamp_msgs::Level::Ok
+        );
+        // Off: never started, so never stale.
+        assert!(super::own_key_report(false, false).is_none());
+        assert!(super::own_key_report(false, true).is_none());
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/lok-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(
+                lamp_msgs::Diagnostic::TOPIC,
+                "test",
+                lamp_msgs::Diagnostic::TYPE,
+            )
+            .unwrap();
+        super::report_own_key(Some(&root), false);
+        let mut heard = Vec::new();
+        while heard.len() < 2 {
+            let said = hears
+                .recv(Duration::from_secs(5))
+                .unwrap()
+                .expect("voice-keys goes on reporting")
+                .parse::<lamp_msgs::Diagnostic>()
+                .unwrap();
+            if said.name == super::OWN_KEY_HEALTH {
+                heard.push(said);
+            }
+        }
+        assert!(
+            heard
+                .iter()
+                .all(|said| said.level == lamp_msgs::Level::Ok
+                    && uses(said).as_deref() == Some("lamp")),
+            "{heard:?}"
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 
     /// The search's functions go beside the lamp's within Live's bound of

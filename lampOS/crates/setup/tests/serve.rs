@@ -66,6 +66,7 @@ impl Root {
             backend: self.0.join("etc/backend.json"),
             reports: self.0.join("etc/reports.json"),
             display_name: self.0.join("etc/display-name"),
+            own_keys: self.0.join("etc/own"),
             web_start: vec![],
             web_stop: vec![],
             free_port: vec![],
@@ -105,6 +106,7 @@ fn a_request_is_checked_before_anything_is_touched() {
             // A port alone is no link.
             backend: None,
             share_reports: false,
+            own_keys: vec![],
         }
     );
     // The key is the user's (the owner, #806, 16:13). Without one, a lamp
@@ -468,6 +470,11 @@ fn a_leftover_temporary_key_is_removed() {
             tmp(&config.credential),
             tmp(&config.policy_key),
             tmp(&config.backend),
+            // The person's own keys (#2094); DeepSeek's key and endpoint
+            // share one temporary name, written one after the other.
+            tmp(&config.own_keys.join("deepseek.key")),
+            tmp(&config.own_keys.join("deepgram.key")),
+            tmp(&config.own_keys.join("deepseek.url")),
         ]
     );
 }
@@ -1403,4 +1410,103 @@ fn the_configuration_reader_knows_every_field_of_the_configuration() {
     let mut known = lamp_setup::serve::FIELDS.to_vec();
     known.sort_unstable();
     assert_eq!(fields, known);
+}
+
+/// A setup that takes own keys (#2094): it says what it is asked, and
+/// answers each check as told.
+struct Owning {
+    saved: Saved,
+    on: bool,
+    verdict: lamp_setup::keys::Verdict,
+}
+impl Save for Owning {
+    fn credential(&mut self, key: &str) -> io::Result<()> {
+        self.saved.credential(key)
+    }
+    fn name(&mut self, name: &str) -> io::Result<()> {
+        self.saved.name(name)
+    }
+    fn timezone(&mut self, zone: &str) -> io::Result<()> {
+        self.saved.timezone(zone)
+    }
+    fn backend(&mut self, link: &Backend) -> io::Result<()> {
+        self.saved.backend(link)
+    }
+    fn marker(&mut self) -> io::Result<()> {
+        self.saved.marker()
+    }
+    fn own_keys_on(&self) -> bool {
+        self.on
+    }
+    fn own_key(&mut self, given: &lamp_setup::keys::Given) -> lamp_setup::keys::Verdict {
+        self.saved
+            .calls
+            .push(format!("own_key={}", given.service.id()));
+        self.verdict
+    }
+}
+
+/// #2094: the person's own keys are checked after the join and before the
+/// marker, each answer in the status by service and never the key; a
+/// refused or misshapen one never fails setup; with the switch off nothing
+/// is checked and the status is as before.
+#[test]
+fn own_keys_are_checked_before_the_marker_and_never_fail_setup() {
+    use lamp_setup::keys::Verdict;
+    let planted = "sk-planted-2094-bbbbbbbbbbbb";
+    let mut body = good();
+    body["deepseek_api_key"] = json!(planted);
+    body["deepgram_api_key"] = json!(format!("{planted} with a space"));
+    let accepted = check(&request(body), &Root::new().config(false)).unwrap();
+    assert!(!format!("{accepted:?}").contains(planted));
+    for (on, verdict, deepseek) in [
+        (
+            true,
+            Verdict::Works,
+            Some(
+                "that key works: your conversations now go to api.deepseek.com with your key: your words, what the lamp remembers that's sent with them, and what it sees when asked to look",
+            ),
+        ),
+        (true, Verdict::Refused, Some("that key was refused")),
+        (false, Verdict::Works, None),
+    ] {
+        let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+        let mut owning = Owning {
+            saved: Saved::default(),
+            on,
+            verdict,
+        };
+        let mut lamp = Lamp::new(true);
+        run(&status, &accepted, "VN", &mut lamp, &mut owning, || {
+            Some("192.168.1.23".into())
+        });
+        let status = status.lock().unwrap().clone();
+        assert!(status.set_up_completed, "{on} {verdict:?}");
+        let calls = &owning.saved.calls;
+        assert_eq!(calls.last().unwrap(), "marker=");
+        let shown = serde_json::to_value(&status).unwrap();
+        assert!(!shown.to_string().contains(planted), "{shown}");
+        match deepseek {
+            Some(words) => {
+                assert_eq!(calls[calls.len() - 2], "own_key=deepseek", "{calls:?}");
+                assert_eq!(shown["own_keys"]["deepseek"]["answer"], words);
+                assert_eq!(
+                    shown["own_keys"]["deepseek"]["code"],
+                    if verdict == Verdict::Works {
+                        "works"
+                    } else {
+                        "refused"
+                    }
+                );
+                assert_eq!(
+                    shown["own_keys"]["deepgram"],
+                    json!({"code": "bad_field", "answer": "a key is 1 to 512 letters, digits and marks, with no spaces"})
+                );
+            }
+            None => {
+                assert!(calls.iter().all(|call| !call.starts_with("own_key")));
+                assert!(shown.get("own_keys").is_none(), "{shown}");
+            }
+        }
+    }
 }

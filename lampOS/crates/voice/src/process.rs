@@ -1200,6 +1200,7 @@ fn second_route_worker_environment(
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::second_config::FLUX_ENV,
+        crate::second_config::OWN_KEYS_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
     ]
     .into_iter()
@@ -1238,6 +1239,7 @@ mod tests {
         for name in [
             crate::second_provider::net::key_terms::ENVIRONMENT,
             crate::second_config::FLUX_ENV,
+            crate::second_config::OWN_KEYS_ENV,
             crate::second_provider::STEADY_FIRST_ENVIRONMENT,
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
@@ -1565,6 +1567,7 @@ mod tests {
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
+                    || name == crate::second_config::OWN_KEYS_ENV
                 {
                     "on"
                 } else if name == crate::second_provider::FIRST_WORDS_ENVIRONMENT {
@@ -1635,6 +1638,7 @@ mod tests {
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
+                    "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_SECOND_CHAT_WARM=on",

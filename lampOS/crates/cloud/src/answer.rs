@@ -208,6 +208,15 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             changes.start_wifi(data)?;
             Ok(None)
         }
+        // A person's own keys (#2094), with LAMP_OWN_KEYS=on too: to root's
+        // keys helper, which checks each once before it keeps it.
+        kind if crate::settings::KEYS_KINDS.contains(&kind)
+            && lamp.changes().is_some_and(|c| c.keys_on()) =>
+        {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            changes.start_keys(kind, data)?;
+            Ok(None)
+        }
         kind if crate::settings::KINDS.contains(&kind) && lamp.changes().is_some() => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::line(kind, data)?;

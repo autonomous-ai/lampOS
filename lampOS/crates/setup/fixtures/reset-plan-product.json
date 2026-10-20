@@ -31,6 +31,7 @@
     "/var/lib/lampOS/light",
     "/run/lampos-voice/thread.json",
     "/etc/lampOS/voice/credential",
+    "/etc/lampOS/voice/own",
     "/etc/lampOS/policy/jev.key",
     "/etc/lampOS/setup/backend.json",
     "/etc/lampOS/setup/reports.json",
