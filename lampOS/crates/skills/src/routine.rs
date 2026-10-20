@@ -252,6 +252,10 @@ pub struct Manager {
     publisher: Publisher,
     clock_id: String,
     asks: mpsc::Receiver<Asked>,
+    /// Asks issued after the current tick's `now` was sampled. A request
+    /// stamped before its own ask would let the permit outlive the wake
+    /// Expression was sent, so they wait for the next tick's sample.
+    early: Vec<Asked>,
     sources: HashMap<String, Source>,
     enabled: Vec<String>,
     definitions: HashMap<String, Skill>,
@@ -274,6 +278,7 @@ impl Manager {
                 publisher,
                 clock_id,
                 asks,
+                early: Vec::new(),
                 sources: HashMap::new(),
                 enabled: Vec::new(),
                 definitions: HashMap::new(),
@@ -322,6 +327,9 @@ impl Manager {
 
     fn invalidate_runs(&mut self) {
         *self.generation.lock().expect("routine generation") = Arc::new(());
+        for ask in self.early.drain(..) {
+            let _ = ask.answer.try_send(Err("skill definitions changed".into()));
+        }
         while let Ok(ask) = self.asks.try_recv() {
             let _ = ask.answer.try_send(Err("skill definitions changed".into()));
         }
@@ -461,7 +469,15 @@ impl Manager {
                 cancel(&mut self.publisher, source, now);
             }
         }
-        while let Ok(ask) = self.asks.try_recv() {
+        // Every ask in the channel was issued before it was sent, so the
+        // next tick's `now` is later than each deferred one: bounded by the
+        // channel, and deferred at most once.
+        let mut early = std::mem::take(&mut self.early).into_iter();
+        while let Some(ask) = early.next().or_else(|| self.asks.try_recv().ok()) {
+            if ask.issued_us > now {
+                self.early.push(ask);
+                continue;
+            }
             let refuse = |why: &str| {
                 let _ = ask.answer.try_send(Err(why.into()));
             };
@@ -765,6 +781,41 @@ mod tests {
             .unwrap()
             .parse()
             .unwrap()
+    }
+    #[test]
+    fn an_ask_issued_after_the_tick_sample_waits_so_its_request_is_not_stamped_earlier() {
+        let mut f = Fixture::new();
+        let initial = f.resting();
+        f.now += 1_000;
+        let (answer, wake) = mpsc::sync_channel(1);
+        // The run thread sampled its clock after the main loop sampled `now`.
+        let issued_us = f.now + 35;
+        f.client
+            .send
+            .try_send(Asked {
+                skill: "routine".into(),
+                rest: Rest {
+                    op: Op::Wake,
+                    during: None,
+                },
+                issued_us,
+                expires_us: issued_us + WAKE_US,
+                answer,
+                generation: f.client.generation.lock().unwrap().clone(),
+            })
+            .unwrap();
+        let published = f.manager.publisher.totals().published;
+        f.tick(NIGHT);
+        assert_eq!(f.manager.publisher.totals().published, published);
+        assert!(wake.try_recv().is_err(), "deferred, not refused");
+        f.now += 1_000;
+        f.tick(NIGHT);
+        let active = f.manager.sources["routine"].active.as_ref().unwrap();
+        assert_eq!(active.request.op, Op::Wake);
+        assert_eq!(active.request.episode, initial.episode);
+        // The permit's deadline never outlives the wake Expression was sent.
+        assert!(issued_us + WAKE_US <= active.request.stamp.at_us + WAKE_US);
+        assert!(active.waiting.is_some());
     }
     #[test]
     fn a_late_sample_keeps_only_the_existing_lease_and_recovers_the_same_episode() {
