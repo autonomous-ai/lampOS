@@ -100,6 +100,7 @@ fn run_with_notice_policy(
         end_silence_blocks: None,
         early_end_blocks: None,
         early_finalize: false,
+        open_name: false,
         faint_level: None,
         speaker: spawn("speaker"),
         capture: spawn("capture"),

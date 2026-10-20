@@ -1492,6 +1492,7 @@ mod tests {
                     end_silence_blocks: None,
                     early_end_blocks: None,
                     early_finalize: false,
+                    open_name: false,
                     faint_level: None,
                     speaker,
                     capture,

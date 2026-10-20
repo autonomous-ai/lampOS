@@ -73,6 +73,7 @@ mod endpoint;
 mod hand;
 mod holding;
 mod notices;
+mod open_name;
 mod second;
 mod service;
 mod speaker_tone;
@@ -1088,6 +1089,9 @@ struct Rig {
     /// A line's words asked for at a pause (`LAMP_SECOND_EARLY_FINALIZE`,
     /// [`early_finalize`]).
     early_finalize: bool,
+    /// A sound just after a line that ended before its name goes on from it
+    /// (`LAMP_SECOND_OPEN_NAME`, [`open_name`]).
+    open_name: bool,
     faint_level: Option<u8>,
     playout_start: PlayoutStart,
     /// `directed-fixture --fixture-at-ms`: the fixture's own turn, this long
@@ -3620,6 +3624,7 @@ fn spawn_rig(
         end_silence_blocks: options.end_silence_blocks,
         early_end_blocks: options.early_end_blocks,
         early_finalize: early_finalize::from_environment(),
+        open_name: open_name::from_environment(),
         faint_level: options.faint_level,
         playout_start: options.playout_start,
         fixture_at_ms,
@@ -4245,6 +4250,9 @@ thread_local! {
     static TEST_EYES: std::cell::RefCell<Option<crate::body_link::EyesLink>> =
         const { std::cell::RefCell::new(None) };
     static TEST_CAMERA_FOLLOWS_EYES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_WAIT_KEEPS_ANSWER=on` (#1123), as
+    /// `TEST_CAMERA_FOLLOWS_EYES`.
+    static TEST_WAIT_KEEPS_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4369,6 +4377,8 @@ fn conversation_with_gate(
     // recorded for, so that the record says so once. With `words`, its
     // words are heard too.
     let (wait_keeps_answer, wait_hears_words) = wait_keeps_answer_from_environment();
+    #[cfg(test)]
+    let wait_keeps_answer = wait_keeps_answer || TEST_WAIT_KEEPS_ANSWER.with(std::cell::Cell::get);
     let mut answer_kept_for: Option<crate::admission::CandidateId> = None;
     // A new sound waits while the lamp's own line has not sounded
     // (`LAMP_OWN_LINE_KEEPS=on`, #2220), and the candidate it was last
@@ -4402,6 +4412,9 @@ fn conversation_with_gate(
     // The turn the lamp last ended, for speech that goes on with it
     // (`LAMP_CUT_KEEPS_NAME`, #782). Never kept without the switch.
     let mut ended_turn: Option<EndedTurn> = None;
+    // The turn whose words ended before a name, and when its speech ended,
+    // for the name said next (`LAMP_SECOND_OPEN_NAME`, [`open_name`]).
+    let mut open_name_turn: Option<(u64, u64)> = None;
     // The turn that was asked while the room was busy, and when the lamp
     // began to be heard answering it.
     let mut asked_in_busy_room: Option<u64> = None;
@@ -5768,6 +5781,30 @@ fn conversation_with_gate(
                     {
                         walk.heard_line(&text);
                     }
+                    // A line whose words end before a name, its answer
+                    // unheard: a sound begun just after its end goes on
+                    // from it (`LAMP_SECOND_OPEN_NAME`). The second route
+                    // holds the answer meanwhile. Never the words.
+                    if request.is_none()
+                        && finished
+                        && let Some((turn, ended_us)) = open_name::opened(
+                            rig.open_name && rig.provider.role == "second",
+                            &text,
+                            reply
+                                .as_ref()
+                                .map(|current| (current.owner.turn(), answer_unheard(current))),
+                            speech_ended,
+                        )
+                    {
+                        open_name_turn = Some((turn, ended_us));
+                        eprintln!(
+                            "lamp-voice: request {turn}: its words end before a name: a sound begun within 1.5 s of its end goes on from it (LAMP_SECOND_OPEN_NAME)"
+                        );
+                        record(
+                            trace,
+                            json!({"kind":"open_name","turn":turn,"ended_at_us":ended_us,"at_us":monotonic_us()}),
+                        )?;
+                    }
                     if request.is_some()
                         && let Some(walk) = onboarding.as_mut()
                     {
@@ -6534,6 +6571,18 @@ fn conversation_with_gate(
                                     })
                                 }
                         });
+                    // A sound begun just after a line that ended before its
+                    // name goes on from it (`LAMP_SECOND_OPEN_NAME`): no rule
+                    // that keeps the awaited answer lets it go, the keeper's
+                    // pause aside.
+                    let goes_on_from_name = open_name::goes_on(
+                        open_name_turn,
+                        reply
+                            .as_ref()
+                            .map(|current| (current.owner.turn(), answer_unheard(current))),
+                        candidate.first_read_at_us,
+                    );
+                    let holding = holding && !goes_on_from_name;
                     if paused {
                         // Paused by the keeper: a new sound takes no turn,
                         // whether or not one is under way; that one goes on.
@@ -6702,7 +6751,10 @@ fn conversation_with_gate(
                     // joint, while an answer is awaited, is the lamp's own
                     // motors: let go, and the answer goes on. Until the
                     // body has said where it was then, it waits.
-                    if let Some(motion) = motion_in.as_mut().filter(|_| !own_theirs_now) {
+                    if let Some(motion) = motion_in
+                        .as_mut()
+                        .filter(|_| !own_theirs_now && !goes_on_from_name)
+                    {
                         let waits_until_us = candidate
                             .trigger_read_at_us
                             .saturating_add(crate::body_motion::WAITS_US)
@@ -6765,16 +6817,20 @@ fn conversation_with_gate(
                         decided: answer_sounded_for == Some(candidate.id),
                         heard: !playback_mask.is_duplex() || frame.echo.is_some(),
                     };
-                    let mut waits = while_answer_waits(
-                        wait,
-                        reply.as_ref(),
-                        &candidate,
-                        admission.pending_ended(),
-                        detector.pause_blocks(),
-                        at_us,
-                    );
+                    let mut waits = if goes_on_from_name {
+                        WhileAnswerWaits::Decide
+                    } else {
+                        while_answer_waits(
+                            wait,
+                            reply.as_ref(),
+                            &candidate,
+                            admission.pending_ended(),
+                            detector.pause_blocks(),
+                            at_us,
+                        )
+                    };
                     // With `words`, its words too (step 2).
-                    if let Some(words) = wait_words.as_mut() {
+                    if let Some(words) = wait_words.as_mut().filter(|_| !goes_on_from_name) {
                         let told;
                         (waits, told) = with_waited_words(
                             words,
@@ -6883,7 +6939,9 @@ fn conversation_with_gate(
                     let judged = reply
                         .as_ref()
                         .filter(|current| {
-                            current.local_input_ended && (current.playback.is_none() || waited)
+                            !goes_on_from_name
+                                && current.local_input_ended
+                                && (current.playback.is_none() || waited)
                         })
                         .and_then(|current| {
                             let turn = current.owner.turn();
@@ -7059,6 +7117,7 @@ fn conversation_with_gate(
                         accepted,
                         provider_session,
                         continues,
+                        goes_on_from_name,
                         took_over,
                         stop_untold.take_for(provider_session, monotonic_us()),
                         heard_of_cut,
@@ -7068,6 +7127,13 @@ fn conversation_with_gate(
                         |state| rig.publish(state),
                     )?;
                     last_publish = monotonic_us();
+                    if goes_on_from_name {
+                        open_name_turn = None;
+                        eprintln!(
+                            "lamp-voice: request {}: goes on from the line that ended before its name (LAMP_SECOND_OPEN_NAME)",
+                            reply.as_ref().map_or(0, |current| current.owner.turn())
+                        );
+                    }
                     if took_over {
                         took_over_turn = reply.as_ref().map(|current| current.owner.turn());
                     }
@@ -10443,6 +10509,9 @@ fn commit_admitted_input(
     accepted: Accepted,
     provider_session: u64,
     continues: bool,
+    // It goes on from a line that ended before its name, whose words the
+    // second route asks with its own (`LAMP_SECOND_OPEN_NAME`).
+    goes_on_from_name: bool,
     // It takes over from the lamp's own answer: its End, if queued here, says so (#926).
     cut_in: bool,
     // The Stop this request tells of, when it is the first after one
@@ -10490,15 +10559,19 @@ fn commit_admitted_input(
     if let Some(cut) = heard_of_cut {
         admitted["heard_of_cut"] = json!({"request":cut.request,"samples":cut.samples});
     }
+    if goes_on_from_name {
+        admitted["goes_on_from_its_name"] = json!(true);
+    }
     record(trace, admitted)?;
     provider_queue.push_back(ProviderInput::Start {
         session: provider_session,
         request: turn.turn(),
         privacy_generation: snapshot.microphone_generation(),
         // The same utterance going on after the lamp ended it (#782). The
-        // model is told of a cut only after an end sent early.
+        // model is told of a cut only after an end sent early, or here when
+        // it goes on from a line that ended before its name.
         continues,
-        continues_cut_off: false,
+        continues_cut_off: goes_on_from_name,
         // Said with a reply in hand: no staff's note. Its voice is judged
         // unless the lamp's could be heard (`over_the_lamps_voice`, #829).
         over_the_lamp: replacing,
@@ -11955,6 +12028,7 @@ mod tests {
             end_silence_blocks: None,
             early_end_blocks: None,
             early_finalize: false,
+            open_name: false,
             faint_level: None,
             microphone: crate::options::Microphone::Mic2,
             speaker,

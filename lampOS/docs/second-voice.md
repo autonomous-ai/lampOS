@@ -678,6 +678,52 @@ order is kept. A written turn is the same from the chat on.
     which ends its turns itself; **not the stop words' stream**, which
     never takes a pause's answer as its end. The Live worker takes nothing
     from `Paused`.
+- **With `LAMP_SECOND_OPEN_NAME=on`, a line that ends before its name
+  waits for it** (off unless set; #2135, the first builder on #1722, 21 Oct
+  01:58 and 02:16). On lamp-4ace at 21:25 "Hey Lamp, my name is" and 400 ms
+  of quiet ended a line (`model_complete`, 0.933). The name began 9 ms after
+  the end. It was judged as a sound while the answer was awaited, and let go
+  1.13 s after the end. The lamp answered "my name is" alone, and the person
+  said it all again 14 s later. With the switch:
+  - **What counts as before a name** (`known_faces::opens_a_name`): the
+    final words end on "my name is", "my name's", "call me", "I'm called",
+    "I am called", "the name is" or "the name's", a trailing "um" or "uh"
+    allowed. Not after "what", "don't", "never" or "not". Not a question
+    ("Do you know what my name is?", "Can you call me?"). Not a bare "I'm"
+    or "I am": "Yes, I am." ends a line.
+  - **The second route holds the answer** (`Engine::waiting_for_a_name`):
+    such a line is answered no sooner than `CARRY_AFTER_END` (1.5 s) after
+    its end. A newer line drops the request, and the wait with it; with
+    none, it is answered as it is.
+  - **The coordinator lets the name go on** (`coordinator/open_name.rs`).
+    The route gives it the line's final words before the answer
+    (`Transcript` with no request). When they end before a name and none of
+    the turn's answer has been heard, a sound that began within 1.5 s of
+    the turn's end skips every rule that keeps an awaited answer: the
+    busy-room hold, the body's motors, the answer wait (#1123, with its
+    words) and asker-first (#829). The keeper's pause still holds it. It is
+    decided as any line is, and its Start says `continues_cut_off`. So the
+    route puts the held line's words before its own (the `before` path),
+    and the two are asked as one: "Hey Lamp, my name is Jim. Please
+    remember it." Its `input_admitted` says `goes_on_from_its_name`, and
+    the turn's `open_name` record says when it ended.
+  - **Only while the second route answers** (`provider.role` is
+    `second`): the Live route has no such hold.
+  - **What it costs:** at most 1.5 s before the answer, on lines whose
+    final words end before a name, and nothing on any other.
+  - **What it doesn't do:** a sound let go before the line's words came is
+    not brought back. On a cold socket the words came 705 ms after the
+    end, before the let-go at 1.13 s. The turn-end model's decision is
+    unchanged: the line still ends at "my name is".
+  - **Tests:** `known_faces::tests::a_line_ending_before_its_name_is_told_apart`,
+    `second_provider::tests::a_line_ending_before_its_name_waits_for_it`,
+    `coordinator::open_name::tests` and, through the session,
+    `coordinator::tests::second_route::a_name_said_just_after_a_line_that_ended_before_it_goes_on_from_it`
+    (with and without the switch, and with `LAMP_WAIT_KEEPS_ANSWER=on`, where
+    without the switch the name first waits as a sound).
+  - **For a lamp:** played name lines that pause 400–800 ms before the
+    name. Count the names that go on (`goes_on_from_its_name`) and the
+    candidates let go after an end, with the switch and without.
 - **With `LAMP_SECOND_PREPARED=on` the chat is begun on the line's early
   words** (off unless set; #1712, the first builder at 17:02: the route's
   first word came about 3.4 s after a line, Live's 2.4 s, and the bar is
