@@ -3,6 +3,8 @@
 Owner scope reaffirmed 2026-10-11: **first deliver natural, responsive live
 interaction with a physical Lamp. Long-running tasks and new memory services are
 future subsystems, not requirements or dependencies of this first release.**
+Memory across days has since been built as its own process, `lamp-memory`
+([memory.md](memory.md)), and the product runs it; the voice works on without it.
 
 Current implementation has separate capture/DSP, speaker, physical privacy and
 Gemini provider processes, optional ring output, and opt-in camera context.
@@ -66,7 +68,8 @@ The first version includes:
 | Failure | An admitted request gets a useful answer, relevant clarification, honest failure or recorded user interruption. Lost connections must not leave false listening/working cues or silently lose accepted requests. |
 
 Agentic tasks, Harness/Codex sessions, browser/computer automation, background
-research and new Hindsight or other long-term memory infrastructure are deferred.
+research and Hindsight are deferred. Memory across days is `lamp-memory`
+([memory.md](memory.md)), off the live audio path.
 Local camera/sensor reads and bounded light, volume or posture controls are part
 of the interaction itself. The model must not claim to have run an excluded task.
 No autonomous room search, stock spoken waiting fillers or random idle movements.
@@ -199,7 +202,9 @@ Whole-interaction acceptance     Dedicated QA: unassigned
 
 FUTURE SUBSYSTEMS: outside the live conversation path
 Harness task adapter             Owner: TBD
-Shared memory / context          Owner: TBD
+
+OUTSIDE THE LIVE CONVERSATION PATH, BUILT
+Memory across days               Builder fourth       Product unit lamp-memory, memory.md
 ```
 
 These are **proposed human assignments**, based on the
@@ -265,10 +270,11 @@ speech and conversational gestures without requiring a model-generated stop.
 
 ## Future task and memory boundaries
 
-These are architectural placeholders only. Do not add idle services, mock
-production APIs, model dependencies or release gates for them in this phase.
-The live interaction release must start, converse and handle interruptions
-without either subsystem installed or reachable.
+The task service below is a placeholder. Do not add idle services, mock
+production APIs, model dependencies or release gates for it in this phase.
+The memory service is built: see the end of this section. The live interaction
+release must start, converse and handle interruptions without either subsystem
+installed or reachable.
 
 **Task service:** reserve an independent adapter to Harness for long-running
 work. Reuse Harness's task/session registry, routing, execution and recovery
@@ -289,12 +295,15 @@ context to tasks, with provenance and explicit correction/deletion behavior.
 Extraction, persistence and larger retrieval happen outside the live audio path.
 Ordinary conversation must not wait for a memory search on every turn.
 
-Ownership of durable facts, use of Harness's existing memory, storage technology,
-retention and context refresh/reconnection semantics remain to be designed.
-Hindsight is not a selected dependency of this release. Review and reuse working
-Harness capabilities before deciding whether another memory system is needed.
-For now, keep the current conversation and explicit interaction configuration;
-do not claim that a preference was saved for future sessions when it was not.
+This boundary is built as `lamp-memory` (`crates/memory`, the fourth builder's),
+its own process and user. The product unit starts it with `--memory-days`, a
+SQLite store with ranked keyword search and 30 days kept, and the voice uses it
+through the Days client (`LAMP_MEMORY_DAYS=on`). A new session gets a frozen
+note of what it was asked to keep within 300 ms; earlier conversations are
+looked up with a `recall` tool call, not searched on every turn. The design,
+storage, retention and forgetting are in [memory.md](memory.md) and
+[memory-days.md](memory-days.md). Hindsight is not a dependency. Do not claim
+that a preference was saved for future sessions when it was not.
 
 ## Qualification
 

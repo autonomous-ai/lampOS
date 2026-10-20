@@ -276,9 +276,11 @@ Every repeated-read p95 meets the declared 50 ms development target.
 Keyword recall is faster in this fixture; newest/day/kept reads are slower
 with SQLite. The first snapshot call durably creates it, costing 75.343 ms;
 repeats retrieve that same frozen snapshot. This remains below the current
-voice's 300 ms initial-fetch allowance on this machine, but the voice does
-not yet call this operation. None of these figures promises a bound on the
-lamp or when another client stalls the sequential socket loop.
+voice's 300 ms initial-fetch allowance on this machine. The voice's Days
+client calls this operation (`session_open`, `crates/voice/src/remember.rs`)
+when `LAMP_MEMORY_DAYS=on`, as the product sets it. None of these figures
+promises a bound on the lamp or when another client stalls the sequential
+socket loop.
 
 One file-store open took 11.348 ms; first SQLite open including import took
 1,848.618 ms; reopen took 80.086 ms. The database then occupied 6,004,736
