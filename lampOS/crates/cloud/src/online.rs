@@ -84,9 +84,24 @@ pub fn reply(
             // A change after setup (#1959): taken now, its result later.
             if answered.is_ok()
                 && (crate::settings::KINDS.contains(&kind.as_str())
+                    || crate::settings::KEYS_KINDS.contains(&kind.as_str())
                     || kind == crate::settings::WIFI_KIND)
             {
-                return Some(identity.starting(now, &kind).to_string());
+                let mut starting = identity.starting(now, &kind);
+                // The keys' kinds say the app's id back at once too (#2094).
+                if crate::settings::KEYS_KINDS.contains(&kind.as_str())
+                    && let Some(id) = data
+                        .get("request_id")
+                        .and_then(serde_json::Value::as_str)
+                        .filter(|id| {
+                            !id.is_empty()
+                                && id.len() <= 64
+                                && id.bytes().all(|b| b.is_ascii_graphic())
+                        })
+                {
+                    starting["data"] = serde_json::json!({"request_id": id});
+                }
+                return Some(starting.to_string());
             }
             identity.data(now, &kind, &answered)
         }
@@ -881,6 +896,81 @@ mod tests {
         );
     }
 
+    /// #2094: a person's own key from the app is acked `starting` at once
+    /// and the helper's answer follows, with the app's id; the key goes to
+    /// the helper's line and is in no message on the channel.
+    #[tokio::test]
+    async fn an_own_key_is_acked_at_once_and_is_in_no_reply() {
+        let socket = std::env::temp_dir().join(format!("lco-{}-keys.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let helper = std::thread::spawn(move || {
+            use std::io::{BufRead, Write};
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            stream
+                .write_all(b"{\"refused\":\"that key was refused\",\"code\":\"refused\"}\n")
+                .unwrap();
+            line
+        });
+        let (port, seen) = broker(
+            Broker::Takes,
+            vec![
+                r#"{"cmd":"data","kind":"keys.set","data":{"service":"deepgram","key":"sk-planted-2094-cloud","request_id":"r-7"}}"#,
+            ],
+        )
+        .await;
+        let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+        let (_identity_tx, me) = watch::channel(identity());
+        let changes = crate::settings::Changes::with_helpers(
+            std::env::temp_dir().join("lco-no-change.sock"),
+            Duration::from_secs(5),
+            None,
+            Some((socket.clone(), Duration::from_secs(5))),
+        );
+        let lamp = tokio::spawn(async move {
+            let mut lamp = Fake {
+                changes: Some(changes),
+                ..Fake::default()
+            };
+            let mut say = |_: &str| {};
+            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+        });
+        let sets = |seen: &[Seen]| {
+            publishes(seen)
+                .into_iter()
+                .filter(|(_, reply)| reply["kind"] == "keys.set")
+                .collect::<Vec<_>>()
+        };
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while sets(&seen.lock().unwrap()).len() < 2 && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        drop(accounts_tx);
+        lamp.await.unwrap();
+        assert_eq!(
+            helper.join().unwrap(),
+            "{\"key\":\"sk-planted-2094-cloud\",\"set\":\"deepgram\"}\n"
+        );
+        let replies = sets(&seen.lock().unwrap());
+        assert_eq!(replies.len(), 2);
+        assert_eq!(replies[0].1["status"], "starting");
+        assert_eq!(replies[0].1["data"]["request_id"], "r-7");
+        assert_eq!(replies[1].1["status"], "failure");
+        assert_eq!(replies[1].1["error"], "that key was refused");
+        assert_eq!(
+            replies[1].1["data"],
+            serde_json::json!({"code": "refused", "request_id": "r-7"})
+        );
+        for (_, reply) in &replies {
+            assert!(!reply.to_string().contains("sk-planted"), "{reply}");
+        }
+        let _ = std::fs::remove_file(&socket);
+    }
+
     /// #1959: the Wi-Fi changed under the connection. The ack goes out on
     /// the old one, which then drops; the helper's result comes while the
     /// lamp is offline and is said on the next connection, with the app's
@@ -993,6 +1083,7 @@ mod tests {
             kind: "wifi.set".into(),
             result: Ok(None),
             request_id: Some(id.into()),
+            code: None,
         };
         let mut handed = Handed::default();
         handed.in_order.push_back(Tagged::Change(outcome("acked")));

@@ -111,6 +111,12 @@ pub struct Hosted {
     /// The relay DeepSeek's chat and search go through, if not DeepSeek's
     /// own API ([`DEEPSEEK_BASE_URL_ENV`] over `deepseek_base_url`).
     pub deepseek_base_url: Option<String>,
+    /// The person's own DeepSeek key ([`OWN_KEYS_ENV`], #2094): over the
+    /// relay's and the unit's `deepseek.key`, at `deepseek_base_url`.
+    pub own_deepseek: Option<Key>,
+    /// The relay the person's key went over, if there was one: a request
+    /// their endpoint refuses (401, 403) goes there, with the relay's key.
+    pub relay_deepseek_base_url: Option<String>,
 }
 
 /// A web search service the model may call, as `second.json` names it.
@@ -430,6 +436,8 @@ fn load_reporting(path: &Path) -> io::Result<(SecondConfig, Option<String>)> {
         openrouter_effort,
         deepseek_model: slug(raw.deepseek_model, DEEPSEEK_MODEL)?,
         deepseek_base_url: given(raw.deepseek_base_url).map(checked_url).transpose()?,
+        own_deepseek: None,
+        relay_deepseek_base_url: None,
     };
     let config = SecondConfig {
         search,
@@ -486,6 +494,87 @@ pub fn unit_credential(directory: Option<&std::ffi::OsStr>, name: &str) -> io::R
             format!("the voice unit's credential {name}: {error}"),
         )
     })
+}
+
+/// `on`: a person's own DeepSeek and Deepgram keys are used when the
+/// voice unit has them (#2094, `docs/own-keys.md`); anything else, or
+/// unset, and they are never read.
+pub const OWN_KEYS_ENV: &str = "LAMP_OWN_KEYS";
+/// The person's keys as the voice unit's credentials: root's helper keeps
+/// them in one folder, loaded whole (`LoadCredential=own:<folder>`), so
+/// each file is `own_<name>`.
+pub const OWN_DEEPSEEK_KEY: &str = "own_deepseek.key";
+/// The DeepSeek endpoint the person gave with their key, one https URL.
+pub const OWN_DEEPSEEK_URL: &str = "own_deepseek.url";
+pub const OWN_DEEPGRAM_KEY: &str = "own_deepgram.key";
+
+impl SecondConfig {
+    /// With the person's own keys when `on` and the unit has them: DeepSeek's
+    /// chat, search and observation pass at their endpoint (absent:
+    /// DeepSeek's own API) with their key, over the relay; speech to text
+    /// straight to Deepgram with theirs. One journal line each, naming whose
+    /// key, never a key or a URL. A key that can't be read is passed over
+    /// for the relay, said by its error's kind. Off: as it was, no line.
+    pub fn with_own_keys(
+        mut self,
+        on: bool,
+        credentials: Option<&std::ffi::OsStr>,
+    ) -> (Self, Vec<String>) {
+        if !on {
+            return (self, Vec::new());
+        }
+        let own = |name: &str| match unit_credential(credentials, name) {
+            Ok(key) => Ok(Some(key)),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error.kind()),
+        };
+        let mut lines = Vec::new();
+        let deepseek = own(OWN_DEEPSEEK_KEY).and_then(|key| {
+            let Some(key) = key else { return Ok(None) };
+            let url = match own(OWN_DEEPSEEK_URL)? {
+                Some(url) => checked_url(url.expose().trim().to_owned())
+                    .map_err(|_| io::ErrorKind::InvalidData)?,
+                None => DEEPSEEK_BASE_URL.to_owned(),
+            };
+            Ok(Some((key, url)))
+        });
+        lines.push(match deepseek {
+            Ok(Some((key, url))) => {
+                let line = format!(
+                    "DeepSeek: the person's own key, at {} (LAMP_OWN_KEYS)",
+                    host(&url)
+                );
+                self.hosted.relay_deepseek_base_url = self.hosted.deepseek_base_url.replace(url);
+                self.hosted.own_deepseek = Some(key);
+                line
+            }
+            Ok(None) => "DeepSeek: the relay, no key of the person's (LAMP_OWN_KEYS)".to_owned(),
+            Err(kind) => format!(
+                "DeepSeek: the relay, the person's key could not be read ({kind}) (LAMP_OWN_KEYS)"
+            ),
+        });
+        lines.push(match own(OWN_DEEPGRAM_KEY) {
+            Ok(Some(key)) => {
+                self.stt = Stt::Deepgram { key };
+                "Deepgram: the person's own key (LAMP_OWN_KEYS)".to_owned()
+            }
+            Ok(None) => "Deepgram: the relay, no key of the person's (LAMP_OWN_KEYS)".to_owned(),
+            Err(kind) => format!(
+                "Deepgram: the relay, the person's key could not be read ({kind}) (LAMP_OWN_KEYS)"
+            ),
+        });
+        (self, lines)
+    }
+}
+
+/// A URL's host, as the journal names where the person's words go: never
+/// its path.
+pub fn host(url: &str) -> &str {
+    url.split_once("://")
+        .map_or(url, |(_, rest)| rest)
+        .split('/')
+        .next()
+        .unwrap_or("")
 }
 
 /// The least OpenRouter's `reasoning.effort` may be for `model`: Gemini 3
@@ -921,6 +1010,8 @@ mod tests {
                 openrouter_effort: "none".into(),
                 deepseek_model: "deepseek-flash".into(),
                 deepseek_base_url: None,
+                own_deepseek: None,
+                relay_deepseek_base_url: None,
             }
         );
         let (_, config) = written(
@@ -944,6 +1035,126 @@ mod tests {
             let (_, config) = written("hosted-refused", extra);
             assert!(load_from_path(&config).is_err(), "{extra}");
         }
+    }
+
+    /// #2094: the person's keys, absent, present and removed, give the
+    /// relay, their own and the relay again; off, they are never read; one
+    /// that can't be read is passed over; no line holds a key or the URL.
+    #[test]
+    fn the_persons_own_keys_are_used_only_with_the_switch_and_never_shown() {
+        let planted = "sk-planted-2094-0000000000000000";
+        let (_, config) = written("own-keys", "");
+        let relay = load_from_path(&config).unwrap();
+        let units = directory("own-keys-units");
+        let dir = Some(units.as_os_str());
+        // Absent: the relay.
+        let (absent, lines) = relay.clone().with_own_keys(true, dir);
+        assert_eq!(absent, relay);
+        assert!(
+            lines.iter().all(|line| line.contains("the relay")),
+            "{lines:?}"
+        );
+        // Present.
+        private(&units.join(OWN_DEEPSEEK_KEY), &format!("{planted}\n"));
+        private(&units.join(OWN_DEEPGRAM_KEY), planted);
+        let (own, lines) = relay.clone().with_own_keys(true, dir);
+        assert_eq!(own.hosted.own_deepseek.as_ref().unwrap().expose(), planted);
+        assert_eq!(
+            own.hosted.deepseek_base_url.as_deref(),
+            Some(DEEPSEEK_BASE_URL)
+        );
+        // No relay was set in this file: none to fall back to.
+        assert_eq!(own.hosted.relay_deepseek_base_url, None);
+        assert!(matches!(&own.stt, Stt::Deepgram { key } if key.expose() == planted));
+        assert_eq!(
+            lines,
+            [
+                "DeepSeek: the person's own key, at api.deepseek.com (LAMP_OWN_KEYS)",
+                "Deepgram: the person's own key (LAMP_OWN_KEYS)"
+            ]
+        );
+        assert!(!format!("{own:?}").contains(planted));
+        // Their endpoint, taken; one that is not https is not.
+        private(
+            &units.join(OWN_DEEPSEEK_URL),
+            "https://deepseek.example.invalid/v1\n",
+        );
+        let mut relayed = relay.clone();
+        relayed.hosted.deepseek_base_url = Some("https://relay.example.invalid/deepseek".into());
+        let (own, lines) = relayed.with_own_keys(true, dir);
+        assert_eq!(
+            own.hosted.deepseek_base_url.as_deref(),
+            Some("https://deepseek.example.invalid/v1")
+        );
+        assert_eq!(
+            own.hosted.relay_deepseek_base_url.as_deref(),
+            Some("https://relay.example.invalid/deepseek")
+        );
+        // The host by name, never its path.
+        assert_eq!(
+            lines[0],
+            "DeepSeek: the person's own key, at deepseek.example.invalid (LAMP_OWN_KEYS)"
+        );
+        private(
+            &units.join(OWN_DEEPSEEK_URL),
+            "http://deepseek.example.invalid",
+        );
+        let (passed, lines) = relay.clone().with_own_keys(true, dir);
+        assert_eq!(passed.hosted, relay.hosted);
+        assert!(lines[0].contains("could not be read"), "{lines:?}");
+        assert!(
+            !lines.join(" ").contains("deepseek.example.invalid"),
+            "{lines:?}"
+        );
+        fs::remove_file(units.join(OWN_DEEPSEEK_URL)).unwrap();
+        // Off: never read.
+        let (off, lines) = relay.clone().with_own_keys(false, dir);
+        assert_eq!(off, relay);
+        assert!(lines.is_empty());
+        // Not private: passed over for the relay, never shown.
+        fs::set_permissions(
+            units.join(OWN_DEEPGRAM_KEY),
+            fs::Permissions::from_mode(0o644),
+        )
+        .unwrap();
+        let (open, lines) = relay.clone().with_own_keys(true, dir);
+        assert_eq!(open.stt, relay.stt);
+        assert!(lines[1].contains("could not be read"), "{lines:?}");
+        // Removed: the relay again.
+        fs::remove_file(units.join(OWN_DEEPSEEK_KEY)).unwrap();
+        fs::remove_file(units.join(OWN_DEEPGRAM_KEY)).unwrap();
+        let (removed, lines) = relay.clone().with_own_keys(true, dir);
+        assert_eq!(removed, relay);
+        for line in &lines {
+            assert!(
+                line.contains("the relay") && !line.contains(planted),
+                "{line}"
+            );
+        }
+        // No unit credentials at all: the relay.
+        let (none, _) = relay.clone().with_own_keys(true, None);
+        assert_eq!(none, relay);
+    }
+
+    /// #2094: the voice's drop-in turns the switch on and loads the keys'
+    /// folder as `own`, so each file is the `own_<file>` read here, the
+    /// files root's helper writes.
+    #[test]
+    fn the_own_keys_drop_in_loads_the_folder_the_names_here_read() {
+        let drop_in = include_str!("../../../deploy/product/own-keys-voice.conf");
+        assert!(drop_in.contains(&format!("Environment={OWN_KEYS_ENV}=on\n")));
+        assert!(drop_in.contains("LoadCredential=own:/etc/lampOS/voice/own\n"));
+        assert!(drop_in.contains("ConfigurationDirectory=lampOS/voice/own\n"));
+        for (name, file) in [
+            (OWN_DEEPSEEK_KEY, "deepseek.key"),
+            (OWN_DEEPSEEK_URL, "deepseek.url"),
+            (OWN_DEEPGRAM_KEY, "deepgram.key"),
+        ] {
+            assert_eq!(name, format!("own_{file}"));
+        }
+        // The product's own unit never loads it: off unless the drop-in is there.
+        let product = include_str!("../../../deploy/product/lamp-voice.service");
+        assert!(!product.contains(OWN_KEYS_ENV) && !product.contains("LoadCredential=own"));
     }
 
     /// A unit's credential is read from its `CREDENTIALS_DIRECTORY`, as the

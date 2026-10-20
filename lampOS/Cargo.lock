@@ -2139,12 +2139,14 @@ dependencies = [
  "lamp-msgs",
  "lamp-ring",
  "lamp-update",
+ "reqwest",
  "rustix",
  "rustls",
  "serde",
  "serde_json",
  "tokio",
  "tower",
+ "webpki-roots 1.0.9",
 ]
 
 [[package]]

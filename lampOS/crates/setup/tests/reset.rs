@@ -286,7 +286,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 31] = [
+const PERSON_STORES: [&str; 32] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -336,6 +336,9 @@ const PERSON_STORES: [&str; 31] = [
     // What setup saves, and its marker: the user's key, to the voice and to
     // the Policy (the owner, #806, 16:13), and the name.
     "/etc/lampOS/voice/credential",
+    // The person's own DeepSeek and Deepgram keys (#2094), the folder the
+    // voice loads whole: `keys::FOLDER` in crates/setup/src/keys.rs.
+    "/etc/lampOS/voice/own",
     "/etc/lampOS/policy/jev.key",
     "/etc/lampOS/person/name",
     "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf",
@@ -910,4 +913,23 @@ fn the_plan_reader_knows_every_field_of_the_plan() {
     let mut known = reset::FIELDS.to_vec();
     known.sort_unstable();
     assert_eq!(fields, known);
+}
+
+/// #2094: the reset wipes the person's own keys, the folder as one plain
+/// path, and the voice's folder stays for the next setup.
+#[test]
+fn a_reset_wipes_the_persons_own_keys() {
+    let product: Plan =
+        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+    let folder = Path::new(lamp_setup::keys::FOLDER);
+    assert!(product.wipe.iter().any(|path| path == folder));
+    let root = Root::new();
+    let own = root.path("own");
+    fs::create_dir_all(&own).unwrap();
+    for file in ["deepseek.key", "deepseek.url", "deepgram.key"] {
+        fs::write(own.join(file), b"sk-planted-2094").unwrap();
+    }
+    reset::wipe(&own).unwrap();
+    assert!(own.is_dir());
+    assert_eq!(fs::read_dir(&own).unwrap().count(), 0);
 }
