@@ -361,12 +361,13 @@ pub struct HeadLines {
 }
 
 impl HeadLines {
-    /// Each pad's line as `probe` reads it: high with a pull-down, high
-    /// with a pull-up.
-    pub fn probed(pads: &[Pin], mut probe: impl FnMut(u32) -> io::Result<(bool, bool)>) -> Self {
+    /// Each pad as `probe` reads its line: high with a pull-down, high with
+    /// a pull-up ([`crate::pins::GpioLines::probe_ending`], ending on the
+    /// pad's own pull).
+    pub fn probed(pads: &[Pin], mut probe: impl FnMut(&Pin) -> io::Result<(bool, bool)>) -> Self {
         let mut lines = Self::default();
         for pad in pads {
-            match probe(pad.line) {
+            match probe(pad) {
                 Ok((down, up)) if down == up => lines.wired.push(pad.line),
                 Ok(_) => lines.bare.push(pad.line),
                 Err(_) => lines.unprobed.push(pad.line),
@@ -378,54 +379,38 @@ impl HeadLines {
     /// The journal's line at start, and health's message while no pad is
     /// left out.
     pub fn said(&self) -> String {
-        let list = |lines: &[u32]| {
-            lines
-                .iter()
-                .map(u32::to_string)
-                .collect::<Vec<_>>()
-                .join(", ")
-        };
         let mut parts = Vec::new();
         if self.wired.is_empty() {
             if !self.bare.is_empty() {
                 parts.push(format!(
-                    "nothing wired on lines {}: the head reads no touch",
-                    list(&self.bare)
+                    "nothing wired on {}: the head reads no touch",
+                    named(&self.bare)
                 ));
             }
         } else {
-            parts.push(format!("wired on lines {}", list(&self.wired)));
+            parts.push(format!("wired on {}", named(&self.wired)));
             if !self.bare.is_empty() {
-                parts.push(format!("nothing on {}", list(&self.bare)));
+                parts.push(format!("nothing on {}", list(&self.bare, ", ")));
             }
         }
         if !self.unprobed.is_empty() {
-            parts.push(format!("lines {} not probed", list(&self.unprobed)));
+            parts.push(format!("{} not probed", named(&self.unprobed)));
         }
         parts.join("; ")
     }
 
     /// What health says ([`HEAD_ITEM`]): well while a pad drives one of
     /// the lines; a warning when none does, or none could be told, or a pad
-    /// has read touched since Controls started and is left out
+    /// has read touched since the head was first read and is left out
     /// (`left_out`, its lines; [`crate::touch::TouchEngine::head_left_out`]).
     pub fn health(&self, left_out: &[u32]) -> lamp_msgs::Diagnostic {
-        let list = |lines: &[u32]| {
-            lines
-                .iter()
-                .map(u32::to_string)
-                .collect::<Vec<_>>()
-                .join(",")
-        };
         let mut message = self.said();
         if !left_out.is_empty() {
+            // Since the head's lines were first read: Controls' start, or the
+            // reader's return after a fault.
             message = format!(
-                "{message}; {} touched since Controls started: left out until let go",
-                left_out
-                    .iter()
-                    .map(|line| format!("line {line}"))
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                "{message}; {} touched since the head was first read: left out until let go",
+                named(left_out)
             );
         }
         let level = if self.wired.is_empty() || !left_out.is_empty() {
@@ -434,11 +419,26 @@ impl HeadLines {
             lamp_msgs::Level::Ok
         };
         lamp_msgs::Diagnostic::new(level, HEAD_ITEM, &message)
-            .with("wired", list(&self.wired))
-            .with("bare", list(&self.bare))
-            .with("unprobed", list(&self.unprobed))
-            .with("left_out", list(left_out))
+            .with("wired", list(&self.wired, ","))
+            .with("bare", list(&self.bare, ","))
+            .with("unprobed", list(&self.unprobed, ","))
+            .with("left_out", list(left_out, ","))
     }
+}
+
+/// `lines`, joined by `between`.
+fn list(lines: &[u32], between: &str) -> String {
+    lines
+        .iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(between)
+}
+
+/// "line 97" or "lines 97, 98".
+fn named(lines: &[u32]) -> String {
+    let word = if lines.len() == 1 { "line" } else { "lines" };
+    format!("{word} {}", list(lines, ", "))
 }
 
 /// No configured GPIO is absence, not a failed optional strip or a made-up

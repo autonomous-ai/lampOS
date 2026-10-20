@@ -31,6 +31,18 @@ pub enum Pull {
     None,
 }
 
+/// The two pulls a probe reads a line with, ending on the one it will be
+/// held by, so a bare line is left where its pins leave it: pulled up
+/// last only for a pull-up, and pulled down last otherwise. A line the
+/// file leaves floating (`none`) keeps the charge of the last read, and a
+/// pull-up last would read it touched (the reviewer's P3 1 on #2243).
+pub fn probe_order(pull: Pull) -> [Pull; 2] {
+    match pull {
+        Pull::Up => [Pull::Down, Pull::Up],
+        Pull::Down | Pull::None => [Pull::Up, Pull::Down],
+    }
+}
+
 /// One input: its name in the controls' configuration, its line on the
 /// chip, and whether a press or a touch pulls it low.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -228,6 +240,12 @@ impl GpioLines {
     /// both ways, and a bare pin follows the pull. For finding out what a
     /// board has, once, with nothing else running on these lines.
     pub fn probe(chip: &str, line: u32) -> io::Result<(bool, bool)> {
+        Self::probe_ending(chip, line, Pull::Up)
+    }
+
+    /// [`Self::probe`], the two reads in [`probe_order`] for a line held by
+    /// `pull`: what it reads with a pull-down, and with a pull-up.
+    pub fn probe_ending(chip: &str, line: u32, pull: Pull) -> io::Result<(bool, bool)> {
         let read = |pull: Pull| -> io::Result<bool> {
             let mut builder = gpiocdev::Request::builder();
             builder
@@ -240,7 +258,12 @@ impl GpioLines {
             std::thread::sleep(std::time::Duration::from_millis(10));
             Ok(request.value(line).map_err(io::Error::other)? == gpiocdev::line::Value::Active)
         };
-        Ok((read(Pull::Down)?, read(Pull::Up)?))
+        // [with a pull-down, with a pull-up], read in the probe's order.
+        let mut high = [false; 2];
+        for pull in probe_order(pull) {
+            high[usize::from(pull == Pull::Up)] = read(pull)?;
+        }
+        Ok((high[0], high[1]))
     }
 }
 
@@ -255,6 +278,16 @@ impl Lines for GpioLines {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The reviewer's P3 1 on #2243: the probe's last read is the line's own
+    /// pull, and pulled down for one left floating, so a bare line isn't
+    /// left charged high and read touched at the first acquisition.
+    #[test]
+    fn the_probe_ends_on_the_lines_own_pull() {
+        assert_eq!(probe_order(Pull::Down), [Pull::Up, Pull::Down]);
+        assert_eq!(probe_order(Pull::None), [Pull::Up, Pull::Down]);
+        assert_eq!(probe_order(Pull::Up), [Pull::Down, Pull::Up]);
+    }
     use std::collections::BTreeMap;
 
     #[derive(Default)]

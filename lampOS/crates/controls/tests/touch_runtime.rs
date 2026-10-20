@@ -284,7 +284,7 @@ fn controls_says_the_head_lines_and_a_pad_left_out_on_diagnostics() {
         said(&mut reports),
         [(
             Level::Warn,
-            "wired on lines 37; line 37 touched since Controls started: left out until let go"
+            "wired on line 37; line 37 touched since the head was first read: left out until let go"
                 .to_owned()
         )]
     );
@@ -294,7 +294,7 @@ fn controls_says_the_head_lines_and_a_pad_left_out_on_diagnostics() {
     rig.step(1_000_000);
     assert_eq!(
         said(&mut reports),
-        [(Level::Ok, "wired on lines 37".to_owned())]
+        [(Level::Ok, "wired on line 37".to_owned())]
     );
     let mut quiet = Rig::new(true);
     let mut reports = quiet
