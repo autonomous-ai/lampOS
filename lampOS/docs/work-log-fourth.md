@@ -4962,6 +4962,18 @@ A usage limit paused me from about 00:40 to 06:2x.
   - the backend's relay findings (10:08 on #1934): the socket is under `/ws/`, which corrects my 09:28;
   - Mobile on lamp-0c89: no provider key is needed (10:54).
 
+## 2026-10-20, 12:06 ICT: #2145 is #2173, folded and read; #2161 up for the socket's "before"
+
+- **#2173** (#2145 folded into one commit, `e0a72a7dd` on #1712's `9ad9416ad`): the reviewer's 11:31 P3 is fixed (the thread file and a new session's recall keep the "—" exchange). Gate green, 3215 passed, 0 failed, and the reviewer's 11:59 read found no new finding. #2145 is closed.
+- **For Twelve's memory side:** the parked worker commit is rebuilt on the fold as `410a563cf` (`fourth/heard-to-memory-2`), Clippy clean, its tests passing.
+- **#2161, `probe-cascade --wire --socket`** (`8bf252969`):
+  - It times a piece on ElevenLabs' socket opened ahead through the relay's `/ws/`, beside a kept HTTP connection.
+  - Gate green (2646 passed, 0 failed). From this Mac with a made-up key, the relay closed it with 4001.
+  - The reviewer's 11:47 read had no P1 or P2; its three P3s are in `045f14c60`, gating.
+  - It waits for the lamp's run, which decides whether the route's socket is worth building.
+- **#2119** is closed, since all of it is on #1712 through #2124 and #2146.
+- **Next:** the route's socket, behind `LAMP_SECOND_SPEECH_SOCKET`. It opens as the chat is asked, takes the first piece if it's open, and falls back to HTTP.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
