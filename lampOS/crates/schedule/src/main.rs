@@ -58,6 +58,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         socket: socket.ok_or("--socket is required")?,
         bus_root,
         zone: zone.ok_or("--zone is required")?,
+        // zone.env's other line, in the unit's environment (#1680).
+        utc_offset_minutes: std::env::var("LAMP_UTC_OFFSET_MINUTES")
+            .ok()
+            .and_then(|minutes| minutes.trim().parse().ok()),
         run_for,
         report_every: lamp_schedule::runtime::REPORT_EVERY,
     };

@@ -84,6 +84,9 @@ struct Running {
 }
 impl Running {
     fn new() -> Self {
+        Self::in_zone("Etc/UTC")
+    }
+    fn in_zone(zone: &str) -> Self {
         let root = tempfile::Builder::new()
             .prefix("sch-")
             .tempdir_in("/private/tmp")
@@ -94,7 +97,8 @@ impl Running {
             dir: root.path().join("data"),
             socket: root.path().join("run/s.sock"),
             bus_root: root.path().join("b"),
-            zone: "Etc/UTC".into(),
+            zone: zone.into(),
+            utc_offset_minutes: None,
             run_for: None,
             // A report every 50 ms, not the lamp's second, so a test that
             // reads it waits a fraction of a second (#1806).
@@ -222,6 +226,7 @@ fn disabled_service_never_reads_clock_or_creates_any_path() {
         socket: root.path().join("run/s"),
         bus_root: root.path().join("bus"),
         zone: "Bad/Zone".into(),
+        utc_offset_minutes: None,
         run_for: None,
         report_every: Duration::from_millis(50),
     };
@@ -431,6 +436,121 @@ fn a_store_set_aside_is_said_in_health_until_it_is_gone() {
     let report = said(&mut sub, false);
     assert!(!report.message.contains("set aside"), "{}", report.message);
 }
+/// The first health report that `wanted` takes, within five seconds.
+fn health_until(s: &Running, wanted: impl Fn(&Diagnostic) -> bool) -> Diagnostic {
+    let bus = Bus::new(&s.config.bus_root).unwrap();
+    let mut sub = bus
+        .subscribe_typed(Diagnostic::TOPIC, "diag_until", Diagnostic::TYPE)
+        .unwrap();
+    let start = Instant::now();
+    loop {
+        if let Some(message) = sub.recv(Duration::from_millis(100)).unwrap() {
+            let report: Diagnostic = message.parse().unwrap();
+            if wanted(&report) {
+                return report;
+            }
+        }
+        assert!(start.elapsed() < Duration::from_secs(5), "never said");
+    }
+}
+
+fn said(report: &Diagnostic, key: &str) -> Option<String> {
+    report
+        .values
+        .iter()
+        .find(|pair| pair.key == key)
+        .map(|pair| pair.value.clone())
+}
+
+/// The store's snapshot, read and written by hand as a newer build would.
+fn stored(s: &Running) -> Value {
+    let db = rusqlite::Connection::open(s.config.dir.join("schedule.sqlite3")).unwrap();
+    let snapshot: Vec<u8> = db
+        .query_row("SELECT snapshot FROM state", [], |row| row.get(0))
+        .unwrap();
+    serde_json::from_slice(&snapshot).unwrap()
+}
+
+fn store(s: &Running, state: &Value) {
+    rusqlite::Connection::open(s.config.dir.join("schedule.sqlite3"))
+        .unwrap()
+        .execute(
+            "UPDATE state SET snapshot = ?1",
+            [serde_json::to_vec(state).unwrap()],
+        )
+        .unwrap();
+}
+
+/// #1680: a reminder with a value this build doesn't know, at the same
+/// `schema`, doesn't stop the part: it is kept in the store as it is, the
+/// part serves, and health counts it as a warning.
+#[test]
+fn a_stored_reminder_this_build_cannot_read_is_kept_and_the_part_serves() {
+    let mut s = Running::new();
+    let first = s.set(60);
+    s.stop();
+    let mut state = stored(&s);
+    state["items"][0]["deadline"]["repeat"] =
+        json!({"kind":"monthly","day":1,"time":"09:00","zone":"Etc/UTC","date":"2026-11-01"});
+    let later = state["items"][0].clone();
+    store(&s, &state);
+    s.start();
+    let status = s.ask(json!({"op":"status"}));
+    assert_eq!(status["items"], 0, "{status}");
+    let next = s.set(60);
+    assert_ne!(next["id"], first["id"]);
+    let report = health_until(&s, |report| said(report, "unread").as_deref() == Some("1"));
+    assert_eq!(report.level, Level::Warn);
+    assert!(report.message.contains("can't read"), "{}", report.message);
+    s.stop();
+    let state = stored(&s);
+    assert_eq!(state["items"][0], later, "kept as it is");
+    assert_eq!(state["items"][1]["id"], next["id"]);
+}
+
+/// #1680: a schedule database from a newer build (`user_version` 2) doesn't
+/// stop the part: it is kept whole, the part starts with an empty store,
+/// serves, and health names the kept file.
+#[test]
+fn a_newer_schedule_database_is_set_aside_and_the_part_serves() {
+    let mut s = Running::new();
+    s.set(60);
+    s.stop();
+    rusqlite::Connection::open(s.config.dir.join("schedule.sqlite3"))
+        .unwrap()
+        .execute_batch("PRAGMA user_version=2")
+        .unwrap();
+    s.start();
+    assert_eq!(s.ask(json!({"op":"status"}))["items"], 0);
+    s.set(60);
+    let report = health_until(&s, |report| said(report, "set_aside").is_some());
+    assert_eq!(report.level, Level::Warn);
+    let kept = said(&report, "set_aside").unwrap();
+    assert!(kept.starts_with("schedule.sqlite3.newer-db2-"), "{kept}");
+    assert!(s.config.dir.join(&kept).exists());
+}
+
+/// #1680: a zone this build doesn't know (`LAMP_ZONE` from a newer tzdb)
+/// doesn't stop the part: it serves in a fallback zone, and health warns
+/// and names both.
+#[test]
+fn an_unknown_zone_is_a_health_warning_not_a_stop() {
+    let s = Running::in_zone("Middle_Earth/Rivendell");
+    let status = s.ask(json!({"op":"status"}));
+    assert_ne!(status["zone"], "Middle_Earth/Rivendell", "{status}");
+    s.set(60);
+    let report = health_until(&s, |report| said(report, "zone_asked").is_some());
+    assert_eq!(report.level, Level::Warn);
+    assert_eq!(
+        said(&report, "zone_asked").as_deref(),
+        Some("Middle_Earth/Rivendell")
+    );
+    assert_eq!(
+        said(&report, "zone"),
+        status["zone"].as_str().map(str::to_owned)
+    );
+}
+
 #[test]
 fn a_second_owner_cannot_replace_the_live_socket_or_database() {
     let s = Running::new();
