@@ -175,7 +175,9 @@ fn a_second_hop_keeps_the_original_absolute_deadline() {
             }
         }
     });
-    let deadline = Instant::now() + Duration::from_secs(2);
+    // 800 ms, eight times the first hop's 100 ms: the first still answers
+    // inside it, the second runs into it (#1806: 2 s took 2.0 s on ARM64).
+    let deadline = Instant::now() + Duration::from_millis(800);
     exchange(&socket, &json!({"op":"status"}), deadline).unwrap();
     let error = exchange(&socket, &json!({"op":"set"}), deadline).unwrap_err();
     assert_eq!(error.kind, ErrorKind::Timeout);

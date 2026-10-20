@@ -21,6 +21,14 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 # The backend's ping, as the voice's second provider makes its requests.
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
 webpki-roots = "1"
+# The app's skills page (`skills.list`, #1722): the skills read with
+# lamp-skills' own loader, from its folder, as `lamp-skills list` reads them;
+# toml for what a folder that does not load says of itself.
+lamp-skills = { path = "../skills" }
+# A photo from the app, base64 in its JSON (`faces.add_photo`, #1968), as the
+# voice decodes a look's picture.
+base64 = "=0.22.1"
+toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 
 [dev-dependencies]
 # Setup's own settings and writer, so the account is read where and as setup

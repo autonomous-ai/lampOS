@@ -1,0 +1,8 @@
+# From 10:00 the sitter stands up at 10 s and leaves by the picture's left: one turn left.
+clock = "10:00"
+
+[[expect]]
+at = "10s"
+within = "1s"
+call = "body.move"
+args = { move = "watch-left" }

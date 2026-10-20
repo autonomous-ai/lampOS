@@ -1067,8 +1067,6 @@ data: [DONE]
         );
     }
 
-    /// An end without `[DONE]` is whole after a `finish_reason`, and cut
-    /// before one.
     /// #1712, the first builder at 18:56: a narrowed chat's request is
     /// given the tools its narrow keeps for that request's messages.
     #[test]
@@ -1107,6 +1105,8 @@ data: [DONE]
         assert_eq!(names(chat.body(&one)), ["light_on"]);
     }
 
+    /// An end without `[DONE]` is whole after a `finish_reason`, and cut
+    /// before one.
     #[test]
     fn a_stream_ended_without_done_is_whole_only_after_a_finish_reason() {
         let mut deltas = Deltas::default();

@@ -7,19 +7,23 @@
 //! a recording is replayed.
 use lamp_bus::Header;
 use lamp_msgs::{
-    Faces, Light, LightPattern, LightRequest, PatternKind, SkillEvent, SkillStage, Speech,
+    Activity, Faces, Light, LightPattern, LightRequest, PatternKind, RoomActivity, RoomPresence,
+    SkillEvent, SkillStage, Speech, StoodUp,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     fs,
     path::{Path, PathBuf},
 };
 
 pub mod clock;
 pub mod glow;
+pub mod known;
 pub mod package;
+pub mod visits;
+pub mod watch;
 
 /// Whether the body plays `name` on its mood socket: one of the clips in its
 /// own table (`lamp_body::clips::ALL`), but `idle`, which is the body's own.
@@ -86,7 +90,7 @@ fn add_heard(to: &mut String, text: &str, most: usize) {
 
 /// The whole words of `text`, lowercase: what is between characters that
 /// are not letters or digits.
-fn words(text: &str) -> Vec<String> {
+pub(crate) fn words(text: &str) -> Vec<String> {
     text.to_lowercase()
         .split(|c: char| !c.is_alphanumeric())
         .filter(|word| !word.is_empty())
@@ -146,11 +150,102 @@ struct SkillFile {
     /// What the model is told of a call while the tool's run, which holds
     /// no pose, is under way.
     still: Option<String>,
+    /// What the room's presence was over the last hours, for the model
+    /// (#1685, "was anyone here while I was out?").
+    history: Option<HistoryFile>,
     /// Local hours when the skill never starts itself.
     quiet: Option<QuietFile>,
-    #[serde(rename = "do")]
+    /// The most runs it starts itself a local day (#1685's nudges).
+    most_a_day: Option<u32>,
+    /// Local hours when alone it may start itself: `[quiet]`'s opposite.
+    active: Option<QuietFile>,
+    /// A budget of runs an hour, shared by every skill of its group.
+    budget: Option<BudgetFile>,
+    /// A rest until the next morning after runs nobody noticed.
+    rest: Option<RestFile>,
+    /// A search a person asked for (#1685): its looks, and what the model
+    /// is told past the last.
+    search: Option<SearchFile>,
+    /// A function the model calls to snooze the skill or turn it off.
+    stop: Option<StopFile>,
+    /// A watch, turned on and off by the skill's tool ([`watch`]).
+    watch: Option<watch::WatchFile>,
+    #[serde(rename = "do", default)]
     steps: Vec<StepFile>,
 }
+
+/// `[budget]`: the skills naming one `group` start at most `per_hour` runs
+/// an hour between them (#1685: one nudge an hour, the lamp's whole).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BudgetFile {
+    group: String,
+    per_hour: u32,
+}
+
+/// `[rest]`: after `after_ignored` runs in a row that nobody noticed within
+/// `within` of each, the skill rests until the next morning.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RestFile {
+    after_ignored: u32,
+    within: Option<String>,
+}
+
+/// `[rest]` as loaded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Rest {
+    pub after_ignored: u32,
+    pub within_us: u64,
+}
+
+/// The most runs a day a skill may say it starts itself.
+pub const MOST_A_DAY_AT_MOST: u32 = 24;
+/// The most runs an hour a group may share.
+pub const PER_HOUR_AT_MOST: u32 = 6;
+/// How long after a run a look or a movement counts as noticing it, when
+/// `[rest]` names no `within`.
+pub const NOTICED_WITHIN_US: u64 = 60_000_000;
+/// The morning a rest or a snooze lasts until, local minutes of the day: 06:00.
+pub const MORNING: u16 = 6 * 60;
+/// A face that moved this share of the picture across or down since the
+/// run, or grew or shrank by this share of its height, has moved.
+pub const NOTICED_MOVE: f32 = 0.15;
+pub const NOTICED_SIZE: f32 = 0.25;
+const HOUR_US: u64 = 3_600_000_000;
+/// How long a member's wait for its group's hour still counts after it was
+/// last held back for it: past that it is not waiting any more (its trigger
+/// ended, or something else holds it back).
+pub const BUDGET_WAIT_LIVE_US: u64 = 120_000_000;
+/// `[stop]`: the function by which a person snoozes what the skill starts
+/// itself, or turns it off or on again (#1685).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StopFile {
+    tool: String,
+    about: String,
+}
+
+/// `[stop]` as loaded: the function's name and when to call it, as the
+/// model is told.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Stop {
+    pub tool: String,
+    pub about: String,
+}
+
+/// The one argument of a `[stop]` function, and its values: `snooze` until
+/// the next local morning, `off` until it is asked for again, `on` again.
+pub const STOP_CHOICE: &str = "how";
+pub const STOP_WAYS: [&str; 3] = ["snooze", "off", "on"];
+/// The yes-or-no of a `[stop]` function its group's skills share: true for
+/// every one of them, left out for the one that nudged last.
+pub const STOP_ALL: &str = "all";
+/// The most a `[stop]`'s `about` may say.
+pub const STOP_ABOUT_MOST_BYTES: usize = 512;
+/// The file in `--state-dir` that keeps the skills turned off: one line
+/// each, the skill's name, and nothing else.
+pub const OFF_FILE: &str = "off";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -186,6 +281,11 @@ struct ChoiceFile {
     /// The value a call that gives none is made as (#1679: a light show
     /// asked with no hint is a party). Without it, such a call has none.
     default: Option<String>,
+    /// In a skill with a trigger and no tool (#1669 (e), watching someone
+    /// leave): the choice is this field of the message that fired it, as
+    /// it is when the steps are made. A message whose value is not in
+    /// `one_of`, or has none, does not hold the trigger ([`chooses`]).
+    field: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -193,6 +293,39 @@ struct ChoiceFile {
 struct FlagFile {
     name: String,
     about: String,
+}
+
+/// `[search]`: a tool's calls that are one search (#1685, "look for my
+/// keys"): at most `looks` of them, the first at the choice's default.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SearchFile {
+    looks: u32,
+    give_up: String,
+}
+
+/// A search a person asked for, as loaded: its calls are the looks of one
+/// run, the first starting it and the others made while it is under way.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Search {
+    /// The most looks of one search: one past them is refused with `give_up`.
+    pub looks: u32,
+    /// What the model is told, as an error, of a look past the last: to say
+    /// kindly that it cannot see the thing from here.
+    pub give_up: String,
+}
+
+/// The most looks a search may say it takes: a living thing looks at a few
+/// places and lets it go (CLAUDE.md's rule 8).
+pub const SEARCH_LOOKS_AT_MOST: u32 = 8;
+
+/// `[history]`: a tool's call is told who was at the lamp over the last
+/// `within` (#1685), from `room/presence`, times only.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HistoryFile {
+    topic: String,
+    within: String,
 }
 
 /// `[again]`: within `within` of the tool's last run, a call runs only if
@@ -377,6 +510,7 @@ fn say_step(say: toml::Value) -> Result<Call, String> {
             match table["from"].as_str() {
                 Some("schedule") => Ok(Call::SayFrom(Source::Schedule, None)),
                 Some("tasks") => Ok(Call::SayFrom(Source::Tasks, None)),
+                Some("onboarding") => Ok(Call::SayFrom(Source::Onboarding, None)),
                 Some(other) => Err(format!(
                     "say.from is \"schedule\" or \"tasks\", not {other:?}"
                 )),
@@ -578,6 +712,15 @@ pub struct Permissions {
     /// what is in front of the lamp (`look`).
     #[serde(default)]
     pub look: bool,
+    /// It may send a short text for the person's phone, unasked
+    /// (`messages/out`, a watch's news: [`watch`]).
+    #[serde(default)]
+    pub messages: bool,
+    /// It may know whether a face at the lamp is one the eyes know, and
+    /// whether it is the person who asked it, never whose (a watch's: the
+    /// eyes' known file, read by the program).
+    #[serde(default)]
+    pub known_faces: bool,
 }
 
 impl Permissions {
@@ -594,6 +737,7 @@ impl Permissions {
                 ("speak", self.speak)
             }
             Call::Look => ("look", self.look),
+            Call::Text(_) => ("messages", self.messages),
             Call::AfterSay | Call::Ends => return None,
         };
         (!given).then(|| {
@@ -634,6 +778,8 @@ impl Permissions {
             ("light", self.light),
             ("body", self.body),
             ("look", self.look),
+            ("messages", self.messages),
+            ("known faces", self.known_faces),
         ]
         .into_iter()
         .filter_map(|(name, given)| given.then_some(name))
@@ -740,11 +886,28 @@ pub struct Skill {
     flag: Option<FlagFile>,
     again: Option<Again>,
     still: String,
+    /// A search a person asked for (#1685): its calls are one run's looks.
+    pub search: Option<Search>,
+    /// With `[history]`: how far back a call is told who was at the lamp
+    /// (#1685).
+    pub history_us: Option<u64>,
     /// Local minutes of the day, from and to, when it never starts itself.
     quiet: Option<(u16, u16)>,
+    /// The most runs it starts itself a local day.
+    pub most_a_day: Option<u32>,
+    /// Local minutes of the day, from and to, when alone it may start itself.
+    active: Option<(u16, u16)>,
+    /// Its group and that group's runs an hour, as this skill names them.
+    pub budget: Option<(String, u32)>,
+    /// When it rests after runs nobody noticed.
+    pub rest: Option<Rest>,
+    /// The function that snoozes it or turns it off (#1685).
+    pub stop: Option<Stop>,
     /// Each step, and the runs it is made in when not every one: one
     /// trigger's, or a call's that chose one of its values.
     steps: Vec<(Option<Only>, Step)>,
+    /// A watch, on only while a person asked for it ([`watch`]).
+    pub watch: Option<watch::Spec>,
 }
 
 impl Skill {
@@ -758,6 +921,11 @@ impl Skill {
     /// hand, the pause) is its own, not the skill's.
     pub fn reads(&self) -> Vec<(String, &'static str)> {
         let mut reads = self.listens();
+        // The privacy switch, looked at as it goes, never listened to: the
+        // voice says it a hundred times a second.
+        if self.watch.is_some() {
+            reads.push((watch::PRIVACY.to_owned(), "a watch"));
+        }
         for (_, step) in &self.steps {
             if let Step::Call(Call::SayFrom(source, _)) = step
                 && !reads.iter().any(|(topic, _)| topic == source.topic())
@@ -765,6 +933,7 @@ impl Skill {
                 let by = match source {
                     Source::Schedule => "a say from schedule",
                     Source::Tasks => "a say from tasks",
+                    Source::Onboarding => "a say from onboarding",
                 };
                 reads.push((source.topic().to_owned(), by));
             }
@@ -793,9 +962,20 @@ impl Skill {
             )
             .chain(looks.then(|| (Faces::TOPIC.to_owned(), "a look at a face")))
             .chain(
+                self.history_us
+                    .is_some()
+                    .then(|| (RoomPresence::TOPIC.to_owned(), "[history]")),
+            )
+            .chain(
                 self.again
                     .is_some()
                     .then(|| (Speech::TOPICS[0].to_owned(), "[again]")),
+            )
+            .chain(
+                self.watch
+                    .iter()
+                    .flat_map(|_| watch::LISTENS)
+                    .map(|topic| (topic.to_owned(), "a watch")),
             )
             .collect();
         let mut seen = Vec::new();
@@ -805,6 +985,33 @@ impl Skill {
             new
         });
         reads
+    }
+
+    /// The arguments a search's next look is made with, after `looked` of
+    /// its looks (#1685): each as asked, the first at the choice's default
+    /// (the desk, where a thing is looked for first) only when the call
+    /// names no place, so a place the person named is where the lamp looks
+    /// (the peer read on #1766); none past `looks`, the model told
+    /// `give_up` instead. A skill with no search takes every call as asked.
+    pub fn search_look(&self, args: &Value, looked: u32) -> Result<Value, String> {
+        let Some(search) = &self.search else {
+            return Ok(args.clone());
+        };
+        if looked >= search.looks {
+            return Err(search.give_up.clone());
+        }
+        let mut args = args.clone();
+        if looked == 0
+            && let Some(choice) = &self.choice
+            && let Some(default) = &choice.default
+            && args.get(&choice.name).is_none()
+        {
+            if !args.is_object() {
+                args = json!({});
+            }
+            args[&choice.name] = json!(default);
+        }
+        Ok(args)
     }
 
     /// Whether a step holds something until its trigger stops holding.
@@ -999,6 +1206,9 @@ pub enum Call {
         mood: String,
         lasting_us: u64,
         toward: Option<f32>,
+        /// A search's pose (#1685): let go within a fifth of a second of the
+        /// voice listening to someone, and the run with it.
+        until_spoken: bool,
     },
     /// A colour, to the actions part's `light_colour`, then stepped to its
     /// level; held for its while in a run with no say. With `keep`, it is
@@ -1010,6 +1220,9 @@ pub enum Call {
         /// How it moves, asked of the ring with `LAMP_LIGHT_REQUESTS=on`.
         pattern: Option<LightPattern>,
         keep: bool,
+        /// Held until the trigger stops holding, then given back (#1681:
+        /// the pale breath of a lamp that is a little unwell).
+        until_ends: bool,
     },
     /// A light show (`shows/NAME.toml`): each frame's light in turn, held
     /// its while, then the light given back (#1679). Only in a skill its
@@ -1049,6 +1262,9 @@ pub enum Call {
     /// The calls after this wait for the say to end: the skill's own say, or
     /// in a skill its tool starts, the line the model says after the call.
     AfterSay,
+    /// A short text for the person's phone, on `messages/out`: only a
+    /// watch's ([`watch`]), never a step.
+    Text(String),
     /// The trigger of a run that holds something until it ends stopped
     /// holding: what it held is given back. Alone in its run.
     Ends,
@@ -1090,6 +1306,8 @@ pub enum Source {
     Schedule,
     /// The news of work handed to an agent (`tasks/status`).
     Tasks,
+    /// A current invitation owned by the onboarding runner.
+    Onboarding,
 }
 
 impl Source {
@@ -1097,6 +1315,7 @@ impl Source {
         match self {
             Self::Schedule => "schedule",
             Self::Tasks => "tasks",
+            Self::Onboarding => "onboarding",
         }
     }
 
@@ -1107,6 +1326,7 @@ impl Source {
         match self {
             Self::Schedule => lamp_msgs::ScheduleDue::TOPIC,
             Self::Tasks => lamp_msgs::TaskStatus::TOPIC,
+            Self::Onboarding => lamp_msgs::OnboardingPending::TOPIC,
         }
     }
 
@@ -1116,7 +1336,7 @@ impl Source {
     pub fn priority(self) -> u8 {
         match self {
             Self::Schedule => 8,
-            Self::Tasks => 5,
+            Self::Tasks | Self::Onboarding => 5,
         }
     }
 }
@@ -1126,7 +1346,10 @@ impl Call {
     pub fn held_until_ends(&self) -> bool {
         matches!(
             self,
-            Self::Dim {
+            Self::Light {
+                until_ends: true,
+                ..
+            } | Self::Dim {
                 until_ends: true,
                 ..
             } | Self::Out {
@@ -1154,10 +1377,14 @@ impl Call {
                 mood,
                 lasting_us,
                 toward,
+                until_spoken,
             } => {
                 let mut args = json!({ "mood": mood, "for_ms": lasting_us / 1_000 });
                 if let Some(toward) = toward {
                     args["toward"] = json!(toward);
+                }
+                if *until_spoken {
+                    args["until_spoken"] = json!(true);
                 }
                 ("body.mood", args)
             }
@@ -1167,6 +1394,7 @@ impl Call {
                 lasting,
                 pattern,
                 keep,
+                until_ends,
             } => {
                 let mut args = json!({ "colour": colour });
                 if let Some(level) = level {
@@ -1180,6 +1408,9 @@ impl Call {
                 }
                 if *keep {
                     args["keep"] = json!(true);
+                }
+                if *until_ends {
+                    args["until"] = json!("ends");
                 }
                 ("light", args)
             }
@@ -1216,13 +1447,18 @@ impl Call {
             Self::SayFrom(source, task) => {
                 let mut args = json!({ "from": source.name() });
                 if let Some(task) = task {
-                    args["task"] = json!(task);
+                    args[if *source == Source::Onboarding {
+                        "invitation"
+                    } else {
+                        "task"
+                    }] = json!(task);
                 }
                 ("say", args)
             }
             Self::Look => ("look", json!({})),
             Self::Sound { name, .. } => ("sound", json!({ "sound": name })),
             Self::AfterSay => ("after_say", json!({})),
+            Self::Text(text) => ("text", json!({ "text": text })),
             Self::Ends => ("ends", json!({})),
         }
     }
@@ -1494,9 +1730,50 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
-    if (triggers.is_empty() && file.tool.is_none()) || file.steps.is_empty() {
+    // A watch is turned on and off by its tool alone, and does what its
+    // `[watch]` says: no trigger and no steps ([`watch`]).
+    if file.watch.is_some() {
+        if !triggers.is_empty() {
+            return Err(
+                "a watch is turned on only by its tool, when a person asks: never on its own, so no trigger"
+                    .into(),
+            );
+        }
+        if file.tool.is_none() {
+            return Err("a watch is turned on and off by its tool: it needs one".into());
+        }
+        if !file.steps.is_empty() {
+            return Err("a watch has no [[do]]: what it does is its [watch]".into());
+        }
+        if file.flag.is_some()
+            || file.again.is_some()
+            || file.still.is_some()
+            || file.quiet.is_some()
+            || !file.conditions.is_empty()
+            || file.ask.is_some()
+        {
+            return Err(
+                "a watch takes no [flag], [again], still, [quiet], [[while]] or [ask]".into(),
+            );
+        }
+        match &file.choice {
+            Some(choice)
+                if choice.default.is_none() && {
+                    let mut values = choice.one_of.clone();
+                    values.sort();
+                    values == ["off", "on"]
+                } => {}
+            _ => {
+                return Err(
+                    "a watch's tool has one [choice] of exactly \"on\" and \"off\", with no default"
+                        .into(),
+                );
+            }
+        }
+    } else if (triggers.is_empty() && file.tool.is_none()) || file.steps.is_empty() {
         return Err("skill.toml needs a trigger or a tool, and at least one [[do]]".into());
     }
+    let watch = file.watch.map(watch::spec).transpose()?;
     let policy = file.ask.map(|ask| ask.policy).unwrap_or_default();
     if !triggers.is_empty() && policy.is_empty() {
         return Err("[ask] names the Policy's question".into());
@@ -1544,7 +1821,23 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         Ok(())
     };
     if let Some(choice) = &file.choice {
-        argument(&choice.name, &choice.about)?;
+        match &choice.field {
+            None => argument(&choice.name, &choice.about)?,
+            Some(field) => {
+                if file.tool.is_some() || triggers.is_empty() || choice.default.is_some() {
+                    return Err(
+                        "a choice read from a field is a trigger's: a skill with a trigger, no tool and no default"
+                            .into(),
+                    );
+                }
+                if !plain_name(&choice.name) || field.is_empty() {
+                    return Err(format!(
+                        "choice {:?}: a plain name, and the trigger's field it is read from",
+                        choice.name
+                    ));
+                }
+            }
+        }
         let mut values = choice.one_of.clone();
         values.sort();
         values.dedup();
@@ -1687,6 +1980,104 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 return Err("quiet: from and to are different times".into());
             }
             Some((from, to))
+        }
+    };
+    // The nudges' limits (#1685): each on what the lamp starts itself, so
+    // only in a skill with a trigger, and not with an each trigger, whose
+    // items' runs are news, not nudges (chosen).
+    let limited = file.most_a_day.is_some()
+        || file.active.is_some()
+        || file.budget.is_some()
+        || file.rest.is_some();
+    if limited && (triggers.is_empty() || triggers.iter().any(|trigger| trigger.each.is_some())) {
+        return Err(
+            "most_a_day, [active], [budget] and [rest] limit what a skill starts itself: in a skill with a trigger, not an each trigger"
+                .into(),
+        );
+    }
+    if file
+        .most_a_day
+        .is_some_and(|most| !(1..=MOST_A_DAY_AT_MOST).contains(&most))
+    {
+        return Err(format!("most_a_day is 1 to {MOST_A_DAY_AT_MOST}"));
+    }
+    let active = match file.active {
+        None => None,
+        Some(active) => {
+            let (from, to) = (minute_of_day(&active.from)?, minute_of_day(&active.to)?);
+            if from == to {
+                return Err("active: from and to are different times".into());
+            }
+            Some((from, to))
+        }
+    };
+    let budget = match file.budget {
+        None => None,
+        Some(budget) => {
+            if !plain_name(&budget.group) || budget.group.contains('_') {
+                return Err(format!(
+                    "[budget] group {:?}: lowercase letters, digits and hyphens",
+                    budget.group
+                ));
+            }
+            if !(1..=PER_HOUR_AT_MOST).contains(&budget.per_hour) {
+                return Err(format!("[budget] per_hour is 1 to {PER_HOUR_AT_MOST}"));
+            }
+            Some((budget.group, budget.per_hour))
+        }
+    };
+    let rest = match file.rest {
+        None => None,
+        Some(rest) => {
+            if !(1..=5).contains(&rest.after_ignored) {
+                return Err("[rest] after_ignored is 1 to 5".into());
+            }
+            let within_us = rest
+                .within
+                .as_deref()
+                .map_or(Ok(NOTICED_WITHIN_US), duration_us)?;
+            if !(10_000_000..=300_000_000).contains(&within_us) {
+                return Err("[rest] within is 10s to 5m".into());
+            }
+            Some(Rest {
+                after_ignored: rest.after_ignored,
+                within_us,
+            })
+        }
+    };
+    // What a person stops is what the lamp starts itself, so only in a
+    // skill with a trigger, and not with an each trigger, whose items' runs
+    // are news they asked for (chosen, as `[quiet]` is not with one).
+    let stop = match file.stop {
+        None => None,
+        Some(_) if triggers.is_empty() || triggers.iter().any(|trigger| trigger.each.is_some()) => {
+            return Err(
+                "[stop] stops what a skill starts itself: in a skill with a trigger, not an each trigger"
+                    .into(),
+            );
+        }
+        Some(stop) => {
+            if !function_name(&stop.tool) {
+                return Err(format!(
+                    "[stop] tool {:?}: a lowercase letter, then at most 47 lowercase letters, digits and _",
+                    stop.tool
+                ));
+            }
+            if file.tool.as_deref() == Some(stop.tool.as_str()) {
+                return Err("[stop] tool is a function of its own, not the skill's tool".into());
+            }
+            if stop.about.trim().is_empty()
+                || stop.about.len() > STOP_ABOUT_MOST_BYTES
+                || stop.about.chars().any(char::is_control)
+            {
+                return Err(format!(
+                    "[stop] about is 1 to {STOP_ABOUT_MOST_BYTES} bytes, with no control characters: when the model calls it"
+                ));
+            }
+            Some(Stop {
+                tool: stop.tool,
+                about: stop.about,
+            })
         }
     };
     let names: Vec<&String> = triggers
@@ -1861,6 +2252,8 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                         mood,
                         lasting_us,
                         toward: body.toward,
+                        // A search's poses end when someone speaks (#1685).
+                        until_spoken: file.search.is_some(),
                     }));
                 }
                 _ => return Err("a body mood goes with its for, and a for with a mood".into()),
@@ -1905,6 +2298,21 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         }
         if let Some(say) = step.say {
             let call = say_step(say)?;
+            if matches!(call, Call::SayFrom(Source::Onboarding, _)) {
+                let canonical = name == "onboarding"
+                    && file.kind.as_deref() == Some("core")
+                    && conditions.is_empty()
+                    && triggers.len() == 1
+                    && triggers[0].test == Test::Equals("ready".into(), json!(true))
+                    && triggers[0].topic == lamp_msgs::OnboardingPending::TOPIC
+                    && triggers[0]
+                        .each
+                        .as_ref()
+                        .is_some_and(|(list, key)| list == "invitations" && key == "invitation");
+                if !canonical {
+                    return Err("say.from onboarding belongs only to the core onboarding skill's invitation trigger".into());
+                }
+            }
             // A tool's run tells the model what to say, and what the voice
             // keeps is not the model's to say (Fourth on #1033).
             if matches!(call, Call::SayFrom(..)) && file.tool.is_some() {
@@ -2031,6 +2439,70 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         ));
     }
     file.permissions.check()?;
+    // A search is a person's ask (#1685): a tool alone starts it, each call
+    // is a look, and its first is at the choice's default (the desk).
+    let search = match file.search {
+        None => None,
+        Some(search) => {
+            if !asked_alone
+                || !steps
+                    .iter()
+                    .any(|(_, step)| *step == Step::Call(Call::Look))
+            {
+                return Err(
+                    "[search] is a tool's looks: in a skill started by its tool alone, with look = true"
+                        .into(),
+                );
+            }
+            if file
+                .choice
+                .as_ref()
+                .is_none_or(|choice| choice.default.is_none())
+            {
+                return Err(
+                    "[search] begins at its choice's default: a [choice] with a default".into(),
+                );
+            }
+            if !(1..=SEARCH_LOOKS_AT_MOST).contains(&search.looks) {
+                return Err(format!(
+                    "[search] looks is 1 to {SEARCH_LOOKS_AT_MOST}: a few places, then it lets it go"
+                ));
+            }
+            if search.give_up.trim().is_empty() || search.give_up.len() > 256 {
+                return Err(
+                    "[search] give_up is what the model is told, in at most 256 bytes".into(),
+                );
+            }
+            Some(Search {
+                looks: search.looks,
+                give_up: search.give_up,
+            })
+        }
+    };
+    // Who was at the lamp (#1685): a person asks, so a tool alone starts
+    // it, and it reads `room/presence` alone, which carries times only.
+    let history_us = match &file.history {
+        None => None,
+        Some(history) => {
+            if file.tool.is_none() || !triggers.is_empty() {
+                return Err(
+                    "[history] is told to a tool's call: in a skill started by its tool alone"
+                        .into(),
+                );
+            }
+            if history.topic != RoomPresence::TOPIC {
+                return Err(format!(
+                    "[history] topic is {}: who was at the lamp, times only",
+                    RoomPresence::TOPIC
+                ));
+            }
+            let within_us = duration_us(&history.within)?;
+            if !(60_000_000..=visits::KEPT_US).contains(&within_us) {
+                return Err("[history] within is 1m to 24h: what the lamp keeps".into());
+            }
+            Some(within_us)
+        }
+    };
     let skill = Skill {
         name,
         description,
@@ -2046,9 +2518,42 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         flag: file.flag,
         again,
         still,
+        search,
+        history_us,
         quiet,
+        most_a_day: file.most_a_day,
+        active,
+        budget,
+        rest,
+        stop,
         steps,
+        watch,
     };
+    // A watch shows a faint mark while it is on, texts the person, and
+    // tells a known face from one it does not know: each needs its key.
+    if let Some(watch) = &skill.watch {
+        for (given, why) in [
+            (
+                skill.permissions.light,
+                "a watch shows its mark while on, which needs light = true",
+            ),
+            (
+                skill.permissions.messages,
+                "a watch texts the person, which needs messages = true",
+            ),
+            (
+                skill.permissions.known_faces,
+                "a watch tells a known face from one it does not know, which needs known_faces = true",
+            ),
+        ] {
+            if !given {
+                return Err(format!("not permitted: {why} in [permissions]"));
+            }
+        }
+        if let Some(why) = skill.permissions.refuses(&watch.mark) {
+            return Err(format!("not permitted: {why}"));
+        }
+    }
     // Least privilege: every read and every step within what it declares,
     // or it is not loaded, and the journal says what it lacks.
     for (topic, by) in skill.reads() {
@@ -2210,10 +2715,15 @@ fn light_call(file: LightFile) -> Result<Call, String> {
             if file.level.is_some_and(|level| !(1..=5).contains(&level)) {
                 return Err("level is 1 to 5".into());
             }
-            if until_ends {
-                return Err("until goes with dim or out".into());
-            }
             let keep = file.keep == Some(true);
+            // Held until the trigger ends, a light has no while of its own,
+            // and it is given back, so it is never the person's (#1681).
+            if until_ends && (file.lasting.is_some() || keep) {
+                return Err(
+                    "until = \"ends\" with a colour takes no for and no keep: it is held until the trigger ends, then given back"
+                        .into(),
+                );
+            }
             // A kept light is the person's own, steady and for good: it has
             // no while and no pattern, which are a skill's light's.
             if keep && (file.lasting.is_some() || file.pattern.is_some()) {
@@ -2231,6 +2741,7 @@ fn light_call(file: LightFile) -> Result<Call, String> {
                 lasting: file.lasting,
                 pattern,
                 keep,
+                until_ends,
             })
         }
         (None, Some(steps)) if (1..=4).contains(&steps) => {
@@ -2375,24 +2886,52 @@ pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
         })
         .collect();
     // Each tool's name, and the skill that has it.
-    let mut taken: BTreeMap<String, (String, SkillKind)> = BTreeMap::new();
+    // With, for a `[stop]` function, the `[budget]` group of its skill: a
+    // `[stop]` may be shared by the skills of one group (#1685), one
+    // function for them all.
+    let mut taken: BTreeMap<String, (String, SkillKind, Option<String>)> = BTreeMap::new();
     for kind in [SkillKind::Core, SkillKind::Installable] {
         for (_, result) in &mut loaded {
             let Ok(skill) = result else { continue };
-            let Some(tool) = skill.tool.clone().filter(|_| skill.kind == kind) else {
+            if skill.kind != kind {
                 continue;
-            };
-            match taken.get(&tool) {
-                Some((owner, owner_kind)) => {
-                    *result = Err(format!(
-                        "its tool {tool:?} is the {} skill {owner}'s: a function the model calls is one skill's, \
-                         a core skill's first",
-                        owner_kind.name()
-                    ));
-                }
-                None => {
-                    taken.insert(tool, (skill.name.clone(), kind));
-                }
+            }
+            let group = skill.budget.as_ref().map(|(group, _)| group.clone());
+            let functions: Vec<(String, Option<String>)> = skill
+                .tool
+                .iter()
+                .map(|tool| (tool.clone(), None))
+                .chain(
+                    skill
+                        .stop
+                        .as_ref()
+                        .map(|stop| (stop.tool.clone(), group.clone())),
+                )
+                .collect();
+            if let Some((tool, mine, (owner, owner_kind, theirs))) =
+                functions.iter().find_map(|(tool, shared)| {
+                    taken
+                        .get(tool)
+                        .filter(|(_, _, theirs)| shared.is_none() || theirs != shared)
+                        .map(|owner| (tool, shared, owner))
+                })
+            {
+                let stops = if mine.is_some() || theirs.is_some() {
+                    "; a `[stop]` is shared only by the skills of one `[budget]` group"
+                } else {
+                    ""
+                };
+                *result = Err(format!(
+                    "its tool {tool:?} is the {} skill {owner}'s: a function the model calls is one skill's, \
+                     a core skill's first{stops}",
+                    owner_kind.name()
+                ));
+                continue;
+            }
+            for (tool, shared) in functions {
+                taken
+                    .entry(tool)
+                    .or_insert((skill.name.clone(), kind, shared));
             }
         }
     }
@@ -2464,6 +3003,134 @@ pub struct Engine {
     ask_policy: bool,
     /// The local time: minutes east of UTC, and one moment on both clocks.
     clock: Option<(i32, u64, u64)>,
+    /// The runs each skill with `most_a_day` started: its day and how many.
+    day_runs: HashMap<String, (i64, u32)>,
+    /// When each group's runs began, within the last hour, by group.
+    group_runs: HashMap<String, std::collections::VecDeque<u64>>,
+    /// By group, each member waiting for its hour: since when, and when it
+    /// was last held back for it.
+    budget_waits: HashMap<String, HashMap<String, (u64, u64)>>,
+    /// When each member of a group last started or was asked: of the
+    /// skills sharing a `[stop]`, the latest is what a call without `all`
+    /// stops.
+    group_ran: HashMap<String, u64>,
+    /// Each resting skill's last nudge and how many in a row went unnoticed.
+    nudges: HashMap<String, Nudge>,
+    /// Until when each snoozed skill starts nothing itself, by skill: in
+    /// memory only, so a restart forgets it (#1685).
+    snoozed: HashMap<String, u64>,
+    /// The skills turned off, by name, until they are asked for again.
+    off: BTreeSet<String>,
+    /// Where `off` is kept across a restart ([`OFF_FILE`]), if anywhere.
+    off_file: Option<PathBuf>,
+    /// Who was at the lamp, from `room/presence`, for a `[history]` (#1685).
+    visits: visits::Visits,
+    /// With `LAMP_WHO_WAS_HERE_KNOWN=on`: the eyes' known file, for the
+    /// mark of someone the lamp knows ([`known`]), never a name.
+    known_file: Option<PathBuf>,
+    /// With `LAMP_WHO_WAS_HERE_NAMES=on` too (#1997): the names of those who
+    /// said yes to being named, from the eyes' `tellable` beside the known
+    /// file.
+    naming: bool,
+}
+
+/// A skill's last run, for `[rest]`: when it began, whether anyone noticed
+/// it within its while, and the unnoticed runs in a row before it.
+#[derive(Clone, Copy, Debug, Default)]
+struct Nudge {
+    at_us: u64,
+    within_us: u64,
+    after: u32,
+    /// The largest face as the run began: its centre across and down, and
+    /// its height, as shares of the picture.
+    face: Option<[f32; 3]>,
+    /// What the eyes said the person at the desk was doing as the run
+    /// began (`room/activity`, #1678), if they said it with the sitting's
+    /// baseline in: before it, a baseline coming in mid-run could say
+    /// `head_down` of someone who did nothing (the reviewer's P3 on #1938).
+    activity: Option<Activity>,
+    noticed: bool,
+    /// The newest faces in its while showed nobody: they got up.
+    gone: bool,
+    judged: bool,
+    ignored: u32,
+    resting_until_us: u64,
+}
+
+/// The largest face of a `humans/faces/tracked` value: its centre across
+/// and down and its height, as shares of the picture.
+fn largest_face(value: &Value) -> Option<[f32; 3]> {
+    serde_json::from_value::<Faces>(value.clone())
+        .ok()?
+        .faces
+        .into_iter()
+        .max_by(|a, b| (a.ymax - a.ymin).total_cmp(&(b.ymax - b.ymin)))
+        .map(|face| {
+            [
+                (face.xmin + face.xmax) / 2.0,
+                (face.ymin + face.ymax) / 2.0,
+                face.ymax - face.ymin,
+            ]
+        })
+}
+
+/// `skill`'s run was made at `now_us`: with `[rest]`, whether it is
+/// noticed is watched for from now, from the largest face now in view.
+fn nudged(
+    nudges: &mut HashMap<String, Nudge>,
+    latest: &HashMap<String, (Value, u64, Option<u64>)>,
+    skill: &Skill,
+    now_us: u64,
+) {
+    let Some(rest) = skill.rest else {
+        return;
+    };
+    let face = Engine::fresh(latest, Faces::TOPIC, now_us).and_then(largest_face);
+    let activity = Engine::fresh(latest, RoomActivity::TOPIC, now_us)
+        .and_then(|value| serde_json::from_value::<RoomActivity>(value.clone()).ok())
+        .filter(|activity| activity.baseline)
+        .map(|activity| activity.state);
+    let nudge = nudges.entry(skill.name.clone()).or_default();
+    *nudge = Nudge {
+        at_us: now_us,
+        within_us: rest.within_us,
+        after: rest.after_ignored,
+        face,
+        activity,
+        noticed: false,
+        gone: false,
+        judged: false,
+        ..*nudge
+    };
+}
+
+/// The local day `now_us` is in: its date with the local time known, else
+/// a day of the engine's own clock.
+fn day_of(clock: Option<(i32, u64, u64)>, now_us: u64) -> i64 {
+    match clock {
+        Some((offset, at_us, unix_ms)) => {
+            let ms = i128::from(unix_ms) + (i128::from(now_us) - i128::from(at_us)) / 1_000;
+            (ms.div_euclid(60_000) + i128::from(offset)).div_euclid(1_440) as i64
+        }
+        None => (now_us / 86_400_000_000) as i64,
+    }
+}
+
+/// When the next [`MORNING`] comes after `now_us`, on the engine's clock:
+/// 12 h on with the local time not known.
+fn next_morning_us(clock: Option<(i32, u64, u64)>, now_us: u64) -> u64 {
+    let Some((offset, at_us, unix_ms)) = clock else {
+        return now_us + 12 * HOUR_US;
+    };
+    let ms = i128::from(unix_ms) + (i128::from(now_us) - i128::from(at_us)) / 1_000;
+    let of_day = (ms + i128::from(offset) * 60_000).rem_euclid(86_400_000);
+    let morning = i128::from(MORNING) * 60_000;
+    let wait = if of_day < morning {
+        morning - of_day
+    } else {
+        86_400_000 - of_day + morning
+    };
+    now_us + (wait as u64) * 1_000
 }
 
 fn event(skill: &str, stage: SkillStage, why: String, allowed: Option<bool>) -> SkillEvent {
@@ -2476,6 +3143,22 @@ fn event(skill: &str, stage: SkillStage, why: String, allowed: Option<bool>) -> 
 }
 
 impl Engine {
+    /// Who was here's mark of someone the lamp knows, from the eyes' known
+    /// file at `path` (`LAMP_WHO_WAS_HERE_KNOWN=on`, [`known`]): off unless
+    /// given, and told only to a skill with `known_faces = true`.
+    pub fn marking_known(mut self, path: PathBuf) -> Self {
+        self.known_file = Some(path);
+        self
+    }
+
+    /// With the mark: a visit by someone who said yes to being named to
+    /// others (the eyes' `tellable`, `LAMP_WHO_WAS_HERE_NAMES=on`, #1997) is
+    /// told with their name, only to a skill with `known_faces = true`.
+    pub fn naming_who_said_yes(mut self) -> Self {
+        self.naming = true;
+        self
+    }
+
     /// `skip_ask`: act without asking the Policy (`LAMP_SKILLS_ASK=skip`).
     /// Without it, or `asking_the_policy`, nothing a skill starts is done.
     pub fn new(skills: Vec<Skill>, skip_ask: bool) -> Self {
@@ -2489,7 +3172,178 @@ impl Engine {
             skip_ask,
             ask_policy: false,
             clock: None,
+            day_runs: HashMap::new(),
+            group_runs: HashMap::new(),
+            budget_waits: HashMap::new(),
+            group_ran: HashMap::new(),
+            nudges: HashMap::new(),
+            snoozed: HashMap::new(),
+            off: BTreeSet::new(),
+            off_file: None,
+            visits: visits::Visits::default(),
+            known_file: None,
+            naming: false,
         }
+    }
+
+    /// The skills turned off are kept in `dir` (`--state-dir`), one line
+    /// each in [`OFF_FILE`], its skill's name and nothing else, and read
+    /// from it now: off stays off across a restart, a snooze does not. A
+    /// line that is not a skill's name is passed over, and the names read
+    /// returned. Without it, off lasts until the program stops.
+    pub fn keep_off_in(&mut self, dir: &Path) -> Result<Vec<String>, String> {
+        let file = dir.join(OFF_FILE);
+        let text = match fs::read_to_string(&file) {
+            Ok(text) => text,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(error) => return Err(format!("{}: {error}", file.display())),
+        };
+        self.off = text
+            .lines()
+            .map(str::trim)
+            .filter(|name| plain_name(name))
+            .map(str::to_owned)
+            .collect();
+        self.off_file = Some(file);
+        Ok(self.off.iter().cloned().collect())
+    }
+
+    /// The skills turned off, written whole where they are kept: a file
+    /// beside it, synced, then moved over it, and the folder synced, so a
+    /// power cut leaves the old file or the new one whole, never an empty
+    /// one, and the move itself holds (the reviewer's P3 on #1837, as
+    /// #1732's daily journal does). False when they are not kept, or could
+    /// not be.
+    fn keep_off(&self) -> bool {
+        let Some(file) = &self.off_file else {
+            return false;
+        };
+        let lines: String = self.off.iter().map(|name| format!("{name}\n")).collect();
+        let new = file.with_extension("new");
+        let kept = (|| -> std::io::Result<()> {
+            let mut out = fs::File::create(&new)?;
+            std::io::Write::write_all(&mut out, lines.as_bytes())?;
+            out.sync_all()?;
+            fs::rename(&new, file)?;
+            if let Some(folder) = file.parent() {
+                fs::File::open(folder)?.sync_all()?;
+            }
+            Ok(())
+        })();
+        if let Err(error) = &kept {
+            eprintln!(
+                "lamp-skills: the skills off not kept in {}: {error}",
+                file.display()
+            );
+        }
+        kept.is_ok()
+    }
+
+    /// Whether `skill` is snoozed at `now_us` or turned off.
+    pub fn stopped(&self, skill: &str, now_us: u64) -> bool {
+        self.off.contains(skill) || self.snoozed.get(skill).is_some_and(|until| now_us < *until)
+    }
+
+    /// A call of a `[stop]` function: `snooze`, `off` or `on` for its skill,
+    /// and the words for the model to pass on, as the note of a tool's say.
+    /// Shared by a group's skills (#1685), it stops the one of them that
+    /// started or was asked last, or with `all` (or none of them yet) every
+    /// one of them, and the words say which.
+    fn stop(
+        &mut self,
+        sharing: &[String],
+        function: &str,
+        args: &Value,
+        now_us: u64,
+    ) -> Result<Run, String> {
+        const HOW: &str = "Say how: snooze, off or on.";
+        let shared = sharing.len() > 1;
+        let (how, all) = match args {
+            Value::Object(given)
+                if given
+                    .keys()
+                    .all(|key| key == STOP_CHOICE || (shared && key == STOP_ALL))
+                    && given.get(STOP_ALL).is_none_or(Value::is_boolean) =>
+            {
+                (
+                    given.get(STOP_CHOICE).and_then(Value::as_str),
+                    given.get(STOP_ALL).and_then(Value::as_bool) == Some(true),
+                )
+            }
+            _ => (None, false),
+        };
+        let group = self
+            .skills
+            .iter()
+            .find(|skill| skill.name == sharing[0])
+            .and_then(|skill| skill.budget.as_ref())
+            .map(|(group, _)| group.clone());
+        let last = sharing
+            .iter()
+            .filter_map(|skill| self.group_ran.get(skill).map(|at| (*at, skill)))
+            .max()
+            .map(|(_, skill)| skill.clone())
+            .filter(|_| shared && !all);
+        let targets: Vec<String> = last.map_or_else(|| sharing.to_vec(), |one| vec![one]);
+        // What the person hears it is about: "these" for a skill's own, else
+        // the one by its name, or the group's.
+        let these = match (shared, targets.as_slice()) {
+            (false, _) => "these".to_owned(),
+            (true, [one]) => format!("the {} nudges", one.replace('-', " ")),
+            (true, _) => format!("the {} nudges", group.as_deref().unwrap_or("wellbeing")),
+        };
+        let note = match how {
+            Some("snooze") => {
+                let until = next_morning_us(self.clock, now_us);
+                for skill in &targets {
+                    self.snoozed.insert(skill.clone(), until);
+                }
+                format!(
+                    "Done: none of {these} until tomorrow morning. Tell them so in a few words."
+                )
+            }
+            Some("off") => {
+                for skill in &targets {
+                    self.snoozed.remove(skill);
+                    self.off.insert(skill.clone());
+                }
+                if self.keep_off() {
+                    format!(
+                        "Done: none of {these} until they ask for them again. Tell them so in a few words."
+                    )
+                } else {
+                    format!(
+                        "Done, but only until the lamp restarts: none of {these} until then, or until they ask for them again. Tell them so in a few words."
+                    )
+                }
+            }
+            Some("on") => {
+                let mut changed = false;
+                for skill in &targets {
+                    self.snoozed.remove(skill);
+                    changed |= self.off.remove(skill);
+                }
+                if changed {
+                    self.keep_off();
+                }
+                let these = if shared { these } else { "these".to_owned() };
+                format!("Done: {these} come again as before. Tell them so in a few words.")
+            }
+            _ => return Err(HOW.into()),
+        };
+        Ok(Run {
+            skill: targets[0].clone(),
+            events: vec![event(
+                &targets[0],
+                SkillStage::Triggered,
+                format!("the model called {function} with {args}, for {targets:?}"),
+                None,
+            )],
+            calls: vec![Call::Say(note)],
+            ask: None,
+            queue: false,
+            from: None,
+        })
     }
 
     /// Ask the Policy's gate (#958, `lamp-policy --gate`) on `skills/ask`
@@ -2514,11 +3368,120 @@ impl Engine {
         self.clock(local.offset_minutes_at(unix_ms), now_us, unix_ms);
     }
 
+    /// Whether a resting skill's run was noticed, from what the bus says,
+    /// within its while (#1685): a face turned to the lamp (`facing`), the
+    /// largest face moved ([`NOTICED_MOVE`] of the picture across or down,
+    /// or [`NOTICED_SIZE`] of its height nearer or farther: leaning in,
+    /// sitting back, turning to it), or anything heard (`voice/heard`, its
+    /// words never kept). Nobody in the newest faces of its while counts
+    /// too: they got up.
+    fn notice(&mut self, topic: &str, value: &Value, now_us: u64) {
+        let open = |nudge: &Nudge| !nudge.judged && now_us <= nudge.at_us + nudge.within_us;
+        if topic == Speech::TOPICS[0] {
+            if value["text"]
+                .as_str()
+                .is_some_and(|text| !text.trim().is_empty())
+            {
+                for nudge in self.nudges.values_mut().filter(|nudge| open(nudge)) {
+                    nudge.noticed = true;
+                }
+            }
+            return;
+        }
+        // The eyes' own word on the person at the desk (#1678), when they
+        // say it: standing up and leaving is noticing; so is any change of
+        // what they are doing from what it was as the run began (looking up
+        // from the page, leaning in or back), and away is gone.
+        if topic == StoodUp::TOPIC {
+            for nudge in self.nudges.values_mut().filter(|nudge| open(nudge)) {
+                nudge.noticed = true;
+            }
+            return;
+        }
+        if topic == RoomActivity::TOPIC {
+            let Ok(activity) = serde_json::from_value::<RoomActivity>(value.clone()) else {
+                return;
+            };
+            for nudge in self.nudges.values_mut().filter(|nudge| open(nudge)) {
+                if activity.state == Activity::Away {
+                    nudge.gone = true;
+                } else if nudge.activity.is_some_and(|was| was != activity.state) {
+                    nudge.noticed = true;
+                }
+            }
+            return;
+        }
+        if topic != Faces::TOPIC {
+            return;
+        }
+        let Ok(faces) = serde_json::from_value::<Faces>(value.clone()) else {
+            return;
+        };
+        let facing = faces.faces.iter().any(|face| face.facing == Some(true));
+        let now = largest_face(value);
+        for nudge in self.nudges.values_mut().filter(|nudge| open(nudge)) {
+            nudge.gone = faces.faces.is_empty();
+            let moved = match (nudge.face, now) {
+                (Some(was), Some(now)) => {
+                    (now[0] - was[0]).abs() >= NOTICED_MOVE
+                        || (now[1] - was[1]).abs() >= NOTICED_MOVE
+                        || (now[2] - was[2]).abs() >= NOTICED_SIZE * was[2]
+                }
+                _ => false,
+            };
+            if facing || moved {
+                nudge.noticed = true;
+            }
+        }
+    }
+
+    /// Each resting skill's run whose while is over: noticed, or nobody in
+    /// view as it ended (they got up), and the count of runs unnoticed in a
+    /// row begins again; else it grows, and at its skill's `after_ignored`
+    /// the skill rests until the next morning ([`MORNING`], local).
+    fn judge_nudges(&mut self, now_us: u64) {
+        let clock = self.clock;
+        for nudge in self.nudges.values_mut() {
+            if nudge.judged || now_us <= nudge.at_us + nudge.within_us {
+                continue;
+            }
+            nudge.judged = true;
+            if nudge.noticed || nudge.gone {
+                nudge.ignored = 0;
+                continue;
+            }
+            nudge.ignored += 1;
+            if nudge.ignored >= nudge.after {
+                nudge.ignored = 0;
+                nudge.resting_until_us = next_morning_us(clock, now_us);
+            }
+        }
+    }
+
+    /// A run asked of the Policy was made at `now_us`, its answer `say_now`
+    /// and its trigger still holding: with `[rest]`, whether it is noticed
+    /// is watched for from now (#1685). Without the Policy asked, a run is
+    /// watched for as it is started.
+    pub fn made(&mut self, skill: &str, now_us: u64) {
+        if let Some(skill) = self.skills.iter().find(|known| known.name == skill) {
+            nudged(&mut self.nudges, &self.latest, skill, now_us);
+        }
+    }
+
+    /// Until when `skill` rests after runs nobody noticed, if it does.
+    pub fn resting_until(&self, skill: &str, now_us: u64) -> Option<u64> {
+        self.nudges
+            .get(skill)
+            .map(|nudge| nudge.resting_until_us)
+            .filter(|until| now_us < *until)
+    }
+
     /// Time passes with no message: a run held until its trigger ends ends
     /// when the trigger topic's newest value has expired (its header's
     /// `expires_ms`) or, naming no lifespan, when the topic has said nothing
     /// for [`SILENT_ENDS_US`]. Its spell is over with it.
     pub fn tick(&mut self, now_us: u64) -> Vec<Run> {
+        self.judge_nudges(now_us);
         let mut runs = Vec::new();
         for skill in &self.skills {
             for (index, trigger) in skill.triggers.iter().enumerate() {
@@ -2548,6 +3511,40 @@ impl Engine {
     }
 
     /// Minutes since local midnight at `now_us`, if the local time is known.
+    /// A `[history]` skill's calls, its note to the model followed by the
+    /// lamp's record of who was at it over its `within` (#1685): each time
+    /// of day when the local time is known, and how long ago.
+    fn told_history(&self, skill: &Skill, calls: Vec<Call>, now_us: u64) -> Vec<Call> {
+        let Some(within_us) = skill.history_us else {
+            return calls;
+        };
+        let ago = visits::ago(now_us);
+        // The mark of someone the lamp knows only for a skill that may know
+        // a known face (`known_faces`); any other is told "someone".
+        let marked = self.known_file.is_some() && skill.permissions.known_faces;
+        let telling = match (marked, self.naming) {
+            (false, _) => visits::Telling::Someone,
+            (true, false) => visits::Telling::Known,
+            (true, true) => visits::Telling::Named,
+        };
+        let record = self.visits.told_as(
+            now_us,
+            within_us,
+            |at_us| match self.local_minute(at_us) {
+                Some(minute) => format!("at {:02}:{:02}, {}", minute / 60, minute % 60, ago(at_us)),
+                None => ago(at_us),
+            },
+            telling,
+        );
+        calls
+            .into_iter()
+            .map(|call| match call {
+                Call::Say(note) => Call::Say(format!("{note}\n\n{record}")),
+                other => other,
+            })
+            .collect()
+    }
+
     fn local_minute(&self, now_us: u64) -> Option<u16> {
         let (offset, at_us, unix_ms) = self.clock?;
         let ms = i128::from(unix_ms) + (i128::from(now_us) - i128::from(at_us)) / 1_000;
@@ -2668,6 +3665,16 @@ impl Engine {
                     .filter(|topic| skill.permissions.refuses_reading(topic).is_none())
             })
             .collect();
+        // What judges a `[rest]` is the program's own reading, as the voice's
+        // state for a step after the say is: never the skill's (#1685).
+        if self.skills.iter().any(|skill| skill.rest.is_some()) {
+            topics.extend([
+                Faces::TOPIC.to_owned(),
+                Speech::TOPICS[0].to_owned(),
+                RoomActivity::TOPIC.to_owned(),
+                StoodUp::TOPIC.to_owned(),
+            ]);
+        }
         topics.sort();
         topics.dedup();
         topics
@@ -2766,7 +3773,7 @@ impl Engine {
                                 item_name(at(item, key)).as_ref() == Some(name)
                                     && trigger.test.holds(item)
                             }),
-                        _ => trigger.test.holds(value),
+                        _ => trigger.test.holds(value) && chooses(skill, value),
                     }
                 })
         };
@@ -2799,6 +3806,32 @@ impl Engine {
         let Ok(value) = serde_json::from_slice::<Value>(payload) else {
             return Vec::new();
         };
+        // Whether a run of a resting skill was noticed (#1685), then each
+        // whose while is over judged.
+        self.notice(topic, &value, now_us);
+        self.judge_nudges(now_us);
+        // Who was at the lamp, for a `[history]` (#1685): times only.
+        if topic == RoomPresence::TOPIC
+            && let Ok(presence) = serde_json::from_value::<RoomPresence>(value.clone())
+            && presence.check().is_ok()
+        {
+            self.visits
+                .seen(presence.someone, presence.nobody_s, presence.by, now_us);
+            // Someone the lamp knows at it, with the mark on: only someone
+            // who asked to be remembered, as the eyes write them. The name
+            // is let go here, unread past whether there is one.
+            // With names on, and only for someone the eyes say said yes to
+            // being named (`tellable`), the name is kept with the spell.
+            if presence.someone
+                && let Some(path) = self.known_file.as_deref()
+                && let Some(name) = known::name_in(path, known::MARK_FRESH)
+            {
+                self.visits.known_here();
+                if self.naming && known::tellable_in(&known::tellable_of(path)).contains(&name) {
+                    self.visits.named(&name);
+                }
+            }
+        }
         // Words still coming count too: the model may call before the end.
         if topic == Speech::TOPICS[0]
             && let Some(text) = value["text"].as_str()
@@ -2861,8 +3894,28 @@ impl Engine {
                     // list. The first message since the program started
                     // only says what is there: what was there then is not
                     // news. After a reload the value kept then is the last.
+                    let onboarding = skill.name == "onboarding"
+                        && skill.kind == SkillKind::Core
+                        && skill.steps.iter().any(|(_, step)| {
+                            matches!(step, Step::Call(Call::SayFrom(Source::Onboarding, _)))
+                        });
+                    // Only this source may deliver its initial snapshot: the
+                    // runner checks the token and owns bounded retry/restart.
+                    // Malformed or oversized lists never produce an ask.
+                    let valid = !onboarding
+                        || serde_json::from_value::<lamp_msgs::OnboardingPending>(value.clone())
+                            .is_ok_and(|pending| pending.check().is_ok());
+                    if !valid {
+                        // Invalid input cannot rearm an already-consumed token.
+                        continue;
+                    }
                     let items = items_of(trigger, list, key, &value);
                     let came: Vec<String> = match &watch.items {
+                        None if onboarding => items
+                            .iter()
+                            .filter(|(_, holds)| **holds)
+                            .map(|(name, _)| name.clone())
+                            .collect(),
                         None => Vec::new(),
                         Some(before) => items
                             .iter()
@@ -2924,7 +3977,7 @@ impl Engine {
                         watch.disarmed = false;
                     }
                 }
-                if !(rose && trigger.test.holds(&value)) {
+                if !(rose && trigger.test.holds(&value) && chooses(skill, &value)) {
                     if watch
                         .last_held_us
                         .is_none_or(|held| now_us - held >= trigger.gap_us)
@@ -2987,6 +4040,88 @@ impl Engine {
                     }
                     continue;
                 }
+                // Snoozed or turned off by a person (#1685): the chance is
+                // spent, so nothing waits to come when it ends.
+                if self.off.contains(&skill.name)
+                    || self
+                        .snoozed
+                        .get(&skill.name)
+                        .is_some_and(|until| now_us < *until)
+                {
+                    continue;
+                }
+                // The nudges' limits (#1685). Past the day's most, or resting
+                // after runs nobody noticed, the chance is spent. Outside its
+                // active hours, or with its group's hour spent or another
+                // of the group waiting longer for it, the chance is kept as
+                // in the quiet hours: taken at the trigger's first message
+                // once they allow it, while it still holds.
+                let day = day_of(self.clock, now_us);
+                if skill.most_a_day.is_some_and(|most| {
+                    self.day_runs
+                        .get(&skill.name)
+                        .is_some_and(|(on, count)| *on == day && *count >= most)
+                }) || self
+                    .nudges
+                    .get(&skill.name)
+                    .is_some_and(|nudge| now_us < nudge.resting_until_us)
+                {
+                    continue;
+                }
+                let outside = skill
+                    .active
+                    .is_some_and(|active| minute.is_none_or(|minute| !within(minute, active)));
+                let hour_spent = skill.budget.as_ref().is_some_and(|(group, _)| {
+                    let limit = self
+                        .skills
+                        .iter()
+                        .filter_map(|other| other.budget.as_ref())
+                        .filter(|(named, _)| named == group)
+                        .map(|(_, per_hour)| *per_hour)
+                        .min()
+                        .unwrap_or(u32::MAX);
+                    self.group_runs.get(group).is_some_and(|began| {
+                        began
+                            .iter()
+                            .filter(|at| now_us.saturating_sub(**at) < HOUR_US)
+                            .count() as u64
+                            >= u64::from(limit)
+                    })
+                });
+                // First come, first served: with the hour free, a member
+                // that has waited for it longer, and still waits, goes first,
+                // so the first of the group in folder order never takes
+                // every hour (#1685's wellbeing skills).
+                let behind = skill.budget.as_ref().is_some_and(|(group, _)| {
+                    self.budget_waits.get(group).is_some_and(|waits| {
+                        let mine = waits.get(&skill.name).map_or(now_us, |(first, _)| *first);
+                        waits.iter().any(|(name, (first, last))| {
+                            *name != skill.name
+                                && now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US
+                                && *first < mine
+                        })
+                    })
+                });
+                if (hour_spent || behind)
+                    && !outside
+                    && let Some((group, _)) = &skill.budget
+                {
+                    let wait = self
+                        .budget_waits
+                        .entry(group.clone())
+                        .or_default()
+                        .entry(skill.name.clone())
+                        .or_insert((now_us, now_us));
+                    wait.1 = now_us;
+                }
+                if outside || hour_spent || behind {
+                    if trigger.when != When::Appears {
+                        watch.spent = false;
+                        watch.disarmed = false;
+                        watch.waiting_us = None;
+                    }
+                    continue;
+                }
                 if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
                     // Held back by a condition (someone talking): with a
                     // `wait`, the chance is kept while the trigger holds,
@@ -3014,6 +4149,32 @@ impl Engine {
                 }
                 if self.skip_ask || self.ask_policy {
                     watch.ran_us = Some(now_us);
+                    // Counted as the cooldown is: when the run is started,
+                    // or asked of the Policy (#1685).
+                    if skill.most_a_day.is_some() {
+                        let count = self.day_runs.entry(skill.name.clone()).or_insert((day, 0));
+                        if count.0 != day {
+                            *count = (day, 0);
+                        }
+                        count.1 += 1;
+                    }
+                    if let Some((group, _)) = &skill.budget {
+                        let began = self.group_runs.entry(group.clone()).or_default();
+                        began.retain(|at| now_us.saturating_sub(*at) < HOUR_US);
+                        began.push_back(now_us);
+                        self.group_ran.insert(skill.name.clone(), now_us);
+                        if let Some(waits) = self.budget_waits.get_mut(group) {
+                            waits.remove(&skill.name);
+                            waits.retain(|_, (_, last)| {
+                                now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US
+                            });
+                        }
+                    }
+                    // Asked of the Policy, a run is watched for once it is
+                    // made ([`Engine::made`]): a no shows nothing to ignore.
+                    if !self.ask_policy {
+                        nudged(&mut self.nudges, &self.latest, skill, now_us);
+                    }
                     // Its end is told even if the Policy says no: with no
                     // run holding anything, the program lets it pass.
                     watch.open = skill.holds_until_ends();
@@ -3056,6 +4217,23 @@ impl Engine {
     /// of the newest thing heard (its pieces joined, as the voice joins
     /// them) if it began after that run began; the model reads its `told`.
     pub fn tool(&mut self, name: &str, args: &Value, now_us: u64) -> Result<Run, String> {
+        // Before a record is told, only the names the eyes still say said
+        // yes are kept: a no, a forget or a reset lets the rest go (#1997).
+        if self.naming
+            && let Some(path) = self.known_file.as_deref()
+        {
+            self.visits
+                .keep_names(&known::tellable_in(&known::tellable_of(path)));
+        }
+        let sharing: Vec<String> = self
+            .skills
+            .iter()
+            .filter(|skill| skill.stop.as_ref().is_some_and(|stop| stop.tool == name))
+            .map(|skill| skill.name.clone())
+            .collect();
+        if !sharing.is_empty() {
+            return self.stop(&sharing, name, args, now_us);
+        }
         let skill = self
             .skills
             .iter()
@@ -3090,7 +4268,11 @@ impl Engine {
                 format!("the model called {name} with {args}"),
                 None,
             )],
-            calls: calls(&self.latest, skill, None, now_us, args, None),
+            calls: self.told_history(
+                skill,
+                calls(&self.latest, skill, None, now_us, args, None),
+                now_us,
+            ),
             ask: None,
             queue: false,
             from: None,
@@ -3252,6 +4434,24 @@ fn arguments(skill: &Skill, args: &Value) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether a trigger's message chooses something, for a skill whose
+/// `[choice]` is read from it (`field`, #1669 (e)): only a value in
+/// `one_of` lets it hold, so a message that chooses nothing neither runs
+/// the skill, nor asks the Policy, nor starts its cooldown (the reviewer on
+/// #2012: a departure from the middle used up Watch you leave's ten
+/// minutes). Every other skill's trigger is as its test says.
+fn chooses(skill: &Skill, value: &Value) -> bool {
+    skill
+        .choice
+        .as_ref()
+        .and_then(|choice| Some((choice.field.as_deref()?, choice)))
+        .is_none_or(|(field, choice)| {
+            value[field]
+                .as_str()
+                .is_some_and(|chosen| choice.one_of.iter().any(|one| one == chosen))
+        })
+}
+
 /// One of `count`, picked from the time: the same time picks the same, so a
 /// replay is the same each time.
 fn pick(now_us: u64, count: usize) -> usize {
@@ -3287,7 +4487,14 @@ fn calls(
     let chosen = skill
         .choice
         .as_ref()
-        .and_then(|choice| args[&choice.name].as_str().or(choice.default.as_deref()));
+        .and_then(|choice| match (&choice.field, trigger) {
+            // The trigger's own message, as it fired (#1669 (e)).
+            (Some(field), Some(trigger)) => latest
+                .get(&trigger.topic)
+                .and_then(|(value, _, _)| value[field.as_str()].as_str()),
+            (Some(_), None) => None,
+            (None, _) => args[&choice.name].as_str().or(choice.default.as_deref()),
+        });
     let twice = skill
         .flag
         .as_ref()
@@ -3311,7 +4518,7 @@ fn calls(
             // and only on a `from = "tasks"` ask: the voice refuses `task`
             // on any other (#1237).
             Step::Call(Call::SayFrom(source, _)) => {
-                let task = (*source == Source::Tasks)
+                let task = matches!(*source, Source::Tasks | Source::Onboarding)
                     .then(|| item.and_then(|name| name.parse().ok()))
                     .flatten();
                 vec![Call::SayFrom(*source, task)]
@@ -3368,6 +4575,48 @@ pub fn tools_file(skills: &[Skill]) -> Value {
                 tool["parameters"] = json!({"type": "object", "properties": properties});
             }
             tools.push(tool);
+        }
+        // One function a skill to snooze it or turn it off (#1685): counted
+        // as any skill's against a session's 32, and reached through
+        // `use_skill` with `LAMP_USE_SKILL=on`.
+        if let Some(stop) = &skill.stop
+            && !tools.iter().any(|tool| tool["name"] == *stop.tool)
+        {
+            let mut properties = serde_json::Map::new();
+            properties.insert(
+                STOP_CHOICE.into(),
+                json!({
+                    "type": "string",
+                    "enum": STOP_WAYS,
+                    "description": "snooze: none until tomorrow morning; off: none until they ask for them again; on: as before again"
+                }),
+            );
+            // Shared by a group's skills: one function, and a yes-or-no for
+            // all of them (#1685).
+            let shared = skills
+                .iter()
+                .filter(|other| {
+                    other
+                        .stop
+                        .as_ref()
+                        .is_some_and(|theirs| theirs.tool == stop.tool)
+                })
+                .count()
+                > 1;
+            if shared {
+                properties.insert(
+                    STOP_ALL.into(),
+                    json!({
+                        "type": "boolean",
+                        "description": "true for every one of them; left out for the one that came last"
+                    }),
+                );
+            }
+            tools.push(json!({
+                "name": stop.tool,
+                "description": stop.about,
+                "parameters": {"type": "object", "properties": properties}
+            }));
         }
     }
     if moving.is_empty() {
@@ -3520,16 +4769,18 @@ pub fn replay_with(
     clock: Option<&str>,
 ) -> Result<Vec<Made>, String> {
     let skill = load(dir)?;
-    // A name the skill's tool is not would make nothing and pass as a
-    // quiet case: it is refused.
-    if let Some(tool) = tools
-        .iter()
-        .find(|tool| skill.tool.as_deref() != Some(tool.name.as_str()))
-    {
+    // A name the skill's tool is not, nor its `[stop]` function's, would
+    // make nothing and pass as a quiet case: it is refused.
+    let stop = skill.stop.as_ref().map(|stop| stop.tool.clone());
+    if let Some(tool) = tools.iter().find(|tool| {
+        skill.tool.as_deref() != Some(tool.name.as_str())
+            && stop.as_deref() != Some(tool.name.as_str())
+    }) {
         return Err(format!(
-            "call_tool {:?}: this skill's tool is {:?}",
+            "call_tool {:?}: this skill's tool is {:?}, its [stop] function {:?}",
             tool.name,
-            skill.tool.as_deref().unwrap_or("none")
+            skill.tool.as_deref().unwrap_or("none"),
+            stop.as_deref().unwrap_or("none")
         ));
     }
     let mut engine = Engine::new(vec![skill], true);
@@ -3564,7 +4815,11 @@ pub fn replay_with(
         while let Some((at, name, args)) =
             calls.next_if(|(at, _, _)| until_us.is_none_or(|until| *at < until))
         {
-            if let Ok(run) = engine.tool(name, &args, first_us + at) {
+            // A `[stop]` call makes nothing: its words are the model's
+            // answer (#1685).
+            if let Ok(run) = engine.tool(name, &args, first_us + at)
+                && stop.as_deref() != Some(name)
+            {
                 keep(made, run.calls, at);
             }
         }
@@ -3590,6 +4845,143 @@ pub fn replay_with(
     Ok(made)
 }
 
+/// In a watch's case, the eyes' known file from `at` on: the name of the
+/// known person at the lamp, or with no `name`, nobody known there.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KnownAt {
+    pub at: String,
+    pub name: Option<String>,
+}
+
+/// What a watch skill does in one case ([`watch`]): its recordings, the
+/// model's calls of its tool and the known faces, each in the order of its
+/// time (at one time, the messages first, then what the eyes know, then the
+/// call), the eyes' known file looked at after each, as the program looks at
+/// it as it goes. Its mark is `light`, the mark given back `ends`, a text
+/// `text`. With `clock`, the case's first message is at that local time.
+pub fn replay_watch(
+    dir: &Path,
+    recording: &Path,
+    tools: &[ToolCall],
+    clock: Option<&str>,
+    known: &[KnownAt],
+) -> Result<Vec<Made>, String> {
+    let skill = load(dir)?;
+    if skill.watch.is_none() {
+        return Err("[[known]] is a watch's: this skill has no [watch]".into());
+    }
+    let mut watches = watch::Watches::default();
+    watches.replace(std::slice::from_ref(&skill));
+    let messages = read_recordings(recording)?;
+    let first_us = messages.first().map_or(0, |message| message.header.at_us);
+    let start = clock.map(minute_of_day).transpose()?;
+    let minute =
+        |at_us: u64| start.map(|start| ((u64::from(start) + at_us / 60_000_000) % 1_440) as u16);
+    // Each event at its time from the first message, in the order above.
+    enum Event<'a> {
+        Message(&'a Recorded),
+        Known(Option<&'a str>),
+        Call(&'a ToolCall),
+    }
+    let mut events: Vec<(u64, u8, Event)> = Vec::new();
+    for message in &messages {
+        events.push((message.header.at_us - first_us, 0, Event::Message(message)));
+    }
+    for entry in known {
+        events.push((
+            duration_us(&entry.at)?,
+            1,
+            Event::Known(entry.name.as_deref()),
+        ));
+    }
+    for tool in tools {
+        if skill.tool.as_deref() != Some(tool.name.as_str()) {
+            return Err(format!(
+                "call_tool {:?}: this skill's tool is {:?}",
+                tool.name,
+                skill.tool.as_deref().unwrap_or("none")
+            ));
+        }
+        events.push((duration_us(&tool.at)?, 2, Event::Call(tool)));
+    }
+    events.sort_by_key(|(at, rank, _)| (*at, *rank));
+    let mut made = Vec::new();
+    let keep = |made: &mut Vec<Made>, outs: Vec<watch::Out>, at_us: u64| {
+        for out in outs {
+            let call = match out {
+                watch::Out::Mark(call) => call,
+                watch::Out::Unmark => Call::Ends,
+                watch::Out::Text(text) => Call::Text(text),
+                watch::Out::Said(_) => continue,
+            };
+            made.push(Made { at_us, call });
+        }
+    };
+    let mut known_now: Option<&str> = None;
+    for (at, _, event) in events {
+        let outs = match event {
+            // What the ring says of the mark, as the program takes it.
+            Event::Message(message) => match ring_said(message) {
+                Some((source, shown, by)) => match source.strip_prefix("skill:") {
+                    Some(name) if name == skill.name => watches
+                        .ring_said(name, shown, by.as_deref(), at)
+                        .into_iter()
+                        .map(|(_, out)| out)
+                        .collect(),
+                    _ => Vec::new(),
+                },
+                None => watches
+                    .observe(&message.header.topic, &message.payload, at, minute(at))
+                    .into_iter()
+                    .map(|(_, out)| out)
+                    .collect(),
+            },
+            Event::Known(name) => {
+                known_now = name;
+                Vec::new()
+            }
+            Event::Call(tool) => {
+                let args = if tool.args.is_empty() {
+                    Value::Null
+                } else {
+                    serde_json::to_value(&tool.args).map_err(|error| error.to_string())?
+                };
+                match watches.tool(&tool.name, &args, at, known_now, true) {
+                    Some(Ok((_, _, outs))) => outs,
+                    _ => Vec::new(),
+                }
+            }
+        };
+        keep(&mut made, outs, at);
+        let looked = watches.known(known_now, at, minute(at));
+        keep(
+            &mut made,
+            looked.into_iter().map(|(_, out)| out).collect(),
+            at,
+        );
+    }
+    Ok(made)
+}
+
+/// What a recorded message of the ring says of a request's light: its
+/// claim's source, whether it is shown (`light/reached`) or not
+/// (`light/outranked`), and by what.
+fn ring_said(message: &Recorded) -> Option<(String, bool, Option<String>)> {
+    match message.header.topic.as_str() {
+        lamp_msgs::LightReached::TOPIC => {
+            let reached: lamp_msgs::LightReached = serde_json::from_slice(&message.payload).ok()?;
+            Some((reached.source, true, None))
+        }
+        lamp_msgs::LightOutranked::TOPIC => {
+            let outranked: lamp_msgs::LightOutranked =
+                serde_json::from_slice(&message.payload).ok()?;
+            Some((outranked.source, false, Some(outranked.by)))
+        }
+        _ => None,
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ExpectFile {
@@ -3602,6 +4994,9 @@ struct ExpectFile {
     /// The model calling the skill's tool, for a skill a person starts.
     #[serde(default)]
     call_tool: Vec<ToolCall>,
+    /// A watch's: the face the eyes know at the lamp, as time goes.
+    #[serde(default)]
+    known: Vec<KnownAt>,
 }
 
 #[derive(Deserialize)]
@@ -3652,7 +5047,7 @@ fn matches(expected: &ExpectedCall, made: &Made) -> Result<bool, String> {
 /// says `none = true`. How many passed and how many have no recording yet,
 /// or the first that did not pass.
 pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
-    load(dir)?;
+    let watches = load(dir)?.watch.is_some();
     let mut cases: Vec<PathBuf> = fs::read_dir(dir.join("tests"))
         .map_err(|error| format!("tests/: {error}"))?
         .flatten()
@@ -3678,7 +5073,21 @@ pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
             unrecorded += 1;
             continue;
         }
-        let made = replay_with(dir, case, &expect.call_tool, expect.clock.as_deref())?;
+        let made = if watches {
+            replay_watch(
+                dir,
+                case,
+                &expect.call_tool,
+                expect.clock.as_deref(),
+                &expect.known,
+            )?
+        } else if !expect.known.is_empty() {
+            return Err(wrong(
+                "[[known]] is a watch's: this skill has no [watch]".into(),
+            ));
+        } else {
+            replay_with(dir, case, &expect.call_tool, expect.clock.as_deref())?
+        };
         let names: Vec<_> = made
             .iter()
             .map(|made| (made.at_us, made.call.named()))

@@ -2511,9 +2511,14 @@ mod tests {
             words.is_some()
         });
         assert_eq!(words.as_deref(), Some("Stop."));
+        // At least two, not exactly: the ears keep a stream ready, so the
+        // one this audio takes up is soon followed by the next asked for.
+        // Checked for exactly two, a thread that took it up and asked again
+        // before this one looked never let the wait end (ARM64, #1699's run
+        // 39271945892).
         until("another stream", || {
             ears.hear(lamp_ipc::monotonic_us(), &[2; 160]);
-            service.connections() == 2
+            service.connections() >= 2
         });
         let before = service.audio();
         until("audio reaches the new stream", || {

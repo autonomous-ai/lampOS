@@ -80,6 +80,22 @@ pub fn keep_known(path: &Path, name: Option<&str>, face: Option<&str>) {
     }
 }
 
+/// The file of names Who was here may say (`lamp-skills --tellable-file`,
+/// #1997): `tellable` beside the known file.
+pub fn tellable_of(known: &Path) -> PathBuf {
+    known.with_file_name("tellable")
+}
+
+/// The names of those who said yes to being named, one a line, replaced
+/// whole (mode 0600); no file when there are none.
+pub fn keep_tellable(path: &Path, names: &[String]) {
+    if names.is_empty() {
+        let _ = std::fs::remove_file(path);
+        return;
+    }
+    replace_line(path, &names.join("\n"));
+}
+
 fn replace_line(path: &Path, line: &str) {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
@@ -304,6 +320,12 @@ pub struct Person {
     /// that only adds, so the file keeps its version (the rule above).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub familiar: Option<f32>,
+    /// Their yes to being named to others in Who was here (#1997, the
+    /// lead's yes 20 Oct): `Some(true)` only, absent for no. An optional
+    /// field under the rule above: an older build reads past it and its next
+    /// save drops it, which only ever narrows what is told.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tell_visits: Option<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -355,7 +377,7 @@ pub fn plain_name(name: &str) -> Option<String> {
     fine.then_some(name)
 }
 
-fn same_name(a: &str, b: &str) -> bool {
+pub(crate) fn same_name(a: &str, b: &str) -> bool {
     a.to_lowercase() == b.to_lowercase()
 }
 
@@ -492,6 +514,29 @@ impl People {
             .collect()
     }
 
+    /// The names of those who said yes to being named to others in Who was
+    /// here (#1997).
+    pub fn tellable(&self) -> Vec<String> {
+        self.people
+            .iter()
+            .filter(|person| person.tell_visits == Some(true))
+            .map(|person| person.name.clone())
+            .collect()
+    }
+
+    /// Their yes (`true`) or no to being named to others, saved; whether
+    /// they are someone the lamp remembers.
+    pub fn tell_visits(&mut self, name: &str, yes: bool) -> Result<bool> {
+        let mut next = self.people.clone();
+        let Some(person) = next.iter_mut().find(|person| same_name(&person.name, name)) else {
+            return Ok(false);
+        };
+        person.tell_visits = yes.then_some(true);
+        self.save(&next)?;
+        self.people = next;
+        Ok(true)
+    }
+
     /// Whose print this is, and how alike: the best match at or over
     /// [`SAME_PERSON`], or nobody.
     pub fn who(&self, print: &[f32]) -> Option<(String, f32)> {
@@ -538,6 +583,11 @@ impl People {
             prints,
             added_unix_s: now_unix_s,
             familiar: None,
+            // A remembering starts with no yes to being named, even under a
+            // name that had one: the prints are whoever is at the lamp now,
+            // and the yes was another face's (the reviewer's P2 on #2098).
+            // The voice asks again.
+            tell_visits: None,
         });
         self.save(&next)?;
         self.people = next;
@@ -786,13 +836,101 @@ impl People {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
     Remember(String),
-    RememberOne { name: String, replace: bool },
+    RememberOne {
+        name: String,
+        replace: bool,
+    },
+    /// Add the one face in a photo in the eyes' photo folder (`--photo-dir`,
+    /// [`crate::photo`]), unconfirmed until its person says yes: its file
+    /// name.
+    RememberPhoto {
+        name: String,
+        file: String,
+    },
+    /// Whether a face from a photo, unconfirmed, is at the lamp now, and
+    /// under which name: so the voice can ask them.
+    PhotoHere,
+    /// The voice has asked them, in this meeting.
+    PhotoAsked(String),
+    /// Their yes: kept as an ordinary print.
+    PhotoYes(String),
+    /// Their no: deleted.
+    PhotoNo(String),
+    /// Their yes to being named to others in Who was here (#1997), taken
+    /// only from the known face at the lamp now.
+    VisitsYes(String),
+    /// Their no: not named to others any more.
+    VisitsNo(String),
     Forget(String),
     List,
     Who,
 }
 
 pub fn ask_of(line: &[u8]) -> Option<Ask> {
+    // A face from a photo's consent (`--photo-dir`): one of these alone.
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Consent {
+        photo_here: Option<bool>,
+        photo_asked: Option<String>,
+        photo_yes: Option<String>,
+        photo_no: Option<String>,
+        visits_yes: Option<String>,
+        visits_no: Option<String>,
+    }
+    if let Ok(consent) = serde_json::from_slice::<Consent>(line) {
+        return match consent {
+            Consent {
+                photo_here: Some(true),
+                photo_asked: None,
+                photo_yes: None,
+                photo_no: None,
+                visits_yes: None,
+                visits_no: None,
+            } => Some(Ask::PhotoHere),
+            Consent {
+                photo_here: None,
+                photo_asked: Some(name),
+                photo_yes: None,
+                photo_no: None,
+                visits_yes: None,
+                visits_no: None,
+            } => Some(Ask::PhotoAsked(name)),
+            Consent {
+                photo_here: None,
+                photo_asked: None,
+                photo_yes: Some(name),
+                photo_no: None,
+                visits_yes: None,
+                visits_no: None,
+            } => Some(Ask::PhotoYes(name)),
+            Consent {
+                photo_here: None,
+                photo_asked: None,
+                photo_yes: None,
+                photo_no: Some(name),
+                visits_yes: None,
+                visits_no: None,
+            } => Some(Ask::PhotoNo(name)),
+            Consent {
+                photo_here: None,
+                photo_asked: None,
+                photo_yes: None,
+                photo_no: None,
+                visits_yes: Some(name),
+                visits_no: None,
+            } => Some(Ask::VisitsYes(name)),
+            Consent {
+                photo_here: None,
+                photo_asked: None,
+                photo_yes: None,
+                photo_no: None,
+                visits_yes: None,
+                visits_no: Some(name),
+            } => Some(Ask::VisitsNo(name)),
+            _ => None,
+        };
+    }
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     struct Line {
@@ -802,6 +940,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
         who: Option<bool>,
         one_face: Option<bool>,
         replace: Option<bool>,
+        photo: Option<String>,
     }
     let line: Line = serde_json::from_slice(line).ok()?;
     match line {
@@ -812,6 +951,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::Remember(name)),
         Line {
             remember: Some(name),
@@ -820,6 +960,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: Some(true),
             replace,
+            photo: None,
         } => Some(Ask::RememberOne {
             name,
             replace: replace.unwrap_or(false),
@@ -831,6 +972,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::Forget(name)),
         Line {
             remember: None,
@@ -839,6 +981,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::List),
         Line {
             remember: None,
@@ -847,7 +990,17 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: Some(true),
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::Who),
+        Line {
+            remember: Some(name),
+            forget: None,
+            list: None,
+            who: None,
+            one_face: None,
+            replace: None,
+            photo: Some(file),
+        } => Some(Ask::RememberPhoto { name, file }),
         _ => None,
     }
 }
@@ -1008,7 +1161,11 @@ fn is_temporary(file: &Path) -> bool {
 /// Whether `file` in the set-aside folder is people's records: not a
 /// rewrite's temporary file, nor the forgets that wait ([`PENDING_FORGETS`]).
 fn is_a_record(file: &Path) -> bool {
-    !is_temporary(file) && file.file_name().is_none_or(|name| name != PENDING_FORGETS)
+    !is_temporary(file)
+        && file
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_none_or(|name| !name.starts_with(PENDING_FORGETS))
 }
 
 /// A name as the forgets that wait keep it: a plain SHA-256 of its lower
@@ -1022,25 +1179,100 @@ fn name_hash(name: &str) -> String {
 }
 
 /// The forgets that wait beside the people file at `path`
-/// ([`PENDING_FORGETS`]); none when there is no such file.
+/// ([`PENDING_FORGETS`]); none when there is no such file. One from a
+/// later build reads past what it doesn't know (#1680). One that can't be
+/// read at all is set aside beside it, kept as it is with its mode
+/// (`forgets-pending.unreadable-<unix s>`), with a line that counts only:
+/// every later `forget` would otherwise fail (#2052's audit). A set-aside
+/// list that can be read again, by the build that wrote it, is merged back.
+/// The reset empties the folder with it.
 fn pending(path: &Path) -> io::Result<Vec<Waiting>> {
-    let file = path
-        .parent()
-        .unwrap_or(Path::new("/"))
-        .join(SET_ASIDE)
-        .join(PENDING_FORGETS);
-    let bytes = match std::fs::read(&file) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+    let folder = path.parent().unwrap_or(Path::new("/")).join(SET_ASIDE);
+    let file = folder.join(PENDING_FORGETS);
+    let mut waiting = match std::fs::read(&file) {
+        Ok(bytes) => match read_waits(&bytes) {
+            Some(waiting) => waiting,
+            None => {
+                set_pending_aside(&file, bytes.len())?;
+                Vec::new()
+            }
+        },
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Vec::new(),
         Err(error) => return Err(error),
     };
+    // A list set aside before that can be read now (the build that wrote
+    // it, back after a step back): its waits come back, so a face read back
+    // from a set-aside file is still forgotten (the reviewer on #2070). One
+    // still unreadable stays, with no line each start.
+    let mut merged = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&folder) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if !name
+                .to_str()
+                .is_some_and(|name| name.starts_with(&format!("{PENDING_FORGETS}.unreadable-")))
+            {
+                continue;
+            }
+            let Some(waits) = std::fs::read(entry.path())
+                .ok()
+                .and_then(|bytes| read_waits(&bytes))
+            else {
+                continue;
+            };
+            for wait in waits {
+                // Asked twice, it waits from the later word.
+                match waiting.iter_mut().find(|kept| kept.hash == wait.hash) {
+                    Some(kept) => kept.at_unix_s = kept.at_unix_s.max(wait.at_unix_s),
+                    None => waiting.push(wait),
+                }
+            }
+            merged.push(entry.path());
+        }
+    }
+    if !merged.is_empty() {
+        keep_pending(path, &waiting)?;
+        for file in &merged {
+            std::fs::remove_file(file)?;
+        }
+        eprintln!(
+            "lamp-eyes: {} set-aside lists of the forgets that wait could be read now; their forgets wait again",
+            merged.len()
+        );
+    }
+    Ok(waiting)
+}
+
+/// The forgets that wait in a file's bytes, past any field this build
+/// doesn't know; `None` when they can't be read.
+fn read_waits(bytes: &[u8]) -> Option<Vec<Waiting>> {
     #[derive(Deserialize)]
     struct Kept {
         forget: Vec<Waiting>,
     }
-    serde_json::from_slice::<Kept>(&bytes)
+    serde_json::from_slice::<Kept>(bytes)
+        .ok()
         .map(|kept| kept.forget)
-        .map_err(|_| io::Error::other(format!("{} is not a list of forgets", file.display())))
+}
+
+/// The forgets file this build can't read, set aside beside it as it is,
+/// with its mode, and said with a line that counts only.
+fn set_pending_aside(file: &Path, bytes: usize) -> io::Result<()> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+    let mut aside = file.with_file_name(format!("{PENDING_FORGETS}.unreadable-{now}"));
+    let mut n = 0;
+    while aside.exists() {
+        n += 1;
+        aside = file.with_file_name(format!("{PENDING_FORGETS}.unreadable-{now}-{n}"));
+    }
+    std::fs::rename(file, &aside)?;
+    eprintln!(
+        "lamp-eyes: the forgets that wait could not be read ({bytes} bytes); set aside as {}, and forgetting goes on",
+        aside.display()
+    );
+    Ok(())
 }
 
 /// The forgets that wait written whole, 0600, or the file removed when
@@ -1325,6 +1557,88 @@ mod tests {
         directory.join("people.json")
     }
 
+    /// #1997, the lead's yes: a remembered person's yes to being named to
+    /// others is kept with their face and only theirs; a no takes it back;
+    /// a new remembering under the same name starts without it; a forget
+    /// takes it with them; the `tellable` file holds the yes names, 0600, and is gone with
+    /// none. An older build's file, with no field, reads as no.
+    #[test]
+    fn a_yes_to_being_named_is_kept_with_the_face_and_goes_with_a_no_or_a_forget() {
+        use std::os::unix::fs::PermissionsExt;
+        let path = file("tell");
+        let mut people = People::open(path.clone()).unwrap();
+        people.remember("Alpha", vec![print(0.1)], 1).unwrap();
+        people.remember("Beta", vec![print(0.7)], 1).unwrap();
+        assert!(people.tellable().is_empty(), "nobody said yes yet");
+        assert!(people.tell_visits("Alpha", true).unwrap());
+        assert!(
+            !people.tell_visits("Gamma", true).unwrap(),
+            "not remembered"
+        );
+        assert_eq!(people.tellable(), ["Alpha"]);
+        // Kept on disk, and only for Alpha.
+        let reopened = People::open(path.clone()).unwrap();
+        assert_eq!(reopened.tellable(), ["Alpha"]);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text.matches("tell_visits").count(), 1, "{text}");
+        // Someone else remembered under the same name (other prints): the
+        // first Alpha's yes isn't theirs (the reviewer's P2 on #2098), nor is
+        // it kept for the same face asked again: the voice asks again.
+        people.remember("Alpha", vec![print(0.9)], 2).unwrap();
+        assert!(people.tellable().is_empty(), "a new remembering has no yes");
+        people.tell_visits("Alpha", true).unwrap();
+        people.remember("Alpha", vec![print(0.9)], 3).unwrap();
+        assert!(
+            people.tellable().is_empty(),
+            "nor the same face asked again"
+        );
+        people.tell_visits("Alpha", true).unwrap();
+        // The file beside the known one.
+        let known = path.with_file_name("known");
+        let tellable = tellable_of(&known);
+        assert_eq!(tellable, path.with_file_name("tellable"));
+        keep_tellable(&tellable, &people.tellable());
+        assert_eq!(std::fs::read_to_string(&tellable).unwrap(), "Alpha\n");
+        assert_eq!(
+            std::fs::metadata(&tellable).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        // A no takes it back, and the file goes with the last name.
+        assert!(people.tell_visits("Alpha", false).unwrap());
+        assert!(people.tellable().is_empty());
+        keep_tellable(&tellable, &people.tellable());
+        assert!(!tellable.exists());
+        // A forget takes it with them.
+        people.tell_visits("Beta", true).unwrap();
+        people.forget("Beta").unwrap();
+        assert!(people.tellable().is_empty());
+        // An older build's record, with no field: no.
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{"version":1,"people":[{{"name":"Delta","prints":[{:?}],"added_unix_s":1}}]}}"#,
+                print(0.3)
+            ),
+        )
+        .unwrap();
+        assert!(People::open(path.clone()).unwrap().tellable().is_empty());
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn a_yes_or_no_to_being_named_is_asked_alone() {
+        assert_eq!(
+            ask_of(br#"{"visits_yes":"A"}"#),
+            Some(Ask::VisitsYes("A".into()))
+        );
+        assert_eq!(
+            ask_of(br#"{"visits_no":"A"}"#),
+            Some(Ask::VisitsNo("A".into()))
+        );
+        assert_eq!(ask_of(br#"{"visits_yes":"A","visits_no":"A"}"#), None);
+        assert_eq!(ask_of(br#"{"visits_yes":"A","photo_yes":"A"}"#), None);
+    }
+
     /// The known name, and while speaking is judged its face's passing id
     /// beside it: both 0600, the face gone with no face, both gone with no
     /// name.
@@ -1595,6 +1909,41 @@ mod tests {
         );
         assert_eq!(ask_of(br#"{"remember":"A","replace":true}"#), None);
         assert_eq!(ask_of(br#"{"forget":"A","one_face":true}"#), None);
+        // From a photo (`--photo-dir`): a name and the photo's file.
+        assert_eq!(
+            ask_of(br#"{"remember":"A","photo":"a.jpg"}"#),
+            Some(Ask::RememberPhoto {
+                name: "A".into(),
+                file: "a.jpg".into(),
+            })
+        );
+        // A photo never replaces anyone: it has no say for them.
+        assert_eq!(
+            ask_of(br#"{"remember":"A","photo":"a.jpg","replace":true}"#),
+            None
+        );
+        // Its person's consent, one ask at a time.
+        assert_eq!(ask_of(br#"{"photo_here":true}"#), Some(Ask::PhotoHere));
+        assert_eq!(
+            ask_of(br#"{"photo_asked":"A"}"#),
+            Some(Ask::PhotoAsked("A".into()))
+        );
+        assert_eq!(
+            ask_of(br#"{"photo_yes":"A"}"#),
+            Some(Ask::PhotoYes("A".into()))
+        );
+        assert_eq!(
+            ask_of(br#"{"photo_no":"A"}"#),
+            Some(Ask::PhotoNo("A".into()))
+        );
+        assert_eq!(ask_of(br#"{"photo_yes":"A","photo_no":"A"}"#), None);
+        assert_eq!(ask_of(br#"{"photo_here":false}"#), None);
+        assert_eq!(ask_of(br#"{"photo":"a.jpg"}"#), None);
+        assert_eq!(
+            ask_of(br#"{"remember":"A","photo":"a.jpg","one_face":true}"#),
+            None
+        );
+        assert_eq!(ask_of(br#"{"forget":"A","photo":"a.jpg"}"#), None);
         assert_eq!(ask_of(br#"{"list":true}"#), Some(Ask::List));
         assert_eq!(ask_of(br#"{"who":true}"#), Some(Ask::Who));
         for nothing in [
@@ -1909,6 +2258,97 @@ mod tests {
             1,
             "kept: nothing can be told about it"
         );
+    }
+
+    /// #1680's rule for the forgets that wait (#2052's audit): a file from a
+    /// later build, with fields this one doesn't know, is read and its waits
+    /// kept; one that can't be read is set aside, kept as it was, never
+    /// counted as anyone's records, and a forget goes on and waits afresh.
+    /// Before, every forget failed while it couldn't be read.
+    #[test]
+    fn the_forgets_that_wait_never_stop_a_forget() {
+        let good = serde_json::to_string(&print(0.2)).unwrap();
+        let fay = format!(
+            r#"{{"version":1,"people":[{{"name":"Fay","prints":[{good}],"added_unix_s":1}}]}}"#
+        );
+        let setup = |name: &str, waits: &str| {
+            let path = file(name);
+            let folder = path.parent().unwrap().join(SET_ASIDE);
+            std::fs::create_dir(&folder).unwrap();
+            // One set-aside file nothing can search, so a forget must wait.
+            std::fs::write(folder.join("people-whole-0000.json"), "not json").unwrap();
+            std::fs::write(folder.join(PENDING_FORGETS), waits).unwrap();
+            std::fs::write(&path, &fay).unwrap();
+            (path, folder)
+        };
+        let waits_for = |folder: &Path| -> Vec<String> {
+            let text = std::fs::read_to_string(folder.join(PENDING_FORGETS)).unwrap();
+            let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+            value["forget"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|wait| wait["hash"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let waited = Forgot {
+            forgot: true,
+            unsearched: 1,
+        };
+
+        // From a later build: a field at its top and in a wait.
+        let later = format!(
+            r#"{{"forget":[{{"hash":"{}","at_unix_s":5,"why":"asked"}}],"kind":2}}"#,
+            name_hash("Gil")
+        );
+        let (path, folder) = setup("pending-later", &later);
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(people.forget("Fay").unwrap(), waited);
+        assert_eq!(waits_for(&folder), [name_hash("Gil"), name_hash("Fay")]);
+
+        // Not readable at all: set aside as it was, and the forget waits.
+        let (path, folder) = setup("pending-unreadable", "{\"forget\": [tor");
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(people.forget("Fay").unwrap(), waited);
+        assert!(people.names().is_empty());
+        assert_eq!(waits_for(&folder), [name_hash("Fay")]);
+        let kept: Vec<_> = std::fs::read_dir(&folder)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .filter(|name| name.starts_with("forgets-pending.unreadable-"))
+            .collect();
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert_eq!(
+            std::fs::read_to_string(folder.join(&kept[0])).unwrap(),
+            "{\"forget\": [tor"
+        );
+        // Never anyone's records: still the one set-aside file.
+        assert_eq!(set_aside_count(&path), 1);
+
+        // The reviewer on #2070: the build that wrote it, back after a step
+        // back, reads it again. At its next start its waits are merged back,
+        // the later word kept for a name in both, and the copy goes.
+        std::fs::write(
+            folder.join(&kept[0]),
+            format!(
+                r#"{{"forget":[{{"hash":"{}","at_unix_s":7}},{{"hash":"{}","at_unix_s":1}}]}}"#,
+                name_hash("Gil"),
+                name_hash("Fay")
+            ),
+        )
+        .unwrap();
+        let fay_asked = {
+            let text = std::fs::read_to_string(folder.join(PENDING_FORGETS)).unwrap();
+            let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+            value["forget"][0]["at_unix_s"].as_u64().unwrap()
+        };
+        People::open(path.clone()).unwrap();
+        assert_eq!(waits_for(&folder), [name_hash("Fay"), name_hash("Gil")]);
+        let text = std::fs::read_to_string(folder.join(PENDING_FORGETS)).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(value["forget"][0]["at_unix_s"].as_u64(), Some(fay_asked));
+        assert!(!folder.join(&kept[0]).exists());
+        assert_eq!(set_aside_count(&path), 1);
     }
 
     /// Twelve's P2 on #1767: a waiting forget covers only the faces kept

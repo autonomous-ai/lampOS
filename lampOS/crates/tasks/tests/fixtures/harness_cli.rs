@@ -118,12 +118,19 @@ pub fn main() -> io::Result<()> {
                 "{}",
                 json!({"machineId":"0123456789abcdef0123456789abcdef","current":true})
             ),
-            "new" => println!(
-                "{}",
-                json!({"ok":true,"machineId":flag("--machine"),"agent":{
-                    "id":"11111111-1111-4111-8111-111111111111","name":flag("--name"),"engine":args.get(1),"permissionMode":"auto","bypassPermission":true
-                }})
-            ),
+            // As Harness answers: the mode asked for, and with none asked
+            // (Devin, #1854) none, and no bypass (`newAgentPayload`).
+            "new" => {
+                let moded = args.iter().any(|arg| arg == "--mode");
+                println!(
+                    "{}",
+                    json!({"ok":true,"machineId":flag("--machine"),"agent":{
+                        "id":"11111111-1111-4111-8111-111111111111","name":flag("--name"),"engine":args.get(1),
+                        "permissionMode":if moded { json!(flag("--mode")) } else { Value::Null },
+                        "bypassPermission":moded
+                    }})
+                )
+            }
             "show" => println!(
                 "{}",
                 json!({"id":args.get(3),"state":"idle","ask":"Earlier unrelated question","answer":"Observed answer","truncated":false,"tools":2})

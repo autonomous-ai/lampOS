@@ -261,6 +261,27 @@ stale copies or resurrect forgotten records. Do not remove that guard by
 deleting the database. Trial the feature on a disposable directory first.
 There is no export or automatic downgrade tool in this task.
 
+A database a newer build wrote (`user_version` above 1) doesn't stop
+memory: it is renamed `memory-days.sqlite3.newer-db<version>-<seconds>`,
+never changed, and this build starts an empty one. No code reads the file
+back yet: on a roll forward the newer build opens `memory-days.sqlite3`,
+which is now this build's store. Whichever build brings `user_version` 2
+reads `newer-db2-*` back. The journal says it with the file's name only,
+and health warns with `set_aside` on every start while the file is there
+(#1680). Its records are not read or searched by this build.
+
+It is the person's memory too, and this build can't reach a fact or a
+person inside it, so every forget (`forget`, `forget_last` and
+`forget_all`, for one person or everyone) removes every set-aside file
+whole, with its `-journal`, `-wal` and `-shm`. Nothing said forgotten
+stays on disk. The journal line names only the files, and health's
+`set_aside` warning clears (#2067). It lasts no longer than the journal:
+the usual pass, on every request, removes one, sidecars too, once its
+`<seconds>` stamp (the store's clock when it was set aside) is
+`keep_days` old, with a journal line naming only the files, and the warning
+moves to a younger one or clears. The 5 s reset wipes the whole
+`/var/lib/lampos-memory` folder, so it removes them too.
+
 The connection uses rollback-journal `DELETE`, `synchronous=EXTRA`,
 `fullfsync=ON`, foreign keys and in-memory temporary tables. EXTRA also
 requests synchronization of the directory entry after journal removal;
@@ -288,6 +309,12 @@ Both versions remain stored; normal search and new notes exclude the old
 version. `history:true` exposes it for inspection. The pass does not
 overwrite or delete evidence. A model's choice of category and correction
 can still be wrong; structural validation cannot prove meaning.
+An observation in a category a newer build wrote is kept as stored and
+read with `category:null`: never read as another category, given to a tidy
+pass as a previous observation, chosen as one, or superseded (#1680). It
+takes none of the 32 previous-observation slots, so a tidy pass still sees
+up to 32 real ones, and a session note shows it as a plain fact, labelled
+`preference` as a kept fact is, never as its newer category (#2067).
 
 `forget {id}` removes that record, its replacement chain in both
 directions, and all linked descendants. When the target is an observation,
@@ -339,7 +366,7 @@ and counts, never queries, remembered words or model output.
 
 The request cap is 64 KiB. New operations refuse unknown fields. Existing
 operations keep their response shapes and text limits. Extra error codes
-include `full`, `busy`, `stale`, `done` and `version`; `bad_request` covers
+include `full`, `busy`, `stale` and `done`; `bad_request` covers
 invalid references or model output, and `storage` has a content-free
 message. A refusal leaves the connection usable.
 

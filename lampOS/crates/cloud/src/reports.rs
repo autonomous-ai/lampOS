@@ -19,6 +19,7 @@
 use lamp_msgs::{BoardState, Health, Level, Online, SelfTest, Verdict};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
 use std::fs;
 use std::io::{self, Read, Write};
@@ -55,7 +56,7 @@ pub const ASKED: u64 = 1;
 /// The parts a report may name: the product's `--expect` list
 /// (`deploy/product/lamp-health.service`) and those `lamp-health show`
 /// knows by name, plus this one. Any other is only counted.
-pub const PARTS: [&str; 18] = [
+pub const PARTS: &[&str] = &[
     "board",
     "voice",
     "eyes",
@@ -77,7 +78,7 @@ pub const PARTS: [&str; 18] = [
 ];
 
 /// The parts the self-test names (`lamp_msgs::PartResult::part`).
-pub const SELFTEST_PARTS: [&str; 16] = [
+pub const SELFTEST_PARTS: &[&str] = &[
     "voice_mic",
     "room_mic",
     "speaker",
@@ -98,7 +99,7 @@ pub const SELFTEST_PARTS: [&str; 16] = [
 
 /// The units a report may name: the product's `lamp-*.service` files
 /// (`deploy/product/`). A test holds the two the same.
-pub const UNITS: [&str; 22] = [
+pub const UNITS: &[&str] = &[
     "lamp-actions.service",
     "lamp-air-clock.service",
     "lamp-air.service",
@@ -110,17 +111,23 @@ pub const UNITS: [&str; 22] = [
     "lamp-eyes.service",
     "lamp-health.service",
     "lamp-memory.service",
+    "lamp-mood.service",
     "lamp-name.service",
     "lamp-policy.service",
     "lamp-records.service",
     "lamp-schedule.service",
     "lamp-selftest.service",
+    "lamp-setup-change@.service",
     "lamp-setup-reset.service",
+    "lamp-setup-wifi@.service",
     "lamp-setup.service",
     "lamp-skills.service",
     "lamp-tasks.service",
+    "lamp-update-apply.service",
+    "lamp-update-back.service",
     "lamp-update.service",
     "lamp-voice.service",
+    "lamp-waking.service",
 ];
 
 /// The signals a crash may name.
@@ -248,6 +255,7 @@ fn rounded(value: f32, places: i32) -> Option<f32> {
 
 /// The lamp's own counts of what it did not send.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Dropped {
     /// Put out of the queue to keep it in its bounds.
     pub queue_full: u32,
@@ -647,11 +655,21 @@ fn signal_name(status: &str) -> Option<&'static str> {
         .find(|name| name.strip_prefix("SIG") == Some(bare))
 }
 
-/// The person's choice as kept: `share`, and since when.
+/// The person's choice as kept: `share`, since when, and who made it,
+/// with whether a voice's stop came from a held line (#1880, the first
+/// builder on #1722, 18:44: a held stop is made visible, never silent).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Consent {
     pub share: bool,
     pub since: Option<String>,
+    /// None for a choice kept before this was.
+    pub by: Option<lamp_msgs::ReportsBy>,
+    pub held: bool,
+}
+
+/// `by` as kept: only the three names.
+fn by_of(value: &Value) -> Option<lamp_msgs::ReportsBy> {
+    serde_json::from_value(value.clone()).ok()
 }
 
 /// A time this lamp wrote, as RFC 3339: digits, `-`, `:`, `T` and `Z` only.
@@ -667,6 +685,22 @@ fn when(value: &Value) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// A JSON error's kind and place, never its message, which can quote a
+/// value from the file (#2061's rule): `Data at line 1 column 15`, or the
+/// kind alone when there is no place (a `Value` read again).
+fn json_why(error: &serde_json::Error) -> String {
+    if error.line() == 0 {
+        format!("{:?}", error.classify())
+    } else {
+        format!(
+            "{:?} at line {} column {}",
+            error.classify(),
+            error.line(),
+            error.column()
+        )
+    }
+}
+
 /// A small JSON file, or nothing.
 fn read_json(path: &Path) -> Option<Value> {
     let mut text = String::new();
@@ -678,28 +712,160 @@ fn read_json(path: &Path) -> Option<Value> {
     serde_json::from_str(&text).ok()
 }
 
+/// A choice file as read: none there, one this build can't read (and
+/// why), or a JSON object with a `share` that is a boolean.
+enum Choice {
+    Absent,
+    Unreadable(String),
+    Object(serde_json::Map<String, Value>),
+}
+
+/// The fields `lamp-cloud`'s own record has (`choose` writes them).
+const OWN_FIELDS: [&str; 4] = ["share", "at", "by", "held"];
+/// The fields setup's record has (`lamp-setup`'s `reports_record`).
+const SETUP_FIELDS: [&str; 3] = ["share", "asked", "at"];
+
+/// A choice file, read whole: only a JSON object whose `share` is a boolean
+/// is one this build can read. A file that can't be opened for any reason
+/// but its absence is unreadable, never absent (#2052): an own no that
+/// can't be read must not let setup's older yes through.
+fn read_choice(path: &Path) -> Choice {
+    let file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Choice::Absent,
+        Err(error) => return Choice::Unreadable(error.to_string()),
+    };
+    let mut text = String::new();
+    if let Err(error) = file.take(4_097).read_to_string(&mut text) {
+        return Choice::Unreadable(error.to_string());
+    }
+    if text.len() > 4_096 {
+        return Choice::Unreadable("over 4 KiB".into());
+    }
+    match serde_json::from_str::<Value>(&text) {
+        Ok(Value::Object(choice)) if choice.get("share").is_some_and(Value::is_boolean) => {
+            Choice::Object(choice)
+        }
+        Ok(_) => Choice::Unreadable("not an object with a boolean `share`".into()),
+        Err(error) => Choice::Unreadable(json_why(&error)),
+    }
+}
+
+/// The first field of `choice` this build doesn't know, if any.
+fn unknown_field<'a>(
+    choice: &'a serde_json::Map<String, Value>,
+    known: &[&str],
+) -> Option<&'a str> {
+    choice
+        .keys()
+        .map(String::as_str)
+        .find(|field| !known.contains(field))
+}
+
 /// The person's choice: `lamp-cloud`'s own record when there is one, else
 /// setup's, else no. Only a JSON `true` is a yes, and setup's only for a
 /// wording no newer than [`ASKED`]. Read at each send, never kept.
-pub fn consent(places: &Places) -> Consent {
-    if let Some(own) = read_json(&places.own) {
-        return Consent {
-            share: own["share"] == Value::Bool(true),
-            since: when(&own["at"]),
-        };
+///
+/// One release forward (#2052), for privacy: a record this build can't
+/// read, a field it doesn't know or a `by` it doesn't know reads as **no**,
+/// whatever its `share` says, so a newer build's field can never turn
+/// sharing on here. Such a record is left as it is (a roll forward reads it
+/// again); the line that says so comes back beside the choice.
+fn read_consent(places: &Places) -> (Consent, Option<String>) {
+    match read_choice(&places.own) {
+        Choice::Absent => {}
+        Choice::Unreadable(why) => {
+            return (
+                Consent::default(),
+                Some(format!(
+                    "the reports choice at {} can't be read ({why}): reports are off",
+                    places.own.display()
+                )),
+            );
+        }
+        Choice::Object(own) => {
+            let unknown = unknown_field(&own, &OWN_FIELDS).map(|field| format!("field `{field}`"));
+            // As a `Value`, a field that isn't there is null.
+            let own = Value::Object(own);
+            let by = by_of(&own["by"]);
+            let newer = unknown
+                .or_else(|| {
+                    (!own["by"].is_null() && by.is_none())
+                        .then(|| "a `by` this build doesn't know".to_owned())
+                })
+                .or_else(|| {
+                    (!own["held"].is_null() && !own["held"].is_boolean())
+                        .then(|| "a `held` that isn't a boolean".to_owned())
+                });
+            let consent = Consent {
+                share: newer.is_none() && own["share"] == Value::Bool(true),
+                since: when(&own["at"]),
+                held: by == Some(lamp_msgs::ReportsBy::Voice) && own["held"] == Value::Bool(true),
+                by,
+            };
+            let note = newer.map(|what| {
+                format!(
+                    "the reports choice at {} is a newer build's ({what}): read as off, and kept",
+                    places.own.display()
+                )
+            });
+            return (consent, note);
+        }
     }
-    match read_json(&places.setup) {
-        Some(setup)
+    match read_choice(&places.setup) {
+        Choice::Absent => (Consent::default(), None),
+        Choice::Unreadable(why) => (
+            Consent::default(),
+            Some(format!(
+                "setup's reports answer at {} can't be read ({why}): reports are off, and it is left there",
+                places.setup.display()
+            )),
+        ),
+        Choice::Object(setup) => {
+            if let Some(field) = unknown_field(&setup, &SETUP_FIELDS) {
+                return (
+                    Consent::default(),
+                    Some(format!(
+                        "setup's reports answer at {} is a newer build's (field `{field}`): read as off, and left there",
+                        places.setup.display()
+                    )),
+                );
+            }
+            let setup = Value::Object(setup);
+            // A later wording (`asked` above ASKED) is a no until the person
+            // is asked again, as designed: said by nothing.
             if setup["share"] == Value::Bool(true)
-                && setup["asked"].as_u64().is_some_and(|asked| asked <= ASKED) =>
-        {
-            Consent {
-                share: true,
-                since: when(&setup["at"]),
+                && setup["asked"].as_u64().is_some_and(|asked| asked <= ASKED)
+            {
+                (
+                    Consent {
+                        share: true,
+                        since: when(&setup["at"]),
+                        by: Some(lamp_msgs::ReportsBy::Setup),
+                        held: false,
+                    },
+                    None,
+                )
+            } else {
+                (Consent::default(), None)
             }
         }
-        _ => Consent::default(),
     }
+}
+
+/// [`read_consent`]'s choice, without its line.
+pub fn consent(places: &Places) -> Consent {
+    read_consent(places).0
+}
+
+/// Where a file this build can't read is kept whole: `<name>.unread-<s>`,
+/// a name no reader here takes for its own.
+fn set_aside(path: &Path, now_s: u64) -> io::Result<PathBuf> {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(format!(".unread-{now_s}"));
+    let aside = path.with_file_name(name);
+    fs::rename(path, &aside)?;
+    Ok(aside)
 }
 
 /// `bytes` at `path` with `mode`: a temporary file, synced, renamed, the
@@ -738,8 +904,11 @@ struct Entry {
     acks: u8,
 }
 
-/// The state the queue keeps beside the crashes.
+/// The state the queue keeps beside the crashes. A field a newer build
+/// adds is read and dropped at the next save; one this build has that a
+/// record lacks is its default (#2052).
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 struct Kept {
     seq: u64,
     dropped: Dropped,
@@ -762,22 +931,84 @@ pub struct Reports {
     /// Each part's `error` since, and its last report at once (wall s).
     error_since: BTreeMap<&'static str, u64>,
     error_told: BTreeMap<&'static str, u64>,
+    /// Reports a newer build queued that this build doesn't send
+    /// ([`Queued::Later`]): kept for it, and deleted by a no.
+    later: Vec<u64>,
+    /// The journal lines said, each once.
+    said: RefCell<VecDeque<String>>,
+}
+
+/// The most journal lines remembered, so that each is said once.
+const SAID_MOST: usize = 256;
+
+/// One file of the queue folder, as read.
+enum Queued {
+    /// One this build sends.
+    Sendable(Kind, u64, String),
+    /// A newer build's: a `schema` past [`SCHEMA`], or a `kind` this build
+    /// doesn't have. Kept where it is and not sent: the backend has agreed
+    /// only [`SCHEMA`]'s kinds from this build, and a report it can't take
+    /// would be acknowledged by the broker and lost all the same.
+    Later(String),
+    /// Not a report this build can read: set aside, never sent.
+    Unreadable(String),
+}
+
+/// A queued report's file, `bytes` as read (`None` past [`MOST_BYTES`]).
+fn queued(bytes: Option<&str>) -> Queued {
+    let Some(bytes) = bytes else {
+        return Queued::Unreadable(format!("over {MOST_BYTES} bytes"));
+    };
+    let report = match serde_json::from_str::<Value>(bytes) {
+        Ok(Value::Object(report)) => report,
+        Ok(_) => return Queued::Unreadable("not a JSON object".into()),
+        Err(error) => return Queued::Unreadable(json_why(&error)),
+    };
+    match report.get("schema").and_then(Value::as_str) {
+        Some(SCHEMA) => {}
+        Some(schema)
+            if schema
+                .strip_prefix("lamp-report/")
+                .and_then(|n| n.parse::<u64>().ok())
+                .is_some_and(|n| n > 1) =>
+        {
+            return Queued::Later(format!("a schema past {SCHEMA}"));
+        }
+        _ => return Queued::Unreadable("no schema this build knows".into()),
+    }
+    let kind = match report.get("kind").and_then(Value::as_str) {
+        Some("crash") => Kind::Crash,
+        Some("stopped") => Kind::Stopped,
+        Some(_) => return Queued::Later("a kind this build doesn't have".into()),
+        None => return Queued::Unreadable("no kind".into()),
+    };
+    match report
+        .get("sent_at")
+        .and_then(Value::as_str)
+        .and_then(seconds_of)
+    {
+        Some(at_s) => Queued::Sendable(kind, at_s, bytes.to_owned()),
+        None => Queued::Unreadable("no `sent_at`".into()),
+    }
 }
 
 impl Reports {
     /// The engine, with what the queue folder kept.
     pub fn open(places: Places) -> Self {
-        let kept = read_json(&places.queue.join("state.json"))
-            .and_then(|state| serde_json::from_value(state).ok())
-            .unwrap_or_default();
         let mut reports = Self {
             places,
-            kept,
+            kept: Kept::default(),
             queue: Vec::new(),
             levels: BTreeMap::new(),
             error_since: BTreeMap::new(),
             error_told: BTreeMap::new(),
+            later: Vec::new(),
+            said: RefCell::new(VecDeque::new()),
         };
+        let now = now_s();
+        reports.own_choice(now);
+        reports.kept = reports.kept_state(now);
+        let mut highest = 0;
         if let Ok(entries) = fs::read_dir(&reports.places.queue) {
             for entry in entries.flatten() {
                 let name = entry.file_name();
@@ -788,57 +1019,191 @@ impl Reports {
                 else {
                     continue;
                 };
+                highest = highest.max(seq);
                 let mut bytes = String::new();
                 let read = fs::File::open(entry.path())
                     .and_then(|file| file.take(MOST_BYTES as u64 + 1).read_to_string(&mut bytes));
-                let report = serde_json::from_str::<Value>(&bytes).ok();
-                let at_s = report
-                    .as_ref()
-                    .and_then(|report| report["sent_at"].as_str().and_then(seconds_of));
-                let kind = match report.as_ref().map(|report| &report["kind"]) {
-                    Some(Value::String(kind)) if kind == "crash" => Some(Kind::Crash),
-                    Some(Value::String(kind)) if kind == "stopped" => Some(Kind::Stopped),
-                    _ => None,
+                let read = match read {
+                    Ok(_) => queued((bytes.len() <= MOST_BYTES).then_some(bytes.as_str())),
+                    Err(error) => Queued::Unreadable(error.to_string()),
                 };
-                match (read, at_s, kind) {
-                    (Ok(_), Some(at_s), Some(kind)) if bytes.len() <= MOST_BYTES => {
-                        reports.queue.push(Entry {
-                            seq,
-                            kind,
-                            at_s,
-                            bytes,
-                            handed: false,
-                            once_more: false,
-                            acks: 0,
-                        })
+                match read {
+                    Queued::Sendable(kind, at_s, bytes) => reports.queue.push(Entry {
+                        seq,
+                        kind,
+                        at_s,
+                        bytes,
+                        handed: false,
+                        once_more: false,
+                        acks: 0,
+                    }),
+                    Queued::Later(what) => {
+                        reports.later.push(seq);
+                        reports.say(format!(
+                            "queued report {} is a newer build's ({what}): kept, not sent",
+                            entry.path().display()
+                        ));
                     }
-                    _ => {
-                        let _ = fs::remove_file(entry.path());
-                    }
+                    Queued::Unreadable(why) => reports.put_aside(&entry.path(), &why, now),
                 }
             }
         }
+        // Past every report on flash, even when the state was lost.
+        reports.kept.seq = reports.kept.seq.max(highest);
         reports.queue.sort_by_key(|entry| entry.seq);
         reports
     }
 
-    /// The person's choice now.
-    pub fn consent(&self) -> Consent {
-        consent(&self.places)
+    /// A line for the journal, said once.
+    fn say(&self, line: String) {
+        let mut said = self.said.borrow_mut();
+        if said.contains(&line) {
+            return;
+        }
+        eprintln!("lamp-cloud reports: {line}");
+        if said.len() >= SAID_MOST {
+            said.pop_front();
+        }
+        said.push_back(line);
     }
 
-    /// What `reports/state` and `reports.get` say.
-    pub fn state(&self) -> lamp_msgs::ReportsState {
-        lamp_msgs::ReportsState {
-            share: self.consent().share,
-            queued: self.queue.len() as u32,
+    /// The lines said, oldest first.
+    pub fn said(&self) -> Vec<String> {
+        self.said.borrow().iter().cloned().collect()
+    }
+
+    /// A file of the queue folder this build can't read, kept whole under
+    /// another name, with a line.
+    fn put_aside(&self, path: &Path, why: &str, now_s: u64) {
+        match set_aside(path, now_s) {
+            Ok(aside) => self.say(format!(
+                "{} can't be read ({why}): kept as {}, not sent",
+                path.display(),
+                aside.display()
+            )),
+            Err(error) => self.say(format!(
+                "{} can't be read ({why}), nor set aside ({error}): not sent",
+                path.display()
+            )),
         }
     }
 
-    /// `reports.get`'s and `reports.set`'s answer.
+    /// `lamp-cloud`'s own choice, when this build can't read it at all: set
+    /// aside whole and an off kept in its place, said once. Off, since
+    /// setup's older yes must not come back through the gap (#2052).
+    fn own_choice(&self, now_s: u64) {
+        let Choice::Unreadable(why) = read_choice(&self.places.own) else {
+            return;
+        };
+        let off = json!({
+            "share": false,
+            "at": crate::online::rfc3339(UNIX_EPOCH + Duration::from_secs(now_s)),
+            "by": null,
+            "held": false,
+        });
+        let line = match set_aside(&self.places.own, now_s) {
+            Ok(aside) => match write_whole(&self.places.own, off.to_string().as_bytes(), 0o600) {
+                Ok(()) => format!(
+                    "the reports choice at {} can't be read ({why}): kept as {}, and reports are off until the person says yes",
+                    self.places.own.display(),
+                    aside.display()
+                ),
+                // Gone and not replaced: put back, so that it still reads off.
+                Err(error) => {
+                    let _ = fs::rename(&aside, &self.places.own);
+                    format!(
+                        "the reports choice at {} can't be read ({why}), nor replaced ({error}): reports are off",
+                        self.places.own.display()
+                    )
+                }
+            },
+            Err(error) => format!(
+                "the reports choice at {} can't be read ({why}), nor set aside ({error}): reports are off",
+                self.places.own.display()
+            ),
+        };
+        self.say(line);
+    }
+
+    /// The queue's state, or a new one: one this build can't read is set
+    /// aside whole with a line.
+    fn kept_state(&self, now_s: u64) -> Kept {
+        let path = self.places.queue.join("state.json");
+        let mut text = String::new();
+        match fs::File::open(&path) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Kept::default(),
+            Err(error) => {
+                self.say(format!(
+                    "{} can't be opened ({error}): begun again",
+                    path.display()
+                ));
+                return Kept::default();
+            }
+            Ok(file) => {
+                if let Err(error) = file.take(QUEUE_BYTES as u64).read_to_string(&mut text) {
+                    self.put_aside(&path, &error.to_string(), now_s);
+                    return Kept::default();
+                }
+            }
+        }
+        match serde_json::from_str::<Kept>(&text) {
+            Ok(kept) => kept,
+            Err(error) => {
+                self.put_aside(&path, &json_why(&error), now_s);
+                Kept::default()
+            }
+        }
+    }
+
+    /// Whether a no now has something to stop: a yes stands, or the
+    /// record read is one this build can't settle (a newer build's or an
+    /// unreadable one), which reads as off here but may be a yes to the
+    /// build that wrote it. A no then is written and does all a no does
+    /// (#2077's review), never taken for one already given.
+    fn may_share(&self) -> bool {
+        let (consent, line) = read_consent(&self.places);
+        let unsettled = line.is_some();
+        if let Some(line) = line {
+            self.say(line);
+        }
+        consent.share || unsettled
+    }
+
+    /// The person's choice now.
+    pub fn consent(&self) -> Consent {
+        let (consent, line) = read_consent(&self.places);
+        if let Some(line) = line {
+            self.say(line);
+        }
+        consent
+    }
+
+    /// What `reports/state` says: whether they are sent, how many wait,
+    /// and how and when the newest choice was made.
+    pub fn state(&self) -> lamp_msgs::ReportsState {
+        let consent = self.consent();
+        lamp_msgs::ReportsState {
+            share: consent.share,
+            queued: self.queue.len() as u32,
+            by: consent.by,
+            held: consent.held,
+            at_s: consent.since.as_deref().and_then(seconds_of),
+        }
+    }
+
+    /// `reports.get`'s and `reports.set`'s answer: with `by` (`voice`,
+    /// `app`, `setup`, or null), `held` and `at`, when the newest choice
+    /// was made, so the app's row can say "Stopped by voice at 3 pm".
     pub fn answer(&self) -> Value {
         let consent = self.consent();
-        json!({"share": consent.share, "since": consent.since, "queued": self.queue.len()})
+        json!({
+            "share": consent.share,
+            "since": consent.since,
+            "queued": self.queue.len(),
+            "by": consent.by,
+            "held": consent.held,
+            "at": consent.since,
+        })
     }
 
     fn keep(&self) {
@@ -856,11 +1221,25 @@ impl Reports {
     /// The app's `reports.set`: the person's own choice, from their
     /// account. A no deletes what waits and sends the last word.
     pub fn set(&mut self, share: bool, now_s: u64) -> io::Result<()> {
+        self.choose(share, now_s, lamp_msgs::ReportsBy::App, false)
+    }
+
+    /// A choice kept with who made it and when, and for the voice's stop
+    /// whether its line was held.
+    fn choose(
+        &mut self,
+        share: bool,
+        now_s: u64,
+        by: lamp_msgs::ReportsBy,
+        held: bool,
+    ) -> io::Result<()> {
         let at = crate::online::rfc3339(UNIX_EPOCH + Duration::from_secs(now_s));
-        let was = self.consent().share;
+        let was = self.may_share();
         write_whole(
             &self.places.own,
-            json!({"share": share, "at": at}).to_string().as_bytes(),
+            json!({"share": share, "at": at, "by": by, "held": held})
+                .to_string()
+                .as_bytes(),
             0o600,
         )?;
         if was && !share {
@@ -883,17 +1262,24 @@ impl Reports {
     }
 
     /// A no from the bus (`reports/request`, the voice): the same as the
-    /// app's, and only ever a no.
-    pub fn stop(&mut self, now_s: u64) -> io::Result<()> {
-        self.set(false, now_s)
+    /// app's, and only ever a no, kept as the voice's, with whether its
+    /// line was held. When reports are already off it changes nothing, so
+    /// the stop that stopped them is the one kept; a newer build's or an
+    /// unreadable record is not an off already given, so the no is kept.
+    pub fn stop(&mut self, now_s: u64, held: bool) -> io::Result<()> {
+        if !self.may_share() {
+            return Ok(());
+        }
+        self.choose(false, now_s, lamp_msgs::ReportsBy::Voice, held)
     }
 
     /// Everything waiting deleted, its files too, and one `stopped` put in
     /// their place: written to flash, kept until it is through, and sent
     /// once more on the next connection. Nothing else is sent after it.
     fn stopped(&mut self, now_s: u64) {
-        for entry in self.queue.drain(..) {
-            let _ = fs::remove_file(self.places.queue.join(format!("{}.json", entry.seq)));
+        let later = std::mem::take(&mut self.later);
+        for seq in self.queue.drain(..).map(|entry| entry.seq).chain(later) {
+            let _ = fs::remove_file(self.places.queue.join(format!("{seq}.json")));
         }
         self.error_since.clear();
         let report = self.report(now_s, None, &Seen::default(), Body::Stopped);
@@ -1076,12 +1462,33 @@ impl Reports {
             self.kept.boot = boot.clone();
             self.kept.notes.clear();
         }
+        // Only `<unit>@<at>.json`: `write_whole`'s `.tmp` is not a note yet.
+        // A note this build can't read is skipped with a line, once, and
+        // left whole where it is: the folder is root's, which `lamp-cloud`
+        // can't write, and `/run` goes at the next boot.
         let mut notes: Vec<ExitNote> = fs::read_dir(&self.places.exits)
             .into_iter()
             .flatten()
             .flatten()
-            .filter_map(|entry| read_json(&entry.path()))
-            .filter_map(|note| serde_json::from_value::<ExitNote>(note).ok())
+            .filter(|entry| entry.file_name().to_string_lossy().ends_with(".json"))
+            .filter_map(|entry| {
+                let path = entry.path();
+                let note = read_json(&path).ok_or_else(|| "not JSON".to_owned());
+                match note.and_then(|note| {
+                    serde_json::from_value::<ExitNote>(note).map_err(|error| json_why(&error))
+                }) {
+                    Ok(note) => Some(note),
+                    // Pruned by the next `exit-note` while this read.
+                    Err(_) if !path.exists() => None,
+                    Err(why) => {
+                        self.say(format!(
+                            "exit note {} can't be read ({why}): skipped, and left there",
+                            path.display()
+                        ));
+                        None
+                    }
+                }
+            })
             .filter(|note| note.boot == boot)
             .filter(|note| {
                 self.kept
@@ -1261,8 +1668,8 @@ pub trait Sources {
     }
     /// Whether the voice is resting (not in a turn); true when unknown.
     fn voice_resting(&mut self) -> bool;
-    /// Asks taken from `reports/request` since the last look: their `share`.
-    fn requests(&mut self) -> Vec<bool>;
+    /// Asks taken from `reports/request` since the last look.
+    fn requests(&mut self) -> Vec<lamp_msgs::ReportsRequest>;
     /// Says `reports/state`.
     fn tell(&mut self, state: &lamp_msgs::ReportsState);
 }
@@ -1302,11 +1709,18 @@ pub fn step(
     now_s: u64,
 ) -> bool {
     let mut put = false;
-    // Only a no is ever taken from the bus.
-    if sources.requests().into_iter().any(|share| !share) {
+    // Only a no is ever taken from the bus. It is kept as held only when
+    // every no taken was from a held line: one heard is the person's.
+    let noes: Vec<_> = sources
+        .requests()
+        .into_iter()
+        .filter(|request| !request.share)
+        .collect();
+    if !noes.is_empty() {
+        let held = noes.iter().all(|request| request.held);
         let stopped = shared.with(|reports| {
             let was = reports.consent().share;
-            let _ = reports.stop(now_s);
+            let _ = reports.stop(now_s, held);
             was
         });
         put |= stopped;
@@ -1445,7 +1859,7 @@ impl Sources for Lamp {
             return found.clone();
         }
         let mut args = vec!["show", "-p", "Id", "-p", "NRestarts"];
-        args.extend(UNITS);
+        args.extend(UNITS.iter().copied());
         let found = bounded_output(&self.systemctl, &args)
             .map(|text| restarts(&text))
             .unwrap_or_default();
@@ -1459,7 +1873,7 @@ impl Sources for Lamp {
             .is_none_or(|(state, _)| state.state == lamp_msgs::Voice::Resting)
     }
 
-    fn requests(&mut self) -> Vec<bool> {
+    fn requests(&mut self) -> Vec<lamp_msgs::ReportsRequest> {
         if self.requests.is_none()
             && let Some(bus) = &self.bus
         {
@@ -1488,7 +1902,7 @@ impl Sources for Lamp {
         if let Some(requests) = self.requests.as_mut() {
             while let Ok(Some(message)) = requests.recv(Duration::ZERO) {
                 if let Ok(request) = message.parse::<lamp_msgs::ReportsRequest>() {
-                    asked.push(request.share);
+                    asked.push(request);
                 }
             }
         }
@@ -1528,7 +1942,7 @@ pub(crate) mod tests {
         fs::create_dir_all(&root).unwrap();
         let bus = lamp_bus::Bus::new(&root).unwrap();
         let mut lamp = Lamp::new(Some(bus.clone()));
-        assert_eq!(lamp.requests(), Vec::<bool>::new());
+        assert_eq!(lamp.requests(), Vec::new());
         assert!(lamp.requests.is_some(), "lamp-cloud took reports/request");
         let mut out = bus
             .publisher_declared(
@@ -1538,7 +1952,7 @@ pub(crate) mod tests {
             )
             .unwrap();
         let sent = out
-            .publish_json(1, &lamp_msgs::ReportsRequest { share: false })
+            .publish_json(1, &lamp_msgs::ReportsRequest::default())
             .unwrap();
         assert_eq!(sent.delivered, 1);
         let mut asked = Vec::new();
@@ -1549,7 +1963,7 @@ pub(crate) mod tests {
             }
             std::thread::sleep(Duration::from_millis(10));
         }
-        assert_eq!(asked, vec![false]);
+        assert_eq!(asked, vec![lamp_msgs::ReportsRequest::default()]);
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1586,8 +2000,15 @@ pub(crate) mod tests {
                 "voice",
             )
             .unwrap();
+        // From a line whose answer was held (#1880).
         let sent = out
-            .publish_json(1, &lamp_msgs::ReportsRequest { share: false })
+            .publish_json(
+                1,
+                &lamp_msgs::ReportsRequest {
+                    share: false,
+                    held: true,
+                },
+            )
             .unwrap();
         assert_eq!(sent.delivered, 1, "lamp-cloud is listening");
         let mut at = first + Duration::from_secs(1);
@@ -1601,6 +2022,11 @@ pub(crate) mod tests {
         }
         assert!(!shared.with(|reports| reports.consent().share));
         assert_eq!(shared.with(sent_kinds), [json!("stopped")]);
+        let state = shared.with(|reports| reports.state());
+        assert_eq!(
+            (state.by, state.held, state.at_s),
+            (Some(lamp_msgs::ReportsBy::Voice), true, Some(NOW + 1))
+        );
         // The next 15 minutes: no health.
         step(
             &shared,
@@ -1693,6 +2119,7 @@ pub(crate) mod tests {
                         },
                     ],
                     missing: vec!["s3cret".into(), "eyes".into()],
+                    quiet_ms: 0,
                 },
                 false,
             )),
@@ -1834,7 +2261,7 @@ pub(crate) mod tests {
         forged.boot = "boot-1".into();
         reports.crash(NOW, None, &forged).unwrap();
         let mut bytes: Vec<String> = reports.due(ID).into_iter().map(|(_, b)| b).collect();
-        reports.stop(NOW + 1).unwrap();
+        reports.stop(NOW + 1, false).unwrap();
         bytes.extend(reports.due(ID).into_iter().map(|(_, b)| b));
         bytes.push(reports.answer().to_string());
         assert_eq!(bytes.len(), 4);
@@ -1903,7 +2330,7 @@ pub(crate) mod tests {
             .crash(NOW, None, &planted_note("lamp-air.service", 3))
             .unwrap();
         assert!(places.queue.join("2.json").exists());
-        reports.stop(NOW + 5).unwrap();
+        reports.stop(NOW + 5, false).unwrap();
         assert!(!places.queue.join("2.json").exists());
         let sent = sent(&mut reports);
         assert_eq!(sent.len(), 1);
@@ -1914,10 +2341,17 @@ pub(crate) mod tests {
         assert!(reports.due(ID).is_empty());
         assert_eq!(
             reports.answer(),
-            json!({"share": false, "since": "2026-10-18T04:00:05Z", "queued": 1})
+            json!({
+                "share": false,
+                "since": "2026-10-18T04:00:05Z",
+                "queued": 1,
+                "by": "voice",
+                "held": false,
+                "at": "2026-10-18T04:00:05Z",
+            })
         );
         // A second no says nothing more.
-        reports.stop(NOW + 7).unwrap();
+        reports.stop(NOW + 7, false).unwrap();
         assert!(reports.due(ID).is_empty());
         // The app's yes turns it on again, and a `stopped` through once
         // never comes after the new reports.
@@ -1947,7 +2381,7 @@ pub(crate) mod tests {
         let mut reports = Reports::open(places.clone());
         reports.health(NOW, None, &planted()).unwrap();
         // Offline: nothing is handed. The no is kept on flash.
-        reports.stop(NOW + 1).unwrap();
+        reports.stop(NOW + 1, false).unwrap();
         assert!(places.queue.join("2.json").exists());
         drop(reports);
         let mut reports = Reports::open(places.clone());
@@ -2002,9 +2436,10 @@ pub(crate) mod tests {
     #[test]
     fn the_bus_can_only_turn_reports_off() {
         struct Bus {
-            asked: Vec<bool>,
+            asked: Vec<lamp_msgs::ReportsRequest>,
             told: Vec<lamp_msgs::ReportsState>,
         }
+        let ask = |share, held| lamp_msgs::ReportsRequest { share, held };
         impl Sources for Bus {
             fn seen(&mut self) -> Seen {
                 Seen::default()
@@ -2012,7 +2447,7 @@ pub(crate) mod tests {
             fn voice_resting(&mut self) -> bool {
                 true
             }
-            fn requests(&mut self) -> Vec<bool> {
+            fn requests(&mut self) -> Vec<lamp_msgs::ReportsRequest> {
                 std::mem::take(&mut self.asked)
             }
             fn tell(&mut self, state: &lamp_msgs::ReportsState) {
@@ -2024,17 +2459,132 @@ pub(crate) mod tests {
         let now = Instant::now();
         let mut timing = Timing::new(now);
         let mut bus = Bus {
-            asked: vec![true],
+            asked: vec![ask(true, false)],
             told: Vec::new(),
         };
         step(&shared, &mut bus, &mut timing, None, now, NOW);
         assert!(!shared.with(|r| r.consent().share));
         assert_eq!(bus.told.last().map(|s| s.share), Some(false));
         yes(&places);
-        bus.asked = vec![true, false];
+        bus.asked = vec![ask(true, false), ask(false, true)];
         assert!(step(&shared, &mut bus, &mut timing, None, now, NOW + 1));
         assert!(!shared.with(|r| r.consent().share));
-        assert_eq!(bus.told.last().map(|s| s.share), Some(false));
+        // A held line's no is said on `reports/state` as the voice's, held,
+        // and when (#1880).
+        assert_eq!(
+            bus.told.last(),
+            Some(&lamp_msgs::ReportsState {
+                share: false,
+                queued: 1,
+                by: Some(lamp_msgs::ReportsBy::Voice),
+                held: true,
+                at_s: Some(NOW + 1),
+            })
+        );
+        // A held no beside one heard is the person's: not kept as held.
+        yes_again(&places);
+        bus.asked = vec![ask(false, true), ask(false, false)];
+        assert!(step(&shared, &mut bus, &mut timing, None, now, NOW + 2));
+        assert_eq!(
+            bus.told.last().map(|s| (s.by, s.held)),
+            Some((Some(lamp_msgs::ReportsBy::Voice), false))
+        );
+    }
+
+    /// A yes as the app would give it, over any choice kept before.
+    fn yes_again(places: &Places) {
+        let _ = fs::remove_file(&places.own);
+        yes(places);
+    }
+
+    /// The first builder on #1722, 18:44, on Third's read of #1880: how and
+    /// when reports were stopped is kept with the choice, said on
+    /// `reports/state`, and returned by `reports.get`, so a stop from a
+    /// held line is never one nobody can find.
+    #[test]
+    fn a_choice_is_kept_with_who_made_it_whether_held_and_when() {
+        let places = places("who");
+        yes(&places);
+        let mut reports = Reports::open(places.clone());
+        let state = reports.state();
+        assert_eq!(
+            (state.by, state.held, state.at_s),
+            (
+                Some(lamp_msgs::ReportsBy::Setup),
+                false,
+                seconds_of("2026-10-19T04:00:00Z")
+            )
+        );
+        // A held line's stop: the voice's, held.
+        reports.stop(NOW + 5, true).unwrap();
+        assert_eq!(
+            reports.consent(),
+            Consent {
+                share: false,
+                since: Some("2026-10-18T04:00:05Z".into()),
+                by: Some(lamp_msgs::ReportsBy::Voice),
+                held: true,
+            }
+        );
+        assert_eq!(
+            reports.state(),
+            lamp_msgs::ReportsState {
+                share: false,
+                queued: 1,
+                by: Some(lamp_msgs::ReportsBy::Voice),
+                held: true,
+                at_s: Some(NOW + 5),
+            }
+        );
+        let answer = reports.answer();
+        assert_eq!(
+            (&answer["by"], &answer["held"], &answer["at"]),
+            (
+                &json!("voice"),
+                &json!(true),
+                &json!("2026-10-18T04:00:05Z")
+            )
+        );
+        // Kept on flash: read again after a restart.
+        drop(reports);
+        let mut reports = Reports::open(places.clone());
+        assert_eq!(reports.consent().by, Some(lamp_msgs::ReportsBy::Voice));
+        assert!(reports.consent().held);
+        // A stop when already off changes nothing: the one that stopped them
+        // is kept.
+        reports.stop(NOW + 9, false).unwrap();
+        assert_eq!(reports.state().at_s, Some(NOW + 5));
+        assert!(reports.state().held);
+        // The app's yes and no are the app's, never held.
+        reports.set(true, NOW + 10).unwrap();
+        reports.set(false, NOW + 11).unwrap();
+        let state = reports.state();
+        assert_eq!(
+            (state.by, state.held, state.at_s),
+            (Some(lamp_msgs::ReportsBy::App), false, Some(NOW + 11))
+        );
+        let answer = reports.answer();
+        assert_eq!(
+            (&answer["by"], &answer["held"], &answer["at"]),
+            (&json!("app"), &json!(false), &json!("2026-10-18T04:00:11Z"))
+        );
+        // A choice kept before this was says nobody; `held` is only ever
+        // the voice's.
+        for (kept, by) in [
+            (r#"{"share":false,"at":"2026-10-18T04:00:00Z"}"#, None),
+            (
+                r#"{"share":false,"at":"2026-10-18T04:00:00Z","by":"app","held":true}"#,
+                Some(lamp_msgs::ReportsBy::App),
+            ),
+            (
+                r#"{"share":false,"at":"2026-10-18T04:00:00Z","by":"someone","held":true}"#,
+                None,
+            ),
+        ] {
+            fs::write(&places.own, kept).unwrap();
+            let consent = reports.consent();
+            assert_eq!((consent.by, consent.held), (by, false), "{kept}");
+        }
     }
 
     #[test]
@@ -2250,5 +2800,397 @@ pub(crate) mod tests {
         assert_eq!(signal_name("11"), Some("SIGSEGV"));
         assert_eq!(signal_name("SIGABRT"), Some("SIGABRT"));
         assert_eq!(signal_name("Alice"), None);
+    }
+
+    /// The file the queue folder holds for `seq`, as a report of `kind`.
+    fn queued_file(places: &Places, seq: u64, text: &str) {
+        fs::create_dir_all(&places.queue).unwrap();
+        fs::write(places.queue.join(format!("{seq}.json")), text).unwrap();
+    }
+
+    /// The one file in `folder` whose name starts with `prefix`.
+    fn aside(folder: &Path, prefix: &str) -> PathBuf {
+        let found: Vec<PathBuf> = fs::read_dir(folder)
+            .unwrap()
+            .flatten()
+            .filter(|entry| entry.file_name().to_string_lossy().starts_with(prefix))
+            .map(|entry| entry.path())
+            .collect();
+        assert_eq!(
+            found.len(),
+            1,
+            "{prefix} in {}: {found:?}",
+            folder.display()
+        );
+        found[0].clone()
+    }
+
+    /// #2052, the privacy rule: a choice this build can't read is off, never
+    /// on, and never lets setup's older yes through. Kept whole under
+    /// another name, an off kept in its place, said once.
+    #[test]
+    fn a_choice_it_cant_read_is_off_kept_whole_and_said() {
+        for unreadable in [
+            "{\"share\":false,\"at\":\"2026-10-",
+            "nonsense",
+            "",
+            r#"{"share":"no"}"#,
+            r#"[true]"#,
+        ] {
+            let places = places("unread-own");
+            yes(&places);
+            fs::write(&places.own, unreadable).unwrap();
+            assert!(!consent(&places).share, "{unreadable:?}");
+            let mut reports = Reports::open(places.clone());
+            assert!(!reports.consent().share, "{unreadable:?}");
+            assert_eq!(reports.health(NOW, None, &planted()), None);
+            assert!(reports.due(ID).is_empty());
+            let kept = aside(places.own.parent().unwrap(), "reports.json.unread-");
+            assert_eq!(fs::read_to_string(&kept).unwrap(), unreadable);
+            let own: Value = serde_json::from_slice(&fs::read(&places.own).unwrap()).unwrap();
+            assert_eq!(own["share"], false);
+            let said = reports.said();
+            assert_eq!(said.len(), 1, "{said:?}");
+            assert!(
+                said[0].contains("can't be read") && said[0].contains("off"),
+                "{said:?}"
+            );
+            // A restart reads the off kept in its place: still off, nothing said.
+            let reports = Reports::open(places.clone());
+            assert!(!reports.consent().share);
+            assert!(reports.said().is_empty(), "{:?}", reports.said());
+        }
+        // Spoiled while running: off at the next send, said once.
+        let places = places("unread-own-live");
+        yes(&places);
+        let mut reports = Reports::open(places.clone());
+        assert!(reports.consent().share);
+        fs::write(&places.own, "{\"share\":tr").unwrap();
+        assert_eq!(reports.health(NOW, None, &planted()), None);
+        assert!(!reports.consent().share);
+        assert_eq!(reports.said().len(), 1, "{:?}", reports.said());
+    }
+
+    /// #2052: a newer build's choice, with a field or a `by` this build
+    /// doesn't know, reads as off whatever its `share` says, is left as it
+    /// is for a roll forward, and is said once.
+    #[test]
+    fn a_newer_builds_choice_reads_off_and_is_kept() {
+        for newer in [
+            r#"{"share":true,"at":"2026-10-19T04:00:00Z","by":"app","held":false,"scope":"more"}"#,
+            r#"{"share":true,"at":"2026-10-19T04:00:00Z","by":"schedule","held":false}"#,
+            r#"{"share":true,"at":"2026-10-19T04:00:00Z","by":"voice","held":"yes"}"#,
+        ] {
+            let places = places("newer-own");
+            yes(&places);
+            fs::write(&places.own, newer).unwrap();
+            let mut reports = Reports::open(places.clone());
+            assert!(!reports.consent().share, "{newer}");
+            assert_eq!(reports.health(NOW, None, &planted()), None, "{newer}");
+            assert!(reports.due(ID).is_empty());
+            assert_eq!(fs::read_to_string(&places.own).unwrap(), newer);
+            let said = reports.said();
+            assert_eq!(said.len(), 1, "{newer}: {said:?}");
+            assert!(said[0].contains("newer build"), "{said:?}");
+        }
+        // Setup's answer, a newer build's: off, left there, said.
+        for newer in [
+            r#"{"share":true,"asked":1,"at":"2026-10-19T04:00:00Z","scope":"more"}"#,
+            "{\"share\":true,\"asked\":1,\"at\":\"2026",
+        ] {
+            let places = places("newer-setup");
+            fs::write(&places.setup, newer).unwrap();
+            let mut reports = Reports::open(places.clone());
+            assert!(!reports.consent().share, "{newer}");
+            assert_eq!(reports.health(NOW, None, &planted()), None, "{newer}");
+            assert_eq!(fs::read_to_string(&places.setup).unwrap(), newer);
+            assert_eq!(reports.said().len(), 1, "{:?}", reports.said());
+        }
+        // Today's records, setup's as `lamp-setup` writes it, read as before
+        // and say nothing.
+        let places = places("today");
+        yes(&places);
+        let reports = Reports::open(places.clone());
+        assert!(reports.consent().share);
+        fs::write(
+            &places.own,
+            r#"{"share":true,"at":"2026-10-19T04:00:00Z","by":"app","held":false}"#,
+        )
+        .unwrap();
+        assert!(reports.consent().share);
+        assert!(reports.said().is_empty(), "{:?}", reports.said());
+    }
+
+    /// #2052: a queued report from one release ahead never stops the part
+    /// and is never sent where the backend may not take it. A newer field
+    /// under [`SCHEMA`] goes as is; a newer schema or kind is kept and not
+    /// sent (a no deletes it); one it can't read is kept whole under
+    /// another name; none of them deletes the rest.
+    #[test]
+    fn queued_reports_read_one_release_forward() {
+        let places = places("queue-forward");
+        yes(&places);
+        let today = |seq: u64, extra: &str| {
+            format!(
+                r#"{{"type":"report","schema":"lamp-report/1","device":"lamp","seq":{seq},"sent_at":"2026-10-18T04:00:00Z","kind":"crash"{extra}}}"#
+            )
+        };
+        queued_file(&places, 3, &today(3, ""));
+        queued_file(
+            &places,
+            4,
+            &today(4, r#","panic":{"file":"a.rs","line":3}"#),
+        );
+        let newer_schema =
+            r#"{"schema":"lamp-report/2","seq":5,"kind":"crash","sent_at":"2026-10-18T04:00:00Z"}"#;
+        queued_file(&places, 5, newer_schema);
+        let newer_kind = today(6, "").replace("\"crash\"", "\"panic\"");
+        queued_file(&places, 6, &newer_kind);
+        let truncated = &today(7, "")[..40];
+        queued_file(&places, 7, truncated);
+        queued_file(&places, 8, "\u{0}\u{1}garbage");
+        let mut reports = Reports::open(places.clone());
+        let went = sent(&mut reports);
+        let seqs: Vec<&Value> = went.iter().map(|report| &report["seq"]).collect();
+        assert_eq!(seqs, [&json!(3), &json!(4)]);
+        assert_eq!(went[1]["panic"]["line"], 3, "a newer field goes as is");
+        // Kept where they are, whole, for the newer build.
+        assert_eq!(
+            fs::read_to_string(places.queue.join("5.json")).unwrap(),
+            newer_schema
+        );
+        assert_eq!(
+            fs::read_to_string(places.queue.join("6.json")).unwrap(),
+            newer_kind
+        );
+        // Set aside whole.
+        assert!(!places.queue.join("7.json").exists());
+        assert_eq!(
+            fs::read_to_string(aside(&places.queue, "7.json.unread-")).unwrap(),
+            truncated
+        );
+        assert_eq!(
+            fs::read_to_string(aside(&places.queue, "8.json.unread-")).unwrap(),
+            "\u{0}\u{1}garbage"
+        );
+        let said = reports.said();
+        assert_eq!(said.len(), 4, "{said:?}");
+        assert!(
+            said.iter()
+                .any(|line| line.contains("5.json") && line.contains("not sent"))
+        );
+        // Past every report on flash.
+        assert_eq!(reports.health(NOW, None, &planted()), Some(9));
+        // A restart reads the same and sets nothing more aside.
+        drop(reports);
+        let mut reports = Reports::open(places.clone());
+        assert_eq!(reports.queued(), 2, "3 and 4; the health was in memory");
+        assert!(
+            sent(&mut reports)
+                .iter()
+                .all(|r| r["seq"] != 5 && r["seq"] != 6)
+        );
+        // A no deletes what waits, the newer build's too; what is set aside
+        // stays.
+        reports.set(false, NOW + 5).unwrap();
+        for seq in [3, 4, 5, 6] {
+            assert!(!places.queue.join(format!("{seq}.json")).exists(), "{seq}");
+        }
+        aside(&places.queue, "7.json.unread-");
+        aside(&places.queue, "8.json.unread-");
+    }
+
+    /// #2052: the queue's state from one release ahead, a field added or
+    /// one gone, reads; one it can't read is set aside whole, and the next
+    /// seq goes past the reports still waiting (it was 1, a seq reused).
+    #[test]
+    fn the_queues_state_reads_forward_and_is_set_aside_when_it_cant() {
+        let forward = places("state-forward");
+        yes(&forward);
+        fs::create_dir_all(&forward.queue).unwrap();
+        fs::write(
+            forward.queue.join("state.json"),
+            r#"{"seq":7,"dropped":{"queue_full":2,"later":1},"boot":"boot-1","later":true}"#,
+        )
+        .unwrap();
+        let mut reports = Reports::open(forward);
+        assert_eq!(reports.dropped().queue_full, 2);
+        assert_eq!(reports.health(NOW, None, &planted()), Some(8));
+        assert!(reports.said().is_empty(), "{:?}", reports.said());
+        for spoiled in ["{\"seq\":", r#"{"seq":"seven"}"#] {
+            let places = places("state-unread");
+            yes(&places);
+            queued_file(
+                &places,
+                4,
+                r#"{"type":"report","schema":"lamp-report/1","seq":4,"sent_at":"2026-10-18T04:00:00Z","kind":"crash"}"#,
+            );
+            fs::write(places.queue.join("state.json"), spoiled).unwrap();
+            let mut reports = Reports::open(places.clone());
+            assert_eq!(
+                fs::read_to_string(aside(&places.queue, "state.json.unread-")).unwrap(),
+                spoiled
+            );
+            assert_eq!(reports.queued(), 1, "{spoiled}");
+            assert_eq!(reports.health(NOW, None, &planted()), Some(5), "{spoiled}");
+            let said = reports.said();
+            assert_eq!(said.len(), 1, "{said:?}");
+            assert!(
+                said[0].contains("state.json") && said[0].contains("kept as"),
+                "{said:?}"
+            );
+        }
+    }
+
+    /// #2052: an exit note this build can't read is skipped with one line
+    /// and left whole (the folder is root's); a newer field reads; the
+    /// rest are taken.
+    #[test]
+    fn an_exit_note_it_cant_read_is_skipped_once_and_left_whole() {
+        let places = places("notes-forward");
+        yes(&places);
+        let mut reports = Reports::open(places.clone());
+        write_exit_note(&places.exits, &planted_note("lamp-air.service", 5)).unwrap();
+        let mut newer = serde_json::to_value(planted_note("lamp-eyes.service", 6)).unwrap();
+        newer["core"] = json!(true);
+        fs::write(
+            places.exits.join("lamp-eyes.service@6.json"),
+            newer.to_string(),
+        )
+        .unwrap();
+        fs::write(
+            places.exits.join("lamp-ring.service@7.json"),
+            "{\"unit\":\"lamp-r",
+        )
+        .unwrap();
+        fs::write(
+            places.exits.join("lamp-ring.service@8.json"),
+            r#"{"unit":3}"#,
+        )
+        .unwrap();
+        // `write_whole`'s temporary is not a note yet, and says nothing.
+        fs::write(places.exits.join("lamp-ring.service@9.tmp"), "{").unwrap();
+        let notes = reports.new_notes();
+        let units: Vec<&str> = notes.iter().map(|note| note.unit.as_str()).collect();
+        assert_eq!(units, ["lamp-air.service", "lamp-eyes.service"]);
+        assert_eq!(reports.new_notes(), Vec::new());
+        let said = reports.said();
+        assert_eq!(said.len(), 2, "each said once: {said:?}");
+        assert!(
+            said.iter().all(|line| line.contains("exit note")),
+            "{said:?}"
+        );
+        assert_eq!(
+            fs::read_to_string(places.exits.join("lamp-ring.service@7.json")).unwrap(),
+            "{\"unit\":\"lamp-r"
+        );
+    }
+
+    /// The reviewer on #2077: a no given while the record reads off only
+    /// because this build can't settle it (a newer build's yes, or one
+    /// spoiled while running) is still a no. The voice's and the app's both
+    /// write it, delete what waits, and queue `stopped`, sent twice.
+    #[test]
+    fn a_no_given_while_a_newer_yes_reads_off_is_kept_and_does_all_a_no_does() {
+        let newer_yes =
+            r#"{"share":true,"at":"2026-10-19T04:00:00Z","by":"app","held":false,"scope":"crash"}"#;
+        for record in [newer_yes, "{\"share\":tr"] {
+            for by in ["voice", "app"] {
+                let places = places("no-over-newer");
+                yes(&places);
+                queued_file(
+                    &places,
+                    3,
+                    r#"{"type":"report","schema":"lamp-report/1","seq":3,"sent_at":"2026-10-18T04:00:00Z","kind":"crash"}"#,
+                );
+                let mut reports = Reports::open(places.clone());
+                fs::write(&places.own, record).unwrap();
+                assert!(!reports.consent().share, "{record}");
+                assert!(reports.due(ID).is_empty(), "nothing goes on it");
+                reports.unhand(None);
+                if by == "voice" {
+                    reports.stop(NOW + 5, false).unwrap();
+                } else {
+                    reports.set(false, NOW + 5).unwrap();
+                }
+                let own: Value = serde_json::from_slice(&fs::read(&places.own).unwrap()).unwrap();
+                assert_eq!(
+                    (&own["share"], &own["by"]),
+                    (&json!(false), &json!(by)),
+                    "{by} over {record}: the no is written"
+                );
+                assert!(
+                    !places.queue.join("3.json").exists(),
+                    "{by} over {record}: what waits is deleted"
+                );
+                let first = sent(&mut reports);
+                assert_eq!(first.len(), 1, "{by} over {record}");
+                assert_eq!(
+                    (&first[0]["kind"], &first[0]["seq"]),
+                    (&json!("stopped"), &json!(4))
+                );
+                // Sent once more on the next connection, as designed.
+                reports.acked(4);
+                reports.unhand(None);
+                reports.connected();
+                assert_eq!(sent(&mut reports), first, "{by} over {record}");
+            }
+        }
+    }
+
+    /// #2061's rule, the reviewer on #2077: a line about a file names the
+    /// error's kind and place, never a value from it.
+    #[test]
+    fn no_value_from_a_file_reaches_the_journal() {
+        const PLANTED: &str = "Alice-s3cret";
+        let places = places("no-values");
+        yes(&places);
+        fs::create_dir_all(&places.queue).unwrap();
+        fs::write(
+            places.queue.join("state.json"),
+            format!(r#"{{"seq":"{PLANTED}"}}"#),
+        )
+        .unwrap();
+        queued_file(
+            &places,
+            3,
+            &format!(
+                r#"{{"type":"report","schema":"lamp-report/1","seq":3,"sent_at":"2026-10-18T04:00:00Z","kind":"{PLANTED}"}}"#
+            ),
+        );
+        queued_file(
+            &places,
+            4,
+            &format!(r#"{{"schema":"lamp-report/2","seq":4,"note":"{PLANTED}"}}"#),
+        );
+        let mut reports = Reports::open(places.clone());
+        let mut note = serde_json::to_value(planted_note("lamp-air.service", 5)).unwrap();
+        note["at_us"] = json!(PLANTED);
+        fs::create_dir_all(&places.exits).unwrap();
+        fs::write(
+            places.exits.join("lamp-air.service@5.json"),
+            note.to_string(),
+        )
+        .unwrap();
+        assert!(reports.new_notes().is_empty());
+        fs::write(
+            &places.own,
+            format!(r#"{{"share":true,"at":"2026-10-19T04:00:00Z","by":"{PLANTED}"}}"#),
+        )
+        .unwrap();
+        assert!(!reports.consent().share);
+        let said = reports.said();
+        assert_eq!(said.len(), 5, "{said:?}");
+        for line in &said {
+            assert!(
+                !line.contains("Alice") && !line.contains("s3cret"),
+                "a value reached the journal: {line}"
+            );
+        }
+        assert!(
+            said.iter()
+                .any(|line| line.contains("state.json") && line.contains("Data at line 1 column")),
+            "the kind and place are said: {said:?}"
+        );
     }
 }

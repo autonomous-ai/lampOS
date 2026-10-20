@@ -39,6 +39,15 @@ pub const HEAD_SLEEP_US: u64 = 3_000_000;
 /// hand, because V1's TTP223 pads can pulse every 50-100 ms under a resting
 /// hand. Authored, to be set from a recording of lamp-4ace's pads (#711).
 pub const HEAD_GAP_US: u64 = 150_000;
+/// A head pad read by its pulses (`head_pulse_pads`): two changes of its
+/// line at least this far apart, and no further than [`PULSE_GAP_US`], are a
+/// pulse; closer ones are a bounce. As `discover-head`'s shortest pulse.
+pub const PULSE_MIN_US: u64 = 20_000;
+/// A pulse pad is touched until this long after its last pulse: a hand
+/// resting on a TTP223 in its pulsing mode changes the line every 50-100 ms
+/// (`docs/controls.md`). A single change with none after it, as lamp-cb94's
+/// and lamp-c0a4's lines made at rest (#1764), is never a touch.
+pub const PULSE_GAP_US: u64 = 250_000;
 
 /// The head's timing, from the touch pins file (`head_qualify_ms`,
 /// `head_tap_min_ms`, `head_gap_ms`), each defaulting to the constants above.
@@ -91,6 +100,11 @@ pub struct TouchConfig {
     pub head_tap_min_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head_gap_ms: Option<u64>,
+    /// The head pads read by their pulses, not their level, as each lamp's
+    /// factory step measured them (the pins file's `head_rest`); the others
+    /// read their level, as before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub head_pulse_pads: Vec<String>,
 }
 
 impl TouchConfig {
@@ -113,6 +127,15 @@ impl TouchConfig {
                 return Err(error(
                     ControlFault::Invalid,
                     "touch input names must be unique",
+                ));
+            }
+        }
+        let mut pulse_pads = BTreeSet::new();
+        for name in &self.head_pulse_pads {
+            if !self.head_pads.contains(name) || !pulse_pads.insert(name) {
+                return Err(error(
+                    ControlFault::Invalid,
+                    "head pulse pads must be distinct configured head pads",
                 ));
             }
         }
@@ -555,6 +578,36 @@ impl Head {
     }
 }
 
+/// One head pad read by its pulses: touched while its line keeps changing.
+#[derive(Clone, Copy, Debug, Default)]
+struct PulsePad {
+    bit: u16,
+    level: Option<bool>,
+    last_change: Option<u64>,
+    touched_until: u64,
+}
+
+impl PulsePad {
+    fn read(&mut self, active: bool, at: u64) -> bool {
+        if self.level.replace(active).is_some_and(|was| was != active) {
+            if self
+                .last_change
+                .is_some_and(|last| (PULSE_MIN_US..=PULSE_GAP_US).contains(&(at - last)))
+            {
+                self.touched_until = at + PULSE_GAP_US;
+            }
+            self.last_change = Some(at);
+        }
+        at < self.touched_until
+    }
+    fn reset(&mut self) {
+        *self = Self {
+            bit: self.bit,
+            ..Self::default()
+        };
+    }
+}
+
 pub struct TouchEngine {
     config: TouchConfig,
     clock_id: String,
@@ -566,6 +619,7 @@ pub struct TouchEngine {
     primary: Button,
     reset: Button,
     head: Head,
+    pulse_pads: Vec<PulsePad>,
     strip: Option<StripRecognizer>,
     strip_selected_mask: u16,
     /// The unmasked, successful twelve-bit acquisition, not inferred levels.
@@ -601,6 +655,16 @@ impl TouchEngine {
             timing: config.head_timing(),
             ..Head::default()
         };
+        let pulse_pads = config
+            .head_pads
+            .iter()
+            .enumerate()
+            .filter(|(_, name)| config.head_pulse_pads.contains(name))
+            .map(|(index, _)| PulsePad {
+                bit: 1 << index,
+                ..PulsePad::default()
+            })
+            .collect();
         Ok(Self {
             config,
             clock_id,
@@ -612,6 +676,7 @@ impl TouchEngine {
             primary: Button::default(),
             reset: Button::arming_after(RESET_ARM_US),
             head,
+            pulse_pads,
             strip,
             strip_selected_mask,
             strip_mask: 0,
@@ -642,6 +707,7 @@ impl TouchEngine {
         self.primary.reset();
         self.reset.reset();
         self.head.reset();
+        self.pulse_pads.iter_mut().for_each(PulsePad::reset);
         self.pending
             .retain(|event| event.source == TouchSource::Strip);
         self.latest
@@ -744,10 +810,18 @@ impl TouchEngine {
     }
     fn ingest_gpio_checked(&mut self, now: u64, sample: GpioSample) -> Result<(), InputError> {
         self.advance(now)?;
-        let mask = self.gpio_mask(&sample)?;
+        let mut mask = self.gpio_mask(&sample)?;
         self.gpio
             .accept(now, &sample.stamp, &sample.session_id, &self.clock_id)?;
         let at = sample.stamp.at_us;
+        // A pulse pad counts as touched while it pulses, not by its level.
+        for pad in &mut self.pulse_pads {
+            if pad.read(mask & pad.bit != 0, at) {
+                mask |= pad.bit;
+            } else {
+                mask &= !pad.bit;
+            }
+        }
         for (source, level) in [
             (TouchSource::Primary, sample.primary),
             (TouchSource::Reset, sample.reset),

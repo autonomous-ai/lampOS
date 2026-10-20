@@ -73,12 +73,16 @@ const ENVIRONMENT: &[&str] = &[
 /// The agents a target may name. `opencode` since Harness 0.4.2 names it
 /// in `harness new --help` ("claude (default), codex, opencode, …"); its ask
 /// mode passes OpenCode no flag, so OpenCode asks as it does by default.
+/// `devin` (#1854) is Devin's own terminal program on the computer, read as
+/// the others are (openharness `cli/src/engines/devin/`); not Devin Cloud,
+/// which the CLI's `new` does not start.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum EngineKind {
     Codex,
     Claude,
     Opencode,
+    Devin,
 }
 
 impl EngineKind {
@@ -87,7 +91,16 @@ impl EngineKind {
             Self::Codex => "codex",
             Self::Claude => "claude",
             Self::Opencode => "opencode",
+            Self::Devin => "devin",
         }
+    }
+
+    /// Whether the agent has Harness's permission modes. Devin has none:
+    /// Harness leaves the mode out for it and refuses one it is sent
+    /// (`INVALID_PERMISSION_MODE`; openharness `cli/src/lib/newCommand.ts`),
+    /// so it opens in its own default.
+    fn has_modes(self) -> bool {
+        !matches!(self, Self::Devin)
     }
 }
 
@@ -422,7 +435,7 @@ impl Cli {
         // list again and can fall back to a name if the ID disappears meanwhile.
         // The machine is named with `--machine` (Harness 0.4.2); the `@id`
         // form before it is refused.
-        let args = vec![
+        let mut args: Vec<OsString> = vec![
             "new".into(),
             launch.target.engine.argument().into(),
             "--machine".into(),
@@ -430,18 +443,22 @@ impl Cli {
             launch.target.project.clone().into(),
             "--name".into(),
             launch.name.clone().into(),
-            // Harness's default, approved by the owner on 2026-10-15: Claude
-            // Code works in its own project folder without asking, and still
-            // stops for anything risky. With `ask` it asked before every file
-            // it wrote, with nobody at the computer to answer: a two-line poem
-            // waited on "Do you want to create coffee_poem.txt?" while the
-            // lamp said "still working".
-            "--mode".into(),
-            "auto".into(),
+        ];
+        // Harness's default, approved by the owner on 2026-10-15: Claude
+        // Code works in its own project folder without asking, and still
+        // stops for anything risky. With `ask` it asked before every file
+        // it wrote, with nobody at the computer to answer: a two-line poem
+        // waited on "Do you want to create coffee_poem.txt?" while the
+        // lamp said "still working". An agent with no modes (Devin) is
+        // sent none, as Harness itself leaves it out (#1854).
+        if launch.target.engine.has_modes() {
+            args.extend(["--mode".into(), "auto".into()]);
+        }
+        args.extend([
             "--json".into(),
             "--task".into(),
             launch.prompt.clone().into(),
-        ];
+        ]);
         match self.run(&args, self.config.launch_timeout) {
             Ok(reply) if reply.success => parse_launch(&reply.stdout, launch),
             Ok(_) => uncertain("new_failed"),
@@ -983,8 +1000,19 @@ struct CreatedAgent {
     id: String,
     name: String,
     engine: EngineKind,
-    permission_mode: String,
-    bypass_permission: Value,
+    /// Absent, or null, for an agent with no modes (Devin, #1854).
+    #[serde(default)]
+    permission_mode: Option<String>,
+    /// Required for an agent with modes, as before #1854: `None` only when
+    /// the field is missing, an explicit `null` being `Some(Null)`.
+    #[serde(default, deserialize_with = "present")]
+    bypass_permission: Option<Value>,
+}
+
+/// A field that is there, `null` included, as `Some`: only a missing one is
+/// `None` (by `default`).
+fn present<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Value>, D::Error> {
+    Value::deserialize(deserializer).map(Some)
 }
 
 fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
@@ -1025,7 +1053,11 @@ fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
     if !uuid(&agent.id)
         || agent.name != launch.name
         || agent.engine != launch.target.engine
-        || !auto_permission(&agent.permission_mode, &agent.bypass_permission)
+        || !asked_permission(
+            launch.target.engine,
+            agent.permission_mode.as_deref(),
+            agent.bypass_permission.as_ref(),
+        )
     {
         return uncertain("invalid_reply");
     }
@@ -1038,6 +1070,19 @@ fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
 /// mode, `full` among them, is not what was asked for.
 fn auto_permission(mode: &str, bypass: &Value) -> bool {
     mode == "auto" && (bypass.is_null() || bypass.is_boolean())
+}
+
+/// What was asked for: `auto` for an agent with modes; for one with none
+/// (Devin), no mode was sent, so the receipt must claim none that approves
+/// on its own (`auto` or `full`) and no bypass. Its exact receipt is not yet
+/// seen from Harness: absent, null, or another mode, are all taken.
+fn asked_permission(engine: EngineKind, mode: Option<&str>, bypass: Option<&Value>) -> bool {
+    if engine.has_modes() {
+        return mode
+            .zip(bypass)
+            .is_some_and(|(mode, bypass)| auto_permission(mode, bypass));
+    }
+    !matches!(mode, Some("auto" | "full")) && bypass != Some(&Value::Bool(true))
 }
 
 #[derive(Deserialize)]

@@ -26,7 +26,11 @@ breaks, a part that says whether the lamp is online, show it) come after it.
   it. The place for the voice's own link state.
 - **Recorded failure lines** ([failure-notices.md](failure-notices.md),
   `--failure-notice-dir`): built, packaged nowhere, no wording approved, and
-  played only for a turn whose request failed. The way to say "I can't reach
+  played only for a turn whose request failed. The product unit passes
+  `--failure-notice-dir /etc/lampOS/voice/notices` since #1959, for the Wi-Fi
+  helper's recorded no-Wi-Fi line (`setup.md`, "The no-Wi-Fi line is a
+  recording"); no recording is in that folder yet, so every line there is
+  still silent. The way to say "I can't reach
   the internet" with no internet: a recording on the lamp.
 - **Schedule's trusted clock** (`crates/schedule/src/time.rs`,
   [schedule.md](schedule.md)): elapsed timers run on the boot clock; calendar
@@ -120,6 +124,26 @@ on the stepped clock): with the switch, a link 3 s past the budget gives the
 line once, then readiness, and the service runs on to a mute; without it,
 the service ends at the budget with "voice input never became ready". The
 units get the switch after a minute on a lamp with its Wi-Fi off.
+
+**A session the provider refuses at start (#1567, lamp-75c9, 19 Oct):** the
+model's account out of quota, the provider worker says `unavailable`
+(`quota_exceeded`) a second after boot. The serving link never ends on that:
+it asks again only after `refusal_pause` (120 s, `RecoveryPolicy`), once,
+and a session that comes up is reported fresh (`lamp-gemini`
+`a_first_connection_refused_for_quota_is_asked_again_after_the_pause`). To
+the voice it is a link not up yet, so with `LAMP_START_OFFLINE=on` it stays
+up past the budget and becomes ready on the later session; without the
+switch it ends at 25 s, as lamp-75c9 did ten times on a 16 Oct unit, which
+did not carry the switch (the product unit has since e0e23ef8c, 17 Oct).
+Tested through the loop for quota and rate refusals
+(`a_session_refused_at_start_does_not_end_a_service_started_offline`). A
+refusal never reaches the voice as `terminal` on the serving link; on one
+that does (a finite session's), the voice ends in order and stays 120 s
+before leaving (`REFUSAL_WAIT`). Slow ears are the other half of the
+budget: a microphone that starts within 25 s is waited for, one that has not
+by then ends the voice even with the switch, since input not retained is not
+proven
+(`slow_ears_within_the_budget_are_waited_for_and_past_it_end_the_voice`).
 
 ## Step 2: the board knows when its clock is set (`lamp-health --clock kernel`)
 

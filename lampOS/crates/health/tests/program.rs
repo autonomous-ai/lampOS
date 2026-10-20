@@ -521,6 +521,7 @@ fn with_nobody_serving_show_says_so_and_ends_with_3() {
             age_ms: 120,
         }],
         missing: Vec::new(),
+        quiet_ms: 0,
     };
     let mut health = places
         .bus

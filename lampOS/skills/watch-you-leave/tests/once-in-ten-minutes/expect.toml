@@ -1,0 +1,14 @@
+# Departures at 10 s, 300 s and 700 s: the second is within ten minutes of the first; the third is not.
+clock = "10:00"
+
+[[expect]]
+at = "10s"
+within = "1s"
+call = "body.move"
+args = { move = "watch-left" }
+
+[[expect]]
+at = "700s"
+within = "1s"
+call = "body.move"
+args = { move = "watch-right" }

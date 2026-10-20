@@ -1,0 +1,26 @@
+{"kind": "service_segment", "generation": 0}
+{"kind": "wait_keeps_answer", "at_us": 1000000, "words": true, "service_sequence": 1}
+{"kind": "input_admitted", "turn": 1, "candidate": 20, "at_us": 1500000, "service_sequence": 2}
+{"kind": "local_endpoint", "turn": 1, "at_us": 2000000, "speech_level": {"blocks": 150}, "service_sequence": 3}
+{"kind": "answer_waits", "turn": 1, "candidate": 21, "at_us": 2500000, "service_sequence": 4}
+{"kind": "wait_words", "turn": 1, "candidate": 21, "words": 1, "took": true, "stop": false, "asked_at_us": 3100000, "at_us": 3250000, "service_sequence": 5}
+{"kind": "turn_finished", "turn": 1, "outcome": "user_interrupted", "provider_audio_seen": false, "at_us": 3250050, "service_sequence": 6}
+{"kind": "input_admitted", "turn": 2, "candidate": 21, "at_us": 3250100, "service_sequence": 7}
+{"kind": "transcript", "turn": null, "text": "wait Pemberton quokka", "finished": true, "at_us": 3600000, "service_sequence": 8}
+{"kind": "local_endpoint", "turn": 2, "at_us": 3700000, "speech_level": {"blocks": 60}, "service_sequence": 9}
+{"kind": "input_admitted", "turn": 3, "candidate": 22, "at_us": 9000000, "service_sequence": 10}
+{"kind": "local_endpoint", "turn": 3, "at_us": 10000000, "speech_level": {"blocks": 150}, "service_sequence": 11}
+{"kind": "answer_waits", "turn": 3, "candidate": 23, "at_us": 10400000, "service_sequence": 12}
+{"kind": "wait_words", "turn": 3, "candidate": 23, "words": 1, "took": false, "stop": true, "asked_at_us": 10900000, "at_us": 11000000, "service_sequence": 13}
+{"kind": "input_let_go_answer_waits", "turn": 3, "candidate": 23, "why": "stop_said", "at_us": 11000000, "service_sequence": 14}
+{"kind": "hand_control_cancel", "reason": "spoken_stop", "at_us": 11010000, "observation_to_speaker_dispatch_us": 2000, "service_sequence": 15}
+{"kind": "turn_finished", "turn": 3, "outcome": "spoken_stop", "provider_audio_seen": false, "at_us": 11010100, "service_sequence": 16}
+{"kind": "input_admitted", "turn": 4, "candidate": 24, "at_us": 19000000, "service_sequence": 17}
+{"kind": "local_endpoint", "turn": 4, "at_us": 20000000, "speech_level": {"blocks": 150}, "service_sequence": 18}
+{"kind": "answer_waits", "turn": 4, "candidate": 25, "at_us": 20300000, "service_sequence": 19}
+{"kind": "wait_words", "turn": 4, "candidate": 25, "words": 0, "took": false, "stop": false, "asked_at_us": 20800000, "at_us": 20900000, "service_sequence": 20}
+{"kind": "input_let_go_answer_waits", "turn": 4, "candidate": 25, "why": "quiet", "at_us": 20900000, "service_sequence": 21}
+{"kind": "answer_waits", "turn": 4, "candidate": 26, "at_us": 21300000, "service_sequence": 22}
+{"kind": "wait_words", "turn": 4, "candidate": 26, "words": null, "took": false, "stop": false, "asked_at_us": 21800000, "at_us": 21900000, "service_sequence": 23}
+{"kind": "input_let_go_answer_waits", "turn": 4, "candidate": 26, "why": "quiet", "at_us": 21900000, "service_sequence": 24}
+{"kind": "turn_finished", "turn": 4, "outcome": "completed", "provider_audio_seen": true, "at_us": 25000000, "service_sequence": 25}

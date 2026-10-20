@@ -734,7 +734,15 @@ impl TaskNews {
         std::thread::Builder::new()
             .name("lamp-voice-task-news".into())
             .spawn(move || {
-                read_forever(&directory, &told_file, &offer, &heard_told, &shared, &clock)
+                read_forever(
+                    &directory,
+                    &told_file,
+                    &offer,
+                    &heard_told,
+                    &shared,
+                    &clock,
+                    WOKEN_GAP,
+                )
             })
             .ok()?;
         Some(Self {
@@ -918,8 +926,9 @@ impl TaskNews {
 }
 
 /// Read the tasks part every [`READ_EVERY`], and at once when a task newly
-/// settled is seen on `tasks/status` ([`Wake::Settled`], #560), with the
-/// tasks part's own clock (`clock`).
+/// settled is seen on `tasks/status` ([`Wake::Settled`], #560), though
+/// never sooner than `woken_gap` ([`WOKEN_GAP`] on the lamp) after the read
+/// before, with the tasks part's own clock (`clock`).
 fn read_forever(
     directory: &Path,
     told_file: &Path,
@@ -927,6 +936,7 @@ fn read_forever(
     told: &Receiver<Wake>,
     shared: &Mutex<BTreeSet<String>>,
     clock: &dyn Fn() -> Option<BootClock>,
+    woken_gap: Duration,
 ) {
     let socket = directory.join("request.sock");
     let mut offered = BTreeSet::new();
@@ -958,7 +968,7 @@ fn read_forever(
         // just after news was told told the same news three times, each
         // time before this thread's next pass had kept it. A task newly
         // settled ends the wait (#560), including one seen while the read
-        // above was under way, though never sooner than `WOKEN_GAP` after
+        // above was under way, though never sooner than `woken_gap` after
         // that read.
         let read_at = std::time::Instant::now();
         let mut next = read_at + READ_EVERY;
@@ -969,7 +979,7 @@ fn read_forever(
             }
             match told.recv_timeout(left) {
                 Ok(Wake::Told(key)) => keep_told(told_file, &key),
-                Ok(Wake::Settled) => next = next.min(read_at + WOKEN_GAP),
+                Ok(Wake::Settled) => next = next.min(read_at + woken_gap),
                 Err(mpsc::RecvTimeoutError::Timeout) => break,
                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
             }
@@ -1287,6 +1297,7 @@ pub(crate) fn who(task: &Value) -> &'static str {
     match task["target"]["engine"].as_str() {
         Some("codex") => "Codex",
         Some("opencode") => "OpenCode",
+        Some("devin") => "Devin",
         _ => "Claude Code",
     }
 }
@@ -3182,9 +3193,12 @@ mod tests {
 
     /// #560: the tasks part is read at once when a task settles, not at the
     /// next of the ten-second reads; news told is kept at once and has
-    /// nothing read.
+    /// nothing read. The least gap between two woken reads is 200 ms here,
+    /// where the lamp's [`WOKEN_GAP`] is a second: the same wait, and the
+    /// test is a second and a half shorter.
     #[test]
     fn a_task_newly_settled_is_read_at_once_and_told_news_reads_nothing() {
+        let woken_gap = Duration::from_millis(200);
         let root = std::env::temp_dir().join(format!("task-news-wake-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
@@ -3206,9 +3220,15 @@ mod tests {
             let (directory, told_file) = (root.clone(), told_file.clone());
             std::thread::spawn(move || {
                 let shared = Mutex::new(BTreeSet::new());
-                read_forever(&directory, &told_file, &offer, &woken, &shared, &|| {
-                    Some(now())
-                });
+                read_forever(
+                    &directory,
+                    &told_file,
+                    &offer,
+                    &woken,
+                    &shared,
+                    &|| Some(now()),
+                    woken_gap,
+                );
             })
         };
         // The first read, as the reader starts.
@@ -3224,12 +3244,12 @@ mod tests {
             "{:?}",
             read.duration_since(woke)
         );
-        // Woken again at once: read again, but not sooner than a second
+        // Woken again at once: read again, but not sooner than the gap
         // after that read (the first builder on #1156).
         wake.send(Wake::Settled).unwrap();
         let again = lists.recv_timeout(READ_EVERY).unwrap();
         let gap = again.duration_since(read);
-        assert!(gap >= WOKEN_GAP && gap < READ_EVERY / 2, "{gap:?}");
+        assert!(gap >= woken_gap && gap < READ_EVERY / 2, "{gap:?}");
         drop(wake);
         reader.join().unwrap();
         std::fs::remove_dir_all(root).unwrap();
@@ -3359,5 +3379,20 @@ mod tests {
         assert_eq!(first_told(true, ended, &yes, &lamp), Some(16));
         // Without the switch, 15 s after the last turn either way.
         assert_eq!(first_told(false, ended, &asked, &lamp), Some(150));
+    }
+
+    /// #1854: news of Devin's work names Devin, as each engine's names its
+    /// own agent; an engine the voice doesn't know is Claude Code, as before.
+    #[test]
+    fn news_names_the_agent_each_engine_is() {
+        for (engine, name) in [
+            ("claude", "Claude Code"),
+            ("codex", "Codex"),
+            ("opencode", "OpenCode"),
+            ("devin", "Devin"),
+            ("a_later_engine", "Claude Code"),
+        ] {
+            assert_eq!(who(&json!({"target":{"engine":engine}})), name, "{engine}");
+        }
     }
 }

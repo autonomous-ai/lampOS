@@ -1,0 +1,15 @@
+# Initial current offer, explicit eligibility retry, then the next token.
+[[expect]]
+at = "0s"
+call = "say"
+args = { from = "onboarding", invitation = 81 }
+
+[[expect]]
+at = "3s"
+call = "say"
+args = { from = "onboarding", invitation = 81 }
+
+[[expect]]
+at = "4s"
+call = "say"
+args = { from = "onboarding", invitation = 82 }

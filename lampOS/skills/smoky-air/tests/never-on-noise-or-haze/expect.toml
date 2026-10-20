@@ -1,0 +1,5 @@
+# An office at 100 +/- 25 for an hour, with ten minutes of haze at 130 and
+# 170 by turns (1,200 to 1,800 s). Never 100 above the 3 minutes before.
+# Nothing.
+clock = "10:00"
+none = true

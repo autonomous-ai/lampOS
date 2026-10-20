@@ -8,9 +8,11 @@ publish.workspace = true
 [dependencies]
 lamp-ipc = { path = "../ipc" }
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 lamp-bus = { path = "../bus" }
 lamp-msgs = { path = "../msgs" }
+# `--zone system`: the zone every other part reads (#820).
+lamp-local-time = { path = "../local-time" }
 jiff = { version = "0.2", features = ["serde", "tzdb-bundle-always"] }
 rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
 rustix = { version = "1", features = ["fs", "process", "time", "net", "event"] }
@@ -19,6 +21,8 @@ signal-hook = "0.4"
 
 [dev-dependencies]
 tempfile = "3"
+# Real zone files for `--zone system`, from the bundle jiff carries.
+jiff-tzdb = "0.1"
 
 [[example]]
 name = "schedule_check"

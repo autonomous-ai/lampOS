@@ -1,0 +1,15 @@
+# 10:00, four hours without getting up: once at 90 minutes, never again
+# while they stay.
+clock = "10:00"
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "light"
+args = { colour = "blue" }

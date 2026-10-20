@@ -10,7 +10,10 @@
 //! new zone counts from the next reading, without a restart. `TZ` is not read;
 //! the lamp's units do not set it, and the file is what setup writes.
 
-use jiff::{Timestamp, tz::TimeZone};
+use jiff::{
+    Timestamp,
+    tz::{TimeZone, TimeZoneDatabase},
+};
 use std::{
     fs::{self, File},
     io::{self, Read},
@@ -67,6 +70,17 @@ impl LocalTime {
         }
     }
 
+    /// The zone's IANA name, for a part that keeps a zone by name (Schedule,
+    /// #820): a named zone's own, or the system's as it is now. Nothing for a
+    /// fixed offset, or a system zone that names none.
+    pub fn name(&self) -> Option<String> {
+        match self {
+            Self::Offset(_) => None,
+            Self::Zone(zone) => zone.iana_name().map(str::to_owned),
+            Self::System(system) => system.name(),
+        }
+    }
+
     /// The local day of `unix_ms`, in days since 1970-01-01.
     pub fn day(&self, unix_ms: u64) -> i64 {
         self.local_ms(unix_ms).div_euclid(DAY_MS) as i64
@@ -85,6 +99,18 @@ impl LocalTime {
     fn local_ms(&self, unix_ms: u64) -> i128 {
         i128::from(unix_ms) + i128::from(self.offset_minutes_at(unix_ms)) * 60_000
     }
+}
+
+/// Seconds east of UTC at `unix_s` (seconds since 1970 UTC) in the zone of
+/// a compiled zone file (RFC 8536) already read: its listed changes, and
+/// past them its closing rule, so a slim file's summer time is worked out as
+/// a full one's. For a part that holds a zone's file itself, as the voice
+/// does for another place's time and to tell two zones apart (#820).
+/// Nothing for bytes that are no zone file.
+pub fn offset_seconds_in(tzif: &[u8], unix_s: i64) -> Option<i32> {
+    let zone = TimeZone::tzif("zone", tzif).ok()?;
+    let at = Timestamp::from_second(unix_s).ok()?;
+    Some(zone.to_offset(at).seconds())
 }
 
 /// The system's zone: the zone file at `localtime` (a link to one, as setup
@@ -187,6 +213,21 @@ impl SystemZone {
             timezone,
             state: Box::new(Mutex::new(State { seen, zone })),
         })
+    }
+
+    /// The zone's IANA name as the files are now: where the link points, or,
+    /// when the zone file is no link into a zone folder, the name file's
+    /// text. Only a name the bundled zones know: a system's own zone folder
+    /// has names such as `localtime` that are no zone (ARM64 on #1825).
+    pub fn name(&self) -> Option<String> {
+        let known = |name: &str| TimeZoneDatabase::bundled().get(name).is_ok();
+        name_of_link(&self.localtime)
+            .filter(|name| known(name))
+            .or_else(|| {
+                let named = fs::read_to_string(&self.timezone).ok()?;
+                let named = named.trim();
+                known(named).then(|| named.to_owned())
+            })
     }
 
     /// The zone as the files are now. Read again only when they changed; a

@@ -1,0 +1,39 @@
+# lampOS Wi-Fi changed after setup (#1959, lampOS/docs/setup.md, "The Wi-Fi changed after setup"):
+# one request from lamp-cloud on lamp-setup-wifi.socket, as standard input and output. The new
+# network is kept only once joined, with an address and the broker reached, within 60 s; else the
+# old file and the old network come back (60 s more). Never the hotspot. Then the lamp says what
+# happened through the voice's say service; with no network back, the lost line at most once a
+# minute for 10 minutes, as the voice's recording `wifi_lost`, never through its model (a missing
+# recording is journalled, and nothing said). The password is never journalled.
+[Unit]
+Description=lampOS Wi-Fi changed after setup: one change
+CollectMode=inactive-or-failed
+
+[Service]
+Type=simple
+# Root: wpa_supplicant's file and V1's radio script. The socket's group is the gate: `--enable`
+# is always passed, so once installed any lampos process may ask for a Wi-Fi change, and only
+# one whose broker the new network reaches is kept.
+User=root
+ExecStart=/opt/lampOS/setup/current/lamp-setup wifi --config /etc/lampOS/setup/serve.json --enable
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+SyslogIdentifier=lamp-setup-wifi
+# The change (2 min at most) and the lost line's 10 minutes.
+RuntimeMaxSec=15min
+# #1982's lamp-setup-change@ sandbox, minus what the radio needs.
+NoNewPrivileges=yes
+ProtectSystem=strict
+# /etc: wpa_supplicant-wlan0.conf, its .lamp-setup and .lamp-previous beside it in
+# /etc/wpa_supplicant, and V1's device-sta-mode, which edits /etc/dhcpcd.conf with `sed -i`
+# (a file made beside it in /etc) under `set -e`. /run: the say socket, wpa_supplicant's control
+# socket, systemctl. /tmp: wpa_cli's reply socket (wpa_ctrl's client folder), which
+# wpa_supplicant must reach, so the real /tmp.
+ReadWritePaths=/etc /run /tmp
+ProtectHome=yes
+# Not PrivateTmp: wpa_supplicant could not answer wpa_cli's socket in a private /tmp.
+PrivateTmp=no
+# The network for the broker's check and ping (AF_INET, AF_INET6); netlink for ip and iw;
+# AF_UNIX for wpa_cli, systemctl, journalctl and the say socket. Not PrivateNetwork.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK

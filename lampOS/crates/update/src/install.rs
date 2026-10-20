@@ -113,6 +113,11 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-tasks.service",
         include_str!("../../../deploy/product/lamp-tasks.service"),
     ),
+    // The lamp's inner state (#1670); off unless set.
+    (
+        "lamp-mood.service",
+        include_str!("../../../deploy/product/lamp-mood.service"),
+    ),
     (
         "lamp-skills.service",
         include_str!("../../../deploy/product/lamp-skills.service"),
@@ -128,6 +133,22 @@ pub const PRODUCT: &[(&str, &str)] = &[
     (
         "lamp-update.service",
         include_str!("../../../deploy/product/lamp-update.service"),
+    ),
+    // lamp-update's fallback, from its fixed path: started by lamp-update's
+    // failure and by its timer (#1680, crate::own).
+    (
+        "lamp-update-back.service",
+        include_str!("../../../deploy/product/lamp-update-back.service"),
+    ),
+    (
+        "lamp-update-back.timer",
+        include_str!("../../../deploy/product/lamp-update-back.timer"),
+    ),
+    // The build's settings and tmpfiles, written at a round's switch from
+    // the same fixed path, and started only by a round (#1680, crate::apply).
+    (
+        "lamp-update-apply.service",
+        include_str!("../../../deploy/product/lamp-update-apply.service"),
     ),
     // The passive self-test, five minutes after the lamp starts and every
     // six hours (#812). Its service is started by its timer alone.
@@ -153,6 +174,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lampos-setup-done.path",
         include_str!("../../../deploy/product/lampos-setup-done.path"),
     ),
+    // The waking face, from power-on until the voice takes the ring
+    // (#1681); off unless `LAMP_WAKING_FACE=on`.
+    (
+        "lamp-waking.service",
+        include_str!("../../../deploy/product/lamp-waking.service"),
+    ),
 ];
 
 /// The skills every lamp runs: each a folder of `lampOS/skills/`, put in
@@ -165,6 +192,7 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "welcome-back",
     "reminders",
     "task-news",
+    "onboarding",
     "stretch-break",
     "stuffy-air",
     "dance",
@@ -186,10 +214,22 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "it is called only after Desk tutor's look, and Desk tutor isn't in the product",
     ),
     (
+        "guard-mode",
+        "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
+         (`LAMP_PRESENCE=on`), and its texts reach no phone until `lamp-cloud` and the app's push \
+         relay take `messages/out`",
+    ),
+    (
         "light-out",
         "it reads `room/presence`, which the eyes say only with `LAMP_PRESENCE=on` (#1677), off \
          until the light going out and coming back has been seen on a lamp: someone reading face \
          down at the desk must never lose their light",
+    ),
+    (
+        "watch-you-leave",
+        "not yet tried on a lamp (#1669 (e)): it turns the base when the sitter leaves \
+         (`room/stood_up`, `LAMP_ACTIVITY=on`), so it is tried at the arm hour with someone at the \
+         arm, and whether the small turn reads as watching someone go is for that check",
     ),
     (
         "laugh-glance",
@@ -225,6 +265,61 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "light-show",
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
          32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
+    ),
+    // An installable skill (#1685): its owner puts it on; not in the
+    // product's install until it has been tried on a lamp.
+    (
+        "look-for-things",
+        "an installable skill, not yet tried on a lamp (#1685): its turns need a lamp-body with \
+         `toward` and the lamp's `--gaze`, and its function would put a product session past its \
+         32 without `LAMP_USE_SKILL=on`",
+    ),
+    // #1685's four wellbeing nudges: installable skills their owner puts on,
+    // off until each has been seen on a lamp with a person. The four share
+    // one function, `wellbeing_nudges` (their `[stop]`), so with all four a
+    // product session declares 32 of its 32 without `LAMP_USE_SKILL=on`.
+    (
+        "rest-your-eyes",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its tilt and \
+         softer light read as a cue to look away, not a fault, is for the lamp check; with the \
+         other three it adds one function, `wellbeing_nudges`, a product session's 32nd",
+    ),
+    (
+        "sip-of-water",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its slow blue \
+         breath reads as a hint to drink, never a status light, is for the lamp check",
+    ),
+    (
+        "stand-up",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its turn and \
+         tilt after a long sitting read as an invitation, never a nag, is for the lamp check",
+    ),
+    (
+        "wind-down",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): its hours are the \
+         owner's own bedtime, and its hand-over to Bedtime and Morning (#1732) is for the lamp \
+         check",
+    ),
+    // #1684's two core skills, merged off (the first builder, #1722): a
+    // trial puts them on by hand. Each comes with the product once the four
+    // real traces are recorded on a lamp with an air sensor and its
+    // provisional numbers are set again from them.
+    (
+        "smoky-air",
+        "not measured for false alarms yet (#1684): its numbers wait for real traces of kettle \
+         steam, toast, a candle blown out and a match, recorded on a lamp with an air sensor and \
+         replayed",
+    ),
+    (
+        "dusty-air",
+        "not measured for false alarms yet (#1684): its hour at 125 ug/m3 waits for the same \
+         traces and an office's own days, replayed",
+    ),
+    (
+        "who-was-here",
+        "an installable skill, not yet tried on a lamp (#1685): it reads `room/presence`, which the \
+         eyes say only with `LAMP_PRESENCE=on`, and its function would put a product session past \
+         its 32 without `LAMP_USE_SKILL=on`",
     ),
 ];
 
@@ -272,6 +367,8 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("reminders", "SKILL.md"),
     skill_file!("task-news", "skill.toml"),
     skill_file!("task-news", "SKILL.md"),
+    skill_file!("onboarding", "skill.toml"),
+    skill_file!("onboarding", "SKILL.md"),
     skill_file!("stretch-break", "skill.toml"),
     skill_file!("stretch-break", "SKILL.md"),
     skill_file!("stuffy-air", "skill.toml"),
@@ -304,32 +401,34 @@ struct Models {
     models: Vec<Model>,
 }
 
-/// One model of [`MODELS`].
-#[derive(Clone, Debug, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Model {
-    pub path: String,
-    pub url: String,
-    pub bytes: u64,
-    pub sha256: String,
-    /// The file is one member of a gzipped tar at `url`, itself pinned.
-    #[serde(default)]
-    pub archive: Option<Archive>,
-}
-
-#[derive(Clone, Debug, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Archive {
-    pub bytes: u64,
-    pub sha256: String,
-    pub member: String,
-}
+/// One model of [`MODELS`]: the manifest's own, which a build may carry.
+pub use crate::manifest::{Archive, Model};
 
 /// The models of [`MODELS`].
 pub fn models() -> Result<Vec<Model>, String> {
-    serde_json::from_str::<Models>(MODELS)
+    models_from(MODELS).map_err(|error| format!("deploy/product/models.json: {error}"))
+}
+
+/// The models of a file in `models.json`'s form.
+pub fn models_from(text: &str) -> Result<Vec<Model>, String> {
+    serde_json::from_str::<Models>(text)
         .map(|list| list.models)
-        .map_err(|error| format!("deploy/product/models.json: {error}"))
+        .map_err(|error| error.to_string())
+}
+
+/// The product's settings as a build carries them (#1680, crate::apply):
+/// every one of [`SETTINGS`] and the tmpfiles, 0644. Never setup's, the
+/// voice's service, the keys or the zone, which are the lamp's; nor the
+/// product skills' files, which a round places from the build's
+/// `lamp-product-skills` (crate::product_skills) and the skills guard judges.
+pub fn product_settings() -> Vec<manifest::Setting> {
+    let skills = format!("{}/", crate::product_skills::FOLDER);
+    SETTINGS
+        .iter()
+        .filter(|(path, _)| !path.starts_with(&skills))
+        .chain([&(TMPFILES_PATH, TMPFILES)])
+        .map(|(path, text)| manifest::Setting::new(path, text))
+        .collect()
 }
 
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
@@ -421,18 +520,30 @@ const HARNESS_DONE: &str = "harness-at-boot";
 const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
 
 /// Services started by a timer of their own, and never enabled themselves.
-const TIMED: &[&str] = &["lamp-records.service", "lamp-selftest.service"];
+const TIMED: &[&str] = &[
+    "lamp-records.service",
+    "lamp-selftest.service",
+    "lamp-update-back.service",
+];
+
+/// Services a round starts, and never enabled.
+const STARTED_BY_A_ROUND: &[&str] = &[crate::apply::UNIT];
 
 /// The units enabled: the target, and what starts outside it.
 fn enabled() -> Vec<String> {
     PRODUCT
         .iter()
         .map(|(name, _)| *name)
-        .filter(|name| name.ends_with(".service") && !TIMED.contains(name))
+        .filter(|name| {
+            name.ends_with(".service")
+                && !TIMED.contains(name)
+                && !STARTED_BY_A_ROUND.contains(name)
+        })
         .chain([
             "lampos.target",
             "lamp-records.timer",
             "lamp-selftest.timer",
+            "lamp-update-back.timer",
             "lampos-setup-done.path",
         ])
         .map(str::to_owned)
@@ -453,8 +564,8 @@ pub fn part(text: &str) -> Option<Part> {
     unit::linked(text).map(|(folder, binary)| Part { folder, binary })
 }
 
-/// Every part of the product, in the order of `PRODUCT`, each once: setup
-/// and its reset start the same binary.
+/// Every part of the product, in the order of `PRODUCT`, each once: setup,
+/// its reset and the waking face start the same binary.
 pub fn parts() -> Vec<Part> {
     let mut parts: Vec<Part> = Vec::new();
     for part in PRODUCT.iter().filter_map(|(_, text)| part(text)) {
@@ -522,11 +633,7 @@ impl Host for System {
     }
 
     fn harness_at_boot(&mut self, user: &str, home: &str) -> Result<(), String> {
-        run(Command::new("install").args(["-d", "-o", user, "-g", user, "-m", "0700", home]))?;
-        // A user manager for the user from boot, with no login: the
-        // daemon's user unit needs it, a system user as any other.
-        run(Command::new("loginctl").args(["enable-linger", user]))?;
-        run(harness_as(user, home)?.args(["service", "install"]))
+        harness_at_boot_with(&mut output_of, Path::new("/"), user, home)
     }
 
     fn harness_off(&mut self, user: &str, home: &str) -> Result<Vec<String>, String> {
@@ -576,14 +683,6 @@ fn uid_of(run: &mut Runner, user: &str) -> Result<String, String> {
     Ok(uid)
 }
 
-fn harness_as(user: &str, home: &str) -> Result<Command, String> {
-    let uid = uid_of(&mut output_of, user)?;
-    let argv = harness_argv(user, home, &uid, &[]);
-    let mut command = Command::new(&argv[0]);
-    command.args(&argv[1..]);
-    Ok(command)
-}
-
 /// One program and its arguments, run to its end: what it printed when it
 /// ended with 0, else why not. The real one is [`output_of`]; a test's logs
 /// and fails on demand.
@@ -603,11 +702,64 @@ fn output_of(argv: &[String]) -> Result<String, String> {
     }
 }
 
+/// Where `user`'s own user manager is given `home` as its `HOME` (#1676):
+/// a drop-in for `user@<uid>.service` alone. `lampos` has no home of its
+/// own (`/nonexistent`), so without it the manager looks for user units
+/// under `/nonexistent/.config/systemd/user`, never where Harness writes
+/// its unit under `home` ("Unit file harnessd.service does not exist", on
+/// lamp-75c9 on 19 Oct). The parts that run as `lampos` keep their `HOME`:
+/// only this manager, which runs nothing but Harness, gets it.
+pub fn home_drop_in(uid: &str) -> String {
+    format!("/etc/systemd/system/user@{uid}.service.d/lamp-home.conf")
+}
+
+/// [`Host::harness_at_boot`]'s steps, each through `run`, under `root` (`/`
+/// on the lamp): `id -u`; `home` made `user`'s own (0700); the manager's
+/// `HOME` drop-in ([`home_drop_in`]) written, `systemctl daemon-reload`,
+/// and `systemctl try-restart` of `user@<uid>.service`, so a manager
+/// already running (its linger on before) takes it, and one not running
+/// is left alone; `loginctl enable-linger`, which starts it with that
+/// `HOME`; then the Harness CLI's own `harness service install` as `user`
+/// with that `HOME`. Shown on lamp-75c9 on 19 Oct: the manager keeps the
+/// drop-in's `HOME`, and Harness's service then installs and runs. A
+/// failing step stops it there.
+pub fn harness_at_boot_with(
+    run: &mut Runner,
+    root: &Path,
+    user: &str,
+    home: &str,
+) -> Result<(), String> {
+    let uid = uid_of(run, user)?;
+    run(&["install", "-d", "-o", user, "-g", user, "-m", "0700", home].map(str::to_owned))?;
+    let drop_in = root.join(home_drop_in(&uid).trim_start_matches('/'));
+    let folder = drop_in.parent().expect("the drop-in is in a folder");
+    std::fs::create_dir_all(folder).map_err(|error| format!("{}: {error}", folder.display()))?;
+    write_whole(
+        &drop_in,
+        format!("[Service]\nEnvironment=HOME={home}\n").as_bytes(),
+        0o644,
+    )
+    .map_err(|error| format!("{}: {error}", drop_in.display()))?;
+    run(&["systemctl", "daemon-reload"].map(str::to_owned))?;
+    run(&[
+        "systemctl".to_owned(),
+        "try-restart".to_owned(),
+        format!("user@{uid}.service"),
+    ])?;
+    // A user manager for the user from boot, with no login: the daemon's
+    // user unit needs it, a system user as any other.
+    run(&["loginctl", "enable-linger", user].map(str::to_owned))?;
+    run(&harness_argv(user, home, &uid, &["service", "install"]))?;
+    Ok(())
+}
+
 /// [`Host::harness_off`]'s steps, each through `run`, in this order: `id -u`,
 /// then as `user` `harness service uninstall` and `harness stop` (with no
 /// daemon running it says so and ends with 0), then `harness service status
 /// --json` while the user's manager is still there, then `loginctl
-/// disable-linger`, which ends it, then `pgrep -u <user> -f harnessd`. A
+/// disable-linger`, which ends it, then the manager's `HOME` drop-in
+/// removed ([`home_drop_in`]) and `systemctl daemon-reload`, then `pgrep -u
+/// <user> -f harnessd`. A
 /// failing step stops it there. The status not answering, and what it and
 /// `pgrep` still find, are the lines returned.
 pub fn harness_off_with(run: &mut Runner, user: &str, home: &str) -> Result<Vec<String>, String> {
@@ -624,6 +776,9 @@ pub fn harness_off_with(run: &mut Runner, user: &str, home: &str) -> Result<Vec<
         Err(_) => vec!["`harness service status --json` did not answer".to_owned()],
     };
     run(&["loginctl", "disable-linger", user].map(str::to_owned))?;
+    // The manager's `HOME` goes with it ([`home_drop_in`]).
+    run(&["rm".to_owned(), "-f".to_owned(), home_drop_in(&uid)])?;
+    run(&["systemctl", "daemon-reload"].map(str::to_owned))?;
     // `pgrep` ends with 1 when it finds nothing: then there is no list.
     if let Ok(found) = run(&["pgrep", "-u", user, "-f", "harnessd"].map(str::to_owned)) {
         let pids: Vec<&str> = found.split_whitespace().collect();
@@ -826,6 +981,20 @@ pub fn install(
     for ((part, _), build) in wanted.iter().zip(&builds) {
         link(config, part, build, &mut changed)?;
     }
+    // lamp-update-back, a copy of this build's lamp-update at a fixed path:
+    // written here alone, never by a round, which cannot even write it, so
+    // a lamp-update that cannot start is still put back (#1680).
+    if let Some(((part, _), build)) = wanted
+        .iter()
+        .zip(&builds)
+        .find(|((part, _), _)| part.binary == crate::own::BINARY)
+    {
+        let from = config
+            .on(&unit::folder(&part.folder, build))
+            .join(&part.binary);
+        let bytes = fs::read(&from).map_err(|error| format!("{}: {error}", from.display()))?;
+        put(config, crate::own::BACK, &bytes, 0o755, &mut changed)?;
+    }
 
     // The units and the tmpfiles. systemd must be told of any of them
     // written, so that is recorded before the first is: a run stopped
@@ -847,6 +1016,12 @@ pub fn install(
     for (path, bytes) in &for_systemd {
         put(config, path, bytes, 0o644, &mut changed)?;
     }
+    // The tmpfiles are install's, recorded as the settings are, so a
+    // build's newer tmpfiles reach this lamp (#1680, crate::apply).
+    state.settings.insert(
+        TMPFILES_PATH.to_owned(),
+        manifest::sha256_hex(TMPFILES.as_bytes()),
+    );
     let mut defaults = SETTINGS.to_vec();
     if config.setup {
         defaults.extend_from_slice(SETUP_SETTINGS);
@@ -1516,14 +1691,25 @@ fn place_models(
     Ok(())
 }
 
-fn fetch_model(channel: &mut dyn Channel, model: &Model, at: &Path) -> Result<(), String> {
-    let parent = at.parent().ok_or("no folder")?;
+/// A model fetched and checked to `at`, whole or not at all. A channel out
+/// of reach is said as [`Fetch::Unreachable`], so a round tries again; any
+/// other failure is [`Fetch::Failed`].
+pub(crate) fn fetch_model(
+    channel: &mut dyn Channel,
+    model: &Model,
+    at: &Path,
+) -> Result<(), Fetch> {
+    let failed = |why: String| Fetch::Failed(why);
+    let parent = at.parent().ok_or_else(|| failed("no folder".into()))?;
     fs::DirBuilder::new()
         .recursive(true)
         .mode(0o755)
         .create(parent)
-        .map_err(|error| error.to_string())?;
-    let name = at.file_name().ok_or("no name")?.to_string_lossy();
+        .map_err(|error| failed(error.to_string()))?;
+    let name = at
+        .file_name()
+        .ok_or_else(|| failed("no name".into()))?
+        .to_string_lossy();
     let temporary = parent.join(format!(".{name}.fetching"));
     let archive = parent.join(format!(".{name}.archive"));
     let result = (|| {
@@ -1531,23 +1717,27 @@ fn fetch_model(channel: &mut dyn Channel, model: &Model, at: &Path) -> Result<()
             None => fetch_checked(channel, &model.url, model.bytes, &model.sha256, &temporary)?,
             Some(pinned) => {
                 fetch_checked(channel, &model.url, pinned.bytes, &pinned.sha256, &archive)?;
-                let out = fs::File::create(&temporary).map_err(|error| error.to_string())?;
+                let out =
+                    fs::File::create(&temporary).map_err(|error| failed(error.to_string()))?;
                 let status = Command::new("tar")
                     .arg("-xzOf")
                     .arg(&archive)
                     .arg(&pinned.member)
                     .stdout(out)
                     .status()
-                    .map_err(|error| format!("tar: {error}"))?;
+                    .map_err(|error| failed(format!("tar: {error}")))?;
                 if !status.success() {
-                    return Err(format!("tar could not take {} out", pinned.member));
+                    return Err(failed(format!("tar could not take {} out", pinned.member)));
                 }
-                let sha = file_sha256(&temporary).map_err(|error| error.to_string())?;
+                let sha = file_sha256(&temporary).map_err(|error| failed(error.to_string()))?;
                 let size = fs::metadata(&temporary)
-                    .map_err(|error| error.to_string())?
+                    .map_err(|error| failed(error.to_string()))?
                     .len();
                 if size != model.bytes || sha != model.sha256 {
-                    return Err(format!("{} does not match its SHA-256", pinned.member));
+                    return Err(failed(format!(
+                        "{} does not match its SHA-256",
+                        pinned.member
+                    )));
                 }
             }
         }
@@ -1555,7 +1745,7 @@ fn fetch_model(channel: &mut dyn Channel, model: &Model, at: &Path) -> Result<()
             .and_then(|()| fs::File::open(&temporary)?.sync_all())
             .and_then(|()| fs::rename(&temporary, at))
             .and_then(|()| sync_parent(at))
-            .map_err(|error| error.to_string())
+            .map_err(|error| failed(error.to_string()))
     })();
     let _ = fs::remove_file(&archive);
     if result.is_err() {
@@ -1571,8 +1761,8 @@ fn fetch_checked(
     bytes: u64,
     sha256: &str,
     to: &Path,
-) -> Result<(), String> {
-    let mut out = fs::File::create(to).map_err(|error| error.to_string())?;
+) -> Result<(), Fetch> {
+    let mut out = fs::File::create(to).map_err(|error| Fetch::Failed(error.to_string()))?;
     let mut hashing = Hashing {
         file: &mut out,
         context: digest::Context::new(&digest::SHA256),
@@ -1581,9 +1771,10 @@ fn fetch_checked(
     let sha = manifest::hex(hashing.context.finish().as_ref());
     match fetched {
         Ok(size) if size == bytes && sha == sha256 => Ok(()),
-        Ok(_) => Err("it does not match its SHA-256".into()),
-        Err(Fetch::Missing) => Err(format!("{url} is not there")),
-        Err(error) => Err(format!("{error:?}")),
+        Ok(_) => Err(Fetch::Failed("it does not match its SHA-256".into())),
+        Err(Fetch::Missing) => Err(Fetch::Failed(format!("{url} is not there"))),
+        Err(Fetch::Unreachable(why)) => Err(Fetch::Unreachable(why)),
+        Err(error) => Err(Fetch::Failed(format!("{error:?}"))),
     }
 }
 
@@ -1761,23 +1952,37 @@ mod tests {
     #[test]
     fn every_product_part_starts_through_its_current_link() {
         let parts = parts();
-        for (name, text) in PRODUCT
-            .iter()
-            .filter(|(name, _)| name.ends_with(".service"))
-        {
+        // lamp-update-back starts from its fixed path, which no round
+        // switches (#1680).
+        let linked = |name: &&str| {
+            name.ends_with(".service")
+                && *name != "lamp-update-back.service"
+                && *name != crate::apply::UNIT
+        };
+        for (name, text) in PRODUCT.iter().filter(|(name, _)| linked(name)) {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }
-        // Setup and its reset share one binary, and so do the air and its
-        // bus clock; every other service is a part.
-        let services = PRODUCT
-            .iter()
-            .filter(|(name, _)| name.ends_with(".service"))
-            .count();
-        assert_eq!(parts.len(), services - 2, "every product service is a part");
+        // Setup, its reset and the waking face share one binary, and so do
+        // the air and its bus clock; every other service is a part.
+        let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
+        assert_eq!(parts.len(), services - 3, "every product service is a part");
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");
         }
+    }
+
+    /// #1815: the cloud is enabled with the lamp, so a Lamp 2 set up from
+    /// the app is online at the next power-up too, not only after
+    /// `cloud-on.sh`.
+    #[test]
+    fn the_cloud_is_enabled_with_the_lamp() {
+        assert!(enabled().iter().any(|name| name == "lamp-cloud.service"));
+        assert!(
+            enabled()
+                .iter()
+                .any(|name| name == "lampos-setup-done.path")
+        );
     }
 
     /// #812: the passive self-test is started by its timer alone, which the

@@ -55,6 +55,7 @@ fn wiring() -> TouchPinsConfig {
         head_qualify_ms: None,
         head_tap_min_ms: None,
         head_gap_ms: None,
+        head_rest: None,
         legacy_head: false,
     }
 }
@@ -451,6 +452,7 @@ fn empty_configuration_does_not_claim_a_functional_touch_source() {
         head_qualify_ms: None,
         head_tap_min_ms: None,
         head_gap_ms: None,
+        head_rest: None,
         legacy_head: false,
     };
     assert!(wiring.check(&Config::default()).is_err());
@@ -488,5 +490,57 @@ fn the_products_pins_name_the_reset_and_its_unit_serves_the_touch_path() {
     assert!(
         words.contains(&"--pins") && words.contains(&"--enable"),
         "{serve}"
+    );
+}
+
+/// #711: each lamp's factory step writes its pads' own baseline, which must
+/// name the pads in order and agree with their polarity; a pad that pulses
+/// is read by its pulses.
+#[test]
+fn head_rest_names_each_pad_in_order_with_its_polarity_and_how_it_reads() {
+    let rest = |rests: serde_json::Value| {
+        let mut wiring = serde_json::to_value(wiring()).unwrap();
+        wiring["head_rest"] = rests;
+        serde_json::from_value::<TouchPinsConfig>(wiring).unwrap()
+    };
+    // Both pads are active-low, so both rest high.
+    let measured = rest(json!([
+        {"name":"head-one","rest":"high","reads":"pulses"},
+        {"name":"head-two","rest":"high","reads":"level"}
+    ]));
+    let touch = measured.check(&config()).unwrap();
+    assert_eq!(touch.head_pulse_pads, ["head-one"]);
+    for (rests, why) in [
+        (
+            json!([
+                {"name":"head-two","rest":"high","reads":"level"},
+                {"name":"head-one","rest":"high","reads":"level"}
+            ]),
+            "out of order",
+        ),
+        (
+            json!([{"name":"head-one","rest":"high","reads":"level"}]),
+            "one pad missing",
+        ),
+        (
+            json!([
+                {"name":"head-one","rest":"low","reads":"level"},
+                {"name":"head-two","rest":"high","reads":"level"}
+            ]),
+            "resting low but active-low",
+        ),
+    ] {
+        assert!(rest(rests).check(&config()).is_err(), "{why}");
+    }
+    let mut unknown = serde_json::to_value(measured).unwrap();
+    unknown["head_rest"][0]["idle"] = json!("high");
+    assert!(serde_json::from_value::<TouchPinsConfig>(unknown).is_err());
+    // Without it, every pad reads its level, as before.
+    assert!(
+        wiring()
+            .check(&config())
+            .unwrap()
+            .head_pulse_pads
+            .is_empty()
     );
 }

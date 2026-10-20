@@ -1265,6 +1265,7 @@ fn unresolved_cleanup_removes_the_service_mute_restart_token() {
     let (dir, mut m, mut c) = ready_fixture("hang");
     wait(&mut m, &mut c, OptionalMotor::is_ready);
     let outcome: super::super::Result<()> = Err(Box::new(PhysicalMute {
+        onboarding: None,
         observed_at_us: monotonic_us(),
     }));
     m.begin_shutdown();

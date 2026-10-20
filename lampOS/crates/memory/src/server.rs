@@ -50,6 +50,11 @@ pub trait Memory {
     fn health_counts(&self) -> Option<io::Result<crate::health_counts::Counts>> {
         None
     }
+
+    /// A database a newer build wrote, set aside and still on disk (#1680).
+    fn set_aside(&self) -> Option<&str> {
+        None
+    }
 }
 
 impl Memory for Store {
@@ -65,6 +70,10 @@ impl Memory for crate::days::Days {
 
     fn health_counts(&self) -> Option<io::Result<crate::health_counts::Counts>> {
         Some(self.health_counts().map_err(io::Error::other))
+    }
+
+    fn set_aside(&self) -> Option<&str> {
+        crate::days::Days::set_aside(self)
     }
 }
 
@@ -249,6 +258,8 @@ impl Server {
                         let answer = store.answer(&line, clock());
                         let ended = health.answered_at();
                         health.finish(ticket, ended, &answer, store.health_counts());
+                        // A forget, or a stamp older than `keep_days`, removes it (#2067).
+                        health.set_aside(store.set_aside());
                         answer
                     } else {
                         store.answer(&line, clock())

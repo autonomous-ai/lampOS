@@ -8,18 +8,25 @@
 //! model calls [`STEP`]; the provider worker writes that into a small
 //! mailbox file beside the onboarding file, and only the runner writes the
 //! onboarding file itself. "Where you sit" is ended by what the eyes
-//! measure. The steps other builders own are placeholders: recorded as not
-//! available, not spoken, and passed over.
+//! measure, and "touch" by Controls' head-pad event on the bus. The steps
+//! other builders own are placeholders: recorded as not available, not
+//! spoken, and passed over.
 //!
 //! Off unless `LAMP_ONBOARDING=on` and `LAMP_ONBOARDING_FILE` names an
 //! absolute path: then nothing here runs, no function is declared and no
 //! file is read or written.
+pub(crate) mod hardware;
+pub(crate) mod privacy;
+pub(crate) mod storage;
+
+use crate::wire::PrivacyReceipt;
 use lamp_gemini::{Tool, ToolCall};
+use lamp_turn_owner::BootId;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
-    io::Write,
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 
@@ -36,7 +43,7 @@ const START_QUIET_US: u64 = 3_000_000;
 const HOLD_US: u64 = 3_000_000;
 /// ... and is given up on after this long, with a word on what to do later.
 const SIT_GIVE_UP_US: u64 = 60_000_000;
-/// A word on how to move the lamp at most this often, after this much quiet.
+/// One word on how to move the lamp, after this much quiet.
 const GUIDE_EVERY_US: u64 = 8_000_000;
 /// A step the model leads and never reports has failed after this long,
 /// once the room has been quiet for [`TIMED_OUT_QUIET_US`].
@@ -53,6 +60,10 @@ const NEAR: f32 = 0.14;
 const MIDDLE: f32 = 0.25;
 /// A look on the bus older than this says nothing of now.
 const FRESH_MS: u64 = 700;
+/// "Touch": no touch on the head this long after the ask has failed.
+const TOUCH_GIVE_UP_US: u64 = 60_000_000;
+/// The name the walk reads Controls' touches under.
+const SUBSCRIBER: &str = "voice_onboarding";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Step {
@@ -94,12 +105,13 @@ impl Step {
 
     /// PLACEHOLDER (#841): the steps whose parts other builders own. Each
     /// is passed over until its part can be measured from here: hearing
-    /// (fourth, #753), head touch (third, #711), the privacy switch (third,
-    /// #795), and whether the body gives way (fifth, #780).
+    /// (fourth, #753), the privacy switch (third, #795), and whether the
+    /// body gives way (fifth, #780). Touch needs Controls' head pads on the
+    /// bus as well ([`Onboarding::step_available`]).
     fn available(self) -> bool {
         matches!(
             self,
-            Step::WhereYouSit | Step::WhoYouAre | Step::Preferences
+            Step::WhereYouSit | Step::WhoYouAre | Step::Touch | Step::Preferences
         )
     }
 
@@ -107,16 +119,19 @@ impl Step {
     /// it was skipped.
     fn reportable(self, outcome: Outcome) -> bool {
         match self {
-            Step::WhereYouSit => outcome == Outcome::Skipped,
+            Step::WhereYouSit | Step::Touch | Step::Privacy => outcome == Outcome::Skipped,
             _ => outcome != Outcome::NotAvailable,
         }
     }
 
-    /// What the model is given to begin the step.
-    fn note(self) -> &'static str {
+    /// What the model is given to begin the step, `again` when it is
+    /// offered after the walk.
+    fn note(self, again: bool) -> &'static str {
         match self {
             Step::WhereYouSit => SIT_NOTE,
             Step::WhoYouAre => WHO_NOTE,
+            Step::Touch if again => TOUCH_OFFER,
+            Step::Touch => TOUCH_NOTE,
             Step::Preferences => PREFERENCES_NOTE,
             // PLACEHOLDER (#841): each owner words its own step's note,
             // opening with "one more thing I can do now" for the re-offer.
@@ -124,9 +139,8 @@ impl Step {
         }
     }
 
-    /// The one move the body is asked for when the step is done (#841,
-    /// First's addition 1): a nod when it sees them well, a greeting when
-    /// it knows them, a nod for the rest. The body has no lean yet.
+    /// Only the future GivingWay step may request a completion movement.
+    /// Other onboarding steps stay physically still (the owner's #841 decision).
     fn gesture(self) -> &'static str {
         match self {
             Step::WhoYouAre => "greeting",
@@ -142,13 +156,16 @@ const OFFER_EVERY_S: u64 = 86_400;
 
 pub const SIT_NOTE: &str = "(Nobody has spoken. You are meeting the person you will live with for the first time. Say hello in a few warm words, then ask them to sit where they usually sit and look at you, so you learn where they are. Nothing more.)";
 pub const SIT_NO_FACE: &str = "(You cannot see their face. Ask them in a few words to sit where they usually sit and look at you.)";
-pub const SIT_CLOSER: &str = "(You can see them, but they are far from you. Ask them in a few words to bring you a bit closer.)";
-pub const SIT_TURN: &str = "(You can see them, but at the edge of what you see. Ask them in a few words to turn you a little toward them.)";
+pub const SIT_CLOSER: &str = "(You can see them, but they are far from you. Ask them in a few words to bring you a bit closer if they like, and that where they are is fine too.)";
+pub const SIT_TURN: &str = "(You can see them, but at the edge of what you see. Ask them in a few words to turn you a little toward them if they like, and that where they are is fine too.)";
 pub const SIT_DONE: &str =
     "(Now you can see them well where they sit. Tell them so in a few words.)";
 pub const SIT_FAILED: &str = "(You still cannot see them well where they sit. Tell them in a few light words that it is fine: they can turn you toward their seat later, or ask you to redo the setup.)";
 pub const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Then call setup_step with step \"who_you_are\": done, skipped if they would rather not, or failed if it could not be done, and then tell them in a few words what they can try later.)";
-pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask them two short things, one at a time: whether there are hours when you should keep quiet, and whether you may say hello when they sit down. Keep each answer as a rule if you can. Then call setup_step with step \"preferences\", and tell them in a few words that is everything, and that they can ask you to redo the setup any time.)";
+pub const TOUCH_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, to touch the top of your head gently, then stay quiet.)";
+pub const TOUCH_OFFER: &str = "(Nobody has spoken. Tell them in a few words that there is one more thing you can do now: feel a touch on the top of your head. Ask them to touch it gently, then stay quiet.)";
+pub const TOUCH_REMIND: &str = "(You have not felt a touch yet. Ask them once more, in a few words, to touch the top of your head gently, then stay quiet.)";
+pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask them two short things, one at a time: whether there are hours when you should keep quiet, and whether you may say hello when they sit down. Keep each answer as a rule if you can. As soon as you have heard the second answer, call setup_step with step \"preferences\" before you say anything else, then tell them in a few words that is everything, and that they can ask you to redo the setup any time.)";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -201,6 +218,46 @@ pub struct Kept {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Progress {
     pub steps: BTreeMap<String, Kept>,
+    /// Durable deduplication of verified physical-close/reopen completion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub privacy_done_attempt: Option<BootId>,
+    /// At most two whole invitation attempts per setup/redo, across restarts.
+    #[serde(default)]
+    pub privacy_invitation_tries: u8,
+    /// Redo's durable tombstone precedes deletion of any old checkpoint.
+    #[serde(default)]
+    pub privacy_discard_pending: bool,
+}
+
+impl Progress {
+    /// The storage executor accepts only the bounded onboarding schema.
+    pub(crate) fn check(&self) -> io::Result<()> {
+        let invalid = || io::Error::new(io::ErrorKind::InvalidData, "invalid onboarding progress");
+        if self.steps.len() > Step::ALL.len() || self.privacy_invitation_tries > 2 {
+            return Err(invalid());
+        }
+        for (name, kept) in &self.steps {
+            if Step::named(name).is_none() {
+                return Err(invalid());
+            }
+            if let Some(frame) = kept.framing
+                && (!(0.0..=1.0).contains(&frame.size)
+                    || !(-1.0..=1.0).contains(&frame.x)
+                    || !(-1.0..=1.0).contains(&frame.y))
+            {
+                return Err(invalid());
+            }
+        }
+        if self.privacy_done_attempt.is_some()
+            && !self
+                .steps
+                .get("privacy")
+                .is_some_and(|step| step.outcome == Outcome::Done)
+        {
+            return Err(invalid());
+        }
+        Ok(())
+    }
 }
 
 struct Led {
@@ -210,9 +267,78 @@ struct Led {
     guided_us: Option<u64>,
 }
 
+struct PrivacyContext {
+    epoch: privacy::Epoch,
+    receipt: Option<PrivacyReceipt>,
+    location: Option<String>,
+}
+
+struct PrivacyOffer {
+    token: u64,
+    attempt: u64,
+    ready: bool,
+    claimed: bool,
+    persisted: bool,
+    offered_us: u64,
+    bound: Option<(BootId, u64)>,
+}
+
+#[derive(Default)]
+struct PrivacyFlow {
+    context: Option<PrivacyContext>,
+    loaded: bool,
+    maintenance_failed: bool,
+    attempt: Option<privacy::Attempt>,
+    offer: Option<PrivacyOffer>,
+    generation: u64,
+    offered: u64,
+    failures: u8,
+    retry_after_us: u64,
+    pending_result: Option<(Outcome, Option<BootId>)>,
+    erase_pending: bool,
+    last_open: Option<(String, String, u64)>,
+    /// Since when privacy has been led with no open, fresh receipt and
+    /// nothing offered (Third's P3 on #1792).
+    no_receipt_since: Option<u64>,
+    /// That wait passed [`SIT_GIVE_UP_US`]: privacy is not available until an
+    /// open, fresh receipt is seen again. Memory only.
+    waited_out: bool,
+}
+
+fn fresh_token() -> io::Result<u64> {
+    let bytes = crate::process::new_boot()?.bytes();
+    let first = u64::from_le_bytes(bytes[..8].try_into().expect("eight bytes"));
+    Ok(if first != 0 {
+        first
+    } else {
+        u64::from_le_bytes(bytes[8..].try_into().expect("eight bytes"))
+    })
+}
+
+// Only the voice's own teardown is verified; the eyes close the camera on
+// their own permit timeout, which this step does not observe (#1802).
+const PRIVACY_DONE: &str = "(Their physical switch closed the microphones, and they opened it again. Briefly confirm that the switch works. Nothing more.)";
+const PRIVACY_FAILED: &str = "(The privacy-switch check was not completed. Briefly say they can try it again later by redoing setup. Do not claim the switch was tested.)";
+
 pub struct Onboarding {
     file: PathBuf,
-    kept: Progress,
+    /// Desired state; only this runner mutates it. Old I/O completions never replace it.
+    desired: Progress,
+    committed: Progress,
+    storage: storage::Client,
+    initialized: bool,
+    storage_epoch: u64,
+    storage_busy: bool,
+    storage_failed: bool,
+    dirty: bool,
+    erase_on_commit: bool,
+    flight: Option<storage::Tag>,
+    barrier: Option<storage::Tag>,
+    mailbox_revision: Option<(u64, u64)>,
+    checkpoint_bytes: Option<Vec<u8>>,
+    pending_records: Vec<Value>,
+    #[cfg(test)]
+    fixture_storage: Option<storage::ServiceStorage>,
     led: Option<Led>,
     /// A word owed before the next step: how "where you sit" ended.
     owed: Option<&'static str>,
@@ -233,6 +359,10 @@ pub struct Onboarding {
     available: fn(Step) -> bool,
     /// The move asked of the body for a step just done, until taken.
     gesture: Option<&'static str>,
+    /// Controls' touches (`controls/touch`), with the bus on: without them
+    /// "touch" is not available.
+    touches: Option<lamp_bus::Subscriber>,
+    privacy_flow: PrivacyFlow,
 }
 
 /// What a read of a body topic found: nothing ever, a message
@@ -276,7 +406,7 @@ pub fn switched_on(switch: Option<&str>, file: Option<&str>) -> Option<PathBuf> 
     (switch == Some("on"))
         .then_some(file?)
         .map(PathBuf::from)
-        .filter(|path| path.is_absolute())
+        .filter(|path| path.is_absolute() && path.file_name().is_some())
 }
 
 pub fn mailbox_of(file: &Path) -> PathBuf {
@@ -286,25 +416,48 @@ pub fn mailbox_of(file: &Path) -> PathBuf {
 }
 
 impl Onboarding {
-    pub fn from_environment() -> Option<Self> {
+    /// The service owns the sole I/O executor across all voice cycles.
+    pub(crate) fn from_storage(client: storage::Client) -> Option<Self> {
         let file = switched_on(
             std::env::var(ENVIRONMENT).ok().as_deref(),
             std::env::var(FILE_ENVIRONMENT).ok().as_deref(),
         )?;
-        let mut walk = Self::at(file);
+        let mut walk = Self::with_storage(file, client);
         walk.eyes = lamp_bus::Bus::from_environment().ok();
+        // The head pads' touches, from `--touch` Controls, only with the
+        // voice's bus on.
+        if std::env::var(crate::bus_out::ENVIRONMENT).ok().as_deref() == Some("on") {
+            walk.touches = walk.eyes.as_ref().and_then(|bus| {
+                bus.subscribe_typed(
+                    lamp_msgs::TouchEvent::TOPIC,
+                    SUBSCRIBER,
+                    lamp_msgs::TouchEvent::TYPE,
+                )
+                .ok()
+            });
+        }
         Some(walk)
     }
 
-    /// The runner keeping its results in `file`. Unreadable: started over.
-    pub fn at(file: PathBuf) -> Self {
-        let kept = std::fs::read(&file)
-            .ok()
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-            .unwrap_or_default();
+    pub(crate) fn with_storage(file: PathBuf, storage: storage::Client) -> Self {
         Self {
             file,
-            kept,
+            desired: Progress::default(),
+            committed: Progress::default(),
+            storage,
+            initialized: false,
+            storage_epoch: 0,
+            storage_busy: true,
+            storage_failed: false,
+            dirty: false,
+            erase_on_commit: false,
+            flight: None,
+            barrier: None,
+            mailbox_revision: None,
+            checkpoint_bytes: None,
+            pending_records: Vec::new(),
+            #[cfg(test)]
+            fixture_storage: None,
             led: None,
             owed: None,
             seen_us: None,
@@ -314,15 +467,699 @@ impl Onboarding {
             eyes: None,
             available: Step::available,
             gesture: None,
+            privacy_flow: PrivacyFlow::default(),
             looked: None,
             felt: None,
             goals: None,
             body_heard: false,
+            touches: None,
         }
     }
 
+    /// Whether Controls said a touch on the head pads since the last look.
+    /// Never waits; what is read is only this, never kept.
+    fn head_touched(&mut self) -> bool {
+        let Some(touches) = self.touches.as_mut() else {
+            return false;
+        };
+        let mut touched = false;
+        for _ in 0..8 {
+            let Ok(Some(message)) = touches.recv(std::time::Duration::ZERO) else {
+                break;
+            };
+            touched |= !message.expired
+                && message.header.source == "controls"
+                && message.parse::<lamp_msgs::TouchEvent>().is_ok_and(|event| {
+                    event.check().is_ok()
+                        && event.enabled
+                        && event.source == lamp_msgs::TouchSource::Head
+                });
+        }
+        touched
+    }
+
+    /// Fixture construction waits outside the production input loop.
+    #[cfg(test)]
+    fn at(file: PathBuf) -> Self {
+        let owner = storage::ServiceStorage::start(storage::Paths {
+            progress: file.clone(),
+            checkpoint: file.parent().unwrap().join("privacy-pending.json"),
+            mailbox: mailbox_of(&file),
+        })
+        .unwrap();
+        let mut walk = Self::with_storage(file, owner.client());
+        walk.fixture_storage = Some(owner);
+        walk.drain_storage_for_test(0);
+        walk
+    }
+
+    fn storage_idle(&self) -> bool {
+        self.initialized
+            && !self.storage_failed
+            && !self.storage_busy
+            && !self.dirty
+            && self.flight.is_none()
+            && self.barrier.is_none()
+    }
+
+    fn storage_failed(&mut self, error: impl std::fmt::Display) {
+        if !self.storage_failed {
+            self.records
+                .push(json!({"kind":"onboarding_storage_failed","error":error.to_string()}));
+        }
+        self.storage_failed = true;
+        self.privacy_flow.offer = None;
+        self.privacy_flow.attempt = None;
+        self.privacy_flow.pending_result = None;
+        self.owed = None;
+        self.gesture = None;
+    }
+
+    /// One bounded completion snapshot; all filesystem work belongs to storage.
+    pub(crate) fn poll_storage(&mut self, now_us: u64) {
+        let snapshot = match self.storage.snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => return,
+            Err(error) => {
+                self.storage_failed(error);
+                return;
+            }
+        };
+        if let Some(error) = snapshot.failed.as_ref() {
+            self.storage_failed(error);
+            self.storage_busy = snapshot.busy;
+            if let Some((revision, lines)) = snapshot.mailbox {
+                if self.mailbox_revision != Some((snapshot.epoch, revision)) {
+                    self.mailbox_revision = Some((snapshot.epoch, revision));
+                    self.apply_mailbox(&lines, now_us);
+                }
+                // A contended acknowledgement retries next poll without
+                // applying the already-consumed batch a second time.
+                if let Err(error) = self.storage.ack_mailbox(revision)
+                    && error.kind() != io::ErrorKind::WouldBlock
+                {
+                    self.storage_failed(error);
+                }
+            }
+            // Failed storage never retries a write on its own. Its bounded
+            // mailbox read remains available so an explicit redo can fence it.
+            if self.storage_failed
+                && !snapshot.busy
+                && self
+                    .read_us
+                    .is_none_or(|at| now_us.saturating_sub(at) >= READ_EVERY_US)
+                && let Ok(storage::Submit::Queued(_)) = self.storage.read_mailbox()
+            {
+                self.read_us = Some(now_us);
+                self.storage_busy = true;
+            }
+            return;
+        }
+        self.storage_busy = snapshot.busy;
+        if self.initialized && snapshot.epoch != self.storage_epoch {
+            // Fence visibility changes immediately, even while its disk barrier
+            // waits behind an older write. It cannot leave old proof usable.
+            self.storage_epoch = snapshot.epoch;
+            self.initialized = false;
+            self.flight = None;
+            self.barrier = None;
+            self.dirty = false;
+            self.erase_on_commit = false;
+            self.pending_records.clear();
+            self.owed = None;
+            self.led = None;
+            self.privacy_flow.offer = None;
+            self.privacy_flow.attempt = None;
+            self.privacy_flow.pending_result = None;
+            self.privacy_flow.loaded = false;
+            self.checkpoint_bytes = None;
+        }
+        if !snapshot.ready {
+            return;
+        }
+        if !self.initialized {
+            let Some(progress) = snapshot.progress.clone() else {
+                return;
+            };
+            self.desired = progress.clone();
+            self.committed = progress;
+            self.storage_epoch = snapshot.epoch;
+            self.initialized = true;
+        }
+        let completed_barrier = self
+            .barrier
+            .is_some_and(|tag| tag.epoch == snapshot.epoch && tag.revision <= snapshot.revision);
+        let completed = self
+            .flight
+            .is_some_and(|tag| tag.epoch == snapshot.epoch && tag.revision <= snapshot.revision)
+            || self.barrier.is_some_and(|tag| {
+                tag.epoch == snapshot.epoch && tag.revision <= snapshot.revision
+            });
+        if completed {
+            if let Some(progress) = snapshot.progress.clone() {
+                self.committed = progress;
+            }
+            self.flight = None;
+            self.barrier = None;
+            if completed_barrier {
+                self.privacy_flow.erase_pending = false;
+                self.privacy_flow.attempt = None;
+                self.privacy_flow.loaded = true;
+            }
+            // The latest desired snapshot wins over any older completed one.
+            self.dirty = self.desired != self.committed;
+            if !self.dirty {
+                self.records.append(&mut self.pending_records);
+                self.erase_on_commit = false;
+            }
+        }
+        self.checkpoint_bytes = snapshot.checkpoint;
+        if let Some((revision, lines)) = snapshot.mailbox {
+            if self.mailbox_revision != Some((snapshot.epoch, revision)) {
+                self.mailbox_revision = Some((snapshot.epoch, revision));
+                self.apply_mailbox(&lines, now_us);
+            }
+            if let Err(error) = self.storage.ack_mailbox(revision)
+                && error.kind() != io::ErrorKind::WouldBlock
+            {
+                self.storage_failed(error);
+            }
+        }
+        if self.storage_failed || self.storage_busy || self.barrier.is_some() {
+            return;
+        }
+        if self.dirty && self.flight.is_none() {
+            match self
+                .storage
+                .commit(self.desired.clone(), self.erase_on_commit)
+            {
+                Ok(storage::Submit::Queued(tag)) => {
+                    self.flight = Some(tag);
+                    self.storage_busy = true;
+                }
+                Ok(storage::Submit::Busy) => self.storage_busy = true,
+                Ok(storage::Submit::Closed) => self.storage_failed("storage is closed"),
+                Err(error) => self.storage_failed(error),
+            }
+        } else if self.flight.is_none()
+            && self
+                .read_us
+                .is_none_or(|at| now_us.saturating_sub(at) >= READ_EVERY_US)
+        {
+            match self.storage.read_mailbox() {
+                Ok(storage::Submit::Queued(_)) => {
+                    self.read_us = Some(now_us);
+                    self.storage_busy = true;
+                }
+                Ok(storage::Submit::Busy) => self.storage_busy = true,
+                Ok(storage::Submit::Closed) => self.storage_failed("storage is closed"),
+                Err(error) => self.storage_failed(error),
+            }
+        }
+    }
+
+    fn fence_storage(&mut self) {
+        if self.storage_failed {
+            return;
+        }
+        match self.storage.fence(Some(self.desired.clone())) {
+            Ok(tag) => {
+                self.storage_epoch = tag.epoch;
+                self.barrier = Some(tag);
+                self.flight = None;
+                self.storage_busy = true;
+                self.dirty = true;
+                self.checkpoint_bytes = None;
+            }
+            Err(error) => self.storage_failed(error),
+        }
+    }
+
+    #[cfg(test)]
+    fn drain_storage_for_test(&mut self, now_us: u64) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            self.poll_storage(now_us);
+            assert!(!self.storage_failed, "fixture storage failed");
+            if self.storage_idle() {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "fixture storage did not settle"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    }
+
+    /// Memory-only context. The profile's location is trusted input, never
+    /// inferred from a model or from an unverified observation. Without a
+    /// receipt source (`LAMP_PRIVACY_CONTROLS=on`; the GPIO worker sends no
+    /// receipt) no offer can ever be made, so the step is not available.
+    pub(crate) fn set_privacy_context(
+        &mut self,
+        epoch: privacy::Epoch,
+        receipt_source: bool,
+        receipt: Option<PrivacyReceipt>,
+        verified_location: Option<&str>,
+    ) {
+        let location = verified_location
+            .filter(|_| receipt_source)
+            .filter(|value| {
+                !value.trim().is_empty()
+                    && value.chars().count() <= 160
+                    && !value.chars().any(char::is_control)
+            })
+            .map(str::to_owned);
+        let source_changed = self.privacy_flow.attempt.as_ref().is_some_and(|attempt| {
+            let prior = attempt.last_acquisition();
+            receipt.as_ref().is_some_and(|receipt| {
+                receipt.controls_session != prior.controls_session
+                    || receipt.physical.reader_session_id != prior.physical.reader_session_id
+                    || receipt.physical.stamp.clock_id != prior.physical.stamp.clock_id
+            })
+        });
+        if source_changed
+            || self
+                .privacy_flow
+                .context
+                .as_ref()
+                .is_some_and(|old| old.epoch != epoch)
+        {
+            self.invalidate_privacy(privacy::Invalidation::SourceRestart);
+        }
+        self.privacy_flow.context = Some(PrivacyContext {
+            epoch,
+            receipt,
+            location,
+        });
+    }
+
+    fn privacy_path(&self) -> PathBuf {
+        self.file
+            .parent()
+            .expect("absolute onboarding file")
+            .join("privacy-pending.json")
+    }
+
+    fn privacy_available(&self) -> bool {
+        !self.privacy_flow.waited_out
+            && self
+                .privacy_flow
+                .context
+                .as_ref()
+                .is_some_and(|context| context.location.is_some())
+    }
+
+    /// Whether this voice has the step now: privacy only with a verified
+    /// location and receipts, touch only with Controls' touches to read.
+    fn step_available(&self, step: Step) -> bool {
+        match step {
+            Step::Privacy => self.privacy_available(),
+            Step::Touch => (self.available)(step) && self.touches.is_some(),
+            _ => (self.available)(step),
+        }
+    }
+
+    fn privacy_open_receipt(&self, now_us: u64) -> Option<privacy::Acquisition> {
+        let context = self.privacy_flow.context.as_ref()?;
+        let receipt = context.receipt.as_ref()?;
+        (receipt.physical.muted == Some(false)
+            && receipt.physical.fault.is_none()
+            && receipt.physical.fresh_at(&context.epoch.clock_id, now_us))
+        .then(|| privacy::Acquisition {
+            controls_session: receipt.controls_session.clone(),
+            physical: receipt.physical.clone(),
+        })
+    }
+
+    pub(crate) fn privacy_pending(&self) -> lamp_msgs::OnboardingPending {
+        let invitations = self
+            .privacy_flow
+            .offer
+            .as_ref()
+            .map(|offer| lamp_msgs::OnboardingInvitation {
+                invitation: offer.token,
+                generation: self.privacy_flow.generation,
+                attempt: offer.attempt,
+                step: lamp_msgs::OnboardingStep::Privacy,
+                ready: offer.ready && offer.persisted && !offer.claimed && self.storage_idle(),
+            })
+            .into_iter()
+            .collect();
+        lamp_msgs::OnboardingPending { invitations }
+    }
+
+    /// Only the core skill's exact current eligible token obtains words. The
+    /// coordinator still checks its normal readiness before calling this.
+    pub(crate) fn take_privacy_invitation(&mut self, token: u64, now_us: u64) -> Option<String> {
+        if !self.storage_idle() {
+            return None;
+        }
+        self.privacy_open_receipt(now_us)?;
+        if self
+            .seen_us
+            .is_none_or(|seen| now_us.saturating_sub(seen) > FRESH_MS * 1_000)
+        {
+            return None;
+        }
+        let location = self.privacy_flow.context.as_ref()?.location.as_deref()?;
+        let offer = self.privacy_flow.offer.as_mut()?;
+        if offer.token != token || !offer.ready || !offer.persisted || offer.claimed {
+            return None;
+        }
+        offer.claimed = true;
+        offer.ready = false;
+        Some(format!(
+            "(Say this short invitation completely before they act: the physical privacy switch {location} closes both microphones and camera. Invite them to close it, then open it again. Explain before they close it that you cannot hear or see them while it is closed. Do not claim success or ask a tool to mark privacy done.)"
+        ))
+    }
+
+    pub(crate) fn bind_privacy_invitation(
+        &mut self,
+        token: u64,
+        voice_boot: BootId,
+        turn: u64,
+    ) -> bool {
+        let Some(offer) = self.privacy_flow.offer.as_mut() else {
+            return false;
+        };
+        if offer.token != token || !offer.claimed || offer.bound.is_some() || turn == 0 {
+            return false;
+        }
+        offer.bound = Some((voice_boot, turn));
+        true
+    }
+
+    pub(crate) fn privacy_invitation_binding(&self) -> Option<(BootId, u64)> {
+        self.privacy_flow
+            .offer
+            .as_ref()
+            .and_then(|offer| offer.bound)
+    }
+
+    pub(crate) fn privacy_invitation_refused(&mut self, token: u64, now_us: u64) {
+        if self
+            .privacy_flow
+            .offer
+            .as_ref()
+            .is_none_or(|offer| offer.token != token || offer.bound.is_some())
+        {
+            return;
+        }
+        self.retry_privacy(now_us);
+    }
+
+    fn retry_privacy(&mut self, now_us: u64) {
+        self.privacy_flow.offer = None;
+        self.privacy_flow.failures = self.privacy_flow.failures.saturating_add(1);
+        self.privacy_flow.retry_after_us = now_us.saturating_add(1_000_000);
+        if self.privacy_flow.failures >= 2 {
+            self.privacy_flow.pending_result = Some((Outcome::Skipped, None));
+        }
+    }
+
+    /// Called only on the existing attributable whole-turn playback result.
+    /// Admission, first audio and model text never arm a physical attempt.
+    pub(crate) fn privacy_invitation_finished(
+        &mut self,
+        voice_boot: BootId,
+        turn: u64,
+        delivered_whole: bool,
+        now_us: u64,
+    ) {
+        if self.privacy_invitation_binding() != Some((voice_boot, turn)) {
+            return;
+        }
+        if !delivered_whole {
+            self.retry_privacy(now_us);
+            return;
+        }
+        let armed = self.privacy_flow.context.as_ref().and_then(|context| {
+            self.privacy_open_receipt(now_us).map(|baseline| {
+                privacy::Attempt::arm(
+                    context.epoch.clone(),
+                    privacy::Invitation {
+                        voice_boot,
+                        turn,
+                        delivered_at_us: now_us,
+                    },
+                    baseline,
+                    now_us,
+                )
+            })
+        });
+        match armed {
+            Some(Ok(attempt)) => {
+                self.privacy_flow.attempt = Some(attempt);
+                self.privacy_flow.offer = None;
+                self.records
+                    .push(json!({"kind":"onboarding_privacy_armed","turn":turn,"at_us":now_us}));
+            }
+            _ => self.retry_privacy(now_us),
+        }
+    }
+
+    /// Memory only, before revocation. The service persists this candidate only
+    /// after the ordinary physical-mute teardown has verifiably succeeded.
+    pub(crate) fn take_close_candidate(
+        &mut self,
+        receipt: &PrivacyReceipt,
+        now_us: u64,
+    ) -> Option<privacy::Checkpoint> {
+        if self.privacy_flow.erase_pending {
+            self.privacy_flow.attempt = None;
+            return Some(privacy::Checkpoint::discard(self.privacy_path()));
+        }
+        let mut attempt = self.privacy_flow.attempt.take()?;
+        if attempt.phase() != privacy::Phase::Armed {
+            self.privacy_flow.attempt = Some(attempt);
+            return None;
+        }
+        let acquisition = privacy::Acquisition {
+            controls_session: receipt.controls_session.clone(),
+            physical: receipt.physical.clone(),
+        };
+        let early = acquisition.physical.stamp.at_us <= attempt.delivered_at_us();
+        match attempt.observe_close(acquisition, now_us) {
+            Ok(()) => Some(privacy::Checkpoint::new(attempt, self.privacy_path())),
+            // A slide read just before the invitation's end was processed is
+            // the person acting early, not a failed check: offer it again.
+            Err(_) if early => {
+                self.privacy_flow.erase_pending = true;
+                self.retry_privacy(now_us);
+                Some(privacy::Checkpoint::discard(self.privacy_path()))
+            }
+            Err(_) => {
+                self.privacy_flow.erase_pending = true;
+                self.privacy_flow.pending_result = Some((Outcome::Failed, None));
+                self.privacy_flow.attempt = Some(attempt);
+                Some(privacy::Checkpoint::discard(self.privacy_path()))
+            }
+        }
+    }
+
+    /// No I/O here: close, software mute and input faults must revoke first.
+    pub(crate) fn invalidate_privacy(&mut self, why: privacy::Invalidation) {
+        let work = self.privacy_flow.attempt.is_some()
+            || self.privacy_flow.offer.is_some()
+            || self.privacy_flow.pending_result.is_some()
+            || self.checkpoint_bytes.is_some()
+            || self.desired.privacy_done_attempt != self.committed.privacy_done_attempt;
+        if let Some(attempt) = self.privacy_flow.attempt.as_mut() {
+            attempt.invalidate(why);
+        }
+        self.privacy_flow.offer = None;
+        self.privacy_flow.attempt = None;
+        self.privacy_flow.pending_result = None;
+        self.privacy_flow.last_open = None;
+        if !work {
+            return;
+        }
+        // A delayed Done write may still reach disk; fence orders its durable
+        // replacement and deletion before any new tutorial offer is possible.
+        if self.desired.privacy_done_attempt != self.committed.privacy_done_attempt {
+            match self.committed.steps.get("privacy").cloned() {
+                Some(kept) => {
+                    self.desired.steps.insert("privacy".into(), kept);
+                }
+                None => {
+                    self.desired.steps.remove("privacy");
+                }
+            }
+            self.desired.privacy_done_attempt = self.committed.privacy_done_attempt;
+        }
+        self.pending_records.retain(|row| row["step"] != "privacy");
+        self.owed = None;
+        self.privacy_flow.erase_pending = true;
+        self.fence_storage();
+    }
+
+    /// Polling and evidence qualification never perform filesystem I/O.
+    /// A completion says storage finished, not that a physical sample is fresh.
+    pub(crate) fn maintain_privacy(&mut self, now_us: u64, normal_ready: bool) -> io::Result<()> {
+        self.poll_storage(now_us);
+        if !normal_ready || !self.storage_idle() {
+            return Ok(());
+        }
+        let Some(context) = self.privacy_flow.context.as_ref() else {
+            return Ok(());
+        };
+        if !self.privacy_flow.loaded {
+            self.privacy_flow.loaded = true;
+            if let Some(bytes) = self.checkpoint_bytes.as_ref() {
+                match privacy::Attempt::from_bytes(bytes, &context.epoch, now_us) {
+                    Ok(attempt) if attempt.phase() == privacy::Phase::Closed => {
+                        if self.committed.privacy_done_attempt == Some(attempt.id()) {
+                            self.privacy_flow.erase_pending = true;
+                        }
+                        self.privacy_flow.attempt = Some(attempt);
+                    }
+                    Ok(attempt) => {
+                        self.privacy_flow.attempt = Some(attempt);
+                        self.privacy_flow.erase_pending = true;
+                    }
+                    Err(error) => {
+                        self.records.push(json!({"kind":"onboarding_privacy_recovery_refused","error":error.to_string(),"at_us":now_us}));
+                        self.privacy_flow.erase_pending = true;
+                    }
+                }
+            }
+            // Even a RAM snapshot load is not a physical observation. Recheck
+            // the current receipt and ordinary readiness on the next pass.
+            return Ok(());
+        }
+        if self.privacy_flow.erase_pending {
+            self.privacy_flow.attempt = None;
+            self.privacy_flow.erase_pending = false;
+            self.fence_storage();
+            return Ok(());
+        }
+        if let Some(offer) = self
+            .privacy_flow
+            .offer
+            .as_mut()
+            .filter(|offer| !offer.persisted)
+        {
+            if u64::from(self.committed.privacy_invitation_tries) >= offer.attempt {
+                offer.persisted = true;
+            } else {
+                self.desired.privacy_invitation_tries =
+                    u8::try_from(offer.attempt).unwrap_or(u8::MAX);
+                self.save();
+                self.poll_storage(now_us);
+                return Ok(());
+            }
+        }
+        if let Some(receipt) = self.privacy_open_receipt(now_us) {
+            let key = (
+                receipt.controls_session.clone(),
+                receipt.physical.reader_session_id.clone(),
+                receipt.physical.stamp.sequence,
+            );
+            if self.privacy_flow.last_open.as_ref() != Some(&key)
+                && let Some(attempt) = self.privacy_flow.attempt.as_mut()
+                && attempt.phase() == privacy::Phase::Closed
+            {
+                self.privacy_flow.last_open = Some(key);
+                match attempt.observe_open(receipt, now_us, true) {
+                    Ok(privacy::OpenOutcome::Done) => {
+                        self.privacy_flow.pending_result = Some((Outcome::Done, Some(attempt.id())))
+                    }
+                    Ok(privacy::OpenOutcome::WaitingForReadiness) => {}
+                    Ok(privacy::OpenOutcome::Expired) | Err(_) => {
+                        self.privacy_flow.pending_result = Some((Outcome::Failed, None))
+                    }
+                }
+            }
+        }
+        if let Some((outcome, attempt_id)) = self.privacy_flow.pending_result.take() {
+            self.desired.steps.insert(
+                Step::Privacy.name().into(),
+                Kept {
+                    outcome,
+                    at_unix_s: unix_ms() / 1000,
+                    framing: None,
+                    offered_at_unix_s: None,
+                },
+            );
+            self.desired.privacy_done_attempt = attempt_id;
+            self.privacy_flow.offer = None;
+            self.privacy_flow.attempt = None;
+            self.led = None;
+            self.pending_records.push(
+                json!({"kind":"onboarding_step","step":"privacy","outcome":outcome,"at_us":now_us}),
+            );
+            self.owed = Some(if outcome == Outcome::Done {
+                PRIVACY_DONE
+            } else {
+                PRIVACY_FAILED
+            });
+            self.erase_on_commit = true;
+            self.save();
+            self.poll_storage(now_us);
+        }
+        Ok(())
+    }
+
+    fn privacy_tick(&mut self, now_us: u64, quiet_us: u64, can_speak: bool, person_present: bool) {
+        if self.privacy_flow.maintenance_failed
+            || !self.privacy_flow.loaded
+            || self.privacy_flow.pending_result.is_some()
+            || self.privacy_flow.attempt.is_some()
+        {
+            return;
+        }
+        if self.privacy_flow.generation == 0 {
+            let Ok(generation) = fresh_token() else {
+                return;
+            };
+            self.privacy_flow.generation = generation;
+        }
+        let ready = can_speak
+            && person_present
+            && quiet_us >= START_QUIET_US
+            && self.privacy_open_receipt(now_us).is_some();
+        if let Some(offer) = self.privacy_flow.offer.as_mut() {
+            offer.ready = ready && !offer.claimed;
+            if offer.bound.is_none()
+                && now_us.saturating_sub(offer.offered_us) >= STEP_GIVE_UP_US
+                && quiet_us >= TIMED_OUT_QUIET_US
+            {
+                self.retry_privacy(now_us);
+            }
+            return;
+        }
+        if self.desired.privacy_invitation_tries >= 2 {
+            self.privacy_flow.pending_result = Some((Outcome::Skipped, None));
+            return;
+        }
+        if !ready || now_us < self.privacy_flow.retry_after_us {
+            return;
+        }
+        let Ok(token) = fresh_token() else {
+            return;
+        };
+        self.privacy_flow.offered = u64::from(self.desired.privacy_invitation_tries) + 1;
+        self.privacy_flow.offer = Some(PrivacyOffer {
+            token,
+            attempt: self.privacy_flow.offered,
+            ready: true,
+            claimed: false,
+            persisted: false,
+            offered_us: now_us,
+            bound: None,
+        });
+        if let Some(led) = self.led.as_mut() {
+            led.asked_us = Some(now_us);
+        }
+        self.records.push(
+            json!({"kind":"onboarding_step","step":"privacy","state":"offered","at_us":now_us}),
+        );
+    }
+
     pub fn kept(&self) -> &Progress {
-        &self.kept
+        &self.committed
     }
 
     /// Whether the lamp is in the middle of leading a step.
@@ -437,17 +1274,14 @@ impl Onboarding {
         face: Option<Framing>,
         still: bool,
     ) -> Option<&'static str> {
-        if self
-            .read_us
-            .is_none_or(|at| now_us.saturating_sub(at) >= READ_EVERY_US)
-        {
-            self.read_us = Some(now_us);
-            self.read_mailbox(now_us);
-        }
+        self.poll_storage(now_us);
+        // Read every tick, so what came before the ask is never taken.
+        let touched = self.head_touched();
         if face.is_some() {
             self.seen_us = Some(now_us);
         }
         if paused {
+            self.invalidate_privacy(privacy::Invalidation::FenceFailure);
             // The keeper's pause stops the walk; a step being led is asked
             // again afterwards.
             if self.led.take().is_some_and(|led| led.asked_us.is_some()) {
@@ -456,26 +1290,31 @@ impl Onboarding {
             }
             return None;
         }
+        if self.privacy_open_receipt(now_us).is_some() {
+            self.privacy_flow.no_receipt_since = None;
+            self.privacy_flow.waited_out = false;
+        }
+        if !self.storage_idle() {
+            return None;
+        }
         if let Some(note) = self.owed
             && can_speak
         {
             self.owed = None;
             return Some(note);
         }
-        let step = loop {
-            let Some(step) = self.next_step() else {
-                if !self.finished_recorded && !self.kept.steps.is_empty() {
-                    self.finished_recorded = true;
-                    self.records
-                        .push(json!({"kind":"onboarding_finished","at_us":now_us}));
-                }
-                return None;
-            };
-            if (self.available)(step) {
-                break step;
+        let Some(step) = self.next_step() else {
+            if !self.finished_recorded && !self.desired.steps.is_empty() {
+                self.finished_recorded = true;
+                self.records
+                    .push(json!({"kind":"onboarding_finished","at_us":now_us}));
             }
-            self.finish(step, Outcome::NotAvailable, None, now_us);
+            return None;
         };
+        if !self.step_available(step) {
+            self.finish(step, Outcome::NotAvailable, None, now_us);
+            return None;
+        }
         if self.led.as_ref().is_none_or(|led| led.step != step) {
             self.led = Some(Led {
                 step,
@@ -483,6 +1322,39 @@ impl Onboarding {
                 held_since: None,
                 guided_us: None,
             });
+        }
+        if step == Step::Privacy {
+            if self
+                .seen_us
+                .is_some_and(|seen| now_us.saturating_sub(seen) >= GONE_US)
+            {
+                self.invalidate_privacy(privacy::Invalidation::FenceFailure);
+                self.led = None;
+                return None;
+            }
+            // A receipt that never turns open and fresh (faulted, stale, or a
+            // reader that stopped) would hold the walk here with nothing
+            // said: past the sitting step's own give-up time the step is not
+            // available, and the next open, fresh receipt offers it again.
+            let unopened = self.privacy_open_receipt(now_us).is_none();
+            let flow = &mut self.privacy_flow;
+            if unopened
+                && flow.offer.is_none()
+                && flow.attempt.is_none()
+                && flow.pending_result.is_none()
+            {
+                let since = *flow.no_receipt_since.get_or_insert(now_us);
+                if now_us.saturating_sub(since) >= SIT_GIVE_UP_US {
+                    flow.waited_out = true;
+                    self.records.push(
+                        json!({"kind":"onboarding_stopped","why":"no_open_privacy_receipt","step":"privacy","at_us":now_us}),
+                    );
+                    self.finish(step, Outcome::NotAvailable, None, now_us);
+                    return None;
+                }
+            }
+            self.privacy_tick(now_us, quiet_us, can_speak, face.is_some());
+            return None;
         }
         let gone = self
             .seen_us
@@ -492,7 +1364,7 @@ impl Onboarding {
             if can_speak && face.is_some() && quiet_us >= START_QUIET_US {
                 led.asked_us = Some(now_us);
                 led.guided_us = Some(now_us);
-                let again = self.kept.steps.get_mut(step.name()).map(|kept| {
+                let again = self.desired.steps.get_mut(step.name()).map(|kept| {
                     kept.offered_at_unix_s = Some(unix_ms() / 1_000);
                 });
                 self.records.push(
@@ -501,8 +1373,10 @@ impl Onboarding {
                 );
                 if again.is_some() {
                     self.save();
+                    self.owed = Some(step.note(true));
+                    return None;
                 }
-                return Some(step.note());
+                return Some(step.note(false));
             }
             return None;
         };
@@ -511,6 +1385,20 @@ impl Onboarding {
             self.records.push(
                 json!({"kind":"onboarding_stopped","why":"nobody_there","step":step.name(),"at_us":now_us}),
             );
+            return None;
+        }
+        if step == Step::Touch {
+            // Done only by a touch Controls felt; one reminder, then failed.
+            if touched {
+                self.finish(step, Outcome::Done, None, now_us);
+            } else if now_us.saturating_sub(asked_us) >= TOUCH_GIVE_UP_US {
+                self.finish(step, Outcome::Failed, None, now_us);
+            } else if can_speak && quiet_us >= GUIDE_EVERY_US && led.guided_us == Some(asked_us) {
+                led.guided_us = Some(now_us);
+                self.records
+                    .push(json!({"kind":"onboarding_guide","step":step.name(),"at_us":now_us}));
+                return Some(TOUCH_REMIND);
+            }
             return None;
         }
         if step != Step::WhereYouSit {
@@ -523,8 +1411,11 @@ impl Onboarding {
         // Where you sit: what the eyes see ends it, and only while the head
         // is still and no hand is on the lamp: a lamp turning toward them,
         // or being turned, can pass through a good framing mid-move. Any
-        // motion starts the three seconds again.
-        match face.filter(|face| still && face.good()) {
+        // motion starts the three seconds again. After the one guide, any
+        // steady face is taken where it is: a person beside the lamp would
+        // just say "there's fine" (row 10 on lamp-52e6).
+        let settled = led.guided_us.is_some_and(|at| at > asked_us);
+        match face.filter(|face| still && (face.good() || settled)) {
             Some(framing) => {
                 let since = *led.held_since.get_or_insert(now_us);
                 if now_us.saturating_sub(since) >= HOLD_US {
@@ -540,12 +1431,7 @@ impl Onboarding {
             self.owed = Some(SIT_FAILED);
             return None;
         }
-        if can_speak
-            && quiet_us >= GUIDE_EVERY_US
-            && led
-                .guided_us
-                .is_none_or(|at| now_us.saturating_sub(at) >= GUIDE_EVERY_US)
-        {
+        if can_speak && quiet_us >= GUIDE_EVERY_US && led.guided_us == Some(asked_us) {
             led.guided_us = Some(now_us);
             let note = match face {
                 None => SIT_NO_FACE,
@@ -565,9 +1451,16 @@ impl Onboarding {
     /// never before the walk is over (First's addition 2).
     fn next_step(&self) -> Option<Step> {
         let unix_s = unix_ms() / 1_000;
+        if self.privacy_flow.context.is_some()
+            && self.desired.steps.get("privacy").is_none_or(|kept| {
+                kept.outcome == Outcome::NotAvailable && self.privacy_available()
+            })
+        {
+            return Some(Step::Privacy);
+        }
         Step::ALL
             .into_iter()
-            .find(|step| !self.kept.steps.contains_key(step.name()))
+            .find(|step| !self.desired.steps.contains_key(step.name()))
             .or_else(|| {
                 // One being offered again now is led to its end.
                 self.led
@@ -577,8 +1470,8 @@ impl Onboarding {
             })
             .or_else(|| {
                 Step::ALL.into_iter().find(|step| {
-                    (self.available)(*step)
-                        && self.kept.steps.get(step.name()).is_some_and(|kept| {
+                    self.step_available(*step)
+                        && self.desired.steps.get(step.name()).is_some_and(|kept| {
                             kept.outcome == Outcome::NotAvailable
                                 && kept
                                     .offered_at_unix_s
@@ -590,14 +1483,18 @@ impl Onboarding {
 
     /// The move to ask of the body for a step just done, once.
     pub fn take_gesture(&mut self) -> Option<&'static str> {
-        self.gesture.take()
+        if self.storage_idle() {
+            self.gesture.take()
+        } else {
+            None
+        }
     }
 
     fn finish(&mut self, step: Step, outcome: Outcome, framing: Option<Framing>, now_us: u64) {
         let at_unix_s = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |since| since.as_secs());
-        self.kept.steps.insert(
+        self.desired.steps.insert(
             step.name().to_owned(),
             Kept {
                 outcome,
@@ -606,13 +1503,15 @@ impl Onboarding {
                 offered_at_unix_s: None,
             },
         );
-        if outcome == Outcome::Done {
+        // The owner's #841 decision: giving way is the only onboarding
+        // step that may move the body. Other success is spoken, never a nod.
+        if outcome == Outcome::Done && step == Step::GivingWay {
             self.gesture = Some(step.gesture());
         }
         if self.led.as_ref().is_some_and(|led| led.step == step) {
             self.led = None;
         }
-        self.records.push(
+        self.pending_records.push(
             json!({"kind":"onboarding_step","step":step.name(),"outcome":outcome,
             "framing":framing,"at_us":now_us}),
         );
@@ -620,41 +1519,34 @@ impl Onboarding {
     }
 
     fn save(&mut self) {
-        let saved = serde_json::to_vec(&self.kept)
-            .map_err(std::io::Error::other)
-            .and_then(|bytes| write_private(&self.file, &bytes));
-        if let Err(error) = saved {
-            eprintln!(
-                "lamp-voice: the onboarding file {} could not be written: {error}",
-                self.file.display()
-            );
-        }
+        self.dirty = self.desired != self.committed || self.erase_on_commit;
     }
 
     /// What the model reported through the provider worker: a step's end,
     /// or that the walk starts again.
-    fn read_mailbox(&mut self, now_us: u64) {
-        let mailbox = mailbox_of(&self.file);
-        let mut taking = mailbox.clone().into_os_string();
-        taking.push(".taking");
-        let taking = PathBuf::from(taking);
-        if std::fs::rename(&mailbox, &taking).is_err() {
-            return;
-        }
-        let lines = std::fs::read_to_string(&taking).unwrap_or_default();
-        let _ = std::fs::remove_file(&taking);
+    fn apply_mailbox(&mut self, lines: &str, now_us: u64) {
         for line in lines.lines() {
             let Ok(told) = serde_json::from_str::<Value>(line) else {
                 continue;
             };
             if told.get("redo").and_then(Value::as_bool) == Some(true) {
-                self.kept = Progress::default();
+                self.storage_failed = false;
+                self.invalidate_privacy(privacy::Invalidation::Redo);
+                self.privacy_flow.loaded = true;
+                self.privacy_flow.maintenance_failed = false;
+                self.privacy_flow.failures = 0;
+                self.privacy_flow.no_receipt_since = None;
+                self.privacy_flow.waited_out = false;
+                self.privacy_flow.generation = 0;
+                self.desired = Progress::default();
                 self.led = None;
                 self.owed = None;
                 self.finished_recorded = false;
-                self.records
+                self.pending_records.clear();
+                self.pending_records
                     .push(json!({"kind":"onboarding_redo","at_us":now_us}));
                 self.save();
+                self.fence_storage();
                 continue;
             }
             let step = told
@@ -669,13 +1561,19 @@ impl Onboarding {
                 continue;
             };
             // Only the step being led, and a measured step only skipped:
-            // "where you sit" is done by what the eyes see, never by a word.
+            // "where you sit" is done by what the eyes see and "touch" by
+            // what Controls feels, never by a word.
             let led = self
                 .led
                 .as_ref()
                 .is_some_and(|led| led.step == step && led.asked_us.is_some());
             if led && step.reportable(outcome) {
-                self.finish(step, outcome, None, now_us);
+                if step == Step::Privacy {
+                    self.invalidate_privacy(privacy::Invalidation::Redo);
+                    self.privacy_flow.pending_result = Some((outcome, None));
+                } else {
+                    self.finish(step, outcome, None, now_us);
+                }
             } else {
                 self.records.push(
                     json!({"kind":"onboarding_report_refused","step":step.name(),
@@ -686,20 +1584,13 @@ impl Onboarding {
     }
 }
 
-fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    use std::os::unix::fs::OpenOptionsExt;
-    let mut next = path.as_os_str().to_owned();
-    next.push(".next");
-    let next = PathBuf::from(next);
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(&next)?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
-    std::fs::rename(&next, path)
+#[cfg(test)]
+impl Drop for Onboarding {
+    fn drop(&mut self) {
+        if let Some(owner) = self.fixture_storage.as_mut() {
+            let _ = owner.finish(std::time::Duration::from_secs(2));
+        }
+    }
 }
 
 /// The joints that move the camera, as the eyes' full look has them (#842).
@@ -770,7 +1661,8 @@ pub fn tools() -> Vec<Tool> {
                           to lead has ended: done, skipped because they asked to skip it, or failed. If \
                           they want to skip the rest, call it skipped for the step you are on. Then go on \
                           talking as the step asked. Only for the step you are leading now; \
-                          where_you_sit can only be skipped, since you finish it by seeing them."
+                          where_you_sit, touch and privacy can only be skipped; the runner requires \
+                          physical evidence: seeing them, feeling their touch, the switch's receipt."
                 .into(),
             parameters: Some(json!({
                 "type": "object",
@@ -809,9 +1701,21 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
                 (Some(step), Some(told)) if step.reportable(told) => {
                     json!({"step": step.name(), "outcome": outcome})
                 }
+                (Some(Step::Privacy), Some(_)) => {
+                    return (
+                        json!({"error":"Privacy is completed only by the physical switch closing the microphones and reopening. You can only skip it if they ask."}),
+                        true,
+                    );
+                }
                 (Some(Step::WhereYouSit), Some(_)) => {
                     return (
                         json!({"error": "Where they sit is done when you can see them well. You can only skip it, if they ask."}),
+                        true,
+                    );
+                }
+                (Some(Step::Touch), Some(_)) => {
+                    return (
+                        json!({"error": "The touch is done when you feel it on your head. You can only skip it, if they ask."}),
                         true,
                     );
                 }
@@ -829,7 +1733,13 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
         .append(true)
         .create(true)
         .open(mailbox_of(file))
-        .and_then(|mut mailbox| writeln!(mailbox, "{line}"));
+        .and_then(|mut mailbox| {
+            let line = format!("{line}\n");
+            if mailbox.metadata()?.len().saturating_add(line.len() as u64) > 16 * 1024 {
+                return Err(io::Error::other("onboarding mailbox is full"));
+            }
+            mailbox.write_all(line.as_bytes())
+        });
     match written {
         Ok(()) => (json!({"ok": true}), true),
         Err(_) => (
@@ -896,6 +1806,7 @@ mod tests {
             let mut notes = Vec::new();
             let until = self.at + for_us;
             while self.at < until {
+                self.walk.drain_storage_for_test(self.at);
                 if let Some(note) =
                     self.walk
                         .tick(self.at, self.at - self.said, true, false, face, self.still)
@@ -903,6 +1814,7 @@ mod tests {
                     notes.push(note);
                     self.said = self.at;
                 }
+                self.walk.drain_storage_for_test(self.at);
                 self.at += S / 4;
             }
             notes
@@ -930,6 +1842,7 @@ mod tests {
         assert_eq!(switched_on(Some("off"), Some("/a")), None);
         assert_eq!(switched_on(Some("on"), None), None);
         assert_eq!(switched_on(Some("on"), Some("a")), None);
+        assert_eq!(switched_on(Some("on"), Some("/")), None);
         assert_eq!(
             switched_on(Some("on"), Some("/a")),
             Some(PathBuf::from("/a"))
@@ -948,8 +1861,7 @@ mod tests {
             y: 0.0,
         };
         assert_eq!(room.wait(9 * S, Some(far)), [SIT_NOTE, SIT_CLOSER]);
-        assert_eq!(room.wait(9 * S, Some(SIDE)), [SIT_TURN]);
-        // Near and in the middle for three seconds: done, said, kept.
+        // Steady for three seconds after the guide: done, said, kept.
         assert_eq!(room.wait(3 * S + S / 2, Some(NEAR_MIDDLE)), [SIT_DONE]);
         let sat = &room.walk.kept().steps["where_you_sit"];
         assert_eq!(sat.outcome, Outcome::Done);
@@ -1023,6 +1935,7 @@ mod tests {
     ) {
         let until = room.at + for_us;
         while room.at < until {
+            room.walk.drain_storage_for_test(room.at);
             let still = room.walk.judge(joints(), hand(), room.body_on_bus);
             if room
                 .walk
@@ -1038,6 +1951,7 @@ mod tests {
             {
                 room.said = room.at;
             }
+            room.walk.drain_storage_for_test(room.at);
             room.at += S / 4;
         }
     }
@@ -1124,11 +2038,11 @@ mod tests {
     fn walked(name: &str) -> Room {
         let mut room = Room::new(name);
         assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
-        assert_eq!(room.walk.take_gesture(), Some("nod"));
+        assert_eq!(room.walk.take_gesture(), None);
         assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
         report(&room.walk, "who_you_are", "done");
         assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
-        assert_eq!(room.walk.take_gesture(), Some("greeting"));
+        assert_eq!(room.walk.take_gesture(), None);
         report(&room.walk, "preferences", "skipped");
         assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), NONE);
         assert_eq!(room.walk.take_gesture(), None);
@@ -1136,7 +2050,7 @@ mod tests {
     }
 
     #[test]
-    fn a_step_done_asks_the_body_for_one_move_and_a_skip_for_none() {
+    fn completed_setup_steps_do_not_move_the_body() {
         let mut room = walked("gesture");
         assert_eq!(room.walk.kept().steps.len(), 7);
         assert_eq!(room.walk.take_gesture(), None);
@@ -1180,7 +2094,7 @@ mod tests {
         // A day later it is offered again, and done it is kept.
         later
             .walk
-            .kept
+            .desired
             .steps
             .get_mut("how_you_sound")
             .unwrap()
@@ -1189,7 +2103,7 @@ mod tests {
         report(&later.walk, "how_you_sound", "done");
         assert_eq!(later.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
         assert_eq!(later.outcome(Step::HowYouSound), Some(Outcome::Done));
-        assert_eq!(later.walk.take_gesture(), Some("nod"));
+        assert_eq!(later.walk.take_gesture(), None);
     }
 
     #[test]
@@ -1332,6 +2246,31 @@ mod tests {
     }
 
     #[test]
+    fn a_seat_beside_the_lamp_is_taken_after_one_guide() {
+        // Row 10 on lamp-52e6: sitting beside the lamp, the face low in the
+        // picture.
+        let beside = Framing {
+            size: 0.2,
+            x: 0.12,
+            y: -0.63,
+        };
+        let mut room = Room::new("beside");
+        assert_eq!(room.wait(12 * S, Some(beside)), [SIT_NOTE, SIT_TURN]);
+        assert_eq!(room.wait(4 * S, Some(beside)), [SIT_DONE]);
+        let sat = &room.walk.kept().steps["where_you_sit"];
+        assert_eq!(sat.outcome, Outcome::Done);
+        assert_eq!(sat.framing, Some(beside));
+    }
+
+    #[test]
+    fn where_you_sit_guides_only_once() {
+        let mut room = Room::new("once");
+        room.still = false;
+        assert_eq!(room.wait(55 * S, Some(SIDE)), [SIT_NOTE, SIT_TURN]);
+        assert_eq!(room.outcome(Step::WhereYouSit), None);
+    }
+
+    #[test]
     fn a_failing_step_says_what_to_do_and_moves_on() {
         let mut room = Room::new("fail");
         let far = Framing {
@@ -1339,15 +2278,14 @@ mod tests {
             x: 0.0,
             y: 0.0,
         };
-        let notes = room.wait(64 * S, Some(far));
-        assert_eq!(notes.first(), Some(&SIT_NOTE));
-        assert_eq!(notes.last(), Some(&SIT_FAILED));
-        assert!(
-            notes[1..notes.len() - 1]
-                .iter()
-                .all(|note| *note == SIT_CLOSER)
+        // A face that never holds still: one guide, then given up on.
+        room.still = false;
+        assert_eq!(
+            room.wait(64 * S, Some(far)),
+            [SIT_NOTE, SIT_CLOSER, SIT_FAILED]
         );
         assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Failed));
+        room.still = true;
         assert_eq!(room.walk.kept().steps["where_you_sit"].framing, Some(far));
         assert_eq!(room.wait(4 * S, Some(far)), [WHO_NOTE]);
         // Never reported: failed after ninety seconds and a quiet room.
@@ -1387,6 +2325,110 @@ mod tests {
         }
     }
 
+    /// A walk led to "touch", with Controls' touches on a bus of its own.
+    fn at_touch(name: &str) -> (Room, lamp_bus::Publisher, PathBuf) {
+        use lamp_msgs::TouchEvent;
+        // Short, for the sockets' path limit.
+        let root = PathBuf::from(format!("/tmp/lvo-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut room = Room::new(name);
+        room.walk.touches = Some(
+            bus.subscribe_typed(TouchEvent::TOPIC, SUBSCRIBER, TouchEvent::TYPE)
+                .unwrap(),
+        );
+        let says = bus
+            .publisher_declared(TouchEvent::TOPIC, &TouchEvent::declaration(), "controls")
+            .unwrap();
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.walk.take_gesture(), None);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [TOUCH_NOTE]);
+        assert_eq!(room.walk.take_gesture(), None);
+        (room, says, root)
+    }
+
+    /// Ticks at the same moment until "touch" has an outcome, or for up to
+    /// two seconds while the bus delivers.
+    fn until_touch_ends(room: &mut Room) {
+        let since = std::time::Instant::now();
+        while room.outcome(Step::Touch).is_none()
+            && since.elapsed() < std::time::Duration::from_secs(2)
+        {
+            room.walk.drain_storage_for_test(room.at);
+            room.walk.tick(
+                room.at,
+                room.at - room.said,
+                true,
+                false,
+                Some(NEAR_MIDDLE),
+                true,
+            );
+            room.walk.drain_storage_for_test(room.at);
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+    }
+
+    #[test]
+    fn a_touch_on_the_head_after_the_ask_is_done() {
+        let (mut room, mut says, root) = at_touch("touched");
+        let (_, touches) = crate::hand_controls::test_head_touch("boot", lamp_ipc::monotonic_us());
+        assert!(!touches.is_empty());
+        for (at, touch) in touches.iter().enumerate() {
+            says.publish_json(at as u64 + 1, touch).unwrap();
+        }
+        until_touch_ends(&mut room);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Done));
+        // Spoken, never a nod (the owner's #841 decision).
+        assert_eq!(room.walk.take_gesture(), None);
+        // Only the outcome is kept.
+        assert_eq!(room.walk.kept().steps["touch"].framing, None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn touch_is_done_only_by_what_controls_feels() {
+        let (mut room, _says, root) = at_touch("touch-forged");
+        let done = ToolCall {
+            id: "c".into(),
+            name: STEP.into(),
+            args: json!({"step": "touch", "outcome": "done"}),
+        };
+        assert!(run(&room.walk.file, &done).0.get("error").is_some());
+        std::fs::write(
+            mailbox_of(&room.walk.file),
+            "{\"step\":\"touch\",\"outcome\":\"done\"}\n",
+        )
+        .unwrap();
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::Touch), None);
+        // Skipped is theirs to ask.
+        report(&room.walk, "touch", "skipped");
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Skipped));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn no_touch_is_reminded_once_then_failed() {
+        let (mut room, _says, root) = at_touch("untouched");
+        assert_eq!(
+            room.wait(61 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_REMIND, PREFERENCES_NOTE]
+        );
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Failed));
+        assert_eq!(room.walk.take_gesture(), None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn touch_is_not_available_without_the_bus() {
+        let room = walked("touch-no-bus");
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::NotAvailable));
+    }
+
     #[test]
     fn the_nearest_face_is_its_framing() {
         let face = |xmin: f32, ymin: f32, side: f32| lamp_msgs::Face {
@@ -1409,3 +2451,6 @@ mod tests {
         assert_eq!(nearest(&lamp_msgs::Faces { faces: vec![] }), None);
     }
 }
+
+#[cfg(test)]
+mod privacy_flow_tests;

@@ -53,6 +53,19 @@ Expression counts nobody for its sleep (`alive.rs`). `room/state` says how
 the room sounds and `attention/addressed` one request at a time, so neither
 carries this.
 
+**Only a voice said to the lamp (`LAMP_PRESENCE_VOICE=addressed`, part 2,
+the first builder's yes on 19 Oct).** By default every finished line on
+`voice/heard` is someone for 20 s, so in an office chatter near the lamp
+keeps the light on. With `LAMP_PRESENCE_VOICE=addressed` in the eyes' unit,
+a voice counts only on a `voice/turn` the voice answered as said to the lamp
+(`answered`, #1155), at that verdict's time; a turn it held back as not said
+to it, and a line only heard, are nobody. `by` is still `voice`. The cost:
+the verdict comes after the voice has judged the line, about 1 to 3 s after
+the words end, so the light coming back on a voice alone, from out of view,
+is that much slower; a face brings it back at once, and "Hey Lamp" from a
+dark doorway is still answered. Off unless set: unset, it is `voice/heard`
+as before.
+
 **Never "nobody" when it is not known.** Nothing is said while the eyes are
 not looking: the camera closed by the privacy switch, a mute or the voice
 gone, or no look for 5 s (`away::BLIND_AFTER_US`, Expression's
@@ -63,6 +76,16 @@ who came and went while the eyes were shut is not known. A gap of under 5 s
 
 **Readers.**
 - Light out when you leave: `nobody_s` above 599, below.
+- Who was here (`skills/who-was-here`, #1685), an installable skill: when
+  a person asks "was anyone here while I was out?", the model is told the
+  spells someone was at the lamp over the last 12 hours, and when the lamp
+  could not tell (a gap past a value's 3 s), each with its length and how
+  long ago (`crates/skills/src/visits.rs`, `[history]` in
+  [skills.md](skills.md)). Times only, in `lamp-skills`' memory, a day at
+  most, lost at a restart; a spell ends where `nobody_s` says the last face
+  or voice was. A spell in which no value's `by` said a face, only a voice,
+  is told as someone heard near the lamp, not seen (a passer-by, or someone
+  out of view); a value with no `by` (an older eyes') counts as a face.
 - Messages (#1673): "nobody for 5 minutes" is `someone` false and
   `nobody_s` at least 300, on a value that has not run out.
 
@@ -159,7 +182,9 @@ heard, so `someone` comes back and the skill's ask ends with it.
 - `crates/eyes`: `away.rs`'s judge (someone within 20 s, nobody counted from
   the last face or voice, nothing when the eyes stop, the count begun again
   after), and `bus_out.rs`'s `room/presence` on a real bus from looks and
-  `voice/heard`.
+  `voice/heard`; with `addressed`, a line heard and a turn held back nobody
+  and an answered turn someone by voice
+  (`with_addressed_only_an_answered_turn_is_someone`).
 - `crates/voice`: the face fading into a light slowly, no frame falling by a
   tenth, a turn over it as quick as ever, the wake in about half a second
   (`ring_face.rs`); the ring giving the shown request's fade to the face,

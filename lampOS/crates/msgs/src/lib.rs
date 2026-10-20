@@ -74,6 +74,8 @@ mod selftest;
 pub use selftest::*;
 mod skills;
 pub use skills::*;
+mod onboarding;
+pub use onboarding::*;
 mod online;
 pub use online::*;
 mod arrival;
@@ -92,6 +94,11 @@ mod reports;
 pub use reports::*;
 mod familiar;
 pub use familiar::*;
+mod seems;
+pub use seems::*;
+
+mod activity;
+pub use activity::*;
 
 /// Why a message is not one its type allows, in words.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -549,6 +556,44 @@ impl RoomState {
     }
 }
 
+/// What the voice made of a turn: answered, or its answer held back as not
+/// said to the lamp.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TurnVerdict {
+    /// Judged said to the lamp: its answer is let out.
+    Answered,
+    /// Judged not said to the lamp (the journal's "its answer is held
+    /// back"): someone in the room talking, not to it.
+    HeldBack,
+}
+
+/// The voice's verdict on a turn (`voice/turn`, #1155), once a turn, as it
+/// is reached: whether the lamp answers it or holds its answer back. The
+/// Policy's hello counts only turns to the lamp toward its quiet.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VoiceTurn {
+    /// The turn's request, as `voice/heard` and `voice/said` number it.
+    pub request: u64,
+    pub verdict: TurnVerdict,
+}
+
+impl VoiceTurn {
+    pub const TYPE: &str = "lamp_msgs/VoiceTurn";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "voice/turn";
+
+    /// One a turn, as its verdict is reached: no period is promised.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
+/// The voice's turns' verdicts (#1155), apart from the first topics.
+pub fn turn_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(VoiceTurn::TOPIC, VoiceTurn::declaration())]
+}
+
 /// The lamp's own light: what is asked for (`light/command`) and what is
 /// shown (`light/state`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -755,6 +800,21 @@ pub struct Health {
     pub items: Vec<HealthItem>,
     /// Parts that are expected and have never reported.
     pub missing: Vec<String>,
+    /// How long, in milliseconds, the longest-quiet part has gone
+    /// unheard (its item's `age_ms`), counting only a part that has said
+    /// `ok` at least once since whoever writes this started and is now
+    /// past the stale time: a part that came up well and then stopped,
+    /// not one that never came up (#1681). A part whose last word was
+    /// `error` is left out: it keeps that level while quiet, and `level`
+    /// says it already. 0 when there is none, and then
+    /// left out, so a lamp with no such part sends what it sent before and
+    /// a reader that does not know the field is untouched.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub quiet_ms: u64,
+}
+
+fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 
 impl Health {
@@ -1327,8 +1387,10 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(logging_topics())
         .chain(memory_topics())
         .chain(skills_topics())
+        .chain(onboarding_topics())
         .chain(online_topics())
         .chain(arrival_topics())
+        .chain(turn_topics())
         .chain(skill_ask_topics())
         .chain(privacy_topics())
         .chain(sound_class_topics())
@@ -1336,6 +1398,8 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(presence_topics())
         .chain(reports_topics())
         .chain(familiar_topics())
+        .chain(activity_topics())
+        .chain(seems_topics())
         .find_map(|(name, declaration)| (name == topic).then_some(declaration))
 }
 
@@ -1640,6 +1704,41 @@ mod tests {
         assert!(serde_json::from_str::<RoomState>("{\"state\":\"loud\"}").is_err());
     }
 
+    /// #1155: a turn's verdict, as the Policy's hello reads it.
+    #[test]
+    fn a_turn_is_answered_or_held_back() {
+        for (verdict, word) in [
+            (TurnVerdict::Answered, "answered"),
+            (TurnVerdict::HeldBack, "held_back"),
+        ] {
+            round_trip(
+                &VoiceTurn {
+                    request: 7,
+                    verdict,
+                },
+                &format!("{{\"request\":7,\"verdict\":\"{word}\"}}"),
+            );
+        }
+        assert!(
+            serde_json::from_str::<VoiceTurn>("{\"request\":7,\"verdict\":\"ignored\"}").is_err()
+        );
+        assert_eq!(VoiceTurn::declaration().kind, Kind::Event);
+        // Its own topic, apart from the first, and known by name.
+        assert_eq!(
+            turn_topics(),
+            [(VoiceTurn::TOPIC, VoiceTurn::declaration())]
+        );
+        assert!(
+            first_topics()
+                .iter()
+                .all(|(topic, _)| *topic != VoiceTurn::TOPIC)
+        );
+        assert_eq!(
+            declaration_of(VoiceTurn::TOPIC),
+            Some(VoiceTurn::declaration())
+        );
+    }
+
     #[test]
     fn a_light_is_on_or_off_in_one_of_ten_colours_at_one_of_five_levels() {
         let light = Light::new(true, "warm", 3).unwrap();
@@ -1753,6 +1852,7 @@ mod tests {
                 item("memory", Level::Ok, "", 610),
             ],
             missing: vec!["board".into()],
+            quiet_ms: 0,
         };
         let text = "{\"level\":\"error\",\"message\":\"voice: the link to the service is down\",\
                     \"items\":[{\"name\":\"voice\",\"level\":\"error\",\
@@ -1781,6 +1881,7 @@ mod tests {
             message: String::new(),
             items: vec![item("voice", Level::Ok, "", 100)],
             missing: vec![],
+            quiet_ms: 0,
         };
         assert_eq!(well.check(), Ok(()));
         well.missing.push("eyes".into());
@@ -1790,6 +1891,36 @@ mod tests {
         let declared = Health::declaration();
         assert_eq!(declared.period(), Some(Duration::from_secs(5)));
         assert_eq!(declared.lifespan(), Some(Duration::from_secs(15)));
+    }
+
+    /// `quiet_ms` (#1681) is left out at 0, read as 0 when absent, and
+    /// written when a part that was well has gone quiet.
+    #[test]
+    fn the_lamps_health_says_how_long_a_part_that_was_well_has_been_quiet() {
+        let well = "{\"level\":\"ok\",\"message\":\"\",\"items\":[],\"missing\":[]}";
+        let read: Health = serde_json::from_str(well).unwrap();
+        assert_eq!(read.quiet_ms, 0);
+        round_trip(&read, well);
+        let quiet = Health {
+            level: Level::Stale,
+            message: "eyes: not heard from for 312 s".into(),
+            items: vec![HealthItem {
+                name: "eyes".into(),
+                level: Level::Stale,
+                message: "not heard from for 312 s".into(),
+                age_ms: 312_400,
+            }],
+            missing: vec![],
+            quiet_ms: 312_400,
+        };
+        round_trip(
+            &quiet,
+            "{\"level\":\"stale\",\"message\":\"eyes: not heard from for 312 s\",\
+             \"items\":[{\"name\":\"eyes\",\"level\":\"stale\",\
+             \"message\":\"not heard from for 312 s\",\"age_ms\":312400}],\
+             \"missing\":[],\"quiet_ms\":312400}",
+        );
+        assert_eq!(quiet.check(), Ok(()));
     }
 
     #[test]

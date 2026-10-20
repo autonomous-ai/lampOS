@@ -135,6 +135,10 @@ pub struct Thread {
     named: Option<String>,
     /// Whom the newest session was opened for: the only exchanges it is told.
     opened_for: Option<String>,
+    /// With `LAMP_LIVE_SCOPED_SESSION`, each known person a spoken line was
+    /// admitted for in the last two minutes, with their newest such line
+    /// ([`Self::admitted`]).
+    admitted: Vec<(String, Instant)>,
     /// A written request not yet answered ([`Self::written`]).
     note: Option<Pending>,
     /// How new a thread file this holds: the modification time of the file
@@ -229,6 +233,7 @@ impl Thread {
             whose: None,
             named: None,
             opened_for: None,
+            admitted: Vec::new(),
             note: None,
             held: None,
         }
@@ -268,6 +273,20 @@ impl Thread {
     /// who keeps talking while turned away from the eyes is not recognised
     /// and must not lose their conversation; the room's after that.
     fn session_person(&self, now: Instant) -> Option<String> {
+        // Lines admitted for someone known, lately ([`Self::admitted`]):
+        // one person's, then theirs, before the count of who is at the lamp
+        // catches up. Two or more known people taking turns: the room's, so
+        // neither is told the other's things and no line is dropped at each
+        // change of speaker (the reviewer's P2 on #1865).
+        let mut lately = self
+            .admitted
+            .iter()
+            .filter(|(_, at)| now.saturating_duration_since(*at) < QUIET_BEFORE_ROOM);
+        match (lately.next(), lately.next()) {
+            (Some((person, _)), None) => return Some(person.clone()),
+            (Some(_), Some(_)) => return None,
+            _ => {}
+        }
         if self.whose.is_some() || self.opened_for.is_none() {
             return self.whose.clone();
         }
@@ -305,6 +324,26 @@ impl Thread {
         changed
     }
 
+    /// A spoken line was admitted for `person`, a memory id
+    /// (`LAMP_LIVE_SCOPED_SESSION`, [`crate::scoped_session`]): for the next
+    /// two minutes the session is theirs, or the room's while someone else
+    /// known has spoken too, and a session opened otherwise is opened again
+    /// between turns. Returns whether the session now open is someone
+    /// else's, so the line must not go into it.
+    pub fn admitted(&mut self, person: &str, now: Instant) -> bool {
+        self.admitted.retain(|(other, at)| {
+            other != person && now.saturating_duration_since(*at) < QUIET_BEFORE_ROOM
+        });
+        self.admitted.push((person.to_owned(), now));
+        crate::scoped_session::refuses(Some(person), self.opened_for.as_deref())
+    }
+
+    /// The camera was closed or changed: who a line was admitted for is
+    /// no longer known.
+    pub fn admitted_unknown(&mut self) {
+        self.admitted.clear();
+    }
+
     /// Whom the session being opened is for.
     pub fn opened_for(&self) -> Option<&str> {
         self.opened_for.as_deref()
@@ -335,16 +374,18 @@ impl Thread {
         };
         // Who is at the lamp and whom the session was opened for are this
         // process's own; each exchange keeps its `whose` through the file.
-        let (whose, named, opened_for, note) = (
+        let (whose, named, opened_for, admitted, note) = (
             self.whose.take(),
             self.named.take(),
             self.opened_for.take(),
+            std::mem::take(&mut self.admitted),
             self.note.take(),
         );
         *self = read;
         self.whose = whose;
         self.named = named;
         self.opened_for = opened_for;
+        self.admitted = admitted;
         self.note = note;
         self.held = Some(at);
         took
@@ -2290,6 +2331,71 @@ mod tests {
         thread.lamp(3, "Okay, A.", now);
         assert_eq!(thread.names_window(2), window(&before));
         assert_eq!(thread.names_window(1), window(&before[1..]));
+    }
+
+    /// `LAMP_LIVE_SCOPED_SESSION`: a line admitted for someone known makes
+    /// the session theirs before the count catches up, refuses only another
+    /// known person's session, and stops counting two minutes on or once
+    /// the camera closes.
+    #[test]
+    fn an_admitted_person_owns_the_next_session_for_two_minutes() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.at_lamp(Some(a.clone()));
+        thread.opening(now);
+        assert!(thread.admitted(&b, now), "B in A's session");
+        assert!(thread.switch_due(now), "the count still says A");
+        assert!(thread.opening(now));
+        assert_eq!(thread.opened_for(), Some(b.as_str()));
+        assert!(!thread.admitted(&b, now));
+        assert!(
+            thread.switch_due(now + QUIET_BEFORE_ROOM),
+            "back to the count"
+        );
+        thread.admitted_unknown();
+        assert!(thread.switch_due(now));
+        let mut room = Thread::new();
+        room.opening(now);
+        assert!(!room.admitted(&a, now), "a room session is never refused");
+        assert!(room.switch_due(now), "but is opened again for them");
+    }
+
+    /// The reviewer's P2 on #1865: two known people taking turns lose one
+    /// line, when the second first speaks, and then talk on in a room
+    /// session, told neither's things; none of their later lines is
+    /// refused or opens a session. Once one has been quiet two minutes, the
+    /// session is the other's again, opened between turns.
+    #[test]
+    fn two_known_people_taking_turns_share_a_room_session() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.at_lamp(Some(a.clone()));
+        thread.opening(now);
+        assert!(!thread.admitted(&a, now), "A in A's session");
+        assert!(!thread.switch_due(now));
+        assert!(thread.admitted(&b, now), "B's first line, in A's session");
+        assert!(thread.switch_due(now));
+        thread.opening(now);
+        assert_eq!(thread.opened_for(), None, "the room's");
+        let second = Duration::from_secs(1);
+        for turn in 1..=20u32 {
+            let at = now + second * turn;
+            let person = if turn % 2 == 0 { &a } else { &b };
+            assert!(!thread.admitted(person, at), "turn {turn} refused");
+            assert!(!thread.switch_due(at), "turn {turn} reopened");
+        }
+        let later = now + second * 20 + QUIET_BEFORE_ROOM;
+        assert!(
+            !thread.admitted(&a, later),
+            "a room session is never refused"
+        );
+        assert!(thread.switch_due(later), "B quiet two minutes: A's again");
+        thread.opening(later);
+        assert_eq!(thread.opened_for(), Some(a.as_str()));
     }
 
     #[test]

@@ -316,6 +316,7 @@ fn run_with_notice_policy(
                         peer.channels
                             .control
                             .send(WorkerEvent::Privacy {
+                                receipt: None,
                                 acquired_at_us: monotonic_us(),
                                 muted: false,
                             })

@@ -124,6 +124,7 @@ pub struct Days {
     keep_days: u32,
     local: LocalTime,
     now: u64,
+    set_aside: Option<String>,
     _held: File,
 }
 
@@ -169,26 +170,29 @@ impl Days {
         })?;
         let path = options.dir.join(DATABASE);
         private_file(&path)?;
+        // Read before any setting below is applied: `journal_mode` alone
+        // would rewrite a newer build's database.
+        let version: u64 =
+            Connection::open(&path)?.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if version > 1 {
+            set_aside(&options.dir, version, now)?;
+            private_file(&path)?;
+        }
         // SQLite inherits the database's private mode for its rollback journal.
         let db = Connection::open(&path)?;
         db.busy_timeout(std::time::Duration::from_millis(50))?;
         // EXTRA also syncs the rollback-journal unlink's directory entry;
         // FULL alone can lose the most recent commit on power failure here.
         db.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=DELETE; PRAGMA synchronous=EXTRA; PRAGMA fullfsync=ON; PRAGMA secure_delete=ON; PRAGMA temp_store=MEMORY;")?;
-        let version: u64 = db.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if version > 1 {
-            return Err(Error::new(
-                "version",
-                "this memory was written by a newer version",
-            ));
-        }
         db.execute_batch(include_str!("days.sql"))?;
+        let set_aside = kept_aside(&options.dir)?;
         let mut this = Self {
             db,
             dir: options.dir,
             keep_days: options.keep_days,
             local: options.local,
             now,
+            set_aside,
             _held: held,
         };
         this.import()?;
@@ -342,6 +346,11 @@ impl Days {
             [self.now.saturating_sub(DAY_MS)],
         )?;
         tx.commit()?;
+        // A set-aside database lasts no longer than the journal does (#2067).
+        let before = self.now.saturating_sub(u64::from(self.keep_days) * DAY_MS) / 1000;
+        if remove_set_aside(&self.dir, Some(before))? {
+            self.set_aside = kept_aside(&self.dir)?;
+        }
         Ok(count)
     }
 
@@ -594,6 +603,12 @@ impl Days {
     }
 
     pub fn forget(&mut self, person: &Person, id: u64) -> Result<u64> {
+        let count = self.forget_here(person, id)?;
+        self.forget_set_aside()?;
+        Ok(count)
+    }
+
+    fn forget_here(&mut self, person: &Person, id: u64) -> Result<u64> {
         let Some(record) = self.record(person, id)? else {
             return Ok(0);
         };
@@ -628,6 +643,7 @@ impl Days {
         });
         let id:Option<u64>=self.db.query_row("SELECT id FROM entries WHERE person=?1 AND kind!='observation' AND (?2 IS NULL OR kind=?2) ORDER BY id DESC LIMIT 1",params![person.as_str(),kind],|r|r.get(0)).optional()?;
         let Some(id) = id else {
+            self.forget_set_aside()?;
             return Ok(None);
         };
         let record = self
@@ -667,7 +683,23 @@ impl Days {
             [person.map(Person::as_str)],
         )?;
         tx.commit()?;
+        self.forget_set_aside()?;
         Ok(count)
+    }
+
+    /// A set-aside database is the person's memory too, and this build can't
+    /// reach a fact or a person inside it: every forget removes it whole,
+    /// with its sidecars, so nothing said forgotten stays on disk (#2067).
+    fn forget_set_aside(&mut self) -> Result<()> {
+        remove_set_aside(&self.dir, None)?;
+        self.set_aside = None;
+        Ok(())
+    }
+
+    /// The newest database a newer build wrote that this one set aside,
+    /// while it is still in the directory: health says it on every start.
+    pub fn set_aside(&self) -> Option<&str> {
+        self.set_aside.as_deref()
     }
 
     /// Enable connection-local counters for health reports. Their table and
@@ -751,7 +783,12 @@ impl Days {
             let record = self
                 .record(person, id)?
                 .ok_or_else(|| bad("a note record is missing"))?;
-            let category = record.category.as_ref().map_or("preference", category_name);
+            // A kept fact, and an observation in a category a newer build
+            // wrote, show as a plain fact: never as another category (#2067).
+            let category = match (&record.category, record.kind.as_str()) {
+                (Some(category), "observation") => category_name(category),
+                _ => PLAIN_FACT,
+            };
             facts.push(serde_json::json!({"id":id,"kind":category,"text":record.text}));
             let next = render(&facts);
             if next.len() > cap {
@@ -1017,7 +1054,7 @@ impl Days {
             let prior = self
                 .record(person, *id)?
                 .ok_or_else(|| bad("a selected previous observation is missing"))?;
-            if prior.kind != "observation" || !prior.active {
+            if prior.kind != "observation" || !prior.active || prior.category.is_none() {
                 return Err(bad("only current observations can be selected as previous"));
             }
         }
@@ -1028,7 +1065,7 @@ impl Days {
         let mut relevant = std::collections::BTreeMap::<u64, f64>::new();
         for record in &records {
             if let Some(query) = search::query(&format!("{} {}", record.heard, record.said)) {
-                let mut statement = self.db.prepare("SELECT e.id,search.rank FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND e.kind='observation' AND e.active=1 ORDER BY search.rank,e.id DESC LIMIT 32")?;
+                let mut statement = self.db.prepare("SELECT e.id,search.rank FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND e.kind='observation' AND e.active=1 AND e.category IN ('promise','thread','preference') ORDER BY search.rank,e.id DESC LIMIT 32")?;
                 for row in statement.query_map(params![query, person.as_str()], |r| {
                     Ok((r.get::<_, u64>(0)?, r.get::<_, f64>(1)?))
                 })? {
@@ -1047,24 +1084,28 @@ impl Days {
                 ids.push(id);
             }
         }
-        let recent:Vec<u64>=self.db.prepare("SELECT id FROM entries WHERE person=? AND kind='observation' AND active=1 ORDER BY id DESC LIMIT 32")?.query_map([person.as_str()],|r|r.get(0))?.collect::<rusqlite::Result<_>>()?;
+        let recent:Vec<u64>=self.db.prepare("SELECT id FROM entries WHERE person=? AND kind='observation' AND active=1 AND category IN ('promise','thread','preference') ORDER BY id DESC LIMIT 32")?.query_map([person.as_str()],|r|r.get(0))?.collect::<rusqlite::Result<_>>()?;
         for id in recent {
             if ids.len() < 32 && !ids.contains(&id) {
                 ids.push(id);
             }
         }
+        // One in a category a newer build wrote takes no slot above: it is
+        // left as it is (#2067).
         let mut previous = vec![];
         for id in ids {
             let r = self
                 .record(person, id)?
                 .ok_or_else(|| bad("a previous observation is missing"))?;
+            // One in a category a newer build wrote is left as it is.
+            let Some(category) = r.category else {
+                continue;
+            };
             previous.push(tidy::Previous {
                 id: r.id,
                 at_unix_ms: r.at_unix_ms,
                 text: r.text,
-                category: r
-                    .category
-                    .ok_or_else(|| bad("an observation has no category"))?,
+                category,
             });
         }
         let tx = self.db.transaction()?;
@@ -1221,6 +1262,100 @@ fn identifier(value: &str) -> Result<()> {
     }
 }
 
+/// A newer build's database (`user_version` above 1): the person's own
+/// memory, so it is kept whole under a new name until a forget removes it
+/// or its stamp is older than `keep_days` (#2067), and this build starts a
+/// new one (#1680, as lamp-tasks does).
+/// Nothing reads it back yet. Its sidecars, if any outlived the close, keep
+/// their pairing. The journal line names only files.
+fn set_aside(dir: &Path, version: u64, now: u64) -> Result<()> {
+    // Stamped by the store's clock, as `keep_days` counts it.
+    let since = now / 1000;
+    let mut kept = format!("{DATABASE}.newer-db{version}-{since}");
+    // The directory is locked, so nothing else names a file here meanwhile.
+    for n in 1.. {
+        if fs::symlink_metadata(dir.join(&kept)).is_err() {
+            break;
+        }
+        kept = format!("{DATABASE}.newer-db{version}-{since}.{n}");
+    }
+    for sidecar in ["-journal", "-wal", "-shm"] {
+        let from = dir.join(format!("{DATABASE}{sidecar}"));
+        if fs::symlink_metadata(&from).is_ok() {
+            fs::rename(from, dir.join(format!("{kept}{sidecar}")))?;
+        }
+    }
+    fs::rename(dir.join(DATABASE), dir.join(&kept))?;
+    File::open(dir)?.sync_all()?;
+    eprintln!(
+        "lamp-memory: memory across days was written by a newer build (database version {version}, this build reads 1); it is set aside as {kept}, and this build starts with an empty store"
+    );
+    Ok(())
+}
+
+/// Remove every database [`set_aside`] kept in `dir`, with its sidecars:
+/// all of them for a forget, or with `before`, those stamped at that second
+/// or earlier: `keep_days` old. The journal line names only the files. True if any went.
+fn remove_set_aside(dir: &Path, before: Option<u64>) -> Result<bool> {
+    let prefix = format!("{DATABASE}.newer-db");
+    let mut removed = vec![];
+    for entry in fs::read_dir(dir)? {
+        let name = entry?.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let Some(rest) = name.strip_prefix(&prefix) else {
+            continue;
+        };
+        if before.is_none_or(|before| stamp(rest).is_some_and(|since| since <= before)) {
+            fs::remove_file(dir.join(name))?;
+            removed.push(name.to_owned());
+        }
+    }
+    if removed.is_empty() {
+        return Ok(false);
+    }
+    File::open(dir)?.sync_all()?;
+    removed.sort();
+    let why = if before.is_some() {
+        "memory a newer build wrote is keep_days old and was removed"
+    } else {
+        "a forget also removed the memory a newer build wrote"
+    };
+    eprintln!("lamp-memory: {why}: {}", removed.join(", "));
+    Ok(true)
+}
+
+/// The `<seconds>` of `<version>-<seconds>[.n][sidecar]`.
+fn stamp(rest: &str) -> Option<u64> {
+    rest.split('-')
+        .nth(1)
+        .and_then(|s| s.split('.').next())
+        .and_then(|s| s.parse::<u64>().ok())
+}
+
+/// The newest database set aside by [`set_aside`] still in `dir`.
+fn kept_aside(dir: &Path) -> Result<Option<String>> {
+    let prefix = format!("{DATABASE}.newer-db");
+    let mut newest: Option<(u64, String)> = None;
+    for entry in fs::read_dir(dir)? {
+        let name = entry?.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let Some(rest) = name.strip_prefix(&prefix) else {
+            continue;
+        };
+        if ["-journal", "-wal", "-shm"]
+            .iter()
+            .any(|s| rest.ends_with(s))
+        {
+            continue;
+        }
+        let since = stamp(rest).unwrap_or(0);
+        if newest.as_ref().is_none_or(|(at, _)| since >= *at) {
+            newest = Some((since, name.to_owned()));
+        }
+    }
+    Ok(newest.map(|(_, name)| name))
+}
+
 fn legacy_people(dir: &Path) -> Result<Vec<Person>> {
     let mut people = vec![];
     for entry in fs::read_dir(dir)? {
@@ -1344,6 +1479,9 @@ fn insert_record(db: &Connection, r: &Record, local: &LocalTime, used: u64) -> R
     }
     Ok(())
 }
+/// The label a plain fact carries in a session note, the one voice reads
+/// for a kept fact (`voice/src/remember.rs`).
+const PLAIN_FACT: &str = "preference";
 fn category_name(category: &tidy::Category) -> &'static str {
     match category {
         tidy::Category::Promise => "promise",
@@ -1351,8 +1489,19 @@ fn category_name(category: &tidy::Category) -> &'static str {
         tidy::Category::Preference => "preference",
     }
 }
+/// A category a newer build wrote is none here: the record is kept as
+/// stored, never read as another category, tidied over or superseded
+/// (#1680).
+fn category_from(name: &str) -> Option<tidy::Category> {
+    match name {
+        "promise" => Some(tidy::Category::Promise),
+        "thread" => Some(tidy::Category::Thread),
+        "preference" => Some(tidy::Category::Preference),
+        _ => None,
+    }
+}
 fn read_record(db: &Connection, person: &Person, id: u64) -> Result<Option<Record>> {
-    let mut record=db.query_row("SELECT id,kind,at_unix_ms,heard,said,text,category,active FROM entries WHERE person=? AND id=?",params![person.as_str(),id],|r|{let category:Option<String>=r.get(6)?; Ok(Record{id:r.get(0)?,person:person.as_str().into(),kind:r.get(1)?,at_unix_ms:r.get(2)?,heard:r.get(3)?,said:r.get(4)?,text:r.get(5)?,category:category.map(|c|match c.as_str(){"promise"=>tidy::Category::Promise,"preference"=>tidy::Category::Preference,_=>tidy::Category::Thread}),source_ids:vec![],supersedes:None,active:r.get(7)?})}).optional()?;
+    let mut record=db.query_row("SELECT id,kind,at_unix_ms,heard,said,text,category,active FROM entries WHERE person=? AND id=?",params![person.as_str(),id],|r|{let category:Option<String>=r.get(6)?; Ok(Record{id:r.get(0)?,person:person.as_str().into(),kind:r.get(1)?,at_unix_ms:r.get(2)?,heard:r.get(3)?,said:r.get(4)?,text:r.get(5)?,category:category.and_then(|c|category_from(&c)),source_ids:vec![],supersedes:None,active:r.get(7)?})}).optional()?;
     if let Some(record) = &mut record {
         record.source_ids=db.prepare("SELECT p.id FROM sources s JOIN entries c ON c.rid=s.child JOIN entries p ON p.rid=s.parent WHERE c.person=? AND c.id=? AND p.person=c.person ORDER BY p.id")?.query_map(params![person.as_str(),id],|r|r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
         record.supersedes=db.query_row("SELECT p.id FROM replacements s JOIN entries c ON c.rid=s.newer JOIN entries p ON p.rid=s.older WHERE c.person=? AND c.id=?",params![person.as_str(),id],|r|r.get(0)).optional()?;

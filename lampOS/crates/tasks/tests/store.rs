@@ -291,7 +291,6 @@ fn a_wal_database_without_sidecars_is_rejected_without_converting_it() {
 fn unknown_versions_and_extra_schema_objects_fail_closed() {
     for change in [
         "PRAGMA user_version=0",
-        "PRAGMA user_version=2",
         "ALTER TABLE state RENAME TO other",
         "CREATE TABLE other(value BLOB)",
         "CREATE TRIGGER changed AFTER INSERT ON state BEGIN SELECT 1; END",
@@ -304,6 +303,76 @@ fn unknown_versions_and_extra_schema_objects_fail_closed() {
         assert!(Store::open(&scratch.dir).is_err(), "{change}");
         assert_eq!(fs::read(scratch.database()).unwrap(), original, "{change}");
     }
+}
+
+/// #1680: a database a newer build wrote (`user_version` above 1) doesn't
+/// stop the part. It is kept whole under a new name, never deleted, said by
+/// `kept_aside`, and the owner goes on with an empty store.
+#[test]
+fn a_newer_database_version_is_set_aside_whole_and_a_new_store_begins() {
+    let scratch = Scratch::new();
+    scratch.populated();
+    scratch.sql("PRAGMA user_version=2; ALTER TABLE state ADD COLUMN later BLOB");
+    let original = fs::read(scratch.database()).unwrap();
+    let mut store = Store::open(&scratch.dir).expect("a newer database does not stop the part");
+    assert_eq!(store.load().unwrap(), None, "the new store is empty");
+    let kept = store.kept_aside().unwrap().expect("the kept store is said");
+    assert!(kept.starts_with("tasks.sqlite3.newer-db2-"), "{kept}");
+    assert_eq!(
+        fs::read(scratch.dir.join(&kept)).unwrap(),
+        original,
+        "kept whole"
+    );
+    store.commit(b"after").unwrap();
+    drop(store);
+    assert_eq!(
+        scratch.open().load().unwrap().as_deref(),
+        Some(&b"after"[..])
+    );
+    assert_eq!(fs::read(scratch.dir.join(&kept)).unwrap(), original);
+}
+
+/// #1680, the reviewer's P3 on #2057: a newer build's database in WAL mode,
+/// with its `-wal` and `-shm` beside it, is set aside with them, every file
+/// renamed byte for byte, not refused by the WAL checks; `user_version` is
+/// read from the file's header before any of them.
+#[test]
+fn a_newer_database_in_wal_mode_is_set_aside_with_its_sidecars() {
+    let scratch = Scratch::new();
+    scratch.populated();
+    let wal = scratch.dir.join(format!("{DATABASE}-wal"));
+    let shm = scratch.dir.join(format!("{DATABASE}-shm"));
+    let (wal_bytes, shm_bytes) = {
+        let db = Connection::open(scratch.database()).unwrap();
+        db.execute_batch("PRAGMA user_version=2; PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE state SET snapshot=x'0102'")
+            .unwrap();
+        (fs::read(&wal).unwrap(), fs::read(&shm).unwrap())
+    };
+    // The newer build's last close checkpointed; put its sidecars back as
+    // a crash would have left them.
+    private_file(&wal, &wal_bytes);
+    private_file(&shm, &shm_bytes);
+    let original = fs::read(scratch.database()).unwrap();
+    assert_eq!(&original[18..20], &[2, 2], "the database is in WAL mode");
+    let mut store = Store::open(&scratch.dir).expect("a newer WAL database does not stop the part");
+    assert_eq!(store.load().unwrap(), None, "the new store is empty");
+    let kept = store.kept_aside().unwrap().expect("the kept store is said");
+    assert!(kept.starts_with("tasks.sqlite3.newer-db2-"), "{kept}");
+    for (name, bytes) in [
+        (kept.clone(), &original),
+        (format!("{kept}-wal"), &wal_bytes),
+        (format!("{kept}-shm"), &shm_bytes),
+    ] {
+        assert_eq!(&fs::read(scratch.dir.join(&name)).unwrap(), bytes, "{name}");
+    }
+    assert!(!wal.exists() && !shm.exists());
+    store.commit(b"after").unwrap();
+    drop(store);
+    assert_eq!(
+        scratch.open().load().unwrap().as_deref(),
+        Some(&b"after"[..])
+    );
+    assert_eq!(fs::read(scratch.dir.join(&kept)).unwrap(), original);
 }
 
 #[test]

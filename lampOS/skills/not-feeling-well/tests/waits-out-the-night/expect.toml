@@ -1,6 +1,6 @@
 # From 07:50, the error from 60 s to 900 s. Nothing at 07:51.5, in the
-# night; it droops and dims at 08:00 (600 s), the chance kept, and gives the
-# light back at 905 s.
+# night; it droops and breathes pale at 08:00 (600 s), the chance kept, and
+# gives the light back at 905 s.
 clock = "07:50"
 
 [[expect]]
@@ -13,7 +13,7 @@ args = { gesture = "sleepy" }
 at = "600s"
 within = "1s"
 call = "light"
-args = { dim = 1, until = "ends" }
+args = { colour = "white", level = 2, pattern = { kind = "breathe", period_ms = 10000, low = 1 }, until = "ends" }
 
 [[expect]]
 at = "905s"

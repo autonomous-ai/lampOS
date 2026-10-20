@@ -132,7 +132,7 @@ is released or the reader has failed.
 |---|---|---|
 | Someone sits down | Looks up, eye brightens; a person it knows gets a word now and then ("you're back"), a stranger a glance | Faces now; who it knows to build |
 | You look at it | Looks back; the eye opens | To build |
-| You leave | Watches you go a moment, settles | To build |
+| You leave | Watches you go a moment, settles | Built, not yet tried: `skills/watch-you-leave` (#1669 (e)), a small base turn toward the side the sitter left by, held about 2 s; a core skill held out of the product until the arm hour |
 | You have been working long without a break | Once in a while, a stretch of its own, as an invitation, never a lecture | To build |
 
 ### The air and the day
@@ -173,7 +173,11 @@ One part, read by every behaviour (to build):
 4. **Resting reactions**: a resting lamp lifts its head (#710).
 5. **The air**: the SEN63C is read (`lamp-air`, running); the quiet droop and the remark.
 6. **Familiarity**: who it knows (eyes and memory).
-7. **Joys**: music sway, laughing, the stretch as an invitation.
+7. **Joys**: music sway, laughing, the stretch as an invitation. Their bars
+   are measured on a lamp with nothing moving by `tools/joys-scores.sh
+   laugh|music` (#1669): an empty room, a track and a line over it, scored
+   against each bar, and the glances or sways the skill would have asked
+   for, replayed offline from the bus.
 
 ## What the best companions teach (research, 2026-10-14)
 

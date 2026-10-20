@@ -191,8 +191,9 @@ product's is `/run/lampos-skills`), and the voice reads and calls them the
 same way, at the same session open and within the same deadline:
 
     <skills>/tools.json   each skill's tool, described with its SKILL.md description,
-                          with the parameters of its choice and flag, if it has them,
-                          and beside the tools, "body": the tools whose skill asks
+                          with the parameters of its choice and flag, if it has them;
+                          a skill's [stop] function (#1685), its "how" one of snooze,
+                          off or on; and beside the tools, "body": the tools whose skill asks
                           for the body (a text never runs one, #1673)
     <skills>/call.sock    {"op":"call","name":"dance","args":{"style":"calm"}} -> {"ok":true,"result":{"next":"..."}}
                           arguments that are not the tool's -> {"ok":false,"error":"..."}
@@ -404,18 +405,48 @@ after `--use-skill`) a session is told of `reports_stop`, with no
 arguments: "stop sending reports" (#1683, [cloud.md](cloud.md), "Health and
 crash reports"). It is the voice's own, never a skill, and comes before the
 executive's and the skills' functions, so it is never the one cut past 32;
-a skill cut for it is named on the setup line (#1706). The voice puts
-`{"share": false}` on `reports/request` and answers from `lamp-cloud`'s
+a skill cut for it is named on the setup line (#1706).
+
+The switch declares two functions, `reports_stop` and `reports_state`
+(below), so a session is told two more than without it. A product lamp
+declares 31 without it (the voice's own 13, the actions part's 17 and
+Dance's) and 32 with it: the voice's own 15 and the actions part's 17 fill
+the 32, and Dance's `dance`, the product's one skill function, is the one
+cut (`; skills not given: dance (past 32: …)` on the setup line). On any
+lamp it is the last skills' functions, in order, that make room for the
+two; the executive's are cut only once the skills' are gone. With
+`LAMP_USE_SKILL=on` as well, `use_skill` would be the 33rd, and the link's
+check leaves it out (`use_skill (past 32)` in the journal). Tests:
+`with_reports_on_a_product_lamp_is_at_32_and_dance_is_cut`
+(`crates/update/tests/functions.rs`) and
+`reports_add_two_functions_and_the_last_skills_are_cut_past_32`.
+
+The voice puts `{"share": false}` on `reports/request` and answers from `lamp-cloud`'s
 `reports/state` within 2 s: `{"ok": true, "say": "I've stopped sending
 reports."}`, or "I'm not sending any reports." when they were off. With
 nobody taking the ask (`lamp-cloud` not running), or no answer in time, it
 says so and never claims a stop. Only a request a person said runs it.
+It runs in a request whose answer the attention rule holds too, its
+answer still held: the one call that does (`DONE_THOUGH_HELD`,
+[attention.md](attention.md), "What happens to an answer that is held
+back"). It then asks with `held: true`, which `lamp-cloud` keeps.
 On the second route a line whose answer is held is asked about
 `reports_stop` only when its heard words name `report`, `reports`,
 `sharing`, `sending` or `data` (whole words, any case;
 `attention::HELD_ASKED_WORDS`, #1925, [attention.md](attention.md)); any
 other held line is sent nowhere.
 There is no function to turn reports on: that is the person's own screen.
+
+Beside it, `reports_state`, with no arguments, which the model is to call
+only when the person asks about reports (#1880, the first builder on
+#1722, 18:44). Answered at once in the voice from `reports/state`:
+`{"sending": true, "say": ...}`, or `{"sending": false, "say": "I'm not
+sending reports. Someone asked me to stop them at 3:04 pm today. They can
+be turned back on in the app."}` for the voice's stop, "They were turned off
+in the app at ..." for the app's, in the lamp's own time ("yesterday", or
+the date, when older). Without `lamp-cloud` it says the part is not
+running. Nothing about reports is said unasked: only this call's answer
+carries how they were stopped.
 
 ## `the_time`, the voice's own
 
@@ -453,12 +484,13 @@ time, from its opening note, and nothing said whose it was.
   taken only there or as `UTC`: the folder's top-level `EST`, `MST` and
   `HST` have no summer time, so "EST" for the East Coast would be an hour
   off New York's half the year (the reviewer on #1552). The zone file is read from
-  `/usr/share/zoneinfo` with the voice's own reader (`local_time.rs`). Only
+  `/usr/share/zoneinfo` and read by `lamp-local-time`, as every part
+  reads the lamp's own zone (#820). Only
   `[A-Za-z0-9_+/-]` is taken, with no `..`, no `//` and no leading or
   trailing `/`, and the file must be a zone file. A slim zone file, which
   lists no changes past its last rule change, has its closing rule worked
-  out (`Mm.w.d` dates; a `Jn` or `n` rule gives nothing). The lamp's own
-  time is read exactly as before.
+  out, and since #820 so has the lamp's own: before, past the changes its
+  file listed, its time was not told.
 - **The answer names the place, and the lamp's own beside it:**
   `{"now":"In London it is 10:40 in the morning, Sunday 18 October 2026.
   Said aloud: twenty to eleven in the morning. Here in Ho Chi Minh it is

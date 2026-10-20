@@ -162,8 +162,8 @@ these six tools never send `ack` or speak a due reminder themselves. See
 
 | Action | What it does | What it says back |
 |---|---|---|
-| `volume_up` | One step louder, to the ceiling at most | "My volume is now 70 out of 100; it was 50." or that it is already as loud as it is allowed to go |
-| `volume_down` | One step quieter, to the floor at least | The same form, or that it is already as quiet as it goes without being muted |
+| `volume_up` | One step louder, to the ceiling at most. Its description has "turn yourself up", louder and too quiet as the voice, and "turn the light up" as the light's (`light_brighter`): on lamp-4ace on 19 Oct the DeepSeek route took "turn yourself back up" for the light in both batteries, where Gemini Live turned the voice (#1712) | "My volume is now 70 out of 100; it was 50." or that it is already as loud as it is allowed to go |
+| `volume_down` | One step quieter, to the floor at least. Its description has "turn yourself down", quieter and too loud as the voice, and "turn the light down" and "softer" alone as the light's (`light_dimmer`), whose description says "turn yourself down" is the voice (the same batteries) | The same form, or that it is already as quiet as it goes without being muted |
 | `volume_mute` | Volume to nothing, remembering where it was | "My speaker is muted." |
 | `volume_unmute` | Back to where it was, or the middle if that is not known | "My speaker is back, at 70 out of 100." |
 | `light_on`, `light_off` | On, in the colour and at the level it had; off, which leaves a faint glow | "My light is on, blue." / "My light is off. The faint glow that is left shows I am still listening." |

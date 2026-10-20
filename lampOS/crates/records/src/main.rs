@@ -202,7 +202,9 @@ mod tests {
         let config = Config::customer_default();
         let mut result = synthetic(&config, 10, None);
         let mut unknown = serde_json::to_value(&result).unwrap();
-        unknown["mode"] = "later_mode".into();
+        // Not a plain word, so not a newer build's mode, which is set aside
+        // instead (#1680): a value this build can't take.
+        unknown["mode"] = "Later Mode!".into();
         let bytes = serde_json::to_vec(&unknown).unwrap();
         fs::write(&path, &bytes).unwrap();
         persist(&config, &path, &mut result);

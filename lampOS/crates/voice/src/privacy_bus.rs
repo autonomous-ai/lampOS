@@ -741,6 +741,16 @@ fn serve(
                 channels.control.send(WorkerEvent::Privacy {
                     acquired_at_us: acquired.at_us,
                     muted,
+                    // A receipt proves the physical switch: a lamp with no
+                    // slide has none to give (#1802's onboarding step then
+                    // reads it as not available, #2086's no-slide route).
+                    receipt: match &value {
+                        Observation::Slide(physical) => Some(crate::wire::PrivacyReceipt {
+                            controls_session: message.header.boot.clone(),
+                            physical: physical.clone(),
+                        }),
+                        Observation::NoSlide(_) => None,
+                    },
                 })?;
                 last = Some(value);
             }

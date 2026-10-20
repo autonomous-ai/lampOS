@@ -406,6 +406,68 @@ fn at_rest_it_breathes_with_the_ring_and_only_lifts_its_head() {
     assert!((lowest - -0.03).abs() < 1e-4, "{lowest}");
 }
 
+/// #1670: where Mood keeps the lamp's one breath, the head breathes at its
+/// phase, whatever the clock says, as the ring does; when it is gone, the
+/// head goes back to the ring's plain breath without a leap.
+#[test]
+fn at_rest_it_breathes_the_lamps_one_breath_where_mood_keeps_it() {
+    let mut lamp = Lamp::new(catalogue());
+    lamp.run(SECOND, |_, _| {});
+    // Mood's breath held at full in: the head held at the top of a breath.
+    lamp.engine.set_mood_breath(Some(0.5));
+    // Let the breath catch up from where the plain one had it.
+    lamp.run(5 * SECOND, |_, _| {});
+    lamp.run(5 * SECOND, |output, now| {
+        let offsets = asked(output);
+        assert!(
+            (offsets.head_pitch - -0.03).abs() < 1e-9,
+            "{offsets:?} at {now}"
+        );
+    });
+    // Out: the head at rest height.
+    lamp.engine.set_mood_breath(Some(0.0));
+    lamp.run(5 * SECOND, |_, _| {});
+    lamp.run(SECOND, |output, _| {
+        assert!(asked(output).head_pitch.abs() < 1e-9);
+    });
+    // Gone: the plain breath again, reached without a leap.
+    lamp.engine.set_mood_breath(None);
+    let mut last: Option<f64> = None;
+    lamp.run(10 * SECOND, |output, _| {
+        let pitch = asked(output).head_pitch;
+        if let Some(last) = last {
+            assert!((pitch - last).abs() < 0.002, "{last} to {pitch}");
+        }
+        last = Some(pitch);
+    });
+    lamp.run(5 * SECOND, |output, now| {
+        assert!((asked(output).head_pitch - -0.03 * ring(now)).abs() < 1e-9);
+    });
+}
+
+/// #1670: Mood's liveliness moves the energy every move here is drawn from:
+/// the same breath, larger with energy and smaller dozing, and the
+/// catalogue's own with no mood.
+#[test]
+fn the_lamps_liveliness_makes_the_same_breath_larger_or_smaller() {
+    let held_in = |liveliness: Option<f32>| {
+        let mut lamp = Lamp::new(catalogue());
+        lamp.run(SECOND, |_, _| {});
+        lamp.engine.set_mood_breath(Some(0.5));
+        lamp.engine.set_mood_liveliness(liveliness);
+        lamp.run(5 * SECOND, |_, _| {});
+        let mut pitch = 0.0;
+        lamp.run(SECOND, |output, _| pitch = asked(output).head_pitch);
+        pitch
+    };
+    // The catalogue's 0.5: size 1, the breath's 0.03 rad.
+    assert!((held_in(None) - -0.03).abs() < 1e-9);
+    assert!((held_in(Some(0.0)) - -0.03).abs() < 1e-9);
+    // Most lively, energy 1: size 1.3. Dozing or asleep, energy 0: 0.7.
+    assert!((held_in(Some(0.5)) - -0.039).abs() < 1e-9);
+    assert!((held_in(Some(-0.5)) - -0.021).abs() < 1e-9);
+}
+
 #[test]
 fn the_layer_comes_in_and_goes_out_within_its_blend() {
     let mut lamp = Lamp::new(catalogue());

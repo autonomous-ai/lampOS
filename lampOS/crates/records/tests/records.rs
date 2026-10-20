@@ -266,14 +266,101 @@ fn real_cli_sets_aside_a_newer_report_and_refuses_unknown_values_before_cleanup(
     assert_eq!(replacement.config_fingerprint, config.fingerprint());
     config.enabled = true;
     json_file::write(&config_path, &config).unwrap();
+    // A newer build's plain new mode at this schema is set aside too, and
+    // the cleanup runs (#1680); the mode is never in the journal.
+    let mut newer_mode = serde_json::to_value(&current).unwrap();
+    newer_mode["mode"] = "later_mode".into();
+    let bytes = serde_json::to_vec(&newer_mode).unwrap();
+    fs::write(&report_path, &bytes).unwrap();
+    let output = run();
+    let journal = String::from_utf8(output.stderr).unwrap();
+    assert!(!output.stdout.is_empty(), "{journal}");
+    assert!(
+        journal.contains("cleanup result has a mode this build does not know, at its schema 1"),
+        "{journal}"
+    );
+    assert!(!journal.contains("later_mode"), "{journal}");
+    let kept: Vec<_> = fs::read_dir(&tree.0)
+        .unwrap()
+        .map(Result::unwrap)
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with("last.json.newer-mode-")
+        })
+        .collect();
+    assert_eq!(kept.len(), 1);
+    assert_eq!(fs::read(kept[0].path()).unwrap(), bytes);
+    let replacement: RunReport = json_file::read(&report_path, json_file::REPORT_BYTES).unwrap();
+    assert_eq!(replacement.mode, "apply");
+    // A mode that is no plain word is still refused before any cleanup.
     let mut unknown = serde_json::to_value(current).unwrap();
-    unknown["mode"] = "later_mode".into();
+    unknown["mode"] = "Later Mode!".into();
     let bytes = serde_json::to_vec(&unknown).unwrap();
     fs::write(&report_path, &bytes).unwrap();
     let refused = run();
     assert_eq!(refused.status.code(), Some(64));
     assert!(refused.stdout.is_empty());
     assert_eq!(fs::read(&report_path).unwrap(), bytes);
+    assert_eq!(entries(&config.roots[0].path), untouched);
+}
+
+/// #2052's audit, the records rows (#1680): `check`, the timer's run, on a
+/// newer build's files. A newer field in `records.json` is read past and
+/// named, and the run is as before; a newer `schema_version` succeeds,
+/// prunes nothing and writes no result, with one line. Before, every run
+/// failed on either.
+#[test]
+fn real_cli_runs_on_a_newer_builds_config_one_release_ahead() {
+    let tree = Tree::new();
+    let config = tree.config();
+    session(&config.roots[0].path, 1, 100);
+    let untouched = entries(&config.roots[0].path);
+    let config_path = tree.0.join("records.json");
+    let report_path = tree.0.join("last.json");
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_lamp-records"))
+            .arg("check")
+            .arg(&config_path)
+            .arg("--apply")
+            .arg("--report")
+            .arg(&report_path)
+            .output()
+            .unwrap()
+    };
+    let mut newer = serde_json::to_value(&config).unwrap();
+    newer["roots"][0]["min_free_bytes"] = 1_000_000_000_u64.into();
+    json_file::write(&config_path, &newer).unwrap();
+    let output = run();
+    let journal = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        journal.contains(&format!(
+            "lamp-records: {}: fields this build does not read, ignored: roots[0].min_free_bytes",
+            config_path.display()
+        )),
+        "{journal}"
+    );
+    let report: RunReport = json_file::read(&report_path, json_file::REPORT_BYTES).unwrap();
+    assert_eq!(report.config_fingerprint, config.fingerprint());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap(),
+        serde_json::to_value(&report).unwrap()
+    );
+    fs::remove_file(&report_path).unwrap();
+    newer["schema_version"] = 2.into();
+    newer["roots"][0]["kind"] = "memory_days".into();
+    json_file::write(&config_path, &newer).unwrap();
+    let output = run();
+    let journal = String::from_utf8(output.stderr).unwrap();
+    assert!(output.status.success(), "{journal}");
+    assert!(output.stdout.is_empty());
+    assert_eq!(journal.lines().count(), 1, "{journal}");
+    assert!(
+        journal.contains("schema 2 is newer than this build's 1: nothing is pruned"),
+        "{journal}"
+    );
+    assert!(!report_path.exists());
     assert_eq!(entries(&config.roots[0].path), untouched);
 }
 

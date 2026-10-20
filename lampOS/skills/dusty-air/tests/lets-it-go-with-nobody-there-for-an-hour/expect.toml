@@ -1,0 +1,5 @@
+# 140 from 10:00, nobody in view until 12:10. The chance at 11:00 is kept
+# for an hour and then spent; the spell goes on, so no new chance comes.
+# Nothing.
+clock = "10:00"
+none = true

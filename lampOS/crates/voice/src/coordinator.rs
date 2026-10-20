@@ -974,7 +974,7 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     ) -> Result<crate::service_privacy::WaitOutcome>,
 ) -> Result<crate::service_privacy::WaitOutcome> {
     muted_wait_pulsing(
-        trace, cues, controls, reminders, tap_face, health, None, wait,
+        trace, cues, controls, reminders, tap_face, health, None, None, wait,
     )
 }
 
@@ -984,6 +984,11 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
 /// the attempt, from the look that first finds it owed, so a pulse held
 /// back for a while neither restarts the half-hour nor comes at once when
 /// it may show again (Thirteen and the reviewer on #1581).
+///
+/// With `light` (`LAMP_LIGHT_WHILE_MUTED=on`, #1816), the person's light is
+/// said and taken at each look, with no session's ring worker to do it; it
+/// draws nothing, and is let go before this returns, so the next session's
+/// ring worker owns it again.
 ///
 /// [`Asleep::owed`]: crate::ring_asleep::Asleep::owed
 #[allow(clippy::too_many_arguments)]
@@ -995,6 +1000,7 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     tap_face: Option<crate::ring_asleep::TapFace<F>>,
     mut health: Option<crate::bus_out::WaitHealth>,
     pulse: Option<std::sync::Arc<crate::ring_asleep::Owed>>,
+    light: Option<crate::ring_light::RingLight>,
     wait: impl FnOnce(
         &mut dyn FnMut(crate::privacy::PrivacyState, BootId, u64) -> Result<()>,
         &mut dyn FnMut() -> Result<bool>,
@@ -1009,6 +1015,7 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     let unread_since = std::cell::Cell::new(None::<u64>);
     let tap_face = RefCell::new(tap_face);
     let owed_since = std::cell::Cell::new(None::<Instant>);
+    let light = RefCell::new(light);
     let outcome = wait(
         &mut |state, boot, at_us| {
             slide.set(Some(state));
@@ -1029,6 +1036,10 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
         &mut || {
             if let Some(reminders) = reminders.borrow_mut().as_mut() {
                 reminders.poll(monotonic_us());
+            }
+            // The person's light, said and taken; nothing is drawn (#1816).
+            if let Some(light) = light.borrow_mut().as_mut() {
+                light.tick(monotonic_us());
             }
             let (allowed, asleep, restored) = match &mut *controls.borrow_mut() {
                 None => (true, false, false),
@@ -1093,6 +1104,8 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     if let Some(face) = tap_face.into_inner() {
         face.stop();
     }
+    // Let go before the next session's ring worker takes the light up.
+    drop(light.into_inner());
     // The wait ends on the look that read the switch open, with no look
     // after it: say the voice is opening, not still off, until the
     // session's own report (#1376).
@@ -1332,6 +1345,10 @@ impl Rig {
         ];
         let mut receipts: [Option<DiagnosticFinished>; 2] = [None, None];
         let mut ring_blank_confirmed = self.ring.blank_confirmed();
+        // A ring that ended mid-session was disabled then; its cached exit is
+        // seen again here, at once. Say so, or it reads as the stop ending it
+        // (lamp-52e6, 19 Oct 21:47, #1620). It still fails the stop below.
+        let ring_exited_before_stop = self.ring.exit_observed();
         // On the Controls route the privacy worker ends itself, cleanly, on a
         // switch it cannot read, saying so first: that is why the cycle ended,
         // not a failed shutdown, and its exit status is still checked below
@@ -1485,7 +1502,8 @@ impl Rig {
                                 let _ = record(
                                     trace,
                                     json!({"kind":"worker_exit_failed", "worker":worker.role,
-                                    "at_us":monotonic_us(), "error":error.to_string()}),
+                                    "at_us":monotonic_us(), "error":error.to_string(),
+                                    "exited_before_stop":worker.role == "ring" && ring_exited_before_stop}),
                                 );
                                 failure.push(CleanupStage::WorkerExit, &worker.role, error);
                             }
@@ -2087,6 +2105,9 @@ fn run_source(
                         tap_face,
                         crate::bus_out::WaitHealth::from_environment(),
                         pulse,
+                        crate::ring_light::while_muted_from_environment(
+                            options.ring_channel_ceiling.is_some(),
+                        ),
                         |on_state, gate| {
                             crate::service_privacy_controls::wait_selected(
                                 &executable,
@@ -2986,6 +3007,7 @@ fn provider_arguments(
     arguments.extend(crate::session_fact::arguments_from_environment());
     arguments.extend(crate::room_told::arguments_from_environment());
     arguments.extend(crate::air_told::arguments_from_environment());
+    arguments.extend(crate::health_told::arguments_from_environment());
     if keep_link {
         arguments.push(crate::provider_worker::KEEP_LINK_FLAG.to_owned());
     }
@@ -3018,6 +3040,7 @@ fn provider_arguments(
     arguments.extend(crate::misheard_hum::arguments_from_environment());
     arguments.extend(crate::holding_answer::arguments_from_environment());
     arguments.extend(crate::messages::arguments_from_environment());
+    arguments.extend(crate::scoped_session::arguments_from_environment());
     if let Some(camera) = camera {
         arguments.extend(camera.source.arguments());
     }
@@ -3986,6 +4009,7 @@ fn conversation_with_gate(
     let mut back_owed_since: Option<u64> = None;
     let privacy_started = session_instant();
     let mut privacy_sequence = 0u64;
+    let mut onboarding_privacy_receipt: Option<crate::wire::PrivacyReceipt> = None;
     let mut permitted = false;
     // A privacy observation read stale before the microphone was first
     // allowed: said once (lamp-4ace, 19 Oct 01:19).
@@ -4128,6 +4152,13 @@ fn conversation_with_gate(
     // Saying hello first to someone who comes and sits down, when the eyes
     // keep a presence file for it; and when anything was last said to the
     // lamp or by it.
+    // A face added from a photo, asked about once at the lamp
+    // (`LAMP_PHOTO_FACES=on`, #1968): the eyes' socket, and when they were
+    // last asked whether one is here.
+    let photo_faces = (lifetime.continuous() && crate::photo_faces::on())
+        .then(|| std::env::var_os(crate::known_faces::ENVIRONMENT))
+        .flatten()
+        .map(|socket| crate::photo_faces::Watch::start(PathBuf::from(socket)));
     let mut arrival = if lifetime.continuous() {
         crate::speak_up::Arrival::from_environment(monotonic_us())
     } else {
@@ -4141,10 +4172,28 @@ fn conversation_with_gate(
     // The first five minutes with a new person, led by the lamp
     // (`docs/onboarding.md`). Off unless `LAMP_ONBOARDING=on`.
     let mut onboarding = if lifetime.continuous() {
-        crate::onboarding::Onboarding::from_environment()
+        trace.onboarding_storage.as_ref().and_then(|storage| {
+            #[cfg(test)]
+            if let Some(file) = trace.onboarding_test_file.as_ref() {
+                return Some(crate::onboarding::Onboarding::with_storage(
+                    file.clone(),
+                    storage.client(),
+                ));
+            }
+            crate::onboarding::Onboarding::from_storage(storage.client())
+        })
     } else {
         None
     };
+    let onboarding_epoch = onboarding.as_ref().and_then(|_| {
+        lamp_controls::runtime::clock_id(None).ok().map(|clock_id| {
+            crate::onboarding::privacy::Epoch {
+                device_boot: clock_id.clone(),
+                clock_id,
+            }
+        })
+    });
+    let mut onboarding_invitation_turn: Option<(BootId, u64)> = None;
     // News from the work handed to agents on other computers, told
     // unasked at a good moment (`docs/tasks.md`).
     #[cfg(test)]
@@ -4172,7 +4221,7 @@ fn conversation_with_gate(
     #[cfg(not(test))]
     let given_says = None;
     let mut says = if lifetime.continuous() {
-        given_says.or_else(crate::say::Says::from_environment)
+        given_says.or_else(|| crate::say::Says::from_environment(notices.recordings()))
     } else {
         None
     };
@@ -4697,7 +4746,14 @@ fn conversation_with_gate(
                 WorkerEvent::Privacy {
                     acquired_at_us,
                     muted,
+                    receipt,
                 } => {
+                    // This metadata proves only the onboarding step. The
+                    // existing privacy gate remains the authority owner.
+                    onboarding_privacy_receipt = receipt.filter(|proof| {
+                        proof.physical.stamp.at_us == acquired_at_us
+                            && proof.physical.muted == Some(muted)
+                    });
                     privacy_sequence = privacy_sequence
                         .checked_add(1u64)
                         .ok_or_else(|| io::Error::other("privacy sequence overflow"))?;
@@ -4738,7 +4794,15 @@ fn conversation_with_gate(
                                     trace,
                                     json!({"kind":"physical_mute", "at_us":observed_at_us,"acquired_at_us":acquired_at_us,"fresh_observation":true}),
                                 )?;
-                                return Err(Box::new(PhysicalMute { observed_at_us }));
+                                let onboarding = onboarding.as_mut().and_then(|walk| {
+                                    onboarding_privacy_receipt.as_ref().and_then(|proof| {
+                                        walk.take_close_candidate(proof, observed_at_us)
+                                    })
+                                });
+                                return Err(Box::new(PhysicalMute {
+                                    observed_at_us,
+                                    onboarding,
+                                }));
                             }
                             _ => {}
                         }
@@ -4759,8 +4823,14 @@ fn conversation_with_gate(
                         trace,
                         json!({"kind":"physical_mute", "at_us":at_us,"fresh_observation":true}),
                     )?;
+                    let onboarding = onboarding.as_mut().and_then(|walk| {
+                        onboarding_privacy_receipt
+                            .as_ref()
+                            .and_then(|proof| walk.take_close_candidate(proof, at_us))
+                    });
                     return Err(Box::new(PhysicalMute {
                         observed_at_us: at_us,
+                        onboarding,
                     }));
                 }
                 PrivacyState::Unavailable
@@ -4773,6 +4843,22 @@ fn conversation_with_gate(
                 }
                 _ => {}
             }
+        }
+        service::poll_storage(trace);
+        let onboarding_location = trace
+            .onboarding_storage
+            .as_ref()
+            .and_then(|storage| storage.client().snapshot().ok())
+            .and_then(|snapshot| snapshot.hardware_location);
+        if let (Some(walk), Some(epoch)) = (onboarding.as_mut(), onboarding_epoch.as_ref()) {
+            walk.set_privacy_context(
+                epoch.clone(),
+                rig.privacy_controls,
+                onboarding_privacy_receipt.clone(),
+                onboarding_location.as_deref().filter(|_| {
+                    says.is_some() && bus_out.is_some() && !trace.onboarding_privacy_disabled
+                }),
+            );
         }
         let observation = match controls.as_mut() {
             Some(controls) => Some(controls.poll()?),
@@ -4965,6 +5051,11 @@ fn conversation_with_gate(
                 }
                 publish?;
                 if muted {
+                    if let Some(walk) = onboarding.as_mut() {
+                        walk.invalidate_privacy(
+                            crate::onboarding::privacy::Invalidation::SoftwareMute,
+                        );
+                    }
                     return Err(Box::new(SoftwareMute {
                         observed_at_us,
                         asleep,
@@ -5807,6 +5898,11 @@ fn conversation_with_gate(
             } else {
                 frame.probability
             };
+            #[cfg(test)]
+            if let Some(accepted) = trace.onboarding_test_capture_accepted.as_ref() {
+                // Counts only validated, fresh frames reaching the hearing path.
+                accepted.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
             let (heard, yielded) = hear_capture_block(
                 &mut playback_mask,
                 reply,
@@ -7083,6 +7179,17 @@ fn conversation_with_gate(
             last_publish = monotonic_us();
             current.complete_reminder(&speaker_pending, snapshot);
             current.answer_say(&speaker_pending, snapshot);
+            if onboarding_invitation_turn == Some((current.owner.boot(), turn)) {
+                if let Some(walk) = onboarding.as_mut() {
+                    walk.privacy_invitation_finished(
+                        current.owner.boot(),
+                        turn,
+                        current.heard_whole(&speaker_pending, snapshot),
+                        monotonic_us(),
+                    );
+                }
+                onboarding_invitation_turn = None;
+            }
             let heard = current.heard_news(&speaker_pending, snapshot);
             if !heard.is_empty()
                 && let Some(news) = task_news.as_ref()
@@ -7930,9 +8037,25 @@ fn conversation_with_gate(
             check.answer_requests(monotonic_us());
         }
         if let Some(walk) = onboarding.as_mut() {
+            #[cfg(test)]
+            if let Some(polls) = trace.onboarding_test_polls.as_ref() {
+                polls.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+            if let Some((boot, turn)) = walk.privacy_invitation_binding()
+                && reply
+                    .as_ref()
+                    .map(|current| (current.owner.boot(), current.owner.turn()))
+                    != Some((boot, turn))
+            {
+                walk.privacy_invitation_finished(boot, turn, false, monotonic_us());
+                onboarding_invitation_turn = None;
+            }
             let can_speak = reply.is_none()
+                && speaker_pending.is_none()
                 && provider_queue.is_empty()
                 && !admission.owns_stream()
+                && admission.idle_for_reminder()
+                && playback_mask.available(monotonic_us())
                 && !submission_draining
                 && snapshot.listening_ready(now())
                 && unasked_session(&cloud, paused).is_some();
@@ -7946,6 +8069,46 @@ fn conversation_with_gate(
                 face,
                 still,
             );
+            let pending = walk.privacy_pending();
+            if let Some(bus) = bus_out.as_mut() {
+                bus.onboarding_pending(&pending, monotonic_us());
+            }
+            if can_speak
+                && let Some(offer) = pending.invitations.first().filter(|offer| offer.ready)
+                && let Some(says) = says.as_mut()
+                && let Some(ticket) = says.take_onboarding(offer.invitation, monotonic_us())
+            {
+                if let (Some(words), Some(provider_session)) = (
+                    walk.take_privacy_invitation(offer.invitation, monotonic_us()),
+                    unasked_session(&cloud, paused),
+                ) {
+                    snapshot = commit_written_turn(
+                        owner,
+                        reply,
+                        &mut provider_queue,
+                        &words,
+                        false,
+                        "onboarding_privacy_invitation",
+                        provider_session,
+                        rig.playout_start,
+                        trace,
+                        |state| rig.publish(state),
+                    )?;
+                    if let Some(current) = reply.as_ref() {
+                        let bound = (current.owner.boot(), current.owner.turn());
+                        if walk.bind_privacy_invitation(offer.invitation, bound.0, bound.1) {
+                            onboarding_invitation_turn = Some(bound);
+                        }
+                    }
+                    begun_for(Some(ticket), reply);
+                    last_publish = monotonic_us();
+                } else {
+                    ticket.answer(crate::say::Outcome::Refused(
+                        "onboarding invitation is no longer eligible".into(),
+                    ));
+                    walk.privacy_invitation_refused(offer.invitation, monotonic_us());
+                }
+            }
             for line in walk.take_records() {
                 record(trace, line)?;
             }
@@ -8032,6 +8195,26 @@ fn conversation_with_gate(
                 snapshot = now_state;
                 last_hum_us = Some(at_us);
                 last_publish = monotonic_us();
+            }
+        }
+        // Onboarding persistence runs only after any immediate tap cue has
+        // been dispatched and its reply has drained. It never precedes revoke.
+        if let Some(walk) = onboarding.as_mut() {
+            let ready = !trace.onboarding_privacy_disabled
+                && !paused
+                && reply.is_none()
+                && speaker_pending.is_none()
+                && provider_queue.is_empty()
+                && !admission.owns_stream()
+                && !submission_draining
+                && snapshot.listening_ready(now())
+                && playback_mask.available(monotonic_us());
+            if let Err(error) = walk.maintain_privacy(monotonic_us(), ready) {
+                record(
+                    trace,
+                    json!({"kind":"onboarding_privacy_incomplete",
+                    "at_us":monotonic_us(),"reason":error.to_string()}),
+                )?;
             }
         }
         // The lamp's own "Sorry?" came back with nothing said (#1417): its
@@ -8165,9 +8348,11 @@ fn conversation_with_gate(
             } else if arrival.speaks() {
                 // By name: someone who asked the lamp to know their face,
                 // else the name typed at setup (`LAMP_PERSON_NAME`, #806).
-                let by_name = crate::person::hello_for(
+                // One beat warmer for someone who comes by often (#1670).
+                let by_name = crate::person::hello_for_familiar(
                     crate::known_faces::known_from_environment().as_deref(),
                     crate::person::from_environment().as_deref(),
+                    arrival.familiar(),
                 );
                 snapshot = commit_written_turn(
                     owner,
@@ -8190,6 +8375,39 @@ fn conversation_with_gate(
                     trace,
                     json!({"kind":"hello_due","at_us":clock,"said":false,"provider_session":provider_session}),
                 )?;
+            }
+        }
+        // A face added from a photo at the lamp, unconfirmed: asked once,
+        // gently, as the lamp's own written turn, while it is quiet (#1968).
+        // The person's spoken yes or no is theirs to give; no answer in the
+        // meeting is the eyes' to let go.
+        if let Some(watch) = photo_faces.as_ref()
+            && reply.is_none()
+            && provider_queue.is_empty()
+            && !admission.owns_stream()
+            && !submission_draining
+            && snapshot.listening_ready(now())
+            && clock.saturating_sub(last_turn_us) >= 3_000_000
+            && let Some(provider_session) = unasked_session(&cloud, paused)
+        {
+            // The eyes took it as asked: say it now. Else ask them to.
+            if let Some(name) = watch.asked() {
+                eprintln!("lamp-voice: a face added from a photo is at the lamp; asking them once");
+                snapshot = commit_written_turn(
+                    owner,
+                    reply,
+                    &mut provider_queue,
+                    &crate::photo_faces::note(&name),
+                    false,
+                    "photo_face_ask",
+                    provider_session,
+                    rig.playout_start,
+                    trace,
+                    |state| rig.publish(state),
+                )?;
+                last_publish = monotonic_us();
+            } else if let Some(name) = watch.to_ask() {
+                watch.ask(name);
             }
         }
         // News from an agent, told the way a chief of staff would: when
@@ -8979,6 +9197,10 @@ fn for_skill(
     held: &mut Option<(String, u64)>,
     now_us: u64,
 ) -> Option<Option<crate::say::Ticket>> {
+    // Onboarding has an exact invitation ticket and no autonomous fallback.
+    if source == crate::say::Source::Onboarding {
+        return None;
+    }
     // No say service: no skill can ask (Fourth on #1038).
     let Some(says) = says else {
         *held = None;
@@ -9007,6 +9229,7 @@ fn for_skill(
             match source {
                 crate::say::Source::Schedule => "reminder",
                 crate::say::Source::Tasks => "news",
+                crate::say::Source::Onboarding => "onboarding invitation",
             },
             crate::say::SKILL_WAITS_US / 1_000_000
         );

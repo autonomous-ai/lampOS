@@ -135,6 +135,9 @@ pub struct Settings {
     /// A name is kept only if the person said it, and a face keeps one
     /// name (`LAMP_NAMES=checked`, [`crate::known_faces::said_by_them`]).
     pub names_checked: bool,
+    /// A face added from a photo is asked about, and its person's yes or
+    /// no told to the eyes (`LAMP_PHOTO_FACES=on`, [`crate::photo_faces`]).
+    pub photo_faces: bool,
     /// The serving session's folder, for marking a bad moment
     /// ([`crate::marked`]).
     pub mark: Option<PathBuf>,
@@ -175,6 +178,9 @@ pub fn arguments_from_environment() -> Vec<String> {
                 .ok()
                 .as_deref(),
         ));
+        if crate::photo_faces::on() {
+            flags.push(crate::photo_faces::FLAG.to_owned());
+        }
     }
     flags.extend(crate::marked::arguments_from_environment());
     if let Some(file) = crate::onboarding::switched_on(
@@ -336,6 +342,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
             && flag == crate::known_faces::NAMES_FLAG
         {
             settings.names_checked = true;
+            flags = rest;
+        }
+        if let [flag, rest @ ..] = flags
+            && flag == crate::photo_faces::FLAG
+        {
+            settings.photo_faces = true;
             flags = rest;
         }
     }
@@ -532,6 +544,10 @@ fn core_tools(settings: &Settings) -> Vec<Tool> {
     }
     if settings.who.is_some() {
         tools.extend(crate::known_faces::tools_checked(settings.names_checked));
+        // A face added from a photo, asked about at the lamp (#1968).
+        if settings.photo_faces {
+            tools.extend(crate::photo_faces::tools());
+        }
     }
     if settings.mark.is_some() {
         tools.push(crate::marked::tool());
@@ -544,6 +560,7 @@ fn core_tools(settings: &Settings) -> Vec<Tool> {
     // named on the setup line (#1706).
     if settings.reports_stop {
         tools.push(crate::reports_stop::tool());
+        tools.push(crate::reports_stop::state_tool());
     }
     if let Some(directory) = &settings.exec {
         let room = lamp_gemini::MAX_TOOLS - tools.len();
@@ -604,10 +621,12 @@ fn voices_own(name: &str) -> bool {
         || crate::remember::is_tool(name)
         || crate::agent_tasks::is_tool(name)
         || crate::known_faces::is_tool(name)
+        || crate::photo_faces::is_tool(name)
         || crate::marked::is_tool(name)
         || crate::onboarding::is_tool(name)
         || name == crate::use_skill::NAME
         || crate::reports_stop::is_tool(name)
+        || crate::reports_stop::is_state_tool(name)
 }
 
 /// The skills' folder that runs `name`, when the executive does not.
@@ -692,8 +711,13 @@ pub enum Route {
     Mark(PathBuf),
     /// A step of the first meeting reported, through this onboarding file.
     Onboarding(PathBuf),
-    /// Health and crash reports stopped, through `lamp-cloud` on the bus.
-    ReportsStop,
+    /// Health and crash reports stopped, through `lamp-cloud` on the bus;
+    /// `true` when the line's answer is held, as `lamp-cloud` keeps it
+    /// (#1880).
+    ReportsStop(bool),
+    /// Whether reports are sent, and who stopped them and when, read from
+    /// `lamp-cloud`'s `reports/state`: answered here, at once.
+    ReportsState,
     /// A skill named in a call of `use_skill` ([`crate::use_skill`]), with
     /// the settings that find it: made the skill's own call when it is run.
     UseSkill(Box<Settings>),
@@ -728,7 +752,7 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if crate::agent_tasks::is_tool(name) {
         return settings.tasks.clone().map_or(Route::Nobody, Route::Tasks);
     }
-    if crate::known_faces::is_tool(name) {
+    if crate::known_faces::is_tool(name) || crate::photo_faces::is_tool(name) {
         return settings.who.clone().map_or(Route::Nobody, |socket| {
             Route::Faces(socket, settings.names_checked)
         });
@@ -744,7 +768,14 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     }
     if crate::reports_stop::is_tool(name) {
         return if settings.reports_stop {
-            Route::ReportsStop
+            Route::ReportsStop(false)
+        } else {
+            Route::Nobody
+        };
+    }
+    if crate::reports_stop::is_state_tool(name) {
+        return if settings.reports_stop {
+            Route::ReportsState
         } else {
             Route::Nobody
         };
@@ -821,6 +852,9 @@ fn answer_with_scope(
     }
     match route(settings, &call.name) {
         Route::Clock => time_now_for(settings.places, &call.args),
+        Route::ReportsState => {
+            crate::reports_stop::state_now(&mut crate::reports_stop::Bus::of_the_lamp())
+        }
         Route::Decline => declined(),
         Route::Nobody => unavailable(),
         route => {
@@ -1011,16 +1045,20 @@ fn run_call_with_scope(
         // may keep or forget one, never a request the lamp wrote or a text
         // from the app (the reviewer on #1713), as for marks.
         Route::Faces(..) if !heard => ("the eyes", (json!({"error": FACES_IN_PERSON}), false)),
+        Route::Faces(socket, _) if crate::photo_faces::is_tool(&call.name) => {
+            ("the eyes", crate::photo_faces::run(socket, call))
+        }
         Route::Faces(socket, checked) => {
             ("the eyes", crate::known_faces::run(socket, call, *checked))
         }
         Route::Mark(session) => ("the marks", crate::marked::run(session, call, heard)),
         Route::Onboarding(file) => ("the onboarding", crate::onboarding::run(file, call)),
-        Route::ReportsStop => (
+        Route::ReportsStop(held) => (
             "the reports",
             crate::reports_stop::run(
-                &mut crate::reports_stop::Bus(lamp_bus::Bus::from_environment().ok()),
+                &mut crate::reports_stop::Bus::of_the_lamp(),
                 heard,
+                *held,
                 crate::reports_stop::ANSWER_WITHIN,
             ),
         ),
@@ -1040,7 +1078,9 @@ fn run_call_with_scope(
                 Err(told) => (crate::use_skill::NAME, (told, true)),
             }
         }
-        Route::Decline | Route::Clock | Route::Nobody => ("nobody", (unavailable(), false)),
+        Route::Decline | Route::Clock | Route::ReportsState | Route::Nobody => {
+            ("nobody", (unavailable(), false))
+        }
     };
     if scope_current(lease, request) {
         result
@@ -1404,6 +1444,7 @@ mod tests {
             who: Some("/run/lampos-eyes/request.sock".into()),
             // The checked `remember_my_face`, with `replace` (#1057).
             names_checked: true,
+            photo_faces: false,
             mark: Some("/var/lib/lampos-voice/session".into()),
             onboarding: Some("/var/lib/lampos-voice/onboarding.json".into()),
             reports_stop: true,
@@ -1647,6 +1688,7 @@ mod tests {
                 schedule_speak: true,
                 who: Some("/run/lampos-eyes/who.sock".into()),
                 names_checked: false,
+                photo_faces: false,
                 mark: None,
                 onboarding: None,
                 reports_stop: false,
@@ -2486,9 +2528,14 @@ mod tests {
         assert!(
             declared(&plain)
                 .iter()
-                .all(|tool| tool.name != crate::reports_stop::NAME)
+                .all(|tool| tool.name != crate::reports_stop::NAME
+                    && tool.name != crate::reports_stop::STATE_NAME)
         );
         assert_eq!(route(&plain, crate::reports_stop::NAME), Route::Nobody);
+        assert_eq!(
+            route(&plain, crate::reports_stop::STATE_NAME),
+            Route::Nobody
+        );
         let mut flags = crate::use_skill::arguments(Some("on"));
         flags.extend(crate::reports_stop::arguments(Some("on")));
         flags.push("rest".into());
@@ -2500,10 +2547,106 @@ mod tests {
             names.contains(&crate::reports_stop::NAME.to_owned()),
             "{names:?}"
         );
-        assert_eq!(route(&on, crate::reports_stop::NAME), Route::ReportsStop);
+        assert!(
+            names.contains(&crate::reports_stop::STATE_NAME.to_owned()),
+            "{names:?}"
+        );
+        assert_eq!(
+            route(&on, crate::reports_stop::NAME),
+            Route::ReportsStop(false)
+        );
+        assert_eq!(
+            route(&on, crate::reports_stop::STATE_NAME),
+            Route::ReportsState
+        );
         assert!(voices_own(crate::reports_stop::NAME));
+        assert!(voices_own(crate::reports_stop::STATE_NAME));
         // Off, the flag is never given.
         assert!(crate::reports_stop::arguments(None).is_empty());
+    }
+
+    /// The reviewer's P3 on #1906: `LAMP_REPORTS=on` declares two more,
+    /// `reports_stop` and `reports_state`, before the executive's and the
+    /// skills', so past 32 it is the last skills' functions that are cut,
+    /// two of them, and the setup line names them.
+    #[test]
+    fn reports_add_two_functions_and_the_last_skills_are_cut_past_32() {
+        let (dir, mut settings) = many_skills("reports-count");
+        // Off: the voice's own five and the executive's twenty-five, and two
+        // of the three skills' functions; show_verdict is past 32.
+        assert_eq!(core_tools(&settings).len(), 30);
+        let off: Vec<String> = declared(&settings)
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect();
+        assert_eq!(off.len(), 32);
+        assert_eq!(&off[30..], ["dance", "check_my_work"]);
+        // On: two more of the voice's own, and the two skills' that fitted
+        // are cut for them; the executive's all stay.
+        settings.reports_stop = true;
+        assert_eq!(core_tools(&settings).len(), 32);
+        let on = declared(&settings);
+        assert_eq!(on.len(), 32);
+        let names: Vec<&str> = on.iter().map(|tool| tool.name.as_str()).collect();
+        assert_eq!(
+            &names[5..7],
+            [crate::reports_stop::NAME, crate::reports_stop::STATE_NAME]
+        );
+        assert!((0..25).all(|n| names.contains(&format!("light_{n}").as_str())));
+        let cut: Vec<&str> = off
+            .iter()
+            .map(String::as_str)
+            .filter(|name| !names.contains(name))
+            .collect();
+        assert_eq!(cut, ["dance", "check_my_work"]);
+        let said = crate::session_tools::setup_line(&on, &settings);
+        assert!(
+            said.ends_with(
+                "; skills not given: dance, check_my_work, show_verdict (past 32: LAMP_USE_SKILL=on reaches them)"
+            ),
+            "{said}"
+        );
+        let (kept, left_out) = admitted(on);
+        assert!(left_out.is_empty(), "{left_out:?}");
+        assert_eq!(kept.len(), 32);
+        // With use_skill as well, it is the 33rd, and the link's check
+        // leaves it out (as tools.md says, until it is given room).
+        settings.use_skill = true;
+        let (kept, left_out) = admitted(declared(&settings));
+        assert_eq!(kept.len(), 32);
+        assert_eq!(left_out, ["use_skill (past 32)"]);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #1880 on the second route (`LAMP_VOICE_ROUTE=second`), whose runner
+    /// is [`answer`]: `reports_state` is answered there at once, from the
+    /// bus's state, as on the Live route, and only for its own call; off,
+    /// it is nobody's. Asked by a text, it is answered the same.
+    #[test]
+    fn reports_state_is_answered_on_the_second_route_only_when_called() {
+        let call = ToolCall {
+            id: "c".into(),
+            name: crate::reports_stop::STATE_NAME.into(),
+            args: json!({}),
+        };
+        assert_eq!(answer(&Settings::default(), &call, 7, true), unavailable());
+        let on = Settings {
+            reports_stop: true,
+            ..Default::default()
+        };
+        // Whatever the bus says now (a test of the Live worker may have put
+        // its own state there): one of the state's answers, never "not
+        // running" as a call nobody here runs is told.
+        let told = answer(&on, &call, 7, true);
+        assert_ne!(told, unavailable());
+        assert!(
+            told.get("say").is_some()
+                || told
+                    == json!({"error": "The part of me that sends reports is not running, so nothing is being sent now."}),
+            "{told}"
+        );
+        let texted = answer_typed(&on, &call, crate::messages::REQUESTS_FROM + 1);
+        assert_ne!(texted, unavailable());
     }
 
     /// The reviewer on #1706: the setup line's two notes with `use_skill`,

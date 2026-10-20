@@ -6,6 +6,7 @@
 //! malicious privileged process; configured roots have trusted owners.
 
 pub mod config;
+pub mod forward;
 pub mod guard;
 pub mod json_file;
 pub mod plan;
@@ -286,6 +287,31 @@ pub(crate) fn newer_report_schema(bytes: &[u8]) -> io::Result<Option<u64>> {
         .map_err(|_| config::invalid("unrecognized cleanup report"))?;
     Ok((envelope.schema_version > u64::from(REPORT_SCHEMA_VERSION))
         .then_some(envelope.schema_version))
+}
+
+/// A report at this build's schema from a newer build that writes a `mode`
+/// this one doesn't know (#1680, `docs/updates.md`): the mode is a plain
+/// word, lowercase letters and `_`, at most 32, and with this build's own
+/// mode in its place every other field reads as this build's report. Set
+/// aside whole like a newer schema, never taken as cleanup evidence, so
+/// the cleanup runs. A malformed mode, or anything else this build can't
+/// read, is still not a cleanup report.
+pub(crate) fn newer_report_mode(bytes: &[u8]) -> bool {
+    let Ok(mut report) = serde_json::from_slice::<serde_json::Value>(bytes) else {
+        return false;
+    };
+    let plain = report["mode"].as_str().is_some_and(|mode| {
+        !valid_mode(mode)
+            && (1..=32).contains(&mode.len())
+            && mode
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte == b'_')
+    });
+    if !plain || report["schema_version"] != REPORT_SCHEMA_VERSION {
+        return false;
+    }
+    report["mode"] = "apply".into();
+    serde_json::from_value::<RunReport>(report).is_ok()
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]

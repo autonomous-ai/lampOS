@@ -1734,3 +1734,313 @@ fn forgetting_an_observation_never_reaches_a_kept_thing_its_evidence_was_only_sh
         "the kettle was only shown, never evidence"
     );
 }
+
+/// #1680: memory a newer build wrote (`user_version` above 1) doesn't stop
+/// the part. The database is kept whole under a new name, never changed,
+/// until a forget or `keep_days` removes it; this build starts a new one.
+#[test]
+fn a_newer_database_version_is_set_aside_whole_and_a_new_store_begins() {
+    let scratch = Scratch::new("newer-database");
+    let room = Person::everyone();
+    let mut store = scratch.open(30, NOW);
+    let kept = store.remember(&room, NOW, "Coffee black").unwrap();
+    drop(store);
+    scratch.sql("PRAGMA user_version=2; CREATE TABLE later(value TEXT)");
+    let original = fs::read(scratch.0.join(DATABASE)).unwrap();
+    let mut store =
+        Days::open(scratch.options(30), NOW).expect("a newer database does not stop the part");
+    let aside = store
+        .set_aside()
+        .expect("the kept database is said")
+        .to_owned();
+    assert!(
+        aside.starts_with("memory-days.sqlite3.newer-db2-"),
+        "{aside}"
+    );
+    assert_eq!(
+        fs::read(scratch.0.join(&aside)).unwrap(),
+        original,
+        "kept whole"
+    );
+    assert_eq!(
+        fs::metadata(scratch.0.join(&aside))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
+    assert!(
+        store.status(None).unwrap().is_empty(),
+        "the new store is empty"
+    );
+    assert!(store.record(&room, kept).unwrap().is_none());
+    let after = store.remember(&room, NOW, "Tea green").unwrap();
+    drop(store);
+    let reopened = scratch.open(30, NOW);
+    assert_eq!(
+        reopened.set_aside(),
+        Some(aside.as_str()),
+        "said on every start"
+    );
+    assert_eq!(
+        reopened.record(&room, after).unwrap().unwrap().text,
+        "Tea green"
+    );
+    drop(reopened);
+    assert_eq!(fs::read(scratch.0.join(&aside)).unwrap(), original);
+    let newer = Connection::open(scratch.0.join(&aside)).unwrap();
+    assert_eq!(
+        newer
+            .query_row("PRAGMA user_version", [], |row| row.get::<_, u64>(0))
+            .unwrap(),
+        2
+    );
+    assert_eq!(
+        newer
+            .query_row("SELECT text FROM entries WHERE id=?", [kept], |row| row
+                .get::<_, String>(
+                0
+            ))
+            .unwrap(),
+        "Coffee black"
+    );
+}
+
+/// #1680: an observation with a category a newer build wrote is read and
+/// kept as it is: never read as a thread, offered to a tidy or superseded.
+#[test]
+fn an_observation_with_a_newer_category_is_kept_and_never_tidied_over() {
+    let scratch = Scratch::new("newer-category");
+    let room = Person::everyone();
+    let mut store = scratch.open(30, NOW);
+    let source = store
+        .append(&room, NOW, "Coffee with milk", "Noted", &[])
+        .unwrap();
+    let later = observe(
+        &mut store,
+        &room,
+        "later",
+        &[source],
+        "Coffee with milk",
+        None,
+    );
+    drop(store);
+    scratch.sql("UPDATE entries SET category='habit' WHERE kind='observation'");
+    let mut store = scratch.open(30, NOW);
+    let read = store.record(&room, later).unwrap().unwrap();
+    assert_eq!(read.category, None, "not read as a thread");
+    assert!(read.active);
+    store.maintain(NOW + 1).unwrap();
+    let correction = store
+        .append(&room, NOW + 1, "Coffee black now, no milk", "Changed", &[])
+        .unwrap();
+    let job = store
+        .conversation_end(&room, "correction", &[correction])
+        .unwrap();
+    assert!(
+        job.previous.iter().all(|prior| prior.id != later),
+        "{job:?}"
+    );
+    assert!(
+        store
+            .conversation_end_with(&room, "chosen", &[correction], &[later])
+            .is_err(),
+        "it can't be chosen as a previous observation"
+    );
+    let mut over = output("Coffee black", &[correction], Some(later));
+    over.observations[0].category = Category::Thread;
+    assert!(store.tidy_apply(&room, &job.job, &over).is_err());
+    assert!(store.record(&room, later).unwrap().unwrap().active);
+    drop(store);
+    let stored: String = Connection::open(scratch.0.join(DATABASE))
+        .unwrap()
+        .query_row("SELECT category FROM entries WHERE id=?", [later], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(stored, "habit");
+}
+
+/// A store opened over a database a newer build wrote, with `-wal` and
+/// `-shm` beside the set-aside file, and one fact remembered here.
+fn set_aside_store(scratch: &Scratch, room: &Person) -> (Days, u64) {
+    let mut store = scratch.open(30, NOW);
+    store.remember(room, NOW, "Coffee black").unwrap();
+    drop(store);
+    scratch.sql("PRAGMA user_version=2");
+    let mut store = scratch.open(30, NOW);
+    let aside = store.set_aside().expect("set aside").to_owned();
+    for sidecar in ["-wal", "-shm"] {
+        fs::write(scratch.0.join(format!("{aside}{sidecar}")), b"").unwrap();
+    }
+    let fact = store.remember(room, NOW, "Favourite colour green").unwrap();
+    (store, fact)
+}
+
+fn assert_no_set_aside(scratch: &Scratch, store: Days) {
+    assert_eq!(store.set_aside(), None);
+    let left: Vec<String> = fs::read_dir(&scratch.0)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .filter(|name| name.contains(".newer-db"))
+        .collect();
+    assert!(left.is_empty(), "{left:?}");
+    drop(store);
+    assert_eq!(
+        scratch.open(30, NOW).set_aside(),
+        None,
+        "nor on a new start"
+    );
+}
+
+/// #2067: a set-aside database is the person's memory too, so forgetting
+/// everything removes it whole, with its sidecars, and it is no longer said.
+#[test]
+fn forgetting_everything_also_removes_a_set_aside_database() {
+    let scratch = Scratch::new("forget-all-set-aside");
+    let room = Person::everyone();
+    let (mut store, _) = set_aside_store(&scratch, &room);
+    store.forget_all(None).unwrap();
+    assert_no_set_aside(&scratch, store);
+}
+
+/// #2067 (Third): this build can't reach one fact inside the set-aside file,
+/// so forgetting one fact removes the whole file too.
+#[test]
+fn forgetting_one_fact_also_removes_a_set_aside_database() {
+    let scratch = Scratch::new("forget-one-set-aside");
+    let room = Person::everyone();
+    let (mut store, fact) = set_aside_store(&scratch, &room);
+    assert!(store.forget(&room, fact).unwrap() > 0);
+    assert_no_set_aside(&scratch, store);
+}
+
+/// #2067: so does forgetting the last thing said.
+#[test]
+fn forgetting_the_last_thing_also_removes_a_set_aside_database() {
+    let scratch = Scratch::new("forget-last-set-aside");
+    let room = Person::everyone();
+    let (mut store, fact) = set_aside_store(&scratch, &room);
+    assert_eq!(store.forget_last(&room, None).unwrap().unwrap().id, fact);
+    assert_no_set_aside(&scratch, store);
+}
+
+fn set_aside_files(scratch: &Scratch) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(&scratch.0)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .filter(|name| name.contains(".newer-db"))
+        .collect();
+    names.sort();
+    names
+}
+
+/// #2067: a set-aside database lasts no longer than `keep_days`, by its
+/// `<seconds>` stamp. One second either side: the one a second past it goes
+/// with its sidecars, the one a second short stays and is still said, until
+/// it too is `keep_days` old.
+#[test]
+fn a_set_aside_database_goes_once_keep_days_old_one_second_either_side() {
+    let scratch = Scratch::new("set-aside-expiry");
+    let room = Person::everyone();
+    let (store, _) = set_aside_store(&scratch, &room);
+    let older = store.set_aside().unwrap().to_owned();
+    drop(store);
+    scratch.sql("PRAGMA user_version=2");
+    let mut store = scratch.open(30, NOW + 2_000);
+    let younger = store.set_aside().unwrap().to_owned();
+    assert_eq!(
+        older,
+        format!("memory-days.sqlite3.newer-db2-{}", NOW / 1000)
+    );
+    assert_eq!(
+        younger,
+        format!("memory-days.sqlite3.newer-db2-{}", NOW / 1000 + 2)
+    );
+    let keep = 30 * DAY;
+    store.maintain(NOW + keep + 1_000).unwrap();
+    assert_eq!(
+        set_aside_files(&scratch),
+        vec![younger.clone()],
+        "a second past keep_days goes, sidecars too; a second short stays"
+    );
+    assert_eq!(store.set_aside(), Some(younger.as_str()));
+    store.maintain(NOW + keep + 2_000).unwrap();
+    assert!(set_aside_files(&scratch).is_empty());
+    assert_eq!(store.set_aside(), None, "health's warning clears");
+    drop(store);
+    assert_eq!(scratch.open(30, NOW + keep + 2_000).set_aside(), None);
+}
+
+/// #2067: an observation in a newer category takes none of the 32 previous
+/// slots, so a tidy pass still sees 32 real previous observations.
+#[test]
+fn observations_in_a_newer_category_take_no_previous_slot() {
+    let scratch = Scratch::new("newer-category-slots");
+    let room = Person::everyone();
+    let mut store = scratch.open(30, NOW);
+    let mut real = BTreeSet::new();
+    for n in 0..37u64 {
+        let source = store
+            .append(&room, NOW, &format!("Item{n} liked"), "Noted", &[])
+            .unwrap();
+        let id = observe(
+            &mut store,
+            &room,
+            &format!("c{n}"),
+            &[source],
+            &format!("Likes item{n}"),
+            None,
+        );
+        if n < 32 {
+            real.insert(id);
+        }
+    }
+    drop(store);
+    // The five newest were written by a newer build.
+    scratch.sql(&format!(
+        "UPDATE entries SET category='habit' WHERE kind='observation' AND id NOT IN ({})",
+        real.iter()
+            .map(u64::to_string)
+            .collect::<Vec<_>>()
+            .join(",")
+    ));
+    let mut store = scratch.open(30, NOW + 100);
+    let said = store
+        .append(&room, NOW + 100, "Weather today", "Sunny", &[])
+        .unwrap();
+    let job = store.conversation_end(&room, "end", &[said]).unwrap();
+    let previous: BTreeSet<u64> = job.previous.iter().map(|prior| prior.id).collect();
+    assert_eq!(previous, real);
+}
+
+/// #2067: in a session note an observation in a newer category shows as a
+/// plain fact, as a kept fact does, never as its newer category.
+#[test]
+fn a_newer_category_shows_in_a_session_note_as_a_plain_fact() {
+    let scratch = Scratch::new("newer-category-note");
+    let room = Person::everyone();
+    let mut store = scratch.open(30, NOW);
+    let kept = store.remember(&room, NOW, "Tea green").unwrap();
+    let source = store
+        .append(&room, NOW, "Coffee with milk", "Noted", &[])
+        .unwrap();
+    let later = observe(&mut store, &room, "c", &[source], "Coffee with milk", None);
+    drop(store);
+    scratch.sql("UPDATE entries SET category='habit' WHERE kind='observation'");
+    let mut store = scratch.open(30, NOW);
+    let note = store.session_open(&room, "s", NOTE_BYTES).unwrap();
+    let facts: Value = serde_json::from_str(&note.note).unwrap();
+    let kind = |id: u64| {
+        facts["facts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|fact| fact["id"] == id)
+            .unwrap_or_else(|| panic!("{facts}"))["kind"]
+            .clone()
+    };
+    assert_eq!(kind(kept), "preference", "a kept fact's plain label");
+    assert_eq!(kind(later), kind(kept), "{facts}");
+}

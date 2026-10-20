@@ -52,6 +52,7 @@ impl Authority {
                 WorkerEvent::Privacy {
                     acquired_at_us,
                     muted,
+                    ..
                 } => {
                     let now_us = monotonic_us();
                     if now_us
@@ -595,6 +596,7 @@ mod tests {
             &mut budget,
             || {
                 sender.control.send(WorkerEvent::Privacy {
+                    receipt: None,
                     acquired_at_us: monotonic_us(),
                     muted: true,
                 })?;

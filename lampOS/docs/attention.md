@@ -52,6 +52,37 @@ are not kept as something the lamp said. The request ends when the service
 completes it. The service still believes it answered; whether that
 changes what it does next has not been looked at.
 
+A call for something to be done in a held request is answered and not run
+(row 6 below), with one exception: a call that withdraws the person's
+consent is done though its line is held (the first builder on #1722,
+16:44; #1683). The list is `DONE_THOUGH_HELD` in `attention.rs`, and today
+it holds only `reports_stop`. Such a call only reduces what leaves the lamp,
+never adds to it. Done for a colleague's line, it costs all that a stop
+does ([cloud.md](cloud.md), "The person's choice"):
+
+- every report waiting is deleted;
+- one `stopped` is sent;
+- sharing stays off until the person turns it back on in the app;
+- since the answer is held, nobody is told at the time: before #1880's
+  follow-up only the journal knew.
+
+If it were not done, a person who asks to stop sharing and is held would
+have to ask twice. The first builder ruled at 16:44 on the cost of one
+report not sent. Asked again at the real cost (Third's read of #1880,
+18:39), the first builder kept it at 18:44 and made it visible: the stop is
+kept by `lamp-cloud` as the voice's, held, and when; the app's reports row
+shows it; and the voice says it only when asked about reports
+(`reports_state`, [tools.md](tools.md)), never unasked. Turning reports
+back on is the app's ([cloud.md](cloud.md), "The person's choice").
+
+The answer stays held: the model is told the call's result, and none of
+what it says after it is played. The room is told nothing of it, as of any
+held line: the call does not count as the lamp answering. The journal says
+`request N: reports_stop done though the answer was held (consent
+withdrawn)`. Every other call, the light, the volume, the schedule, memory,
+skills, stays held as before. A call that adds to what leaves the lamp is
+never put on the list.
+
 On the second route, with `LAMP_REPORTS=on`, a held line is asked one
 round for a `reports_stop` (`attention::DONE_THOUGH_HELD`,
 [second-voice.md](second-voice.md)) only when its heard words name
@@ -185,10 +216,16 @@ With the name heard in the sound it was one, and "Helen" is now among the
 words the text may show a call by (with "Mom", "Amen" and "Weiland", each
 written for the lamp's name at least once in its records).
 
-More words the service writes for the name ("Lynn", "Len", "Lin", "Lump",
+**On the second route only** (#1973, the first builder at 22:38), more
+words the service writes for the name ("Lynn", "Len", "Lin", "Lump",
 "Land", "Line", "Palin", "Palan", `attention::STAND_ALONE_INS`) are never
 taken for someone else's name, and call the lamp only standing alone, set
-off as a name is: "Hey, Lynn. How are you today?", "Lynn, what time is
+off as a name is. Its worker's rule counts them
+(`Attention::count_stand_alone_ins`, `called_by_name_on`). Deepgram writes
+"Lamp" so; Gemini's transcript doesn't, and Linh and Lin are common names.
+So on Live they are people's names as before, and "Lin, pass me that."
+between people stays held (`the_names_stand_ins_call_the_lamp_on_the_second_route_only`).
+On the second route: "Hey, Lynn. How are you today?", "Lynn, what time is
 it?", "Thank you, Lynn." are its calls, "Line up the meetings" is not
 (`called_by_name`). On lamp-4ace on 19 Oct, on the second route, "Hey Lamp,
 how are you today?" and "Lamp, what time is it?" came back with "Lynn" and
@@ -591,7 +628,7 @@ What was changed, each behind a switch, 1 to 5 on lamp-4ace since 11:52 the same
 | 2 | When the room changes and no quiet moment comes, it is told inside the request being heard, beside what is said, as the name is; a request's name and room go as one note | `LAMP_ROOM_FACTS=on`, as before |
 | 3 | In a busy room the name note is given only when the eyes' newest look, under two seconds old, has a face turned to the lamp (`humans/faces/tracked`, [eyes.md](eyes.md)); otherwise it is held and the journal says why | `LAMP_NAME_NOTE_BUSY=face`, beside `LAMP_NAME_NOTE=on` |
 | 4 | The model asks the lamp's clock for the time ([tools.md](tools.md), "`the_time`") | `LAMP_CLOCK=on` |
-| 6 | The rule is decided at a call for something to be done, too, and a held request's call is answered and not run: at 11:57, with the busy form on, the model asked for the light during the table's talk and the light was switched on while the answer's sound was held. On the lamp since 12:10 (`46403ffbd`) | `LAMP_ATTENTION=on` or `busy` |
+| 6 | The rule is decided at a call for something to be done, too, and a held request's call is answered and not run, except a call that withdraws consent, today only `reports_stop`, which is done though its answer stays held ("What happens to an answer that is held back", since `90c66e1bf`): at 11:57, with the busy form on, the model asked for the light during the table's talk and the light was switched on while the answer's sound was held. On the lamp since 12:10 (`46403ffbd`) | `LAMP_ATTENTION=on` or `busy` |
 | 5 | The rule's busy form: in a busy room every answer is held, not only a new session's first two, unless a conversation with the lamp is going on, the text shows it was called, or the eyes' newest fresh look has someone turned to the lamp; the name heard in the sound counts only with someone turned to it | `LAMP_ATTENTION=busy` in place of `on` |
 
 Against this meeting, by its records: with 1 the room would have been busy
@@ -653,6 +690,46 @@ are counted beside the answers let out. The name note's line "the lamp's
 name was heard in a busy room and nobody is turned to the lamp" gives the
 rise over the request's sound so far, when the name is heard, or "no rise
 of the room microphone read". Nothing the lamp does changes.
+
+**This home's bar, measured at setup (#753, `lamp-near-call`, nothing
+reads it yet).** 18 dB is one evening's guess at one desk. Setup asks the
+person to say the lamp's name from their own chair, and each answer is
+one try (`near_try`):
+- the name heard once on `name/heard` within 6 s of the prompt's end, at
+  0.95 or more;
+- mic1's largest rise over its quiet from the hearing's start to 1 s
+  after, the lamp's own voice left out.
+
+A try doesn't count if the lamp spoke from 0.5 s before the hearing to the
+end of that second. Its echo would be in the number, and speech anywhere
+else in the window is not. Three tries are needed, from at most five
+prompts, and setup stops asking once five can't reach three (`asks_again`).
+The bar is the quietest try less 3 dB, held to 16–24 dB (`near_rise`). It
+is never under 16 because people farther off reached 15.1 dB, and never
+over 24 so a loud talker isn't left with a raised voice as the only way in.
+No bar is set, and the rule keeps 18, with fewer than three tries or when
+they spread over more than 10 dB.
+
+Only numbers are kept, never sound: `/var/lib/lampOS/voice/near-call.json`
+(0600, written whole), `{"near_rise_db", "tries": [{"rise_db", "score"}],
+"at_unix_s"}`. A file whose bar its own tries don't make is not used, nor
+one with a try no step could have accepted (a score outside 0.95 to 1, or
+not a number).
+Setup's step (Seventh) takes the tries.
+
+**The rule reads it with `LAMP_ATTENTION_NEAR_CALIBRATED=on`** (off unless
+set), on both routes: the Live worker's busy-near rule and `--addressed`
+judgement, the second route's heeding, and the coordinator's room floor. Each
+takes the bar from `attention::near_rise_db()`, which looks at the file at
+most every 10 s and reads it only when it has changed, so a new measurement is
+used without a restart. A missing or unfit file keeps 18 dB. Each process's
+journal says the bar in use when it changes: "lamp-voice: the near rule's
+bar is 19.4 dB over the room's quiet (this home's, measured at setup)", or
+"(the default: no measurement that fits)". The switch goes to the two
+routes' workers alone (`process.rs`). The reset wipes the file
+(`reset-plan-product.json`, and lamp-06c1's plan). `NEAR_SCORE` and
+`NEAR_RISE_DB` are `lamp-near-call`'s own, so setup and the rule share one
+bar.
 
 What each costs. 5: in a busy room a question put to the lamp without
 its name in the service's text and without a face turned to it is not

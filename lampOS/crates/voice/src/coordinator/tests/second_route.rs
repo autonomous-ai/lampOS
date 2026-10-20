@@ -107,6 +107,9 @@ struct Script {
     second_says: Option<&'static str>,
     /// Packets of a wait cue the second route plays before its words.
     second_cue: usize,
+    /// What the second route heard the person say, as its recogniser
+    /// gives it before the answer: a transcript with no request (#1670).
+    second_hears: Option<&'static str>,
     /// Speech starts again (a new turn, or speaking over an answer).
     speak_again: Option<When>,
     /// Privacy reports muted once this many turns are settled.
@@ -165,6 +168,7 @@ impl Script {
             second_packets: 12,
             second_says: None,
             second_cue: 0,
+            second_hears: None,
             speak_again: None,
             turns: 1,
             live_back_after: None,
@@ -792,6 +796,15 @@ impl Peers {
                         if self.script.second_cue > 0 {
                             self.audio(index, request, self.script.second_cue, CUE);
                         }
+                        if let Some(text) = self.script.second_hears {
+                            self.peers[index]
+                                .queued
+                                .push_back(ProviderOutput::Transcript {
+                                    request: None,
+                                    text: text.into(),
+                                    finished: true,
+                                });
+                        }
                         if let Some(text) = self.script.second_says {
                             self.peers[index]
                                 .queued
@@ -1016,6 +1029,7 @@ impl PrivacyPeer {
         }
         if !self.peer.stopped && crate::scenario_clock::instant() >= self.next {
             let _ = self.peer.channels.control.send(WorkerEvent::Privacy {
+                receipt: None,
                 acquired_at_us: monotonic_us(),
                 muted: self.muted.load(Ordering::SeqCst),
             });
@@ -2736,12 +2750,14 @@ fn a_stop_during_a_slow_tool_call_lets_the_second_worker_exit_within_its_deadlin
         .build()
         .unwrap();
     let (taken, held) = std::sync::mpsc::channel();
+    let (release, released) = std::sync::mpsc::channel::<()>();
     let holder = std::thread::spawn(move || {
         let (call, _) = executive.accept().unwrap();
         let (stream, _) = chat.accept().unwrap();
         taken.send(()).unwrap();
-        // Held open, unanswered, until the test ends.
-        std::thread::sleep(Duration::from_secs(3));
+        // Held open, unanswered, until the test has timed the stop, not a
+        // fixed 3 s the test then waited out (#1806).
+        let _ = released.recv_timeout(Duration::from_secs(10));
         drop((call, stream));
     });
     runtime.block_on(async move {
@@ -2762,9 +2778,44 @@ fn a_stop_during_a_slow_tool_call_lets_the_second_worker_exit_within_its_deadlin
     let stopped = Instant::now();
     crate::second_provider::worker::finish(runtime);
     let took = stopped.elapsed();
+    release.send(()).unwrap();
     holder.join().unwrap();
     assert!(
         took < Duration::from_millis(300),
         "the second worker's runtime took {took:?} to end after Stop"
     );
+}
+
+/// #1670, the owner's rule of 19 Oct (a voice feature works on the second
+/// route): the inner state reads two of the voice's topics, `voice/state`
+/// and `voice/heard`. With the second route alone, what it heard the person
+/// say reaches the coordinator's heard path (`turn` null, the branch that
+/// says `voice/heard`), and the ring phases that `voice/state` is made from
+/// pass through listening, waiting and speaking, as with Gemini.
+#[test]
+fn the_second_route_alone_gives_mood_what_was_heard_and_the_voices_phases() {
+    let _one = super::pilot_faults::one_session();
+    let alone = run(Script {
+        second: false,
+        only: true,
+        second_hears: Some("what time is it"),
+        ..Script::question(Live::Answer(12))
+    });
+    alone.assert_clean();
+    let heard: Vec<_> = alone
+        .events("transcript")
+        .into_iter()
+        .filter(|event| event["turn"].is_null())
+        .collect();
+    assert_eq!(heard.len(), 1, "{}", alone.summary());
+    assert_eq!(heard[0]["text"], "what time is it");
+    assert_eq!(heard[0]["finished"], true);
+    let phases = dedup(&alone.seen.phases);
+    for phase in [
+        RingPhase::Listening,
+        RingPhase::Waiting,
+        RingPhase::Speaking,
+    ] {
+        assert!(phases.contains(&phase), "{phase:?}: {phases:?}");
+    }
 }

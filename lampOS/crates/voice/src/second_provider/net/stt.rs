@@ -1095,7 +1095,8 @@ where
                         },
                     ));
                     return if finalize_by.is_some() {
-                        Ok(ending(&transcript, &at_end, Some(answered), "close_stream"))
+                        let from = closed_by_service(&mut at_end, &transcript, sent, closing, finalize_went);
+                        Ok(ending(&transcript, &at_end, Some(answered), from))
                     } else {
                         Err(Error::Transport("speech-to-text stream"))
                     };
@@ -1103,7 +1104,8 @@ where
                 None => {
                     replies.end("ended with no close".to_owned());
                     return if finalize_by.is_some() {
-                        Ok(ending(&transcript, &at_end, Some(answered), "close_stream"))
+                        let from = closed_by_service(&mut at_end, &transcript, sent, closing, finalize_went);
+                        Ok(ending(&transcript, &at_end, Some(answered), from))
                     } else {
                         Err(Error::Transport("speech-to-text stream"))
                     };
@@ -1117,6 +1119,31 @@ where
             }
         }
     }
+}
+
+/// Where a line's words came from when the service ended the stream after
+/// `Finalize`: `close_stream` when the lamp had asked it to close; otherwise
+/// `closed_early`, and the journal's account says when, how far the finals
+/// reached and how many words there were, never the words: a line the
+/// service closed before `Finalize`'s answer may have lost its end, and the
+/// turn goes on with the words so far (the reviewer on #1954).
+fn closed_by_service(
+    at_end: &mut String,
+    transcript: &Transcript,
+    sent: f64,
+    closing: bool,
+    finalize_went: Option<Instant>,
+) -> &'static str {
+    if closing {
+        return "close_stream";
+    }
+    let after = finalize_went.map_or(0, |went| went.elapsed().as_millis());
+    let words = transcript.words().0.split_whitespace().count();
+    at_end.push_str(&format!(
+        "; closed by the service {after} ms after finalize, before its answer: {}, {words} words",
+        transcript.at_end(sent)
+    ));
+    "closed_early"
 }
 
 #[cfg(test)]
@@ -1849,6 +1876,58 @@ mod tests {
             at_end.ends_with(
                 ", finalize unanswered, results 2 with words, 1 without, words from=close_stream"
             ),
+            "{at_end}"
+        );
+    }
+
+    /// The reviewer on #1954: the service closing the stream just after
+    /// `Finalize`, before its answer and with no `CloseStream` asked, keeps
+    /// the words so far, and the journal says it was closed early, when,
+    /// how far the finals reached and how many words, never the words.
+    #[tokio::test(start_paused = true)]
+    async fn a_close_before_finalizes_answer_is_told_as_closed_early() {
+        use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
+        const SAID: &str = r#"{"type":"Results","is_final":true,"speech_final":false,"start":0.0,"duration":0.5,"channel":{"alternatives":[{"transcript":"hey lamp"}]}}"#;
+        let (near, far) = tokio::io::duplex(1 << 16);
+        let server = tokio::spawn(async move {
+            let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+            let mut told = false;
+            while let Some(Ok(message)) = socket.next().await {
+                match message {
+                    Message::Binary(_) if !told => {
+                        told = true;
+                        socket.send(Message::text(SAID)).await.unwrap();
+                    }
+                    Message::Text(text) if text.contains("Finalize") => {
+                        tokio::time::sleep(Duration::from_millis(40)).await;
+                        let _ = socket.close(None).await;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        });
+        let stream =
+            SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+        for _ in 0..50 {
+            stream.send(&[0; 320]).unwrap();
+        }
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let (words, at_end) = stream.finish_told(true).await.unwrap();
+        server.abort();
+        let at_end = at_end.unwrap();
+        assert_eq!(words, "hey lamp");
+        assert!(at_end.ends_with("words from=closed_early"), "{at_end}");
+        assert!(
+            at_end.contains("; closed by the service 40 ms after finalize, before its answer: settled=false, speech_final=false, finals cover 500 of 1000 ms sent"),
+            "{at_end}"
+        );
+        assert!(
+            at_end.contains(", 2 words, finalize unanswered"),
+            "{at_end}"
+        );
+        assert!(
+            !at_end.contains("hey") && !at_end.contains("lamp"),
             "{at_end}"
         );
     }

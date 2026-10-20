@@ -193,7 +193,7 @@ fn starts(outputs: &[(u64, Output)], name: &str) -> usize {
 }
 
 #[test]
-fn while_it_speaks_its_head_nods_on_stressed_words_sways_between_sentences_and_settles() {
+fn while_it_speaks_it_nods_on_stressed_words_sways_its_base_between_sentences_and_settles() {
     for room in [Room::Quiet, Room::Busy] {
         let mut lamp = Lamp::new(catalogue(true), room);
         let outputs = answer(&mut lamp, 8);
@@ -206,20 +206,22 @@ fn while_it_speaks_its_head_nods_on_stressed_words_sways_between_sentences_and_s
         let pitch =
             |f: fn(f64, f64) -> f64, start: f64| during.iter().map(|o| o.head_pitch).fold(start, f);
         // Visible: about two degrees of nod over the speaking pose, and the
-        // head rolled to both sides between sentences.
+        // base turned out after a pause (#955: about 52 counts at most,
+        // inside the body's 70; which pauses sway, and to which side, the
+        // unit tests check).
         assert!(
             pitch(f64::max, f64::MIN) - pitch(f64::min, f64::MAX) > 0.02,
             "{room:?}"
         );
-        assert!(during.iter().any(|o| o.head_roll > 0.015), "{room:?}");
-        assert!(during.iter().any(|o| o.head_roll < -0.015), "{room:?}");
+        assert!(during.iter().any(|o| o.base_yaw.abs() > 0.055), "{room:?}");
         // Within the catalogue's limits.
         let limits = catalogue(true).limits;
         assert!(
             during
                 .iter()
                 .all(|o| o.head_pitch.abs() <= limits.head_pitch
-                    && o.head_roll.abs() <= limits.head_roll)
+                    && o.head_roll.abs() <= limits.head_roll
+                    && o.base_yaw.abs() <= limits.base_yaw)
         );
         // What speaking adds, against the same answer without it, never
         // jumps between ticks. (The old played-sound clip follows each 20 ms
@@ -237,19 +239,19 @@ fn while_it_speaks_its_head_nods_on_stressed_words_sways_between_sentences_and_s
             .map(|(with, without)| {
                 (
                     with.head_pitch - without.head_pitch,
-                    with.head_roll - without.head_roll,
+                    with.base_yaw - without.base_yaw,
                 )
             })
             .collect();
-        let (pitch_step, roll_step) = added.windows(2).fold((0.0_f64, 0.0_f64), |(p, r), w| {
+        let (pitch_step, yaw_step) = added.windows(2).fold((0.0_f64, 0.0_f64), |(p, r), w| {
             (
                 p.max((w[1].0 - w[0].0).abs()),
                 r.max((w[1].1 - w[0].1).abs()),
             )
         });
         assert!(
-            pitch_step < 0.007 && roll_step < 0.003,
-            "{room:?} {pitch_step} {roll_step}"
+            pitch_step < 0.007 && yaw_step < 0.007,
+            "{room:?} {pitch_step} {yaw_step}"
         );
         // A nod on a stressed word in each of its three sentences, never
         // two in one, never two within 4 s (the first builder on #2030).
@@ -506,6 +508,38 @@ fn a_catalogue_without_speaking_plans_its_speech_as_before() {
         .collect();
     // The old clip's roll is at most 0.009 rad, scaled by the level.
     assert!(rolls.iter().all(|roll| roll.abs() <= 0.0091), "{rolls:?}");
+    // And the base does not turn for it.
+    assert!(
+        outputs
+            .iter()
+            .filter_map(|(_, output)| output.body.as_ref())
+            .all(|body| body.offsets.base_yaw == 0.0)
+    );
+}
+
+/// #955's own `speaking` section, with the head roll it asked: read, its
+/// roll ignored, no sway, and the rest of its speech as before.
+#[test]
+fn a_catalogue_with_the_old_head_roll_still_loads_and_does_not_sway() {
+    let text = include_str!("../alive-behaviours.json")
+        .replace("\"sway_yaw\": 0.08", "\"sway_roll\": 0.025")
+        .replace("\"sway_us\": 800000", "\"sway_us\": 600000");
+    let mut old = Catalogue::from_json(&text).unwrap();
+    old.timing.body_lag_us = Some(0);
+    let speaking = old.speaking.unwrap();
+    assert_eq!((speaking.sway_roll, speaking.sway_yaw), (Some(0.025), 0.0));
+    let mut lamp = Lamp::new(old, Room::Quiet);
+    let outputs = answer(&mut lamp, 8);
+    assert_eq!(starts(&outputs, "swaying between sentences"), 0);
+    // At most one nod a sentence (#2030): its three sentences nod 2 or 3
+    // times.
+    assert!(starts(&outputs, "nodding on a stressed word") >= 2);
+    assert!(
+        outputs
+            .iter()
+            .filter_map(|(_, output)| output.body.as_ref())
+            .all(|body| body.offsets.base_yaw == 0.0 && body.offsets.head_roll.abs() <= 0.0091)
+    );
 }
 
 /// Three seconds of the answer from 1 s, ticked; then `after` at 4 s, and
@@ -586,4 +620,79 @@ fn a_new_turn_or_a_cancelled_answer_carries_none_of_the_old_answers_motion() {
             .iter()
             .any(|(_, output)| named(output, "settling as it finishes"))
     );
+}
+
+/// The sway and the nods read the speaking motion's level, sampled at the
+/// catalogue's body lag (lamp-4ace's measured 300 ms), not the playout clip.
+/// Here each piece is said 400 ms before it plays, so one covers now + lag.
+/// (The voice says only 200 ms ahead today; #2030 on #1712 gives the speaking
+/// motion its own `speech_level` for that, and the sway follows it.)
+#[test]
+fn with_the_measured_body_lag_the_speaking_level_still_nods_and_sways() {
+    const AHEAD: u64 = 400_000;
+    let mut catalogue = catalogue(true);
+    catalogue.timing.body_lag_us = Some(300_000);
+    let mut lamp = Lamp::new(catalogue, Room::Quiet);
+    let (start, end) = (1_000_000, 9_000_000);
+    let mut outputs = Vec::new();
+    let mut at = 0;
+    while at < end + 1_500_000 {
+        let speaking = (start..end).contains(&at);
+        if at % 100_000 == 0 {
+            let state = if speaking {
+                Voice::Speaking
+            } else {
+                Voice::Resting
+            };
+            lamp.parts(at, state);
+        }
+        let plays = at + AHEAD;
+        if speaking && plays < end {
+            let playout = VoicePlayout {
+                stamp: lamp.stamp(at),
+                session_id: "voice-one".into(),
+                turn: 1,
+                request: 11,
+                start_us: plays,
+                end_us: plays + TICK,
+                level: level(plays - start),
+            };
+            lamp.send(
+                at,
+                Input::Sound(VoiceSound {
+                    playout,
+                    audio_generation: 1,
+                }),
+            );
+        }
+        outputs.push((at, lamp.engine.tick(at)));
+        at += TICK;
+    }
+    let nods = starts(&outputs, "nodding on a stressed word");
+    let sways = starts(&outputs, "swaying between sentences");
+    let settled = outputs
+        .iter()
+        .any(|(_, output)| named(output, "settling as it finishes"));
+    assert!(
+        // At most one nod a sentence (#2030): 2 or 3 in its three.
+        settled && nods >= 2 && sways >= 1,
+        "nods {nods} sways {sways} settled {settled}"
+    );
+}
+
+/// #933: the product's catalogue carries the speaking section, the same as
+/// the alive catalogue's, base sway included. Without it a lamp installed
+/// from the product never nods, sways or settles while it speaks, whatever
+/// Expression can do (it had none until 17 Oct).
+#[test]
+fn the_products_catalogue_nods_sways_and_settles_as_the_alive_one_does() {
+    let product = Catalogue::from_json(include_str!(
+        "../../../deploy/product/settings/expression.json"
+    ))
+    .unwrap();
+    let alive = Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+    let speaking = product.speaking.expect("the product's catalogue speaks");
+    assert_eq!(Some(speaking), alive.speaking);
+    assert!(speaking.sway_yaw > 0.0, "the base sways between sentences");
+    assert!(speaking.sway_roll.is_none());
 }
