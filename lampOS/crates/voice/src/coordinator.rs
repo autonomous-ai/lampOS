@@ -3900,6 +3900,33 @@ thread_local! {
     /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
     static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
         const { std::cell::RefCell::new(None) };
+    /// A loop test's near-call try (#1803), in place of onboarding's own.
+    static TEST_NEAR: std::cell::RefCell<Option<crate::onboarding::near::NearFlow>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Whether onboarding's near-call step holds the reply to the utterance
+/// whose speech began at `began_us`, at `at_us` (#1803): its try window is
+/// open and the lamp's name was heard as it began, so it is the person
+/// calling the lamp for the measurement, and the lamp's answer would spoil
+/// the try. Nothing outside the step is held.
+fn near_call_window(
+    onboarding: Option<&crate::onboarding::Onboarding>,
+    began_us: Option<u64>,
+    at_us: u64,
+) -> bool {
+    let Some(began_us) = began_us else {
+        return false;
+    };
+    #[cfg(test)]
+    if let Some(held) = TEST_NEAR.with(|near| {
+        near.borrow()
+            .as_ref()
+            .map(|flow| flow.holds_reply(began_us, at_us))
+    }) {
+        return held;
+    }
+    onboarding.is_some_and(|walk| walk.near_holds_reply(began_us, at_us))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4082,6 +4109,10 @@ fn conversation_with_gate(
     // (`LAMP_SHORT_SOUNDS`): until it is answered the lamp does not ponder
     // it, and the room and the provider do not count it as talk.
     let mut sound_turn: Option<u64> = None;
+    // A call heard during the near-call step's try window (#1803): it ends
+    // unanswered, however long it runs past the window, if it is no more
+    // than a call.
+    let mut near_call_turn: Option<u64> = None;
     // The answer whose words are arriving, and whether any of them has been
     // a word yet.
     let mut answer_words: Option<(u64, bool)> = None;
@@ -4135,6 +4166,12 @@ fn conversation_with_gate(
         })
     });
     let mut onboarding_invitation_turn: Option<(BootId, u64)> = None;
+    // The near-call step's evidence (#1803): `name/heard`, `ears/level` and
+    // `voice/state`, drained without waiting. Without the bus the step is
+    // unavailable.
+    let mut onboarding_ears = onboarding
+        .as_ref()
+        .and_then(|_| crate::onboarding::near::Ears::from_environment());
     // News from the work handed to agents on other computers, told
     // unasked at a good moment (`docs/tasks.md`).
     #[cfg(test)]
@@ -4783,6 +4820,19 @@ fn conversation_with_gate(
                     says.is_some() && bus_out.is_some() && !trace.onboarding_privacy_disabled
                 }),
             );
+        }
+        if let Some(walk) = onboarding.as_mut() {
+            walk.set_near_available(
+                says.is_some()
+                    && bus_out.is_some()
+                    && onboarding_ears.is_some()
+                    && !trace.onboarding_privacy_disabled,
+            );
+            if let Some(ears) = onboarding_ears.as_mut() {
+                for seen in ears.take(monotonic_us()) {
+                    walk.near_seen(seen);
+                }
+            }
         }
         let observation = match controls.as_mut() {
             Some(controls) => Some(controls.poll()?),
@@ -6044,6 +6094,21 @@ fn conversation_with_gate(
                     }),
                 step => step,
             };
+            // An utterance ending in the near-call window is held too, even
+            // if no block of it was (#1803); but only a call: one with more
+            // said than the name ("can we skip this?") goes on as any other.
+            if matches!(step, AdmissionStep::End(_)) {
+                if near_call_window(
+                    onboarding.as_ref(),
+                    speech_levels.front().map(|(at, _)| *at),
+                    monotonic_us(),
+                ) {
+                    near_call_turn = reply.as_ref().map(|current| current.owner.turn());
+                }
+                if speech_levels.len() > usize::from(crate::activity::CALL_SPEECH_BLOCKS) {
+                    near_call_turn = None;
+                }
+            }
             match step {
                 AdmissionStep::None => {}
                 AdmissionStep::Rejected(rejection) => record_input_rejection(trace, rejection)?,
@@ -6461,6 +6526,13 @@ fn conversation_with_gate(
                         return Err(io::Error::other("speech continuation lost its owner").into());
                     };
                     let turn = current.owner.turn();
+                    if near_call_window(
+                        onboarding.as_ref(),
+                        speech_levels.front().map(|(at, _)| *at),
+                        monotonic_us(),
+                    ) {
+                        near_call_turn = Some(turn);
+                    }
                     let mut resumed = None;
                     if early.as_ref().is_some_and(|early| early.holds(turn)) {
                         // The end was sent early: nothing more goes to the
@@ -6620,40 +6692,54 @@ fn conversation_with_gate(
                 }
                 AdmissionStep::End(audio)
                     if reply.as_ref().is_some_and(|current| {
-                        crate::not_speech::dropped(
-                            speech_levels.len(),
-                            took_over_turn == Some(current.owner.turn()),
-                            crate::not_speech::own_words_ago(
-                                last_spoke_us,
-                                stopped_at_us,
-                                monotonic_us(),
-                            ),
-                            said_close(&speech_levels, &loud_blocks, &rise),
-                            short_sounds,
-                            room.busy(),
-                            crate::not_speech::just_stopped(
-                                stopped_at_us,
-                                last_spoke_us,
-                                monotonic_us(),
-                            ),
-                        )
+                        near_call_turn == Some(current.owner.turn())
+                            || crate::not_speech::dropped(
+                                speech_levels.len(),
+                                took_over_turn == Some(current.owner.turn()),
+                                crate::not_speech::own_words_ago(
+                                    last_spoke_us,
+                                    stopped_at_us,
+                                    monotonic_us(),
+                                ),
+                                said_close(&speech_levels, &loud_blocks, &rise),
+                                short_sounds,
+                                room.busy(),
+                                crate::not_speech::just_stopped(
+                                    stopped_at_us,
+                                    last_spoke_us,
+                                    monotonic_us(),
+                                ),
+                            )
                     }) =>
                 {
-                    // A sound, not something said. It is not sent on as a
-                    // finished question: the turn ends here, unanswered.
+                    // A sound, not something said, or the person calling the
+                    // lamp's name for the near-call step (#1803). It is not
+                    // sent on as a finished question: the turn ends here,
+                    // unanswered.
+                    let near_call = reply
+                        .as_ref()
+                        .is_some_and(|current| near_call_turn == Some(current.owner.turn()));
                     if let Some(current) = reply.as_ref() {
                         let mut endpoint_record = json!({"kind":"local_endpoint","owner":current.owner,"turn":current.owner.turn(),"at_us":at,
                                 "last_block_host_read_us":audio.captured_at_us,
                                 "includes_silence_wait_ms":detector.last_endpoint().map_or(detector.endpoint_silence_ms(), |decision| decision.silence_ms),
-                                "acoustic_speech_end":null,
-                                "not_speech":{"speech_blocks":speech_levels.len(),"fewer_than":crate::not_speech::SCRAP_BLOCKS,
-                                    "said_close":said_close(&speech_levels, &loud_blocks, &rise),
-                                    "last_blocks":last_blocks(&judged_blocks)}});
-                        if crate::not_speech::just_stopped(
-                            stopped_at_us,
-                            last_spoke_us,
-                            monotonic_us(),
-                        ) {
+                                "acoustic_speech_end":null});
+                        if near_call {
+                            endpoint_record["onboarding_near_call"] = json!(
+                                "held: the name alone, heard in the near-call step's try window, so the lamp does not answer it"
+                            );
+                        } else {
+                            endpoint_record["not_speech"] = json!({"speech_blocks":speech_levels.len(),"fewer_than":crate::not_speech::SCRAP_BLOCKS,
+                                "said_close":said_close(&speech_levels, &loud_blocks, &rise),
+                                "last_blocks":last_blocks(&judged_blocks)});
+                        }
+                        if !near_call
+                            && crate::not_speech::just_stopped(
+                                stopped_at_us,
+                                last_spoke_us,
+                                monotonic_us(),
+                            )
+                        {
                             endpoint_record["not_speech"]["after_stop"] = json!(true);
                             eprintln!(
                                 "lamp-voice: a short sound just after the lamp was stopped is not taken as a request"
@@ -6677,7 +6763,16 @@ fn conversation_with_gate(
                     if let Some(stop) = reply.as_ref().and_then(|current| current.told_stop) {
                         stop_untold.given_back(stop);
                     }
-                    cancel_reply(owner, reply, trace, "not_speech")?;
+                    cancel_reply(
+                        owner,
+                        reply,
+                        trace,
+                        if near_call {
+                            "onboarding_near_call"
+                        } else {
+                            "not_speech"
+                        },
+                    )?;
                     speaker_pending = None;
                     provider_queue.clear();
                     snapshot = owner.snapshot(now())?;
@@ -7044,7 +7139,7 @@ fn conversation_with_gate(
             current.answer_say(&speaker_pending, snapshot);
             if onboarding_invitation_turn == Some((current.owner.boot(), turn)) {
                 if let Some(walk) = onboarding.as_mut() {
-                    walk.privacy_invitation_finished(
+                    walk.invitation_finished(
                         current.owner.boot(),
                         turn,
                         current.heard_whole(&speaker_pending, snapshot),
@@ -7904,13 +7999,13 @@ fn conversation_with_gate(
             if let Some(polls) = trace.onboarding_test_polls.as_ref() {
                 polls.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
-            if let Some((boot, turn)) = walk.privacy_invitation_binding()
+            if let Some((boot, turn)) = walk.invitation_binding()
                 && reply
                     .as_ref()
                     .map(|current| (current.owner.boot(), current.owner.turn()))
                     != Some((boot, turn))
             {
-                walk.privacy_invitation_finished(boot, turn, false, monotonic_us());
+                walk.invitation_finished(boot, turn, false, monotonic_us());
                 onboarding_invitation_turn = None;
             }
             let can_speak = reply.is_none()
@@ -7932,7 +8027,7 @@ fn conversation_with_gate(
                 face,
                 still,
             );
-            let pending = walk.privacy_pending();
+            let pending = walk.pending();
             if let Some(bus) = bus_out.as_mut() {
                 bus.onboarding_pending(&pending, monotonic_us());
             }
@@ -7942,7 +8037,7 @@ fn conversation_with_gate(
                 && let Some(ticket) = says.take_onboarding(offer.invitation, monotonic_us())
             {
                 if let (Some(words), Some(provider_session)) = (
-                    walk.take_privacy_invitation(offer.invitation, monotonic_us()),
+                    walk.take_invitation(offer.invitation, monotonic_us()),
                     unasked_session(&cloud, paused),
                 ) {
                     snapshot = commit_written_turn(
@@ -7951,7 +8046,12 @@ fn conversation_with_gate(
                         &mut provider_queue,
                         &words,
                         false,
-                        "onboarding_privacy_invitation",
+                        match offer.step {
+                            lamp_msgs::OnboardingStep::Privacy => "onboarding_privacy_invitation",
+                            lamp_msgs::OnboardingStep::HowYouSound => "onboarding_near_call_prompt",
+                            // Only read, never offered by this voice.
+                            lamp_msgs::OnboardingStep::Unknown => "onboarding_invitation",
+                        },
                         provider_session,
                         rig.playout_start,
                         trace,
@@ -7959,7 +8059,7 @@ fn conversation_with_gate(
                     )?;
                     if let Some(current) = reply.as_ref() {
                         let bound = (current.owner.boot(), current.owner.turn());
-                        if walk.bind_privacy_invitation(offer.invitation, bound.0, bound.1) {
+                        if walk.bind_invitation(offer.invitation, bound.0, bound.1) {
                             onboarding_invitation_turn = Some(bound);
                         }
                     }
@@ -7969,7 +8069,7 @@ fn conversation_with_gate(
                     ticket.answer(crate::say::Outcome::Refused(
                         "onboarding invitation is no longer eligible".into(),
                     ));
-                    walk.privacy_invitation_refused(offer.invitation, monotonic_us());
+                    walk.invitation_refused(offer.invitation, monotonic_us());
                 }
             }
             for line in walk.take_records() {

@@ -8,6 +8,14 @@ use std::time::Duration;
 #[serde(rename_all = "snake_case")]
 pub enum OnboardingStep {
     Privacy,
+    /// One prompt to call the lamp by name from the person's usual seat
+    /// (#1803). Only the prompt's identity travels here, never a measurement.
+    HowYouSound,
+    /// A step a newer voice names (one release forward, the reviewer on
+    /// #1964): the core skill still hands its token to the say service,
+    /// which alone decides whether it is current. Never sent.
+    #[serde(other)]
+    Unknown,
 }
 
 /// The runner owns these identities. A new invitation token is required after
@@ -95,9 +103,13 @@ mod tests {
         }
         pending.invitations.push(invitation);
         assert!(pending.check().is_err());
-        assert!(
-            serde_json::from_str::<OnboardingPending>(&text.replace("privacy", "unrecognised"))
-                .is_err()
-        );
+        let newer: OnboardingPending =
+            serde_json::from_str(&text.replace("privacy", "giving_way")).unwrap();
+        assert_eq!(newer.invitations[0].step, OnboardingStep::Unknown);
+        assert!(newer.check().is_ok());
+        let near: OnboardingPending =
+            serde_json::from_str(&text.replace("privacy", "how_you_sound")).unwrap();
+        assert_eq!(near.invitations[0].step, OnboardingStep::HowYouSound);
+        assert!(near.check().is_ok());
     }
 }
