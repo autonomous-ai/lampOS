@@ -1,3 +1,4 @@
 owner: mobile (named by the first builder on #1396, 2026-10-19 13:24; role file #1734)
-runs: product install of build 3058 (lamp-voice 89bd0e65f), set up from the app; lamp-cloud on by cloud-on.sh (started, not enabled); body down (no lamp.env); V1 disabled and kept
-since: 2026-10-19 14:5x +07, from a file:/// channel signed with a test key
+runs: product install of build 4203 (lamp-voice e93fdaddc), `install --setup on` from a channel signed with this lamp's test key; set up from the app (the mobile team's account, record of 2026-10-20 07:06Z); body down (no lamp.env, waits for the factory sheet, #1682); V1 disabled and kept
+switches (drop-ins, for the app's tries, removed after): lamp-cloud LAMP_SKILLS_PAGE, LAMP_SETTINGS_CHANGE, LAMP_PHOTO_FACES, LAMP_FACES_PAGE, LAMP_APP_SCHEDULE (+ LAMP_EYES_PHOTO_DIR, LAMP_EYES_WHO_SOCKET, ReadWritePaths=-/run/lampos-eyes/photos); lamp-voice LAMP_PHOTO_FACES; lamp-eyes --photo-dir /run/lampos-eyes/photos; lamp-setup-change.socket/@.service from build 3944's deploy/product
+since: 2026-10-20 16:23 +07 (3944 since 10:5x; 3058 before)

@@ -139,3 +139,38 @@ Ready for lamp-voice: no (the work is in the app's repository)
   `flutter test` +685 −1 (`v3`'s own failure).
 - Next on the list: #1683's app side (the backend's store is live, 14:57),
   then the skills page's design.
+
+## 2026-10-20 — lamp-0c89's tries for the app's Lamp 2 pages
+
+Ready for lamp-voice: no (the work is in the app's repository; lamp-0c89's
+owner file is updated here)
+
+- **lamp-0c89 updated twice through `lamp-update`:** build 3944
+  (`b1c8cf27c`) at 10:5x, then build 4203 (`e93fdaddc`) at 16:23 by El's
+  way (a channel in `/var/lib/lampos-channel-new/`, `manifest --skills`,
+  signed with the lamp's own test key and the key removed, `install
+  --setup on`, the voice's two models copied at their pins). Running
+  binaries checked by hash each time.
+- **Findings, each on its issue:**
+  - an absolute `cloud/current` link left by `cloud-on.sh` made `check`
+    skip `lamp-cloud` silently (#1396);
+  - `lamp-setup-change` subscribed as `setup-change`, which the bus refuses
+    (#1396, fixed by El);
+  - `lamp-cloud` failed once at start on `ReadWritePaths` for a photo folder
+    the eyes make after it, fixed with `-` (Ten's sheet, #2263);
+  - **open:** `lamp-cloud`'s MQTT client takes no incoming packet over
+    10 KiB, so a photo face (231 KB) drops its connection (#1722, 16:5x).
+- **Tried from the phone, driven by WebDriverAgent:**
+  - the Skills page, the lamp's name and time zone (ecm-sds-mobile#8, #9);
+  - texting a task and a refused moving skill (#1673, on the second route);
+  - #1683's company-broker run: off before, the yes at setup, health every
+    15 min, the app's no with `stopped` twice and the backend's delete
+    (passed, Jarvis's read);
+  - the privacy switch row, closed and open (#12);
+  - reminders set by voice, listed, one cancelled (#14).
+- **Merged into the app's `v3` today:** ecm-sds-mobile#7, #8, #9, #12,
+  #13 (its end-to-end try still owed) and #14. Open: #10 (task news, waits
+  on the backend's subscriber); next: removing an added skill (#1890).
+- The device record of the morning was deleted at the company side at
+  12:13; the lamp was set up again from the mobile team's account. A power
+  cut at 16:28 rebooted it; everything came back on 4203.
