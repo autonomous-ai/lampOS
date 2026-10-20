@@ -75,8 +75,8 @@ case ${2:-} in
   *) echo "$USAGE" >&2; exit 2 ;;
 esac
 case $ROW in
-  laugh) NAME=laugh-glance FIELD=laughter BAR=0.5 HOLD_S=1 TRACK="the laugh track" ASK=body.gaze ;;
-  music) NAME=music-sway FIELD=music BAR=0.6 HOLD_S=20 TRACK="the music track" ASK=body.move ;;
+  laugh) NAME=laugh-glance FIELD=laughter TRACK="the laugh track" ASK=body.gaze ;;
+  music) NAME=music-sway FIELD=music TRACK="the music track" ASK=body.move ;;
   *) echo "$USAGE" >&2; exit 2 ;;
 esac
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -93,6 +93,10 @@ now_ms() { if [[ -n ${NOW_FILE:-} ]]; then cat "$NOW_FILE"; else echo $(($(date 
 
 [[ -n ${EARS_MODEL:-} && -f $EARS_MODEL ]] || { echo "EARS_MODEL must name the pinned yamnet.onnx" >&2; exit 2; }
 [[ -f $SKILL_DIR/skill.toml ]] || { echo "no $NAME skill at $SKILL_DIR (SKILL_DIR)" >&2; exit 2; }
+# The bar is the skill's own `above`, read from it, so the scores are counted
+# against what the skill asks (#2383 moved Laugh glance's from 0.5 to 0.3).
+BAR=$(sed -nE 's/^above *= *([0-9.]+).*/\1/p' "$SKILL_DIR/skill.toml" | head -1)
+[[ -n $BAR ]] || { echo "$SKILL_DIR/skill.toml has no trigger bar (above)" >&2; exit 2; }
 command -v "$SKILLS" >/dev/null || { echo "SKILLS must name lamp-skills" >&2; exit 2; }
 # The replay reads the skill's fields as this lamp-skills does: one that
 # can't pass the skill's own recorded cases (a dotted field before #1920)
