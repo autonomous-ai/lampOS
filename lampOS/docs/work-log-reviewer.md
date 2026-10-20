@@ -4,6 +4,17 @@
 
 Newest first. Times from `date` (+07).
 
+- 08:30 #2105 P3 1 test in (a later yes doesn't name an earlier visit)
+- 08:29 merged #2108 (endpoint: no link followed; docs) as b5db27501 on green
+- 08:27 merged #2073 (Flux closed_early) as de3b9ca47 on its green third run
+- 08:26 #2110 read (room-sounds consent): no P1/P2, three P3s (a roll back stops the walk); first builder's
+- 08:22 #2105 read (who was here names, part 2): no P1/P2, two P3s; built with #2098, 206/0; first builder's
+- 08:21 #2031 read (Seventh's restack): Jarvis's four privacy fixes kept, merge right; P3 CountOnly vs #2102's Paused when the stacks meet; 398/0
+- 08:20 #2110 (Seventh: room-sounds consent on no-slide lamps) sent to a second pass
+- 08:19 #2102 read (early finalize): no P1/P2, two P3s; built with all six open #1712 PRs, 926/0; first builder's
+- 08:18 #2108 (my two P3s on #2097): no finding; merge when out of draft and green
+- 08:14 merged #2097 (voice-eval endpoint) as 0781eea57 and #2100 (cost from one matcher) as 995ebe3cf, built together 598/0, both green
+- 08:12 #2106 (whose_words as a function, my P3 on #2043): no finding
 - 08:06 #2095 rebased: built with #2089 #2091 #2099 on #1712, clean, 404/0
 - 08:05 #2103 (#2083's two P3s): no finding
 - 08:03 #2073 ARM64 failed again on capture_hold_worker timing; reran; flagged the flake to Tests on #1722
