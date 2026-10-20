@@ -493,24 +493,63 @@ mod tests {
     use crate::second_config::TtsProvider;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    /// A local plain HTTP server answering one request with `head` and
-    /// `body`; whether a request came is read from the handle.
-    async fn server(head: &'static str, body: Vec<u8>) -> (String, tokio::task::JoinHandle<usize>) {
+    /// What a stand-in reads of one connection: the request's head, or
+    /// `None` if it closed first, as a bare connect from another test does.
+    async fn head_of(socket: &mut tokio::net::TcpStream) -> Option<Vec<u8>> {
+        let mut request = Vec::new();
+        let mut buffer = [0; 4096];
+        while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+            let n = socket.read(&mut buffer).await.ok()?;
+            if n == 0 {
+                return None;
+            }
+            request.extend_from_slice(&buffer[..n]);
+        }
+        Some(request)
+    }
+
+    const NOT_HERE: &str =
+        "HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n";
+
+    /// The next connection whose request carries `key`, the test's own, within
+    /// 500 ms. Any other is answered 404 and not counted: another test's
+    /// client, on a port the host has given again, made one of these count 3
+    /// for 2 in a full `--lib` run (#1569 row 50).
+    async fn next_ours(
+        listener: &tokio::net::TcpListener,
+        key: &str,
+    ) -> Option<tokio::net::TcpStream> {
+        let until = tokio::time::Instant::now() + std::time::Duration::from_millis(500);
+        loop {
+            let (mut socket, _) = tokio::time::timeout_at(until, listener.accept())
+                .await
+                .ok()?
+                .ok()?;
+            match head_of(&mut socket).await {
+                Some(head) if head.windows(key.len()).any(|w| w == key.as_bytes()) => {
+                    return Some(socket);
+                }
+                Some(_) => {
+                    let _ = socket.write_all(NOT_HERE.as_bytes()).await;
+                }
+                None => {}
+            }
+        }
+    }
+
+    /// A local plain HTTP server answering one request carrying `key` with
+    /// `head` and `body`; whether one came is read from the handle.
+    async fn server(
+        head: &'static str,
+        body: Vec<u8>,
+        key: &'static str,
+    ) -> (String, tokio::task::JoinHandle<usize>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let task = tokio::spawn(async move {
-            let accepted =
-                tokio::time::timeout(std::time::Duration::from_millis(500), listener.accept())
-                    .await;
-            let Ok(Ok((mut socket, _))) = accepted else {
+            let Some(mut socket) = next_ours(&listener, key).await else {
                 return 0;
             };
-            let mut request = Vec::new();
-            let mut buffer = [0; 4096];
-            while !request.windows(4).any(|w| w == b"\r\n\r\n") {
-                let n = socket.read(&mut buffer).await.unwrap();
-                request.extend_from_slice(&buffer[..n]);
-            }
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
             socket.write_all(head.as_bytes()).await.unwrap();
             socket.write_all(&body).await.unwrap();
@@ -534,36 +573,56 @@ mod tests {
         samples.iter().flat_map(|s| s.to_le_bytes()).collect()
     }
 
-    /// A local plain HTTP server answering each request, on its own
-    /// connection, with the next of `answers`; how many came is read from
-    /// the handle.
+    /// A local plain HTTP server answering each request carrying `key`, on
+    /// its own connection, with the next of `answers`; how many came is read
+    /// from the handle.
     async fn servers(
         answers: Vec<(&'static str, Vec<u8>)>,
+        key: &'static str,
     ) -> (String, tokio::task::JoinHandle<usize>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let task = tokio::spawn(async move {
             let mut came = 0;
             for (head, body) in answers {
-                let accepted =
-                    tokio::time::timeout(std::time::Duration::from_millis(500), listener.accept())
-                        .await;
-                let Ok(Ok((mut socket, _))) = accepted else {
+                let Some(mut socket) = next_ours(&listener, key).await else {
                     break;
                 };
                 came += 1;
-                let mut request = Vec::new();
-                let mut buffer = [0; 4096];
-                while !request.windows(4).any(|w| w == b"\r\n\r\n") {
-                    let n = socket.read(&mut buffer).await.unwrap();
-                    request.extend_from_slice(&buffer[..n]);
-                }
                 socket.write_all(head.as_bytes()).await.unwrap();
                 socket.write_all(&body).await.unwrap();
             }
             came
         });
         (format!("http://{address}"), task)
+    }
+
+    /// #1569 row 50: a request without the test's own key, such as another
+    /// test's client finding this port, is answered 404 and not counted,
+    /// nor is a bare connect; the test's own is answered and counted.
+    #[tokio::test]
+    async fn a_stand_in_counts_only_its_own_tests_requests() {
+        let (url, came) = servers(vec![(PCM, bytes(&[1]))], "ours-key").await;
+        let address = url.trim_start_matches("http://").to_owned();
+        let ask = |key: &'static str| {
+            let address = address.clone();
+            async move {
+                let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
+                socket
+                    .write_all(
+                        format!("POST / HTTP/1.1\r\nx-goog-api-key: {key}\r\n\r\n").as_bytes(),
+                    )
+                    .await
+                    .unwrap();
+                let mut answer = Vec::new();
+                socket.read_to_end(&mut answer).await.unwrap();
+                String::from_utf8_lossy(&answer).into_owned()
+            }
+        };
+        drop(tokio::net::TcpStream::connect(&address).await.unwrap());
+        assert!(ask("theirs-key").await.starts_with("HTTP/1.1 404"));
+        assert!(ask("ours-key").await.starts_with("HTTP/1.1 200"));
+        assert_eq!(came.await.unwrap(), 1);
     }
 
     const REFUSED: &str =
@@ -586,9 +645,12 @@ mod tests {
     /// said. No other voice is ever asked.
     #[tokio::test]
     async fn a_sentence_the_voice_cannot_start_is_asked_once_more_never_of_another() {
-        let (gemini_url, gemini_asked) =
-            servers(vec![(REFUSED, Vec::new()), (SSE, gemini_event(&[7, 9]))]).await;
-        let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g", "Kore").unwrap());
+        let (gemini_url, gemini_asked) = servers(
+            vec![(REFUSED, Vec::new()), (SSE, gemini_event(&[7, 9]))],
+            "g-once-more",
+        )
+        .await;
+        let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g-once-more", "Kore").unwrap());
         let samples = said(in_one_voice(
             Voice::Gemini(gemini),
             "Hello there.".into(),
@@ -598,13 +660,16 @@ mod tests {
         assert_eq!(samples, [7, 9], "Gemini's own level, on its second asking");
         assert_eq!(gemini_asked.await.unwrap(), 2);
 
-        let (gemini_url, gemini_asked) = servers(vec![
-            (REFUSED, Vec::new()),
-            (REFUSED, Vec::new()),
-            (SSE, gemini_event(&[1])),
-        ])
+        let (gemini_url, gemini_asked) = servers(
+            vec![
+                (REFUSED, Vec::new()),
+                (REFUSED, Vec::new()),
+                (SSE, gemini_event(&[1])),
+            ],
+            "g-once-more",
+        )
         .await;
-        let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g", "Kore").unwrap());
+        let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g-once-more", "Kore").unwrap());
         let results: Vec<_> = in_one_voice(Voice::Gemini(gemini), "Hello there.".into(), None)
             .collect()
             .await;
@@ -615,9 +680,12 @@ mod tests {
     /// The same for the configured voice: once more, then not said.
     #[tokio::test]
     async fn the_configured_voice_is_asked_once_more_then_not() {
-        let (openai, asked) =
-            servers(vec![(REFUSED, Vec::new()), (PCM, bytes(&[100, -100]))]).await;
-        let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k", None).unwrap());
+        let (openai, asked) = servers(
+            vec![(REFUSED, Vec::new()), (PCM, bytes(&[100, -100]))],
+            "k-once-more",
+        )
+        .await;
+        let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k-once-more", None).unwrap());
         let samples = said(in_one_voice(
             Voice::Configured(tts, "OpenAI"),
             "Hello there.".into(),
@@ -627,8 +695,12 @@ mod tests {
         // The configured voice's level, +6 dB.
         assert_eq!(samples, [200, -200]);
         assert_eq!(asked.await.unwrap(), 2);
-        let (openai, asked) = servers(vec![(REFUSED, Vec::new()), (REFUSED, Vec::new())]).await;
-        let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k", None).unwrap());
+        let (openai, asked) = servers(
+            vec![(REFUSED, Vec::new()), (REFUSED, Vec::new())],
+            "k-once-more",
+        )
+        .await;
+        let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k-once-more", None).unwrap());
         let results: Vec<_> = in_one_voice(
             Voice::Configured(tts, "OpenAI"),
             "Hello there.".into(),
@@ -682,10 +754,10 @@ mod tests {
     /// Nothing to say asks no voice at all.
     #[tokio::test]
     async fn only_tags_ask_neither_voice() {
-        let (gemini_url, gemini_asked) = server(PCM, Vec::new()).await;
-        let (openai, openai_asked) = server(PCM, Vec::new()).await;
-        let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g", "Kore").unwrap());
-        let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k", None).unwrap());
+        let (gemini_url, gemini_asked) = server(PCM, Vec::new(), "g-tags-only").await;
+        let (openai, openai_asked) = server(PCM, Vec::new(), "k-tags-only").await;
+        let gemini = Arc::new(GeminiTts::new(&gemini_url, "tts", "g-tags-only", "Kore").unwrap());
+        let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k-tags-only", None).unwrap());
         let samples = said(in_one_voice(Voice::Gemini(gemini), "[sigh]".into(), None)).await;
         assert!(samples.is_empty());
         let samples = said(in_one_voice(
