@@ -898,6 +898,11 @@ where
     // however soft, that its answer can't hold (Jarvis on #2102: a soft
     // "on" 31 dB under the line's peak, under `LineSound`'s bar, was lost).
     let mut sounded_since_flush = false;
+    // Early words were given from the last pause's answer: sound after
+    // them takes them back (`Early::Resumed`), so a chat begun on them
+    // stops at once rather than running on, paid, to the line's end (the
+    // reviewer on #2171).
+    let mut early_from_pause = false;
     // The loudest block sent since that `Finalize`, RMS, for the journal:
     // what a floor for a busy room would be set from (#2135).
     let mut loudest_since_flush = 0.0f64;
@@ -943,6 +948,9 @@ where
                             loudest_since_flush = loudest_since_flush.max(level);
                             if level > SOUND_FLOOR_RMS {
                                 sounded_since_flush = true;
+                                if std::mem::take(&mut early_from_pause) {
+                                    let _ = early.send(Early::Resumed);
+                                }
                             }
                         }
                         sound.sent(&bytes, (samples_sent + bytes.len() / 2) as f64 / 16_000.0);
@@ -1093,6 +1101,30 @@ where
                             answered = Some((went.elapsed(), words.end));
                         }
                         transcript.add(words);
+                        // The last pause's answer before the line's end, its
+                        // finals covering the sound with nothing over the
+                        // floor since: the words the line will most likely
+                        // end on, as early words, so a chat begun on them
+                        // (`LAMP_SECOND_PREPARED`) has the time left before
+                        // the end: on lamp-4ace's lines that ended on the
+                        // pause's answer, 158–233 ms on six of seven and
+                        // 4 ms on one (#2135, 10:10–10:13). The first
+                        // builder on #1722, 11:36: 0 of 14 kept at 07:12.
+                        // Only a request's
+                        // line has them taken (`SttStream::early`); the stop
+                        // words' stream never is.
+                        if a_pauses
+                            && flushes_unanswered == 0
+                            && finalize_went.is_none()
+                            && !sounded_since_flush
+                            && transcript.covers_the_sound(sound.to)
+                        {
+                            let (words, _) = transcript.words();
+                            if words.chars().any(char::is_alphanumeric) {
+                                let _ = early.send(Early::Words(words));
+                                early_from_pause = true;
+                            }
+                        }
                         if closing && transcript.settled(sent) {
                             // `CloseStream`'s words cover all the audio sent:
                             // its close is not waited for.
@@ -1615,6 +1647,19 @@ mod tests {
         quiet_end: bool,
         held: usize,
     ) -> (String, String, Duration, usize) {
+        let (words, at_end, took, finalizes, _) =
+            finish_flushed_early(runs, flush_after, answers, quiet_end, held).await;
+        (words, at_end, took, finalizes)
+    }
+
+    /// The same, with the early words given before the line's end.
+    async fn finish_flushed_early(
+        runs: &[(usize, i16)],
+        flush_after: usize,
+        answers: &'static [&'static str],
+        quiet_end: bool,
+        held: usize,
+    ) -> (String, String, Duration, usize, Vec<Early>) {
         use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
         let (near, far) = tokio::io::duplex(1 << 16);
         let server = tokio::spawn(async move {
@@ -1647,8 +1692,9 @@ mod tests {
             let _ = socket.close(None).await;
             finalizes
         });
-        let stream =
+        let mut stream =
             SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+        let mut early = stream.early.take().unwrap();
         for (run, &(blocks, sample)) in runs.iter().enumerate() {
             for _ in 0..blocks {
                 stream.send(&[sample; 320]).unwrap();
@@ -1659,10 +1705,119 @@ mod tests {
             }
         }
         tokio::time::sleep(Duration::from_millis(300)).await;
+        let mut before_end = Vec::new();
+        while let Ok(said) = early.try_recv() {
+            before_end.push(said);
+        }
         let began = Instant::now();
         let (words, at_end) = stream.finish_told(quiet_end).await.unwrap();
         let took = began.elapsed();
-        (words, at_end.unwrap(), took, server.await.unwrap())
+        (
+            words,
+            at_end.unwrap(),
+            took,
+            server.await.unwrap(),
+            before_end,
+        )
+    }
+
+    /// The first builder on #1722, 11:36 (`LAMP_SECOND_PREPARED` with early
+    /// finalize): the pause's answer, in before the line's end with the
+    /// rest quiet, gives its words early, so a chat begun on them has the
+    /// time before the end; the line then ends on the same words. A pause
+    /// answered only after the end gives none before it.
+    #[tokio::test(start_paused = true)]
+    async fn a_pauses_answer_before_the_end_gives_its_words_early() {
+        const ANSWERED: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hello lamp"}]}}"#;
+        const END: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.6,"duration":0.4,"channel":{"alternatives":[{"transcript":""}]}}"#;
+        let (words, at_end, _, _, early) =
+            finish_flushed_early(&[(30, SOUND), (20, 0)], 0, &[ANSWERED], true, 0).await;
+        assert_eq!(early, [Early::Words("hello lamp".to_owned())]);
+        assert_eq!(words, "hello lamp");
+        assert!(at_end.contains("words from=flush"), "{at_end}");
+        let (words, _, _, _, early) =
+            finish_flushed_early(&[(30, SOUND), (20, 0)], 0, &[ANSWERED, END], true, 1).await;
+        assert!(early.is_empty(), "{early:?}");
+        assert_eq!(words, "hello lamp");
+    }
+
+    /// The reviewer on #2171: a word after the pause's answer takes its
+    /// early words back at once (`Early::Resumed`), so the chat begun on
+    /// them stops, and the line keeps every word.
+    #[tokio::test(start_paused = true)]
+    async fn a_word_after_the_early_words_takes_them_back() {
+        const HANG: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hang"}]}}"#;
+        const ON: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.6,"duration":0.9,"channel":{"alternatives":[{"transcript":"on"}]}}"#;
+        let (words, _, _, _, early) = finish_flushed_early(
+            &[(30, SOUND), (20, 0), (15, 80), (10, 0)],
+            1,
+            &[HANG, ON],
+            true,
+            0,
+        )
+        .await;
+        assert_eq!(early, [Early::Words("hang".to_owned()), Early::Resumed]);
+        assert_eq!(words, "hang on");
+    }
+
+    /// The reviewer on #2171: a word between the pause's `Finalize` and its
+    /// answer gives no early words: the answer can't hold it.
+    #[tokio::test(start_paused = true)]
+    async fn a_word_before_the_pauses_answer_gives_no_early_words() {
+        use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
+        const HANG: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hang"}]}}"#;
+        const ON: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.6,"duration":0.9,"channel":{"alternatives":[{"transcript":"on"}]}}"#;
+        let (near, far) = tokio::io::duplex(1 << 16);
+        let server = tokio::spawn(async move {
+            let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+            let mut finalizes = 0;
+            while let Some(Ok(message)) = socket.next().await {
+                match message {
+                    // The pause's answer comes 200 ms after its `Finalize`,
+                    // once the soft word has gone.
+                    Message::Text(text) if text.contains("Finalize") => {
+                        tokio::time::sleep(Duration::from_millis(200)).await;
+                        let answer = if finalizes == 0 { HANG } else { ON };
+                        socket.send(Message::text(answer)).await.unwrap();
+                        finalizes += 1;
+                    }
+                    Message::Text(text) if text.contains("CloseStream") => break,
+                    _ => {}
+                }
+            }
+            let _ = socket.close(None).await;
+        });
+        let mut stream =
+            SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+        let mut early = stream.early.take().unwrap();
+        for _ in 0..30 {
+            stream.send(&[SOUND; 320]).unwrap();
+        }
+        stream.flush().unwrap();
+        for _ in 0..15 {
+            stream.send(&[80; 320]).unwrap();
+        }
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        for _ in 0..10 {
+            stream.send(&[0; 320]).unwrap();
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(early.try_recv().is_err(), "no early words");
+        let (words, _) = stream.finish_told(true).await.unwrap();
+        assert_eq!(words, "hang on");
+        server.await.unwrap();
+    }
+
+    /// An answer short of the line's sound (a word past it not yet in a
+    /// final) gives no early words: they would not be the line's.
+    #[tokio::test(start_paused = true)]
+    async fn a_pauses_answer_short_of_the_sound_gives_no_early_words() {
+        const SHORT: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.3,"channel":{"alternatives":[{"transcript":"hello"}]}}"#;
+        const REST: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.3,"duration":0.7,"channel":{"alternatives":[{"transcript":"lamp"}]}}"#;
+        let (words, _, _, _, early) =
+            finish_flushed_early(&[(30, SOUND), (20, 0)], 0, &[SHORT, REST], true, 0).await;
+        assert!(early.is_empty(), "{early:?}");
+        assert_eq!(words, "hello lamp");
     }
 
     /// The first builder on #1722, 20 Oct 07:20 (`LAMP_SECOND_EARLY_FINALIZE`):
