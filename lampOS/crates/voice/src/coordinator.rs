@@ -829,6 +829,10 @@ struct Rig {
     /// read closes the cycle as a mute does, for the service to wait and read
     /// again, never ending it (#795).
     privacy_controls: bool,
+    /// The Controls route reads a slide (`LAMP_PRIVACY_CONTROLS=on`), so its
+    /// observations carry a physical receipt for onboarding's privacy step;
+    /// `no-slide` has none to give (#2155's P3).
+    privacy_receipts: bool,
     ring: OptionalRing,
     camera: Option<OptionalCamera>,
     motor: Option<OptionalMotor>,
@@ -3332,6 +3336,7 @@ fn spawn_rig(
         speaker,
         privacy,
         privacy_controls: privacy_route.is_some(),
+        privacy_receipts: matches!(privacy_route, Some((_, crate::privacy_bus::Route::Slide))),
         ring,
         camera,
         motor: None,
@@ -4853,7 +4858,7 @@ fn conversation_with_gate(
         if let (Some(walk), Some(epoch)) = (onboarding.as_mut(), onboarding_epoch.as_ref()) {
             walk.set_privacy_context(
                 epoch.clone(),
-                rig.privacy_controls,
+                rig.privacy_receipts,
                 onboarding_privacy_receipt.clone(),
                 onboarding_location.as_deref().filter(|_| {
                     says.is_some() && bus_out.is_some() && !trace.onboarding_privacy_disabled
@@ -11347,6 +11352,7 @@ mod tests {
             provider,
             privacy,
             privacy_controls: false,
+            privacy_receipts: false,
             ring: Some(ring).into(),
             camera: None,
             motor: None,
