@@ -1860,6 +1860,7 @@ dependencies = [
  "lamp-msgs",
  "lamp-turn-end",
  "lamp-turn-owner",
+ "libc",
  "ort",
  "serde",
  "serde_json",
