@@ -537,3 +537,26 @@ in `lamp-voice` — tracking separately, not blocking this report)
   (`addUnlockEvent` missing a required `scope` argument), already on v3's
   own tip, unrelated to any of my three PRs. Flagged on #1722, not fixed
   (not mine — "Crates: none" and not app code I touched either).
+
+## 2026-10-20 — #2194 follow-up: `restoring` and `stale`'s real meaning
+
+Ready for lamp-voice: yes (same PR, ecm-sds-mobile#17, pushed as a second
+commit)
+
+- Migrate, on #2194: #2271's review (`9c95ccb28`) widened `now` with a
+  sixth value, `restoring` (a rollback), and spelled out what `stale`
+  means — `lamp-update` hasn't republished within its own 180 s lifetime
+  (said again every 60 s), so `now` shouldn't be believed. Field names
+  and types otherwise unchanged.
+- Added `restoring` as its own `LampUpdatePhase`, with its own row/page
+  wording ("Rolling back to the previous build…"), not folded into
+  `unknown`.
+- Along the way, found `LampUpdateStatus.warns` had a doc comment
+  claiming staleness warns on its own, but the code never actually
+  checked `stale` — a bug from the first pass, not something Migrate's
+  note introduced. Fixed to match the doc, so the row itself turns
+  amber on a stale reply, not only the detail page's separate "Stale"
+  tile.
+- Two new tests (a stale reply warning mid-round, `restoring`'s own
+  wording); 14/14. Replied on
+  [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6294569062).
