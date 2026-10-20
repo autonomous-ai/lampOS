@@ -892,8 +892,10 @@ With the switch:
     sibling who said yes to "are you Minh?" would have taken Minh's face,
     and with it Minh's memory (the reviewer's P1 on #2202). It also keeps
     a known person's name from someone who isn't them (P2).
-  - **Spelled as the known name:** kept under it. The same name spelled
-    again: called with `"apart":true`, and kept beside the near one.
+  - **Once spelled,** the model calls again with the spelled name and
+    `"apart":true`, whatever the first call held, so the person is asked
+    once (Reviewer-lead's P3 on #2252). The known name spelled: judged
+    against theirs, as below. Another name: kept beside the near one.
     `apart` is sent only when true, since eyes from before it refuse a
     field they don't know.
 - **A known name never takes a face that isn't theirs**, whatever is asked
@@ -903,8 +905,10 @@ With the switch:
   them. **A face the lamp knows under another name never takes a known
   name**, near theirs or not: always `not_like_them`. Under a name the
   lamp already keeps:
-  - **At `SAME_PERSON` to theirs:** the new prints are kept in place of
-    theirs, as before.
+  - **At `SAME_PERSON` to theirs** (by the median): the new prints are
+    kept in place of theirs, but only those near theirs, so up to two of
+    five that are someone else's don't go in with them (the reviewer's P1
+    after #2252).
   - **Near (`NEAR_PERSON` or more):** refused as `near_to` too, since it may
     be another person's name misheard into exactly theirs, so the model asks
     for a spelling. Spelled as their name (`apart`), only the new prints that

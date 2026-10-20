@@ -795,6 +795,18 @@ impl People {
                     .map(|()| theirs_name(&self.people, &kept))
                     .map_err(|error| Refused::Store(error.to_string()));
             }
+            // Theirs as a whole: kept in place of theirs, but only the prints
+            // that are near theirs, so up to two of five that are someone
+            // else's don't go in with them (the reviewer's P1 after #2252).
+            let own: Vec<Vec<f32>> = prints
+                .iter()
+                .zip(each_to(theirs))
+                .filter(|(_, alike)| *alike >= NEAR_PERSON)
+                .map(|(print, _)| print.clone())
+                .collect();
+            return self
+                .remember(&kept, own, now_unix_s)
+                .map_err(|error| Refused::Store(error.to_string()));
         } else if known.is_empty() && !apart {
             let near = self
                 .people
@@ -2189,6 +2201,21 @@ mod tests {
             "the unrelated print isn't theirs"
         );
         assert_eq!(whose(&mixed, &print(0.3)), Some("Ossa".into()));
+        // The reviewer's P1 after #2252: theirs as a whole (three of five at
+        // their face) keeps only the three, so the other two faces aren't
+        // recognised as them.
+        let mut whole = known("near-name-whole");
+        let mut capture_of_three = vec![at(0.9); 3];
+        capture_of_three.push(print(0.5));
+        capture_of_three.push(print(0.7));
+        assert_eq!(
+            whole.remember_one("Ossa", capture_of_three, 2, false, false),
+            Ok("Ossa".into())
+        );
+        assert_eq!(whole.people[0].prints.len(), 3);
+        assert_eq!(whose(&whole, &print(0.5)), None);
+        assert_eq!(whose(&whole, &print(0.7)), None);
+        assert_eq!(whose(&whole, &at(0.9)), Some("Ossa".into()));
         // Jarvis's new P1: a face known under another name never takes a
         // known name, `replace` or `apart` or not, even when it's near theirs
         // (siblings), and both stay as they were.
