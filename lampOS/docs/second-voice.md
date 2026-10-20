@@ -615,9 +615,24 @@ order is kept. A written turn is the same from the chat on.
     a soft last word, however far under the line's peak, is kept, Jarvis on
     #2102), they are the line's words at once, with no second `Finalize`
     (`words from=flush` in the journal's end line). Otherwise the end asks
-    as before. Such a line gives `LAMP_SECOND_PREPARED` no early words, so
-    no chat is begun early on it: its words come at once anyway, and an
-    A/B's "0 early rounds" on those lines isn't a fault;
+    as before;
+  - **the pause's answer gives the line's early words** when it comes
+    before the line's end, its finals cover the line's sound, and nothing
+    over the floor has come since (the first builder on #1722, 20 Oct
+    11:36). With `LAMP_SECOND_PREPARED` the chat is begun on them then,
+    and kept when the line ends on the same words (`words from=flush`).
+    How long before the end that is depends on when the line ends: on
+    lamp-4ace's lines that ended on the pause's answer (#2135, 10:10–10:13)
+    it came 158–233 ms before the end on six of seven, and 4 ms on one. A
+    line that ends at 400 ms of quiet, with the answer later than 250 ms,
+    gives none (the reviewer on #2171). The journal's "kept, begun N ms
+    ago" gives each line's head start. Sound over the floor after the early
+    words takes them back at once (`Early::Resumed`), so the chat begun on
+    them stops rather than running on to the line's end; round 1 is asked
+    on the line's final words as before. An answer only after the end gives no
+    early words: the line's words are at once then anyway. Each such pause
+    begins one chat, so a line that pauses twice and goes on may ask
+    twice;
   - **a pause's answer that comes after the line's end** is taken the same
     way (#2135). On lamp-4ace the end comes 400 ms into the quiet
     (`smart-turn-fast`'s confident "finished"), 250 ms after the pause's
