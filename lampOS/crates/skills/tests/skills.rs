@@ -81,9 +81,33 @@ impl Clock {
     /// As [`Clock::skip`], with `between` run once a stand-in's time has
     /// skipped and before the program's has.
     fn skip_after(&self, by: Duration, between: impl FnOnce()) {
+        let Some(stream) = self.sent(by, between) else {
+            return;
+        };
+        let mut line = String::new();
+        BufReader::new(&stream).read_line(&mut line).unwrap();
+        assert!(line.contains("now_us"), "{line}");
+    }
+
+    /// As [`Clock::skip`], for the skip the program is to end on: it can end
+    /// before its answer is whole, or written at all, so the answer is read
+    /// and not judged; whether it ended is the test's to check. Answered
+    /// whole, 25 of 200 runs of such a test failed beside fourteen busy
+    /// processes on a Mac, with `{"` and the stream's end (#1569 row 44).
+    fn skip_ending(&self, by: Duration) {
+        if let Some(stream) = self.sent(by, || {}) {
+            let mut line = String::new();
+            let _ = BufReader::new(&stream).read_line(&mut line);
+        }
+    }
+
+    /// The skip sent, `between` run first: the stream its answer comes on,
+    /// or none on the host's clock, where `by` is slept.
+    fn sent(&self, by: Duration, between: impl FnOnce()) -> Option<UnixStream> {
         let Some(socket) = &self.socket else {
             std::thread::sleep(by);
-            return between();
+            between();
+            return None;
         };
         let deadline = Instant::now() + Duration::from_secs(10);
         let stream = loop {
@@ -105,9 +129,7 @@ impl Clock {
         stream
             .set_read_timeout(Some(Duration::from_secs(10)))
             .unwrap();
-        let mut line = String::new();
-        BufReader::new(&stream).read_line(&mut line).unwrap();
-        assert!(line.contains("now_us"), "{line}");
+        Some(stream)
     }
 
     /// Skips the program's clock to `at`, if it is not there yet.
@@ -6116,7 +6138,8 @@ fn the_tools_socket_lost_is_made_again_and_the_folder_gone_ends_lamp_skills() {
     // The folder gone, under a parent it cannot write.
     fs::remove_dir_all(&tools).unwrap();
     fs::set_permissions(&run, fs::Permissions::from_mode(0o555)).unwrap();
-    clock.skip(RELOAD);
+    // It ends on this skip, and may before its answer is written.
+    clock.skip_ending(RELOAD);
     let deadline = Instant::now() + Duration::from_secs(10);
     let status = loop {
         if let Some(status) = child.try_wait().unwrap() {
