@@ -1111,6 +1111,7 @@ fn second_route_worker_environment(
         crate::second_provider::SPEECH_WARM_ENVIRONMENT,
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
+        crate::second_provider::SAID_ONCE_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1153,6 +1154,7 @@ mod tests {
             crate::second_config::FLUX_ENV,
             crate::second_provider::STEADY_FIRST_ENVIRONMENT,
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
+            crate::second_provider::SAID_ONCE_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -1413,6 +1415,7 @@ mod tests {
                     || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
+                    || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                 {
                     "on"
@@ -1484,6 +1487,7 @@ mod tests {
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_KNOWN_NAMES=on",
                     "LAMP_SECOND_PREPARED=on",
+                    "LAMP_SECOND_SAID_ONCE=on",
                     "LAMP_SECOND_SCOPED_CONTEXT=on",
                     "LAMP_SECOND_SPEAKING_FACE=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",

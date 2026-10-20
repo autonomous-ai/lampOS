@@ -1668,6 +1668,18 @@ pub fn serve(
     // A holding-only answer is asked to go on, as on Live
     // (`LAMP_HOLDING_ANSWER=on`; the first builder's 22:54 on #1722).
     engine = engine.holding_answers(files.holding_answer);
+    // Words said before a call are not said again after it
+    // (`LAMP_SECOND_SAID_ONCE=on`; the first builder at 06:56 on #1722).
+    let said_once = std::env::var(crate::second_provider::SAID_ONCE_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if said_once {
+        eprintln!(
+            "lamp-voice second: a round's words said before its calls are told to the next round, which adds only what is new (LAMP_SECOND_SAID_ONCE)"
+        );
+    }
+    engine = engine.saying_once(said_once);
     // A line lost on the network is asked once more when a service host
     // answers again, the link's own check (`LAMP_RESEND_LOST_LINE=on`; the
     // first builder's 00:02 on #1722). As the only voice, with its hosts.

@@ -484,6 +484,21 @@ order is kept. A written turn is the same from the chat on.
   time right after the character. A text's request is unchanged. Each turn's
   journal says how much the cache held (above): the A/B is the played check
   both ways, by H and by the first event's time.
+- **With `LAMP_SECOND_SAID_ONCE=on` words said before a call are not said
+  again after it** (off unless set; the first builder at 06:56 on #1722). On
+  lamp-4ace "Set a timer for one minute." got "A minute, starting now. One
+  minute, counting from now — six forty-four and change.", 2 of the last 4
+  runs. The round that called had said its words, and the next round, given
+  the timer's result, confirmed again. With the switch, a round that said
+  words before its calls tells the next round, as a system message after
+  the calls' results, that the person heard them
+  (`second_provider::said_once_note`). It is told to say only what the
+  results add, such as the time it is set for or that it failed, or nothing.
+  A round that said nothing before its calls, or a call written as words
+  (which isn't said), tells nothing. The journal says `chat round N said
+  words before its calls: the next round is told they were heard`. The
+  check is on the lamp: the day lines' timer and reminder at 4 of 4 runs,
+  one confirmation each.
 - **With `LAMP_SECOND_FEW_TOOLS=on` a spoken turn's chat is given its few
   functions first** (off unless set; #1712, the first builder at 18:56:
   "light, volume, timer, search, look, tasks"). The others are behind one,
@@ -2174,6 +2189,15 @@ read from the actions part's catalog as a voice with `--schedule-tools`
 reads them. Where the catalog has no schedule, the lines aren't asked, and
 it says so. It prints `right=N/M` and the functions called first per line,
 then a verdict.
+
+**Then the timer said once** (#2089, `LAMP_SECOND_SAID_ONCE`, asked with the
+heeding's functions). This is round 2 of "Set a timer for one minute.", as
+the engine asks it: round 1's "A minute, starting now." with its `set_timer`
+call, then the schedule's committed result. It is asked once without the
+switch's note and once with it (`said_once_note`). Right is nothing called
+and no second confirmation: no "minute", "starting", "started" or
+"counting". The time it goes off at, or nothing, is right. It prints
+`right=N/M` per arm, then whether the note's arm was right every time.
 
 **Then memory's quality** (`probe/quality.rs`, #1693, the first builder at
 03:05 on #1722). There are six cases, each a fresh session told what the lamp
