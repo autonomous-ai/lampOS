@@ -382,3 +382,50 @@ branch)
   `key_insight_period_test.dart`.
 - Pushed to `fourteen/own-keys` (`35ccd5ca`). Replied to Mobile on
   [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6285152973).
+
+## 2026-10-20 — #2193 — the app side built and pushed
+
+Ready for lamp-voice: no (the app side; nothing a lamp runs is on this
+branch)
+
+- Fifth's lamp side landed as
+  [#2223](https://github.com/autonomous-ai/lampOS/pull/2223) (not merged):
+  `lamp-cloud`'s `system.reboot` asks the keeper
+  (`lamp-keeper restart-asked`), refused while an update installs,
+  otherwise `success {"restarting": true}` before the lamp goes down. The
+  machine-vs-`lampos.target` question Fifth asked is still unanswered.
+- Read #2223's diff in full before building, the same discipline as El's
+  #2167: `answer.rs` routes `"system.reboot" => lamp.restart().map(Some)`
+  through the same synchronous match arm as `system.info`/`volume.get`, no
+  `starting` ack, confirming `system.reboot` is single-phase — unlike
+  `keys.*`, `BuddyMqttDataSource.request()` is the right call, not
+  `_awaitTerminal`.
+- That reading also showed the wire contract (kind, empty request,
+  `success`'s shape, the failure strings) doesn't depend on the open
+  machine-vs-target question at all — only the lamp's own internal
+  mechanism differs, invisible to the app. So nothing was actually
+  blocking the build once #2223 existed; the earlier "waits on the
+  answer" read was wrong, corrected here rather than silently dropped.
+- Built `lib/src/features/device/domain/entities/lamp_restart.dart`,
+  `.../notifiers/lamp_restart_notifier.dart`, and
+  `.../pages/autonomous_os_detail_page_lamp_restart.dart`: a `_LampRestartControls`
+  row beside V1's `_LampPowerControls` in General's Maintenance card, gated
+  on `isLampV2`, reusing `_LampPowerButton`'s look over
+  `BuddyMqttDataSource` instead of V1's HTTP
+  `standToEarnRepositoryProvider`. No new tests — nothing of its own to
+  unit test.
+- Branched clean from `v3` at `c5cf58d2` (`fourteen/lamp-restart`), not
+  stacked on ecm-sds-mobile#11 — a separate task from #2094, kept
+  separate. (Caught and fixed a `git checkout -b` mistake that first
+  stacked it on #11's branch; rebased `--onto origin/v3` before pushing.)
+- Opened
+  [ecm-sds-mobile#15](https://github.com/autonomous-ai/ecm-sds-mobile/pull/15),
+  not a draft. Gate: `flutter analyze` 29/29 against clean `v3`;
+  `flutter test -j 2` 695/1 skipped/1 failed, the one pre-existing
+  `key_insight_period_test.dart` failure, matching `v3` exactly.
+- Reported on
+  [#2193](https://github.com/autonomous-ai/lampOS/issues/2193#issuecomment-6285336496)
+  and
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6285339069).
+- #2094's app side (ecm-sds-mobile#11, four pieces) still awaits review.
+  #2194 stays blocked on #2188/#2189, both still open.
