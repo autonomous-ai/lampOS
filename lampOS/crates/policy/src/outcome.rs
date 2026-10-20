@@ -166,11 +166,12 @@ impl Watch {
         }
     }
 
-    /// Nothing more is waited for: the lamp spoke and has had time to
-    /// write its first words, or it has had its time and did not speak.
-    pub fn over(&self, now: Instant) -> bool {
+    /// Nothing more is waited for: the lamp spoke and has had `words_for`
+    /// ([`WORDS_FOR`] on the lamp) to write its first words, or it has had
+    /// its time and did not speak.
+    pub fn over(&self, now: Instant, words_for: Duration) -> bool {
         match self.spoke {
-            Some(at) => now >= at + WORDS_FOR,
+            Some(at) => now >= at + words_for,
             None => now >= self.ended + WINDOW,
         }
     }
@@ -268,7 +269,7 @@ mod tests {
             (at(2_000), at(2_100)),
             &begun,
         );
-        assert!(!watch.over(at(2_700)));
+        assert!(!watch.over(at(2_700), WORDS_FOR));
         assert!(begun.said(Some(7), at(3_050)));
         watch.said(Some(7), at(3_050));
         assert!(begun.state(true, at(3_200)));
@@ -276,8 +277,8 @@ mod tests {
         // What comes after the first of each changes nothing.
         watch.said(Some(8), at(3_300));
         watch.spoke(at(3_400));
-        assert!(!watch.over(at(4_199)));
-        assert!(watch.over(at(4_200)));
+        assert!(!watch.over(at(4_199), WORDS_FOR));
+        assert!(watch.over(at(4_200), WORDS_FOR));
         assert_eq!(
             watch.outcome(false),
             Outcome {
@@ -314,8 +315,8 @@ mod tests {
         assert_eq!(outcome.said_after_ms, Some(-500));
         assert_eq!(outcome.heard_to_sound_ms, Some(800));
         assert_eq!(outcome.request, Some(3));
-        assert!(!watch.over(at(2_999)));
-        assert!(watch.over(at(3_000)));
+        assert!(!watch.over(at(2_999), WORDS_FOR));
+        assert!(watch.over(at(3_000), WORDS_FOR));
     }
 
     #[test]
@@ -328,8 +329,8 @@ mod tests {
         begun.state(true, at(200));
         begun.state(false, at(800));
         let watch = Watch::new(9, Choice::LookUp, at(1_700), (at(1_000), at(1_200)), &begun);
-        assert!(!watch.over(at(7_199)));
-        assert!(watch.over(at(7_200)));
+        assert!(!watch.over(at(7_199), WORDS_FOR));
+        assert!(watch.over(at(7_200), WORDS_FOR));
         assert_eq!(
             watch.outcome(true),
             Outcome {
@@ -357,8 +358,8 @@ mod tests {
         assert!(!outcome.spoke);
         assert_eq!(outcome.said_after_ms, Some(300));
         assert_eq!(outcome.request, Some(4));
-        assert!(!watch.over(at(6_099)));
-        assert!(watch.over(at(6_100)));
+        assert!(!watch.over(at(6_099), WORDS_FOR));
+        assert!(watch.over(at(6_100), WORDS_FOR));
     }
 
     #[test]

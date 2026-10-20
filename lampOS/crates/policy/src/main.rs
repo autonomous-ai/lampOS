@@ -488,6 +488,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         pictures,
         attention_next: arguments.attention_next,
         rule_decides: arguments.rule_decides.clone(),
+        timing: policy::Timing::LAMP,
     };
     let say = &mut |note: policy::Note| log(&note.to_string());
     match arguments.hedge_after {
