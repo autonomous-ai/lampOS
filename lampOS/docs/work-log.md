@@ -15,43 +15,65 @@ log and nothing a lamp runs ([joining.md](joining.md),
 
 ## Current checkpoint: 2026-10-20
 
-Ready for lamp-voice: no — Music #1757 is being integrated and freshly tested.
+Ready for lamp-voice: no — Music #1757 is in its fresh final host gate.
 
-GitHub CLI access is working again. The session start is on
-[Queue #1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6293120562).
-All **1,627 Queue comments** and the current own PR reviews were read. The
-Bedtime reassignment is acknowledged: #2157 merged the change at
-`c4fd23ac20a2502c2b5e539f2c66130a6e06867a`; #1732 is closed. The earlier
-four-branch publication plan below is superseded, and its host gates remain
-historical evidence for those exact heads. No old foundation is being republished.
+GitHub access is restored. The start and continuing updates are on
+[Queue #1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6293120562),
+most recently [the integration update](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6294198618).
+The initial 1,627 comments and subsequent Queue/own-PR reviews were read.
+#2157 landed Bedtime/caps at `c4fd23ac20a2502c2b5e539f2c66130a6e06867a`;
+#1732 is closed and the older four-foundation publication plan is superseded.
+#1996 is now [closed as superseded](https://github.com/autonomous-ai/lampOS/pull/1996#issuecomment-6293396655)
+by the verified source carried in #2157. The old-CLI environment path and
+30-store reset inventory are retained. The disabled caps RPC surface remains
+present and returns unavailable without changing ordinary volume or state.
 
-Music remains Second's assigned slice of #1685. Its saved implementation
-`b59fc17757b6f6dc8f0138c8ac1da077fff06726` is being integrated onto the actual
-Bedtime landing, observed `lamp-voice` head
-`bc31e93d85997e3cab98b52b04da6ec9ff6b6fb3`. The merge preserves the current
-voice policy, holding/retry rules, face scope, name carry and Skills state.
-Conflicts are being resolved with separate file ownership; the fresh host
-and automatic ARM64/x86 gates have not run yet. The voice target rule is
-being reconciled against the separate #1712 history before publication.
+Music remains the allocated slice of #1685. The frozen checkpoint
+`e1c3226665bbe01dab6dcec678d426d1d3f59d08` on `bc31e93d85` passed formatting,
+strict workspace/all-target Clippy, **11** voice integration tests, **48** audio
+lifecycle tests and **23** Skills tests. Its complete [consumer gate](verification/second-current-checkpoint-20261020/music-before-latest-base.json)
+passed **7,992 / 0 failed / 32 ignored**, none filtered, plus the workspace build;
+all **2,114** source hashes still match both copies.
+These results do not qualify the newer source. The candidate now incorporates
+`dfc5f73c00dbf10a65b668156914d44a19fb4575`, preserving search(found), product
+pins and the Written-turn wait. Its separate fresh source-only gate tests all
+**29 consumer crates**, with all Update tests in the checkout for the inherited
+parent image fixture. The [verification record](verification/second-current-checkpoint-20261020/README.md)
+identifies the source, changed inputs, consumers and preserved failures.
 
-Source reconciliation of #1996 finds its caps implementation already carried
-by #2157. The service now uses an environment setting that an older binary
-can ignore; the reset inventory contains all **30 distinct stores**. A ring
-ceiling above 120 is rejected before clamping, as it was in the published
-caps head. Disabled cap operations still return `unavailable` on the shared
-socket without creating cap state or changing volume behavior. That socket
-surface is retained behavior, not a claim that it was removed. This is a
-source review, not a new gate run. The duplicate PR can close as superseded.
+Two failures drove corrections: current Reports fixture fields were missing,
+and a strict gap negative showed that recording gaps use a different counter
+from provider speech. Review then found a cancellation/completion race:
+completion now requires winning the ticket's atomic terminal transition.
+Regressions cover that race, search permission states and delayed Written
+Music calls with task news. The current source SHA-256 is
+`8beb566ec9b131ad6c6d12da1229ac60390dcbd55cbb60ccf2c773b142025449`.
+The [new focused checks](verification/second-current-checkpoint-20261020/music-current-focused.json)
+pass: **12** voice integration, **49** audio and **24** Skills tests, plus
+formatting and strict workspace Clippy. The first/repeated prepared host handoff
+measured **199 / 194 microseconds** from confirmation retirement to authored
+speaker IPC acceptance; acoustic onset is unmeasured. No completed full gate
+or new native CI for this newer source is claimed yet. #1757 retains its
+existing lamp-voice target while the #1712 direction is reconciled: that branch
+was observed still missing the #2157 dependency. #2005 has no new review reply. Its unchanged test-only patch applies cleanly
+to current #1712 base `e26ebab90b1177379a7965cb0da276cdd3fdb153`; a separate
+13-consumer refresh is being prepared. Earlier native evidence remains tied
+to its existing published head.
 
-Cleanup removed **27,227,584 KiB** of completed build caches. **49** completed
-source snapshots (**256,269 files**) were archived with every file's SHA-256
-verified before the originals were removed: **8,481,144 KiB** became
-**1,704,644 KiB**. All measured Second scratch, including the archive and
-retained worktrees, is now **13,118,200 KiB**, below the **20 GB** cap. Logs,
-commits and source contents remain available. No other builder's job was stopped.
+A separate [row-52 source audit](https://github.com/autonomous-ai/lampOS/issues/1569#issuecomment-6293852079)
+identified a run-thread issue time later than the main tick's sampled time.
+That can fail the test's first-wake stamp bound without extending the original
+12-second deadline. Tests has opened #2318; the deterministic deadline
+regression remains with the routines owner. No production change in that
+separately owned path is included in Music.
 
-No lamp is available to Second. #2157's physical row remains unqualified;
-these source and host steps do not establish acoustic or lamp behavior.
+Storage cleanup retained all evidence and source commits: the earlier
+27,227,584 KiB build cache cleanup and verified 49-snapshot archive preserved
+the source and logs. Another
+**27 clean completed checkouts**, **6,460,024 KiB**, were removed; all branches
+and commits remain, while active and dirty worktrees were preserved. No other
+builder's job was stopped. No lamp is available to Second; Music stays off and
+Bedtime's physical row remains unqualified.
 
 ## Previous checkpoint: 2026-10-19
 
