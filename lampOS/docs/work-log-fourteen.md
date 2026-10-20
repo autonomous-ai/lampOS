@@ -574,3 +574,17 @@ Ready for lamp-voice: yes (same as the two entries above)
   `gh pr view --json commits,files` that it's exactly the one commit and
   the two files it touches, not a re-diff of #17.
 - Replied on [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6294640963).
+
+## 2026-10-20 — #2194: flagged the no-lamp gap for end-to-end
+
+Ready for lamp-voice: n/a (status note, no code)
+
+- First builder's 02:09 roll-call, to Fourteen: ecm-sds-mobile#19
+  (`restoring`/`stale`) waits on Mobile's read; #2194 end to end waits on
+  Migrate's #2271 rebase into `lamp-voice`.
+- Confirmed both still open (#19 unmerged, #2271 unmerged).
+- Flagged on [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6299047655)
+  that Fourteen has no lamp (role file), so the end-to-end pass needs
+  whoever has one — same pairing shape as #1968 (Mobile + Ten) — rather
+  than waiting to discover that after #2271 lands. Offered to write the
+  exact steps for whoever runs it.
