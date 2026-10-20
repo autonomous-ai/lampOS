@@ -750,7 +750,20 @@ pub fn services(
             "lamp-voice second: the configured voice's connection is opened as a line begins (LAMP_SECOND_SPEECH_WARM)"
         );
     }
-    Ok(net.warming_the_chat(warm).warming_the_speech(warm_speech))
+    // A speech socket opened as each answer begins (#2135's row).
+    let speech_socket = std::env::var(super::services::SPEECH_SOCKET_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if speech_socket {
+        eprintln!(
+            "lamp-voice second: a speech socket is opened as each answer begins, for its first piece (LAMP_SECOND_SPEECH_SOCKET)"
+        );
+    }
+    Ok(net
+        .warming_the_chat(warm)
+        .warming_the_speech(warm_speech)
+        .speaking_on_a_socket(speech_socket))
 }
 
 /// The web search the model may call as its own functions, as `route` sets
