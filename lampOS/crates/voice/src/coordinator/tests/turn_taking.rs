@@ -1996,7 +1996,8 @@ fn with_words_a_sound_decided_without_echo_evidence_is_never_held_for_its_words(
 /// answer that has sounded, the lamp sounding now, or no answer awaited,
 /// each hears it as before, and the body is not asked.
 /// `LAMP_OWN_LINE_KEEPS` (#2220): while a line the lamp started on its own
-/// (a skill's say) hasn't sounded, a new sound waits. The lamp's name heard
+/// (a skill's say, news it tells, its hello to someone arriving or a line of
+/// the setup walk) hasn't sounded, a new sound waits. The lamp's name heard
 /// as it began takes the turn; otherwise it's let go once the line sounds,
 /// or at its own deadline. A sound begun once the line sounds is judged as
 /// before (a cut-in), and so is anything with the switch off or for an
@@ -2022,7 +2023,7 @@ fn a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds() {
         assert!(!reply.had_audio && reply.playback.is_none());
     }
     let wait = |h: &Harness, waited, name, at| {
-        while_own_line_waits(true, h.reply.as_ref(), waited, &candidate, name, at)
+        while_own_line_waits(true, h.reply.as_ref(), None, waited, &candidate, name, at)
     };
     assert_eq!(wait(&h, false, None, trigger), WhileOwnLineWaits::Wait);
     assert_eq!(
@@ -2058,16 +2059,53 @@ fn a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds() {
     // Off, or an answer to someone's words: as before.
     h.reply.as_mut().unwrap().had_audio = false;
     assert_eq!(
-        while_own_line_waits(false, h.reply.as_ref(), false, &candidate, None, trigger),
+        while_own_line_waits(
+            false,
+            h.reply.as_ref(),
+            None,
+            false,
+            &candidate,
+            None,
+            trigger
+        ),
         WhileOwnLineWaits::AsBefore
     );
     h.reply.as_mut().unwrap().input_sequence = 1;
     assert_eq!(wait(&h, false, None, trigger), WhileOwnLineWaits::AsBefore);
     // No line at all: as before.
     assert_eq!(
-        while_own_line_waits(true, None, false, &candidate, None, trigger),
+        while_own_line_waits(true, None, None, false, &candidate, None, trigger),
         WhileOwnLineWaits::AsBefore
     );
+    // A written turn with no ticket: the lamp's own only as the turn it
+    // began itself (its hello to someone arriving, a line of the setup
+    // walk) or with news it tells. Another written turn, a look's, is as
+    // before.
+    {
+        let reply = h.reply.as_mut().unwrap();
+        reply.input_sequence = 0;
+        reply.say = None;
+    }
+    let turn = h.reply.as_ref().unwrap().owner.turn();
+    let began = |h: &Harness, lamp_began| {
+        while_own_line_waits(
+            true,
+            h.reply.as_ref(),
+            lamp_began,
+            false,
+            &candidate,
+            None,
+            trigger,
+        )
+    };
+    assert_eq!(began(&h, None), WhileOwnLineWaits::AsBefore);
+    assert_eq!(began(&h, Some(turn + 1)), WhileOwnLineWaits::AsBefore);
+    assert_eq!(began(&h, Some(turn)), WhileOwnLineWaits::Wait);
+    h.reply.as_mut().unwrap().news = vec!["task-1".to_owned()];
+    assert_eq!(began(&h, None), WhileOwnLineWaits::Wait);
+    // News on an answer to someone's words is no line of the lamp's own.
+    h.reply.as_mut().unwrap().input_sequence = 1;
+    assert_eq!(began(&h, Some(turn)), WhileOwnLineWaits::AsBefore);
 }
 
 #[test]

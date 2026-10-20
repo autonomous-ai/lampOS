@@ -399,8 +399,16 @@ over. A move is under a second.
 - **With the switch,** while a line the lamp started on its own has not
   sounded, a new sound waits instead of taking the turn
   (`while_own_line_waits` in `crates/voice/src/coordinator.rs`). Such a line
-  is a skill's say or a reminder: no person's words it answers, no audio
-  arrived, nothing playing.
+  answers no person's words, has had no audio arrive, and has nothing
+  playing. It is one of:
+  - a skill's say;
+  - a reminder;
+  - news the lamp tells unasked (`lamp_tells_news`);
+  - its hello to someone arriving (`lamp_speaks_first`);
+  - a line of the setup walk (`lamp_leads_setup`).
+
+  A written turn that follows a person's, a look's or a "Sorry?", is as
+  before.
   - **The lamp's name** heard as the sound began (`name/rising`, up to
     `CALL_BEFORE_US` before its trigger) takes the turn at once, as before.
   - **Any other sound** is let go once the line begins to sound, or 100 ms

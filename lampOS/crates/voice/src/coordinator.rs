@@ -160,7 +160,8 @@ const WAIT_KEEPS_WITHIN_US: u64 = 3_000_000;
 const AFTER_LET_GO_US: u64 = 1_000_000;
 
 /// `LAMP_OWN_LINE_KEEPS=on` (#2220, El on lamp-06c1, 20 Oct): a line the
-/// lamp starts on its own (a skill's say, a reminder) waiting for its first
+/// lamp starts on its own (a skill's say, a reminder, its hello to someone
+/// arriving, a line of the setup walk, news it tells) waiting for its first
 /// audio is not ended by room sound. On lamp-06c1 two of three of Welcome
 /// back's hellos were dropped as `user_interrupted` by a sound the room made
 /// about 2 s in, before any of their audio. Off unless set.
@@ -185,10 +186,15 @@ enum WhileOwnLineWaits {
     LetGo(&'static str),
 }
 
-/// A line the lamp started on its own: a skill's say or a reminder, with no
-/// person's words it answers.
-fn own_line(current: &Reply) -> bool {
-    current.input_sequence == 0 && (current.say.is_some() || current.reminder.is_some())
+/// A line the lamp started on its own, with no person's words it answers: a
+/// skill's say, a reminder, news it tells, or the turn `lamp_began` (its
+/// hello to someone arriving, or a line of the setup walk).
+fn own_line(current: &Reply, lamp_began: Option<u64>) -> bool {
+    current.input_sequence == 0
+        && (current.say.is_some()
+            || current.reminder.is_some()
+            || !current.news.is_empty()
+            || lamp_began == Some(current.owner.turn()))
 }
 
 /// [`WhileOwnLineWaits`] for `candidate` at `at_us`, with `on`
@@ -198,16 +204,17 @@ fn own_line(current: &Reply) -> bool {
 /// line sounds, or 100 ms before its own decision deadline. A sound that
 /// begins once the line sounds is a cut-in over the lamp's voice, judged as
 /// before, so words said over the lamp still stop it. `waited` says it
-/// waited before.
+/// waited before; `lamp_began` is [`own_line`]'s.
 fn while_own_line_waits(
     on: bool,
     reply: Option<&Reply>,
+    lamp_began: Option<u64>,
     waited: bool,
     candidate: &crate::admission::Candidate,
     name_began_us: Option<u64>,
     at_us: u64,
 ) -> WhileOwnLineWaits {
-    let Some(current) = reply.filter(|current| on && own_line(current)) else {
+    let Some(current) = reply.filter(|current| on && own_line(current, lamp_began)) else {
         return WhileOwnLineWaits::AsBefore;
     };
     if current.had_audio || current.playback.is_some() {
@@ -4134,6 +4141,9 @@ fn conversation_with_gate(
     // recorded for.
     let own_line_keeps = own_line_keeps_from_environment();
     let mut own_kept_for: Option<crate::admission::CandidateId> = None;
+    // The newest turn the lamp began itself with no ticket or news on it:
+    // its hello to someone arriving, or a line of the setup walk.
+    let mut lamp_began: Option<u64> = None;
     // When the lamp's name was last heard beginning, and when the sound
     // last let go had stopped, for the wait.
     let mut name_began_us: Option<u64> = None;
@@ -6212,6 +6222,7 @@ fn conversation_with_gate(
                     match while_own_line_waits(
                         own_line_keeps,
                         reply.as_ref(),
+                        lamp_began,
                         own_kept_for == Some(candidate.id),
                         &candidate,
                         name_began_us,
@@ -8121,6 +8132,7 @@ fn conversation_with_gate(
                     |state| rig.publish(state),
                 )?;
                 last_publish = monotonic_us();
+                lamp_began = reply.as_ref().map(|current| current.owner.turn());
             }
         }
         // A tap on the head of a quiet lamp (#711): a soft "hm?" of its own,
@@ -8322,6 +8334,7 @@ fn conversation_with_gate(
                     |state| rig.publish(state),
                 )?;
                 last_publish = monotonic_us();
+                lamp_began = reply.as_ref().map(|current| current.owner.turn());
             } else {
                 eprintln!(
                     "lamp-voice: someone has sat down; a hello was due and is not switched on"
