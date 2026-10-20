@@ -423,8 +423,8 @@ per ordinary 1,000-step movement check. One finite release invocation ran
 `arithmetic_cost`; a second ran `inconclusive_cost`:
 
 ```sh
-cargo test -p lamp-lean --release --test cost arithmetic_cost --offline --locked -- --ignored --nocapture
-cargo test -p lamp-lean --release --test cost inconclusive_cost --offline --locked -- --ignored --nocapture
+cargo test -p lamp-lean --release --test it cost::arithmetic_cost --offline --locked -- --ignored --nocapture
+cargo test -p lamp-lean --release --test it cost::inconclusive_cost --offline --locked -- --ignored --nocapture
 ```
 
 The first command initially ran before `inconclusive_cost` existed, so its
@@ -500,7 +500,7 @@ software's calibration kept on lamp-4ace
 dated 2026-08-21). Given the same angles, this check and the first
 software's own function put the centre of mass in the same place to within
 0.02 mm over 42 poses (the two rest and standing readings and 40 drawn at
-random); [a test](../crates/lean/tests/first_software.rs) keeps four of them.
+random); [a test](../crates/lean/tests/it/first_software.rs) keeps four of them.
 That shows the conversion is right. It does not make the file the lamp:
 
 - The masses add up to 1.49 kg; the lamp's own specification

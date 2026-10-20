@@ -3,7 +3,7 @@
 //! not in the repository, so this runs only where they are installed:
 //!
 //!     LAMP_NAME_MODELS=/opt/lampOS/name/models LAMP_NAME_SOUND=a.wav:b.raw \
-//!         cargo test -p lamp-name --test quiet_models -- --ignored
+//!         cargo test -p lamp-name --test it quiet_models:: -- --ignored
 //!
 //! Each file is 16 kHz, one channel, 16 bits, raw or WAV, given 20 ms at a
 //! time as the voice sends it.

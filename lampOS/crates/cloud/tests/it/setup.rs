@@ -6,11 +6,11 @@ use lamp_cloud::account::{self, Account};
 use lamp_setup::serve::{Config, Files, Save, SetupRequest, backend_link};
 use std::path::PathBuf;
 
-const UNIT: &str = include_str!("../../../deploy/product/lamp-cloud.service");
+const UNIT: &str = include_str!("../../../../deploy/product/lamp-cloud.service");
 
 /// The product's setup settings, as `lamp-update`'s install writes them.
 fn product_setup() -> Config {
-    serde_json::from_str(include_str!("../../setup/fixtures/serve-own-page.json")).unwrap()
+    serde_json::from_str(include_str!("../../../setup/fixtures/serve-own-page.json")).unwrap()
 }
 
 /// The lamp says the same generation on the hotspot, in setup's status, as
@@ -41,8 +41,10 @@ fn the_unit_reads_the_account_where_the_products_setup_writes_it() {
         "the unit does not wait for setup's marker {marker}"
     );
     // The reset removes it with the rest of the person's data.
-    let plan: serde_json::Value =
-        serde_json::from_str(include_str!("../../setup/fixtures/reset-plan-product.json")).unwrap();
+    let plan: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../setup/fixtures/reset-plan-product.json"
+    ))
+    .unwrap();
     assert!(
         plan.to_string().contains(&format!("\"{backend}\"")),
         "{plan}"
@@ -51,7 +53,7 @@ fn the_unit_reads_the_account_where_the_products_setup_writes_it() {
 
 #[test]
 fn what_setup_writes_from_the_apps_request_reads_as_a_complete_account() {
-    let dir = PathBuf::from(format!("/tmp/lcs-{}", std::process::id()));
+    let dir = PathBuf::from(format!("/tmp/lcsu-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let mut setup = product_setup();

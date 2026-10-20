@@ -9,7 +9,7 @@
 
 use lamp_lean::{Angles, Model};
 
-const FILE: &str = include_str!("../../../deploy/lamp-4ace/lean-first-software.json");
+const FILE: &str = include_str!("../../../../deploy/lamp-4ace/lean-first-software.json");
 
 /// Motor readings for servos 1..5 and the first software's distance, in mm,
 /// of the centre of mass from the base's axis.

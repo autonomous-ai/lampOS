@@ -5,7 +5,7 @@
 //! Tests that need the model and the library are ignored by default: install
 //! the pinned model and ONNX Runtime library under `.cache/endpoint/` (or set
 //! `LAMP_SMART_TURN_MODEL` and `LAMP_ONNX_RUNTIME`), then run
-//! `cargo test -p lamp-turn-end --test fast -- --include-ignored`.
+//! `cargo test -p lamp-turn-end --test it fast:: -- --include-ignored`.
 use lamp_turn_end::{
     FAST_THREADS, FastTurn, FeatureExtractor, ONNX_RUNTIME, SMART_TURN_V3_2, SmartTurn, reference,
 };

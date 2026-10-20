@@ -2,7 +2,7 @@
 
 `pipecat-reference.json` (SHA256
 `e63375bd32ce098a9930019821e3db8c5aa9d0b09e5cd75777ca14b5d5518fae`) is the
-oracle for `tests/parity.rs`. It is data only; no generator lives in lampOS.
+oracle for `tests/it/parity.rs`. It is data only; no generator lives in lampOS.
 
 ## How it was generated
 
@@ -18,7 +18,7 @@ owner's Rust-only rule.
   - The pinned model `smart-turn-v3.2-gpu.onnx` (`model_sha256`).
   - ONNX Runtime 1.31.0 with one intra-op thread, and NumPy 2.5.4.
 - **Signals.** The four signals are the integer xorshift32 sequences that
-  `signal()` in `tests/parity.rs` regenerates bit for bit:
+  `signal()` in `tests/it/parity.rs` regenerates bit for bit:
   - `noise_2s`: seed 1, 32,000 samples;
   - `voiced_9s`: seed 2, 144,000 samples, with a 3-sample pulse every 100
     samples;
