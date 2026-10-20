@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-20 17:43 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-20 18:28 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 82.5% over 72 rows. Quality 66.6% over 16 rows.**
+**Build 83.0% over 72 rows. Quality 66.6% over 16 rows.**
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -65,7 +65,7 @@ Written by the first builder from the team's review page at 2026-10-20 17:43 (+0
 | Remembers what matters without being asked (“how was the wedding?”) | 0.40 | #1693 | twelve | Built 19 Oct 23:1x (#1974, Twelve), merged into #1712, off behind LAMP_MEMORY_OBSERVE: at a conversation’s end the model proposes what to keep and the memory checks it. |
 | Keeps going when one part fails | 1.00 | — | — | Built: each part its own unit, restarted alone, health says how the lamp is |
 | Change the Wi-Fi, name or time zone after setup, without a reset | 0.75 | #1982 #1995 #2038 | nine | 20 Oct 04:46–05:08: the Wi-Fi from the app is merged (#1995, #2033: kept only once the broker is reached, else back on the old network; |
-| Hand-overs from a home lamp: Harness installed, the person signed in | 0.25 | #751 #765 #798 | seventh | Install’s “Harness at boot” is built; |
+| Hand-overs from a home lamp: Harness installed, the person signed in | 0.60 | #751 #765 #798 #1854 | seventh | 20 Oct 18:2x, up from 0.25: on lamp-75c9 with its person (Eighth, #1854), the update put Harness on, the person signed in, and the lamp handed a Slack job to Devin Cloud by voice, which Devin did (four replies, checked i… |
 | Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part’s saved data read across versions | 0.45 | #1369 #1505 | — | 20 Oct 04:49–05:29 (El): the image’s own units carried by an update (#1945), the lowest updater a build needs (#1801), models (#1879) and settings (#1913) merged; |
 | The company sees its lamps in homes: health, crash and support logs, opt-in | 0.85 | #1683 #1755 | jarvis, mobile, backend | 20 Oct 15:1x, up from 0.50: run end to end on lamp-0c89 (Jarvis, Mobile, the backend): asked at setup, reports sent, the app’s no stops them within a second, and the backend deletes the record; |
 | The factory’s per-lamp steps: body poses, touch pads, the update key | 0.60 | #1682 #1717 #1744 | thirteen | 20 Oct 16:0x, up from 0.50: the camera is found on any port (#2215, merged) and the factory stands the lamp for its head check (#2238, passed on 52e6); |
@@ -92,7 +92,7 @@ Written by the first builder from the team's review page at 2026-10-20 17:43 (+0
 | Cutting in | 0.50 | 0.75 | 20 Oct 03:45 on the cheaper voice, lamp-4ace: two lines played over a long story each made the lamp pause and then go on, and after two such pauses it no longer lets anyone cut in on that story, so a third line 30 s late… |
 | Stop words | 0.50 | 0.75 | 19 Oct 01:3x: why a played “Stop.” is often missed: the sound the lamp sends to be written down for stop words is the microphone before the echo canceller, where its own voice is loudest, so what comes back is mostly its… |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
-| Not spoken to | 0.65 | 0.90 | 20 Oct 17:2x, down from 0.75, the 16:34 played test on lamp-4ace: after a question to the lamp, its own answers kept “a conversation with the lamp is going on” alive, so it answered two people’s own talk in the next two … |
+| Not spoken to | 0.65 | 0.90 | 20 Oct 18:2x, the same on you: talking to another device, the lamp took a word in your talk for its name (18:20) and then answered four of your lines as a conversation with it, until the busy-room rule held it and you mu… |
 | Several people | 0.60 | 0.85 | 19 Oct 02:33, telling two people apart by voice, with its main fault fixed (#1627): it now does its job, the second person’s umbrella line answered 0 of 3 with it against 3 of 3 without; |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.80 | 0.85 | 18 Oct 15:39, everything the lamp said unasked since midnight (Jarvis’s readout, 14 sessions): 17 reminders and timers, a median 0.98 s after they were due (16 within 5 s, one held back by the link), and 17 pieces of tas… |
