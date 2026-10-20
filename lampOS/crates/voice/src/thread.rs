@@ -773,8 +773,15 @@ impl Thread {
     /// [`Self::going_on`] counts them; `None` when it said none: for the
     /// journal (#1712).
     pub fn said_last_ago(&self, now: Instant) -> Option<Duration> {
+        self.said_last_ago_but(now, &[])
+    }
+
+    /// [`Self::said_last_ago`], the lamp's answers to `but` left out
+    /// (`LAMP_GOING_ON_NOT_OWN`).
+    pub fn said_last_ago_but(&self, now: Instant, but: &[u64]) -> Option<Duration> {
         self.exchanges
             .iter()
+            .filter(|exchange| !but.contains(&exchange.request))
             .filter(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
             .map(|exchange| now.saturating_duration_since(exchange.at))
             .min()

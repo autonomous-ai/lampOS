@@ -3889,7 +3889,7 @@ async fn the_lamps_work_and_its_own_turns_are_told_to_the_rule() {
             Did::Worked(_) => "worked",
             Did::Spoke(_) => "spoke",
             // The words' end, told with each packet: tested on its own.
-            Did::Said(_) => return,
+            Did::Said(..) => return,
         })
     }));
     for request in 1..=2 {
@@ -3922,7 +3922,7 @@ async fn the_end_of_the_lamps_words_is_told_as_they_are_sent() {
     let said: Arc<Mutex<Vec<u64>>> = Arc::default();
     let seen = said.clone();
     let mut engine = engine.telling_what_it_did(Arc::new(move |did| {
-        if let Did::Said(until_us) = did {
+        if let Did::Said(_, until_us) = did {
             seen.lock().unwrap().push(until_us);
         }
     }));
