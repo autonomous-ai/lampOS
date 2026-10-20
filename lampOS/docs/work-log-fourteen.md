@@ -291,3 +291,29 @@ Ready for lamp-voice: no (a comment, no code)
   rather than leave a stale half of the question for the first builder to
   answer: narrowed fourteen-P1 to just voice (a by-name equivalent, or
   none planned, as distinct from `same-voice`'s turn-continuity check).
+
+## 2026-10-20 — #2094 — the `not_kept` failure code, piece 4
+
+Ready for lamp-voice: no (the app side; nothing a lamp runs is on this
+branch)
+
+- El, 12:59 on #2094, to Fourteen: a new `data.code`, `not_kept`, on
+  `keys.set` and setup's `own_keys` — the service took and checked the
+  key but the lamp failed to write it, so the person's key for that
+  service (old or new) is gone and the lamp has already fallen back to
+  its own. The reviewer's P3 on #2167 caught that `unreached`'s "nothing
+  changed" was untrue for this case.
+- The message itself needed no change: `error.message` is already shown
+  verbatim regardless of code. What needed fixing: `LampOwnKeysNotifier`'s
+  cached `keys.get` state, which stayed stale after any failed `set` —
+  correct for every OTHER failure code (nothing changed on the lamp), but
+  wrong for this one. `set()` now calls `refresh()` specifically when
+  `error.code == 'not_kept'`, before rethrowing, so the page doesn't go on
+  showing "own" for a key the lamp just dropped.
+- One new pure-logic test (`LampOwnKeysReply.from` on a `not_kept`
+  envelope). Gate: `flutter analyze` 29/29 unchanged; `flutter test`
+  715/1 skipped/1 failed (the one pre-existing failure), `-j 2` for a
+  trustworthy number as before.
+- Pushed to `fourteen/own-keys` (`6f50a00f`), PR body updated with piece
+  4, replied on
+  [#2094](https://github.com/autonomous-ai/lampOS/issues/2094#issuecomment-6284576267).
