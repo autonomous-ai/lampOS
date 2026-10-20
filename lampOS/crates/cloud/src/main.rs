@@ -173,6 +173,8 @@ fn main() -> ExitCode {
         }),
         // A face from the app's photo (#1968): only with LAMP_PHOTO_FACES=on.
         photos: lamp_cloud::photos::Place::from_environment(),
+        // The faces it knows, and removing one (#2192): only with LAMP_FACES_PAGE=on.
+        faces: lamp_cloud::faces::Eyes::from_environment(),
     };
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -198,6 +200,7 @@ fn main() -> ExitCode {
         skills: None,
         changes: None,
         photos: None,
+        faces: None,
     };
     runtime.block_on(async move {
         let looks = async move {

@@ -3778,6 +3778,10 @@ mod tests {
     fn a_person_id_is_their_name_hashed_and_fits_the_memory() {
         // SHA-256 of "minh" begins be9688998f085098.
         assert_eq!(person_id("Minh"), "p-be9688998f085098");
+        // lamp-cloud's copy (`cloud/src/faces.rs`, the app's `face.remove`)
+        // pins the same: a change here must change it too, or the app's
+        // remove forgets another id (the reviewer on #2199).
+        assert_eq!(person_id("Lan"), "p-094a367b026246fb");
         assert_eq!(person_id(" MINH "), person_id("minh"));
         assert_ne!(person_id("Sam"), person_id("Minh"));
         for name in ["Minh", "Sam", "Nguyễn Văn A", "Al"] {

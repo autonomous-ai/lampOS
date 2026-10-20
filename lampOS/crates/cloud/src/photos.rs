@@ -135,7 +135,7 @@ pub fn add(place: &Place, name: &str, photo: &[u8], stamp: u64) -> Result<Value,
     }
 }
 
-fn exchange(socket: &Path, line: &Value, deadline: Duration) -> Option<Value> {
+pub(crate) fn exchange(socket: &Path, line: &Value, deadline: Duration) -> Option<Value> {
     let mut stream = UnixStream::connect(socket).ok()?;
     stream.set_read_timeout(Some(deadline)).ok()?;
     stream.set_write_timeout(Some(deadline)).ok()?;

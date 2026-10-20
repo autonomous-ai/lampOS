@@ -6,6 +6,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+sha2.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 lamp-bus = { path = "../bus" }

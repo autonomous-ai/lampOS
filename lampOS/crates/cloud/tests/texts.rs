@@ -34,6 +34,7 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
         skills: None,
         changes: None,
         photos: None,
+        faces: None,
     };
     (lamp, bus_root)
 }

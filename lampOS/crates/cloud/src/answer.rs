@@ -92,6 +92,11 @@ pub trait Lamp {
     fn photos(&self) -> Option<crate::photos::Place> {
         None
     }
+    /// The eyes asked for the faces they know and to forget one (#2192,
+    /// `crate::faces`): there only with `LAMP_FACES_PAGE=on`.
+    fn faces(&self) -> Option<crate::faces::Eyes> {
+        None
+    }
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -199,6 +204,16 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let place = lamp.photos().ok_or_else(|| not_here(kind))?;
             let (name, photo) = crate::photos::asked(data)?;
             crate::photos::add(&place, &name, &photo, crate::chat::now_ms()).map(Some)
+        }
+        // The faces the lamp knows, and removing one (#2192): names only,
+        // and the eyes' own forget. Over the lamp's own account channel only.
+        "face.list" if lamp.faces().is_some() => {
+            let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
+            crate::faces::list(&eyes).map(Some)
+        }
+        "face.remove" if lamp.faces().is_some() => {
+            let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
+            crate::faces::remove(&eyes, data).map(Some)
         }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the

@@ -77,6 +77,9 @@ pub struct Real {
     /// Where a face from the app's photo goes, with `LAMP_PHOTO_FACES=on`
     /// (#1968, `crate::photos`).
     pub photos: Option<crate::photos::Place>,
+    /// The eyes asked for the faces they know and to forget one, with
+    /// `LAMP_FACES_PAGE=on` (#2192, `crate::faces`).
+    pub faces: Option<crate::faces::Eyes>,
 }
 
 /// Texts from the app (`crate::chat`, #1673): whether they are taken, the
@@ -545,6 +548,10 @@ impl Lamp for Real {
         self.photos.clone()
     }
 
+    fn faces(&self) -> Option<crate::faces::Eyes> {
+        self.faces.clone()
+    }
+
     fn new_run(&mut self, now_ms: u64) -> String {
         self.texts.stream.new_run(now_ms)
     }
@@ -684,6 +691,7 @@ mod tests {
             skills: None,
             changes: None,
             photos: None,
+            faces: None,
         };
         let level = Volume {
             volume: 35,
@@ -807,6 +815,7 @@ mod tests {
             skills: None,
             changes: None,
             photos: None,
+            faces: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.

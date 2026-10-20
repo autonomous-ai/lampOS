@@ -714,7 +714,20 @@ this room" until someone asks to be recognised.
     crash left there (`….json.new`) is neither searched nor counted, and a
     `set-aside` that is a link is never followed (`forget` refuses with
     `{"error":"storage"}`, health counts it as one).
-  - `{"list":true}` answers the names.
+  - `{"list":true}` answers the names (`people`), and never a face from a
+    photo still waiting for its yes. `{"list":true,"waiting":true}`, which
+    only lamp-cloud asks for the owner's own page (`face.list`, #2192),
+    names those too (`waiting`). They are never said at the lamp, counted
+    or greeted.
+  - A forget also lets go a face from a photo by that name, and one let
+    go is a face forgotten (`forgot: true`). A let-go its file couldn't be
+    written for answers `{"error":"storage"}`, as a failed forget does.
+  - **A forget is the face only.** "Forget my face" at the lamp leaves what
+    memory keeps for that person, unless they also say "forget
+    everything"; a remove from the owner's page (`face.remove`) takes their
+    memory too (cloud.md, "The faces it knows"). Memory names a person by
+    their name's hash, so until person ids are stable (#2176 row 3), a new
+    face kept under the same name would be given those memories.
   - `{"who":true}` answers who is at the lamp now, or `null`.
   - Remembering someone already known replaces their prints.
 - **Said.** With `--known-file` (on lamp-4ace `/run/lampos-eyes/known`,

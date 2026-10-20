@@ -69,6 +69,8 @@ routes are not served. Each kind is carried out by the part that owns it.
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Read only. Without the switch, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
+| `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
+| `face.remove` (`{"name"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules. `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
@@ -180,6 +182,57 @@ the JPEG checked, too long, empty, not base64, not a JPEG and too large
 refused; the photo written 0600 as a new file, the eyes asked for it by
 name, and gone afterwards, also when nobody answers; the eyes' reasons said
 plainly.
+
+## The faces it knows (#2192, `face.list` and `face.remove`)
+
+Off unless `LAMP_FACES_PAGE=on`, with the eyes' request socket
+(`LAMP_EYES_WHO_SOCKET`). The Lamp 2 page's list of faces, and removing one:
+the privacy half of the photo faces (Mobile on #1396, mobile-P3 item 3).
+lamp-cloud keeps nothing; both go to the eyes as the voice's own asks do.
+
+- **Only the lamp's own account,** over its `fa_channel`, as `faces.add_photo`.
+- **`face.list`** asks the eyes `{"list":true,"waiting":true}`, an ask only
+  lamp-cloud makes, and answers each name with
+  `waiting`: `false` for a face kept on its person's yes, `true` for one from
+  a photo still to be confirmed at the lamp. Nothing else of the eyes'
+  answer is passed on: never a print or a photo (`faces::listed`).
+- **`face.remove`** takes the person off all of the lamp (the first builder
+  on #2199, 13:08). It checks the name as `faces.add_photo` does, then asks
+  the eyes `{"forget":NAME}`: their own forget, which takes the person's
+  prints, their familiarity number, a face from a photo by that name, and
+  their name in set-aside records. If set-aside records couldn't all be
+  searched, the forget waits for them (#1586) and the answer says
+  `finishing`. Then memory is asked, as the voice's `forget_everything`
+  asks it, `{"op":"forget_all","person":ID}` for the person's id
+  (`faces::person_id`, the voice's `p-` and 16 hex digits of the name's
+  hash) and again for their rules' (`r-`, the same digits). `memory` says
+  `forgotten` only when both were done, else `kept` with a `reason`: memory
+  not reached, refused, or not given to lamp-cloud (no `LAMP_MEMORY_SOCKET`),
+  so the app never says gone when it isn't. Memory's socket is mode 0600
+  and its own user's, so a lamp giving lamp-cloud the socket must also give
+  it the access; until then the answer is `kept`, and the app shows that
+  the person's memories stay on the lamp, never "removed" alone. "Forget my
+  face" at the lamp stays the face only (eyes.md).
+- **A face already gone can't take its memories from the page.** After
+  "forget my face" at the lamp, or a remove whose photo face couldn't be
+  let go after the people's forget ran, the eyes no longer know the name:
+  a remove then answers "the lamp doesn't know that face", and memory isn't
+  asked. Their memories stay until "forget everything" at the lamp, or an
+  ask for memory alone, which isn't built.
+- **The waiting names are by convention:** only lamp-cloud sends
+  `{"list":true,"waiting":true}`, but the eyes don't check who asks. It's
+  the same trust their socket already has (anything running as `lampos`).
+- **2 s** for the eyes' answer, as `faces.add_photo`'s, for the same reason.
+
+Tests (`faces.rs`): the switch needs the eyes' socket's absolute path; the
+list as names and `waiting` only, an empty one, and the eyes' error
+refused; a remove's name checked, and each forget answer said; memory's id
+the voice's, asked for the person and their rules, and `forgotten` only
+when both were done; both asked over the sockets, and nobody answering
+said. `tests/app_contract.rs` pins what the page reads of both (`memory`,
+and `reason` with `kept`), in V1's envelope, and both refused without the
+switch. `online.rs`: only the lamp's own account channel commands it
+(`commanded`).
 
 ## The skills page (#1722, `skills.list`)
 

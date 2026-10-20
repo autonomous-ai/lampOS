@@ -48,6 +48,7 @@ fn a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_giv
         skills: None,
         changes: None,
         photos: None,
+        faces: None,
     };
     let mut voice = Bus::new(&bus_root)
         .unwrap()
