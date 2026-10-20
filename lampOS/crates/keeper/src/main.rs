@@ -5,6 +5,7 @@ use lamp_bus::{Bus, Publisher};
 use lamp_keeper::{
     Keeper, NAME, Notify, PartState, Rules, STATE,
     package::{self, Answer, Release},
+    profile,
     units::{self, Systemctl, Systemd},
 };
 use lamp_msgs::{Diagnostic, Health, Level, Pause, Voice, VoiceState};
@@ -43,6 +44,11 @@ package's adapter calls it from its own prepare), writes the device key
 and /etc/lampOS/policy/jev.key where missing, 0600, with lamp-update
 install's code. It stops nothing and touches no hardware or unit. With no
 usable key it says so and exits 0, as install does: setup takes the key.
+Then, where missing, it writes what a V1 lamp lacks for the generic
+package: /etc/lampOS/package-profile.json from a read-only hardware probe
+and this lamp's /etc/lampOS/body/lamp.env, the package's provision/
+settings, and the runtime directories. A device it cannot find, or one
+found twice, stops it with exit 1 before any of these is written.
 status prints every lampOS unit: its state, its build and its health.
 start, stop and restart act on lamp-PART.service, or lampos.target for lamp.
 pause says on lamp/pause that the lamp is paused: each part that honours it
@@ -88,27 +94,47 @@ fn main() -> ExitCode {
 }
 
 /// `lamp-keeper prepare`: V1's key where missing and never written before,
-/// by lamp-update install's own code and records. Nothing it prints carries
-/// the key: the paths only.
+/// by lamp-update install's own code and records; then what a V1 lamp lacks
+/// for the generic package (the profile, the settings and the directories),
+/// where missing (#2163). Nothing it prints carries the key: the paths only.
 fn prepare() -> ExitCode {
     use lamp_update::install;
     let mut say = |line: &str| eprintln!("lamp-keeper: prepare: {line}");
-    match install::provision_device_key(Path::new("/"), install::RECORDS, &mut say) {
-        Ok(wrote) if wrote.is_empty() => {
-            eprintln!("lamp-keeper: prepare: nothing written");
-            ExitCode::SUCCESS
-        }
-        Ok(wrote) => {
-            for path in wrote {
-                eprintln!("lamp-keeper: prepare: wrote {path}");
+    let mut wrote: Vec<String> =
+        match install::provision_device_key(Path::new("/"), install::RECORDS, &mut say) {
+            Ok(wrote) => wrote.into_iter().map(str::to_owned).collect(),
+            Err(why) => {
+                eprintln!("lamp-keeper: prepare: {why}");
+                return ExitCode::FAILURE;
             }
-            ExitCode::SUCCESS
-        }
+        };
+    let Some(release) = Release::of_this_program() else {
+        eprintln!("lamp-keeper: prepare: cannot tell which release this program is in");
+        return ExitCode::FAILURE;
+    };
+    // The mixer is asked, not set: `sget` only reads.
+    let mut has_control = |card: &str, control: &str| {
+        std::process::Command::new("amixer")
+            .args(["-c", card, "sget", control])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success())
+    };
+    match profile::prepare(Path::new("/"), &release.root, &mut has_control, &mut say) {
+        Ok(more) => wrote.extend(more),
         Err(why) => {
             eprintln!("lamp-keeper: prepare: {why}");
-            ExitCode::FAILURE
+            return ExitCode::FAILURE;
         }
     }
+    if wrote.is_empty() {
+        eprintln!("lamp-keeper: prepare: nothing written");
+    }
+    for path in wrote {
+        eprintln!("lamp-keeper: prepare: wrote {path}");
+    }
+    ExitCode::SUCCESS
 }
 
 /// Say on `lamp/pause` whether the lamp is paused. The value is kept on the
