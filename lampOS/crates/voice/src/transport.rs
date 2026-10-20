@@ -45,6 +45,10 @@ pub struct Channel {
     take_late: bool,
     late_run: u64,
     late_oldest_us: u64,
+    /// Stale renewals passed over in the run now going on
+    /// ([`Self::receive_renewed`]), and the oldest.
+    passed_run: u64,
+    passed_oldest_us: u64,
     #[cfg(test)]
     probe: probe::Slot,
 }
@@ -83,6 +87,8 @@ impl Channel {
             take_late: false,
             late_run: 0,
             late_oldest_us: 0,
+            passed_run: 0,
+            passed_oldest_us: 0,
             #[cfg(test)]
             probe: probe::Slot::new(sender, peer),
         })
@@ -274,17 +280,19 @@ impl Channel {
             match self.judge(&packet, at_us, max_age_us) {
                 Ok(()) => break,
                 // Stale by its age alone, a renewal, the next renewal behind.
-                Err(error) if renews(&packet.payload) && self.incoming.is_in_order(&packet) => {
+                // One stamped after now is not stale: it is refused as ever,
+                // its channel named (the lead's reviewer on #2293).
+                Err(error)
+                    if renews(&packet.payload)
+                        && self.incoming.is_in_order(&packet)
+                        && packet.sent_at_us <= at_us =>
+                {
                     let Some(behind) = self.renewal_behind(&packet, renews)? else {
                         return Err(error);
                     };
                     self.incoming.accept(&packet, at_us, u64::MAX)?;
                     self.received = true;
-                    say(format!(
-                        "lamp-voice: {}: a renewal {} us old (bound {max_age_us} us) passed over: the next renewal is behind it",
-                        self.name,
-                        at_us.saturating_sub(packet.sent_at_us)
-                    ));
+                    self.passed_over(at_us.saturating_sub(packet.sent_at_us), max_age_us);
                     packet = behind;
                     // Again after this receive, for the same reason.
                     at_us = now();
@@ -361,11 +369,34 @@ impl Channel {
         }
     }
 
+    /// A stale renewal passed over ([`Self::receive_renewed`]): the first of
+    /// a run is said, and the run when it ends ([`Self::say_run`]), so a long
+    /// hold-up's backlog of renewals is two lines, not one each (the
+    /// reviewer on #2293).
+    fn passed_over(&mut self, age_us: u64, bound_us: u64) {
+        self.passed_run += 1;
+        self.passed_oldest_us = self.passed_oldest_us.max(age_us);
+        if self.passed_run == 1 {
+            say(format!(
+                "lamp-voice: {}: a renewal {age_us} us old (bound {bound_us} us) passed over: the next renewal is behind it",
+                self.name
+            ));
+        }
+    }
+
     /// A run of late messages, said as it ends: `on time again`, `ended by
     /// an error` or `closed` with the channel, so a run that ends the
     /// worker or goes quiet still says its count and its oldest (the
-    /// reviewer on #1660).
+    /// reviewer on #1660). A run of renewals passed over is said so too.
     fn say_run(&mut self, how: &str) {
+        if self.passed_run > 0 {
+            say(format!(
+                "lamp-voice: {}: {how} after {} renewals passed over, the oldest {} us",
+                self.name, self.passed_run, self.passed_oldest_us
+            ));
+            self.passed_run = 0;
+            self.passed_oldest_us = 0;
+        }
         if self.late_run > 0 {
             say(format!(
                 "lamp-voice: {}: {how} after {} late messages, the oldest {} us",
@@ -649,10 +680,22 @@ mod tests {
         let (taken, error) = first_look(&[1, 2], 60_000, 150_000, false);
         assert!(taken.is_empty() && stale(error));
         // 210, 170, 130 and 90 ms old: 1 passed over, 2 taken late in order,
-        // 3 passed over, 4 on time.
+        // 3 passed over, 4 on time. The run is said in two lines, its first
+        // and its end, not one a renewal.
+        let _ = said();
         assert_eq!(
             first_look(&[1, 2, 3, 4], 40_000, 210_000, true),
             (vec![2, 4], None)
+        );
+        let lines = said();
+        assert_eq!(lines.len(), 2, "{lines:?}");
+        assert!(
+            lines[0].contains("a renewal 210000 us old (bound 100000 us) passed over"),
+            "{lines:?}"
+        );
+        assert!(
+            lines[1].ends_with("on time again after 2 renewals passed over, the oldest 210000 us"),
+            "{lines:?}"
         );
         // A stale renewal alone still ends it.
         let (taken, error) = first_look(&[1], 0, 150_000, true);
@@ -666,6 +709,22 @@ mod tests {
         // A stale message of another kind ends it, a renewal behind or not.
         let (taken, error) = first_look(&[100, 2], 60_000, 150_000, true);
         assert!(taken.is_empty() && stale(error));
+        // A renewal stamped after the reading is not passed over, a renewal
+        // behind or not: it is refused as before, its channel named.
+        let dir = SessionDirectory::create().unwrap();
+        let (mut sender, mut receiver) = pair(&dir.path);
+        let t = monotonic_us();
+        sender.send_with(1u32, || t + 50_000).unwrap();
+        sender.send_with(2u32, || t + 60_000).unwrap();
+        let error = receiver
+            .receive_renewed_with(|| t, |value: &u32| *value < 100)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.starts_with(&format!("{}: ", receiver.name)),
+            "{error}"
+        );
+        assert!(error.contains("stale"), "{error}");
     }
 
     /// Past its first message, a receiver that reads its renewals one at a
