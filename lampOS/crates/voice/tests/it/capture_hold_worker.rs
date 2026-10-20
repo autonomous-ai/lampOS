@@ -1188,14 +1188,17 @@ fn a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded() {
         0,
         ReferenceRecovery::Bounded,
     );
-    rig.stream(&signal, 100);
+    // Running before the pause and after it, each long enough for the
+    // reference to be primed and trusted: with recovery taken as off, this
+    // half ends on `ReferenceLate` as the first does (#823).
+    rig.stream(&signal, 30);
     rig.speaker_quiet(&signal, 10);
-    rig.stream(&signal, 200);
+    rig.stream(&signal, 50);
     rig.settle(0);
     assert_eq!(rig.frames.len(), rig.pushed_at.len());
     rig.end_with(Control::Stop);
     let frames = rig.finish();
-    assert_eq!(frames.len(), 310);
+    assert_eq!(frames.len(), 30 + 10 + 50);
 }
 
 /// #1359: the worker ends on `Stop` and is gone before the controller looks
@@ -1230,14 +1233,16 @@ fn the_loop_waits_on_the_microphone_only_with_the_switch() {
     warm_up();
     for wait in [false, true] {
         let name = Microphone::Mic2.device();
-        let signal = Signal::new(200);
+        let signal = Signal::new(62);
         let mut rig = Rig::start_waiting(name, wait);
-        rig.stream(&signal, 100);
+        // Past the prime's start (20 blocks with render, as the next test
+        // says), then the two quiet blocks and as many again (#823).
+        rig.stream(&signal, 30);
         // Two blocks with no render beside them: only the microphone wakes
         // the loop, so it is waited on (with render, the speaker's socket
         // mostly wakes it first).
         rig.speaker_quiet(&signal, 2);
-        rig.stream(&signal, 98);
+        rig.stream(&signal, 30);
         rig.settle(0);
         let waits = rig.device.waits();
         rig.end_with(Control::Stop);
