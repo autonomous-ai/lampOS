@@ -1026,6 +1026,47 @@ With the switch, a yield's request begins at the person's first words:
 - `duplex_policy` records `first_words_kept_blocks` (160). Each
   `input_candidate`'s `first_read_at_us` shows where its audio began.
 
+### A line begun as the lamp's sound ends (#1722)
+
+Off unless `LAMP_REPLY_END_REACH=on`, and nothing without
+`LAMP_FIRST_WORDS=kept` (built by the fourth builder on 20 October 2026,
+for the first builder's 06:56 on #1722).
+
+- **The fault:** a person who starts as the lamp's reply ends, and leads
+  with the name, lost the name. Under the lamp's last words the rule takes
+  their voice for the lamp's own sound and doesn't yield. The line starts
+  only once the lamp has been quiet 300 ms (`clear_after_blocks`), with the
+  usual 300 ms before its onset, after the name. On lamp-4ace on 20 October,
+  "Hey Lamp, ask Codex to write a haiku about coffee.", said as the
+  lighthouse story ended, reached speech to text as its last 8 words. It was
+  held for no name in 3 of the last 4 hourly hand-overs. lamp-name heard
+  nothing under the story's end, so the name's own hit can't anchor it.
+- **With the switch,** a start while the lamp's sound has been quiet under
+  640 ms (`QUIET_BLOCKS_CEILING`, which the duplex rule's 300 ms falls
+  inside) begins 200 ms (`REACH_LEAD_BLOCKS`) before the earliest onset of
+  the kept 1.6 s. An onset here is the detector's own: a run of six blocks
+  (`START_BLOCKS`), each scored 0.8 or more (`START_PROBABILITY`) by its own
+  score. So the line begins where it would have, had the lamp not been
+  sounding (`TurnDetector::reach_back_to_onset`, `reaches_past_reply`).
+- **The lamp's own last words aren't taken.** The canceller leaves them
+  scored under the onset's bar, so they never make a run, even scored where
+  a yield's reach (0.35) would take them. At most the 200 ms lead before the
+  person's onset goes with the line.
+- **And only within the line's own stretch.** The onset is looked for back
+  from the usual start, as far as a pause as long as the one that ends a
+  line (the end-of-speech wait, 600 ms on lamp-4ace). Now and then the
+  canceller leaves the lamp's last words scored as an onset (#828's replay),
+  and words before such a pause aren't this line's (the reviewer's P3 on
+  #2096).
+- **The rest is as for a yield's first words:** never past a block heard
+  without echo evidence, never later than without the switch, the same 2.0 s
+  first-words age at the commit, and the same hold. A line begun 640 ms or
+  more after the lamp's sound, and every line without the switch, starts as
+  before.
+- `duplex_policy` records `reply_end_reach_within_blocks` (64) with it on.
+  As before, `input_candidate`'s `first_read_at_us` shows where the audio
+  began.
+
 Measured on the first builder's two recordings of 01:51, replayed with
 `lamp-audio replay-aec` ([the evidence](verification/first-words-20261016/README.md)):
 of six yields over a story, four requests that began 1.2 to 1.7 s late
@@ -1152,6 +1193,10 @@ functions:
 | `a_person_who_speaks_once_the_lamp_is_silent_is_an_ordinary_turn` | Six blocks and admitted, as ever |
 | `first_words_older_than_the_provider_takes_are_dropped_before_the_commit` | Paced on the scenario clock, 40 ms a block: first words 2.5 s before the commit are trimmed to 2.0 s; the onset and what followed are kept, in one run; the drop is recorded |
 | `with_first_words_kept_a_yields_request_begins_at_the_words_said_under_the_lamp` | With `LAMP_FIRST_WORDS=kept`, the request begins 20 blocks before the first words said under the lamp's voice, through the same yield and commit; without it, 30 blocks before the onset |
+| `with_the_reply_end_reach_a_line_begun_under_the_lamps_last_words_keeps_its_name` | With `LAMP_REPLY_END_REACH=on`, a name said under the lamp's last sound, with no yield, begins its line 20 blocks before its onset; without the switch, 300 ms before the trigger after the lamp's sound; the lamp's last words scored 0.6 aren't reached back to |
+| `with_the_reply_end_reach_the_lamps_words_before_a_pause_are_not_taken` | The lamp's last words scored 0.9, then a 610 ms pause with a 600 ms end-of-speech wait, then the name: the line begins at the name, not in them |
+| `with_the_reply_end_reach_a_line_long_after_the_lamps_sound_starts_as_before` | A line begun 640 ms after the lamp's sound starts as without the switch, though words said under that sound are in the pre-roll |
+| `a_start_reaches_past_the_reply_only_as_the_lamps_sound_ends` | Only with the switch, echo evidence and the lamp's sound quiet under 64 blocks |
 
 ## Verification
 
