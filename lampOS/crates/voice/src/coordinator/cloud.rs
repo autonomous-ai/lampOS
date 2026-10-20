@@ -166,6 +166,7 @@ impl CloudRequest {
             }
             ProviderInput::Audio { .. }
             | ProviderInput::Called { .. }
+            | ProviderInput::CountOnly { .. }
             | ProviderInput::End { .. }
                 if self.start_submitted && !self.input_end_submitted =>
             {
@@ -186,7 +187,9 @@ impl CloudRequest {
         match command {
             ProviderInput::Start { .. } => self.start_submitted = true,
             ProviderInput::End { .. } => self.input_end_submitted = true,
-            ProviderInput::Audio { .. } | ProviderInput::Called { .. } => {}
+            ProviderInput::Audio { .. }
+            | ProviderInput::Called { .. }
+            | ProviderInput::CountOnly { .. } => {}
             ProviderInput::Written { .. } | ProviderInput::Reminder { .. } => {
                 self.start_submitted = true;
                 self.input_end_submitted = true;

@@ -145,6 +145,8 @@ pub struct Thread {
     /// last read or written, or the moment of the last forgetting, whichever
     /// is later. A file no newer than this is not read again.
     held: Option<SystemTime>,
+    /// Onboarding's sentence in hand ([`Self::count_only`]).
+    count_only: Option<u64>,
 }
 
 /// One exchange as it is kept in the file: when, by the wall clock, since
@@ -188,6 +190,14 @@ pub static THREAD: Mutex<Thread> = Mutex::new(Thread::new());
 pub fn unsay(request: u64) {
     if let Ok(mut thread) = THREAD.lock() {
         thread.unsay(request);
+    }
+}
+
+/// Onboarding's sentence (#1803) is `request`, or with `None` a new line
+/// is not it: [`Thread::count_only`] on this process's thread.
+pub fn count_only(request: Option<u64>) {
+    if let Ok(mut thread) = THREAD.lock() {
+        thread.count_only(request);
     }
 }
 
@@ -236,6 +246,7 @@ impl Thread {
             admitted: Vec::new(),
             note: None,
             held: None,
+            count_only: None,
         }
     }
 
@@ -381,12 +392,15 @@ impl Thread {
             std::mem::take(&mut self.admitted),
             self.note.take(),
         );
+        let count_only = self.count_only;
         *self = read;
         self.whose = whose;
         self.named = named;
         self.opened_for = opened_for;
         self.admitted = admitted;
         self.note = note;
+        // The sentence in hand stays out of a thread read meanwhile.
+        self.count_only = count_only;
         self.held = Some(at);
         took
     }
@@ -493,8 +507,20 @@ impl Thread {
         Ok(thread)
     }
 
+    /// The line in hand is onboarding's sentence (#1803), or with `None`
+    /// it is not: while it is, nothing heard is kept, and nothing of the
+    /// lamp's answer to it either, so its words reach no exchange, no file,
+    /// no journal and no later prompt. Set just after its Start; a Start
+    /// clears it.
+    pub fn count_only(&mut self, request: Option<u64>) {
+        self.count_only = request;
+    }
+
     /// A piece of what the provider heard a person say.
     pub fn person(&mut self, text: &str, finished: bool, now: Instant) {
+        if self.count_only.is_some() {
+            return;
+        }
         // Something new after something that was never answered: the old
         // was not said to the lamp.
         let stale = self
@@ -560,7 +586,7 @@ impl Thread {
         // not something the lamp said: neither that piece nor what follows
         // it in the same answer is kept, told again or taken for a
         // conversation going on.
-        if self.unsaid == Some(request) {
+        if self.unsaid == Some(request) || self.count_only == Some(request) {
             return;
         }
         let opening = self.exchanges.back().map(|last| last.request) != Some(request);

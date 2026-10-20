@@ -226,6 +226,11 @@ pub struct Progress {
     /// The accepted near-call tries so far: numbers only, never sound.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub near_call_tries: Vec<lamp_near_call::Try>,
+    /// Prompts for the step's sentence part committed this setup/redo,
+    /// before each is published: at most [`near::SENTENCE_PROMPTS`]. Only
+    /// the count: nothing of the sentence is kept.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub sentence_prompts: u8,
 }
 
 fn is_zero(value: &u8) -> bool {
@@ -257,10 +262,13 @@ impl Progress {
             || tries.len() > lamp_near_call::TRIES
             || tries.len() > usize::from(self.near_call_prompts)
             || !tries.iter().all(near::valid_try)
+            || self.sentence_prompts > near::SENTENCE_PROMPTS
+            // The step is done by its sentence part, which asked at least
+            // once; the name part's bar is its own file.
             || self
                 .steps
                 .get(Step::HowYouSound.name())
-                .is_some_and(|kept| kept.outcome == Outcome::Done && !near::done_fits(tries))
+                .is_some_and(|kept| kept.outcome == Outcome::Done && self.sentence_prompts == 0)
         {
             return Err(invalid());
         }
