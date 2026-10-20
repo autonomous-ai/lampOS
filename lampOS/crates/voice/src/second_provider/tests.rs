@@ -6086,7 +6086,9 @@ async fn a_kept_listener_goes_after_its_time_or_when_listening_stops() {
     };
     let listened = |script: &Script| script.listened.load(Ordering::Relaxed);
     // Each way the kept one goes, then the next line: 4 listeners (line
-    // 1's, its kept one, line 2's own, and line 2's kept one), not 3.
+    // 1's, its kept one, line 2's own, and line 2's kept one), not 3. A new
+    // generation also has its own opened before its first line, which a
+    // line of the old one doesn't take: 5.
     for gone in [
         "its time",
         "listening stopped",
@@ -6112,9 +6114,92 @@ async fn a_kept_listener_goes_after_its_time_or_when_listening_stops() {
         engine.submit(audio(2, 1));
         engine.submit(end(2));
         assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
-        let expected = if gone == "kept" { 3 } else { 4 };
+        let expected = match gone {
+            "kept" => 3,
+            "another generation" => 5,
+            _ => 4,
+        };
         assert_eq!(listened(&played), expected, "{gone}");
     }
+}
+
+/// #2135 (the first builder on #1722, 01:15): with `LAMP_SECOND_STT_WARM`
+/// the first line after the voice starts goes to a socket opened at the
+/// worker's first authority, before it, and opens none of its own; on
+/// lamp-4ace it had waited 753 ms for one. Once a generation: another
+/// authority opens no second one, nor one past [`KEPT_FOR`], so a lamp
+/// nobody talks to keeps nothing open; listening stopped and allowed again
+/// opens one anew. None while listening isn't allowed, or with the switch
+/// off.
+#[tokio::test(start_paused = true)]
+async fn the_first_line_after_a_start_goes_to_a_socket_opened_before_it() {
+    let lines = ["What time is it?", "And tomorrow?", "Thanks."];
+    let played = Arc::new(Script {
+        heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
+        chats: Mutex::new(
+            lines
+                .iter()
+                .map(|_| vec![text("Sure."), Ok(ChatEvent::Done)])
+                .collect(),
+        ),
+        ..Script::default()
+    });
+    let listened = |script: &Script| script.listened.load(Ordering::Relaxed);
+    let (engine, _, _) = scripted(played.clone());
+    let mut engine = engine.keeping_a_listener_ready(true);
+    engine.listening(false, 1);
+    assert_eq!(listened(&played), 0, "not while listening isn't allowed");
+    engine.listening(true, 1);
+    assert_eq!(listened(&played), 1, "opened before the first line");
+    engine.listening(true, 1);
+    assert_eq!(listened(&played), 1, "once a generation");
+    tokio::task::yield_now().await;
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    // The first line took it, and opened only the next line's.
+    assert_eq!(listened(&played), 2);
+    assert_eq!(
+        played.asked.lock().unwrap()[0].last(),
+        Some(&Message::user("What time is it?"))
+    );
+    // Listening stopped and allowed again: opened anew, and taken.
+    engine.listening(false, 1);
+    engine.listening(true, 1);
+    assert_eq!(listened(&played), 3);
+    tokio::task::yield_now().await;
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(listened(&played), 4);
+    // The one kept after line 1 went with listening, its scripted words
+    // with it; line 2 is heard on the one opened after.
+    assert_eq!(
+        played.asked.lock().unwrap()[1].last(),
+        Some(&Message::user("Thanks."))
+    );
+    // Past its time, the authorities that keep coming open nothing.
+    tokio::time::sleep(KEPT_FOR + Duration::from_secs(1)).await;
+    engine.listening(true, 1);
+    assert_eq!(listened(&played), 4, "nothing kept past its time");
+    // Off: nothing before a line.
+    let plain = Arc::new(Script::default());
+    let (engine, _, _) = scripted(plain.clone());
+    engine.listening(true, 1);
+    assert_eq!(listened(&plain), 0);
+}
+
+/// Outside a runtime the first line's listener isn't opened, and nothing
+/// panics: the worker's own tests install authorities with no runtime.
+#[test]
+fn no_listener_is_opened_before_a_line_outside_a_runtime() {
+    let script = Arc::new(Script::default());
+    let (engine, _, _) = scripted(script.clone());
+    let engine = engine.keeping_a_listener_ready(true);
+    engine.listening(true, 1);
+    assert_eq!(script.listened.load(Ordering::Relaxed), 0);
 }
 
 /// #1712 (the first builder at 03:48): the journal counts a line's words in
