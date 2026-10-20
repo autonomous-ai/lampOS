@@ -140,8 +140,76 @@ fn omitted_or_null_options_preserve_existing_setup_and_authentication_choices() 
     }
 }
 
+/// A field a newer build writes is read past and named once at start
+/// (#1505, #1680); a known field with a bad value is still refused, and
+/// says which file.
 #[test]
-fn typed_load_rejects_malformed_levels_language_types_and_unknown_fields() {
+fn a_field_from_a_newer_build_is_read_past_and_named() {
+    let fixture = Private::new();
+    let mut configuration = fixture.value();
+    configuration["languageCode"] = json!("en-US");
+    configuration["newer_field"] = json!({"nested": [1, 2]});
+    fixture.write(&configuration);
+    let config = ProviderConfig::load(&fixture.config).unwrap();
+    assert_eq!(
+        config.unread_line().unwrap(),
+        format!(
+            "{}: fields this build does not read, ignored: languageCode, newer_field",
+            fixture.config.display()
+        )
+    );
+    fixture.write(&fixture.value());
+    assert_eq!(
+        ProviderConfig::load(&fixture.config).unwrap().unread_line(),
+        None
+    );
+
+    configuration["thinking_level"] = json!("low");
+    fixture.write(&configuration);
+    let error = ProviderConfig::load(&fixture.config).err().unwrap();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert!(
+        error.to_string().contains(fixture.config.to_str().unwrap()),
+        "{error}"
+    );
+}
+
+/// The file never holds a key: one written in it is refused by name, the
+/// key itself never shown.
+#[test]
+fn a_key_written_in_the_provider_file_is_refused() {
+    let fixture = Private::new();
+    for field in ["api_key", "token", "relay_secret"] {
+        let mut configuration = fixture.value();
+        configuration[field] = json!(MARKER);
+        fixture.write(&configuration);
+        let error = ProviderConfig::load(&fixture.config).err().unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput, "{field}");
+        assert!(error.to_string().contains(field), "{error}");
+        assert!(!error.to_string().contains(MARKER));
+    }
+}
+
+/// A key pasted into an enum field is refused, and neither the error nor a
+/// journal line quotes it (#2061): serde's kind and place only.
+#[test]
+fn a_key_pasted_into_an_enum_field_is_never_quoted() {
+    let fixture = Private::new();
+    for field in ["authentication", "resumption"] {
+        let mut configuration = fixture.value();
+        configuration[field] = json!("sk-test-PLANTED-0000");
+        fixture.write(&configuration);
+        let error = ProviderConfig::load(&fixture.config).err().unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData, "{field}");
+        let shown = format!("{error} {error:?}");
+        assert!(!shown.contains("PLANTED"), "{shown}");
+        assert!(shown.contains(fixture.config.to_str().unwrap()), "{shown}");
+        assert!(shown.contains(": Data at line "), "{shown}");
+    }
+}
+
+#[test]
+fn typed_load_rejects_malformed_levels_and_language_types() {
     let fixture = Private::new();
     for (field, value) in [
         ("thinking_level", json!("low")),
@@ -151,8 +219,6 @@ fn typed_load_rejects_malformed_levels_language_types_and_unknown_fields() {
         ("thinking_level", json!({})),
         ("language_code", json!(["en-US"])),
         ("language_code", json!(true)),
-        ("languageCode", json!("en-US")),
-        ("thinkingLevel", json!("LOW")),
         ("authentication", json!("unknown")),
     ] {
         let mut configuration = fixture.value();
