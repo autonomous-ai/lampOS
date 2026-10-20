@@ -1,7 +1,8 @@
 //! The weather where the lamp stands, asked of Open-Meteo ahead of any
 //! question (`LAMP_SECOND_WEATHER=on`, #1712): its place looked up once by
-//! name, then the weather now, today and tomorrow every [`EVERY`], told to
-//! the model beside the time, so "what's the weather" needs no search. The
+//! name, then the weather now and for the week ahead every [`EVERY`], told
+//! to the model beside the time, so "what's the weather" and "will it rain
+//! this weekend" need no search. The
 //! first builder on #1712 (15:18): Open-Meteo, free and with no key. Only the
 //! place's name and its coordinates leave the lamp.
 use super::{Result, get_public_json};
@@ -50,7 +51,7 @@ pub fn coordinates(answer: &Value) -> Option<(f64, f64)> {
     Some((first["latitude"].as_f64()?, first["longitude"].as_f64()?))
 }
 
-/// The forecast request for a place: now, and today's and tomorrow's.
+/// The forecast request for a place: now, and each day of the week ahead.
 pub fn forecast_url(latitude: f64, longitude: f64) -> Option<String> {
     reqwest::Url::parse_with_params(
         FORECAST,
@@ -66,7 +67,7 @@ pub fn forecast_url(latitude: f64, longitude: f64) -> Option<String> {
                 "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
             ),
             ("timezone", "auto"),
-            ("forecast_days", "2"),
+            ("forecast_days", "7"),
         ],
     )
     .ok()
@@ -95,8 +96,35 @@ fn sky(code: i64) -> &'static str {
     }
 }
 
-/// The forecast in a few words for `place`: now, today and tomorrow, in
-/// degrees Celsius. `None` without the weather now.
+/// The day of the week of a `YYYY-MM-DD` date, as the forecast names its
+/// days (Sakamoto's method).
+fn weekday(date: &str) -> Option<&'static str> {
+    let mut parts = date.splitn(3, '-').map(|part| part.parse::<i64>().ok());
+    let (mut year, month, day) = (parts.next()??, parts.next()??, parts.next()??);
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    const OFFSET: [i64; 12] = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+    if month < 3 {
+        year -= 1;
+    }
+    let index = (year + year / 4 - year / 100 + year / 400 + OFFSET[month as usize - 1] + day)
+        .rem_euclid(7);
+    Some(
+        [
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+        ][index as usize],
+    )
+}
+
+/// The forecast in a few words for `place`: now, today, tomorrow and each
+/// later day by its name, in degrees Celsius. `None` without the weather now.
 pub fn summary(answer: &Value, place: &str) -> Option<String> {
     let now = &answer["current"];
     let degrees = |value: &Value| value.as_f64().map(|value| value.round() as i64);
@@ -113,8 +141,17 @@ pub fn summary(answer: &Value, place: &str) -> Option<String> {
     }
     said.push('.');
     let daily = &answer["daily"];
-    for (day, name) in [(0, "Today"), (1, "Tomorrow")] {
+    let days = daily["weather_code"].as_array().map_or(0, Vec::len);
+    for day in 0..days {
         let at = |field: &str| daily[field].get(day).cloned().unwrap_or(Value::Null);
+        let name = match day {
+            0 => "Today",
+            1 => "Tomorrow",
+            _ => match at("time").as_str().and_then(weekday) {
+                Some(name) => name,
+                None => continue,
+            },
+        };
         let (Some(low), Some(high), Some(code)) = (
             degrees(&at("temperature_2m_min")),
             degrees(&at("temperature_2m_max")),
@@ -174,6 +211,37 @@ mod tests {
         );
     }
 
+    /// "Will it rain this weekend" is answered from the forecast: the days
+    /// after tomorrow go by their names, and one without a date is left out.
+    #[test]
+    fn the_days_after_tomorrow_are_said_by_their_names() {
+        let answer = json!({
+            "current": {"temperature_2m": 30.0, "weather_code": 0},
+            "daily": {
+                "time": ["2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23",
+                         "2026-10-24", "2026-10-25", "x"],
+                "weather_code": [0, 0, 3, 61, 95, 80, 0],
+                "temperature_2m_max": [33, 33, 32, 31, 30, 31, 32],
+                "temperature_2m_min": [25, 25, 25, 24, 24, 24, 25]
+            }
+        });
+        let said = summary(&answer, "Ho Chi Minh").unwrap();
+        assert!(said.contains(" Thursday 25 to 32°C, overcast."), "{said}");
+        assert!(
+            said.contains(" Saturday 24 to 30°C, thunderstorms."),
+            "{said}"
+        );
+        assert!(
+            said.ends_with(" Sunday 24 to 31°C, light showers."),
+            "{said}"
+        );
+        assert!(!said.contains("Tuesday"), "today is Today: {said}");
+        assert_eq!(weekday("2026-10-24"), Some("Saturday"));
+        assert_eq!(weekday("2024-02-29"), Some("Thursday"));
+        assert_eq!(weekday("2026-13-01"), None);
+        assert_eq!(weekday("soon"), None);
+    }
+
     #[test]
     fn a_place_is_looked_up_by_its_first_part() {
         assert_eq!(place_query("Hanoi, Vietnam").as_deref(), Some("Hanoi"));
@@ -196,7 +264,7 @@ mod tests {
             ),
             "{forecast}"
         );
-        assert!(forecast.contains("forecast_days=2"));
+        assert!(forecast.contains("forecast_days=7"));
     }
 
     #[test]

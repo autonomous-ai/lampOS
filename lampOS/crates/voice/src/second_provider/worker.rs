@@ -938,15 +938,18 @@ pub(crate) fn with_look(mut tools: Vec<lamp_gemini::Tool>) -> Vec<lamp_gemini::T
 }
 
 /// A search begun from a request's words before the model asks (#1712):
-/// the last request's, until its first `web_search` takes it.
+/// the last request's, until its first `web_search` takes it, if that asks
+/// nothing the words did not ([`early_covers`]).
 #[derive(Default)]
 pub(crate) struct Early {
     begun: Mutex<Option<EarlySearch>>,
 }
 
-/// One search begun early: its request, when, and its answer to come.
+/// One search begun early: its request, its query, when, and its answer to
+/// come.
 type EarlySearch = (
     u64,
+    String,
     Instant,
     futures_util::future::Shared<futures_util::future::BoxFuture<'static, serde_json::Value>>,
 );
@@ -957,33 +960,68 @@ impl Early {
     pub(crate) fn begin(
         &self,
         request: u64,
+        query: String,
         search: futures_util::future::BoxFuture<'static, serde_json::Value>,
     ) {
         use futures_util::FutureExt;
         let shared = search.shared();
         tokio::spawn(shared.clone());
         if let Ok(mut begun) = self.begun.lock() {
-            *begun = Some((request, Instant::now(), shared));
+            *begun = Some((request, query, Instant::now(), shared));
         }
     }
 
-    /// The search begun for `request`, once: when it began, and its answer.
-    pub(crate) fn take(
-        &self,
-        request: u64,
-    ) -> Option<(
-        Instant,
-        futures_util::future::Shared<futures_util::future::BoxFuture<'static, serde_json::Value>>,
-    )> {
+    /// The search begun for `request`, once: when it began, and its answer,
+    /// when the model's `asked` query adds nothing to it. One asking more
+    /// takes it too, and is told `Err` with the words it added, so its own
+    /// query is searched: a "what's the weather this weekend" searched as
+    /// heard found the forecasts of American towns, while the model had
+    /// asked for the lamp's own city (lamp-4ace, 20 Oct).
+    pub(crate) fn take(&self, request: u64, asked: &str) -> Option<Result<EarlyAnswer, usize>> {
         let mut begun = self.begun.lock().ok()?;
         match begun.take() {
-            Some((of, at, answer)) if of == request => Some((at, answer)),
+            Some((of, query, at, answer)) if of == request => {
+                Some(match early_adds(&query, asked) {
+                    0 => Ok((at, answer)),
+                    added => Err(added),
+                })
+            }
             other => {
                 *begun = other;
                 None
             }
         }
     }
+}
+
+/// A search begun early, as its request takes it: when it began, and its
+/// answer.
+pub(crate) type EarlyAnswer = (
+    Instant,
+    futures_util::future::Shared<futures_util::future::BoxFuture<'static, serde_json::Value>>,
+);
+
+/// How many words the model's `asked` query has that the `early` query
+/// begun from the words heard has not, small words aside: 0 when the
+/// early search answers what the model asked, in any order and with words
+/// left out.
+pub(crate) fn early_adds(early: &str, asked: &str) -> usize {
+    const SMALL: [&str; 24] = [
+        "a", "an", "the", "in", "at", "on", "of", "for", "to", "and", "is", "are", "what",
+        "what's", "whats", "how", "me", "please", "tell", "check", "look", "up", "find", "out",
+    ];
+    let words = |text: &str| -> Vec<String> {
+        text.to_lowercase()
+            .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+            .filter(|word| !word.is_empty() && !SMALL.contains(word))
+            .map(str::to_owned)
+            .collect()
+    };
+    let had = words(early);
+    words(asked)
+        .iter()
+        .filter(|word| !had.contains(word))
+        .count()
 }
 
 /// The words of a plain ask for something new (news, a score or result, a
@@ -1613,6 +1651,7 @@ pub fn serve(
             let search = search.clone();
             early.begin(
                 request,
+                query.clone(),
                 Box::pin(async move {
                     search
                         .answer(
@@ -2135,13 +2174,21 @@ async fn run_call(
         // The request's first search takes the one begun from its
         // words, if any (#1712).
         if name == crate::second_provider::net::search::NAME
-            && let Some((begun, answer)) = early.and_then(|early| early.take(request))
+            && let Some(taken) = early
+                .and_then(|early| early.take(request, args["query"].as_str().unwrap_or_default()))
         {
-            eprintln!(
-                "lamp-voice second: request {request} web_search answered by the search begun {} ms before the call",
-                begun.elapsed().as_millis()
-            );
-            return answer.await;
+            match taken {
+                Ok((begun, answer)) => {
+                    eprintln!(
+                        "lamp-voice second: request {request} web_search answered by the search begun {} ms before the call",
+                        begun.elapsed().as_millis()
+                    );
+                    return answer.await;
+                }
+                Err(added) => eprintln!(
+                    "lamp-voice second: request {request} web_search asks {added} words the search begun from its words did not: searched as asked"
+                ),
+            }
         }
         return search.answer(&name, &args).await;
     }
@@ -6537,17 +6584,50 @@ mod tests {
         let early = super::Early::default();
         early.begin(
             7,
+            "who won the race October 2026".into(),
             Box::pin(async { serde_json::json!({"results": ["early"]}) }),
         );
-        assert!(early.take(8).is_none(), "another request's");
-        let (_, answer) = early.take(7).unwrap();
+        assert!(early.take(8, "who won").is_none(), "another request's");
+        let (_, answer) = early.take(7, "Who won the race?").unwrap().unwrap();
         assert_eq!(answer.await, serde_json::json!({"results": ["early"]}));
-        assert!(early.take(7).is_none(), "taken once");
+        assert!(early.take(7, "who won").is_none(), "taken once");
+    }
+
+    /// lamp-4ace, 20 Oct: "what's the weather this weekend" was searched as
+    /// heard and the model, which had asked for the lamp's own city, was
+    /// given American towns' forecasts. A query that adds words the heard
+    /// ones lacked is searched as asked; one that only drops or reorders
+    /// them, or adds small words, takes the early answer.
+    #[tokio::test]
+    async fn the_models_query_adding_a_place_is_not_answered_by_the_early_search() {
+        let heard = "What's the weather this weekend October 2026";
+        assert_eq!(
+            super::early_adds(heard, "Ho Chi Minh City weather this weekend"),
+            4
+        );
+        assert_eq!(super::early_adds(heard, "weather in Saigon"), 1);
+        assert_eq!(super::early_adds(heard, "the weather for this weekend"), 0);
+        assert_eq!(super::early_adds(heard, "weekend weather October 2026"), 0);
+        assert_eq!(super::early_adds(heard, ""), 0);
+        let early = super::Early::default();
+        early.begin(
+            3,
+            heard.into(),
+            Box::pin(async { serde_json::json!({"results": ["early"]}) }),
+        );
+        assert!(matches!(
+            early.take(3, "weather in Saigon this weekend"),
+            Some(Err(1))
+        ));
+        assert!(
+            early.take(3, "weather this weekend").is_none(),
+            "taken once, either way"
+        );
     }
 
     /// #1712: the request's first `web_search` is answered by the search
-    /// begun early, whatever its query; a later one goes to the service
-    /// (here a closed port, so it fails).
+    /// begun early when it asks nothing more; a later one, or one asking
+    /// more, goes to the service (here a closed port, so it fails).
     #[tokio::test]
     async fn a_requests_first_search_takes_the_one_begun_early() {
         let search = Arc::new(
@@ -6563,6 +6643,7 @@ mod tests {
         );
         early.begin(
             5,
+            "who won the race".into(),
             Box::pin(async { serde_json::json!({"results": ["early"]}) }),
         );
         let args = serde_json::json!({"query": "who won the race"});
@@ -6572,6 +6653,14 @@ mod tests {
         );
         let again = runner(5, true, "web_search".into(), args).await;
         assert!(again.get("error").is_some(), "{again}");
+        early.begin(
+            6,
+            "what's the weather this weekend".into(),
+            Box::pin(async { serde_json::json!({"results": ["early"]}) }),
+        );
+        let asked = serde_json::json!({"query": "Saigon weather this weekend"});
+        let own = runner(6, true, "web_search".into(), asked).await;
+        assert!(own.get("error").is_some(), "searched as asked: {own}");
     }
 
     /// #1712: the look's function follows the lamp's, while there is room.
