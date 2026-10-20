@@ -51,6 +51,7 @@ impl Store {
             progress: path.join("progress.json"),
             checkpoint: path.join("privacy-pending.json"),
             mailbox: path.join("progress.json.told"),
+            near_call: path.join("near-call.json"),
         };
         let owner = match hook {
             Some(hook) => storage::ServiceStorage::start_with_hook(paths, hook).unwrap(),

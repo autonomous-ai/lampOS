@@ -21,6 +21,8 @@ pub(crate) struct Paths {
     pub progress: PathBuf,
     pub checkpoint: PathBuf,
     pub mailbox: PathBuf,
+    /// This home's near-call bar (`lamp_near_call::FILE` in the product).
+    pub near_call: PathBuf,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Tag {
@@ -51,6 +53,8 @@ enum Operation {
     Closed(privacy::Checkpoint),
     Invalidate(Option<Progress>),
     Mailbox,
+    /// Keep a measured bar, or remove any bar when the measurement made none.
+    NearCall(Option<lamp_near_call::Calibrated>),
 }
 struct Job {
     tag: Tag,
@@ -234,6 +238,21 @@ impl Client {
         Ok(())
     }
 
+    /// The near-call file is written on this worker only: its synchronous
+    /// write and fsync never run on the interaction loop (#1803).
+    pub(crate) fn near_call(
+        &self,
+        calibrated: Option<lamp_near_call::Calibrated>,
+    ) -> io::Result<Submit> {
+        if calibrated.as_ref().is_some_and(|kept| !kept.fits()) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "near-call bar does not fit its tries",
+            ));
+        }
+        self.submit(Operation::NearCall(calibrated), false)
+    }
+
     pub(crate) fn read_mailbox(&self) -> io::Result<Submit> {
         self.submit(Operation::Mailbox, false)
     }
@@ -313,7 +332,12 @@ impl ServiceStorage {
         mut before: Box<dyn FnMut(Tag) -> io::Result<()> + Send>,
         profile: Box<dyn FnOnce() -> Option<String> + Send>,
     ) -> io::Result<Self> {
-        for path in [&paths.progress, &paths.checkpoint, &paths.mailbox] {
+        for path in [
+            &paths.progress,
+            &paths.checkpoint,
+            &paths.mailbox,
+            &paths.near_call,
+        ] {
             if !path.is_absolute() || path.file_name().is_none() {
                 return Err(io::Error::other("storage paths must be absolute files"));
             }
@@ -516,6 +540,14 @@ fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
             }
             update.mailbox = Some(text);
         }
+        Operation::NearCall(Some(calibrated)) => {
+            lamp_near_call::write(&paths.near_call, &calibrated)?;
+        }
+        Operation::NearCall(None) => match fs::remove_file(&paths.near_call) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e),
+        },
     }
     Ok(update)
 }
@@ -538,6 +570,7 @@ mod tests {
                 progress: self.0.join("progress.json"),
                 checkpoint: self.0.join("privacy-pending.json"),
                 mailbox: self.0.join("progress.told"),
+                near_call: self.0.join("near-call.json"),
             }
         }
     }
@@ -827,6 +860,47 @@ mod tests {
         let mut next = ServiceStorage::start(paths).unwrap();
         assert!(idle(&next.client()).progress.unwrap().steps.is_empty());
         next.finish(Duration::from_secs(2)).unwrap();
+    }
+
+    #[test]
+    fn the_near_call_bar_is_written_or_removed_only_on_the_worker() {
+        let files = Files::new();
+        let paths = files.paths();
+        let caller = thread::current().id();
+        let mut owner = ServiceStorage::start_with_hook(
+            paths.clone(),
+            Box::new(move |_| {
+                assert_ne!(thread::current().id(), caller);
+                Ok(())
+            }),
+        )
+        .unwrap();
+        let client = owner.client();
+        idle(&client);
+        let tries = [22.4, 25.0, 23.1].map(|rise_db| lamp_near_call::Try {
+            rise_db,
+            score: 0.98,
+        });
+        let bar = lamp_near_call::Calibrated::of(tries.to_vec(), 7).unwrap();
+        // A bar its tries don't make is refused before it reaches the worker.
+        let edited = lamp_near_call::Calibrated {
+            near_rise_db: 30.0,
+            ..bar.clone()
+        };
+        assert!(client.near_call(Some(edited)).is_err());
+        assert!(matches!(
+            client.near_call(Some(bar)).unwrap(),
+            Submit::Queued(_)
+        ));
+        assert!(idle(&client).failed.is_none());
+        assert_eq!(lamp_near_call::read(&paths.near_call), Some(19.4));
+        assert!(matches!(client.near_call(None).unwrap(), Submit::Queued(_)));
+        idle(&client);
+        assert!(!paths.near_call.exists());
+        // Removing what is not there is no failure.
+        client.near_call(None).unwrap();
+        assert!(idle(&client).failed.is_none());
+        owner.finish(Duration::from_secs(2)).unwrap();
     }
 
     #[test]
