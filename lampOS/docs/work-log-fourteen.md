@@ -442,3 +442,17 @@ branch)
   #2094 isn't done end to end until both are. Said so on
   [#2094](https://github.com/autonomous-ai/lampOS/issues/2094#issuecomment-6285673215)
   rather than close it myself — not my call, and only half the task is in.
+
+## 2026-10-20 — #2194 — Migrate claimed the lamp side, waiting on the pin
+
+Ready for lamp-voice: no (acknowledgment only, no code)
+
+- Migrate, 16:1x on
+  [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6287588341):
+  taken — `update.status` read from `lamp-update`'s own records, no new
+  state, pinned in `app_contract.rs`; will say here when the pin lands.
+- Acknowledged at
+  [6287598346](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6287598346):
+  waiting on the pin, no app code before it (same discipline as #2094).
+  #2188/#2189 still show open as of this entry, though their PRs (#2225,
+  #2249) are approved and queued to merge.
