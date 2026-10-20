@@ -1738,14 +1738,37 @@ after a take-over, but now for every turn:
   - **The journal says** `request N: H of its answer's W words were played,
     M ms of it, before it was cut; request K is asked with only those as
     the lamp's`.
-  - **The lamp's memory** takes the trimmed words only when the cut came
-    while the route was still sending the answer. A retired request's output
-    is dropped, so its exchange is handed on at the next request's end,
-    after the trim. When the route had sent all of it, and its turn had
-    ended, before the cut, memory already has the whole answer. That's the
-    usual case for a long story, sent in seconds and played for many more.
+  - **The lamp's memory takes the answer as heard.**
+    - The route sends a long story in seconds, and the lamp plays it for
+      many more. So the worker no longer hands an answer to memory at its
+      turn's end (`HeldHandOn`, with the worker's `--said-as-heard`).
+    - It holds the answer until the next line or a written request begins,
+      after that line's trim, or until 30 s have passed (`HAND_ON_WITHIN`,
+      the most a reply can hold, and before memory's 45 s idle end), or the
+      worker stops.
+    - An answer held is handed on when a newer turn ends.
+    - Memory's journal gets the same exchange as before, up to 30 s later,
+      and as heard.
+    - **Memory's side** (Twelve's conditions, 10:40 on #1722): at the
+      turn's end the worker calls `remember::hold`, which keeps what that
+      moment knew, the provider context's sources and rules, when it ended,
+      and the forgets before it. The exchange is sent with those and the
+      words as heard, so it links none of the next turn's recall ids and
+      counts toward memory's idle end from when it ended.
+    - **A forget reaches it:** each `forget` and `forget_everything` sent
+      to the store is counted first, and the writer never writes an
+      exchange made before one (`HandOns`), so "forget that" said as the
+      line that cuts an answer reaches that answer, held or queued. The
+      forget waits up to 300 ms (`FORGET_SETTLE`) for an exchange the writer
+      has in hand.
+    - **A stop:** the held answers go first, then the writer has up to
+      150 ms to write them, then the open session closes
+      (`remember::close_at_exit`).
   - **Not covered:**
-    - the memory case above;
+    - a Stop with no line after it within 30 s: the Stop's count reaches
+      the route only on the next Start, so that answer goes to memory whole;
+    - a crash while an answer is held: that one exchange is lost from
+      memory's journal, though the thread's file keeps it;
     - a Stop followed by a written request rather than a spoken line: a
       written request has no Start, so that answer stays as sent;
     - the Stop's path through the session loop: its record of the cut is

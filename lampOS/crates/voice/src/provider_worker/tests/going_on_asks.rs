@@ -637,3 +637,25 @@ fn others_answer_is_read_after_messages() {
         .into();
     assert!(parse_flags(dir, &wrong).is_err());
 }
+
+/// `--said-as-heard` comes after `--messages`, on both routes' parsers, as
+/// the coordinator passes them; only the second route acts on it.
+#[test]
+fn said_as_heard_is_read_after_messages() {
+    let dir = std::path::Path::new("/run/test");
+    let flags: Vec<String> = [crate::messages::FLAG, crate::said_as_heard::FLAG]
+        .map(String::from)
+        .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.messages && files.said_as_heard);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.said_as_heard);
+    let (_, _, files, _) = parse_flags(dir, &flags[1..]).unwrap();
+    assert!(files.said_as_heard && !files.messages);
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert!(!files.said_as_heard);
+    let wrong: Vec<String> = [crate::said_as_heard::FLAG, crate::messages::FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+}
