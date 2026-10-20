@@ -1227,10 +1227,16 @@ size, since a head bowed over the desk comes closer too; leaning in is the
 face 1.25 times as tall, held 10 s. No sitter for 20 s is away; a sitting
 goes on through a gap under two minutes. Rising out of the chair is the sitter's face, over
 its looks in the 2 s before it was lost, risen by half its height or more,
-then not seen again for 2 s. Its size is not asked: on lamp-52e6 the lead
-stood straight up and the face rose 1.90 of its height at 1.02 as tall, out
-of the picture's top (row 14 try 4, 20 Oct); before that, a shrink to 0.85
-was also needed, and no standing up was ever said there. Once a loss,
+or shrunk to 0.6 of it or less, then not seen again for 2 s. Which one shows
+depends on the lamp's head. On lamp-52e6, resting with its head low, the
+lead stood straight up and the face rose 1.90 of its height at 1.02 as tall,
+out of the picture's top (row 14 try 4, 20 Oct). With its head up, the face
+fell 0.28 and shrank to 0.47 (try 5). On lamp-75c9 it rose 0.84 and grew to
+1.30 (Nine, #1678). A head turned while sitting shrank to 0.84 at most, and
+leaning back sits at 0.68 or more. Before, both a rise and a shrink to 0.85
+were needed, and no standing up was ever said on either lamp. A face must
+stay near (0.14 tall) to be followed, so on a lamp whose sitter's face is
+under 0.23 tall, the shrink alone can't be seen and only the rise counts. Once a loss,
 the journal says how those looks moved against that, numbers only ("sitter's
 face lost: over its last N looks it rose R of its height … and was S as
 tall …, last A across, H tall: rising" or "not standing up"), so a run that
@@ -1274,8 +1280,8 @@ written, never published, never compared with `people.json` and never
 named. The journal says only what was decided, with a number: `lamp-eyes: a
 face at the sitter's place, likeness 0.21: not the sitter`. Without the
 recogniser it is by place alone, as above. Standing up is
-the face rising by half its height within 2 s, then not seen for 2 s, said
-once. Nothing is said with no look for 5 s.
+the face rising by half its height or shrinking to 0.6 of it within 2 s,
+then not seen for 2 s, said once. Nothing is said with no look for 5 s.
 States and counts only on the bus: no box, no picture, nobody's identity.
 Arithmetic on the looks the eyes already make, and with the recogniser the
 few prints above, on frames the eyes already have: no model or frame is
