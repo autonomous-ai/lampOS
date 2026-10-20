@@ -229,6 +229,19 @@ fn plain_yes(name: &str, turn: &str) -> bool {
 /// Whether the lamp said `name` back in the exchange just before the turn
 /// in hand, and the person said a plain yes to it now ([`plain_yes`]):
 /// what `replace` needs, and a name kept from an earlier exchange.
+/// Whether the eyes keep someone by this name, asked on their socket.
+fn eyes_know(socket: &Path, name: &str) -> bool {
+    crate::tools::exchange(socket, &json!({"list": true}), DEADLINE)
+        .and_then(|answer| answer.get("people").cloned())
+        .and_then(|people| people.as_array().cloned())
+        .is_some_and(|people| {
+            people
+                .iter()
+                .filter_map(Value::as_str)
+                .any(|known| known.trim().eq_ignore_ascii_case(name.trim()))
+        })
+}
+
 fn agreed_to(name: &str, said: &Said) -> bool {
     plain_yes(name, &said.this)
         && said
@@ -562,7 +575,8 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
                     "type": "object",
                     "properties": {
                         "name": {"type": "string", "description": "Their name, as they said or spelled it."},
-                        "replace": {"type": "boolean", "description": "Only when you were told this face is known by another name, and they said yes to being known by this one instead."}
+                        "replace": {"type": "boolean", "description": "Only when you were told this face is known by another name, and they said yes to being known by this one instead."},
+                        "apart": {"type": "boolean", "description": "Only when you were told this face looks like someone you know by a near name, and they said they are not that person."}
                     },
                     "required": ["name"]
                 })
@@ -624,7 +638,15 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
             true,
         );
     };
-    if checked && call.name == REMEMBER && !name_heard(name, said) {
+    // A name the eyes already know, said back by the lamp and answered with
+    // a plain yes, needs no hearing of its own: "are you Dee?", "yes" after
+    // a near face and a near name (#2176 row 4), where the name they said
+    // was the misheard one.
+    if checked
+        && call.name == REMEMBER
+        && !name_heard(name, said)
+        && !(agreed_to(name, said) && eyes_know(socket, name))
+    {
         return (json!({"error": NOT_HEARD}), true);
     }
     let replace = call.args.get("replace").and_then(Value::as_bool) == Some(true);
@@ -634,7 +656,13 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
     if checked && call.name == REMEMBER && replace && !agreed_to(name, said) {
         return (json!({"error": NOT_AGREED}), true);
     }
+    let apart = call.args.get("apart").and_then(Value::as_bool) == Some(true);
     let line = match call.name.as_str() {
+        // `apart` only when true: eyes from before #2176 row 4 refuse a
+        // field they don't know.
+        REMEMBER if checked && apart => {
+            json!({"remember": name, "one_face": true, "replace": replace, "apart": true})
+        }
         REMEMBER if checked => json!({"remember": name, "one_face": true, "replace": replace}),
         REMEMBER => json!({"remember": name}),
         FORGET => json!({"forget": name}),
@@ -687,6 +715,13 @@ fn told(answer: &Value) -> Value {
         (Some(true), _) => return json!({"ok": true, "note": FORGOTTEN_SOME_KEPT_APART}),
         (Some(false), _) => return json!({"error": NOT_KNOWN_SOME_KEPT_APART}),
         (None, _) => {}
+    }
+    if answer.get("error").and_then(Value::as_str) == Some("near_to")
+        && let Some(near) = answer.get("near_to").and_then(Value::as_str)
+    {
+        return json!({"error": format!(
+            "This face looks like someone you know as {near}, and the name you heard is one letter from theirs, so you may have misheard it. Ask whether they are {near}. If they say yes, call this again with the name {near}. If they say they are someone else, say their name back and call this again with that name and apart true."
+        )});
     }
     if answer.get("error").and_then(Value::as_str) == Some("known_as")
         && let Some(known) = answer.get("known_as").and_then(Value::as_str)
@@ -1496,6 +1531,77 @@ mod tests {
                 json!({"remember": "Jim", "one_face": true, "replace": false}),
                 json!({"remember": "Jim", "one_face": true, "replace": true}),
                 json!({"remember": "B"}),
+            ]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+    /// #2176 row 4, lamp-4ace 20 Oct: a person known by their face was
+    /// saved again under their name misheard. A near face with a near name
+    /// is asked about; "yes" to the known name the lamp said back keeps the
+    /// face under it, though they never said it themselves; "no" keeps the
+    /// new name with `apart`; a yes to a name the eyes don't know is not
+    /// enough.
+    #[test]
+    fn a_near_name_is_asked_about_and_a_yes_to_the_known_one_keeps_it() {
+        let call = |args: Value| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args,
+        };
+        let (socket, asked) = eyes(vec![
+            json!({"error": "near_to", "near_to": "Minh"}),
+            json!({"people": ["Minh"]}),
+            json!({"remembered": "Minh"}),
+            json!({"remembered": "Linh"}),
+            json!({"people": ["Minh"]}),
+        ]);
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Linh"})),
+            true,
+            &Said::now("Remember my face, I'm Linh."),
+        );
+        let told = words["error"].as_str().unwrap();
+        assert!(
+            told.contains("as Minh") && told.contains("apart true"),
+            "{told}"
+        );
+        let asked_back = |lamp: &str| Said {
+            this: "Yes.".into(),
+            before: vec![("Remember my face, I'm Linh.".into(), lamp.into())],
+        };
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Minh"})),
+            true,
+            &asked_back("You look like Minh. Are you Minh?"),
+        );
+        assert_eq!(words, json!({"ok": true, "remembered": "Minh"}));
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Linh", "apart": true})),
+            true,
+            &Said::now("No, I'm Linh, not Minh."),
+        );
+        assert_eq!(words, json!({"ok": true, "remembered": "Linh"}));
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Bao"})),
+            true,
+            &asked_back("Are you Bao?"),
+        );
+        assert!(
+            words["error"].as_str().unwrap().contains("spell"),
+            "{words}"
+        );
+        assert_eq!(
+            asked.join().unwrap(),
+            [
+                json!({"remember": "Linh", "one_face": true, "replace": false}),
+                json!({"list": true}),
+                json!({"remember": "Minh", "one_face": true, "replace": false}),
+                json!({"remember": "Linh", "one_face": true, "replace": false, "apart": true}),
+                json!({"list": true}),
             ]
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());

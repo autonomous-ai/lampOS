@@ -859,6 +859,32 @@ With the switch:
   they have while they are still correcting it. A name kept from an
   earlier exchange needs the same plain yes. The journal says "did not
   remember a face: it is known by another name", without the name.
+- **A near face with a near name is asked about** (#2176 row 4). On
+  lamp-4ace on 20 Oct a person known since 16 Oct was saved again under
+  their name misheard by one letter: the new prints came to at most 0.359
+  against their own, 0.004 under `SAME_PERSON` (0.363), so the check
+  above let it through. Now, with no print at `SAME_PERSON` to anyone,
+  a print at or over `NEAR_PERSON` (0.30) to someone known by a name one
+  letter from the new one (one put in, left out or changed, ignoring case,
+  both names three letters or more: `who::near_name`) is refused with
+  `{"error":"near_to","near_to":"Dee"}`, and nothing is kept. A near face
+  with a far name, or a near name with a far face, changes nothing, so a
+  Linh is never asked whether they are Minh unless their face is near Minh's
+  too. The model is told to ask whether they are that person:
+  - **Yes:** it calls again with the known name. That name passes though
+    they never said it themselves (theirs was the misheard one), but only
+    when the lamp said it in its last answer, the turn in hand is a plain
+    yes, and the eyes keep someone by it (`{"list":true}`,
+    `known_faces::eyes_know`). The face is then kept under the known name,
+    as any same-name remembering is.
+  - **No:** it says their name back and calls again with `"apart":true`,
+    and the eyes keep the new name beside the near one. `apart` is sent
+    only when true, since eyes from before it refuse a field they don't
+    know.
+  A face confirmed from a photo is kept as before, with no near-name
+  question. The journal says "did not remember a face: it is near someone
+  known by a near name", without either name. It's part of
+  `LAMP_NAMES=checked`, with no switch of its own.
 - **A name told is a name kept** (the first builder, #705, 13:43). The
   lamp-4ace records showed no face asked to be kept on 15 October at all:
   the model had only said it would remember. With the switch,

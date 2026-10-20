@@ -493,6 +493,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 eprintln!("lamp-eyes: did not remember a face: it is known by another name");
                 serde_json::json!({"error": "known_as", "known_as": known})
             }
+            // Near someone known by a name one letter off: the voice asks
+            // whether they are that person (#2176 row 4).
+            Err(who::Refused::NearTo(near)) => {
+                eprintln!(
+                    "lamp-eyes: did not remember a face: it is near someone known by a near name"
+                );
+                serde_json::json!({"error": "near_to", "near_to": near})
+            }
             Err(who::Refused::NotAName) => serde_json::json!({"error": "not_a_name"}),
             Err(who::Refused::Store(error)) => {
                 eprintln!("lamp-eyes: could not remember a face: {error}");
@@ -963,11 +971,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     let now_unix_s = std::time::SystemTime::now()
                                         .duration_since(std::time::UNIX_EPOCH)
                                         .map_or(0, |since| since.as_secs());
+                                    // A face its person confirmed by name: no
+                                    // near-name question (`apart`).
                                     let kept = who.people.remember_one(
                                         taken.name(),
                                         vec![taken.print()],
                                         now_unix_s,
                                         false,
+                                        true,
                                     );
                                     if let Err(who::Refused::Store(_)) = &kept {
                                         // Refused by the store: unconfirmed again.
@@ -1015,7 +1026,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         }
                         None => serde_json::json!({"error": "not_a_name"}),
                     },
-                    Some(Ask::RememberOne { name, replace }) => match plain_name(&name) {
+                    Some(Ask::RememberOne {
+                        name,
+                        replace,
+                        apart,
+                    }) => match plain_name(&name) {
                         Some(name) => {
                             eprintln!(
                                 "lamp-eyes: asked to remember a face, one name for it{}",
@@ -1023,6 +1038,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             );
                             let mut taking = Taking::new(name, lamp_ipc::monotonic_us());
                             taking.one_face = Some(replace);
+                            taking.apart = apart;
                             who.taking = Some((taking, stream));
                             continue;
                         }
@@ -1071,10 +1087,13 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             .people
                             .remember(&taking.name, prints, now_unix_s)
                             .map_err(|error| who::Refused::Store(error.to_string())),
-                        Some(replace) => {
-                            who.people
-                                .remember_one(&taking.name, prints, now_unix_s, replace)
-                        }
+                        Some(replace) => who.people.remember_one(
+                            &taking.name,
+                            prints,
+                            now_unix_s,
+                            replace,
+                            taking.apart,
+                        ),
                     };
                     let reply = kept_reply(kept, who.visits, who.people.names().len());
                     answer(&mut stream, reply);
