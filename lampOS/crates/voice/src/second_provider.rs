@@ -443,6 +443,9 @@ struct Shared {
     though_held: bool,
     /// With `LAMP_STAFF_NOTE=on`: the note for words that name the staff.
     staff: Option<StaffNote>,
+    /// What memory holds that may fit a spoken request's words
+    /// ([`Engine::remembering`]).
+    remembered: Option<StaffNote>,
     /// With `LAMP_NAME_NOTE=on`: the note for a line the lamp's name began.
     name_note: Option<NameNote>,
     /// The note for a line let out only as the conversation going on.
@@ -866,6 +869,7 @@ impl Engine {
                 stop_untold: Mutex::new(None),
                 though_held: false,
                 staff: None,
+                remembered: None,
                 name_note: None,
                 conversation_alone: None,
                 busy: None,
@@ -1197,6 +1201,17 @@ impl Engine {
     pub fn noting_staff(mut self, staff: StaffNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.staff = Some(staff);
+        }
+        self
+    }
+
+    /// A spoken request is asked with what memory holds that may fit its
+    /// words (`LAMP_SECOND_MEMORY_HITS=on`, #2176 row 5c,
+    /// `crate::remember::hits_note`), computed as its notes are, within a
+    /// short bound. Before any turn only.
+    pub fn remembering(mut self, note: StaffNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.remembered = Some(note);
         }
         self
     }
@@ -2556,6 +2571,25 @@ async fn spoken(
         .staff
         .as_ref()
         .and_then(|staff| staff(request, &text));
+    // What memory holds for these words: the prepared chat's, when it was
+    // begun on them (so its round still stands), else asked now, off the
+    // runtime's thread (Fourth's P3 on #2229).
+    let remembered = match prepared
+        .as_ref()
+        .filter(|prepared| plain_words(&prepared.words) == plain_words(&text))
+    {
+        Some(prepared) => prepared.remembered.clone(),
+        None => match shared.remembered.clone() {
+            Some(note) => {
+                let words = text.clone();
+                tokio::task::spawn_blocking(move || note(request, &words))
+                    .await
+                    .ok()
+                    .flatten()
+            }
+            None => None,
+        },
+    };
     // Its name heard as it began: told as the Live route tells it (#1712:
     // without it this route missed two calls this morning).
     let named = shared
@@ -2619,6 +2653,7 @@ async fn spoken(
         .chain(cut_in)
         .chain(misheard)
         .chain(staff)
+        .chain(remembered)
         .chain(named)
         .chain(call)
         .chain(alone)
@@ -2687,8 +2722,13 @@ pub const PREPARED_ENVIRONMENT: &str = "LAMP_SECOND_PREPARED";
 /// what the lamp knows or does.
 struct Prepared {
     words: String,
-    /// The notes beside the words known when it began (a cut-in's).
+    /// The notes beside the words known when it began (a cut-in's, and
+    /// memory's for those words).
     notes: Vec<String>,
+    /// What memory told for its words ([`Engine::remembering`]), asked as it
+    /// began, so the final words, when they are its own, aren't asked again
+    /// and its round still stands (Fourth's P2 on #2229).
+    remembered: Option<String>,
     messages: Vec<Message>,
     events: mpsc::UnboundedReceiver<net::Result<ChatEvent>>,
     at: Instant,
@@ -2712,7 +2752,9 @@ impl Prepared {
         scope: Option<&crate::memory_scope::ScopeLease>,
         words: String,
         notes: &[String],
+        remembered: Option<String>,
     ) -> Self {
+        let notes: Vec<String> = notes.iter().cloned().chain(remembered.clone()).collect();
         let mut messages = told(shared, scope).messages();
         messages.extend(notes.iter().cloned().map(Message::system));
         messages.push(Message::user(words.clone()));
@@ -2727,7 +2769,8 @@ impl Prepared {
         });
         Self {
             words,
-            notes: notes.to_vec(),
+            notes,
+            remembered,
             messages,
             events,
             at: Instant::now(),
@@ -2914,7 +2957,13 @@ fn prepared_on(
             eprintln!(
                 "lamp-voice second: request {request}: its chat is begun on the line's early words"
             );
-            Some(Prepared::begin(shared, scope, words, notes))
+            // Memory is asked here, on the early words, off the final
+            // words' path; the final words reuse it when they are these.
+            let remembered = shared
+                .remembered
+                .as_ref()
+                .and_then(|note| note(request, &words));
+            Some(Prepared::begin(shared, scope, words, notes, remembered))
         }
         net::Early::Resumed => {
             if prepared.is_some() {

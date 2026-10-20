@@ -1901,6 +1901,49 @@ async fn a_resumed_turn_drops_the_chat_begun_on_its_early_words() {
     );
 }
 
+/// Fourth's P2 on #2229: with a chat begun on the early words, memory is
+/// asked once, on those words, and its note goes with the prepared round;
+/// when the final words are the same, the round stands and memory isn't
+/// asked again.
+#[tokio::test(start_paused = true)]
+async fn memory_told_on_the_early_words_keeps_the_prepared_round() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What's my name?".to_owned())].into()),
+        early: Mutex::new([vec![net::Early::Words("what's my name".to_owned())]].into()),
+        chats: Mutex::new([vec![text("You're Ossa."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let asked_memory = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = asked_memory.clone();
+    let mut engine = engine
+        .preparing(true)
+        .remembering(Arc::new(move |_, words: &str| {
+            counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            words.contains("name").then(|| "MEMORY NOTE".to_owned())
+        }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert!(
+        turn(&mut engine)
+            .await
+            .contains(&"said:You're Ossa.".to_owned())
+    );
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 1, "the prepared round stands");
+    assert!(
+        asked[0].contains(&Message::system("MEMORY NOTE".to_owned())),
+        "{:?}",
+        asked[0]
+    );
+    assert_eq!(
+        asked_memory.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "asked once, early"
+    );
+}
+
 /// #1712, the first builder at 18:26: the first piece waits for 4 words
 /// with the configured voice and 6 with Gemini's, unless
 /// `LAMP_SECOND_FIRST_WORDS` says otherwise (0: whole clauses only).
@@ -1926,6 +1969,7 @@ fn early_words_stand_only_for_the_same_line_asked_the_same_way() {
     let prepared = Prepared {
         words: "lamp what time is it".to_owned(),
         notes: Vec::new(),
+        remembered: None,
         messages: vec![
             Message::system("SYSTEM".to_owned()),
             Message::user("lamp what time is it".to_owned()),

@@ -5922,7 +5922,7 @@ pub(crate) mod seen_in_tests {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     mod holding_answer;
     mod reminders;
     mod resend;
@@ -8459,7 +8459,7 @@ mod tests {
     /// again freely by the test's thread while it holds it (#1422: a test
     /// that read the lamp's question from the thread failed 1 in 3 parallel
     /// runs, when another test's rig wrote its own lines between).
-    pub(super) struct OneThread {
+    pub(crate) struct OneThread {
         /// The lock itself, on the first hold of a thread's test.
         _lock: Option<std::sync::MutexGuard<'static, ()>>,
     }
@@ -8472,7 +8472,7 @@ mod tests {
     }
 
     /// The lock, or another hold on it if this thread has it already.
-    pub(super) fn one_thread() -> OneThread {
+    pub(crate) fn one_thread() -> OneThread {
         let held = HELD.with(|held| held.replace(held.get() + 1));
         OneThread {
             _lock: (held == 0).then(|| {

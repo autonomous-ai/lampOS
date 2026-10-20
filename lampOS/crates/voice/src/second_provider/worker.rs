@@ -1435,6 +1435,8 @@ pub fn serve(
     let face_cache = Arc::new(crate::memory_scope::FaceCache::default());
     let scoped_settings = tools.clone();
     let days = crate::remember::days_from_environment();
+    // For what memory holds that fits a turn's words (#2176 row 5c).
+    let (hits_socket, hits_who) = (socket.clone(), who.clone());
     // Told after the character with `LAMP_TASKS_ASKED=on`, as the Live route is (#854).
     let tasks = tools.tasks.clone();
     // What a Live session is told of the moment, with `--session-fact` and
@@ -1458,7 +1460,10 @@ pub fn serve(
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
     let character = spoken_character(&character, look_by_call, tools.memory.is_some());
-    let sessions = std::sync::Mutex::new(Sessions::default());
+    // One for the turn's notes and memory's hits alike, so both see the
+    // session the turn is opened for (the reviewer's P2 on #2268).
+    let sessions = Arc::new(Mutex::new(Sessions::default()));
+    let hits_sessions = sessions.clone();
     let place = crate::local_time::place_here();
     if let Some(place) = &place {
         eprintln!("lamp-voice second: the lamp's place is {place} (LAMP_PLACE)");
@@ -1634,6 +1639,60 @@ pub fn serve(
     }
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
+    }
+    // What memory holds that may fit a spoken turn's words (#2176 row 5c,
+    // `LAMP_SECOND_MEMORY_HITS=on`, Days only): searched in the scope the
+    // turn's note is told for, the known face's or the room's, within
+    // `HITS_WITHIN`, and told as notes, never as sources. Not with
+    // `LAMP_SECOND_SCOPED_CONTEXT`, whose per-line lease it doesn't read yet.
+    match (crate::remember::hits_on(), hits_socket) {
+        (true, Some(socket)) if days && !scoped_context_from_environment() => {
+            eprintln!(
+                "lamp-voice second: each spoken turn is told what memory holds that may fit its words ({})",
+                crate::remember::HITS_ENVIRONMENT
+            );
+            let who = hits_who;
+            engine = engine.remembering(Arc::new(move |request, heard| {
+                let started = Instant::now();
+                let Some(person) = hits_person(&hits_sessions, who.as_deref(), started) else {
+                    eprintln!(
+                        "lamp-voice second: request {request}: memory isn't told: the face and the session's person differ"
+                    );
+                    return None;
+                };
+                let now_unix_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| since.as_millis() as u64);
+                let offset = crate::local_time::offset_here().unwrap_or(0);
+                let note = crate::remember::hits_note(
+                    &socket,
+                    person.as_deref(),
+                    heard,
+                    now_unix_ms,
+                    offset,
+                );
+                eprintln!(
+                    "lamp-voice second: request {request}: memory {} in {} ms ({})",
+                    if note.is_some() {
+                        "told"
+                    } else {
+                        "had nothing told"
+                    },
+                    started.elapsed().as_millis(),
+                    if person.is_some() {
+                        "theirs"
+                    } else {
+                        "the room's"
+                    }
+                );
+                note
+            }));
+        }
+        (true, _) => eprintln!(
+            "lamp-voice second: memory isn't told on each turn: {} needs the Days memory and no LAMP_SECOND_SCOPED_CONTEXT",
+            crate::remember::HITS_ENVIRONMENT
+        ),
+        (false, _) => {}
     }
     // Seeing someone speak (`LAMP_SECOND_SPEAKING_FACE=on`, the first
     // builder on #1722, 00:08): the eyes' faces, read every 100 ms on their
@@ -3823,6 +3882,24 @@ fn unix_ms(at: SystemTime) -> u64 {
         .map_or(0, |since| since.as_millis().try_into().unwrap_or(u64::MAX))
 }
 
+/// Whose kept things a turn's words are matched against (memory's hits,
+/// `crate::remember::hits_scope`): the person's only when the eyes' face
+/// and the turn's session agree, the room's when neither names anyone, and
+/// otherwise none. The session is opened here for the turn, before its
+/// notes are, so a person's first turn is theirs and not the last
+/// session's (the reviewer's P2 on #2268).
+fn hits_person(
+    sessions: &Mutex<Sessions>,
+    who: Option<&Path>,
+    now: Instant,
+) -> Option<Option<String>> {
+    let (known, session) = sessions
+        .lock()
+        .map(|mut sessions| sessions.open_ahead(who, now))
+        .unwrap_or_default();
+    crate::remember::hits_scope(known.as_deref(), session.as_deref())
+}
+
 /// Whose the second route's turns are, and the Days note of that person's
 /// run of turns.
 #[derive(Default)]
@@ -3833,26 +3910,51 @@ struct Sessions {
     note: Option<String>,
     /// The admitted scope the Days note was last asked for.
     scoped: Option<Option<String>>,
+    /// A change of person seen by [`Sessions::open_ahead`] that the turn's
+    /// notes haven't been opened for yet.
+    unsaid: bool,
 }
 impl Sessions {
     /// Open the thread for whoever is at the lamp now ([`Thread::opening`]):
-    /// whether that is someone other than the last turn's, and whom.
+    /// whether that is someone other than the last turn's notes were for,
+    /// and whom.
     ///
     /// [`Thread::opening`]: crate::thread::Thread::opening
     fn open(&mut self, who: Option<&Path>, now: Instant) -> (bool, Option<String>) {
+        let (changed, _, person) = self.opening(who, now);
+        (changed || std::mem::take(&mut self.unsaid), person)
+    }
+
+    /// As [`Sessions::open`], for what is worked out before the turn's
+    /// notes (memory's hits): the face known now, and whose the session is.
+    /// A change it sees is kept for the notes' own `open`, so their Days
+    /// note is still asked anew.
+    fn open_ahead(&mut self, who: Option<&Path>, now: Instant) -> (Option<String>, Option<String>) {
+        let (changed, known, person) = self.opening(who, now);
+        self.unsaid |= changed;
+        (known, person)
+    }
+
+    /// Whether the session changed person, the face known now, and whose
+    /// the session is.
+    fn opening(
+        &mut self,
+        who: Option<&Path>,
+        now: Instant,
+    ) -> (bool, Option<String>, Option<String>) {
         let known = who
             .and_then(crate::known_faces::known_now)
             .map(|name| crate::remember::person_id(&name));
         let whose = who.and(self.presence.seen(known.clone(), now).map(str::to_owned));
         let Ok(mut thread) = crate::thread::THREAD.lock() else {
-            return (false, None);
+            return (false, known, None);
         };
         if who.is_some() {
             thread.at_lamp(whose);
-            thread.seen_now(known);
+            thread.seen_now(known.clone());
         }
         let changed = thread.opening(now);
-        (changed, thread.opened_for().map(str::to_owned))
+        (changed, known, thread.opened_for().map(str::to_owned))
     }
 
     /// Whether `person`'s admitted scope differs from the last turn's.
@@ -4645,6 +4747,8 @@ mod tests {
     /// it, a question in the conversation's own voice goes on, as on Live.
     #[test]
     fn another_voice_going_on_is_held_and_the_conversations_own_goes_on() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         use crate::second_provider::Heard;
         /// Prints by a line's first sample, answered at once: 1 is A's
         /// voice, -1 B's.
@@ -4722,6 +4826,8 @@ mod tests {
     /// three-word line later, in a trusted session, is held.
     #[test]
     fn a_call_unanswered_carries_the_next_lines_for_fifteen_seconds() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
         crate::room_told::room()
@@ -4749,6 +4855,8 @@ mod tests {
     /// lamp has said no word yet; two lines left alone since still end it.
     #[test]
     fn a_call_let_out_carries_the_next_line_though_the_lamp_said_nothing() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
         {
             let mut room = crate::room_told::room().lock().unwrap();
@@ -5332,6 +5440,8 @@ mod tests {
     /// the thread's own, so each worker is a thread of its own.
     #[test]
     fn as_the_only_voice_the_room_goes_to_its_file_and_the_next_worker_starts_from_it() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         // Skipped by the system, not by the file: on Linux a missing boot
         // file fails here, so a pass there means this ran.
         if !cfg!(target_os = "linux") {
@@ -5640,6 +5750,8 @@ mod tests {
     /// memory are this process's globals.
     #[test]
     fn a_turn_is_kept_and_told_to_the_next() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         use std::io::{BufRead, BufReader, Write};
         const CHILD: &str = "LAMP_SECOND_KEEP_TEST_CHILD";
         if std::env::var(CHILD).ok().as_deref() != Some("1") {
@@ -5784,6 +5896,8 @@ mod tests {
     /// theirs.
     #[test]
     fn a_narrowed_lines_exchange_is_the_rooms_not_the_known_persons() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         use crate::memory_scope::{FaceCache, RequestKey, RequestScope};
         let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
         let known = std::env::temp_dir().join(format!("ten-narrowed-{}", std::process::id()));
@@ -5857,6 +5971,8 @@ mod tests {
     /// system message has it, and a text's has neither it nor any history.
     #[test]
     fn a_texts_system_message_never_has_the_rooms_spoken_conversation() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
         let request = 41;
         for event in [
@@ -5940,6 +6056,8 @@ mod tests {
     /// at the lamp, though the room's thread holds one.
     #[tokio::test]
     async fn the_worker_answers_a_text_without_the_rooms_spoken_conversation() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         use lamp_msgs::{ChatIn, ChatOut, ChatPart};
         let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
         let request = 43;
@@ -6021,6 +6139,8 @@ mod tests {
     /// A's at once, never B's thread and kept things.
     #[test]
     fn a_known_person_long_after_another_has_their_own_turns_at_once() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         use std::time::{Duration, Instant};
         let dir =
             std::env::temp_dir().join(format!("lamp-voice-second-sessions-{}", std::process::id()));
@@ -6054,11 +6174,58 @@ mod tests {
         assert_eq!(opened, [a.clone(), a]);
     }
 
+    /// The reviewer's P2 on #2268: with the session still the room's, a
+    /// known person's first turn is matched against their own kept things,
+    /// and the turn's notes still see the change (their Days note is asked
+    /// anew). Someone else sitting down within 10 s keeps the session the
+    /// first person's while the face is theirs, so nothing is matched.
+    #[test]
+    fn a_persons_first_turn_is_matched_against_their_own_kept_things() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
+        use std::time::{Duration, Instant};
+        let dir =
+            std::env::temp_dir().join(format!("lamp-voice-second-hits-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("known");
+        let kept = std::mem::take(
+            &mut *crate::thread::THREAD
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+        );
+        let start = Instant::now();
+        let at = |seconds| start + Duration::from_secs(seconds);
+        let sessions = Mutex::new(Sessions::default());
+        let room = sessions.lock().unwrap().open(None, at(0));
+        std::fs::write(&file, "Ossa\n").unwrap();
+        let first = hits_person(&sessions, Some(&file), at(1));
+        let notes = sessions.lock().unwrap().open(Some(&file), at(1));
+        let next = sessions.lock().unwrap().open(Some(&file), at(2));
+        std::fs::write(&file, "Kesh\n").unwrap();
+        let other = hits_person(&sessions, Some(&file), at(3));
+        *crate::thread::THREAD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = kept;
+        std::fs::remove_dir_all(&dir).unwrap();
+        let ossa = Some(crate::remember::person_id("Ossa"));
+        assert_eq!(room, (false, None));
+        assert_eq!(first, Some(ossa.clone()), "their first turn is theirs");
+        assert_eq!(
+            notes,
+            (true, ossa.clone()),
+            "the notes still see the change"
+        );
+        assert_eq!(next, (false, ossa));
+        assert_eq!(other, None, "a face the session isn't for");
+    }
+
     /// #1712: as the lamp's only voice, the rule judges in the room this
     /// route keeps (`room_told::room`), not in an unknown one; without the
     /// switch, and with no bus, the room stays unknown.
     #[test]
     fn as_the_only_voice_the_rule_judges_in_the_room_the_route_keeps() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         {
             let mut room = crate::room_told::room().lock().unwrap();
             let now = monotonic_us();
@@ -6565,6 +6732,8 @@ mod tests {
     /// is the thread's own, so each case runs on a thread of its own.
     #[test]
     fn as_the_only_voice_lines_said_over_the_lamp_are_not_talk_with_the_switch() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         let busy_after_three = |cut_ins_not_talk: bool| {
             std::thread::spawn(move || {
                 let _tick = super::keeping_room(false, cut_ins_not_talk, None, None);
