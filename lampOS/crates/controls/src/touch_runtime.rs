@@ -20,8 +20,9 @@ pub const DRAIN_LIMIT: usize = 32;
 /// changes, with an event or a gesture, and at least this often, as their
 /// topics declare: each one wakes every reader, so a still pad is not said
 /// fifty times a second (the first builder on #1456, lamp-4ace). With the
-/// privacy switch attached, `controls/state` keeps
-/// [`crate::privacy::STATE_EVERY_US`], since its evidence lasts 50 ms.
+/// privacy switch attached, or the privacy route on a lamp with no slide,
+/// `controls/state` keeps [`crate::privacy::STATE_EVERY_US`], since its
+/// evidence lasts 50 ms.
 pub const STATE_EVERY_US: u64 = 100_000;
 /// What only grows or moves while a hand stays (a held contact's `held_us`,
 /// the strip's position, distance and speed) is said at most this often,
@@ -77,6 +78,8 @@ pub struct Service<G: PinReader, S: StripReader> {
     recorder: Option<crate::record::Recorder>,
     hand: HandIn,
     privacy: Option<crate::privacy::Source>,
+    /// The privacy route on a lamp with no slide ([`Self::mark_no_slide`]).
+    no_slide: bool,
     /// When the head's state and `controls/state` were last said, and what.
     touch_said: Said<TouchState>,
     primary_said: Said<ControlsState>,
@@ -300,6 +303,7 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
                 pushed: false,
             },
             privacy: None,
+            no_slide: false,
             touch_said: Said::default(),
             primary_said: Said::default(),
             _lock: lock,
@@ -335,6 +339,31 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
     }
 
     pub fn attach_privacy(&mut self, bus: &Bus, source: crate::privacy::Source) -> io::Result<()> {
+        self.ensure_primary(bus, source.monitor.clock())?;
+        self.privacy = Some(source);
+        Ok(())
+    }
+
+    /// The privacy route on a lamp with no slide (`LAMP_PRIVACY_CONTROLS=no-slide`):
+    /// nothing is read, and each `controls/state` says so
+    /// (`no_privacy_slide`) at the route's cadence, as when a slide reader is
+    /// attached, with a state owner made for it if the pins give none.
+    /// Refused beside a slide reader; a reader attached later wins, and no
+    /// marker is said.
+    pub fn mark_no_slide(&mut self, bus: &Bus, clock: &str) -> io::Result<()> {
+        if self.privacy.is_some() {
+            return Err(io::Error::other(
+                "a lamp with a slide reader is not a lamp with no slide",
+            ));
+        }
+        self.ensure_primary(bus, clock)?;
+        self.no_slide = true;
+        Ok(())
+    }
+
+    /// The `controls/state` owner the privacy route publishes on, made with
+    /// no button or head if the pins give it none.
+    fn ensure_primary(&mut self, bus: &Bus, clock: &str) -> io::Result<()> {
         if self.primary.is_none() {
             let state = bus.publisher_declared(
                 ControlsState::TOPIC,
@@ -347,7 +376,7 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
                         enabled: self.engine.config().enabled,
                         ..Config::default()
                     },
-                    source.monitor.clock(),
+                    clock,
                     state.boot(),
                 )
                 .map_err(io::Error::other)?,
@@ -361,8 +390,12 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
                 head: false,
             });
         }
-        self.privacy = Some(source);
         Ok(())
+    }
+
+    /// The privacy route is on: a slide reader, or a lamp with no slide.
+    fn privacy_route(&self) -> bool {
+        self.privacy.is_some() || self.no_slide
     }
 
     pub fn finish_recording(&mut self) -> Option<crate::record::RecordStats> {
@@ -375,7 +408,7 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
     }
 
     pub fn poll_us(&self) -> u64 {
-        if self.privacy.is_some() {
+        if self.privacy_route() {
             crate::privacy::STEP_US
         } else {
             crate::runtime::POLL_US
@@ -546,12 +579,15 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
         for event in &output.events {
             account(&mut self.counts, self.events.publish_json(at_us, event));
         }
+        let privacy_route = self.privacy_route();
         if let Some(primary) = &mut self.primary {
             let mut output = primary.engine.tick(at_us);
             if let Some(privacy) = &mut self.privacy {
                 output.state.privacy = Some(privacy.monitor.snapshot(at_us));
+            } else if self.no_slide {
+                output.state.no_privacy_slide = true;
             }
-            let every_us = if self.privacy.is_some() {
+            let every_us = if privacy_route {
                 crate::privacy::STATE_EVERY_US
             } else {
                 STATE_EVERY_US

@@ -559,10 +559,23 @@ CHECK
 # (its session's newest endpoint_worker event: ready, loading, recovering,
 # failed or closed), or none. On 19 and 20 Oct an old lamp-turn-end refused
 # its new options and every end of speech waited the full 600 ms, seen by
-# nobody (the first builder, #1722, 20 Oct 07:20).
+# nobody (the first builder, #1722, 20 Oct 07:20). A long session rotates its
+# records, and the states, written as the worker starts, can go with the
+# oldest: with none left but ends its model decided, it ran, and is ready,
+# inferred (the first builder, #1722, 20 Oct 12:13). It counts every end the
+# model decided in the session's records, as it runs before the arm; after an
+# arm, `lamp-voice-eval endpoint SESSION --since-us N` counts only the arm's
+# (the reviewer on #2180, P3).
 IFS= read -r -d '' ENDPOINT_CHECK <<'CHECK' || true
 d=@SESSIONS@/$(systemctl show -p InvocationID --value lamp-voice)/metadata
 line=$(sudo -n sh -c "cat '$d'/events-*.jsonl" 2>/dev/null | grep '"kind":"endpoint_worker"' | sed -n 's/.*"at_us":\([0-9]*\).*/\1 &/p' | sort -n | tail -1)
+if [ -z "$line" ]; then
+  n=$(sudo -n sh -c "cat '$d'/events-*.jsonl" 2>/dev/null | grep '"kind":"local_endpoint"' | grep -cE '"basis":"model_(complete|uncertain)"')
+  if [ "${n:-0}" -gt 0 ]; then
+    printf 'ready, inferred: no state in the records (rotated out), and %s ends decided by the model\n' "$n"
+    exit 0
+  fi
+fi
 state=$(printf '%s' "$line" | sed -n 's/.*"availability":{[^}]*"state":"\([a-z]*\)".*/\1/p')
 detail=$(printf '%s' "$line" | sed -n 's/.*"availability":{[^}]*"detail":"\([^"]*\)".*/\1/p')
 printf '%s %s\n' "${state:-none}" "$detail"
@@ -665,7 +678,9 @@ preflight() {
   fi
   local endpoint
   endpoint=$(on_lamp "${ENDPOINT_CHECK//@SESSIONS@/${ARM_VOICE_SESSIONS:-/var/lib/lampOS/voice/sessions}}" 2>/dev/null)
-  if [[ ${endpoint%% *} == ready ]]; then
+  if [[ $endpoint == "ready, inferred"* ]]; then
+    say_ "  the voice's end-of-speech worker: $endpoint"
+  elif [[ ${endpoint%% *} == ready ]]; then
     say_ "  the voice's end-of-speech worker: ready"
   else
     say_ "  the voice's end-of-speech worker: MISSING: ${endpoint:-none} (every end of speech waits its whole silence without it)"

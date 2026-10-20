@@ -36,6 +36,7 @@ The voice keeps mic2 to itself; the two parts never share a device.
 | `ears/level` | `RoomSound` | latest, every 100 ms | The last 100 ms in dBFS; the room's quiet (the tenth percentile of the last 30 s heard while the lamp was not speaking; none for the first two seconds); whether the lamp's own voice is in it |
 | `ears/sudden` | `SuddenSound` | event | Its loudest 20 ms, the quiet it rose out of, how long it stayed 10 dB over the quiet in the 300 ms it was watched, whether that was under 200 ms ("short": a knock, a clap) or not (a voice, a chair, music), and how long ago it began |
 | `diagnostics` | `Diagnostic` | every second | `ears`: ok, or an error with why the microphone does not open; the quiet now, how many sudden sounds, overruns |
+| `ears/classes` | `SoundClasses` | latest, every 500 ms | Only with `LAMP_EARS_CLASSES=on` and `LAMP_PRIVACY_CONTROLS=on` (never with `no-slide`): speech, music and laughter scores of the last patch, or why there are none (below, and [sound-events.md](sound-events.md)) |
 
 **When a sound is sudden.** A 20 ms block at least 30 dB over the quiet
 (`--rise-db`, 10 to 60) and at least -40 dBFS, after 200 ms that averaged under 10 dB over the quiet.
@@ -61,7 +62,10 @@ recordings (16 kHz, one channel, 16 bits) and prints each sudden sound.
 
 ## Optional microphone privacy boundary (#755)
 
-`LAMP_PRIVACY_CONTROLS=on` selects the new capture boundary. An absent value or
+`LAMP_PRIVACY_CONTROLS=on`, or `no-slide` for a lamp with no slide (whose
+lease Voice grants from its software mute alone,
+[privacy-switch.md](privacy-switch.md#a-lamp-with-no-slide-no-slide)), selects
+the new capture boundary. An absent value or
 `off` preserves the existing capture path, CLI and output; no privacy subscriber
 or new worker is created. Any other value, an empty one included, does the same,
 as in Controls and Voice, so a mistyped unit never stops Ears; a value other
@@ -190,7 +194,7 @@ Taken: level and onset now; a classifier only when a behaviour needs one.
 ## Optional mic1 PCM export (#1669)
 
 `LAMP_BUS_AUDIO=on` in Ears explicitly opts into raw room audio export. It is
-otherwise off. This requires `LAMP_PRIVACY_CONTROLS=on`; requesting audio without
+otherwise off. This requires `LAMP_PRIVACY_CONTROLS=on` or `no-slide`; requesting audio without
 that boundary fails before the compatibility capture path can open the device.
 No product unit or default is changed by this code. Voice's same variable still
 controls its own microphone independently.
@@ -252,3 +256,24 @@ retention enforcement. `lamp-bus record` can persist raw PCM using the caller's
 umask and its serialized-file size cap (64 MiB by default). Operator permission,
 private storage and retention limits are required policy, not a property the
 publisher can enforce after handing a block to a subscriber.
+
+
+## Optional room sound classes (#1669)
+
+`LAMP_EARS_CLASSES=on` (exactly `on`) scores speech, music and laughter with
+a pinned YAMNet and publishes them on `ears/classes`. It is off unless set,
+and runs only with `LAMP_PRIVACY_CONTROLS=on`, a lamp with a slide; otherwise,
+`no-slide` included ([privacy-switch.md](privacy-switch.md#a-lamp-with-no-slide-no-slide)),
+one journal line says no classifier runs. `LAMP_EARS_CLASSES_MODEL` is the absolute path to
+`yamnet.onnx`, with `yamnet.data` beside it; both must match their pinned
+SHA256 or the topic says `invalid_model`. No unit sets either.
+
+Capture offers each admitted block, from the same post-read callback as the
+PCM export, to a bounded queue of 500 ms; it never waits, and a full queue
+drops the block and purges. A separate thread holds at most one patch of
+one uninterrupted capture era (under 1.5 s, capped at 2 s) in memory and
+writes nothing; any gap, mute, epoch or fence change, overflow or age past
+2 s purges it. The Bus pump publishes a score only while that era still
+holds authority and the result is under 2 s old. The retention, timing and
+measurements are in [sound-events.md](sound-events.md), "The publisher
+behind LAMP_EARS_CLASSES". Nothing consumes the topic yet.

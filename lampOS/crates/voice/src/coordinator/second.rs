@@ -115,6 +115,7 @@ fn request_of(command: &ProviderInput) -> u64 {
         | ProviderInput::Audio { request, .. }
         | ProviderInput::End { request, .. }
         | ProviderInput::Called { request, .. }
+        | ProviderInput::Paused { request, .. }
         | ProviderInput::Written { request, .. }
         | ProviderInput::Reminder { request, .. } => *request,
     }
@@ -1489,12 +1490,14 @@ mod tests {
                     microphone: crate::options::Microphone::Mic2,
                     end_silence_blocks: None,
                     early_end_blocks: None,
+                    early_finalize: false,
                     faint_level: None,
                     speaker,
                     capture,
                     provider: second_worker,
                     privacy,
                     privacy_controls: false,
+                    privacy_receipts: false,
                     ring: None.into(),
                     camera: None,
                     motor: None,

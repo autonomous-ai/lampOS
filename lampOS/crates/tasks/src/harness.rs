@@ -587,6 +587,52 @@ impl Cli {
         parse_machines(&reply.stdout).map_err(str::to_string)
     }
 
+    /// Harness's own sign-in by a spoken code (`harness login --code
+    /// --json`, Harness 0.4.23; `serve --sign-in-by-code`, #1676): the same
+    /// program, checked as every run is, with the same environment and
+    /// `HOME`, but its own life ([`crate::sign_in::MOST_LIFE`]), its stdin
+    /// kept for the person's answer and its lines read as they come. Never
+    /// takes the operation lock: a sign-in waits minutes on a person.
+    pub fn sign_in_by_code(&self) -> Result<Box<dyn crate::sign_in::Link>, String> {
+        if self.poisoned.load(Ordering::Acquire) {
+            return Err("cleanup_incomplete".into());
+        }
+        if !executable_identity(&self.config.executable)
+            .is_ok_and(|identity| identity == self.executable)
+        {
+            return Err("executable_changed".into());
+        }
+        let mut command = Command::new(&self.config.executable);
+        command
+            .args(["login", "--code", "--json"])
+            .env_clear()
+            .envs(&self.config.environment);
+        if !self.config.as_person {
+            command
+                .env("AI_AGENT", "lampos")
+                .env("HARNESS_AGENT_SESSION", &self.caller_session);
+        }
+        command
+            .current_dir(&self.config.environment["HOME"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .process_group(0);
+        let mut child = command.spawn().map_err(|_| "spawn_failed".to_string())?;
+        let pid = Pid::from_child(&child);
+        let (Some(stdin), Some(stdout), Some(stderr)) =
+            (child.stdin.take(), child.stdout.take(), child.stderr.take())
+        else {
+            let _ = kill_process_group(pid, Signal::KILL);
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("pipe_failed".into());
+        };
+        Ok(Box::new(CodeSignIn::start(
+            child, pid, stdin, stdout, stderr,
+        )))
+    }
+
     /// A second adapter on the same CLI and settings, for `wait`
     /// (`serve --push-wait`): held for minutes, it must never take the one
     /// operation lane launches and reads share.
@@ -911,6 +957,123 @@ impl Drop for OwnedChild {
         if !self.cleaned {
             let _ = self.finish();
         }
+    }
+}
+
+/// A running `harness login --code --json` ([`Cli::sign_in_by_code`]): its
+/// lines read on a thread of their own, its answer written to its stdin,
+/// and its process group stopped when dropped.
+struct CodeSignIn {
+    child: Child,
+    pid: Pid,
+    stdin: std::process::ChildStdin,
+    read: std::sync::mpsc::Receiver<Result<crate::sign_in::Event, &'static str>>,
+    ended: bool,
+}
+
+/// What Harness writes when it doesn't know `--code`: a build before 0.4.23
+/// ("error: unknown option '--code'").
+fn too_old(errors: &str) -> bool {
+    let errors = errors.to_lowercase();
+    errors.contains("unknown option") || errors.contains("unknown argument")
+}
+
+impl CodeSignIn {
+    fn start(
+        child: Child,
+        pid: Pid,
+        stdin: std::process::ChildStdin,
+        stdout: ChildStdout,
+        stderr: ChildStderr,
+    ) -> Self {
+        let (send, read) = std::sync::mpsc::sync_channel(8);
+        // What it says on stderr, bounded, for why it ended with no result.
+        let errors = thread::spawn(move || {
+            let mut kept = Vec::new();
+            let _ = stderr.take(STDERR_LIMIT as u64).read_to_end(&mut kept);
+            String::from_utf8_lossy(&kept).into_owned()
+        });
+        thread::spawn(move || {
+            use std::io::BufRead;
+            let mut lines = io::BufReader::new(stdout);
+            let mut line = Vec::new();
+            let ended = loop {
+                line.clear();
+                match (&mut lines)
+                    .take(crate::sign_in::MOST_LINE_BYTES as u64 + 1)
+                    .read_until(b'\n', &mut line)
+                {
+                    Ok(0) | Err(_) => break None,
+                    Ok(_) => {}
+                }
+                let text = std::str::from_utf8(&line).map(str::trim);
+                let read = match text {
+                    Ok("") => continue,
+                    Ok(text) if line.len() <= crate::sign_in::MOST_LINE_BYTES => {
+                        crate::sign_in::parse_line(text)
+                    }
+                    _ => Err("unreadable"),
+                };
+                match read {
+                    Ok(None) => {}
+                    Ok(Some(event)) => {
+                        if send.send(Ok(event)).is_err() {
+                            return;
+                        }
+                    }
+                    Err(code) => break Some(code),
+                }
+            };
+            let code = ended.unwrap_or_else(|| {
+                if errors.join().is_ok_and(|errors| too_old(&errors)) {
+                    "harness_too_old"
+                } else {
+                    "ended"
+                }
+            });
+            let _ = send.send(Err(code));
+        });
+        Self {
+            child,
+            pid,
+            stdin,
+            read,
+            ended: false,
+        }
+    }
+}
+
+impl crate::sign_in::Link for CodeSignIn {
+    fn poll(&mut self) -> Option<Result<crate::sign_in::Event, &'static str>> {
+        if self.ended {
+            return None;
+        }
+        match self.read.try_recv() {
+            Ok(read) => {
+                self.ended = read.is_err();
+                Some(read)
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => None,
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                self.ended = true;
+                Some(Err("ended"))
+            }
+        }
+    }
+
+    fn answer(&mut self, yes: bool) -> io::Result<()> {
+        use std::io::Write;
+        self.stdin.write_all(if yes { b"yes\n" } else { b"no\n" })?;
+        self.stdin.flush()
+    }
+}
+
+impl Drop for CodeSignIn {
+    fn drop(&mut self) {
+        // Its whole group, as every run here is stopped; then reaped.
+        let _ = kill_process_group(self.pid, Signal::KILL);
+        let _ = self.child.kill();
+        let _ = self.child.wait();
     }
 }
 

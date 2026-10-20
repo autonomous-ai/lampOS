@@ -328,7 +328,7 @@ pub fn export_enabled(audio: Option<&str>, privacy: Option<&str>) -> io::Result<
     if !crate::privacy::enabled(privacy) {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "Ears LAMP_BUS_AUDIO=on requires LAMP_PRIVACY_CONTROLS=on",
+            "Ears LAMP_BUS_AUDIO=on requires LAMP_PRIVACY_CONTROLS=on or no-slide",
         ));
     }
     Ok(true)
@@ -408,7 +408,8 @@ mod tests {
             assert!(!export_enabled(audio, None).unwrap());
         }
         assert!(export_enabled(Some("on"), Some("on")).unwrap());
-        for privacy in [None, Some("off"), Some("ON")] {
+        assert!(export_enabled(Some("on"), Some("no-slide")).unwrap());
+        for privacy in [None, Some("off"), Some("ON"), Some("NO-SLIDE")] {
             assert!(export_enabled(Some("on"), privacy).is_err());
         }
     }

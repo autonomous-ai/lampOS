@@ -87,6 +87,8 @@ pub(super) struct Harness {
     reads: Vec<u64>,
     /// A yield's words, with `LAMP_STOP_WORDS=heard` (#828).
     stop_words: Option<crate::stop_words::StopWords>,
+    /// `LAMP_REPLY_END_REACH=on` (#1722), as the session loop reads it.
+    pub(super) reach_past_reply: bool,
 }
 
 impl Harness {
@@ -165,6 +167,7 @@ impl Harness {
             gap_us: 0,
             reads: vec![0],
             stop_words: None,
+            reach_past_reply: false,
         }
     }
     pub(super) fn old(&self) -> TurnOwner {
@@ -251,6 +254,8 @@ impl Harness {
         self.reads.push(at);
         if yielded {
             self.detector.reach_back();
+        } else if reaches_past_reply(self.reach_past_reply, echo.as_ref()) {
+            self.detector.reach_back_to_onset();
         }
         let samples = observation.samples;
         let (update, _) = observe_prospective_heard(
@@ -617,6 +622,139 @@ fn with_first_words_kept_a_yields_request_begins_at_the_words_said_under_the_lam
         yielded_at + 1 - crate::activity::PRE_ROLL_BLOCKS as u64
     );
     assert_eq!(usual.last(), kept.last());
+}
+
+/// #1722 (the first builder at 06:56): "Hey Lamp, ask Codex to write a haiku
+/// about coffee." begun as the lamp's story ends. The duplex rule takes the
+/// name, said under the lamp's last words, for the lamp's own sound, and the
+/// line starts only once the lamp has been quiet 300 ms, with the 300 ms
+/// before that: on lamp-4ace its request heard 8 of the 10 words, held for no
+/// name, in 3 of 4 hand-overs. With `LAMP_REPLY_END_REACH=on` the request
+/// begins 200 ms before the onset its name made. The lamp's own last words,
+/// left by the canceller under the onset's bar, aren't reached back to, even
+/// scored where a yield's reach would take them.
+#[test]
+fn with_the_reply_end_reach_a_line_begun_under_the_lamps_last_words_keeps_its_name() {
+    let request = |on: bool, residue: f32| {
+        let mut h = Harness::keeping_first_words(true, 400);
+        h.reach_past_reply = on;
+        // Blocks 1 to 100: the lamp's last words, as the canceller leaves
+        // them to the detector.
+        h.blocks(100, residue, Some(evidence(0, OWN)));
+        // Blocks 101 to 140: "Hey Lamp," under the lamp's last sound.
+        h.blocks(40, 0.9, Some(evidence(0, OWN)));
+        // The lamp falls quiet while the person goes on, and is let start
+        // once it has been quiet 300 ms.
+        for quiet in 1..=29 {
+            h.block(0.9, Some(evidence(quiet, None)));
+        }
+        let clear = h.blocks(6, 0.9, Some(evidence(30, None)));
+        let accepted = clear[5]
+            .accepted
+            .as_ref()
+            .expect("the person was not let in");
+        assert!(accepted.audio.windows(2).all(|pair| pair[1] == pair[0] + 1));
+        assert_eq!(h.provider_queue.len(), 1 + accepted.audio.len());
+        assert!(h.provider_queue.len() < provider_queue_bound(h.hold));
+        assert!(
+            h.events("duplex_yield").is_empty(),
+            "no yield: the name was taken for the lamp's own sound"
+        );
+        (accepted.audio.clone(), accepted.trigger_sequence)
+    };
+    let lead = crate::activity::REACH_LEAD_BLOCKS as u64;
+    let (reached, trigger) = request(true, 0.1);
+    assert_eq!(reached[0], 101 - lead, "200 ms before the name's onset");
+    let (usual, usual_trigger) = request(false, 0.1);
+    assert_eq!(usual_trigger, trigger);
+    assert_eq!(
+        usual[0],
+        trigger + 1 - crate::activity::PRE_ROLL_BLOCKS as u64,
+        "without the switch, after the lamp's sound, as before"
+    );
+    assert_eq!(usual.last(), reached.last());
+    // The lamp's last words scored 0.6: over a yield's bar (0.35), under an
+    // onset's (0.8). The line still begins at the name, not in them.
+    let (residue, _) = request(true, 0.6);
+    assert_eq!(residue[0], 101 - lead);
+}
+
+/// The reviewer's P3 on #2096: the canceller leaves the lamp's own last words
+/// scored as an onset now and then (#828's replay). Before a pause as long as
+/// the one that ends a line (600 ms, as on lamp-4ace), they aren't this
+/// line's, and it begins at its name, not in them.
+#[test]
+fn with_the_reply_end_reach_the_lamps_words_before_a_pause_are_not_taken() {
+    let mut h = Harness::keeping_first_words(true, 400);
+    h.reach_past_reply = true;
+    let detector = std::mem::take(&mut h.detector);
+    h.detector = detector.with_end_silence(60).unwrap();
+    // Blocks 1 to 30: the lamp's last words, left scored as an onset.
+    h.blocks(30, 0.9, Some(evidence(0, OWN)));
+    // Blocks 31 to 91: a pause in them, 610 ms.
+    h.blocks(61, 0.1, Some(evidence(0, OWN)));
+    // Blocks 92 to 131: "Hey Lamp," under the lamp's last sound.
+    h.blocks(40, 0.9, Some(evidence(0, OWN)));
+    for quiet in 1..=29 {
+        h.block(0.9, Some(evidence(quiet, None)));
+    }
+    let clear = h.blocks(6, 0.9, Some(evidence(30, None)));
+    let accepted = clear[5]
+        .accepted
+        .as_ref()
+        .expect("the person was not let in");
+    assert!(
+        accepted.audio.first().is_some_and(|first| *first > 30),
+        "the lamp's words were taken: {:?}",
+        accepted.audio.first()
+    );
+    assert_eq!(
+        accepted.audio[0],
+        92 - crate::activity::REACH_LEAD_BLOCKS as u64
+    );
+}
+
+/// #1722: a line begun 640 ms or more after the lamp's sound ends starts as
+/// before with the switch on, though words said under that sound are still
+/// in the pre-roll: only a line begun as the lamp's sound ends reaches back.
+#[test]
+fn with_the_reply_end_reach_a_line_long_after_the_lamps_sound_starts_as_before() {
+    let request = |on: bool| {
+        let mut h = Harness::keeping_first_words(true, 100);
+        h.reach_past_reply = on;
+        h.blocks(50, 0.1, Some(evidence(0, OWN)));
+        // Blocks 51 to 80: something said under the lamp's last sound.
+        h.blocks(30, 0.9, Some(evidence(0, OWN)));
+        // The lamp falls quiet, and the room with it, for 640 ms.
+        for quiet in 1..=63 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+        let line = h.blocks(6, 0.9, Some(evidence(64, None)));
+        let accepted = line[5].accepted.as_ref().expect("the line was not let in");
+        (accepted.audio.clone(), accepted.trigger_sequence)
+    };
+    let (on, trigger) = request(true);
+    let (off, _) = request(false);
+    assert_eq!(on, off);
+    assert_eq!(on[0], trigger + 1 - crate::activity::PRE_ROLL_BLOCKS as u64);
+}
+
+/// #1722: only a start as the lamp's sound ends reaches back: with the
+/// switch, quiet under 640 ms, and echo evidence to say so.
+#[test]
+fn a_start_reaches_past_the_reply_only_as_the_lamps_sound_ends() {
+    use lamp_audio::evidence::QUIET_BLOCKS_CEILING;
+    assert!(reaches_past_reply(true, Some(&evidence(30, None))));
+    assert!(reaches_past_reply(
+        true,
+        Some(&evidence(QUIET_BLOCKS_CEILING - 1, None))
+    ));
+    assert!(!reaches_past_reply(
+        true,
+        Some(&evidence(QUIET_BLOCKS_CEILING, None))
+    ));
+    assert!(!reaches_past_reply(true, None));
+    assert!(!reaches_past_reply(false, Some(&evidence(30, None))));
 }
 
 /// The words a yield gives back, as the relay does: only once they are

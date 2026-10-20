@@ -550,6 +550,7 @@ mod tests {
             &[],
             Duration::ZERO,
             0,
+            0,
         )
         .await;
         assert_eq!(words, "Hello, Lamp.");
@@ -702,6 +703,7 @@ mod tests {
         forced: &'static [&'static str],
         round_trip: Duration,
         flushes: usize,
+        pauses: usize,
     ) -> (String, String, Duration, Vec<usize>) {
         let (near, far) = tokio::io::duplex(1 << 16);
         let server = tokio::spawn(async move {
@@ -742,6 +744,9 @@ mod tests {
         for _ in 0..flushes {
             stream.flush().unwrap();
         }
+        for _ in 0..pauses {
+            stream.paused().unwrap();
+        }
         let began = Instant::now();
         let (words, at_end) = stream.finish_told(true).await.unwrap();
         let took = began.elapsed();
@@ -757,7 +762,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_turn_ended_over_all_the_audio_sent_is_the_answer_at_once_in_80_ms_messages() {
         let (words, at_end, took, audio) =
-            finish_flux(&[HELLO, ENDED], &[], Duration::from_millis(800), 0).await;
+            finish_flux(&[HELLO, ENDED], &[], Duration::from_millis(800), 0, 0).await;
         assert_eq!(words, "Hello, Lamp.");
         assert_eq!(took, Duration::ZERO);
         assert!(at_end.starts_with("flux: turns=1, the latest turn ended by model, the model ended turn 1 300 ms before End, settled=true"), "{at_end}");
@@ -768,10 +773,22 @@ mod tests {
         assert_eq!(audio[12], 1_280);
     }
 
+    /// Jarvis on #2102: a pause (`LAMP_SECOND_EARLY_FINALIZE`) asks nothing
+    /// of Flux, whose flush would end its turn (`ForceEndTurn`): three of
+    /// them leave the turn the model ended settled, as with none.
+    #[tokio::test(start_paused = true)]
+    async fn a_pause_asks_nothing_of_flux() {
+        let (words, at_end, took, _) =
+            finish_flux(&[HELLO, ENDED], &[], Duration::from_millis(800), 0, 3).await;
+        assert_eq!(words, "Hello, Lamp.");
+        assert_eq!(took, Duration::ZERO);
+        assert!(at_end.ends_with(", words from=settled"), "{at_end}");
+    }
+
     #[tokio::test(start_paused = true)]
     async fn an_open_turn_is_ended_by_force_end_turn_without_waiting_for_the_close() {
         let (words, at_end, took, _) =
-            finish_flux(&[HELLO], &[FORCED], Duration::from_millis(800), 0).await;
+            finish_flux(&[HELLO], &[FORCED], Duration::from_millis(800), 0, 0).await;
         assert_eq!(words, "Hello, Lamp.");
         assert_eq!(took, Duration::from_millis(100));
         assert!(
@@ -791,7 +808,7 @@ mod tests {
     async fn no_turn_to_end_answers_force_end_turn() {
         const SHORT: &str = r#"{"type":"TurnInfo","event":"EndOfTurn","turn_index":0,"audio_window_end":0.7,"transcript":"Hello, Lamp.","trigger":"model"}"#;
         let (words, at_end, took, _) =
-            finish_flux(&[SHORT], &[NO_TURN], Duration::from_millis(800), 0).await;
+            finish_flux(&[SHORT], &[NO_TURN], Duration::from_millis(800), 0, 0).await;
         assert_eq!(words, "Hello, Lamp.");
         assert_eq!(took, Duration::from_millis(100));
         assert!(
@@ -803,7 +820,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn force_end_turn_unanswered_falls_back_to_close_stream_and_the_latest_words() {
         let (words, at_end, took, _) =
-            finish_flux(&[HELLO], &[], Duration::from_millis(800), 0).await;
+            finish_flux(&[HELLO], &[], Duration::from_millis(800), 0, 0).await;
         assert_eq!(words, "hello");
         assert_eq!(took, FINALIZE + Duration::from_millis(800));
         assert!(
@@ -867,8 +884,14 @@ mod tests {
     /// its answer is not taken for the line's.
     #[tokio::test(start_paused = true)]
     async fn a_flushs_late_answer_is_not_the_lines() {
-        let (words, at_end, took, _) =
-            finish_flux(&[HELLO], &[FORCED, NO_TURN], Duration::from_millis(800), 1).await;
+        let (words, at_end, took, _) = finish_flux(
+            &[HELLO],
+            &[FORCED, NO_TURN],
+            Duration::from_millis(800),
+            1,
+            0,
+        )
+        .await;
         assert_eq!(words, "Hello, Lamp.");
         assert_eq!(took, Duration::from_millis(200));
         assert!(

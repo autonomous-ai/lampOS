@@ -23,8 +23,17 @@ pub fn selected(value: Option<&OsStr>) -> bool {
     value == Some(OsStr::new("on"))
 }
 
-/// Apply only to an explicitly selected privacy route. The normal Bus discovery
-/// period can exceed the switch's freshness budget when a subscriber joins late.
+/// `no-slide`: the privacy route on a lamp with no slide. No line is read and
+/// a pins file's privacy section is refused; each `controls/state` says so
+/// (`no_privacy_slide`), at the route's cadence. Builds before it read this
+/// value as off.
+pub fn no_slide(value: Option<&OsStr>) -> bool {
+    value == Some(OsStr::new("no-slide"))
+}
+
+/// Apply only to an explicitly selected privacy route, with a slide or with
+/// none. The normal Bus discovery period can exceed the route's freshness
+/// budget when a subscriber joins late.
 pub fn selected_bus(bus: lamp_bus::Bus) -> lamp_bus::Bus {
     bus.rescan_every(std::time::Duration::from_millis(5))
 }

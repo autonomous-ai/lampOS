@@ -643,6 +643,29 @@ mod tests {
         assert!(!super::super::asleep_face_allowed(false, true));
     }
 
+    /// A lamp with no slide (`LAMP_PRIVACY_CONTROLS=no-slide`): its wait
+    /// paints no physical-mute indication, so its ring is as with the route
+    /// off: the asleep face, the tap face and the reminder pulse all show.
+    /// With a slide (`on`) they stay off, as before.
+    #[test]
+    fn the_ring_of_a_lamp_with_no_slide_is_as_with_the_route_off() {
+        use super::super::{
+            asleep_face_allowed, privacy_ring, pulse_without_face, tap_face_allowed,
+        };
+        use crate::privacy_bus::Route;
+        assert!(!privacy_ring(None));
+        assert!(privacy_ring(Some(Route::Slide)));
+        assert!(!privacy_ring(Some(Route::NoSlide)));
+        let no_slide = privacy_ring(Some(Route::NoSlide));
+        assert!(asleep_face_allowed(true, no_slide));
+        assert!(tap_face_allowed(true, false, no_slide));
+        assert_eq!(pulse_without_face(true, true, true, no_slide), None);
+        let slide = privacy_ring(Some(Route::Slide));
+        assert!(!asleep_face_allowed(true, slide));
+        assert!(!tap_face_allowed(true, false, slide));
+        assert!(pulse_without_face(true, true, true, slide).is_some());
+    }
+
     #[test]
     fn verified_mutes_repeat_the_privacy_wait_and_record_their_actual_source() {
         // Physical, software, and software because the head put it to

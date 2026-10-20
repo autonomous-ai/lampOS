@@ -191,7 +191,8 @@ Off unless `lamp-expression serve --head-touch`, and Controls runs with
     - **The voice's own mute:** `voice/mute` muted, not `sleep`. The
       voice's sleep is not this: a tap still wakes it.
     - **The privacy switch closed:** `voice/privacy` with `physical_muted`.
-      Only the Controls privacy route (`LAMP_PRIVACY_CONTROLS=on`) says
+      Only the Controls privacy route (`LAMP_PRIVACY_CONTROLS=on`, or
+      `no-slide`, whose leases say `no_slide` and are never closed) says
       `voice/privacy`, and `voice/mute` leaves the switch out. So with the
       route off, on every lamp today, a closed switch still gets a look-up
       (the reviewer on #1282).

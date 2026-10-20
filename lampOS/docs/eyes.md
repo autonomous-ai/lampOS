@@ -1212,7 +1212,14 @@ the nose lower between the eyes and mouth by 0.12 than it sat, held 20 s
 (reading, writing or a phone held low, not told apart), whatever the face's
 size, since a head bowed over the desk comes closer too; leaning in is the
 face 1.25 times as tall, held 10 s. No sitter for 20 s is away; a sitting
-goes on through a gap under two minutes.
+goes on through a gap under two minutes. Rising out of the chair is the sitter's face, over
+its looks in the 2 s before it was lost, risen by half its height or more
+and shrunk to 0.85 of it or less, then not seen again for 2 s. Once a loss,
+the journal says how those looks moved against that, numbers only ("sitter's
+face lost: over its last N looks it rose R of its height … and was S as
+tall …, last A across, H tall: rising" or "not standing up"), so a run that
+saw someone leave with no `room/stood_up` shows which part was missing
+(row 14 on lamp-52e6, 20 Oct).
 
 At lamp-75c9 (19 Oct, one person, an open office, the lamp beside the
 laptop at about face height) leaning in was seen (1.52 times as tall). Head

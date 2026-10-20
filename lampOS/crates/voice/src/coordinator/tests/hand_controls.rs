@@ -683,6 +683,7 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
         provider,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         camera: None,
         motor: None,
@@ -699,6 +700,7 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
         follows_on: false,
         paused: Box::new(|| false),
         early_end_blocks: None,
+        early_finalize: false,
     };
     let (mut owner, current, permit) = active_reply();
     let old_owner = current.owner;
@@ -735,6 +737,7 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
         event_sequence: 1,
         rejected_inputs: 0,
         privacy: None,
+        no_privacy_slide: false,
     };
     state.check().unwrap();
     let mut controls =
@@ -1231,6 +1234,7 @@ fn run_loop_ringed(
         provider,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: ring.into(),
         camera: None,
         motor: None,
@@ -1247,6 +1251,7 @@ fn run_loop_ringed(
         follows_on: false,
         paused: Box::new(|| false),
         early_end_blocks: None,
+        early_finalize: false,
     };
     // Every worker's side is read while the loop runs, as a worker reads
     // it: a message is stale 100 ms after it is sent. The speaker's keeps

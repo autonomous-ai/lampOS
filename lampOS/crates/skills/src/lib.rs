@@ -3675,6 +3675,11 @@ impl Engine {
                 StoodUp::TOPIC.to_owned(),
             ]);
         }
+        // A search reads what was heard before its call, to know which
+        // turn asked for it (#2179): the program's own reading too.
+        if self.skills.iter().any(|skill| skill.search.is_some()) {
+            topics.push(Speech::TOPICS[0].to_owned());
+        }
         topics.sort();
         topics.dedup();
         topics

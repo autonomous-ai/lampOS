@@ -187,6 +187,7 @@ fn authored_bus_cues_to_observed_state_first_and_repeated() {
                 event_sequence: touch_sequence,
                 rejected_inputs: 0,
                 privacy: None,
+                no_privacy_slide: false,
             };
             controls.publish_json(now, &state).unwrap();
         } else {

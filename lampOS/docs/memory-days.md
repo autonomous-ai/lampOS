@@ -33,9 +33,10 @@ comparison material outside standalone lampOS.
 ## Switch and reply path
 
 Start `lamp-memory` with `--memory-days` to enable this store. Without it,
-the existing JSONL implementation is used. No deployment or voice setting
-is changed. The opt-in binary never calls a model, starts a model worker,
-or makes a network request. It logs that the model adapter is unconfigured.
+the existing JSONL implementation is used. The flag changes no voice
+setting. The product unit (`deploy/product/lamp-memory.service`) passes it,
+and the product's voice unit sets `LAMP_MEMORY_DAYS=on` (below). The opt-in
+binary never calls a model, starts a model worker, or makes a network request. It logs that the model adapter is unconfigured.
 
 The message `the model adapter is not configured` means this build does not
 automatically extract promises, threads or preferences from conversations,
@@ -88,7 +89,9 @@ The coordinator clears worker environments, then forwards only the exact
 non-Unicode values pass nothing; all other roles retain their empty
 environment. This narrow exception was approved in
 [Fourth-Q29](https://github.com/autonomous-ai/lampOS/issues/698#issuecomment-6165838226).
-No deployment has been changed. Host checks, retained failures and first and
+Task 29 changed no deployment. The switch has been on since: on lamp-4ace from
+15 Oct (#743), and now in the product's `deploy/product/lamp-voice.service`
+([switches.md](switches.md)). Host checks, retained failures and first and
 repeated client timings are in
 [task 29's evidence](verification/memory-voice-host-20261014/README.md).
 The task's final native ARM64 run and readiness are recorded in Fourth's log
@@ -111,8 +114,11 @@ validates the complete snapshot and quotes its JSON, retaining its identity,
 generation and source IDs; the inner note is capped at 1,200 bytes. A failed,
 invalidated, malformed or late snapshot gives an explicit unavailable-note
 instruction, with no stale-note fallback. Old sessions and failed opens
-are closed through the background queue, best effort; Memory's 32-session,
-24-hour limits cover lost closes. At the first Days session after a worker
+are closed through the background queue, best effort. At a worker's stop
+(the coordinator's `Stop`, on either route) the session it has open is
+closed straight to the memory within 150 ms (`remember::close_at_exit`), so a
+restart leaves none. Memory's 32-session limit, oldest closed first, and its
+24-hour limit cover lost closes. At the first Days session after a worker
 start, the restored conversation thread is discarded because the thread
 file contains no provenance.
 
@@ -397,8 +403,12 @@ examined. Opening the same session returns the same snapshot, even after
 new appends or observations; changing its cap is refused. Deletion returns
 the same snapshot identity with empty text/IDs and `invalidated:true`.
 There are at most 32 sessions per person, retained for at most 24 hours
-from opening. Close them promptly and use fresh unique names for new
-provider sessions; a reused name after expiry can create a new snapshot.
+from opening. A person at 32 has their oldest sessions closed when a new one
+opens, rather than the new one refused (#1722, D): a voice that stopped
+without closing its own left one behind, and enough restarts filled the
+room's, after which every session was told no note. Close them promptly and
+use fresh unique names for new provider sessions; a reused name after expiry
+can create a new snapshot.
 
 `Input` contains `job`, `person`, `generation`, `source_ids`, `records`
 and `previous`. Each evidence record has `id`, `at_unix_ms`, `kind`,
@@ -611,8 +621,9 @@ The scenes played again at 14:50 do not count: the office was loud, the
 room was busy, and the voice's busy-room rule held the requests (including
 the call to remember: "asked for remember; not done"). To be played in a
 quiet room. At that lamp checkpoint, Voice did not use the new ranked
-response order, frozen session note or conversation-end handoff. Task 29's
-client above has not changed that recorded lamp result.
+response order, frozen session note or conversation-end handoff. The voice's
+switch for them, `LAMP_MEMORY_DAYS=on`, went on later: on lamp-4ace on
+15 Oct (#743), and in the product unit since ([switches.md](switches.md)).
 
 ## Not shown
 

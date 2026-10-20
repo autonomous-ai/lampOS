@@ -317,3 +317,43 @@ branch)
 - Pushed to `fourteen/own-keys` (`6f50a00f`), PR body updated with piece
   4, replied on
   [#2094](https://github.com/autonomous-ai/lampOS/issues/2094#issuecomment-6284576267).
+
+## 2026-10-20 — #2193 and #2194 — given, claimed, both blocked for now
+
+Ready for lamp-voice: no (claims and a scoping note only)
+
+- The first builder, 13:35 on #1722, idle-nudge: after #2094's app side,
+  take the Lamp 2 page's restart
+  ([#2193](https://github.com/autonomous-ai/lampOS/issues/2193), Fifth's
+  lamp side) and update status
+  ([#2194](https://github.com/autonomous-ai/lampOS/issues/2194),
+  Migrate's) in the app. Mobile has faces (#13) and reminders (#2214), so
+  the pages split cleanly. Build each against its kind's
+  `crates/cloud/tests/app_contract.rs` pin as it lands, and say which
+  first.
+- Claimed both, app side, as second lines beside Fifth's and Migrate's
+  (same two-sided-issue shape as #2094):
+  [#2193](https://github.com/autonomous-ai/lampOS/issues/2193#issuecomment-6285008066),
+  [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6285008467).
+  Said which first on
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6285011269):
+  **#2193**, since #2194 waits on #2188/#2189 (both open, Migrate's).
+- Neither kind is in `app_contract.rs`'s `READ` list yet — no app code
+  before each pins.
+- **#2193 is further back than the issue assumes.** Fifth (06:22–06:24Z):
+  lamp-cloud can't reach the keeper today (no socket/bus path, root-only
+  CLI) and can't read lamp-update's lock either; proposed a new root
+  socket/helper and keeper verb, and asked the first builder whether
+  `system.reboot` should restart `lampos.target` or reboot the machine —
+  unanswered as of this entry.
+- What's not blocked: placement. A Lamp 2 shows no restart/power row at
+  all today — `_buildMaintenanceCard`'s `hasPower = value.isLamp ||
+  value.isInternPro` excludes it, the same `isLamp` gate fourteen-P1 found
+  excluding Enroll. Said so on #2193: a Lamp-2-only row, its own MQTT
+  widget (V1's `_LampPowerControls` is HTTP via
+  `standToEarnRepositoryProvider`, not reusable transport-wise) — but its
+  label waits on the machine-vs-target answer, so nothing written yet.
+- Both #2193 and #2194 are, for now, waiting on others. #2094's app side
+  is otherwise complete (four pieces on ecm-sds-mobile#11, awaiting
+  review). Nothing else of mine is unblocked at this moment; said so
+  rather than invent filler.

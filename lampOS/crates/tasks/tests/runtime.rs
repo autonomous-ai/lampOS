@@ -99,6 +99,26 @@ struct Counts {
     /// What `harness machines` lists, and how often it was asked (#1676).
     machines: Mutex<Vec<AccountMachine>>,
     machine_reads: AtomicUsize,
+    /// Harness's sign-in lines still to come, the answers written and how
+    /// many sign-ins were started (#1676).
+    sign_in_lines: Arc<Mutex<std::collections::VecDeque<SignInRead>>>,
+    sign_in_answers: Arc<Mutex<Vec<bool>>>,
+    sign_in_starts: AtomicUsize,
+}
+type SignInRead = Result<lamp_tasks::sign_in::Event, &'static str>;
+/// A sign-in that reads the script's lines and keeps its answers.
+struct ScriptSignIn(
+    Arc<Mutex<std::collections::VecDeque<SignInRead>>>,
+    Arc<Mutex<Vec<bool>>>,
+);
+impl lamp_tasks::sign_in::Link for ScriptSignIn {
+    fn poll(&mut self) -> Option<SignInRead> {
+        self.0.lock().unwrap().pop_front()
+    }
+    fn answer(&mut self, yes: bool) -> io::Result<()> {
+        self.1.lock().unwrap().push(yes);
+        Ok(())
+    }
 }
 struct ScriptLane(Arc<Counts>);
 impl WaitLane for ScriptLane {
@@ -190,6 +210,16 @@ impl Adapter for Script {
         self.counts.machine_reads.fetch_add(1, Ordering::SeqCst);
         Ok(self.counts.machines.lock().unwrap().clone())
     }
+    fn sign_in_starter(&self) -> Option<lamp_tasks::sign_in::Starter> {
+        let counts = self.counts.clone();
+        Some(Box::new(move || {
+            counts.sign_in_starts.fetch_add(1, Ordering::SeqCst);
+            Ok(Box::new(ScriptSignIn(
+                counts.sign_in_lines.clone(),
+                counts.sign_in_answers.clone(),
+            )))
+        }))
+    }
     fn signed_in(&self) -> Result<SignIn, String> {
         Ok(if self.counts.signed_out.load(Ordering::SeqCst) {
             SignIn::Out
@@ -273,6 +303,7 @@ impl Running {
             set_up_later: None,
             // Its report every 50 ms, not each second: a test reading it
             // waits a fraction of a second (#1128).
+            sign_in_by_code: false,
             report_every: Duration::from_millis(50),
         };
         let mut running = Self {
@@ -1423,6 +1454,88 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
         s.ask(json!({"op":"targets"}))["targets"][1]["alias"],
         "office"
     );
+}
+
+/// #1676: Harness's sign-in by a spoken code through the service, on the
+/// trusted route only: started once while open, its code, the question,
+/// the answer passed on only while asked, and how it ended, kept for the
+/// voice; started anew once done. Without `--sign-in-by-code` it is off.
+#[test]
+fn the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end() {
+    use lamp_tasks::sign_in::{Done, Event};
+    let off = Running::new(false);
+    assert_eq!(
+        off.trusted(json!({"op":"sign_in_start"}))["error"],
+        "sign_in_off"
+    );
+    let mut s = Running::new(false);
+    s.stop();
+    s.config.sign_in_by_code = true;
+    s.start();
+    assert_eq!(s.ask(json!({"op":"sign_in_start"}))["error"], "untrusted");
+    assert_eq!(s.ask(json!({"op":"sign_in_state"}))["error"], "untrusted");
+    assert_eq!(s.trusted(json!({"op":"sign_in_state"}))["sign_in"], "none");
+    s.counts
+        .sign_in_lines
+        .lock()
+        .unwrap()
+        .push_back(Ok(Event::Code {
+            code: "12345678".into(),
+            expires_in: 120,
+        }));
+    let started = s.trusted(json!({"op":"sign_in_start"}));
+    assert_eq!(started["ok"], true, "{started}");
+    assert_eq!(started["sign_in"], "code");
+    assert_eq!(started["code"], "12345678");
+    // Asked again while open: the same one, not another.
+    assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["code"], "12345678");
+    assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_answer","answer":"yes"}))["error"],
+        "not_asking"
+    );
+    s.counts
+        .sign_in_lines
+        .lock()
+        .unwrap()
+        .push_back(Ok(Event::Confirm {
+            email: "someone@example.com".into(),
+        }));
+    let until = |want: &str| {
+        let start = Instant::now();
+        loop {
+            let state = s.trusted(json!({"op":"sign_in_state"}));
+            if state["sign_in"] == want {
+                return state;
+            }
+            assert!(start.elapsed() < Duration::from_secs(5), "{state}");
+            thread::sleep(Duration::from_millis(10));
+        }
+    };
+    assert_eq!(until("asking")["email"], "someone@example.com");
+    assert_eq!(
+        s.ask(json!({"op":"sign_in_answer","answer":"yes"}))["error"],
+        "untrusted"
+    );
+    assert!(s.counts.sign_in_answers.lock().unwrap().is_empty());
+    let answered = s.trusted(json!({"op":"sign_in_answer","answer":"yes"}));
+    assert_eq!(answered["sign_in"], "answered", "{answered}");
+    assert_eq!(*s.counts.sign_in_answers.lock().unwrap(), [true]);
+    s.counts
+        .sign_in_lines
+        .lock()
+        .unwrap()
+        .push_back(Ok(Event::Result(Done::Success {
+            email: Some("someone@example.com".into()),
+        })));
+    assert_eq!(until("done")["result"], "success");
+    // Done: kept for the voice, and a start begins anew.
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_state"}))["result"],
+        "success"
+    );
+    s.trusted(json!({"op":"sign_in_start"}));
+    assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 2);
 }
 
 /// Without `serve --set-up-later` nothing of it is said, and the targets

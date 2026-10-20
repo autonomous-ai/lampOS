@@ -685,6 +685,7 @@ fn provider_peer(
                 }
                 ProviderInput::Written { .. } => seen.provider.push("written"),
                 ProviderInput::Called { .. } => seen.provider.push("called"),
+                ProviderInput::Paused { .. } => seen.provider.push("paused"),
                 ProviderInput::Reminder { .. } => panic!("reminders are disabled in this fixture"),
             }
         }
@@ -1063,6 +1064,8 @@ struct Lamp {
     listen_gaps: bool,
     /// `directed-fixture --fixture-at-ms` (diagnostic only).
     fixture_at_ms: Option<u64>,
+    /// `LAMP_SECOND_EARLY_FINALIZE`: a line's words asked for at a pause.
+    early_finalize: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1200,12 +1203,14 @@ fn run_policy_with_peers_held(
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: lamp.end_silence_blocks,
         early_end_blocks: None,
+        early_finalize: lamp.early_finalize,
         faint_level: None,
         provider,
         capture,
         speaker,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         camera: None,
         motor: None,
@@ -1414,6 +1419,53 @@ fn one_question(block: u64) -> f32 {
     } else {
         QUIET
     }
+}
+
+/// 400 ms of speech, a 200 ms pause, then 900 ms more, then quiet.
+fn question_with_a_pause(block: u64) -> f32 {
+    if (50..90).contains(&block) || (110..200).contains(&block) {
+        SPEECH
+    } else {
+        QUIET
+    }
+}
+
+/// Jarvis on #2102 (P3 2): through the coordinator, a line's pause reaches
+/// the provider as `Paused` with `LAMP_SECOND_EARLY_FINALIZE`: once at
+/// 150 ms of the pause in the line, once as its last quiet begins, and
+/// before its end. Off, none goes.
+#[test]
+fn a_lines_pause_reaches_the_provider_only_with_the_switch() {
+    let _one = one_session();
+    let run = |early_finalize| {
+        run_policy_with_peers(
+            TurnTaking::V1Baseline,
+            4,
+            question_with_a_pause,
+            EndpointRig::double(delayed(0.01, Duration::from_millis(60))),
+            None,
+            None,
+            PeerMode::Stepped,
+            Lamp {
+                early_finalize,
+                ..Lamp::default()
+            },
+        )
+    };
+    let on = run(true);
+    on.result.as_ref().unwrap();
+    let kinds: Vec<&str> = on
+        .seen
+        .provider
+        .iter()
+        .copied()
+        .filter(|kind| *kind != "audio")
+        .collect();
+    assert_eq!(kinds, ["start", "paused", "paused", "end"], "{kinds:?}");
+    let off = run(false);
+    off.result.as_ref().unwrap();
+    assert!(!off.seen.provider.contains(&"paused"));
+    assert!(off.seen.provider.contains(&"end"));
 }
 
 fn endpoint_rows(session: &Session) -> Vec<&Value> {
@@ -1757,12 +1809,14 @@ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
         early_end_blocks: None,
+        early_finalize: false,
         faint_level: None,
         speaker,
         capture,
         provider,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         camera: None,
         motor: None,

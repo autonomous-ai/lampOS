@@ -502,6 +502,7 @@ impl BusOut {
                     across: (face.xmin + face.xmax) / 2.0,
                     down: (face.ymin + face.ymax) / 2.0,
                     tall: face.ymax - face.ymin,
+                    wide: filled.0 as f32 / filled.1.max(1) as f32,
                 })
                 .collect();
             presence.away.looked_at(now_us, &faces);
@@ -561,6 +562,9 @@ impl BusOut {
             }
             // Numbers only, so a scripted sitting can set the lines (#1678).
             if let Some(line) = activity.judge.journal(now_us) {
+                eprintln!("lamp-eyes: {line}");
+            }
+            if let Some(line) = activity.judge.lost_journal() {
                 eprintln!("lamp-eyes: {line}");
             }
         }

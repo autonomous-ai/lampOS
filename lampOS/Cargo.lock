@@ -1814,7 +1814,10 @@ dependencies = [
  "lamp-bus",
  "lamp-ipc",
  "lamp-msgs",
+ "rustfft",
  "serde_json",
+ "sha2",
+ "tract-onnx",
 ]
 
 [[package]]
@@ -2006,6 +2009,19 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "lamp-peek"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "lamp-bus",
+ "lamp-keeper",
+ "lamp-msgs",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

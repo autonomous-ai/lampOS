@@ -437,6 +437,19 @@ has "--preflight: row 1 itself ready" "$T/out" "row 1, Ready: ready"
 rm -f "$T/sessions/4242/metadata/events-"*
 preflight --only 1; check "--preflight, no end-of-speech event" 1 $?
 has "--preflight: none said" "$T/out" "the voice's end-of-speech worker: MISSING: none"
+# A long session rotated its states out, and its model decided ends: ready,
+# inferred (the first builder, #1722, 20 Oct 12:13).
+local_endpoint() { # AT BASIS
+  printf '{"kind":"local_endpoint","turn":1,"at_us":%s,"endpoint":{"basis":"%s","silence_ms":400,"probability":null,"fallback":null}}\n' "$1" "$2"
+}
+{ local_endpoint 900 model_complete; local_endpoint 950 silence; local_endpoint 990 model_uncertain; } >"$T/sessions/4242/metadata/events-3.jsonl"
+preflight --only 1; check "--preflight, states rotated out, the model's ends" 0 $?
+has "--preflight: ready, inferred" "$T/out" "the voice's end-of-speech worker: ready, inferred: no state in the records (rotated out), and 2 ends decided by the model"
+# Rotated, and no end the model decided: still none.
+local_endpoint 900 silence >"$T/sessions/4242/metadata/events-3.jsonl"
+preflight --only 1; check "--preflight, states rotated out, no model end" 1 $?
+has "--preflight: still none" "$T/out" "the voice's end-of-speech worker: MISSING: none"
+rm -f "$T/sessions/4242/metadata/events-3.jsonl"
 { endpoint_event 100 loading; endpoint_event 200 ready; } >"$T/sessions/4242/metadata/events-0.jsonl"
 
 # ARM_LAMP_HOST has no default: a row that sends a file names it when unset.
