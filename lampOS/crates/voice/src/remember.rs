@@ -753,7 +753,8 @@ fn journalable(done: Vec<FinishedExchange>) -> impl Iterator<Item = FinishedExch
 
 fn hand_on_days(done: Vec<FinishedExchange>, wall: u64, client: &DaysClient) {
     for exchange in journalable(done) {
-        client.finished_exchange_for(
+        client.finished_exchange_of(
+            exchange.request,
             wall.saturating_sub(exchange.age.as_millis() as u64),
             &exchange.heard,
             &exchange.said,
@@ -813,7 +814,19 @@ const TEXTS_DAYS: &str = "\n\nYour memory\nFor questions about earlier conversat
 /// leaves none behind (#1722, D). Nothing without the Days client.
 pub fn close_at_exit() {
     if let Some(client) = DAYS.get().and_then(Option::as_ref) {
-        client.close_open_session(Duration::from_millis(150));
+        client.close_after_held(finished);
+    }
+}
+
+/// `LAMP_SAID_AS_HEARD` (#2145): this request's turn has ended and its
+/// hand-on to memory is held until it is known how much was heard
+/// ([`finished`] then). Its exchange keeps what is known now: the provider
+/// context's sources and rules, when it ended, and the forgets before it.
+pub fn hold(request: u64) {
+    if DAYS_MODE.get() == Some(&true)
+        && let Some(client) = DAYS.get().and_then(Option::as_ref)
+    {
+        client.hold(request);
     }
 }
 
@@ -976,6 +989,9 @@ const ROOM_SCOPE: &str = "said in this room; speaker unknown";
 const PERSON_SCOPE: &str = "caller-supplied person; identity not verified";
 const BOTH_SCOPE: &str = "marked theirs: the person at the lamp now, whose face you know; the rest said in this room, speaker unknown";
 const CONVERSATION_IDLE: Duration = Duration::from_secs(45);
+/// What a forget waits, at most, for the writer to finish an exchange it
+/// has in hand ([`HandOns::settle`]).
+const FORGET_SETTLE: Duration = Duration::from_millis(300);
 const ANSWER_BYTES: usize = 8_192;
 
 /// A separate, explicitly selected client for Memory's Days protocol. The
@@ -1000,6 +1016,52 @@ pub struct DaysClient {
     /// journalled so far. With [`forget_all_on`], a thing remembered in it
     /// is kept with them, so forgetting it removes them too (#1693).
     current: Arc<Mutex<Current>>,
+    /// Held and queued answers, shared with the writer (#2145).
+    hand_ons: Arc<HandOns>,
+}
+
+/// What the client and its writer share about answers on their way to the
+/// journal (`LAMP_SAID_AS_HEARD`, #2145, Twelve's conditions on #1722 at
+/// 10:40): an answer held until it is known how much of it was heard keeps
+/// what its turn's end knew, and a forget reaches what is queued.
+#[derive(Default)]
+struct HandOns {
+    /// Forgets sent to the store: an exchange made before one is not
+    /// written after it, so "forget that" as the line that cuts an answer
+    /// reaches that answer, and "forget everything" what is queued.
+    forgotten: AtomicU64,
+    /// Exchanges queued, and those the writer is done with.
+    queued: AtomicU64,
+    done: AtomicU64,
+    /// Answers whose hand-on is held ([`hold`]), with what each turn's end
+    /// knew, newest last.
+    held: Mutex<VecDeque<Held>>,
+}
+
+/// At most this many answers held at once.
+const HELD: usize = 4;
+
+/// What an answer's turn's end knew: when it ended, the forgets before it,
+/// and the provider context's sources and rules, so a hand-on up to half a
+/// minute later links none of the next turn's.
+struct Held {
+    request: u64,
+    finished: Instant,
+    forgotten: u64,
+    sources: Vec<(Option<String>, u64)>,
+    rules: Vec<(Option<String>, u64)>,
+}
+
+impl HandOns {
+    /// Waits, within `within`, for the writer to be done with what was
+    /// queued before now.
+    fn settle(&self, within: Duration) {
+        let until = Instant::now() + within;
+        let queued = self.queued.load(Ordering::Acquire);
+        while self.done.load(Ordering::Acquire) < queued && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
 }
 
 /// Whose conversation it is (`None` for the room's) and its exchanges.
@@ -1105,6 +1167,8 @@ enum DaysJob {
         /// The person's own rules it may have followed (#813).
         rules: Vec<u64>,
         person: Option<String>,
+        /// The forgets sent before it was made ([`HandOns::forgotten`]).
+        forgotten: u64,
     },
     Close(String, Option<String>),
     End,
@@ -1133,9 +1197,13 @@ impl DaysClient {
         let name = prefix.clone();
         let current = Arc::new(Mutex::new(Current::default()));
         let writing = Arc::clone(&current);
+        let hand_ons = Arc::new(HandOns::default());
+        let handing = Arc::clone(&hand_ons);
         std::thread::Builder::new()
             .name("lamp-voice-memory-days".into())
-            .spawn(move || days_writer(&path, &name, &work, idle, &lost_worker, &writing))?;
+            .spawn(move || {
+                days_writer(&path, &name, &work, idle, &lost_worker, &writing, &handing)
+            })?;
         Ok(Self {
             socket,
             prefix,
@@ -1149,6 +1217,7 @@ impl DaysClient {
             ),
             forget_all: AtomicBool::new(forget_all_on()),
             current,
+            hand_ons,
         })
     }
 
@@ -1457,6 +1526,17 @@ impl DaysClient {
             };
             result
         } else {
+            // A forget reaches what is queued and held: nothing made before
+            // it is written after it, and what the writer has in hand is
+            // let finish first, within a little of the call's time.
+            if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) {
+                self.hand_ons.forgotten.fetch_add(1, Ordering::AcqRel);
+                self.hand_ons.settle(
+                    deadline
+                        .saturating_sub(started.elapsed())
+                        .min(FORGET_SETTLE),
+                );
+            }
             let answer = deadline.checked_sub(started.elapsed()).and_then(|left| {
                 bounded_exchange_scoped(&self.socket, &for_person(request, person), left, lease)
             });
@@ -1580,6 +1660,88 @@ impl DaysClient {
         said: &str,
         person: Option<&str>,
     ) -> bool {
+        self.queue_exchange(at_unix_ms, heard, said, person, None)
+    }
+
+    /// Holds this request's hand-on ([`hold`]): what its turn's end knows
+    /// now goes with its exchange whenever it is handed on. The context lock
+    /// is never held across I/O, so this waits for it rather than skip (the
+    /// reviewer's P3 on #2186); a poisoned one is said, and that answer then
+    /// goes with what is known when it is handed on.
+    pub fn hold(&self, request: u64) {
+        let Ok(context) = self.context.lock() else {
+            eprintln!(
+                "lamp-voice provider: request {request}'s turn end could not be kept for memory; it goes with what is known when handed on"
+            );
+            return;
+        };
+        let held = Held {
+            request,
+            finished: Instant::now(),
+            forgotten: self.hand_ons.forgotten.load(Ordering::Acquire),
+            sources: context.sources.clone(),
+            rules: context.rules.clone(),
+        };
+        drop(context);
+        if let Ok(mut all) = self.hand_ons.held.lock() {
+            all.retain(|older| older.request != request);
+            if all.len() == HELD {
+                all.pop_front();
+            }
+            all.push_back(held);
+        }
+    }
+
+    /// As a voice stops: each held answer goes first (`finish`, oldest
+    /// first), the writer is given a little to write them, so none is left
+    /// behind in a stopping voice's queue, and then the open session closes.
+    fn close_after_held(&self, finish: impl Fn(u64)) {
+        for request in self.held_requests() {
+            finish(request);
+        }
+        self.hand_ons.held.lock().map(|mut all| all.clear()).ok();
+        self.hand_ons.settle(Duration::from_millis(150));
+        self.close_open_session(Duration::from_millis(150));
+    }
+
+    /// The requests whose hand-on is held, oldest first.
+    fn held_requests(&self) -> Vec<u64> {
+        self.hand_ons
+            .held
+            .lock()
+            .map(|all| all.iter().map(|held| held.request).collect())
+            .unwrap_or_default()
+    }
+
+    /// What this request's turn's end knew, if its hand-on was held.
+    fn take_held(&self, request: u64) -> Option<Held> {
+        let mut all = self.hand_ons.held.lock().ok()?;
+        let at = all.iter().position(|held| held.request == request)?;
+        all.remove(at)
+    }
+
+    /// [`Self::finished_exchange_for`] of a request, with what its turn's
+    /// end knew when its hand-on was held.
+    fn finished_exchange_of(
+        &self,
+        request: u64,
+        at_unix_ms: u64,
+        heard: &str,
+        said: &str,
+        person: Option<&str>,
+    ) -> bool {
+        let held = self.take_held(request);
+        self.queue_exchange(at_unix_ms, heard, said, person, held)
+    }
+
+    fn queue_exchange(
+        &self,
+        at_unix_ms: u64,
+        heard: &str,
+        said: &str,
+        person: Option<&str>,
+        held: Option<Held>,
+    ) -> bool {
         let Ok(context) = self.context.try_lock() else {
             self.lost.fetch_add(1, Ordering::Relaxed);
             return false;
@@ -1591,19 +1753,42 @@ impl DaysClient {
             self.lost.fetch_add(1, Ordering::Relaxed);
             return false;
         }
+        let mine = |all: &[(Option<String>, u64)]| -> Vec<u64> {
+            all.iter()
+                .filter(|(whose, _)| whose.as_deref() == person)
+                .map(|(_, id)| *id)
+                .collect()
+        };
+        let (finished, forgotten, sources, rules) = match &held {
+            Some(held) => (
+                held.finished,
+                held.forgotten,
+                mine(&held.sources),
+                mine(&held.rules),
+            ),
+            None => (
+                Instant::now(),
+                self.hand_ons.forgotten.load(Ordering::Acquire),
+                context.of(person),
+                context.rules_of(person),
+            ),
+        };
         let sent = self
             .jobs
             .try_send(DaysJob::Exchange {
                 at_unix_ms,
-                finished: Instant::now(),
+                finished,
                 heard: heard.to_owned(),
                 said: said.to_owned(),
-                sources: context.of(person),
-                rules: context.rules_of(person),
+                sources,
+                rules,
                 person: person.map(str::to_owned),
+                forgotten,
             })
             .is_ok();
-        if !sent {
+        if sent {
+            self.hand_ons.queued.fetch_add(1, Ordering::AcqRel);
+        } else {
             self.lost.fetch_add(1, Ordering::Relaxed);
         }
         sent
@@ -2101,6 +2286,7 @@ fn days_writer(
     idle: Duration,
     lost: &AtomicU64,
     current: &Mutex<Current>,
+    hand_ons: &HandOns,
 ) {
     let mut conversation = Conversation::default();
     let mut next = 0u64;
@@ -2189,7 +2375,13 @@ fn days_writer(
                 sources,
                 rules,
                 person,
+                forgotten,
             }) => {
+                // Made before a forget: not written after it.
+                if forgotten < hand_ons.forgotten.load(Ordering::Acquire) {
+                    hand_ons.done.fetch_add(1, Ordering::AcqRel);
+                    continue;
+                }
                 // Someone else at the lamp is another conversation, in
                 // another person's journal.
                 if conversation
@@ -2225,6 +2417,7 @@ fn days_writer(
                 } else {
                     conversation.incomplete = true;
                 }
+                hand_ons.done.fetch_add(1, Ordering::AcqRel);
             }
             Ok(DaysJob::Close(session, person)) => {
                 if conversation.wait(idle).is_zero() {
@@ -2685,9 +2878,13 @@ mod tests {
         let (told, answered) = run(FORGET, json!({"source_id":99}));
         assert!(answered);
         assert_eq!(told["forgotten"], false, "{told}");
+        // A forget refused here reaches nothing queued (#2145).
+        assert_eq!(client.hand_ons.forgotten.load(Ordering::Acquire), 0);
         let (told, _) = run(FORGET, json!({"source_id":8}));
         assert_eq!(told, json!({"forgotten": true}));
         assert!(client.context.lock().unwrap().journal_inhibited);
+        // One sent to the store reaches what was made before it.
+        assert_eq!(client.hand_ons.forgotten.load(Ordering::Acquire), 1);
         // With nobody known, everything is refused here: the room's memory
         // is the household's (the reviewer on #1723), and nothing is sent.
         let (told, answered) = run(FORGET_EVERYTHING, json!({}));
@@ -2699,6 +2896,7 @@ mod tests {
                 .unwrap()
                 .contains("only for someone I know")
         );
+        assert_eq!(client.hand_ons.forgotten.load(Ordering::Acquire), 1);
         let read = served.join().unwrap();
         assert_eq!(read.len(), 2, "{read:?}");
         assert_eq!(read[0]["op"], "search");
@@ -3181,6 +3379,7 @@ mod tests {
                 sources: vec![],
                 rules: vec![],
                 person: None,
+                forgotten: 0,
             })
             .unwrap();
         }
@@ -3194,6 +3393,7 @@ mod tests {
             Duration::from_secs(1),
             &AtomicU64::new(1),
             &Mutex::new(Current::default()),
+            &HandOns::default(),
         );
         let read = served.join().unwrap();
         assert_eq!(
@@ -4147,6 +4347,7 @@ mod tests {
             threads: AtomicBool::new(false),
             forget_all: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
+            hand_ons: Arc::new(HandOns::default()),
         };
         hand_on_days(batch(), NOW, &client);
         for (index, whose) in expected.into_iter().enumerate() {
@@ -4285,5 +4486,137 @@ mod tests {
             started.elapsed() < FIRST_READ,
             "a socket that is not there costs no wait"
         );
+    }
+
+    fn held_test_client(jobs: SyncSender<DaysJob>) -> DaysClient {
+        DaysClient {
+            socket: PathBuf::from("/unused-no-io"),
+            prefix: "test".into(),
+            zone: Vec::new(),
+            context: Mutex::new(DaysContext::default()),
+            keeping: Mutex::new(()),
+            jobs,
+            lost: Arc::new(AtomicU64::new(0)),
+            threads: AtomicBool::new(false),
+            forget_all: AtomicBool::new(false),
+            current: Arc::new(Mutex::new(Current::default())),
+            hand_ons: Arc::new(HandOns::default()),
+        }
+    }
+
+    /// #2145, Twelve's second condition: a held answer is handed on with the
+    /// sources and rules its turn's end knew, and when it ended, never those
+    /// the next turn brought; one not held, with what is known then.
+    #[test]
+    fn a_held_answer_keeps_what_its_turns_end_knew() {
+        let (jobs, work) = sync_channel(4);
+        let client = held_test_client(jobs);
+        client.context.lock().unwrap().include(None, &[7]);
+        client.context.lock().unwrap().rule(None, [3]);
+        client.hold(41);
+        let ended = Instant::now();
+        client.context.lock().unwrap().include(None, &[9]);
+        client.context.lock().unwrap().rule(None, [4]);
+        assert_eq!(client.held_requests(), [41]);
+        assert!(client.finished_exchange_of(41, NOW, "asked", "said", None));
+        let DaysJob::Exchange {
+            sources,
+            rules,
+            finished,
+            ..
+        } = work.try_recv().unwrap()
+        else {
+            panic!("expected Days exchange")
+        };
+        assert_eq!((sources, rules), (vec![7], vec![3]));
+        assert!(finished <= ended);
+        assert!(client.held_requests().is_empty(), "taken once");
+        assert!(client.finished_exchange_of(42, NOW, "asked", "said", None));
+        let DaysJob::Exchange { sources, rules, .. } = work.try_recv().unwrap() else {
+            panic!("expected Days exchange")
+        };
+        assert_eq!((sources, rules), (vec![7, 9], vec![3, 4]));
+        assert_eq!(client.hand_ons.queued.load(Ordering::Acquire), 2);
+        // At most HELD held; the oldest goes first.
+        for request in 0..=HELD as u64 {
+            client.hold(100 + request);
+        }
+        assert_eq!(client.held_requests().first(), Some(&101));
+    }
+
+    /// #2145, Twelve's third condition: an exchange made before a forget is
+    /// never written after it, so "forget that" said as the line that cuts
+    /// an answer reaches the answer held or queued; one made after is.
+    #[test]
+    fn an_answer_made_before_a_forget_is_never_written_after_it() {
+        let (socket, served) = memory("days-held-forget", 2, |request| {
+            if request["op"] == "append_linked" {
+                json!({"ok":true,"id":5})
+            } else {
+                json!({"ok":true})
+            }
+        });
+        let (send, receive) = sync_channel(4);
+        let hand_ons = HandOns::default();
+        hand_ons.forgotten.store(1, Ordering::Release);
+        for (heard, forgotten) in [("before", 0), ("after", 1)] {
+            send.send(DaysJob::Exchange {
+                at_unix_ms: NOW,
+                finished: Instant::now(),
+                heard: heard.into(),
+                said: "answer".into(),
+                sources: vec![],
+                rules: vec![],
+                person: None,
+                forgotten,
+            })
+            .unwrap();
+        }
+        send.send(DaysJob::Close("barrier".into(), None)).unwrap();
+        drop(send);
+        days_writer(
+            &socket,
+            "voice-test",
+            &receive,
+            Duration::from_secs(60),
+            &AtomicU64::new(0),
+            &Mutex::new(Current::default()),
+            &hand_ons,
+        );
+        let read = served.join().unwrap();
+        assert_eq!(read[0]["op"], "append_linked");
+        assert_eq!(read[0]["heard"], "after");
+        assert_eq!(read[1]["op"], "session_close");
+        assert_eq!(hand_ons.done.load(Ordering::Acquire), 2, "both done with");
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// A forget, and a stopping voice, wait for what is queued, but never
+    /// past their bound.
+    #[test]
+    fn settling_waits_for_what_was_queued_within_its_bound() {
+        let hand_ons = HandOns::default();
+        hand_ons.queued.store(1, Ordering::Release);
+        let started = Instant::now();
+        hand_ons.settle(Duration::from_millis(40));
+        assert!(started.elapsed() >= Duration::from_millis(40));
+        hand_ons.done.store(1, Ordering::Release);
+        let started = Instant::now();
+        hand_ons.settle(Duration::from_secs(5));
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    /// #2145, Twelve's fourth condition: as a voice stops, its held answers
+    /// go first, oldest first, and then its session closes.
+    #[test]
+    fn a_stopping_voice_hands_on_what_it_holds_before_its_session_closes() {
+        let (jobs, _work) = sync_channel(4);
+        let client = held_test_client(jobs);
+        client.hold(5);
+        client.hold(6);
+        let finished = Mutex::new(Vec::new());
+        client.close_after_held(|request| finished.lock().unwrap().push(request));
+        assert_eq!(*finished.lock().unwrap(), [5, 6]);
+        assert!(client.held_requests().is_empty());
     }
 }

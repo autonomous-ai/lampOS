@@ -114,7 +114,19 @@ instruction, with no stale-note fallback. Old sessions and failed opens
 are closed through the background queue, best effort. At a worker's stop
 (the coordinator's `Stop`, on either route) the session it has open is
 closed straight to the memory within 150 ms (`remember::close_at_exit`), so a
-restart leaves none. Memory's 32-session limit, oldest closed first, and its
+restart leaves none. Any answer whose hand-on is held (`LAMP_SAID_AS_HEARD`,
+`remember::hold`) goes first, with up to 150 ms for the writer to write it.
+
+With `LAMP_SAID_AS_HEARD`, the second route holds an answer's hand-on until
+it is known how much of it was heard (#2145). The exchange keeps what its
+turn's end knew: the sources and rules then in the provider context, and when
+it ended. A forget sent to the store is counted before it goes, and the writer
+never writes an exchange made before a forget, so forgetting reaches an
+answer held or queued. It waits up to 300 ms for the one the writer has in
+hand. The count is one for the whole voice, so any forget keeps out every
+exchange made before it, not only the one it names, and at a shared lamp
+one person's forget keeps out another's answer too: less is kept, never
+more, as `journal_inhibited` already stops journalling after a forget. Memory's 32-session limit, oldest closed first, and its
 24-hour limit cover lost closes. At the first Days session after a worker
 start, the restored conversation thread is discarded because the thread
 file contains no provenance.
