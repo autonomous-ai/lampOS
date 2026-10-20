@@ -2046,6 +2046,10 @@ the words), and,
 with both targets, the relay's medians less DeepSeek's own, step by step
 (`wire relay-less-direct size=lamp tcp_ms=+… tls_ms=+… …`).
 
+Only a 200 is timed, on a connection of its own as on a kept one: a
+refused answer's line says its status, and it is counted `closed`, so its
+quick answer never lowers the medians.
+
 A failed step is told by its name and kind only (`tcp: TimedOut`). Like
 the rest of the probe it prints counts and milliseconds only, never the
 words asked or answered, a key, a host or a URL. Five runs unless said, at
@@ -2066,6 +2070,45 @@ systemd-run --pty --wait \
 `--wire --kept` takes the same command with `--kept` after `--wire`, at most
 20 runs (`MOST_KEPT_RUNS`). Its 10 runs ask 120 requests and wait 5 s 40
 times, about 4 minutes.
+
+**The route's speech** (`--wire --speech`, #1934, 20 Oct 08:36). The second
+route's speech goes through the relay too: `tts_base_url` is
+`llm_base_url` unless set, and ElevenLabs is then reached on the relay's
+`…/elevenlabs` path (`tts.rs`, `service_base`). With `--speech`, each run
+asks each target for a piece of speech instead of the chat:
+- **The piece** is the route's own request as `Tts` makes it, with the
+  route's voice and model. It is one of four sentences of 35 to 38
+  characters (`PIECES`), an answer's first sentence long, one a run in
+  turn, the same on both targets.
+- **relay:** `tts_base_url` with the route's speech credential, as the
+  route asks. When that is ElevenLabs' own API, it is the direct target and
+  the relay is left out.
+- **direct:** ElevenLabs' own API (`https://api.elevenlabs.io/v1`) with an
+  `elevenlabs.key` unit credential. The route has no ElevenLabs key of its
+  own, so without one the direct target is left out, saying so.
+- **Timed** as a chat is, to the first byte (the head), then to the
+  **first audio** (`first_audio_ms`, the body's first byte) and **done**
+  (`done_ms`, the whole piece downloaded), with its `audio_bytes`. An
+  answer's first sound waits for its first piece's first audio, so the
+  relay's share of that is what each turn pays before the lamp speaks.
+- **With `--kept`** as well (`--wire --kept --speech`), on one kept
+  connection, as the chat's arms are.
+
+The lines are `wire speech target=… run=…` (`wire kept speech target=…
+run=… arm=…` with `--kept`), then each target's medians with the 90th
+percentile of the first byte, the first audio and done, and
+`wire speech relay-less-direct`, step by step to done. Its 10 runs ask 20
+pieces, about 740 characters billed, or 60 pieces and about 2,200
+characters with `--kept`. The first line names the model asked:
+`systemd-run` doesn't carry the voice unit's environment, so give the
+unit's `LAMP_SECOND_SPEECH_MODEL` with `-E` when it sets one.
+
+```sh
+systemd-run --pty --wait \
+  -p LoadCredential=elevenlabs.key:/path/to/elevenlabs.key \
+  /opt/lampOS/voice/current/lamp-voice probe-cascade \
+  /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10 --wire --speech
+```
 
 ### How much the prompt cache holds (`probe-cache`)
 
