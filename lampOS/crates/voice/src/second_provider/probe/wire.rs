@@ -1396,8 +1396,8 @@ pub fn socket_less_http(label: &str, socket: &Kept, http: &Kept) -> String {
 }
 
 /// `--wire --socket`: each run, each target, one piece on a kept HTTP
-/// connection as the route sends them, and the same piece on a speech socket
-/// opened [`SOCKET_AHEAD`] before it.
+/// connection as the route sends them, and another of the same length on a
+/// speech socket opened [`SOCKET_AHEAD`] before it, the two in turn first.
 fn run_socket(second_config: &Path, runs: u32) -> io::Result<()> {
     let config = crate::second_config::load_from_path(second_config)?
         .with_environment(|name| std::env::var_os(name))?;
@@ -1447,37 +1447,45 @@ fn run_socket(second_config: &Path, runs: u32) -> io::Result<()> {
     let mut kept: Vec<[Kept; 2]> = targets.iter().map(|_| Default::default()).collect();
     for run in 1..=runs {
         for ((name, base, key), kept) in targets.iter().zip(&mut kept) {
-            let text = PIECES[run as usize % PIECES.len()];
+            // Neither arm is always second, nor asks the piece just made: the
+            // order alternates, and the socket's piece is another of the
+            // same length (the reviewer's P3 on #2161).
+            let text = PIECES[(run as usize + 2) % PIECES.len()];
             let first = Wired::speech(piece(base, key, voice, &model, run + 1)?)?;
             let timed = Wired::speech(piece(base, key, voice, &model, run)?)?;
-            match http_kept(&first, &timed, Some(tls.clone())) {
-                Ok(times) => {
-                    println!(
-                        "wire socket http target={name} run={run} {}",
-                        times.shown(timed.body.len(), Reading::Audio)
-                    );
-                    kept[0].bytes = timed.body.len();
-                    kept[0].keep(&times);
-                }
-                Err(error) => {
-                    println!("wire socket http target={name} run={run} failed: {error}");
-                    kept[0].failed += 1;
-                }
-            }
             let socket =
                 net::socket_request(base, key, voice, Some(&model)).map_err(io::Error::other)?;
             let bytes = net::socket_piece(text).map_or(0, |piece| piece.to_string().len());
-            match socket_arm(&socket, text, Some(tls.clone()), SOCKET_AHEAD) {
-                Ok(times) => {
-                    println!(
-                        "wire socket target={name} run={run} {}",
-                        socket_shown(&times, bytes)
-                    );
-                    kept[1].keep(&times);
+            for socket_now in [run % 2 == 0, run % 2 == 1] {
+                if socket_now {
+                    match socket_arm(&socket, text, Some(tls.clone()), SOCKET_AHEAD) {
+                        Ok(times) => {
+                            println!(
+                                "wire socket target={name} run={run} {}",
+                                socket_shown(&times, bytes)
+                            );
+                            kept[1].keep(&times);
+                        }
+                        Err(error) => {
+                            println!("wire socket target={name} run={run} failed: {error}");
+                            kept[1].failed += 1;
+                        }
+                    }
+                    continue;
                 }
-                Err(error) => {
-                    println!("wire socket target={name} run={run} failed: {error}");
-                    kept[1].failed += 1;
+                match http_kept(&first, &timed, Some(tls.clone())) {
+                    Ok(times) => {
+                        println!(
+                            "wire socket http target={name} run={run} {}",
+                            times.shown(timed.body.len(), Reading::Audio)
+                        );
+                        kept[0].bytes = timed.body.len();
+                        kept[0].keep(&times);
+                    }
+                    Err(error) => {
+                        println!("wire socket http target={name} run={run} failed: {error}");
+                        kept[0].failed += 1;
+                    }
                 }
             }
         }

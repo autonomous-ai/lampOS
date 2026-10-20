@@ -2124,8 +2124,10 @@ a bearer (the backend, 10:05 on #1934). On ElevenLabs' own API it takes
 `xi-api-key` (`tts::socket_request`). Each run, each target:
 - **a piece on a kept HTTP connection,** as the route sends its pieces: one
   piece makes the connection, the next is timed;
-- **the same piece on a socket opened 1 s ahead** (`SOCKET_AHEAD`, about the
-  chat's time to its first piece on lamp-4ace):
+- **another piece of the same length on a socket opened 1 s ahead**
+  (`SOCKET_AHEAD`, about the chat's time to its first piece on lamp-4ace),
+  the two arms first in turn, so neither gains from the other's piece just
+  made (the reviewer on #2161):
   - the connect, TLS and upgrade are timed;
   - then the voice's settings, the piece (`flush`) and the end are sent;
   - from the piece's last byte, its first audio and its end are timed.
@@ -2136,12 +2138,16 @@ one's medians, and `wire socket-less-http target=…`, what the socket saves a
 piece once it's open (negative is faster). With both targets there's also
 `wire socket relay-less-direct`. A socket refused at the upgrade says its
 status, and one closed before any audio says its close code. An answer that
-isn't audio is counted `refused`, never shown. Each run asks three pieces a
+isn't audio ends that run as failed (`answer: refused`), never shown. Each run asks three pieces a
 target, at most 20 runs. From this Mac with a made-up key, the relay took
 the upgrade and closed with 4001, and ElevenLabs' own API refused it.
 
+Give `-p LoadCredential=elevenlabs.key:…` only with an ElevenLabs key of
+its own; without it the relay alone is timed:
+
 ```sh
 systemd-run --pty --wait \
+  -p LoadCredential=elevenlabs.key:/path/to/elevenlabs.key \
   /opt/lampOS/voice/current/lamp-voice probe-cascade \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10 --wire --socket
 ```
