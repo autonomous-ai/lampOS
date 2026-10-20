@@ -4131,6 +4131,8 @@ impl ProviderIntake {
             match command {
                 Control::Stop => {
                     self.stop();
+                    // Its Days session closed, so a restart leaves none (#1722, D).
+                    crate::remember::close_at_exit();
                     return Ok(ControlDrain::Stopped);
                 }
                 Control::Authority { snapshot } => {

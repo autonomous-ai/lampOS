@@ -872,16 +872,46 @@ fn session_and_pending_job_limits_are_bounded_and_released_without_duplicate_wor
             .session_open(&room, &format!("session-{index}"), NOTE_BYTES)
             .unwrap();
     }
-    assert_eq!(
-        store
-            .session_open(&room, "overflow", NOTE_BYTES)
-            .unwrap_err()
-            .code,
-        "full"
-    );
-    assert!(store.session_open(&room, "session-0", NOTE_BYTES).is_ok());
-    store.session_close(&room, "session-0").unwrap();
+    // At the limit, the oldest session is closed and the new one opens
+    // (#1722, D): sessions a stopped voice left behind no longer fill it.
+    let sessions = |name: &str| -> (u64, bool) {
+        let db = Connection::open(scratch.0.join(DATABASE)).unwrap();
+        let count = db
+            .query_row(
+                "SELECT count(*) FROM sessions WHERE person='everyone'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let there = db
+            .query_row(
+                "SELECT 1 FROM sessions WHERE person='everyone' AND session=?",
+                [name],
+                |r| r.get::<_, u64>(0),
+            )
+            .optional()
+            .unwrap()
+            .is_some();
+        (count, there)
+    };
     assert!(store.session_open(&room, "overflow", NOTE_BYTES).is_ok());
+    assert_eq!(
+        sessions("overflow"),
+        (lamp_memory::days::MAX_SESSIONS, true)
+    );
+    assert!(!sessions("session-0").1);
+    assert!(sessions("session-1").1);
+    // A session still open is answered as it was, and closes as before.
+    assert!(store.session_open(&room, "session-1", NOTE_BYTES).is_ok());
+    assert_eq!(
+        sessions("session-1"),
+        (lamp_memory::days::MAX_SESSIONS, true)
+    );
+    store.session_close(&room, "session-1").unwrap();
+    assert_eq!(
+        sessions("session-1"),
+        (lamp_memory::days::MAX_SESSIONS - 1, false)
+    );
     let mut jobs = vec![];
     for index in 0..lamp_memory::days::MAX_PENDING {
         jobs.push(
