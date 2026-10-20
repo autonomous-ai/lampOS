@@ -478,7 +478,15 @@ mod tests {
         /// Takes every connection, answering CONNECT only after 300 ms, six
         /// of the texts' ticks: a broker across the internet.
         SlowConnAck,
+        /// As `Takes`, but sends each command first on topics that aren't
+        /// the lamp's account channel, then on it (the reviewer's P3 1 on
+        /// #2214).
+        OtherTopicsFirst,
     }
+
+    /// Topics a command must never be taken from: the lamp's own reply
+    /// channel, another lamp's, longer and shorter ones, and another case.
+    const NOT_OURS: [&str; 5] = ["fd/d-42", "fa/d-43", "fa/d-42/x", "fa/d-4", "FA/D-42"];
 
     /// A broker on a free local port, with V1's packets, enough for one
     /// lamp: CONNECT, SUBSCRIBE, PUBLISH at QoS 1 both ways, PINGREQ.
@@ -559,11 +567,27 @@ mod tests {
                             } else {
                                 &commands[..]
                             };
-                            for (n, command) in commands.iter().enumerate() {
-                                let mut publish =
-                                    Publish::new("fa/d-42", QoS::AtLeastOnce, *command, None);
-                                publish.pkid = 100 + n as u16;
-                                Packet::Publish(publish).write(&mut out, None).unwrap();
+                            let topics: &[&str] = if behaves == Broker::OtherTopicsFirst {
+                                &[
+                                    NOT_OURS[0],
+                                    NOT_OURS[1],
+                                    NOT_OURS[2],
+                                    NOT_OURS[3],
+                                    NOT_OURS[4],
+                                    "fa/d-42",
+                                ]
+                            } else {
+                                &["fa/d-42"]
+                            };
+                            let mut pkid = 100u16;
+                            for command in commands {
+                                for topic in topics {
+                                    let mut publish =
+                                        Publish::new(*topic, QoS::AtLeastOnce, *command, None);
+                                    publish.pkid = pkid;
+                                    pkid += 1;
+                                    Packet::Publish(publish).write(&mut out, None).unwrap();
+                                }
                             }
                         }
                         Packet::Publish(publish) => {
@@ -754,6 +778,50 @@ mod tests {
             )
         );
         let _ = std::fs::remove_file(&socket);
+    }
+
+    /// The reviewer's P3 1 on #2214, which #1968, #2199 and #2214 rest on:
+    /// a command on any topic but the lamp's own account channel is neither
+    /// done nor answered. The same command then on `fa/d-42` is done once
+    /// and answered once, on `fd/d-42`.
+    #[tokio::test]
+    async fn only_a_command_on_the_lamps_own_account_channel_is_done_and_answered() {
+        let (port, seen) = broker(
+            Broker::OtherTopicsFirst,
+            vec![r#"{"cmd":"data","kind":"volume.set","data":{"volume":44}}"#],
+        )
+        .await;
+        let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+        let (_identity_tx, me) = watch::channel(identity());
+        let lamp = tokio::spawn(async move {
+            let mut lamp = Fake {
+                ceiling: 80,
+                ..Fake::default()
+            };
+            let mut say = |_: &str| {};
+            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            lamp
+        });
+        let sets = |seen: &[Seen]| {
+            publishes(seen)
+                .into_iter()
+                .filter(|(_, reply)| reply["kind"] == "volume.set")
+                .collect::<Vec<_>>()
+        };
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while sets(&seen.lock().unwrap()).is_empty() && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        // Every copy was sent in one write, the account channel's last: any
+        // other answered would be here by now.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        drop(accounts_tx);
+        let lamp = lamp.await.unwrap();
+        let replies = sets(&seen.lock().unwrap());
+        assert_eq!(replies.len(), 1, "{replies:?}");
+        assert_eq!(replies[0].0, "fd/d-42");
+        assert_eq!(replies[0].1["status"], "success");
+        assert_eq!(lamp.set, [44], "done once, from the account channel only");
     }
 
     /// #1959: the Wi-Fi changed under the connection. The ack goes out on

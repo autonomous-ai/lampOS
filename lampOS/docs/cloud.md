@@ -55,6 +55,16 @@ device's credentials and topic ACLs (`mqtt.md`), so the page works away from
 the home network, and V1's local admin, Fo, MCP and `/api/health/live`
 routes are not served. Each kind is carried out by the part that owns it.
 
+**Only the lamp's own account channel commands it** (`online::commanded`):
+a message on any other topic is neither done nor answered, not its reply
+channel, another lamp's, a longer or shorter topic, nor another case. That
+is the one guard the owner's kinds rest on (`faces.add_photo`,
+`face.remove`, the reminders' cancel, #2214): whoever holds the lamp's
+signed-in account speaks as its owner. **The owner's app acts for the whole
+lamp, not one person at it:** it can cancel any reminder the lamp keeps,
+one another person set by voice at the lamp included, as it can remove any
+face the lamp knows.
+
 | `cmd` / `kind` | Answer |
 |---|---|
 | `info` | the identity fields above |
@@ -741,7 +751,9 @@ ring that takes no previews or shows nothing in time said), a preview
 answered only when it fails, the ping's URL, body and reply, and, against a
 broker in the test built from `rumqttc`'s own codec: coming online as V1
 (client id, keepalive, clean start, expiry, login), `info` on connect and
-answers on `fd_channel`; a refused login backing off and said once; a dropped
+answers on `fd_channel`; a command sent first on five other topics (the
+reply channel, another lamp's, longer, shorter, another case) done and
+answered only once, from `fa_channel`; a refused login backing off and said once; a dropped
 connection made and subscribed again. A backend in the test checks the ping's
 bearer and body, a failure said once, and a rotated broker kept. Not yet run
 against the company's broker or on a lamp.
