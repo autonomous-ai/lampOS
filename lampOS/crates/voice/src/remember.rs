@@ -1309,14 +1309,14 @@ pub fn hits_note(
     person: Option<&str>,
     heard: &str,
     now_unix_ms: u64,
-    offset_seconds: i32,
+    zone: Option<&LocalTime>,
 ) -> Option<String> {
     if content_words(heard).is_empty() {
         return None;
     }
     let request = for_person(json!({"op":"kept","max_bytes":HITS_KEPT_BYTES}), person);
     let answer = bounded_exchange_up_to(socket, &request, HITS_WITHIN, HITS_ANSWER_BYTES)?;
-    let told = hits_told(&answer, heard, now_unix_ms, offset_seconds)?;
+    let told = hits_told(&answer, heard, now_unix_ms, zone)?;
     Some(match person {
         Some(_) => told,
         None => format!("{told}\n{HITS_ROOM_NOTE}"),
@@ -1365,12 +1365,17 @@ fn content_words(text: &str) -> Vec<String> {
 /// [`hits_note`]'s words for a kept list's answer and what was heard: the
 /// kept things sharing the most words with it, then the newest, at most
 /// [`HITS`]; nothing when none shares a word.
-fn hits_told(answer: &Value, heard: &str, now_unix_ms: u64, offset_seconds: i32) -> Option<String> {
+fn hits_told(
+    answer: &Value,
+    heard: &str,
+    now_unix_ms: u64,
+    zone: Option<&LocalTime>,
+) -> Option<String> {
     if answer.get("ok") != Some(&json!(true)) {
         return None;
     }
     let wanted = content_words(heard);
-    let today = local_day(now_unix_ms, offset_seconds);
+    let today = local_day(now_unix_ms, zone);
     let mut found: Vec<(usize, u64, String)> = answer
         .get("entries")?
         .as_array()?
@@ -1389,7 +1394,7 @@ fn hits_told(answer: &Value, heard: &str, now_unix_ms: u64, offset_seconds: i32)
     let lines: Vec<String> = found
         .into_iter()
         .take(HITS)
-        .map(|(_, at, text)| format!("- {text} ({})", when(today - local_day(at, offset_seconds))))
+        .map(|(_, at, text)| format!("- {text} ({})", when(today - local_day(at, zone))))
         .collect();
     (!lines.is_empty()).then(|| format!("{HITS_NOTE}\n{}", lines.join("\n")))
 }
@@ -4207,26 +4212,26 @@ mod tests {
                 json!({"ok":false,"error":"nope"})
             }
         });
-        let told = hits_note(&socket, Some("p-1"), "What's my name?", NOW, 0).unwrap();
+        let told = hits_note(&socket, Some("p-1"), "What's my name?", NOW, None).unwrap();
         assert_eq!(
             told,
             format!(
                 "{HITS_NOTE}\n- Names of the cats: Pim and Pom. (today)\n- Their name is Ossa. (yesterday)"
             )
         );
-        let coffee = hits_note(&socket, None, "how do I take my coffee", NOW, 0).unwrap();
+        let coffee = hits_note(&socket, None, "how do I take my coffee", NOW, None).unwrap();
         assert!(
             coffee.contains("- They take their coffee black, no sugar. (2 days ago)")
                 && coffee.ends_with(HITS_ROOM_NOTE),
             "{coffee}"
         );
         assert_eq!(
-            hits_note(&socket, Some("p-2"), "the wedding", NOW, 0),
+            hits_note(&socket, Some("p-2"), "the wedding", NOW, None),
             None,
             "not ok"
         );
         assert_eq!(
-            hits_note(&socket, None, "what is it", NOW, 0),
+            hits_note(&socket, None, "what is it", NOW, None),
             None,
             "small words: not asked"
         );
@@ -4280,10 +4285,10 @@ mod tests {
             }
             json!({"ok":true,"entries":entries})
         });
-        let told = hits_note(&socket, Some("p-1"), "how is my sister's job?", NOW, 0).unwrap();
+        let told = hits_note(&socket, Some("p-1"), "how is my sister's job?", NOW, None).unwrap();
         assert!(told.contains("Their sister lives in Hue."), "{told}");
         assert!(!told.contains(HITS_ROOM_NOTE), "theirs, not the room's");
-        let room = hits_note(&socket, None, "the sister", NOW, 0).unwrap();
+        let room = hits_note(&socket, None, "the sister", NOW, None).unwrap();
         assert!(room.ends_with(HITS_ROOM_NOTE), "{room}");
         served.join().unwrap();
         let _ = std::fs::remove_file(&socket);
@@ -4304,7 +4309,7 @@ mod tests {
             drop(stream);
         });
         let started = Instant::now();
-        assert_eq!(hits_note(&socket, None, "the wedding", 1, 0), None);
+        assert_eq!(hits_note(&socket, None, "the wedding", 1, None), None);
         assert!(
             started.elapsed() < Duration::from_millis(250),
             "{:?}",

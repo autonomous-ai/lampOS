@@ -1663,13 +1663,14 @@ pub fn serve(
                 let now_unix_ms = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map_or(0, |since| since.as_millis() as u64);
-                let offset = crate::local_time::offset_here().unwrap_or(0);
+                // The lamp's own zone, as memory's other notes read the day
+                // (#820): each moment at its own offset.
                 let note = crate::remember::hits_note(
                     &socket,
                     person.as_deref(),
                     heard,
                     now_unix_ms,
-                    offset,
+                    crate::local_time::system(),
                 );
                 eprintln!(
                     "lamp-voice second: request {request}: memory {} in {} ms ({})",
