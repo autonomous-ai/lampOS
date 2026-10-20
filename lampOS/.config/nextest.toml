@@ -31,8 +31,8 @@ realtime = { max-threads = 1 }
 filter = '''
     (binary_id(lamp-voice::it) & test(/^capture_hold_worker::/))
   | (binary_id(lamp-voice) & test(=coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff))
-  | (binary_id(lamp-health::program) & test(=between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone))
-  | (binary_id(lamp-skills::skills) & (test(=asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait) | test(=a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go) | test(=asking_the_policy_a_hello_made_and_not_noticed_rests) | test(=the_program_keeps_a_skill_off_across_a_restart) | test(=the_program_forgets_a_snooze_at_a_restart)))
+  | (binary_id(lamp-health::it) & test(=program::between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone))
+  | (binary_id(lamp-skills::it) & (test(=skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait) | test(=skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go) | test(=skills::asking_the_policy_a_hello_made_and_not_noticed_rests) | test(=skills::the_program_keeps_a_skill_off_across_a_restart) | test(=skills::the_program_forgets_a_snooze_at_a_restart)))
   | (binary_id(lamp-voice) & (test(=hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once) | test(=hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump)))
 '''
 test-group = 'realtime'
@@ -66,7 +66,7 @@ default-filter = 'all()'
 default-filter = '''
     (binary_id(lamp-voice::it) & test(/^capture_hold_worker::/))
   | (binary_id(lamp-voice) & test(=coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff))
-  | (binary_id(lamp-health::program) & test(=between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone))
-  | (binary_id(lamp-skills::skills) & (test(=asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait) | test(=a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go) | test(=asking_the_policy_a_hello_made_and_not_noticed_rests) | test(=the_program_keeps_a_skill_off_across_a_restart) | test(=the_program_forgets_a_snooze_at_a_restart)))
+  | (binary_id(lamp-health::it) & test(=program::between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone))
+  | (binary_id(lamp-skills::it) & (test(=skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait) | test(=skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go) | test(=skills::asking_the_policy_a_hello_made_and_not_noticed_rests) | test(=skills::the_program_keeps_a_skill_off_across_a_restart) | test(=skills::the_program_forgets_a_snooze_at_a_restart)))
   | (binary_id(lamp-voice) & (test(=hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once) | test(=hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump)))
 '''

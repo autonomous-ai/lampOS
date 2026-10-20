@@ -18,6 +18,6 @@ are in `lamp-bus record`'s shape, written by hand (`voice/heard`,
 A replay lists the calls in order; it does not wait. That the show waits
 for the line, plays each frame its while, gives the light back after, and
 stops within a fifth of a second when someone speaks is the program's
-(`crates/skills/tests/skills.rs`,
+(`crates/skills/tests/it/skills.rs`,
 `a_light_show_plays_its_frames_in_turn_and_stops_when_someone_speaks`).
 Whether it reads as a show and not as a machine is for a lamp (#1679).

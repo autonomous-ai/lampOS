@@ -2171,7 +2171,7 @@ mod tests {
     /// files; its request is what is quoted of it, never the brief; and
     /// read again it is the kept one, not checked again. Without the switch
     /// its news is any task's, the request quoted. Here the checker is a
-    /// stand-in that writes the package; `crates/skills/tests/skills.rs`
+    /// stand-in that writes the package; `crates/skills/tests/it/skills.rs`
     /// runs the real one.
     #[test]
     fn a_skill_made_by_voice_is_told_as_kept_and_never_read_out() {

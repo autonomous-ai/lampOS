@@ -15,7 +15,7 @@ are in `lamp-bus record`'s shape, written by hand (`voice/heard`,
 | `never-on-its-own` | Talk of a book and a keyboard, no call | Pass: nothing |
 
 That a turned pose takes the place of the one held is the program's
-(`crates/skills/tests/skills.rs`, `a_turned_pose_takes_the_place_of_the_one_held`),
+(`crates/skills/tests/it/skills.rs`, `a_turned_pose_takes_the_place_of_the_one_held`),
 and that the base turns for it the body's (`crates/body`,
 `a_reading_lamp_turns_toward_the_place_it_is_asked_and_back`). Whether the
 turn lands the light on a book, with `--gaze` as lamp-4ace has it, is for a

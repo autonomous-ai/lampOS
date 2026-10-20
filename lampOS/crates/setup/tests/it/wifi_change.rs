@@ -710,7 +710,7 @@ fn with_no_wifi_back_the_lost_line_is_said_at_most_once_a_minute_until_one_is() 
 
 #[test]
 fn the_helpers_units_are_its_own_one_change_at_a_time() {
-    let unit = include_str!("../../../deploy/product/lamp-setup-wifi@.service");
+    let unit = include_str!("../../../../deploy/product/lamp-setup-wifi@.service");
     assert!(unit.contains(
         "ExecStart=/opt/lampOS/setup/current/lamp-setup wifi --config /etc/lampOS/setup/serve.json --enable\n"
     ));
@@ -726,7 +726,7 @@ fn the_helpers_units_are_its_own_one_change_at_a_time() {
     ] {
         assert!(unit.contains(line), "{line}");
     }
-    let socket = include_str!("../../../deploy/product/lamp-setup-wifi.socket");
+    let socket = include_str!("../../../../deploy/product/lamp-setup-wifi.socket");
     assert!(socket.contains("ListenStream=/run/lampos-setup-wifi/wifi.sock\n"));
     assert!(socket.contains("SocketGroup=lampos\nSocketMode=0660\n"));
     assert!(socket.contains("Accept=yes\nMaxConnections=1\n"));
@@ -803,7 +803,7 @@ fn the_lost_line_is_the_recording_and_one_missing_is_journalled_not_said() {
 /// folder, in one language, so the no-Wi-Fi line can be played there.
 #[test]
 fn the_product_voice_loads_its_recorded_lines_from_the_fixed_folder() {
-    let unit = include_str!("../../../deploy/product/lamp-voice.service");
+    let unit = include_str!("../../../../deploy/product/lamp-voice.service");
     let start = unit
         .lines()
         .find(|line| line.starts_with("ExecStart="))

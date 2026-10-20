@@ -695,7 +695,6 @@ fn audit_crashed_child_does_not_leak_owned_ipc_directory() {
 #[allow(dead_code)]
 #[path = "../../../tests/runtime/support.rs"]
 mod core_fixture;
-use wire::Motion;
 
 #[test]
 fn real_core_fault_receipts_are_accepted_by_supervisor_without_restamping_stop() {
