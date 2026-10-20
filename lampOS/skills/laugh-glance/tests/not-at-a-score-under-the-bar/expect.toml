@@ -1,0 +1,4 @@
+# One laughter score of 0.25 at 10 s, under the 0.3 bar: nothing. People
+# talking scored at most 0.09 (#1669, 21 Oct).
+clock = "10:00"
+none = true

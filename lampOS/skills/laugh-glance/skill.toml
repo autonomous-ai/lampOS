@@ -20,8 +20,7 @@ body = true
 [trigger]
 topic = "ears/classes"
 field = "scores.laughter" # YAMNet's laughter score, 0 to 1; an unavailable message has none and never holds
-above = 0.5               # provisional: no threshold is measured yet (sound-events.md); the lamp check sets it
-for = "1s"                # a laugh, not one loud syllable: two scores in a row
+above = 0.3               # one window: a laugh lands high in one 0.96 s window, rarely two (#1669, 21 Oct: 5 of 9 free laughs over 0.3, 0 of 2,016 windows of people talking; sound-events.md); the lamp check confirms it
 rearm = { below = 0.2, for = "20s" }  # once a burst of laughter; again only after twenty seconds without it
 cooldown = "5m"           # now and then, never at every laugh in a merry room
 

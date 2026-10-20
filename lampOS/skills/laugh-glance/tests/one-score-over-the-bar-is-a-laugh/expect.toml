@@ -1,0 +1,9 @@
+# A face in view; one laughter score of 0.35 at 10 s: one glance at 10 s. A
+# laugh lands high in one window, rarely two (#1669, 21 Oct).
+clock = "10:00"
+
+[[expect]]
+at = "10s"
+within = "1s"
+call = "body.gaze"
+args = { look_at = "face" }
