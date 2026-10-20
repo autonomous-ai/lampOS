@@ -506,3 +506,34 @@ Ready for lamp-voice: no (a convention to follow from now, no code)
 - Left [ecm-sds-mobile#11](https://github.com/autonomous-ai/ecm-sds-mobile/pull/11)
   as it is: already merged before the rule, and editing a closed PR's body
   changes nothing mechanical. Future PRs follow the rule from here.
+
+## 2026-10-20 — #2194: a Lamp 2's software update status, read only
+
+Ready for lamp-voice: yes (app side; depends on the lamp side, #2271, being
+in `lamp-voice` — tracking separately, not blocking this report)
+
+- Taken off Migrate's note on #2194: against #2271's `update.status`, read
+  the pin in `app_contract.rs`
+  (`the_software_update_is_answered_from_lamp_updates_status`) before
+  writing anything, then confirmed from `answer.rs` that it answers inline
+  (single-phase, like `system.reboot`) and from `round.rs`'s `Outcome::kind`
+  that `last.outcome`'s wire names are a closed set of 10 — gave
+  `LampUpdateOutcome.other` a defensive fallback for a name not in that
+  set, never reached against the lamp as it stands.
+- Built `LampUpdateStatus`/`LampUpdatePhase`/`LampUpdateOutcome`/
+  `LampUpdateBuild`/`LampUpdateResult`, a notifier, and
+  `_LampUpdateStatusRow`/`_LampUpdateStatusPage`, gated on `isLampV2`, read
+  only (unlike V1's app-triggered `_SoftwareUpdateButton`).
+- Cut the branch fresh from `v3` this time (`fourteen/update-status`), not
+  stacked on `fourteen/lamp-restart` — the mistake from #2193 I corrected
+  once already, not repeated.
+- [ecm-sds-mobile#17](https://github.com/autonomous-ai/ecm-sds-mobile/pull/17),
+  "Part of" #2194 (closes once #2271 is in `lamp-voice`). Reported on
+  [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6288886434)
+  and [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6288889747).
+- Side finding while comparing gate numbers against a clean `origin/v3`
+  worktree: `test/features/brick/key_insight_period_test.dart` isn't flaky
+  as I'd assumed in earlier reports here — it's a real compile error
+  (`addUnlockEvent` missing a required `scope` argument), already on v3's
+  own tip, unrelated to any of my three PRs. Flagged on #1722, not fixed
+  (not mine — "Crates: none" and not app code I touched either).
