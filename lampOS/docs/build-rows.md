@@ -1,6 +1,6 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-20 18:28 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-21 01:16 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
 **Build 83.0% over 72 rows. Quality 66.6% over 16 rows.**
 
@@ -96,7 +96,7 @@ Written by the first builder from the team's review page at 2026-10-20 18:28 (+0
 | Several people | 0.60 | 0.85 | 19 Oct 02:33, telling two people apart by voice, with its main fault fixed (#1627): it now does its job, the second person’s umbrella line answered 0 of 3 with it against 3 of 3 without; |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.80 | 0.85 | 18 Oct 15:39, everything the lamp said unasked since midnight (Jarvis’s readout, 14 sessions): 17 reminders and timers, a median 0.98 s after they were due (16 within 5 s, one held back by the link), and 17 pieces of tas… |
-| Remembers you: your name and what you told it | 0.40 | 0.90 | 20 Oct 13:2x, new row after the owner’s report that the lamp forgot their name: they said it while their face wasn’t recognised, so it was kept in the room’s memory, not theirs; |
+| Remembers you: your name and what you told it | 0.40 | 0.90 | 20 Oct 22:1x, the face fix and memory on each turn are on lamp-4ace since 21:23 (the fifth landing), but the played name test isn’t right yet: a played name was misheard (“Oscar”), “what’s my name?” was answered with two… |
 | A good companion | 0.85 | 0.90 | 18 Oct 16:40: asked the time in London it gave Ho Chi Minh City’s (twenty to five, when London’s was 10:40); |
 | Both microphones | 0.60 | 0.80 | Voice on one, the room on the other (ears). |
 | Body | 0.70 | 0.80 | 17 Oct: the guarded body (#1192) on lamp-4ace since 07:34: stands for a question, turns to the voice, gestures and folds, with no refused or bad-read stop; |
