@@ -277,6 +277,12 @@ pub const NAMED_ALWAYS_ENVIRONMENT: &str = "LAMP_NAMED_ALWAYS";
 /// #1722, `Heeding::not_counting_own_answers`).
 pub const GOING_ON_NOT_OWN_ENVIRONMENT: &str = "LAMP_GOING_ON_NOT_OWN";
 
+/// Where the worker reads whether, in a busy room with nobody turned to the
+/// lamp, the text shows a call only as the name set off as one or with the
+/// name heard (#1712): `on`, and nothing else
+/// (`crate::attention::Attention::narrow_the_call`).
+pub const BUSY_CALLED_STRICT_ENVIRONMENT: &str = "LAMP_BUSY_CALLED_STRICT";
+
 /// What a `not_for_me` is answered in a turn named to a face
 /// ([`NAMED_ALWAYS_ENVIRONMENT`]): the model is asked once more.
 pub(crate) const NAMED_TO_A_FACE_ANSWER: &str =

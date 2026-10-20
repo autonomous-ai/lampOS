@@ -995,6 +995,8 @@ pub struct Attention {
     /// "The lamp" said in passing is no call ([`called_by_name`],
     /// `LAMP_NAME_IN_PASSING=ignored`).
     name_in_passing_ignored: bool,
+    /// The text's call narrowed ([`Self::narrow_the_call`]).
+    call_narrowed: bool,
     /// A remark to the room is not a reply to the lamp in a busy room
     /// (`LAMP_REMARKS=on`, [`crate::remarks`], #829).
     remarks: bool,
@@ -1595,11 +1597,7 @@ impl Attention {
             self.verdict = Some(verdict);
             return Some(verdict);
         }
-        let called_in_text = if self.name_in_passing_ignored {
-            called_by_name_on(&self.heard, self.stand_alone_ins)
-        } else {
-            called(&self.heard)
-        };
+        let called_in_text = self.called_in_text();
         // A short sound let through in a quiet room (#800): on lamp-52e6 on
         // 2026-10-15 at 13:03 a room sound of 0.7 s was heard as "¿Qué?" and
         // answered, nobody having spoken to the lamp. It is answered only
@@ -1835,11 +1833,7 @@ impl Attention {
     /// close to it, or a conversation going on (#1712, the first builder at
     /// 17:49: such lines were journaled as let out by trust).
     pub fn sign(&self, turned: Option<bool>) -> Option<&'static str> {
-        let called_in_text = if self.name_in_passing_ignored {
-            called_by_name_on(&self.heard, self.stand_alone_ins)
-        } else {
-            called(&self.heard)
-        };
+        let called_in_text = self.called_in_text();
         if self.named {
             Some(NAMED)
         } else if self.tapped {
@@ -1882,13 +1876,30 @@ impl Attention {
     /// another person's conversation was going on was judged against that
     /// person's voice).
     pub fn called_for_itself(&self) -> bool {
-        self.named
-            || self.tapped
-            || if self.name_in_passing_ignored {
-                called_by_name_on(&self.heard, self.stand_alone_ins)
-            } else {
-                called(&self.heard)
-            }
+        self.named || self.tapped || self.called_in_text()
+    }
+
+    /// Whether the text shows the lamp was called, as the rule reads it
+    /// ([`called_by_name_on`] with `LAMP_NAME_IN_PASSING=ignored`, else
+    /// [`called`]), narrowed when [`Self::narrow_the_call`] said so.
+    fn called_in_text(&self) -> bool {
+        let read = if self.name_in_passing_ignored {
+            called_by_name_on(&self.heard, self.stand_alone_ins)
+        } else {
+            called(&self.heard)
+        };
+        read && !(self.call_narrowed && !self.named && !begins_with_the_name(&self.heard))
+    }
+
+    /// With `LAMP_BUSY_CALLED_STRICT=on`, in a busy room with nobody turned
+    /// to the lamp (the second route says so before each line): the text
+    /// shows a call only as "Lamp" or "Lamb" set off as one
+    /// ([`begins_with_the_name`]), or with the name heard in the sound. A
+    /// stand-in ("Man, that meeting ran long.", "Mom, can you pick me up?")
+    /// or "Lamp is broken, …" alone is office talk (#1712, the first
+    /// builder on #1722 at 16:11).
+    pub fn narrow_the_call(&mut self, narrowed: bool) {
+        self.call_narrowed = narrowed;
     }
 
     /// Whether the request in hand is someone else's, and why: with the

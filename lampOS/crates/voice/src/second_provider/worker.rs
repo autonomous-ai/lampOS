@@ -1978,25 +1978,14 @@ pub fn serve(
                     .is_ok_and(|heeding| heeding.judged_busy(request))
             }));
         }
-        // A line that begins with the lamp's name, said to a face turned to
-        // the lamp, is answered in a busy room (`LAMP_NAMED_ALWAYS=on`,
-        // #2191).
-        if std::env::var(crate::second_provider::NAMED_ALWAYS_ENVIRONMENT)
-            .is_ok_and(|value| value == "on")
-        {
-            eprintln!(
-                "lamp-voice second: a line that begins with the lamp's name, said to a face turned to the lamp, is answered in a busy room (LAMP_NAMED_ALWAYS)"
-            );
-            if let Ok(mut heeding) = heeding.lock() {
-                heeding.always_answering_named();
-            }
-            let heeding = heeding.clone();
-            engine = engine.answering_named_to_a_face(Arc::new(move |request| {
-                heeding
-                    .lock()
-                    .is_ok_and(|heeding| heeding.named_to_a_face(request))
-            }));
-        }
+        engine = heeding_switches(
+            engine,
+            &heeding,
+            std::env::var(crate::second_provider::NAMED_ALWAYS_ENVIRONMENT)
+                .is_ok_and(|value| value == "on"),
+            std::env::var(crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT)
+                .is_ok_and(|value| value == "on"),
+        );
         // The lamp's own answers to lines let out only as the conversation
         // going on keep no conversation going (`LAMP_GOING_ON_NOT_OWN=on`).
         if std::env::var(crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT)
@@ -2767,6 +2756,46 @@ pub(crate) struct Heeding {
     chain: Vec<u64>,
     /// [`Self::said_until_us`] but for the words of answers to `chain`.
     said_until_free_us: Option<u64>,
+    /// `LAMP_BUSY_CALLED_STRICT=on` ([`crate::attention::Attention::narrow_the_call`]).
+    busy_called_strict: bool,
+}
+
+/// The rule's two switches on `engine` and `heeding`, each on its own.
+/// `named_always` (`LAMP_NAMED_ALWAYS=on`, #2191): a line that begins with
+/// the lamp's name, said to a face turned to the lamp, is answered in a busy
+/// room, the model asked once more on its `not_for_me`. `busy_called_strict`
+/// (`LAMP_BUSY_CALLED_STRICT=on`, #1712): in a busy room, a stand-in or the
+/// name not set off as a call is no call without the name heard or a face
+/// turned to the lamp.
+fn heeding_switches(
+    mut engine: Engine,
+    heeding: &Arc<Mutex<Heeding>>,
+    named_always: bool,
+    busy_called_strict: bool,
+) -> Engine {
+    if named_always {
+        eprintln!(
+            "lamp-voice second: a line that begins with the lamp's name, said to a face turned to the lamp, is answered in a busy room (LAMP_NAMED_ALWAYS)"
+        );
+        if let Ok(mut heeding) = heeding.lock() {
+            heeding.always_answering_named();
+        }
+        let heeding = heeding.clone();
+        engine = engine.answering_named_to_a_face(Arc::new(move |request| {
+            heeding
+                .lock()
+                .is_ok_and(|heeding| heeding.named_to_a_face(request))
+        }));
+    }
+    if busy_called_strict {
+        eprintln!(
+            "lamp-voice second: in a busy room, a stand-in for the lamp's name or the name not set off as a call counts only with the name heard or a face turned to the lamp (LAMP_BUSY_CALLED_STRICT)"
+        );
+        if let Ok(mut heeding) = heeding.lock() {
+            heeding.narrowing_busy_calls();
+        }
+    }
+    engine
 }
 
 /// A line counts as begun with the lamp's name if a hearing of it began no
@@ -3104,6 +3133,7 @@ impl Heeding {
             not_own: false,
             chain: Vec::new(),
             said_until_free_us: None,
+            busy_called_strict: false,
         }
     }
 
@@ -3129,6 +3159,13 @@ impl Heeding {
     /// is judged as before.
     pub(crate) fn not_counting_own_answers(&mut self) {
         self.not_own = true;
+    }
+
+    /// In a busy room with nobody turned to the lamp, the text shows a call
+    /// only as the name set off as one, or with the name heard
+    /// (`LAMP_BUSY_CALLED_STRICT=on`).
+    pub(crate) fn narrowing_busy_calls(&mut self) {
+        self.busy_called_strict = true;
     }
 
     /// Whether `request` was judged as begun with the lamp's name said to
@@ -3659,6 +3696,9 @@ impl Heeding {
         attention.lamp_asked(signs.lamp_asked);
         let (busy, lamp_asked) = (signs.room == crate::room_told::Room::Busy, signs.lamp_asked);
         attention.set_near(signs.near);
+        // `LAMP_BUSY_CALLED_STRICT=on`: in a busy room with nobody turned to
+        // the lamp, a stand-in or "Lamp is broken, …" is no call in itself.
+        attention.narrow_the_call(self.busy_called_strict && busy && signs.turned != Some(true));
         // Said to the lamp from close to it, over the line's sound, judged
         // once as the Live worker judges it as the sound ends.
         if let Some((looks, out)) = self.addressed.as_mut()
@@ -7052,6 +7092,129 @@ mod tests {
         };
         let held = heeding.judge(9, (1_000_000_000, 1_003_000_000), heard, signs);
         (held, heeding.named_to_a_face(9))
+    }
+
+    /// The office lines the busy room let out as "the text shows it was
+    /// called" (#1712, the first builder on #1722 at 16:11).
+    const OFFICE_LINES: [&str; 5] = [
+        "Man, that meeting ran long.",
+        "Plan the sprint for tomorrow.",
+        "Mom, can you pick me up?",
+        "Lamp is broken, can you fix it?",
+        "Lamb for dinner tonight?",
+    ];
+
+    /// `LAMP_BUSY_CALLED_STRICT=on`: in a busy room, with no name heard and
+    /// nobody turned to the lamp, the office lines are held; without the
+    /// switch, or in a quiet room, they are judged as before.
+    #[test]
+    fn with_busy_called_strict_office_lines_are_no_call_in_a_busy_room() {
+        use crate::room_told::Room;
+        for heard in OFFICE_LINES {
+            assert_eq!(
+                busy_called_judged(false, Room::Busy, None, vec![], heard),
+                None,
+                "{heard}: let out without the switch"
+            );
+            assert_eq!(
+                busy_called_judged(true, Room::Busy, None, vec![], heard),
+                Some(crate::attention::BUSY_UNCALLED),
+                "{heard}"
+            );
+            assert_eq!(
+                busy_called_judged(true, Room::Quiet, None, vec![], heard),
+                busy_called_judged(false, Room::Quiet, None, vec![], heard),
+                "{heard}: a quiet room"
+            );
+        }
+    }
+
+    /// With the switch, the name set off as a call still calls the lamp in
+    /// a busy room, and a stand-in does with the name heard in the sound or
+    /// a face turned to the lamp.
+    #[test]
+    fn with_busy_called_strict_a_call_set_off_or_backed_still_counts() {
+        use crate::room_told::Room;
+        for heard in ["Hey Lamp, what time is it?", "Lamp, what's the weather?"] {
+            assert_eq!(
+                busy_called_judged(true, Room::Busy, None, vec![], heard),
+                None,
+                "{heard}"
+            );
+        }
+        let heard = "Mom, can you pick me up?";
+        let named = vec![(1_000_200_000, 0.95)];
+        assert_eq!(
+            busy_called_judged(true, Room::Busy, None, named, heard),
+            None
+        );
+        // Not a question: a face alone would leave it to the busy room's bar.
+        assert_eq!(
+            busy_called_judged(
+                true,
+                Room::Busy,
+                Some(true),
+                vec![],
+                "Man, turn the light on please."
+            ),
+            None
+        );
+    }
+
+    /// Each switch the worker reads turns on its own part of the rule, and
+    /// only that: `LAMP_NAMED_ALWAYS` alone still has the model asked once
+    /// more (#2210), and `LAMP_BUSY_CALLED_STRICT` alone only narrows the
+    /// call (#2257's review).
+    #[test]
+    fn the_rule_s_switches_each_turn_on_only_their_own_part() {
+        for (named_always, strict) in [(false, false), (true, false), (false, true), (true, true)] {
+            let heeding = Arc::new(Mutex::new(super::Heeding::new(true, false, None, None)));
+            let engine = super::heeding_switches(
+                Engine::new(
+                    Arc::new(Silent),
+                    Told::default,
+                    Arc::new(|_, _, _, _| Box::pin(async { serde_json::Value::Null })),
+                ),
+                &heeding,
+                named_always,
+                strict,
+            );
+            let case =
+                format!("LAMP_NAMED_ALWAYS {named_always}, LAMP_BUSY_CALLED_STRICT {strict}");
+            assert_eq!(
+                engine.shared.named_to_a_face.is_some(),
+                named_always,
+                "{case}"
+            );
+            let heeding = heeding.lock().unwrap();
+            assert_eq!(heeding.named_always, named_always, "{case}");
+            assert_eq!(heeding.busy_called_strict, strict, "{case}");
+        }
+    }
+
+    /// One line judged in `room` by the strict rule, with
+    /// `LAMP_BUSY_CALLED_STRICT` when `on`: why it is held, if it is.
+    fn busy_called_judged(
+        on: bool,
+        room: crate::room_told::Room,
+        turned: Option<bool>,
+        names: Vec<(u64, f32)>,
+        heard: &str,
+    ) -> Option<&'static str> {
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        if on {
+            heeding.narrowing_busy_calls();
+        }
+        let signs = super::Signs {
+            room,
+            going_on: false,
+            lamp_asked: false,
+            turned,
+            names,
+            near: false,
+            continues_from: None,
+        };
+        heeding.judge(9, (1_000_000_000, 1_003_000_000), heard, signs)
     }
 
     #[test]
