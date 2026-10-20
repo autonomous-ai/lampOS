@@ -4,6 +4,28 @@
 
 Newest first. Times from `date` (+07).
 
+- 16:30 2240 P1 fixed with bus name devin_cloud, no msgs change; mine, merge on green
+- 16:28 1890 skills.remove: no P1/P2, four P3s (peer check missing among them), needs a rebase; first builder's
+- 16:22 2246 both P3s fixed; mine once onto lamp-voice
+- 16:21 2243 (on #2239) no P1/P2, two P3s; first builder's (every lamp's start)
+- 16:21 2240 P1 fixed by allowing inner dashes in msgs engine_named: harmless to readers; first builder's
+- 16:20 Merged #2172 (self-test head clock, test-only) as `023165c18` on green, Ten's peer read
+- 16:16 2240 P1 (Jarvis's: devin-cloud fails engine_named, tasks/status invalid), four P3s; mine once fixed
+- 16:16 2253 skill light tints the Speaking face, off unless set: no finding; merge on green; conflicts with #2157 (both add a RingOptions field)
+- 16:11 2210 P2 and P3s fixed at 0c0005824; note: #1712's called lets office lines out via stand-ins; first builder's
+- 16:10 Merged #2250 (standing up: rising or shrinking away) as `ff4a26099` on green
+- 16:09 2217 two P2s (early-call level read in the own-voice tail; the lamp can hear itself as its name)
+- 16:09 2157 carried right from #1732, P3s in; one P2 (units pass new flags old binaries refuse); store-count order with #2167/#2110; first builder's
+- 16:09 2249 P2: install of a build before 19 Oct 15:21 fails whole (BESIDE names required); first builder's
+- 16:07 2234 P2: the retry can pass a wrong mic open under load; three P3s
+- 16:07 2235 #2211's three paths closed, name gone; P1 (known X takes A's name on a yes), P2 (apart on the model's word)
+- 16:07 2233 code right but on by default on every product lamp (starts #764 per-person Live sessions); same as #2176 finding 9: first builder to pick
+- 16:07 2226 one P2 (resumed session still told the old thread), three P3s; first builder's
+- 16:06 Merged #2241 (memory review readings, docs) as `c2372340a` on green
+- 16:05 Merged #2228 (lamp-body-measure --seated) as `3dd304281` on green, body owner approved
+- 15:25 2246 (stacked on #2243): no P1/P2, two P3s (unprobed fails; item age); mine once onto lamp-voice
+- 15:19 2214 rebased onto #2237, same patch; first builder's
+- 15:17 2241 new head clean (no script, no lamp text); merge on green
 - 15:07 2167 re-read: P2 and five P3s fixed, one small P3 (slice not pinned by a test); first builder's
 - 15:05 2238 factory stands the lamp for head_move: no P1/P2, P3 (the voice's resting may win); first builder's
 - 15:03 Merged #2237 (account-channel test) as `7b9277fb5` on green
