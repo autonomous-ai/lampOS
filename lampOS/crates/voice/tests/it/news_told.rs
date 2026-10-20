@@ -114,6 +114,7 @@ impl Place {
             close_told: true,
             targets_newer: None,
             set_up_later: None,
+            sign_in_by_code: false,
             report_every: REPORT_EVERY,
         };
         let mut place = Self {
