@@ -26,6 +26,7 @@ fn fixture_with_command(directory: &SessionDirectory, command: &str) -> (Rig, Pe
             end_silence_blocks: None,
             early_end_blocks: None,
             early_finalize: false,
+            open_name: false,
             faint_level: None,
             speaker,
             capture,

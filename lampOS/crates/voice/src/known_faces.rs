@@ -464,6 +464,63 @@ const QUESTION: &[&str] = &[
     "when", "where",
 ];
 
+/// What the person says just before their name, as a line's last words:
+/// the name still to come. Not "I'm" or "I am" alone: "Yes, I am." ends a
+/// line.
+const OPENS_A_NAME: &[&[&str]] = &[
+    &["my", "name", "is"],
+    &["my", "name's"],
+    &["call", "me"],
+    &["i'm", "called"],
+    &["i", "am", "called"],
+    &["the", "name", "is"],
+    &["the", "name's"],
+];
+
+/// Said while a name is found: "My name is, um,".
+const FILLERS: &[&str] = &["um", "uh", "er", "erm", "ah", "eh", "hmm"];
+
+/// Words that, just before an opening, mean no name follows: "Don't call
+/// me.", "Never call me."
+const NO_NAME_AFTER: &[&str] = &["don't", "dont", "never", "not"];
+
+/// Whether what the person said ends opening their name, the name still to
+/// come: "Hey Lamp, my name is", "You can call me, um,". A line the
+/// turn-end model ends there is cut before the name: on lamp-4ace "my name
+/// is" and 400 ms of quiet was `model_complete` (0.933), and the name came
+/// as the next line (#2135, the first builder on #1722 at 01:58). Never a
+/// question ("Do you know what my name is?", "Can you call me?"), one asking
+/// what it is ("Tell me what my name is."), or "Don't call me.".
+pub fn opens_a_name(said: &str) -> bool {
+    let said = said.replace('\u{2019}', "'");
+    if said.trim_end().ends_with('?') {
+        return false;
+    }
+    let mut words: Vec<String> = said
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    while words
+        .last()
+        .is_some_and(|word| FILLERS.contains(&word.as_str()))
+    {
+        words.pop();
+    }
+    OPENS_A_NAME.iter().any(|opening| {
+        let Some(at) = words.len().checked_sub(opening.len()) else {
+            return false;
+        };
+        let before = at.checked_sub(1).map(|before| words[before].as_str());
+        words[at..]
+            .iter()
+            .zip(opening.iter())
+            .all(|(word, open)| word == open)
+            && !before
+                .is_some_and(|before| ASKING.contains(&before) || NO_NAME_AFTER.contains(&before))
+    })
+}
+
 /// Whether what the person said gives their name: "my name is Jim", "my
 /// name's Jim", "call me Jim", "I am called Jim", "I'm Jim" or "I am Jim",
 /// with the name as the service writes one, capitalised and not a word that
@@ -1430,6 +1487,44 @@ mod tests {
             "Who's my name for?",
         ] {
             assert!(!gives_a_name(not), "{not}");
+        }
+    }
+
+    /// #2135: a line that ends opening a name, the name still to come, is
+    /// told from one that gives it, asks about it, or ends.
+    #[test]
+    fn a_line_ending_before_its_name_is_told_apart() {
+        for open in [
+            "Hey Lamp, my name is",
+            "Hey Lamp, my name is.",
+            "Hey, Lamp. My name is",
+            "My name's",
+            "Hi, my name is, um,",
+            "You can call me",
+            "Lamp, just call me uh",
+            "I'm called",
+            "I am called",
+            "The name is",
+            "My name\u{2019}s",
+        ] {
+            assert!(opens_a_name(open), "{open}");
+            assert!(!gives_a_name(open), "{open}");
+        }
+        for not in [
+            "Hey Lamp, my name is Jim.",
+            "Call me Jim.",
+            "Do you know what my name is?",
+            "Tell me what my name is.",
+            "Can you call me?",
+            "Don't call me.",
+            "Yes, I am.",
+            "I'm",
+            "What's my name",
+            "Remember my name.",
+            "My name is Jim, and I'm",
+            "",
+        ] {
+            assert!(!opens_a_name(not), "{not}");
         }
         assert!(
             tools_checked(true)[0]

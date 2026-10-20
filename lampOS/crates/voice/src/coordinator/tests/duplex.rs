@@ -347,6 +347,7 @@ impl Harness {
                 1,
                 false,
                 false,
+                false,
                 None,
                 None,
                 false,
