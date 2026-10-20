@@ -435,3 +435,9 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   quotes their own words as `said_today` ("nothing said today" when none),
   answered word for word; the preference line opens the memory note. One
   commit on #1712's `61b690638`; probe 47/0.
+- #2063 rebased onto `9519328f7` (`faeb02d25`), then `678a39837`: the
+  preference line's docs say where it is (first in the memory section,
+  after the correction lines). c0a4: pins head-2 96 → 97 (Thirteen's
+  find); the installed lamp-controls still doesn't see the pads, asked
+  about a newer install. Fourth's held hand-on to memory: yes, with three
+  conditions (under 45 s, context at turn end, "forget that" ordering).
