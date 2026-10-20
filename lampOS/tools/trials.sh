@@ -41,8 +41,11 @@
 #   TRIALS_PROC        where a process's environ and cmdline are read (/proc)
 #   TRIALS_SUDO        the command to run as root (sudo, or nothing as root)
 #   TRIALS_WAIT        overrides every row's wait, in seconds
-#   TRIALS_CALL        sends a call: COMMAND SOCKET LINE (socat, else nc -U)
+#   TRIALS_CALL        sends a call: COMMAND SOCKET LINE (socat, else nc -U;
+#                      for send and sendfile, socat)
+#   TRIALS_ETC         where the lamp's settings are read (/etc)
 #   LAMP_BUS_BIN       lamp-bus (on PATH, else /usr/local/bin/lamp-bus)
+#   TRIALS_MOOD_BIN    lamp-mood, for the mood row (/opt/lampOS/mood/current/lamp-mood)
 set -euo pipefail
 
 usage() { sed -n '7,9p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
@@ -50,6 +53,7 @@ usage() { sed -n '7,9p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 HERE=$(cd "$(dirname "$0")" && pwd)
 SKILLS_SRC=${TRIALS_SKILLS_SRC:-$HERE/../skills}
 UNIT_DIR=${TRIALS_UNIT_DIR:-/run/systemd/system}
+ETC=${TRIALS_ETC:-/etc}
 ASIDE_DIR=${TRIALS_ASIDE_DIR:-/run}
 PROC=${TRIALS_PROC:-/proc}
 if [[ -n ${TRIALS_SUDO+set} ]]; then
@@ -61,6 +65,7 @@ else
 fi
 BUS=${LAMP_BUS_BIN:-$(command -v lamp-bus || echo /usr/local/bin/lamp-bus)}
 DROPIN=zz-trial.conf
+MOOD_BIN=${TRIALS_MOOD_BIN:-/opt/lampOS/mood/current/lamp-mood}
 
 # ---------------------------------------------------------------------------
 # The rows. Each sets:
@@ -82,7 +87,13 @@ DROPIN=zz-trial.conf
 #            "keepfile PATH TEXT" (TEXT written to PATH every second until
 #            the end, as a file another part keeps fresh), "call NAME JSON"
 #            (a skill's function called on lamp-skills' call.sock, as the
-#            voice calls it), "run COMMAND", or "play LINE"
+#            voice calls it), "send SOCKET LINE" (one line to a part's
+#            socket as root with socat; a reply without "done" fails, and
+#            only done or the refusal is printed), "run COMMAND", or "play
+#            LINE". AFTER may also "sendfile SOCKET FILE": each line of FILE
+#            sent so, if FILE is there (what SETUP saved to put back), with
+#            neither the lines nor the replies printed, since they may hold
+#            a person's name
 #   AFTER    optional: lines as CAUSE's, run at the end before the units are
 #            restarted (a light given back, a presence ended)
 #   FIRST    optional: for a behaviour that is done only when its cause
@@ -99,21 +110,34 @@ DROPIN=zz-trial.conf
 #            message once `lamp-bus hz` has seen messages come, so a value
 #            kept from before the trial never passes alone
 #   WAIT     seconds to wait for PROOF after the cause
+#   PROOFS   optional, in place of PROOF, EXAMPLE and IN, for a row that
+#            shows its behaviour in more than one place: one a line,
+#            "IN|REGEX|EXAMPLE", each looked for as PROOF is in its IN. The
+#            row passes when every one has been seen, in any order. REGEX may
+#            hold "|"; EXAMPLE may not
+#   ABSENT   optional: lines as PROOFS's, each a line or message that must
+#            not have come: judged once, when every proof has been seen, over
+#            the journal since the switches went on, or a bus topic's newest
+#            message. Its EXAMPLE is the line that would fail the row
 # In SETASIDE, SETUP and AFTER, @SKILLS_DIR@, @SKILLS_USER@ and @SKILLS_GROUP@
 # are the running lamp-skills' --dir, user and group, @MEMORY_DIR@ and
 # @MEMORY_SOCKET@ are lamp-memory's --dir and --socket, @EYES_KNOWN_FILE@ is
-# lamp-eyes' --known-file, and @SRC@ is TRIALS_SKILLS_SRC. CAUSE's keepfile
+# lamp-eyes' --known-file, @SRC@ is TRIALS_SKILLS_SRC, @ASIDE@ is the
+# trial's own root-only set-aside folder, @UNIT_DIR@ is where drop-ins go
+# (units a trial installs go there too, gone at a reboot), @ETC@ is
+# TRIALS_ETC, @EXPRESSION_ARGV@, @EXPRESSION_USER@, @EXPRESSION_GROUP@ and
+# @BUS_ROOT@ are lamp-expression's command line, user, group and --bus-root,
+# @MOOD_BIN@ is TRIALS_MOOD_BIN, and @BUS@ is lamp-bus. CAUSE's keepfile
 # takes them too.
 # ---------------------------------------------------------------------------
-ROWS="light-out scenes who-was-here activity forget thread reports nudges smoky dusty light-show"
+ROWS="light-out scenes who-was-here activity forget thread reports nudges smoky dusty light-show settings look point sip-of-water stand-up wind-down mood"
 # Rows not here, and why: printed by `list`.
 NOT_HERE="bedtime    Bedtime and Morning (#1732): a draft, not merged; three switches, --zone and its daily state, and it moves the body
-nudges     the other three nudges (#1957): sip-of-water, stand-up and wind-down are tried by hand, as rest-your-eyes is here
-mood       Mood on: lampOS/tools/mood-minute.sh --clap (#1956), its own minute with a clap played from the Mac
+mood       Mood's minute with the body moving: lampOS/tools/mood-minute.sh --clap (#1956); the mood row here moves nothing
 updates    the update stack (#1680: #1788 to #1945, open): updates.md's rehearsal, a file channel and a test key, not a switch"
 
 define() {
-  ABOUT= NOTE= SETASIDE= SETUP= PAUSE= SWITCHES= CAUSE= AFTER= FIRST= THEN= FIRSTEX= PROOF= EXAMPLE= IN= WAIT=
+  ABOUT= NOTE= SETASIDE= SETUP= PAUSE= SWITCHES= CAUSE= AFTER= FIRST= THEN= FIRSTEX= PROOF= EXAMPLE= IN= WAIT= PROOFS= ABSENT=
   case $1 in
     light-out)
       # #1721 and #1747 (on lamp-voice and #1712). The skill's trigger is
@@ -339,6 +363,199 @@ call light_show {"show":"calm"}'
       EXAMPLE='lamp-skills: light-show Done: …; show calm: 5 frames shown; …'
       IN="lamp-skills.service"
       WAIT=90 ;;
+    settings)
+      # #1982 (on lamp-voice): root's helper for changes after setup, as
+      # lamp-cloud asks it with LAMP_SETTINGS_CHANGE=on (the first builder's
+      # (a), #1722 03:16): its two units, in deploy/product/ and on no lamp
+      # yet, installed for the trial in the transient unit folder, and the
+      # lines lamp-cloud sends (cloud settings.rs `line`) sent to its socket.
+      # The app's half, over the broker, stays with lamp-cloud's host tests.
+      # The trial's copy of the socket is root's group: lamp-4ace has no
+      # lampos, and only the trial connects. The zone tried is Asia/Bangkok,
+      # the lamp's own offset, so nothing's day shifts. The old name and zone
+      # are saved first and sent back at the end; the helper's waiting
+      # instance is stopped, so lamp-schedule isn't restarted onto a zone it
+      # already has, and the units are removed and checked gone. Its lines:
+      # setup main.rs, "lamp-setup: change: {}", the change's `said`.
+      ABOUT="settings changed after setup: root's helper sets the person's name and the zone, both put back (#1982)"
+      NOTE="the checkout's lampOS/deploy/product beside its skills folder (the two units are copied from it), a build with #1982's lamp-setup at /opt/lampOS/setup/current/lamp-setup, /etc/lampOS/setup/serve.json, setup done (/var/lib/lampos-setup/done, the socket's condition), and socat. Neither the saved name nor a reply is printed. For a minute the person's name is \"Trial\" and the zone Asia/Bangkok (the same offset), then both are as they were. No Wi-Fi"
+      SETUP="! systemctl cat lamp-setup-change.socket >/dev/null 2>&1 || { echo 'lamp-setup-change.socket is already on this lamp: not touched'; exit 1; }
+zone=\$(cat @ETC@/timezone 2>/dev/null || readlink @ETC@/localtime | sed 's|.*/zoneinfo/||'); [ -n \"\$zone\" ] || { echo 'the zone now is not known: nothing changed'; exit 1; }; name=\$(sed 's/[\\\\\"]/\\\\&/g' @ETC@/lampOS/person/name 2>/dev/null); printf '{\"person_name\":\"%s\"}\n{\"timezone\":\"%s\"}\n' \"\$name\" \"\$zone\" >@ASIDE@/settings.back
+sed 's/^SocketGroup=lampos/SocketGroup=root/' @SRC@/../deploy/product/lamp-setup-change.socket >@UNIT_DIR@/lamp-setup-change.socket
+cp @SRC@/../deploy/product/lamp-setup-change@.service @UNIT_DIR@/lamp-setup-change@.service
+systemctl daemon-reload && systemctl start lamp-setup-change.socket"
+      # No part's switch: the helper takes --enable from its own unit, and
+      # lamp-cloud isn't in the path. The marker restarts lamp-skills and
+      # shows the trial's machinery runs, as scenes' does.
+      SWITCHES="lamp-skills.service|LAMP_TRIAL=settings"
+      CAUSE='send /run/lampos-setup-change/change.sock {"person_name":"Trial"}
+send /run/lampos-setup-change/change.sock {"timezone":"Asia/Bangkok"}'
+      AFTER="sendfile /run/lampos-setup-change/change.sock @ASIDE@/settings.back
+run systemctl stop lamp-setup-change.socket 'lamp-setup-change@*.service'; rm -f @UNIT_DIR@/lamp-setup-change.socket @UNIT_DIR@/lamp-setup-change@.service; systemctl daemon-reload; ! systemctl cat lamp-setup-change.socket >/dev/null 2>&1"
+      FIRST="change: the person's name was changed"
+      FIRSTEX="lamp-setup: change: the person's name was changed (5 characters)"
+      PROOF='change: the time zone is now Asia/Bangkok'
+      EXAMPLE='lamp-setup: change: the time zone is now Asia/Bangkok'
+      IN='lamp-setup-change@*'
+      WAIT=30 ;;
+    look)
+      # #1871 (on lamp-voice, installable): "Look for my keys", asked out
+      # loud, for the arm hour's row 3. The model calls look_for with the
+      # desk first, then left, right, far left, far right, five looks at
+      # most, each with the head down over the desk (the reading pose) and
+      # the base turned toward the place; someone speaking ("stop") ends the
+      # search within a fifth of a second (lamp-skills main.rs, wait_out),
+      # and the head is up about 2 s later. Its line: the skill's Done, when
+      # the search ends (spoken over, or two minutes after the last look).
+      ABOUT="look for my keys: look_for searches the desk, then a few places either side, until it's found or told to stop (#1871)"
+      NOTE="a build with #1871, the voice's full look (LAMP_LOOK_FULL=on, lamp-eyes --full-look; lamp-4ace has both) and the second route giving every function (no LAMP_SECOND_FEW_TOOLS). It MOVES: the head comes down over the desk and the base turns, so a hand near the arm. Put keys on the desk to one side first. Say the line; say \"stop\" to end it, or wait two minutes after it finds them"
+      SETASIDE="copy @SKILLS_DIR@/look-for-things"
+      SETUP="rm -rf @SKILLS_DIR@/look-for-things && cp -a @SRC@/look-for-things @SKILLS_DIR@/look-for-things
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/look-for-things"
+      SWITCHES="lamp-skills.service|LAMP_LIGHT_REQUESTS=on"
+      CAUSE="play Hey Lamp, look for my keys."
+      PROOF='look-for-things Done'
+      # The why is the run's steps' reports joined by "; " (main.rs
+      # perform): left out here rather than guessed.
+      EXAMPLE='lamp-skills: look-for-things Done: …'
+      IN="lamp-skills.service"
+      WAIT=240 ;;
+    point)
+      # #1730 (on lamp-voice, held out of the product): "light my book", for
+      # the arm hour's row 4. The model calls point_light: the head down over
+      # the desk (the reading pose) and a clear white light, kept as the
+      # person's; one look; and, only if the book is off to one side, a
+      # second call that turns the base toward it. The pose holds two
+      # minutes, then the run ends. Its line: the skill's Done.
+      ABOUT="point the light: point_light brings the head over the desk and turns toward the book (#1730)"
+      NOTE="a build with #1730, the voice's full look (lamp-4ace has it) and every function given. It MOVES: the head comes down over the desk and the base may turn, so a hand near the arm. Put a book on the desk a little to one side first. The white light is kept as the person's afterwards: ask for the light you want after"
+      SETASIDE="copy @SKILLS_DIR@/point-light"
+      SETUP="rm -rf @SKILLS_DIR@/point-light && cp -a @SRC@/point-light @SKILLS_DIR@/point-light
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/point-light"
+      SWITCHES="lamp-skills.service|LAMP_LIGHT_REQUESTS=on"
+      CAUSE="play Hey Lamp, light my book."
+      PROOF='point-light Done'
+      EXAMPLE='lamp-skills: point-light Done: …'
+      IN="lamp-skills.service"
+      WAIT=240 ;;
+    sip-of-water)
+      # #1957 (on lamp-voice, installable): a slow blue breath of light and a look at the face after 90 minutes at the desk. The trial's copy waits
+      # 30 s in place of 90m and has no [active] and [quiet] hours, so it
+      # can be tried now. The face is said near the lamp by the trial. With
+      # the eyes' room/activity off its two conditions hold (unknown =
+      # "holds"). Its line: lamp-skills main.rs, the skill's Done.
+      ABOUT="the wellbeing nudges: the head looks at the face once and the light breathes blue for 6 s (#1957)"
+      NOTE="a build with #1957, the voice resting, nobody at the lamp (the trial says a face near the lamp itself), and the eyes' LAMP_ACTIVITY off. It MOVES: the head looks at the face once and the light breathes blue for 6 s; keep the arm clear"
+      SETASIDE="copy @SKILLS_DIR@/sip-of-water"
+      SETUP="rm -rf @SKILLS_DIR@/sip-of-water && cp -a @SRC@/sip-of-water @SKILLS_DIR@/sip-of-water
+sed -e 's/^for = \"90m\"/for = \"30s\"/' -e '/^\[active\]/,/^to = /d' -e '/^\[quiet\]/,/^to = /d' @SRC@/sip-of-water/skill.toml >@SKILLS_DIR@/sip-of-water/skill.toml
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/sip-of-water"
+      SWITCHES="lamp-skills.service|+--zone system"
+      CAUSE='keep humans/faces/tracked latest {"faces":[{"id":"trial","xmin":0.35,"ymin":0.2,"xmax":0.65,"ymax":0.6,"confidence":0.9}]} lamp_msgs/Faces'
+      AFTER='pub humans/faces/tracked latest {"faces":[]} lamp_msgs/Faces'
+      PROOF='sip-of-water Done'
+      # The why is its steps' own reports joined by "; " (lamp-skills
+      # main.rs): left out here rather than guessed.
+      EXAMPLE='lamp-skills: sip-of-water Done: …'
+      IN="lamp-skills.service"
+      WAIT=90 ;;
+    stand-up)
+      # #1957 (on lamp-voice, installable): a look at the face and a small tilt toward them after 100 minutes. The trial's copy waits
+      # 30 s in place of 100m and has no [active] and [quiet] hours, so it
+      # can be tried now. The face is said near the lamp by the trial. With
+      # the eyes' room/activity off its two conditions hold (unknown =
+      # "holds"). Its line: lamp-skills main.rs, the skill's Done.
+      ABOUT="the wellbeing nudges: the head looks at the face, then tilts toward them once (#1957)"
+      NOTE="a build with #1957, the voice resting, nobody at the lamp (the trial says a face near the lamp itself), and the eyes' LAMP_ACTIVITY off. It MOVES: the head looks at the face, then tilts toward them once; keep the arm clear"
+      SETASIDE="copy @SKILLS_DIR@/stand-up"
+      SETUP="rm -rf @SKILLS_DIR@/stand-up && cp -a @SRC@/stand-up @SKILLS_DIR@/stand-up
+sed -e 's/^for = \"100m\"/for = \"30s\"/' -e '/^\[active\]/,/^to = /d' -e '/^\[quiet\]/,/^to = /d' @SRC@/stand-up/skill.toml >@SKILLS_DIR@/stand-up/skill.toml
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/stand-up"
+      SWITCHES="lamp-skills.service|+--zone system"
+      CAUSE='keep humans/faces/tracked latest {"faces":[{"id":"trial","xmin":0.35,"ymin":0.2,"xmax":0.65,"ymax":0.6,"confidence":0.9}]} lamp_msgs/Faces'
+      AFTER='pub humans/faces/tracked latest {"faces":[]} lamp_msgs/Faces'
+      PROOF='stand-up Done'
+      # The why is its steps' own reports joined by "; " (lamp-skills
+      # main.rs): left out here rather than guessed.
+      EXAMPLE='lamp-skills: stand-up Done: …'
+      IN="lamp-skills.service"
+      WAIT=90 ;;
+    wind-down)
+      # #1957 (on lamp-voice, installable): one slow droop and the light a shade dimmer in the hour before bedtime, the dim held until they leave the desk, so it is done only when its trigger ends: FIRST is its Triggered, then the face goes and its gap (2 m, 10 s in the copy) runs out. The trial's copy waits
+      # 30 s in place of 20m and has no [active] and [quiet] hours, so it
+      # can be tried now. The face is said near the lamp by the trial. With
+      # the eyes' room/activity off its two conditions hold (unknown =
+      # "holds"). Its line: lamp-skills main.rs, the skill's Done.
+      ABOUT="the wellbeing nudges: one slow droop and the light a shade dimmer, given back once the trial says the face is gone (#1957)"
+      NOTE="a build with #1957, the voice resting, nobody at the lamp (the trial says a face near the lamp itself), and the eyes' LAMP_ACTIVITY off. It MOVES: one slow droop and the light a shade dimmer, given back once the trial says the face is gone; keep the arm clear"
+      SETASIDE="copy @SKILLS_DIR@/wind-down"
+      SETUP="rm -rf @SKILLS_DIR@/wind-down && cp -a @SRC@/wind-down @SKILLS_DIR@/wind-down
+sed -e 's/^for = \"20m\"/for = \"30s\"/' -e 's/^gap = \"2m\"/gap = \"10s\"/' -e '/^\[active\]/,/^to = /d' -e '/^\[quiet\]/,/^to = /d' @SRC@/wind-down/skill.toml >@SKILLS_DIR@/wind-down/skill.toml
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/wind-down"
+      SWITCHES="lamp-skills.service|+--zone system"
+      CAUSE='keep humans/faces/tracked latest {"faces":[{"id":"trial","xmin":0.35,"ymin":0.2,"xmax":0.65,"ymax":0.6,"confidence":0.9}]} lamp_msgs/Faces'
+      AFTER='pub humans/faces/tracked latest {"faces":[]} lamp_msgs/Faces'
+      FIRST='wind-down Triggered'
+      FIRSTEX='lamp-skills: wind-down Triggered: humans/faces/tracked has held for 30 s'
+      THEN='pub humans/faces/tracked latest {"faces":[]} lamp_msgs/Faces
+wait 15'
+      PROOF='wind-down Done'
+      # The why is its steps' own reports joined by "; " (lamp-skills
+      # main.rs): left out here rather than guessed.
+      EXAMPLE='lamp-skills: wind-down Done: …'
+      IN="lamp-skills.service"
+      WAIT=90 ;;
+    mood)
+      # #1670's Mood with its readers: #1728 (the ring's breath, lamp-voice
+      # ring_mood.rs), #1749 (Expression's liveliness, runtime.rs) and #1772
+      # (the familiar level, mood input.rs). Mood runs as a transient unit as
+      # mood-minute.sh starts it (lamp-4ace has no lamp-mood unit), as
+      # Expression's user. Expression runs in shadow, its own command line
+      # without --enable in a drop-in of its own, as speaking-ab.sh
+      # --levels-only does: it plans and names each move on expression/state
+      # and asks the body for nothing. Mood's pace is exactly 1 from 07:00 to
+      # 22:00 with nothing happening (mood engine.rs), and leaves it at night
+      # or when a sudden sound lifts its energy: a clap from the Mac, since
+      # Mood takes ears/sudden only from the ears.
+      ABOUT="Mood on, nothing moving: Mood says its state and breath, Expression takes it in shadow, nobody known (#1728, #1749, #1772)"
+      NOTE="a build with #1728, #1749 and #1772; lamp-mood at TRIALS_MOOD_BIN (/opt/lampOS/mood/current/lamp-mood); lamp-voice, lamp-ears and lamp-expression running; nobody the eyes know at the lamp. Nothing moves: Expression is in shadow until the end. By day, clap once near the lamp when asked, 40 s in: Mood's pace is 1 with nothing happening from 07:00 to 22:00. The light is read before and after, and must be as it was"
+      # The light's value alone: lamp-bus latest prints the bus's header,
+      # which changes with every send, before it (bus main.rs line()).
+      # A Mood already running (its unit, or a trial's left behind) is
+      # refused before anything changes, as mood-minute.sh refuses it: two
+      # would both say mood/state (Jarvis on #2042).
+      SETUP='for u in lamp-mood.service lamp-trial-mood.service; do [ "$(systemctl is-active "$u" 2>/dev/null)" != active ] || { echo "Mood already runs ($u): nothing done"; exit 1; }; done
+@BUS@ latest light/state 2>/dev/null | grep "^{" | cut -d" " -f2- >@ASIDE@/light || true
+mkdir -p @UNIT_DIR@/lamp-expression.service.d && printf "[Service]\nExecStart=\nExecStart=%s\n" "$(printf "%s" "@EXPRESSION_ARGV@" | sed -E -e "s/ --enable( |$)/\1/g" -e "s/%/%%/g")" >@UNIT_DIR@/lamp-expression.service.d/zz-trial-shadow.conf'
+      # No switch of its own: the marker restarts Expression into its shadow
+      # drop-in, and shows the trial's process is the one running.
+      SWITCHES="lamp-expression.service|LAMP_TRIAL=mood"
+      # Mood starts after the trial's mark, so the ring's and Expression's
+      # first lines are seen. By day they say 1.00 and 0.00, and a change is
+      # said only a minute after (MoodTaken); one clap lifts the pace about
+      # 25 s and the liveliness about 40 s, and only one counts in 120 s
+      # (mood SUDDEN_COOLDOWN_US), so it's asked for 40 s in, to be still
+      # there at the minute (the reviewer on #2042, P2-1).
+      CAUSE='run systemd-run --unit=lamp-trial-mood --uid=@EXPRESSION_USER@ --gid=@EXPRESSION_GROUP@ -p NoNewPrivileges=yes -p ProtectSystem=strict -p ReadWritePaths=@BUS_ROOT@ -E LAMP_MOOD=on @MOOD_BIN@ serve --zone system --bus-root @BUS_ROOT@ && sleep 1 && systemctl is-active --quiet lamp-trial-mood
+wait 40
+play one clap, close to the lamp, now (by day: Mood breathes at the plain pace until it; at night it need not)'
+      AFTER='run systemctl stop lamp-trial-mood 2>/dev/null; systemctl reset-failed lamp-trial-mood 2>/dev/null; true
+run rm -f @UNIT_DIR@/lamp-expression.service.d/zz-trial-shadow.conf
+run now=$(@BUS@ latest light/state 2>/dev/null | grep "^{" | cut -d" " -f2- || true); was=$(cat @ASIDE@/light 2>/dev/null); if [ "$now" = "$was" ]; then echo "  the light as it was: $was"; else echo "  the light changed: was $was, now $now"; exit 1; fi'
+      # Mood's breath away from the plain one's pace (1): mood.rs MoodBreath.
+      # The ring and Expression each say what they took from it (msgs
+      # MoodTaken: first, then a change of 0.05 at most once a minute):
+      # voice ring_mood.rs taken_line, expression runtime.rs liveliness_line.
+      # Expression in shadow, a drift asked for: alive.rs names "drifting".
+      # Nobody known: mood.rs leaves familiar out with no humans/familiar.
+      PROOFS='lamp-voice.service|the ring breathes with Mood: pace (0\.[0-9]{2}|1\.(0[1-9]|[1-9][0-9]))|lamp-voice ring: the ring breathes with Mood: pace 0.81
+lamp-expression.service|Mood.s liveliness -?0\.(0[1-9]|[1-9][0-9])|lamp-expression: Mood'"'"'s liveliness -0.31
+bus:mood/state|"breath": ?\{"phase": ?[0-9.e-]+, ?"pace": ?(0\.[0-9]+|1\.0*[1-9][0-9]*|1\.[1-9][0-9]*)\}|{"stamp":{"clock_id":"c","at_us":1,"sequence":1},"session_id":"s","awake":0.15,"energy":0.3,"warmth":0.5,"asleep":false,"familiarity":"unknown","breath":{"phase":0.42,"pace":0.81}}
+bus:expression/state|"enabled": ?false.*"drifting"|{"stamp":{"clock_id":"c","at_us":1,"sequence":1},"enabled":false,"behaviours":["breathing","drifting"],"missing":[],"warnings":[],"body":false,"light":false}'
+      ABSENT='bus:mood/state|"familiar": ?"|{"stamp":{"clock_id":"c","at_us":1,"sequence":1},"session_id":"s","awake":0.15,"energy":0.3,"warmth":0.5,"asleep":false,"familiarity":"unknown","familiar":"regular","breath":{"phase":0.42,"pace":0.81}}'
+      # By day the first lines say 1.00 and 0.00 at once; a clap's change
+      # is said a minute after them.
+      WAIT=120 ;;
     *) return 1 ;;
   esac
 }
@@ -385,7 +602,37 @@ placeholders() { # TEXT: with the @...@ names filled from the running units
     [[ -n $value ]] || { say "lamp-eyes.service has no --known-file" >&2; exit 3; }
     text=${text//@EYES_KNOWN_FILE@/$value}
   fi
+  text=${text//@ASIDE@/${ASIDE:-@ASIDE@}}
+  text=${text//@UNIT_DIR@/$UNIT_DIR}
+  text=${text//@ETC@/$ETC}
+  if [[ $text == *@EXPRESSION_* || $text == *@BUS_ROOT@* ]]; then
+    value=$(exec_argv lamp-expression.service)
+    [[ -n $value ]] || { say "lamp-expression.service has no ExecStart" >&2; exit 3; }
+    text=${text//@EXPRESSION_ARGV@/$value}
+    value=$(arg_of lamp-expression.service --bus-root)
+    text=${text//@BUS_ROOT@/${value:-/run/lampos-bus}}
+    value=$(systemctl show lamp-expression.service -p User --value 2>/dev/null)
+    text=${text//@EXPRESSION_USER@/${value:-root}}
+    value=$(systemctl show lamp-expression.service -p Group --value 2>/dev/null)
+    text=${text//@EXPRESSION_GROUP@/${value:-root}}
+  fi
+  text=${text//@MOOD_BIN@/$MOOD_BIN}
+  text=${text//@BUS@/$BUS}
   printf '%s\n' "${text//@SRC@/$SKILLS_SRC}"
+}
+
+# One line to a part's socket as root, and its one-line reply: through
+# TRIALS_CALL, else socat (lamp-4ace has no nc -U, and no Python is run on a
+# lamp).
+send_line() { # SOCKET LINE
+  if [[ -n ${TRIALS_CALL:-} ]]; then
+    $TRIALS_CALL "$1" "$2"
+  elif command -v socat >/dev/null; then
+    printf '%s\n' "$2" | $SUDO socat -t 15 - "UNIX-CONNECT:$1"
+  else
+    say "FAIL: socat is needed on the lamp to send to $1"
+    return 1
+  fi
 }
 
 # Where the journal is now, so the watch reads only what comes after it: its
@@ -570,6 +817,32 @@ act() { # WHEN LINE
       fi
       printf '  answered: %s\n' "$(printf '%s' "$answered" | head -1 | cut -c1-200)"
       ;;
+    send | sendfile)
+      # send SOCKET LINE, or sendfile SOCKET FILE: each line of FILE. A
+      # reply is never printed, only done or the refusal (the helper's own
+      # words, which never hold the value): a name's reply holds the name.
+      # sendfile's lines are what SETUP saved and may hold a person's name,
+      # so they aren't printed either.
+      local socket=${rest%% *} what=${rest#* } line answered n=0
+      what=$(placeholders "$what")
+      if [[ $kind == sendfile ]]; then
+        $SUDO test -e "$what" || { say "$when: nothing saved to send back"; return 0; }
+        what=$($SUDO cat "$what")
+      fi
+      while IFS= read -r line; do
+        [[ -n $line ]] || continue
+        n=$((n + 1))
+        if [[ $kind == send ]]; then say "$when: $line to $socket"; else say "$when: saved line $n sent back to $socket"; fi
+        answered=$(send_line "$socket" "$line") || { say "FAIL: nothing answered on $socket"; return 1; }
+        if [[ $answered == *'"done"'* ]]; then
+          printf '  answered: done\n'
+        else
+          printf '  answered: %s\n' "$(printf '%s' "$answered" | sed -n 's/.*"refused": *"\([^"]*\)".*/refused: \1/p' | head -1)"
+          say "FAIL: $socket refused it"
+          return 1
+        fi
+      done <<<"$what"
+      ;;
     run)
       rest=$(placeholders "$rest")
       say "$when: $rest"
@@ -611,6 +884,41 @@ dropin() { # UNIT
   fi
 }
 
+# The row's proofs, one a line as "IN|REGEX|EXAMPLE": PROOFS, else the one
+# PROOF in IN with its EXAMPLE.
+proofs() {
+  if [[ -n $PROOFS ]]; then lines "$PROOFS"; else printf '%s|%s|%s\n' "$IN" "$PROOF" "$EXAMPLE"; fi
+}
+proof_in() { printf '%s' "${1%%|*}"; }
+proof_example() { local rest=${1#*|}; printf '%s' "${rest##*|}"; }
+proof_regex() { local rest=${1#*|}; printf '%s' "${rest%|*}"; }
+
+# The line matching REGEX in IN since MARK, or the newest message of a
+# "bus:" topic seen fresh; nothing when there is none.
+seen() { # MARK IN REGEX
+  local mark=$1 in=$2 regex=$3
+  if [[ $in == bus:* ]]; then
+    # A topic said every 5 s shows within 6.
+    if $SUDO "$BUS" hz "${in#bus:}" --seconds 6 >/dev/null 2>&1; then
+      $SUDO "$BUS" latest "${in#bus:}" 2>/dev/null | grep -E -m1 -- "$regex" || true
+    fi
+  else
+    # shellcheck disable=SC2086 # IN is a list of units
+    since_mark "$mark" $in | grep -E -m1 -- "$regex" || true
+  fi
+}
+
+# What a proof's IN last said, for a FAIL.
+last_said() { # MARK IN
+  local mark=$1 in=$2
+  if [[ $in == bus:* ]]; then
+    $SUDO "$BUS" latest "${in#bus:}" 2>&1 | tail -3 | sed 's/^/  /'
+  else
+    # shellcheck disable=SC2086
+    since_mark "$mark" $in | tail -15 | sed 's/^/  /'
+  fi
+}
+
 trial() { # ROW [--dry]
   local row=$1 dry=${2:-} line
   define "$row" || { echo "no row '$row'; trials.sh list shows them" >&2; exit 2; }
@@ -624,11 +932,19 @@ trial() { # ROW [--dry]
     lines "$SWITCHES" | sed 's/^/  switch: /'
     lines "$CAUSE" | sed 's/^/  cause: /'
     lines "$AFTER" | sed 's/^/  after: /'
-    printf '  proof in %s, within %s s: /%s/\n' "$IN" "$WAIT" "$PROOF"
+    while IFS= read -r line; do
+      printf '  proof in %s, within %s s: /%s/\n' "$(proof_in "$line")" "$WAIT" "$(proof_regex "$line")"
+    done < <(proofs)
+    while IFS= read -r line; do
+      printf '  absent in %s: /%s/\n' "$(proof_in "$line")" "$(proof_regex "$line")"
+      printf '  absent example: %s\n' "$(proof_example "$line")"
+    done < <(lines "$ABSENT")
     [[ -z $FIRST ]] || printf '  first: /%s/, then:\n' "$FIRST"
     [[ -z $FIRST ]] || printf '  first example: %s\n' "$FIRSTEX"
     lines "$THEN" | sed 's/^/  then: /'
-    printf '  example: %s\n' "$EXAMPLE"
+    while IFS= read -r line; do
+      printf '  example: %s\n' "$(proof_example "$line")"
+    done < <(proofs)
     exit 0
   fi
 
@@ -723,33 +1039,44 @@ trial() { # ROW [--dry]
     done < <(lines "$THEN")
     deadline=$(($(date +%s) + WAIT))
   fi
-  # shellcheck disable=SC2086 # IN is a list of units
+  # Every proof, in any order; then what must not have come, judged once.
+  local all=() saw=() n in
+  while IFS= read -r line; do all+=("$line"); saw+=(""); done < <(proofs)
   while :; do
-    if [[ $IN == bus:* ]]; then
-      found=
-      # A topic said every 5 s shows within 6.
-      if $SUDO "$BUS" hz "${IN#bus:}" --seconds 6 >/dev/null 2>&1; then
-        found=$($SUDO "$BUS" latest "${IN#bus:}" 2>/dev/null | grep -E -m1 -- "$PROOF" || true)
-      fi
-    else
-      found=$(since_mark "$mark" $IN | grep -E -m1 -- "$PROOF" || true)
-    fi
+    for n in "${!all[@]}"; do
+      [[ -n ${saw[$n]} ]] && continue
+      saw[$n]=$(seen "$mark" "$(proof_in "${all[$n]}")" "$(proof_regex "${all[$n]}")")
+    done
+    found=1
+    for n in "${!saw[@]}"; do [[ -n ${saw[$n]} ]] || found=; done
     if [[ -n $found ]]; then
+      local bad
+      while IFS= read -r line; do
+        bad=$(seen "$mark" "$(proof_in "$line")" "$(proof_regex "$line")")
+        if [[ -n $bad ]]; then
+          say "FAIL: $row: $(proof_in "$line") said what it must not, /$(proof_regex "$line")/:"
+          printf '  %s\n' "$bad"
+          exit 1
+        fi
+      done < <(lines "$ABSENT")
       say "PASS: $row"
-      printf '  %s\n' "$found"
+      for n in "${!saw[@]}"; do printf '  %s\n' "${saw[$n]}"; done
       exit 0
     fi
     [[ $(date +%s) -ge $deadline ]] && break
     sleep 1
   done
-  if [[ $IN == bus:* ]]; then
-    say "FAIL: $row: no fresh ${IN#bus:} matching /$PROOF/ within $WAIT s. Its newest:"
-    $SUDO "$BUS" latest "${IN#bus:}" 2>&1 | tail -3 | sed 's/^/  /'
-  else
-    say "FAIL: $row: no line matching /$PROOF/ in $IN within $WAIT s. Its last lines:"
-    # shellcheck disable=SC2086
-    since_mark "$mark" $IN | tail -15 | sed 's/^/  /'
-  fi
+  for n in "${!all[@]}"; do
+    [[ -n ${saw[$n]} ]] && continue
+    line=${all[$n]}
+    if [[ $(proof_in "$line") == bus:* ]]; then
+      in=$(proof_in "$line")
+      say "FAIL: $row: no fresh ${in#bus:} matching /$(proof_regex "$line")/ within $WAIT s. Its newest:"
+    else
+      say "FAIL: $row: no line matching /$(proof_regex "$line")/ in $(proof_in "$line") within $WAIT s. Its last lines:"
+    fi
+    last_said "$mark" "$(proof_in "$line")"
+  done
   exit 1
 }
 

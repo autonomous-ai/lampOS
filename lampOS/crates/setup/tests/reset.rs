@@ -526,6 +526,12 @@ fn only_an_enabled_fresh_release_after_five_seconds_on_this_boot_is_a_reset() {
 }
 
 fn publish_and_watch(enabled: bool, events: Vec<TouchEvent>) -> (Watched, usize) {
+    publish_and_watch_as(false, enabled, events)
+}
+
+/// With `refused`, the watcher of a plan this build refuses: what it acts
+/// on is the telling, counted the same.
+fn publish_and_watch_as(refused: bool, enabled: bool, events: Vec<TouchEvent>) -> (Watched, usize) {
     // A short root: a Unix socket's address holds 103 bytes.
     let root = PathBuf::from(format!(
         "/tmp/ls-{}-{}",
@@ -548,18 +554,34 @@ fn publish_and_watch(enabled: bool, events: Vec<TouchEvent>) -> (Watched, usize)
     let acted = RefCell::new(0);
     let logged = RefCell::new(Vec::new());
     let now = events.last().map_or(0, |event| event.stamp.at_us + 1_000);
-    let watched = lamp_setup::watch(
-        &mut touch,
-        CLOCK,
-        enabled,
-        Some(Instant::now() + Duration::from_millis(600)),
-        || now,
-        |line| logged.borrow_mut().push(line.to_owned()),
-        || {
-            *acted.borrow_mut() += 1;
-            Ok(())
-        },
-    )
+    let until = Some(Instant::now() + Duration::from_millis(600));
+    let log = |line: &str| logged.borrow_mut().push(line.to_owned());
+    let watched = if refused {
+        lamp_setup::watch_refused(
+            &mut touch,
+            CLOCK,
+            enabled,
+            until,
+            || now,
+            log,
+            || {
+                *acted.borrow_mut() += 1;
+            },
+        )
+    } else {
+        lamp_setup::watch(
+            &mut touch,
+            CLOCK,
+            enabled,
+            until,
+            || now,
+            log,
+            || {
+                *acted.borrow_mut() += 1;
+                Ok(())
+            },
+        )
+    }
     .unwrap();
     LOGGED.with(|log| *log.borrow_mut() = logged.into_inner());
     (watched, acted.into_inner())
@@ -605,6 +627,33 @@ fn the_watcher_acts_once_on_a_real_bus_and_only_logs_with_the_switch_off() {
 }
 
 #[test]
+fn the_watcher_of_a_refused_plan_tells_each_reset_and_keeps_watching() {
+    let at = 40_000_000;
+    let first = event(at - 1_000, 6_000_000);
+    let mut second = event(at, 6_000_000);
+    second.contact_id = 2;
+    assert_eq!(
+        publish_and_watch_as(true, true, vec![first, second.clone()]),
+        (Watched::Refused, 2)
+    );
+    LOGGED.with(|log| {
+        let log = log.borrow();
+        assert_eq!(
+            log.iter()
+                .filter(|line| line.contains("nothing was wiped"))
+                .count(),
+            2,
+            "{log:?}"
+        );
+        assert!(!log.iter().any(|line| line.contains("wiping")), "{log:?}");
+    });
+    assert_eq!(
+        publish_and_watch_as(true, false, vec![second]),
+        (Watched::Shadow, 0)
+    );
+}
+
+#[test]
 fn the_command_checks_plans_and_reports_an_unfinished_reset_without_acting() {
     let root = Root::new();
     let plan = lamp(&root);
@@ -636,4 +685,178 @@ fn the_command_checks_plans_and_reports_an_unfinished_reset_without_acting() {
             .code(),
         Some(2)
     );
+}
+
+/// A plan a build one version ahead writes (#1680, the rule agreed on
+/// #2060), from this build's plan with `more` merged over it, its stop and
+/// reboot harmless so a reset this build wrongly runs only wipes.
+fn ahead(plan: &Plan, more: serde_json::Value) -> serde_json::Value {
+    let mut value = serde_json::to_value(plan).unwrap();
+    value["stop"] = serde_json::json!(["/usr/bin/true"]);
+    value["reboot"] = serde_json::json!(["/usr/bin/true"]);
+    for (field, more) in more.as_object().unwrap() {
+        value[field] = more.clone();
+    }
+    value
+}
+
+/// Run `command --plan … --enable` on `plan`, as the lamp does.
+fn act_on(root: &Root, command: &str, plan: &serde_json::Value) -> std::process::Output {
+    let file = root.path("plan.json");
+    fs::write(&file, serde_json::to_vec(plan).unwrap()).unwrap();
+    Command::new(PROGRAM)
+        .args([command, "--plan", file.to_str().unwrap(), "--enable"])
+        .output()
+        .unwrap()
+}
+
+/// Nothing of the reset happened: no journal, the marker kept, nothing wiped.
+fn untouched(root: &Root) {
+    assert!(!root.path("setup/reset.json").exists(), "no journal");
+    assert!(root.path("setup/done").exists(), "the marker kept");
+    assert!(root.path("memory/index.json").exists(), "nothing wiped");
+    assert!(root.path("tasks/1.json").exists(), "nothing wiped");
+    assert!(root.path("people.json").exists(), "nothing wiped");
+}
+
+#[test]
+fn an_unknown_kind_in_wipe_refuses_the_reset_with_nothing_wiped() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut value = ahead(&plan, serde_json::json!({}));
+    value["wipe"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({"kind": "tree", "path": root.path("voice")}));
+    assert!(matches!(
+        reset::read(&serde_json::to_vec(&value).unwrap()),
+        Err(reset::Refused::Ahead(why)) if why.contains("wipe entry 6")
+    ));
+    let out = act_on(&root, "reset-now", &value);
+    assert_eq!(out.status.code(), Some(2), "{out:?}");
+    let said = String::from_utf8_lossy(&out.stderr);
+    assert!(said.contains("wipe entry 6"), "{said}");
+    assert!(said.contains("nothing is wiped"), "{said}");
+    assert!(said.contains("update the lamp, then reset again"), "{said}");
+    untouched(&root);
+}
+
+#[test]
+fn a_newer_plans_extra_plain_path_is_wiped() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    // A newer build's new store, named as a plain path, with an empty
+    // keep-back field beside it: read with nothing passed over.
+    fs::create_dir_all(root.path("voice")).unwrap();
+    fs::write(root.path("voice/key"), b"k").unwrap();
+    let mut value = ahead(&plan, serde_json::json!({"keep_back": []}));
+    value["wipe"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!(root.path("voice")));
+    let (read, notes) = reset::read(&serde_json::to_vec(&value).unwrap()).unwrap();
+    assert!(read.wipe.contains(&root.path("voice")));
+    assert!(notes.is_empty(), "{notes:?}");
+    fs::write(root.path("setup/reset.json"), b"{}").unwrap();
+    let out = act_on(&root, "resume-reset", &value);
+    assert!(out.status.success(), "{out:?}");
+    assert!(
+        !String::from_utf8_lossy(&out.stderr).contains("dropped"),
+        "{out:?}"
+    );
+    wiped(&root);
+    assert!(!root.path("voice/key").exists(), "the newer path is wiped");
+    // A newer plan's extra path is still checked against what is never wiped.
+    value["wipe"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!("/opt/lampOS/voice"));
+    assert!(matches!(
+        reset::read(&serde_json::to_vec(&value).unwrap()),
+        Err(reset::Refused::Bad(_))
+    ));
+}
+
+#[test]
+fn an_unknown_keep_back_entry_is_dropped_and_its_path_wiped() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let value = ahead(
+        &plan,
+        serde_json::json!({"keep_back": [
+            {"kind": "all_but", "path": root.path("memory"), "keep": ["index.json"]},
+            root.path("memory/index.json"),
+        ]}),
+    );
+    let (read, notes) = reset::read(&serde_json::to_vec(&value).unwrap()).unwrap();
+    assert_eq!(read.wipe, plan.wipe);
+    assert_eq!(notes.len(), 2, "{notes:?}");
+    fs::write(root.path("setup/reset.json"), b"{}").unwrap();
+    let out = act_on(&root, "resume-reset", &value);
+    assert!(out.status.success(), "{out:?}");
+    let said = String::from_utf8_lossy(&out.stderr);
+    assert!(said.contains("keep_back entry 1 is not one"), "{said}");
+    assert!(said.contains("keep_back entry 2 is not one"), "{said}");
+    wiped(&root);
+    assert!(
+        !root.path("memory/index.json").exists(),
+        "what it would keep is wiped"
+    );
+}
+
+#[test]
+fn an_unknown_field_refuses_the_reset_with_nothing_wiped() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let value = ahead(
+        &plan,
+        serde_json::json!({"stop_first": ["/usr/bin/true", "voice"]}),
+    );
+    assert!(matches!(
+        reset::read(&serde_json::to_vec(&value).unwrap()),
+        Err(reset::Refused::Ahead(why)) if why.contains("`stop_first`")
+    ));
+    let out = act_on(&root, "reset-now", &value);
+    assert_eq!(out.status.code(), Some(2), "{out:?}");
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("`stop_first`"),
+        "{out:?}"
+    );
+    untouched(&root);
+}
+
+#[test]
+fn a_plan_ahead_still_refuses_a_bad_known_value() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let bad = |more: serde_json::Value| {
+        let value = ahead(&plan, more);
+        matches!(
+            reset::read(&serde_json::to_vec(&value).unwrap()),
+            Err(reset::Refused::Bad(_))
+        )
+    };
+    assert!(bad(serde_json::json!({"wipe": ["/opt/lampOS/voice"]})));
+    assert!(bad(serde_json::json!({"marker": 7})));
+    assert!(bad(
+        serde_json::json!({"keep_back": {"path": "/var/lib/x"}})
+    ));
+    assert!(bad(serde_json::json!({"wipe": []})));
+    assert!(matches!(reset::read(b"{"), Err(reset::Refused::Bad(_))));
+}
+
+#[test]
+fn the_plan_reader_knows_every_field_of_the_plan() {
+    let root = Root::new();
+    let value = serde_json::to_value(lamp(&root)).unwrap();
+    let mut fields: Vec<&str> = value
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    fields.sort_unstable();
+    let mut known = reset::FIELDS.to_vec();
+    known.sort_unstable();
+    assert_eq!(fields, known);
 }

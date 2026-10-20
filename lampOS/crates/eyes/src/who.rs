@@ -66,14 +66,18 @@ pub fn keep_known(path: &Path, name: Option<&str>, face: Option<&str>) {
         let _ = std::fs::remove_file(path);
         return;
     };
-    // The face first, so a new name is never read beside an older face.
+    // The name first, then the face (the reviewer on #2008). The voice reads
+    // face, name, face; between the two writes it can only see the new name
+    // beside the old face, which matches nobody and narrows a line to the
+    // room. The other order could pair the old name with the new face and
+    // keep a newcomer's line as the one before's.
+    replace_line(path, name);
     match face {
         Some(face) => replace_line(&beside, face),
         None => {
             let _ = std::fs::remove_file(&beside);
         }
     }
-    replace_line(path, name);
 }
 
 fn replace_line(path: &Path, line: &str) {
@@ -1076,7 +1080,11 @@ fn is_temporary(file: &Path) -> bool {
 /// Whether `file` in the set-aside folder is people's records: not a
 /// rewrite's temporary file, nor the forgets that wait ([`PENDING_FORGETS`]).
 fn is_a_record(file: &Path) -> bool {
-    !is_temporary(file) && file.file_name().is_none_or(|name| name != PENDING_FORGETS)
+    !is_temporary(file)
+        && file
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_none_or(|name| !name.starts_with(PENDING_FORGETS))
 }
 
 /// A name as the forgets that wait keep it: a plain SHA-256 of its lower
@@ -1090,25 +1098,100 @@ fn name_hash(name: &str) -> String {
 }
 
 /// The forgets that wait beside the people file at `path`
-/// ([`PENDING_FORGETS`]); none when there is no such file.
+/// ([`PENDING_FORGETS`]); none when there is no such file. One from a
+/// later build reads past what it doesn't know (#1680). One that can't be
+/// read at all is set aside beside it, kept as it is with its mode
+/// (`forgets-pending.unreadable-<unix s>`), with a line that counts only:
+/// every later `forget` would otherwise fail (#2052's audit). A set-aside
+/// list that can be read again, by the build that wrote it, is merged back.
+/// The reset empties the folder with it.
 fn pending(path: &Path) -> io::Result<Vec<Waiting>> {
-    let file = path
-        .parent()
-        .unwrap_or(Path::new("/"))
-        .join(SET_ASIDE)
-        .join(PENDING_FORGETS);
-    let bytes = match std::fs::read(&file) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+    let folder = path.parent().unwrap_or(Path::new("/")).join(SET_ASIDE);
+    let file = folder.join(PENDING_FORGETS);
+    let mut waiting = match std::fs::read(&file) {
+        Ok(bytes) => match read_waits(&bytes) {
+            Some(waiting) => waiting,
+            None => {
+                set_pending_aside(&file, bytes.len())?;
+                Vec::new()
+            }
+        },
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Vec::new(),
         Err(error) => return Err(error),
     };
+    // A list set aside before that can be read now (the build that wrote
+    // it, back after a step back): its waits come back, so a face read back
+    // from a set-aside file is still forgotten (the reviewer on #2070). One
+    // still unreadable stays, with no line each start.
+    let mut merged = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&folder) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if !name
+                .to_str()
+                .is_some_and(|name| name.starts_with(&format!("{PENDING_FORGETS}.unreadable-")))
+            {
+                continue;
+            }
+            let Some(waits) = std::fs::read(entry.path())
+                .ok()
+                .and_then(|bytes| read_waits(&bytes))
+            else {
+                continue;
+            };
+            for wait in waits {
+                // Asked twice, it waits from the later word.
+                match waiting.iter_mut().find(|kept| kept.hash == wait.hash) {
+                    Some(kept) => kept.at_unix_s = kept.at_unix_s.max(wait.at_unix_s),
+                    None => waiting.push(wait),
+                }
+            }
+            merged.push(entry.path());
+        }
+    }
+    if !merged.is_empty() {
+        keep_pending(path, &waiting)?;
+        for file in &merged {
+            std::fs::remove_file(file)?;
+        }
+        eprintln!(
+            "lamp-eyes: {} set-aside lists of the forgets that wait could be read now; their forgets wait again",
+            merged.len()
+        );
+    }
+    Ok(waiting)
+}
+
+/// The forgets that wait in a file's bytes, past any field this build
+/// doesn't know; `None` when they can't be read.
+fn read_waits(bytes: &[u8]) -> Option<Vec<Waiting>> {
     #[derive(Deserialize)]
     struct Kept {
         forget: Vec<Waiting>,
     }
-    serde_json::from_slice::<Kept>(&bytes)
+    serde_json::from_slice::<Kept>(bytes)
+        .ok()
         .map(|kept| kept.forget)
-        .map_err(|_| io::Error::other(format!("{} is not a list of forgets", file.display())))
+}
+
+/// The forgets file this build can't read, set aside beside it as it is,
+/// with its mode, and said with a line that counts only.
+fn set_pending_aside(file: &Path, bytes: usize) -> io::Result<()> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+    let mut aside = file.with_file_name(format!("{PENDING_FORGETS}.unreadable-{now}"));
+    let mut n = 0;
+    while aside.exists() {
+        n += 1;
+        aside = file.with_file_name(format!("{PENDING_FORGETS}.unreadable-{now}-{n}"));
+    }
+    std::fs::rename(file, &aside)?;
+    eprintln!(
+        "lamp-eyes: the forgets that wait could not be read ({bytes} bytes); set aside as {}, and forgetting goes on",
+        aside.display()
+    );
+    Ok(())
 }
 
 /// The forgets that wait written whole, 0600, or the file removed when
@@ -2012,6 +2095,97 @@ mod tests {
             1,
             "kept: nothing can be told about it"
         );
+    }
+
+    /// #1680's rule for the forgets that wait (#2052's audit): a file from a
+    /// later build, with fields this one doesn't know, is read and its waits
+    /// kept; one that can't be read is set aside, kept as it was, never
+    /// counted as anyone's records, and a forget goes on and waits afresh.
+    /// Before, every forget failed while it couldn't be read.
+    #[test]
+    fn the_forgets_that_wait_never_stop_a_forget() {
+        let good = serde_json::to_string(&print(0.2)).unwrap();
+        let fay = format!(
+            r#"{{"version":1,"people":[{{"name":"Fay","prints":[{good}],"added_unix_s":1}}]}}"#
+        );
+        let setup = |name: &str, waits: &str| {
+            let path = file(name);
+            let folder = path.parent().unwrap().join(SET_ASIDE);
+            std::fs::create_dir(&folder).unwrap();
+            // One set-aside file nothing can search, so a forget must wait.
+            std::fs::write(folder.join("people-whole-0000.json"), "not json").unwrap();
+            std::fs::write(folder.join(PENDING_FORGETS), waits).unwrap();
+            std::fs::write(&path, &fay).unwrap();
+            (path, folder)
+        };
+        let waits_for = |folder: &Path| -> Vec<String> {
+            let text = std::fs::read_to_string(folder.join(PENDING_FORGETS)).unwrap();
+            let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+            value["forget"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|wait| wait["hash"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let waited = Forgot {
+            forgot: true,
+            unsearched: 1,
+        };
+
+        // From a later build: a field at its top and in a wait.
+        let later = format!(
+            r#"{{"forget":[{{"hash":"{}","at_unix_s":5,"why":"asked"}}],"kind":2}}"#,
+            name_hash("Gil")
+        );
+        let (path, folder) = setup("pending-later", &later);
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(people.forget("Fay").unwrap(), waited);
+        assert_eq!(waits_for(&folder), [name_hash("Gil"), name_hash("Fay")]);
+
+        // Not readable at all: set aside as it was, and the forget waits.
+        let (path, folder) = setup("pending-unreadable", "{\"forget\": [tor");
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(people.forget("Fay").unwrap(), waited);
+        assert!(people.names().is_empty());
+        assert_eq!(waits_for(&folder), [name_hash("Fay")]);
+        let kept: Vec<_> = std::fs::read_dir(&folder)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .filter(|name| name.starts_with("forgets-pending.unreadable-"))
+            .collect();
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert_eq!(
+            std::fs::read_to_string(folder.join(&kept[0])).unwrap(),
+            "{\"forget\": [tor"
+        );
+        // Never anyone's records: still the one set-aside file.
+        assert_eq!(set_aside_count(&path), 1);
+
+        // The reviewer on #2070: the build that wrote it, back after a step
+        // back, reads it again. At its next start its waits are merged back,
+        // the later word kept for a name in both, and the copy goes.
+        std::fs::write(
+            folder.join(&kept[0]),
+            format!(
+                r#"{{"forget":[{{"hash":"{}","at_unix_s":7}},{{"hash":"{}","at_unix_s":1}}]}}"#,
+                name_hash("Gil"),
+                name_hash("Fay")
+            ),
+        )
+        .unwrap();
+        let fay_asked = {
+            let text = std::fs::read_to_string(folder.join(PENDING_FORGETS)).unwrap();
+            let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+            value["forget"][0]["at_unix_s"].as_u64().unwrap()
+        };
+        People::open(path.clone()).unwrap();
+        assert_eq!(waits_for(&folder), [name_hash("Fay"), name_hash("Gil")]);
+        let text = std::fs::read_to_string(folder.join(PENDING_FORGETS)).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(value["forget"][0]["at_unix_s"].as_u64(), Some(fay_asked));
+        assert!(!folder.join(&kept[0]).exists());
+        assert_eq!(set_aside_count(&path), 1);
     }
 
     /// Twelve's P2 on #1767: a waiting forget covers only the faces kept

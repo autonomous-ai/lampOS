@@ -202,11 +202,37 @@ going dark, then the hotspot coming back with the setup light (below). Where `re
 `watch-reset` run in the boot order, and with what rights, waits on the
 keeper's owner (the fifth builder, asked on #702).
 
+`serve.json` is read one version ahead (#1680, `docs/updates.md`): a field
+this build doesn't know is dropped and named in the journal. The reset plan
+follows the rule agreed on #2060, so a reset is all or nothing:
+
+- **Anything to wipe is a plain absolute path's text in `wipe`**, which every
+  build wipes. A newer plan's extra path is wiped here too, and is still
+  checked against what is never wiped (`PROTECTED`).
+- **Keeping something back goes only in `keep_back: [...]`.** This build
+  knows no `keep_back` entry yet, so each one is dropped with a journal line
+  and what it would keep is wiped: the privacy-safe side, a pairing lost at
+  worst. A `keep_back` that isn't a list is refused as a bad value.
+- **A `wipe` entry that isn't a path's text, or any other field this build
+  doesn't know, refuses the reset** (`reset::Refused::Ahead`): nothing is
+  journalled, the marker stays and nothing is wiped. `reset-now`,
+  `resume-reset` and `check` exit 2 with the reason in the journal.
+  `watch-reset` keeps watching instead: each 5 s hold is logged as refused and
+  the person is told "Nothing was wiped. Update me, then reset again." through
+  the voice's say service (skill `reset`, `docs/speaking-first.md`). That is
+  the reset's only line to the person: words for the voice's model, so said
+  only while the lamp has a network and `LAMP_SAY=on`, with no recording.
+- A bad known value, an empty `wipe`, or JSON that doesn't read is still
+  refused (`reset::Refused::Bad`), as before.
+
 Host tests (`crates/setup/tests/reset.rs`): the order of the steps, a failed
 stop wiping nothing, a wipe that fails halfway keeping the journal and marker
 until `resume-reset` finishes, a start with no journal touching nothing,
 refused plans, every reason an event is not a reset, the watcher on a real bus
-acting once and only logging with the switch off, the command line, and the
+acting once and only logging with the switch off, the watcher of a refused
+plan telling each hold and wiping nothing, a plan one version ahead (an
+unknown `wipe` kind or field refused with nothing touched, an extra path
+wiped, an unknown `keep_back` entry dropped and wiped), the command line, and the
 example plan covering every store of the person's listed above.
 
 ## Joining the home's Wi-Fi (built, not yet served)
@@ -443,7 +469,10 @@ standard input and output. It reads one line (at most 4 KiB), answers
 changed (below). It checks every request itself, whoever connects: exactly
 one of `{"person_name": s}`, `{"display_name": s}` or `{"timezone": s}`.
 Without `--enable` every request is refused, "changes after setup are off",
-and nothing is written. A refusal never holds the value asked, and the
+and nothing is written. **The socket's group is the gate:** the unit always
+passes `--enable`, so once installed any `lampos` process can ask for these
+changes; `LAMP_SETTINGS_CHANGE` only decides whether `lamp-cloud` asks. A
+refusal never holds the value asked, and the
 journal says what changed, never a name ("the person's name was changed (8
 characters)"); a zone is said.
 
@@ -462,6 +491,116 @@ a turn, a conversation that never ends and a voice that says nothing given up
 at the bound); the binary on standard input and output with a journal line
 holding no name; the product's reset wiping the lamp's name and the units
 running the helper. Not run on a lamp.
+
+## The Wi-Fi changed after setup (#1959, built, off unless set)
+
+The person gives the lamp a new Wi-Fi from the app (`wifi.set`, `cloud.md`),
+without a reset. Off unless `lamp-cloud` has `LAMP_SETTINGS_WIFI=on` beside
+`LAMP_SETTINGS_CHANGE=on`: its own switch, since this is the one change that
+can take the lamp off the network the app reaches it on.
+
+**Root's helper, `lamp-setup wifi`** (`crates/setup/src/wifi_change.rs`), on a
+socket of its own: `/run/lampos-setup-wifi/wifi.sock` (`lamp-setup-wifi.socket`:
+root's, group `lampos`, 0660, `Accept=yes`, **one connection at a time**), each
+connection starting `lamp-setup-wifi@.service` as root, with the names'
+helper's sandbox (`NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`)
+less what the radio needs: the network (the broker's check), netlink, and
+writes to `/etc` (the Wi-Fi file and V1's `device-sta-mode`, which edits
+`/etc/dhcpcd.conf`), `/run` and the real `/tmp` (`wpa_cli`'s reply socket, so
+no `PrivateTmp`). The names' helper has `PrivateNetwork=yes` and could not.
+**The socket's group is the gate:** the unit always passes `--enable`, so once
+installed any `lampos` process can ask for a Wi-Fi change, and only one whose
+broker the new network reaches is kept. One line in,
+`{"wifi": {"ssid", "password", "broker": "host:port"}}`, checked with setup's
+own `wpa_conf` and its page's words (`serve::refused_words`); one line out at
+the end, `{"done": {"ssid"}}` or `{"refused": why}`.
+
+**It never strands the lamp:**
+1. The old network's file is kept beside the live one
+   (`wpa_supplicant-wlan0.conf.lamp-previous`, 0600) until the new one is
+   confirmed. A lamp with no Wi-Fi file is refused, with nothing changed.
+2. The new file is written as setup writes it, and V1's `device-sta-mode`
+   restarts the radio, as setup's join does.
+3. **Confirmed** = the new name is the one joined, with a station address,
+   and a TCP connection to the broker `lamp-cloud` is on is made and closed
+   (3 s at most, name lookup included), within 60 s (setup's own bound). Two
+   rejected keys stop early, as setup's join does.
+4. Otherwise the old file goes back, the radio again, and the old network is
+   waited for (an address and the broker), 60 s at most. A lamp whose old
+   network does not come back either stays on it and keeps trying it:
+   **never the hotspot**, since after setup there is no setup page behind it.
+
+**The lamp says what happened**, through the voice's say service (`LAMP_SAY`,
+`speaking-first.md`) from the skill `wifi`, never the network's name or
+password. The two lines said while online go as `text`, words for the voice's
+model: "I'm on the new Wi-Fi now."; "I couldn't join that one, so I've gone
+back to the old Wi-Fi.". With neither network back, "I can't reach any Wi-Fi.
+Hold my button for five seconds to set me up again." at most once a minute,
+for 10 minutes at most or until a network is back.
+
+**The no-Wi-Fi line is a recording** (the first builder on #1722, 01:56): with
+no network the voice cannot reach its model, so this one line is never words
+for it. It is recorded once at build time in the lamp's own voice and played
+by the voice:
+
+- **Asked** as `{"skill":"wifi","recording":"wifi_lost","priority":7,"expires_in_ms":60000}`.
+  The say service takes only the names it knows (`wifi_lost`), and only from
+  the Wi-Fi helper: the socket's peer must be root (`SO_PEERCRED`, read on
+  Linux), so a skill, under any name, is refused ("recording is asked by the
+  Wi-Fi helper only") and cannot say there is no Wi-Fi while the lamp is
+  online (`say::Caller`). Its samples are
+  played as a skill's sound is (`play_skill_sound`): a turn of the lamp's own,
+  on the head cue's speaker path at the recorded level, with the same gates
+  (not paused, muted, speaking, listening or owing an answer; 15 s after the
+  last turn; one sound in 30 s). Nothing goes to the provider.
+- **Where it lives:** the failure notice `wifi_lost` (`failure-notices.md`) in
+  `/etc/lampOS/voice/notices`: `manifest.json` names `wifi-lost.en-US.wav`
+  with its SHA-256, frames, transcript, voice and approval, and the loader
+  refuses anything that does not match. `lamp-voice.service` passes
+  `--failure-notice-dir /etc/lampOS/voice/notices --failure-notice-language en-US`.
+  It is read once at start; `failure_notice_capability` reports `wifi_lost`.
+- **Rendered** by `tools/render-wifi-line.sh PROVIDER.json NEW_FOLDER [production|test]`:
+  the voice's own route, model and voice (`gemini-3.8-live`, `Kore`), the line
+  as one written turn, as the say service's `text` is
+  (`crates/gemini/examples/render_line.rs`), kept as 24 kHz mono 16-bit with
+  the silence at either end cut. The example itself hashes it and writes the
+  manifest beside it (the kind, the words, the provider file's voice and
+  model, the approval, the SHA-256 and the frames); the script only calls it
+  and then checks the folder with `lamp-audio notices`. It needs the voice's key in its credential file; it
+  never prints it. `test` unless `production` is given, after a person has
+  listened to it.
+- **Missing:** with no folder, no manifest, or a file that fails a check, the
+  voice refuses the ask at once with the loader's reason (`the recording is not
+  there: not_provisioned`), nothing is heard, and the helper journals it:
+  `lamp-setup: wifi: the recording wifi_lost was not played: refused, ...`. The
+  helper waits at most 2 s for the voice's first answer, and a refusal within
+  them (the lamp speaking or listening when the voice comes to it) is
+  journalled the same way. After them the helper has hung up and counts the
+  ask as waiting in the voice: a refusal that comes later is read by nobody
+  and **not journalled**. Either way the next try is a minute later.
+- **Owed:** the recording itself. No clip has been rendered (it needs the
+  voice's key) and none is in `deploy/product/` or `lamp-update install`'s
+  list; until it is, the line is silent and journalled.
+
+**The password** is in the request line and the network file, and nowhere
+else: no reply, error or journal line holds it, and the journal holds no
+network name either, only its length.
+
+Tests (`crates/setup/tests/wifi_change.rs`, with a fake network manager): a
+network that joins and reaches the broker kept, and the old file gone; the old
+file kept while waiting; a wrong password, a network out of range, one with no
+address and one without the broker each back on the old network, never the
+hotspot; an old network that does not come back kept, within 2 min; no Wi-Fi
+file refused; the request's checks in setup's words; the password and the names
+in no reply or journal line, for every outcome; the switch off, the radio
+untouched; the three lines, and the lost line at most once a minute and given
+up at its bound; the lost line always the recording, never words for the
+model, and the other two always words; a recording not there journalled with
+the voice's reason, and nothing said; the units, and the voice's unit loading
+the fixed folder. The voice's side (`crates/voice/src/say.rs`,
+`coordinator/notices.rs`): a recording asked by name reaches the voice as a
+sound, one not provisioned is refused with why, and only known names are taken.
+Not run on a lamp.
 
 ## On a lamp
 

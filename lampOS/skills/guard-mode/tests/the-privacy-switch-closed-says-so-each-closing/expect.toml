@@ -1,5 +1,6 @@
 # On, the desk empty; the switch closed from 300 s for 30 s and again from
-# 600 s: one line, once, and quiet after.
+# 600 s: one line each closing (they are more than a minute apart), and
+# quiet while it stays closed (the peer read's P3 on #1807).
 clock = "14:20"
 
 [[call_tool]]
@@ -13,5 +14,10 @@ call = "light"
 
 [[expect]]
 at = "300250ms"
+call = "text"
+args = { text = "I can't see right now, the privacy switch is closed." }
+
+[[expect]]
+at = "600250ms"
 call = "text"
 args = { text = "I can't see right now, the privacy switch is closed." }

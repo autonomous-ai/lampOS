@@ -33,5 +33,10 @@ known_faces = true
 
 [watch]
 every = "10m"                           # at most one text in ten minutes
-asked_within = "30s"                    # on only when someone spoke at the lamp this lately: asked out loud, never by a text
-mark = { colour = "blue", level = 1 }   # the faint mark while it is on, so nobody is watched without a sign
+asked_within = "30s"                    # on only when someone spoke at the lamp this lately: asked out loud, never by a text...
+# ...and asked for it in words: the newest thing heard has one of these
+# among its whole words, so the model's call after talk of something else is
+# refused (the peer read on #1807).
+if_heard = ["keep an eye", "keep watch", "watch my desk", "watch the desk", "guard", "look after my desk", "while i'm out", "while i am out", "while i'm away", "while i am away"]
+most = "12h"                            # it ends by itself twelve hours after it was asked, with one text that it has stopped
+mark = { colour = "blue", level = 1 }   # the faint mark while it is on, so nobody is watched without a sign; while the ring shows something else over it, it counts nothing

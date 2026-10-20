@@ -436,6 +436,19 @@ the unchanged legacy client, used unless the new Days client is selected.
       `NEW_DIR/labels.jsonl` (0600), one line per conversation, each proposal
       with `"mark": "right | wrong | intrusive"` for a person to fill in.
     - **Afterwards:** the copy is removed at the end.
+    - **Made-up conversations** (the first builder's 01:36): run the tool
+      with `--conversations crates/voice-eval/observe/synthetic-20.json` in
+      place of `--store`. The 20 conversations are synthetic: ten with
+      something worth keeping, eight with nothing, and two with health or
+      money said in passing. They are built into the run's own store, each
+      ten minutes apart. The pass's results are scored against what each
+      should keep. Each thing kept counts once: rightly if it carries the
+      conversation's word as a whole word, wrongly if not. The score also
+      gives conversations missed and their share of those worth keeping
+      (`missed_of_worth`), intrusive things kept, and whether the bar
+      passes (`passes_wrong_and_intrusive`: under 1 in 10 kept wrongly,
+      none intrusive; it says nothing of what was missed). A `--gap-seconds`
+      or `--limit` that doesn't give the set back one for one is refused.
     - **Tests:** `observe_dry::tests`: the cut, a whole run on a seeded copy
       with a scripted model, kept and nothing, and the given store byte for
       byte unchanged.
@@ -501,7 +514,9 @@ then use that person's scope:
   eyes' `humans/faces/tracked` (`LAMP_EYES_SPEAKING=on`), looked at every
   100 ms on the worker's own thread. A face *speaks through the line* when
   it reads `yes` in at least half of the looks between the line's start and
-  end (at least three looks).
+  end (at least three looks). Each of the eyes' frames counts once, however
+  often it is read, and their silence one empty look each 500 ms, so a short
+  line never passes on one frame.
   - **Only the known person's face** (its passing id is the eyes'
     `known-face`, and the known name is still the admitted person's): the
     line stays theirs.

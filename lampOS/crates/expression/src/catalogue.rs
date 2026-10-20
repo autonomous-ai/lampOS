@@ -24,7 +24,6 @@ pub enum Trigger {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Keyframe {
     pub at_us: u64,
     pub offsets: BodyOffsets,
@@ -33,7 +32,6 @@ pub struct Keyframe {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Behaviour {
     pub name: String,
     pub trigger: Trigger,
@@ -94,7 +92,6 @@ impl Behaviour {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Postures {
     pub resting: BodyOffsets,
     pub listening: BodyOffsets,
@@ -114,7 +111,6 @@ impl Postures {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct FaceLevels {
     pub resting: f32,
     pub listening: f32,
@@ -124,7 +120,6 @@ pub struct FaceLevels {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Timing {
     pub voice_stale_us: u64,
     pub joints_stale_us: u64,
@@ -147,7 +142,6 @@ pub struct Timing {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct GazeRules {
     pub minimum_confidence: f32,
     /// A room judged busy inhibits fresh unsolicited gaze/nods/sway.
@@ -155,7 +149,6 @@ pub struct GazeRules {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Catalogue {
     pub version: u32,
     /// Select the complete generation-fenced VoiceProgress/VoiceSound contract.
@@ -179,6 +172,46 @@ pub struct Catalogue {
     pub speaking: Option<crate::speaking::Speaking>,
 }
 
+/// The paths in `written` that `read` (the catalogue as this build read
+/// it, written again) lacks: fields this build does not read. A field it
+/// reads but writes only when set (an empty list, `false`, none) is not
+/// one, so a missing key whose value is that is passed over.
+fn unread_paths(
+    written: &serde_json::Value,
+    read: &serde_json::Value,
+    at: &str,
+    unread: &mut Vec<String>,
+) {
+    use serde_json::Value;
+    match (written, read) {
+        (Value::Object(written), Value::Object(read)) => {
+            for (key, value) in written {
+                let path = if at.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{at}.{key}")
+                };
+                match read.get(key) {
+                    Some(known) => unread_paths(value, known, &path, unread),
+                    None => {
+                        let unset = matches!(value, Value::Null | Value::Bool(false))
+                            || value.as_array().is_some_and(Vec::is_empty);
+                        if !unset {
+                            unread.push(path);
+                        }
+                    }
+                }
+            }
+        }
+        (Value::Array(written), Value::Array(read)) => {
+            for (index, (value, known)) in written.iter().zip(read).enumerate() {
+                unread_paths(value, known, &format!("{at}[{index}]"), unread);
+            }
+        }
+        _ => {}
+    }
+}
+
 impl Catalogue {
     pub fn builtin() -> Self {
         Self::from_json(include_str!("../behaviours.json"))
@@ -186,13 +219,29 @@ impl Catalogue {
     }
 
     pub fn from_json(text: &str) -> Result<Self, Error> {
+        Self::from_json_naming(text).map(|(catalogue, _)| catalogue)
+    }
+
+    /// As [`Self::from_json`], with the fields this build does not read,
+    /// by path (`speaking.sway_yaw`, `behaviours[2].weight`). A catalogue
+    /// a newer build wrote is read past them, so a roll back never stops
+    /// Expression (#1505, #1680); a known field with a bad value, an
+    /// unknown value of a known field (a new trigger) or another
+    /// `version` is still refused.
+    pub fn from_json_naming(text: &str) -> Result<(Self, Vec<String>), Error> {
         if text.len() > MAX_CATALOGUE_BYTES {
             return Err(Error("catalogue exceeds 128 KiB".into()));
         }
         let catalogue: Self = serde_json::from_str(text)
             .map_err(|error| Error(format!("catalogue JSON: {error}")))?;
         catalogue.check()?;
-        Ok(catalogue)
+        let written: serde_json::Value = serde_json::from_str(text)
+            .map_err(|error| Error(format!("catalogue JSON: {error}")))?;
+        let read = serde_json::to_value(&catalogue)
+            .map_err(|error| Error(format!("catalogue JSON: {error}")))?;
+        let mut unread = Vec::new();
+        unread_paths(&written, &read, "", &mut unread);
+        Ok((catalogue, unread))
     }
 
     pub fn check(&self) -> Result<(), Error> {

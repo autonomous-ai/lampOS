@@ -1336,3 +1336,71 @@ fn the_answer_on_reports_is_written_readable_and_the_reset_removes_it() {
         json!({"share": false, "asked": 1, "at": "1970-01-01T00:00:00Z"})
     );
 }
+
+/// The configuration a build one version ahead writes (#1680, #1505): the
+/// product's, with a field this build does not know.
+fn serve_ahead() -> Value {
+    let mut value: Value =
+        serde_json::from_str(include_str!("../fixtures/serve-own-page.json")).unwrap();
+    value["hotspot_name"] = json!("Lamp-4ace");
+    value
+}
+
+#[test]
+fn a_configuration_one_version_ahead_is_read_and_its_unknown_field_named() {
+    let (config, notes) =
+        lamp_setup::serve::read(&serde_json::to_vec(&serve_ahead()).unwrap()).unwrap();
+    assert_eq!(
+        config,
+        fixture(include_str!("../fixtures/serve-own-page.json"))
+    );
+    assert_eq!(notes.len(), 1, "{notes:?}");
+    assert!(notes[0].contains("`hotspot_name`"), "{notes:?}");
+    let mut bad = serve_ahead();
+    bad["listen"] = json!(80);
+    assert!(lamp_setup::serve::read(&serde_json::to_vec(&bad).unwrap()).is_err());
+    let mut bad = serve_ahead();
+    bad["country"] = json!("vietnam");
+    assert!(lamp_setup::serve::read(&serde_json::to_vec(&bad).unwrap()).is_err());
+}
+
+#[test]
+fn setup_starts_with_both_files_one_version_ahead() {
+    let root = Root::new();
+    let config = root.0.join("serve.json");
+    fs::write(&config, serde_json::to_vec(&serve_ahead()).unwrap()).unwrap();
+    let mut plan: Value =
+        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+    // The reset plan's one field a newer build may add (#2060).
+    plan["keep_back"] = json!([{"kind": "later"}]);
+    let plan_file = root.0.join("reset-plan.json");
+    fs::write(&plan_file, serde_json::to_vec(&plan).unwrap()).unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_lamp-setup"))
+        .arg("serve")
+        .arg("--config")
+        .arg(&config)
+        .arg("--plan")
+        .arg(&plan_file)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{out:?}");
+    assert!(String::from_utf8_lossy(&out.stdout).contains("\"enabled\":false"));
+    let said = String::from_utf8_lossy(&out.stderr);
+    assert!(said.contains("`hotspot_name`"), "{said}");
+    assert!(said.contains("keep_back entry 1"), "{said}");
+}
+
+#[test]
+fn the_configuration_reader_knows_every_field_of_the_configuration() {
+    let value = serde_json::to_value(Root::new().config(true)).unwrap();
+    let mut fields: Vec<&str> = value
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    fields.sort_unstable();
+    let mut known = lamp_setup::serve::FIELDS.to_vec();
+    known.sort_unstable();
+    assert_eq!(fields, known);
+}

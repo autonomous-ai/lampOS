@@ -4162,7 +4162,7 @@ fn conversation_with_gate(
     #[cfg(not(test))]
     let given_says = None;
     let mut says = if lifetime.continuous() {
-        given_says.or_else(crate::say::Says::from_environment)
+        given_says.or_else(|| crate::say::Says::from_environment(notices.recordings()))
     } else {
         None
     };
@@ -4476,6 +4476,7 @@ fn conversation_with_gate(
             "plain_percent":Hearing::EVALUATED.plain_percent,
             "commit_on_stillness_after_plain_blocks":Confirmation::EVALUATED.plain_blocks,
             "fruitless_yields_before_fallback":FRUITLESS_YIELDS,
+            "fruitless_yield_forgiven_after_ms":crate::turn_taking::FORGIVE_FRUITLESS_US / 1_000,
             "decision_budget_us":hold.decision_budget_us,
             "first_words_kept_blocks":first_words.then_some(crate::activity::REACH_BACK_BLOCKS),
             "listen_gaps":listen_gaps.then_some(json!({"after_ms":crate::listen_gaps::AFTER_FRAMES * 1_000 / u64::from(lamp_audio::RENDER_RATE),"quiet_run_ms":crate::listen_gaps::LOW_RUN_CHUNKS * 10,"gap_ms":crate::listen_gaps::GAP_US / 1_000,"silence_heard":true})),
@@ -5583,7 +5584,8 @@ fn conversation_with_gate(
                 record(
                     trace,
                     json!({"kind":"duplex_summary","at_us":monotonic_us(),"yields":yields,"commits":commits,"resumes":resumes,
-                    "fallen_back_at_end":fallen_back,"hearing_margin_db":playback_mask.hearing_margin_db(),
+                    "fallen_back_at_end":fallen_back,"fruitless_forgiven":playback_mask.fruitless_forgiven(),
+                    "hearing_margin_db":playback_mask.hearing_margin_db(),
                     "margin_scope":"person in the clear against own voice, both before cancellation; not addressee evidence"}),
                 )?;
             }
@@ -8508,6 +8510,13 @@ fn hear_capture_block(
         mask.hearing_levels_db(),
         at_us,
     )?;
+    if listened.forgiven {
+        record(
+            trace,
+            json!({"kind":"duplex_fruitless_forgiven","at_us":at_us,"frame_sequence":sequence,
+            "forgiven_so_far":mask.fruitless_forgiven(),"forgiven_after_ms":crate::turn_taking::FORGIVE_FRUITLESS_US / 1_000}),
+        )?;
+    }
     if let Some(interval) = trace.yield_interval.as_mut() {
         interval.last_frame_sequence = sequence;
         if echo.is_none() && interval.missing_evidence_since.is_none() {

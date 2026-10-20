@@ -130,6 +130,10 @@ lamp playback, music with vocals, instrumental music and laughter as separate
 labelled conditions. Training/calibration and held-out evaluation recordings
 must not overlap. A zero observation duration is unmeasured, not zero false rate.
 
+The first of them, the music sway, is built and held out of the product
+(`skills/music-sway`, `install::NOT_PRODUCT_SKILLS`); it reads
+`scores.music` and does nothing without this topic.
+
 Only after this evidence do the three `kind = "core"` skills use the topic:
 a small rare music sway, a glance at laughter, and following a departing person
 with Nine's presence contract (#1677). None acts over the lamp's speech or a

@@ -10,6 +10,9 @@ After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=600
 StartLimitBurst=5
+# A lamp-update that fails, a new build of its own that cannot start among them, starts lamp-update-back, which puts
+# its previous build back while that switch is unconfirmed, and otherwise does nothing (lampOS/docs/updates.md).
+OnFailure=lamp-update-back.service
 
 [Service]
 Type=simple

@@ -20,16 +20,19 @@ cat >"$T/argv" <<EOF
 lamp-skills.service /opt/lampOS/skills/x/lamp-skills --dir $T/skills --bus-root /run/lampos-bus --tools-dir /run/lampos-skills
 lamp-memory.service /opt/lampOS/memory/x/lamp-memory --dir $T/memory --socket /run/lampos-memory/memory.sock
 lamp-eyes.service /opt/lampOS/eyes/x/lamp-eyes --known-file $T/eyes/known
+lamp-expression.service /opt/lampOS/expression/x/lamp-expression serve --enable --head-touch --bus-root /run/lampos-bus --zone system
 EOF
 
 cat >"$T/bin/systemctl" <<'EOF'
 #!/usr/bin/env bash
 echo "systemctl $*" >>"$FAKE/calls"
 argv_of() { # the last ExecStart= of the unit's drop-ins, else its own
-  local line=
-  for conf in "$TRIALS_UNIT_DIR/$1.d"/*.conf; do
-    [[ -e $conf ]] || continue
-    line=$(sed -n 's/^ExecStart=\(..*\)/\1/p' "$conf" | tail -1)
+  # In byte order, as systemd reads them; a drop-in with no ExecStart= of
+  # its own leaves the one before standing.
+  local line= found conf
+  for conf in $(LC_ALL=C ls "$TRIALS_UNIT_DIR/$1.d"/*.conf 2>/dev/null); do
+    found=$(sed -n 's/^ExecStart=\(..*\)/\1/p' "$conf" | tail -1)
+    [[ -n $found ]] && line=$found
   done
   [[ -n $line ]] && { printf '%s\n' "${line//%%/%}"; return; }
   sed -n "s|^$1 ||p" "$FAKE/argv"
@@ -122,7 +125,9 @@ case $1 in
     fi
     ;;
   hz) [[ -e $file ]] ;;
-  latest) cat "$file" 2>/dev/null ;;
+  # As lamp-bus prints it: the bus's header, new with every send, then the
+  # value (bus main.rs line()).
+  latest) [[ -e $file ]] && printf '{"topic":"%s","seq":%s} %s\n' "$2" "$RANDOM" "$(cat "$file")" ;;
   *) exit 2 ;;
 esac
 EOF
@@ -152,18 +157,41 @@ case $line in
 esac
 EOF
 
+# systemd-run: recorded, as the mood row starts Mood with it.
+cat >"$T/bin/systemd-run" <<'EOF'
+#!/usr/bin/env bash
+echo "systemd-run $*" >>"$FAKE/calls"
+EOF
+
 # A skill's call: recorded, and the behaviour's line follows.
 cat >"$T/bin/fake-call" <<'EOF'
 #!/usr/bin/env bash
 echo "call $1 $2" >>"$FAKE/calls"
 if [[ -e $FAKE/answer ]]; then cat "$FAKE/answer" >>"$FAKE/journal"; rm -f "$FAKE/answer"; fi
-echo '{"ok":true}'
+# As lamp-bus's pub: a second line at the call whose arguments hold match.
+if [[ -e $FAKE/answer2 ]] && [[ $* == *"$(cut -f1 "$FAKE/answer2")"* ]]; then
+  cut -f2- "$FAKE/answer2" >>"$FAKE/journal"; rm -f "$FAKE/answer2"
+fi
+# A part's socket other than lamp-skills' answers as root's helper does;
+# $FAKE/send-refused: it refuses the next line, once.
+if [[ $1 == */call.sock ]]; then
+  echo '{"ok":true}'
+elif [[ -e $FAKE/send-refused ]]; then
+  rm -f "$FAKE/send-refused"; echo '{"refused":"no"}'
+else
+  echo '{"done":{}}'
+fi
 EOF
 chmod +x "$T/bin/"*
 
 export TRIALS_THEN_WAIT=0
 export PATH="$T/bin:$PATH" FAKE=$T TRIALS_UNIT_DIR=$T/units TRIALS_ASIDE_DIR=$T/run TRIALS_PROC=$T/proc TRIALS_SUDO= \
-  LAMP_BUS_BIN=$T/bin/lamp-bus TRIALS_CALL=$T/bin/fake-call TRIALS_WAIT=2
+  LAMP_BUS_BIN=$T/bin/lamp-bus TRIALS_CALL=$T/bin/fake-call TRIALS_WAIT=2 TRIALS_ETC=$T/etc
+# The lamp's settings, for the settings row: a person's name with a quote in
+# it, and the zone.
+mkdir -p "$T/etc/lampOS/person"
+printf 'Saved "Name"\n' >"$T/etc/lampOS/person/name"
+echo Asia/Ho_Chi_Minh >"$T/etc/timezone"
 
 pass=0 fail=0
 ok() { pass=$((pass + 1)); }
@@ -175,17 +203,54 @@ no_dropin() { if ls "$T/units"/*.d/zz-trial.conf >/dev/null 2>&1; then bad "$1: 
 reset() {
   rm -rf "$T/units"/* "$T/calls" "$T/journal" "$T/answer" "$T/env-ignored" "$T/restarts" \
     "$T/restarts-before-failing" "$T/bus" "$T/state"/* "$T/pub-fails" "$T/skills"/* "$T/answer2" \
-    "$T/memory-sent" "$T/eyes"
+    "$T/memory-sent" "$T/eyes" "$T/answer-all" "$T"/bus-[0-9]* \
+    "$T/send-refused" "$T/units"/lamp-setup-change* "$T/out"
   mkdir -p "$T/bus"
+  # Mood isn't running on the stand-in lamp unless a test says so.
+  echo inactive >"$T/state/lamp-mood.service"
+  echo inactive >"$T/state/lamp-trial-mood.service"
   : >"$T/calls"
 }
 dry() { "$SCRIPT" "$1" --dry; }
+# NAME COMMAND...: the command's lines into the array NAME (no mapfile: a
+# Mac's bash is 3.2).
+lines_into() {
+  local name=$1 line
+  shift
+  eval "$name=()"
+  while IFS= read -r line; do eval "$name+=(\"\$line\")"; done < <("$@")
+}
 field() { dry "$1" | sed -n "s/^  $2: //p"; }
 in_of() { dry "$1" | sed -n 's/^  proof in \([^,]*\),.*/\1/p'; }
+proofs_of() { dry "$1" | sed -n 's/^  proof in .*: \/\(.*\)\/$/\1/p'; }
+absents_of() { dry "$1" | sed -n 's/^  absent in [^:]*: \/\(.*\)\/$/\1/p'; }
 # Makes the row's proof come: its line in the journal at its pub or call, or a
 # second after the trial begins; or its message on the bus.
 answer() { # ROW
   local in example
+  if [[ $(in_of "$1" | wc -l) -gt 1 ]]; then
+    # Several proofs: each example where its proof looks, a second in.
+    local ins examples n
+    lines_into ins in_of "$1"
+    lines_into examples field "$1" example
+    : >"$T/answer-all"
+    for n in "${!ins[@]}"; do
+      if [[ ${ins[$n]} == bus:* ]]; then
+        printf '%s\n' "${examples[$n]}" >"$T/bus-$n"
+        (sleep 1; cp "$T/bus-$n" "$T/bus/$(printf '%s' "${ins[$n]#bus:}" | tr / _)") &
+      else
+        printf '%s\t%s\n' "${ins[$n]}" "${examples[$n]}" >>"$T/answer-all"
+      fi
+    done
+    # Once the trial has taken its mark: when its cause begins.
+    if [[ -s $T/answer-all ]]; then
+      (
+        for _ in $(seq 100); do grep -qE '(cause|PLAY):' "$T/out" 2>/dev/null && break; sleep 0.1; done
+        cat "$T/answer-all" >>"$T/journal"
+      ) &
+    fi
+    return
+  fi
   in=$(in_of "$1" | awk '{print $1}')
   example=$(field "$1" example)
   if [[ $in == bus:* ]]; then
@@ -219,10 +284,28 @@ for row in $ROWS; do
   dry "$row" >"$T/out" 2>&1; check "$row --dry" 0 $?
   [[ -s $T/calls ]] && bad "$row --dry called: $(cat "$T/calls")" || ok
   has "$row --dry names a switch" "$T/out" "switch: "
-  # Each row's proof matches its example, the line as the code writes it.
-  proof=$(dry "$row" | sed -n 's/^  proof in .*: \/\(.*\)\/$/\1/p')
-  example=$(field "$row" example)
-  if [[ -n $example ]] && printf '%s\n' "$example" | grep -qE -- "$proof"; then ok; else bad "$row: /$proof/ doesn't match its example '$example'"; fi
+  # Each row's proofs match their examples, the lines as the code writes
+  # them; what must not come matches the line that would fail it, and none
+  # of the row's own examples.
+  lines_into proofs proofs_of "$row"
+  lines_into examples field "$row" example
+  [[ ${#proofs[@]} -ge 1 && ${#proofs[@]} == "${#examples[@]}" ]] && ok ||
+    bad "$row: ${#proofs[@]} proofs, ${#examples[@]} examples"
+  for n in "${!proofs[@]}"; do
+    if [[ -n ${examples[$n]:-} ]] && printf '%s\n' "${examples[$n]}" | grep -qE -- "${proofs[$n]}"; then ok; else
+      bad "$row: /${proofs[$n]}/ doesn't match its example '${examples[$n]:-}'"
+    fi
+  done
+  lines_into absents absents_of "$row"
+  lines_into absent_examples field "$row" "absent example"
+  for n in "${!absents[@]}"; do
+    if printf '%s\n' "${absent_examples[$n]:-}" | grep -qE -- "${absents[$n]}"; then ok; else
+      bad "$row: absent /${absents[$n]}/ doesn't match its example '${absent_examples[$n]:-}'"
+    fi
+    for example in "${examples[@]}"; do
+      if printf '%s\n' "$example" | grep -qE -- "${absents[$n]}"; then bad "$row: its own example '$example' is absent /${absents[$n]}/"; else ok; fi
+    done
+  done
 
   # A pass: set up, the switches on and carried, the cause, the proof; then
   # put back.
@@ -273,6 +356,27 @@ TRIALS_WAIT=1 "$SCRIPT" dusty >"$T/out" 2>&1; check "dusty with lamp-air not run
 has "dusty: lamp-air left as it is" "$T/out" "pause: lamp-air.service (not running: left as it is)"
 hasnt "dusty: lamp-air not stopped" "$T/calls" "systemctl stop lamp-air.service"
 hasnt "dusty: lamp-air not started" "$T/calls" "systemctl start lamp-air.service"
+
+# settings installs root's helper's two units for the trial (the socket's
+# group root), saves the old name and zone, sends the two changes, then sends
+# the saved lines back, stops the helper and removes the units; a change
+# refused fails the trial, and the put-back still runs and removes them.
+reset
+answer settings
+"$SCRIPT" settings >"$T/out" 2>&1; check "settings passes" 0 $?
+wait
+has "settings: the name sent" "$T/calls" 'call /run/lampos-setup-change/change.sock {"person_name":"Trial"}'
+has "settings: the zone sent" "$T/calls" 'call /run/lampos-setup-change/change.sock {"timezone":"Asia/Bangkok"}'
+has "settings: the old zone sent back" "$T/calls" 'call /run/lampos-setup-change/change.sock {"timezone":"Asia/Ho_Chi_Minh"}'
+has "settings: the old name sent back, escaped" "$T/calls" 'call /run/lampos-setup-change/change.sock {"person_name":"Saved \"Name\""}'
+hasnt "settings: the saved name never printed" "$T/out" "Saved"
+has "settings: the helper stopped" "$T/calls" "systemctl stop lamp-setup-change.socket"
+ls "$T/units"/lamp-setup-change* >/dev/null 2>&1 && bad "settings: the units are left" || ok
+reset
+touch "$T/send-refused"
+"$SCRIPT" settings >"$T/out" 2>&1; check "settings refused" 1 $?
+has "settings: says refused" "$T/out" "refused it"
+ls "$T/units"/lamp-setup-change* >/dev/null 2>&1 && bad "settings: the units are left after a refusal" || ok
 
 # light-out: --zone added to lamp-skills' own command line and carried,
 # nobody_s kept up every second until the end, then someone said back; an
@@ -492,6 +596,62 @@ wait $pid
 check "stopped mid-wait" 130 $?
 has "put back after TERM" "$T/out" "put back: drop-ins removed"
 no_dropin "after TERM"
+
+# The mood row: Mood started as a transient unit and stopped after;
+# Expression run in shadow, its own command line without --enable, from a
+# drop-in removed after; the light read before and after.
+reset
+printf '{"on":true,"colour":"orange","level":3}\n' >"$T/bus/light_state"
+answer mood
+"$SCRIPT" mood >"$T/out" 2>&1; check "mood passes" 0 $?
+wait
+has "mood: Mood started" "$T/calls" "systemd-run --unit=lamp-trial-mood"
+has "mood: as Expression's user" "$T/calls" "--uid=$(id -un)"
+has "mood: Mood switched on" "$T/calls" "-E LAMP_MOOD=on"
+has "mood: Mood stopped after" "$T/calls" "systemctl stop lamp-trial-mood"
+has "mood: the light as it was" "$T/out" 'the light as it was: {"on":true,"colour":"orange","level":3}'
+grep -lx 'lamp-expression serve --head-touch --bus-root /run/lampos-bus --zone system' \
+  <(for f in "$T"/proc/*/cmdline; do tr '\0' ' ' <"$f" | sed 's/^[^ ]*\///; s/ $//'; echo; done) >/dev/null && ok ||
+  bad "mood: Expression never ran without --enable"
+[[ -e $T/units/lamp-expression.service.d/zz-trial-shadow.conf ]] && bad "mood: the shadow drop-in is left" || ok
+# Run once more, Expression is back on its own line, with --enable.
+tr '\0' ' ' <"$T/proc/$(cat "$T/pids/lamp-expression.service")/cmdline" | grep -q -- "--enable" && ok ||
+  bad "mood: Expression not put back with --enable"
+
+# Someone known: the familiar level is said, and the row fails with the
+# message that says it.
+reset
+answer mood
+# The message mood/state's proof will be, a familiar level in it (the third
+# proof's: answer() copies $T/bus-2 there).
+field mood "absent example" >"$T/bus-2"
+"$SCRIPT" mood >"$T/out" 2>&1; check "mood fails on a familiar level" 1 $?
+wait
+has "mood: says what it must not" "$T/out" "said what it must not"
+has "mood: the line itself" "$T/out" '"familiar":"regular"'
+has "mood: put back after" "$T/out" "put back: drop-ins removed"
+
+# The light not as it was after: the put back says so and fails.
+reset
+printf '{"on":true,"colour":"orange","level":3}\n' >"$T/bus/light_state"
+answer mood
+# The light changes once the setup has read it: when the cause begins.
+(
+  for _ in $(seq 100); do grep -qE '(cause|PLAY):' "$T/out" 2>/dev/null && break; sleep 0.1; done
+  printf '{"on":false,"colour":"orange","level":3}\n' >"$T/bus/light_state"
+) &
+"$SCRIPT" mood >"$T/out" 2>&1; check "mood: a changed light fails the put back" 3 $?
+wait
+has "mood: says the light changed" "$T/out" "the light changed"
+
+# Mood already running: refused before anything changes, nothing started.
+reset
+echo active >"$T/state/lamp-mood.service"
+"$SCRIPT" mood >"$T/out" 2>&1; check "mood refused with Mood running" 3 $?
+has "mood: says Mood already runs" "$T/out" "Mood already runs (lamp-mood.service): nothing done"
+hasnt "mood: no second Mood" "$T/calls" "systemd-run"
+[[ -e $T/units/lamp-expression.service.d/zz-trial-shadow.conf ]] && bad "mood: a shadow drop-in written though refused" || ok
+no_dropin "mood refused"
 
 echo "trials-test: $pass passed, $fail failed"
 [[ $fail == 0 ]]

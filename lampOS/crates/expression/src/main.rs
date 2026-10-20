@@ -234,7 +234,17 @@ fn catalogue(path: Option<&PathBuf>) -> Result<Catalogue, Box<dyn std::error::Er
     if text.len() > 131_072 {
         return Err("catalogue is over 128 KiB".into());
     }
-    Ok(Catalogue::from_json(&text)?)
+    let (catalogue, unread) = Catalogue::from_json_naming(&text)?;
+    // Once, at start: a newer build's catalogue, read past what this build
+    // does not know (#1680).
+    if !unread.is_empty() {
+        eprintln!(
+            "lamp-expression: {}: fields this build does not read, ignored: {}",
+            path.display(),
+            unread.join(", ")
+        );
+    }
+    Ok(catalogue)
 }
 
 fn writer(path: Option<&PathBuf>) -> io::Result<Box<dyn Write>> {

@@ -39,6 +39,16 @@
 //!   why, when the lamp is not at rest as a say needs it, or a sound
 //!   played less than [`SOUND_EVERY_US`] ago ([`may_play_sound`]).
 //!   `spoken` then means played whole, with no gap in its playback.
+//! - **A recording the voice holds** (#1959): in place of the words,
+//!   `recording` names one line recorded at build time in the lamp's own
+//!   voice and loaded with the failure notices at start
+//!   (`docs/failure-notices.md`), [`RECORDINGS`] only: `wifi_lost`, for the
+//!   Wi-Fi helper with no network, when the model cannot be reached. Its
+//!   samples are played as a skill's sound is, with the same gates; one not
+//!   provisioned is refused at once with the loader's reason
+//!   ([`Recordings`]), and nothing is said. Only the Wi-Fi helper may ask
+//!   for one: the socket's peer is root ([`Caller`], by `SO_PEERCRED`), so
+//!   a skill cannot say there is no Wi-Fi while the lamp is online.
 //!
 //! Onboarding is also a source-owned request: only `skill: onboarding` with
 //! `from: onboarding` and a nonzero `invitation` can ask for it. The coordinator
@@ -175,6 +185,9 @@ pub enum Words {
     Text(String),
     From(Source),
     SoundAt(PathBuf),
+    /// One of [`RECORDINGS`], by name, until the client's thread takes its
+    /// samples from [`Recordings`].
+    Recording(String),
     Sound(Vec<i16>),
 }
 
@@ -185,7 +198,7 @@ impl Words {
         match self {
             Self::Note(note) => Some(note.clone()),
             Self::Text(text) => Some(format!("{AS_WRITTEN} {text}")),
-            Self::From(_) | Self::SoundAt(_) | Self::Sound(_) => None,
+            Self::From(_) | Self::SoundAt(_) | Self::Recording(_) | Self::Sound(_) => None,
         }
     }
 }
@@ -244,6 +257,8 @@ struct Wire {
     #[serde(default)]
     sound: Option<String>,
     #[serde(default)]
+    recording: Option<String>,
+    #[serde(default)]
     priority: Option<u8>,
     expires_in_ms: u64,
 }
@@ -255,9 +270,40 @@ fn invitation_id<'de, D: serde::Deserializer<'de>>(
     u64::deserialize(deserializer).map(Some)
 }
 
-/// Read and check one request line. The reason, if refused, names the
-/// field and never repeats what was asked.
+/// Who is at the other end of the socket, as its peer credentials say.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Caller {
+    /// Root's Wi-Fi helper (`lamp-setup wifi`, #1959): the one caller that
+    /// may ask for a [`RECORDINGS`] line.
+    WifiHelper,
+    /// Any other: a skill, a part, or a peer whose credentials are unknown.
+    Other,
+}
+
+/// The caller at `stream`'s other end: the Wi-Fi helper when its user is
+/// `helper_uid` (root in the product). Peer credentials are read on Linux
+/// only; elsewhere every caller is [`Caller::Other`].
+fn caller_of(stream: &UnixStream, helper_uid: u32) -> Caller {
+    #[cfg(target_os = "linux")]
+    if rustix::net::sockopt::socket_peercred(stream)
+        .is_ok_and(|peer| peer.uid.as_raw() == helper_uid)
+    {
+        return Caller::WifiHelper;
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = (stream, helper_uid);
+    Caller::Other
+}
+
+/// Read and check one request line from a caller that is not the Wi-Fi
+/// helper ([`parse_from`]).
 pub fn parse(line: &str) -> Result<Request, String> {
+    parse_from(line, Caller::Other)
+}
+
+/// Read and check one request line from `caller`. The reason, if refused,
+/// names the field and never repeats what was asked.
+pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     let wire: Wire = serde_json::from_str(line.trim_end_matches(['\n', '\r']))
         .map_err(|_| "not a say request".to_owned())?;
     let skill = wire.skill;
@@ -269,21 +315,30 @@ pub fn parse(line: &str) -> Result<Request, String> {
     {
         return Err("skill is 1 to 64 of a-z, 0-9, - and _".into());
     }
-    let words = match (wire.note, wire.text, wire.from, wire.sound) {
-        (Some(note), None, None, None) => Words::Note(note),
-        (None, Some(text), None, None) => Words::Text(text),
-        (None, None, Some(from), None) => Words::From(
+    let words = match (wire.note, wire.text, wire.from, wire.sound, wire.recording) {
+        (Some(note), None, None, None, None) => Words::Note(note),
+        (None, Some(text), None, None, None) => Words::Text(text),
+        (None, None, Some(from), None, None) => Words::From(
             Source::named(&from)
                 .ok_or_else(|| "from is schedule, tasks or onboarding".to_owned())?,
         ),
-        (None, None, None, Some(sound)) => {
+        (None, None, None, None, Some(name)) => {
+            if !RECORDINGS.contains(&name.as_str()) {
+                return Err(format!("recording is one of {}", RECORDINGS.join(", ")));
+            }
+            if caller != Caller::WifiHelper {
+                return Err("recording is asked by the Wi-Fi helper only".into());
+            }
+            Words::Recording(name)
+        }
+        (None, None, None, Some(sound), None) => {
             if !sound.starts_with('/') || sound.len() > 1_024 || sound.chars().any(char::is_control)
             {
                 return Err("sound is an absolute path of at most 1024 bytes".into());
             }
             Words::SoundAt(PathBuf::from(sound))
         }
-        _ => return Err("exactly one of note, text, from and sound".into()),
+        _ => return Err("exactly one of note, text, from, sound and recording".into()),
     };
     if let Words::Note(said) | Words::Text(said) = &words
         && (said.trim().is_empty()
@@ -406,7 +461,7 @@ pub struct Says {
 impl Says {
     /// The service, when [`ENVIRONMENT`] is `on` and the socket can be
     /// made; one that cannot is said once, and the voice goes on without.
-    pub fn from_environment() -> Option<Self> {
+    pub fn from_environment(recordings: Recordings) -> Option<Self> {
         if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on") {
             return None;
         }
@@ -429,7 +484,7 @@ impl Says {
         };
         let sounds = std::env::var_os(SOUNDS_ENVIRONMENT)
             .map_or_else(|| PathBuf::from(DEFAULT_SOUNDS), PathBuf::from);
-        match Self::serve(&path, group, &sounds) {
+        match Self::serve(&path, group, &sounds, recordings) {
             Ok(says) => {
                 eprintln!("lamp-voice: the say service listens at {}", path.display());
                 Some(says)
@@ -445,15 +500,22 @@ impl Says {
     }
 
     /// Listen at `path`, opened to `group` if given, on a thread of its
-    /// own; a sound is played only from under `sounds`.
-    pub fn serve(path: &Path, group: Option<u32>, sounds: &Path) -> io::Result<Self> {
+    /// own; a sound is played only from under `sounds`, and a recording
+    /// only from `recordings`.
+    pub fn serve(
+        path: &Path,
+        group: Option<u32>,
+        sounds: &Path,
+        recordings: Recordings,
+    ) -> io::Result<Self> {
         let (listener, bound) = bind(path, group)?;
         let (ask, incoming) = mpsc::channel();
         let open = Arc::new(AtomicUsize::new(0));
         let sounds: Arc<Path> = sounds.into();
+        let recordings = Arc::new(recordings);
         thread::Builder::new()
             .name("lamp-voice-say".into())
-            .spawn(move || accept(&listener, &ask, &open, &sounds))?;
+            .spawn(move || accept(&listener, &ask, &open, &sounds, &recordings))?;
         Ok(Self {
             incoming,
             waiting: Vec::new(),
@@ -628,7 +690,7 @@ impl Says {
         self.next_of(|request| {
             !matches!(
                 request.words,
-                Words::From(_) | Words::SoundAt(_) | Words::Sound(_)
+                Words::From(_) | Words::SoundAt(_) | Words::Recording(_) | Words::Sound(_)
             )
         })
     }
@@ -819,6 +881,7 @@ fn accept(
     ask: &mpsc::Sender<Asked>,
     open: &Arc<AtomicUsize>,
     sounds: &Arc<Path>,
+    recordings: &Arc<Recordings>,
 ) {
     for stream in listener.incoming() {
         let Ok(mut stream) = stream else { continue };
@@ -832,10 +895,11 @@ fn accept(
             continue;
         }
         let (ask, held, sounds) = (ask.clone(), Arc::clone(open), Arc::clone(sounds));
+        let recordings = Arc::clone(recordings);
         let spawned = thread::Builder::new()
             .name("lamp-voice-say-client".into())
             .spawn(move || {
-                serve_client(stream, &ask, &sounds);
+                serve_client(stream, &ask, &sounds, &recordings);
                 held.fetch_sub(1, Ordering::AcqRel);
             });
         if spawned.is_err() {
@@ -848,15 +912,28 @@ fn accept(
 /// written back when it comes. A sound is read here, on the client's
 /// thread, and its samples handed on: a slow or strange file never holds
 /// the voice's loop.
-fn serve_client(mut stream: UnixStream, ask: &mpsc::Sender<Asked>, sounds: &Path) {
+fn serve_client(
+    mut stream: UnixStream,
+    ask: &mpsc::Sender<Asked>,
+    sounds: &Path,
+    recordings: &Recordings,
+) {
     let outcome = match read_line_within(&stream, READ_WITHIN) {
         Err(why) => Outcome::Refused(why.into()),
-        Ok(line) => match parse(&line).and_then(|mut request| {
-            if let Words::SoundAt(path) = &request.words {
-                request.words = Words::Sound(read_skill_sound(path, sounds)?);
-            }
-            Ok(request)
-        }) {
+        Ok(line) => match parse_from(&line, caller_of(&stream, recordings.helper_uid)).and_then(
+            |mut request| {
+                match &request.words {
+                    Words::SoundAt(path) => {
+                        request.words = Words::Sound(read_skill_sound(path, sounds)?);
+                    }
+                    Words::Recording(name) => {
+                        request.words = Words::Sound(recordings.samples(name)?);
+                    }
+                    _ => {}
+                }
+                Ok(request)
+            },
+        ) {
             Err(why) => Outcome::Refused(why),
             Ok(request) => {
                 let (answer, answered) = mpsc::channel();
@@ -921,6 +998,54 @@ fn read_line_within(stream: &UnixStream, within: Duration) -> Result<String, &'s
         if let Some(end) = end {
             line.truncate(end + 1);
             return String::from_utf8(line).map_err(|_| "not a say request");
+        }
+    }
+}
+
+/// The recordings an ask may name (#1959): each is one line recorded at
+/// build time in the lamp's own voice, a failure notice of the same name
+/// (`lamp_audio::notice::NoticeKind`, `docs/failure-notices.md`).
+pub const RECORDINGS: &[&str] = &["wifi_lost"];
+
+/// The recordings the voice loaded at start, by name: their samples, or
+/// the loader's reason they are not there (`not_provisioned`,
+/// `asset_hash_mismatch`, ...), and the user whose asks for them are the
+/// Wi-Fi helper's (root, `0`). Read on the client's thread; never reloaded.
+#[derive(Clone, Debug, Default)]
+pub struct Recordings {
+    held: Vec<(&'static str, Loaded)>,
+    helper_uid: u32,
+}
+
+/// One recording's samples, or why it is not there.
+pub type Loaded = Result<Arc<[i16]>, String>;
+
+impl Recordings {
+    /// None loaded: every recording asked for is refused.
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// `name`'s samples, or its reason.
+    pub fn with(mut self, name: &'static str, loaded: Loaded) -> Self {
+        self.held.retain(|(held, _)| *held != name);
+        self.held.push((name, loaded));
+        self
+    }
+
+    /// The Wi-Fi helper is `uid` rather than root: a test's own user.
+    pub fn helper_uid(mut self, uid: u32) -> Self {
+        self.helper_uid = uid;
+        self
+    }
+
+    /// The samples of `name`, or why there are none, in words the asker
+    /// can journal: never a path.
+    pub fn samples(&self, name: &str) -> Result<Vec<i16>, String> {
+        match self.held.iter().find(|(held, _)| *held == name) {
+            Some((_, Ok(samples))) => Ok(samples.to_vec()),
+            Some((_, Err(why))) => Err(format!("the recording is not there: {why}")),
+            None => Err("the recording is not there: no_directory".into()),
         }
     }
 }
@@ -1319,7 +1444,7 @@ mod tests {
         let file = fs::canonicalize(&sounds).unwrap().join("ding.wav");
         fs::write(&file, wav(MONO, &chime)).unwrap();
         let path = dir.join("say.sock");
-        let mut says = Says::serve(&path, None, &sounds).unwrap();
+        let mut says = Says::serve(&path, None, &sounds, Recordings::none()).unwrap();
         assert_eq!(
             exchange(
                 &path,
@@ -1367,6 +1492,126 @@ mod tests {
             )
         );
         assert!(says.take_sound(0).is_none());
+        drop(says);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #1959: a recording the voice holds is asked by its name, by the
+    /// Wi-Fi helper only, and never as a turn for the model.
+    #[test]
+    fn a_recording_is_asked_by_name_by_the_wifi_helper_only() {
+        let line = r#"{"skill":"wifi","recording":"wifi_lost","expires_in_ms":60000}"#;
+        let asked = parse_from(line, Caller::WifiHelper).unwrap();
+        assert_eq!(asked.words, Words::Recording("wifi_lost".into()));
+        assert_eq!(asked.words.turn(), None, "never a turn for the model");
+        // Another caller, under any skill name, is refused.
+        for line in [
+            line,
+            r#"{"skill":"chime","recording":"wifi_lost","expires_in_ms":60000}"#,
+        ] {
+            assert_eq!(
+                parse(line).unwrap_err(),
+                "recording is asked by the Wi-Fi helper only"
+            );
+        }
+        assert!(
+            parse_from(
+                r#"{"skill":"wifi","recording":"anything","expires_in_ms":1}"#,
+                Caller::WifiHelper
+            )
+            .is_err(),
+            "only a recording the voice knows"
+        );
+        assert!(
+            parse_from(
+                r#"{"skill":"wifi","recording":"wifi_lost","text":"Hi.","expires_in_ms":1}"#,
+                Caller::WifiHelper
+            )
+            .is_err()
+        );
+    }
+
+    /// #1959: over the socket, a caller that is not the Wi-Fi helper's
+    /// user is refused a recording that is there, and nothing is handed on.
+    #[test]
+    fn a_recording_asked_through_the_socket_by_another_user_is_refused() {
+        let line = "{\"skill\":\"wifi\",\"recording\":\"wifi_lost\",\"expires_in_ms\":60000}\n";
+        let dir = socket_dir("rec-other");
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("say.sock");
+        let not_us = rustix::process::getuid().as_raw().wrapping_add(1);
+        let held = Recordings::none()
+            .with("wifi_lost", Ok(vec![2_000_i16; 24_000].into()))
+            .helper_uid(not_us);
+        let mut says = Says::serve(&path, None, &dir, held).unwrap();
+        assert_eq!(
+            exchange(&path, line),
+            format!(
+                "{}\n",
+                Outcome::Refused("recording is asked by the Wi-Fi helper only".into()).line()
+            )
+        );
+        says.poll(0);
+        assert!(says.take_sound(0).is_none() && says.take(0).is_none());
+        drop(says);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #1959: the Wi-Fi helper's recording is played as a sound; one not
+    /// provisioned is refused at once with the loader's reason, and never
+    /// reaches the voice. The helper is this test's own user here; the
+    /// peer's user is read on Linux only.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_recording_is_asked_by_name_and_one_not_there_is_refused_with_why() {
+        let us = rustix::process::getuid().as_raw();
+        let line = "{\"skill\":\"wifi\",\"recording\":\"wifi_lost\",\"expires_in_ms\":60000}\n";
+        // Not provisioned: refused by the socket, nothing handed on.
+        let dir = socket_dir("rec");
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("say.sock");
+        let missing = Recordings::none()
+            .with("wifi_lost", Err("not_provisioned".into()))
+            .helper_uid(us);
+        let mut says = Says::serve(&path, None, &dir, missing).unwrap();
+        assert_eq!(
+            exchange(&path, line),
+            format!(
+                "{}\n",
+                Outcome::Refused("the recording is not there: not_provisioned".into()).line()
+            )
+        );
+        says.poll(0);
+        assert!(says.take_sound(0).is_none() && says.take(0).is_none());
+        drop(says);
+        // Provisioned: its samples reach the voice as a sound.
+        let line_samples: Arc<[i16]> = vec![2_000_i16; 24_000].into();
+        let held = Recordings::none()
+            .with("wifi_lost", Ok(Arc::clone(&line_samples)))
+            .helper_uid(us);
+        let mut says = Says::serve(&path, None, &dir, held).unwrap();
+        let client = {
+            let path = path.clone();
+            thread::spawn(move || exchange(&path, line))
+        };
+        let mut taken = None;
+        for _ in 0..200 {
+            says.poll(0);
+            assert!(says.take(0).is_none(), "a recording is no say");
+            if let Some(one) = says.take_sound(0) {
+                taken = Some(one);
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        let (samples, ticket) = taken.expect("the recording reached the voice");
+        assert_eq!(samples, &line_samples[..]);
+        assert_eq!(ticket.skill(), "wifi");
+        ticket.answer(Outcome::Spoken);
+        assert_eq!(
+            client.join().unwrap(),
+            format!("{}\n", Outcome::Spoken.line())
+        );
         drop(says);
         fs::remove_dir_all(&dir).unwrap();
     }
@@ -1532,7 +1777,7 @@ mod tests {
             ),
             (
                 r#"{"skill":"x","from":"tasks","note":"n","expires_in_ms":5}"#,
-                "exactly one of note, text, from and sound",
+                "exactly one of note, text, from, sound and recording",
             ),
         ] {
             assert_eq!(parse(line).unwrap_err(), why, "{line}");
@@ -1825,7 +2070,7 @@ mod tests {
     fn a_line_sent_slowly_is_refused_after_a_second_and_its_place_given_back() {
         let dir = socket_dir("slow");
         let path = dir.join("say.sock");
-        let mut says = Says::serve(&path, None, &dir).unwrap();
+        let mut says = Says::serve(&path, None, &dir, Recordings::none()).unwrap();
         let started = Instant::now();
         let slow: Vec<_> = (0..MOST_WAITING)
             .map(|_| {
@@ -1891,7 +2136,7 @@ mod tests {
     fn a_say_waiting_for_the_voice_expires_from_when_its_line_was_read() {
         let dir = socket_dir("late");
         let path = dir.join("say.sock");
-        let mut says = Says::serve(&path, None, &dir).unwrap();
+        let mut says = Says::serve(&path, None, &dir, Recordings::none()).unwrap();
         let client = {
             let path = path.clone();
             thread::spawn(move || {
@@ -1917,7 +2162,7 @@ mod tests {
     fn through_the_socket_an_ask_is_answered_when_the_voice_says_what_became_of_it() {
         let dir = socket_dir("sock");
         let path = dir.join("say.sock");
-        let mut says = Says::serve(&path, None, &dir).unwrap();
+        let mut says = Says::serve(&path, None, &dir, Recordings::none()).unwrap();
         assert_eq!(
             fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
             0o700
@@ -1930,7 +2175,8 @@ mod tests {
             exchange(&path, "{\"skill\":\"x\",\"expires_in_ms\":5}\n"),
             format!(
                 "{}\n",
-                Outcome::Refused("exactly one of note, text, from and sound".into()).line()
+                Outcome::Refused("exactly one of note, text, from, sound and recording".into())
+                    .line()
             )
         );
         let client = {
@@ -1966,7 +2212,7 @@ mod tests {
         );
         // A second voice cannot take the socket of one still listening.
         assert_eq!(
-            Says::serve(&path, None, &dir)
+            Says::serve(&path, None, &dir, Recordings::none())
                 .err()
                 .map(|error| error.kind()),
             Some(io::ErrorKind::AddrInUse)

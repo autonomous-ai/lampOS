@@ -167,8 +167,10 @@ fn main() -> ExitCode {
         // The app's skills page (#1722): only with LAMP_SKILLS_PAGE=on too.
         skills: skills::on_from_environment().then(skills::Places::product),
         // Names and the zone after setup (#1959): only with LAMP_SETTINGS_CHANGE=on too.
-        changes: lamp_cloud::settings::on_from_environment()
-            .then(lamp_cloud::settings::Changes::product),
+        // The Wi-Fi too only with LAMP_SETTINGS_WIFI=on (#1959's second piece).
+        changes: lamp_cloud::settings::on_from_environment().then(|| {
+            lamp_cloud::settings::Changes::product(lamp_cloud::settings::wifi_on_from_environment())
+        }),
         // A face from the app's photo (#1968): only with LAMP_PHOTO_FACES=on.
         photos: lamp_cloud::photos::Place::from_environment(),
     };

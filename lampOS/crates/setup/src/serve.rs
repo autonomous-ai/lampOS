@@ -135,6 +135,44 @@ pub struct Config {
     pub light: bool,
 }
 
+/// The configuration's fields, as [`read`] knows them.
+pub const FIELDS: [&str; 20] = [
+    "listen",
+    "marker",
+    "credential",
+    "policy_key",
+    "name",
+    "country",
+    "interface",
+    "hotspot_address",
+    "page",
+    "zoneinfo",
+    "localtime",
+    "timezone_file",
+    "zone_env",
+    "backend",
+    "reports",
+    "display_name",
+    "web_start",
+    "web_stop",
+    "free_port",
+    "light",
+];
+
+/// Read a written configuration, one version ahead (#1680): a field this
+/// build does not know is dropped and named in the returned lines; the rest
+/// is read and checked as before.
+pub fn read(bytes: &[u8]) -> Result<(Config, Vec<String>), String> {
+    let mut value: Value =
+        serde_json::from_slice(bytes).map_err(|error| format!("the configuration: {error}"))?;
+    let mut notes = Vec::new();
+    crate::drop_unknown_fields(&mut value, "setup configuration", &FIELDS, &mut notes);
+    let config: Config =
+        serde_json::from_value(value).map_err(|error| format!("the configuration: {error}"))?;
+    config.check()?;
+    Ok((config, notes))
+}
+
 impl Config {
     pub fn check(&self) -> Result<(), String> {
         for path in [
@@ -427,21 +465,25 @@ impl fmt::Debug for Accepted {
     }
 }
 
+/// Why a network name or password is refused, in the page's words. Never
+/// either value: the Wi-Fi changed after setup says the same (#1959).
+pub fn refused_words(why: wifi::Refused) -> &'static str {
+    match why {
+        wifi::Refused::SsidEmpty => "choose a Wi-Fi network",
+        wifi::Refused::SsidTooLong => "the Wi-Fi name is longer than 32 bytes",
+        wifi::Refused::SsidControl => "the Wi-Fi name has a character the lamp cannot use",
+        wifi::Refused::PasswordLength => "a Wi-Fi password has 8 to 63 characters",
+        wifi::Refused::PasswordCharacters => {
+            "the Wi-Fi password has a character the lamp cannot use"
+        }
+        wifi::Refused::Country => "the lamp's country is not set",
+    }
+}
+
 /// Check a request before anything is touched; the message is for the page.
 pub fn check(request: &SetupRequest, config: &Config) -> Result<Accepted, String> {
-    wifi::wpa_conf(&config.country, &request.ssid, &request.password).map_err(|why| {
-        match why {
-            wifi::Refused::SsidEmpty => "choose a Wi-Fi network",
-            wifi::Refused::SsidTooLong => "the Wi-Fi name is longer than 32 bytes",
-            wifi::Refused::SsidControl => "the Wi-Fi name has a character the lamp cannot use",
-            wifi::Refused::PasswordLength => "a Wi-Fi password has 8 to 63 characters",
-            wifi::Refused::PasswordCharacters => {
-                "the Wi-Fi password has a character the lamp cannot use"
-            }
-            wifi::Refused::Country => "the lamp's country is not set",
-        }
-        .to_owned()
-    })?;
+    wifi::wpa_conf(&config.country, &request.ssid, &request.password)
+        .map_err(|why| refused_words(why).to_owned())?;
     let credential = request.llm_api_key.trim();
     if credential.len() > 512 || !credential.bytes().all(|b| b.is_ascii_graphic()) {
         return Err("the voice's key has a character it cannot have, or is too long".into());
