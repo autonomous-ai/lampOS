@@ -562,7 +562,10 @@ CHECK
 # nobody (the first builder, #1722, 20 Oct 07:20). A long session rotates its
 # records, and the states, written as the worker starts, can go with the
 # oldest: with none left but ends its model decided, it ran, and is ready,
-# inferred (the first builder, #1722, 20 Oct 12:13).
+# inferred (the first builder, #1722, 20 Oct 12:13). It counts every end the
+# model decided in the session's records, as it runs before the arm; after an
+# arm, `lamp-voice-eval endpoint SESSION --since-us N` counts only the arm's
+# (the reviewer on #2180, P3).
 IFS= read -r -d '' ENDPOINT_CHECK <<'CHECK' || true
 d=@SESSIONS@/$(systemctl show -p InvocationID --value lamp-voice)/metadata
 line=$(sudo -n sh -c "cat '$d'/events-*.jsonl" 2>/dev/null | grep '"kind":"endpoint_worker"' | sed -n 's/.*"at_us":\([0-9]*\).*/\1 &/p' | sort -n | tail -1)
