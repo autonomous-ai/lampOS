@@ -1244,7 +1244,10 @@ half) could not be seen from that place and were dropped; they come back
 only if a lamp in front of a person shows them. While a sitting with its
 baseline is followed the journal says every 2 s `lamp-eyes: sitter 1.04 as
 tall as sat, 0.03 of its height lower, pitch 0.52 (sat 0.50), AtDesk`, numbers
-only, for the next run. By place alone, someone else in the sitter's own
+only, for the next run. Once no look has had the sitter for 2 s, until Away
+20 s on, it says `lamp-eyes: sitter not seen for 14 s, AtDesk` instead of
+repeating the last look, which read as a face held still (lamp-75c9, 20 Oct,
+#1678). By place alone, someone else in the sitter's own
 place, at their distance, is taken for them (the run's leave step: faces
 side-on at 0.40 to 0.53 across, where the sitter had sat at 0.44).
 
