@@ -432,6 +432,50 @@ as any word does, with no record of its own). Code:
 `crates/voice-eval/tests/waiting_cuts.rs` on an invented journal excerpt and
 sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
 
+**A line the lamp starts on its own isn't ended by the room's sound
+(`LAMP_OWN_LINE_KEEPS=on`, #2220; off unless set).**
+- **The fault:** on lamp-06c1 on 20 Oct (El, #806's step 7), two of three of
+  Welcome back's hellos were dropped as `user_interrupted`. A sound the room
+  made about 2 s in was admitted before any of the hello's audio
+  (`provider_audio_seen: false`). The wait above is only for an answer to
+  someone, so any sound ended the lamp's own line.
+- **With the switch,** while a line the lamp started on its own has not
+  sounded, a new sound waits instead of taking the turn
+  (`while_own_line_waits` in `crates/voice/src/coordinator.rs`). Such a line
+  answers no person's words, has had no audio arrive, and has nothing
+  playing. It is one of:
+  - a skill's say;
+  - a reminder;
+  - news the lamp tells unasked (`lamp_tells_news`);
+  - its hello to someone arriving (`lamp_speaks_first`);
+  - a line of the setup walk (`lamp_leads_setup`).
+
+  A written turn that follows a person's, a look's or a "Sorry?", is as
+  before.
+  - **The lamp's name** heard as the sound began (`name/rising`, up to
+    `CALL_BEFORE_US` before its trigger) takes the turn at once, as before.
+  - **Any other sound** is let go once the line begins to sound, or 100 ms
+    before the sound's own decision deadline (`WAIT_DECIDES_BEFORE_US`). The
+    line goes on. The record says `own_line_waits` once for each sound
+    that waits, then `input_let_go_own_line` with `why` (`sounded` or
+    `deadline`), and the journal says it was let go.
+  - **A sound that begins once the line sounds** is a cut-in over the lamp's
+    voice, judged by the duplex rules as for any of its speech. So words said
+    over the hello still stop it.
+  - **A block the mask heard without echo evidence** (a duplex lamp's block
+    with no `echo`) is decided as before, as the answer's wait does: such a
+    block is kept only among the mask's last reads, so a sound held longer
+    couldn't be held whole (the reviewer on #2242).
+- **Its cost:** someone who answers the lamp before its hello sounds, without
+  its name, is let go with the room, and says it again over the hello or
+  after it. That includes "not now" and "stop": said before the line sounds,
+  they don't stop it, and the line plays; said over it, they do.
+- **Tested** as a function
+  (`a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds`). The
+  loop's own call isn't driven by a test, as the wait's isn't. On a lamp:
+  played room noise over three hellos before and after, and the cut-in test
+  of a person speaking over one unchanged.
+
 **With `LAMP_ASKER_FIRST=on`, the person asked comes first while the
 answer is awaited** (`crates/voice/src/asker_first.rs`, #829; off unless
 set, and `record` to judge it without acting). On lamp-4ace in the busy
