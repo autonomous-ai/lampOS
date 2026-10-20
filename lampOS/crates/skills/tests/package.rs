@@ -882,7 +882,14 @@ fn a_list_says_each_skills_name_kind_version_and_what_it_may_use() {
 /// asked`, its standard input and output one end of a Unix socket, asked
 /// `line` straight, with nobody before it to check the request (#1722).
 fn ask_helper(skills: &Path, line: &[u8]) -> (serde_json::Value, bool) {
-    use std::io::{BufRead, Write};
+    let (answer, ok, _) = ask_helper_journal(skills, line);
+    (answer, ok)
+}
+
+/// [`ask_helper`], with what the helper wrote to its journal (its standard
+/// error) as well.
+fn ask_helper_journal(skills: &Path, line: &[u8]) -> (serde_json::Value, bool, String) {
+    use std::io::{BufRead, Read, Write};
     use std::os::unix::net::UnixStream;
     use std::process::{Command, Stdio};
     let (mut ours, theirs) = UnixStream::pair().unwrap();
@@ -893,7 +900,7 @@ fn ask_helper(skills: &Path, line: &[u8]) -> (serde_json::Value, bool) {
             theirs.try_clone().unwrap(),
         )))
         .stdout(Stdio::from(std::os::fd::OwnedFd::from(theirs)))
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .unwrap();
     ours.write_all(line).unwrap();
@@ -902,8 +909,115 @@ fn ask_helper(skills: &Path, line: &[u8]) -> (serde_json::Value, bool) {
     std::io::BufReader::new(&ours)
         .read_line(&mut answer)
         .unwrap();
+    let mut journal = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut journal)
+        .unwrap();
     let status = child.wait().unwrap();
-    (serde_json::from_str(&answer).unwrap(), status.success())
+    (
+        serde_json::from_str(&answer).unwrap(),
+        status.success(),
+        journal,
+    )
+}
+
+/// While another run holds the skills folder, the helper waits at most
+/// `ASKED_LOCK_WAIT`, under `lamp-cloud`'s 5 s, then refuses in the words
+/// the app already shows, with nothing done; a hold given back within it
+/// lets the remove go on (the reviewer's P3 1 on #1890).
+#[test]
+fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
+    use std::time::{Duration, Instant};
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    tutor(&skills, "1.0.0");
+    let held = fs::File::open(&skills).unwrap();
+    held.lock().unwrap();
+    let asked = Instant::now();
+    let (answer, ok) = ask_helper(&skills, b"{\"remove\": \"desk-tutor\"}\n");
+    let waited = asked.elapsed();
+    assert!(!ok);
+    assert_eq!(answer["refused"], package::BUSY);
+    assert_eq!(package::BUSY, "the lamp's skills can't be changed now");
+    assert!(
+        waited >= package::ASKED_LOCK_WAIT && waited < Duration::from_secs(5),
+        "{waited:?}"
+    );
+    held.unlock().unwrap();
+    assert_eq!(left(&skills), ["desk-tutor"]);
+
+    // Given back within the wait, the remove goes on.
+    held.lock().unwrap();
+    let giving_back = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(500));
+        held.unlock().unwrap();
+    });
+    let mut answer = Vec::new();
+    let ok = package::asked(&skills, &b"{\"remove\": \"desk-tutor\"}\n"[..], &mut answer).unwrap();
+    giving_back.join().unwrap();
+    assert!(ok, "{}", String::from_utf8_lossy(&answer));
+    assert!(left(&skills).is_empty());
+}
+
+/// A skill renamed aside whose `.removed-NAME-PID` could not then be
+/// deleted is gone for the running program, so it is answered done; where
+/// it was set aside goes to the journal alone, never into the answer (the
+/// reviewer's P3 2 on #1890).
+#[test]
+fn a_skill_renamed_aside_but_not_deleted_is_answered_done_its_path_in_the_journal_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    let skill = tutor(&skills, "1.0.0");
+    // A folder inside it whose file can't be deleted: the rename goes, the
+    // delete after it does not.
+    let stuck = skill.join("stuck");
+    fs::create_dir(&stuck).unwrap();
+    fs::write(stuck.join("kept"), "x").unwrap();
+    fs::set_permissions(&stuck, fs::Permissions::from_mode(0o555)).unwrap();
+
+    let (answer, ok, journal) = ask_helper_journal(&skills, b"{\"remove\": \"desk-tutor\"}\n");
+    let names = left(&skills);
+    for name in &names {
+        let _ = fs::set_permissions(
+            skills.join(name).join("stuck"),
+            fs::Permissions::from_mode(0o755),
+        );
+    }
+    assert!(ok, "{answer}");
+    assert_eq!(
+        answer["done"],
+        "removed desk-tutor: a running lamp-skills lets it go within 2 s"
+    );
+    assert_eq!(answer.as_object().unwrap().len(), 1, "{answer}");
+    let said = answer.to_string();
+    assert!(
+        !said.contains(".removed-") && !said.contains(&*skills.to_string_lossy()),
+        "{said}"
+    );
+    assert_eq!(names.len(), 1, "{names:?}");
+    assert!(names[0].starts_with(".removed-desk-tutor-"), "{names:?}");
+    assert!(journal.contains(&names[0]), "{journal}");
+    assert!(journal.contains("was not deleted"), "{journal}");
+    // By hand, the same is said as not finished, its path with it.
+    let skill = tutor(&skills, "1.0.0");
+    let stuck = skill.join("stuck");
+    fs::create_dir(&stuck).unwrap();
+    fs::write(stuck.join("kept"), "x").unwrap();
+    fs::set_permissions(&stuck, fs::Permissions::from_mode(0o555)).unwrap();
+    let why = package::remove(&skills, "desk-tutor").unwrap_err();
+    for name in left(&skills) {
+        let _ = fs::set_permissions(
+            skills.join(name).join("stuck"),
+            fs::Permissions::from_mode(0o755),
+        );
+    }
+    assert!(why.starts_with("removed desk-tutor, but "), "{why}");
+    assert!(why.contains(".removed-desk-tutor-"), "{why}");
 }
 
 /// The helper checks each request itself, whoever connects: a core skill

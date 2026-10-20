@@ -20,6 +20,7 @@ use std::{
     io::{BufRead, Read},
     os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
+    time::{Duration, Instant},
 };
 
 /// The package format this program writes and reads.
@@ -486,6 +487,44 @@ fn locked(skills: &Path) -> Result<fs::File, String> {
     Ok(folder)
 }
 
+/// [`locked`], but waiting at most `wait` for another run to give the
+/// folder back: then [`BUSY`]. The manage helper waits this way, so it never
+/// goes on with a remove after its asker has stopped waiting for it.
+fn locked_within(skills: &Path, wait: Duration) -> Result<fs::File, String> {
+    let folder =
+        fs::File::open(skills).map_err(|error| format!("{}: {error}", skills.display()))?;
+    let until = Instant::now() + wait;
+    loop {
+        match folder.try_lock() {
+            Ok(()) => return Ok(folder),
+            Err(fs::TryLockError::WouldBlock) if Instant::now() < until => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(fs::TryLockError::WouldBlock) => {
+                eprintln!(
+                    "lamp-skills: {}: held by another run for {} ms: nothing done",
+                    skills.display(),
+                    wait.as_millis()
+                );
+                return Err(BUSY.to_owned());
+            }
+            Err(fs::TryLockError::Error(error)) => {
+                return Err(format!("{}: not locked: {error}", skills.display()));
+            }
+        }
+    }
+}
+
+/// Why the manage helper did nothing when another run held the skills
+/// folder past [`ASKED_LOCK_WAIT`]: the words `lamp-cloud` already gives the
+/// app when the helper does not answer.
+pub const BUSY: &str = "the lamp's skills can't be changed now";
+
+/// The longest the manage helper waits for the skills folder's lock, under
+/// `lamp-cloud`'s 5 s wait for its answer, so a remove is done, or refused,
+/// while `lamp-cloud` still waits for it, never after.
+pub const ASKED_LOCK_WAIT: Duration = Duration::from_secs(4);
+
 /// Whether `name` is what [`hidden_place`] names: `.install-NAME-PID` or
 /// `.removed-NAME-PID`, a skill's name and a number, and nothing else.
 fn left_by_a_run(name: &str) -> bool {
@@ -740,6 +779,22 @@ fn moved_in(
 /// Removes the installable skill `name` from `skills` and says so. A core
 /// skill is refused: it comes with the lamp.
 pub fn remove(skills: &Path, name: &str) -> Result<String, String> {
+    match taken_off(skills, name, None)? {
+        None => Ok(removed_said(name)),
+        Some(left) => Err(format!("removed {name}, but {left}")),
+    }
+}
+
+/// What a remove says once the skill is gone for the running program.
+fn removed_said(name: &str) -> String {
+    format!("removed {name}: a running lamp-skills lets it go within 2 s")
+}
+
+/// [`remove`]'s steps, the folder's lock waited for at most `wait` (always,
+/// when `None`). Once the skill is renamed aside it is gone for the running
+/// program: `Some` says where it was set aside and why that was not then
+/// deleted (the next install deletes it, [`left_by_a_run`]).
+fn taken_off(skills: &Path, name: &str, wait: Option<Duration>) -> Result<Option<String>, String> {
     if !skill_name_ok(name) {
         return Err(format!(
             "{name:?} is not a skill's name: 1 to 64 lowercase letters, digits and hyphens"
@@ -759,7 +814,10 @@ pub fn remove(skills: &Path, name: &str) -> Result<String, String> {
         }
         Err(error) => return Err(format!("{}: {error}", target.display())),
     }
-    let _held = locked(skills)?;
+    let _held = match wait {
+        None => locked(skills)?,
+        Some(wait) => locked_within(skills, wait)?,
+    };
     if kind_of(&target) == SkillKind::Core {
         return Err(format!(
             "{name} is a core skill: it comes with the lamp and can't be removed"
@@ -772,15 +830,9 @@ pub fn remove(skills: &Path, name: &str) -> Result<String, String> {
         fs::remove_dir_all(&old).map_err(failed)?;
     }
     fs::rename(&target, &old).map_err(failed)?;
-    fs::remove_dir_all(&old).map_err(|error| {
-        format!(
-            "removed {name}, but {} was not deleted: {error}",
-            old.display()
-        )
-    })?;
-    Ok(format!(
-        "removed {name}: a running lamp-skills lets it go within 2 s"
-    ))
+    Ok(fs::remove_dir_all(&old)
+        .err()
+        .map(|error| format!("{} was not deleted: {error}", old.display())))
 }
 
 /// Where the manage helper listens on a product lamp
@@ -799,7 +851,9 @@ pub const ASKED_MOST: u64 = 4_096;
 /// `{"remove": NAME}`, a skill taken off by [`remove`], which checks it
 /// itself, whoever asked: a name that is not a skill's and a core skill are
 /// refused here, not only by the asker (`lamp-cloud`'s `skills.remove`,
-/// #1722). `install` is not taken: it will be, for a package from the update
+/// #1722). It waits at most [`ASKED_LOCK_WAIT`] for the folder, then refuses
+/// with [`BUSY`] having done nothing; a skill renamed aside whose old folder
+/// was not deleted is answered done, that folder's path in the journal only. `install` is not taken: it will be, for a package from the update
 /// channel under its key's signature alone, once the channel carries skills.
 pub fn asked(skills: &Path, input: impl Read, mut output: impl io::Write) -> io::Result<bool> {
     let mut line = String::new();
@@ -814,7 +868,16 @@ pub fn asked(skills: &Path, input: impl Read, mut output: impl io::Write) -> io:
             .and_then(|asked| asked.get(key))
     };
     let done = match (only("remove"), only("install")) {
-        (Some(serde_json::Value::String(name)), _) => remove(skills, name),
+        // Renamed aside is removed: where it was set aside, and why it
+        // was not then deleted, go to the journal alone.
+        (Some(serde_json::Value::String(name)), _) => {
+            taken_off(skills, name, Some(ASKED_LOCK_WAIT)).map(|left| {
+                if let Some(left) = left {
+                    eprintln!("lamp-skills: asked: removed {name}, but {left}");
+                }
+                removed_said(name)
+            })
+        }
         (_, Some(_)) => Err(
             "install is not taken here yet: only a package from the update channel, under its key's \
              signature, will be"
