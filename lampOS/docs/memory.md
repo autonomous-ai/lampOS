@@ -426,7 +426,7 @@ the unchanged legacy client, used unless the new Days client is selected.
       (the voice's client against the real store: the turn goes, an earlier
       conversation stays).
   - Tests: `remember::tests::with_the_switch_what_recall_gave_and_everything_can_be_forgotten`
-    (requests and scopes, the switch off), and `crates/memory/tests/voice_forget.rs`
+    (requests and scopes, the switch off), and `crates/memory/tests/it/voice_forget.rs`
     (through the voice's Days client against the real store: what recall
     gave goes and something else stays; everything goes, journal included).
 
@@ -450,7 +450,7 @@ the unchanged legacy client, used unless the new Days client is selected.
   - **Off:** the function and every request are as before.
   - Tests: `remember::tests::with_the_switch_recall_asks_a_span_of_days_and_the_second_version`
     (the requests, the clamp, the function, the switch off) and
-    `crates/memory/tests/days_recall.rs` (the store: the drink order, common
+    `crates/memory/tests/it/days_recall.rs` (the store: the drink order, common
     words only, a keyword beside them, an accented word matching its
     common fold, 7 to 1 finding three days ago and
     not nine, a kept thing by span, bad spans, and without the option the
@@ -569,7 +569,7 @@ the unchanged legacy client, used unless the new Days client is selected.
     `forget_about_for_someone_known_tells_of_the_rooms_from_before`,
     `forget_about_that_stops_part_way_says_some_may_be_forgotten` and
     `without_the_about_switch_forget_is_as_before`. And
-    `crates/memory/tests/voice_forget_about.rs`, the voice's client against
+    `crates/memory/tests/it/voice_forget_about.rs`, the voice's client against
     the real store: both bicycle things go, coffee stays, another person's
     bicycle stays; in the room's, what this conversation kept goes, matched
     without accents, and one kept by an earlier session stays.
@@ -606,7 +606,7 @@ the unchanged legacy client, used unless the new Days client is selected.
     refused and why.
   - **Privacy:** with it on, each conversation's text leaves the lamp once
     more, to the same model ([service-privacy.md](service-privacy.md)).
-  - **Tests:** `crates/memory/tests/voice_observe.rs` (the voice's client,
+  - **Tests:** `crates/memory/tests/it/voice_observe.rs` (the voice's client,
     the real store, a scripted model: kept, then closed with nothing);
     `days::an_empty_result_closes_the_job_with_nothing_kept_and_frees_its_place`;
     `remember::tests::the_observation_pass_reads_only_the_models_one_json_object`;
@@ -904,7 +904,7 @@ round trip not measured on the host. During it what is said is not heard,
 which is why it happens only between turns. Not shown: a lamp run.
 
 Not shown: anything on a lamp. The host test
-`crates/memory/tests/voice_people.rs` plays two known people and the room
+`crates/memory/tests/it/voice_people.rs` plays two known people and the room
 against the real store in both modes: each is answered from their own and
 the room's, never from the other's, their exchanges are journalled and
 found in their own scope only, and one forgetting leaves the other's.
@@ -1019,7 +1019,7 @@ facts stay `remember`.
 - The exchange in which a rule was kept, forgotten or listed stays out of
   the journal, like `remember` and `forget`.
 
-Host test: `crates/memory/tests/voice_people.rs`
+Host test: `crates/memory/tests/it/voice_people.rs`
 (`days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten`)
 keeps Minh's rule through the real Days store, tells it in Minh's next
 session and never in Sam's or the room's, lists it, does not return it
@@ -1160,7 +1160,7 @@ and the provider worker with the scripted provider and a memory on a
 socket. On a lamp: the played run above, once. A power cut was imitated by cutting
 a file short. Moving the socket to its path after binding it has run on macOS and in
 that emulated Linux run. Times, on that Mac through the socket with thirty days of 200 exchanges
-(`tests/timing.rs`): `append` 19 ms, `recall` by words 15 ms, by day or newest
+(`tests/it/timing.rs`): `append` 19 ms, `recall` by words 15 ms, by day or newest
 under 1 ms, `forget_last` 50 ms. None is known for the lamp.
 
 The opt-in implementation's host results and current limitations are in

@@ -673,7 +673,7 @@ fn cli_import_and_replay_keep_stdout_as_jsonl_and_default_to_shadow() {
 
 #[test]
 fn written_five_behaviour_scenario_is_repeatable_and_declares_requests_only() {
-    let input = include_bytes!("../fixtures/five-behaviours.jsonl");
+    let input = include_bytes!("../../fixtures/five-behaviours.jsonl");
     let (summary, ticks, bytes) = replay(input, Some(2_000_000));
     let (again, _, repeated) = replay(input, Some(2_000_000));
     assert_eq!(bytes, repeated);
@@ -727,7 +727,7 @@ fn the_same_written_scenario_in_default_shadow_never_commands_an_owner() {
     let mut shadow = Engine::new(Catalogue::builtin(), false, CLOCK).unwrap();
     let mut output = Vec::new();
     let summary = replay::run(
-        include_bytes!("../fixtures/five-behaviours.jsonl").as_slice(),
+        include_bytes!("../../fixtures/five-behaviours.jsonl").as_slice(),
         &mut output,
         &mut shadow,
         None,

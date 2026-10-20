@@ -2,7 +2,7 @@ use lamp_expression::{Catalogue, Trigger};
 use lamp_msgs::{BodyOffsets, Voice};
 
 fn proposed() -> Catalogue {
-    Catalogue::from_json(include_str!("../rest-behaviours.json")).unwrap()
+    Catalogue::from_json(include_str!("../../rest-behaviours.json")).unwrap()
 }
 
 #[test]

@@ -1,5 +1,5 @@
 //! Synthetic host comparison, not lamp qualification. Run alone in release:
-//! `RUST_TEST_THREADS=1 cargo test -p lamp-memory --release --offline --locked --test voice_timing -- --ignored --nocapture`
+//! `RUST_TEST_THREADS=1 cargo test -p lamp-memory --release --offline --locked --test it voice_timing:: -- --ignored --nocapture`
 use lamp_gemini::ToolCall;
 use lamp_memory::{Options, Server, days::Days, server::Stopper, store::Day};
 use lamp_voice::remember::{DaysClient, RECALL};

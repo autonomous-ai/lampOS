@@ -17,7 +17,7 @@ const MINUTE: u64 = 60 * SECOND;
 const START: u64 = 1_000 * SECOND;
 
 fn catalogue() -> Catalogue {
-    Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap()
+    Catalogue::from_json(include_str!("../../alive-behaviours.json")).unwrap()
 }
 
 /// The same, falling asleep after one minute of nobody, to reach sleep soon.

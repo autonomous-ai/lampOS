@@ -581,7 +581,7 @@ On a lamp with the source and Rust/native toolchain available, run from
 
 ```sh
 cargo test -p lamp-memory
-cargo test -p lamp-memory --release --test days_timing -- --ignored --nocapture
+cargo test -p lamp-memory --release --test it days_timing:: -- --ignored --nocapture
 ```
 
 If the first builder builds elsewhere, compile the test executables with

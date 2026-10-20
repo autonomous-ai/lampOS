@@ -1,5 +1,5 @@
 //! Synthetic host measurements, not lamp qualification. Run alone in release:
-//! `cargo test -p lamp-memory --release --test health_timing --offline -- --ignored --nocapture`
+//! `cargo test -p lamp-memory --release --test it health_timing:: --offline -- --ignored --nocapture`
 use lamp_bus::Bus;
 use lamp_memory::{
     Options, Server, Store,

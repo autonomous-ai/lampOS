@@ -22,7 +22,7 @@ const SECOND: u64 = 1_000_000;
 const MINUTE: u64 = 60 * SECOND;
 
 fn catalogue() -> Catalogue {
-    Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap()
+    Catalogue::from_json(include_str!("../../alive-behaviours.json")).unwrap()
 }
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -360,7 +360,7 @@ fn the_live_service_tells_the_planner_the_time_of_day_every_minute() {
 fn serving_a_catalogue_with_sleep_needs_the_local_time() {
     let folder = Folder::new();
     let catalogue = folder.0.join("alive.json");
-    fs::write(&catalogue, include_str!("../alive-behaviours.json")).unwrap();
+    fs::write(&catalogue, include_str!("../../alive-behaviours.json")).unwrap();
     let bus = folder.0.join("b");
     fs::create_dir(&bus).unwrap();
     let result = Command::new(env!("CARGO_BIN_EXE_lamp-expression"))

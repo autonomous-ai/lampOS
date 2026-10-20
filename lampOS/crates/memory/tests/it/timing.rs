@@ -3,7 +3,7 @@
 //! it passes or fails on a time: run it where the answer matters and read
 //! what it prints.
 //!
-//! `cargo test -p lamp-memory --test timing -- --ignored --nocapture`
+//! `cargo test -p lamp-memory --test it timing:: -- --ignored --nocapture --skip days_timing --skip health_timing --skip voice_timing`
 use lamp_memory::{Options, Server, Store};
 use std::{
     fs,

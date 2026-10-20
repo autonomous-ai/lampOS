@@ -110,7 +110,7 @@ fn built_service_is_shadow_by_default_and_its_lock_survives_second_start() {
 fn a_catalogue_with_the_old_head_roll_still_serves_and_says_so_once() {
     // #955's own `speaking` section, as lamps were given it by hand.
     let mut catalogue: serde_json::Value =
-        serde_json::from_str(include_str!("../behaviours.json")).unwrap();
+        serde_json::from_str(include_str!("../../behaviours.json")).unwrap();
     catalogue["speaking"] = serde_json::json!({
         "nod": {"base_yaw": 0.0, "shoulder": 0.0, "elbow": 0.0, "head_roll": 0.0, "head_pitch": 0.035},
         "nod_us": 360000,

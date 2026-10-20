@@ -20,19 +20,19 @@ use std::{
 };
 
 const CLOCK: &str = "expression-rest-fixture";
-const RESUMED: &str = include_str!("../fixtures/held-resumed.jsonl");
-const CANCELLED: &str = include_str!("../fixtures/held-cancelled.jsonl");
-const NOD: &str = include_str!("../fixtures/finish-nod.jsonl");
-const DEFAULT_CONCENTRATION: &str = include_str!("../fixtures/no-concentration.jsonl");
-const QUIET: &str = include_str!("../fixtures/rest-quiet.jsonl");
-const BUSY: &str = include_str!("../fixtures/rest-busy.jsonl");
-const CONCENTRATING: &str = include_str!("../fixtures/rest-concentrating.jsonl");
-const EXPIRED: &str = include_str!("../fixtures/rest-expired.jsonl");
+const RESUMED: &str = include_str!("../../fixtures/held-resumed.jsonl");
+const CANCELLED: &str = include_str!("../../fixtures/held-cancelled.jsonl");
+const NOD: &str = include_str!("../../fixtures/finish-nod.jsonl");
+const DEFAULT_CONCENTRATION: &str = include_str!("../../fixtures/no-concentration.jsonl");
+const QUIET: &str = include_str!("../../fixtures/rest-quiet.jsonl");
+const BUSY: &str = include_str!("../../fixtures/rest-busy.jsonl");
+const CONCENTRATING: &str = include_str!("../../fixtures/rest-concentrating.jsonl");
+const EXPIRED: &str = include_str!("../../fixtures/rest-expired.jsonl");
 const NOD_NAME: &str = "nod as speech ends";
 const REST_NAME: &str = "settle at rest";
 
 fn catalogue() -> Catalogue {
-    let mut catalogue = Catalogue::from_json(include_str!("../rest-behaviours.json")).unwrap();
+    let mut catalogue = Catalogue::from_json(include_str!("../../rest-behaviours.json")).unwrap();
     // Authored zero lag isolates requested timing. The shipped catalogue
     // retains unknown physical lag; no test result fills in that measurement.
     catalogue.timing.body_lag_us = Some(0);

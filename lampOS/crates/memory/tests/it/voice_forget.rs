@@ -62,7 +62,7 @@ struct Fixture {
 impl Fixture {
     fn new(seed: impl FnOnce(&mut Days, u64), hold: Option<Receiver<()>>) -> Self {
         let root = std::env::temp_dir().join(format!(
-            "lamp-mv-{}-{}",
+            "lamp-mv-forget-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
