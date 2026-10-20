@@ -108,6 +108,18 @@ observations stay labelled as observations; all results include source IDs,
 an untrusted-data marker and the unknown-speaker scope. Empty results mean
 there is no matching memory, not permission to invent one.
 
+With `LAMP_MEMORY_RECALL_V2=on` (#2176; off unless set, with the Days
+client only, both voice routes), each recall's `search` or `recall` also
+carries `"recall_v2":true`, and the model may give a span of days:
+`recall {about?, days_ago?, days_ago_from?, days_ago_to?}`, "last week"
+being 7 to 1. The voice sends the span as `day_from` and `day_to`
+(`YYYY-MM-DD`, the lamp's local days) with `day` null. A span given with
+only `days_ago_from` runs to today; with only `days_ago_to` it is that one
+day. A span longer than 14 days keeps its newest 14. Off, the voice sends
+what it sent before and the function has no span. The voice needs a
+lamp-memory from the same build: an older memory refuses the new fields,
+so recall answers nothing until both are updated.
+
 Every new provider session asks `session_open` for a frozen note. Its name
 combines a fresh process nonce and the provider session number. Voice
 validates the complete snapshot and quotes its JSON, retaining its identity,
@@ -403,7 +415,8 @@ message. A refusal leaves the connection usable.
 
 | Request | Successful response and rules |
 |---|---|
-| `search {query, day?, limit?, max_bytes?, history?}` | `{ok:true, entries:[Record...]}` in relevance order. Searches raw records, kept items and current observations; `history` defaults false. `day` restricts to journal exchanges on that local day. Defaults: 8 results, 4,096 text bytes; maxima 50 and 16,384. Empty or tokenless queries return no records. |
+| `search {query, day?, day_from?, day_to?, recall_v2?, limit?, max_bytes?, history?}` | `{ok:true, entries:[Record...]}` in relevance order. Searches raw records, kept items and current observations; `history` defaults false. `day` restricts to journal exchanges on that local day; `day_from` with `day_to` (#2176) to those from the one through the other, both ends counted. Defaults: 8 results, 4,096 text bytes; maxima 50 and 16,384. Empty or tokenless queries return no records. `recall_v2` (default false): common words are left out of the query first (below), and a day or span also returns kept items kept on those days. |
+| `recall {…, day_from?, day_to?, recall_v2?}` | The legacy `recall` (memory.md), with #2176's fields. With any of them it is parsed as a new operation (unknown fields refused); without them it is the legacy request, answered as before. Same span and `recall_v2` rules as `search`; no query lists the span's exchanges, newest first, and with `recall_v2` the kept items kept on those days too. |
 | `append_linked {at_unix_ms, heard?, said?, source_ids, rule_ids?}` | `{ok:true,id}`. Like append, with at most 64 distinct existing source IDs in the same person's store. Sources can be raw records, kept facts or observations. `rule_ids` (#813), at most 64, are kept entries of the person's own rules scope (`r-<hex>` beside `p-<hex>`, `r-everyone` beside `everyone`); forgetting one removes this exchange. |
 | `forget {id}` | `{ok:true,removed:N}` after transitive deletion and verification; missing ID gives zero. |
 | `session_open {session, max_bytes?}` | `{ok:true,snapshot:Note}`. Default/max cap 1,200 UTF-8 bytes for `Note.note`, including its inner JSON framing and escaping. Outer response metadata and re-escaping are outside that cap. |
@@ -421,6 +434,25 @@ The first 16 distinct terms of at least two characters are ORed as literal
 tokens. Punctuation cannot become an FTS operator. No stemming, phrase
 reasoning, translation or semantic similarity is claimed. Matching a common
 word is evidence to inspect, not evidence that a question is answerable.
+
+A span (#2176) is both `day_from` and `day_to`, each `YYYY-MM-DD`, the first
+not after the last, at most 14 days with both ends counted, and never
+beside `day`; anything else is `bad_day`. With `recall_v2` the query first
+leaves out a fixed list of common words (`search::COMMON`): English ones
+such as "what", "is", "my", "the", "you", "did", "tell", "remember", and the
+Vietnamese function words "của", "là", "tôi", "và", "có", "không", "này",
+"đó", "thì", "mà", "những", "các", "một", "cho", "với", "được", "gì",
+"nào". They are compared after the same NFC, lowercase and `đ`→`d` folding,
+with accents kept: "chó" (a dog) is not "cho", nor "đỏ" (red) "đó", although
+the index matches them alike. This is a known limit: Vietnamese words that
+only differ by accents from a common word (chó/cho, đỏ/đó, má/mà, lá/là) are
+kept as key words, but the index folds accents, so they also match entries
+with the common word, and ranking does not put the exact word first (both
+fold to one token); folding before the check would drop the real word
+instead. The first 16 of the remaining words are
+ORed. A question of common words only searches nothing and returns no
+records, so "what is my drink order" no longer finds an exchange that
+shares only "my" with it.
 
 `Note` contains `session`, `opened_unix_ms`, `generation`, `note`,
 `source_ids` and `invalidated`. Its note is a JSON string with `scope`,

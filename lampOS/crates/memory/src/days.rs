@@ -117,6 +117,18 @@ pub struct Note {
     pub invalidated: bool,
 }
 
+/// What a recall or search asks beside its [`Ask`] (#2176). The default
+/// asks what it always did.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Wider {
+    /// The last day of a span that begins on the ask's day, inclusive.
+    pub last_day: Option<Day>,
+    /// The second version (`recall_v2`): a question's common words match
+    /// nothing ([`search::query_with`]), and a day or span finds what was
+    /// kept on it, not only exchanges.
+    pub second: bool,
+}
+
 /// No service thread, network client or model belongs to this store.
 pub struct Days {
     db: Connection,
@@ -526,8 +538,14 @@ impl Days {
     }
 
     pub fn recall(&self, person: &Person, ask: &Ask<'_>) -> Result<Vec<Entry>> {
+        self.recall_wider(person, ask, Wider::default())
+    }
+
+    /// [`Self::recall`], with a span of days and the second version's
+    /// rules ([`Wider`], #2176).
+    pub fn recall_wider(&self, person: &Person, ask: &Ask<'_>, wider: Wider) -> Result<Vec<Entry>> {
         let mut entries: Vec<Entry> = self
-            .find(person, ask, false, false)?
+            .find(person, ask, false, false, wider)?
             .into_iter()
             .filter_map(|r| r.legacy())
             .collect();
@@ -538,10 +556,25 @@ impl Days {
     /// Ranked data, never an answer. No overlap means no memory. A caller must
     /// still judge whether any returned record actually answers its question.
     pub fn search(&mut self, person: &Person, ask: &Ask<'_>, history: bool) -> Result<Vec<Record>> {
-        if ask.query.is_none_or(|query| search::query(query).is_none()) {
+        self.search_wider(person, ask, history, Wider::default())
+    }
+
+    /// [`Self::search`], with a span of days and the second version's
+    /// rules ([`Wider`], #2176).
+    pub fn search_wider(
+        &mut self,
+        person: &Person,
+        ask: &Ask<'_>,
+        history: bool,
+        wider: Wider,
+    ) -> Result<Vec<Record>> {
+        if ask
+            .query
+            .is_none_or(|query| search::query_with(query, wider.second).is_none())
+        {
             return Ok(Vec::new());
         }
-        let records = self.find(person, ask, true, history)?;
+        let records = self.find(person, ask, true, history, wider)?;
         let tx = self.db.transaction()?;
         for record in &records {
             if record.kind == "observation" {
@@ -557,17 +590,21 @@ impl Days {
         ask: &Ask<'_>,
         observations: bool,
         history: bool,
+        wider: Wider,
     ) -> Result<Vec<Record>> {
         let query = ask.query.filter(|q| !q.trim().is_empty());
-        let expression = query.and_then(search::query);
+        let expression = query.and_then(|query| search::query_with(query, wider.second));
         if query.is_some() && expression.is_none() {
             return Ok(vec![]);
         }
         let day = ask.day.map(|d| d.to_string());
+        // One day is a span from it to itself; `day_to` without a first day
+        // is never asked ([`crate::days_protocol`]).
+        let last = wider.last_day.or(ask.day).map(|d| d.to_string());
         let sql = if expression.is_some() {
-            "SELECT e.id FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND (?3 IS NULL OR (e.kind='exchange' AND e.day=?3)) AND (?4 OR e.kind!='observation') AND (?5 OR e.active=1) ORDER BY search.rank,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+            "SELECT e.id FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND (?3 IS NULL OR ((e.kind='exchange' OR (?8 AND e.kind='kept')) AND e.day BETWEEN ?3 AND ?7)) AND (?4 OR e.kind!='observation') AND (?5 OR e.active=1) ORDER BY search.rank,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
         } else {
-            "SELECT e.id FROM entries e WHERE ?1 IS NULL AND e.person=?2 AND (?3 IS NULL OR e.day=?3) AND ((?4 AND e.kind!='kept') OR e.kind='exchange') AND (?5 OR e.active=1) ORDER BY e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+            "SELECT e.id FROM entries e WHERE ?1 IS NULL AND e.person=?2 AND (?3 IS NULL OR e.day BETWEEN ?3 AND ?7) AND ((?4 AND e.kind!='kept') OR e.kind='exchange' OR (?8 AND ?3 IS NOT NULL AND e.kind='kept')) AND (?5 OR e.active=1) ORDER BY e.at_unix_ms DESC,e.id DESC LIMIT ?6"
         };
         let mut statement = self.db.prepare(sql)?;
         let ids = statement
@@ -578,7 +615,9 @@ impl Days {
                     day,
                     observations,
                     history,
-                    ask.limit.min(50)
+                    ask.limit.min(50),
+                    last,
+                    wider.second
                 ],
                 |r| r.get::<_, u64>(0),
             )?
