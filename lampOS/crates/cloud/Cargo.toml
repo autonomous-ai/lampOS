@@ -40,10 +40,10 @@ lamp-update = { path = "../update" }
 ring = "0.17"
 base64 = "0.22"
 # Setup's own settings and writer, so the account is read where and as setup
-# writes it (tests/setup.rs).
+# writes it (tests/it/setup.rs).
 lamp-setup = { path = "../setup" }
 # The voice's own ring, so a preview is tried against its arbitration
-# (tests/ring.rs, the reviewer on #1464).
+# (tests/it/ring.rs, the reviewer on #1464).
 lamp-voice = { path = "../voice" }
 lamp-ipc = { path = "../ipc" }
 # A stand-in lamp-schedule's times, as the store resolves them (#2195).

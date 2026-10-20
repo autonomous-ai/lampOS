@@ -14,7 +14,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const REFERENCE: &str = include_str!("fixtures/pipecat-reference.json");
+const REFERENCE: &str = include_str!("../fixtures/pipecat-reference.json");
 
 fn xorshift(seed: u32) -> impl FnMut() -> u32 {
     let mut state = seed;
@@ -458,7 +458,7 @@ fn inherited_lower_address_space_limits_are_kept() {
         Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
-                "exec_check_model_under_inherited_limit",
+                "parity::exec_check_model_under_inherited_limit",
                 "--nocapture",
                 "--test-threads=1",
             ])

@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use std::hint::black_box;
 use std::time::Instant;
 
-const DATA: &str = include_str!("../geometry.stand-in.json");
+const DATA: &str = include_str!("../../geometry.stand-in.json");
 const REPEATS: usize = 30;
 
 fn timed<T>(operation: impl FnOnce() -> T) -> (T, f64) {

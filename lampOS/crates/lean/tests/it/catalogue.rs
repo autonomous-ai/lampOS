@@ -7,7 +7,7 @@ use lamp_msgs::{BodyOffsets, Voice};
 const MASKS: [[bool; 5]; 2] = [[true; 5], [true, false, false, true, true]];
 
 fn model() -> Model {
-    Model::from_json(include_str!("../geometry.stand-in.json")).unwrap()
+    Model::from_json(include_str!("../../geometry.stand-in.json")).unwrap()
 }
 
 fn frames(behaviour: &Behaviour) -> Vec<OffsetFrame> {

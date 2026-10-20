@@ -195,6 +195,6 @@ omitted/null defaults, invalid options, unknown proxy aliases and existing file
 privacy/size/symlink guards without a provider connection:
 
 ```sh
-cargo test -p lamp-voice --test provider_config --locked --offline
+cargo test -p lamp-voice --test it --locked --offline provider_config::
 cargo clippy -p lamp-voice --all-targets --locked --offline -- -D warnings
 ```

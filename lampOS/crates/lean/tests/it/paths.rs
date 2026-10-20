@@ -3,7 +3,7 @@ use lamp_msgs::BodyOffsets;
 use std::f64::consts::{FRAC_PI_2, PI};
 
 fn geometry() -> Geometry {
-    Geometry::from_json(include_str!("../geometry.stand-in.json")).unwrap()
+    Geometry::from_json(include_str!("../../geometry.stand-in.json")).unwrap()
 }
 fn angles(values: [f64; 5]) -> Angles {
     Angles::new(values).unwrap()

@@ -248,7 +248,7 @@ It does not reuse the LongMemEval corpus. Exact values and machine metadata
 are in [memory-socket-results.json](memory-socket-results.json).
 
 ```sh
-/Users/autonomous/.cargo/bin/cargo test -p lamp-memory --release --test days_timing -- --ignored --nocapture
+/Users/autonomous/.cargo/bin/cargo test -p lamp-memory --release --test it days_timing:: -- --ignored --nocapture
 ```
 
 The boundary starts before socket connect and request serialization, then
