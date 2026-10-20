@@ -400,8 +400,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     /// Time for STREAMOFF and the buffers' release to return when the camera
     /// is closed, so it is left stopped and freed before its file is closed.
     const STOP: u64 = DRIVER_TEARDOWN_BUDGET_US;
-    /// A camera that did not open, or failed, is tried again after this.
-    const RETRY: Duration = Duration::from_secs(5);
+    /// A camera that failed while open is tried again after this.
+    const RETRY: Duration = lamp_eyes::reopen::RETRY;
     const REPORT_EVERY: Duration = Duration::from_secs(10);
     /// Whose the near face is, asked at most this often: a print takes a
     /// tenth of a second or more on the lamp.
@@ -653,6 +653,10 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     // Opens in a row that failed, and when to try the full size again
     // after falling back to the working size.
     let mut failures = 0u32;
+    // Opens in a row that did not open, and the USB resets of a stuck
+    // camera (#2126); apart from `failures`, which the full size's turns
+    // also set.
+    let mut reopen = lamp_eyes::reopen::Reopen::default();
     let mut upgrade = lamp_eyes::full_look::Upgrade::default();
     let joints_bus = arguments
         .full_look
@@ -740,7 +744,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 aside = lamp_eyes::who::set_aside_count(people_path);
                 aside_counted = Some(Instant::now());
             }
-            bus.report(camera, aside, now);
+            bus.report(camera, aside, reopen.resets(), now);
         }
         // Visits counted today reach the file once a UTC day begins, whoever
         // is at the lamp (#1670), looked at once a minute.
@@ -1189,6 +1193,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         mode.width, mode.height
                     );
                     failures = 0;
+                    if let Some(failed) = reopen.opened() {
+                        eprintln!(
+                            "lamp-eyes: camera open again after {failed} opens in a row that did not"
+                        );
+                    }
                     if let Some(full) = arguments.full_look {
                         upgrade.opened((mode.width, mode.height) == full, lamp_ipc::monotonic_us());
                     }
@@ -1205,7 +1214,40 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     camera = lamp_eyes::bus_out::Camera::NotOpening;
                     // The full size first, then the two in turn.
                     failures = failures.saturating_add(1);
-                    retry_at = Instant::now() + RETRY;
+                    let failed = reopen.failed(permit.holds());
+                    if failed.stuck {
+                        eprintln!(
+                            "lamp-eyes: camera did not open {} times in a row, the last {error:?}: the device seems stuck (minutes, or until a reboot); tried again every {} s now",
+                            failed.failed,
+                            lamp_eyes::reopen::RETRY_STUCK.as_secs()
+                        );
+                    }
+                    if failed.reset {
+                        // Closed above; nothing of ours holds the device.
+                        match lamp_camera::linux::reset_usb(&UsbIdentity {
+                            vendor: arguments.usb.vendor,
+                            product: arguments.usb.product,
+                            topology: arguments.usb.topology.clone(),
+                            serial: None,
+                            interface_number: 0,
+                            capture_index: 0,
+                        }) {
+                            Ok(node) => {
+                                reopen.reset();
+                                eprintln!(
+                                    "lamp-eyes: camera's USB device {} reset ({}), as an unplug would; tried again in {} s",
+                                    arguments.usb.topology,
+                                    node.display(),
+                                    lamp_eyes::reopen::RETRY_STUCK.as_secs()
+                                );
+                            }
+                            Err(error) => eprintln!(
+                                "lamp-eyes: camera's USB device {} not reset: {error:?}",
+                                arguments.usb.topology
+                            ),
+                        }
+                    }
+                    retry_at = Instant::now() + failed.retry_after;
                     continue;
                 }
             }

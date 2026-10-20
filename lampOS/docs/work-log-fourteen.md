@@ -12,6 +12,7 @@ lamp.
 
 | Id | Proposal | Answer |
 |----|----------|--------|
+| fourteen-P1 | Should a Lamp 2 get the app's V1 Enroll (My Voice/My Face) screen? Face is already done lampOS's own way (`eyes::who`, spoken consent); voice has no by-name equivalent at all (`same-voice` is turn-continuity, not identity); `face.enroll` has no lamp-side kind. Proposed instead, if anything: a read-only "who the lamp remembers" row with removal only, adding stays spoken. | — |
 
 ## Found, not mine
 
@@ -234,3 +235,28 @@ Ready for lamp-voice: no (reading only; no code changed)
 - No change needed in ecm-sds-mobile#11 from this read. The one open gap
   (setup's `own_keys` status readback) is confirmed real and precisely
   specified (`setup/src/serve.rs`'s `Status.own_keys`), not a guess.
+
+## 2026-10-20 — fourteen-P1 — asked, not started
+
+Ready for lamp-voice: no (a question, no code)
+
+- Asked on the Queue,
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6283796390),
+  whether a Lamp 2 should get the app's V1 Enroll screen
+  (`AutonomousOsDeviceEntity.isLamp` explicitly excludes a Lamp 2 today,
+  with its own comment that none of it is lampOS's).
+- Read before asking, not just asking blind: `crates/eyes/src/who.rs`
+  already does face recognition the spoken way ("remember my face"), kept
+  only for those who asked; the app's `face.enroll`/`face.owners`/
+  `face.remove` kinds have no lamp-side implementation (`cloud/src/wire.rs`,
+  `answer.rs` use `"face.enroll"` only as a generic "not on this lamp"
+  example). Voice has no by-name equivalent: `same-voice` and
+  `voice/src/same_voice.rs` answer "same voice as the ongoing
+  conversation" (#829), not "whose voice, by name"; `speaking_faces.rs`
+  (#1917) ties a line to whose face is seen speaking, so personalization
+  already rides on face recognition rather than a separate voiceprint.
+- Proposed, if the answer is "something, but not that screen": a read-only
+  row of who the lamp remembers (name only, from `eyes::who`'s list),
+  removal only from the app, adding staying spoken.
+- No task taken; `builder:fourteen` has no such label, and a lamp-side
+  read (if wanted) is outside "Crates: none" in my role file either way.

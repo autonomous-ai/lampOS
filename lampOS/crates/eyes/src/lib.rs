@@ -32,6 +32,7 @@ pub mod mesh;
 pub mod permit;
 pub mod photo;
 pub mod picture;
+pub mod reopen;
 pub mod seems;
 pub mod sight;
 pub mod speaking;

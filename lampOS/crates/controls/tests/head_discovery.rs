@@ -150,3 +150,32 @@ fn two_quick_touches_on_a_level_pad_say_nothing_of_how_it_reads() {
     assert_eq!(line.fast_changes, 0);
     assert_eq!(line.reads, None);
 }
+
+/// thirteen-P4, after lamp-c0a4 (#1965): a person asked to touch each pad
+/// twice made one long press instead, three runs in a row, and nothing was
+/// found. One held press of 500 ms or more now finds the pad, read as a
+/// level; a lone short press still does not, nor does a line that changed
+/// at rest.
+#[test]
+fn one_long_hold_finds_a_pad_and_a_lone_short_press_does_not() {
+    use lamp_controls::touch_pins::Reads;
+    // 37 and 97 rest low; 96 and 98 low too.
+    let mut scan = Discovery::with_rest(0, [(false, false); 4], 1_000_000).unwrap();
+    feed(&mut scan, 0, 1_995_000, 0);
+    // 37: one press of 1.3 s, as c0a4's two touches merged into.
+    feed(&mut scan, 2_000_000, 3_295_000, 0b0001);
+    feed(&mut scan, 3_300_000, 3_995_000, 0);
+    // 97: one press of 3.6 s.
+    feed(&mut scan, 4_000_000, 7_595_000, 0b0100);
+    feed(&mut scan, 7_600_000, 7_995_000, 0);
+    // 96: one short press of 200 ms, nothing more.
+    feed(&mut scan, 8_000_000, 8_195_000, 0b0010);
+    feed(&mut scan, 8_200_000, 8_995_000, 0);
+    let lines = &scan.report().lines;
+    assert_eq!(lines[0].active_low_candidate, Some(false));
+    assert_eq!(lines[0].reads, Some(Reads::Level));
+    assert_eq!(lines[2].active_low_candidate, Some(false));
+    assert_eq!(lines[2].reads, Some(Reads::Level));
+    assert_eq!(lines[1].active_low_candidate, None, "a lone short press");
+    assert_eq!(lines[3].active_low_candidate, None);
+}

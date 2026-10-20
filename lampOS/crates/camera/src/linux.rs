@@ -10,6 +10,7 @@
 mod identity;
 mod params;
 mod queue;
+mod reset;
 
 use crate::backend::{Budget, Check, Queue};
 pub use crate::backend::{CleanupReport, Fault as BackendFault, Stage};
@@ -169,6 +170,16 @@ fn run_budget<T>(
         cancelled: &cancelled,
     };
     operation(&mut check)
+}
+/// Resets the camera's USB device, as an unplug would (#2126): found by
+/// `expected`'s topology, and only when its vendor and product match. Its
+/// node, on success.
+pub fn reset_usb(expected: &UsbIdentity) -> Result<PathBuf, PortError> {
+    reset::reset_at(
+        std::path::Path::new("/sys/bus/usb/devices"),
+        std::path::Path::new("/dev/bus/usb"),
+        expected,
+    )
 }
 pub(super) fn errno(errno: i32) -> PortError {
     if errno == 19 || errno == 6 {

@@ -273,7 +273,12 @@ fn config(args: &Args) -> Result<Config, Box<dyn std::error::Error>> {
         if bytes.len() > 16_384 {
             return Err("controls configuration exceeds 16 KiB".into());
         }
-        serde_json::from_slice(&bytes)?
+        // A newer build's fields are read past and named (#1680).
+        let (config, unread) = lamp_controls::forward::read::<Config>(path, &bytes)?;
+        if let Some(line) = unread {
+            eprintln!("lamp-controls: {line}");
+        }
+        config
     } else {
         Config {
             buttons: vec!["primary".into()],
@@ -294,7 +299,13 @@ fn pins(
     if bytes.len() > 16_384 {
         return Err("the pins file exceeds 16 KiB".into());
     }
-    let wiring: lamp_controls::pins::PinsConfig = serde_json::from_slice(&bytes)?;
+    // Strict at its top (`PinsConfig`); a pin's unknown fields are named,
+    // and serde's reason is told without its message (#1680).
+    let (wiring, unread) =
+        lamp_controls::forward::read::<lamp_controls::pins::PinsConfig>(path, &bytes)?;
+    if let Some(line) = unread {
+        eprintln!("lamp-controls: {line}");
+    }
     if wiring.privacy.is_some() && !privacy_selected() {
         return Err(UNSELECTED_PRIVACY.into());
     }
@@ -745,7 +756,18 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
 /// working pad gave thresholds, and never over an existing file.
 fn calibrate_touch(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     use lamp_controls::{touch_calibrate, touch_pins::TouchPinsConfig};
-    let mut wiring = TouchPinsConfig::load(args.pins.as_ref().expect("checked when parsed"))?;
+    let (mut wiring, unread) =
+        TouchPinsConfig::read(args.pins.as_ref().expect("checked when parsed"))?;
+    // The new file is written from what this build reads: a newer build's
+    // fields are not in it, and its line says so (the reviewer on #2076).
+    if let Some(line) = &unread {
+        eprintln!("lamp-controls: {line}");
+    }
+    let dropped = if unread.is_some() {
+        "; the fields this build does not read, named above, are not in it"
+    } else {
+        ""
+    };
     let output = args.output.as_ref().expect("checked when parsed");
     if output.exists() {
         return Err(format!("{} already exists", output.display()).into());
@@ -806,7 +828,10 @@ fn calibrate_touch(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         .mode(0o644)
         .open(output)?
         .write_all(&bytes)?;
-    eprintln!("lamp-controls: calibrate-touch: wrote {}", output.display());
+    eprintln!(
+        "lamp-controls: calibrate-touch: wrote {}{dropped}",
+        output.display()
+    );
     Ok(())
 }
 

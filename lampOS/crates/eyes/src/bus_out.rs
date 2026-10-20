@@ -17,7 +17,7 @@
 //! voice's lines on `voice/heard`, said once a second while the eyes look.
 use crate::{
     activity::{Judge, Look},
-    away::Away,
+    away::{Away, Seen},
     faces, facing, speaking,
 };
 use lamp_bus::{Bus, Publisher, Subscriber};
@@ -36,6 +36,10 @@ pub const PRESENCE_ENVIRONMENT: &str = "LAMP_PRESENCE";
 /// `addressed`, only a turn the voice answered as said to the lamp
 /// (`voice/turn`); otherwise every line heard (`voice/heard`).
 pub const PRESENCE_VOICE_ENVIRONMENT: &str = "LAMP_PRESENCE_VOICE";
+/// Where the eyes read whether a face far from the lamp counts (#1678):
+/// `moving`, a face under `away::NEAR_TALL` only while it moves or just
+/// after a near one ([`Away::far_moving`]); otherwise every face.
+pub const PRESENCE_FAR_ENVIRONMENT: &str = "LAMP_PRESENCE_FAR";
 
 /// Where the eyes read whether to say what the person at the desk is doing
 /// (#1678), with the bus on. `on` only.
@@ -194,7 +198,8 @@ pub enum Camera {
 /// build could not read them (`set_aside`, #1505), so that a person whose
 /// face the lamp no longer knows is told why. A count, never a name. The
 /// camera's warning comes first when there are both.
-pub fn health(camera: Camera, set_aside: usize) -> Diagnostic {
+/// `resets` counts the camera's USB device reset since it last opened (#2126).
+pub fn health(camera: Camera, set_aside: usize, resets: u32) -> Diagnostic {
     let (mut level, message, state) = match camera {
         Camera::Closed => (Level::Ok, "", "closed"),
         Camera::Open => (Level::Ok, "", "open"),
@@ -202,6 +207,14 @@ pub fn health(camera: Camera, set_aside: usize) -> Diagnostic {
         Camera::Failed => (Level::Warn, "the camera stopped giving pictures", "failed"),
     };
     let mut message = message.to_owned();
+    if resets > 0 && camera == Camera::NotOpening {
+        let times = if resets == 1 {
+            "once".to_owned()
+        } else {
+            format!("{resets} times")
+        };
+        message = format!("{message}; its USB device was reset {times}");
+    }
     if set_aside > 0 {
         if message.is_empty() {
             message = format!("the eyes set aside {set_aside} people's records they couldn't read");
@@ -211,6 +224,7 @@ pub fn health(camera: Camera, set_aside: usize) -> Diagnostic {
     Diagnostic::new(level, SOURCE, &message)
         .with("camera", state)
         .with("set_aside", set_aside)
+        .with("camera_resets", resets)
 }
 
 pub struct BusOut {
@@ -394,7 +408,19 @@ impl BusOut {
     pub fn say_presence(&mut self, bus: &Bus) -> io::Result<()> {
         let addressed =
             std::env::var(PRESENCE_VOICE_ENVIRONMENT).ok().as_deref() == Some("addressed");
-        self.say_presence_by(bus, addressed)
+        self.say_presence_by(bus, addressed)?;
+        if std::env::var(PRESENCE_FAR_ENVIRONMENT).ok().as_deref() == Some("moving") {
+            self.judge_far_faces();
+        }
+        Ok(())
+    }
+
+    /// With presence said, a face far from the lamp counts only while it
+    /// moves or just after a near one (`LAMP_PRESENCE_FAR=moving`, #1678).
+    pub fn judge_far_faces(&mut self) {
+        if let Some(presence) = self.presence.as_mut() {
+            presence.away = Away::far_moving();
+        }
     }
 
     /// As [`BusOut::say_presence`], with which voice counts given.
@@ -466,14 +492,19 @@ impl BusOut {
         self.alive_at_us = now_us;
         let _ = self.faces.publish_json(now_us, &seen);
         if let Some(presence) = self.presence.as_mut() {
-            // The tallest face as published, clamped to the picture, so the
+            // The faces as published, clamped to the picture, so the
             // journal's height matches `humans/faces/tracked`.
-            let tall = seen
+            let faces: Vec<Seen> = seen
                 .faces
                 .iter()
-                .map(|face| face.ymax - face.ymin)
-                .reduce(f32::max);
-            presence.away.looked(now_us, tall);
+                .map(|face| Seen {
+                    id: face.id.clone(),
+                    across: (face.xmin + face.xmax) / 2.0,
+                    down: (face.ymin + face.ymax) / 2.0,
+                    tall: face.ymax - face.ymin,
+                })
+                .collect();
+            presence.away.looked_at(now_us, &faces);
         }
         if let Some(activity) = self.activity.as_mut() {
             activity.judge.looked(now_us, &Look::all(found, filled));
@@ -538,7 +569,7 @@ impl BusOut {
     /// Say how the eyes are. Call from the loop on every turn, whatever
     /// the camera is doing: it is said a little more often than once a
     /// second, as the topic promises, and no more.
-    pub fn report(&mut self, camera: Camera, set_aside: usize, now_us: u64) {
+    pub fn report(&mut self, camera: Camera, set_aside: usize, resets: u32, now_us: u64) {
         if self
             .reported_at_us
             .is_some_and(|at| now_us.saturating_sub(at) < 950_000)
@@ -546,7 +577,9 @@ impl BusOut {
             return;
         }
         self.reported_at_us = Some(now_us);
-        let _ = self.health.publish_json(now_us, &health(camera, set_aside));
+        let _ = self
+            .health
+            .publish_json(now_us, &health(camera, set_aside, resets));
     }
 }
 
@@ -694,7 +727,7 @@ mod tests {
         std::fs::remove_dir_all(&root).unwrap();
         out.saw(&[], &[], PICTURE, 7);
         out.tick(2_000_000);
-        out.report(Camera::Open, 0, 2_000_000);
+        out.report(Camera::Open, 0, 0, 2_000_000);
     }
 
     #[test]
@@ -715,12 +748,12 @@ mod tests {
                 "failed",
             ),
         ] {
-            let report = health(camera, 0);
+            let report = health(camera, 0, 0);
             assert_eq!(
                 (report.level, report.name.as_str(), report.message.as_str()),
                 (level, "eyes", message)
             );
-            assert_eq!(report.values.len(), 2);
+            assert_eq!(report.values.len(), 3);
             assert_eq!(
                 (
                     report.values[0].key.as_str(),
@@ -736,7 +769,7 @@ mod tests {
     /// comes first.
     #[test]
     fn set_aside_records_make_the_eyes_warn_with_a_count() {
-        let report = health(Camera::Open, 2);
+        let report = health(Camera::Open, 2, 0);
         assert_eq!(report.level, Level::Warn);
         assert_eq!(
             report.message,
@@ -750,10 +783,27 @@ mod tests {
             "{:?}",
             report.values
         );
-        let both = health(Camera::Failed, 1);
+        let both = health(Camera::Failed, 1, 0);
         assert_eq!(both.level, Level::Warn);
         assert_eq!(both.message, "the camera stopped giving pictures");
-        assert_eq!(health(Camera::Open, 0).level, Level::Ok);
+        assert_eq!(health(Camera::Open, 0, 0).level, Level::Ok);
+        // A stuck camera's resets are counted and said (#2126).
+        assert_eq!(
+            health(Camera::NotOpening, 0, 1).message,
+            "the camera does not open; its USB device was reset once"
+        );
+        let stuck = health(Camera::NotOpening, 0, 2);
+        assert_eq!(stuck.level, Level::Warn);
+        assert_eq!(
+            stuck.message,
+            "the camera does not open; its USB device was reset 2 times"
+        );
+        assert!(
+            stuck
+                .values
+                .iter()
+                .any(|value| value.key == "camera_resets" && value.value == "2")
+        );
     }
 
     #[test]
@@ -774,7 +824,7 @@ mod tests {
             } else {
                 Camera::NotOpening
             };
-            out.report(camera, 0, turn * 5_000);
+            out.report(camera, 0, 0, turn * 5_000);
         }
         let mut said = Vec::new();
         while let Some(message) = hears.recv(std::time::Duration::from_millis(50)).unwrap() {
@@ -942,6 +992,44 @@ mod tests {
                 by: Some(lamp_msgs::SeenBy::Voice),
             })
         );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// #1678: with far faces judged, a small steady face (0.06 of the
+    /// picture tall, its box moving a pixel or two) is nobody; a near one is
+    /// someone.
+    #[test]
+    fn with_far_faces_judged_a_small_steady_face_is_nobody() {
+        let root = std::path::PathBuf::from(format!("/tmp/lpf-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(RoomPresence::TOPIC, "test", RoomPresence::TYPE)
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        out.say_presence_by(&bus, false).unwrap();
+        out.judge_far_faces();
+        let s = 1_000_000u64;
+        let mut last = None;
+        for look in 0..60u64 {
+            let at = s + look * s / 2;
+            // 29 of 480 tall, at the picture's right, a pixel back and forth.
+            let x = 540.0 + (look % 2) as f32;
+            out.saw(&[face(x, 200.0, 24.0, 29.0, 0.0)], &[], PICTURE, at);
+            out.tick(at);
+            while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+                last = Some(message.parse::<RoomPresence>().unwrap());
+            }
+        }
+        assert_eq!(last.map(|now| now.someone), Some(false), "{last:?}");
+        // A face 96 of 480 tall is near: someone at once.
+        out.saw(&[face(300.0, 200.0, 80.0, 96.0, 0.0)], &[], PICTURE, 32 * s);
+        out.tick(32 * s);
+        while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+            last = Some(message.parse::<RoomPresence>().unwrap());
+        }
+        assert_eq!(last.map(|now| now.someone), Some(true), "{last:?}");
         std::fs::remove_dir_all(&root).unwrap();
     }
 

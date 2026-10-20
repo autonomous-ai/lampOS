@@ -16,6 +16,9 @@ SUBSYSTEM=="sound", ACTION=="change", ATTRS{idVendor}=="1bcf", ATTRS{idProduct}=
 SUBSYSTEM=="video4linux", ATTRS{idVendor}=="01da", ATTRS{idProduct}=="5875", ATTR{index}=="0", SYMLINK+="device-camera"
 # ZVCAI USB_Camera (current standard fit, seen on lamp-ac82/4ace/dbda 2026-09)
 SUBSYSTEM=="video4linux", ATTRS{idVendor}=="01da", ATTRS{idProduct}=="5875", ATTR{index}=="0", SYMLINK+="device-camera"
+# Its USB node, writable by `video`, so lampOS's lamp-eyes can reset a camera
+# stuck after a mute without a reboot (USBDEVFS_RESET, lampOS #2126).
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="01da", ATTR{idProduct}=="5875", GROUP="video", MODE="0664"
 
 # Servo driver: QinHeng CH340 -> /dev/device-servo
 SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d3", SYMLINK+="device-servo"

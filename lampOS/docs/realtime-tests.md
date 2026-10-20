@@ -1559,3 +1559,41 @@ Kept as they are, each for its own reason:
   over 32,000 of `POLL_US` (2 ms) for a scenario of about 65 s of logical
   time. A shorter plan or a driver that jumps to the next thing due would cut
   it. That is voice-eval's own design, proposed on #1128.
+
+## The Policy's own waits, short in its tests (#1806, 20 October)
+
+Five of `lamp-policy::policy`'s tests waited out two of the loop's own waits
+in the full run of 19 October (39337741436). Four waited for the lamp's words
+after its first sound (`outcome::WORDS_FOR`, 1 s):
+`what_the_lamp_did_after_each_decision_is_written_beside_it` 1.8 s,
+`a_lamp_that_spoke_before_it_was_decided_is_written_with_a_time_less_than_nothing`
+1.5 s, and `a_piece_taken_up_after_the_lamps_sound_but_sent_before_it_is_answered_by_it`
+and `a_session_stamped_minutes_ago_is_timed_by_its_taking_up` 1.2 s each.
+`how_the_room_is_and_who_the_eyes_see_are_taken_from_the_bus` (2.3 s) slept
+2.1 s for the eyes' list to outlast `SEEN_FOR` (2 s).
+
+The two are now a `policy::Timing { words_for, seen_for }` in `Beside`.
+`Timing::LAMP` and the default are the lamp's 1 s and 2 s, and `lamp-policy`'s
+own `main` passes `Timing::LAMP`, so the lamp is unchanged.
+`the_loops_own_waits_are_the_lamps_unless_a_test_says_otherwise` holds those
+values. The second judge's tracker (`--local-judge`) takes the same
+`seen_for`.
+
+The five tests use `QUICK`: 400 ms for the words, and 1 s for the list. The
+tests send their words within milliseconds of the lamp's first sound, so
+400 ms still takes them all in. In the room test the second utterance comes
+150 ms after the list, and the test sleeps 1.1 s before the third.
+On this Mac the five took 8.05 s and now take 4.85 s, each run
+from its own build: 1.81 to 1.22, 1.51 to 0.96, 1.20 to 0.69, 1.21 to 0.66
+and 2.32 to 1.32. With the loop's list read on `SEEN_FOR` in place of its own
+`seen_for`, the room test fails (the third decision still saw the faces).
+
+Left as they are, for what each is there to show:
+- `hello`'s office scenes are timed to the rig's 400 ms quiet. Halved, the
+  lull would sit 50 ms inside it on a busy runner.
+- `decide`'s picture test needs its 1.1 s gap. It is what makes "the new frame
+  is sent with its own age" a check: with a gap of 100 ms, an age measured
+  from the old frame would pass `< 500 ms` too.
+- `judges_program` keeps `--seconds 2`. The child's time starts at its
+  start, and inside it the test waits for the ready report, sends a line,
+  and waits for a decision with a 1 s deadline.

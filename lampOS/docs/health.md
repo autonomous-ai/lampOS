@@ -148,6 +148,9 @@ time go in, a `Health` comes out):
   again, however long ago: it is stale.
 - **Order.** The items are worst first by `Level::rank()` (error, warn,
   stale, ok), then by name.
+- **The privacy switch** is its own item, `privacy switch`, sent by Controls
+  when the switch is attached: `open` or `closed`, with `, not moved since
+  Controls started` until it has moved ([privacy-switch.md](privacy-switch.md#the-switch-in-the-lamps-health)).
 - **The lamp's level** is the worst item's, and `stale` at least when a
   part is missing.
 - **The lamp's message** is empty when the level is ok. Otherwise it is

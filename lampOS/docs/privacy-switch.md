@@ -11,6 +11,25 @@ selects the route, in all three; any other value, an empty one included, is off.
 Without it, a pins file that has a `privacy` section is refused, as it was before
 the section existed.
 
+**The product selects it.** Its lamps have the switch on chip 1, line 9 (the
+lead on #1711, 20 Oct 09:33; on lamp-52e6 Fifth saw the line follow it, with
+the camera and the microphone closing). So `deploy/product`'s pins file has
+the `privacy` section, and its Controls, Voice and Ears units set
+`LAMP_PRIVACY_CONTROLS=on`. With the route off, the switch closes only the
+voice's microphone, and lamp-ears keeps reading the room microphone for
+`ears/levels` and `ears/sudden`. With it on, Ears captures only under the
+voice's lease, which a closed switch withdraws. The first builder turns it on
+by default once lamp-52e6 has run it for an hour. A lamp's own pins file
+(the factory's head pads, a calibration), which an update keeps, gains the
+build's `privacy` section when it has none, with everything else in it kept
+(`install::pins_gain_privacy`; the reviewer's P1 on #2143). Without it the
+units would select the route with no switch evidence, and the lamp would
+never hear. New lamps keep the section through the factory's steps, which
+change only the head pads or calibrate through the typed profile. On an update, Controls
+starts after the voice (`After=lamp-voice.service`). Until the voice's
+route-on worker has let the line go, Controls asks for it again each second
+(below), so the microphones stay closed meanwhile.
+
 Controls takes the single GPIO request for `/dev/gpiochip1`, line 9, pull-up,
 electrical LOW = muted. A line it cannot take (another process still holds
 it, as the voice's direct path does on a lamp moving to this route, or this
@@ -122,6 +141,19 @@ pump. Slow Bus I/O cannot keep that handle alive; native ALSA open/configure,
 read/discard and process scheduling still require device timing measurements.
 Derived metadata already inside a Bus send cannot be retracted; its original
 timestamp is retained. See [Ears](ears.md) for that boundary.
+
+## The switch in the lamp's health
+
+With the switch attached, Controls sends a second item on `diagnostics`
+beside its own report, once a second: `privacy switch`, from the switch's
+own fresh reading (`privacy::Source::health`, the first builder on #2143).
+Its message is `open` or `closed`. Until the switch has changed since
+Controls started, it adds `, not moved since Controls started`, and
+`changes` counts each change of the level read, so a lamp whose switch
+never moves is noticed on `lamp/health` and in `lamp-health show`. Either
+is well (`ok`): a still switch is not a fault, and a warning would mark the
+whole lamp all day. A reading that can't be had is `warn`, `unknown:` with
+its fault; Controls' own item already says the route is closed then.
 
 ## Muted appearance and timing
 

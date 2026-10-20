@@ -1768,6 +1768,16 @@ own measurement. It writes the file only with `--write`, never over one
 already there, and refuses a read taken with torque on (install.md, "At the
 factory, once per lamp").
 
+The body does **not** read that file one release forward, on purpose
+(#1680's one exception, a safety rule): an option a newer measure wrote that
+this build does not read still stops the body, and the journal names it and
+says why ("lamp-body: /etc/lampOS/body/lamp.env: --…: an option this build
+does not read, written by a newer measure; the body stays still until this
+lamp is updated"). A pose option may be a bound the arm needs, as
+`--pitch-window` once was; a body that stands still until it is updated is
+the safe failure, not one that moves on bounds it knows to be incomplete
+(the first builder on #2071, 20 Oct 06:28).
+
 **`lamp-body-mood`** (#1682) tells a body one mood on its `--mood-socket`,
 as the voice does: one `{"mood":WORD,"level":LEVEL}` datagram (level 128
 unless given). The factory's steps use it to stand a body run by hand on a

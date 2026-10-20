@@ -9,5 +9,6 @@
   ],
   "every_ms": 5,
   "reset": {"name": "reset", "line": 100, "active_low": true, "pull": "up"},
-  "legacy_head": true
+  "legacy_head": true,
+  "privacy": {"chip": "/dev/gpiochip1", "line": 9, "active_low": true, "pull": "up"}
 }

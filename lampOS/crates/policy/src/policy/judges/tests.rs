@@ -1,5 +1,5 @@
 use super::*;
-use crate::{decide::Answer, gather::LampThen};
+use crate::{decide::Answer, gather::LampThen, policy::Timing};
 use lamp_msgs::Face;
 
 fn judgement(p: f32) -> Judgement {
@@ -166,7 +166,12 @@ fn missing_pose_is_not_away_and_an_empty_or_distant_view_is_unknown() {
         ),
     ] {
         judges.faces(&Faces { faces }, at);
-        assert_eq!(judges.cues(&context(), &utterance(at)).facing, expected);
+        assert_eq!(
+            judges
+                .cues(&context(), &utterance(at), Timing::LAMP.seen_for)
+                .facing,
+            expected
+        );
     }
 }
 
@@ -187,7 +192,7 @@ fn cue_receipt_history_excludes_future_faces_and_later_voice_knowledge() {
         at + Duration::from_millis(5),
     );
     judges.voice_seen(at + Duration::from_millis(5));
-    let frozen = judges.cues(&context(), &utterance(at));
+    let frozen = judges.cues(&context(), &utterance(at), Timing::LAMP.seen_for);
     assert_eq!(frozen.facing, Some(false));
     assert_eq!(frozen.face_age_ms, Some(0));
     assert_eq!(frozen.conversation, None);
@@ -195,12 +200,14 @@ fn cue_receipt_history_excludes_future_faces_and_later_voice_knowledge() {
     assert_eq!(frozen.duration_ms, None);
     let later = at + Duration::from_millis(10);
     assert_eq!(
-        judges.cues(&context(), &utterance(later)).conversation,
+        judges
+            .cues(&context(), &utterance(later), Timing::LAMP.seen_for)
+            .conversation,
         Some(false)
     );
     judges.voice_gone(later);
     judges.eyes_gone(later);
-    let gone = judges.cues(&context(), &utterance(later));
+    let gone = judges.cues(&context(), &utterance(later), Timing::LAMP.seen_for);
     assert_eq!(gone.conversation, None);
     assert_eq!(gone.facing, None);
 }
@@ -217,7 +224,7 @@ fn stale_and_evicted_cues_stay_unknown_and_cut_text_has_no_length() {
     );
     let mut heard = utterance(at + Duration::from_millis(2001));
     heard.cut = true;
-    let cues = judges.cues(&context(), &heard);
+    let cues = judges.cues(&context(), &heard, Timing::LAMP.seen_for);
     assert_eq!(
         (cues.facing, cues.face_age_ms, cues.word_count),
         (None, None, None)
@@ -226,7 +233,12 @@ fn stale_and_evicted_cues_stay_unknown_and_cut_text_has_no_length() {
         judges.voice_seen(at + Duration::from_millis(n));
     }
     assert_eq!(judges.tracker.voice.len(), 32);
-    assert_eq!(judges.cues(&context(), &utterance(at)).conversation, None);
+    assert_eq!(
+        judges
+            .cues(&context(), &utterance(at), Timing::LAMP.seen_for)
+            .conversation,
+        None
+    );
 }
 
 #[test]

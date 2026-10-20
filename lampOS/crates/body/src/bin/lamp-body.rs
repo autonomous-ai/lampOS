@@ -44,6 +44,50 @@ struct Arguments {
     arbitration: bool,
 }
 
+/// Every option this build reads. One that is not among them is refused.
+/// One from the lamp's own poses file (`BODY_POSES`, written by
+/// `lamp-body-measure` into `/etc/lampOS/body/lamp.env`) is refused too,
+/// with a line that names it and says the body stays still: a pose option a
+/// newer measure adds may be a bound that lamp's mechanics need, as
+/// `--pitch-window` once was, and a body that stands still until it is
+/// updated is the safe failure, not one that moves on bounds it knows to be
+/// incomplete (the first builder on #2071, 20 Oct 06:28; #1680's one
+/// exception, a safety rule).
+const OPTIONS: [&str; 32] = [
+    "--arbitration",
+    "--arm-load",
+    "--awake-seconds",
+    "--device",
+    "--folded-arm",
+    "--force-limit",
+    "--gaze",
+    "--gaze-reach",
+    "--gaze-socket",
+    "--give-way",
+    "--home",
+    "--idle",
+    "--let-go-at-stop",
+    "--limp",
+    "--lock-directory",
+    "--look-at-name",
+    "--mood-socket",
+    "--moves",
+    "--overload",
+    "--pitch-window",
+    "--reach",
+    "--rest-glance",
+    "--servo-acceleration",
+    "--servo-speed",
+    "--speed",
+    "--stand",
+    "--stand-roll",
+    "--stand-seconds",
+    "--stand-share",
+    "--torque",
+    "--unit-id",
+    "--wake",
+];
+
 /// What `--give-way` said; the body's own type is built for Linux only.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum GiveWay {
@@ -99,7 +143,18 @@ fn home_of(value: &str) -> Option<[u16; 3]> {
     parts.next().is_none().then_some(home)
 }
 
+#[cfg(test)]
 fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, &'static str> {
+    parse_with(args, None)
+}
+
+/// As [`parse`], `poses` being the lamp's poses file's options as systemd
+/// gave them (`BODY_POSES`): an option there this build does not read is
+/// still refused, and named.
+fn parse_with(
+    args: impl IntoIterator<Item = OsString>,
+    poses: Option<&str>,
+) -> Result<Option<Arguments>, &'static str> {
     let mut args = args.into_iter();
     let (mut device, mut unit_id, mut lock_directory, mut mood_socket) = (None, None, None, None);
     let mut home = None;
@@ -392,7 +447,18 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                         .ok_or("--gaze-reach is YAW,PITCH in encoder counts")?,
                 );
             }
-            _ => return Err("unknown or duplicate option"),
+            _ => {
+                let name = key.to_str().unwrap_or_default();
+                let from_poses =
+                    poses.is_some_and(|poses| poses.split_whitespace().any(|word| word == name));
+                if !OPTIONS.contains(&name) && from_poses {
+                    eprintln!(
+                        "lamp-body: /etc/lampOS/body/lamp.env: {name}: an option this build does not read, written by a newer measure; the body stays still until this lamp is updated"
+                    );
+                    return Err("an option in the lamp's poses file this build does not read");
+                }
+                return Err("unknown or duplicate option");
+            }
         }
     }
     // Eyes are a socket and what the picture is worth, or nothing. A socket
@@ -794,7 +860,8 @@ fn main() -> std::process::ExitCode {
     {
         return exit_report();
     }
-    let arguments = match parse(std::env::args_os().skip(1)) {
+    let poses = std::env::var("BODY_POSES").ok();
+    let arguments = match parse_with(std::env::args_os().skip(1), poses.as_deref()) {
         Ok(None) => {
             print!("{USAGE}");
             return std::process::ExitCode::SUCCESS;
@@ -1498,6 +1565,68 @@ mod tests {
 
     fn args(values: &[&str]) -> Vec<OsString> {
         values.iter().map(OsString::from).collect()
+    }
+
+    /// #1680, the first builder on #2071: a newer `lamp-body-measure` may
+    /// write a pose option this build does not read. The body stays strict
+    /// on it (it may be a bound the arm needs), and says which option and
+    /// why; the poses it knows still read; an unknown word, a bad value or a
+    /// known option twice is refused as before.
+    #[test]
+    fn a_newer_poses_files_option_still_stops_the_body() {
+        let poses = "--home 1772,2057,2034 --shoulder-trim 12 --torque on";
+        let line: Vec<&str> =
+            [&FULL[..], &poses.split_whitespace().collect::<Vec<_>>()[..]].concat();
+        assert_eq!(
+            parse_with(args(&line), Some(poses)).err(),
+            Some("an option in the lamp's poses file this build does not read")
+        );
+        assert_eq!(
+            parse_with(args(&line), None).err(),
+            Some("unknown or duplicate option")
+        );
+        // The poses it knows read as before.
+        let known = "--home 1772,2057,2034 --torque on";
+        let line: Vec<&str> =
+            [&FULL[..], &known.split_whitespace().collect::<Vec<_>>()[..]].concat();
+        let read = parse_with(args(&line), Some(known)).unwrap().unwrap();
+        assert_eq!(read.home, Some([1772, 2057, 2034]));
+        let typo = [&FULL[..], &["--wakee", "on"]].concat();
+        assert!(parse_with(args(&typo), Some(known)).is_err());
+        let line = [&FULL[..], &["--home", "1,2"]].concat();
+        assert!(parse_with(args(&line), Some("--home 1,2")).is_err());
+        let twice = "--home 1772,2057,2034 --home 1772,2057,2034";
+        let line = [
+            &FULL[..],
+            &["--home", "1772,2057,2034", "--home", "1772,2057,2034"],
+        ]
+        .concat();
+        assert!(parse_with(args(&line), Some(twice)).is_err());
+    }
+
+    /// Every option the usage names is one this build reads, so a known
+    /// option is never taken for a newer one.
+    #[test]
+    fn every_option_the_usage_names_is_known() {
+        let synopsis = USAGE
+            .split("lamp-body --device")
+            .nth(1)
+            .and_then(|rest| rest.split("\n\n").next())
+            .unwrap();
+        let named: Vec<&str> = format!("--device{synopsis}")
+            .split(|c: char| !(c.is_ascii_lowercase() || c == '-'))
+            .filter(|word| word.starts_with("--") && word.len() > 2)
+            .map(|word| {
+                OPTIONS
+                    .iter()
+                    .find(|known| **known == word)
+                    .copied()
+                    .unwrap_or_else(|| panic!("{word} not in OPTIONS"))
+            })
+            .collect();
+        for option in OPTIONS {
+            assert!(named.contains(&option), "{option} not in the usage");
+        }
     }
 
     const FULL: [&str; 8] = [

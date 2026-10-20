@@ -12,7 +12,8 @@ pub const SETTLE_US: u64 = 500_000;
 pub const EDGE_US: u64 = 20_000;
 pub const FRESH_US: u64 = 100_000;
 /// A candidate whose longest pulse is at least this held its level under a
-/// hand. The touch's own longest tap.
+/// hand. The touch's own longest tap. One press this long also finds the
+/// pad, as two pulses do: a held hand is the clearest touch (thirteen-P4).
 pub const HELD_US: u64 = 500_000;
 /// A change of a line this soon after its last one, and no sooner than
 /// [`EDGE_US`], is a fast one: a TTP223 pulsing under a hand (50-100 ms) makes
@@ -212,7 +213,10 @@ impl Discovery {
                 if duration >= EDGE_US {
                     line.completed_pulses += 1;
                     line.longest_pulse_us = line.longest_pulse_us.max(duration);
-                    if line.completed_pulses >= 2 {
+                    // Two presses, or one held: a person's two touches on
+                    // a pad merge into one long one more often than not
+                    // (lamp-c0a4, three runs, #1965; thirteen-P4).
+                    if line.completed_pulses >= 2 || duration >= HELD_US {
                         line.active_low_candidate = Some(idle);
                         line.reads = if line.longest_pulse_us >= HELD_US {
                             Some(Reads::Level)

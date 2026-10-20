@@ -2,8 +2,8 @@
 //! local decision never waits for its completion after its original deadline.
 //! Deadline admission uses both worker completion and loop receipt time.
 use super::{
-    Ask, Context, Diagnostic, Faces, Level, NAME, Note, Policy, Room, SEEN_FOR, SHADOW, Utterance,
-    Waiting, Watch, attention, baseline, judge_log, local, millis, unix_ms,
+    Ask, Context, Diagnostic, Faces, Level, NAME, Note, Policy, Room, SHADOW, Utterance, Waiting,
+    Watch, attention, baseline, judge_log, local, millis, unix_ms,
 };
 use crate::{
     attention::{Answers, Choice, Judgement},
@@ -243,23 +243,24 @@ fn retain<T>(history: &mut VecDeque<(Instant, T)>, at: Instant, value: T) {
 }
 
 impl Tracker {
-    fn face(&self, ended: Instant) -> (Option<bool>, Option<u32>) {
+    /// The newest face before `ended`, while it is `seen_for` old at most.
+    fn face(&self, ended: Instant, seen_for: Duration) -> (Option<bool>, Option<u32>) {
         match self.faces.iter().rev().find(|(at, _)| *at <= ended) {
-            Some((at, facing)) if ended.duration_since(*at) <= SEEN_FOR => {
+            Some((at, facing)) if ended.duration_since(*at) <= seen_for => {
                 (*facing, Some(millis(ended.duration_since(*at))))
             }
             _ => (None, None),
         }
     }
 
-    fn cues(&self, context: &Context, utterance: &Utterance) -> local::Cues {
+    fn cues(&self, context: &Context, utterance: &Utterance, seen_for: Duration) -> local::Cues {
         let known_voice = self
             .voice
             .iter()
             .rev()
             .find(|(at, _)| *at <= utterance.began)
             .is_some_and(|(_, known)| *known);
-        let (facing, face_age_ms) = self.face(utterance.ended);
+        let (facing, face_age_ms) = self.face(utterance.ended, seen_for);
         local::Cues {
             name_score: context
                 .name_heard
@@ -374,8 +375,13 @@ impl Judges {
         retain(&mut self.tracker.faces, at, facing);
     }
 
-    pub(super) fn cues(&self, context: &Context, utterance: &Utterance) -> local::Cues {
-        self.tracker.cues(context, utterance)
+    pub(super) fn cues(
+        &self,
+        context: &Context,
+        utterance: &Utterance,
+        seen_for: Duration,
+    ) -> local::Cues {
+        self.tracker.cues(context, utterance, seen_for)
     }
 
     pub(super) fn wait(&self, now: Instant) -> Duration {

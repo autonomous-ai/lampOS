@@ -192,6 +192,7 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "welcome-back",
     "reminders",
     "task-news",
+    "onboarding",
     "stretch-break",
     "stuffy-air",
     "dance",
@@ -366,6 +367,8 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("reminders", "SKILL.md"),
     skill_file!("task-news", "skill.toml"),
     skill_file!("task-news", "SKILL.md"),
+    skill_file!("onboarding", "skill.toml"),
+    skill_file!("onboarding", "SKILL.md"),
     skill_file!("stretch-break", "skill.toml"),
     skill_file!("stretch-break", "SKILL.md"),
     skill_file!("stuffy-air", "skill.toml"),
@@ -504,6 +507,35 @@ pub const HARNESS_HOME: &str = "/var/lib/lampos-tasks";
 /// root and no question asked; what it fetches is checked against Harness's
 /// sha256 metadata (#1676, the lead on #1711).
 pub const HARNESS_INSTALLER: &str = "https://cdn.autonomous.ai/harness/cli/install.sh";
+/// The oldest Harness that signs a lamp in by a spoken code (`harness login
+/// --code`, Harness 0.4.23, openharness#1410; `lamp-tasks serve
+/// --sign-in-by-code`, #1676). `harness-on` brings an older one it put there
+/// up to the version Harness's own installer ships.
+pub const HARNESS_LEAST: (u32, u32, u32) = (0, 4, 23);
+
+/// The version `harness version` prints ("0.4.23", or with a `v` or a word
+/// before it): its first `a.b.c`.
+pub fn harness_version_of(text: &str) -> Option<(u32, u32, u32)> {
+    text.split_whitespace().find_map(|word| {
+        let mut parts = word.trim_start_matches('v').split('.');
+        let number = |part: Option<&str>| part?.parse::<u32>().ok();
+        let version = (number(parts.next())?, number(parts.next())?, {
+            // "23-beta.1" is 23.
+            let patch = parts.next()?;
+            let digits: String = patch.chars().take_while(char::is_ascii_digit).collect();
+            digits.parse::<u32>().ok()?
+        });
+        Some(version)
+    })
+}
+
+fn shown_version(version: Option<(u32, u32, u32)>) -> String {
+    version.map_or_else(
+        || "of a version it doesn't say".to_owned(),
+        |(major, minor, patch)| format!("{major}.{minor}.{patch}"),
+    )
+}
+
 /// The part that hands work to Harness, started again once Harness is on.
 const TASKS_UNIT: &str = "lamp-tasks.service";
 /// What says Harness was set to start at boot: written in lamp-update's
@@ -602,6 +634,8 @@ pub trait Host {
     /// with that `HOME`, then [`HARNESS`] linked to the launcher it wrote.
     /// Never a copy of Harness of this program's own.
     fn harness_on(&mut self, user: &str, home: &str) -> Result<(), String>;
+    /// What `harness version` prints, as `user` with that `HOME` (#1676).
+    fn harness_version(&mut self, user: &str, home: &str) -> Result<String, String>;
     /// `systemctl restart` of one unit.
     fn restart(&mut self, unit: &str) -> Result<(), String>;
 }
@@ -639,6 +673,11 @@ impl Host for System {
 
     fn harness_on(&mut self, user: &str, home: &str) -> Result<(), String> {
         harness_on_with(&mut output_of, user, home)
+    }
+
+    fn harness_version(&mut self, user: &str, home: &str) -> Result<String, String> {
+        let uid = uid_of(&mut output_of, user)?;
+        output_of(&harness_argv(user, home, &uid, &["version"]))
     }
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
@@ -1039,6 +1078,7 @@ pub fn install(
         say,
         &mut |state| save(&records, state),
     )?;
+    pins_gain_privacy(config, &defaults, &mut changed, say)?;
     // The voice's service and the user's key, private. Each is install's
     // while it is still what an install wrote, so a newer provider, or a key
     // V1 rotated in its config, reaches the lamp; one setup wrote, or one
@@ -1241,6 +1281,65 @@ pub fn settings(
     persist: &mut dyn FnMut(&State) -> Result<(), String>,
 ) -> Result<(), String> {
     settings_with_mode(config, defaults, 0o644, state, changed, say, persist)
+}
+
+/// Where the product's units read Controls' pins.
+const PINS_PATH: &str = "/etc/lampOS/controls/controls-pins.json";
+
+/// A lamp's own pins file, which [`settings`] keeps (the factory's head
+/// pads, a calibration), gains the build's `privacy` section when it has
+/// none. The product's units select the privacy route
+/// (`LAMP_PRIVACY_CONTROLS=on`), and without the section Controls has no
+/// privacy source, so Voice and Ears never open a microphone (the
+/// reviewer's P1 on #2143). Only that one key is added; everything else is
+/// kept, the file's mode too. A file that already has the section, a build
+/// without one, a file that isn't there (the default was just written) or
+/// one that isn't a JSON object is left, the last said.
+fn pins_gain_privacy(
+    config: &Install,
+    defaults: &[(&str, &str)],
+    changed: &mut Vec<String>,
+    say: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    let Some(section) = defaults
+        .iter()
+        .find(|(path, _)| *path == PINS_PATH)
+        .and_then(|(_, text)| serde_json::from_str::<serde_json::Value>(text).ok())
+        .and_then(|default| default.get("privacy").cloned())
+    else {
+        return Ok(());
+    };
+    let at = config.on(PINS_PATH);
+    let text = match fs::read_to_string(&at) {
+        Ok(text) => text,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(format!("{PINS_PATH}: {error}")),
+    };
+    let mut pins = match serde_json::from_str::<serde_json::Value>(&text) {
+        Ok(serde_json::Value::Object(pins)) => pins,
+        _ => {
+            say(&format!(
+                "{PINS_PATH} is not a JSON object: its privacy section is not added, and Controls will say so"
+            ));
+            return Ok(());
+        }
+    };
+    if pins.contains_key("privacy") {
+        return Ok(());
+    }
+    pins.insert("privacy".into(), section);
+    let mode = fs::metadata(&at)
+        .map(|meta| meta.permissions().mode() & 0o777)
+        .map_err(|error| format!("{PINS_PATH}: {error}"))?;
+    let mut bytes = serde_json::to_vec_pretty(&serde_json::Value::Object(pins))
+        .map_err(|error| format!("{PINS_PATH}: {error}"))?;
+    bytes.push(b'\n');
+    write_whole(&at, &bytes, mode).map_err(|error| format!("{PINS_PATH}: {error}"))?;
+    changed.push(format!("wrote {PINS_PATH}"));
+    say(&format!(
+        "added the privacy section to {PINS_PATH}: this lamp's own pins are kept otherwise"
+    ));
+    Ok(())
 }
 
 /// [`settings`], written with `mode`: the voice's service and the device
@@ -1588,7 +1687,13 @@ pub fn harness_off(
 /// `lamp-update harness-on` (#1676 B5): Harness on a lamp lampOS is
 /// installed on, as the person's computer has it. Without Harness at
 /// [`HARNESS`], [`Host::harness_on`] puts it there with Harness's own
-/// installer; one already there is kept as it is. Then Harness at boot, as
+/// installer. One already there is kept as it is, unless it is older than
+/// [`HARNESS_LEAST`] and is the one `harness-on` put there (the link to the
+/// launcher in [`HARNESS_HOME`]): Harness's own installer is run again, to
+/// the version it ships, and `harness version` read before and after (the
+/// first builder at 09:46 on #1676). A failed or still too old install, or
+/// an older Harness put there otherwise, is kept as it is and said as
+/// `harness_too_old`; the rest goes on. Then Harness at boot, as
 /// [`install`] sets it, with its record, if not yet set; then the tasks part
 /// is started again, so it hands over with Harness, but only when something
 /// changed. Signing in is the person's, and not done here. Run again, it
@@ -1611,8 +1716,50 @@ pub fn harness_on(
         .lock()
         .map_err(|error| format!("another lamp-update is running: {error}"))?;
     let mut changed = Vec::new();
-    if on(HARNESS).exists() {
-        say(&format!("Harness is already at {HARNESS}: kept as it is"));
+    let link = on(HARNESS);
+    if fs::symlink_metadata(&link).is_ok() {
+        let launcher = format!("{HARNESS_HOME}/.local/bin/harness");
+        let ours = fs::read_link(&link).is_ok_and(|to| to == Path::new(&launcher));
+        let mut version = || {
+            host.harness_version(USER, HARNESS_HOME)
+                .ok()
+                .as_deref()
+                .and_then(harness_version_of)
+        };
+        let least = shown_version(Some(HARNESS_LEAST));
+        match version() {
+            Some(found) if found >= HARNESS_LEAST => say(&format!(
+                "Harness {} is already at {HARNESS}: kept as it is",
+                shown_version(Some(found))
+            )),
+            found if ours => {
+                let was = shown_version(found);
+                let installed = host.harness_on(USER, HARNESS_HOME);
+                let now = host
+                    .harness_version(USER, HARNESS_HOME)
+                    .ok()
+                    .as_deref()
+                    .and_then(harness_version_of);
+                match (installed, now) {
+                    (Ok(()), Some(now)) if now >= HARNESS_LEAST => changed.push(format!(
+                        "Harness updated from {was} to {} by its own installer, for signing in by a spoken code",
+                        shown_version(Some(now))
+                    )),
+                    (Ok(()), now) => say(&format!(
+                        "harness_too_old: Harness is {} after its own installer; signing in by a spoken code needs {least} or later",
+                        shown_version(now)
+                    )),
+                    (Err(error), now) => say(&format!(
+                        "harness_too_old: Harness's own installer failed ({error}); Harness {} is kept; signing in by a spoken code needs {least} or later",
+                        shown_version(now)
+                    )),
+                }
+            }
+            found => say(&format!(
+                "harness_too_old: Harness {} at {HARNESS} wasn't put there by harness-on, so it is kept as it is; signing in by a spoken code needs {least} or later",
+                shown_version(found)
+            )),
+        }
     } else {
         host.harness_on(USER, HARNESS_HOME)?;
         changed.push(format!(

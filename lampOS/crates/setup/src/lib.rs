@@ -9,6 +9,13 @@ pub mod wake;
 pub mod wifi;
 pub mod wifi_change;
 
+/// The bus name `lamp-setup` subscribes under for touch.
+pub const SUBSCRIBER: &str = "setup";
+
+/// Every name this crate subscribes to the bus under. A new subscriber is
+/// added here, and a test holds each to the bus's rule for a name.
+pub const SUBSCRIBERS: [&str; 2] = [SUBSCRIBER, change::SUBSCRIBER];
+
 use lamp_bus::Subscriber;
 use lamp_msgs::TouchEvent;
 use std::{

@@ -5,7 +5,7 @@
 # sway's bars, and the glances or sways each skill would have asked for. Run on
 # the lamp as root, with someone at the Mac to play the tracks:
 #
-#   sudo EARS_MODEL=/opt/lampOS/models/yamnet/yamnet.onnx lampOS/tools/joys-scores.sh laugh|music [--with-privacy-controls]
+#   sudo EARS_MODEL=/opt/lampOS/models/yamnet/yamnet.onnx lampOS/tools/joys-scores.sh laugh|music [--with-privacy-controls|--no-slide]
 #
 # Nothing moves: the skill is never installed. The bus is recorded
 # (`ears/classes`, `voice/state`, `humans/faces/tracked`) while the sound
@@ -23,6 +23,15 @@
 # the same /run drop-ins, removed on any exit and the three restarted: the
 # route is the one the slide closes both microphones on, so it adds controls,
 # but whether a lamp runs on it is the first builder's call (switches.md).
+#
+# A lamp with no slide (lamp-4ace) takes `--no-slide` instead: the route
+# `LAMP_PRIVACY_CONTROLS=no-slide` in the same three drop-ins, on which Ears
+# scores only with the person's stored yes to room sounds (privacy-switch.md).
+# The tool never writes that yes: on `no-slide`, with the flag or already on
+# the lamp, it runs only when the person's own yes is in ROOM_SOUNDS, given in
+# setup, and otherwise touches nothing (a no leaves no file, as "never asked"
+# does; the reviewer's P2 on #2113). A yes lamp-ears can't read scores
+# nothing, and the 20 s check below says so.
 #
 # The model: Qualcomm AI Hub's YAMNet ONNX float export, release v0.59.0
 # (`qai-hub-models/models/yamnet/releases/v0.59.0/yamnet-onnx-float.zip`):
@@ -49,23 +58,26 @@
 # Environment: EARS_MODEL (required), SKILL_DIR (../skills/laugh-glance or
 # ../skills/music-sway beside this), BUS (lamp-bus, from PATH), SKILLS
 # (lamp-skills, from PATH), BUS_ROOT (/run/lampos-bus), UNIT_DIR
-# (/run/systemd/system), QUIET_S (120), TRACK_S (120), OVER_S (30),
+# (/run/systemd/system), ROOM_SOUNDS
+# (/var/lib/lampOS/consent/room-sounds.json), QUIET_S (120), TRACK_S (120), OVER_S (30),
 # SYSTEMCTL (systemctl); and for the tests, NOW_FILE (a file holding the wall
 # clock in ms) and SLEEP (sleep). Its own work is always a new folder from
 # mktemp, never one given, since it is deleted at the end.
 set -euo pipefail
 
 ROW=${1:-}
-PRIVACY=0
+USAGE="usage: joys-scores.sh laugh|music [--with-privacy-controls|--no-slide]"
+ROUTE=
 case ${2:-} in
   "") ;;
-  --with-privacy-controls) PRIVACY=1 ;;
-  *) echo "usage: joys-scores.sh laugh|music [--with-privacy-controls]" >&2; exit 2 ;;
+  --with-privacy-controls) ROUTE=on ;;
+  --no-slide) ROUTE=no-slide ;;
+  *) echo "$USAGE" >&2; exit 2 ;;
 esac
 case $ROW in
   laugh) NAME=laugh-glance FIELD=laughter BAR=0.5 HOLD_S=1 TRACK="the laugh track" ASK=body.gaze ;;
   music) NAME=music-sway FIELD=music BAR=0.6 HOLD_S=20 TRACK="the music track" ASK=body.move ;;
-  *) echo "usage: joys-scores.sh laugh|music [--with-privacy-controls]" >&2; exit 2 ;;
+  *) echo "$USAGE" >&2; exit 2 ;;
 esac
 HERE=$(cd "$(dirname "$0")" && pwd)
 SKILL_DIR=${SKILL_DIR:-$HERE/../skills/$NAME}
@@ -73,6 +85,7 @@ BUS=${BUS:-lamp-bus}
 SKILLS=${SKILLS:-lamp-skills}
 BUS_ROOT=${BUS_ROOT:-/run/lampos-bus}
 UNIT_DIR=${UNIT_DIR:-/run/systemd/system}
+ROOM_SOUNDS=${ROOM_SOUNDS:-/var/lib/lampOS/consent/room-sounds.json}
 QUIET_S=${QUIET_S:-120} TRACK_S=${TRACK_S:-120} OVER_S=${OVER_S:-30}
 SYSTEMCTL=${SYSTEMCTL:-systemctl}
 SLEEP=${SLEEP:-sleep}
@@ -90,10 +103,18 @@ own=$("$SKILLS" test "$SKILL_DIR" 2>&1) && grep -q ' cases pass' <<<"$own" ||
 # The units restarted for the run, in this order: Ears alone, or the three
 # that take the privacy route together.
 UNITS=lamp-ears
-if [[ $PRIVACY == 1 ]]; then
+SET_ROUTE=$ROUTE
+if [[ -n $ROUTE ]]; then
   UNITS="lamp-controls lamp-voice lamp-ears"
-elif ! "$SYSTEMCTL" show -p Environment --value lamp-ears.service | tr ' ' '\n' | grep -qx LAMP_PRIVACY_CONTROLS=on; then
-  echo "lamp-ears runs without LAMP_PRIVACY_CONTROLS=on, which ears/classes needs (with Controls and Voice); nothing done. --with-privacy-controls turns the route on in all three for the run" >&2
+else
+  ROUTE=$("$SYSTEMCTL" show -p Environment --value lamp-ears.service | tr ' ' '\n' | grep -oE '^LAMP_PRIVACY_CONTROLS=(on|no-slide)$' | tail -1 | cut -d= -f2 || true)
+  [[ -n $ROUTE ]] || {
+    echo "lamp-ears runs without LAMP_PRIVACY_CONTROLS=on or no-slide, which ears/classes needs (with Controls and Voice); nothing done. --with-privacy-controls (a lamp with a slide) or --no-slide turns the route on in all three for the run" >&2
+    exit 3
+  }
+fi
+if [[ $ROUTE == no-slide ]] && ! grep -q '"room_sounds": *"yes"' "$ROOM_SOUNDS" 2>/dev/null; then
+  echo "no yes to room sounds in $ROOM_SOUNDS: on a lamp with no slide the person at it says yes in setup first; nothing done" >&2
   exit 3
 fi
 
@@ -119,7 +140,7 @@ for unit in $UNITS; do
   DROPINS="$DROPINS $dropin"
   {
     echo '[Service]'
-    [[ $PRIVACY == 1 ]] && echo 'Environment=LAMP_PRIVACY_CONTROLS=on'
+    [[ -n $SET_ROUTE ]] && echo "Environment=LAMP_PRIVACY_CONTROLS=$SET_ROUTE"
     [[ $unit == lamp-ears ]] && printf 'Environment=LAMP_EARS_CLASSES=on\nEnvironment=LAMP_EARS_CLASSES_MODEL=%s\n' "$EARS_MODEL"
     true
   } >"$dropin"
@@ -131,7 +152,7 @@ for _ in $(seq 20); do
   if LAMP_BUS_ROOT=$BUS_ROOT "$BUS" latest ears/classes 2>/dev/null | grep -q '"scored"'; then scored=1; break; fi
   "$SLEEP" 1
 done
-[[ $scored == 1 ]] || { echo "lamp-ears says no scores on ears/classes in 20 s (the model, or privacy); nothing measured" >&2; exit 4; }
+[[ $scored == 1 ]] || { echo "lamp-ears says no scores on ears/classes in 20 s (the model, or privacy$([[ $ROUTE == no-slide ]] && echo ", or a yes in $ROOM_SOUNDS lamp-ears can't read")); nothing measured" >&2; exit 4; }
 
 TOTAL=$((QUIET_S + TRACK_S + OVER_S))
 LAMP_BUS_ROOT=$BUS_ROOT "$BUS" record "$OUT/rec" ears/classes voice/state humans/faces/tracked --seconds $((TOTAL + 2)) >/dev/null 2>&1 &

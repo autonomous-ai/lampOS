@@ -47,6 +47,7 @@ fn cleanup_failure_cannot_leave_a_restartable_physical_mute() {
         &mut trace,
         &mut None,
         Err(Box::new(PhysicalMute {
+            onboarding: None,
             observed_at_us: monotonic_us(),
         })),
     )
@@ -133,6 +134,7 @@ impl MutePeer {
                         self.channels
                             .control
                             .send(WorkerEvent::Privacy {
+                                receipt: None,
                                 acquired_at_us,
                                 muted: true,
                             })

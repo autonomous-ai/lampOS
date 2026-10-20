@@ -1924,13 +1924,11 @@ fn perform(
         // Its own words as written, or its note, at its priority and
         // expiry (#1684): the text goes to the voice as it is in the file.
         Call::Words(words) => Some(("say", words.ask())),
-        Call::SayFrom(source, task) => {
-            let mut ask = json!({"from": source.name(), "priority": source.priority()});
-            // An item's run names its task: the voice gives it that task's
-            // news and no other (#1237).
-            if let Some(task) = task {
-                ask["task"] = json!(task);
-            }
+        Call::SayFrom(source, _) => {
+            // Share the item identity encoding with replay: task news names
+            // its task; onboarding names its exact pending invitation.
+            let (_, mut ask) = call.named();
+            ask["priority"] = json!(source.priority());
             Some(("say", ask))
         }
         Call::Sound { path, .. } => Some(("sound", json!({"sound": path, "priority": 5}))),

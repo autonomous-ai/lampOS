@@ -256,11 +256,19 @@ journal line, and the part starts with an empty store (#1680). The version is
 read from the file's header before any SQLite connection, so a newer build's
 WAL database, or one with `-wal`/`-shm` beside it, is set aside with its
 sidecars (named after it) rather than refused by the journal-mode and sidecar
-checks; health names it
+checks. The sidecars are renamed first; a start after a crash between their
+renames and the database's keeps the database under their stamp, so they stay
+paired. It does so only when the database's mtime is no later than their
+ctime and none of its own sidecars would land on a name already there; a stale
+leftover from an older crash, or a complete earlier set-aside at the same
+version, gets a new stamp. Health names it
 as `set_aside`, as above. `user_version` 0 with tables, or a schema it doesn't
 expect at 1, is still refused (corruption, not a newer build). Tests:
 `a_newer_database_version_is_set_aside_whole_and_a_new_store_begins`,
-`a_newer_wal_database_is_set_aside_with_its_sidecars`
+`a_newer_wal_database_is_set_aside_with_its_sidecars`,
+`a_set_aside_cut_before_the_database_rename_joins_its_sidecars_again`,
+`a_stale_leftover_sidecar_is_not_taken_as_the_newer_databases`,
+`each_set_aside_at_the_same_version_keeps_its_own_stamp`
 (`tests/storage.rs`), `a_newer_schedule_database_is_set_aside_and_the_part_serves`
 (`tests/runtime.rs`). A future writer
 must bump the JSON schema for new enum values, required fields, raised bounds,

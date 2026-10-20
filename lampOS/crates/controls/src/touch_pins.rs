@@ -1,5 +1,7 @@
-//! Explicit Orange Pi wiring for the opt-in touch path. Its separate schema
-//! leaves the legacy pins reader, including unknown-field rejection, intact.
+//! Explicit Orange Pi wiring for the touch path, the product's, in a schema
+//! of its own: the legacy pins reader keeps refusing unknown fields at its
+//! top. This one reads a newer build's file one release forward
+//! ([`crate::forward`], #1680).
 use crate::{
     engine::Config,
     input::{InputError, Observation, PinReader},
@@ -39,7 +41,6 @@ pub enum Reads {
 /// One head pad's own baseline (#711): each unit's pads rest and read
 /// differently (#1764), so each lamp's factory step writes its own.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct HeadRest {
     pub name: String,
     pub rest: Rest,
@@ -70,8 +71,10 @@ pub fn serving(
     (wiring, config, set_aside)
 }
 
+/// The product's pins file. A field a newer build writes is read past and
+/// named once ([`crate::forward`]), except one about privacy; the `privacy`
+/// section itself stays strict.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TouchPinsConfig {
     pub chip: String,
     pub buttons: Vec<Pin>,
@@ -111,13 +114,25 @@ pub struct TouchPinsConfig {
 }
 
 impl TouchPinsConfig {
+    /// The pins file at `path`, the fields this build does not read named
+    /// once in the journal.
     pub fn load(path: &Path) -> io::Result<Self> {
+        let (wiring, unread) = Self::read(path)?;
+        if let Some(line) = unread {
+            eprintln!("lamp-controls: {line}");
+        }
+        Ok(wiring)
+    }
+
+    /// The pins file at `path`, and the line naming the fields this build
+    /// does not read, if any ([`crate::forward::read`]).
+    pub fn read(path: &Path) -> io::Result<(Self, Option<String>)> {
         let mut bytes = Vec::new();
         File::open(path)?.take(16_385).read_to_end(&mut bytes)?;
         if bytes.len() > 16_384 {
             return Err(io::Error::other("touch pins file exceeds 16 KiB"));
         }
-        Ok(serde_json::from_slice(&bytes)?)
+        crate::forward::read(path, &bytes)
     }
 
     pub fn check(&self, config: &Config) -> Result<TouchConfig, String> {

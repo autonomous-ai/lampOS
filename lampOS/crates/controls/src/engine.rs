@@ -20,8 +20,9 @@ pub const HEAD_COOLDOWN_US: u64 = 1_500_000;
 pub const MAX_PENDING_GESTURES: usize = 64;
 pub const MAX_READER_SESSIONS: usize = 32;
 
+/// `controls.json`. A field a newer build writes is read past and named once
+/// ([`crate::forward`], #1680); a known field with a bad value is refused.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Config {
     /// Off unless explicitly enabled. Shadow reports never become an action.
     pub enabled: bool,
