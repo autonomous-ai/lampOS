@@ -1,5 +1,5 @@
 {
-  "about": "Models no build carries, fetched by lamp-update install where missing and checked by size and SHA-256 before they are placed (lampOS/docs/install.md, #811). All from one release of ours, models-2026-10-16, each with its licence beside it (the first builder on #811, 2026-10-16 13:58). A file under a part's current/ goes beside its binary in the build's folder; a round carries it to the next.",
+  "about": "Models no build carries, fetched by lamp-update install where missing and checked by size and SHA-256 before they are placed (lampOS/docs/install.md, #811). The models from one release of ours, models-2026-10-16, each with its licence beside it (the first builder on #811, 2026-10-16 13:58); the voice's spoken notices (the offline line, back online, the voice service's line and the Wi-Fi helper's no-Wi-Fi line, with their manifest) from notices-2026-10-20, rendered in the second route's voice (#1844). A file under a part's current/ goes beside its binary in the build's folder; a round carries it to the next.",
   "models": [
     {
       "path": "/opt/lampOS/voice/current/smart-turn-v3.2-gpu.onnx",
@@ -47,6 +47,36 @@
       "url": "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/name.onnx",
       "bytes": 609394,
       "sha256": "1d238ca7c468bc3b22d6de94155abaec422f7433693e0696302f20157e9af50f"
+    },
+    {
+      "path": "/opt/lampOS/voice/notices/manifest.json",
+      "url": "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-20/manifest.json",
+      "bytes": 1674,
+      "sha256": "0fae11431b5ac1a5d9c22d0a27826b0e479f9159455bc2c693a9b8012af63745"
+    },
+    {
+      "path": "/opt/lampOS/voice/notices/provider-unavailable.en-US.wav",
+      "url": "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-20/provider-unavailable.en-US.wav",
+      "bytes": 180294,
+      "sha256": "685c5c4fdfb55f1726fa6744303564442d0c9fa3e65287e9a9a6edaf69597c66"
+    },
+    {
+      "path": "/opt/lampOS/voice/notices/back-online.en-US.wav",
+      "url": "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-20/back-online.en-US.wav",
+      "bytes": 55086,
+      "sha256": "e7ec0ee934b3ffd49e87646e4d80d3a931d35e1847fc4bd6eca0555de8749001"
+    },
+    {
+      "path": "/opt/lampOS/voice/notices/voice-service-unreachable.en-US.wav",
+      "url": "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-20/voice-service-unreachable.en-US.wav",
+      "bytes": 190290,
+      "sha256": "61620e23e0957d79d5c0fed4b72e4376b8de16f5ff05a3155e897069a656522f"
+    },
+    {
+      "path": "/opt/lampOS/voice/notices/wifi-lost.en-US.wav",
+      "url": "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-20/wifi-lost.en-US.wav",
+      "bytes": 234804,
+      "sha256": "fec06f71147735c1a4130902767108ef0ba4b2d975f23196d897d5dc169f3b93"
     }
   ]
 }

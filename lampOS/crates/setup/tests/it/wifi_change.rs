@@ -810,7 +810,7 @@ fn the_product_voice_loads_its_recorded_lines_from_the_fixed_folder() {
         .unwrap();
     assert!(
         start.ends_with(
-            " --failure-notice-dir /etc/lampOS/voice/notices --failure-notice-language en-US"
+            " --failure-notice-dir /opt/lampOS/voice/notices --failure-notice-language en-US"
         ),
         "{start}"
     );

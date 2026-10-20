@@ -568,10 +568,11 @@ by the voice:
   (not paused, muted, speaking, listening or owing an answer; 15 s after the
   last turn; one sound in 30 s). Nothing goes to the provider.
 - **Where it lives:** the failure notice `wifi_lost` (`failure-notices.md`) in
-  `/etc/lampOS/voice/notices`: `manifest.json` names `wifi-lost.en-US.wav`
+  `/opt/lampOS/voice/notices`, placed by `lamp-update install` from
+  `deploy/product/models.json` (#1844): `manifest.json` names `wifi-lost.en-US.wav`
   with its SHA-256, frames, transcript, voice and approval, and the loader
   refuses anything that does not match. `lamp-voice.service` passes
-  `--failure-notice-dir /etc/lampOS/voice/notices --failure-notice-language en-US`.
+  `--failure-notice-dir /opt/lampOS/voice/notices --failure-notice-language en-US`.
   It is read once at start; `failure_notice_capability` reports `wifi_lost`.
 - **Rendered** by `tools/render-wifi-line.sh PROVIDER.json NEW_FOLDER [production|test]`:
   the voice's own route, model and voice (`gemini-3.8-live`, `Kore`), the line
@@ -583,6 +584,11 @@ by the voice:
   and then checks the folder with `lamp-audio notices`. It needs the voice's key in its credential file; it
   never prints it. `test` unless `production` is given, after a person has
   listened to it.
+  **The product's copy** is rendered in the second route's voice instead
+  (ElevenLabs, with #2300's `render_line_second`), since every lamp now
+  speaks with it, and comes with the other three lines from the
+  `notices-2026-10-20` release ([failure-notices.md](failure-notices.md),
+  "The product's recordings", #1844).
 - **Missing:** with no folder, no manifest, or a file that fails a check, the
   voice refuses the ask at once with the loader's reason (`the recording is not
   there: not_provisioned`), nothing is heard, and the helper journals it:

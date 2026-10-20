@@ -957,10 +957,12 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   pinned release archive with `tar`. Each is written under a temporary name
   and renamed into place only when it matches; the voice's two go beside
   its binary through `current/`, and a round carries them to the next
-  build. Every file, the name part's own `name.onnx` among them
+  build. Every model, the name part's own `name.onnx` among them
   (`1d238ca7…`, the model lamp-4ace and lamp-52e6 run), is in one release of
   ours, `models-2026-10-16`, with each model's licence beside it (the first
-  builder on #811, 2026-10-16 13:58; the fifth made it). It is a draft until
+  builder on #811, 2026-10-16 13:58; the fifth made it). The voice's four
+  recorded lines and their manifest are in `notices-2026-10-20`, placed in
+  `/opt/lampOS/voice/notices` (#1844, [failure-notices.md](failure-notices.md)). It is a draft until
   #811 ships, so until it is published every fetch says the model could not
   be had. One that cannot be had is said and the install goes on. What
   install placed is recorded by SHA-256 as the settings are, so when

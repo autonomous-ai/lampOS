@@ -3,7 +3,8 @@
 Scope: `crates/audio/src/notice.rs`, the `lamp-audio notices` check, and the
 optional same-owner integration in `lamp-voice`. The loader plays nothing by
 itself. Live playback requires explicit configuration and a still-valid owned
-failed turn. No recording is packaged in this source.
+failed turn. No recording is in this source: the product's four are in the
+`notices-2026-10-20` release, placed by `lamp-update install` (below).
 
 ## The rule
 
@@ -218,8 +219,32 @@ manifest-level failure; test assets refused in production; one faulty asset
 refusing only itself; format, length and silence checks at both bounds; a
 linked asset; malformed names and text.
 
-Not done: no approved wording, no approved voice, no recorded asset, no
-provisioning on any device, and no native qualification of the optional live playback integration.
+Not done: native qualification of the optional live playback integration.
+
+## The product's recordings (#1844)
+
+Four lines, `en-US`, `approval: production`, worded by the first builder
+(16:29 on #1844) and rendered by El on lamp-06c1 with #2300's
+`render_line_second` in the voice every lamp now speaks with: the second
+route's ElevenLabs `eleven_v4_turbo`, its default voice (the manifest names
+it Rachel), 24 kHz mono 16-bit. A first render in Live's voice (Kore) was
+held, since a lamp that goes offline would suddenly sound like someone else
+(the first builder, 17:46). The person at lamp-06c1 listens to them before
+the install change merges.
+
+| kind | words | file |
+|---|---|---|
+| `provider_unavailable` | "Sorry, I can't reach the internet right now. I'll be back soon." | `provider-unavailable.en-US.wav` |
+| `back_online` | "I'm back online." | `back-online.en-US.wav` |
+| `voice_service_unreachable` | "Sorry, I'm having trouble thinking right now. Give me a moment." | `voice-service-unreachable.en-US.wav` |
+| `wifi_lost` | "I can't reach any Wi-Fi. Hold my button for five seconds to set me up again." | `wifi-lost.en-US.wav` |
+
+They and `manifest.json` are in the release `notices-2026-10-20`, pinned by
+size and SHA-256 in `deploy/product/models.json`. `lamp-update install`
+places them in `/opt/lampOS/voice/notices`, the folder the product unit's
+`--failure-notice-dir` names. The manifest lists every kind, so it goes only
+onto a voice that knows them all: `wifi_lost` is known from `a441fea06`,
+build 4142 on.
 
 ## Optional same-owner live integration
 
@@ -231,7 +256,8 @@ child-worker commands reject these options. This integration selects only
 and loads it once before starting audio workers. It never synthesizes,
 downloads, resamples, or opens a second speaker. A missing or refused recording
 is visible in `failure_notice_capability`; active ticks perform no asset I/O.
-No production recording or approved wording is supplied by this source.
+The production recordings aren't in this source; see "The product's
+recordings" above.
 
 A validated failure of the current owned request may select one notice only
 after the real input endpoint and retirement of all prior provider audio.
