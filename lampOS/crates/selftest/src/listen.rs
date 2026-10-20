@@ -647,6 +647,7 @@ mod tests {
             message: String::new(),
             items,
             missing: vec![],
+            quiet_ms: 0,
         }
     }
 
@@ -682,6 +683,7 @@ mod tests {
                 age_ms: 400,
             }],
             missing: vec![],
+            quiet_ms: 0,
         }
     }
 
@@ -860,6 +862,7 @@ mod tests {
                         message: String::new(),
                         items: vec![item],
                         missing: Vec::new(),
+                        quiet_ms: 0,
                     };
                     air_silent(&seen(100, health)).unwrap().verdict
                 })

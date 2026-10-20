@@ -274,6 +274,7 @@ SubState=dead
                 age_ms: 120,
             }],
             missing: vec!["voice".into()],
+            quiet_ms: 0,
         };
         let lines = status_lines(&parse_show(SHOW), Some(&health));
         let lines: Vec<_> = lines

@@ -185,16 +185,26 @@ struct Kind {
     close: &'static [&'static str],
 }
 
-/// The engines `lamp-tasks` takes. "Cloud" and "codecs" are what the issue
-/// (#733) expects the model to hear for Claude and Codex; none of these
-/// forms is close to another engine's.
 /// The agents the lamp hands work to, as the person calls them: what the
 /// second route's speech to text listens for (`second_provider::net::key_terms`).
-pub fn agent_names() -> [&'static str; 3] {
-    KINDS.map(|kind| kind.name)
+pub fn agent_names() -> Vec<&'static str> {
+    let mut names: Vec<&'static str> = Vec::new();
+    for kind in &KINDS {
+        if !names.contains(&kind.name) {
+            names.push(kind.name);
+        }
+    }
+    names
 }
 
-const KINDS: [Kind; 3] = [
+/// The engines `lamp-tasks` takes. "Cloud" and "codecs" are what the issue
+/// (#733) expects the model to hear for Claude and Codex; none of these
+/// forms is close to another engine's. Devin (#1854) may come as "Devon" or
+/// "Kevin"; "Kevin" is said to the model as a mishearing, never taken as
+/// Devin's own name, since it is a person's name too. Devin Cloud
+/// (`devin-cloud`, openharness#1444) is Devin to the person, heard the same
+/// way: a lamp has one or the other.
+const KINDS: [Kind; 5] = [
     Kind {
         engine: "claude",
         name: CLAUDE_CODE,
@@ -212,6 +222,18 @@ const KINDS: [Kind; 3] = [
         name: "OpenCode",
         sounds: "\"OpenCode\" or \"Open Code\"",
         close: &["opencode"],
+    },
+    Kind {
+        engine: "devin",
+        name: "Devin",
+        sounds: "\"Devin\", which can sound like \"Devon\" or \"Kevin\"",
+        close: &["devin", "devon"],
+    },
+    Kind {
+        engine: "devin-cloud",
+        name: "Devin",
+        sounds: "\"Devin\", which can sound like \"Devon\" or \"Kevin\"",
+        close: &["devin", "devon"],
     },
 ];
 
@@ -490,10 +512,14 @@ const CHOSE: &str = "The person chose who does it: never do the work yourself in
 /// (`every_description_fits_the_service_whatever_the_switches`).
 const CHOSE_NOTED: &str = "The person chose who does it (a note may name them): never do the work yourself, never begin it, nor offer to.";
 
-/// "\"ask Claude Code to …\", \"get Codex to …\"" for the staff.
+/// "\"ask Claude Code to …\", \"get Codex to …\"" for the staff. With all
+/// four of them (Devin, #1854) only the first two: the list beside it names
+/// all four, and the description must stay inside the service's 1,024 bytes
+/// (it came to 1,048 with four examples, the lead-in and the staff's note).
 fn examples(staff: &[Member]) -> String {
+    let shown = if staff.len() > 3 { 2 } else { staff.len() };
     let mut said: Vec<String> = Vec::new();
-    for (index, member) in staff.iter().enumerate() {
+    for (index, member) in staff.iter().take(shown).enumerate() {
         let name = member.kind.name;
         said.push(match index % 3 {
             0 => format!("\"ask {name} to …\""),
@@ -712,8 +738,9 @@ fn chosen<'a>(
 }
 
 /// The staff in the tasks part's answer to `targets`: the first alias of
-/// each engine, in the tasks part's order, and none of an engine this
-/// voice does not know.
+/// each name the person calls them by (Devin and Devin Cloud are both
+/// "Devin"), in the tasks part's order, and none of an engine this voice
+/// does not know.
 fn staff_from(answer: &Value) -> Option<Vec<Member>> {
     if answer.get("ok") != Some(&json!(true)) {
         return None;
@@ -727,7 +754,10 @@ fn staff_from(answer: &Value) -> Option<Vec<Member>> {
         let Some(kind) = KINDS.iter().find(|kind| kind.engine == engine) else {
             continue;
         };
-        if alias(name) && !staff.iter().any(|member| member.kind == kind) {
+        // One member a name: Devin and Devin Cloud are both "Devin", so
+        // with both targets the first is kept and the other left out, and
+        // "Devin" names it (the reviewer's P3 3 on #2240).
+        if alias(name) && !staff.iter().any(|member| member.kind.name == kind.name) {
             staff.push(Member {
                 alias: name.to_owned(),
                 kind,
@@ -1372,7 +1402,15 @@ fn run_for(
                             who,
                         });
                     }
-                    let place_said = format!("{who} on {}", where_done(place, &sent_to));
+                    // Devin Cloud works in Devin's cloud, not on a computer.
+                    let cloud = member.is_some_and(|member| {
+                        member.alias == sent_to && member.kind.engine == "devin-cloud"
+                    });
+                    let place_said = if cloud {
+                        format!("{who}, in Devin's cloud")
+                    } else {
+                        format!("{who} on {}", where_done(place, &sent_to))
+                    };
                     // A skill's brief is never said back: only what the
                     // person asked for.
                     if making {
@@ -3582,8 +3620,10 @@ pub(crate) mod tests {
             member("office-codex", "codex"),
             member("office-opencode", "opencode"),
         ];
+        // All four the tasks part takes, Devin among them (#1854).
+        let four = [three.clone(), vec![member("office-devin", "devin")]].concat();
         let mut refused = Vec::new();
-        for staff in [Vec::new(), two(), three] {
+        for staff in [Vec::new(), two(), three, four] {
             for (((asked, lead_in), noted), accounts) in
                 [(false, false), (false, true), (true, false), (true, true)]
                     .into_iter()
@@ -3651,6 +3691,88 @@ pub(crate) mod tests {
             handed_over("on-office", true, Some(&office), named),
             (sent, told)
         );
+    }
+
+    /// #1854: Devin is one of the staff the person may name, heard as
+    /// "Devin" or "Devon", and the work goes to Devin's own target; the
+    /// model is told it may also sound like "Kevin".
+    #[test]
+    fn the_person_may_hand_work_to_devin_by_name() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let staff = [
+            member("office-claude", "claude"),
+            member("office-devin", "devin"),
+        ];
+        let on = place(Path::new("/run/t"), true);
+        let told = declared(&on, &staff);
+        let who = &told[0].parameters.as_ref().unwrap()["properties"]["who"];
+        assert_eq!(who["enum"], json!(["Claude Code", "Devin"]));
+        let hint = who["description"].as_str().unwrap();
+        for heard in ["\"Devon\"", "\"Kevin\""] {
+            assert!(hint.contains(heard), "{hint}");
+        }
+        for (tag, said) in [("devin", "Devin"), ("devon", "devon")] {
+            let (sent, told) = handed_over(
+                tag,
+                true,
+                Some(&staff),
+                json!({"task":"Write hello.txt","who":said}),
+            );
+            assert_eq!(sent[1]["target"], "office-devin", "{tag}");
+            assert_eq!(told[0]["where"], "Devin on the office computer", "{tag}");
+        }
+    }
+
+    /// #1854, openharness#1444: a `devin-cloud` target is Devin to the
+    /// person, heard the same way; the work goes to its target, said to be
+    /// done in Devin's cloud, not on a computer.
+    #[test]
+    fn the_person_may_hand_work_to_devin_cloud_by_name() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let staff = [
+            member("office-claude", "claude"),
+            member("devin", "devin-cloud"),
+        ];
+        let read = staff_from(&json!({"ok":true,"targets":[
+            {"alias":"office-claude","engine":"claude"},
+            {"alias":"devin","engine":"devin-cloud"}]}))
+        .unwrap();
+        assert_eq!(read, staff);
+        let on = place(Path::new("/run/t"), true);
+        let told = declared(&on, &staff);
+        let who = &told[0].parameters.as_ref().unwrap()["properties"]["who"];
+        assert_eq!(who["enum"], json!(["Claude Code", "Devin"]));
+        for said in ["Devin", "devon"] {
+            let (sent, told) = handed_over(
+                "devin-cloud",
+                true,
+                Some(&staff),
+                json!({"task":"Reply in the Slack thread about the release","who":said}),
+            );
+            assert_eq!(sent[1]["target"], "devin", "{said}");
+            assert_eq!(told[0]["where"], "Devin, in Devin's cloud", "{said}");
+        }
+        // With both Devin targets, the first is kept: "Devin" names one.
+        let both = staff_from(&json!({"ok":true,"targets":[
+            {"alias":"devin","engine":"devin-cloud"},
+            {"alias":"office-devin","engine":"devin"},
+            {"alias":"office-claude","engine":"claude"}]}))
+        .unwrap();
+        assert_eq!(
+            both,
+            [
+                member("devin", "devin-cloud"),
+                member("office-claude", "claude")
+            ]
+        );
+        assert_eq!(named(&both, "Devin"), Some(&both[0]));
+        // Heard once among the names speech to text listens for.
+        let names = agent_names();
+        assert_eq!(names.iter().filter(|name| **name == "Devin").count(), 1);
     }
 
     #[test]

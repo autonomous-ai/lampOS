@@ -1,0 +1,50 @@
+Oct 20 14:22:40.657429 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 16: speech to text opened in 761 ms, 1060 ms of the line's sound waiting
+Oct 20 14:22:42.259918 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 16 at the line's end: settled=false, speech_final=false, finals cover none of 1860 ms sent, pending=speech_started 210 ms after the last final, last final none, finalize answered in 236 ms to 1150 ms, results 0 with words, 4 without, words from=close_stream
+Oct 20 14:22:42.259918 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 16 heard 0 words, the last 805 ms after the line ended
+Oct 20 14:23:09.570698 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 17: speech to text opened in 661 ms, 960 ms of the line's sound waiting
+Oct 20 14:23:10.558924 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 17 at the line's end: settled=false, speech_final=false, finals cover none of 980 ms sent, pending=none, last final none, finalize answered in 378 ms to 240 ms, results 0 with words, 3 without, words from=close_stream
+Oct 20 14:23:10.558924 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 17 heard 0 words, the last 968 ms after the line ended
+Oct 20 14:24:00.247217 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18: speech to text opened in 676 ms, 970 ms of the line's sound waiting
+Oct 20 14:24:03.903851 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18 at the line's end: settled=false, speech_final=false, finals cover none of 4330 ms sent, pending=interim 3260 ms after the last final, last final none, finalize answered in 302 ms to 4300 ms, results 5 with words, 1 without, words from=finalize
+Oct 20 14:24:03.903851 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18 heard 10 words, the last 303 ms after the line ended
+Oct 20 14:24:03.903851 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18: of its 10 words, 1 in the lamp's answer to request 15 so far
+Oct 20 14:24:03.905595 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18: no conversation going on: it was last heard saying words, to their end, 97 s ago, it was last called 102 s ago, 0 lines left alone since it last spoke
+Oct 20 14:24:03.905595 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18: the model is told the lamp's name was heard
+Oct 20 14:24:03.905595 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18: its answer is played: its name was heard in the room's sound
+Oct 20 14:24:04.979253 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat request 22787 bytes, 8 messages, 32 tools; its answer began in 1073 ms; the last request 100 s before; its tools as the last request's, its first message not
+Oct 20 14:24:05.306988 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat answer: its first words or call 1400 ms and its end 1400 ms after it was asked; 5684 prompt tokens, 128 from the cache, 5556 not; 43 completion tokens
+Oct 20 14:24:05.306988 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18 chat round 1 first event in 1402 ms
+Oct 20 14:24:05.306988 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18 chat round 1 called remember
+Oct 20 14:24:05.335639 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18 asked for remember; the memory answered in 27 ms; the answer was sent
+Oct 20 14:24:06.146010 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat request 23079 bytes, 10 messages, 32 tools; its answer began in 810 ms; the last request 1 s before; its tools and first message as the last request's
+Oct 20 14:24:06.658289 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18 chat round 2 first event in 2753 ms
+Oct 20 14:24:06.725482 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18 first piece to the voice 2821 ms after the words were heard, 4 words
+Oct 20 14:24:06.727138 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat answer: its first words or call 1323 ms and its end 1391 ms after it was asked; 5744 prompt tokens, 5504 from the cache, 240 not; 8 completion tokens
+Oct 20 14:24:06.948818 lamp-06c1 lamp-voice[20485]: lamp-voice: asker first: speech 14.1 dB under the asker's would have taken no turn from request 18's answer
+Oct 20 14:24:06.949901 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 18: ended before its answer: a newer line began; its words wait for that line's verdict
+Oct 20 14:24:07.652216 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19: speech to text opened in 701 ms, 1860 ms of the line's sound waiting
+Oct 20 14:24:09.232762 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 at the line's end: settled=false, speech_final=false, finals cover none of 1860 ms sent, pending=none, last final none, finalize answered in 439 ms to 400 ms, results 0 with words, 4 without, words from=close_stream
+Oct 20 14:24:09.232762 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 heard 0 words, the last 1578 ms after the line ended
+Oct 20 14:24:09.232762 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 is held, so request 18's words, cut short by it, are answered in its place
+Oct 20 14:24:10.452363 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat request 22485 bytes, 8 messages, 32 tools; its answer began in 1218 ms; the last request 3 s before; its tools as the last request's, its first message not
+Oct 20 14:24:10.734308 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 made a sound while its chat had not begun in 1501 ms
+Oct 20 14:24:11.025780 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat answer: its first words or call 1791 ms and its end 1791 ms after it was asked; 5615 prompt tokens, 640 from the cache, 4975 not; 42 completion tokens
+Oct 20 14:24:11.025780 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 chat round 1 first event in 1792 ms
+Oct 20 14:24:11.025780 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 chat round 1 called remember
+Oct 20 14:24:11.053720 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 asked for remember; the memory answered in 25 ms; the answer was sent
+Oct 20 14:24:11.791163 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat request 22773 bytes, 10 messages, 32 tools; its answer began in 738 ms; the last request 1 s before; its tools and first message as the last request's
+Oct 20 14:24:12.466299 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 chat round 2 first event in 3233 ms
+Oct 20 14:24:12.570554 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 first piece to the voice 3337 ms after the words were heard, 4 words
+Oct 20 14:24:12.586312 lamp-06c1 lamp-voice[20485]: lamp-voice second: chat answer: its first words or call 1413 ms and its end 1533 ms after it was asked; 5674 prompt tokens, 5504 from the cache, 170 not; 10 completion tokens
+Oct 20 14:24:13.145968 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 ElevenLabs piece 2: 12 chars, sent 3353 ms after the words were heard on a new connection; its first audio byte 559 ms after it went
+Oct 20 14:24:13.284628 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 ElevenLabs piece 1: 21 chars, sent 3337 ms after the words were heard on a new connection; its first audio byte 714 ms after it went
+Oct 20 14:24:13.284628 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 first answer audio 4051 ms after the words were heard
+Oct 20 14:24:13.672440 lamp-06c1 lamp-voice[20485]: lamp-voice second: request 19 ElevenLabs: 2 of 2 pieces began, 0 on a reused connection, 33 chars; the first piece's first audio byte 714 ms after it went, the slowest 714 ms
+Oct 20 14:22:46.333943 lamp-06c1 lamp-memory[20478]: lamp-memory: recall person=everyone ok entries=2
+Oct 20 14:22:48.357504 lamp-06c1 lamp-memory[20478]: lamp-memory: kept person=everyone ok entries=3
+Oct 20 14:23:10.373416 lamp-06c1 lamp-memory[20478]: lamp-memory: conversation_end person=everyone ok entries=0
+Oct 20 14:23:33.068491 lamp-06c1 lamp-memory[20478]: lamp-memory: kept person=everyone ok entries=3
+Oct 20 14:24:05.334361 lamp-06c1 lamp-memory[20478]: lamp-memory: remember person=everyone ok entries=0
+Oct 20 14:24:11.051455 lamp-06c1 lamp-memory[20478]: lamp-memory: remember person=everyone ok entries=0
+Oct 20 14:24:21.983277 lamp-06c1 lamp-memory[20478]: lamp-memory: kept person=everyone ok entries=5
+{"entries":[{"at_unix_ms":1792476189037,"id":8,"kind":"exchange"},{"at_unix_ms":1792479635362,"id":14,"kind":"exchange"},{"at_unix_ms":1792479700192,"id":15,"kind":"exchange"},{"at_unix_ms":1792479775171,"id":16,"kind":"exchange"},{"at_unix_ms":1792480142789,"id":19,"kind":"exchange"},{"at_unix_ms":1792480155177,"id":20,"kind":"exchange"},{"at_unix_ms":1792480533440,"id":21,"kind":"exchange"},{"at_unix_ms":1792480944785,"id":23,"kind":"exchange"}],"ok":true}

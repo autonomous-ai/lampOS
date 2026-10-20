@@ -16,7 +16,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const NAME: &str = "setup";
+const NAME: &str = lamp_setup::SUBSCRIBER;
 
 const USAGE: &str = "\
 usage: lamp-setup COMMAND [OPTIONS]
@@ -38,6 +38,23 @@ usage: lamp-setup COMMAND [OPTIONS]
   resume-reset --plan FILE [--enable]
       At start, before the lamp: finish a reset a power cut interrupted.
       Without --enable it only says whether one is unfinished.
+  change --config FILE [--bus-root PATH] [--enable]
+      Root's helper for changes after setup (#1959): one request line on
+      standard input from lamp-cloud, a name or the time zone, checked and
+      written with setup's own writers; one reply line on standard output.
+      A zone change then restarts lamp-schedule once the lamp is quiet.
+      Without --enable every request is refused.
+  wifi --config FILE [--enable]
+      Root's helper for the Wi-Fi changed after setup (#1959): one request
+      line on standard input from lamp-cloud, the new network and the broker
+      it is on; the new network is kept only once joined with an address and
+      the broker reached within 60 s, else the old one comes back. One reply
+      line on standard output, at the end; then the lamp says what happened.
+      The password is never printed.
+      Without --enable every request is refused.
+  wake
+      From power-on until the voice asks for the ring: the waking face
+      (#1681). Only with LAMP_WAKING_FACE=on; otherwise it exits at once.
 
 The plan names the setup marker, the reset journal, the paths to wipe and
 the stop and reboot commands (docs/setup.md, \"The reset\").
@@ -82,8 +99,11 @@ fn plan(path: &Path) -> Result<Plan, Box<dyn std::error::Error>> {
     if bytes.len() > 16_384 {
         return Err("the plan exceeds 16 KiB".into());
     }
-    let plan: Plan = serde_json::from_slice(&bytes)?;
-    plan.check()?;
+    // One version ahead (#1680): read, with what was passed over said.
+    let (plan, notes) = reset::read(&bytes)?;
+    for note in notes {
+        eprintln!("lamp-setup: {}: {note}", path.display());
+    }
     Ok(plan)
 }
 
@@ -103,9 +123,34 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         print!("{USAGE}");
         return Ok(true);
     }
+    if command == "wake" {
+        if given.next().is_some() {
+            return Err("wake takes no options".into());
+        }
+        return wake();
+    }
+    if command == "change" {
+        return change(given);
+    }
+    if command == "wifi" {
+        return wifi_change(given);
+    }
     let (mut options, enabled) = options(given)?;
     let plan_path = PathBuf::from(options.remove("--plan").ok_or("--plan is required")?);
-    let plan = plan(&plan_path)?;
+    let plan = match plan(&plan_path) {
+        Ok(plan) => plan,
+        Err(error) => {
+            // A newer build's plan this build refuses (#2060): no reset runs,
+            // and the watcher stays to tell the person who holds the button.
+            if command == "watch-reset"
+                && let Some(reset::Refused::Ahead(_)) = error.downcast_ref::<reset::Refused>()
+            {
+                eprintln!("lamp-setup: {}: {error}", plan_path.display());
+                return watch_refused(options, enabled);
+            }
+            return Err(error);
+        }
+    };
     match command.as_str() {
         "check" => {
             if enabled || !options.is_empty() {
@@ -134,26 +179,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             Ok(true)
         }
         "watch-reset" => {
-            let bus = match options.remove("--bus-root") {
-                Some(root) => Bus::new(root)?,
-                None => Bus::from_environment()?,
-            };
-            let clock = clock_id(options.get("--clock-id"))?;
-            options.remove("--clock-id");
-            let until = match options.remove("--seconds") {
-                Some(seconds) => {
-                    let seconds: u64 = seconds
-                        .parse()
-                        .ok()
-                        .filter(|n| (1..=86_400).contains(n))
-                        .ok_or("--seconds must be 1..86400")?;
-                    Some(Instant::now() + Duration::from_secs(seconds))
-                }
-                None => None,
-            };
-            if !options.is_empty() {
-                return Err("watch-reset does not take that option".into());
-            }
+            let (bus, clock, until) = watch_options(&mut options)?;
             let act = || start_reset(&plan, &plan_path);
             // A power cut right after a reset's journal, before its marker
             // went, leaves both: the lamp started, so carry on with it here.
@@ -223,6 +249,162 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     }
 }
 
+/// `change`: one request from `lamp-cloud`, on the socket systemd hands
+/// over as standard input and output (`lamp-setup-change@.service`).
+fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::error::Error>> {
+    use lamp_setup::change;
+    use std::io::{BufRead, Write};
+    let (mut options, enabled) = options(given)?;
+    let config_path = PathBuf::from(options.remove("--config").ok_or("--config is required")?);
+    let bus_root = options.remove("--bus-root");
+    if !options.is_empty() {
+        return Err("change takes --config, --bus-root and --enable".into());
+    }
+    let config = serve_config(&config_path)?;
+    let mut line = String::new();
+    io::stdin()
+        .lock()
+        .take(change::LINE_MOST as u64 + 1)
+        .read_line(&mut line)?;
+    let (reply, done) = change::answer(&line, &config, enabled);
+    {
+        let mut out = io::stdout().lock();
+        writeln!(out, "{reply}")?;
+        out.flush()?;
+    }
+    // What was changed, never the value: the journal is not the person's.
+    match (&done, reply.get("refused")) {
+        (Some(done), _) => eprintln!("lamp-setup: change: {}", done.said),
+        (None, Some(why)) => {
+            eprintln!("lamp-setup: change refused: {}", why.as_str().unwrap_or(""))
+        }
+        _ => {}
+    }
+    if !done.is_some_and(|done| done.restart_schedule) {
+        return Ok(true);
+    }
+    let bus = match bus_root {
+        Some(root) => Bus::new(root)?,
+        None => Bus::from_environment()?,
+    };
+    let mut ears = change::BusEars::new(&bus, &mut |line| eprintln!("lamp-setup: change: {line}"));
+    match change::wait_for_quiet(&mut ears, change::QUIET_MOST) {
+        Ok(()) => {
+            let status = std::process::Command::new("/usr/bin/systemctl")
+                .args(["try-restart", change::SCHEDULE_UNIT])
+                .status();
+            match status {
+                Ok(status) if status.success() => {
+                    eprintln!(
+                        "lamp-setup: change: lamp-schedule restarted on the new zone, at a quiet moment"
+                    );
+                }
+                Ok(status) => {
+                    eprintln!("lamp-setup: change: lamp-schedule's restart ended with {status}")
+                }
+                Err(error) => {
+                    eprintln!("lamp-setup: change: lamp-schedule could not be restarted: {error}")
+                }
+            }
+        }
+        Err(why) => eprintln!(
+            "lamp-setup: change: the lamp was not quiet within {} min ({why}); lamp-schedule keeps the old zone until it next starts",
+            change::QUIET_MOST.as_secs() / 60
+        ),
+    }
+    Ok(true)
+}
+
+/// `wifi`: one Wi-Fi change from `lamp-cloud`, on the socket systemd hands
+/// over as standard input and output (`lamp-setup-wifi@.service`).
+fn wifi_change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::error::Error>> {
+    use lamp_setup::wifi_change;
+    use std::io::{BufRead, Write};
+    let (mut options, enabled) = options(given)?;
+    let config_path = PathBuf::from(options.remove("--config").ok_or("--config is required")?);
+    if !options.is_empty() {
+        return Err("wifi takes --config and --enable".into());
+    }
+    let config = serve_config(&config_path)?;
+    let mut line = String::new();
+    io::stdin()
+        .lock()
+        .take(wifi_change::LINE_MOST as u64 + 1)
+        .read_line(&mut line)?;
+    let mut host = wifi_change::ImageRejoin::new();
+    let answered = wifi_change::answer(&line, &config.country, enabled, &mut host);
+    // Never the password, and never the network's name: `said` holds neither.
+    eprintln!("lamp-setup: wifi: {}", answered.said);
+    {
+        let mut out = io::stdout().lock();
+        writeln!(out, "{}", answered.reply)?;
+        out.flush()?;
+    }
+    // Then the lamp says what happened, never the network's name.
+    if let Some((changed, broker)) = &answered.changed {
+        let mut mouth = wifi_change::SayService::product();
+        let said = wifi_change::say_after(&mut host, &mut mouth, changed, broker);
+        eprintln!("lamp-setup: wifi: {said} line(s) asked of the voice");
+    }
+    Ok(true)
+}
+
+/// `watch-reset`'s own options: the bus, this boot's clock and how long.
+fn watch_options(
+    options: &mut BTreeMap<String, String>,
+) -> Result<(Bus, String, Option<Instant>), Box<dyn std::error::Error>> {
+    let bus = match options.remove("--bus-root") {
+        Some(root) => Bus::new(root)?,
+        None => Bus::from_environment()?,
+    };
+    let clock = clock_id(options.get("--clock-id"))?;
+    options.remove("--clock-id");
+    let until = match options.remove("--seconds") {
+        Some(seconds) => {
+            let seconds: u64 = seconds
+                .parse()
+                .ok()
+                .filter(|n| (1..=86_400).contains(n))
+                .ok_or("--seconds must be 1..86400")?;
+            Some(Instant::now() + Duration::from_secs(seconds))
+        }
+        None => None,
+    };
+    if !options.is_empty() {
+        return Err("watch-reset does not take that option".into());
+    }
+    Ok((bus, clock, until))
+}
+
+/// `watch-reset` with a plan this build refuses (#2060): each valid reset is
+/// refused before its journal and the marker, logged, and said to the person
+/// through the voice's say service ([`reset::SAY_REFUSED`]). The reset does
+/// not speak otherwise, so this is its first line to the person; it is words
+/// for the voice's model, said only while the lamp has a network and the say
+/// service is on, with no recording behind it.
+fn watch_refused(
+    mut options: BTreeMap<String, String>,
+    enabled: bool,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let (bus, clock, until) = watch_options(&mut options)?;
+    let mut touch = bus.subscribe_typed(TouchEvent::TOPIC, NAME, TouchEvent::TYPE)?;
+    let mouth = lamp_setup::wifi_change::SayService::product();
+    let watched = lamp_setup::watch_refused(
+        &mut touch,
+        &clock,
+        enabled,
+        until,
+        lamp_ipc::monotonic_us,
+        |line| eprintln!("lamp-setup: {line}"),
+        || mouth.say_as("reset", reset::SAY_REFUSED),
+    )?;
+    println!(
+        "{}",
+        serde_json::json!({"enabled": enabled, "watched": format!("{watched:?}")})
+    );
+    Ok(true)
+}
+
 /// Hand the reset to a unit of its own (`detach`), outside `lampos.target`:
 /// the keeper's stop would otherwise end this watcher, and the reset with it,
 /// after the marker is gone and before the wipe and the reboot.
@@ -249,8 +431,10 @@ fn serve_config(path: &Path) -> Result<lamp_setup::serve::Config, Box<dyn std::e
     if bytes.len() > 16_384 {
         return Err("the configuration exceeds 16 KiB".into());
     }
-    let config: lamp_setup::serve::Config = serde_json::from_slice(&bytes)?;
-    config.check()?;
+    let (config, notes) = lamp_setup::serve::read(&bytes)?;
+    for note in notes {
+        eprintln!("lamp-setup: {}: {note}", path.display());
+    }
     Ok(config)
 }
 
@@ -323,6 +507,48 @@ fn setup_light(on: bool, _: &Arc<Mutex<Status>>) -> Option<Light> {
         eprintln!("lamp-setup: the setup light needs a lamp's ring, and there is none here");
     }
     None
+}
+
+/// `wake`: the waking face until the voice asks for the ring
+/// (`lamp_setup::wake`), only with its switch on.
+fn wake() -> Result<bool, Box<dyn std::error::Error>> {
+    let switch = std::env::var(lamp_setup::wake::SWITCH).ok();
+    if !lamp_setup::wake::switched_on(switch.as_deref()) {
+        eprintln!(
+            "lamp-setup: the waking face is off ({} is not on); the ring is the voice's",
+            lamp_setup::wake::SWITCH
+        );
+        return Ok(true);
+    }
+    let socket = Path::new(lamp_ring::waking::RELEASE_SOCKET);
+    // One left from an earlier start; the unit's runtime folder is fresh.
+    if std::fs::symlink_metadata(socket)
+        .is_ok_and(|metadata| std::os::unix::fs::FileTypeExt::is_socket(&metadata.file_type()))
+    {
+        std::fs::remove_file(socket)?;
+    }
+    let listener = std::os::unix::net::UnixListener::bind(socket)?;
+    let ended = wake_on_ring(listener);
+    // Gone, so a later open of the voice's goes on at once.
+    let _ = std::fs::remove_file(socket);
+    eprintln!("lamp-setup: the waking face has ended: {ended:?}");
+    Ok(ended == lamp_setup::wake::Ended::Released)
+}
+
+#[cfg(target_os = "linux")]
+fn wake_on_ring(listener: std::os::unix::net::UnixListener) -> lamp_setup::wake::Ended {
+    lamp_setup::wake::run(
+        listener,
+        lamp_ring::linux::open_waking,
+        |line| eprintln!("lamp-setup: {line}"),
+        lamp_setup::wake::RETRY,
+    )
+}
+
+#[cfg(not(target_os = "linux"))]
+fn wake_on_ring(_: std::os::unix::net::UnixListener) -> lamp_setup::wake::Ended {
+    eprintln!("lamp-setup: the waking face needs a lamp's ring, and there is none here");
+    lamp_setup::wake::Ended::SocketFailed
 }
 
 /// Serving itself, from the hotspot until it is time to stop.

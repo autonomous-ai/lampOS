@@ -309,6 +309,222 @@ fn claude_and_explicit_folder_are_preserved_without_shell_expansion() {
 /// others. Only a receipt that says auto mode binds the task; one that does
 /// not (what a real OpenCode receipt says is not yet seen) leaves it
 /// uncertain, never sent again.
+/// #1854: Devin, the terminal program on the computer, is asked for by name
+/// with no `--mode` (it has none: Harness leaves it out and refuses one), and
+/// its receipt is taken with no mode and no bypass, or a mode that does not
+/// approve on its own; never one claiming `auto` or `full`, or a bypass.
+#[test]
+fn devin_is_asked_for_by_name_with_no_mode_and_its_receipt_claims_none() {
+    let rig = Rig::new();
+    let mut request = launch();
+    request.target.engine = EngineKind::Devin;
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let args = rig.calls()[1]["args"].as_array().unwrap().clone();
+    assert_eq!(args[1], "devin");
+    assert!(!args.iter().any(|arg| arg == "--mode"), "{args:?}");
+    assert_eq!(args[7], "--json");
+    let receipt = |mode: Value, bypass: Option<Value>| {
+        let mut agent = json!({"id":AGENT,"name":"lamp-task-001","engine":"devin"});
+        if !mode.is_null() {
+            agent["permissionMode"] = mode;
+        }
+        if let Some(bypass) = bypass {
+            agent["bypassPermission"] = bypass;
+        }
+        json!({"ok":true,"machineId":MACHINE,"agent":agent})
+    };
+    for (mode, bypass) in [
+        (Value::Null, None),
+        (Value::Null, Some(json!(false))),
+        (Value::Null, Some(Value::Null)),
+        (json!("default"), Some(json!(false))),
+    ] {
+        rig.new_step(step(receipt(mode.clone(), bypass.clone())));
+        assert!(
+            matches!(rig.cli().launch(&request), LaunchOutcome::Created { .. }),
+            "{mode} {bypass:?}"
+        );
+    }
+    for (mode, bypass) in [
+        (json!("auto"), Some(json!(true))),
+        (json!("full"), Some(json!(false))),
+        (Value::Null, Some(json!(true))),
+    ] {
+        rig.new_step(step(receipt(mode.clone(), bypass.clone())));
+        assert_eq!(
+            rig.cli().launch(&request),
+            uncertain("invalid_reply"),
+            "{mode} {bypass:?}"
+        );
+    }
+}
+
+/// A Devin Cloud agent's id, as Harness 0.4.27 gave one on 20 October.
+const CLOUD: &str = "cloud_4b0055ec2843353e";
+
+/// #1854, openharness#1444: Devin Cloud is asked for by name with no folder
+/// and no `--mode`, and its receipt (Harness 0.4.27's, as it came on 20
+/// October: a `cloud_` id, no mode, a null bypass) binds the task.
+#[test]
+fn devin_cloud_is_asked_for_with_no_folder_or_mode_and_its_cloud_receipt_binds() {
+    let rig = Rig::new();
+    let mut request = launch();
+    request.target.engine = EngineKind::DevinCloud;
+    request.target.project = String::new();
+    rig.new_step(step(json!({"ok":true,"machineId":MACHINE,"agent":{
+        "id":CLOUD,"name":"lamp-task-001","engine":"devin-cloud",
+        "permissionMode":null,"bypassPermission":null,"location":"cloud",
+        "cloud":{"place":"Devin's cloud","state":"starting"}}})));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: CLOUD.into()
+        }
+    );
+    let args = rig.calls()[1]["args"].as_array().unwrap().clone();
+    assert_eq!(
+        args[..6],
+        [
+            json!("new"),
+            json!("devin-cloud"),
+            json!("--machine"),
+            json!(MACHINE),
+            json!("--name"),
+            json!("lamp-task-001")
+        ]
+    );
+    assert!(!args.iter().any(|arg| arg == "--mode"), "{args:?}");
+    assert_eq!(args[6], "--json");
+    // Its target names no folder; another agent's must.
+    assert_eq!(request.target.validate(), Ok(()));
+    request.target.project = "desk-work".into();
+    assert_eq!(request.target.validate(), Err("invalid_project".into()));
+    request.target.engine = EngineKind::Codex;
+    request.target.project = String::new();
+    assert_eq!(request.target.validate(), Err("invalid_project".into()));
+}
+
+/// The reviewer's P1 on #2240: every engine's name on the bus passes
+/// `tasks/status`' check, Devin Cloud's as `devin_cloud`, while Harness is
+/// still asked for `devin-cloud`.
+#[test]
+fn every_engines_bus_name_passes_the_status_check() {
+    for engine in [
+        EngineKind::Codex,
+        EngineKind::Claude,
+        EngineKind::Opencode,
+        EngineKind::Devin,
+        EngineKind::DevinCloud,
+    ] {
+        let settled = lamp_msgs::TaskSettled {
+            task: 1,
+            engine: engine.bus_name(),
+            state: lamp_msgs::AgentState::Idle,
+            settled: true,
+            at_unix_ms: 1_791_964_900_000,
+        };
+        assert_eq!(settled.check(), Ok(()), "{engine:?}");
+    }
+    assert_eq!(EngineKind::DevinCloud.bus_name(), "devin_cloud");
+    assert_eq!(EngineKind::Codex.bus_name(), "codex");
+}
+
+/// openharness#1449: a Devin Cloud agent that has answered is `needs-input`
+/// whether or not it asked anything, so its `show` and `wait` read it as
+/// `idle` and its answer is told; a computer's agent waiting for the person
+/// is still `needs-input`. Harness closes no cloud harness, so none is
+/// asked to.
+#[test]
+fn a_devin_cloud_answer_is_read_as_idle_and_it_is_never_asked_to_close() {
+    let rig = Rig::new();
+    let mut reply = shown();
+    reply["id"] = json!(CLOUD);
+    reply["state"] = json!("needs-input");
+    reply["answer"] = json!("Posted: https://example.slack.com/archives/C1/p1");
+    reply["links"] = json!([{"label":"Session","url":"https://app.devin.ai/sessions/1"}]);
+    reply["needsPerson"] = json!(true);
+    rig.show_step(step(reply));
+    let observation = rig.cli().observe(MACHINE, CLOUD).unwrap();
+    assert_eq!(
+        (observation.agent_id.as_str(), observation.state.as_str()),
+        (CLOUD, "idle")
+    );
+    assert!(observation.answer.starts_with("Posted:"));
+    // Only `needs-input` is read so: a cloud agent working or failed is as
+    // Harness says (the reviewer's P3 4 on #2240).
+    for state in ["working", "failed"] {
+        let mut reply = shown();
+        reply["id"] = json!(CLOUD);
+        reply["state"] = json!(state);
+        rig.show_step(step(reply));
+        assert_eq!(rig.cli().observe(MACHINE, CLOUD).unwrap().state, state);
+        let row = json!({"harnesses":[{"id":CLOUD,"state":state}]}).to_string();
+        assert_eq!(parse_ps(row.as_bytes()).unwrap()[0].state, state);
+        if state == "failed" {
+            assert_eq!(
+                parse_wait(Some(4), row.as_bytes(), &[CLOUD.to_owned()]).unwrap()[0].state,
+                state
+            );
+        }
+    }
+    let agents = vec![CLOUD.to_owned(), AGENT.to_owned()];
+    let both = json!({"harnesses":[
+        {"id":CLOUD,"state":"needs-input","needsPerson":true},
+        {"id":AGENT,"state":"needs-input"}]})
+    .to_string();
+    assert_eq!(
+        parse_wait(Some(3), both.as_bytes(), &agents).unwrap(),
+        [
+            Ended {
+                agent_id: CLOUD.into(),
+                state: "idle".into()
+            },
+            Ended {
+                agent_id: AGENT.into(),
+                state: "needs-input".into()
+            }
+        ]
+    );
+    // `ps` too, so progress doesn't say it waits for the person (Jarvis's P2).
+    let listed = json!({"harnesses":[
+        {"id":CLOUD,"state":"needs-input"},
+        {"id":AGENT,"state":"needs-input"}]})
+    .to_string();
+    let states: Vec<(String, String)> = parse_ps(listed.as_bytes())
+        .unwrap()
+        .into_iter()
+        .map(|row| (row.agent_id, row.state))
+        .collect();
+    assert_eq!(
+        states,
+        [
+            (CLOUD.to_owned(), "idle".to_owned()),
+            (AGENT.to_owned(), "needs-input".to_owned())
+        ]
+    );
+    let calls = rig.calls().len();
+    assert_eq!(rig.cli().close(MACHINE, CLOUD), Ok(Closed::Refused));
+    assert_eq!(rig.calls().len(), calls, "close was never run");
+    // Only Harness's own form of a cloud id is taken.
+    for bad in [
+        "cloud_4b0055ec2843353",
+        "cloud_4B0055EC2843353E",
+        "cloud_4b0055ec2843353e0",
+        "cloud-4b0055ec2843353e",
+    ] {
+        assert_eq!(
+            rig.cli().observe(MACHINE, bad),
+            Err("invalid_agent_id".into()),
+            "{bad}"
+        );
+    }
+}
+
 #[test]
 fn opencode_is_asked_for_by_name_in_auto_mode_and_bound_only_by_its_own_receipt() {
     let rig = Rig::new();
@@ -996,6 +1212,129 @@ fn status_is_one_ps_of_the_full_machine_id_bounded_and_never_retried() {
     let rig = Rig::new();
     assert_eq!(rig.cli().status("office"), Err("invalid_machine".into()));
     assert!(rig.calls().is_empty());
+}
+
+/// The sign-in's lines as they come, up to its end, for at most `within`.
+fn sign_in_lines(
+    link: &mut dyn lamp_tasks::sign_in::Link,
+    within: Duration,
+    until_end: bool,
+) -> Vec<Result<lamp_tasks::sign_in::Event, &'static str>> {
+    let until = Instant::now() + within;
+    let mut lines = Vec::new();
+    while Instant::now() < until {
+        match link.poll() {
+            Some(read) => {
+                let ended = read.is_err()
+                    || matches!(read, Ok(lamp_tasks::sign_in::Event::Confirm { .. })) && !until_end
+                    || matches!(read, Ok(lamp_tasks::sign_in::Event::Result(_)));
+                lines.push(read);
+                if ended {
+                    break;
+                }
+            }
+            None => thread::sleep(Duration::from_millis(5)),
+        }
+    }
+    lines
+}
+
+/// #1676: Harness's sign-in by a spoken code is its own `login --code
+/// --json`, run as every call is (the same marks and HOME), its lines read
+/// as they come, the person's answer written to its stdin, and its result
+/// read after it.
+#[test]
+fn the_sign_in_by_code_reads_harness_lines_and_writes_the_answer() {
+    use lamp_tasks::sign_in::{Done, Event};
+    for (yes, done) in [
+        (
+            true,
+            Done::Success {
+                email: Some("someone@example.com".into()),
+            },
+        ),
+        (
+            false,
+            Done::Error {
+                code: "DENIED".into(),
+            },
+        ),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"login":{"code_flow":true}}));
+        let mut link = rig.cli().sign_in_by_code().unwrap();
+        let code = Event::Code {
+            code: "12345678".into(),
+            expires_in: 120,
+        };
+        assert_eq!(
+            sign_in_lines(link.as_mut(), Duration::from_secs(10), false),
+            [
+                Ok(code.clone()),
+                Ok(code),
+                Ok(Event::Confirm {
+                    email: "someone@example.com".into()
+                })
+            ]
+        );
+        let calls = rig.calls();
+        assert_eq!(calls[0]["args"], json!(["login", "--code", "--json"]));
+        assert_eq!(calls[0]["environment"]["AI_AGENT"], "lampos");
+        assert_eq!(
+            calls[0]["environment"]["HOME"],
+            rig.root.path().to_str().unwrap()
+        );
+        link.answer(yes).unwrap();
+        let lines = sign_in_lines(link.as_mut(), Duration::from_secs(10), true);
+        assert_eq!(lines, [Ok(Event::Result(done))]);
+        assert_eq!(
+            fs::read_to_string(rig.root.path().join("answer")).unwrap(),
+            if yes { "yes\n" } else { "no\n" }
+        );
+        // Then its end, and nothing after.
+        assert_eq!(
+            sign_in_lines(link.as_mut(), Duration::from_secs(10), true),
+            [Err("ended")]
+        );
+        assert_eq!(link.poll(), None);
+    }
+}
+
+/// #1676: a Harness before 0.4.23 doesn't know `--code`; the sign-in ends
+/// saying so, not merely that it ended. Stopped early, the program goes.
+#[test]
+fn a_harness_without_the_code_sign_in_is_told_apart_and_a_dropped_one_stops() {
+    let rig = Rig::new();
+    rig.plan(json!({"login":{"stderr":"error: unknown option '--code'\n","exit":1}}));
+    let mut link = rig.cli().sign_in_by_code().unwrap();
+    assert_eq!(
+        sign_in_lines(link.as_mut(), Duration::from_secs(10), true),
+        [Err("harness_too_old")]
+    );
+    let rig = Rig::new();
+    rig.plan(json!({"login":{"exit":1}}));
+    let mut link = rig.cli().sign_in_by_code().unwrap();
+    assert_eq!(
+        sign_in_lines(link.as_mut(), Duration::from_secs(10), true),
+        [Err("ended")]
+    );
+    // Waiting on its person for minutes: dropped, it is stopped at once.
+    let rig = Rig::new();
+    rig.plan(json!({"login":{"delay_ms":5000}}));
+    let link = rig.cli().sign_in_by_code().unwrap();
+    rig.wait_operation("login");
+    let pid = rig.calls()[0]["pid"].as_u64().unwrap();
+    let began = Instant::now();
+    drop(link);
+    assert!(began.elapsed() < Duration::from_secs(2));
+    // Gone, and reaped: `kill -0` finds nothing (on macOS too).
+    let alive = std::process::Command::new("kill")
+        .args(["-0", &pid.to_string()])
+        .stderr(std::process::Stdio::null())
+        .status()
+        .unwrap()
+        .success();
+    assert!(!alive);
 }
 
 /// #1676: the sign-in is one `auth status --json`, read as Harness gives it

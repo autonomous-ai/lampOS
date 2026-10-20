@@ -400,6 +400,67 @@ fn actual_bus_root_reload_recreates_the_selected_factory() {
     assert_eq!(calls, vec![first, second]);
 }
 
+/// #1680, the first builder on #2078: while `records.json` is a schema newer
+/// than this build's, `check` prunes nothing, and the reporter says so in
+/// lamp-health, "records: a newer schema, cleanup paused", at warn, on the
+/// bus the newer file names, so a lamp left rolled back shows why its disk
+/// grows. With this build's schema back, it reports as before.
+#[test]
+fn a_newer_schema_is_reported_as_the_cleanup_paused_until_this_builds_is_back() {
+    let scratch = Scratch::new();
+    let (config_path, config) = scratch.config();
+    let mut newer = serde_json::to_value(&config).unwrap();
+    newer["schema_version"] = 2.into();
+    newer["roots"][0]["kind"] = "memory_days".into();
+    json_file::write(&config_path, &newer).unwrap();
+    let mut subscriber = Bus::new(&config.bus_root)
+        .unwrap()
+        .subscribe_typed(Diagnostic::TOPIC, "paused", Diagnostic::TYPE)
+        .unwrap();
+    let clock = Clock::new();
+    let mut said = Vec::new();
+    let mut schedule = Schedule {
+        clock: clock.clone(),
+        reads: Arc::new(AtomicUsize::new(0)),
+        wait: |cycle: ReportCycle, remaining| {
+            cycle.construction_or_publish.unwrap();
+            let message = subscriber.recv(Duration::ZERO).unwrap().unwrap();
+            said.push(serde_json::from_value::<Diagnostic>(message.json().unwrap()).unwrap());
+            if said.len() == 3 {
+                return stopped();
+            }
+            if said.len() == 2 {
+                json_file::write(&config_path, &config).unwrap();
+            }
+            clock.advance(remaining);
+            Ok(())
+        },
+    };
+    assert_stopped(reporting_with(
+        config_path.clone(),
+        scratch.0.join("last.json"),
+        None,
+        &mut schedule,
+        |root| {
+            let publisher_clock = clock.clone();
+            Reporter::new_with_cadence_clock(root, move || publisher_clock.now())
+        },
+    ));
+    for paused in &said[..2] {
+        assert_eq!(paused.level, lamp_msgs::Level::Warn);
+        assert_eq!(
+            (paused.name.as_str(), paused.message.as_str()),
+            ("records", "a newer schema, cleanup paused")
+        );
+        assert_eq!(paused.values[0].value, "2");
+    }
+    // This build's own, off by default: said as before.
+    assert_eq!(
+        said[2].message,
+        "cleanup is disabled; no retention is enforced"
+    );
+}
+
 #[test]
 fn a_real_publish_error_is_retained_after_successful_construction() {
     let scratch = Scratch::new();

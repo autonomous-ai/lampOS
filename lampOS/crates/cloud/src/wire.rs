@@ -108,6 +108,15 @@ impl Identity {
         Value::Object(reply)
     }
 
+    /// A `data` kind taken and still being carried out: V1's `starting`
+    /// (`timezone.set`), its result to follow as another reply.
+    pub fn starting(&self, now: &str, kind: &str) -> Value {
+        let mut reply = self.base("data", now);
+        reply.insert("kind".into(), json!(kind));
+        reply.insert("status".into(), json!("starting"));
+        Value::Object(reply)
+    }
+
     /// The reply to a `cmd` this lamp does not have: V1's shape for it,
     /// failed, saying so.
     pub fn refused(&self, now: &str, cmd: &str) -> Value {

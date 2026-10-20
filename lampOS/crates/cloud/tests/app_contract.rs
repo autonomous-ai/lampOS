@@ -161,6 +161,11 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         ring: Ring::default(),
         texts: Texts::default(),
         reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -215,6 +220,240 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
     // answered `system.info`, so they stay out of it.
     for absent in ["versions.openclaw_detected", "versions.openclaw"] {
         assert!(field(info, absent).is_none(), "{absent} in {info}");
+    }
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// The Lamp 2 page's faces (#2192, `face.list` and `face.remove`): what it
+/// reads of each, by name and type, from `lamp-cloud`'s own answer to a
+/// stand-in for the eyes' request socket, in V1's envelope. Without
+/// `LAMP_FACES_PAGE` the kinds aren't on this lamp, and the page shows no
+/// row.
+#[test]
+fn the_faces_page_reads_names_and_removes_one() {
+    let root = PathBuf::from(format!("/tmp/lcf-{}", std::process::id()));
+    let places = lamp(&root);
+    let socket = root.join("who.sock");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let eyes = std::thread::spawn(move || {
+        let mut asked = Vec::new();
+        for answer in [
+            json!({"people": ["Lan"], "waiting": ["Bo"]}),
+            json!({"forgot": true}),
+        ] {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            asked.push(serde_json::from_str::<Value>(line.trim()).unwrap());
+            writeln!(&stream, "{answer}").unwrap();
+        }
+        asked
+    });
+    let mut real = Real {
+        places,
+        bus: None,
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: Some(lamp_cloud::faces::Eyes {
+            socket,
+            memory: None,
+        }),
+        schedule: None,
+    };
+    let me = Identity {
+        device: "lamp".into(),
+        version: "812+460a1a1aa2b3".into(),
+        id: "d-42".into(),
+        mac: "lamp-7f72".into(),
+        ..Identity::default()
+    };
+    let reply = |real: &mut Real, kind: &str, data: Value| -> Value {
+        let result = answer(real, kind, &data);
+        let sent = me.data("2026-10-20T12:00:00Z", kind, &result).to_string();
+        serde_json::from_str(&sent).unwrap()
+    };
+    let listed = reply(&mut real, "face.list", Value::Null);
+    assert_eq!(listed["status"], "success", "{listed}");
+    let faces = listed["data"]["faces"].as_array().unwrap();
+    for face in faces {
+        assert!(is(&face["name"], Type::Text), "{face}");
+        assert!(is(&face["waiting"], Type::Flag), "{face}");
+        // Names only: no print, photo or anything else of a face.
+        assert_eq!(face.as_object().unwrap().len(), 2, "{face}");
+    }
+    assert_eq!(faces.len(), 2);
+    let removed = reply(&mut real, "face.remove", json!({"name": "Lan"}));
+    assert_eq!(removed["status"], "success", "{removed}");
+    assert!(is(&removed["data"]["removed"], Type::Text), "{removed}");
+    // Whether memory went too, and why not when it didn't (the first
+    // builder on #2199, 13:08): `memory` text, and `reason` with `kept`.
+    // This lamp gives lamp-cloud no memory socket.
+    assert_eq!(removed["data"]["memory"], "kept", "{removed}");
+    assert!(is(&removed["data"]["reason"], Type::Text), "{removed}");
+    assert_eq!(
+        eyes.join().unwrap(),
+        [
+            json!({"list": true, "waiting": true}),
+            json!({"forget": "Lan"})
+        ]
+    );
+    // Without the switch, neither is on this lamp.
+    real.faces = None;
+    for kind in ["face.list", "face.remove"] {
+        let refused = reply(&mut real, kind, json!({"name": "Lan"}));
+        assert_ne!(refused["status"], "success", "{kind}: {refused}");
+    }
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// A stand-in lamp-schedule answering each request with `replies[op]`, in
+/// its own one-line protocol, for as many requests as `replies` holds.
+fn schedule(socket: &PathBuf, replies: Vec<(&'static str, Value)>) -> std::thread::JoinHandle<()> {
+    let listener = UnixListener::bind(socket).unwrap();
+    std::thread::spawn(move || {
+        for (op, reply) in replies {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            let asked: Value = serde_json::from_str(&line).unwrap();
+            assert_eq!(asked["op"], op, "{asked}");
+            stream.write_all(format!("{reply}\n").as_bytes()).unwrap();
+        }
+    })
+}
+
+/// #2195 (Mobile on #1396): with `LAMP_APP_SCHEDULE=on`, the app's Lamp 2
+/// page reads the lamp's timers and reminders, each as the lamp keeps it,
+/// and cancels one, through lamp-schedule (a stand-in here) and the client
+/// the voice's own reminder functions use. Its refusals are its fixed
+/// sentences. Without the switch, neither kind is here.
+#[test]
+fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
+    const STORE: &str = "0123456789abcdef0123456789abcdef";
+    let root = PathBuf::from(format!("/tmp/lcs-{}", std::process::id()));
+    let places = lamp(&root);
+    let socket = root.join("schedule.sock");
+    let sample = lamp_schedule::time::ClockSample {
+        unix_ms: 1_791_964_800_000,
+        boot_ms: 0,
+        boot_id: "cloud-fixture".into(),
+        wall_trusted: true,
+    };
+    let resolved = lamp_schedule::time::resolve(
+        &lamp_schedule::time::When::After { seconds: 600 },
+        &sample,
+        "Etc/UTC",
+    )
+    .unwrap();
+    let item = json!({"id": 1, "delivery": 1, "text": "stretch", "kind": "reminder",
+        "state": "scheduled", "due_unix_ms": resolved.unix_ms, "local": resolved.local,
+        "repeat": null, "snoozed": false, "late": false});
+    let serving = schedule(
+        &socket,
+        vec![
+            (
+                "list",
+                json!({"ok": true, "store_id": STORE, "revision": 0, "items": [item], "next_after_id": null}),
+            ),
+            (
+                "status",
+                json!({"ok": true, "store_id": STORE, "revision": 0}),
+            ),
+            (
+                "cancel",
+                json!({"ok": true, "store_id": STORE, "revision": 1, "id": 1, "delivery": 1, "cancelled": true}),
+            ),
+            (
+                "status",
+                json!({"ok": true, "store_id": STORE, "revision": 1}),
+            ),
+            (
+                "cancel",
+                json!({"ok": false, "error": "not_found", "message": "no such item"}),
+            ),
+        ],
+    );
+    let mut real = Real {
+        places,
+        bus: None,
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: Some(lamp_actions::schedule::Adapter::new(socket.clone()).unwrap()),
+    };
+    let me = Identity {
+        device: "lamp".into(),
+        version: "812+460a1a1aa2b3".into(),
+        id: "d-42".into(),
+        mac: "lamp-7f72".into(),
+        ..Identity::default()
+    };
+    let replied = |real: &mut Real, kind: &str, data: Value| -> Value {
+        let result = answer(real, kind, &data);
+        let sent = me.data("2026-10-20T13:00:00Z", kind, &result).to_string();
+        serde_json::from_str(&sent).unwrap()
+    };
+    let listed = replied(&mut real, "schedule.list", json!({}));
+    assert_eq!(listed["status"], "success", "{listed}");
+    let page = &listed["data"];
+    let first = &page["items"][0];
+    for (within, path, kind_of_value) in [
+        (first, "id", Type::Whole),
+        (first, "kind", Type::Text),
+        (first, "text", Type::Text),
+        (first, "state", Type::Text),
+        (first, "local", Type::Text),
+        (first, "due_unix_ms", Type::Whole),
+        (first, "snoozed", Type::Flag),
+        (first, "late", Type::Flag),
+        (page, "complete", Type::Flag),
+    ] {
+        let value = field(within, path);
+        assert!(
+            value.is_some_and(|value| is(value, kind_of_value)),
+            "schedule.list {path}: the app takes {kind_of_value:?}, lamp-cloud said {value:?}"
+        );
+    }
+    assert_eq!(page["items"][0]["text"], "stretch");
+    assert!(page["next_after_id"].is_null(), "{page}");
+    let cancelled = replied(&mut real, "schedule.cancel", json!({"id": 1}));
+    assert_eq!(cancelled["status"], "success", "{cancelled}");
+    assert_eq!(cancelled["data"], json!({"cancelled": true, "id": 1}));
+    let refused = replied(&mut real, "schedule.cancel", json!({"id": 1}));
+    assert_ne!(refused["status"], "success", "{refused}");
+    assert!(
+        refused
+            .to_string()
+            .contains("That reminder or timer is no longer active."),
+        "{refused}"
+    );
+    serving.join().unwrap();
+    // A bad id is refused before lamp-schedule is asked.
+    assert!(answer(&mut real, "schedule.cancel", &json!({"id": 0})).is_err());
+    assert!(answer(&mut real, "schedule.list", &json!({"after_id": "x"})).is_err());
+    // Without the switch, neither kind is here.
+    real.schedule = None;
+    for kind in ["schedule.list", "schedule.cancel"] {
+        assert!(
+            answer(&mut real, kind, &json!({"id": 1})).is_err(),
+            "{kind}"
+        );
     }
     let _ = std::fs::remove_dir_all(root);
 }

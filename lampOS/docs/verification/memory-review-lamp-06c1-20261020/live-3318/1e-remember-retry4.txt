@@ -1,0 +1,3 @@
+Oct 20 13:35:18.819821 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 72: the model said it was not for it
+Oct 20 13:35:18.822641 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(6821) prompt=Some(6813) prompt_audio=Some(1348) response=Some(8) response_audio=None thoughts=None cached=None
+Oct 20 13:35:31.217308 lamp-06c1 lamp-voice[2382]: lamp-voice provider: a sound (request 73) got no answer in 8004 ms, as a sound should; closed, connection kept

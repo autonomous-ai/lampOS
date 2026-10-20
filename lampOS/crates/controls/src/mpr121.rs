@@ -36,7 +36,6 @@ const MAX_SETTLE_US: u64 = 5_000_000;
 /// This is a software selection, not an electrical scan mask: ECR still enables
 /// all twelve electrodes. Nothing is opened by deserialization or validation.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Config {
     pub bus: u8,
     pub address: u16,
@@ -48,7 +47,6 @@ pub struct Config {
 /// Explicit electrical settings. CDC units are microamps; CDT values are the
 /// register codes: 1=0.5us, 2=1us, ..., 7=32us. Per-pad zero inherits the global.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Profile {
     pub touch_thresholds: [u8; 12],
     pub release_thresholds: [u8; 12],
@@ -72,7 +70,6 @@ pub struct Profile {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Baseline {
     pub rising: Filter,
     pub falling: Filter,
@@ -80,7 +77,6 @@ pub struct Baseline {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Filter {
     pub mhd: u8,
     pub nhd: u8,
@@ -89,7 +85,6 @@ pub struct Filter {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TouchFilter {
     /// Zero deliberately disables the touched baseline adjustment, as in V1.
     pub nhd: u8,
@@ -100,9 +95,10 @@ pub struct TouchFilter {
 /// FFI and baseline initialization bits are derived from the matching profile;
 /// hardware retry and unused interrupt bits remain zero. No host retry exists.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "mode", rename_all = "snake_case")]
 pub enum AutoConfig {
-    // Empty struct variant preserves deny_unknown_fields for this tagged case.
+    // An empty struct variant, so a newer field beside `mode` is read past
+    // and named, as in any struct of the pins file (#1680).
     Disabled {},
     Enabled {
         upper_limit: u8,

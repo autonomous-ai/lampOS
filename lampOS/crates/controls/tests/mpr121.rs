@@ -208,16 +208,21 @@ fn explicit_profile_roundtrips_without_hidden_defaults() {
     assert!(serde_json::from_value::<Config>(value).is_err());
 }
 
+/// #1680: the strip's section of a newer build's pins file is read one
+/// release forward. A field this build doesn't know, at every layer, is
+/// read past and named by its path; what it knows reads as before.
 #[test]
-fn unknown_fields_at_every_configuration_layer_are_rejected() {
-    for pointer in [
-        "",
-        "/profile",
-        "/profile/baseline",
-        "/profile/baseline/rising",
-        "/profile/baseline/falling",
-        "/profile/baseline/touched",
-        "/profile/autoconfig",
+fn unknown_fields_at_every_configuration_layer_are_read_past_and_named() {
+    let ours: Config = serde_json::from_str(PROFILE).unwrap();
+    let file = std::path::Path::new("/etc/lampOS/controls/controls-pins.json");
+    for (pointer, named) in [
+        ("", "typo"),
+        ("/profile", "profile.typo"),
+        ("/profile/baseline", "profile.baseline.typo"),
+        ("/profile/baseline/rising", "profile.baseline.rising.typo"),
+        ("/profile/baseline/falling", "profile.baseline.falling.typo"),
+        ("/profile/baseline/touched", "profile.baseline.touched.typo"),
+        ("/profile/autoconfig", "profile.autoconfig.typo"),
     ] {
         let mut value: Value = serde_json::from_str(PROFILE).unwrap();
         value
@@ -226,14 +231,27 @@ fn unknown_fields_at_every_configuration_layer_are_rejected() {
             .as_object_mut()
             .unwrap()
             .insert("typo".into(), json!(1));
+        let bytes = serde_json::to_vec(&value).unwrap();
+        let (read, line) = lamp_controls::forward::read::<Config>(file, &bytes).unwrap();
+        assert_eq!(read, ours, "{pointer}");
         assert!(
-            serde_json::from_value::<Config>(value).is_err(),
+            line.unwrap().ends_with(&format!("ignored: {named}")),
             "{pointer}"
         );
     }
     let mut value: Value = serde_json::from_str(PROFILE).unwrap();
     value["profile"]["autoconfig"] = json!({"mode":"disabled","target":180});
-    assert!(serde_json::from_value::<Config>(value).is_err());
+    let bytes = serde_json::to_vec(&value).unwrap();
+    let (read, line) = lamp_controls::forward::read::<Config>(file, &bytes).unwrap();
+    assert_eq!(read.profile.autoconfig, AutoConfig::Disabled {});
+    assert!(
+        line.unwrap()
+            .ends_with("ignored: profile.autoconfig.target")
+    );
+    // A mode it doesn't know is a known field's bad value: refused.
+    value["profile"]["autoconfig"] = json!({"mode":"adaptive"});
+    let bytes = serde_json::to_vec(&value).unwrap();
+    assert!(lamp_controls::forward::read::<Config>(file, &bytes).is_err());
 }
 
 #[test]

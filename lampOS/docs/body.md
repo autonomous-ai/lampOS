@@ -1178,6 +1178,16 @@ in the body's unit (and the bus on), the body listens to `expression/body`
   four and six degrees), whatever was asked. Nothing is added while a
   gesture plays, and a lamp at rest is not stirred by it (but see "A
   glance from rest" below).
+- **With the gaze.** The base's turn from Expression (#933's sway between
+  sentences, out at most about 52 counts from centre and back) is added to
+  the turn the body's own gaze has, never instead of it. While Speaking
+  the gaze corrects only a face more than 0.35 of a half-picture off the
+  middle, and only from a head still for 0.4 s. On lamp-52e6
+  (`--gaze 782,557`) 52 counts move a face about 0.07, so a face within
+  about 0.28 of the middle is never pushed past 0.35 and the sway is left
+  alone. A face further out than that is not corrected during a sway
+  either: the sway moves the goal through its whole 1.6 s, and the gaze
+  waits for a head still for 0.4 s. Expression's sway relies on this 0.35.
 - **Which request counts.** One that passes its own check, is of this
   start of the machine (the kernel's boot identity), has not run out, was
   not made ahead of the body's clock, lasts no longer than a request may
@@ -1731,7 +1741,7 @@ four rows, "Without it" is what `off` leaves.
 | `--wake on` (default) | with `--home`, a joint found out of where it may start but within 400 counts of home is brought home slowly before anything else; a shoulder left up with its elbow folded is lowered first; in the run, a joint held 30 to 50 counts short of its goal, still, rests where it is (see "Waking") | such a joint is refused | on or off |
 | `--let-go-at-stop on\|off` (default off; the factory's, #1682) | asked to stop (SIGINT or SIGTERM), a lamp that got down, its head within 20 counts of home and its arm of its folded counts (inside the tracking bound and the arm's goal step, so an arm left a little short of folded keeps holding), has its last goals written and is then let go, torque off on all five, so that `lamp-body-measure` can read it at rest; a standing lamp folds first, as always, and one that did not get down in time keeps holding (`asked_to_stop_standing_it_folds_first_and_only_then_lets_go_with_let_go_at_stop`, `asked_to_stop_folded_at_rest_it_lets_go_only_with_let_go_at_stop`, `asked_to_stop_with_its_elbow_short_of_folded_it_keeps_holding_with_let_go_at_stop`). The product's unit never passes it | a stop keeps the lamp held, torque on, until the power goes | on or off |
 | `--overload release` | any joint at a load of 800 (80% of `--force-limit` for a joint held to one) for 1.5 s: torque off on all five for 120 s, then held where they are and the head brought home slowly; a second time within ten minutes ends the run, torque off (see "Letting go under overload") | torque is written off only as a run ends on a surprise | release |
-| `--gaze-socket PATH` with `--gaze Y,P` | where the eyes report, and the signed counts of yaw and pitch that a half-picture is worth | never looks | 900 either way |
+| `--gaze-socket PATH` with `--gaze Y,P` | where the eyes report, and the signed counts of yaw and pitch that a half-picture is worth; the socket without `--gaze` (a factory `lamp.env` before its gaze is measured, as the product unit passes it) is gaze off, said at start (thirteen-P1) | never looks | 900 either way |
 | `--gaze-reach Y,P` | the farthest the gaze takes yaw and pitch; the yaw may be wider than `--reach`'s | 250,120 | 500, 200 |
 | `--look-at-name on` (default) | the lamp's name heard on the bus taken as being spoken to for two seconds, and with nobody in view one small glance once it stands (see "Turning to a call") | a call is not taken | on or off |
 | `--idle on` (default) | a standing lamp at rest shifts a little now and then | off | on or off |
@@ -1757,6 +1767,40 @@ pitch and the pitch servo's limits, `--torque on`, and `--gaze` left for its
 own measurement. It writes the file only with `--write`, never over one
 already there, and refuses a read taken with torque on (install.md, "At the
 factory, once per lamp").
+
+With `--seated` (#2163) the same read makes a seated file: `--home` as found,
+the default `--pitch-window` (checked the same way) and `--torque on`, and
+nothing else. It has no `--stand` and no `--folded-arm`, so a body given it
+commands the head and the base only. Without a stand, `--torque on` takes hold
+of those three only. The body never writes a goal to the shoulder or the
+elbow, and writes torque to them only to let go (off on all five, at a
+surprise, an overload or a limp), as V1 does. `--torque on` is needed: the
+lamp was read with torque off, and a body without it refuses to start.
+The seated file is for the generic package's `lamp-body` unit, which is how a
+V1 lamp moves to V2. The product unit passes the stand's own options
+(`--stand-share`, `--stand-seconds`, `--awake-seconds`, `--idle`), which need
+a `--stand`, so it refuses a seated file. A product lamp is never seated: its
+file is the factory's, written after its watched stand. Both are tested from
+the unit files themselves. That file is for a lamp moved to V2 whose first stand
+no person has confirmed yet. Its standing file comes later, from the
+factory's watched stand. A read with torque on is refused here too: the tool
+never turns torque off to get a read, since an arm that is up would drop
+(Fifth on #2163).
+
+The body does **not** read that file one release forward, on purpose
+(#1680's one exception, a safety rule): an option a newer measure wrote that
+this build does not read still stops the body, and the journal names it and
+says why ("lamp-body: /etc/lampOS/body/lamp.env: --…: an option this build
+does not read, written by a newer measure; the body stays still until this
+lamp is updated"). A pose option may be a bound the arm needs, as
+`--pitch-window` once was; a body that stands still until it is updated is
+the safe failure, not one that moves on bounds it knows to be incomplete
+(the first builder on #2071, 20 Oct 06:28).
+
+**`lamp-body-mood`** (#1682) tells a body one mood on its `--mood-socket`,
+as the voice does: one `{"mood":WORD,"level":LEVEL}` datagram (level 128
+unless given). The factory's steps use it to stand a body run by hand on a
+private socket. It never opens the servo port.
 
 ### Reading a run without stopping it
 

@@ -1,0 +1,21 @@
+# 22:00, 40 minutes at the desk, then away: at 20 minutes one slow sleepy
+# droop and its light a shade dimmer, given back when they have gone, about
+# two minutes after they leave.
+clock = "22:00"
+
+[[expect]]
+at = "20m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "sleepy" }
+
+[[expect]]
+at = "20m"
+within = "1m"
+call = "light"
+args = { dim = 1, until = "ends" }
+
+[[expect]]
+at = "42m"
+within = "1m"
+call = "ends"

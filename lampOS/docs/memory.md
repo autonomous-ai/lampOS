@@ -666,7 +666,9 @@ job. Its 300 ms note and 1.5 s call budgets cover nonblocking socket I/O and
 reply validation; they do not measure provider connection or audible
 response time. Source overflow, uncertain mutations and confirmed forgetting
 inhibit new journal writes until a fresh worker; a restart also discards the
-old thread-file recap because it carries no provenance. These new paths
+old thread-file recap because it carries no provenance. The voice's journal
+says when that stop begins, why, and how many exchanges it has held back
+([memory-days.md](memory-days.md), #2176). These new paths
 have no task 29 lamp measurements.
 
 ### What a person teaches and corrects (#813)
@@ -876,9 +878,12 @@ No audio, no pictures. Nothing is sent anywhere from here, though a line
 leaves the lamp, to the voice provider, whenever the voice uses one in an
 answer. The default has whole-word matching; the opt-in mode normalizes
 Unicode and ranks with FTS5, with no embeddings or semantic answer model.
-Its observation pass has only a scripted adapter here. It does not know who speaks: the person is
+Its observation pass has a DeepSeek adapter on the voice's second route
+(`LAMP_MEMORY_OBSERVE=on`, off unless set; above); the memory itself calls no
+model. It does not know who speaks: the person is
 whoever the caller says, and the voice says whom the eyes know at the lamp. Files are not encrypted; forgotten text is unlinked,
-not scrubbed from the flash. The offset from UTC is fixed: no summer time.
+not scrubbed from the flash. `--utc-offset-minutes` is fixed all year;
+`--zone`, which the product unit uses, follows summer time.
 
 ## Not shown
 
@@ -935,8 +940,14 @@ returned after revocation. A write already accepted by Memory cannot be undone
 by canceling its caller. Typed conversations continue to use the room scope.
 
 This boundary fixes tool attribution and cancellation only. A visible face is
-not proof of the speaker. Voice matching remains diagnostic until provider
-context isolation and real-person qualification are complete (#1675).
+not proof of the speaker. On a route whose switch is off
+(`LAMP_SECOND_SCOPED_CONTEXT` for the Second route, `LAMP_LIVE_SCOPED_SESSION`
+for Live), provider context, snapshots and history still require their own
+session isolation: this does not establish that a session already containing
+one person's private context is safe for another person. With Live's switch on,
+a line nobody known is named for still goes into the open session. Voice
+matching remains diagnostic until that isolation and real-person qualification
+are complete (#1675).
 
 ### Second route context scope
 
@@ -972,9 +983,40 @@ went from 0 of 12, every turn the room's and codes crossing, to 11 of 12
 with no code crossed (the one miss an answer too late).
 
 Off, a turn is told and kept as before, for the person the session was opened
-for. The Live route is not covered: its provider session already holds earlier
-history and tool results, and resetting it at an identity change is a separate
-change awaiting First's scope decision.
+for.
+
+### Live route session scope
+
+With `LAMP_LIVE_SCOPED_SESSION=on` (off unless set), a spoken line on the Live
+route goes only into a session opened for the person it was admitted for
+(`crate::scoped_session`). Whose a Live session is otherwise follows the
+counted person, who changes only after someone else known has been named for
+10 s; a line admitted meanwhile for B went into A's session, which already holds
+A's kept things, thread and conversation.
+
+- **Someone known in another known person's session:** the line is not sent.
+  It fails as not delivered (the same report as a line refused for a lost
+  connection), and the session is opened again, fresh, for B between turns.
+  B's next line is answered in B's own session. The cost is that first line.
+- **For two minutes after a line admitted for someone known**, the session is
+  theirs, ahead of the count of who is at the lamp (`Thread::admitted`), so
+  the count catching up later does not open it again for A. Closing or
+  changing the camera forgets it.
+- **Two or more known people taking turns** within two minutes share a room
+  session, told neither's kept things or thread: one line is lost when the
+  second first speaks, and none after, however often they alternate (the
+  reviewer's P2 on #1865). Once only one of them has spoken in the last two
+  minutes, the session is theirs again, opened between turns without
+  refusing a line.
+- **Not refused:** a line admitted for the room, any line in a room session
+  (it holds nobody's private context; the session is still opened again for a
+  known person between turns), and written requests and reminders. A known
+  person who keeps talking turned away from the eyes keeps their session, as
+  before.
+- **Latency:** the check is a mutex and a comparison before the line is sent;
+  the new session costs one session open between turns, as any renewal. Not
+  measured on a lamp, and no lamp run yet.
+
 
 The added admission work targets less than 100 microseconds: no filesystem or
 network I/O and no waiting for the cache mutex. Privacy invalidation is atomic

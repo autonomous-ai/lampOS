@@ -196,6 +196,51 @@ for frame beside it, and again only after 3 s without a face; with the eye off
 it changes nothing. Not yet seen on a lamp: it is for the owner's face and the
 iMac's camera on 16 Oct.
 
+### The lamp's one breath (#1670)
+
+The ring's resting breath and the head's (Expression's idle layer,
+[alive.md](alive.md)) are one breath: on the boot clock over 5.2 s, as
+always, and where Mood runs (`LAMP_MOOD=on`, [mood.md](mood.md)), at the
+phase Mood keeps in `mood/state`'s `breath`. There is no switch of the
+ring's own: without Mood, or with no fresh state, every frame is what it
+was. The ring worker reads `mood/state` four times a second
+(`crates/voice/src/ring_mood.rs`), Expression's service its own copy as
+often, and both take the phase through the one function
+(`lamp_msgs::MoodState::breath_in`): from `mood` only, checked, no older
+than its 2.5 s, moved on from its stamp to now at its pace. So the head and
+the ring breathe together at any pace, as [creature.md](creature.md) has it
+("mood shows only as pace and warmth"). Listening, thinking, speaking and
+muted keep their own faces.
+
+| Mood says | Pace | One breath | Blinks (with the eye) |
+|---|---:|---:|---:|
+| Calm (energy 0.30), awake 0.40 or more: the day and the evening | 1 | 5.2 s | every 7 to 16 s |
+| Energy up to 0.70 (a bang's) | up to 1.25 | down to 4.2 s | every 5.6 to 12.8 s |
+| Awake under 0.40, dozing | down to 0.7 at 0 | up to 7.4 s | up to every 10 to 23 s |
+| Asleep | 0.7 | 7.4 s | every 10 to 23 s |
+
+Energy and dozing add; the pace stays from 0.7 to 1.25 (`lamp_msgs::mood_pace`).
+Mood begins the breath where the plain one is and moves it on at the pace
+whenever its time does, so a change of pace changes the tempo from where the
+breath is: it never jumps. When Mood starts or stops, both the ring and the
+head go from one clock to the other at once (the head eases, as it always
+has at the hour's turn). A blink itself stays 150 ms. Expression's sleeping
+breath (9 s) is its own and keeps the boot clock, as before. These are
+authored starting values, small on purpose (CLAUDE.md rule 8), not fitted to
+a lamp.
+
+Tests: Mood's breath begins at the plain phase, goes on at the pace, keeps
+its place at a bang, and a reader moving the last state on lands where Mood
+does (`crates/mood/tests/engine.rs`); with no breath the face is as before,
+frame for frame; the ring breathes at the phase given, 11 to 12 breaths a
+minute at the plain pace, 14 to 15 at the quickest and 8 to 9 at the
+slowest; blinks follow the pace; the ring's reader takes the breath from
+Mood's fresh, valid state on a real bus and nothing else; Expression's head
+holds the phase it is given and goes back to the plain breath without a
+leap (`alive_engine.rs`); and the ring's and the head's breath are the same
+at every phase and with none (`crates/voice-eval/tests/one_breath.rs`). Not
+yet seen on a lamp.
+
 Which way the ring counts was measured on lamp-4ace on 2026-10-14 at 19:54:
 with the voice stopped, `crates/ring/examples/pixel_map.rs` lit pixel 0 red,
 1 and 2 orange and yellow, 8 green, 16 blue and 24 white, and a photograph
@@ -376,6 +421,60 @@ show only those colours over the whole ring, no brighter than 24, and black.
 It sends black and closes the device just before the marker that starts the
 lamp, so the voice's ring worker is again the only writer.
 
+### The waking face (#1681)
+
+From power-on until the voice takes the ring, nothing else of a set-up lamp
+lights it, often for a quarter of a minute, and a dark lamp reads as a
+broken one. With `LAMP_WAKING_FACE=on`, `lamp-setup wake`
+(`lamp-waking.service`, early at boot, only once setup's marker exists)
+lights it as a creature waking: the asleep face's warm glow at the bottom
+opens slowly up the ring, as an eye opens, over 20 s, and breathes every
+6 s, never dark at the low of a breath; the bottom stays the brightest,
+and no channel is above 24. It is lit from its first frame and fades the
+rest of the way in over 1.5 s. If no voice has asked for the ring within
+5 minutes, it turns pale and grey over the whole ring over 3 s and
+breathes every 10 s, and stays so, still ready to be asked: a voice that
+never started. No spinner and no blink.
+
+It writes through `lamp_ring::waking::WakingRing`, the third writer that
+needs no permit: it can show only that face and black. The ring opens with
+a lock (`try_lock`), and a ring the voice cannot lock stays off all its
+session, so the hand-over is asked, never raced: `lamp_ring::linux::open`
+(the ring worker) and `open_asleep` (the asleep face) first ask on
+`/run/lampos-waking/release.sock`; the waking face fades out over 600 ms,
+sends black, closes the device and only then answers. `open_privacy` (the
+physical-mute indication) asks for it at once: black and closed with no
+fade, within 100 ms of asking. It waits no longer than 100 ms, and a ring
+still locked then is opened without the lock (`lamp_ring::waking::take`):
+the privacy switch's light never depends on the waking face. A face that
+is alive but stuck may land the frame it was stuck on, and nothing more:
+asked at once, it sends its black only within 50 ms of reading the ask
+and otherwise closes with no frame, and the indication paints again every
+25 ms. The voice's own asks
+are given up after 2 s and the open goes on; that is only for a waking
+face that doesn't answer. With no socket
+(the switch off, or the face already gone) the open goes on at once, as
+before. The setup light's opener and the waking face's own never ask.
+
+Targets, not yet measured on a lamp: first light within 300 ms of the
+unit's start, and the ring dark for at most 1 s at the hand-over. Not
+shown: power-on to the unit's start, and whether `/dev/spidev3.0` is there
+by then (it is tried every 200 ms until it is).
+
+Host tests: `crates/ring/src/waking.rs` (capped and the same on both sides
+of the bottom, closed it is the asleep glow, it only opens, a breath never
+dark, unwell pale over the whole ring; the ask's 2 s bound, the at-once ask's
+100 ms, a missing socket, and the privacy open locking when it can and
+taking the ring when it cannot); `crates/setup/src/wake.rs` (the switch, lit from the first frame,
+the fade-in and the opening, 6 s then 10 s breaths, pale after 5 minutes,
+the fade-out); `crates/setup/tests/wake.rs` (with a real `try_lock` on a
+file: the voice's lock fails while the face shows and succeeds the moment
+it is answered, the privacy ring has it within 100 ms, a face that never
+answers cannot keep the privacy ring dark past 100 ms and writes nothing
+after but the frame it was stuck in, a device that isn't
+there yet is tried again, and an ask before any ring opened is answered at
+once).
+
 ### The lamp's own light
 
 The resting face is also the lamp's light: a colour and a level that
@@ -523,6 +622,29 @@ that takes the light (`src/ring_light.rs`). Started with
   it. A ring without fades eases at its own 70 ms. A boot
   clock that cannot be read is said once and the ring takes the person's
   light alone.
+- With `LAMP_SKILL_LIGHT_SPEAKING=on` as well (El on #1722, the first
+  builder's 14:43; off unless `on`, and nothing without
+  `LAMP_LIGHT_REQUESTS=on`), the request shown also tints the **Speaking**
+  face, so a skill's light held through its words (Welcome back's warm
+  glow, held exactly as long as its hello) is seen with them rather than
+  covered by the turn for its whole life. The face keeps its own motion,
+  following the lamp's voice with its slow two-lobed turn, and takes 60% of
+  its colour from the light and 40% from its own warm (`ring_face.rs`,
+  `SKILL_TINT_SHARE`); its least glow, with the voice quiet, becomes that
+  of the light's level, at least level 3 (`SKILL_LEVEL_LEAST`), since the
+  ring can't tell a level the skill named from one `lamp-skills` filled in
+  from the light shown, and a level 1 or 2 is under Speaking's own least.
+  Only Speaking: listening, thinking (the amber point), offline, a tap's
+  face and rest are as before, and a gesture's accent still rides over the
+  tinted face. A self-test over the request, the person's own light, or a
+  light that is out (#1677's ember) tints nothing. Given back or lapsed,
+  the next frame is plain Speaking, eased at the face's 70 ms. The tinted
+  face is a turn's frame like any other, written only under the turn's
+  permit, so the privacy switch closing refuses it as it refuses every turn
+  frame (`ring_face.rs`,
+  `a_tinted_speaking_frame_is_refused_once_the_privacy_switch_closes`).
+  Nothing is said `reached` for it: that is still for resting frames
+  only. Not seen on a lamp.
 
 Whoever asks never writes the ring: the actions program publishes the
 light wanted and reads the state back ([actions.md](actions.md)). A bus
@@ -546,6 +668,33 @@ second. The write runs in the ring's loop, at most once a second and
 only after a change; its time on the lamp's disk is not yet measured
 (the lamp check reads the ring's stall lines). The reset empties
 `/var/lib/lampOS/light`, a file left beside it by a power cut included.
+
+**While the microphones are off** (#1816, `LAMP_LIGHT_WHILE_MUTED=on`,
+off unless set). The ring's light lives in the voice's ring worker, which
+runs only inside a session. While the voice waits out a mute or a closed
+privacy switch, no session runs, so nothing said `light/state` or took
+`light/command`, and the app's light row found "the lamp's light is not
+running" (mobile on lamp-0c89, #1396).
+- **With the switch on:** on a lamp with a ring and the bus on, the
+  muted wait opens the same light, with `LAMP_LIGHT_KEEP`'s file if that's
+  on. It ticks it at each look of the wait, about every 2 ms, and the
+  light looks for commands every 50 ms.
+- **What it says and takes:** the person's light is said once a second and
+  at each change, and a light asked for is taken, so the app can read and
+  set it. A command reaches `light/state` within the light's 50 ms look.
+- **Nothing is drawn:** the ring shows what the wait shows today, the
+  privacy face, the asleep face or dark, and nothing goes on
+  `light/drawn`. Requests (`light/request`) are not taken while muted. A
+  self-test colour is read, as the light reads one, but never drawn, and
+  `light/state` goes on saying the person's light (the reviewer on
+  #1842).
+- **When the switch opens:** the wait lets the light go before the next
+  session's ring worker opens. That worker begins with the bus's newest
+  command, so a light set from the app while muted is the one shown.
+
+Tests: `coordinator::tests::service_mute::the_persons_light_is_said_and_taken_while_the_switch_is_closed`
+(a wait that never ticks the light fails it) and
+`ring_light::tests::the_light_while_muted_is_off_unless_on_with_a_ring_and_a_bus`.
 
 **On lamp-4ace, 2026-10-14, about 03:00, nobody in the office.** Called
 directly on the actions program's socket, each change was answered in 15
@@ -773,6 +922,17 @@ shutdown; a later Stop does not invalidate that evidence. Failed stop delivery,
 malformed cleanup, forced termination, abnormal exit, or missing black-write
 proof still fails final cleanup. A clean degraded shutdown may complete the
 voice run; its trace still records that ring qualification failed.
+
+The final shared shutdown looks at every child's exit once more, the disabled
+ring's included. A ring that had already ended mid-session (its
+`ring_degraded_exit` recorded then) is seen ended again in the stop's first
+pass, a millisecond or so after `service_stop_requested`; that
+`worker_exit_failed` carries `exited_before_stop: true`, so it is not read as
+the stop ending the ring (lamp-52e6, 19 Oct 2026, #1620). The stop still fails
+on the missing black-write receipt: a ring that ended on its own never said
+the strip went black. The ring's shutdown path is the same with or without the
+eye (`LAMP_RING_EYE=on` or `strong`), host-tested in
+`every_eye_mode_writes_and_says_the_shutdown_black_at_a_service_stop`.
 
 SPI I/O remains in the child. Linux cannot promise a userspace deadline for a
 stalled kernel SPI write; the existing 10 ms write budget is checked on return.

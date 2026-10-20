@@ -1,0 +1,4 @@
+# 140 from 22:00 to 02:00, then 80, a face in view: the chance comes at
+# 23:00, in the quiet hours, and is spent when the spell ends. Nothing.
+clock = "22:00"
+none = true

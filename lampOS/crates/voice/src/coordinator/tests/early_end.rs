@@ -419,6 +419,7 @@ impl PrivacyPeer {
             self.channels
                 .control
                 .send(WorkerEvent::Privacy {
+                    receipt: None,
                     acquired_at_us: monotonic_us(),
                     muted: false,
                 })
@@ -775,6 +776,7 @@ impl Setup {
             speaker,
             privacy,
             privacy_controls: false,
+            privacy_receipts: false,
             ring: None.into(),
             camera: None,
             motor: None,

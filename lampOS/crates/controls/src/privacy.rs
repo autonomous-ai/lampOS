@@ -4,7 +4,7 @@ use crate::{
     input::InputError,
     pins::{Lines, Pull},
 };
-use lamp_msgs::{ClockStamp, ControlFault, PRIVACY_SWITCH_TTL_US, PrivacySwitch};
+use lamp_msgs::{ClockStamp, ControlFault, Diagnostic, PRIVACY_SWITCH_TTL_US, PrivacySwitch};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
@@ -375,9 +375,15 @@ impl Monitor {
     }
 }
 
+/// The item health shows for the switch itself (the first builder on #2143).
+pub const SWITCH_ITEM: &str = "privacy switch";
+
 pub struct Source {
     reader: Box<dyn Reader>,
     pub monitor: Monitor,
+    /// The switch's last level read, and how often it has changed since
+    /// Controls started, for [`Self::health`].
+    moved: (Option<bool>, u64),
 }
 
 impl Source {
@@ -385,6 +391,7 @@ impl Source {
         Self {
             reader,
             monitor: Monitor::new(clock),
+            moved: (None, 0),
         }
     }
 
@@ -392,8 +399,43 @@ impl Source {
     pub fn poll(&mut self, now: impl Fn() -> u64) -> Option<(u64, PrivacySwitch)> {
         let sample = self.reader.read(now())?;
         let received = now();
+        if let Some(muted) = sample.muted {
+            let (last, changes) = &mut self.moved;
+            if last.is_some_and(|last| last != muted) {
+                *changes += 1;
+            }
+            *last = Some(muted);
+        }
         let _ = self.monitor.observe(received, sample.clone());
         Some((received, sample))
+    }
+
+    /// What health says of the switch itself ([`SWITCH_ITEM`]): open or
+    /// closed, from its own fresh reading at `now`, and whether it has moved
+    /// since Controls started, so a lamp whose switch never changes is
+    /// noticed (the first builder on #2143). Either is well; a reading that
+    /// can't be had is a warning, with its fault, as Controls' own report
+    /// already says the route is closed then.
+    pub fn health(&mut self, now: u64) -> Diagnostic {
+        let sample = self.monitor.snapshot(now);
+        let changes = self.moved.1;
+        let report = match sample.muted {
+            Some(muted) => {
+                let level = if muted { "closed" } else { "open" };
+                let message = if changes == 0 {
+                    format!("{level}, not moved since Controls started")
+                } else {
+                    level.to_owned()
+                };
+                Diagnostic::new(lamp_msgs::Level::Ok, SWITCH_ITEM, &message)
+            }
+            None => Diagnostic::new(
+                lamp_msgs::Level::Warn,
+                SWITCH_ITEM,
+                &format!("unknown: {:?}", sample.fault),
+            ),
+        };
+        report.with("changes", changes)
     }
 }
 

@@ -22,6 +22,7 @@ fn cleanup_failure_cannot_leave_a_restartable_physical_mute() {
         provider,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         camera: None,
         motor: None,
@@ -48,6 +49,7 @@ fn cleanup_failure_cannot_leave_a_restartable_physical_mute() {
         &mut trace,
         &mut None,
         Err(Box::new(PhysicalMute {
+            onboarding: None,
             observed_at_us: monotonic_us(),
         })),
     )
@@ -134,6 +136,7 @@ impl MutePeer {
                         self.channels
                             .control
                             .send(WorkerEvent::Privacy {
+                                receipt: None,
                                 acquired_at_us,
                                 muted: true,
                             })
@@ -224,6 +227,7 @@ fn active_mute(trace: &mut SessionState, invalid: bool) -> Result<()> {
         provider,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         camera: None,
         motor: None,
@@ -474,6 +478,7 @@ fn shutdown_after_unreadable(
         provider,
         privacy,
         privacy_controls,
+        privacy_receipts: privacy_controls,
         ring: None.into(),
         camera: None,
         motor: None,
@@ -559,4 +564,87 @@ fn a_queued_unreadable_fault_with_a_clean_exit_is_no_failed_shutdown() {
             "{failed}"
         );
     }
+}
+
+/// #1816: with `LAMP_LIGHT_WHILE_MUTED=on`, the person's light is said on
+/// `light/state` and a light asked for is taken while the voice waits out a
+/// closed switch, with no session's ring worker; nothing is drawn (nothing
+/// on `light/drawn`); and once the wait ends the light is let go, so the
+/// next session's ring worker begins with the one asked for.
+#[test]
+fn the_persons_light_is_said_and_taken_while_the_switch_is_closed() {
+    use lamp_msgs::Light;
+    let root = std::path::PathBuf::from(format!("/tmp/lv-muted-light-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut asks = bus
+        .publisher_declared(Light::TOPICS[0], &Light::declaration(), "actions")
+        .unwrap();
+    let (light, _) = crate::ring_light::RingLight::on(&root).unwrap();
+    let state = || {
+        bus.latest(Light::TOPICS[1])
+            .unwrap()
+            .map(|message| message.parse::<Light>().unwrap())
+    };
+    let blue = Light {
+        on: true,
+        colour: "blue".into(),
+        level: 2,
+    };
+    let controls = RefCell::new(None);
+    let reminders = RefCell::new(None);
+    let mut trace = SessionState::default();
+    let mut said = Vec::new();
+    let outcome = muted_wait_pulsing(
+        &mut trace,
+        &mut None,
+        &controls,
+        &reminders,
+        None::<crate::ring_asleep::TapFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
+        None,
+        None,
+        Some(light),
+        |on_state, gate| {
+            on_state(
+                crate::privacy::PrivacyState::Muted,
+                crate::process::new_boot().unwrap(),
+                1,
+            )?;
+            // Looks every 2 ms, as the wait's own loop; the person asks for
+            // blue from the app a little way in.
+            let started = Instant::now();
+            let mut asked = false;
+            while started.elapsed() < Duration::from_millis(400) {
+                gate()?;
+                if !asked && started.elapsed() >= Duration::from_millis(100) {
+                    said.push(state());
+                    asks.publish_json(1, &blue).unwrap();
+                    asked = true;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            said.push(state());
+            Ok(crate::service_privacy::WaitOutcome::Allowed)
+        },
+    )
+    .unwrap();
+    assert_eq!(outcome, crate::service_privacy::WaitOutcome::Allowed);
+    // Said while muted: the first light, then the one asked for.
+    assert_eq!(
+        said[0].as_ref().map(|light| light.colour.as_str()),
+        Some("warm")
+    );
+    assert_eq!(said[1], Some(blue.clone()));
+    // Nothing drawn: no ring wrote a frame.
+    assert!(
+        bus.latest(crate::ring_light::DRAWN_TOPIC)
+            .unwrap()
+            .is_none()
+    );
+    // Let go: the next session's ring begins with blue.
+    let (next, _) = crate::ring_light::RingLight::on(&root).unwrap();
+    assert_eq!(next.now(), &blue);
+    drop(next);
+    let _ = std::fs::remove_dir_all(&root);
 }

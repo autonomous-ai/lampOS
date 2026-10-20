@@ -289,6 +289,9 @@ pub(crate) fn said_once_note(said: &str) -> String {
 /// begun just before it, in the same session.
 pub type Heed =
     Arc<dyn Fn(u64, (u64, u64), &str, Option<u64>) -> Option<&'static str> + Send + Sync>;
+/// Where a spoken turn's verdict is said (`voice/turn`, #1155): its
+/// request, and whether it is answered or its answer held back.
+pub type Verdicts = Arc<dyn Fn(u64, lamp_msgs::TurnVerdict) + Send + Sync>;
 /// Told that `request` ended as a cut-in over the lamp's answer
 /// (`ProviderInput::End { cut_in: true }`), before the rule judges it.
 pub type CutIn = Arc<dyn Fn(u64) + Send + Sync>;
@@ -400,6 +403,8 @@ struct Shared {
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
     heed: Option<Heed>,
+    /// Where each judged turn's verdict is said, when it is.
+    verdicts: Option<Verdicts>,
     /// [`Engine::asking_again`]: told of cut-ins, and asked after a hold.
     ask_again: Option<(CutIn, AskAgain)>,
     /// When a cut-in was last held as misheard with the lamp's hum: the
@@ -848,6 +853,7 @@ impl Engine {
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
+                verdicts: None,
                 ask_again: None,
                 misheard_at_us: Mutex::new(None),
                 holding_answer: false,
@@ -1355,6 +1361,15 @@ impl Engine {
     pub fn noting_a_task_waiting(mut self, note: TaskNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.task_waiting = Some(note);
+        }
+        self
+    }
+
+    /// Each judged turn's verdict is said with `told` (#1155): held back,
+    /// or answered when it was judged and let out. Before any turn only.
+    pub fn telling_verdicts(mut self, told: Verdicts) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.verdicts = Some(told);
         }
         self
     }
@@ -2439,6 +2454,15 @@ async fn spoken(
         .ok()
         .and_then(|mut cut| cut.take())
         .filter(|carried| carried.request < request && carried.at.elapsed() <= CARRY_WITHIN);
+    // The turn's verdict, as the journal says it above (#1155): only for a
+    // turn something judged, and never for one with nothing heard.
+    if let Some(told) = shared.verdicts.as_ref().filter(|_| !empty) {
+        if held || heeded.is_some() {
+            told(request, lamp_msgs::TurnVerdict::HeldBack);
+        } else if shared.heed.is_some() || marked {
+            told(request, lamp_msgs::TurnVerdict::Answered);
+        }
+    }
     if empty || held || heeded.is_some() {
         // Left unanswered: a line held by the rule is not talk, nor are no
         // words at all, which are a sound (as a short sound already is).
@@ -2763,7 +2787,7 @@ impl Prepared {
     fn misfit(&self, base: &[Message], notes: &[String], said: &str) -> Option<&'static str> {
         let asked = &self.messages[..self.messages.len().saturating_sub(1)];
         let asked = asked.get(..asked.len().saturating_sub(self.notes.len()));
-        let named = crate::attention::called_by_name(said);
+        let named = crate::attention::called_by_name_on(said, true);
         let told = notes.iter().filter(|note| {
             !(named && [crate::called::NOTE, crate::called::NOTE_HEARD_AS].contains(&note.as_str()))
         });
@@ -3118,12 +3142,17 @@ async fn run_tool(
 
 /// How an answer stopped short.
 enum Stop {
-    /// `not_for_me`: nothing more is said.
-    Silent,
     /// The first round had not begun within its bound ([`BEGIN_WITHIN`]):
     /// the route gave the turn up, not the model. It ends as a silent turn,
     /// but what was said is no talk the lamp left alone.
     GaveUp,
+    /// `not_for_me`: nothing more is said, and the model judged the line
+    /// not said to the lamp.
+    Declined,
+    /// The Policy held one of the turn's calls (#1984): nothing more is
+    /// said. It ends as a silent turn; the Policy, which held it, is told
+    /// no other verdict.
+    Held,
     Failed(Fault),
     /// The engine is gone.
     Gone,
@@ -3189,6 +3218,9 @@ async fn answer(
     let spoke = AtomicBool::new(false);
     // The answer's own first audio went (not the announcement's).
     let answered = AtomicBool::new(false);
+    // Whether a tool ran for this line: one declined after is the lamp's.
+    let ran = AtomicBool::new(false);
+    let acted = &ran;
     // The words of the answer's sentences begun so far, for a call the
     // Policy holds after them.
     let words_begun = AtomicUsize::new(0);
@@ -3450,7 +3482,7 @@ async fn answer(
                         .as_ref()
                         .is_some_and(|named| named(request));
                 if !named || std::mem::replace(&mut named_asked_again, true) {
-                    return Err(Stop::Silent);
+                    return Err(Stop::Declined);
                 }
                 // Called by name while faced (#2191): the decline is not
                 // taken, and the model is asked once more. Every call of
@@ -3601,6 +3633,7 @@ async fn answer(
                 {
                     did(Did::Worked(monotonic_us()));
                 }
+                acted.store(true, Ordering::Relaxed);
                 let mut result = run_tool(shared, request, heard, call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
@@ -3633,7 +3666,7 @@ async fn answer(
                     "lamp-voice second: request {request}: {} words were let out before a held call; the turn ends here, and nothing more is said",
                     words_out.load(Ordering::Relaxed)
                 );
-                return Err(Stop::Silent);
+                return Err(Stop::Held);
             }
             if let Some(note) = said_once {
                 eprintln!(
@@ -3787,10 +3820,24 @@ async fn answer(
                 idle: true,
             }
         }
-        Err(Stop::Silent | Stop::GaveUp) => ProviderOutput::TurnComplete {
+        Err(Stop::GaveUp | Stop::Held) => ProviderOutput::TurnComplete {
             request,
             idle: true,
         },
+        Err(Stop::Declined) => {
+            // A line the model declines is told held back, as a line the
+            // rule holds is, unless a tool ran for it first (#1155, the
+            // first builder on #1817).
+            if let Some(told) = shared.verdicts.as_ref()
+                && !acted.load(Ordering::Relaxed)
+            {
+                told(request, lamp_msgs::TurnVerdict::HeldBack);
+            }
+            ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            }
+        }
         Err(Stop::Failed(reason)) => ProviderOutput::TurnFailed {
             request,
             stage: if spoke.load(Ordering::Relaxed) {
@@ -3914,7 +3961,7 @@ impl Queue<'_> {
         // other is left out, and not run (its arguments are not read).
         if crate::not_speech::bare_call(&text) {
             if text.trim_start().starts_with(NOT_FOR_ME) {
-                return Err(Stop::Silent);
+                return Err(Stop::Declined);
             }
             return Ok(());
         }

@@ -680,6 +680,22 @@ pub fn lease(
     }
 }
 
+/// The receipt onboarding's privacy step takes: proof of the physical switch,
+/// so only a slide's observation gives one. A lamp with no slide has no
+/// reading to give (#1802's step is then not available; #2086's no-slide).
+fn receipt(
+    observation: &Observation,
+    controls_session: &str,
+) -> Option<crate::wire::PrivacyReceipt> {
+    match observation {
+        Observation::Slide(physical) => Some(crate::wire::PrivacyReceipt {
+            controls_session: controls_session.to_owned(),
+            physical: physical.clone(),
+        }),
+        Observation::NoSlide(_) => None,
+    }
+}
+
 fn serve(
     channels: &mut WorkerChannels,
     controller: BootId,
@@ -741,6 +757,7 @@ fn serve(
                 channels.control.send(WorkerEvent::Privacy {
                     acquired_at_us: acquired.at_us,
                     muted,
+                    receipt: receipt(&value, &message.header.boot),
                 })?;
                 last = Some(value);
             }
@@ -800,6 +817,29 @@ pub(crate) mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn a_receipt_comes_only_with_a_slides_reading() {
+        let stamp = lamp_msgs::ClockStamp {
+            clock_id: "test-clock".into(),
+            at_us: 100,
+            sequence: 7,
+        };
+        let physical = lamp_msgs::PrivacySwitch {
+            stamp: stamp.clone(),
+            reader_session_id: "reader".into(),
+            muted: Some(false),
+            fault: None,
+        };
+        let given = super::receipt(&Observation::Slide(physical.clone()), "0123456789abcdef")
+            .expect("a slide's reading is the receipt");
+        assert_eq!(given.controls_session, "0123456789abcdef");
+        assert_eq!(given.physical, physical);
+        assert!(
+            super::receipt(&Observation::NoSlide(stamp), "0123456789abcdef").is_none(),
+            "with no slide there is no switch reading to prove"
+        );
     }
 
     #[test]

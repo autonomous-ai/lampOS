@@ -28,7 +28,7 @@ use crate::{
 use lamp_bus::{Bus, Notice, Publisher, Subscriber};
 use lamp_msgs::{
     Decision, Diagnostic, Faces, Level, NameHeard, RoomState, Rules, SkillAsk, Speech, TaskStatus,
-    Voice, VoiceArrival, VoiceState,
+    Voice, VoiceArrival, VoiceState, VoiceTurn,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
@@ -511,6 +511,13 @@ impl Ear {
         taken
     }
 
+    /// Its source's comings and goings, passed over unsaid: for a topic
+    /// silent between its messages for longer than the bus's lease, whose
+    /// source would otherwise be said gone and back around each one.
+    fn sources_unsaid(&mut self) {
+        let _ = self.subscriber.notices();
+    }
+
     /// Say what has changed about the topic's source. True if it has just
     /// gone.
     fn source(&mut self, say: &mut dyn FnMut(Note)) -> bool {
@@ -568,6 +575,30 @@ pub struct Seen {
 const NEAR_HEIGHT: f32 = 0.15;
 /// The eyes' list is good for this long (`lamp-eyes`, `bus_out::LASTS`).
 const SEEN_FOR: Duration = Duration::from_secs(2);
+
+/// The two waits of the loop's own a test runs short (#1806): the lamp's
+/// unless told otherwise.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Timing {
+    /// How long the lamp's words are waited for after its first sound
+    /// ([`crate::outcome::WORDS_FOR`]).
+    pub words_for: Duration,
+    /// How long the eyes' list counts ([`SEEN_FOR`], 2 s).
+    pub seen_for: Duration,
+}
+
+impl Timing {
+    pub const LAMP: Self = Self {
+        words_for: crate::outcome::WORDS_FOR,
+        seen_for: SEEN_FOR,
+    };
+}
+
+impl Default for Timing {
+    fn default() -> Self {
+        Self::LAMP
+    }
+}
 
 fn counted(faces: &Faces) -> (u8, u8, u8) {
     let near = |face: &&lamp_msgs::Face| face.ymax - face.ymin >= NEAR_HEIGHT;
@@ -804,6 +835,8 @@ struct Policy<'a> {
     not_judged: Vec<u64>,
     /// The picture's askings (`--images`, #871), if started.
     pictures: Option<Pictures>,
+    /// The loop's own waits ([`Timing`]).
+    timing: Timing,
 }
 
 impl Policy<'_> {
@@ -831,7 +864,7 @@ impl Policy<'_> {
         }
         let seen = self.seen.and_then(|((faces, near, facing), at)| {
             let age = utterance.ended.saturating_duration_since(at);
-            (age <= SEEN_FOR).then_some(Seen {
+            (age <= self.timing.seen_for).then_some(Seen {
                 faces,
                 near,
                 facing,
@@ -841,7 +874,7 @@ impl Policy<'_> {
         let local = self
             .judges
             .as_ref()
-            .map(|judges| judges.cues(&context, &utterance));
+            .map(|judges| judges.cues(&context, &utterance, self.timing.seen_for));
         self.waiting.push_back(Waiting {
             utterance,
             context,
@@ -1105,7 +1138,8 @@ impl Policy<'_> {
     /// Close the newest decision's outcome once nothing more of it is
     /// waited for.
     fn after(&mut self, now: Instant) {
-        if let Some((watch, number)) = self.watch.take_if(|(watch, _)| watch.over(now)) {
+        let words_for = self.timing.words_for;
+        if let Some((watch, number)) = self.watch.take_if(|(watch, _)| watch.over(now, words_for)) {
             self.close(&watch, number, false);
         }
     }
@@ -1153,8 +1187,9 @@ impl Policy<'_> {
     /// publish and write down a decision that comes of it.
     fn progress_turn(&mut self, now: Instant) {
         let room = self.room;
+        let seen_for = self.timing.seen_for;
         let someone_here = self.seen.and_then(|((_, near, _), at)| {
-            (now.saturating_duration_since(at) <= SEEN_FOR).then_some(near > 0)
+            (now.saturating_duration_since(at) <= seen_for).then_some(near > 0)
         });
         let Some(decided) = self
             .progress
@@ -1218,8 +1253,9 @@ impl Policy<'_> {
     /// decision that comes of it (`--gate`, #939).
     fn moment_turn(&mut self, now: Instant) {
         let room = self.room;
+        let seen_for = self.timing.seen_for;
         let someone_here = self.seen.and_then(|((_, near, _), at)| {
-            (now.saturating_duration_since(at) <= SEEN_FOR).then_some(near > 0)
+            (now.saturating_duration_since(at) <= seen_for).then_some(near > 0)
         });
         let Some(decided) = self
             .hello
@@ -1251,8 +1287,9 @@ impl Policy<'_> {
     fn hello_turn(&mut self, now: Instant) {
         let room = self.room;
         // Someone near, and whether such a face is turned to the lamp.
+        let seen_for = self.timing.seen_for;
         let seen = self.seen.and_then(|((_, near, facing), at)| {
-            (now.saturating_duration_since(at) <= SEEN_FOR)
+            (now.saturating_duration_since(at) <= seen_for)
                 .then_some((Some(near > 0), (near > 0).then_some(facing > 0)))
         });
         let Some(decided) = self
@@ -1605,6 +1642,8 @@ pub struct Beside {
     /// the model (`--rule-decides`, #705): the record showed the model
     /// agreeing with the rule on them. Empty: every decision is asked.
     pub rule_decides: Vec<crate::replay::Kind>,
+    /// The loop's own waits: [`Timing::LAMP`] unless a test runs them short.
+    pub timing: Timing,
 }
 
 /// [`run`], with whatever [`Beside`] gives. With nothing, it is [`run`].
@@ -1655,6 +1694,7 @@ fn run_inner<D: Decider + Send + 'static>(
         pictures,
         attention_next,
         rule_decides,
+        timing,
     } = beside;
     let mut heard = Ear::new(bus, HEARD, Speech::TYPE)?;
     let mut said = Ear::new(bus, SAID, Speech::TYPE)?;
@@ -1678,6 +1718,15 @@ fn run_inner<D: Decider + Send + 'static>(
     let mut arrivals = match hello {
         Some(_) => Some(Ear::new(bus, VoiceArrival::TOPIC, VoiceArrival::TYPE)?),
         None => None,
+    };
+    // The voice's verdict on each turn, only with `--hello-quiet
+    // to-the-lamp` (#1155): a turn held back as not said to the lamp is
+    // taken back from the hello's quiet.
+    let mut turns = match hello.as_ref() {
+        Some(hello) if hello.quiet_to_the_lamp() => {
+            Some(Ear::new(bus, VoiceTurn::TOPIC, VoiceTurn::TYPE)?)
+        }
+        _ => None,
     };
     // Nor, without `--gate`, the skills' asks (#939).
     let mut skill_asks = match hello.as_ref() {
@@ -1730,6 +1779,7 @@ fn run_inner<D: Decider + Send + 'static>(
         hello,
         not_judged: Vec::new(),
         pictures,
+        timing,
     };
     policy.second();
     if let Some(judges) = policy.judges.take() {
@@ -1747,6 +1797,18 @@ fn run_inner<D: Decider + Send + 'static>(
         let now = Instant::now();
         let now_us = lamp_ipc::monotonic_us();
         let unreadable = &mut policy.totals.unreadable;
+        // A turn's verdict before the voice's state: one for the last turn
+        // is its, though the next has begun in the same look (#1155). Said
+        // once a turn, silent between: its source is not said gone and back
+        // around each, as the voice's words were on 14 October.
+        if let Some(turns) = turns.as_mut() {
+            for turn in turns.take::<VoiceTurn>(Duration::ZERO, unreadable, policy.say) {
+                if let Some(hello) = policy.hello.as_mut() {
+                    hello.verdict(turn.request, turn.verdict);
+                }
+            }
+            turns.sources_unsaid();
+        }
         for (state, at_us) in voice.take_sent::<VoiceState>(Duration::ZERO, unreadable, policy.say)
         {
             if let Some(judges) = policy.judges.as_mut() {
@@ -1945,7 +2007,9 @@ fn run_inner<D: Decider + Send + 'static>(
                 progress.talk(now);
             }
             if let Some(hello) = policy.hello.as_mut() {
-                hello.talk(now);
+                for (piece, _) in &pieces {
+                    hello.heard(now, piece.request);
+                }
             }
         }
         for (piece, at_us) in pieces {

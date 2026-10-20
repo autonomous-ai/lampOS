@@ -1,7 +1,7 @@
 //! Durable task policy. A launch intent is committed before it can leave this
 //! module. Transcript observations and qualified speech receipts are separate.
 use crate::{
-    harness::{Closed, Launch, LaunchOutcome, Observation, Target},
+    harness::{Closed, EngineKind, Launch, LaunchOutcome, Observation, Target},
     protocol::{MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
     store::{MAX_STATE_BYTES, Store},
 };
@@ -64,7 +64,19 @@ fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
 /// build launch, close or speak more than the newer one would. Any other new
 /// optional field needs no bump: this build reads past it (#1505, Jarvis on
 /// #1512).
-const SCHEMA: u32 = 1;
+///
+/// 2: a target's engine may be `devin` (#1854). Only a state that holds a
+/// Devin task is written as 2 ([`State::schema_needed`]): one with only
+/// other engines' work stays 1, so a build before Devin still reads it after
+/// a rollback, and the person's hand-overs stay (the first builder on #1872).
+///
+/// 3: a target's engine may be `devin-cloud`, whose agents have Harness's
+/// `cloud_…` ids (#1854, openharness#1444). Only a state holding a Devin
+/// Cloud task is written as 3, by the same rule.
+const SCHEMA: u32 = 3;
+/// The oldest `schema` this build reads and writes: a state with no Devin
+/// task.
+const OLDEST_SCHEMA: u32 = 1;
 
 pub trait Persistence {
     fn load(&self) -> io::Result<Option<Vec<u8>>>;
@@ -332,11 +344,76 @@ struct State {
     next_observation_id: u64,
     next_claim_id: u64,
     saved_at: Audit,
+    /// The tasks this build reads. One it can't (a newer build's value or
+    /// field, written without a `schema` bump) is in [`State::unread`].
+    #[serde(deserialize_with = "readable_tasks")]
     tasks: Vec<Task>,
+    /// Tasks in the store this build can't read, as their own JSON text and
+    /// id: never run, watched, told or closed here, and written back as they
+    /// are, so the build that wrote them still finds them (#1680).
+    #[serde(skip)]
+    unread: Vec<Unread>,
     /// Read on its own ([`receipt_or_none`]): one this build cannot read is
     /// dropped, never refused.
     #[serde(default, deserialize_with = "receipt_or_none")]
     last_receipt: Option<Receipt>,
+}
+
+/// A stored task this build can't read: its JSON text as stored, and its
+/// `id` when that alone reads, to keep the tasks in order.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Unread {
+    id: Option<u64>,
+    json: String,
+}
+
+/// The stored tasks this build reads; the others are found again by
+/// [`read_state`], as [`State::unread`].
+fn readable_tasks<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<Task>, D::Error> {
+    let raw = Vec::<Box<serde_json::value::RawValue>>::deserialize(deserializer)?;
+    Ok(raw
+        .iter()
+        .filter_map(|task| serde_json::from_str::<Task>(task.get()).ok())
+        .collect())
+}
+
+/// The state as stored: its tasks, read or not, in `id` order, each unread
+/// one as its own text, byte for byte.
+fn encode(state: &State) -> Result<Vec<u8>, Error> {
+    if state.unread.is_empty() {
+        return serde_json::to_vec(state).map_err(|_| storage());
+    }
+    #[derive(Serialize)]
+    #[serde(untagged)]
+    enum Slot<'a> {
+        Read(&'a Task),
+        Unread(Box<serde_json::value::RawValue>),
+    }
+    #[derive(Serialize)]
+    struct Out<'a> {
+        #[serde(flatten)]
+        rest: serde_json::Map<String, Value>,
+        tasks: Vec<Slot<'a>>,
+    }
+    let Value::Object(mut rest) = serde_json::to_value(state).map_err(|_| storage())? else {
+        return Err(storage());
+    };
+    rest.remove("tasks");
+    let mut slots: Vec<(u64, Slot)> = state
+        .tasks
+        .iter()
+        .map(|task| (task.id, Slot::Read(task)))
+        .collect();
+    for unread in &state.unread {
+        let raw =
+            serde_json::value::RawValue::from_string(unread.json.clone()).map_err(|_| storage())?;
+        slots.push((unread.id.unwrap_or(u64::MAX), Slot::Unread(raw)));
+    }
+    slots.sort_by_key(|(id, _)| *id);
+    let tasks = slots.into_iter().map(|(_, slot)| slot).collect();
+    serde_json::to_vec(&Out { rest, tasks }).map_err(|_| storage())
 }
 
 /// What a stored state is to this build.
@@ -380,7 +457,32 @@ fn read_state(bytes: &[u8]) -> Result<Stored, Error> {
     // The state from the bytes themselves, never through a `Value`, which
     // would keep the last of two duplicate keys where the bytes are refused
     // (my #1512; Second's #1562 reads its store this way).
-    let state: State = serde_json::from_slice(bytes).map_err(|_| storage())?;
+    let mut state: State = serde_json::from_slice(bytes).map_err(|_| storage())?;
+    // A task this build can't read (a newer build's value or field with no
+    // `schema` bump) never stops the part: it is passed over with a line and
+    // kept in the store as it is (#1680). Only its `id` reaches the journal.
+    #[derive(Deserialize)]
+    struct Rows<'a> {
+        #[serde(borrow)]
+        tasks: Vec<&'a serde_json::value::RawValue>,
+    }
+    let Rows { tasks } = serde_json::from_slice(bytes).map_err(|_| storage())?;
+    for task in tasks {
+        if serde_json::from_str::<Task>(task.get()).is_ok() {
+            continue;
+        }
+        let id = serde_json::from_str::<Value>(task.get())
+            .ok()
+            .and_then(|task| task["id"].as_u64());
+        eprintln!(
+            "tasks: stored task {} is not one this build reads; it is kept in the store as it is, for the build that wrote it, and this build leaves it alone",
+            id.map_or("without an id".to_owned(), |id| id.to_string())
+        );
+        state.unread.push(Unread {
+            id,
+            json: task.get().to_owned(),
+        });
+    }
     Ok(Stored::State(Box::new(state)))
 }
 
@@ -436,14 +538,7 @@ fn code(value: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 fn agent_id(value: &str) -> bool {
-    value.len() == 36
-        && value.bytes().enumerate().all(|(i, b)| {
-            if [8, 13, 18, 23].contains(&i) {
-                b == b'-'
-            } else {
-                b.is_ascii_digit() || (b'a'..=b'f').contains(&b)
-            }
-        })
+    crate::harness::agent_id(value)
 }
 fn creation_id(value: &str) -> bool {
     (16..=96).contains(&value.len())
@@ -565,12 +660,29 @@ fn task_label(store_id: &str, id: u64) -> String {
 }
 
 impl State {
+    /// The `schema` this state is written with: the lowest that reads every
+    /// task in it: 3 with a Devin Cloud task, 2 with a Devin one, else
+    /// [`OLDEST_SCHEMA`].
+    fn schema_needed(&self) -> u32 {
+        self.tasks
+            .iter()
+            .map(|task| match task.launch.target.engine {
+                EngineKind::DevinCloud => 3,
+                EngineKind::Devin => 2,
+                _ => OLDEST_SCHEMA,
+            })
+            .max()
+            .unwrap_or(OLDEST_SCHEMA)
+    }
+    /// A state read may carry a `schema` above the one it needs (its Devin
+    /// tasks since dropped), never one below: a schema-1 state naming Devin
+    /// is refused.
     fn check(&self) -> Result<(), Error> {
         let fail = storage;
-        if self.schema != SCHEMA
+        if !(self.schema_needed()..=SCHEMA).contains(&self.schema)
             || !hex(&self.store_id, 32)
             || !hex(&self.session_id, 32)
-            || self.tasks.len() > MAX_TASKS
+            || self.tasks.len() + self.unread.len() > MAX_TASKS
             || self.next_task_id == 0
             || self.next_read_id == 0
             || self.next_observation_id == 0
@@ -1012,7 +1124,7 @@ impl<P: Persistence> Engine<P> {
                 ));
             }
             State {
-                schema: SCHEMA,
+                schema: OLDEST_SCHEMA,
                 store_id: new_store_id.into(),
                 session_id: session_id.into(),
                 revision: 0,
@@ -1027,6 +1139,7 @@ impl<P: Persistence> Engine<P> {
                     revision: 0,
                 },
                 tasks: Vec::new(),
+                unread: Vec::new(),
                 last_receipt: None,
             }
         };
@@ -1108,8 +1221,9 @@ impl<P: Persistence> Engine<P> {
                 }
             }
         }
+        state.schema = state.schema_needed();
         state.check()?;
-        let bytes = serde_json::to_vec(&state).map_err(|_| storage())?;
+        let bytes = encode(&state)?;
         if bytes.len() > MAX_STATE_BYTES {
             return Err(storage());
         }
@@ -1206,9 +1320,10 @@ impl<P: Persistence> Engine<P> {
         self.last_clock = now.clone();
         Ok(())
     }
-    fn save(&mut self, next: State) -> Result<(), Error> {
+    fn save(&mut self, mut next: State) -> Result<(), Error> {
+        next.schema = next.schema_needed();
         next.check()?;
-        let bytes = serde_json::to_vec(&next).map_err(|_| storage())?;
+        let bytes = encode(&next)?;
         if bytes.len() > MAX_STATE_BYTES {
             return Err(exhausted());
         }
@@ -1264,7 +1379,7 @@ impl<P: Persistence> Engine<P> {
                 .count()
         };
         json!({"store_id":self.store_id(),"revision":self.revision(),"session_id":self.session_id(),"failed":self.failed,
-            "retained":self.state.tasks.len(),"prepared":count(DispatchState::Prepared),"queued":count(DispatchState::Queued),
+            "retained":self.state.tasks.len(),"unread":self.state.unread.len(),"prepared":count(DispatchState::Prepared),"queued":count(DispatchState::Queued),
             "attempting":count(DispatchState::Attempting),"accepted":count(DispatchState::Accepted),"pending":count(DispatchState::Pending),
             "uncertain":count(DispatchState::Uncertain),"observations":self.state.tasks.iter().map(|t|t.observations.len()).sum::<usize>(),
             "speech_claimed":speech(SpeechState::Claimed),"speech_spoken":speech(SpeechState::Spoken),"speech_uncertain":speech(SpeechState::Uncertain),"completion":"unverified",
@@ -1353,6 +1468,17 @@ impl<P: Persistence> Engine<P> {
                     "Progress is not read; the service runs without --progress.",
                 ));
             }
+            // The sign-in, too, is held by the service, and only with
+            // `--sign-in-by-code` (#1676).
+            Request::SignInStart {}
+            | Request::SignInState {}
+            | Request::SignInAsked { .. }
+            | Request::SignInAnswer { .. } => {
+                return Err(err(
+                    "sign_in_off",
+                    "Signing in by a spoken code is off; the service runs without --sign-in-by-code.",
+                ));
+            }
             _ => None,
         };
         if let Some(body) = read {
@@ -1418,7 +1544,8 @@ impl<P: Persistence> Engine<P> {
                 }
                 // Full: the oldest task that is over gives way. Only when
                 // every task kept is still going is a new one refused.
-                if next.tasks.len() >= MAX_TASKS {
+                // Tasks this build can't read count too: they stay.
+                if next.tasks.len() + next.unread.len() >= MAX_TASKS {
                     let oldest = next.tasks.iter().position(spent).ok_or_else(exhausted)?;
                     next.tasks.remove(oldest);
                 }
@@ -1904,10 +2031,7 @@ impl<P: Persistence> Engine<P> {
                 }
                 Some(Settled {
                     task_id: task.id,
-                    engine: serde_json::to_value(task.launch.target.engine)
-                        .ok()?
-                        .as_str()?
-                        .to_owned(),
+                    engine: task.launch.target.engine.bus_name(),
                     state: newest.data.state.clone(),
                     ago_ms,
                 })
@@ -1928,10 +2052,7 @@ impl<P: Persistence> Engine<P> {
                     machine_id: task.launch.target.machine_id.clone(),
                     agent_id: task.dispatch.agent_id.clone()?,
                     // As the target file names it; the same words as `new`.
-                    engine: serde_json::to_value(task.launch.target.engine)
-                        .ok()?
-                        .as_str()?
-                        .to_owned(),
+                    engine: task.launch.target.engine.bus_name(),
                     accepted_ago_ms: age,
                 })
             })
@@ -2406,7 +2527,7 @@ fn receipt_body(state: &State, request: &Request) -> Result<Value, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{harness::EngineKind, protocol::Guard};
+    use crate::protocol::Guard;
     use std::{cell::RefCell, rc::Rc};
 
     const STORE: &str = "11111111111111111111111111111111";
@@ -3844,7 +3965,9 @@ mod tests {
         // A task's target, its launch and an observation's data stay strict:
         // the target is the targets file's type too, and the launch and the
         // data are under digests (the person's yes, and what was seen), so a
-        // field added to them needs a `schema` bump (Jarvis on #1512).
+        // field added to them needs a `schema` bump (Jarvis on #1512). One
+        // added without a bump leaves that task unread and kept, and the
+        // store opens (#1680).
         for path in [
             "/tasks/0/launch/target",
             "/tasks/0/launch",
@@ -3854,14 +3977,10 @@ mod tests {
             strict.pointer_mut(path).unwrap()["later_field"] = json!(1);
             let memory = Memory::default();
             memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&strict).unwrap());
-            assert_eq!(
-                Engine::open(memory, targets(), STORE, RESTART, &clock(1))
-                    .err()
-                    .unwrap()
-                    .code,
-                "storage",
-                "{path}"
-            );
+            let engine = Engine::open(memory.clone(), targets(), STORE, RESTART, &clock(1))
+                .unwrap_or_else(|error| panic!("{path}: {error}"));
+            assert!(engine.state.tasks.is_empty(), "{path}");
+            assert_eq!(written(&memory)["tasks"][0], strict["tasks"][0], "{path}");
         }
         let memory = Memory::default();
         memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&next).unwrap());
@@ -3963,7 +4082,7 @@ mod tests {
         assert!(engine.summary()["set_aside"].is_null());
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(2);
+        newer["schema"] = json!(4);
         let memory = Memory::default();
         memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&newer).unwrap());
         let engine = Engine::open(
@@ -3975,7 +4094,7 @@ mod tests {
         )
         .unwrap();
         let kept = engine.summary()["set_aside"].as_str().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-2-"), "{kept}");
+        assert!(kept.starts_with("tasks.sqlite3.newer-4-"), "{kept}");
         drop(engine);
         let mut engine = Engine::open(
             memory.clone(),
@@ -4096,10 +4215,20 @@ mod tests {
         let (mut engine, memory) = opened();
         accepted(&mut engine, 0);
         let text = String::from_utf8(memory.0.borrow().bytes.clone().unwrap()).unwrap();
+        // A task with a field twice is not read either: it is kept as it is,
+        // unread, and the store opens (#1680).
+        let task = text.replacen("\"tasks\":[{", "\"tasks\":[{\"id\":9,", 1);
+        assert_ne!(task, text);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(task.into_bytes());
+        let engine = Engine::open(memory.clone(), targets(), STORE, RESTART, &clock(1))
+            .expect("the store opens without the task");
+        assert!(engine.state.tasks.is_empty());
+        let saved = String::from_utf8(memory.0.borrow().bytes.clone().unwrap()).unwrap();
+        assert!(saved.contains("\"tasks\":[{\"id\":9,\"id\":"), "{saved}");
         for doubled in [
             text.replacen('{', "{\"next_task_id\":1,", 1),
             text.replacen('{', "{\"schema\":1,", 1),
-            text.replacen("\"tasks\":[{", "\"tasks\":[{\"id\":9,", 1),
         ] {
             assert_ne!(doubled, text);
             let memory = Memory::default();
@@ -4155,6 +4284,96 @@ mod tests {
         assert_eq!(receipt_op(&json!({})), "unknown");
     }
 
+    fn written(memory: &Memory) -> Value {
+        serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap()
+    }
+
+    /// #1854, the first builder on #1872: a store with no Devin task stays
+    /// schema 1, so a rollback to a build before Devin keeps the person's
+    /// hand-overs; one written as 2 whose Devin work is gone goes back to 1.
+    #[test]
+    fn a_store_with_no_devin_task_is_written_as_schema_one() {
+        let (mut engine, memory) = opened();
+        accepted(&mut engine, 0);
+        assert_eq!(written(&memory)["schema"], 1);
+        let mut later = written(&memory);
+        later["schema"] = json!(2);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&later).unwrap());
+        let mut engine = Engine::open(memory.clone(), targets(), STORE, RESTART, &clock(1))
+            .expect("a schema-2 store opens");
+        assert!(engine.set_aside().is_none());
+        assert_eq!(engine.state.tasks.len(), 1);
+        assert_eq!(written(&memory)["schema"], 1);
+        prepare(&mut engine, 2);
+        assert_eq!(written(&memory)["schema"], 1);
+    }
+
+    /// #1854: a store that holds a Devin task is written as 2, which a build
+    /// before Devin sets aside; one that names Devin under schema 1 is
+    /// refused, never read.
+    #[test]
+    fn a_store_with_a_devin_task_is_written_as_schema_two() {
+        let devin = || {
+            let mut staff = targets();
+            staff.get_mut("desk").unwrap().engine = EngineKind::Devin;
+            staff
+        };
+        let memory = Memory::default();
+        let mut engine = Engine::open(memory.clone(), devin(), STORE, SESSION, &clock(0)).unwrap();
+        assert_eq!(written(&memory)["schema"], 1);
+        prepare(&mut engine, 0);
+        let stored = written(&memory);
+        assert_eq!(stored["schema"], 2);
+        assert_eq!(stored["tasks"][0]["launch"]["target"]["engine"], "devin");
+        drop(engine);
+        let engine = Engine::open(memory.clone(), devin(), STORE, RESTART, &clock(1))
+            .expect("a schema-2 store opens");
+        assert_eq!(engine.state.tasks.len(), 1);
+        assert_eq!(written(&memory)["schema"], 2);
+        drop(engine);
+        let mut wrong = written(&memory);
+        wrong["schema"] = json!(1);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&wrong).unwrap());
+        assert!(Engine::open(memory, devin(), STORE, RESTART, &clock(2)).is_err());
+    }
+
+    /// #1854: a store that holds a Devin Cloud task is written as 3, which a
+    /// build before it sets aside; its `cloud_` agent id is kept and read
+    /// back; one that names Devin Cloud under schema 2 is refused.
+    #[test]
+    fn a_store_with_a_devin_cloud_task_is_written_as_schema_three() {
+        let cloud = || {
+            let mut staff = targets();
+            let desk = staff.get_mut("desk").unwrap();
+            desk.engine = EngineKind::DevinCloud;
+            desk.project = String::new();
+            staff
+        };
+        let memory = Memory::default();
+        let mut engine = Engine::open(memory.clone(), cloud(), STORE, SESSION, &clock(0)).unwrap();
+        assert_eq!(written(&memory)["schema"], 1);
+        prepare(&mut engine, 0);
+        let stored = written(&memory);
+        assert_eq!(stored["schema"], 3);
+        assert_eq!(
+            stored["tasks"][0]["launch"]["target"]["engine"],
+            "devin-cloud"
+        );
+        assert_eq!(stored["tasks"][0]["launch"]["target"]["project"], "");
+        drop(engine);
+        let engine = Engine::open(memory.clone(), cloud(), STORE, RESTART, &clock(1))
+            .expect("a schema-3 store opens");
+        assert_eq!(engine.state.tasks.len(), 1);
+        drop(engine);
+        let mut wrong = written(&memory);
+        wrong["schema"] = json!(2);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&wrong).unwrap());
+        assert!(Engine::open(memory, cloud(), STORE, RESTART, &clock(2)).is_err());
+    }
+
     /// A store from a newer `schema` is set aside whole and this build
     /// starts with an empty one, never destroying it (#1505).
     #[test]
@@ -4163,7 +4382,7 @@ mod tests {
         accepted(&mut engine, 0);
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(2);
+        newer["schema"] = json!(4);
         newer["tasks"][0]["dispatch"]["state"] = json!("a_state_from_later");
         let bytes = serde_json::to_vec(&newer).unwrap();
         let memory = Memory::default();
@@ -4177,7 +4396,7 @@ mod tests {
         )
         .expect("a newer store is set aside, not refused");
         let kept = engine.set_aside().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-2-"), "{kept}");
+        assert!(kept.starts_with("tasks.sqlite3.newer-4-"), "{kept}");
         assert_eq!(
             memory.0.borrow().kept,
             [(kept, bytes)],
@@ -4185,7 +4404,7 @@ mod tests {
         );
         assert!(engine.state.tasks.is_empty());
         assert_eq!(engine.store_id(), "f".repeat(32), "a new store, its own id");
-        assert_eq!(engine.state.schema, SCHEMA);
+        assert_eq!(engine.state.schema, OLDEST_SCHEMA);
     }
 
     /// Requests stay strict: a request this build has no `op` for is
@@ -4855,5 +5074,171 @@ mod tests {
             .finish_observation(&job, data("Lumi, Sunny and Archie."), &clock(40))
             .unwrap();
         assert!(engine.watched(&clock(50)).is_empty());
+    }
+    /// #1680: a stored task with a value this build doesn't know, written
+    /// with no `schema` bump, never stops the part. It is passed over with a
+    /// line, kept in the store as it is (this one is at work on a computer)
+    /// and counted; the part serves; and the build that wrote it finds it
+    /// again, whole.
+    #[test]
+    fn a_task_this_build_cannot_read_is_kept_as_it_is_and_the_part_serves() {
+        let (mut engine, memory) = opened();
+        let at_work = accepted(&mut engine, 0);
+        let other = prepare(&mut engine, 0);
+        drop(engine);
+        let mut later = written(&memory);
+        later["tasks"][0]["dispatch"]["state"] = json!("a_state_from_later");
+        let unread = later["tasks"][0].clone();
+        assert_eq!(unread["id"], at_work);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&later).unwrap());
+        let mut engine = Engine::open(memory.clone(), targets(), STORE, RESTART, &clock(1))
+            .expect("a task this build can't read does not stop the part");
+        assert!(engine.set_aside().is_none(), "nothing is set aside");
+        assert_eq!(engine.state.tasks.len(), 1);
+        assert_eq!(engine.state.tasks[0].id, other);
+        assert_eq!(engine.summary()["unread"], 1);
+        assert_eq!(written(&memory)["tasks"][0], unread, "kept as it is");
+        // It serves: a new hand-over is prepared and saved, the unread task
+        // with it, in order.
+        let new = prepare(&mut engine, 2);
+        let saved = written(&memory);
+        let tasks = saved["tasks"].as_array().unwrap();
+        assert_eq!(tasks.len(), 3);
+        assert_eq!(tasks[0], unread);
+        assert_eq!(tasks[1]["id"], other);
+        assert_eq!(tasks[2]["id"], new);
+        drop(engine);
+        // The build that wrote it, which knows the value, reads it again.
+        let mut back = saved;
+        back["tasks"][0]["dispatch"]["state"] = json!("accepted");
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&back).unwrap());
+        let engine = Engine::open(
+            memory,
+            targets(),
+            STORE,
+            "44444444444444444444444444444444",
+            &clock(3),
+        )
+        .expect("the newer build reads its task again");
+        assert_eq!(engine.state.tasks.len(), 3);
+        assert_eq!(engine.state.tasks[0].id, at_work);
+        assert_eq!(dispatch(&engine, at_work), DispatchState::Accepted);
+        assert_eq!(
+            engine.state.tasks[0].dispatch.agent_id.as_deref(),
+            Some(AGENT)
+        );
+    }
+
+    /// Every value a stored enum can hold, by `schema`. A new one can't be
+    /// read by the build before it, so it raises [`SCHEMA`] (and
+    /// [`State::schema_needed`]) and this line is written again: the
+    /// `match`es below stop compiling on a new variant, and the line pins
+    /// the vocabulary to the schema (#1680).
+    #[test]
+    fn a_new_stored_value_comes_with_a_schema_bump() {
+        use DispatchState as D;
+        use ReadState as R;
+        use SpeechState as S;
+        fn names<T: Serialize>(kind: &str, all: &[T]) -> String {
+            let all: Vec<_> = all
+                .iter()
+                .map(|value| {
+                    serde_json::to_value(value)
+                        .unwrap()
+                        .as_str()
+                        .unwrap()
+                        .to_owned()
+                })
+                .collect();
+            format!("{kind}: {}", all.join(" "))
+        }
+        let dispatch = [
+            D::Prepared,
+            D::Queued,
+            D::Attempting,
+            D::Accepted,
+            D::Pending,
+            D::NotSent,
+            D::Uncertain,
+            D::Cancelled,
+            D::Invalidated,
+        ];
+        for value in dispatch {
+            match value {
+                D::Prepared
+                | D::Queued
+                | D::Attempting
+                | D::Accepted
+                | D::Pending
+                | D::NotSent
+                | D::Uncertain
+                | D::Cancelled
+                | D::Invalidated => {}
+            }
+        }
+        let read = [R::Requested, R::Attempting, R::Finished, R::Failed];
+        for value in read {
+            match value {
+                R::Requested | R::Attempting | R::Finished | R::Failed => {}
+            }
+        }
+        let speech = [S::Claimed, S::Spoken, S::Uncertain];
+        for value in speech {
+            match value {
+                S::Claimed | S::Spoken | S::Uncertain => {}
+            }
+        }
+        let close = [
+            CloseState::Attempting,
+            CloseState::Closed,
+            CloseState::Refused,
+            CloseState::Left,
+            CloseState::Failed,
+        ];
+        for value in close {
+            match value {
+                CloseState::Attempting
+                | CloseState::Closed
+                | CloseState::Refused
+                | CloseState::Left
+                | CloseState::Failed => {}
+            }
+        }
+        let engine = [
+            EngineKind::Codex,
+            EngineKind::Claude,
+            EngineKind::Opencode,
+            EngineKind::Devin,
+            EngineKind::DevinCloud,
+        ];
+        for value in engine {
+            match value {
+                EngineKind::Codex
+                | EngineKind::Claude
+                | EngineKind::Opencode
+                | EngineKind::Devin
+                | EngineKind::DevinCloud => {}
+            }
+        }
+        let vocabulary = [
+            names("dispatch", &dispatch),
+            names("read", &read),
+            names("speech", &speech),
+            names("close", &close),
+            names("engine", &engine),
+        ]
+        .join("; ");
+        assert_eq!(
+            (SCHEMA, vocabulary.as_str()),
+            (
+                3,
+                "dispatch: prepared queued attempting accepted pending not_sent uncertain cancelled invalidated; \
+                 read: requested attempting finished failed; speech: claimed spoken uncertain; \
+                 close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud"
+            ),
+            "a new stored value needs a `schema` bump (see SCHEMA): raise it, then write this line again"
+        );
     }
 }

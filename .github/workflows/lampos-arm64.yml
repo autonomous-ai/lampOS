@@ -20,10 +20,18 @@ name: lampOS on ARM64
 # workflow on lamp-voice with `full`. A failed full run opens an issue. See
 # lampOS/docs/realtime-tests.md.
 #
-#            | runners | profile   | tests at once | realtime
-# pull req.  | 1       | `pr`      | one per core  | skipped
-# lamp-voice | 1       | `pr`      | one per core  | skipped (binaries for updates.md)
-# full       | 4       | `default` | one           | run
+#            | runners | profile   | tests at once | realtime | crates tested
+# pull req.  | 1       | `pr`      | one per core  | skipped  | its own, their users, three readers (below)
+# lamp-voice | 1       | `pr`      | one per core  | skipped  | all (binaries for updates.md)
+# full       | 4       | `default` | one           | run      | all
+#
+# A pull request tests only the crates its diff changes, every crate that
+# depends on them, and lamp-cloud, lamp-voice-eval and lamp-update, whose
+# tests read other crates' files (the project lead's proposal, 19 Oct 2026,
+# #1711; .github/scripts/lampos-pr-crates.py). Cargo.lock, any Cargo.toml,
+# crates/msgs, bus and ipc, deploy/, skills/, the docs tests read, .config/,
+# the script, this workflow and any other path run every crate. Every binary
+# is still built, and the run's summary says what was tested and why.
 #
 # Without the realtime group the tests take about 4 minutes of test time,
 # mostly quick unit tests, so one runner runs them as many at once as it has
@@ -38,11 +46,12 @@ name: lampOS on ARM64
 on:
   push:
     branches: ['lamp-voice']
-    paths: ['lampOS/**', '.github/workflows/lampos-arm64.yml']
+    paths: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/scripts/lampos-pr-crates.py']
   # A pull request that changes only docs a build never reads skips this run (the
   # project lead, 19 Oct 2026, #1711): the docs' and the role files' Markdown. The
   # docs that code or tests read are named again below, so a change to one still
-  # runs. Find them with `git grep -o 'docs/[a-z0-9_-]*\.md' lampOS/crates`. A
+  # runs. lampOS/crates/update/tests/ci_paths.rs fails when a crate reads one that
+  # isn't (#1791's guard). A
   # skill's SKILL.md is part of the skill, so lampOS/skills/** always runs. The
   # push to lamp-voice keeps every run: its artifact is what lamps install.
   # Such a PR merges without ARM64 once the reviewer has read it
@@ -63,6 +72,7 @@ on:
       - 'lampOS/docs/memory.md'
       - 'lampOS/docs/switches.md'
       - '.github/workflows/lampos-arm64.yml'
+      - '.github/scripts/lampos-pr-crates.py'
   workflow_dispatch:
     inputs:
       full:
@@ -94,6 +104,9 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file
       - uses: actions/checkout@v4
+        with:
+          # A pull request's merge commit and its first parent (lamp-voice), for the crates it changes.
+          fetch-depth: 2
       - name: Rust 1.96.0
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
@@ -112,6 +125,10 @@ jobs:
       - name: build (release, the lamps' binaries)
         working-directory: lampOS
         run: cargo build --locked --release --workspace --bins --examples
+      - name: which crates a pull request tests
+        id: scope
+        if: github.event_name == 'pull_request'
+        run: python3 -I .github/scripts/lampos-pr-crates.py
       - name: test (full run, every test one at a time; otherwise without the realtime group, in parallel)
         working-directory: lampOS
         # The two tests with their own harness (harness = false) cannot be listed by nextest; the first runner runs them below.
@@ -119,7 +136,7 @@ jobs:
         # A full run uses `default`: every test, one at a time.
         run: >-
           echo "cores: $(nproc)" &&
-          cargo nextest run --locked --release --workspace
+          cargo nextest run --locked --release ${{ steps.scope.outputs.args || '--workspace' }}
           --profile ${{ inputs.full && 'default' || 'pr' }}
           --no-tests=pass -j ${{ inputs.full && '1' || 'num-cpus' }}
           --partition hash:${{ matrix.shard }}/${{ strategy.job-total }}

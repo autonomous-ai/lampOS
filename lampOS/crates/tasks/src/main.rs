@@ -59,6 +59,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut push_wait = false;
     let mut close_told = false;
     let mut set_up_later = false;
+    let mut sign_in_by_code = false;
     let mut from_machines = None;
     let mut seen = std::collections::BTreeSet::new();
     while let Some(arg) = args.next() {
@@ -74,6 +75,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--push-wait" => push_wait = true,
             "--close-told" => close_told = true,
             "--set-up-later" => set_up_later = true,
+            "--sign-in-by-code" => sign_in_by_code = true,
             "--targets-from-machines" => {
                 let engine = args
                     .next()
@@ -167,6 +169,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             every: SET_UP_LOOK_EVERY,
             from_machines,
         }),
+        sign_in_by_code,
         report_every: REPORT_EVERY,
     };
     let clock = SystemClock::new(boot_id.as_deref())?;

@@ -54,13 +54,27 @@ const USAGE: &str = "usage:
   lamp-voice-eval export --since HH:MM:SS --until HH:MM:SS --out NEW_DIR [--sessions DIR]
       [--journal JOURNAL_JSON] [--bus LAMP_BUS_RECORD]... [--date YYYY-MM-DD] [--zone system|ZONE]
       [--wall-offset-us N]
+  lamp-voice-eval waiting-cuts [--since 'YYYY-MM-DD HH:MM[:SS]'] [--until ...] [--sessions DIR] [--json]
+      < journal (`journalctl -u lamp-voice -o short-iso`); --since/--until filter its own stamps;
+      the counts need the session records too (DIR, default /var/lib/lampOS/voice/sessions, root's)
   lamp-voice-eval cost JOURNAL --prices FILE --arm NAME FROM TO... [--voice-estimate VOICE N]
       (what each arm of a played test cost, from `journalctl -u lamp-voice`; FROM and TO are
       HH:MM or HH:MM:SS by the lamp's clock; the prices are dollars, in a JSON file;
       --voice-estimate prices answered lines with no voice line at N chars a completion token)
   lamp-voice-eval lamp-session --runtime LAMP_LIVE --work NEW_ABS_DIR --seconds N
       (--fixture-reply WAV --fixture-sha256 SHA | --provider-config FILE | --serve-config FILE)
-      [--noise-suppression on|off] [--diagnostics] [--allowance-seconds N]";
+      [--noise-suppression on|off] [--diagnostics] [--allowance-seconds N]
+  lamp-voice-eval endpoint SESSION [--since-us N]
+      (whether the voice's end of speech worked: its worker's states and each end of speech's
+      basis, from the session's records under SESSION; fails when the worker isn't ready or an
+      end of speech fell back because it failed; N is the arm's start on the voice's clock)
+  lamp-voice-eval score JOURNAL --arm NAME FROM TO [--arm NAME FROM TO]...
+      [--scenes DIR --date YYYY-MM-DD --utc-offset +HH:MM]
+      (JOURNAL is `journalctl -u lamp-voice` text of the run alone; FROM and TO are
+      HH:MM or HH:MM:SS by the lamp's clock; DIR holds the played test's scene files
+      and battery summaries; YYYY-MM-DD is the day the first arm begins)
+  lamp-voice-eval mood-minute DIR
+      the numbers of Mood's lamp minute from the taps tools/mood-minute.sh wrote in DIR";
 
 /// `cost JOURNAL --prices FILE --arm NAME FROM TO ... [--voice-estimate
 /// VOICE N]`: what each arm cost, printed (the first builder on #1722, 19
@@ -247,6 +261,161 @@ fn assets(args: &mut Args, catalog: &StimulusCatalog) -> Result<Option<AssetInde
     }
 }
 
+/// `+HH:MM` or `-HH:MM` as seconds east of UTC.
+fn utc_offset(value: &str) -> Option<i32> {
+    let (sign, rest) = match value.as_bytes().first()? {
+        b'+' => (1, &value[1..]),
+        b'-' => (-1, &value[1..]),
+        _ => return None,
+    };
+    let (hours, minutes) = rest.split_once(':')?;
+    let hours: i32 = hours.parse().ok().filter(|h| (0..=14).contains(h))?;
+    let minutes: i32 = minutes.parse().ok().filter(|m| (0..60).contains(m))?;
+    Some(sign * (hours * 3600 + minutes * 60))
+}
+
+/// An I/O error naming the path it was about (Jarvis on #1899).
+fn named(path: &Path) -> impl FnOnce(std::io::Error) -> Box<dyn std::error::Error + Send + Sync> {
+    let path = path.display().to_string();
+    move |error| invalid(&format!("{path}: {error}"))
+}
+
+/// `endpoint SESSION [--since-us N]`: the session's end of speech, printed;
+/// 1 when it didn't work (the first builder on #1722, 20 Oct 07:20).
+fn endpoint(all: &[String]) -> Result<i32> {
+    let (session, rest) = all.split_first().ok_or_else(|| invalid(USAGE))?;
+    let since_us = match rest {
+        [] => 0,
+        [flag, value] if flag == "--since-us" => value
+            .parse::<u64>()
+            .map_err(|_| invalid("--since-us is a whole number of microseconds"))?,
+        _ => return Err(invalid(USAGE)),
+    };
+    let mut files = Vec::new();
+    session_records(Path::new(session), &mut files)?;
+    if files.is_empty() {
+        return Err(invalid(&format!("{session}: no events-*.jsonl under it")));
+    }
+    let mut lines = String::new();
+    for file in &files {
+        lines.push_str(&String::from_utf8_lossy(
+            &fs::read(file).map_err(named(file))?,
+        ));
+        lines.push('\n');
+    }
+    let summary = lamp_voice_eval::endpoint::summarize(lines.lines(), since_us);
+    print!("{summary}");
+    Ok(if summary.faults().is_empty() { 0 } else { 1 })
+}
+
+/// Every `events-*.jsonl` under `dir`, at any depth. A link is not followed,
+/// so a link to a folder above can't send it round for ever (the reviewer on
+/// #2097).
+fn session_records(dir: &Path, found: &mut Vec<PathBuf>) -> Result<()> {
+    for entry in fs::read_dir(dir).map_err(named(dir))? {
+        let entry = entry.map_err(named(dir))?;
+        let path = entry.path();
+        if entry.file_type().map_err(named(&path))?.is_dir() {
+            session_records(&path, found)?;
+        } else if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("events-") && name.ends_with(".jsonl"))
+        {
+            found.push(path);
+        }
+    }
+    Ok(())
+}
+
+/// `score JOURNAL --arm NAME FROM TO ...`: the routes' table, printed.
+fn score(all: &[String]) -> Result<i32> {
+    let (journal, rest) = all.split_first().ok_or_else(|| invalid(USAGE))?;
+    let mut arms = Vec::new();
+    let mut scenes = None;
+    let mut offset = None;
+    let mut day = None;
+    let mut rest = rest;
+    loop {
+        match rest {
+            [flag, name, from, to, more @ ..] if flag == "--arm" => {
+                arms.push(
+                    lamp_voice_eval::score::Arm::parse(name, from, to)
+                        .map_err(|why| invalid(&why))?,
+                );
+                rest = more;
+            }
+            [flag, dir, more @ ..] if flag == "--scenes" => {
+                scenes = Some(PathBuf::from(dir));
+                rest = more;
+            }
+            [flag, value, more @ ..] if flag == "--date" => {
+                day = Some(
+                    lamp_voice_eval::score::day(value)
+                        .ok_or_else(|| invalid("--date is YYYY-MM-DD"))?,
+                );
+                rest = more;
+            }
+            [flag, value, more @ ..] if flag == "--utc-offset" => {
+                offset = Some(
+                    utc_offset(value).ok_or_else(|| invalid("--utc-offset is +HH:MM or -HH:MM"))?,
+                );
+                rest = more;
+            }
+            [] => break,
+            _ => return Err(invalid(USAGE)),
+        }
+    }
+    if arms.is_empty() {
+        return Err(invalid(USAGE));
+    }
+    // Every scene folder holds earlier days' files (Jarvis on #1899).
+    if scenes.is_some() && day.is_none() {
+        return Err(invalid(
+            "--scenes needs --date YYYY-MM-DD, the day the first arm begins by the lamp's clock",
+        ));
+    }
+    // A scene's start is UTC and a battery's day is its file's: with no
+    // offset both fall on the wrong day, and none in an arm.
+    if scenes.is_some() && offset.is_none() {
+        return Err(invalid(
+            "--scenes needs --utc-offset +HH:MM, the lamp's zone (+07:00 for lamp-4ace)",
+        ));
+    }
+    let offset = offset.unwrap_or(0);
+    let mut files = lamp_voice_eval::score::Files {
+        offset,
+        day,
+        ..Default::default()
+    };
+    if let Some(dir) = scenes {
+        for entry in std::fs::read_dir(&dir).map_err(named(&dir))? {
+            let path = entry.map_err(named(&dir))?.path();
+            if path.extension().is_none_or(|extension| extension != "txt") {
+                continue;
+            }
+            let text =
+                String::from_utf8_lossy(&std::fs::read(&path).map_err(named(&path))?).into_owned();
+            if text.starts_with("scenario ") {
+                files.scenes.push(text);
+            } else if text.starts_with("battery ") {
+                let written = std::fs::metadata(&path)
+                    .and_then(|metadata| metadata.modified())
+                    .ok()
+                    .and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok())
+                    .and_then(|at| i64::try_from(at.as_secs()).ok());
+                files.batteries.push((text, written));
+            }
+        }
+    }
+    let text = std::fs::read(journal).map_err(named(Path::new(journal)))?;
+    print!(
+        "{}",
+        lamp_voice_eval::score::score_with(&String::from_utf8_lossy(&text), &arms, &files)
+    );
+    Ok(0)
+}
+
 fn run() -> Result<i32> {
     let mut all: Vec<String> = std::env::args().skip(1).collect();
     if all.is_empty() {
@@ -270,10 +439,18 @@ fn run() -> Result<i32> {
         "fake-room-recorder" => return fake_lamp::room_recorder(&all),
         "fake-slow-transport" => return fake_lamp::slow_transport(&all),
         "cost" => return cost(&all),
+        "endpoint" => return endpoint(&all),
+        "score" => return score(&all),
         _ => {}
     }
     let mut args = Args { values: all };
     match command.as_str() {
+        "mood-minute" => {
+            let dir = PathBuf::from(args.positional()?);
+            args.done()?;
+            lamp_voice_eval::mood_minute::run(&dir)?;
+            return Ok(0);
+        }
         "export" => {
             let options = lamp_voice_eval::export::ExportOptions {
                 since: args.take("--since")?.ok_or_else(|| invalid(USAGE))?,
@@ -296,6 +473,37 @@ fn run() -> Result<i32> {
             args.done()?;
             let summary = lamp_voice_eval::export::export(&options)?;
             println!("{summary}");
+        }
+        "waiting-cuts" => {
+            use lamp_voice_eval::waiting_cuts;
+            let bound = |text: Option<String>| {
+                text.map(|text| {
+                    waiting_cuts::wall_bound(&text)
+                        .ok_or_else(|| invalid("--since/--until: YYYY-MM-DD HH:MM[:SS]"))
+                })
+                .transpose()
+            };
+            let since = bound(args.take("--since")?)?;
+            let until = bound(args.take("--until")?)?;
+            let sessions = args
+                .take("--sessions")?
+                .unwrap_or_else(|| waiting_cuts::SESSIONS.into());
+            let as_json = args.take_flag("--json");
+            args.done()?;
+            let mut journal = String::new();
+            std::io::Read::read_to_string(&mut std::io::stdin(), &mut journal)?;
+            let runs = waiting_cuts::count(
+                &journal,
+                &waiting_cuts::find_sessions(Path::new(&sessions)),
+                since.as_deref(),
+                until.as_deref(),
+            );
+            let report = waiting_cuts::report(&runs, &sessions);
+            if as_json {
+                println!("{report:#}");
+            } else {
+                println!("{}", waiting_cuts::table(&report));
+            }
         }
         "list" | "validate" => {
             let (catalog, plan) = load(&mut args)?;

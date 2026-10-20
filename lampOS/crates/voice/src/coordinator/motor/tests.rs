@@ -1163,6 +1163,7 @@ fn motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch() {
         provider,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         camera: None,
         motor: Some(motor),
@@ -1265,6 +1266,7 @@ fn unresolved_cleanup_removes_the_service_mute_restart_token() {
     let (dir, mut m, mut c) = ready_fixture("hang");
     wait(&mut m, &mut c, OptionalMotor::is_ready);
     let outcome: super::super::Result<()> = Err(Box::new(PhysicalMute {
+        onboarding: None,
         observed_at_us: monotonic_us(),
     }));
     m.begin_shutdown();
@@ -1597,6 +1599,7 @@ fn failed_reap_after_stopped_is_latched_and_reported_once() {
         provider,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         camera: None,
         motor: Some(motor),

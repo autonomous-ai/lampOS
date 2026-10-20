@@ -22,18 +22,20 @@ use std::{
 const USAGE: &str = "lamp-controls serve [--config FILE] [--pins FILE] [--touch] [--enable] [--bus-root PATH] [--clock-id ID] [--record FILE] [--seconds N]\n\
 lamp-controls replay --input FILE --config FILE --clock-id ID [--touch --pins FILE] [--enable] [--output FILE] [--until-us N]\n\
 lamp-controls probe --pins FILE\n\
-lamp-controls discover-head --seconds N\n\
+lamp-controls discover-head --seconds N [--rest-seconds R]\n\
 lamp-controls calibrate-touch --pins FILE --output FILE [--settle-seconds N] [--quiet-seconds N] [--swipe-seconds N] [--touch-percent P] [--release-percent P] [--record FILE | --replay FILE]\n\
 lamp-controls clock [--clock-id ID]\n\n\
 Shadow is the default. A config file cannot enable the process without --enable.\n\
 Without --pins, serve reads nothing and reports Missing. With it, the board's GPIO lines named in FILE are read.\n\
 probe reads each line of FILE once with a pull-down and once with a pull-up, and serves nothing.\n\
-discover-head samples candidates 37/96/97/98 on chip 0 for 2..60 seconds; it installs no mapping.\n\
+discover-head samples candidates 37/96/97/98 on chip 0 for 2..60 seconds; it installs no mapping. With --rest-seconds,\n\
+its first R seconds after the settle are hands away: each line's changes then are counted, and its pulses only after.\n\
 calibrate-touch runs the hardware team's MPR121 steps with a person at the lamp (hands away 10+5 s, then swipe 30 s),\n\
 sets touch at 40% and release at 20% of the way from each pad's noise to its own touch level, and writes FILE:\n\
 --pins with those thresholds, only if every working pad gave a clear swipe. It serves nothing. --record keeps the\n\
 readings; --replay works from kept readings instead of the chip.\n\
 --touch selects the new independent head/strip path and its pins schema. It configures the selected I2C chip even in shadow.\n\
+The base strip (MPR121) is off unless LAMP_CONTROLS_STRIP=on: serve keeps a pins file's base section unread and starts no strip worker; the head pads, button and reset are served as before.\n\
 Without --touch, no new reader, touch topic or gesture interpretation is selected.\n\
 Only LAMP_PRIVACY_CONTROLS=on selects an explicit privacy section in --pins; absent/off never opens chip 1.\n\
 LAMP_PRIVACY_CONTROLS=no-slide is the route on a lamp with no slide: it refuses a privacy section, opens no chip 1,\n\
@@ -53,6 +55,7 @@ struct Args {
     bus_root: Option<PathBuf>,
     clock: Option<String>,
     seconds: Option<u64>,
+    rest_seconds: Option<u64>,
     until: Option<u64>,
     pins: Option<PathBuf>,
     touch: bool,
@@ -115,7 +118,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
             ]
             .contains(&option.as_str()),
             "probe" => option == "--pins",
-            "discover-head" => option == "--seconds",
+            "discover-head" => ["--seconds", "--rest-seconds"].contains(&option.as_str()),
             "calibrate-touch" => [
                 "--pins",
                 "--output",
@@ -172,6 +175,15 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
                         .ok()
                         .filter(|n| (1..=86400).contains(n))
                         .ok_or("seconds must be 1..86400")?,
+                )
+            }
+            "--rest-seconds" => {
+                out.rest_seconds = Some(
+                    value
+                        .parse::<u64>()
+                        .ok()
+                        .filter(|n| (1..=30).contains(n))
+                        .ok_or("rest seconds must be 1..30")?,
                 )
             }
             "--settle-seconds" | "--quiet-seconds" | "--swipe-seconds" => {
@@ -238,6 +250,13 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
     {
         return Err("discover-head needs --seconds in 2..60".into());
     }
+    if out.command == "discover-head"
+        && out
+            .rest_seconds
+            .is_some_and(|rest| rest >= out.seconds.unwrap_or(0))
+    {
+        return Err("discover-head's --rest-seconds must leave time to touch".into());
+    }
     if out.command == "mpr-worker"
         && (out.profile.is_none()
             || out.sink.is_none()
@@ -256,7 +275,12 @@ fn config(args: &Args) -> Result<Config, Box<dyn std::error::Error>> {
         if bytes.len() > 16_384 {
             return Err("controls configuration exceeds 16 KiB".into());
         }
-        serde_json::from_slice(&bytes)?
+        // A newer build's fields are read past and named (#1680).
+        let (config, unread) = lamp_controls::forward::read::<Config>(path, &bytes)?;
+        if let Some(line) = unread {
+            eprintln!("lamp-controls: {line}");
+        }
+        config
     } else {
         Config {
             buttons: vec!["primary".into()],
@@ -277,7 +301,13 @@ fn pins(
     if bytes.len() > 16_384 {
         return Err("the pins file exceeds 16 KiB".into());
     }
-    let wiring: lamp_controls::pins::PinsConfig = serde_json::from_slice(&bytes)?;
+    // Strict at its top (`PinsConfig`); a pin's unknown fields are named,
+    // and serde's reason is told without its message (#1680).
+    let (wiring, unread) =
+        lamp_controls::forward::read::<lamp_controls::pins::PinsConfig>(path, &bytes)?;
+    if let Some(line) = unread {
+        eprintln!("lamp-controls: {line}");
+    }
     if wiring.privacy.is_some() && !privacy_selected() {
         return Err(unselected_privacy().into());
     }
@@ -373,7 +403,10 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     if args.command == "discover-head" {
         println!(
             "{}",
-            serde_json::to_string(&lamp_controls::head_discovery::run(args.seconds.unwrap())?)?
+            serde_json::to_string(&lamp_controls::head_discovery::run(
+                args.seconds.unwrap(),
+                args.rest_seconds.unwrap_or(0)
+            )?)?
         );
         return Ok(());
     }
@@ -617,8 +650,25 @@ fn touch_reader(
 }
 
 fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std::error::Error>> {
-    use lamp_controls::{strip_worker::Worker, touch_pins::TouchPinsConfig, touch_runtime};
+    use lamp_controls::{
+        strip_worker::Worker, touch_pins, touch_pins::TouchPinsConfig, touch_runtime,
+    };
     let wiring = TouchPinsConfig::load(args.pins.as_ref().expect("validated pins argument"))?;
+    // The base strip is off unless switched on; a replay reads what it was
+    // recorded with.
+    let (wiring, config) = if args.command == "replay" {
+        (wiring, config)
+    } else {
+        let switch = std::env::var(touch_pins::STRIP_ENV).ok();
+        let (wiring, config, set_aside) = touch_pins::serving(wiring, config, switch.as_deref());
+        if set_aside {
+            eprintln!(
+                "lamp-controls: the base strip is off: V2 doesn't use it; its pins section is kept, unread; {}=on turns it back on",
+                touch_pins::STRIP_ENV
+            );
+        }
+        (wiring, config)
+    };
     if wiring.privacy.is_some() && !privacy_selected() {
         return Err(unselected_privacy().into());
     }
@@ -763,7 +813,18 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
 /// working pad gave thresholds, and never over an existing file.
 fn calibrate_touch(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     use lamp_controls::{touch_calibrate, touch_pins::TouchPinsConfig};
-    let mut wiring = TouchPinsConfig::load(args.pins.as_ref().expect("checked when parsed"))?;
+    let (mut wiring, unread) =
+        TouchPinsConfig::read(args.pins.as_ref().expect("checked when parsed"))?;
+    // The new file is written from what this build reads: a newer build's
+    // fields are not in it, and its line says so (the reviewer on #2076).
+    if let Some(line) = &unread {
+        eprintln!("lamp-controls: {line}");
+    }
+    let dropped = if unread.is_some() {
+        "; the fields this build does not read, named above, are not in it"
+    } else {
+        ""
+    };
     let output = args.output.as_ref().expect("checked when parsed");
     if output.exists() {
         return Err(format!("{} already exists", output.display()).into());
@@ -824,7 +885,10 @@ fn calibrate_touch(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         .mode(0o644)
         .open(output)?
         .write_all(&bytes)?;
-    eprintln!("lamp-controls: calibrate-touch: wrote {}", output.display());
+    eprintln!(
+        "lamp-controls: calibrate-touch: wrote {}{dropped}",
+        output.display()
+    );
     Ok(())
 }
 

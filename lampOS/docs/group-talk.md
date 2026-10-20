@@ -389,6 +389,49 @@ starts speaking just as the lamp moves, while it thinks, is let go at
 that start; the rest of what they say begins a new line once the move is
 over. A move is under a second.
 
+**Counting it** (#1866). On lamp-4ace after a played test, for both routes,
+with `lamp-voice-eval` from the ARM64 build:
+
+    journalctl -u lamp-voice --since '<test start>' -o short-iso \
+      | sudo ./lamp-voice-eval waiting-cuts
+
+`--since`/`--until 'YYYY-MM-DD HH:MM[:SS]'` filter the piped journal's own
+stamps (they don't call journalctl); `--json` for JSON; `--sessions DIR`
+for records elsewhere. The journal alone can't say it:
+none of the wait's decisions, nor whether what cut an answer had words, nor
+a turn's route, is a journal line. They are the session's records
+(`/var/lib/lampOS/voice/sessions/<invocation>/metadata/events-*.jsonl`,
+root's only), which the tool reads, never writes, and pairs with the
+journal's runs by when each session's folder was made. The journal gives
+each run's start, `second only`, `wait words` and the second route's own
+lines. Per run (its route at start and wait mode: `off`, `on`, `words`) and
+per route, it counts:
+- `wait_held_a_sound` (`answer_waits`), and how each ended:
+  `wait_let_go_quiet`, `wait_let_go_ended`, `wait_stop_said`,
+  `wait_took_turn`; with `words`, what the words said
+  (`wait_words_asking`, `_asking_nothing`, `_none_in_time`);
+- `cut_waiting_by_words` and `cut_waiting_by_no_words`: an answer cut
+  (`user_interrupted`) before any of its audio came, by a turn whose input
+  transcript had a word or had none, and how many of those had waited
+  (`_after_a_wait`); `short_follow_up_kept`: one with words under 80 speech
+  blocks; `cut_while_answer_sounds` apart;
+- stops (`stop_hand`, `stop_head`, `stop_spoken`), and speech that went on
+  (`went_on_after_early_end`, and the second route's `second_goes_on`);
+- times in ms (n, median, p90, max): `wait_hold_ms` (sound held to its
+  decision), `wait_words_ms` (asked to decided), `awaited_before_cut_ms`
+  (the request's end to the cut), `stop_dispatch_ms`,
+  `wait_stop_to_cancel_ms`.
+
+It prints counts, category names and numbers only, never a word heard or
+said; a journal line near these (wait, stop, request, route) that it does
+not know is counted as `unclassified`, unprinted. Not countable: a short
+follow-up lost with `on` (it is let go unheard, so whether it had words is
+never known), and a stop the person went on from (#1352: it takes the turn
+as any word does, with no record of its own). Code:
+`crates/voice-eval/src/waiting_cuts.rs`; tested in
+`crates/voice-eval/tests/waiting_cuts.rs` on an invented journal excerpt and
+sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
+
 **A line the lamp starts on its own isn't ended by the room's sound
 (`LAMP_OWN_LINE_KEEPS=on`, #2220; off unless set).**
 - **The fault:** on lamp-06c1 on 20 Oct (El, #806's step 7), two of three of

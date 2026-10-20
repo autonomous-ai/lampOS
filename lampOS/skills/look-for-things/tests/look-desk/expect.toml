@@ -1,0 +1,21 @@
+# "Where are my keys?": the first look, at the desk (the choice's default):
+# the look, the head down over the desk until someone speaks, the desk lit
+# white for two minutes, and the note.
+[[call_tool]]
+name = "look_for"
+at = "0s"
+
+[[expect]]
+call = "look"
+
+[[expect]]
+call = "body.mood"
+args = { mood = "reading", for_ms = 120000, until_spoken = true }
+
+[[expect]]
+call = "light"
+args = { colour = "white", level = 4, for = "2m" }
+
+[[expect]]
+call = "say"
+args = { note = "Say in a few words what you see as you go, as \"Not on the desk...\". If you see what they are looking for, say where it is by something near it, as \"there, by the mug\", and stop: you stay looking at it. If not, call look_for once more with the next place: left, then right, then far_left, then far_right. Never look toward a person." }

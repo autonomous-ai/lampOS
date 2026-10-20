@@ -75,6 +75,34 @@ pub trait Lamp {
     fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
         None
     }
+    /// Where the skills are read for the app's skills page (#1722,
+    /// `crate::skills`): there only with `LAMP_CLOUD=on` and
+    /// `LAMP_SKILLS_PAGE=on`.
+    fn skills(&self) -> Option<crate::skills::Places> {
+        None
+    }
+    /// Names and the time zone changed after setup (#1959,
+    /// `crate::settings`): there only with `LAMP_CLOUD=on` and
+    /// `LAMP_SETTINGS_CHANGE=on`.
+    fn changes(&self) -> Option<std::sync::Arc<crate::settings::Changes>> {
+        None
+    }
+    /// Where a face from the app's photo goes, and the eyes to ask (#1968,
+    /// `crate::photos`): there only with `LAMP_PHOTO_FACES=on`.
+    fn photos(&self) -> Option<crate::photos::Place> {
+        None
+    }
+    /// The eyes asked for the faces they know and to forget one (#2192,
+    /// `crate::faces`): there only with `LAMP_FACES_PAGE=on`.
+    fn faces(&self) -> Option<crate::faces::Eyes> {
+        None
+    }
+
+    /// The lamp's timers and reminders (`LAMP_APP_SCHEDULE=on`, #2195,
+    /// `crate::schedule`): there only with the switch.
+    fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
+        None
+    }
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -154,6 +182,61 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             }
             some(shared.with(|reports| reports.answer()))
         }
+        // The app's skills page (#1722): every skill on the lamp, its group,
+        // whether it can be removed or turned off and what it may use. Read
+        // only.
+        "skills.list" if lamp.skills().is_some() => {
+            let places = lamp.skills().ok_or_else(|| not_here(kind))?;
+            crate::skills::list(&places).map(Some)
+        }
+        // Names and the time zone after setup (#1959): handed to root's
+        // helper, answered `starting` now and its result later.
+        // The Wi-Fi (#1959's second piece), with its own switch too.
+        crate::settings::WIFI_KIND if lamp.changes().is_some_and(|c| c.wifi_on()) => {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            changes.start_wifi(data)?;
+            Ok(None)
+        }
+        kind if crate::settings::KINDS.contains(&kind) && lamp.changes().is_some() => {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            let line = crate::settings::line(kind, data)?;
+            changes.start(kind, line);
+            Ok(None)
+        }
+        // A face from a photo the app sends (#1968): handed to the eyes,
+        // which keep it unconfirmed until its person says yes at the lamp.
+        // It comes over the lamp's own account channel only.
+        "faces.add_photo" if lamp.photos().is_some() => {
+            let place = lamp.photos().ok_or_else(|| not_here(kind))?;
+            let (name, photo) = crate::photos::asked(data)?;
+            crate::photos::add(&place, &name, &photo, crate::chat::now_ms()).map(Some)
+        }
+        // The faces the lamp knows, and removing one (#2192): names only,
+        // and the eyes' own forget. Over the lamp's own account channel only.
+        "face.list" if lamp.faces().is_some() => {
+            let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
+            crate::faces::list(&eyes).map(Some)
+        }
+        "face.remove" if lamp.faces().is_some() => {
+            let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
+            crate::faces::remove(&eyes, data).map(Some)
+        }
+        // The lamp's timers and reminders, for the app's Lamp 2 page
+        // (#2195): only with `LAMP_APP_SCHEDULE=on`.
+        "schedule.list" | "schedule.cancel" if lamp.schedule().is_some() => {
+            let adapter = lamp.schedule().ok_or_else(|| not_here(kind))?;
+            if kind == "schedule.list" {
+                crate::schedule::list(adapter, data)
+            } else {
+                crate::schedule::cancel(adapter, data)
+            }
+        }
+        // An installed or made-here skill taken off on the person's tap
+        // (#1722), never a core one: the page as it now is.
+        "skills.remove" if lamp.skills().is_some() => {
+            let places = lamp.skills().ok_or_else(|| not_here(kind))?;
+            crate::skills::remove(&places, data).map(Some)
+        }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -182,6 +265,10 @@ pub mod tests {
         pub to_give: Vec<Value>,
         /// Reports (#1683), with their switch.
         pub reports: Option<std::sync::Arc<crate::reports::Shared>>,
+        /// The skills page (#1722), with its switch.
+        pub skills: Option<crate::skills::Places>,
+        /// Changes after setup (#1959), with their switch.
+        pub changes: Option<std::sync::Arc<crate::settings::Changes>>,
     }
 
     impl Lamp for Fake {
@@ -235,6 +322,12 @@ pub mod tests {
         }
         fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
             self.reports.clone()
+        }
+        fn skills(&self) -> Option<crate::skills::Places> {
+            self.skills.clone()
+        }
+        fn changes(&self) -> Option<std::sync::Arc<crate::settings::Changes>> {
+            self.changes.clone()
         }
         fn send_text(&mut self, text: &lamp_msgs::ChatIn, _now_ms: u64) -> Result<(), String> {
             self.texts.push(text.clone());
@@ -374,7 +467,10 @@ pub mod tests {
         let got = answer(&mut lamp, "reports.get", &Value::Null)
             .unwrap()
             .unwrap();
-        assert_eq!(got, json!({"share": false, "since": null, "queued": 0}));
+        assert_eq!(
+            got,
+            json!({"share": false, "since": null, "queued": 0, "by": null, "held": false, "at": null})
+        );
         let on = answer(&mut lamp, "reports.set", &json!({"share": true}))
             .unwrap()
             .unwrap();
@@ -391,6 +487,67 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!((&off["share"], &off["queued"]), (&json!(false), &json!(1)));
+        // How and when, for the app's row: the app's own no, never held.
+        assert_eq!((&off["by"], &off["held"]), (&json!("app"), &json!(false)));
+        assert_eq!(off["at"], off["since"]);
+        assert!(off["at"].is_string());
+    }
+
+    /// #1722: the skills page is answered only with its switch, and
+    /// without it refused as every kind this lamp lacks.
+    #[test]
+    fn the_skills_are_listed_for_the_app_only_with_their_switch() {
+        let mut lamp = lamp();
+        assert_eq!(
+            answer(&mut lamp, "skills.list", &Value::Null),
+            Err("not on this lamp: skills.list".to_owned())
+        );
+        let places = crate::skills::tests::places("answer");
+        crate::skills::tests::helper(&places);
+        crate::skills::tests::skill(
+            &places,
+            "dance",
+            "Dance",
+            "",
+            "kind = \"core\"\n[permissions]\nbody = true",
+        );
+        lamp.skills = Some(places);
+        let listed = answer(&mut lamp, "skills.list", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(listed["version"], 1);
+        assert_eq!(listed["skills"][0]["name"], "dance");
+        assert_eq!(listed["skills"][0]["can_remove"], false);
+        // A core skill is not removed, and an installed one is.
+        assert_eq!(
+            answer(&mut lamp, "skills.remove", &json!({"name": "dance"})),
+            Err("dance is a core skill: it comes with the lamp, so it can't be removed".to_owned())
+        );
+        crate::skills::tests::skill(
+            lamp.skills.as_ref().unwrap(),
+            "tutor",
+            "Desk tutor",
+            "",
+            "[permissions]\nbody = true",
+        );
+        let after = answer(&mut lamp, "skills.remove", &json!({"name": "tutor"}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(after["skills"].as_array().unwrap().len(), 1);
+        assert_eq!(after["skills"][0]["name"], "dance");
+        // Off, removing is refused as any kind this lamp lacks.
+        lamp.skills = None;
+        assert_eq!(
+            answer(&mut lamp, "skills.remove", &json!({"name": "dance"})),
+            Err("not on this lamp: skills.remove".to_owned())
+        );
+        // The other skills kinds are not built: refused as before.
+        for kind in ["skills.catalog", "skills.install"] {
+            assert_eq!(
+                answer(&mut lamp, kind, &json!({"name": "dance"})),
+                Err(not_here(kind))
+            );
+        }
     }
 
     #[test]

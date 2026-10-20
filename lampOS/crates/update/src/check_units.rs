@@ -17,7 +17,12 @@
 //! lamp each one is a finding), every unit the lamp printed that the product
 //! has no file for, and every product unit read from somewhere other than
 //! `/etc/systemd/system/`. All the same and nothing else is a pass.
-use crate::install;
+//!
+//! A unit of the image's own that updates carry (`manifest::IMAGE_FILES`,
+//! #1369), such as `lamp-cmedia-speaker.service`, is not "not in the
+//! product": it is the image's, compared with the variant's own when one is
+//! given (`--image robots/lamp --variant NAME`), and said only otherwise.
+use crate::{install, manifest};
 use std::{collections::BTreeMap, fs, path::Path};
 
 /// One file `systemctl cat` printed: its path and its text.
@@ -165,6 +170,9 @@ pub struct Report {
     pub elsewhere: Vec<String>,
     /// Units systemd says are masked.
     pub masked: Vec<String>,
+    /// The image's own units the lamp printed: compared with the
+    /// variant's, or none when no image was given.
+    pub image: BTreeMap<String, Option<Verdict>>,
 }
 
 impl Report {
@@ -175,6 +183,10 @@ impl Report {
             && self.extra.is_empty()
             && self.elsewhere.is_empty()
             && self.masked.is_empty()
+            && self
+                .image
+                .values()
+                .all(|verdict| matches!(verdict, None | Some(Verdict::Same)))
     }
 
     /// The report as printed, one line a finding.
@@ -196,6 +208,21 @@ impl Report {
             out.push_str(&format!("drop-in: {}\n", drop_in.path));
             for line in drop_in.text.lines() {
                 out.push_str(&format!("  {line}\n"));
+            }
+        }
+        for (name, verdict) in &self.image {
+            match verdict {
+                None => out.push_str(&format!(
+                    "the image's: {name} (carried by updates; not compared without --image)\n"
+                )),
+                Some(Verdict::Same) => out.push_str(&format!("the image's: {name}: same\n")),
+                Some(Verdict::Missing) => {}
+                Some(Verdict::Differs(lines)) => {
+                    out.push_str(&format!("the image's: {name}: differs\n"));
+                    for line in lines {
+                        out.push_str(&format!("  {line}\n"));
+                    }
+                }
             }
         }
         for name in &self.extra {
@@ -264,8 +291,38 @@ fn name_of(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }
 
+/// The image's own units a build carries, by name.
+pub fn image_unit_names() -> Vec<&'static str> {
+    manifest::IMAGE_FILES
+        .iter()
+        .filter_map(|path| path.strip_prefix(install::UNITS))
+        .filter(|name| !name.contains('/'))
+        .collect()
+}
+
+/// The image's own units for `variant`, by name, from its files.
+pub fn image_units(image: &[manifest::ImageFile], variant: &str) -> BTreeMap<String, String> {
+    image
+        .iter()
+        .filter(|file| file.variant == variant)
+        .filter_map(|file| {
+            let name = file.path.strip_prefix(install::UNITS)?;
+            (!name.contains('/')).then(|| (name.to_owned(), file.text.clone()))
+        })
+        .collect()
+}
+
 /// Compares what the lamp printed with the product's units.
 pub fn check(product: &BTreeMap<String, String>, parsed: &Parsed) -> Report {
+    check_with_image(product, None, parsed)
+}
+
+/// [`check`], with the image's own units of the lamp's variant compared too.
+pub fn check_with_image(
+    product: &BTreeMap<String, String>,
+    image: Option<&BTreeMap<String, String>>,
+    parsed: &Parsed,
+) -> Report {
     // A masked unit is a finding; "no files found" for a unit the product
     // has is already `missing`, and for one it hasn't (the implicit
     // `lampos.slice` that `'lampos*'` matches) is nothing.
@@ -286,6 +343,21 @@ pub fn check(product: &BTreeMap<String, String>, parsed: &Parsed) -> Report {
             continue;
         }
         let name = name_of(&file.path);
+        if !product.contains_key(name) && image_unit_names().contains(&name) {
+            let verdict = image.map(|image| match image.get(name) {
+                None => Verdict::Differs(vec![format!("+ (the variant's image has no {name})")]),
+                Some(text) => {
+                    let lines = differing(&trimmed(text), &file.text);
+                    if lines.is_empty() {
+                        Verdict::Same
+                    } else {
+                        Verdict::Differs(lines)
+                    }
+                }
+            });
+            report.image.insert(name.to_owned(), verdict);
+            continue;
+        }
         if !product.contains_key(name) {
             report.extra.push(name.to_owned());
             continue;
@@ -524,5 +596,55 @@ ExecStart=/opt/x
         let report = check(&units, &parse(&printed));
         assert!(report.passes(), "{}", report.said());
         assert_eq!(report.units.len(), units.len());
+    }
+    const SPEAKER_PRINTED: &str = "\
+# /etc/systemd/system/lamp-cmedia-speaker.service
+[Service]
+ExecStart=/usr/bin/amixer -q -c device_cmedia sset Speaker 9
+
+# /etc/systemd/system/lamp-cmedia-speaker.service.d/30-local-gain.conf
+[Service]
+ExecStart=
+";
+
+    #[test]
+    fn the_images_unit_is_the_images_not_extra_and_compared_with_its_variant() {
+        let parsed = parse(SPEAKER_PRINTED);
+        let report = check(&BTreeMap::new(), &parsed);
+        assert!(report.extra.is_empty(), "{report:?}");
+        assert_eq!(report.image["lamp-cmedia-speaker.service"], None);
+        assert!(
+            report
+                .said()
+                .contains("the image's: lamp-cmedia-speaker.service (carried")
+        );
+        // The drop-in a person made is still said.
+        assert_eq!(report.drop_ins.len(), 1);
+        let standard = BTreeMap::from([(
+            "lamp-cmedia-speaker.service".to_owned(),
+            "[Service]\nExecStart=/usr/bin/amixer -q -c device_cmedia sset Speaker 9\n".to_owned(),
+        )]);
+        let report = check_with_image(&BTreeMap::new(), Some(&standard), &parsed);
+        assert_eq!(
+            report.image["lamp-cmedia-speaker.service"],
+            Some(Verdict::Same)
+        );
+        let pro = BTreeMap::from([(
+            "lamp-cmedia-speaker.service".to_owned(),
+            "[Service]\nExecStart=/usr/bin/amixer -q -c device_cmedia sset Speaker 6\n".to_owned(),
+        )]);
+        let report = check_with_image(&BTreeMap::new(), Some(&pro), &parsed);
+        assert!(matches!(
+            &report.image["lamp-cmedia-speaker.service"],
+            Some(Verdict::Differs(lines)) if lines.len() == 2
+        ));
+        assert!(!report.passes());
+        assert_eq!(
+            image_unit_names(),
+            [
+                "lamp-cmedia-speaker.service",
+                "respeaker-lite-softvol.service"
+            ]
+        );
     }
 }

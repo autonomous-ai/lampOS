@@ -1,8 +1,9 @@
 # lampOS body: all motion; it alone owns the servo port (lampOS/docs/body.md).
 # The product unit (lampOS/docs/install.md). Its poses are this lamp's own, measured on it, in
-# /etc/lampOS/body/lamp.env as BODY_POSES="--gaze .. --stand .. --folded-arm .. --home .." and any
-# other option only this lamp needs. Without that file the body does not start: a body never
-# moves on poses measured on another lamp.
+# /etc/lampOS/body/lamp.env as BODY_POSES="--home .. --folded-arm .. --stand .. --pitch-window ..
+# --torque on" (lamp-body-measure at the factory) and any other option only this lamp needs; its
+# --gaze is added once measured with a face, and until then the body runs with gaze off. Without
+# that file the body does not start: a body never moves on poses measured on another lamp.
 # A body that stopped itself three times in ten minutes stays stopped until someone has looked.
 [Unit]
 Description=lampOS body (lamp-body)

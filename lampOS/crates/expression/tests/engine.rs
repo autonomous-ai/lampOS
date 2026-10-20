@@ -759,8 +759,10 @@ fn malformed_catalogues_and_nonfinite_measurements_are_refused() {
     catalogue.limits.base_yaw = f64::NAN;
     assert!(catalogue.check().is_err());
     let mut value = serde_json::to_value(Catalogue::builtin()).unwrap();
+    // A field this build does not know is read past and named (#1680).
     value["typo"] = true.into();
-    assert!(Catalogue::from_json(&value.to_string()).is_err());
+    let (_, unread) = Catalogue::from_json_naming(&value.to_string()).unwrap();
+    assert_eq!(unread, ["typo"]);
     let mut catalogue = Catalogue::builtin();
     catalogue.behaviours[1].cooldown_us = 1;
     assert!(catalogue.check().is_err());

@@ -7,7 +7,7 @@ use std::{
     io,
     path::PathBuf,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering::SeqCst},
         mpsc::{self, Receiver},
     },
@@ -56,6 +56,8 @@ pub struct State {
     active_at: AtomicU64,
     active_budget: AtomicU64,
     answered: AtomicU64,
+    /// The database a newer build wrote, set aside at start (#1680).
+    set_aside: Mutex<Option<String>>,
     buckets: [Bucket; WINDOW],
 }
 
@@ -76,6 +78,7 @@ struct Snapshot {
     recent_answers: u64,
     note_us: u64,
     call_us: u64,
+    set_aside: Option<String>,
 }
 
 impl Default for State {
@@ -94,6 +97,7 @@ impl Default for State {
             active_at: AtomicU64::new(0),
             active_budget: AtomicU64::new(0),
             answered: AtomicU64::new(0),
+            set_aside: Mutex::new(None),
             buckets: std::array::from_fn(|_| Bucket::default()),
         }
     }
@@ -106,6 +110,16 @@ impl State {
 
     pub fn serving(&self) {
         self.phase.store(SERVING, SeqCst);
+    }
+
+    /// Said on every report while it is there: the memory a newer build
+    /// wrote is kept under this file name and not read by this build
+    /// (#1680). None once forgetting everything removed it (#2067).
+    pub fn set_aside(&self, name: Option<&str>) {
+        let mut held = self.set_aside.lock().unwrap_or_else(|e| e.into_inner());
+        if held.as_deref() != name {
+            *held = name.map(str::to_owned);
+        }
     }
 
     pub fn counts(&self, counts: io::Result<Counts>) {
@@ -227,6 +241,11 @@ impl State {
                 active_us: (active != 0).then(|| now.saturating_sub(active)),
                 active_budget: self.active_budget.load(SeqCst),
                 answered: self.answered.load(SeqCst),
+                set_aside: self
+                    .set_aside
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .clone(),
                 ..Snapshot::default()
             };
             let second = now / 1_000_000 + 1;
@@ -273,6 +292,9 @@ fn diagnostic(snapshot: &Snapshot, now: u64) -> Diagnostic {
         }
         _ if snapshot.note_us > NOTE_US => "recent session note exceeded 300 ms",
         _ if snapshot.call_us > CALL_US => "recent answer exceeded 1500 ms",
+        _ if snapshot.set_aside.is_some() => {
+            "memory set aside a database from a newer build; its records are not read"
+        }
         _ => "",
     };
     let report = if why.is_empty() {
@@ -289,6 +311,10 @@ fn diagnostic(snapshot: &Snapshot, now: u64) -> Diagnostic {
             .with("exchanges", "unknown")
             .with("kept", "unknown")
             .with("counts_age_ms", "unknown"),
+    };
+    let report = match &snapshot.set_aside {
+        Some(name) => report.with("set_aside", name.as_str()),
+        None => report,
     };
     report
         .with("answered", snapshot.answered)

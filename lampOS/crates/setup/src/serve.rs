@@ -52,6 +52,9 @@ fn default_backend() -> PathBuf {
 fn default_reports() -> PathBuf {
     "/etc/lampOS/setup/reports.json".into()
 }
+fn default_display_name() -> PathBuf {
+    "/etc/lampOS/setup/display-name".into()
+}
 
 /// The server's written configuration.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +109,12 @@ pub struct Config {
     /// reset's plan removes it.
     #[serde(default = "default_reports")]
     pub reports: PathBuf,
+    /// The lamp's name in the app, changed after setup (`device.rename`,
+    /// #1959, `crate::change`): one line, root's, 0644 for `lamp-cloud` to
+    /// read. Setup itself writes none; the reset's plan removes it. It never
+    /// changes what the lamp answers to.
+    #[serde(default = "default_display_name")]
+    pub display_name: PathBuf,
     /// Run once the hotspot is up and once serving ends: V1's nginx, which
     /// serves V1's page and passes `/api/` here, is on only during setup.
     #[serde(default)]
@@ -126,6 +135,44 @@ pub struct Config {
     pub light: bool,
 }
 
+/// The configuration's fields, as [`read`] knows them.
+pub const FIELDS: [&str; 20] = [
+    "listen",
+    "marker",
+    "credential",
+    "policy_key",
+    "name",
+    "country",
+    "interface",
+    "hotspot_address",
+    "page",
+    "zoneinfo",
+    "localtime",
+    "timezone_file",
+    "zone_env",
+    "backend",
+    "reports",
+    "display_name",
+    "web_start",
+    "web_stop",
+    "free_port",
+    "light",
+];
+
+/// Read a written configuration, one version ahead (#1680): a field this
+/// build does not know is dropped and named in the returned lines; the rest
+/// is read and checked as before.
+pub fn read(bytes: &[u8]) -> Result<(Config, Vec<String>), String> {
+    let mut value: Value =
+        serde_json::from_slice(bytes).map_err(|error| format!("the configuration: {error}"))?;
+    let mut notes = Vec::new();
+    crate::drop_unknown_fields(&mut value, "setup configuration", &FIELDS, &mut notes);
+    let config: Config =
+        serde_json::from_value(value).map_err(|error| format!("the configuration: {error}"))?;
+    config.check()?;
+    Ok((config, notes))
+}
+
 impl Config {
     pub fn check(&self) -> Result<(), String> {
         for path in [
@@ -139,6 +186,7 @@ impl Config {
             &self.zone_env,
             &self.backend,
             &self.reports,
+            &self.display_name,
         ] {
             if !path.is_absolute() {
                 return Err(format!("{} is not absolute", path.display()));
@@ -417,21 +465,25 @@ impl fmt::Debug for Accepted {
     }
 }
 
+/// Why a network name or password is refused, in the page's words. Never
+/// either value: the Wi-Fi changed after setup says the same (#1959).
+pub fn refused_words(why: wifi::Refused) -> &'static str {
+    match why {
+        wifi::Refused::SsidEmpty => "choose a Wi-Fi network",
+        wifi::Refused::SsidTooLong => "the Wi-Fi name is longer than 32 bytes",
+        wifi::Refused::SsidControl => "the Wi-Fi name has a character the lamp cannot use",
+        wifi::Refused::PasswordLength => "a Wi-Fi password has 8 to 63 characters",
+        wifi::Refused::PasswordCharacters => {
+            "the Wi-Fi password has a character the lamp cannot use"
+        }
+        wifi::Refused::Country => "the lamp's country is not set",
+    }
+}
+
 /// Check a request before anything is touched; the message is for the page.
 pub fn check(request: &SetupRequest, config: &Config) -> Result<Accepted, String> {
-    wifi::wpa_conf(&config.country, &request.ssid, &request.password).map_err(|why| {
-        match why {
-            wifi::Refused::SsidEmpty => "choose a Wi-Fi network",
-            wifi::Refused::SsidTooLong => "the Wi-Fi name is longer than 32 bytes",
-            wifi::Refused::SsidControl => "the Wi-Fi name has a character the lamp cannot use",
-            wifi::Refused::PasswordLength => "a Wi-Fi password has 8 to 63 characters",
-            wifi::Refused::PasswordCharacters => {
-                "the Wi-Fi password has a character the lamp cannot use"
-            }
-            wifi::Refused::Country => "the lamp's country is not set",
-        }
-        .to_owned()
-    })?;
+    wifi::wpa_conf(&config.country, &request.ssid, &request.password)
+        .map_err(|why| refused_words(why).to_owned())?;
     let credential = request.llm_api_key.trim();
     if credential.len() > 512 || !credential.bytes().all(|b| b.is_ascii_graphic()) {
         return Err("the voice's key has a character it cannot have, or is too long".into());
@@ -602,6 +654,15 @@ pub fn reports_record(share: bool, at: SystemTime) -> Value {
 
 /// The files named in the configuration.
 pub struct Files<'a>(pub &'a Config);
+
+impl Files<'_> {
+    /// The lamp's name in the app (#1959): root's, 0644, so `lamp-cloud`
+    /// (as `lampos`) reads it where it is.
+    pub fn display_name(&mut self, name: &str) -> io::Result<()> {
+        let temporary = stage(&self.0.display_name, format!("{name}\n").as_bytes(), 0o644)?;
+        put_in_place(&temporary, &self.0.display_name)
+    }
+}
 
 impl Save for Files<'_> {
     fn credential(&mut self, key: &str) -> io::Result<()> {

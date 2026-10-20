@@ -158,6 +158,26 @@ the room's Live session or the speaker.
   has the pointer). When it can, the presence topic (#1677, #1721) says
   when nobody's there.
 
+## Unasked texts (`messages/out`)
+
+A skill's short line for the person's phone, which no text asked for: the
+first is guard mode's "Someone was at your desk at 14:31, for about 2
+minutes." ([guard-mode.md](guard-mode.md), #1685).
+
+- **The topic:** `messages/out`, `lamp_msgs::MessageOut`: `from`
+  (`skill:<name>`, stamped by `lamp-skills`, never by the skill's files) and
+  `text`, one line of at most 280 bytes (`MESSAGE_TEXT_BYTES`), never a
+  picture. An event that lasts 10 minutes (`MessageOut::LASTS`): older is
+  old news.
+- **Who sends:** `lamp-skills`, for a skill whose `[permissions]` give
+  `messages = true`, checked again as each text leaves the program
+  ([skills.md](skills.md), "A watch").
+- **Not delivered yet.** Nothing takes `messages/out` off the lamp:
+  `lamp-cloud` has to carry it to the backend (as it carries `task_news`,
+  with no run), and the app team's push relay (mobile-P1) has to deliver it
+  to a phone that isn't open on the chat. Until both, a text is on the
+  lamp's bus and in `lamp-skills`' journal only.
+
 ## Tests
 
 - `lamp_cloud::chat::tests`: a `chat.send`'s text, session and `speak`, and

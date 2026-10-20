@@ -1342,6 +1342,194 @@ async fn words_the_heed_holds_end_the_turn_unanswered() {
     assert!(calls.lock().unwrap().is_empty());
 }
 
+/// Each judged turn's verdict, as the engine tells it (#1155).
+type TurnsTold = Arc<Mutex<Vec<(u64, lamp_msgs::TurnVerdict)>>>;
+
+fn telling(engine: Engine) -> (Engine, TurnsTold) {
+    let told: TurnsTold = Arc::default();
+    let seen = told.clone();
+    let engine = engine.telling_verdicts(Arc::new(move |request, verdict| {
+        seen.lock().unwrap().push((request, verdict));
+    }));
+    (engine, told)
+}
+
+/// #1155: a turn the heed holds is told held back, for the Policy's hello,
+/// as the journal says it.
+#[tokio::test]
+async fn a_turn_the_heed_holds_is_told_held_back() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Me.".to_owned())].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let (mut engine, told) = telling(engine.heeding(Arc::new(|_, _, _, _| Some("a busy room"))));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(
+        turn(&mut engine).await,
+        ["started:1", "heard:Me.", "complete"]
+    );
+    assert_eq!(
+        *told.lock().unwrap(),
+        [(1, lamp_msgs::TurnVerdict::HeldBack)]
+    );
+}
+
+/// The first builder on #1817: a line the model itself declines
+/// (`not_for_me`, called or written as words) is told held back, with no
+/// heed too, as a line the rule holds is.
+#[tokio::test]
+async fn a_line_the_model_declines_is_told_held_back() {
+    for declined in [
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            NOT_FOR_ME,
+            json!({}),
+        )])),
+        text("not_for_me{}"),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("No, the other one".to_owned())].into()),
+            chats: Mutex::new([vec![declined, Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let (mut engine, told) = telling(engine);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        assert_eq!(
+            labels.last().map(String::as_str),
+            Some("complete"),
+            "{labels:?}"
+        );
+        assert_eq!(
+            *told.lock().unwrap(),
+            [(1, lamp_msgs::TurnVerdict::HeldBack)]
+        );
+    }
+}
+
+/// A line declined after a tool ran for it is the lamp's: nothing is told.
+#[tokio::test]
+async fn a_line_declined_after_a_tool_ran_is_not_told_held_back() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Set a timer for five minutes.".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "set_timer",
+                        json!({"minutes": 5}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        NOT_FOR_ME,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, calls, _) = scripted(script);
+    let (mut engine, told) = telling(engine);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let labels = turn(&mut engine).await;
+    assert_eq!(
+        labels.last().map(String::as_str),
+        Some("complete"),
+        "{labels:?}"
+    );
+    assert_eq!(calls.lock().unwrap().len(), 1);
+    assert!(
+        told.lock().unwrap().is_empty(),
+        "{:?}",
+        told.lock().unwrap()
+    );
+}
+
+/// Second on #1782: the verdict is told before the turn's words leave the
+/// engine. When it is told, the turn's start, its words and its end are all
+/// still waiting to be taken, so the policy can hear the verdict before the
+/// words, and keeps it for them (`lamp_policy::hello::Hello::verdict`).
+#[tokio::test]
+async fn a_held_verdict_is_told_before_its_words_are_taken() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Me.".to_owned())].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let (said, told) = tokio::sync::oneshot::channel();
+    let said = Mutex::new(Some(said));
+    let mut engine = engine
+        .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
+        .telling_verdicts(Arc::new(move |request, verdict| {
+            if let Some(said) = said.lock().unwrap().take() {
+                let _ = said.send((request, verdict));
+            }
+        }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let verdict = tokio::time::timeout(Duration::from_secs(2), told)
+        .await
+        .expect("the verdict is told with nothing taken")
+        .unwrap();
+    assert_eq!(verdict, (1, lamp_msgs::TurnVerdict::HeldBack));
+    assert_eq!(
+        turn(&mut engine).await,
+        ["started:1", "heard:Me.", "complete"]
+    );
+}
+
+/// #1155: a turn the heed lets out is told answered. With nothing that
+/// judges turns, as on a route with the rule off, no verdict is told, nor
+/// for a turn with nothing heard: the hello then counts the turn, as it
+/// did before.
+#[tokio::test]
+async fn a_turn_the_heed_lets_out_is_told_answered_and_one_not_judged_is_not_told() {
+    for heed in [true, false] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What time is it?".to_owned()), Ok(String::new())].into()),
+            chats: Mutex::new([vec![text("Noon."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let engine = if heed {
+            engine.heeding(Arc::new(|_, _, _, _| None))
+        } else {
+            engine
+        };
+        let (mut engine, told) = telling(engine);
+        for request in [1, 2] {
+            engine.submit(start(request));
+            engine.submit(audio(request, 1));
+            engine.submit(end(request));
+            let labels = turn(&mut engine).await;
+            assert_eq!(
+                labels.last().map(String::as_str),
+                Some("complete"),
+                "{labels:?}"
+            );
+        }
+        let answered = [(1, lamp_msgs::TurnVerdict::Answered)];
+        let expected: &[_] = if heed { &answered } else { &[] };
+        assert_eq!(*told.lock().unwrap(), expected, "with a heed: {heed}");
+    }
+}
+
 /// The first builder's 21:51 on #1722, the hums on the second route: a line
 /// the rule held as unclear is told to the coordinator as `Unclear`, before
 /// the turn completes and with no chat asked, as the Live worker tells it;
@@ -4462,7 +4650,9 @@ async fn each_spoken_line_is_asked_with_its_call_note() {
     });
     let (engine, _, _) = scripted(script.clone());
     let mut engine = engine.noting_whether_called(Arc::new(|_, words| {
-        Some(worker::call_note(crate::attention::called_by_name(words)))
+        Some(worker::call_note(crate::attention::called_by_name_on(
+            words, true,
+        )))
     }));
     for request in 1..=2 {
         engine.submit(start(request));
@@ -4657,6 +4847,68 @@ async fn a_wordless_piece_with_the_name_heard_lends_its_time_not_its_sound() {
         (3 * frame, Some(1_000), vec![1_000]),
         "no name heard: its sound goes again"
     );
+}
+
+/// #1675: a scoped turn is told for its admitted person, not for whoever the
+/// eyes see when its chat begins; a written turn is told as the room's.
+#[tokio::test]
+async fn scoped_system_is_built_for_the_admitted_scope_not_the_face_in_view() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    let path = std::env::temp_dir().join(format!(
+        "sixth-scoped-system-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    let observe = |cache: &FaceCache, name: &str| {
+        std::fs::write(&path, name).unwrap();
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+    };
+    let cache = Arc::new(FaceCache::default());
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What is on my list?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![text("Tea."), Ok(ChatEvent::Done)],
+                vec![text("Noted."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let runner: ScopedToolRunner =
+        Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+    let mut engine = engine
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([12; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            Some(Arc::new(|lease: &ScopeLease| {
+                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+            })),
+        )
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    observe(&cache, "A");
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    // B steps in front of the lamp before the chat is asked.
+    observe(&cache, "B");
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    engine.submit(written(2, "Remind me later."));
+    turn(&mut engine).await;
+    let asked = script.asked.lock().unwrap();
+    let a = crate::remember::person_id("A");
+    assert_eq!(
+        asked[0][0],
+        Message::system(format!("for {:?}", Some(a.as_str())))
+    );
+    assert_eq!(asked[1][0], Message::system("for None"));
+    std::fs::remove_file(path).unwrap();
 }
 
 /// A Start marked as the coordinator marks it: begun over the lamp's
@@ -4893,68 +5145,6 @@ async fn a_chat_begun_on_a_cut_ins_early_words_carries_its_note() {
         let cut_in = Message::system(crate::cut_in_told::NOTE);
         assert!(chats.iter().all(|chat| chat.contains(&cut_in)), "{chats:?}");
     }
-}
-
-/// #1675: a scoped turn is told for its admitted person, not for whoever the
-/// eyes see when its chat begins; a written turn is told as the room's.
-#[tokio::test]
-async fn scoped_system_is_built_for_the_admitted_scope_not_the_face_in_view() {
-    use crate::memory_scope::{FaceCache, ScopeLease};
-    let path = std::env::temp_dir().join(format!(
-        "sixth-scoped-system-{}-{:?}",
-        std::process::id(),
-        std::thread::current().id()
-    ));
-    let observe = |cache: &FaceCache, name: &str| {
-        std::fs::write(&path, name).unwrap();
-        cache.replace(
-            cache.begin_refresh(),
-            crate::known_faces::FaceObservation::read(&path),
-        );
-    };
-    let cache = Arc::new(FaceCache::default());
-    let script = Arc::new(Script {
-        heard: Mutex::new([Ok("What is on my list?".to_owned())].into()),
-        chats: Mutex::new(
-            [
-                vec![text("Tea."), Ok(ChatEvent::Done)],
-                vec![text("Noted."), Ok(ChatEvent::Done)],
-            ]
-            .into(),
-        ),
-        ..Script::default()
-    });
-    let (engine, _, _) = scripted(script.clone());
-    let runner: ScopedToolRunner =
-        Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
-    let mut engine = engine
-        .with_memory_scope(
-            lamp_turn_owner::BootId::new([12; 16]).unwrap(),
-            cache.clone(),
-            runner,
-            Some(Arc::new(|lease: &ScopeLease| {
-                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
-            })),
-        )
-        .announcing(false);
-    engine.memory_camera(true, 1);
-    observe(&cache, "A");
-    engine.submit(start(1));
-    engine.submit(audio(1, 1));
-    // B steps in front of the lamp before the chat is asked.
-    observe(&cache, "B");
-    engine.submit(end(1));
-    turn(&mut engine).await;
-    engine.submit(written(2, "Remind me later."));
-    turn(&mut engine).await;
-    let asked = script.asked.lock().unwrap();
-    let a = crate::remember::person_id("A");
-    assert_eq!(
-        asked[0][0],
-        Message::system(format!("for {:?}", Some(a.as_str())))
-    );
-    assert_eq!(asked[1][0], Message::system("for None"));
-    std::fs::remove_file(path).unwrap();
 }
 
 /// #1895 on the second route (the first builder, 19:49): B's first line,

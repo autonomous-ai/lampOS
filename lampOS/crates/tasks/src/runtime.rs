@@ -9,7 +9,8 @@ use crate::{
         MOST_WAITED, Observation, SignIn, Target,
     },
     progress::{Reads, Tracker},
-    protocol::{MAX_LINE_BYTES, MAX_REPLY_BYTES, Request},
+    protocol::{Answer, MAX_LINE_BYTES, MAX_REPLY_BYTES, Request},
+    sign_in::{Session as SignInSession, Starter},
     store::Store,
 };
 use lamp_bus::{Bus, Publisher};
@@ -143,6 +144,11 @@ pub struct Config {
     /// `serve --set-up-later`: the part runs before the lamp is set up for
     /// hand-overs, and says why they are off (#1676). Off unless set.
     pub set_up_later: Option<SetUpLater>,
+    /// Sign Harness in by a spoken code (`serve --sign-in-by-code`, #1676,
+    /// [`crate::sign_in`]): the voice starts Harness's own sign-in, says its
+    /// code, and passes on the person's answer, all on the trusted route.
+    /// Off unless set.
+    pub sign_in_by_code: bool,
     /// How often the part says how it is on `diagnostics` while nothing
     /// changes: [`REPORT_EVERY`] on a lamp. A change in readiness is said
     /// at once, whatever this is. Tests pass less, so a test that reads the
@@ -358,6 +364,12 @@ pub trait Adapter: Send + 'static {
     fn absent(&self) -> bool {
         false
     }
+    /// What starts Harness's sign-in by a spoken code (`serve
+    /// --sign-in-by-code`), apart from this adapter's lane: a sign-in waits
+    /// minutes on a person. None when the adapter has no such thing.
+    fn sign_in_starter(&self) -> Option<Starter> {
+        None
+    }
 }
 impl Adapter for Cli {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
@@ -386,6 +398,15 @@ impl Adapter for Cli {
     }
     fn machines(&self) -> Result<Vec<AccountMachine>, String> {
         Cli::machines(self)
+    }
+    fn sign_in_starter(&self) -> Option<Starter> {
+        match self.lane() {
+            Ok(lane) => Some(Box::new(move || lane.sign_in_by_code())),
+            Err(error) => {
+                eprintln!("tasks: no lane for the sign-in: {error}");
+                None
+            }
+        }
     }
 }
 
@@ -443,6 +464,12 @@ impl Adapter for Production {
     }
     fn absent(&self) -> bool {
         matches!(self, Self::Absent)
+    }
+    fn sign_in_starter(&self) -> Option<Starter> {
+        match self {
+            Self::Cli(cli) => Adapter::sign_in_starter(cli),
+            Self::Absent => Some(Box::new(|| Err("no_harness".into()))),
+        }
     }
 }
 
@@ -620,6 +647,18 @@ fn bind(path: &Path) -> io::Result<(UnixListener, Binding)> {
 /// How often the owner looks again for a store kept aside (#1505).
 const LOOK_ASIDE_EVERY: Duration = Duration::from_secs(60);
 
+/// The owner's switches: `serve --watch`, `--progress`, the `wait` lane
+/// (`--push-wait`), `--close-told`, `--set-up-later` and what starts a
+/// sign-in (`--sign-in-by-code`).
+type Switches = (
+    bool,
+    bool,
+    Option<Arc<dyn WaitLane>>,
+    bool,
+    Option<SetUpLater>,
+    Option<Starter>,
+);
+
 fn owner<C: Clock>(
     mut engine: Engine<Store>,
     clock: C,
@@ -627,13 +666,7 @@ fn owner<C: Clock>(
     (jobs, outcomes): (SyncSender<Job>, Receiver<Outcome>),
     current: Arc<Mutex<Report>>,
     stop: Arc<AtomicBool>,
-    (watch, progress, lane, close_told, set_up_later): (
-        bool,
-        bool,
-        Option<Arc<dyn WaitLane>>,
-        bool,
-        Option<SetUpLater>,
-    ),
+    (watch, progress, lane, close_told, set_up_later, mut sign_in_starter): Switches,
 ) -> io::Result<()> {
     let mut requests = 0u64;
     let mut busy = false;
@@ -657,7 +690,31 @@ fn owner<C: Clock>(
     // What the last write from the machines said, so the journal has one
     // line a change, not one a look.
     let mut machines_said = String::new();
+    // `serve --sign-in-by-code`: the sign-in open, or the last one, done.
+    let mut sign_in: Option<SignInSession> = None;
+    // The last sign-in's id. Counted from the clock, so a sign-in after a
+    // restart isn't taken for one before it (the reviewer's P3 on #2174).
+    let mut sign_ins: u64 = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64);
     while !stop.load(Ordering::Acquire) {
+        if let Some(session) = sign_in.as_mut() {
+            let was_open = session.open();
+            for said in session.tend(Instant::now()) {
+                eprintln!("tasks: sign-in {}: {said}", session.id());
+            }
+            // Signed in: the sign-in and the machines are looked at at
+            // once, not a minute later.
+            if was_open
+                && matches!(
+                    session.state(),
+                    crate::sign_in::State::Done(crate::sign_in::Done::Success { .. })
+                )
+            {
+                sign_in_due = Instant::now();
+                machines_due = Instant::now();
+            }
+        }
         if looked_aside.elapsed() >= LOOK_ASIDE_EVERY {
             engine.look_aside();
             looked_aside = Instant::now();
@@ -761,6 +818,27 @@ fn owner<C: Clock>(
                         code: "timeout",
                         message: "The queued request expired before it started.",
                     }));
+                } else if let (Some(starter), true) = (
+                    sign_in_starter.as_mut(),
+                    matches!(
+                        work.request,
+                        Request::SignInStart {}
+                            | Request::SignInState {}
+                            | Request::SignInAsked { .. }
+                            | Request::SignInAnswer { .. }
+                    ),
+                ) {
+                    let answer = sign_in_operation(
+                        &work.request,
+                        work.trusted,
+                        starter,
+                        &mut sign_in,
+                        &mut sign_ins,
+                        Instant::now(),
+                    )
+                    .and_then(|body| engine.identified(body));
+                    requests = requests.saturating_add(1);
+                    let _ = work.response.try_send(answer);
                 } else if let (Request::GetProgress { id }, Some(tracker)) =
                     (&work.request, tracker.as_ref())
                 {
@@ -899,6 +977,117 @@ fn owner<C: Clock>(
         };
     }
     Ok(())
+}
+
+/// One of the sign-in's operations (`serve --sign-in-by-code`, #1676), on
+/// the trusted route only. A start while one is open gives that one back;
+/// a start after one is done begins anew. The answer is passed on only
+/// while Harness is asking.
+fn sign_in_operation(
+    request: &Request,
+    trusted: bool,
+    starter: &mut Starter,
+    sign_in: &mut Option<SignInSession>,
+    sign_ins: &mut u64,
+    now: Instant,
+) -> Result<Value, EngineError> {
+    if !trusted {
+        return Err(EngineError {
+            code: "untrusted",
+            message: "This operation requires the trusted Voice route.",
+        });
+    }
+    match request {
+        Request::SignInStart {} => {
+            if !sign_in.as_ref().is_some_and(SignInSession::open) {
+                *sign_ins += 1;
+                let session = match starter() {
+                    Ok(link) => {
+                        eprintln!("tasks: sign-in {sign_ins}: started");
+                        SignInSession::new(*sign_ins, link, now)
+                    }
+                    Err(code) => {
+                        eprintln!("tasks: sign-in {sign_ins}: not started: {code}");
+                        SignInSession::failed(*sign_ins, &code)
+                    }
+                };
+                *sign_in = Some(session);
+            }
+            let session = sign_in.as_mut().expect("just set");
+            for said in session.tend(now) {
+                eprintln!("tasks: sign-in {}: {said}", session.id());
+            }
+            session.code_given();
+            Ok(session.view(now))
+        }
+        Request::SignInState {} => Ok(sign_in
+            .as_ref()
+            .map_or_else(|| json!({"sign_in": "none"}), |session| session.view(now))),
+        Request::SignInAsked { id, request } => {
+            let session = sign_in.as_mut().ok_or(EngineError {
+                code: "not_asking",
+                message: "No sign-in is asking for an answer.",
+            })?;
+            for said in session.tend(now) {
+                eprintln!("tasks: sign-in {}: {said}", session.id());
+            }
+            match session.asked(*id, *request, now) {
+                Ok(()) => {
+                    eprintln!("tasks: sign-in {id}: question told in request {request}");
+                    Ok(session.view(now))
+                }
+                Err("not_this_sign_in") => Err(EngineError {
+                    code: "not_this_sign_in",
+                    message: "That sign-in is not the one open.",
+                }),
+                Err(_) => Err(EngineError {
+                    code: "not_asking",
+                    message: "The sign-in is not asking for an answer now.",
+                }),
+            }
+        }
+        Request::SignInAnswer { answer, request } => {
+            let session = sign_in.as_mut().ok_or(EngineError {
+                code: "not_asking",
+                message: "No sign-in is asking for an answer.",
+            })?;
+            for said in session.tend(now) {
+                eprintln!("tasks: sign-in {}: {said}", session.id());
+            }
+            let said = if *answer == Answer::Yes { "yes" } else { "no" };
+            match session.answer(*answer == Answer::Yes, *request, now) {
+                Ok(()) => {
+                    eprintln!("tasks: sign-in {}: answered {said}", session.id());
+                    Ok(session.view(now))
+                }
+                Err(code) => {
+                    // A refusal leaves the question open: journalled, so a
+                    // yes the lamp didn't take can be told from one never
+                    // heard.
+                    eprintln!("tasks: sign-in {}: {said} not taken: {code}", session.id());
+                    Err(match code {
+                        "not_asking" => EngineError {
+                            code: "not_asking",
+                            message: "The sign-in is not asking for an answer now.",
+                        },
+                        "not_told" => EngineError {
+                            code: "not_told",
+                            message: "The question was not heard before this request.",
+                        },
+                        "too_late" => EngineError {
+                            code: "too_late",
+                            message: "The question was told more than two minutes ago.",
+                        },
+                        _ => EngineError {
+                            code: "ended",
+                            message: "Harness's sign-in ended before the answer reached it.",
+                        },
+                    })
+                }
+            }
+        }
+        _ => unreachable!("only the sign-in's operations"),
+    }
 }
 
 /// The targets the person's machines give (`serve
@@ -1788,6 +1977,17 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     if adapter.absent() {
         engine.no_harness();
     }
+    let sign_in_starter = if config.sign_in_by_code {
+        let starter = adapter.sign_in_starter();
+        if starter.is_none() {
+            eprintln!(
+                "tasks: --sign-in-by-code asked, but this adapter has no sign-in; it stays off"
+            );
+        }
+        starter
+    } else {
+        None
+    };
     let lane = if config.push_wait {
         let lane = adapter.wait_lane();
         if lane.is_none() {
@@ -1873,7 +2073,14 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 (jobs_tx, outcomes_rx),
                 report,
                 owner_stop,
-                (switches.0, switches.1, lane, switches.2, set_up_later),
+                (
+                    switches.0,
+                    switches.1,
+                    lane,
+                    switches.2,
+                    set_up_later,
+                    sign_in_starter,
+                ),
             )
         })?;
     let (clients_tx, clients_rx) = mpsc::sync_channel::<(UnixStream, Instant, bool)>(CLIENT_QUEUE);
@@ -1949,6 +2156,9 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 // part runs, and says so until someone looks (#1505).
                 let targets_newer = report.summary["targets_newer"].as_u64();
                 let set_aside = report.summary["set_aside"].as_str().map(str::to_owned);
+                // Stored tasks a newer build wrote that this one can't read:
+                // kept as they are, and not followed (#1680).
+                let unread = report.summary["unread"].as_u64().unwrap_or(0);
                 // With `--set-up-later`: why hand-overs are off, or will
                 // fail, while the lamp is not yet set up for them (#1676).
                 // Not set up is not unwell; a targets file that is not
@@ -1974,6 +2184,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     || targets_newer.is_some()
                     || targets_invalid
                     || set_aside.is_some()
+                    || unread > 0
                     || handover_failed
                 {
                     Level::Warn
@@ -1998,6 +2209,8 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     "The task targets file changed and is not valid; the targets before it are kept"
                 } else if set_aside.is_some() {
                     "Tasks set aside a store from a newer build; its tasks are not followed"
+                } else if unread > 0 {
+                    "Tasks kept stored tasks from a newer build that this build can't read; they are not followed"
                 } else if handover_failed {
                     "Tasks could not hand the last task over"
                 } else {
@@ -2030,6 +2243,9 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 }
                 if let Some(name) = set_aside.as_deref() {
                     value = value.with("set_aside", name);
+                }
+                if unread > 0 {
+                    value = value.with("unread", unread);
                 }
                 if let Some(found) = set_up {
                     if let Some((reason, _)) = off {
@@ -2359,6 +2575,15 @@ mod tests {
         }
         write_targets(&path, &targets());
         assert_eq!(read_targets_or_newer(&path).unwrap().unwrap().len(), 1);
+        // Devin is this build's (#1854), not a later engine's.
+        write_targets(
+            &path,
+            &json!({"version":1,"targets":{"devin":{"machine_id":"11111111111111111111111111111111","project":"project","engine":"devin"}}}),
+        );
+        assert_eq!(
+            read_targets(&path).unwrap()["devin"].engine,
+            EngineKind::Devin
+        );
     }
 
     #[test]
@@ -2446,6 +2671,7 @@ mod tests {
             close_told: false,
             targets_newer: None,
             set_up_later: None,
+            sign_in_by_code: false,
             report_every: REPORT_EVERY,
         };
         serve_with_adapter::<_, Never>(config, Never, Arc::new(AtomicBool::new(false)), |_| {

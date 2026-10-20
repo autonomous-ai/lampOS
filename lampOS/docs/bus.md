@@ -356,12 +356,17 @@ of each, and its kind and period as a declaration, are in
 | `camera/image` | Where the newest picture is, and when it was taken. The picture itself stays in a file | latched | Eyes | 2 to 4 a second |
 | `body/joint_states` | Each joint: where it is, how fast, how loaded (ROS's `JointState`) | latched | Body | 10 to 20 a second |
 | `humans/faces/tracked` | The faces in view: a passing id, where, and whether it is turned to the lamp | latched | Eyes | With each look |
+| `humans/familiar` | How familiar the remembered person at the lamp is, as a level, with no name | latched | Eyes, with `--visits on` (#1670) | At each recognition, every 2 s |
+| `humans/seems` | How the near face seems, as a kind and a confidence, for measuring; nothing reads it yet | latched | Eyes, with `--seems` (#1671) | At most every 2 s while a face is near |
 | `voice/heard`, `voice/said` | What was heard and what was said, as text | stream | Voice | With each thing said |
 | `voice/state` | Resting, listening, thinking or speaking | latched | Voice | When it changes, and once a second |
+| `voice/turn` | A turn's verdict: its request, and whether it was `answered` or its answer `held_back` as not said to the lamp, as the voice's journal says it (#1155, [policy.md](policy.md#the-quiet-counts-talk-to-the-lamp-1155)) | stream | Voice, on the bus as `room/state` is | Once for each turn the rule judged, as its answer is let out or held back; again, `held_back`, when the model declines the line (`not_for_me`) |
 | `voice/link` | Whether the provider can be reached | latched | Voice, with `LAMP_BUS=on` and `LAMP_VOICE_LINK=on` (#830): unavailable once down for 5 s, reason `transport` | Once a second |
 | `lamp/online` | Whether the lamp can reach the internet, worked out from the parts' links | latched | Health, with `--online on` (#830) | Once a second |
 | `room/state` | Quiet or busy | latched | Voice, later the situation | When it changes, and once a second |
 | `room/presence` | Whether anyone is at the lamp: someone (a face or a voice within 20 s), or nobody for how long (#1677, [presence.md](presence.md)) | latched | Eyes, with `LAMP_PRESENCE=on` | Once a second while they look, and when someone comes or goes; each good for 3 s |
+| `room/activity` | What the face at the desk shows: at the desk, leaning in, head down, or away, with how long and the sitting's length (#1678, [eyes.md](eyes.md)) | latched | Eyes, with `LAMP_ACTIVITY=on` | Once a second while they look, and on a change; each good for 3 s |
+| `room/stood_up` | Someone at the desk stood up and left, and the sitting's length (#1678) | event | Eyes, with `LAMP_ACTIVITY=on` | Once each time |
 | `light/command`, `light/state` | The light asked for, and the light shown | latched | The executive and `lamp-cloud` (the app's Light row); the ring's owner | When it changes, and once a second |
 | `light/test`, `light/drawn` | A self-test's colour, shown for 2 s at most; the light the ring actually drew | latched | The self-test; the ring's owner | Asked once a colour; drawn when it changes, and once a second |
 | `light/request` | A light asked for that lapses, with its asker, priority and time, how it moves (`pattern`: breathe, candle or one pulse, #940), and how slowly it is faded into (`fade_ms`, #1677) | event | Skills and other parts (`lamp-cloud`'s preview, [cloud.md](cloud.md)) | Asked, and asked again to keep it, at most 30 s ahead |
@@ -416,7 +421,8 @@ that owns it:
 | Topic | Published by | Read by |
 |---|---|---|
 | `room/state` | the voice's provider worker, on each change and once a second | the policy, and Expression |
-| `room/presence` | the eyes, with `LAMP_PRESENCE=on`, from their looks and `voice/heard` ([presence.md](presence.md)) | `lamp-skills` (Light out when you leave); Messages (#1673) |
+| `room/presence` | the eyes, with `LAMP_PRESENCE=on`, from their looks and `voice/heard` ([presence.md](presence.md)) | `lamp-skills` (Light out when you leave; Who was here's record, #1685); Messages (#1673) |
+| `room/activity`, `room/stood_up` | the eyes, with `LAMP_ACTIVITY=on`, from their looks ([eyes.md](eyes.md)) | `lamp-skills` (Stretch break waits for a look up); "watches you leave" (#1669) |
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
 | `policy/decisions` | the policy ([policy.md](policy.md)) | nothing yet |
 | `body/joint_states` | the body ([body.md](body.md), "On the bus") | nothing yet; recorded to measure how the lamp moves |
@@ -428,7 +434,7 @@ that owns it:
 | `light/reached` | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | nothing yet; `lamp-skills`, to wait for a skill's light before its look (#1146) |
 | `light/outranked` | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | `lamp-skills`, a run's own subscription: the run says what was over its light in its journal and at its give-back ([skills.md](skills.md)) |
 | `diagnostics` | every part that says how it is: the voice, the eyes, the body, the policy, and the board through the health program | the health program |
-| `lamp/health`, `board/state` | the health program ([health.md](health.md)) | `lamp-health`, the command; `lamp-skills` (Not feeling well reads `lamp/health`, not in the product yet, [skills.md](skills.md)) |
+| `lamp/health`, `board/state` | the health program ([health.md](health.md)) | `lamp-health`, the command; `lamp-skills` (Not feeling well reads `lamp/health`'s `level` and `quiet_ms`, not in the product yet, [skills.md](skills.md)) |
 
 The policy also reads `voice/heard`, `voice/said`, `voice/state` and
 `humans/faces/tracked`.

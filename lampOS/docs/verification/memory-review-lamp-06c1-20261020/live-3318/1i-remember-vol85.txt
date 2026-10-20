@@ -1,0 +1,2 @@
+Oct 20 13:39:05.403971 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 79: the model said it was not for it
+Oct 20 13:39:05.406755 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(7452) prompt=Some(7444) prompt_audio=Some(1754) response=Some(8) response_audio=None thoughts=None cached=None

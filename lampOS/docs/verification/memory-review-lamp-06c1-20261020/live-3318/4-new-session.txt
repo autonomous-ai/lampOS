@@ -1,0 +1,9 @@
+Oct 20 13:45:50.611857 lamp-06c1 lamp-voice[2382]: lamp-voice provider: told the session (For you to know, not to answer: the room around you has gone quiet.)
+Oct 20 13:45:52.414499 lamp-06c1 lamp-memory[2377]: lamp-memory: conversation_end person=everyone ok entries=0
+Oct 20 13:46:35.645589 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 89: the model is told the lamp's name was heard
+Oct 20 13:46:39.154090 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 89: its answer is played: the session has heard enough to be trusted (the room microphone 7.1 dB over its quiet)
+Oct 20 13:46:39.154603 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(9458) prompt=Some(9448) prompt_audio=Some(2787) response=Some(10) response_audio=None thoughts=None cached=None
+Oct 20 13:46:39.160255 lamp-06c1 lamp-memory[2377]: lamp-memory: search person=everyone ok entries=4
+Oct 20 13:46:39.162169 lamp-06c1 lamp-voice[2382]: lamp-voice provider: request 89 asked for recall; the memory answered in 6 ms; the answer was sent
+Oct 20 13:46:42.227342 lamp-06c1 lamp-voice[2382]: lamp-voice provider: usage total=Some(9678) prompt=Some(9616) prompt_audio=Some(2787) response=Some(62) response_audio=Some(62) thoughts=None cached=None
+Oct 20 13:46:42.255619 lamp-06c1 lamp-memory[2377]: lamp-memory: append_linked person=everyone ok entries=0

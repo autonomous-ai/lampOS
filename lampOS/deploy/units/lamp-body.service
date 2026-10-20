@@ -11,7 +11,10 @@ Description=lampOS body (lamp-body)
 ConditionHost=@UNIT_ID@
 PartOf=lampos.target
 # After the voice: the lamp can talk before it can move, and a body without a voice only rests.
-After=lamp-voice.service
+# After its poses: a lamp with none is read once, seated, first (lamp-body-measure.service, #2163);
+# a read refused there keeps the body from starting.
+After=lamp-voice.service lamp-body-measure.service
+Requires=lamp-body-measure.service
 StartLimitIntervalSec=600
 StartLimitBurst=3
 
@@ -27,8 +30,12 @@ Slice=lampos-parts.slice
 WorkingDirectory=/
 RuntimeDirectory=lampos-body
 RuntimeDirectoryMode=0755
-# @BODY_POSES@: this lamp's measured poses (--reach, --gaze, --stand, --folded-arm, --home and the rest).
-ExecStart=/opt/lampOS/body/@BODY_SHA256@/lamp-body --device @SERVO_DEVICE@ --unit-id @UNIT_ID@ --lock-directory @MOTOR_LOCK_DIR@ --mood-socket /run/lampos-body/mood.sock --gaze-socket /run/lampos-body/gaze.sock @BODY_POSES@
+# $BODY_POSES: this lamp's measured poses, as the product unit takes them. The confirmed ones in
+# /etc/lampOS/body/lamp.env (the factory's, after its watched stand) win over the seated ones
+# lamp-body-measure.service read (no stand). --gaze-socket without --gaze runs with gaze off.
+EnvironmentFile=-/var/lib/lampos-body/measured.env
+EnvironmentFile=-/etc/lampOS/body/lamp.env
+ExecStart=/opt/lampOS/body/@BODY_SHA256@/lamp-body --device @SERVO_DEVICE@ --unit-id @UNIT_ID@ --lock-directory @MOTOR_LOCK_DIR@ --mood-socket /run/lampos-body/mood.sock --gaze-socket /run/lampos-body/gaze.sock $BODY_POSES
 Restart=on-failure
 RestartSec=15s
 KillMode=mixed

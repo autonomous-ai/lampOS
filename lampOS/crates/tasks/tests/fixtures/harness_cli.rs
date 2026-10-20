@@ -95,6 +95,33 @@ pub fn main() -> io::Result<()> {
             thread::sleep(Duration::from_millis(1));
         }
     }
+    if let Some(text) = step["stderr"].as_str() {
+        io::stderr().write_all(text.as_bytes())?;
+    }
+    // Harness 0.4.23's `login --code --json` (openharness#1410): the code,
+    // kept alive once, the question, the answer read from stdin and kept
+    // under HOME, and the result for it.
+    if step["code_flow"] == true {
+        let code = json!({"type":"code","code":"12345678","expiresIn":120});
+        println!("{code}");
+        println!("{code}");
+        println!(
+            "{}",
+            json!({"type":"confirm","email":"someone@example.com"})
+        );
+        io::stdout().flush()?;
+        let mut answer = String::new();
+        io::stdin().read_line(&mut answer)?;
+        private_write(home.join("answer"), answer.as_bytes())?;
+        println!(
+            "{}",
+            if answer == "yes\n" {
+                json!({"type":"result","status":"success","email":"someone@example.com"})
+            } else {
+                json!({"type":"result","status":"error","code":"DENIED"})
+            }
+        );
+    }
     if let Some(ms) = step["delay_ms"].as_u64() {
         thread::sleep(Duration::from_millis(ms.min(5000)));
     }
@@ -118,12 +145,19 @@ pub fn main() -> io::Result<()> {
                 "{}",
                 json!({"machineId":"0123456789abcdef0123456789abcdef","current":true})
             ),
-            "new" => println!(
-                "{}",
-                json!({"ok":true,"machineId":flag("--machine"),"agent":{
-                    "id":"11111111-1111-4111-8111-111111111111","name":flag("--name"),"engine":args.get(1),"permissionMode":"auto","bypassPermission":true
-                }})
-            ),
+            // As Harness answers: the mode asked for, and with none asked
+            // (Devin, #1854) none, and no bypass (`newAgentPayload`).
+            "new" => {
+                let moded = args.iter().any(|arg| arg == "--mode");
+                println!(
+                    "{}",
+                    json!({"ok":true,"machineId":flag("--machine"),"agent":{
+                        "id":"11111111-1111-4111-8111-111111111111","name":flag("--name"),"engine":args.get(1),
+                        "permissionMode":if moded { json!(flag("--mode")) } else { Value::Null },
+                        "bypassPermission":moded
+                    }})
+                )
+            }
             "show" => println!(
                 "{}",
                 json!({"id":args.get(3),"state":"idle","ask":"Earlier unrelated question","answer":"Observed answer","truncated":false,"tools":2})

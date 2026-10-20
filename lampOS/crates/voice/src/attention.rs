@@ -132,10 +132,95 @@ pub fn take_busy(flags: &[String]) -> (bool, &[String]) {
 /// farther off (`docs/ears.md`). Someone at the desk can also be talking to
 /// someone else: so the name must be heard as well.
 pub const NEAR_FLAG: &str = "--attention-near";
-/// A name heard at least this surely counts as a call when it is close.
-pub const NEAR_SCORE: f32 = 0.95;
-/// Close: the room microphone this far over its quiet during the request.
-pub const NEAR_RISE_DB: f32 = 18.0;
+/// A name heard at least this surely counts as a call when it is close:
+/// setup's measurement uses the same bar (`lamp_near_call::SCORE`).
+pub const NEAR_SCORE: f32 = lamp_near_call::SCORE;
+/// Close: the room microphone this far over its quiet during the request,
+/// unless this home's own bar is used ([`near_rise_db`]).
+pub const NEAR_RISE_DB: f32 = lamp_near_call::DEFAULT_RISE_DB;
+/// `on`: the near rule's bar is this home's, measured at setup from the
+/// person's own chair (#753, `lamp_near_call::FILE`), in place of
+/// [`NEAR_RISE_DB`]. Off unless set; without a fitting file the bar stays.
+/// Passed to the Live and the second route's workers, which judge with it.
+pub const NEAR_CALIBRATED_ENVIRONMENT: &str = "LAMP_ATTENTION_NEAR_CALIBRATED";
+/// How often the file is looked at again: a new measurement is used within
+/// this, with no restart.
+pub const NEAR_READ_EVERY: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// The near rule's bar now, in dB over the room's quiet: this home's with
+/// [`NEAR_CALIBRATED_ENVIRONMENT`] on and a file that fits, else
+/// [`NEAR_RISE_DB`]. Looks at the file at most every [`NEAR_READ_EVERY`],
+/// and reads it only when it has changed. The journal says the bar in use
+/// when it changes.
+pub fn near_rise_db() -> f32 {
+    static BAR: std::sync::OnceLock<Option<std::sync::Mutex<NearBar>>> = std::sync::OnceLock::new();
+    BAR.get_or_init(|| {
+        (std::env::var(NEAR_CALIBRATED_ENVIRONMENT).ok().as_deref() == Some("on"))
+            .then(|| std::sync::Mutex::new(NearBar::new(lamp_near_call::FILE.into())))
+    })
+    .as_ref()
+    .and_then(|bar| {
+        bar.lock()
+            .ok()
+            .map(|mut bar| bar.now(std::time::Instant::now()))
+    })
+    .unwrap_or(NEAR_RISE_DB)
+}
+
+/// This home's bar as last read from its file ([`near_rise_db`]).
+#[derive(Debug)]
+pub struct NearBar {
+    path: std::path::PathBuf,
+    looked: Option<std::time::Instant>,
+    modified: Option<Option<std::time::SystemTime>>,
+    bar: f32,
+}
+
+impl NearBar {
+    pub fn new(path: std::path::PathBuf) -> Self {
+        Self {
+            path,
+            looked: None,
+            modified: None,
+            bar: NEAR_RISE_DB,
+        }
+    }
+
+    /// The bar at `now`: the file's, looked at again once
+    /// [`NEAR_READ_EVERY`] has passed, or [`NEAR_RISE_DB`] with none that
+    /// fits.
+    pub fn now(&mut self, now: std::time::Instant) -> f32 {
+        if self
+            .looked
+            .is_some_and(|looked| now.saturating_duration_since(looked) < NEAR_READ_EVERY)
+        {
+            return self.bar;
+        }
+        self.looked = Some(now);
+        let modified = std::fs::metadata(&self.path)
+            .and_then(|metadata| metadata.modified())
+            .ok();
+        if self.modified == Some(modified) {
+            return self.bar;
+        }
+        let first = self.modified.is_none();
+        self.modified = Some(modified);
+        let read = lamp_near_call::read(&self.path);
+        let bar = read.unwrap_or(NEAR_RISE_DB);
+        if first || bar != self.bar {
+            eprintln!(
+                "lamp-voice: the near rule's bar is {bar:.1} dB over the room's quiet ({})",
+                if read.is_some() {
+                    "this home's, measured at setup"
+                } else {
+                    "the default: no measurement that fits"
+                }
+            );
+        }
+        self.bar = bar;
+        bar
+    }
+}
 const NAMED_NEAR: &str = "its name was heard close to the lamp";
 /// The reason an answer is let out for a request said to the lamp from
 /// close to it (`crate::addressed`, `LAMP_ADDRESSED=on`).
@@ -338,6 +423,15 @@ const NOT_NAMES_OPENING: &[&str] = &[
 /// lamp's, nor a word the service writes in its place, nor one that opens a
 /// sentence of its own ("Okay,").
 pub fn addresses_someone_else(heard: &str) -> bool {
+    addresses_someone_else_on(heard, false)
+}
+
+/// [`addresses_someone_else`], with the words written for the lamp's name
+/// standing alone ([`STAND_ALONE_INS`]) taken as the lamp's, never as a
+/// person's name, when `stand_alone_ins`: on the second route only
+/// ([`Attention::count_stand_alone_ins`]).
+pub fn addresses_someone_else_on(heard: &str, stand_alone_ins: bool) -> bool {
+    let alone = stand_alone(stand_alone_ins);
     let is_name = |word: &str| {
         word.chars().next().is_some_and(char::is_uppercase)
             && word.chars().all(char::is_alphabetic)
@@ -347,7 +441,7 @@ pub fn addresses_someone_else(heard: &str) -> bool {
                 .any(|not| word.eq_ignore_ascii_case(not))
             && !STAND_INS
                 .iter()
-                .chain(STAND_ALONE_INS)
+                .chain(alone)
                 .any(|not| word.eq_ignore_ascii_case(not))
     };
     let words: Vec<&str> = heard.split_whitespace().collect();
@@ -471,9 +565,19 @@ const STAND_INS: &[&str] = &[
 /// else; "Len", "Palin" and "Palan" on lamp-52e6 on 15 Oct; "Land" and
 /// "Line" in the first builder's trials; "Lin" and "Lump" as the first
 /// builder asked). "Line up the meetings" is no call.
+///
+/// On the second route only (#1973, the first builder at 22:38): Deepgram
+/// writes "Lamp" so, Gemini's transcript doesn't, and Linh and Lin are
+/// common names, so "Lin, pass me that." between people stays held on a
+/// Live lamp.
 const STAND_ALONE_INS: &[&str] = &[
     "lynn", "len", "lin", "lump", "land", "line", "palin", "palan",
 ];
+
+/// [`STAND_ALONE_INS`] when they count, else none.
+fn stand_alone(counted: bool) -> &'static [&'static str] {
+    if counted { STAND_ALONE_INS } else { &[] }
+}
 
 /// Greetings that may come before the name of a call ("Hey Lamp,").
 const GREETINGS: &[&str] = &["hey", "hi", "ok", "okay", "oh", "hello"];
@@ -486,6 +590,14 @@ const GREETINGS: &[&str] = &["hey", "hi", "ok", "okay", "oh", "hello"];
 /// writes in the name's place is read as [`called`] reads it: first, or
 /// after a greeting.
 pub fn called_by_name(heard: &str) -> bool {
+    called_by_name_on(heard, false)
+}
+
+/// [`called_by_name`], with the words written for the lamp's name standing
+/// alone ([`STAND_ALONE_INS`]) counted as its call when `stand_alone_ins`:
+/// on the second route only ([`Attention::count_stand_alone_ins`]).
+pub fn called_by_name_on(heard: &str, stand_alone_ins: bool) -> bool {
+    let alone = stand_alone(stand_alone_ins);
     // Words, and the punctuation between them that marks a sentence's start
     // or a comma.
     #[derive(Clone, Copy, PartialEq)]
@@ -520,7 +632,7 @@ pub fn called_by_name(heard: &str) -> bool {
         };
         // The name, or a word written for it set off as a name is: nothing
         // after it but a comma, a stop or the line's end.
-        let standing_alone = is(word, STAND_ALONE_INS)
+        let standing_alone = is(word, alone)
             && matches!(
                 tokens.get(at + 1),
                 None | Some(Token::Comma) | Some(Token::Stop)
@@ -547,8 +659,9 @@ pub fn called_by_name(heard: &str) -> bool {
 
 /// Whether what was heard is the lamp's name alone, or a word written for
 /// it, with greetings at most: "Lamp.", "Hey Lamp,", "Hey, Lynn." A call cut
-/// off at a pause, the rest still to come ([`called_by_name`] reads it as a
-/// call).
+/// off at a pause, the rest still to come. For the second route's carry, so
+/// read as that route reads a call: [`called_by_name_on`] with the words
+/// written for the name standing alone (#1973).
 pub fn only_the_name(heard: &str) -> bool {
     let is = |word: &str, list: &[&str]| list.iter().any(|known| word.eq_ignore_ascii_case(known));
     let words: Vec<&str> = heard
@@ -562,7 +675,7 @@ pub fn only_the_name(heard: &str) -> bool {
                 || is(word, STAND_INS)
                 || is(word, STAND_ALONE_INS)
         })
-        && called_by_name(heard)
+        && called_by_name_on(heard, true)
 }
 
 /// Whether what was heard opens with the lamp's name set off as a call:
@@ -820,6 +933,9 @@ fn decide_called(
 /// What the worker keeps for the request in hand.
 #[derive(Default)]
 pub struct Attention {
+    /// The words written for the lamp's name standing alone count as its
+    /// call ([`STAND_ALONE_INS`]): the second route's rule only.
+    stand_alone_ins: bool,
     request: u64,
     /// The session the request began on, and how many requests that were
     /// heard have begun on it. A turn the lamp wrote itself is not one:
@@ -1081,7 +1197,7 @@ impl Attention {
                 .ended_us
                 .or(self.began_us)
                 .is_some_and(|end| end.saturating_add(ANOTHER_REPLY_US) >= now_us)
-            && addresses_someone_else(&self.heard);
+            && addresses_someone_else_on(&self.heard, self.stand_alone_ins);
         // The line before, if it was a question the lamp left unanswered
         // and ended just now (#829, 15:40).
         let after_question = self.spoken_to
@@ -1151,10 +1267,10 @@ impl Attention {
     /// reviewer on #1158). The eyes are not read for a bare call, so only
     /// its words or a sure hearing show it then.
     fn call_shown(&self) -> bool {
-        !addresses_someone_else(&self.heard)
+        !addresses_someone_else_on(&self.heard, self.stand_alone_ins)
             && (self.named_sure
                 || self.near && self.best_score >= NEAR_SCORE && !self.day_bars()
-                || called_by_name(&self.heard))
+                || called_by_name_on(&self.heard, self.stand_alone_ins))
     }
 
     /// A request began on `session` at `now_us` that continues the one in
@@ -1287,6 +1403,13 @@ impl Attention {
         if request == self.request {
             self.cut_in = true;
         }
+    }
+
+    /// Count the words written for the lamp's name standing alone as its
+    /// call ([`STAND_ALONE_INS`]), as the second route's rule does (#1973,
+    /// the first builder at 22:38). Off, as the Live worker's rule is.
+    pub fn count_stand_alone_ins(&mut self, on: bool) {
+        self.stand_alone_ins = on;
     }
 
     /// Whether the lamp's last line was a question, for the next judgement.
@@ -1437,7 +1560,7 @@ impl Attention {
             return Some(verdict);
         }
         let called_in_text = if self.name_in_passing_ignored {
-            called_by_name(&self.heard)
+            called_by_name_on(&self.heard, self.stand_alone_ins)
         } else {
             called(&self.heard)
         };
@@ -1526,7 +1649,9 @@ impl Attention {
         // its own words calling it by name. On lamp-4ace on 16 October at
         // 17:08, request 169 played on the near rule alone and answered
         // colleagues talking about eye drops beside it.
-        let near_shows = !self.day_bars() || turned == Some(true) || called_by_name(&self.heard);
+        let near_shows = !self.day_bars()
+            || turned == Some(true)
+            || called_by_name_on(&self.heard, self.stand_alone_ins);
         if strict && room == Room::Busy && self.near && self.best_score >= NEAR_SCORE && near_shows
         {
             let verdict = Verdict::Play(NAMED_NEAR);
@@ -1675,7 +1800,7 @@ impl Attention {
     /// 17:49: such lines were journaled as let out by trust).
     pub fn sign(&self, turned: Option<bool>) -> Option<&'static str> {
         let called_in_text = if self.name_in_passing_ignored {
-            called_by_name(&self.heard)
+            called_by_name_on(&self.heard, self.stand_alone_ins)
         } else {
             called(&self.heard)
         };
@@ -1724,7 +1849,7 @@ impl Attention {
         self.named
             || self.tapped
             || if self.name_in_passing_ignored {
-                called_by_name(&self.heard)
+                called_by_name_on(&self.heard, self.stand_alone_ins)
             } else {
                 called(&self.heard)
             }
@@ -1741,7 +1866,9 @@ impl Attention {
             None
         } else if self.after_another {
             Some(ANSWERING_ANOTHER)
-        } else if addresses_someone_else(&self.heard) && self.heard.contains('?') {
+        } else if addresses_someone_else_on(&self.heard, self.stand_alone_ins)
+            && self.heard.contains('?')
+        {
             // Only a question put to that person: a request that opens
             // with a word and a comma is the lamp's (Second on #1090).
             Some(TO_ANOTHER)
@@ -1808,6 +1935,42 @@ impl Attention {
 
 #[cfg(test)]
 mod tests {
+    /// #753: this home's bar is read from setup's file once it fits, looked
+    /// at again only every [`NEAR_READ_EVERY`], and the default is kept
+    /// without one, or with one its own tries don't make.
+    #[test]
+    fn this_homes_near_bar_is_read_from_setups_file_and_the_default_kept_without_one() {
+        use super::{NEAR_READ_EVERY, NEAR_RISE_DB, NearBar};
+        use std::time::{Duration, Instant};
+        let folder = std::env::temp_dir().join(format!("lamp-near-bar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let path = folder.join("near-call.json");
+        let mut bar = NearBar::new(path.clone());
+        let at = Instant::now();
+        assert_eq!(bar.now(at), NEAR_RISE_DB);
+        let tries = [22.4, 25.0, 23.1].map(|rise_db| lamp_near_call::Try {
+            rise_db,
+            score: 0.98,
+        });
+        let measured = lamp_near_call::Calibrated::of(tries.to_vec(), 1_760_000_000).unwrap();
+        lamp_near_call::write(&path, &measured).unwrap();
+        // Not looked at again within the interval.
+        assert_eq!(bar.now(at + Duration::from_secs(1)), NEAR_RISE_DB);
+        assert_eq!(bar.now(at + NEAR_READ_EVERY), 19.4);
+        assert_eq!(bar.now(at + NEAR_READ_EVERY * 2), 19.4);
+        // A bar its tries don't make, then no file: the default again.
+        let edited = lamp_near_call::Calibrated {
+            near_rise_db: 30.0,
+            ..measured
+        };
+        std::thread::sleep(Duration::from_millis(20));
+        lamp_near_call::write(&path, &edited).unwrap();
+        assert_eq!(bar.now(at + NEAR_READ_EVERY * 3), NEAR_RISE_DB);
+        std::fs::remove_dir_all(&folder).unwrap();
+        assert_eq!(bar.now(at + NEAR_READ_EVERY * 4), NEAR_RISE_DB);
+    }
+
     use super::*;
 
     /// The calls held in the played scenes of 2026-10-14 had their name
@@ -3486,8 +3649,8 @@ mod tests {
         ] {
             assert!(addresses_someone_else(calls), "{calls}");
         }
-        // #1712: the words written for the lamp's name are not someone
-        // else's, and standing alone they call the lamp.
+        // #1712: on the second route the words written for the lamp's name
+        // are not someone else's, and standing alone they call the lamp.
         for heard in [
             "Hey, Lynn. How are you today?",
             "Hey Lynn, how are you today?",
@@ -3496,16 +3659,28 @@ mod tests {
             "Thank you. Lynn.",
             "Palin, set a timer for five minutes.",
             "Len, what's the weather?",
+            "Lin, what time is it?",
         ] {
-            assert!(!addresses_someone_else(heard), "{heard}");
-            assert!(called_by_name(heard), "{heard}");
+            assert!(!addresses_someone_else_on(heard, true), "{heard}");
+            assert!(called_by_name_on(heard, true), "{heard}");
         }
         for heard in [
             "Line up the meetings for me.",
             "We should land the plan soon.",
         ] {
+            assert!(!called_by_name_on(heard, true), "{heard}");
+        }
+        // #1973, the first builder at 22:38: on Live they are people's
+        // names, as before.
+        for heard in [
+            "Lin, pass me that.",
+            "Lynn, what time is it?",
+            "Thank you, Lin.",
+        ] {
             assert!(!called_by_name(heard), "{heard}");
         }
+        assert!(addresses_someone_else("Lin, are you coming?"));
+        assert!(!addresses_someone_else_on("Lin, are you coming?", true));
         for not in [
             "Lamp, what time is it?",
             "Hey Lamp, tell me a story.",
@@ -3519,6 +3694,41 @@ mod tests {
             "",
         ] {
             assert!(!addresses_someone_else(not), "{not}");
+        }
+    }
+
+    /// #1973, the first builder at 22:38: on Live "Lin, pass me that."
+    /// between people is held, as before, since "Lin" is a person's name
+    /// there; with the second route's stand-ins, "Lin, what time is it?"
+    /// calls the lamp, in a busy room too.
+    #[test]
+    fn the_names_stand_ins_call_the_lamp_on_the_second_route_only() {
+        const S: u64 = 1_000_000;
+        let judged = |heard: &str, stand_alone: bool, room: Room| {
+            // As the units run it: the name in passing ignored.
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.ignore_name_in_passing(true);
+            attention.count_stand_alone_ins(stand_alone);
+            attention.began_at(60, 7, 10 * S);
+            attention.heard(heard);
+            attention.first_output_busy(60, room, false, false, None)
+        };
+        for room in [Room::Quiet, Room::Busy] {
+            assert!(
+                matches!(
+                    judged("Lin, pass me that.", false, room),
+                    Some(Verdict::Hold(_))
+                ),
+                "Live, {room:?}"
+            );
+            assert!(
+                matches!(
+                    judged("Lin, what time is it?", true, room),
+                    Some(Verdict::Play(_))
+                ),
+                "the second route, {room:?}"
+            );
         }
     }
 

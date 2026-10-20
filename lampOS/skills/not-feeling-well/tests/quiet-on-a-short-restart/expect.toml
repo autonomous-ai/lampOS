@@ -1,0 +1,5 @@
+# From 10:00, every part well; the body restarts five times, gone 6 to 9 s
+# each time (stale, then ok again: its keeper restarting it). quiet_ms is
+# at most 5.4 s, in one health each time: nothing.
+clock = "10:00"
+none = true

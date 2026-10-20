@@ -1,0 +1,23 @@
+# The sharp rise (the line at 360 s), a dip to 120, then slowly back up to
+# 300 by 2,400 s (no rise): under 150 for 7 minutes only (978 to 1,400 s).
+# Then a further rise to 450 from 2,500 s, past the cooldown: the air never
+# stayed under 150 for 10 minutes, so it is the same spell. Once.
+clock = "10:00"
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "light"
+args = { colour = "warm", level = 2 }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "say"
+args = { text = "The air reads like smoke. If something's burning, please check it.", priority = 8, expires_ms = 120000 }

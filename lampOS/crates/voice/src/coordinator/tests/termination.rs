@@ -288,6 +288,7 @@ fn isolated_signal_child() {
         speaker,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         ring_channel_ceiling: None,
         diagnostic_directory: Some(output.clone()),
@@ -626,6 +627,7 @@ fn speaker_finish_failure(speaker_late: bool, capture_late: bool) -> (String, Ve
         speaker,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         ring_channel_ceiling: None,
         diagnostic_directory: Some(output.clone()),
@@ -741,6 +743,7 @@ fn capture_exiting_during_speaker_reap_is_not_forced() {
         speaker,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         ring_channel_ceiling: None,
         diagnostic_directory: None,
@@ -848,6 +851,7 @@ fn service_signal_child(output: PathBuf, termination: Termination, mut trace: Se
         speaker,
         privacy,
         privacy_controls: false,
+        privacy_receipts: false,
         ring: None.into(),
         ring_channel_ceiling: None,
         diagnostic_directory: None,
@@ -1023,7 +1027,10 @@ fn a_cycle_that_failed_before_it_heard_releases_the_guard() {
     );
 
     for exit in [
-        Box::new(PhysicalMute { observed_at_us: 1 }) as Box<dyn std::error::Error + Send + Sync>,
+        Box::new(PhysicalMute {
+            onboarding: None,
+            observed_at_us: 1,
+        }) as Box<dyn std::error::Error + Send + Sync>,
         Box::new(SoftwareMute {
             observed_at_us: 1,
             asleep: false,

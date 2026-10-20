@@ -7,22 +7,72 @@ use std::{
     io::{self, Write},
     os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt, symlink},
     path::{Path, PathBuf},
-    process::{self, Command},
+    process::{self, Command, Output, Stdio},
+    sync::{PoisonError, RwLock, RwLockReadGuard},
+    time::{Duration, SystemTime},
 };
 
 const DATABASE: &str = "tasks.sqlite3";
 const INITIALIZING: &str = ".tasks.sqlite3.init";
 
+/// A spawn and a test letting go of a store take turns (#1569 row 43, row
+/// 27's case: schedule's `tests/runtime.rs`, update's `tests/round.rs`). A
+/// child spawned by one test thread holds a copy of every descriptor, a
+/// store's directory lock among them, until its exec closes them, and
+/// `spawn` returns only after that. A store let go of and opened again in
+/// that moment finds its directory `already owned`: 2 of 30 runs of this
+/// file beside fourteen busy processes on a Mac, 20 Oct (Eighth on #1722,
+/// 12:33). So a spawn takes the turn alone ([`output_alone`]), and a test
+/// shares it while it opens and lets go of stores ([`Scratch::new`]).
+/// nextest, a process for each test, is not affected.
+static SPAWNS: RwLock<()> = RwLock::new(());
+
+fn share() -> RwLockReadGuard<'static, ()> {
+    SPAWNS.read().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// `command`'s output, as `Command::output` gives it, spawned alone in the
+/// turn ([`SPAWNS`]).
+fn output_alone(command: &mut Command) -> Output {
+    let child = {
+        let _turn = SPAWNS.write().unwrap_or_else(PoisonError::into_inner);
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap()
+    };
+    child.wait_with_output().unwrap()
+}
+
 struct Scratch {
     root: tempfile::TempDir,
     dir: PathBuf,
+    /// The turn's share, held for the whole test, so that every store it
+    /// opens is let go of in it ([`SPAWNS`]). `None` for a test that spawns:
+    /// it shares the turn around its own stores, and spawns alone.
+    _turn: Option<RwLockReadGuard<'static, ()>>,
 }
 
 impl Scratch {
     fn new() -> Self {
+        Self::with(Some(share()))
+    }
+
+    /// For a test that spawns ([`output_alone`]).
+    fn spawning() -> Self {
+        Self::with(None)
+    }
+
+    fn with(turn: Option<RwLockReadGuard<'static, ()>>) -> Self {
         let root = tempfile::tempdir().unwrap();
         let dir = root.path().join("private");
-        Self { root, dir }
+        Self {
+            root,
+            dir,
+            _turn: turn,
+        }
     }
 
     fn open(&self) -> Store {
@@ -148,22 +198,24 @@ fn exclusive_ownership_blocks_another_process_and_is_released_on_drop() {
         );
         process::exit(73);
     }
-    let scratch = Scratch::new();
+    let scratch = Scratch::spawning();
     let mut store = scratch.open();
     store.commit(b"owned").unwrap();
     assert_eq!(
         Store::open(&scratch.dir).err().unwrap().kind(),
         io::ErrorKind::WouldBlock
     );
-    let child = Command::new(std::env::current_exe().unwrap())
-        .args([
-            "--exact",
-            "exclusive_ownership_blocks_another_process_and_is_released_on_drop",
-        ])
-        .env(CHILD, &scratch.dir)
-        .output()
-        .unwrap();
+    // The store is held through the spawn, and let go of in the turn.
+    let child = output_alone(
+        Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "exclusive_ownership_blocks_another_process_and_is_released_on_drop",
+            ])
+            .env(CHILD, &scratch.dir),
+    );
     assert_eq!(child.status.code(), Some(73), "{child:?}");
+    let _turn = share();
     drop(store);
     assert_eq!(
         scratch.open().load().unwrap().as_deref(),
@@ -291,7 +343,6 @@ fn a_wal_database_without_sidecars_is_rejected_without_converting_it() {
 fn unknown_versions_and_extra_schema_objects_fail_closed() {
     for change in [
         "PRAGMA user_version=0",
-        "PRAGMA user_version=2",
         "ALTER TABLE state RENAME TO other",
         "CREATE TABLE other(value BLOB)",
         "CREATE TRIGGER changed AFTER INSERT ON state BEGIN SELECT 1; END",
@@ -303,6 +354,219 @@ fn unknown_versions_and_extra_schema_objects_fail_closed() {
         let original = fs::read(scratch.database()).unwrap();
         assert!(Store::open(&scratch.dir).is_err(), "{change}");
         assert_eq!(fs::read(scratch.database()).unwrap(), original, "{change}");
+    }
+}
+
+/// #1680: a database a newer build wrote (`user_version` above 1) doesn't
+/// stop the part. It is kept whole under a new name, never deleted, said by
+/// `kept_aside`, and the owner goes on with an empty store.
+#[test]
+fn a_newer_database_version_is_set_aside_whole_and_a_new_store_begins() {
+    let scratch = Scratch::new();
+    scratch.populated();
+    scratch.sql("PRAGMA user_version=2; ALTER TABLE state ADD COLUMN later BLOB");
+    let original = fs::read(scratch.database()).unwrap();
+    let mut store = Store::open(&scratch.dir).expect("a newer database does not stop the part");
+    assert_eq!(store.load().unwrap(), None, "the new store is empty");
+    let kept = store.kept_aside().unwrap().expect("the kept store is said");
+    assert!(kept.starts_with("tasks.sqlite3.newer-db2-"), "{kept}");
+    assert_eq!(
+        fs::read(scratch.dir.join(&kept)).unwrap(),
+        original,
+        "kept whole"
+    );
+    store.commit(b"after").unwrap();
+    drop(store);
+    assert_eq!(
+        scratch.open().load().unwrap().as_deref(),
+        Some(&b"after"[..])
+    );
+    assert_eq!(fs::read(scratch.dir.join(&kept)).unwrap(), original);
+}
+
+/// #1680, the reviewer's P3 on #2057: a newer build's database in WAL mode,
+/// with its `-wal` and `-shm` beside it, is set aside with them, every file
+/// renamed byte for byte, not refused by the WAL checks; `user_version` is
+/// read from the file's header before any of them.
+#[test]
+fn a_newer_database_in_wal_mode_is_set_aside_with_its_sidecars() {
+    let scratch = Scratch::new();
+    scratch.populated();
+    let wal = scratch.dir.join(format!("{DATABASE}-wal"));
+    let shm = scratch.dir.join(format!("{DATABASE}-shm"));
+    let (wal_bytes, shm_bytes) = {
+        let db = Connection::open(scratch.database()).unwrap();
+        db.execute_batch("PRAGMA user_version=2; PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE state SET snapshot=x'0102'")
+            .unwrap();
+        (fs::read(&wal).unwrap(), fs::read(&shm).unwrap())
+    };
+    // The newer build's last close checkpointed; put its sidecars back as
+    // a crash would have left them.
+    private_file(&wal, &wal_bytes);
+    private_file(&shm, &shm_bytes);
+    let original = fs::read(scratch.database()).unwrap();
+    assert_eq!(&original[18..20], &[2, 2], "the database is in WAL mode");
+    let mut store = Store::open(&scratch.dir).expect("a newer WAL database does not stop the part");
+    assert_eq!(store.load().unwrap(), None, "the new store is empty");
+    let kept = store.kept_aside().unwrap().expect("the kept store is said");
+    assert!(kept.starts_with("tasks.sqlite3.newer-db2-"), "{kept}");
+    for (name, bytes) in [
+        (kept.clone(), &original),
+        (format!("{kept}-wal"), &wal_bytes),
+        (format!("{kept}-shm"), &shm_bytes),
+    ] {
+        assert_eq!(&fs::read(scratch.dir.join(&name)).unwrap(), bytes, "{name}");
+    }
+    assert!(!wal.exists() && !shm.exists());
+    store.commit(b"after").unwrap();
+    drop(store);
+    assert_eq!(
+        scratch.open().load().unwrap().as_deref(),
+        Some(&b"after"[..])
+    );
+    assert_eq!(fs::read(scratch.dir.join(&kept)).unwrap(), original);
+}
+
+/// The reviewer's P3 on #2057: a crash after the sidecars' renames and
+/// before the database's leaves `-wal` and `-shm` at `newer-db2-<s1>`. The
+/// next start keeps the database under that same `<s1>`, not a new one, so
+/// the WAL is beside its database again.
+#[test]
+fn a_set_aside_cut_before_the_database_rename_joins_its_sidecars_again() {
+    let scratch = Scratch::new();
+    scratch.populated();
+    let wal = scratch.dir.join(format!("{DATABASE}-wal"));
+    let shm = scratch.dir.join(format!("{DATABASE}-shm"));
+    let (wal_bytes, shm_bytes) = {
+        let db = Connection::open(scratch.database()).unwrap();
+        db.execute_batch("PRAGMA user_version=2; PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE state SET snapshot=x'0102'")
+            .unwrap();
+        (fs::read(&wal).unwrap(), fs::read(&shm).unwrap())
+    };
+    private_file(&wal, &wal_bytes);
+    private_file(&shm, &shm_bytes);
+    // The cut: the sidecars renamed under an earlier stamp, the database not.
+    let kept = format!("{DATABASE}.newer-db2-1000");
+    fs::rename(&wal, scratch.dir.join(format!("{kept}-wal"))).unwrap();
+    fs::rename(&shm, scratch.dir.join(format!("{kept}-shm"))).unwrap();
+    let original = fs::read(scratch.database()).unwrap();
+    let store = Store::open(&scratch.dir).expect("the cut does not stop the part");
+    assert_eq!(store.kept_aside().unwrap().as_deref(), Some(kept.as_str()));
+    for (name, bytes) in [
+        (kept.clone(), &original),
+        (format!("{kept}-wal"), &wal_bytes),
+        (format!("{kept}-shm"), &shm_bytes),
+    ] {
+        assert_eq!(&fs::read(scratch.dir.join(&name)).unwrap(), bytes, "{name}");
+    }
+}
+
+/// Turns the store's database into a newer build's at version 2 in WAL
+/// mode, with its `-wal` and `-shm` beside it as a crash leaves them, or
+/// none when it closed cleanly. Returns each file's suffix and bytes.
+fn newer_wal_database(scratch: &Scratch, sidecars: bool) -> Vec<(&'static str, Vec<u8>)> {
+    let wal = scratch.dir.join(format!("{DATABASE}-wal"));
+    let shm = scratch.dir.join(format!("{DATABASE}-shm"));
+    let bytes = {
+        let db = Connection::open(scratch.database()).unwrap();
+        db.execute_batch("PRAGMA user_version=2; PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE state SET snapshot=x'0102'")
+            .unwrap();
+        (fs::read(&wal).unwrap(), fs::read(&shm).unwrap())
+    };
+    let mut files = vec![("", fs::read(scratch.database()).unwrap())];
+    if sidecars {
+        private_file(&wal, &bytes.0);
+        private_file(&shm, &bytes.1);
+        files.push(("-wal", bytes.0));
+        files.push(("-shm", bytes.1));
+    }
+    files
+}
+
+/// Sets the database's mtime, as a write at that time would.
+fn written_at(path: &Path, at: SystemTime) {
+    OpenOptions::new()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(at)
+        .unwrap();
+}
+
+/// The reviewer's P3 on #2138: a stale `newer-db2-1000-wal`, left by an
+/// older crash, beside a version-2 database written after it, with and
+/// without the database's own `-wal`. The part starts, the database takes a
+/// new stamp with its own sidecars, and the stale file is left as it is.
+#[test]
+fn a_stale_leftover_sidecar_is_not_taken_as_the_newer_databases() {
+    for sidecars in [true, false] {
+        let scratch = Scratch::new();
+        scratch.populated();
+        let stale = scratch.dir.join(format!("{DATABASE}.newer-db2-1000-wal"));
+        private_file(&stale, b"an older crash's wal");
+        let files = newer_wal_database(&scratch, sidecars);
+        written_at(
+            &scratch.database(),
+            SystemTime::now() + Duration::from_secs(2),
+        );
+        let store = Store::open(&scratch.dir)
+            .unwrap_or_else(|error| panic!("own -wal {sidecars}: {error}"));
+        let kept = store.kept_aside().unwrap().expect("the kept store is said");
+        assert!(kept.starts_with("tasks.sqlite3.newer-db2-"), "{kept}");
+        assert_ne!(kept, "tasks.sqlite3.newer-db2-1000", "own -wal {sidecars}");
+        for (suffix, bytes) in &files {
+            assert_eq!(
+                &fs::read(scratch.dir.join(format!("{kept}{suffix}"))).unwrap(),
+                bytes,
+                "own -wal {sidecars}: {suffix}"
+            );
+        }
+        assert_eq!(fs::read(&stale).unwrap(), b"an older crash's wal");
+    }
+}
+
+/// Two flips at the same version, each with a `-wal`: the earlier
+/// set-aside is complete, so the second takes its own stamp. And with a
+/// clock behind (a board with no RTC), a second database closed cleanly and
+/// dated before the first set-aside still takes its own stamp.
+#[test]
+fn each_set_aside_at_the_same_version_keeps_its_own_stamp() {
+    for clock_behind in [false, true] {
+        let scratch = Scratch::new();
+        scratch.populated();
+        let first = newer_wal_database(&scratch, true);
+        let earlier = format!("{DATABASE}.newer-db2-1000");
+        for (suffix, _) in &first {
+            fs::rename(
+                scratch.dir.join(format!("{DATABASE}{suffix}")),
+                scratch.dir.join(format!("{earlier}{suffix}")),
+            )
+            .unwrap();
+        }
+        scratch.populated();
+        let second = newer_wal_database(&scratch, !clock_behind);
+        written_at(
+            &scratch.database(),
+            if clock_behind {
+                SystemTime::UNIX_EPOCH + Duration::from_secs(1000)
+            } else {
+                SystemTime::now() + Duration::from_secs(2)
+            },
+        );
+        let store = Store::open(&scratch.dir)
+            .unwrap_or_else(|error| panic!("clock behind {clock_behind}: {error}"));
+        let kept = store.kept_aside().unwrap().expect("the kept store is said");
+        assert!(kept.starts_with("tasks.sqlite3.newer-db2-"), "{kept}");
+        assert_ne!(kept, earlier, "clock behind {clock_behind}");
+        for (name, files) in [(&earlier, &first), (&kept, &second)] {
+            for (suffix, bytes) in files {
+                assert_eq!(
+                    &fs::read(scratch.dir.join(format!("{name}{suffix}"))).unwrap(),
+                    bytes,
+                    "clock behind {clock_behind}: {name}{suffix}"
+                );
+            }
+        }
     }
 }
 
@@ -498,20 +762,24 @@ fn interrupted_transaction_recovers_the_last_committed_snapshot() {
         // page cache makes the uncommitted update spill to the database file.
         process::exit(91);
     }
-    let scratch = Scratch::new();
+    let scratch = Scratch::spawning();
     // Replacing a full snapshot journals the old pages, so this covers
     // recovery of an eight-MiB value rather than only database growth.
     let previous = vec![0x11; MAX_STATE_BYTES];
-    scratch.open().commit(&previous).unwrap();
-    let child = Command::new(std::env::current_exe().unwrap())
-        .args([
-            "--exact",
-            "interrupted_transaction_recovers_the_last_committed_snapshot",
-        ])
-        .env(CHILD, &scratch.dir)
-        .output()
-        .unwrap();
+    {
+        let _turn = share();
+        scratch.open().commit(&previous).unwrap();
+    }
+    let child = output_alone(
+        Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "interrupted_transaction_recovers_the_last_committed_snapshot",
+            ])
+            .env(CHILD, &scratch.dir),
+    );
     assert_eq!(child.status.code(), Some(91), "{child:?}");
+    let _turn = share();
     let journal = scratch.dir.join(format!("{DATABASE}-journal"));
     assert!(fs::metadata(&journal).unwrap().len() >= MAX_STATE_BYTES as u64);
     assert_eq!(

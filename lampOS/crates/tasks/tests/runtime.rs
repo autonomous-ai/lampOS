@@ -99,6 +99,26 @@ struct Counts {
     /// What `harness machines` lists, and how often it was asked (#1676).
     machines: Mutex<Vec<AccountMachine>>,
     machine_reads: AtomicUsize,
+    /// Harness's sign-in lines still to come, the answers written and how
+    /// many sign-ins were started (#1676).
+    sign_in_lines: Arc<Mutex<std::collections::VecDeque<SignInRead>>>,
+    sign_in_answers: Arc<Mutex<Vec<bool>>>,
+    sign_in_starts: AtomicUsize,
+}
+type SignInRead = Result<lamp_tasks::sign_in::Event, &'static str>;
+/// A sign-in that reads the script's lines and keeps its answers.
+struct ScriptSignIn(
+    Arc<Mutex<std::collections::VecDeque<SignInRead>>>,
+    Arc<Mutex<Vec<bool>>>,
+);
+impl lamp_tasks::sign_in::Link for ScriptSignIn {
+    fn poll(&mut self) -> Option<SignInRead> {
+        self.0.lock().unwrap().pop_front()
+    }
+    fn answer(&mut self, yes: bool) -> io::Result<()> {
+        self.1.lock().unwrap().push(yes);
+        Ok(())
+    }
 }
 struct ScriptLane(Arc<Counts>);
 impl WaitLane for ScriptLane {
@@ -190,6 +210,16 @@ impl Adapter for Script {
         self.counts.machine_reads.fetch_add(1, Ordering::SeqCst);
         Ok(self.counts.machines.lock().unwrap().clone())
     }
+    fn sign_in_starter(&self) -> Option<lamp_tasks::sign_in::Starter> {
+        let counts = self.counts.clone();
+        Some(Box::new(move || {
+            counts.sign_in_starts.fetch_add(1, Ordering::SeqCst);
+            Ok(Box::new(ScriptSignIn(
+                counts.sign_in_lines.clone(),
+                counts.sign_in_answers.clone(),
+            )))
+        }))
+    }
     fn signed_in(&self) -> Result<SignIn, String> {
         Ok(if self.counts.signed_out.load(Ordering::SeqCst) {
             SignIn::Out
@@ -273,6 +303,7 @@ impl Running {
             set_up_later: None,
             // Its report every 50 ms, not each second: a test reading it
             // waits a fraction of a second (#1128).
+            sign_in_by_code: false,
             report_every: Duration::from_millis(50),
         };
         let mut running = Self {
@@ -1425,6 +1456,118 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
     );
 }
 
+/// #1676: Harness's sign-in by a spoken code through the service, on the
+/// trusted route only: started once while open, its code, the question,
+/// the answer passed on only once the voice heard the question told, in a
+/// later request, and how it ended, kept for the voice; started anew, with
+/// the next id, once done. Without `--sign-in-by-code` it is off.
+#[test]
+fn the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end() {
+    use lamp_tasks::sign_in::{Done, Event};
+    let off = Running::new(false);
+    assert_eq!(
+        off.trusted(json!({"op":"sign_in_start"}))["error"],
+        "sign_in_off"
+    );
+    let mut s = Running::new(false);
+    s.stop();
+    s.config.sign_in_by_code = true;
+    s.start();
+    assert_eq!(s.ask(json!({"op":"sign_in_start"}))["error"], "untrusted");
+    assert_eq!(s.ask(json!({"op":"sign_in_state"}))["error"], "untrusted");
+    assert_eq!(s.trusted(json!({"op":"sign_in_state"}))["sign_in"], "none");
+    s.counts
+        .sign_in_lines
+        .lock()
+        .unwrap()
+        .push_back(Ok(Event::Code {
+            code: "12345678".into(),
+            expires_in: 120,
+        }));
+    let started = s.trusted(json!({"op":"sign_in_start"}));
+    assert_eq!(started["ok"], true, "{started}");
+    assert_eq!(started["sign_in"], "code");
+    assert_eq!(started["code"], "12345678");
+    // Counted from the clock, so not taken for one before a restart.
+    let id = started["id"].as_u64().unwrap();
+    assert!(id > 1_700_000_000_000, "{started}");
+    assert_eq!(started["code_told"], true);
+    // Asked again while open: the same one, not another.
+    assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["code"], "12345678");
+    assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_answer","answer":"yes","request":2}))["error"],
+        "not_asking"
+    );
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_asked","id":id,"request":2}))["error"],
+        "not_asking"
+    );
+    s.counts
+        .sign_in_lines
+        .lock()
+        .unwrap()
+        .push_back(Ok(Event::Confirm {
+            email: "someone@example.com".into(),
+        }));
+    let until = |want: &str| {
+        let start = Instant::now();
+        loop {
+            let state = s.trusted(json!({"op":"sign_in_state"}));
+            if state["sign_in"] == want {
+                return state;
+            }
+            assert!(start.elapsed() < Duration::from_secs(5), "{state}");
+            thread::sleep(Duration::from_millis(10));
+        }
+    };
+    assert_eq!(until("asking")["email"], "someone@example.com");
+    assert_eq!(
+        s.ask(json!({"op":"sign_in_answer","answer":"yes","request":9}))["error"],
+        "untrusted"
+    );
+    assert_eq!(
+        s.ask(json!({"op":"sign_in_asked","id":id,"request":3}))["error"],
+        "untrusted"
+    );
+    // Asked in Harness, but not yet heard said by the lamp: a yes is for
+    // something else.
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_answer","answer":"yes","request":9}))["error"],
+        "not_told"
+    );
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_asked","id":id + 7,"request":3}))["error"],
+        "not_this_sign_in"
+    );
+    let told = s.trusted(json!({"op":"sign_in_asked","id":id,"request":3}));
+    assert_eq!(told["sign_in"], "asking", "{told}");
+    // The yes in the request the question was told in isn't its answer.
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_answer","answer":"yes","request":3}))["error"],
+        "not_told"
+    );
+    assert!(s.counts.sign_in_answers.lock().unwrap().is_empty());
+    let answered = s.trusted(json!({"op":"sign_in_answer","answer":"yes","request":4}));
+    assert_eq!(answered["sign_in"], "answered", "{answered}");
+    assert_eq!(*s.counts.sign_in_answers.lock().unwrap(), [true]);
+    s.counts
+        .sign_in_lines
+        .lock()
+        .unwrap()
+        .push_back(Ok(Event::Result(Done::Success {
+            email: Some("someone@example.com".into()),
+        })));
+    assert_eq!(until("done")["result"], "success");
+    // Done: kept for the voice, and a start begins anew.
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_state"}))["result"],
+        "success"
+    );
+    assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["id"], id + 1);
+    assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 2);
+}
+
 /// Without `serve --set-up-later` nothing of it is said, and the targets
 /// file is not looked at again.
 #[test]
@@ -1495,7 +1638,7 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
     s.stop();
     let mut store = released(&s);
     let mut newer: Value = serde_json::from_slice(&store.load().unwrap().unwrap()).unwrap();
-    newer["schema"] = json!(2);
+    newer["schema"] = json!(4);
     store.commit(&serde_json::to_vec(&newer).unwrap()).unwrap();
     drop(store);
     s.start();
@@ -1515,7 +1658,7 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
         "Tasks set aside a store from a newer build; its tasks are not followed"
     );
     let kept = kept.expect("the kept file is named");
-    assert!(kept.starts_with("tasks.sqlite3.newer-2-"), "{kept}");
+    assert!(kept.starts_with("tasks.sqlite3.newer-4-"), "{kept}");
     // Restarted: the store opens well now, and the kept file is still said.
     s.stop();
     drop(released(&s));
@@ -1560,4 +1703,88 @@ fn targets_from_machines_needs_an_engine_and_set_up_later() {
         unknown.contains("needs claude, codex or opencode"),
         "{unknown}"
     );
+}
+
+/// The tasks database, opened by hand as a newer build would write it.
+fn tasks_database(s: &Running) -> rusqlite::Connection {
+    rusqlite::Connection::open(s.config.dir.join("tasks.sqlite3")).unwrap()
+}
+
+/// #1680: a tasks database from a newer build (`user_version` 2) doesn't
+/// stop the part: it is kept whole, the part starts with an empty store,
+/// serves, and says so on health.
+#[test]
+fn a_newer_tasks_database_is_set_aside_and_the_part_serves() {
+    let mut s = Running::new(false);
+    let prepared = s.prepare();
+    s.stop();
+    tasks_database(&s)
+        .execute_batch("PRAGMA user_version=2")
+        .unwrap();
+    s.start();
+    assert_eq!(s.status()["summary"]["retained"], 0);
+    let kept = s.status()["summary"]["set_aside"]
+        .as_str()
+        .expect("the kept store is said")
+        .to_owned();
+    assert!(kept.starts_with("tasks.sqlite3.newer-db2-"), "{kept}");
+    let old = rusqlite::Connection::open(s.config.dir.join(&kept)).unwrap();
+    let snapshot: Vec<u8> = old
+        .query_row("SELECT snapshot FROM state", [], |row| row.get(0))
+        .unwrap();
+    let snapshot: Value = serde_json::from_slice(&snapshot).unwrap();
+    assert_eq!(
+        snapshot["tasks"][0]["id"], prepared["id"],
+        "its task is kept"
+    );
+    drop(old);
+    s.prepare();
+    let report = tasks_diagnostic_until(&s, |report| {
+        report.values.iter().any(|pair| pair.key == "set_aside")
+    });
+    assert_eq!(report.level, Level::Warn);
+}
+
+/// #1680: a stored task with a value this build doesn't know, at the same
+/// `schema`, doesn't stop the part: it is kept in the store as it is, the
+/// part serves, and health counts it.
+#[test]
+fn a_stored_task_this_build_cannot_read_is_kept_and_the_part_serves() {
+    let mut s = Running::new(false);
+    let prepared = s.prepare();
+    s.stop();
+    let db = tasks_database(&s);
+    let snapshot: Vec<u8> = db
+        .query_row("SELECT snapshot FROM state", [], |row| row.get(0))
+        .unwrap();
+    let mut state: Value = serde_json::from_slice(&snapshot).unwrap();
+    state["tasks"][0]["dispatch"]["state"] = json!("a_state_from_later");
+    let later = state["tasks"][0].clone();
+    db.execute(
+        "UPDATE state SET snapshot = ?1",
+        [serde_json::to_vec(&state).unwrap()],
+    )
+    .unwrap();
+    drop(db);
+    s.start();
+    let summary = s.status()["summary"].clone();
+    assert_eq!(summary["retained"], 0, "{summary}");
+    assert_eq!(summary["unread"], 1, "{summary}");
+    assert!(summary["set_aside"].is_null(), "{summary}");
+    let next = s.prepare();
+    assert_ne!(next["id"], prepared["id"]);
+    let report = tasks_diagnostic_until(&s, |report| {
+        report
+            .values
+            .iter()
+            .any(|pair| pair.key == "unread" && pair.value == "1")
+    });
+    assert_eq!(report.level, Level::Warn);
+    s.stop();
+    let snapshot: Vec<u8> = tasks_database(&s)
+        .query_row("SELECT snapshot FROM state", [], |row| row.get(0))
+        .unwrap();
+    let state: Value = serde_json::from_slice(&snapshot).unwrap();
+    assert_eq!(state["tasks"][0], later, "kept as it is");
+    assert_eq!(state["tasks"][1]["id"], next["id"]);
 }

@@ -1,0 +1,8 @@
+# A departure from the middle at 10 s turns nothing and starts no cooldown: a left one at 300 s turns (the reviewer on #2012).
+clock = "10:00"
+
+[[expect]]
+at = "300s"
+within = "1s"
+call = "body.move"
+args = { move = "watch-left" }

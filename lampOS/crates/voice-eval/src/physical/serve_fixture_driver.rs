@@ -23,6 +23,11 @@ use std::{
 };
 
 const POLL_US: u64 = 2_000;
+/// The poll while a round has changed nothing: the fake runtime's own tick.
+/// Over 99% of the eight-turn conversation's rounds change nothing, and the
+/// test took more than twice as long at 2 ms throughout (#1806). After any
+/// round that changes something, the next is the lamp's 2 ms again.
+const IDLE_POLL_US: u64 = crate::fake::TICK_US;
 // Retained startup readiness is 150 ms old. A positive epoch preserves that
 // age instead of saturating it at zero. The setup Ping still precedes startup.
 const EPOCH_US: u64 = 1_000_000;
@@ -637,13 +642,31 @@ impl ClockedServeFixture {
         if self.recorder_pending() || next < self.next_poll_us {
             return Ok(());
         }
+        let before = self.progress();
         self.runtime_step(host_until)?;
         self.players.pump_before(host_until)?;
         self.relay_step(sent, enqueued, host_until)?;
+        let step = if self.progress() == before {
+            IDLE_POLL_US
+        } else {
+            POLL_US
+        };
         self.next_poll_us = next
-            .checked_add(POLL_US)
+            .checked_add(step)
             .ok_or_else(|| invalid("serve poll time overflow"))?;
         self.finish_runtime_exit(sent, enqueued)
+    }
+
+    /// What a round can change: the runtime's output and rooms read, the
+    /// relay's inputs and output, and the players' sends.
+    fn progress(&self) -> (u64, u64, u64, u64, u64) {
+        (
+            self.runtime_stdout,
+            self.runtime_rooms,
+            self.runner_inputs,
+            self.output_frames,
+            self.players.successful_sends(),
+        )
     }
 
     fn wait_before(

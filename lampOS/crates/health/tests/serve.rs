@@ -134,13 +134,25 @@ impl Rig {
         reader: Option<Reader>,
         before: impl FnOnce(&Self),
     ) -> Self {
+        Self::leased(name, lamp_bus::DEFAULT_LEASE, change, reader, before)
+    }
+
+    /// As `with`, on a bus whose publishers are taken for gone after
+    /// `lease`.
+    fn leased(
+        name: &str,
+        lease: Duration,
+        change: impl FnOnce(&mut Options),
+        reader: Option<Reader>,
+        before: impl FnOnce(&Self),
+    ) -> Self {
         // A root short enough for a socket's path, which the system's own
         // temporary directory on a Mac is not.
         let root = PathBuf::from(format!("/tmp/lh-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
         // Publishers look for new subscribers every 20 ms, not 200.
-        let bus = Bus::new(&root).unwrap().rescan_every(ms(20));
+        let bus = Bus::new(&root).unwrap().rescan_every(ms(20)).lease(lease);
         let mut options = Options {
             expected: Vec::new(),
             stale_after: NEVER,
@@ -687,13 +699,16 @@ fn shown(rig: &Rig, topic: &str) -> SystemTime {
 #[test]
 fn between_two_messages_the_publishers_show_that_they_are_alive() {
     // Nothing is published after the first of each: the next is ten
-    // minutes off. The bus has the lamp's own lease of three seconds, with
-    // which a publisher shows itself once a second.
+    // minutes off. The bus has a lease of 900 ms, with which a publisher
+    // shows itself every 300 ms. The loop calls `alive()` on each turn and
+    // the publisher refreshes its entry every third of the bus's lease, so
+    // with the lamp's lease of three seconds (once a second) it goes the
+    // same way, only two seconds slower.
     let far = |options: &mut Options| {
         options.times.health_every = NEVER;
         options.times.board_every = NEVER;
     };
-    let mut rig = Rig::with("alive", far, None, |_| {});
+    let mut rig = Rig::leased("alive", ms(900), far, None, |_| {});
     rig.next();
     rig.numbers();
     let topics = [Health::TOPIC, BoardState::TOPIC];

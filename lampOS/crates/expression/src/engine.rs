@@ -85,7 +85,8 @@ pub enum Input {
     },
     /// The local time of day, in minutes since local midnight, at `stamp`.
     /// Not a bus topic: the live service makes it from the wall clock and
-    /// its `--utc-offset-minutes`, and an import from the recording's.
+    /// its local time (`--zone`, or `--utc-offset-minutes`; #820), and an
+    /// import from the recording's.
     DayTime {
         stamp: ClockStamp,
         minute: u16,
@@ -628,6 +629,23 @@ impl Engine {
     /// breath; the work light does not say "go ahead".
     pub fn set_offline(&mut self, offline: bool) {
         self.offline = offline;
+    }
+
+    /// The lamp's one breath's phase now, from 0 to 1, where Mood keeps it
+    /// (#1670), or `None` for the plain breath on the boot clock.
+    pub fn set_mood_breath(&mut self, phase: Option<f64>) {
+        if let Some(life) = &mut self.life {
+            life.set_mood_breath(phase);
+        }
+    }
+
+    /// How lively the idle layer's moves are from the lamp's inner state, from
+    /// -0.5 to 0.5 ([`lamp_msgs::mood_liveliness`]), added to the catalogue's
+    /// energy; `None`, the catalogue's alone (#1670).
+    pub fn set_mood_liveliness(&mut self, liveliness: Option<f32>) {
+        if let Some(life) = &mut self.life {
+            life.set_mood_liveliness(liveliness);
+        }
     }
 
     /// Whether the privacy switch is closed, as `voice/privacy` says at a

@@ -1,0 +1,80 @@
+# Wind down: in the hour before bedtime, someone still at the desk, the lamp
+# droops once and dims a shade until they leave (#1685, "a design, before
+# code: habits and wellbeing nudges"). The bedtime is the end of its
+# [active] hours: set it to your own (22:00 to 23:00 here, for a bedtime at
+# 23:00, Bedtime and Morning's). From bedtime on it never starts, and its
+# light is given back as they leave the desk: the night is then Bedtime and
+# Morning's, if that is on the lamp. Written to lamp-skills' schema
+# (docs/skills.md, "The schema, as lamp-skills reads it").
+needs = ["eyes", "body", "light"]
+# Its owner puts it on (`lamp-skills install`) and takes it off; not in the
+# product's install.
+kind = "installable"
+version = "1.0.0"
+# Once an evening, counted from the local midnight.
+most_a_day = 1
+
+# What it may read and use, and nothing more: the faces, the voice's state,
+# one droop and a shade of dim. It never speaks.
+[permissions]
+topics = ["humans/faces/tracked", "voice/state", "room/activity"]
+body = true
+light = true
+
+[trigger]
+topic = "humans/faces/tracked"
+when = "present"          # a face there, continuously
+near = 0.14               # at the desk, not across the room
+for = "20m"
+gap = "2m"                # looking away or leaning out of view does not end the sitting
+rearm = "leaves"          # once a sitting
+wait = "10m"              # talking when the time comes: once the talk ends, within ten minutes
+
+[[while]]                 # never in the middle of a conversation
+topic = "voice/state"
+field = "state"
+equals = "resting"
+
+[[while]]                 # not while they read or write, head down (#1678), as Stretch break:
+topic = "room/activity"   # it waits for them to look up. Without the eyes' room/activity
+field = "state"           # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
+not_equals = "head_down"
+unknown = "holds"
+
+[[while]]                 # the sitting is the sitter's own (#1678): the eyes' sitting_s, which
+topic = "room/activity"   # begins again when someone else sits down, has lasted 20 minutes
+field = "sitting_s"       # too, not only a face in the chair. Without the eyes' room/activity
+above = 1199           # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
+unknown = "holds"
+
+[active]                  # the hour before bedtime: its end is the bedtime
+from = "22:00"
+to = "23:00"
+
+[quiet]                   # from bedtime to the morning
+from = "23:00"
+to = "06:00"
+
+# One nudge an hour between the wellbeing skills.
+[budget]
+group = "wellbeing"
+per_hour = 1
+
+# As the other three: two nudges nobody noticed in a row, and it rests
+# until the morning. With these hours and once a day it adds nothing (the
+# morning comes before the next evening); it holds if the hours are widened.
+[rest]
+after_ignored = 2
+
+# One function for the four wellbeing skills, so a session counts it once
+# (#1685): it stops the one that came last, or with all, every one.
+[stop]
+tool = "wellbeing_nudges"
+about = "When someone asks you to stop a wellbeing nudge, the lamp's wordless hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
+
+[ask]
+policy = "nudge"
+
+[[do]]
+body = { gesture = "sleepy" }          # one slow droop
+light = { dim = 1, until = "ends" }    # a shade dimmer, given back when they leave the desk

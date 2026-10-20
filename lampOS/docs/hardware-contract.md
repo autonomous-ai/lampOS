@@ -75,7 +75,7 @@ Default serial path is `/dev/ttyACM0`. The Lamp udev profile also defines
 writes, pings, configuration and emergency handling on this shared bus.
 
 Provenance: `hal/config.py:8`, `hal/follower/hal_follower.py:53–64`,
-`robots/lamp/rootfs/etc/udev/rules.d/99-lamp-device.rules:21`; SDK
+`robots/lamp/rootfs/etc/udev/rules.d/99-lamp-device.rules:24`; SDK
 `lerobot/motors/feetech/feetech.py:36–40,120–135`,
 `scservo_sdk/port_handler.py:91–108`.
 
@@ -225,7 +225,12 @@ Rust process without retaining OpenCV/Python orchestration.
 Legacy `capture_still()` returns the latest frame on timeout even if it failed
 the freshness test. Do not claim freshness using that fallback. Legacy camera
 recovery can unbind/rebind USB; qualify composite-device effects before using
-it because a camera may share its USB device with a microphone. Do not silently
+it because a camera may share its USB device with a microphone. lampOS's
+lamp-eyes resets the ZVCAI camera (01da:5875) by USBDEVFS_RESET when it is
+stuck (#2126). The microphones lampOS uses are other USB devices (the voice's
+Jieli 4c4a:4155 and the room's C-Media 0d8c:0014), so a reset of the camera
+cuts neither; whether 01da:5875 carries an audio interface of its own is to
+be read with `lsusb -t` on a lamp. Do not silently
 switch to an unrelated camera when a configured role device disappears.
 
 Provenance: `hal/drivers/camera/video_capture_device.py:28–97,260–299,

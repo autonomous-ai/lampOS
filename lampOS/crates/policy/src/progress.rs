@@ -212,6 +212,8 @@ fn agent(engine: &str) -> &str {
     match engine {
         "claude" => "Claude Code",
         "codex" => "Codex",
+        // Devin Cloud's name on the bus (#1854).
+        "devin_cloud" => "Devin",
         other => other,
     }
 }
@@ -1043,6 +1045,14 @@ mod tests {
             spoke_up_last_hour: 1,
             hour: Some(14),
         }
+    }
+
+    /// Devin Cloud is named on the bus `devin_cloud` (#1854): the model is
+    /// told Devin.
+    #[test]
+    fn devin_cloud_is_told_as_devin() {
+        assert_eq!(agent("devin_cloud"), "Devin");
+        assert_eq!(agent("claude"), "Claude Code");
     }
 
     #[test]

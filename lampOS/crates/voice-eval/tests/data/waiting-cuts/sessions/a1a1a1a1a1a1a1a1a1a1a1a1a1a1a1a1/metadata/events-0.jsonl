@@ -1,0 +1,32 @@
+{"kind": "service_segment", "generation": 0}
+{"kind": "wait_keeps_answer", "at_us": 1000000, "words": false, "service_sequence": 1}
+{"kind": "input_admitted", "turn": 1, "candidate": 10, "at_us": 2000000, "service_sequence": 2}
+{"kind": "transcript", "turn": null, "text": "what does a quokka eat", "finished": true, "at_us": 2900000, "service_sequence": 3}
+{"kind": "local_endpoint", "turn": 1, "at_us": 3000000, "speech_level": {"blocks": 150}, "service_sequence": 4}
+{"kind": "answer_waits", "turn": 1, "candidate": 11, "at_us": 4000000, "service_sequence": 5}
+{"kind": "input_let_go_answer_waits", "turn": 1, "candidate": 11, "why": "quiet", "at_us": 4700000, "service_sequence": 6}
+{"kind": "turn_finished", "turn": 1, "outcome": "completed", "provider_audio_seen": true, "at_us": 8000000, "service_sequence": 7}
+{"kind": "input_admitted", "turn": 2, "candidate": 12, "at_us": 10000000, "service_sequence": 8}
+{"kind": "local_endpoint", "turn": 2, "at_us": 11000000, "speech_level": {"blocks": 120}, "service_sequence": 9}
+{"kind": "answer_waits", "turn": 2, "candidate": 13, "at_us": 11500000, "service_sequence": 10}
+{"kind": "turn_finished", "turn": 2, "outcome": "user_interrupted", "provider_audio_seen": false, "at_us": 12500000, "service_sequence": 11}
+{"kind": "input_admitted", "turn": 3, "candidate": 13, "at_us": 12500100, "service_sequence": 12}
+{"kind": "local_endpoint", "turn": 3, "at_us": 13000000, "not_speech": {"speech_blocks": 12}, "service_sequence": 13}
+{"kind": "input_admitted", "turn": 4, "candidate": 14, "at_us": 20000000, "service_sequence": 14}
+{"kind": "local_endpoint", "turn": 4, "at_us": 21000000, "speech_level": {"blocks": 200}, "service_sequence": 15}
+{"kind": "turn_finished", "turn": 4, "outcome": "user_interrupted", "provider_audio_seen": false, "at_us": 22000000, "service_sequence": 16}
+{"kind": "input_admitted", "turn": 5, "candidate": 15, "at_us": 22000100, "service_sequence": 17}
+{"kind": "transcript", "turn": null, "text": "no zebrafinch", "finished": true, "at_us": 22400000, "service_sequence": 18}
+{"kind": "local_endpoint", "turn": 5, "at_us": 22600000, "speech_level": {"blocks": 50}, "service_sequence": 19}
+{"kind": "input_admitted", "turn": 6, "candidate": 16, "at_us": 29900000, "service_sequence": 20}
+{"kind": "voice_route_switched", "to": "second", "why": "live_link_not_ready", "turn": 6, "at_us": 30000000, "service_sequence": 21}
+{"kind": "local_endpoint", "turn": 6, "at_us": 31000000, "speech_level": {"blocks": 100}, "service_sequence": 22}
+{"kind": "answer_waits", "turn": 6, "candidate": 17, "at_us": 31500000, "service_sequence": 23}
+{"kind": "input_let_go_answer_waits", "turn": 6, "candidate": 17, "why": "ended", "at_us": 31800000, "service_sequence": 24}
+{"kind": "turn_finished", "turn": 6, "outcome": "completed", "provider_audio_seen": true, "at_us": 35000000, "service_sequence": 25}
+{"kind": "voice_route_switched", "to": "live", "turn": null, "at_us": 36000000, "service_sequence": 26}
+{"kind": "hand_control_cancel", "reason": "hand_stop", "at_us": 40000000, "observation_to_speaker_dispatch_us": 3000, "service_sequence": 27}
+{"kind": "hand_control_cancel", "reason": "capture_gap", "at_us": 41000000, "observation_to_speaker_dispatch_us": 1000, "service_sequence": 28}
+{"kind": "turn_finished", "turn": 7, "outcome": "user_interrupted", "provider_audio_seen": true, "at_us": 50000000, "service_sequence": 29}
+{"kind": "input_admitted", "turn": 8, "candidate": null, "admission_basis": "continued_after_early_end", "at_us": 50000100, "service_sequence": 30}
+{"kind": "answer_waits", "turn": 8, "at_us": 51000000, "service_sequence": 31}

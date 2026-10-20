@@ -1,0 +1,22 @@
+# lampOS skills' manage helper: the one way a part other than root changes the skills folder
+# (lampOS/docs/skills.md, "The manage helper"; #1722). lamp-cloud's skills.remove, for the app's
+# skills page, asks here instead of writing /var/lib/lampOS/skills, root's, itself: lamp-cloud talks
+# to the network and stays ProtectSystem=strict with no writable path for the skills (the first
+# builder, 18:33 on #1722). systemd holds the socket and starts lamp-skills-manage@.service as root
+# for each connection; nothing listens between requests. Only root and the group lampos may connect.
+# Not yet in lamp-update's install list: it goes there after its lamp check.
+[Unit]
+Description=lampOS skills' manage helper socket
+
+[Socket]
+ListenStream=/run/lampos-skills-manage/manage.sock
+Accept=yes
+SocketUser=root
+SocketGroup=lampos
+SocketMode=0660
+DirectoryMode=0755
+# One request a connection, a few at once at most.
+MaxConnections=4
+
+[Install]
+WantedBy=sockets.target

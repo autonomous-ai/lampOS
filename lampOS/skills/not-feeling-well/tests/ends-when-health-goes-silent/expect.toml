@@ -1,8 +1,8 @@
 # From 10:00, the error from 60 s and held; lamp/health's last message at
 # 200 s, good for 15 s; voice/state every 10 s from 200.5 s. It droops and
-# dims at 90 s; the light is given back at 220.5 s, the first message after
-# the health ran out at 215 s (lamp-health stopped: the lamp is not known
-# to be unwell any more).
+# breathes pale at 90 s; the light is given back at 220.5 s, the first
+# message after the health ran out at 215 s (lamp-health stopped: the lamp
+# is not known to be unwell any more).
 clock = "10:00"
 
 [[expect]]
@@ -15,7 +15,7 @@ args = { gesture = "sleepy" }
 at = "90s"
 within = "1s"
 call = "light"
-args = { dim = 1, until = "ends" }
+args = { colour = "white", level = 2, pattern = { kind = "breathe", period_ms = 10000, low = 1 }, until = "ends" }
 
 [[expect]]
 at = "220500ms"

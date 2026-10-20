@@ -9,9 +9,9 @@ kind = "core"
 version = "1.0.0"
 
 # What it may read and use, and nothing more: the faces, the voice's state,
-# and the body. It never speaks.
+# what the person at the desk is doing, and the body. It never speaks.
 [permissions]
-topics = ["humans/faces/tracked", "voice/state"]
+topics = ["humans/faces/tracked", "voice/state", "room/activity"]
 body = true
 
 [trigger]
@@ -32,6 +32,18 @@ wait = "10m"              # talking when the 50 minutes come: it stretches once 
 topic = "voice/state"
 field = "state"
 equals = "resting"
+
+[[while]]                 # not while they read or write, head down (#1678): it waits for them to look up,
+topic = "room/activity"   # within the ten minutes above, and lets this sitting's stretch go if they do not.
+field = "state"           # It never says a word about posture. Without the eyes' room/activity
+not_equals = "head_down"  # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
+unknown = "holds"
+
+# One nudge an hour between the wellbeing skills (#1685): with none of the
+# installable ones on the lamp, it is the only member and nothing changes.
+[budget]
+group = "wellbeing"
+per_hour = 1
 
 [ask]
 policy = "nudge"

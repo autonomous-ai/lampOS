@@ -302,6 +302,49 @@ the migration. It prints the paths it wrote, never
 the key, not even its length. Checking the release (unit templates filled,
 programs present) is the adapter's, which renders the units.
 
+Then prepare writes what a V1 lamp lacks for the generic package (#2163,
+`profile::prepare`), each only where it is missing, so a lamp that has it
+keeps its own:
+
+- `/etc/lampOS/package-profile.json` (0644), which the adapter fills the
+  units from. The hardware is found by reading only: the one CH340 servo
+  adapter under `/dev/serial/by-id`, the one USB camera's index-0 video node
+  and its `vendor:product@usb-path`, the microphone and speaker cards in
+  `/proc/asound/cards` (the speaker's `Speaker` control asked with `amixer
+  sget`, a read), the CPUs with the highest top frequency, and the `cpu` and
+  `skin` thermal zones. A lamp with `/etc/lampOS/body/lamp.env` (this lamp's
+  own, from lamp-body-measure) has its `BODY_POSES` there too, for older
+  packages' body units, which took the poses in the unit; without a measured
+  `--gaze` the model's `755,555` is used there, and the profile says
+  `"gaze": "default, not measured"`. A lamp without one is not refused: the
+  generic body unit reads its poses from the files, and
+  `lamp-body-measure.service` reads them seated, at rest, after cutover
+  (#2163, `deploy/units/README.md`). That profile has no `BODY_POSES` and
+  says `"gaze": "not measured"`.
+- The settings the package carries in `provision/`: the voice's
+  `provider.json` (0600), and the controls' `controls.json` and
+  `controls-pins.json` (0644), the pins without `reset` and `legacy_head`,
+  which only `--touch` takes.
+- The runtime directories under `/var/lib` (`lampOS`, the memory's, the
+  actions', and the motor and camera locks 0700, the last four the parts'
+  account's, `orangepi` on a V1 image).
+
+A missing or doubled device, a `lamp.env` without `--home`, a setting the package
+lacks or a missing account stops it, exit 1, before any of these is written
+(the device key above may already be), and the old runtime keeps the lamp.
+The account is looked up only when a directory it owns is missing, so a
+lamp that has its profile, settings and directories is refused for none of
+them: no V2 update is refused here. Its first run on a V1 lamp writes them
+all, and a second run writes nothing. Each file is linked into place from a
+temporary beside it, so one that appeared meanwhile is never replaced.
+
+The settings prepare writes are not in `lamp-update install`'s records
+(`state.settings`). A lamp moved this way stays on the package's settings:
+install would take each as the lamp's own and keep it, so a newer default
+would never reach it, and the pins file (without `reset`) would stay on a
+product's `--touch` controls. Moving such a lamp to `install` needs those
+three files removed, or recorded, first.
+
 The key stays after a failed migration or a rollback: it is written outside
 the updater's data folder, so neither the updater's staging cleanup nor its
 snapshots remove it. A later `lamp-update install` finds it equal to the key

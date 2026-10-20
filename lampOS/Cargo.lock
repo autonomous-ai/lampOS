@@ -1772,18 +1772,24 @@ dependencies = [
 name = "lamp-cloud"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "bytes",
+ "lamp-actions",
  "lamp-bus",
  "lamp-ipc",
  "lamp-msgs",
+ "lamp-schedule",
  "lamp-setup",
+ "lamp-skills",
  "lamp-voice",
  "reqwest",
  "rumqttc",
  "rustls",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
+ "toml",
  "webpki-roots 1.0.9",
 ]
 
@@ -1870,6 +1876,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "tokio-tungstenite",
 ]
@@ -1951,6 +1958,7 @@ version = "0.1.0"
 dependencies = [
  "jiff",
  "lamp-bus",
+ "lamp-local-time",
  "lamp-msgs",
  "rustix",
  "serde",
@@ -1980,6 +1988,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-near-call"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "lamp-observer"
 version = "0.1.0"
 dependencies = [
@@ -1995,6 +2012,20 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "lamp-peek"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "lamp-bus",
+ "lamp-keeper",
+ "lamp-msgs",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -2053,8 +2084,10 @@ version = "0.1.0"
 dependencies = [
  "getrandom 0.4.3",
  "jiff",
+ "jiff-tzdb",
  "lamp-bus",
  "lamp-ipc",
+ "lamp-local-time",
  "lamp-msgs",
  "rusqlite",
  "rustix",
@@ -2102,6 +2135,7 @@ dependencies = [
  "lamp-local-time",
  "lamp-msgs",
  "lamp-ring",
+ "lamp-update",
  "rustix",
  "rustls",
  "serde",
@@ -2138,6 +2172,19 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "lamp-station"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "lamp-msgs",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]
@@ -2259,8 +2306,11 @@ dependencies = [
  "lamp-ears",
  "lamp-expression",
  "lamp-gemini",
+ "lamp-health",
  "lamp-ipc",
+ "lamp-local-time",
  "lamp-msgs",
+ "lamp-near-call",
  "lamp-policy",
  "lamp-ring",
  "lamp-schedule",
@@ -2292,9 +2342,11 @@ version = "0.1.0"
 dependencies = [
  "hound",
  "lamp-audio",
+ "lamp-expression",
  "lamp-ipc",
  "lamp-local-time",
  "lamp-memory",
+ "lamp-msgs",
  "lamp-observer",
  "lamp-policy",
  "lamp-skills",

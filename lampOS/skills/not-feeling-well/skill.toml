@@ -1,9 +1,11 @@
 # Not feeling well (#1681; the owner's scope, docs/v1-verdicts.md: "a face for
 # a failed part", GO-3.17). When the lamp's health has said `error` for half a
-# minute, it droops once, sleepily, and dims its light a shade until the error
-# ends: a creature that is a little unwell, never a status light. It never
-# speaks of it; what is wrong is `lamp/health`'s, for `lamp-health` and the
-# app. Written to lamp-skills' schema (docs/skills.md, "The schema, as
+# minute, or a part that came up well has been unheard for 5 minutes (a
+# crashed part, `quiet_ms`), it droops once, sleepily, and its light goes
+# pale and low and breathes slowly until that ends: a creature that is a
+# little unwell, never a status light. It never speaks of it; what is wrong
+# is `lamp/health`'s, for `lamp-health` and the app. Written to lamp-skills'
+# schema (docs/skills.md, "The schema, as
 # lamp-skills reads it").
 needs = ["body", "light"]
 # A core skill (docs/skills.md, "Core and installable skills"), held out of
@@ -12,13 +14,13 @@ kind = "core"
 version = "1.0.0"
 
 # What it may read and use, and nothing more: the lamp's health, the voice's
-# state, the droop and a shade of dim. It never speaks.
+# state, the droop and a pale breath. It never speaks.
 [permissions]
 topics = ["lamp/health", "voice/state"]
 light = true
 body = true
 
-[trigger]
+[[trigger]]               # a part says something is wrong
 topic = "lamp/health"
 field = "level"
 equals = "error"          # a part failed (the self-test, the body, the eyes, ...); stale or a warning does nothing
@@ -26,6 +28,14 @@ for = "30s"               # a part restarted at once by its keeper does nothing
 gap = "10s"               # one reading in between (lamp/health every 5 s) does not end it
 rearm = "ends"            # once each time; again only after the error ended
 wait = "1h"               # talking when the half minute comes: it droops once the talk ends
+
+[[trigger]]               # a part that came up well has stopped (#1681, the first builder's 11:19)
+topic = "lamp/health"
+field = "quiet_ms"        # how long the longest-quiet part that once said ok has gone unheard; absent when none
+above = 299999            # unheard for 5 minutes: a part restarting for a few seconds, or never heard from, does nothing
+gap = "10s"
+rearm = "ends"            # once each time; again only after every such part is heard from again
+wait = "1h"
 
 [[while]]                 # never while someone is talking to the lamp
 topic = "voice/state"
@@ -41,4 +51,7 @@ policy = "nudge"
 
 [[do]]
 body = { gesture = "sleepy" }          # a slow droop, once
-light = { dim = 1, until = "ends" }    # a shade dimmer, given back when the error ends or lamp/health goes silent
+# A pale, low, slow breath, given back when what ran it ends (the error, or
+# the quiet part heard again) or lamp/health goes silent. Without the ring's
+# light requests it is a steady pale light.
+light = { colour = "white", level = 2, pattern = { kind = "breathe", period = "10s", low = 1 }, until = "ends" }

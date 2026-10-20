@@ -734,7 +734,15 @@ impl TaskNews {
         std::thread::Builder::new()
             .name("lamp-voice-task-news".into())
             .spawn(move || {
-                read_forever(&directory, &told_file, &offer, &heard_told, &shared, &clock)
+                read_forever(
+                    &directory,
+                    &told_file,
+                    &offer,
+                    &heard_told,
+                    &shared,
+                    &clock,
+                    WOKEN_GAP,
+                )
             })
             .ok()?;
         Some(Self {
@@ -918,8 +926,9 @@ impl TaskNews {
 }
 
 /// Read the tasks part every [`READ_EVERY`], and at once when a task newly
-/// settled is seen on `tasks/status` ([`Wake::Settled`], #560), with the
-/// tasks part's own clock (`clock`).
+/// settled is seen on `tasks/status` ([`Wake::Settled`], #560), though
+/// never sooner than `woken_gap` ([`WOKEN_GAP`] on the lamp) after the read
+/// before, with the tasks part's own clock (`clock`).
 fn read_forever(
     directory: &Path,
     told_file: &Path,
@@ -927,6 +936,7 @@ fn read_forever(
     told: &Receiver<Wake>,
     shared: &Mutex<BTreeSet<String>>,
     clock: &dyn Fn() -> Option<BootClock>,
+    woken_gap: Duration,
 ) {
     let socket = directory.join("request.sock");
     let mut offered = BTreeSet::new();
@@ -958,7 +968,7 @@ fn read_forever(
         // just after news was told told the same news three times, each
         // time before this thread's next pass had kept it. A task newly
         // settled ends the wait (#560), including one seen while the read
-        // above was under way, though never sooner than `WOKEN_GAP` after
+        // above was under way, though never sooner than `woken_gap` after
         // that read.
         let read_at = std::time::Instant::now();
         let mut next = read_at + READ_EVERY;
@@ -969,7 +979,7 @@ fn read_forever(
             }
             match told.recv_timeout(left) {
                 Ok(Wake::Told(key)) => keep_told(told_file, &key),
-                Ok(Wake::Settled) => next = next.min(read_at + WOKEN_GAP),
+                Ok(Wake::Settled) => next = next.min(read_at + woken_gap),
                 Err(mpsc::RecvTimeoutError::Timeout) => break,
                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
             }
@@ -1287,14 +1297,19 @@ pub(crate) fn who(task: &Value) -> &'static str {
     match task["target"]["engine"].as_str() {
         Some("codex") => "Codex",
         Some("opencode") => "OpenCode",
+        Some("devin" | "devin-cloud") => "Devin",
         _ => "Claude Code",
     }
 }
 
 /// Where the rest of a task's answer is: "their MacBook Air" for a computer
 /// known by its own name (`LAMP_TASKS_MACHINE_NAMES`, #1676), else "their
-/// computer", as without it.
+/// computer", as without it; for Devin Cloud, which works on no computer,
+/// "the Devin session in Harness".
 pub(crate) fn their_computer(task: &Value) -> String {
+    if task["target"]["engine"] == "devin-cloud" {
+        return "the Devin session in Harness".to_owned();
+    }
     task["target_alias"]
         .as_str()
         .and_then(crate::agent_tasks::machine_name)
@@ -1333,6 +1348,24 @@ fn note(task: &Value, data: &Value, age_ms: u64) -> Option<String> {
         "a while ago, and you have not told them yet:"
     };
     let opening = "(Nobody has spoken. News from work you handed over for the person.";
+    // Devin Cloud is read as done whether or not it asked something
+    // (openharness#1449, `harness::state_of`): a question in its answer is
+    // said, with where they answer it, not told as a result (Jarvis's P2 on
+    // #2240).
+    let (no_question_cut, no_question) = if task["target"]["engine"] == "devin-cloud" {
+        let asks = format!(
+            "If its answer asks them something, say what it asks, and that they answer it in {computer}."
+        );
+        (
+            format!("and no question of your own. {asks}"),
+            format!("No question of your own at the end. {asks}"),
+        )
+    } else {
+        (
+            "and no question.".to_owned(),
+            "No question at the end.".to_owned(),
+        )
+    };
     let state = match data["state"].as_str()? {
         "idle" if !answer.is_empty() => "idle",
         state @ ("needs-input" | "stopped" | "failed") => state,
@@ -1344,13 +1377,13 @@ fn note(task: &Value, data: &Value, age_ms: u64) -> Option<String> {
             "{opening} {who} {when} finished the task they gave it: \"{asked}\". Its answer is long; it begins: \"{answer}{more}\". \
              Tell them now in one or two natural spoken sentences, as a good chief of staff would: \"Oh, {who} just finished…\" (\"earlier\" if it was a while ago), \
              then its gist in one plain line from that beginning (a story: who it is about and what happens; code: what it does now), \
-             then that the rest is on {computer}. Never only that. No code, lists, file paths or links, and no question.)"
+             then that the rest is on {computer}. Never only that. No code, lists, file paths or links, {no_question_cut})"
         ),
         "idle" => format!(
             "{opening} {who} {when} finished the task they gave it: \"{asked}\". What it came back with: \"{answer}{more}\". \
              Tell them now, the way a good chief of staff tells the person they work for: one or two natural spoken sentences, \
              starting with something like \"Oh, {who} just finished…\" (or \"earlier\" if it was a while ago), then the gist of the result in plain words. \
-             Do not read out code, lists, file paths or links; if there is more than fits, say the rest is on {computer}. No question at the end.)"
+             Do not read out code, lists, file paths or links; if there is more than fits, say the rest is on {computer}. {no_question})"
         ),
         "needs-input" if answer.is_empty() && more.is_empty() => format!(
             "{opening} {who} has stopped and is waiting for them about the task they gave it: \"{asked}\". {})",
@@ -3182,9 +3215,12 @@ mod tests {
 
     /// #560: the tasks part is read at once when a task settles, not at the
     /// next of the ten-second reads; news told is kept at once and has
-    /// nothing read.
+    /// nothing read. The least gap between two woken reads is 200 ms here,
+    /// where the lamp's [`WOKEN_GAP`] is a second: the same wait, and the
+    /// test is a second and a half shorter.
     #[test]
     fn a_task_newly_settled_is_read_at_once_and_told_news_reads_nothing() {
+        let woken_gap = Duration::from_millis(200);
         let root = std::env::temp_dir().join(format!("task-news-wake-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
@@ -3206,9 +3242,15 @@ mod tests {
             let (directory, told_file) = (root.clone(), told_file.clone());
             std::thread::spawn(move || {
                 let shared = Mutex::new(BTreeSet::new());
-                read_forever(&directory, &told_file, &offer, &woken, &shared, &|| {
-                    Some(now())
-                });
+                read_forever(
+                    &directory,
+                    &told_file,
+                    &offer,
+                    &woken,
+                    &shared,
+                    &|| Some(now()),
+                    woken_gap,
+                );
             })
         };
         // The first read, as the reader starts.
@@ -3224,12 +3266,12 @@ mod tests {
             "{:?}",
             read.duration_since(woke)
         );
-        // Woken again at once: read again, but not sooner than a second
+        // Woken again at once: read again, but not sooner than the gap
         // after that read (the first builder on #1156).
         wake.send(Wake::Settled).unwrap();
         let again = lists.recv_timeout(READ_EVERY).unwrap();
         let gap = again.duration_since(read);
-        assert!(gap >= WOKEN_GAP && gap < READ_EVERY / 2, "{gap:?}");
+        assert!(gap >= woken_gap && gap < READ_EVERY / 2, "{gap:?}");
         drop(wake);
         reader.join().unwrap();
         std::fs::remove_dir_all(root).unwrap();
@@ -3359,5 +3401,46 @@ mod tests {
         assert_eq!(first_told(true, ended, &yes, &lamp), Some(16));
         // Without the switch, 15 s after the last turn either way.
         assert_eq!(first_told(false, ended, &asked, &lamp), Some(150));
+    }
+
+    /// #1854: news of Devin's work names Devin, as each engine's names its
+    /// own agent; an engine the voice doesn't know is Claude Code, as before.
+    #[test]
+    fn news_names_the_agent_each_engine_is() {
+        for (engine, name) in [
+            ("claude", "Claude Code"),
+            ("codex", "Codex"),
+            ("opencode", "OpenCode"),
+            ("devin", "Devin"),
+            ("devin-cloud", "Devin"),
+            ("a_later_engine", "Claude Code"),
+        ] {
+            assert_eq!(who(&json!({"target":{"engine":engine}})), name, "{engine}");
+        }
+        // A question in Devin Cloud's answer is said, with where it's
+        // answered; other engines' news is as before.
+        let task =
+            |engine: &str| json!({"text":"Reply in the release thread","target":{"engine":engine}});
+        let done = json!({"state":"idle","answer":"Which release do you mean, 2.1 or 2.2?"});
+        let cloud = note(&task("devin-cloud"), &done, 0).unwrap();
+        assert!(
+            cloud.contains("If its answer asks them something"),
+            "{cloud}"
+        );
+        assert!(
+            cloud.contains("answer it in the Devin session in Harness"),
+            "{cloud}"
+        );
+        let plain = note(&task("claude"), &done, 0).unwrap();
+        assert!(!plain.contains("asks them something"), "{plain}");
+        // Devin Cloud's work is on no computer of theirs.
+        assert_eq!(
+            their_computer(&json!({"target":{"engine":"devin-cloud"},"target_alias":"devin"})),
+            "the Devin session in Harness"
+        );
+        assert_eq!(
+            their_computer(&json!({"target":{"engine":"devin"},"target_alias":"devin"})),
+            "their computer"
+        );
     }
 }

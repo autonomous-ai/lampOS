@@ -22,6 +22,15 @@ use tokio::sync::watch;
 pub const KEEP_ALIVE: Duration = Duration::from_secs(60);
 /// V1's session expiry.
 pub const SESSION_EXPIRY_S: u32 = 60;
+/// The largest packet taken from the broker, and told it: a `faces.add_photo`
+/// with the largest photo lamp-cloud takes (`crate::photos::MOST_BYTES`, as
+/// base64), with 1 MiB more for its envelope and for a sender that writes
+/// base64's `/` as `\/` (one character in 64, about 170 KiB on the largest
+/// photo; Reviewer-lead on #2272). rumqttc's own is 10 KiB, which dropped
+/// the connection on every photo (Mobile on lamp-0c89, 20 Oct). The broker
+/// holds back a packet past this one, so a photo over it gets no answer
+/// rather than `photos::asked`'s refusal: the app sends at most 1 MiB.
+pub const MOST_PACKET_BYTES: u32 = (crate::photos::MOST_BYTES.div_ceil(3) * 4 + (1 << 20)) as u32;
 
 /// The client's options for `account`: V1's, with this lamp's keepalive.
 pub fn options(account: &Account) -> MqttOptions {
@@ -37,7 +46,7 @@ pub fn options(account: &Account) -> MqttOptions {
         .set_connect_properties(ConnectProperties {
             session_expiry_interval: Some(SESSION_EXPIRY_S),
             receive_maximum: None,
-            max_packet_size: None,
+            max_packet_size: Some(MOST_PACKET_BYTES),
             topic_alias_max: None,
             request_response_info: None,
             request_problem_info: None,
@@ -46,6 +55,15 @@ pub fn options(account: &Account) -> MqttOptions {
             authentication_data: None,
         });
     options
+}
+
+/// Whether a message on `topic` is a command for this lamp: only its own
+/// account channel, `fa_channel`, which only the lamp's signed-in account
+/// may publish to. Every kind rests on this, `face.remove` and
+/// `faces.add_photo` among them (the reviewer on #2199): the whole topic,
+/// never a part of it.
+pub fn commanded(topic: &[u8], account: &Account) -> bool {
+    !account.fa_channel.is_empty() && topic == account.fa_channel.as_bytes()
 }
 
 /// The reply to one message on `fa_channel`, or nothing for one that is no
@@ -62,6 +80,13 @@ pub fn reply(
             let answered = answer(lamp, &kind, &data);
             if answered.is_ok() && QUIET_WHEN_DONE.contains(&kind.as_str()) {
                 return None;
+            }
+            // A change after setup (#1959): taken now, its result later.
+            if answered.is_ok()
+                && (crate::settings::KINDS.contains(&kind.as_str())
+                    || kind == crate::settings::WIFI_KIND)
+            {
+                return Some(identity.starting(now, &kind).to_string());
             }
             identity.data(now, &kind, &answered)
         }
@@ -97,13 +122,22 @@ pub fn rfc3339(at: SystemTime) -> String {
 }
 
 /// What was handed to the client, so the broker's acknowledgement of a
-/// report can be told from the rest (#1683). The client numbers publishes
-/// as it sends them, in the order they were handed over, so each handed
-/// publish is noted in that order: a report's `seq`, or none.
+/// report, or of a change's result (#1959), can be told from the rest
+/// (#1683). The client numbers publishes as it sends them, in the order they
+/// were handed over, so each handed publish is noted in that order.
 #[derive(Default)]
 struct Handed {
-    in_order: VecDeque<Option<u64>>,
-    by_packet: HashMap<u16, u64>,
+    in_order: VecDeque<Tagged>,
+    by_packet: HashMap<u16, Tagged>,
+}
+
+/// What a handed publish was.
+enum Tagged {
+    Other,
+    /// A report's `seq`.
+    Report(u64),
+    /// A change's result, said again if it is lost before its ack.
+    Change(crate::settings::Outcome),
 }
 
 impl Handed {
@@ -114,32 +148,64 @@ impl Handed {
         payload: String,
         report: Option<u64>,
     ) -> bool {
+        self.publish_tagged(
+            client,
+            topic,
+            payload,
+            report.map_or(Tagged::Other, Tagged::Report),
+        )
+    }
+
+    fn publish_tagged(
+        &mut self,
+        client: &AsyncClient,
+        topic: &str,
+        payload: String,
+        tag: Tagged,
+    ) -> bool {
         let handed = client
             .try_publish(topic, QoS::AtLeastOnce, false, payload)
             .is_ok();
         if handed {
-            self.in_order.push_back(report);
+            self.in_order.push_back(tag);
         }
         handed
     }
 
     /// The client sent the next one as packet `pkid`.
     fn sent(&mut self, pkid: u16) {
-        if let Some(Some(seq)) = self.in_order.pop_front() {
-            self.by_packet.insert(pkid, seq);
+        match self.in_order.pop_front() {
+            Some(Tagged::Other) | None => {}
+            Some(tag) => {
+                self.by_packet.insert(pkid, tag);
+            }
         }
     }
 
-    /// The report the broker acknowledged as `pkid`, if it was one.
+    /// The report the broker acknowledged as `pkid`, if it was one; a
+    /// change's result acknowledged is done with.
     fn acked(&mut self, pkid: u16) -> Option<u64> {
-        self.by_packet.remove(&pkid)
+        match self.by_packet.remove(&pkid) {
+            Some(Tagged::Report(seq)) => Some(seq),
+            _ => None,
+        }
     }
 
     /// The connection went: the client drops what it had not had
-    /// acknowledged (a clean start), so the lamp sends it again.
-    fn lost(&mut self) {
-        self.in_order.clear();
-        self.by_packet.clear();
+    /// acknowledged (a clean start), so the lamp sends it again. The
+    /// changes' results among it are handed back, oldest first.
+    fn lost(&mut self) -> Vec<crate::settings::Outcome> {
+        let mut by_packet: Vec<_> = self.by_packet.drain().collect();
+        by_packet.sort_by_key(|(pkid, _)| *pkid);
+        by_packet
+            .into_iter()
+            .map(|(_, tag)| tag)
+            .chain(self.in_order.drain(..))
+            .filter_map(|tag| match tag {
+                Tagged::Change(outcome) => Some(outcome),
+                _ => None,
+            })
+            .collect()
     }
 }
 
@@ -247,16 +313,33 @@ async fn session(
         // One `poll` is kept until it ends, and the tick runs beside it, only
         // while texts are taken.
         let texting = lamp.texting();
+        // Changes after setup (#1959): their results are looked for on the
+        // same tick, only with their switch.
+        let changes = lamp.changes();
         let poll = events.poll();
         tokio::pin!(poll);
         let polled = loop {
             tokio::select! {
                 polled = &mut poll => break polled,
-                _ = tick.tick(), if texting => {
+                _ = tick.tick(), if texting || changes.is_some() => {
                     let me = identity.borrow().clone();
-                    for data in lamp.chat_events(crate::chat::now_ms()) {
-                        let event = me.data(&now(), "chat.event", &Ok(Some(data))).to_string();
-                        handed.publish(&client, account.fd_channel.as_str(), event, None);
+                    if texting {
+                        for data in lamp.chat_events(crate::chat::now_ms()) {
+                            let event = me.data(&now(), "chat.event", &Ok(Some(data))).to_string();
+                            handed.publish(&client, account.fd_channel.as_str(), event, None);
+                        }
+                    }
+                    // Only while connected, and kept until the broker's ack:
+                    // a Wi-Fi change's result is often ready only once the
+                    // lamp is back online.
+                    if connected && let Some(changes) = &changes {
+                        for outcome in changes.take() {
+                            let reply = outcome.reply(&me, &now()).to_string();
+                            let tag = Tagged::Change(outcome.clone());
+                            if !handed.publish_tagged(&client, account.fd_channel.as_str(), reply, tag) {
+                                changes.owe(vec![outcome]);
+                            }
+                        }
                     }
                 }
                 () = woken(&reports), if connected => {
@@ -268,6 +351,9 @@ async fn session(
         match polled {
             Ok(Event::Incoming(Packet::ConnAck(_))) => {
                 wait = first;
+                if let Some(changes) = &changes {
+                    changes.set_broker(account.mqtt_endpoint.trim(), account.mqtt_port);
+                }
                 let _ = client.try_subscribe(account.fa_channel.as_str(), QoS::AtLeastOnce);
                 let info = identity.borrow().info(&now()).to_string();
                 handed.publish(&client, account.fd_channel.as_str(), info, None);
@@ -287,7 +373,7 @@ async fn session(
                 );
             }
             Ok(Event::Incoming(Packet::Publish(message))) => {
-                if message.topic.as_ref() != account.fa_channel.as_bytes() {
+                if !commanded(message.topic.as_ref(), account) {
                     continue;
                 }
                 let me = identity.borrow().clone();
@@ -306,7 +392,10 @@ async fn session(
             Ok(_) => {}
             Err(error) => {
                 connected = false;
-                handed.lost();
+                let again = handed.lost();
+                if let Some(changes) = &changes {
+                    changes.owe(again);
+                }
                 if let Some(shared) = &reports {
                     shared.with(|reports| reports.unhand(None));
                 }
@@ -322,6 +411,34 @@ async fn session(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Only the lamp's own account channel commands it: not its reply
+    /// channel, another lamp's, a longer or shorter topic, or an empty one.
+    #[test]
+    fn only_the_lamps_own_account_channel_commands_it() {
+        let account: Account = serde_json::from_value(serde_json::json!({
+            "mqtt_endpoint": "broker.example", "mqtt_port": 8883,
+            "mqtt_username": "u", "mqtt_password": "p",
+            "fa_channel": "fa/d-42", "fd_channel": "fd/d-42", "llm_base_url": ""
+        }))
+        .unwrap();
+        assert!(commanded(b"fa/d-42", &account));
+        for other in [
+            &b"fd/d-42"[..],
+            b"fa/d-43",
+            b"fa/d-42/x",
+            b"fa/d-4",
+            b"",
+            b"FA/D-42",
+        ] {
+            assert!(!commanded(other, &account), "{other:?}");
+        }
+        let unset = Account {
+            fa_channel: String::new(),
+            ..account
+        };
+        assert!(!commanded(b"", &unset));
+    }
 
     #[test]
     fn the_time_is_rfc3339_in_utc() {
@@ -364,10 +481,21 @@ mod tests {
         Refuses,
         /// Takes the first connection, then closes it after its first reply.
         DropsOnce,
+        /// Sends `commands` on the first connection only, and closes it
+        /// after its second reply: the Wi-Fi changed under it (#1959).
+        CommandsOnceThenDrops,
         /// Takes every connection, answering CONNECT only after 300 ms, six
         /// of the texts' ticks: a broker across the internet.
         SlowConnAck,
+        /// As `Takes`, but sends each command first on topics that aren't
+        /// the lamp's account channel, then on it (the reviewer's P3 1 on
+        /// #2214).
+        OtherTopicsFirst,
     }
+
+    /// Topics a command must never be taken from: the lamp's own reply
+    /// channel, another lamp's, longer and shorter ones, and another case.
+    const NOT_OURS: [&str; 5] = ["fd/d-42", "fa/d-43", "fa/d-42/x", "fa/d-4", "FA/D-42"];
 
     /// A broker on a free local port, with V1's packets, enough for one
     /// lamp: CONNECT, SUBSCRIBE, PUBLISH at QoS 1 both ways, PINGREQ.
@@ -442,11 +570,33 @@ mod tests {
                             })
                             .write(&mut out, None)
                             .unwrap();
-                            for (n, command) in commands.iter().enumerate() {
-                                let mut publish =
-                                    Publish::new("fa/d-42", QoS::AtLeastOnce, *command, None);
-                                publish.pkid = 100 + n as u16;
-                                Packet::Publish(publish).write(&mut out, None).unwrap();
+                            let once = behaves == Broker::CommandsOnceThenDrops;
+                            let commands = if once && connections > 1 {
+                                &[][..]
+                            } else {
+                                &commands[..]
+                            };
+                            let topics: &[&str] = if behaves == Broker::OtherTopicsFirst {
+                                &[
+                                    NOT_OURS[0],
+                                    NOT_OURS[1],
+                                    NOT_OURS[2],
+                                    NOT_OURS[3],
+                                    NOT_OURS[4],
+                                    "fa/d-42",
+                                ]
+                            } else {
+                                &["fa/d-42"]
+                            };
+                            let mut pkid = 100u16;
+                            for command in commands {
+                                for topic in topics {
+                                    let mut publish =
+                                        Publish::new(*topic, QoS::AtLeastOnce, *command, None);
+                                    publish.pkid = pkid;
+                                    pkid += 1;
+                                    Packet::Publish(publish).write(&mut out, None).unwrap();
+                                }
                             }
                         }
                         Packet::Publish(publish) => {
@@ -468,6 +618,10 @@ mod tests {
                         break;
                     }
                     if behaves == Broker::DropsOnce && connections == 1 && replies == 1 {
+                        break;
+                    }
+                    if behaves == Broker::CommandsOnceThenDrops && connections == 1 && replies == 2
+                    {
                         break;
                     }
                 }
@@ -570,6 +724,291 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    /// #1959: a change after setup is acked `starting` on `fd_channel` at
+    /// once, and its result goes out after it as the same kind, from the
+    /// broker's own loop.
+    #[tokio::test]
+    async fn a_change_is_acked_starting_and_its_result_follows_on_the_channel() {
+        let socket = std::env::temp_dir().join(format!("lco-{}-change.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let helper = std::thread::spawn(move || {
+            use std::io::{BufRead, Write};
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            stream
+                .write_all(b"{\"done\":{\"name\":\"Desk lamp\"}}\n")
+                .unwrap();
+            line
+        });
+        let (port, seen) = broker(
+            Broker::Takes,
+            vec![r#"{"cmd":"data","kind":"device.rename","data":{"name":"Desk lamp"}}"#],
+        )
+        .await;
+        let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+        let (_identity_tx, me) = watch::channel(identity());
+        let changes = crate::settings::Changes::new(&socket, Duration::from_secs(5));
+        let lamp = tokio::spawn(async move {
+            let mut lamp = Fake {
+                changes: Some(changes),
+                ..Fake::default()
+            };
+            let mut say = |_: &str| {};
+            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+        });
+        let renames = |seen: &[Seen]| {
+            publishes(seen)
+                .into_iter()
+                .filter(|(_, reply)| reply["kind"] == "device.rename")
+                .collect::<Vec<_>>()
+        };
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while renames(&seen.lock().unwrap()).len() < 2 && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        drop(accounts_tx);
+        lamp.await.unwrap();
+        assert_eq!(helper.join().unwrap(), "{\"display_name\":\"Desk lamp\"}\n");
+        let replies = renames(&seen.lock().unwrap());
+        assert_eq!(replies.len(), 2);
+        assert_eq!(replies[0].0, "fd/d-42");
+        assert_eq!(replies[0].1["status"], "starting");
+        assert_eq!(
+            (&replies[1].1["status"], &replies[1].1["data"]["name"]),
+            (
+                &serde_json::json!("success"),
+                &serde_json::json!("Desk lamp")
+            )
+        );
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// The reviewer's P3 1 on #2214, which #1968, #2199 and #2214 rest on:
+    /// a command on any topic but the lamp's own account channel is neither
+    /// done nor answered. The same command then on `fa/d-42` is done once
+    /// and answered once, on `fd/d-42`.
+    #[tokio::test]
+    async fn only_a_command_on_the_lamps_own_account_channel_is_done_and_answered() {
+        let (port, seen) = broker(
+            Broker::OtherTopicsFirst,
+            vec![r#"{"cmd":"data","kind":"volume.set","data":{"volume":44}}"#],
+        )
+        .await;
+        let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+        let (_identity_tx, me) = watch::channel(identity());
+        let lamp = tokio::spawn(async move {
+            let mut lamp = Fake {
+                ceiling: 80,
+                ..Fake::default()
+            };
+            let mut say = |_: &str| {};
+            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            lamp
+        });
+        let sets = |seen: &[Seen]| {
+            publishes(seen)
+                .into_iter()
+                .filter(|(_, reply)| reply["kind"] == "volume.set")
+                .collect::<Vec<_>>()
+        };
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while sets(&seen.lock().unwrap()).is_empty() && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        // Every copy was sent in one write, the account channel's last: any
+        // other answered would be here by now.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        drop(accounts_tx);
+        let lamp = lamp.await.unwrap();
+        let replies = sets(&seen.lock().unwrap());
+        assert_eq!(replies.len(), 1, "{replies:?}");
+        assert_eq!(replies[0].0, "fd/d-42");
+        assert_eq!(replies[0].1["status"], "success");
+        assert_eq!(lamp.set, [44], "done once, from the account channel only");
+    }
+
+    /// Mobile on lamp-0c89 (20 Oct): a `faces.add_photo` with the largest
+    /// photo lamp-cloud takes is read on the connection and answered on
+    /// `fd/d-42`, not dropped with it as over rumqttc's 10 KiB, even from a
+    /// sender that writes base64's `/` as `\/` (Reviewer-lead on #2272). The
+    /// broker is told the same limit.
+    #[tokio::test]
+    async fn a_command_with_the_largest_photo_is_read_and_answered() {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        // A photo's bytes look random, so its base64 has `/` once in 64.
+        let mut seed = 0x2545_f491_4f6c_dd1du64;
+        let mut photo: Vec<u8> = (0..crate::photos::MOST_BYTES)
+            .map(|_| {
+                seed ^= seed << 13;
+                seed ^= seed >> 7;
+                seed ^= seed << 17;
+                seed as u8
+            })
+            .collect();
+        photo[..2].copy_from_slice(&[0xFF, 0xD8]);
+        let command = format!(
+            r#"{{"cmd":"data","kind":"faces.add_photo","data":{{"name":"Quillo","photo":"{}"}}}}"#,
+            STANDARD.encode(&photo).replace('/', "\\/")
+        );
+        let largest = crate::photos::MOST_BYTES.div_ceil(3) * 4;
+        assert!(command.len() > largest + 128 * 1_024, "{}", command.len());
+        let (port, seen) = broker(Broker::Takes, vec![command.leak()]).await;
+        let lines = against(port, &seen, Duration::from_millis(50), |seen| {
+            publishes(seen)
+                .iter()
+                .any(|(_, reply)| reply["kind"] == "faces.add_photo")
+        })
+        .await;
+        let replies: Vec<_> = publishes(&seen.lock().unwrap())
+            .into_iter()
+            .filter(|(_, reply)| reply["kind"] == "faces.add_photo")
+            .collect();
+        assert_eq!(replies.len(), 1, "{:?}", &lines[..lines.len().min(4)]);
+        assert_eq!(replies[0].0, "fd/d-42");
+        assert!(
+            !lines.iter().any(|line| line.contains("offline")),
+            "{lines:?}"
+        );
+        assert_eq!(
+            options(&account(port)).max_packet_size(),
+            Some(MOST_PACKET_BYTES)
+        );
+    }
+
+    /// #1959: the Wi-Fi changed under the connection. The ack goes out on
+    /// the old one, which then drops; the helper's result comes while the
+    /// lamp is offline and is said on the next connection, with the app's
+    /// id, and the password is in no message.
+    #[tokio::test]
+    async fn a_wifi_result_ready_while_offline_is_said_once_back_online() {
+        let socket = std::env::temp_dir().join(format!("lco-{}-wifi.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let helper = std::thread::spawn(move || {
+            use std::io::{BufRead, Write};
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            // The radio switching: answered while the lamp is offline.
+            std::thread::sleep(Duration::from_millis(200));
+            stream
+                .write_all(b"{\"done\":{\"ssid\":\"New Home\"}}\n")
+                .unwrap();
+            line
+        });
+        let (port, seen) = broker(
+            Broker::CommandsOnceThenDrops,
+            vec![
+                r#"{"cmd":"data","kind":"wifi.set","data":{"ssid":"New Home","password":"fake-pass-NEW-1234","request_id":"r-7"}}"#,
+            ],
+        )
+        .await;
+        let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+        let (_identity_tx, me) = watch::channel(identity());
+        let changes = crate::settings::Changes::with_wifi(
+            std::env::temp_dir().join("lco-never.sock"),
+            Duration::from_secs(5),
+            Some((socket.clone(), Duration::from_secs(5))),
+        );
+        let lamp = tokio::spawn(async move {
+            let mut lamp = Fake {
+                changes: Some(changes),
+                ..Fake::default()
+            };
+            let mut say = |_: &str| {};
+            // Back online only after the helper has answered.
+            run(
+                accounts,
+                me,
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(600),
+            )
+            .await;
+        });
+        let wifi = |seen: &[Seen]| {
+            publishes(seen)
+                .into_iter()
+                .filter(|(_, reply)| reply["kind"] == "wifi.set")
+                .collect::<Vec<_>>()
+        };
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while wifi(&seen.lock().unwrap()).len() < 2 && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        drop(accounts_tx);
+        lamp.await.unwrap();
+        let line: serde_json::Value = serde_json::from_str(&helper.join().unwrap()).unwrap();
+        assert_eq!(line["wifi"]["broker"], format!("127.0.0.1:{port}"));
+        let seen = seen.lock().unwrap().clone();
+        let connects = seen
+            .iter()
+            .filter(|seen| matches!(seen, Seen::Connect { .. }))
+            .count();
+        assert_eq!(connects, 2);
+        let replies = wifi(&seen);
+        assert_eq!(replies.len(), 2, "{replies:?}");
+        assert_eq!(replies[0].1["status"], "starting");
+        assert_eq!(replies[1].1["status"], "success");
+        assert_eq!(
+            replies[1].1["data"],
+            serde_json::json!({"ssid": "New Home", "request_id": "r-7"})
+        );
+        // The result went out on the second connection: after its info.
+        let second_info = seen
+            .iter()
+            .enumerate()
+            .filter(
+                |(_, seen)| matches!(seen, Seen::Publish(_, p) if p.contains("\"type\":\"info\"")),
+            )
+            .map(|(at, _)| at)
+            .nth(1)
+            .unwrap();
+        let result_at = seen
+            .iter()
+            .position(|seen| matches!(seen, Seen::Publish(_, p) if p.contains("\"status\":\"success\"") && p.contains("wifi.set")))
+            .unwrap();
+        assert!(result_at > second_info);
+        for seen in &seen {
+            if let Seen::Publish(_, payload) = seen {
+                assert!(!payload.contains("fake-pass-NEW-1234"), "{payload}");
+            }
+        }
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// A change's result handed but lost with the connection before its ack
+    /// is handed back, to be said again; one acked is done with.
+    #[test]
+    fn a_result_lost_before_its_ack_is_handed_back() {
+        let outcome = |id: &str| crate::settings::Outcome {
+            kind: "wifi.set".into(),
+            result: Ok(None),
+            request_id: Some(id.into()),
+        };
+        let mut handed = Handed::default();
+        handed.in_order.push_back(Tagged::Change(outcome("acked")));
+        handed.in_order.push_back(Tagged::Other);
+        handed.in_order.push_back(Tagged::Change(outcome("sent")));
+        handed.in_order.push_back(Tagged::Change(outcome("queued")));
+        handed.sent(1);
+        handed.sent(2);
+        handed.sent(3);
+        assert_eq!(handed.acked(1), None);
+        let again: Vec<_> = handed
+            .lost()
+            .into_iter()
+            .map(|outcome| outcome.request_id.unwrap())
+            .collect();
+        assert_eq!(again, ["sent", "queued"]);
     }
 
     /// #1673: with texts taken, a `chat.send` on `fa_channel` is acked on

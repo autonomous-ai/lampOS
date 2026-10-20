@@ -73,6 +73,15 @@ at most 24 behaviors and 64 keyframes per behavior; catalogues are at most
 128 KiB. A repeating clip is allowed only on playout evidence: a committed
 interval, or the explicitly enabled bounded recent level described below.
 
+A catalogue reads one release forward (#1680): a field this build does not
+know, at any depth, is read past, and `lamp-expression` names it once at
+start ("fields this build does not read, ignored: speaking.sway_pitch"), so a
+roll back after a newer build wrote the catalogue never stops it. A known
+field with a bad value, an unknown value of a known field (a new trigger)
+or a `version` other than 1 is still refused. A missing field the build
+writes only when set (an empty list, `false`, none) is not named. Tests:
+`crates/expression/tests/forward.rs`.
+
 | Initial behavior | Built-in plan |
 |---|---|
 | Look away and back | A small thinking glance develops over 250 ms. A committed first-audio schedule causes return over up to 250 ms, reaching the planned speaking posture 40 ms before that schedule. A measured body lag can be supplied; the default is unknown |
@@ -208,6 +217,11 @@ drift that waits after a tap is meant. It is seen on `body/joint_states`, which 
 service already reads: a joint's goal going 0.04 rad/s or faster for 0.3 s
 (the breath and the drift go under 0.02, a shift 0.06 to 0.09; a goal that
 leaps once is not a move). The body keeps the same 30 s after a drift.
+The breath is the ring's: the boot clock over 5.2 s, and where Mood runs, the
+phase of the lamp's one breath in `mood/state`, which the service reads
+four times a second from the bus it already has; no switch of its own, and
+with no fresh mood nothing changes (#1670,
+[ring-choreography.md](ring-choreography.md#the-lamps-one-breath-1670)).
 
 ## Optional speaking: the lamp's own speech in its head (#933)
 
@@ -231,7 +245,8 @@ under one nod's 360 ms. Tests: `speaking_engine.rs`'s
 `an_answer_said_200_ms_ahead_nods_and_sways_at_the_catalogues_own_lag` (0
 nods without it), and the second route's coordinator test at the
 catalogue's own lag. The old playout clip still takes the level at the lag
-only. All are head only, within the catalogue's limits, in any room
+only. The nods move the head's pitch and the sway turns the base,
+within the catalogue's limits, in any room
 (it is the lamp's own speech). None runs while the body is held, while
 concentrating, asleep, or once someone has cut in, and nothing is owed after.
 - **A nod on a stressed word.** A dip of `nod` (0.035 rad of head pitch, about
@@ -257,9 +272,22 @@ concentrating, asleep, or once someone has cut in, and nothing is owed after.
   against 12).
 - **A sway between sentences.** After `pause_us` (0.35 s) of the lamp silent
   (level under 0.06), as the next sentence begins (level back over 0.12),
-  the head rolls over `sway_us` (0.6 s) to the other side: `sway_roll`
-  (0.025 rad, about 1.4°), 75% to 100% of it each time. It stays there until
-  the next pause, and comes back level when the answer ends.
+  now and then (about two sentences in five) the base turns out from centre
+  to one side and back: out over `sway_us` (0.8 s) and back over another,
+  eased at both ends, by `sway_yaw` (0.08 rad, about 52 counts, inside the
+  body's 70-count cap for Expression), 75% to 100% of it each time. Whether
+  a sentence sways, which side and how far are picked afresh each time
+  from a count, so a replay is the same; a sentence that begins while a
+  turn is still under way does not sway, so the base is at centre between
+  sways. An answer that ends mid-sway eases back to centre from there over
+  `sway_us`, never further out. (#1067's review: a sway on every sentence,
+  always to the other side and first to the same one, read as a
+  metronome.) A section still written with #955's `sway_roll` loads, says
+  once on the journal that it is ignored, and does not sway. Until #955's review
+  it rolled the head 0.025 rad: filmed from the front on lamp-4ace, head roll
+  that small did not show, and on lamp-52e6 roll has a reach of 1 count. The
+  base turning does. The body adds it to wherever its own gaze has turned
+  the base; see `body.md`.
 - **A settle as it finishes.** One soft nod (`settle`, 0.03 rad) over
   `settle_us` (0.6 s) when an answer of at least `settle_after_us` (1.5 s)
   ends, then rest.
@@ -291,16 +319,21 @@ held until just before the first word) was already there. It is too short to
 show in stills 4.5 s apart.
 
 Tests: `crates/expression/src/speaking.rs` (a stressed word nods and a steady
-voice does not; nods keep their gap and differ; a pause sways the next
-sentence to the other side, eased, and a short breath does not; a long
-answer settles and a short one does not; held or cut in on, nothing moves;
+voice does not; nods keep their gap and differ; over ten sentences, for
+ten counts, not every pause sways, both sides and both first sides occur,
+each sway is 75% to 100% of `sway_yaw`, eased, without rolling the head,
+and the base is at centre before each pause ends and after the answer; an
+answer that ends mid-sway eases back to centre, never further out; a
+short breath does not sway; a long answer settles and a short one does not; held or cut in on, nothing moves;
 poses outside the limits are refused). `crates/expression/tests/speaking_engine.rs`
 runs an eight-second answer with stressed words every 1.1 s and a half-second
 pause every 3 s through the engine, in a quiet and a busy room. It expects
-2 or 3 nods (one a sentence), the head rolled both ways by more than 0.015 rad, over 0.02 rad
+2 or 3 nods (one a sentence), the base turned out by more than 0.055 rad, over 0.02 rad
 of pitch range, the settle, and what speaking adds never stepping more than
-0.007 rad of pitch or 0.003 of roll in a 20 ms tick. Without `speaking`, the
-same answer plans none of it. It also checks the fences: a new turn, or a
+0.007 rad of pitch or of yaw in a 20 ms tick. Without `speaking`, the
+same answer plans none of it and never turns the base, and #955's section
+with `sway_roll` loads and plans no sway (`tests/program.rs`: the service
+starts with it and says so once). It also checks the fences: a new turn, or a
 cancelled answer, carries none of the old answer's motion (the offsets equal
 a catalogue without speaking on every tick), and a finished answer is
 settled after.
@@ -310,6 +343,27 @@ old fixed bars the quiet one failed. At 0.01 times, all hiss, it nods and
 sways never. A voice that fills the meter (1.0 through every sentence) has no
 word standing out of its sentence: it nods at most once a sentence and still
 sways.
+
+**Measuring it on a lamp** (`lampOS/tools/`, run from the computer beside
+the lamp; each needs sudo on the lamp, its password taken from
+`LAMP_SUDO_PASS` on stdin, never on a command line):
+
+- `speaking-ab.sh` says one story request (the Mac's `say`) with Expression's
+  catalogue without its speaking section, then with it (`--arms off,on`, or
+  one of them), each by a runtime drop-in that is removed on any exit. It
+  prints lamp-body's speaking steps, each speaking behaviour's starts (nod,
+  sway, settle), the voice's levels against the scaled bars, Expression's
+  offsets, and how the voice's turns ended (`ends=`, so a missing settle is
+  told from a cut turn). With `--levels-only` Expression runs in shadow
+  (its `--enable` left out), so it plans and names each move but nothing
+  moves, and lamp-body is not touched: for a night with nobody at the arm.
+  Its files stay in `/var/lib/thirteen-ab` on the lamp until removed by hand.
+- `sound-shape.sh FILE`, on a `voice/sound` tap the run left there: the
+  levels' spread, how many pieces each rise rule would take, the pauses
+  under each quiet line, and how far ahead each piece was said (against
+  `body_lag_us`: how #1759 found that the head never nodded on a lamp).
+
+Tests: `tools/speaking-ab-test.sh`, `tools/sound-shape-test.sh`.
 
 Not shown: how it looks on a lamp, and the body's own smoothing and speed
 limits on these offsets.

@@ -30,6 +30,11 @@
 //! the person's light is over it, is said on `light/outranked`, naming
 //! what is over it, so its asker is told it lost (#940).
 //!
+//! With `LAMP_SKILL_LIGHT_SPEAKING=on` as well (El on #1722), a request's
+//! light shown also tints the Speaking face ([`RingLight::held`],
+//! [`crate::ring_face::Face::skill_light`]), so a skill's light held through
+//! its words is seen with them; the other faces of a turn are their own.
+//!
 //! With `LAMP_LIGHT_KEEP=on` (the first builder on #1464) the person's light
 //! is also kept on disk ([`KEEP_PATH`]), written when it changes, at most
 //! once a second, so a lamp set warm at level 3 wakes up at level 3: the bus
@@ -76,10 +81,18 @@ const FRAMES_APART_US: u64 = 100_000;
 /// The switch for lights asked for that lapse (#940), off unless `on`.
 pub const REQUESTS_ENVIRONMENT: &str = "LAMP_LIGHT_REQUESTS";
 const REQUESTS_FLAG: &str = "--light-requests";
+/// The switch for a skill's light held tinting the Speaking face (El on
+/// #1722), off unless `on`; it needs [`REQUESTS_ENVIRONMENT`].
+pub const SPEAKING_ENVIRONMENT: &str = "LAMP_SKILL_LIGHT_SPEAKING";
+const SPEAKING_FLAG: &str = "--skill-light-speaking";
 /// The switch for keeping the person's light across a restart, off unless
 /// `on`, and where it is kept (the reset wipes it).
 pub const KEEP_ENVIRONMENT: &str = "LAMP_LIGHT_KEEP";
 pub const KEEP_PATH: &str = "/var/lib/lampOS/light/person.json";
+/// The switch for the person's light while the voice waits out a mute or a
+/// closed privacy switch (#1816), off unless `on`: `light/state` said and
+/// `light/command` taken with no session, the ring left as the wait has it.
+pub const WHILE_MUTED_ENVIRONMENT: &str = "LAMP_LIGHT_WHILE_MUTED";
 const KEEP_FLAG: &str = "--light-keep";
 /// The kept light is written at most this often.
 pub const KEEP_EVERY_US: u64 = 1_000_000;
@@ -105,6 +118,28 @@ pub fn take(flags: &[String]) -> (bool, &[String]) {
     }
 }
 
+/// The ring worker's flag for a skill's light on the Speaking face, with
+/// `LAMP_SKILL_LIGHT_SPEAKING=on`.
+pub fn speaking_arguments_from_environment() -> Vec<String> {
+    speaking_arguments(std::env::var(SPEAKING_ENVIRONMENT).ok().as_deref())
+}
+
+fn speaking_arguments(value: Option<&str>) -> Vec<String> {
+    match value {
+        Some("on") => vec![SPEAKING_FLAG.to_owned()],
+        _ => Vec::new(),
+    }
+}
+
+/// Take a leading `--skill-light-speaking` off the ring worker's flags,
+/// after [`take`].
+pub fn take_speaking(flags: &[String]) -> (bool, &[String]) {
+    match flags {
+        [flag, rest @ ..] if flag == SPEAKING_FLAG => (true, rest),
+        _ => (false, flags),
+    }
+}
+
 /// The ring worker's flag for keeping the person's light, with
 /// `LAMP_LIGHT_KEEP=on`.
 pub fn keep_arguments_from_environment() -> Vec<String> {
@@ -123,6 +158,42 @@ pub fn take_keep(flags: &[String]) -> (Option<&Path>, &[String]) {
     match flags {
         [flag, path, rest @ ..] if flag == KEEP_FLAG => (Some(Path::new(path)), rest),
         _ => (None, flags),
+    }
+}
+
+/// The person's light for the voice's muted wait (#1816), with
+/// [`WHILE_MUTED_ENVIRONMENT`] on, a ring (`ring`) and the bus on: the ring
+/// worker, which owns it in a session, does not run while the microphones
+/// are off, so the app's light row found the light not running. The same
+/// light as the ring worker's, kept on disk where [`KEEP_ENVIRONMENT`] says,
+/// with no requests; a self-test colour is read but, like everything here,
+/// never drawn. It draws nothing: whatever the wait shows on
+/// the ring (the privacy face, the asleep face, dark) stays. A bus that
+/// cannot be used is said once, and the wait goes on without it.
+pub fn while_muted_from_environment(ring: bool) -> Option<RingLight> {
+    let switch = std::env::var(WHILE_MUTED_ENVIRONMENT).ok();
+    let flags = crate::bus_out::worker_arguments_from_environment();
+    let root = crate::bus_out::take_root(&flags).ok()?.0;
+    let keep = std::env::var(KEEP_ENVIRONMENT).ok();
+    while_muted(switch.as_deref(), ring, root.as_deref(), keep.as_deref())
+}
+
+fn while_muted(
+    switch: Option<&str>,
+    ring: bool,
+    root: Option<&Path>,
+    keep: Option<&str>,
+) -> Option<RingLight> {
+    if switch != Some("on") || !ring {
+        return None;
+    }
+    let keep = (keep == Some("on")).then(|| Path::new(KEEP_PATH));
+    match RingLight::on_keeping(root?, keep) {
+        Ok((light, _)) => Some(light),
+        Err(error) => {
+            eprintln!("lamp-voice: the person's light is not said while muted: {error}");
+            None
+        }
     }
 }
 
@@ -213,6 +284,9 @@ pub struct RingLight {
     outranked: Option<Publisher>,
     /// The request the face shows, until its light is said reached.
     reaching: Option<Reaching>,
+    /// Whether the request shown tints the Speaking face too
+    /// (`LAMP_SKILL_LIGHT_SPEAKING=on`, [`RingLight::held`]).
+    speaking: bool,
 }
 
 /// A shown request's pattern, and its asker and light, so that only a new
@@ -291,6 +365,7 @@ impl RingLight {
                 reached: None,
                 outranked: None,
                 reaching: None,
+                speaking: false,
                 keep: keep.map(|path| Keep {
                     path: path.to_owned(),
                     written,
@@ -582,6 +657,28 @@ impl RingLight {
         moving.since_us = Some(since_us);
     }
 
+    /// Let the request shown tint the Speaking face as well, with
+    /// `LAMP_SKILL_LIGHT_SPEAKING=on` and requests taken (El on #1722).
+    pub fn tint_speaking(&mut self, on: bool) {
+        self.speaking = on;
+    }
+
+    /// Whether the request shown tints the Speaking face
+    /// ([`crate::ring_face::Face::tints_speaking`]).
+    pub fn tints_speaking(&self) -> bool {
+        self.speaking
+    }
+
+    /// The light a request holds on the face now, as the face's light: none
+    /// under a self-test, for the person's own light, or without requests.
+    /// For the Speaking face's tint ([`crate::ring_face::Face::skill_light`]).
+    pub fn held(&self) -> Option<Lit> {
+        self.requested
+            .as_ref()
+            .filter(|_| self.testing.is_none())
+            .and_then(lit)
+    }
+
     /// The light given to the face now: a test's, a request's that holds,
     /// or the person's.
     pub fn face(&self) -> &Light {
@@ -692,6 +789,27 @@ mod tests {
             std::thread::sleep(Duration::from_millis(2));
         }
         None
+    }
+
+    /// #1816: the muted wait's light is opened only with the switch on, a
+    /// ring and a bus.
+    #[test]
+    fn the_light_while_muted_is_off_unless_on_with_a_ring_and_a_bus() {
+        let root = Root::new("light-while-muted");
+        for (switch, ring, bus) in [
+            (None, true, true),
+            (Some("yes"), true, true),
+            (Some("on"), false, true),
+            (Some("on"), true, false),
+        ] {
+            let root = bus.then_some(root.0.as_path());
+            assert!(
+                while_muted(switch, ring, root, None).is_none(),
+                "{switch:?} {ring} {bus}"
+            );
+        }
+        let light = while_muted(Some("on"), true, Some(&root.0), None).unwrap();
+        assert_eq!(light.now(), &first());
     }
 
     #[test]
@@ -992,6 +1110,13 @@ mod tests {
         let flags = ["--light-requests".to_owned(), "--x".to_owned()];
         assert_eq!(take(&flags), (true, &flags[1..]));
         assert_eq!(take(&flags[1..]), (false, &flags[1..]));
+        // A skill's light on the Speaking face (El on #1722): its own flag.
+        assert_eq!(speaking_arguments(Some("on")), ["--skill-light-speaking"]);
+        assert!(speaking_arguments(Some("true")).is_empty());
+        assert!(speaking_arguments(None).is_empty());
+        let flags = ["--skill-light-speaking".to_owned(), "--x".to_owned()];
+        assert_eq!(take_speaking(&flags), (true, &flags[1..]));
+        assert_eq!(take_speaking(&flags[1..]), (false, &flags[1..]));
     }
 
     /// The reviewer on #993: off unless switched on. A ring without
@@ -1053,6 +1178,8 @@ mod tests {
         ring.tick(at);
         asks.publish_json(1, &light(true, "blue", 2)).unwrap();
         assert_eq!(taken(&mut ring, &mut at), Lit::of(true, "blue", 2));
+        // The person's own light is held by no skill (El on #1722).
+        assert_eq!(ring.held(), None);
         std::thread::sleep(Duration::from_millis(2));
         let until = at + 10_000_000;
         glows
@@ -1063,6 +1190,7 @@ mod tests {
             .unwrap();
         assert_eq!(taken(&mut ring, &mut at), Lit::of(true, "green", 4));
         assert_eq!(ring.face(), &light(true, "green", 4));
+        assert_eq!(ring.held(), Lit::of(true, "green", 4));
         assert_eq!(state(&bus), Some(light(true, "blue", 2)));
         // From another boot, it is not shown.
         let mut other = request("skill:other", lamp_msgs::Priority::Safety, until, "red");
@@ -1076,6 +1204,7 @@ mod tests {
         // Its time passes: the person's light again, with no one asking.
         assert_eq!(ring.tick(until), Lit::of(true, "blue", 2));
         assert_eq!(ring.face(), &light(true, "blue", 2));
+        assert_eq!(ring.held(), None, "given back, nothing tints Speaking");
     }
 
     /// Resting frames at the ring's 25 ms pace from `at` for `for_us`,

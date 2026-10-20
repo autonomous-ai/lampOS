@@ -8,10 +8,11 @@
 //! with `unwell` says it is in error in the lamp's health.
 use lamp_msgs::{Health, HealthItem, Level, Voice};
 use lamp_update::{
-    Config, Outcome, World,
+    Config, Outcome, World, apply,
     fetch::{Channel, Fetch},
     judge::UnitState,
-    manifest::{self, File, Manifest, Unit, sha256_hex},
+    manifest::{self, File, ImageFile, Manifest, Model, Setting, Unit, sha256_hex},
+    own,
     quiet::Heard,
     round, unit,
     world::{self, Clock, Disk, Ears, Systemd},
@@ -42,11 +43,21 @@ fn throwaway() -> Ed25519KeyPair {
 struct FakeChannel {
     files: HashMap<String, Vec<u8>>,
     offline: bool,
+    /// URLs under this one are out of reach, the rest answered.
+    unreachable_under: Option<String>,
+    /// Every URL asked for, in order.
+    fetched: Vec<String>,
 }
 
 impl Channel for FakeChannel {
     fn fetch(&mut self, url: &str, most: u64, out: &mut dyn Write) -> Result<u64, Fetch> {
-        if self.offline {
+        self.fetched.push(url.to_owned());
+        if self.offline
+            || self
+                .unreachable_under
+                .as_ref()
+                .is_some_and(|under| url.starts_with(under.as_str()))
+        {
             return Err(Fetch::Unreachable("no network".into()));
         }
         let bytes = self.files.get(url).ok_or(Fetch::Missing)?;
@@ -124,6 +135,7 @@ impl Ears for FakeEars {
             message: String::new(),
             items,
             missing: Vec::new(),
+            quiet_ms: 0,
         })
     }
 }
@@ -170,6 +182,11 @@ struct FakeSystemd {
     /// `systemctl show` fails from the first restart on.
     unreachable_after_restart: bool,
     unreachable: bool,
+    /// What starting lamp-update-apply runs: none, and its start is skipped
+    /// (a lamp without it), doing nothing.
+    applier: Option<Box<dyn FnMut() -> Result<(), String>>>,
+    /// The next reload stops the round dead, as a power cut would.
+    cut_at_reload: bool,
 }
 
 impl FakeSystemd {
@@ -230,11 +247,17 @@ impl Systemd for FakeSystemd {
 
     fn reload(&mut self) -> Result<(), String> {
         self.calls.borrow_mut().push("reload".into());
+        if std::mem::take(&mut self.cut_at_reload) {
+            panic!("the lamp lost power");
+        }
         Ok(())
     }
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
         self.calls.borrow_mut().push(format!("restart {unit}"));
+        if unit == apply::UNIT {
+            return self.applier.as_mut().map_or(Ok(()), |applier| applier());
+        }
         self.restarted_at.push((unit.to_owned(), self.now.get()));
         self.unreachable |= self.unreachable_after_restart;
         self.start(unit);
@@ -276,6 +299,25 @@ fn controls_unit(build: &str) -> String {
     format!(
         "[Service]\nExecStart=/opt/lampOS/controls/{build}/lamp-controls serve --config /opt/lampOS/controls/{build}/controls.json\n"
     )
+}
+
+/// A process one test starts holds, from its fork to its exec, a copy of
+/// every file the other tests have open, a records' lock among them: that
+/// lock, let go by its test and taken again, is then "another lamp-update
+/// is at work". A test that starts a process holds `FORKS` to write until
+/// it has started; each take of the lock holds it to read.
+static FORKS: std::sync::RwLock<()> = std::sync::RwLock::new(());
+
+fn no_fork() -> std::sync::RwLockReadGuard<'static, ()> {
+    FORKS
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn forking() -> std::sync::RwLockWriteGuard<'static, ()> {
+    FORKS
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// A lamp made of files, its channel, and the rest of its world.
@@ -361,6 +403,8 @@ impl Lamp {
             crashing: Vec::new(),
             unreachable_after_restart: false,
             unreachable: false,
+            applier: None,
+            cut_at_reload: false,
         };
         for unit in [
             "lamp-voice.service",
@@ -381,6 +425,12 @@ impl Lamp {
             quiet_wait: Duration::from_secs(600),
             watch: Duration::from_secs(60),
             keep_free: 256_000_000,
+            self_switch: false,
+            running: None,
+            updater: manifest::UPDATER,
+            models: false,
+            settings: false,
+            image: false,
         };
         Self {
             _folder: folder,
@@ -454,10 +504,15 @@ impl Lamp {
             files_url,
             files,
             units: carried,
+            min_updater: None,
+            models: Vec::new(),
+            settings: Vec::new(),
+            image: Vec::new(),
         }
     }
 
     fn round(&mut self) -> Outcome {
+        let _no_fork = no_fork();
         let clock = FakeClock(Rc::clone(&self.now));
         let talking = self.talking.take().unwrap_or_else(|| Box::new(|_| false));
         let mut ears = FakeEars {
@@ -549,7 +604,10 @@ fn build_two(lamp: &mut Lamp) -> Manifest {
 fn a_round_that_sets_damaged_records_aside_keeps_the_keys_marked() {
     use lamp_update::install;
     const V1_KEY: &str = "previous-owners-key-0123456789";
-    let prepare = |root: &Path| install::provision_device_key(root, install::RECORDS, &mut |_| {});
+    let prepare = |root: &Path| {
+        let _no_fork = no_fork();
+        install::provision_device_key(root, install::RECORDS, &mut |_| {})
+    };
     let keys = |root: &Path| {
         install::KEY_PATHS.map(|path| root.join(path.trim_start_matches('/')).exists())
     };
@@ -951,6 +1009,7 @@ fn the_journal_line_is_the_units_own_last_cleaned_and_cut() {
 /// holds is read whole; one that fails gives nothing.
 #[test]
 fn a_command_is_read_within_its_bound_and_killed_after() {
+    let _forking = forking();
     let began = std::time::Instant::now();
     let hung = world::output_within(
         std::process::Command::new("sleep").arg("30"),
@@ -1091,6 +1150,61 @@ fn without_apply_nothing_is_written_and_what_would_change_is_said() {
     assert_eq!(lamp.files(), before);
     assert!(!lamp.exists("/var/lib/lampos-update"));
     assert!(lamp.calls().is_empty());
+}
+
+/// #1680: a build for a newer updater is refused whole, with nothing
+/// fetched, written or restarted, and it is said why. Nothing is held
+/// against the build: once the lamp's updater can apply it, it is taken.
+#[test]
+fn a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can() {
+    let mut lamp = Lamp::new();
+    let before = lamp.lamp_files();
+    let mut needing = build_two(&mut lamp);
+    needing.min_updater = Some(manifest::UPDATER + 1);
+    let bytes = serde_json::to_vec(&needing).unwrap();
+    lamp.channel.files.insert(
+        format!("{CHANNEL}{}", manifest::ENVELOPE),
+        manifest::seal(&bytes, &lamp.key).unwrap(),
+    );
+    let fetched = lamp.channel.fetched.len();
+    let outcome = lamp.round();
+    let why = format!(
+        "build 2 needs updater {} or newer, and this is updater {}; \
+         it carries no lamp-update, so waiting for a build that does",
+        manifest::UPDATER + 1,
+        manifest::UPDATER
+    );
+    assert_eq!(outcome, Outcome::Refused(why.clone()));
+    assert_eq!(
+        outcome.to_string(),
+        format!("refused, nothing switched: {why}")
+    );
+    // Only the envelope was read: no unit, no binary.
+    assert_eq!(
+        lamp.channel.fetched[fetched..],
+        [format!("{CHANNEL}{}", manifest::ENVELOPE)]
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert!(lamp.calls().is_empty());
+    assert!(!lamp.exists("/var/lib/lampos-update/state.json"));
+    let log = lamp.read("/var/lib/lampos-update/log.jsonl");
+    assert!(log.contains("\"event\":\"refused\""), "{log}");
+    assert!(
+        log.contains(&format!("needs updater {}", manifest::UPDATER + 1)),
+        "{log}"
+    );
+    // Said again the next round, and still nothing changed.
+    assert!(matches!(lamp.round(), Outcome::Refused(_)));
+    assert_eq!(lamp.lamp_files(), before);
+
+    // The same build for this updater: taken.
+    needing.min_updater = Some(manifest::UPDATER);
+    let bytes = serde_json::to_vec(&needing).unwrap();
+    lamp.channel.files.insert(
+        format!("{CHANNEL}{}", manifest::ENVELOPE),
+        manifest::seal(&bytes, &lamp.key).unwrap(),
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2));
 }
 
 #[test]
@@ -1428,6 +1542,549 @@ fn a_linked_part_keeps_its_build_and_the_one_before() {
     assert!(lamp.exists(&folder("eyes 1")));
 }
 
+/// A lamp-skills from before #1698: no `list`, and no `[permissions]`
+/// checks, so every folder loads. Any other command is a wrong option.
+const SKILLS_BEFORE_CHECKS: &str =
+    "#!/bin/sh\n# lamp-skills 1, before the permission checks\nexit 2\n";
+
+/// A lamp-skills with #1698's checks, as `lamp-skills list --dir DIR`
+/// prints them: a folder whose skill.toml gives no `[permissions]` is not
+/// loaded. `refuses` names a folder it refuses whatever it says.
+fn skills_with_checks(build: &str, refuses: &str) -> String {
+    format!(
+        "#!/bin/sh\n# lamp-skills {build}, with the permission checks\n\
+         [ \"$1\" = list ] && [ \"$2\" = --dir ] || exit 2\n\
+         echo 'NAME  KIND  VERSION  MAY USE'\n\
+         for folder in \"$3\"/*/; do\n\
+         name=$(basename \"$folder\")\n\
+         if [ \"$name\" != '{refuses}' ] && grep -q '^\\[permissions\\]' \"$folder/skill.toml\" 2>/dev/null; then\n\
+         echo \"$name  core  -  topics: voice/heard\"\n\
+         else\n\
+         echo \"$name  core  -  not loaded: voice/heard is not in [permissions] topics\"\n\
+         fi\n\
+         done\n"
+    )
+}
+
+fn skills_unit() -> String {
+    "[Unit]\nDescription=lampOS skills (lamp-skills)\n\n[Service]\nExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus\nRestart=on-failure\n".into()
+}
+
+impl Lamp {
+    /// A product lamp's skills part, running `binary` through its link,
+    /// and these skill folders, each a skill.toml.
+    fn with_skills(mut self, binary: &str, folders: &[(&str, &str)]) -> Self {
+        use std::os::unix::fs::PermissionsExt;
+        let build = sha(binary);
+        let folder = self.root.join(format!("opt/lampOS/skills/{build}"));
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(folder.join("lamp-skills"), binary).unwrap();
+        fs::set_permissions(
+            folder.join("lamp-skills"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(&build, self.root.join("opt/lampOS/skills/current")).unwrap();
+        fs::write(
+            self.root.join("etc/systemd/system/lamp-skills.service"),
+            skills_unit(),
+        )
+        .unwrap();
+        for (name, toml) in folders {
+            self.write_skill(name, toml);
+        }
+        self.systemd.start("lamp-skills.service");
+        self
+    }
+
+    fn write_skill(&self, name: &str, toml: &str) {
+        let folder = self.root.join(format!("var/lib/lampOS/skills/{name}"));
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(folder.join("skill.toml"), toml).unwrap();
+    }
+
+    fn skills_link(&self) -> String {
+        fs::read_link(self.root.join("opt/lampOS/skills/current"))
+            .unwrap()
+            .display()
+            .to_string()
+    }
+}
+
+fn build_with_skills(lamp: &mut Lamp, sequence: u64, skills: &str) -> Manifest {
+    lamp.publish(
+        sequence,
+        &[
+            ("lamp-voice", "voice 1"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+            ("lamp-skills", skills),
+        ],
+        &[],
+    )
+}
+
+/// A skill folder from before #1698 declares no `[permissions]`.
+const OLD_SKILL: &str = "name = \"dance\"\n[[watch]]\ntopic = \"voice/heard\"\n";
+/// The same skill as the build's own declares what it reads.
+const NEW_SKILL: &str = "name = \"dance\"\n[permissions]\ntopics = [\"voice/heard\"]\n[[watch]]\ntopic = \"voice/heard\"\n";
+
+/// The first builder on #1722 (00:28): a round moves lamp-skills onto a
+/// build with #1698's checks while the lamp's folders are from before
+/// them, and every skill is refused, with lamp-skills up and well. The
+/// round runs the build's own lamp-skills on the folders first: a skill
+/// that loads now and would not under the build keeps lamp-skills, and
+/// every part, where it is. Once the folders are the build's, it switches,
+/// and they load.
+#[test]
+fn a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail() {
+    let mut lamp = Lamp::new().with_skills(
+        SKILLS_BEFORE_CHECKS,
+        &[("dance", OLD_SKILL), ("reminders", OLD_SKILL)],
+    );
+    let old = sha(SKILLS_BEFORE_CHECKS);
+    let checks = skills_with_checks("2", "");
+    build_with_skills(&mut lamp, 2, &checks);
+    let units_before: BTreeMap<String, Vec<u8>> = lamp
+        .lamp_files()
+        .into_iter()
+        .filter(|(name, _)| name.starts_with("etc/"))
+        .collect();
+
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Refused(why)
+            if why.contains("dance (voice/heard is not in [permissions] topics)")
+                && why.contains("reminders")
+                && why.contains("/var/lib/lampOS/skills")),
+        "{outcome:?}"
+    );
+    // Nothing switched: no unit written, no link moved, nothing restarted,
+    // no journal, and the lamp still runs build 1.
+    assert_eq!(lamp.skills_link(), old);
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    let units_after: BTreeMap<String, Vec<u8>> = lamp
+        .lamp_files()
+        .into_iter()
+        .filter(|(name, _)| name.starts_with("etc/"))
+        .collect();
+    assert_eq!(units_after, units_before);
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+    assert!(lamp.state()["installed"].is_null());
+
+    // The build's skills placed (as `lamp-update install` does): the next
+    // round switches, and under the new lamp-skills both load.
+    lamp.write_skill("dance", NEW_SKILL);
+    lamp.write_skill("reminders", NEW_SKILL);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skills_link(), sha(&checks));
+    assert_eq!(lamp.calls(), ["reload", "restart lamp-skills.service"]);
+    let listed =
+        std::process::Command::new(lamp.root.join("opt/lampOS/skills/current/lamp-skills"))
+            .args(["list", "--dir"])
+            .arg(lamp.root.join("var/lib/lampOS/skills"))
+            .output()
+            .unwrap();
+    let listed = String::from_utf8(listed.stdout).unwrap();
+    assert!(!listed.contains("not loaded"), "{listed}");
+    assert!(
+        listed.contains("dance") && listed.contains("reminders"),
+        "{listed}"
+    );
+}
+
+/// A folder the running lamp-skills already refuses (a lamp's own, broken
+/// before the round) is no reason to keep the old build: only a skill that
+/// loads now and would not after holds the switch back. The build's
+/// lamp-skills that cannot list the folder at all switches nothing.
+#[test]
+fn only_a_skill_that_would_stop_loading_holds_lamp_skills_back() {
+    let mut lamp = Lamp::new().with_skills(
+        &skills_with_checks("1", "mine"),
+        &[("dance", NEW_SKILL), ("mine", NEW_SKILL)],
+    );
+    let checks = skills_with_checks("2", "mine");
+    build_with_skills(&mut lamp, 2, &checks);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skills_link(), sha(&checks));
+
+    let broken = "#!/bin/sh\n# lamp-skills 3, which cannot read the folder\necho 'no such folder' >&2\nexit 1\n";
+    build_with_skills(&mut lamp, 3, broken);
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Failed(why) if why.contains("no such folder")),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.skills_link(), sha(&checks));
+    assert_eq!(lamp.calls(), ["reload", "restart lamp-skills.service"]);
+}
+
+/// Install's product skills folder, as the round names its files.
+const PRODUCT_SKILLS: &str = "var/lib/lampOS/skills";
+
+impl Lamp {
+    /// Records these files as install wrote them: the build's before.
+    fn record_as_installs(&self, files: &[(&str, &str)]) {
+        let settings: serde_json::Map<String, serde_json::Value> = files
+            .iter()
+            .map(|(path, text)| (format!("/{PRODUCT_SKILLS}/{path}"), sha(text).into()))
+            .collect();
+        let state = serde_json::json!({
+            "installed": null, "previous": null, "refused": [], "made": [],
+            "settings": settings,
+        });
+        let at = self.root.join("var/lib/lampos-update/state.json");
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(at, serde_json::to_vec(&state).unwrap()).unwrap();
+    }
+
+    fn put_skill_file(&self, path: &str, text: &str) {
+        let at = self.root.join(format!("{PRODUCT_SKILLS}/{path}"));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(at, text).unwrap();
+    }
+
+    fn skill_file(&self, path: &str) -> Option<String> {
+        fs::read_to_string(self.root.join(format!("{PRODUCT_SKILLS}/{path}"))).ok()
+    }
+
+    /// What `lamp-skills list` of the running build says of the folder.
+    fn listed(&self) -> String {
+        let listed =
+            std::process::Command::new(self.root.join("opt/lampOS/skills/current/lamp-skills"))
+                .args(["list", "--dir"])
+                .arg(self.root.join(PRODUCT_SKILLS))
+                .output()
+                .unwrap();
+        String::from_utf8(listed.stdout).unwrap()
+    }
+}
+
+/// The product skills a build carries, as `lamp-update manifest` writes
+/// them.
+fn bundle(files: &[(&str, &str)]) -> String {
+    let mut skills: Vec<&str> = files
+        .iter()
+        .map(|(path, _)| path.split('/').next().unwrap())
+        .collect();
+    skills.sort_unstable();
+    skills.dedup();
+    let files: Vec<serde_json::Value> = files
+        .iter()
+        .map(|(path, text)| serde_json::json!({"path": path, "text": text}))
+        .collect();
+    serde_json::to_string(&serde_json::json!({
+        "format": "lampos-skills/1", "skills": skills, "files": files,
+    }))
+    .unwrap()
+}
+
+/// The build's dance and reminders, with #1698's `[permissions]`, and a new
+/// product skill with a file in a folder of its own.
+fn product_skills_of_build() -> String {
+    bundle(&[
+        ("dance/skill.toml", NEW_SKILL),
+        ("dance/SKILL.md", "Dance, the build's."),
+        ("reminders/skill.toml", NEW_SKILL),
+        ("reminders/SKILL.md", "Reminders, the build's."),
+        ("welcome-back/skill.toml", NEW_SKILL),
+        ("welcome-back/lights/warm_glow.toml", "glow"),
+    ])
+}
+
+fn build_with_product_skills(
+    lamp: &mut Lamp,
+    sequence: u64,
+    voice: &str,
+    skills: &str,
+    product: &str,
+) -> Manifest {
+    lamp.publish(
+        sequence,
+        &[
+            ("lamp-voice", voice),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+            ("lamp-skills", skills),
+            ("lamp-product-skills", product),
+        ],
+        &[],
+    )
+}
+
+/// A lamp with pre-#1698 product skill folders, as install wrote them, a
+/// file of one the lamp changed, and a skill the person installed.
+fn lamp_before_permissions() -> Lamp {
+    let lamp = Lamp::new().with_skills(
+        SKILLS_BEFORE_CHECKS,
+        &[
+            ("dance", OLD_SKILL),
+            ("reminders", OLD_SKILL),
+            ("mine", NEW_SKILL),
+        ],
+    );
+    lamp.put_skill_file("dance/SKILL.md", "Dance, install's.");
+    lamp.put_skill_file(
+        "reminders/SKILL.md",
+        "Reminders, as this lamp's person wrote them.",
+    );
+    lamp.put_skill_file("mine/SKILL.md", "Mine.");
+    lamp.record_as_installs(&[
+        ("dance/skill.toml", OLD_SKILL),
+        ("dance/SKILL.md", "Dance, install's."),
+        ("reminders/skill.toml", OLD_SKILL),
+        ("reminders/SKILL.md", "Reminders, install's."),
+    ]);
+    lamp
+}
+
+/// #2014's P2 (the reviewer, 01:22; the first builder, 01:29): a lamp
+/// whose product skills are from before #1698, given a round to a build
+/// with #1698's checks, gets the build's product skills from the channel
+/// and switches, every one loaded. The person's own skill is not touched,
+/// and a file of a product skill the lamp changed is kept.
+#[test]
+fn a_round_places_the_builds_product_skills_and_keeps_the_lamps_own() {
+    let mut lamp = lamp_before_permissions();
+    let checks = skills_with_checks("2", "");
+    build_with_product_skills(&mut lamp, 2, "voice 1", &checks, &product_skills_of_build());
+    let mine_before = (
+        lamp.skill_file("mine/skill.toml"),
+        lamp.skill_file("mine/SKILL.md"),
+    );
+
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skills_link(), sha(&checks));
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), NEW_SKILL);
+    assert_eq!(
+        lamp.skill_file("dance/SKILL.md").unwrap(),
+        "Dance, the build's."
+    );
+    assert_eq!(lamp.skill_file("reminders/skill.toml").unwrap(), NEW_SKILL);
+    assert_eq!(
+        lamp.skill_file("welcome-back/lights/warm_glow.toml")
+            .unwrap(),
+        "glow"
+    );
+    // The lamp's own file and the person's skill, as they were.
+    assert_eq!(
+        lamp.skill_file("reminders/SKILL.md").unwrap(),
+        "Reminders, as this lamp's person wrote them."
+    );
+    assert_eq!(
+        (
+            lamp.skill_file("mine/skill.toml"),
+            lamp.skill_file("mine/SKILL.md")
+        ),
+        mine_before
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line
+                .contains("kept /var/lib/lampOS/skills/reminders/SKILL.md: this lamp's own")),
+        "{:?}",
+        lamp.said
+    );
+    let listed = lamp.listed();
+    assert!(!listed.contains("not loaded"), "{listed}");
+    for name in ["dance", "reminders", "welcome-back", "mine"] {
+        assert!(listed.contains(name), "{name}: {listed}");
+    }
+    // Recorded as the build's: the next build's are written over them.
+    let state = lamp.state();
+    assert_eq!(
+        state["settings"]["/var/lib/lampOS/skills/dance/skill.toml"],
+        sha(NEW_SKILL)
+    );
+    assert!(state["settings"]["/var/lib/lampOS/skills/mine/skill.toml"].is_null());
+    assert!(!lamp.exists("/var/lib/lampos-update/skills-staged"));
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+}
+
+/// The guard stays the net: a skill of the person's that the new
+/// lamp-skills would not load refuses the build, judged on the folder as
+/// the round would leave it, and nothing of the lamp's is written.
+#[test]
+fn the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load() {
+    let mut lamp = lamp_before_permissions();
+    lamp.write_skill("mine", OLD_SKILL);
+    let checks = skills_with_checks("2", "");
+    build_with_product_skills(&mut lamp, 2, "voice 1", &checks, &product_skills_of_build());
+    // The skills, the units: what the lamp runs and reads.
+    let lamps = |lamp: &Lamp| -> BTreeMap<String, Vec<u8>> {
+        lamp.files()
+            .into_iter()
+            .filter(|(name, _)| name.starts_with("var/lib/lampOS/") || name.starts_with("etc/"))
+            .collect()
+    };
+    let before = lamps(&lamp);
+
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Refused(why)
+            if why.contains("mine (voice/heard is not in [permissions] topics)")
+                && !why.contains("dance")
+                && !why.contains("reminders")),
+        "{outcome:?}"
+    );
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    // Not a file of the lamp's written, and nothing staged left behind.
+    assert!(lamps(&lamp) == before, "a file of the lamp's was written");
+    assert!(!lamp.exists("/var/lib/lampos-update/skills-staged"));
+    assert_eq!(lamp.skills_link(), sha(SKILLS_BEFORE_CHECKS));
+}
+
+/// A build put back puts the product skills back too: each file as it was,
+/// a folder made for the build gone, the records as before.
+#[test]
+fn a_build_put_back_puts_the_product_skills_back() {
+    let mut lamp = lamp_before_permissions();
+    let checks = skills_with_checks("2", "");
+    build_with_product_skills(
+        &mut lamp,
+        2,
+        "voice 2, which crashes",
+        &checks,
+        &product_skills_of_build(),
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(
+            &outcome,
+            Outcome::RolledBack {
+                sequence: 2,
+                after: Ok(()),
+                ..
+            }
+        ),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), OLD_SKILL);
+    assert_eq!(
+        lamp.skill_file("dance/SKILL.md").unwrap(),
+        "Dance, install's."
+    );
+    assert_eq!(lamp.skill_file("reminders/skill.toml").unwrap(), OLD_SKILL);
+    assert!(!lamp.exists(&format!("/{PRODUCT_SKILLS}/welcome-back")));
+    assert_eq!(lamp.skills_link(), sha(SKILLS_BEFORE_CHECKS));
+    assert_eq!(
+        lamp.state()["settings"]["/var/lib/lampOS/skills/dance/skill.toml"],
+        sha(OLD_SKILL)
+    );
+}
+
+/// A switch cut short after the skills were written puts them back at the
+/// next start, from the journal: a file still as written goes back, a
+/// folder made for the build goes, and a file the lamp changed since stays.
+#[test]
+fn product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start() {
+    let mut lamp = lamp_before_permissions();
+    // As a switch to build 2 leaves it when the lamp loses power after the
+    // skills are written.
+    let back = |path: &str, before: Option<&str>, wrote: &str, made: &[&str]| {
+        serde_json::json!({
+            "path": format!("/{PRODUCT_SKILLS}/{path}"),
+            "before": before,
+            "wrote": sha(wrote),
+            "made": made.iter().map(|folder| format!("/{PRODUCT_SKILLS}/{folder}")).collect::<Vec<_>>(),
+        })
+    };
+    let journal = serde_json::json!({
+        "build": {"sequence": 2, "commit": "2".repeat(40)},
+        "units": [],
+        "skills": [
+            back("dance/skill.toml", Some(OLD_SKILL), NEW_SKILL, &[]),
+            back("dance/SKILL.md", Some("Dance, install's."), "Dance, the build's.", &[]),
+            back("welcome-back/skill.toml", None, NEW_SKILL, &["welcome-back"]),
+        ],
+    });
+    fs::write(
+        lamp.root.join("var/lib/lampos-update/journal.json"),
+        serde_json::to_vec(&journal).unwrap(),
+    )
+    .unwrap();
+    lamp.put_skill_file("dance/skill.toml", NEW_SKILL);
+    lamp.put_skill_file("dance/SKILL.md", "Dance, changed on the lamp after.");
+    lamp.put_skill_file("welcome-back/skill.toml", NEW_SKILL);
+
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, .. } if why.contains("cut short")),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), OLD_SKILL);
+    assert_eq!(
+        lamp.skill_file("dance/SKILL.md").unwrap(),
+        "Dance, changed on the lamp after."
+    );
+    assert!(!lamp.exists(&format!("/{PRODUCT_SKILLS}/welcome-back")));
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+}
+
+/// A build that changes only the product skills places them, restarting
+/// nothing: lamp-skills reloads its folder by itself.
+#[test]
+fn a_build_of_only_new_product_skills_places_them_and_restarts_nothing() {
+    let mut lamp = Lamp::new().with_skills(&skills_with_checks("1", ""), &[("dance", NEW_SKILL)]);
+    lamp.record_as_installs(&[("dance/skill.toml", NEW_SKILL)]);
+    let skills = skills_with_checks("1", "");
+    let newer = NEW_SKILL.replace("dance\"", "dance\"\nabout = \"newer\"");
+    build_with_product_skills(
+        &mut lamp,
+        2,
+        "voice 1",
+        &skills,
+        &bundle(&[("dance/skill.toml", &newer)]),
+    );
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), newer);
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    assert_eq!(lamp.state()["installed"]["sequence"], 2);
+}
+
+/// A lamp-skills reading a folder of the lamp's own (lamp-4ace's) is not
+/// given the product skills; and a round that cannot write install's folder
+/// (a lamp-update.service without it in `ReadWritePaths`) fails with
+/// nothing switched, and the build is not refused.
+#[test]
+fn product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut lamp = lamp_before_permissions();
+    let unit = lamp.read("/etc/systemd/system/lamp-skills.service");
+    fs::write(
+        lamp.root.join("etc/systemd/system/lamp-skills.service"),
+        unit.replace("--dir /var/lib/lampOS/skills", "--dir /var/lib/lamp-skills"),
+    )
+    .unwrap();
+    build_with_product_skills(
+        &mut lamp,
+        2,
+        "voice 1",
+        SKILLS_BEFORE_CHECKS,
+        &product_skills_of_build(),
+    );
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), OLD_SKILL);
+
+    let mut lamp = lamp_before_permissions();
+    let folder = lamp.root.join(PRODUCT_SKILLS);
+    fs::set_permissions(&folder, fs::Permissions::from_mode(0o555)).unwrap();
+    let checks = skills_with_checks("2", "");
+    build_with_product_skills(&mut lamp, 2, "voice 1", &checks, &product_skills_of_build());
+    let outcome = lamp.round();
+    fs::set_permissions(&folder, fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(
+        matches!(&outcome, Outcome::Failed(why) if why.contains("ReadWritePaths")),
+        "{outcome:?}"
+    );
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    assert!(lamp.state()["refused"].as_array().unwrap().is_empty());
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), OLD_SKILL);
+}
+
 /// The machine as `lamp-update install` asks it, for a lamp made of files:
 /// users go into the root's /etc/passwd, and nothing else is done.
 struct InstallHost(PathBuf);
@@ -1467,20 +2124,29 @@ impl lamp_update::install::Host for InstallHost {
         Ok(())
     }
 
+    fn harness_version(&mut self, _: &str, _: &str) -> Result<String, String> {
+        Ok(String::new())
+    }
+
     fn restart(&mut self, _: &str) -> Result<(), String> {
         Ok(())
     }
 }
 
 /// Every binary the product starts, and the voice's worker, each the line
-/// `<name> <sequence>`.
+/// `<name> <sequence>`; lamp-skills a script that lists the folders, since
+/// a round runs it before a switch.
 fn product_build(lamp: &mut Lamp, sequence: u64) -> Manifest {
     let texts: Vec<(String, String)> = lamp_update::install::parts()
         .into_iter()
         .map(|part| part.binary)
         .chain(["lamp-turn-end".to_owned()])
         .map(|name| {
-            let text = format!("{name} {sequence}");
+            let text = if name == "lamp-skills" {
+                skills_with_checks(&sequence.to_string(), "")
+            } else {
+                format!("{name} {sequence}")
+            };
             (name, text)
         })
         .collect();
@@ -1523,7 +2189,9 @@ impl Lamp {
             models: Vec::new(),
         };
         let mut host = InstallHost(lamp.root.clone());
+        let no_fork = no_fork();
         lamp_update::install::install(&config, &mut lamp.channel, &mut host, &mut |_| {}).unwrap();
+        drop(no_fork);
         lamp.systemd.units.clear();
         for entry in fs::read_dir(lamp.root.join("etc/systemd/system")).unwrap() {
             let entry = entry.unwrap();
@@ -1636,4 +2304,2018 @@ fn a_round_that_cannot_place_second_json_writes_no_unit() {
         voice_unit(&sha("voice 1"))
     );
     assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+}
+
+/// Build `sequence` of the product, with lamp-update's own binary `updater`.
+fn product_build_with_updater(lamp: &mut Lamp, sequence: u64, updater: &str) -> Manifest {
+    let texts: Vec<(String, String)> = lamp_update::install::parts()
+        .into_iter()
+        .map(|part| part.binary)
+        .chain(["lamp-turn-end".to_owned()])
+        .map(|name| {
+            let text = if name == "lamp-update" {
+                updater.to_owned()
+            } else if name == "lamp-skills" {
+                skills_with_checks(&sequence.to_string(), "")
+            } else {
+                format!("{name} {sequence}")
+            };
+            (name, text)
+        })
+        .collect();
+    let binaries: Vec<(&str, &str)> = texts
+        .iter()
+        .map(|(name, text)| (name.as_str(), text.as_str()))
+        .collect();
+    lamp.publish(sequence, &binaries, &[])
+}
+
+/// What `systemctl show` says of lamp-update.service.
+fn update_unit(active: &str, sub: &str) -> UnitState {
+    UnitState {
+        unit: "lamp-update.service".into(),
+        active: active.into(),
+        sub: sub.into(),
+        pid: 0,
+        restarts: 0,
+    }
+}
+
+impl Lamp {
+    /// Installed, with lamp-update switching itself (`LAMP_UPDATE_SELF=on`).
+    fn installed_switching_itself() -> Self {
+        let mut lamp = Lamp::installed();
+        lamp.config.self_switch = true;
+        lamp
+    }
+
+    fn records(&self) -> PathBuf {
+        self.root.join("var/lib/lampos-update")
+    }
+
+    /// The build `update/current` names.
+    fn own_build(&self) -> String {
+        fs::read_link(self.root.join("opt/lampOS/update/current"))
+            .unwrap()
+            .display()
+            .to_string()
+    }
+
+    /// The new lamp-update confirming itself, as the build `running` from:
+    /// only after a dry round has read and checked the channel's manifest.
+    fn confirm(&mut self, running: &str) -> own::Confirm {
+        let _no_fork = no_fork();
+        let clock = FakeClock(Rc::clone(&self.now));
+        let mut ears = FakeEars {
+            now: Rc::clone(&self.now),
+            talking: Box::new(|_| false),
+            root: self.root.clone(),
+        };
+        let disk = FakeDisk(self.free);
+        let said = &mut self.said;
+        let mut say = |line: &str| said.push(line.to_owned());
+        let mut world = World {
+            channel: &mut self.channel,
+            systemd: &mut self.systemd,
+            ears: &mut ears,
+            disk: &disk,
+            clock: &clock,
+            say: &mut say,
+        };
+        own::confirm(&self.config, &mut world, Some(running)).unwrap()
+    }
+
+    /// lamp-update-back, as its timer or `OnFailure=` starts it.
+    fn back(&mut self, unit: UnitState, now_unix_ms: u64) -> own::Back {
+        let _no_fork = no_fork();
+        let records = self.records();
+        let said = &mut self.said;
+        own::back(&records, &self.root, now_unix_ms, &unit, &mut |line| {
+            said.push(line.to_owned())
+        })
+        .unwrap()
+    }
+
+    fn pending(&self) -> Option<own::Pending> {
+        own::pending(&self.records()).unwrap()
+    }
+}
+
+/// #1680: a new lamp-update that starts and confirms itself keeps its
+/// switch: the fallback leaves it, and the next round is as any other.
+#[test]
+fn a_new_updater_that_confirms_keeps_its_switch() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert_eq!(
+        lamp.round(),
+        Outcome::SelfSwitched {
+            sequence: 2,
+            from: old.clone(),
+            to: new.clone()
+        },
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.own_build(), new);
+    assert_eq!(
+        lamp.read("/opt/lampOS/update/current/lamp-update"),
+        "lamp-update 2"
+    );
+    let pending = lamp.pending().unwrap();
+    assert_eq!(
+        (pending.old.as_str(), pending.new.as_str()),
+        (old.as_str(), new.as_str())
+    );
+
+    assert_eq!(lamp.confirm(&new), own::Confirm::Confirmed);
+    assert!(lamp.pending().is_none());
+    // Neither a failure later nor the deadline puts back a confirmed one.
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), u64::MAX),
+        own::Back::Nothing
+    );
+    assert_eq!(lamp.own_build(), new);
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert_eq!(lamp.own_build(), new);
+}
+
+/// #1680, the first builder's test: a new binary that exits at once,
+/// before it has read anything, never confirms; `OnFailure=` starts the
+/// fallback, which puts the old link back and refuses that binary.
+#[test]
+fn a_new_updater_that_exits_at_once_is_put_back() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "#!/bin/sh\nexit 1\n");
+    let new = sha("#!/bin/sh\nexit 1\n");
+    assert!(
+        matches!(lamp.round(), Outcome::SelfSwitched { .. }),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.own_build(), new);
+    let forking = forking();
+    let status =
+        std::process::Command::new(lamp.root.join("opt/lampOS/update/current/lamp-update"))
+            .args(["serve", "--channel-url", CHANNEL])
+            .status()
+            .unwrap();
+    drop(forking);
+    assert_eq!(status.code(), Some(1));
+    assert!(lamp.pending().is_some(), "it exited without confirming");
+
+    let back = lamp.back(update_unit("failed", "failed"), records_now());
+    assert!(matches!(back, own::Back::PutBack(_)), "{back:?}");
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(
+        lamp.read("/opt/lampOS/update/current/lamp-update"),
+        "lamp-update 1"
+    );
+    assert!(lamp.pending().is_none());
+    assert_eq!(own::refused(&lamp.records()), vec![new.clone()]);
+    // The old updater, started again, does not take that binary again.
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert_eq!(lamp.own_build(), old);
+}
+
+/// #1680: a new lamp-update that runs but never confirms (it hangs) is put
+/// back by the deadline's timer, and not before.
+#[test]
+fn a_new_updater_not_confirmed_by_the_deadline_is_put_back() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    let at = lamp.pending().unwrap().at_unix_ms;
+    let running = update_unit("active", "running");
+    assert_eq!(lamp.back(running.clone(), at + 60_000), own::Back::Waiting);
+    assert_eq!(lamp.own_build(), sha("lamp-update 2"));
+    let late = at + own::DEADLINE.as_millis() as u64 + 1;
+    assert!(matches!(lamp.back(running, late), own::Back::PutBack(_)));
+    assert_eq!(lamp.own_build(), old);
+    assert!(lamp.pending().is_none());
+}
+
+/// #1680, the race: every round, the confirmation and the fallback take
+/// the one lock of the records, and no round starts while a switch of
+/// lamp-update's own waits to be confirmed: a restart in phase 2 (or the
+/// old binary run by hand) never begins a second round.
+#[test]
+fn no_second_round_begins_while_lamp_updates_own_switch_waits() {
+    let mut lamp = Lamp::installed_switching_itself();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    let restarts = lamp.calls().len();
+
+    // Not yet confirmed: a round is refused and changes nothing.
+    let before = lamp.lamp_files();
+    product_build_with_updater(&mut lamp, 3, "lamp-update 3");
+    let refused = lamp.round();
+    assert!(
+        matches!(&refused, Outcome::Refused(why) if why.contains("not confirmed")),
+        "{refused:?}"
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert_eq!(lamp.calls().len(), restarts, "nothing restarted");
+
+    // A process that is not the new build does not confirm it.
+    let old = lamp.pending().unwrap().old;
+    assert_eq!(lamp.confirm(&old), own::Confirm::NotOwn);
+    assert!(lamp.pending().is_some());
+
+    // While another holds the lock, none of them acts.
+    let held = {
+        let _no_fork = no_fork();
+        lamp_update::records::Records::new(lamp.records())
+            .lock()
+            .unwrap()
+    };
+    assert_eq!(lamp.confirm(&new), own::Confirm::Busy);
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), u64::MAX),
+        own::Back::Busy
+    );
+    assert!(matches!(lamp.round(), Outcome::Failed(_)));
+    assert_eq!(lamp.own_build(), new);
+    drop(held);
+
+    assert_eq!(lamp.confirm(&new), own::Confirm::Confirmed);
+    assert!(
+        matches!(lamp.round(), Outcome::SelfSwitched { sequence: 3, .. }),
+        "{:?}",
+        lamp.said
+    );
+}
+
+/// #1680: with `LAMP_UPDATE_SELF` off (or absent) a round is as before:
+/// lamp-update's own link stays, nothing is waited for, and the fallback
+/// and the confirmation have nothing to do.
+#[test]
+fn with_the_switch_off_lamp_update_never_switches_itself() {
+    assert!(!own::on(None));
+    assert!(!own::on(Some("off")));
+    assert!(!own::on(Some("yes")));
+    assert!(own::on(Some("on")));
+
+    let mut lamp = Lamp::installed();
+    assert!(!lamp.config.self_switch);
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.own_build(), old);
+    assert!(lamp.pending().is_none());
+    assert!(!lamp.exists(&format!("/opt/lampOS/update/{}", sha("lamp-update 2"))));
+    let before = lamp.files();
+    assert_eq!(lamp.confirm(&old), own::Confirm::Nothing);
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), u64::MAX),
+        own::Back::Nothing
+    );
+    assert_eq!(lamp.files(), before, "nothing written");
+}
+
+/// #1680: install writes the fallback at its fixed path, outside what
+/// lamp-update.service may write, and starts it from lamp-update's failure
+/// and from its timer; no round touches it, not even one that switches
+/// lamp-update itself.
+#[test]
+fn install_writes_the_fallback_and_no_round_touches_it() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut lamp = Lamp::installed_switching_itself();
+    assert_eq!(lamp.read(own::BACK), "lamp-update 1");
+    let mode = fs::metadata(lamp.root.join(own::BACK.trim_start_matches('/')))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o755);
+
+    let unit = lamp.read("/etc/systemd/system/lamp-update.service");
+    assert!(
+        unit.lines()
+            .any(|line| line == "OnFailure=lamp-update-back.service")
+    );
+    let writes = unit
+        .lines()
+        .find_map(|line| line.strip_prefix("ReadWritePaths="))
+        .unwrap();
+    assert!(
+        !writes
+            .split_whitespace()
+            .any(|path| own::BACK.starts_with(path.trim_start_matches('-'))),
+        "{writes}"
+    );
+    let back = lamp.read("/etc/systemd/system/lamp-update-back.service");
+    assert!(
+        back.contains(&format!("ExecStart={} back", own::BACK)),
+        "{back}"
+    );
+    let timer = lamp.read("/etc/systemd/system/lamp-update-back.timer");
+    assert!(timer.contains("Unit=lamp-update-back.service"), "{timer}");
+
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    lamp.confirm(&sha("lamp-update 2"));
+    product_build_with_updater(&mut lamp, 3, "lamp-update 3");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    assert_eq!(lamp.read(own::BACK), "lamp-update 1");
+}
+
+/// Now, on the clock the records keep their times by.
+fn records_now() -> u64 {
+    lamp_update::records::unix_ms()
+}
+
+/// #1680, the first builder at 11:40: a new lamp-update that starts but
+/// cannot check a manifest (here, it reads another key) never confirms,
+/// however often it tries, and the deadline puts the old one back. One
+/// that cannot reach the channel does not confirm either.
+#[test]
+fn a_new_updater_that_refuses_every_manifest_is_put_back() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    let key = lamp.config.key;
+    lamp.config.key = throwaway().public_key().as_ref().try_into().unwrap();
+    for _ in 0..3 {
+        let confirm = lamp.confirm(&new);
+        assert!(matches!(confirm, own::Confirm::NotProven(_)), "{confirm:?}");
+    }
+    lamp.config.key = key;
+    lamp.channel.offline = true;
+    let confirm = lamp.confirm(&new);
+    assert!(matches!(confirm, own::Confirm::NotProven(_)), "{confirm:?}");
+    assert!(lamp.pending().is_some());
+    let late = lamp.pending().unwrap().at_unix_ms + own::DEADLINE.as_millis() as u64 + 1;
+    let back = lamp.back(update_unit("active", "running"), late);
+    assert!(matches!(back, own::Back::PutBack(_)), "{back:?}");
+    assert_eq!(lamp.own_build(), old);
+}
+
+/// #1680, the first builder at 11:40: `self.json` is a contract for good.
+/// lamp-update-back is written once, by install, so the one a lamp has
+/// reads what any later lamp-update writes: a newer version, with fields it
+/// does not know, still names the old build and the new and when.
+#[test]
+fn the_fallback_reads_a_self_json_written_by_a_later_updater() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    let path = lamp.records().join("self.json");
+    let written: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(written["version"], own::VERSION);
+    let later = format!(
+        r#"{{"version":5,"old":"{old}","new":"{new}","at_unix_ms":{},"why":"a field of V5's","models":["x"]}}"#,
+        records_now()
+    );
+    fs::write(&path, later).unwrap();
+    let back = lamp.back(update_unit("failed", "failed"), records_now());
+    assert!(matches!(back, own::Back::PutBack(_)), "{back:?}");
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(own::refused(&lamp.records()), vec![new]);
+}
+
+/// #1680, the first builder's P3 on #1737: a round started by hand, on a
+/// lamp with no unit of lamp-update's own to name its folder, keeps the
+/// folder the running binary is in.
+#[test]
+fn a_round_by_hand_keeps_the_folder_it_runs_from() {
+    let mut lamp = Lamp::installed();
+    fs::remove_file(lamp.root.join("etc/systemd/system/lamp-update.service")).unwrap();
+    let running = format!("/opt/lampOS/update/{}/", lamp.own_build());
+    lamp.config.running = Some(running.clone());
+    product_build(&mut lamp, 2);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(
+        lamp.exists(&format!("{running}lamp-update")),
+        "{:?}",
+        lamp.said
+    );
+}
+
+/// #1680, the first builder's P3 on #1737: after phase 1, `update/current`
+/// names the new build while the old binary still runs; a round it makes
+/// then keeps the old binary's folder.
+#[test]
+fn a_round_after_its_own_switch_keeps_the_old_binarys_folder() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = format!("/opt/lampOS/update/{}/", lamp.own_build());
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    assert_eq!(lamp.confirm(&sha("lamp-update 2")), own::Confirm::Confirmed);
+    // The old binary, still running, makes a round that prunes.
+    lamp.config.running = Some(old.clone());
+    product_build_with_updater(&mut lamp, 3, "lamp-update 2");
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    assert!(lamp.exists(&format!("{old}lamp-update")), "{:?}", lamp.said);
+}
+
+/// The build `manifest` again, signed with `min_updater` set to `needed`.
+fn needing(lamp: &mut Lamp, mut manifest: Manifest, needed: u64) -> Manifest {
+    manifest.min_updater = Some(needed);
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    lamp.channel.files.insert(
+        format!("{CHANNEL}{}", manifest::ENVELOPE),
+        manifest::seal(&bytes, &lamp.key).unwrap(),
+    );
+    manifest
+}
+
+/// Every file of the lamp but lamp-update's own folders and link and its
+/// records: the parts, their units and links.
+fn parts_files(lamp: &Lamp) -> BTreeMap<String, Vec<u8>> {
+    lamp.lamp_files()
+        .into_iter()
+        .filter(|(name, _)| !name.starts_with("opt/lampOS/update/"))
+        .collect()
+}
+
+/// #1680, the first builder's rule: an updater too old for a build takes
+/// the newer lamp-update it carries and nothing else; that one confirms
+/// itself, reads the same build again and takes the rest.
+#[test]
+fn an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest() {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    let old = lamp.own_build();
+    let parts = parts_files(&lamp);
+    let build = product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    needing(&mut lamp, build, 2);
+    let new = sha("lamp-update 2");
+
+    // `check` says what it would take first.
+    lamp.config.apply = false;
+    let would = lamp.round();
+    assert!(
+        matches!(&would, Outcome::Would(lines) if lines[0].contains("lamp-update first")),
+        "{would:?}"
+    );
+    lamp.config.apply = true;
+
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 2,
+            needed: 2,
+            from: old.clone(),
+            to: new.clone()
+        },
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.own_build(), new);
+    assert_eq!(
+        lamp.read("/opt/lampOS/update/current/lamp-update"),
+        "lamp-update 2"
+    );
+    // Nothing else of the build: no part's file, unit or link, no restart.
+    assert_eq!(parts_files(&lamp), parts);
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    assert!(lamp.pending().is_some());
+
+    // The new updater, of level 2, confirms itself and takes the rest.
+    lamp.config.updater = 2;
+    assert_eq!(lamp.confirm(&new), own::Confirm::Confirmed);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_ne!(parts_files(&lamp), parts);
+    assert_eq!(lamp.own_build(), new);
+}
+
+/// #1680: a build too new for this updater that carries no lamp-update is
+/// refused, said clearly, with nothing fetched or written.
+#[test]
+fn an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written() {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    let old = lamp.own_build();
+    let mut build = product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    build.files.retain(|file| file.name != "lamp-update");
+    needing(&mut lamp, build, 2);
+    let before = lamp.lamp_files();
+    let fetched = lamp.channel.fetched.len();
+    assert_eq!(
+        lamp.round(),
+        Outcome::Refused(
+            "build 2 needs updater 2 or newer, and this is updater 1; \
+             it carries no lamp-update, so waiting for a build that does"
+                .into()
+        )
+    );
+    assert_eq!(
+        lamp.channel.fetched[fetched..],
+        [format!("{CHANNEL}{}", manifest::ENVELOPE)]
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert!(lamp.calls().is_empty());
+    assert!(lamp.pending().is_none());
+    assert_eq!(lamp.own_build(), old);
+}
+
+/// #1680: one lamp-update per round, however old the lamp: 1 to 2, which
+/// confirms on a channel that has meanwhile moved to a build for updater
+/// 3, then 2 to 3, which takes the build.
+#[test]
+fn an_old_updater_climbs_one_updater_a_round() {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    let first = lamp.own_build();
+    let parts = parts_files(&lamp);
+    let build = product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    needing(&mut lamp, build, 2);
+    let two = sha("lamp-update 2");
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 2,
+            needed: 2,
+            from: first,
+            to: two.clone()
+        },
+        "{:?}",
+        lamp.said
+    );
+
+    let build = product_build_with_updater(&mut lamp, 3, "lamp-update 3");
+    needing(&mut lamp, build, 3);
+    let three = sha("lamp-update 3");
+    lamp.config.updater = 2;
+    // Its dry round reads build 3 and finds the updater it would take: it
+    // can still update, so it is confirmed.
+    assert_eq!(lamp.confirm(&two), own::Confirm::Confirmed);
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 3,
+            needed: 3,
+            from: two,
+            to: three.clone()
+        },
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(parts_files(&lamp), parts);
+
+    lamp.config.updater = 3;
+    assert_eq!(lamp.confirm(&three), own::Confirm::Confirmed);
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    assert_eq!(lamp.own_build(), three);
+}
+
+/// #1680: with `LAMP_UPDATE_SELF` off, a build too new for this updater is
+/// refused even when it carries a newer lamp-update: that one is not taken,
+/// and nothing but the envelope is fetched or written.
+#[test]
+fn with_the_switch_off_an_updater_too_old_for_a_build_takes_nothing_it_carries() {
+    let mut lamp = Lamp::installed();
+    assert!(!lamp.config.self_switch);
+    lamp.config.updater = 1;
+    let old = lamp.own_build();
+    let build = product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    needing(&mut lamp, build, 2);
+    let before = lamp.lamp_files();
+    let fetched = lamp.channel.fetched.len();
+    assert_eq!(
+        lamp.round(),
+        Outcome::Refused(
+            "build 2 needs updater 2 or newer, and this is updater 1; \
+             waiting for a newer updater"
+                .into()
+        ),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(
+        lamp.channel.fetched[fetched..],
+        [format!("{CHANNEL}{}", manifest::ENVELOPE)]
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert!(lamp.calls().is_empty());
+    assert!(lamp.pending().is_none());
+    assert_eq!(lamp.own_build(), old);
+}
+
+/// #1680: a build too new for this updater, no newer than the build the
+/// lamp runs, is refused: the newer lamp-update it carries is not taken.
+#[test]
+fn an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries() {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    let old = lamp.own_build();
+    let build = product_build_with_updater(&mut lamp, 1, "lamp-update 2");
+    needing(&mut lamp, build, 2);
+    let before = lamp.lamp_files();
+    let fetched = lamp.channel.fetched.len();
+    assert_eq!(
+        lamp.round(),
+        Outcome::Refused(
+            "build 1 needs updater 2 or newer, and this is updater 1; \
+             waiting for a newer updater"
+                .into()
+        ),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(
+        lamp.channel.fetched[fetched..],
+        [format!("{CHANNEL}{}", manifest::ENVELOPE)]
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert!(lamp.calls().is_empty());
+    assert!(lamp.pending().is_none());
+    assert_eq!(lamp.own_build(), old);
+}
+
+// Models carried in the manifest (#1680, step 3): with LAMP_UPDATE_MODELS=on.
+
+const FACE: &str = "/opt/lampOS/eyes/models/face.onnx";
+const TURN: &str = "/opt/lampOS/releases/current/smart-turn.onnx";
+
+/// The eyes as the product runs them: started through their link, reading
+/// a model at a path of its own.
+fn eyes_reading_a_model() -> String {
+    format!(
+        "[Unit]\nDescription=lampOS eyes\n\n[Service]\nExecStart=/opt/lampOS/eyes/current/lamp-eyes --device /dev/video0 --model {FACE}\nRestart=on-failure\n"
+    )
+}
+
+impl Lamp {
+    /// lamp-4ace with linked eyes running `eyes 1` and the face model
+    /// `face 1` that install placed (its SHA-256 recorded), the switch on.
+    fn with_models(self) -> Self {
+        let mut lamp = self.with_linked_eyes("eyes 1");
+        let at = lamp.root.join(FACE.trim_start_matches('/'));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(&at, "face 1").unwrap();
+        fs::write(
+            lamp.root.join("etc/systemd/system/lamp-eyes.service"),
+            eyes_reading_a_model(),
+        )
+        .unwrap();
+        let records = lamp.root.join("var/lib/lampos-update");
+        fs::create_dir_all(&records).unwrap();
+        fs::write(
+            records.join("state.json"),
+            format!(
+                "{{\"installed\":null,\"previous\":null,\"refused\":[],\"made\":[],\"settings\":{{\"{FACE}\":\"{}\"}}}}",
+                sha("face 1")
+            ),
+        )
+        .unwrap();
+        lamp.config.models = true;
+        lamp
+    }
+
+    /// A model the channel serves as `text` at its own URL.
+    fn model(&mut self, path: &str, text: &str) -> Model {
+        let url = format!("https://models.test/{}", sha(text));
+        self.channel
+            .files
+            .insert(url.clone(), text.as_bytes().to_vec());
+        Model {
+            path: path.into(),
+            url,
+            bytes: text.len() as u64,
+            sha256: sha(text),
+            archive: None,
+        }
+    }
+
+    /// Build `sequence` with these eyes and these models, signed.
+    fn publish_with_models(&mut self, sequence: u64, eyes: &str, models: Vec<Model>) {
+        let mut manifest = self.manifest(
+            sequence,
+            &[
+                ("lamp-voice", "voice 1"),
+                ("lamp-turn-end", "turn-end 1"),
+                ("lamp-body", "body 1"),
+                ("lamp-controls", "controls 1"),
+                ("lamp-eyes", eyes),
+            ],
+            &[],
+        );
+        manifest.min_updater = Some(manifest::MODELS_UPDATER);
+        manifest.models = models;
+        let bytes = serde_json::to_vec(&manifest).unwrap();
+        let envelope = manifest::seal(&bytes, &self.key).unwrap();
+        self.channel
+            .files
+            .insert(format!("{CHANNEL}{}", manifest::ENVELOPE), envelope);
+    }
+
+    fn is_link(&self, path: &str) -> bool {
+        fs::symlink_metadata(self.root.join(path.trim_start_matches('/')))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    }
+
+    fn stored(&self) -> Vec<String> {
+        let mut found: Vec<String> = fs::read_dir(self.root.join("opt/lampOS/models"))
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                    .collect()
+            })
+            .unwrap_or_default();
+        found.sort();
+        found
+    }
+
+    fn fetched_models(&self) -> Vec<String> {
+        self.channel
+            .fetched
+            .iter()
+            .filter(|url| url.starts_with("https://models.test/"))
+            .cloned()
+            .collect()
+    }
+}
+
+fn sorted(mut names: Vec<String>) -> Vec<String> {
+    names.sort();
+    names
+}
+
+#[test]
+fn a_changed_model_is_fetched_checked_and_switched_with_its_part() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 2");
+    let turn = lamp.model(TURN, "turn model 2");
+    lamp.publish_with_models(2, "eyes 2", vec![face, turn]);
+    let outcome = lamp.round();
+    assert_eq!(outcome, Outcome::Switched(2), "{:?}", lamp.said);
+
+    // The face model's path is now a link into the store, with the eyes.
+    assert!(lamp.is_link(FACE));
+    assert_eq!(lamp.read(FACE), "face 2");
+    assert_eq!(lamp.eyes_link(), sha("eyes 2"));
+    // install's file is kept in the store by its bytes, for the way back.
+    assert_eq!(lamp.stored(), sorted(vec![sha("face 1"), sha("face 2")]));
+    // The voice's own model goes beside its binary, in a new folder named
+    // by its files, though the binary is the same.
+    let voice = lamp.read("/etc/systemd/system/lamp-voice.service");
+    assert_ne!(voice, voice_unit(&sha("voice 1")));
+    let program = unit::program(&voice).unwrap();
+    let folder = program.folder();
+    assert_eq!(
+        lamp.read(&format!("{folder}smart-turn.onnx")),
+        "turn model 2"
+    );
+    assert_eq!(lamp.read(&format!("{folder}lamp-voice")), "voice 1");
+    // Each model fetched once.
+    assert_eq!(lamp.fetched_models().len(), 2, "{:?}", lamp.channel.fetched);
+    assert!(
+        lamp.calls()
+            .contains(&"restart lamp-eyes.service".to_owned()),
+        "{:?}",
+        lamp.calls()
+    );
+}
+
+#[test]
+fn an_unchanged_model_is_not_fetched_and_its_file_stays() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 1");
+    let turn = lamp.model(TURN, "a model");
+    lamp.publish_with_models(2, "eyes 2", vec![face, turn]);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(
+        lamp.fetched_models().is_empty(),
+        "{:?}",
+        lamp.channel.fetched
+    );
+    assert!(!lamp.is_link(FACE));
+    assert_eq!(lamp.read(FACE), "face 1");
+    assert!(lamp.stored().is_empty());
+    // The voice changes nothing.
+    assert_eq!(
+        lamp.read("/etc/systemd/system/lamp-voice.service"),
+        voice_unit(&sha("voice 1"))
+    );
+}
+
+#[test]
+fn a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 2");
+    // What the URL serves is not what the build pins.
+    lamp.channel
+        .files
+        .insert(face.url.clone(), b"face 2, damaged".to_vec());
+    lamp.publish_with_models(2, "eyes 2", vec![face]);
+    let before = lamp.lamp_files();
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Refused(why) if why.contains(FACE)),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert_eq!(lamp.eyes_link(), sha("eyes 1"));
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+}
+
+#[test]
+fn a_model_switch_whose_part_dies_puts_the_model_back() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 2");
+    lamp.publish_with_models(2, "eyes 2, which crashes", vec![face]);
+    let before = lamp.lamp_files();
+    let outcome = lamp.round();
+    assert!(
+        matches!(
+            &outcome,
+            Outcome::RolledBack {
+                sequence: 2,
+                after: Ok(()),
+                ..
+            }
+        ),
+        "{outcome:?}"
+    );
+    // install's file again, as a file; the store gone with nothing to keep.
+    assert!(!lamp.is_link(FACE));
+    assert_eq!(lamp.read(FACE), "face 1");
+    assert_eq!(lamp.lamp_files(), before);
+}
+
+impl Lamp {
+    /// A store entry of `text`'s bytes.
+    fn in_store(&self, text: &str) {
+        let store = self.root.join("opt/lampOS/models");
+        fs::create_dir_all(&store).unwrap();
+        fs::write(store.join(sha(text)), text).unwrap();
+    }
+
+    /// `path` a link into the store, to `text`'s entry, as a switch leaves it.
+    fn linked_to(&self, path: &str, text: &str) {
+        let at = self.root.join(path.trim_start_matches('/'));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        let _ = fs::remove_file(&at);
+        std::os::unix::fs::symlink(lamp_update::models::target(path, &sha(text)), &at).unwrap();
+    }
+
+    /// A switch to build 2 cut short after its models moved: the eyes' unit
+    /// and link as they were, the model paths as `models` (the journal's
+    /// JSON) says they were.
+    fn cut_short_after_models(&self, models: &str) {
+        let records = self.root.join("var/lib/lampos-update");
+        fs::create_dir_all(records.join("previous")).unwrap();
+        fs::write(
+            records.join("previous/lamp-eyes.service"),
+            eyes_reading_a_model(),
+        )
+        .unwrap();
+        fs::write(
+            records.join("journal.json"),
+            format!(
+                "{{\"build\":{{\"sequence\":2,\"commit\":\"{}\"}},\"units\":[{{\"unit\":\"lamp-eyes.service\",\"was_active\":true,\"link\":{{\"path\":\"/opt/lampOS/eyes/current\",\"build\":\"{}\"}}}}],\"models\":{models}}}",
+                "2".repeat(40),
+                sha("eyes 1")
+            ),
+        )
+        .unwrap();
+    }
+}
+
+/// A model path of its own a unit reads as a folder, as the name does.
+const NAME: &str = "/opt/lampOS/name/models/name.onnx";
+
+#[test]
+fn a_model_switch_cut_short_is_put_back_at_the_next_start() {
+    let mut lamp = Lamp::new().with_models();
+    // As a switch to build 2 leaves it when the power goes after the face
+    // model's link moved: install's file in the store, the path a link.
+    lamp.in_store("face 1");
+    lamp.in_store("face 2");
+    lamp.linked_to(FACE, "face 2");
+    lamp.cut_short_after_models(&format!(
+        "[{{\"path\":\"{FACE}\",\"sha256\":\"{}\",\"file\":true}}]",
+        sha("face 1")
+    ));
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, .. } if why.contains("cut short")),
+        "{outcome:?}"
+    );
+    assert!(!lamp.is_link(FACE));
+    assert_eq!(lamp.read(FACE), "face 1");
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+    // No kept build names either: the store is emptied, and goes.
+    assert!(lamp.stored().is_empty());
+}
+
+/// The reviewer on #1879: a switch whose only change was a model, cut
+/// short, restarts the part that reads it on the model put back. Its unit
+/// and link never changed, but it may have started on the new model.
+#[test]
+fn a_model_only_switch_cut_short_restarts_the_part_that_reads_it() {
+    let mut lamp = Lamp::new().with_models();
+    lamp.in_store("face 1");
+    lamp.in_store("face 2");
+    lamp.linked_to(FACE, "face 2");
+    lamp.cut_short_after_models(&format!(
+        "[{{\"path\":\"{FACE}\",\"sha256\":\"{}\",\"file\":true}}]",
+        sha("face 1")
+    ));
+    let outcome = lamp.round();
+    assert!(
+        matches!(
+            &outcome,
+            Outcome::RolledBack {
+                sequence: 2,
+                after: Ok(()),
+                ..
+            }
+        ),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(FACE), "face 1");
+    assert!(
+        lamp.calls()
+            .contains(&"restart lamp-eyes.service".to_owned()),
+        "{:?}",
+        lamp.calls()
+    );
+}
+
+/// The reviewer on #1879: a model path that cannot be put back does not
+/// stop the others, and the journal stays for the next start, with no
+/// store entry a path links to removed.
+#[test]
+fn a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept() {
+    let mut lamp = Lamp::new().with_models();
+    // install's face file was kept in the store, and is gone from it now:
+    // it cannot come back. The name's link can.
+    lamp.in_store("face 2");
+    lamp.in_store("name 1");
+    lamp.in_store("name 2");
+    lamp.linked_to(FACE, "face 2");
+    lamp.linked_to(NAME, "name 2");
+    // Put back in reverse: the face first, then the name.
+    lamp.cut_short_after_models(&format!(
+        "[{{\"path\":\"{NAME}\",\"sha256\":\"{}\"}},{{\"path\":\"{FACE}\",\"sha256\":\"{}\",\"file\":true}}]",
+        sha("name 1"),
+        sha("face 1")
+    ));
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, after: Err(why), .. } if why.contains(FACE)),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(NAME), "name 1");
+    assert!(lamp.exists("/var/lib/lampos-update/journal.json"));
+    // What the face still links to is kept, and the name's entry too.
+    assert_eq!(lamp.read(FACE), "face 2");
+    assert!(
+        lamp.stored().contains(&sha("face 2")),
+        "{:?}",
+        lamp.stored()
+    );
+    assert!(
+        lamp.stored().contains(&sha("name 1")),
+        "{:?}",
+        lamp.stored()
+    );
+    // The next start tries again: the name stays put back, the face waits.
+    let again = lamp.round();
+    assert!(
+        matches!(&again, Outcome::RolledBack { after: Err(why), .. } if why.contains(FACE)),
+        "{again:?}"
+    );
+    assert_eq!(lamp.read(NAME), "name 1");
+    assert_eq!(lamp.read(FACE), "face 2");
+}
+
+/// The reviewer on #1879: with state.json set aside as unreadable, the
+/// next switch's prune keeps every store entry a model path links to now.
+#[test]
+fn prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 2");
+    lamp.publish_with_models(2, "eyes 1", vec![face.clone()]);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(lamp.is_link(FACE));
+    fs::write(lamp.root.join("var/lib/lampos-update/state.json"), "{").unwrap();
+    // The eyes change, the face model does not.
+    lamp.publish_with_models(3, "eyes 3", vec![face]);
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("could not be read")),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.read(FACE), "face 2");
+    assert!(
+        lamp.stored().contains(&sha("face 2")),
+        "{:?}",
+        lamp.stored()
+    );
+}
+
+/// The reviewer on #1879: a store fetch the network cuts is unreachable,
+/// as a build's file is, and tried again: not a refusal.
+#[test]
+fn a_model_fetch_cut_by_the_network_is_unreachable_not_refused() {
+    let mut lamp = Lamp::new().with_models();
+    let face = lamp.model(FACE, "face 2");
+    lamp.publish_with_models(2, "eyes 2", vec![face]);
+    lamp.channel.unreachable_under = Some("https://models.test/".into());
+    let before = lamp.lamp_files();
+    let outcome = lamp.round();
+    assert!(matches!(&outcome, Outcome::Unreachable(_)), "{outcome:?}");
+    assert_eq!(lamp.lamp_files(), before);
+}
+
+#[test]
+fn prune_keeps_the_models_of_the_kept_builds() {
+    let mut lamp = Lamp::new().with_models();
+    for (sequence, face) in [(2, "face 2"), (3, "face 3"), (4, "face 4")] {
+        // Only the model changes: the eyes, which read it, restart with it.
+        let model = lamp.model(FACE, face);
+        lamp.publish_with_models(sequence, "eyes 1", vec![model]);
+        let restarts = lamp.calls().len();
+        assert_eq!(lamp.round(), Outcome::Switched(sequence), "{:?}", lamp.said);
+        let restarted: Vec<String> = lamp.calls()[restarts..]
+            .iter()
+            .filter(|call| call.starts_with("restart"))
+            .cloned()
+            .collect();
+        assert_eq!(restarted, ["restart lamp-eyes.service"]);
+        assert_eq!(lamp.read(FACE), face);
+    }
+    // The model of the build the lamp runs and of the one before it.
+    assert_eq!(lamp.stored(), sorted(vec![sha("face 3"), sha("face 4")]));
+}
+
+#[test]
+fn a_lamp_short_of_room_for_the_models_refuses_before_fetching() {
+    let mut lamp = Lamp::new().with_models();
+    let mut face = lamp.model(FACE, "face 2");
+    // Fifty MB, as the build says: refused before the URL is read.
+    face.bytes = 50_000_000;
+    lamp.publish_with_models(2, "eyes 2", vec![face]);
+    lamp.free = lamp.config.keep_free + 10_000_000;
+    let before = lamp.lamp_files();
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Refused(why) if why.contains("(50 MB of it models)")),
+        "{outcome:?}"
+    );
+    assert!(
+        lamp.fetched_models().is_empty(),
+        "{:?}",
+        lamp.channel.fetched
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    let log = lamp.read("/var/lib/lampos-update/log.jsonl");
+    assert!(log.contains("50 MB of it models"), "{log}");
+}
+
+#[test]
+fn with_the_switch_off_a_build_with_other_models_is_refused() {
+    let mut lamp = Lamp::new().with_models();
+    lamp.config.models = false;
+    let face = lamp.model(FACE, "face 2");
+    lamp.publish_with_models(2, "eyes 2", vec![face]);
+    let before = lamp.lamp_files();
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::WaitsForModels(why) if why.contains("LAMP_UPDATE_MODELS=on")),
+        "{outcome:?}"
+    );
+    assert!(
+        outcome
+            .to_string()
+            .starts_with("refused, nothing switched: ")
+    );
+    assert!(lamp.fetched_models().is_empty());
+    assert_eq!(lamp.lamp_files(), before);
+    let log = lamp.read("/var/lib/lampos-update/log.jsonl");
+    assert!(log.contains("LAMP_UPDATE_MODELS=on"), "{log}");
+    // The same models as the lamp's: taken as today, nothing fetched.
+    let face = lamp.model(FACE, "face 1");
+    lamp.publish_with_models(3, "eyes 2", vec![face]);
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    assert!(lamp.fetched_models().is_empty());
+    assert!(!lamp.is_link(FACE));
+}
+
+/// The reviewer on #1879: off agrees with on for a file at a model's path
+/// that install did not place. It is the lamp's own, kept and said, and
+/// the rest of the build is taken.
+#[test]
+fn with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on() {
+    for on in [true, false] {
+        let mut lamp = Lamp::new().with_models();
+        lamp.config.models = on;
+        // No record of install placing it.
+        fs::write(
+            lamp.root.join("var/lib/lampos-update/state.json"),
+            "{\"installed\":null,\"previous\":null,\"refused\":[],\"made\":[]}",
+        )
+        .unwrap();
+        let face = lamp.model(FACE, "face 2");
+        lamp.publish_with_models(2, "eyes 2", vec![face]);
+        assert_eq!(
+            lamp.round(),
+            Outcome::Switched(2),
+            "on {on}: {:?}",
+            lamp.said
+        );
+        assert_eq!(lamp.read(FACE), "face 1");
+        assert!(!lamp.is_link(FACE));
+        assert!(
+            lamp.said
+                .iter()
+                .any(|line| line == &format!("kept {FACE}: it is not the pinned model")),
+            "on {on}: {:?}",
+            lamp.said
+        );
+        assert_eq!(lamp.eyes_link(), sha("eyes 2"));
+    }
+}
+
+/// The reviewer on #1879, the dead end: with LAMP_UPDATE_SELF=on and
+/// LAMP_UPDATE_MODELS off, a build with models the lamp lacks. The new
+/// updater its climb takes confirms itself, since its dry round counts only
+/// what it is switched to apply, and then waits for the models switch with
+/// nothing of the parts written; no later round climbs again.
+#[test]
+fn with_models_off_a_new_updater_confirms_and_the_build_waits_for_models() {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    // A model install placed, its SHA-256 recorded.
+    let at = lamp.root.join(FACE.trim_start_matches('/'));
+    fs::create_dir_all(at.parent().unwrap()).unwrap();
+    fs::write(&at, "face 1").unwrap();
+    let mut state = lamp.state();
+    state["settings"][FACE] = sha("face 1").into();
+    fs::write(
+        lamp.records().join("state.json"),
+        serde_json::to_vec(&state).unwrap(),
+    )
+    .unwrap();
+    let old = lamp.own_build();
+    let parts = parts_files(&lamp);
+    let mut build = product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    build.models = vec![lamp.model(FACE, "face 2")];
+    needing(&mut lamp, build, manifest::MODELS_UPDATER);
+    let new = sha("lamp-update 2");
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 2,
+            needed: 2,
+            from: old,
+            to: new.clone()
+        },
+        "{:?}",
+        lamp.said
+    );
+
+    lamp.config.updater = 2;
+    assert_eq!(lamp.confirm(&new), own::Confirm::Confirmed);
+    assert!(lamp.pending().is_none());
+    // The fallback leaves it.
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), u64::MAX),
+        own::Back::Nothing
+    );
+    for _ in 0..2 {
+        let outcome = lamp.round();
+        assert!(
+            matches!(&outcome, Outcome::WaitsForModels(why) if why.contains("LAMP_UPDATE_MODELS=on")),
+            "{outcome:?}"
+        );
+        assert_eq!(lamp.own_build(), new);
+        assert_eq!(parts_files(&lamp), parts);
+        assert!(lamp.pending().is_none());
+    }
+    assert!(lamp.fetched_models().is_empty());
+
+    // The models switch on: the build is taken, its model with it.
+    lamp.config.models = true;
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(FACE), "face 2");
+    assert_eq!(lamp.own_build(), new);
+}
+
+/// The controls' settings at their product path, as install wrote and
+/// recorded them, the controls reading them, and lamp-update-apply ready:
+/// what a product lamp has (#1680).
+fn lamp_with_settings() -> (Lamp, Rc<RefCell<Vec<String>>>) {
+    let mut lamp = Lamp::new();
+    let controls = sha("controls 1");
+    let write = |root: &Path, path: &str, text: &str| {
+        let at = root.join(path.trim_start_matches('/'));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(at, text).unwrap();
+    };
+    write(
+        &lamp.root,
+        "/etc/systemd/system/lamp-controls.service",
+        &format!(
+            "[Service]\nExecStart=/opt/lampOS/controls/{controls}/lamp-controls serve --config /etc/lampOS/controls/controls.json\n"
+        ),
+    );
+    write(&lamp.root, CONTROLS_JSON, "controls 1");
+    write(&lamp.root, RECORDS_JSON, "records 1");
+    let state = serde_json::json!({
+        "installed": {"sequence": 1, "commit": format!("{:040}", 1)},
+        "previous": null,
+        "refused": [],
+        "made": [],
+        "settings": {
+            CONTROLS_JSON: sha("controls 1"),
+            RECORDS_JSON: sha("records 1"),
+        },
+    });
+    write(
+        &lamp.root,
+        "/var/lib/lampos-update/state.json",
+        &state.to_string(),
+    );
+    lamp.config.settings = true;
+    let tmpfiles = Rc::new(RefCell::new(Vec::new()));
+    let (root, key, ran) = (lamp.root.clone(), lamp.config.key, Rc::clone(&tmpfiles));
+    lamp.systemd.applier = Some(Box::new(move || {
+        apply::run(
+            &root,
+            &root.join("var/lib/lampos-update"),
+            &key,
+            // The tmpfiles' path, or any other command whole.
+            &mut |parts| {
+                ran.borrow_mut().push(if parts[0] == "systemd-tmpfiles" {
+                    parts[2].to_owned()
+                } else {
+                    parts.join(" ")
+                });
+                Ok(())
+            },
+            &mut |_| {},
+        )
+    }));
+    (lamp, tmpfiles)
+}
+
+const CONTROLS_JSON: &str = "/etc/lampOS/controls/controls.json";
+const RECORDS_JSON: &str = "/etc/lampOS/records.json";
+const TMPFILES_CONF: &str = "/etc/tmpfiles.d/lampos.conf";
+
+/// Build `sequence`: build 1's binaries, and these settings.
+fn publish_settings(lamp: &mut Lamp, sequence: u64, settings: Vec<Setting>) {
+    let mut manifest = lamp.manifest(
+        sequence,
+        &[
+            ("lamp-voice", "voice 1"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+    manifest.min_updater = Some(manifest::SETTINGS_UPDATER);
+    manifest.settings = settings;
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let envelope = manifest::seal(&bytes, &lamp.key).unwrap();
+    lamp.channel
+        .files
+        .insert(format!("{CHANNEL}{}", manifest::ENVELOPE), envelope);
+}
+
+#[test]
+fn with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted() {
+    let (mut lamp, tmpfiles) = lamp_with_settings();
+    // The lamp's own records bound, changed since install wrote it.
+    fs::write(lamp.root.join("etc/lampOS/records.json"), "this lamp's").unwrap();
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![
+            Setting::new(CONTROLS_JSON, "controls 2"),
+            Setting::new(RECORDS_JSON, "records 2"),
+            Setting::new(TMPFILES_CONF, "d /run/lampos-bus 2770 root lampos -\n"),
+        ],
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 2");
+    assert_eq!(lamp.read(RECORDS_JSON), "this lamp's");
+    assert_eq!(
+        lamp.read(TMPFILES_CONF),
+        "d /run/lampos-bus 2770 root lampos -\n"
+    );
+    assert_eq!(*tmpfiles.borrow(), [TMPFILES_CONF]);
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with(&format!("kept {RECORDS_JSON}"))),
+        "{:?}",
+        lamp.said
+    );
+    // The settings before the parts, and only the part reading one restarted.
+    let calls = lamp.calls();
+    let applied = calls
+        .iter()
+        .position(|call| call == &format!("restart {}", apply::UNIT))
+        .unwrap();
+    let controls = calls
+        .iter()
+        .position(|call| call == "restart lamp-controls.service")
+        .unwrap();
+    assert!(applied < controls, "{calls:?}");
+    assert!(
+        !calls
+            .iter()
+            .any(|call| call == "restart lamp-voice.service"),
+        "{calls:?}"
+    );
+    let state = lamp.state();
+    assert_eq!(state["settings"][CONTROLS_JSON], sha("controls 2"));
+    assert_eq!(state["settings"][RECORDS_JSON], sha("records 1"));
+    assert_eq!(
+        state["settings"][TMPFILES_CONF],
+        sha("d /run/lampos-bus 2770 root lampos -\n")
+    );
+    assert!(!lamp.exists("/var/lib/lampos-update/apply/request.json"));
+    assert!(lamp.exists("/var/lib/lampos-update/apply/back.json"));
+}
+
+#[test]
+fn with_apply_off_a_builds_settings_are_not_written_and_that_is_said() {
+    let (mut lamp, _) = lamp_with_settings();
+    lamp.config.settings = false;
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![Setting::new(CONTROLS_JSON, "controls 2")],
+    );
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
+    assert!(!lamp.calls().iter().any(|call| call.contains(apply::UNIT)));
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("settings are not written") && line.contains(apply::SWITCH)),
+        "{:?}",
+        lamp.said
+    );
+}
+
+#[test]
+fn a_build_put_back_puts_its_settings_back_byte_for_byte() {
+    let (mut lamp, _) = lamp_with_settings();
+    let before = lamp.state()["settings"].clone();
+    lamp.systemd.crashing.push("lamp-controls.service".into());
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![Setting::new(CONTROLS_JSON, "controls 2")],
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::RolledBack { sequence: 2, .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
+    assert_eq!(lamp.state()["settings"], before);
+    assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+}
+
+#[test]
+fn a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written() {
+    let (mut lamp, _) = lamp_with_settings();
+    lamp.systemd.applier = None;
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![Setting::new(CONTROLS_JSON, "controls 2")],
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, .. } if why.contains("did nothing")),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
+    assert!(
+        !lamp
+            .calls()
+            .iter()
+            .any(|call| call == "restart lamp-controls.service")
+    );
+    // Nothing was written, so nothing is asked back: the round ends, the
+    // journal cleared and the build refused, and the next start is quiet.
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+    assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+    assert!(!lamp.exists("/var/lib/lampos-update/apply/request.json"));
+    let restarts = |lamp: &Lamp| {
+        lamp.calls()
+            .iter()
+            .filter(|call| *call == &format!("restart {}", apply::UNIT))
+            .count()
+    };
+    let asked = restarts(&lamp);
+    let again = lamp.round();
+    assert!(!matches!(again, Outcome::RolledBack { .. }), "{again:?}");
+    assert_eq!(restarts(&lamp), asked, "{again:?}");
+}
+
+/// The reviewer on #1913, 19:50: a product lamp installed before #1680 has
+/// install's tmpfiles with no record; a build's newer tmpfiles reach it.
+#[test]
+fn a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles() {
+    let (mut lamp, tmpfiles) = lamp_with_settings();
+    let at = lamp.root.join(TMPFILES_CONF.trim_start_matches('/'));
+    fs::create_dir_all(at.parent().unwrap()).unwrap();
+    fs::write(&at, lamp_update::install::TMPFILES).unwrap();
+    assert!(lamp.state()["settings"].get(TMPFILES_CONF).is_none());
+    let new = format!(
+        "{}d /run/lampos-new 0755 root root -\n",
+        lamp_update::install::TMPFILES
+    );
+    publish_settings(&mut lamp, 2, vec![Setting::new(TMPFILES_CONF, &new)]);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(TMPFILES_CONF), new);
+    assert_eq!(*tmpfiles.borrow(), [TMPFILES_CONF]);
+    assert_eq!(lamp.state()["settings"][TMPFILES_CONF], sha(&new));
+}
+
+#[test]
+fn a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start() {
+    let (mut lamp, _) = lamp_with_settings();
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![Setting::new(CONTROLS_JSON, "controls 2")],
+    );
+    lamp.systemd.cut_at_reload = true;
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| lamp.round()));
+    assert!(cut.is_err());
+    assert_eq!(
+        lamp.read(CONTROLS_JSON),
+        "controls 2",
+        "written before the cut"
+    );
+    assert!(lamp.exists("/var/lib/lampos-update/journal.json"));
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::RolledBack { sequence: 2, .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
+    assert_eq!(lamp.state()["settings"][CONTROLS_JSON], sha("controls 1"));
+}
+
+const ASOUND: &str = "/etc/asound.conf";
+const SPEAKER: &str = "/etc/systemd/system/lamp-cmedia-speaker.service";
+const JOURNAL: &str = "/etc/systemd/journald.conf.d/zz-lamp-journal.conf";
+
+fn image_file(path: &str, text: &str, shipped: &[&str]) -> ImageFile {
+    ImageFile {
+        variant: "standard".into(),
+        path: path.into(),
+        text: text.into(),
+        sha256: sha(text),
+        shipped: shipped.iter().map(|text| sha(text)).collect(),
+    }
+}
+
+/// A product lamp flashed with an earlier image, `LAMP_UPDATE_IMAGE=on`
+/// (#1369): its own `/etc/asound.conf` and speaker unit the image's.
+fn lamp_with_image() -> (Lamp, Rc<RefCell<Vec<String>>>) {
+    let (mut lamp, ran) = lamp_with_settings();
+    lamp.config.image = true;
+    for (path, text) in [
+        (ASOUND, "asound 1"),
+        (SPEAKER, "speaker 1"),
+        (JOURNAL, "journal 1"),
+    ] {
+        fs::write(lamp.root.join(path.trim_start_matches('/')), text)
+            .or_else(|_| {
+                let at = lamp.root.join(path.trim_start_matches('/'));
+                fs::create_dir_all(at.parent().unwrap())?;
+                fs::write(at, text)
+            })
+            .unwrap();
+    }
+    (lamp, ran)
+}
+
+/// Build `sequence`: build 1's binaries, and these of the image's files.
+fn publish_image(lamp: &mut Lamp, sequence: u64, image: Vec<ImageFile>) {
+    let mut manifest = lamp.manifest(
+        sequence,
+        &[
+            ("lamp-voice", "voice 1"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+    manifest.min_updater = Some(manifest::IMAGE_UPDATER);
+    manifest.image = image;
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let envelope = manifest::seal(&bytes, &lamp.key).unwrap();
+    lamp.channel
+        .files
+        .insert(format!("{CHANNEL}{}", manifest::ENVELOPE), envelope);
+}
+
+fn asound_build(lamp: &mut Lamp, sequence: u64) {
+    publish_image(
+        lamp,
+        sequence,
+        vec![
+            image_file(ASOUND, "asound 2", &["asound 1", "asound 2"]),
+            image_file(SPEAKER, "speaker 2", &["speaker 1", "speaker 2"]),
+            image_file(JOURNAL, "journal 2", &["journal 1", "journal 2"]),
+        ],
+    );
+}
+
+#[test]
+fn with_image_on_the_images_files_are_written_and_asound_restarts_the_voice_at_a_quiet_moment() {
+    let (mut lamp, ran) = lamp_with_image();
+    asound_build(&mut lamp, 2);
+    let before = lamp.now.get();
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(ASOUND), "asound 2");
+    assert_eq!(lamp.read(SPEAKER), "speaker 2");
+    assert_eq!(lamp.read(JOURNAL), "journal 2");
+    assert_eq!(
+        *ran.borrow(),
+        [
+            "systemd-analyze verify /run/lampos-update-apply/lamp-cmedia-speaker.service",
+            "systemctl daemon-reload",
+            "systemctl start lamp-cmedia-speaker.service"
+        ]
+    );
+    // The voice restarted for asound.conf, after 45 s of quiet, and the
+    // files written only then.
+    let calls = lamp.calls();
+    let applied = calls
+        .iter()
+        .position(|call| call == &format!("restart {}", apply::UNIT))
+        .unwrap();
+    let voice = calls
+        .iter()
+        .position(|call| call == "restart lamp-voice.service")
+        .unwrap();
+    assert!(applied < voice, "{calls:?}");
+    let (_, at) = lamp
+        .systemd
+        .restarted_at
+        .iter()
+        .find(|(unit, _)| unit == "lamp-voice.service")
+        .unwrap();
+    assert!(*at >= before + 45_000, "{at} {before}");
+    // journald: never restarted, nor anything of it run.
+    assert!(
+        !calls.iter().any(|call| call.contains("journald")),
+        "{calls:?}"
+    );
+    assert!(
+        !ran.borrow()
+            .iter()
+            .any(|command| command.contains("journald"))
+    );
+    assert_eq!(lamp.state()["settings"][ASOUND], sha("asound 2"));
+}
+
+/// The first builder on #1680, 19:48: asound.conf restarts the voice only
+/// when the lamp is quiet. Someone talks through the whole bound: nothing
+/// is written, the voice is not restarted, and the next quiet round does it.
+#[test]
+fn asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round() {
+    let (mut lamp, ran) = lamp_with_image();
+    asound_build(&mut lamp, 2);
+    lamp.talking = Some(Box::new(|at| at % 30_000 == 0));
+    lamp.config.quiet_wait = Duration::from_secs(120);
+    let start = lamp.now.get();
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::NotQuiet(why) if why.contains("no quiet moment in 120 s")),
+        "{outcome:?}"
+    );
+    // The bound held: the round gave up after it, not before, not later.
+    let waited = lamp.now.get() - start;
+    assert!((120_000..=125_000).contains(&waited), "{waited}");
+    assert_eq!(lamp.read(ASOUND), "asound 1");
+    assert!(ran.borrow().is_empty());
+    assert!(
+        !lamp
+            .calls()
+            .iter()
+            .any(|call| call == "restart lamp-voice.service" || call.contains(apply::UNIT)),
+        "{:?}",
+        lamp.calls()
+    );
+    // A turn going on, the voice speaking, is not quiet either: the gate
+    // reads the voice's state as well as its speech.
+    lamp.talking = Some(Box::new(|_| false));
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(ASOUND), "asound 2");
+    assert!(
+        lamp.calls()
+            .iter()
+            .any(|call| call == "restart lamp-voice.service")
+    );
+}
+
+#[test]
+fn with_image_off_the_images_files_are_not_written_and_that_is_said() {
+    let (mut lamp, ran) = lamp_with_image();
+    lamp.config.image = false;
+    asound_build(&mut lamp, 2);
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(lamp.read(ASOUND), "asound 1");
+    assert!(ran.borrow().is_empty());
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("image files are not written")
+                && line.contains("LAMP_UPDATE_IMAGE=on")),
+        "{:?}",
+        lamp.said
+    );
+}
+
+/// The reviewer on #1945, 21:43: with the switch off the hardware profile
+/// and the image's files are never read, so one that can't be read fails
+/// nothing. On, it is said, and the rest of the build goes on.
+#[test]
+fn a_hardware_profile_that_cannot_be_read_never_fails_the_round() {
+    for on in [false, true] {
+        let (mut lamp, ran) = lamp_with_image();
+        lamp.config.image = on;
+        // A folder where the profile is: reading it fails, not "not found".
+        fs::create_dir_all(lamp.root.join("etc/autonomous/hardware-profile")).unwrap();
+        publish_image(
+            &mut lamp,
+            2,
+            vec![image_file(ASOUND, "asound 2", &["asound 1", "asound 2"])],
+        );
+        assert_eq!(lamp.round(), Outcome::UpToDate(2), "{on} {:?}", lamp.said);
+        assert_eq!(lamp.read(ASOUND), "asound 1");
+        assert!(ran.borrow().is_empty());
+        let said = |text: &str| lamp.said.iter().any(|line| line.contains(text));
+        if on {
+            assert!(said("cannot be read"), "{:?}", lamp.said);
+        } else {
+            assert!(said("LAMP_UPDATE_IMAGE=on is not set"), "{:?}", lamp.said);
+            assert!(!said("cannot be read"), "{:?}", lamp.said);
+        }
+    }
+}
+
+#[test]
+fn a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it() {
+    let (mut lamp, _) = lamp_with_image();
+    fs::write(lamp.root.join("etc/asound.conf"), "this lamp's").unwrap();
+    asound_build(&mut lamp, 2);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(ASOUND), "this lamp's");
+    assert!(
+        !lamp
+            .calls()
+            .iter()
+            .any(|call| call == "restart lamp-voice.service")
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with(&format!("kept {ASOUND}"))),
+        "{:?}",
+        lamp.said
+    );
+}
+
+#[test]
+fn a_build_put_back_puts_the_images_files_back() {
+    let (mut lamp, ran) = lamp_with_image();
+    lamp.systemd.crashing.push("lamp-voice.service".into());
+    asound_build(&mut lamp, 2);
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::RolledBack { sequence: 2, .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(ASOUND), "asound 1");
+    assert_eq!(lamp.read(SPEAKER), "speaker 1");
+    // Reloaded once for the write and once for the put-back.
+    let reloads = ran
+        .borrow()
+        .iter()
+        .filter(|command| *command == "systemctl daemon-reload")
+        .count();
+    assert_eq!(reloads, 2, "{:?}", ran.borrow());
+}
+
+/// A lamp-update-back from before the field ignores `image`: the round says
+/// so, and the rest of the build goes on.
+#[test]
+fn an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so() {
+    let (mut lamp, _) = lamp_with_image();
+    let (root, key) = (lamp.root.clone(), lamp.config.key);
+    lamp.systemd.applier = Some(Box::new(move || {
+        let records = root.join("var/lib/lampos-update");
+        // An older copy: the request's `image` is a field it doesn't know.
+        let request = records.join("apply/request.json");
+        let mut asked: serde_json::Value =
+            serde_json::from_slice(&fs::read(&request).unwrap()).unwrap();
+        asked.as_object_mut().unwrap().remove("image");
+        fs::write(&request, asked.to_string()).unwrap();
+        apply::run(&root, &records, &key, &mut |_| Ok(()), &mut |_| {})
+    }));
+    asound_build(&mut lamp, 2);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(ASOUND), "asound 1");
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("lamp-update-back is older") && line.contains(ASOUND)),
+        "{:?}",
+        lamp.said
+    );
+    // The reviewer on #1945, 21:43: no asound.conf written, so the voice
+    // is not restarted for it.
+    assert!(
+        !lamp
+            .calls()
+            .iter()
+            .any(|call| call == "restart lamp-voice.service"),
+        "{:?}",
+        lamp.calls()
+    );
+}
+
+impl Lamp {
+    /// `self.json` turned into bytes that are not JSON, written `ago`
+    /// before now: before the link moved when `ago` is long enough.
+    fn spoil_pending(&self, ago: Duration) {
+        let path = self.records().join("self.json");
+        fs::write(&path, b"{\"version\": 1, \"old\": \"").unwrap();
+        fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(std::time::SystemTime::now() - ago)
+            .unwrap();
+    }
+
+    /// The names of what the records set aside, as `<name>.corrupt-<ms>`.
+    fn set_aside(&self, name: &str) -> Vec<String> {
+        fs::read_dir(self.records())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|found| found.starts_with(&format!("{name}.corrupt-")))
+            .collect()
+    }
+
+    fn logged(&self, event: &str) -> bool {
+        fs::read_to_string(self.records().join("log.jsonl"))
+            .unwrap_or_default()
+            .contains(&format!("\"event\":\"{event}\""))
+    }
+}
+
+/// #1680, #1505: a `self.json` that cannot be read, while a round knows
+/// the two builds from elsewhere (the link moved after the file was
+/// written, and `update/` holds one other build): the switch is taken as
+/// failed, never as confirmed. The updater that runs puts the old build
+/// back and refuses the new one, the file is kept aside, and the next
+/// round runs.
+#[test]
+fn an_unreadable_self_json_with_both_builds_known_is_put_back() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    lamp.spoil_pending(Duration::from_secs(60));
+
+    // A round by hand is refused while it waits, as for a readable one.
+    let refused = lamp.round();
+    assert!(
+        matches!(&refused, Outcome::Refused(why) if why.contains("cannot be read")),
+        "{refused:?}"
+    );
+    assert_eq!(lamp.own_build(), new);
+
+    assert_eq!(
+        lamp.confirm(&new),
+        own::Confirm::Unreadable(own::Unreadable::PutBack {
+            old: old.clone(),
+            new: new.clone()
+        })
+    );
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(own::refused(&lamp.records()), vec![new.clone()]);
+    assert!(lamp.pending().is_none());
+    assert_eq!(lamp.set_aside("self.json").len(), 1);
+    assert!(lamp.logged("self-put-back"));
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert_eq!(lamp.own_build(), old);
+}
+
+/// The same file seen by lamp-update-back: a new updater still running
+/// within its deadline (counted from the file's own time) is waited for;
+/// one that failed is put back.
+#[test]
+fn lamp_update_back_puts_back_an_unreadable_self_json() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    lamp.spoil_pending(Duration::from_secs(60));
+
+    assert_eq!(
+        lamp.back(update_unit("active", "running"), records_now()),
+        own::Back::Waiting
+    );
+    assert_eq!(lamp.own_build(), new);
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), records_now()),
+        own::Back::Unreadable(own::Unreadable::PutBack {
+            old: old.clone(),
+            new: new.clone()
+        })
+    );
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(own::refused(&lamp.records()), vec![new]);
+    assert_eq!(lamp.set_aside("self.json").len(), 1);
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+}
+
+/// When the builds are not known (here the file was written after the
+/// link last moved, so the link may still name the old build), nothing is
+/// guessed: after the dry round a confirmation needs, the file is set
+/// aside with a line, the link is left, and the next round runs. Before
+/// that dry round passes, it waits.
+#[test]
+fn an_unreadable_self_json_with_the_builds_unknown_is_set_aside() {
+    let mut lamp = Lamp::installed_switching_itself();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    std::thread::sleep(Duration::from_millis(20));
+    lamp.spoil_pending(Duration::ZERO);
+
+    let key = lamp.config.key;
+    lamp.config.key = throwaway().public_key().as_ref().try_into().unwrap();
+    assert!(matches!(lamp.confirm(&new), own::Confirm::NotProven(_)));
+    assert!(lamp.set_aside("self.json").is_empty());
+    lamp.config.key = key;
+
+    assert_eq!(
+        lamp.confirm(&new),
+        own::Confirm::Unreadable(own::Unreadable::SetAside)
+    );
+    assert_eq!(lamp.own_build(), new);
+    assert!(own::refused(&lamp.records()).is_empty());
+    assert_eq!(lamp.set_aside("self.json").len(), 1);
+    assert!(lamp.logged("self-set-aside"));
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+}
+
+/// The reviewer on #2075, 06:49: a power cut inside the put-back of an
+/// unreadable `self.json` never turns it around. Cut after `self-refused`
+/// is written (here the link's move fails, as a cut would leave it), then
+/// after the link moves: each start ends with the link on the good build,
+/// the failed one refused and the file set aside.
+#[test]
+fn a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around() {
+    // A cut after `self-refused`, before the link moves.
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    lamp.spoil_pending(Duration::from_secs(60));
+    let blocker = lamp.root.join("opt/lampOS/update/.current.lamp-update");
+    fs::create_dir_all(blocker.join("held")).unwrap();
+    let cut = own::back(
+        &lamp.records(),
+        &lamp.root,
+        records_now(),
+        &update_unit("failed", "failed"),
+        &mut |_| {},
+    );
+    assert!(cut.is_err(), "{cut:?}");
+    assert_eq!(own::refused(&lamp.records()), vec![new.clone()]);
+    assert_eq!(lamp.own_build(), new);
+    assert!(lamp.set_aside("self.json").is_empty());
+    fs::remove_dir_all(&blocker).unwrap();
+    assert_eq!(
+        lamp.confirm(&new),
+        own::Confirm::Unreadable(own::Unreadable::PutBack {
+            old: old.clone(),
+            new: new.clone()
+        })
+    );
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(own::refused(&lamp.records()), vec![new.clone()]);
+    assert_eq!(lamp.set_aside("self.json").len(), 1);
+
+    // A cut after the link moves, before the file is set aside.
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    lamp.spoil_pending(Duration::from_secs(60));
+    fs::write(lamp.records().join("self-refused"), format!("{new}\n")).unwrap();
+    lamp_update::records::replace_link(&lamp.root.join("opt/lampOS/update/current"), &old).unwrap();
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), records_now()),
+        own::Back::Unreadable(own::Unreadable::PutBack {
+            old: old.clone(),
+            new: new.clone()
+        })
+    );
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(own::refused(&lamp.records()), vec![new]);
+    assert_eq!(lamp.set_aside("self.json").len(), 1);
+    assert!(lamp.pending().is_none());
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+}
+
+/// The reviewer on #2075, 06:49: a `self.json` the disk will not give
+/// (here a folder in its place), not bad JSON, is never settled: the file
+/// may be fine. The round waits with a line, and the next one tries again.
+#[test]
+fn a_self_json_the_disk_cannot_give_is_tried_again_next_round() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let path = lamp.records().join("self.json");
+    fs::create_dir(&path).unwrap();
+    let refused = lamp.round();
+    assert!(
+        matches!(&refused, Outcome::Refused(why) if why.contains("the next one tries again")),
+        "{refused:?}"
+    );
+    assert!(lamp.logged("self-unread"));
+    assert!(lamp.said.iter().any(|line| line.contains("tries again")));
+    let back = own::back(
+        &lamp.records(),
+        &lamp.root,
+        records_now(),
+        &update_unit("failed", "failed"),
+        &mut |_| {},
+    );
+    assert!(back.is_err(), "{back:?}");
+    assert!(path.is_dir());
+    assert!(lamp.set_aside("self.json").is_empty());
+    fs::remove_dir(&path).unwrap();
+    assert_eq!(lamp.round(), Outcome::UpToDate(1), "{:?}", lamp.said);
+}
+
+/// #1505: a `self.json` from a later version, with a field this build
+/// does not know, reads as a switch that waits and is confirmed as ever.
+/// A guard: it read so before, and lamp-update-back must keep reading it.
+#[test]
+fn a_self_json_from_a_later_version_still_reads() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    let later = serde_json::json!({
+        "version": 2,
+        "old": old,
+        "new": new,
+        "at_unix_ms": records_now(),
+        "why": "a later build's reason",
+    });
+    fs::write(
+        lamp.records().join("self.json"),
+        serde_json::to_vec(&later).unwrap(),
+    )
+    .unwrap();
+    let pending = lamp.pending().unwrap();
+    assert_eq!((pending.version, pending.new.as_str()), (2, new.as_str()));
+    assert_eq!(lamp.confirm(&new), own::Confirm::Confirmed);
+}
+
+/// #1505: a `journal.json` that cannot be read no longer fails every round
+/// for good: it is set aside with a line and the round goes on.
+#[test]
+fn an_unreadable_journal_is_set_aside_and_the_round_goes_on() {
+    let mut lamp = Lamp::installed();
+    fs::write(lamp.records().join("journal.json"), b"{not json").unwrap();
+    assert_eq!(lamp.round(), Outcome::UpToDate(1), "{:?}", lamp.said);
+    assert_eq!(lamp.set_aside("journal.json").len(), 1);
+    assert!(!lamp.records().join("journal.json").exists());
+    assert!(lamp.logged("journal-set-aside"));
 }

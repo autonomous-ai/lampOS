@@ -115,6 +115,7 @@ fn wiring() -> TouchPinsConfig {
         head_qualify_ms: None,
         head_tap_min_ms: None,
         head_gap_ms: None,
+        head_rest: None,
         legacy_head: false,
     }
 }
@@ -1054,4 +1055,88 @@ fn a_button_held_is_said_at_each_reading_and_its_release_at_once() {
     heard.take();
     served(&mut rig, &mut heard, 2_000_000, 3_000_000, false, false);
     still(heard.take());
+}
+
+/// The project lead, 19 Oct: the base strip isn't used. Without its switch,
+/// a pins file's strip and the config's selected mask are set aside: the
+/// program starts no strip worker (it starts one only for a `base`), the
+/// touch state has no strip source, and the head pads and the button work
+/// as before. Only `on` keeps the strip.
+#[test]
+fn without_its_switch_the_strip_is_off_and_the_head_pads_still_work() {
+    use lamp_controls::touch_pins::{STRIP_ENV, serving};
+    assert_eq!(STRIP_ENV, "LAMP_CONTROLS_STRIP");
+    for switch in [None, Some("off"), Some("yes"), Some("ON")] {
+        let (served, config, set_aside) = serving(wiring(), config(true), switch);
+        assert!(set_aside, "{switch:?}");
+        assert!(served.base.is_none(), "{switch:?}");
+        assert_eq!(config.base_selected_mask, None);
+        // Everything else as written: the head pads, the button, the reset.
+        assert_eq!(
+            served,
+            TouchPinsConfig {
+                base: None,
+                ..wiring()
+            }
+        );
+        let mut rig = Rig::with_config(config, served);
+        for at in (0..=1_000_000).step_by(50_000) {
+            rig.gpio(at, false, false, false);
+            let output = rig.step(at);
+            assert!(
+                output
+                    .state
+                    .sources
+                    .iter()
+                    .all(|state| state.source != TouchSource::Strip),
+                "{:?}",
+                output.state.sources
+            );
+        }
+        let mut events = Vec::new();
+        for at in [1_020_000, 1_040_000] {
+            rig.gpio(at, false, false, true);
+            events.extend(rig.step(at).events);
+        }
+        assert!(
+            events
+                .iter()
+                .any(|event| event.source == TouchSource::Head
+                    && event.gesture == TouchGesture::Touch),
+            "{events:?}"
+        );
+        let output = rig.step(1_060_000);
+        let head = source(&output, TouchSource::Head);
+        assert!(head.ready && head.fault.is_none(), "{head:?}");
+        assert!(source(&output, TouchSource::Primary).fault.is_none());
+    }
+    // On, the strip is as configured, and the touch state has it.
+    let (served, kept, set_aside) = serving(wiring(), config(true), Some("on"));
+    assert!(!set_aside);
+    assert_eq!(served, wiring());
+    assert_eq!(kept.base_selected_mask, Some(4095));
+    let mut rig = Rig::with_config(kept, served);
+    rig.gpio(0, false, false, false);
+    let output = rig.step(0);
+    assert!(
+        output
+            .state
+            .sources
+            .iter()
+            .any(|state| state.source == TouchSource::Strip)
+    );
+    // A pins file with no strip, as the product's: nothing set aside.
+    let (served, _, set_aside) = serving(
+        TouchPinsConfig {
+            base: None,
+            ..wiring()
+        },
+        Config {
+            base_selected_mask: None,
+            ..config(true)
+        },
+        None,
+    );
+    assert!(!set_aside);
+    assert!(served.base.is_none());
 }

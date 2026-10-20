@@ -1,0 +1,14 @@
+# As a-visit-gives-one-text-with-its-time-and-length, with a ring that never
+# says the mark is shown (no `light/reached`: no ring worker, or the voice down):
+# the mark is asked for, and the visit at 14:31 is not counted or texted.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[expect]]
+at = "4s"
+call = "light"
+args = { colour = "blue", level = 1 }

@@ -51,6 +51,9 @@ pub enum NoticeKind {
     /// The internet answers but the voice service does not (a relay
     /// outage), and nothing else can answer (#830, `LAMP_SERVICE_DOWN_LINE`).
     VoiceServiceUnreachable,
+    /// Neither the new Wi-Fi nor the old one could be joined after a change
+    /// from the app (#1959): no network, so no cloud voice to say so.
+    WifiLost,
 }
 
 /// Who may hear it.

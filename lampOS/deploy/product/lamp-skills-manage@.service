@@ -1,0 +1,28 @@
+# lampOS skills' manage helper, one request (lampOS/docs/skills.md, "The manage helper"; #1722):
+# started by lamp-skills-manage.socket for each connection, as root, the connection its standard
+# input and output. `lamp-skills asked` reads one line, {"remove": NAME}, checks it itself (a
+# skill's name, never a core skill), runs lamp-skills' own remove under the folder's lock, answers
+# one line and exits. install is not taken. Only the skills folder is writable; no network.
+[Unit]
+Description=lampOS skills' manage helper (lamp-skills asked)
+CollectMode=inactive-or-failed
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/opt/lampOS/skills/current/lamp-skills asked --dir /var/lib/lampOS/skills
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+SyslogIdentifier=lamp-skills
+RuntimeMaxSec=60
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lampOS/skills
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=

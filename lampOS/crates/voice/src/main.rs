@@ -751,6 +751,7 @@ fn run() -> Result<()> {
             let (eye_strong, flags) = lamp_voice::ring_sight::take_strong(flags);
             let (head_touch, flags) = lamp_voice::ring_head::take(flags);
             let (light_requests, flags) = lamp_voice::ring_light::take(flags);
+            let (skill_light_speaking, flags) = lamp_voice::ring_light::take_speaking(flags);
             let (light_keep, flags) = lamp_voice::ring_light::take_keep(flags);
             if !flags.is_empty() {
                 return Err(io::Error::new(io::ErrorKind::InvalidInput, "unknown ring worker option").into());
@@ -767,6 +768,7 @@ fn run() -> Result<()> {
                     eye_strong,
                     head_touch,
                     light_requests,
+                    skill_light_speaking,
                     light_keep,
                 },
             )?;

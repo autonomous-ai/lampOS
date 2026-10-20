@@ -13,21 +13,26 @@
 pub mod annotations;
 pub mod canary;
 pub mod cost;
+pub mod endpoint;
 pub mod evaluate;
 pub mod events;
 pub mod export;
 pub mod fake;
 pub mod import;
 pub mod ledger;
+pub mod mood_minute;
 pub mod physical;
 pub mod plan;
 mod playback;
 pub mod record;
 pub mod report;
 pub mod runner;
+pub mod score;
 pub mod stats;
 pub mod stimulus;
 pub mod target_audio;
+pub mod voice_lines;
+pub mod waiting_cuts;
 
 use std::{error::Error, io};
 
