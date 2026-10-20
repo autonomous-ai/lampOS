@@ -1391,6 +1391,75 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
 
 const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
 
+/// The reviewer's P1 on #2143: a lamp whose pins are its own (the
+/// factory's head pads, before this build) keeps them, and gains the
+/// build's `privacy` section, which the product's units now select; without
+/// it Controls has no privacy source and the lamp never hears. Everything
+/// else is kept, it is said, and installing again changes nothing. A pins
+/// file that isn't a JSON object is left, and said.
+#[test]
+fn a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest() {
+    let mut lamp = Lamp::new(188, &[]);
+    let own = r#"{
+  "chip": "/dev/gpiochip0",
+  "buttons": [{"name": "primary", "line": 99, "active_low": true, "pull": "up"}],
+  "head_pads": [{"name": "head-1", "line": 41, "active_low": true, "pull": "up"}],
+  "every_ms": 5,
+  "reset": {"name": "reset", "line": 100, "active_low": true, "pull": "up"},
+  "legacy_head": true
+}
+"#;
+    fs::create_dir_all(lamp.on(PINS).parent().unwrap()).unwrap();
+    fs::write(lamp.on(PINS), own).unwrap();
+    let first = lamp.install().unwrap();
+    let pins: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(lamp.on(PINS)).unwrap()).unwrap();
+    assert_eq!(
+        pins["privacy"],
+        serde_json::json!({"chip": "/dev/gpiochip1", "line": 9, "active_low": true, "pull": "up"})
+    );
+    let mut kept = pins.clone();
+    kept.as_object_mut().unwrap().remove("privacy");
+    assert_eq!(
+        kept,
+        serde_json::from_str::<serde_json::Value>(own).unwrap()
+    );
+    assert!(
+        first.changed.contains(&format!("wrote {PINS}")),
+        "{:?}",
+        first.changed
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with(&format!("added the privacy section to {PINS}"))),
+        "{:?}",
+        lamp.said
+    );
+    let added = fs::read_to_string(lamp.on(PINS)).unwrap();
+    lamp.said.clear();
+    let again = lamp.install().unwrap();
+    assert_eq!(fs::read_to_string(lamp.on(PINS)).unwrap(), added);
+    assert!(
+        !again.changed.contains(&format!("wrote {PINS}")),
+        "{:?}",
+        again.changed
+    );
+    // Not a JSON object: left as it is, and said.
+    let mut odd = Lamp::new(189, &[]);
+    fs::create_dir_all(odd.on(PINS).parent().unwrap()).unwrap();
+    fs::write(odd.on(PINS), "[]\n").unwrap();
+    odd.install().unwrap();
+    assert_eq!(fs::read_to_string(odd.on(PINS)).unwrap(), "[]\n");
+    assert!(
+        odd.said
+            .iter()
+            .any(|line| line.starts_with(&format!("{PINS} is not a JSON object"))),
+        "{:?}",
+        odd.said
+    );
+}
+
 /// The reviewer's case on #815: install, move the primary button to
 /// another line on this lamp, install the same build again. The lamp's
 /// line stays, it is said, and nothing else is written or asked.
