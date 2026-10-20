@@ -113,7 +113,7 @@ const AGREE_WITH_A_NO: &[&[&str]] = &[
     &["do", "not", "mind"],
 ];
 
-fn lower_words(text: &str) -> Vec<String> {
+pub(crate) fn lower_words(text: &str) -> Vec<String> {
     text.replace('\u{2019}', "'")
         .split(|c: char| !(c.is_alphanumeric() || c == '\''))
         .map(|word| word.trim_matches('\''))
@@ -216,6 +216,12 @@ const BESIDE_A_YES: &[&str] = &[
 /// about again (the reviewer on #1208): that costs a turn, and a misheard
 /// name put in place costs the right one. So is a yes said as a question:
 /// "Yes?", "Right?", and "Dạ?", which in Vietnamese is "sorry, what?".
+/// A plain yes and nothing more ([`plain_yes`] with no name): "Yes.",
+/// "Yes, please.", "Vâng ạ.", never "Right, what's on today?".
+pub(crate) fn plain_agreement(turn: &str) -> bool {
+    plain_yes("", turn)
+}
+
 fn plain_yes(name: &str, turn: &str) -> bool {
     if turn.trim_end().ends_with('?') {
         return false;
@@ -347,7 +353,7 @@ fn spelled_runs(theirs: &[String]) -> Vec<String> {
 /// The words of `text` as a name is matched: lowercase, without accents,
 /// written as one letter or as a letter and its mark, a word with an
 /// apostrophe kept whole and ’ read as '.
-fn folded_words(text: &str) -> Vec<String> {
+pub(crate) fn folded_words(text: &str) -> Vec<String> {
     text.replace('\u{2019}', "'")
         .chars()
         .filter(|c| !('\u{300}'..='\u{36f}').contains(c))
