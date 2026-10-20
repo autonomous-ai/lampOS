@@ -1994,8 +1994,8 @@ after a take-over, but now for every turn:
   16:34 (`6225eb110c2c`), after scene 1's question, requests 31 to 35 were
   each `its answer is played: …, only as the conversation going on`. With
   the switch, once a line is let out only as the conversation going on
-  (`attention::Attention::played_on_the_conversation_alone`), the request
-  is kept (`Heeding::chain`), and the lamp's answers to the requests kept
+  (`attention::Attention::played_on_the_conversation_alone`) and is surely
+  another person's, the request is kept (`Heeding::chain`), and the lamp's answers to the requests kept
   open no window (`Thread::said_last_ago_but`; their words' end,
   `Did::Said`, is left out too), in a quiet room or a busy one, and the
   same-voice check's "under the mark" reads the same. Its other lines (a
@@ -2005,11 +2005,28 @@ after a take-over, but now for every turn:
   cut, "Thanks, I'll go and get it now." 5 s later is answered). A line
   said to the lamp (a call, a face, a reply to its question) and answered
   empties the requests kept, and a line that may answer the lamp's own
-  question reads all its words. Still held: one person's follow-ups with no
-  name, face or question of the lamp's end 45 s (a busy room: 15 s after
-  the words) after the last answer to a line said to the lamp, however
-  many answers come between (five lines 15 s apart, the fifth held). The
-  journal says `the lamp's answers to requests [N, …], let out only as the
+  question reads all its words. Surely another person's (the first
+  builder's 01:02 on #1722: on lamp-4ace at 00:32 the switch held one
+  person's day lines, 12/12 to 9/12, "What do you see right now?",
+  "Remember that my favourite colour is green." and "What time is it?"
+  each `no_audio_answer`) means its print scored under 0.30 against the
+  caller's (`same_voice::SOMEONE_ELSE_BELOW`, the first builder at 02:33:
+  on lamp-4ace's mic2 on 21 Oct at 02:29 the same voice in a quiet room
+  scored down to 0.35, other voices up to 0.29), or the eyes saw a face
+  speaking it and none of them the answered caller's (`Heeding::someone_else`,
+  #2305's `caller_faces` and speaking-faces reader, read with this switch
+  too). No print (a line begun over the lamp's voice, or under 1.5 s) is
+  never another voice and goes on as the conversation (the first builder
+  at 02:19). The conversation's own check keeps its bar of 0.45
+  (`same_voice::DIFFERENT_BELOW`): #829 holds a line under it at
+  its verdict, or, known after its answer, ends the conversation at the
+  next line, with the switch as without it, so a line #829 lets out scored
+  0.45 or more and the 0.30 bar chains nothing by voice while #829's bar
+  stands; the same voice at 0.35 is still held there. A line with nothing to tell
+  the speakers apart (no voice model, no speaking face seen) is taken for
+  the same person's follow-up, and its answer renews the window as
+  without the switch: without a speaking face (lamp-4ace's played test,
+  most lamps today) the switch does nothing. The journal says `the lamp's answers to requests [N, …], let out only as the
   conversation going on, keep no conversation going
   (LAMP_GOING_ON_NOT_OWN)`. Not changed: the session fact, the Policy's
   `lamp_spoke_lately`, a checked sound's `lamp_just_asked`, and the Live

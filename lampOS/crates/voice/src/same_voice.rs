@@ -94,6 +94,13 @@ const _: () = assert!(ASKED_AT <= MOST_SAMPLES);
 /// stays off, and is at most one weak sign beside a face, lips and the
 /// name (#829).
 pub const DIFFERENT_BELOW: f32 = 0.45;
+/// Under this, a line's print against the caller's is surely someone else's,
+/// for the rules that hold or chain a line as another person's
+/// (`LAMP_GOING_ON_NOT_OWN`, `LAMP_QUIET_GOING_ON_SAME_ONE`); the
+/// conversation's own check keeps [`DIFFERENT_BELOW`]. On lamp-4ace's mic2
+/// (21 Oct, 02:29, the first builder at 02:33 on Queue #1722) the same voice
+/// in a quiet room scored down to 0.35 and other voices up to 0.29.
+pub const SOMEONE_ELSE_BELOW: f32 = 0.30;
 /// A child that has ended is started again after this long.
 pub const RESTART_AFTER: Duration = Duration::from_secs(5);
 /// A child that ends this many times in a row before it is ready is not

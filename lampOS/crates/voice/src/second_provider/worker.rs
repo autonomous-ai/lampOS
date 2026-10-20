@@ -1987,15 +1987,7 @@ pub fn serve(
                 // lamp-eyes): the answered caller's face seen speaking
                 // through a line lets it go on. Without them nothing reads
                 // speaking, and nothing changes.
-                // ponytail: its own reader beside `LAMP_SECOND_SPEAKING_FACE`'s;
-                // one shared reader if both are ever on together.
-                if let Some(root) = files.bus_root.as_deref() {
-                    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
-                    let reader = crate::speaking_faces::read_from(eyes.clone(), root);
-                    if reader.is_some() {
-                        heeding.seeing_speaking_faces(eyes, reader);
-                    }
-                }
+                heeding.opening_the_eyes(files.bus_root.as_deref());
             }
         }
         // A camera close or a mute: no face id outlives it.
@@ -2042,6 +2034,9 @@ pub fn serve(
             );
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.not_counting_own_answers();
+                // Another face than the caller's seen speaking a line tells
+                // it is another person's; the same reader as above.
+                heeding.opening_the_eyes(files.bus_root.as_deref());
             }
         }
         // The rule keeps the route's one reader of the Policy's decisions,
@@ -3126,6 +3121,9 @@ struct Seen {
     other_voice: bool,
     /// Found in the conversation's own voice by the same-voice check.
     same_voice: bool,
+    /// Its print's likeness to the conversation's voice, if judged: none
+    /// begun over the lamp's voice or too short for a print.
+    likeness: Option<f32>,
 }
 
 /// A line that waits for the Policy's decision: its request, since when,
@@ -3276,7 +3274,12 @@ impl Heeding {
     /// call, a face, a reply to its question) is answered. Its other lines
     /// (a reminder, news, a skill's say, an answer to a line said to it)
     /// open their window as before, and a reply to the lamp's own question
-    /// is judged as before.
+    /// is judged as before. Only a line surely another person's joins the
+    /// chain: another face than the caller's seen speaking it (the first
+    /// builder at 01:02 on Queue #1722: on lamp-4ace at 00:32 one person's
+    /// follow-ups without the name were held, day lines 12/12 to 9/12).
+    /// With nothing to tell the speakers apart the line is the same
+    /// person's, and its answer renews the window as without the switch.
     pub(crate) fn not_counting_own_answers(&mut self) {
         self.not_own = true;
     }
@@ -3331,9 +3334,9 @@ impl Heeding {
     /// conversation's own voice goes on, a statement in it is talk past the
     /// lamp. The second field: held as another voice; the third: found in
     /// the conversation's own voice.
-    fn voice_going_on(&mut self, request: u64, going_on: bool) -> (bool, bool, bool) {
+    fn voice_going_on(&mut self, request: u64, going_on: bool) -> (bool, bool, bool, Option<f32>) {
         let Some(voices) = self.voices.as_mut() else {
-            return (going_on, false, false);
+            return (going_on, false, false, None);
         };
         let attention = &self.attention;
         let under_the_mark = !going_on
@@ -3373,7 +3376,7 @@ impl Heeding {
             }
             (false, false, false)
         };
-        match at.likeness {
+        let (going_on, other, same) = match at.likeness {
             _ if at.late_other.is_some() => (false, false, false),
             Some(likeness) if likeness < crate::same_voice::DIFFERENT_BELOW => {
                 eprintln!(
@@ -3402,7 +3405,8 @@ impl Heeding {
                 (true, false, true)
             }
             None => (going_on, false, false),
-        }
+        };
+        (going_on, other, same, at.likeness)
     }
 
     /// Ask again rather than answer a line of a conversation heard in
@@ -3434,6 +3438,41 @@ impl Heeding {
         reader: Option<crate::speaking_faces::Reader>,
     ) {
         self.eyes = Some((eyes, reader));
+    }
+
+    /// The eyes' speaking faces read from the bus at `root`, once for both
+    /// switches that read them (`LAMP_QUIET_GOING_ON_SAME_ONE`,
+    /// `LAMP_GOING_ON_NOT_OWN`); none without a reader.
+    /// ponytail: its own reader beside `LAMP_SECOND_SPEAKING_FACE`'s; one
+    /// shared reader if both are ever on together.
+    fn opening_the_eyes(&mut self, root: Option<&Path>) {
+        if self.eyes.is_some() {
+            return;
+        }
+        let Some(root) = root else {
+            return;
+        };
+        let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+        let reader = crate::speaking_faces::read_from(eyes.clone(), root);
+        if reader.is_some() {
+            self.seeing_speaking_faces(eyes, reader);
+        }
+    }
+
+    /// Whether `seen` shows a line surely someone else's than the answered
+    /// caller's: its print scored under [`crate::same_voice::SOMEONE_ELSE_BELOW`]
+    /// (0.30) against the caller's, or faces seen speaking both, none of the
+    /// line's the caller's. No print (begun over the lamp, too short) is no
+    /// voice told; nothing seen is nothing told.
+    fn someone_else(&self, seen: &Seen) -> bool {
+        seen.likeness
+            .is_some_and(|likeness| likeness < crate::same_voice::SOMEONE_ELSE_BELOW)
+            || (!seen.speakers.is_empty()
+                && !self.caller_faces.is_empty()
+                && !seen
+                    .speakers
+                    .iter()
+                    .any(|face| self.caller_faces.contains(face)))
     }
 
     /// The camera closed or reopened, or the microphone was muted or
@@ -3907,7 +3946,8 @@ impl Heeding {
             self.noted = Some((request, None));
         }
         let turned = signs.turned.filter(|_| self.strict);
-        let (going_on, other_voice, same_voice) = self.voice_going_on(request, signs.going_on);
+        let (going_on, other_voice, same_voice, likeness) =
+            self.voice_going_on(request, signs.going_on);
         let attention = &mut self.attention;
         let seen = Seen {
             room: signs.room,
@@ -3921,6 +3961,7 @@ impl Heeding {
             short_after_the_lamp: short_after(began_us, ended_us, self.said_until_us),
             heard: heard.to_owned(),
             named_faced,
+            likeness,
         };
         // The conversation's window over (none going on, whoever spoke):
         // the caller's faces go with it, before a call sets them again.
@@ -4028,6 +4069,7 @@ impl Heeding {
 
     /// The verdict on `request`, seen as `seen`, said and kept.
     fn verdict(&mut self, request: u64, seen: &Seen) -> Option<&'static str> {
+        let someone_else = self.someone_else(seen);
         let attention = &mut self.attention;
         let (heard, busy, lamp_asked, turned) =
             (seen.heard.as_str(), seen.busy, seen.lamp_asked, seen.turned);
@@ -4134,10 +4176,19 @@ impl Heeding {
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
         // `LAMP_GOING_ON_NOT_OWN`: the answer to a line let out only as the
-        // conversation going on renews nothing; one to a line said to the
-        // lamp does.
+        // conversation going on renews nothing when it is surely someone
+        // else's ([`Self::someone_else`]). Under #829's own bar another voice
+        // (`LAMP_SAME_VOICE_MODEL`) is held at its verdict, or, known after
+        // its answer, ends the conversation at the next line
+        // ([`Self::voice_going_on`]).
+        // With nothing to tell the speakers apart it is the same person's
+        // follow-up, and its answer renews the window as without the switch
+        // (the first builder at 01:02 on Queue #1722). An answer to a line
+        // said to the lamp ends the chain.
         if self.not_own && self.alone.is_some() {
-            self.chain.push(request);
+            if someone_else {
+                self.chain.push(request);
+            }
         } else if played {
             self.chain.clear();
             self.said_until_free_us = self.said_until_us;
@@ -5458,25 +5509,77 @@ mod tests {
     /// played test): after one question to the lamp, two people's own talk
     /// was answered line after line, "only as the conversation going on",
     /// each answer opening the window for the next. With
-    /// `LAMP_GOING_ON_NOT_OWN=on` the lamp's answers to such lines renew
-    /// nothing: the line inside the window of the answer to the question is
+    /// `LAMP_GOING_ON_NOT_OWN=on` the lamp's answers to such lines, seen
+    /// spoken by another face than the caller's, renew nothing: the line inside the window of the answer to the question is
     /// judged as before, the ones after it are held, in a quiet room and in
     /// a busy one, and after a name heard only in a busy room's sound (the
     /// first builder's 18:20 case); a reply to the lamp's own question still
-    /// goes on.
+    /// goes on. With nothing to tell the speakers apart, one person's
+    /// follow-ups all go on (the first builder's 01:02).
     #[test]
     fn the_lamps_own_answers_to_talk_keep_no_conversation_going() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
         let s = Duration::from_secs;
         // Lines at a virtual second, each answered a second later if let
         // out: `answer` says what the lamp answers it. A line with nothing
         // heard is the lamp's own (a reminder), said at its second.
         // `named`: the first line's name heard only in the room's sound, at
         // that score, close to the lamp, its words not calling it.
+        // `faces`: the face seen speaking each line, by the eyes; none, no
+        // eyes. `voices`: each line's voice for the same-voice check (1 one
+        // person, -1 another), its print known only after its verdict.
+        /// Prints by a line's first sample, each given only once released.
+        struct Late(
+            Arc<Mutex<Vec<u64>>>,
+            std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>,
+        );
+        impl crate::same_voice::Printer for Late {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.1.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                let released = self.0.lock().unwrap();
+                let at = self
+                    .1
+                    .iter()
+                    .position(|(request, _)| released.contains(request))?;
+                self.1.remove(at)
+            }
+        }
         let run = |not_own: bool,
                    busy: bool,
                    named: Option<f32>,
+                   faces: Option<&[&str]>,
+                   voices: Option<&[i16]>,
                    lines: &[(u64, &str, &str)]|
          -> Vec<bool> {
+            use lamp_msgs::{Face, Faces, Speaking, SpeakingState};
+            let speaking = |id: &str| Faces {
+                faces: vec![Face {
+                    id: id.to_owned(),
+                    xmin: 0.2,
+                    ymin: 0.2,
+                    xmax: 0.4,
+                    ymax: 0.5,
+                    confidence: 1.0,
+                    yaw: None,
+                    facing: None,
+                    speaking: Some(Speaking {
+                        state: SpeakingState::Yes,
+                        score: 0.9,
+                        from: None,
+                    }),
+                }],
+            };
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (eyes_at, eyes_at_us) = (Instant::now(), monotonic_us());
             // The lamp's words for `request`, played to their end at virtual
             // second `end`, told at virtual second `now` (`Did::Said`), so
             // both the thread's window and the words' end are exercised.
@@ -5494,6 +5597,16 @@ mod tests {
             heeding.as_the_only_voice(false, true, false);
             if not_own {
                 heeding.not_counting_own_answers();
+            }
+            if faces.is_some() {
+                heeding.seeing_speaking_faces(eyes.clone(), None);
+            }
+            let released = Arc::new(Mutex::new(Vec::new()));
+            if voices.is_some() {
+                heeding.checking_the_voice(Box::new(Late(
+                    released.clone(),
+                    std::collections::VecDeque::new(),
+                )));
             }
             let mut answered: Vec<(u64, &str, &str, u64)> = Vec::new();
             let mut was = 0;
@@ -5513,8 +5626,24 @@ mod tests {
                 };
                 heeding.said_until_us = older(heeding.said_until_us);
                 heeding.said_until_free_us = older(heeding.said_until_free_us);
-                // Each line's own sound, a second long, at its second.
-                let said = (10_000_000 + at * 1_000_000, 11_000_000 + at * 1_000_000);
+                // Each line's own sound, a second long, at its second; with
+                // faces, on the eyes' clock, 3 s apart, its face speaking in
+                // four looks through it.
+                let said = match faces {
+                    Some(faces) => {
+                        // "": no face seen speaking it.
+                        let face = faces[request as usize - 1];
+                        for look in (0..4u64).filter(|_| !face.is_empty()) {
+                            eyes.look(
+                                eyes_at + Duration::from_millis(request * 3_000 + 200 + look * 200),
+                                Some((("b", request * 10 + look), &speaking(face))),
+                            );
+                        }
+                        let began = eyes_at_us + request * 3_000_000;
+                        (began, began + 1_000_000)
+                    }
+                    None => (10_000_000 + at * 1_000_000, 11_000_000 + at * 1_000_000),
+                };
                 let now = Instant::now();
                 let mut thread = crate::thread::Thread::new();
                 for (asked, person, lamp, at_s) in &answered {
@@ -5534,6 +5663,18 @@ mod tests {
                     }
                     assert_eq!(room.at(monotonic_us()), crate::room_told::Room::Busy);
                 }
+                if let Some(voices) = voices {
+                    use crate::second_provider::Heard;
+                    let voice = voices[request as usize - 1];
+                    heeding.hear(
+                        request,
+                        Heard::Began {
+                            over_the_lamps_voice: false,
+                        },
+                    );
+                    heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+                    heeding.hear(request, Heard::Ended);
+                }
                 let held = match named.filter(|_| request == 1) {
                     Some(score) => {
                         let mut signs = heeding.signs(request, said);
@@ -5550,6 +5691,7 @@ mod tests {
                     room.spoke(request, monotonic_us());
                 }
                 played.push(held.is_none());
+                released.lock().unwrap().push(request);
             }
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
             played
@@ -5584,14 +5726,108 @@ mod tests {
             ),
         ];
         assert_eq!(
-            run(false, false, None, &quiet),
+            run(false, false, None, None, None, &quiet),
             [true; 5],
             "today: all answered"
         );
         assert_eq!(
-            run(true, false, None, &quiet),
+            run(
+                true,
+                false,
+                None,
+                Some(&["f1", "f2", "f1", "f2", "f1"]),
+                None,
+                &quiet
+            ),
             [true, true, false, false, false],
-            "the lamp's own answers renew nothing"
+            "another face than the caller's speaking: the lamp's answers to it renew nothing"
+        );
+        assert_eq!(
+            run(true, false, None, None, None, &quiet),
+            [true; 5],
+            "nothing tells the two apart: taken for one person, as without the switch"
+        );
+        // The first builder's 01:02 on Queue #1722 (lamp-4ace's 00:32 played
+        // test, day lines 12/12 to 9/12): one person, a named question, then
+        // follow-ups without the name, 20 s apart, no voice model, no face.
+        // Each answer renews the window, with the switch as without it.
+        let day = [
+            (
+                0,
+                "Lamp, what's the weather today?",
+                "Sunny and warm today.",
+            ),
+            (20, "What do you see right now?", "I see a desk and a mug."),
+            (
+                40,
+                "Remember that my favourite colour is green.",
+                "I'll remember that green is your favourite.",
+            ),
+            (60, "What time is it?", "It's ten past one."),
+        ];
+        assert_eq!(run(false, false, None, None, None, &day), [true; 4], "off");
+        assert_eq!(
+            run(true, false, None, None, None, &day),
+            [true; 4],
+            "on: one person's follow-ups all answered"
+        );
+        // Another voice known only after its answer (the same-voice check
+        // slow) ends the conversation at the next line (#829), with the
+        // switch as without it; in one voice the same lines all go on.
+        let late = [
+            (
+                0,
+                "Lamp, what's the weather today?",
+                "Sunny and warm today.",
+            ),
+            (
+                30,
+                "Did you finish the slides for Monday?",
+                "I can't see your slides.",
+            ),
+            (60, "I think I'll go out later.", "Have a nice walk."),
+            (70, "Will it rain this evening?", "No rain this evening."),
+        ];
+        let voices = Some(&[1, -1, 1, 1][..]);
+        assert_eq!(
+            run(false, false, None, None, voices, &late),
+            [true, true, false, false],
+            "off"
+        );
+        assert_eq!(
+            run(true, false, None, None, voices, &late),
+            [true, true, false, false],
+            "on: another voice, known late, ends it"
+        );
+        assert_eq!(
+            run(true, false, None, None, Some(&[1, 1, 1, 1][..]), &late),
+            [true; 4],
+            "on: one voice"
+        );
+        assert_eq!(
+            run(true, false, None, None, Some(&[1, 1, 1, 1][..]), &day),
+            [true; 4],
+            "on: one voice's follow-ups all answered"
+        );
+        assert_eq!(
+            run(
+                true,
+                false,
+                None,
+                Some(&["f1", "f1", "f1", "f1"]),
+                None,
+                &day
+            ),
+            [true; 4],
+            "on: the caller's own face speaking each"
+        );
+        // The reviewer's P3 on #2339: the call seen spoken by no face, then
+        // a face speaking each follow-up: nothing to compare it with, so
+        // nothing is another's.
+        assert_eq!(
+            run(true, false, None, Some(&["", "f2", "f2", "f2"]), None, &day),
+            [true; 4],
+            "on: the caller never seen speaking"
         );
         // A busy room goes on 15 s from the end of the lamp's words.
         let busy = [
@@ -5618,12 +5854,19 @@ mod tests {
             (52, "Sure, let me just get my jacket.", "Enjoy your coffee."),
         ];
         assert_eq!(
-            run(false, true, None, &busy),
+            run(false, true, None, None, None, &busy),
             [true; 5],
             "today: all answered"
         );
         assert_eq!(
-            run(true, true, None, &busy),
+            run(
+                true,
+                true,
+                None,
+                Some(&["f1", "f2", "f1", "f2", "f1"]),
+                None,
+                &busy
+            ),
             [true, true, false, false, false]
         );
         // A reply to the lamp's own question goes on, and its answer renews.
@@ -5645,7 +5888,17 @@ mod tests {
             ),
             (70, "Thanks, that is very helpful.", "You're welcome."),
         ];
-        assert_eq!(run(true, false, None, &asked), [true; 4]);
+        assert_eq!(
+            run(
+                true,
+                false,
+                None,
+                Some(&["f1", "f2", "f2", "f2"]),
+                None,
+                &asked
+            ),
+            [true; 4]
+        );
         // The reviewer's 21:39 case: once the chain is cut, a line the lamp
         // says on its own (a reminder) opens its window as before, and the
         // person's reply to it goes on.
@@ -5668,9 +5921,16 @@ mod tests {
             (300, "", "Your tea is ready."),
             (305, "Thanks, I'll go and get it now.", "Enjoy your tea."),
         ];
-        assert_eq!(run(false, false, None, &reminded), [true; 4]);
+        assert_eq!(run(false, false, None, None, None, &reminded), [true; 4]);
         assert_eq!(
-            run(true, false, None, &reminded),
+            run(
+                true,
+                false,
+                None,
+                Some(&["f1", "f2", "f1", "", "f2"]),
+                None,
+                &reminded
+            ),
             [true, true, false, true],
             "a reply to the lamp's own line goes on"
         );
@@ -5690,14 +5950,50 @@ mod tests {
             (52, "Great, let me get my keys.", "Have a nice dinner."),
         ];
         assert_eq!(
-            run(false, true, Some(0.95), &named),
+            run(false, true, Some(0.95), None, None, &named),
             [true; 5],
             "today: all answered"
         );
         assert_eq!(
-            run(true, true, Some(0.95), &named),
+            run(
+                true,
+                true,
+                Some(0.95),
+                Some(&["f1", "f2", "f1", "f2", "f1"]),
+                None,
+                &named
+            ),
             [true, true, false, false, false]
         );
+    }
+
+    /// The first builder at 02:33 on Queue #1722: a print is someone else's
+    /// only under 0.30 against the caller's (mic2 on lamp-4ace: the same
+    /// voice in a quiet room down to 0.35, others up to 0.29); no print is
+    /// never another voice.
+    #[test]
+    fn someone_else_by_voice_only_under_0_30() {
+        let heeding = Heeding::new(true, true, None, None);
+        let seen = |likeness| Seen {
+            room: crate::room_told::Room::Quiet,
+            going_on: true,
+            turned: None,
+            busy: false,
+            lamp_asked: false,
+            speakers: Vec::new(),
+            short_after_the_lamp: false,
+            heard: String::new(),
+            named_faced: false,
+            other_voice: false,
+            same_voice: false,
+            likeness,
+        };
+        assert!(
+            !heeding.someone_else(&seen(Some(0.35))),
+            "the same voice, quiet"
+        );
+        assert!(heeding.someone_else(&seen(Some(0.25))), "another voice");
+        assert!(!heeding.someone_else(&seen(None)), "no print");
     }
 
     /// #1712: a line that called the lamp, let out, carries the person's
@@ -6148,6 +6444,58 @@ mod tests {
             held,
             "long, at 10 s"
         );
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
+    /// The first builder's 01:02 on Queue #1722: with no voice model and no
+    /// face (lamp-4ace's 00:32 played test), does
+    /// `LAMP_QUIET_GOING_ON_SAME_ONE` keep one person's follow-ups without
+    /// the name, each 15 s after the lamp's last words? A short one goes on
+    /// (`SHORT_GOES_ON_FOR`); a long one, "Remember that my favourite colour
+    /// is green.", is held as anyone's talk.
+    #[test]
+    fn quiet_going_on_without_voice_or_face_holds_one_persons_long_follow_up() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::room_told::Room;
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+        let signs = |going_on| Signs {
+            room: Room::Quiet,
+            going_on,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let mut heeding = Heeding::new(true, true, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.going_on_quiet_only_for_the_same_one();
+        let s = 1_000_000;
+        let mut verdicts = vec![heeding.judge(
+            1,
+            (10 * s, 11 * s),
+            "Lamp, what's the weather today?",
+            signs(false),
+        )];
+        heeding.lamp_did(crate::second_provider::Did::Said(1, 14 * s));
+        // Each line: begun 15 s after the lamp's words, that long, answered.
+        let mut until = 14 * s;
+        for (request, (long, words)) in (2..).zip([
+            (1_400_000, "What do you see right now?"),
+            (2_500_000, "Remember that my favourite colour is green."),
+            (1_000_000, "What time is it?"),
+        ]) {
+            let began = until + 15 * s;
+            let verdict = heeding.judge(request, (began, began + long), words, signs(true));
+            if verdict.is_none() {
+                until = began + long + 4 * s;
+                heeding.lamp_did(crate::second_provider::Did::Said(request, until));
+            }
+            verdicts.push(verdict);
+        }
+        let held = Some(crate::second_provider::QUIET_GOING_ON_HELD);
+        assert_eq!(verdicts, [None, None, held, None]);
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 

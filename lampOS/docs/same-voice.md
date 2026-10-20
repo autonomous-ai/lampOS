@@ -192,6 +192,18 @@ to the lamp's answer to A ("And what about tomorrow?", when 1.5 s or
 longer) now needs B facing the lamp, or the name. A person at the desk
 would usually answer it. That is why it is behind its own model path.
 
+**A second bar, 0.30, for the same-one rules** (`SOMEONE_ELSE_BELOW`,
+beside `DIFFERENT_BELOW`; the first builder at 02:33 and 02:44 on #1722):
+`LAMP_GOING_ON_NOT_OWN` and `LAMP_QUIET_GOING_ON_SAME_ONE` take a print
+under 0.30 against the caller's as someone else's; no print (a line begun
+over the lamp's voice, or under 1.5 s) never is. On lamp-4ace's mic2 on
+21 October at 02:29 the same voice with both clips quiet scored down to
+0.35 and other voices up to 0.29
+([verification](verification/same-voice-20261021/)); on the sets with
+pairs kept, 0.30 read none of 37 same-voice pairs of printed lines as
+another and caught 27 of 29 others. The known cost: 18 October's set had
+one same-voice pair at 0.27. The conversation's own check keeps 0.45.
+
 **The bar is 0.45**, the equal-error bar of lamp-4ace's labelled set
 (18 October, scored on lamp-4ace by the first builder with the Sixth's
 script; [verification](verification/same-voice-20261018/README.md), #1485).
