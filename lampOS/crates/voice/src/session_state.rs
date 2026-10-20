@@ -64,6 +64,20 @@ fn tenth(value: Option<f32>) -> char {
 }
 #[derive(Default)]
 pub(crate) struct SessionState {
+    #[cfg(test)]
+    pub(crate) onboarding_test_polls: Option<std::sync::Arc<std::sync::atomic::AtomicU64>>,
+    #[cfg(test)]
+    pub(crate) onboarding_test_file: Option<std::path::PathBuf>,
+    #[cfg(test)]
+    pub(crate) onboarding_test_capture_accepted:
+        Option<std::sync::Arc<std::sync::atomic::AtomicU64>>,
+    /// A failed privacy-step invalidation disables only onboarding proof for
+    /// this service invocation; capture authority remains with its own gate.
+    pub(crate) onboarding_privacy_disabled: bool,
+    /// Recovery needs an acknowledged storage epoch newer than this failure.
+    pub(crate) onboarding_storage_failed_epoch: Option<u64>,
+    /// The sole onboarding filesystem executor, retained across voice cycles.
+    pub(crate) onboarding_storage: Option<crate::onboarding::storage::ServiceStorage>,
     events: Vec<Value>,
     pub(crate) receipts: ReceiptHistory,
     pub(crate) yield_interval: Option<YieldInterval>,

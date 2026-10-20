@@ -510,6 +510,7 @@ fn say_step(say: toml::Value) -> Result<Call, String> {
             match table["from"].as_str() {
                 Some("schedule") => Ok(Call::SayFrom(Source::Schedule, None)),
                 Some("tasks") => Ok(Call::SayFrom(Source::Tasks, None)),
+                Some("onboarding") => Ok(Call::SayFrom(Source::Onboarding, None)),
                 Some(other) => Err(format!(
                     "say.from is \"schedule\" or \"tasks\", not {other:?}"
                 )),
@@ -932,6 +933,7 @@ impl Skill {
                 let by = match source {
                     Source::Schedule => "a say from schedule",
                     Source::Tasks => "a say from tasks",
+                    Source::Onboarding => "a say from onboarding",
                 };
                 reads.push((source.topic().to_owned(), by));
             }
@@ -1304,6 +1306,8 @@ pub enum Source {
     Schedule,
     /// The news of work handed to an agent (`tasks/status`).
     Tasks,
+    /// A current invitation owned by the onboarding runner.
+    Onboarding,
 }
 
 impl Source {
@@ -1311,6 +1315,7 @@ impl Source {
         match self {
             Self::Schedule => "schedule",
             Self::Tasks => "tasks",
+            Self::Onboarding => "onboarding",
         }
     }
 
@@ -1321,6 +1326,7 @@ impl Source {
         match self {
             Self::Schedule => lamp_msgs::ScheduleDue::TOPIC,
             Self::Tasks => lamp_msgs::TaskStatus::TOPIC,
+            Self::Onboarding => lamp_msgs::OnboardingPending::TOPIC,
         }
     }
 
@@ -1330,7 +1336,7 @@ impl Source {
     pub fn priority(self) -> u8 {
         match self {
             Self::Schedule => 8,
-            Self::Tasks => 5,
+            Self::Tasks | Self::Onboarding => 5,
         }
     }
 }
@@ -1441,7 +1447,11 @@ impl Call {
             Self::SayFrom(source, task) => {
                 let mut args = json!({ "from": source.name() });
                 if let Some(task) = task {
-                    args["task"] = json!(task);
+                    args[if *source == Source::Onboarding {
+                        "invitation"
+                    } else {
+                        "task"
+                    }] = json!(task);
                 }
                 ("say", args)
             }
@@ -2288,6 +2298,21 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         }
         if let Some(say) = step.say {
             let call = say_step(say)?;
+            if matches!(call, Call::SayFrom(Source::Onboarding, _)) {
+                let canonical = name == "onboarding"
+                    && file.kind.as_deref() == Some("core")
+                    && conditions.is_empty()
+                    && triggers.len() == 1
+                    && triggers[0].test == Test::Equals("ready".into(), json!(true))
+                    && triggers[0].topic == lamp_msgs::OnboardingPending::TOPIC
+                    && triggers[0]
+                        .each
+                        .as_ref()
+                        .is_some_and(|(list, key)| list == "invitations" && key == "invitation");
+                if !canonical {
+                    return Err("say.from onboarding belongs only to the core onboarding skill's invitation trigger".into());
+                }
+            }
             // A tool's run tells the model what to say, and what the voice
             // keeps is not the model's to say (Fourth on #1033).
             if matches!(call, Call::SayFrom(..)) && file.tool.is_some() {
@@ -3869,8 +3894,28 @@ impl Engine {
                     // list. The first message since the program started
                     // only says what is there: what was there then is not
                     // news. After a reload the value kept then is the last.
+                    let onboarding = skill.name == "onboarding"
+                        && skill.kind == SkillKind::Core
+                        && skill.steps.iter().any(|(_, step)| {
+                            matches!(step, Step::Call(Call::SayFrom(Source::Onboarding, _)))
+                        });
+                    // Only this source may deliver its initial snapshot: the
+                    // runner checks the token and owns bounded retry/restart.
+                    // Malformed or oversized lists never produce an ask.
+                    let valid = !onboarding
+                        || serde_json::from_value::<lamp_msgs::OnboardingPending>(value.clone())
+                            .is_ok_and(|pending| pending.check().is_ok());
+                    if !valid {
+                        // Invalid input cannot rearm an already-consumed token.
+                        continue;
+                    }
                     let items = items_of(trigger, list, key, &value);
                     let came: Vec<String> = match &watch.items {
+                        None if onboarding => items
+                            .iter()
+                            .filter(|(_, holds)| **holds)
+                            .map(|(name, _)| name.clone())
+                            .collect(),
                         None => Vec::new(),
                         Some(before) => items
                             .iter()
@@ -4473,7 +4518,7 @@ fn calls(
             // and only on a `from = "tasks"` ask: the voice refuses `task`
             // on any other (#1237).
             Step::Call(Call::SayFrom(source, _)) => {
-                let task = (*source == Source::Tasks)
+                let task = matches!(*source, Source::Tasks | Source::Onboarding)
                     .then(|| item.and_then(|name| name.parse().ok()))
                     .flatten();
                 vec![Call::SayFrom(*source, task)]
