@@ -461,3 +461,7 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   #2226: Friday's P1/P2/P3 fixed (`5ac6d5839`): a fresh session is asked
   for after a stop on both routes; only lost writes settle; rules settle.
   Took #2176 row 5b.
+- #2226: ARM64 caught lamp-memory's malformed rule acknowledgement test; an
+  ok that is no acknowledgement stays uncertain again. #2265: #2176 row 5b,
+  a known face lost a few seconds with no face in view keeps its memory
+  scope (`LAMP_FACE_GAP_HOLD`, off), tested through the request's lease.
