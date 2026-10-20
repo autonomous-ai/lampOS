@@ -187,8 +187,8 @@ or the `own_*` credentials and uses the relay; the drop-in's
 
 ## Tests
 
-`cargo test -p lamp-setup` (`tests/keys.rs`, `tests/serve.rs`,
-`tests/reset.rs`, `src/keys.rs`), `-p lamp-voice` (`second_config`,
+`cargo test -p lamp-setup` (`tests/it/keys.rs`, `tests/it/serve.rs`,
+`tests/it/reset.rs`, `src/keys.rs`), `-p lamp-voice` (`second_config`,
 `second_provider::worker`), `-p lamp-cloud` (`settings`, `online`) and
 `-p lamp-selftest`: a key absent, present and removed (relay, own, relay);
 a refused or unreachable key not kept; a key that worked but couldn't be

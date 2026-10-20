@@ -1,6 +1,4 @@
-#[allow(dead_code)]
-#[path = "runtime/support.rs"]
-mod support;
+use crate::support;
 use lamp_body::{
     control::Clock,
     runtime::{

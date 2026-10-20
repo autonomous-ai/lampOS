@@ -15,7 +15,7 @@ are in `lamp-bus record`'s shape, written by hand (`voice/heard`,
 | `never-on-its-own` | Talk of lost keys and glasses, no call | Pass: nothing |
 
 A replay makes each call a fresh run. What one search is is the program's,
-tested in `crates/skills/tests/skills.rs`: its first look at the desk
+tested in `crates/skills/tests/it/skills.rs`: its first look at the desk
 when no place is named, each where it is asked, and none past its looks
 (`a_search_looks_at_the_desk_first_then_where_asked_and_no_more_than_its_looks`);
 someone speaking ending it, its pose and its light, within a fifth of a

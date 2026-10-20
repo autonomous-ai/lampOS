@@ -227,7 +227,7 @@ follows the rule agreed on #2060, so a reset is all or nothing:
 - A bad known value, an empty `wipe`, or JSON that doesn't read is still
   refused (`reset::Refused::Bad`), as before.
 
-Host tests (`crates/setup/tests/reset.rs`): the order of the steps, a failed
+Host tests (`crates/setup/tests/it/reset.rs`): the order of the steps, a failed
 stop wiping nothing, a wipe that fails halfway keeping the journal and marker
 until `resume-reset` finishes, a start with no journal touching nothing,
 refused plans, every reason an event is not a reset, the watcher on a real bus
@@ -263,7 +263,7 @@ never match. And a failed join puts the previous file back before the hotspot
 returns, so nothing of it is kept. `wpa_cli status` prints the joined network's
 name with C escapes ("Nhà Lan" as `Nh\xc3\xa0 Lan`); it is decoded before it is
 compared with the name asked for. V1's eight failure cases, from its
-own captured wpa_supplicant lines, are tests here (`crates/setup/tests/wifi.rs`),
+own captured wpa_supplicant lines, are tests here (`crates/setup/tests/it/wifi.rs`),
 with the join's timing against a fake lamp.
 
 **The TLS reach.** A TCP connection alone is not the Internet: anything that
@@ -368,7 +368,7 @@ failure shown at 80 s. Each fetch
 gives up after 2 s, so a request to a hotspot that has just gone cannot hold
 those checks back.
 
-Host tests (`crates/setup/tests/serve.rs`): every refused request, a run that
+Host tests (`crates/setup/tests/it/serve.rs`): every refused request, a run that
 joins and saves in order with the address published while joining, a wrong
 password that saves nothing, a save that fails and leaves no marker, the
 private files and the zone link, V1's routes and shapes, one run at a time, no
@@ -430,7 +430,7 @@ begun, so a stop in the first seconds also ends in black (the reviewer on
 script; setup then says it was asked to stop, with the script's error,
 and exits cleanly, and the unit does not read failed (the reviewer on
 #1336 and #1341). That choice is `serve::start_unless_stopped`, tested in
-`tests/serve.rs` (Fourth on #1341).
+`tests/it/serve.rs` (Fourth on #1341).
 
 It is painted by `lamp_setup::light` from a thread of `lamp-setup`, through
 `lamp_ring::setup::SetupRing`, a writer like the asleep face's that needs no
@@ -444,7 +444,7 @@ itself, 20 s later).
 Host tests: `crates/ring/src/setup.rs` (one colour over the ring, never over
 24, black first and last); `crates/setup/src/light.rs` (each phase's look,
 the fade in, a breath that never goes dark, the change, the fade out, joining
-breathing twice as fast); `crates/setup/tests/light.rs`, the painter's
+breathing twice as fast); `crates/setup/tests/it/light.rs`, the painter's
 thread on a fake ring: white, blue, then black and the ring closed before the
 marker; amber again after a save that failed; nothing drawn after the marker
 of a run that finished; black at stop; a ring that cannot be opened said once
@@ -496,7 +496,7 @@ characters)"); a zone is said.
 | The lamp's name in the app | the same, and not empty | `/etc/lampOS/setup/display-name`, 644 root (`display_name` in the settings), one line | `lamp-cloud` reads it at each `system.info` as `host.device_name`. **It never changes what the lamp answers to: the wake word stays "Lamp"** |
 | The time zone | an IANA name the lamp's zone data has (`zone_known`, as setup) **and** the parts' bundled zone data has, else refused, so `zone.env` and `/etc/localtime` never disagree | `/etc/localtime`, `/etc/timezone` and `/etc/lampOS/zone.env`, as setup writes them | the voice, memory, Expression and skills follow `/etc/localtime` at each reading. `lamp-schedule` takes `LAMP_ZONE` at start, so after a zone that changed `zone.env` the helper waits for the lamp to be quiet, as an update does before it restarts the voice (`lamp_update::quiet`: resting, nobody heard and nothing said for 45 s), and runs `systemctl try-restart lamp-schedule.service`. It waits at most 30 minutes; then schedule keeps the old zone until it next starts, and the journal says so. Reminders already set keep the zone they were set in (`schedule.md`) |
 
-Tests (`crates/setup/tests/change.rs`): each change's files, modes and reply;
+Tests (`crates/setup/tests/it/change.rs`): each change's files, modes and reply;
 a name removed; a rename to nothing refused; a zone either zone data lacks,
 or a path, refused with nothing changed; the same zone again restarting
 nothing; the switch off, nothing written; requests that are not exactly one
@@ -600,7 +600,7 @@ by the voice:
 else: no reply, error or journal line holds it, and the journal holds no
 network name either, only its length.
 
-Tests (`crates/setup/tests/wifi_change.rs`, with a fake network manager): a
+Tests (`crates/setup/tests/it/wifi_change.rs`, with a fake network manager): a
 network that joins and reaches the broker kept, and the old file gone; the old
 file kept while waiting; a wrong password, a network out of range, one with no
 address and one without the broker each back on the old network, never the
