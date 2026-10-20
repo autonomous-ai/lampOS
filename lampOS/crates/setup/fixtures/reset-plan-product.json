@@ -19,6 +19,7 @@
     "/var/lib/lampos-policy",
     "/var/lib/lampos-cloud",
     "/var/lib/lampOS/voice/sessions",
+    "/var/lib/lampOS/voice/onboarding",
     "/var/lib/lampOS/voice/schedule-delivery",
     "/var/lib/lampOS/voice/first-output",
     "/var/lib/lampOS/voice/tasks-told",

@@ -1019,7 +1019,10 @@ fn a_cycle_that_failed_before_it_heard_releases_the_guard() {
     );
 
     for exit in [
-        Box::new(PhysicalMute { observed_at_us: 1 }) as Box<dyn std::error::Error + Send + Sync>,
+        Box::new(PhysicalMute {
+            onboarding: None,
+            observed_at_us: 1,
+        }) as Box<dyn std::error::Error + Send + Sync>,
         Box::new(SoftwareMute {
             observed_at_us: 1,
             asleep: false,

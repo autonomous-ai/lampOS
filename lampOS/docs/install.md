@@ -240,6 +240,13 @@ lamp installed before and keeps running. Taking a skill out is the removal
 work's (`lamp-skills remove` and the core and installable kinds, on
 `first/skills-core-installable`), not install's.
 
+The core `onboarding` folder is installed too. It contributes no model tool;
+its privacy invitation bridge remains inactive without the voice's explicit
+onboarding switch, Controls' privacy receipts (`LAMP_PRIVACY_CONTROLS=on`,
+which the product unit doesn't set), valid hardware profile and pending
+invitation. Private progress lives under `/var/lib/lampOS/voice/onboarding/`;
+factory reset wipes that state, not the skill package.
+
 **17 October: lamp-4ace's switches of that day became the product's** (joining.md's rule), taken from lamp-4ace's unit as it ran that day; most were switched on there on 16 or 17 October, several only as part of the groups of #1238's census, so their lamp record is that day's running, not a run of their own. They're the switch groups (lead-in to a tool, a waited answer kept, the stop told, the asker first only recorded, names checked, the staff note, task news at a pause, memory rules), the light requests (the voice's ring and the skills' half, `lamp-skills.service`), the quiet pace, starting offline, the asleep ring, a sorry in another language, the lamp's name in passing ignored, first words kept, tasks asked and who asked, a cut keeping the name, the self-test's speaker, the stall recorder, the strong ring eye, and short sounds judged in a quiet room after a check. Not taken: those that need the second voice's configuration (stop words, its down-line and wait cue, the voice link), which a product lamp doesn't have; the office's own (its Harness target, its say group); head touch, which needs Controls' and Expression's flags as well (#711); those that need another part's flag the product doesn't pass (the Policy holding actions needs `lamp-policy --act attention`, its hello and progress news need `--hello` and `--progress`, the full look needs the eyes' `--full-look`, a restored mute needs `--controls-mute`); and "that was weird", a builder's review tool whose marks (`/var/lib/lampOS/voice/marked/`) the reset doesn't wipe. Expression's catalogue differs too (`expression-alive-name-speech` on
 lamp-4ace, `expression-alive` on lamp-52e6): the product takes lamp-4ace's, plus the `speaking` section (#933): the nods on stressed words, the base's sway between sentences (#1067) and the settle at the end, which no catalogue in `deploy/` had, so a product lamp only leaned while it spoke (the body's lean, #1010, needs no catalogue). `speaking_engine`'s `the_products_catalogue_nods_sways_and_settles_as_the_alive_one_does` holds the product's to the alive catalogue's.
 
@@ -419,7 +426,10 @@ units stopped:
    `--torque on`. It refuses, with why, where the body would refuse the
    poses, and when any joint has torque on (the lamp is then held, not at
    rest). `--gaze` is not in it: it is measured with a face and the camera
-   ([body.md](body.md)), and the body runs without it until then. Without
+   ([body.md](body.md)), and the body runs without it until then: the
+   product unit's `--gaze-socket` and `--gaze-reach` without `--gaze` are
+   gaze off, said in the body's first line (thirteen-P1; before it, the body
+   refused them and never started on a factory `lamp.env`). Without
    `--write` it only prints, so a lamp can be read first and written later.
 2. **The touch pads**, `/etc/lampOS/controls/controls-pins.json`, with a
    person at the lamp. GPIO head pads differ by unit: the hardware team's test

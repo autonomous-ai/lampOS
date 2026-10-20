@@ -475,6 +475,10 @@ fn serve(
                 channels.control.send(WorkerEvent::Privacy {
                     acquired_at_us: value.stamp.at_us,
                     muted,
+                    receipt: Some(crate::wire::PrivacyReceipt {
+                        controls_session: message.header.boot.clone(),
+                        physical: value.clone(),
+                    }),
                 })?;
                 last = Some(value);
             }
