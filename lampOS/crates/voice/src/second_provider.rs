@@ -2738,10 +2738,6 @@ fn shared_words(heard: &str, other: &str) -> usize {
 /// requests of 6 words each, the second begun with nothing played; the same
 /// words again read as a replay, the lamp's own as an echo).
 fn tell_whose_words(shared: &Shared, request: u64, heard: &str) {
-    let words = heard.split_whitespace().count();
-    if words == 0 {
-        return;
-    }
     let cut = shared
         .cut
         .lock()
@@ -2757,8 +2753,24 @@ fn tell_whose_words(shared: &Shared, request: u64, heard: &str) {
         .ok()
         .map(|said| said.clone())
         .filter(|(of, said)| *of != 0 && *of < request && !said.trim().is_empty());
-    if cut.is_none() && said.is_none() {
-        return;
+    if let Some(line) = whose_words(request, heard, cut, said) {
+        eprintln!("{line}");
+    }
+}
+
+/// The journal's line for [`tell_whose_words`]: `request`'s words counted
+/// against the line it cut short (`cut`) and the lamp's answer so far
+/// (`said`), each with its request, counts only. None with no words, or
+/// nothing to compare them with.
+fn whose_words(
+    request: u64,
+    heard: &str,
+    cut: Option<(u64, String)>,
+    said: Option<(u64, String)>,
+) -> Option<String> {
+    let words = heard.split_whitespace().count();
+    if words == 0 || cut.is_none() && said.is_none() {
+        return None;
     }
     let cut = cut.map_or(String::new(), |(of, text)| {
         format!(
@@ -2772,7 +2784,9 @@ fn tell_whose_words(shared: &Shared, request: u64, heard: &str) {
             shared_words(heard, &text)
         )
     });
-    eprintln!("lamp-voice second: request {request}: of its {words} words{cut}{said}");
+    Some(format!(
+        "lamp-voice second: request {request}: of its {words} words{cut}{said}"
+    ))
 }
 
 fn plain_words(words: &str) -> String {
