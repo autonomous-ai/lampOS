@@ -8946,6 +8946,16 @@ fn onboarding_pending_snapshot_is_asked_once_and_retry_is_an_explicit_edge() {
         send(&mut restarted, 9, message(82, true)),
         vec![Call::SayFrom(lamp_skills::Source::Onboarding, Some(82))]
     );
+    // A step a newer voice names is still asked: the say service decides
+    // (the reviewer on #1964).
+    assert_eq!(
+        send(
+            &mut restarted,
+            10,
+            message(83, true).replace("privacy", "giving_way")
+        ),
+        vec![Call::SayFrom(lamp_skills::Source::Onboarding, Some(83))]
+    );
 }
 
 #[test]
@@ -8971,7 +8981,6 @@ fn onboarding_refuses_wrong_kind_wrong_trigger_and_unbounded_pending_identity() 
     let skill = load(&skills_root().join("onboarding")).unwrap();
     for bad in [
         serde_json::json!({"invitations":[{"invitation":0,"generation":1,"attempt":1,"step":"privacy","ready":true}]}),
-        serde_json::json!({"invitations":[{"invitation":1,"generation":1,"attempt":1,"step":"unknown","ready":true}]}),
         serde_json::json!({"invitations":[
             {"invitation":1,"generation":1,"attempt":1,"step":"privacy","ready":true},
             {"invitation":2,"generation":1,"attempt":1,"step":"privacy","ready":true}]}),

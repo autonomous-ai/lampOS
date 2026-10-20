@@ -227,7 +227,8 @@ loud that call is at the room microphone, for the busy-near rule's bar
 (`lamp-near-call`, [attention.md](attention.md), Fourth's #753). The runner is
 `crates/voice/src/onboarding/near.rs`, modelled on the privacy step: one exact
 invitation token per prompt on `onboarding/pending` (`step: how_you_sound`),
-asked for by the same core skill, and only the prompt's complete playback opens
+asked for by the same core skill (a step it does not know, from a newer voice,
+is read as `unknown` and its token still asked for: the say service decides), and only the prompt's complete playback opens
 a try. A prompt counts once its budget commit lands, before it is published;
 one dropped before the model took it (nobody there, the pause) is given back.
 
@@ -258,17 +259,25 @@ identity is used or kept.
 **The reply is held.** An answer that starts within a second of the name
 spoils the try, and a model hearing its name answers ("Yes?"). So while a
 try's window is open, from the prompt's end to 7 s on, the voice holds its
-reply to what is said: an utterance heard in it ends unanswered when it ends,
-however long it runs past the window, as a sound does
-(`coordinator.rs`, `near_call_window` and the `AdmissionStep::End` arm that
-drops a turn; `Onboarding::near_holds_reply`). Its End never goes to the model
-and nothing of an answer is played, on Gemini Live and on the second route
-(`LAMP_VOICE_ROUTE=second`) alike, since both are the coordinator's
+reply to the call: an utterance in it that is only the name ends unanswered
+when it ends, however long it runs past the window, as a sound does. Only the
+name: the step must have heard it (`name/heard`, in the window, beginning no
+more than 0.5 s before the utterance's first speech, as the call wait's
+`CALL_BEFORE_US`), and the utterance holds no more speech than a call (1.2 s,
+`CALL_SPEECH_BLOCKS`, #782). Anything else said in the window, "skip that"
+with no name or "Lamp, can we skip this?" with more than the name, goes on as
+any other turn (the reviewer on #1964). The rule is the step's own
+(`Onboarding::near_holds_reply`, `NearFlow::holds_reply`), read by
+`coordinator.rs`'s `near_call_window` on every block of a turn and at its End,
+and the `AdmissionStep::End` arm drops the turn. Its End never goes to the
+model and nothing of an answer is played, on Gemini Live and on the second
+route (`LAMP_VOICE_ROUTE=second`) alike, since both are the coordinator's
 `rig.provider`. Its record says `onboarding_near_call` (the endpoint's field
 and the turn's outcome), not `not_speech`, so it is not counted as a short
 sound. Outside the window, and with no near-call try open, nothing changes;
 Stop, mute and physical privacy are not touched. Tests:
 `coordinator::tests::second_route::a_call_in_the_near_call_window_is_not_answered_on_either_route`,
+`coordinator::tests::second_route::a_line_that_is_more_than_the_name_is_answered_in_the_near_call_window`,
 `onboarding::near_flow_tests::the_reply_is_held_only_in_the_try_window_and_the_held_call_counts`.
 
 **The name part's end.** At most five prompts, and the part stops asking
