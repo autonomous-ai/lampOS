@@ -196,6 +196,7 @@ fn serve(arguments: &Arguments, server: Server, health: Option<&State>) -> io::R
         )
         .map_err(io::Error::other)?;
         if let Some(health) = health {
+            health.set_aside(store.set_aside());
             let counts = store
                 .enable_health_counts()
                 .and_then(|()| store.health_counts());

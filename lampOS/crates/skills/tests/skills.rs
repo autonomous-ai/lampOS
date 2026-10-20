@@ -317,6 +317,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "light-out",
             "light-scenes",
             "light-show",
+            "music-sway",
             "not-feeling-well",
             "point-light",
             "reminders",

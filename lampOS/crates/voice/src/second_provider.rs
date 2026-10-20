@@ -52,7 +52,7 @@ use std::{
     collections::VecDeque,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -63,6 +63,7 @@ use tokio::{
 
 pub mod link;
 pub mod net;
+pub mod policy;
 pub mod probe;
 mod services;
 pub mod worker;
@@ -322,6 +323,18 @@ pub type WordsHeard = Arc<dyn Fn(u64, &str) + Send + Sync>;
 /// Whether a call, by its request and name, is held as not said to the
 /// lamp ([`Engine::holding_calls`]).
 pub type CallHold = Arc<dyn Fn(u64, &str) -> bool + Send + Sync>;
+/// What the Policy makes of a call in a spoken turn
+/// ([`Engine::holding_for_the_policy`], `crate::policy_holds`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Policed {
+    /// Run it, as without the switch.
+    Run,
+    /// Not run: the Policy judged the turn not for the lamp.
+    Held,
+}
+/// The Policy's gate for a call, by its request and name: it waits for the
+/// turn's decision, at most `crate::policy_holds::WAIT`.
+pub type PolicyGate = Arc<dyn Fn(u64, String) -> BoxFuture<'static, Policed> + Send + Sync>;
 
 /// What every turn task shares.
 struct Shared {
@@ -364,6 +377,10 @@ struct Shared {
     /// The words last heard, with their request: a request that goes on
     /// from one given up after an early end begins with them.
     heard_last: Mutex<Option<(u64, String)>>,
+    /// The words of the latest answer sent to the voice so far, and its
+    /// request: for the journal's count of a line's words that were the
+    /// lamp's own ([`shared_words`]), never its words.
+    lamp_said: Mutex<(u64, String)>,
     /// The stop to be told (`after_stop`), with the request it is for.
     stop_untold: Mutex<Option<StopToTell>>,
     /// A held line is asked for the calls done though it is held
@@ -387,10 +404,14 @@ struct Shared {
     name_sounded: Option<NameSounded>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
+    /// With `LAMP_AIR_FACTS=on`: the air's note, when it is due.
+    air: Option<TaskNote>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
     hold: Option<CallHold>,
+    /// Calls that wait for the Policy's decision ([`Engine::holding_for_the_policy`]).
+    policy: Option<PolicyGate>,
     /// Told a spoken request's words before its chat ([`Engine::hearing_words`]).
     words_heard: Option<WordsHeard>,
     /// The model looks by calling [`LOOK_CALL`] ([`Engine::looking_by_call`]).
@@ -768,6 +789,7 @@ impl Engine {
                 down: None,
                 announce: true,
                 heard_last: Mutex::new(None),
+                lamp_said: Mutex::new((0, String::new())),
                 stop_untold: Mutex::new(None),
                 though_held: false,
                 staff: None,
@@ -778,8 +800,10 @@ impl Engine {
                 call_note: None,
                 name_sounded: None,
                 task_waiting: None,
+                air: None,
                 did: None,
                 hold: None,
+                policy: None,
                 words_heard: None,
                 look_by_call: false,
                 prepare: false,
@@ -1179,6 +1203,21 @@ impl Engine {
         self
     }
 
+    /// With `LAMP_POLICY_HOLDS_ACTIONS=on` (#800, #1712): each call of a
+    /// spoken turn is put to `gate` before it runs, which waits for the
+    /// Policy's decision about the turn; a round's calls together, so the
+    /// round waits `policy_holds::WAIT` at most. One it holds is not run: the model
+    /// is told it was not done ([`crate::policy_holds::HELD`]), the round's
+    /// other calls run as they would, and the turn ends there in silence,
+    /// as `not_for_me` ends it: nothing more is said, and the model is not
+    /// asked again. Before any turn only.
+    pub fn holding_for_the_policy(mut self, gate: PolicyGate) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.policy = Some(gate);
+        }
+        self
+    }
+
     /// While a task this voice prepared waits for the person's yes, a spoken
     /// request is told so beside its words (`note`, with the tasks part):
     /// this route's history keeps the words of its last exchanges, not its
@@ -1196,6 +1235,16 @@ impl Engine {
     pub fn telling_verdicts(mut self, told: Verdicts) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.verdicts = Some(told);
+        }
+        self
+    }
+
+    /// A spoken request is told, beside its words, that the air has been
+    /// stuffy a while, when `note` says so (`LAMP_AIR_FACTS=on`,
+    /// `crate::air_told`, as the Live route tells it). Before any turn only.
+    pub fn noting_the_air(mut self, note: TaskNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.air = Some(note);
         }
         self
     }
@@ -2056,6 +2105,7 @@ async fn spoken(
                 text.split_whitespace().count(),
                 finishing.elapsed().as_millis()
             );
+            tell_whose_words(&shared, request, &text);
             text
         }
         Err(error) => {
@@ -2341,6 +2391,8 @@ async fn spoken(
         );
         crate::provider_worker::CALLED_NOTE.to_owned()
     });
+    // A stuffy room, told beside what a person says (#1712's map, item 6).
+    let air = shared.air.as_ref().and_then(|note| note(request));
     // Let out only as the conversation going on: it may be people's talk.
     let alone = shared
         .conversation_alone
@@ -2370,6 +2422,7 @@ async fn spoken(
         .chain(waiting)
         .chain(follows_on)
         .chain(called)
+        .chain(air)
         .collect();
     if let Some(carried) = carried {
         eprintln!(
@@ -2528,6 +2581,67 @@ impl Drop for AbortOnDrop {
 
 /// `words` as letters, digits and single spaces, lower case: what the early
 /// and the final words are compared as.
+/// How many of `heard`'s words are among `other`'s, each word as its letters
+/// and digits in lower case ("It's" is "its"), so the count is never more
+/// than the line's own words.
+fn shared_words(heard: &str, other: &str) -> usize {
+    let key = |word: &str| -> String {
+        word.chars()
+            .filter(|c| c.is_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .collect()
+    };
+    let others: std::collections::HashSet<String> = other.split_whitespace().map(key).collect();
+    heard
+        .split_whitespace()
+        .map(key)
+        .filter(|word| !word.is_empty() && others.contains(word))
+        .count()
+}
+
+/// The journal's count, never the words, of how many of a line's words were
+/// in the line it cut short and in the lamp's latest answer so far (#1712,
+/// the first builder at 03:48: on lamp-4ace one line said once became two
+/// requests of 6 words each, the second begun with nothing played; the same
+/// words again read as a replay, the lamp's own as an echo).
+fn tell_whose_words(shared: &Shared, request: u64, heard: &str) {
+    let words = heard.split_whitespace().count();
+    if words == 0 {
+        return;
+    }
+    let cut = shared
+        .cut
+        .lock()
+        .ok()
+        .and_then(|cut| {
+            cut.as_ref()
+                .map(|carried| (carried.request, carried.text.clone()))
+        })
+        .filter(|(of, _)| *of < request);
+    let said = shared
+        .lamp_said
+        .lock()
+        .ok()
+        .map(|said| said.clone())
+        .filter(|(of, said)| *of != 0 && *of < request && !said.trim().is_empty());
+    if cut.is_none() && said.is_none() {
+        return;
+    }
+    let cut = cut.map_or(String::new(), |(of, text)| {
+        format!(
+            ", {} in request {of}'s words it cut short",
+            shared_words(heard, &text)
+        )
+    });
+    let said = said.map_or(String::new(), |(of, text)| {
+        format!(
+            ", {} in the lamp's answer to request {of} so far",
+            shared_words(heard, &text)
+        )
+    });
+    eprintln!("lamp-voice second: request {request}: of its {words} words{cut}{said}");
+}
+
 fn plain_words(words: &str) -> String {
     words
         .chars()
@@ -2769,6 +2883,10 @@ enum Stop {
     /// `not_for_me`: nothing more is said, and the model judged the line
     /// not said to the lamp.
     Declined,
+    /// The Policy held one of the turn's calls (#1984): nothing more is
+    /// said. It ends as a silent turn; the Policy, which held it, is told
+    /// no other verdict.
+    Held,
     Failed(Fault),
     /// The engine is gone.
     Gone,
@@ -2831,6 +2949,10 @@ async fn answer(
     // Whether a tool ran for this line: one declined after is the lamp's.
     let ran = AtomicBool::new(false);
     let acted = &ran;
+    // The words of the answer's sentences begun so far, for a call the
+    // Policy holds after them.
+    let words_begun = AtomicUsize::new(0);
+    let words_out = &words_begun;
     let mut queue = Queue {
         shared,
         speech: &mut speech,
@@ -3142,16 +3264,54 @@ async fn answer(
                 &calls,
                 reasoning.take(),
             ));
-            for call in &calls {
-                if shared
-                    .hold
-                    .as_ref()
-                    .is_some_and(|hold| hold(request, &call.name))
-                {
+            // A call the Policy held ends the turn after this round.
+            let mut policy_held = false;
+            let held_by_rule: Vec<bool> = calls
+                .iter()
+                .map(|call| {
+                    shared
+                        .hold
+                        .as_ref()
+                        .is_some_and(|hold| hold(request, &call.name))
+                })
+                .collect();
+            // The Policy's decisions about a spoken turn's calls (#800,
+            // #1712), waited for together: one `policy_holds::WAIT` for the
+            // round, as the Live route parks a round's calls at once, never
+            // one wait after another (the peer read on #1984: three actions
+            // with the Policy down took 6 s). The lamp's own turns, and calls
+            // the rule holds, are never put to it.
+            let policed: Vec<Policed> = match &shared.policy {
+                Some(gate) if heard => {
+                    let waits = calls.iter().zip(&held_by_rule).map(|(call, held)| {
+                        if *held {
+                            Box::pin(async { Policed::Run }) as BoxFuture<'static, Policed>
+                        } else {
+                            gate(request, call.name.clone())
+                        }
+                    });
+                    let policed = futures_util::future::join_all(waits).await;
+                    if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                        return Err(Stop::Gone);
+                    }
+                    policed
+                }
+                _ => vec![Policed::Run; calls.len()],
+            };
+            for ((call, held), policed) in calls.iter().zip(held_by_rule).zip(policed) {
+                if held {
                     eprintln!(
                         "lamp-voice second: request {request} asked for {}: held, nothing shows it was said to the lamp",
                         call.name
                     );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        crate::policy_holds::held().to_string(),
+                    ));
+                    continue;
+                }
+                if policed == Policed::Held {
+                    policy_held = true;
                     messages.push(Message::tool(
                         call.id.clone(),
                         crate::policy_holds::held().to_string(),
@@ -3190,6 +3350,17 @@ async fn answer(
                 }
                 messages.push(Message::tool(call.id.clone(), result.to_string()));
             }
+            // Held: nothing more of the turn is said, as on the Live route,
+            // where none of a held turn's sound is let out. What the model
+            // said before its call may have gone out already: counted, for
+            // the battery (the first builder on #1712, 20:46).
+            if policy_held {
+                eprintln!(
+                    "lamp-voice second: request {request}: {} words were let out before a held call; the turn ends here, and nothing more is said",
+                    words_out.load(Ordering::Relaxed)
+                );
+                return Err(Stop::Held);
+            }
         }
         // ponytail: a model still calling tools after MAX_ROUNDS ends the
         // turn with what it has said; a spoken "I could not finish" if seen.
@@ -3208,6 +3379,7 @@ async fn answer(
             // space, so the lamp's words read "just now. Hmm," (#1014).
             let answering = text != ANNOUNCEMENT;
             if answering {
+                words_out.fetch_add(text.split_whitespace().count(), Ordering::Relaxed);
                 whole.push(' ');
                 whole.push_str(&text);
                 let words = ProviderOutput::Transcript {
@@ -3323,7 +3495,7 @@ async fn answer(
                 idle: true,
             }
         }
-        Err(Stop::GaveUp) => ProviderOutput::TurnComplete {
+        Err(Stop::GaveUp | Stop::Held) => ProviderOutput::TurnComplete {
             request,
             idle: true,
         },
@@ -3478,6 +3650,13 @@ impl Queue<'_> {
             );
         }
         self.started = true;
+        if let Ok(mut said) = self.shared.lamp_said.lock() {
+            if said.0 != self.request {
+                *said = (self.request, String::new());
+            }
+            said.1.push(' ');
+            said.1.push_str(&text);
+        }
         let turn = net::Turn {
             request: self.request,
             heard_at: self.heard_at,

@@ -245,7 +245,36 @@ without end (Twelve on lamp-cb94). A file already on the lamp that isn't
 install's own is kept, as any setting is. The built-in default below stays
 off and at 500 MB; the product file is what turns it on.
 There are no environment overrides for retention, no implicit roots and no
-CLI option to bypass live protection. Unknown JSON fields and kinds are errors.
+CLI option to bypass live protection. An unknown `kind` is an error, so it
+can never become a path.
+
+**A newer build's `records.json`** (#1680, `docs/updates.md`, "Every
+part's saved data, one version ahead"), since install writes it and a
+put-back may leave one behind:
+- At this build's `schema_version`, a field it doesn't know, at any depth,
+  is read past and named once a run, by its path, never its value:
+  `lamp-records: /etc/lampOS/records.json: fields this build does not
+  read, ignored: roots[0].min_free_bytes`. The cleanup runs as before, and
+  the fingerprint is this build's fields'.
+- A greater `schema_version` is told apart before anything else is read.
+  `check` prunes nothing, writes no result, says so in one line and
+  succeeds, so the timer's run doesn't fail: what a bump means isn't this
+  build's to guess, and a cleanup deletes. The reporter keeps reporting,
+  at warn, on the bus the newer file names: lamp-health shows "records: a
+  newer schema, cleanup paused" (`report::paused`, with `config_schema`), so
+  a lamp left rolled back shows why its disk grows. It reports as before
+  once this build's schema is back
+  (`a_newer_schema_is_reported_as_the_cleanup_paused_until_this_builds_is_back`).
+  A newer file naming no bus it can take stops the reporter at start, with
+  nowhere to say it. Where the reporter isn't running (it is still a
+  template, not a product unit, below), the journal line is where this
+  shows.
+- Still refused: a file that doesn't parse, a known field's bad value (a
+  `kind` it doesn't know), and a field named like a key's, by its name.
+  serde's reason is told only as its category, line and column, never its
+  message.
+- Tests: `config::tests::the_products_config_one_release_ahead_is_read_or_told_newer`,
+  `real_cli_runs_on_a_newer_builds_config_one_release_ahead`.
 
 ```json
 {
@@ -315,8 +344,9 @@ the current build's fields, so fields added by a later build are not retained
 in its replacement. Required fields, known-field types, bounds and configuration
 fingerprint matching remain enforced. `ProcessSkipReason` still accepts only
 `gone`, `zombie` and `exiting`; unknown reason strings and unknown tagged values
-are refused, as is another `mode`. Configuration and fixture/wire readers stay
-strict.
+are refused, as is a `mode` that isn't a plain word. A plain new `mode` at
+this schema is a newer build's, and is set aside (below). Fixture and wire
+readers stay strict; the configuration reads one release forward (above).
 
 A future change that adds a required field, enum value or changes a field's
 meaning must bump `REPORT_SCHEMA_VERSION`; an optional field can keep it,
@@ -331,8 +361,17 @@ and a structurally recognizable envelope: an unsigned 64-bit schema, valid
 fingerprint, unsigned timestamp, a mode string of at most 128 decoded UTF-8
 bytes, boolean `enabled`, and at most four roots. Future mode values and the
 contents of future roots are not interpreted or trusted as cleanup evidence.
-An absent or invalid envelope is refused and remains in place; mode values in
-the supported schema still have to be `apply` or `dry_run`.
+An absent or invalid envelope is refused and remains in place.
+
+At the supported schema, a `mode` other than `apply` or `dry_run` that is a
+plain word (lowercase letters and `_`, at most 32), in a report whose every
+other field reads as this build's, is a newer build's (#1680): it is
+retained whole the same way, as `last.json.newer-mode-<unix s>`. The
+journal says "cleanup result has a mode this build does not know, at its
+schema 1", never the mode, and the cleanup runs. Before, every run was
+refused until someone removed the file. Any other mode, or a plain new one
+beside a field that doesn't read, is still refused and left in place
+(`a_newer_builds_mode_at_this_schema_is_set_aside_whole_on_read_and_write`).
 
 Archival uses the writer's private-directory lock, checks the source identity
 again, refuses to overwrite an existing archive and syncs the parent directory.

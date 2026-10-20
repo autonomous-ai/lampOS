@@ -401,6 +401,25 @@ the first onset block), the old reply is cancelled as
 start of the request. On resume it is rejected as policy, inside its own
 budget, so the microphone is not left draining.
 
+**A reply that yields to nothing twice stops yielding, for a while.** Two
+yields in one reply that resumed (`FRUITLESS_YIELDS`) make the mask fall
+back to the conservative baseline: no yield, and a person over the lamp
+scores 0. Since #1712 (the first builder's yes at 04:40 on 20 Oct) one of
+them is forgiven after 20 s of the reply with no yield
+(`FORGIVE_FRUITLESS_US`), so at most two count in any 20 s. A noise that
+trips it more often still falls back as before, but a long story is never
+deaf for its rest. On lamp-4ace at 03:45 that night, a Hindi line and "What
+was that?" each yielded and resumed 0.76 s later, at margins near 0 dB
+from a speaker across the desk, and "Hey Lamp, what's the weather in
+Hanoi?" 30 s later made no request at all. A forced yield (a stop word)
+that resumes is no fruitless yield. The session's `duplex_policy` event
+gives both numbers (`fruitless_yields_before_fallback`,
+`fruitless_yield_forgiven_after_ms`). Each forgiving is traced on the block
+it happens (`duplex_fruitless_forgiven`, with `forgiven_so_far`), and
+`duplex_summary` counts them (`fruitless_forgiven`):
+`fallen_back_at_end` says only whether the last reply had fallen back when
+the session ended (Eighth on #2048).
+
 What that means for a person in the room:
 
 - Someone who starts a new question over the lamp is heard from their

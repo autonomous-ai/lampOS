@@ -100,6 +100,18 @@ fn free_percent(disk: &Disk) -> String {
     format!("{}.{:02}", hundredths / 100, hundredths % 100)
 }
 
+/// What the reporter says while `records.json` is a schema newer than this
+/// build's (#1680): `check` prunes nothing with it, so a lamp left rolled
+/// back shows in lamp-health why its disk grows, as "records: a newer
+/// schema, cleanup paused". A warning: the lamp runs, and the records are
+/// kept, never lost.
+pub const PAUSED: &str = "a newer schema, cleanup paused";
+
+/// The diagnostic while the cleanup is paused for `schema` ([`PAUSED`]).
+pub fn paused(schema: u64) -> Diagnostic {
+    Diagnostic::new(Level::Warn, NAME, PAUSED).with("config_schema", schema)
+}
+
 /// A content-free summary with fixed-size output, independent of record names,
 /// paths, error text and the number of individual records in the stored report.
 ///

@@ -37,6 +37,7 @@
 use super::net::{self, Chat, ChatEvent, GeminiTts, Message, Sentences, Tts, search::Search};
 
 pub mod cache;
+pub mod quality;
 pub mod tools;
 pub mod wire;
 use crate::second_config::{

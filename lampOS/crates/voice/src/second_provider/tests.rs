@@ -40,6 +40,9 @@ struct Script {
     /// socket has closed ([`Listener::open`]).
     listened: AtomicUsize,
     closed: Arc<AtomicBool>,
+    /// Each listener's stream drops after this many samples sent, as a
+    /// connection lost mid-line does (#1844's D); `None`, never.
+    drops_after: Mutex<VecDeque<Option<usize>>>,
 }
 
 struct ScriptListener {
@@ -48,12 +51,18 @@ struct ScriptListener {
     early: Vec<net::Early>,
     finish_after: Option<Duration>,
     closed: Arc<AtomicBool>,
+    drops_after: Option<usize>,
+    sent: AtomicUsize,
 }
 impl Listener for ScriptListener {
     fn open(&self) -> bool {
         !self.closed.load(Ordering::Relaxed)
     }
     fn send(&self, samples: &[i16]) -> net::Result<()> {
+        let sent = self.sent.fetch_add(samples.len(), Ordering::Relaxed) + samples.len();
+        if self.drops_after.is_some_and(|after| sent > after) {
+            return Err(net::Error::Transport("speech-to-text stream"));
+        }
         self.samples.fetch_add(samples.len(), Ordering::Relaxed);
         Ok(())
     }
@@ -91,6 +100,8 @@ impl Services for Script {
                 early: self.early.lock().unwrap().pop_front().unwrap_or_default(),
                 finish_after: self.finish_after,
                 closed: self.closed.clone(),
+                drops_after: self.drops_after.lock().unwrap().pop_front().flatten(),
+                sent: AtomicUsize::new(0),
             }) as Box<dyn Listener>),
         };
         Box::pin(async move { result })
@@ -501,7 +512,7 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(|| "SYSTEM".to_owned().into()),
-        worker::tool_runner(settings, None, None),
+        worker::tool_runner(settings, None, None, false),
         Arc::new(Instant::now),
     )
     .announcing(false)
@@ -665,7 +676,7 @@ fn news_asked_by_voice_through_this_route_is_put_on_the_turn() {
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(|| "SYSTEM".to_owned().into()),
-        worker::tool_runner(settings, None, None),
+        worker::tool_runner(settings, None, None, false),
         Arc::new(Instant::now),
     )
     .announcing(false);
@@ -2403,6 +2414,58 @@ async fn each_failing_service_fails_the_turn_at_its_stage() {
     );
 }
 
+/// #1844's D: speech to text's stream lost mid-line fails that turn where
+/// it was (`InputOpen`, `Transport`, which #1942's link check takes up), and
+/// the next line opens a stream of its own and is answered: nothing of the
+/// lost one is kept.
+#[tokio::test]
+async fn a_speech_to_text_stream_lost_mid_line_fails_that_turn_and_the_next_is_answered() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("never heard whole".to_owned()),
+                Ok("What time is it?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new([vec![text("It is noon."), Ok(ChatEvent::Done)]].into()),
+        drops_after: Mutex::new([Some(lamp_audio::CAPTURE_SAMPLES), None].into()),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script.clone());
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(audio(1, 2));
+    engine.submit(audio(1, 3));
+    assert_eq!(
+        turn(&mut engine).await,
+        ["started:1", "failed:InputOpen:Transport"]
+    );
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let next = turn(&mut engine).await;
+    assert!(
+        next.contains(&"heard:What time is it?".to_owned()),
+        "{next:?}"
+    );
+    assert!(next.contains(&"said:It is noon.".to_owned()), "{next:?}");
+    assert!(
+        !next.iter().any(|label| label.starts_with("failed")),
+        "{next:?}"
+    );
+    assert!(
+        !script
+            .asked
+            .lock()
+            .unwrap()
+            .iter()
+            .flatten()
+            .any(|message| format!("{message:?}").contains("never heard whole")),
+        "nothing of the lost line is asked"
+    );
+}
+
 #[tokio::test]
 async fn a_reminder_is_deferred_as_the_fixture_does() {
     let (mut engine, _, _) = scripted(Arc::default());
@@ -3416,7 +3479,7 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(|| "SYSTEM".to_owned().into()),
-        worker::tool_runner(settings, None, None),
+        worker::tool_runner(settings, None, None, false),
         Arc::new(Instant::now),
     )
     .announcing(false)
@@ -3451,6 +3514,55 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
     let ops: Vec<Value> = seen.try_iter().collect();
     let ops: Vec<&str> = ops.iter().filter_map(|op| op["op"].as_str()).collect();
     assert_eq!(ops, ["status", "prepare", "status", "confirm"]);
+}
+
+/// #1712's map, item 6 (`LAMP_AIR_FACTS` on the second route): a spoken
+/// request is asked with the air's note beside its words when the note is
+/// due; a written turn (the lamp's own) never asks for it.
+#[tokio::test]
+async fn a_spoken_request_is_told_the_air_and_a_written_turn_is_not() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What should I do?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![text("Maybe open a window."), Ok(ChatEvent::Done)],
+                vec![text("Hello."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let asked_for = Arc::new(Mutex::new(Vec::new()));
+    let (engine, _, _) = scripted(script.clone());
+    let noted = asked_for.clone();
+    let mut engine = engine.noting_the_air(Arc::new(move |request| {
+        noted.lock().unwrap().push(request);
+        Some("AIR NOTE".to_owned())
+    }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    engine.submit(written(2, "Say hello."));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    let told = |messages: &Vec<Message>| {
+        messages.iter().any(|message| {
+            message.role == "system"
+                && message
+                    .content
+                    .as_ref()
+                    .and_then(Value::as_str)
+                    .is_some_and(|note| note == "AIR NOTE")
+        })
+    };
+    let asked = script.asked.lock().unwrap();
+    assert!(told(&asked[0]), "{:?}", asked[0]);
+    assert!(!told(&asked[1]), "{:?}", asked[1]);
+    assert_eq!(
+        *asked_for.lock().unwrap(),
+        [1],
+        "asked of the spoken one only"
+    );
 }
 
 /// #1712: what the lamp did is told to the rule, as the Live worker tells its
@@ -5160,6 +5272,9 @@ async fn a_line_that_waits_for_the_policy_goes_as_it_decides() {
     }
 }
 
+/// The Policy holding the lamp's actions on this route (#800, #1712).
+mod policy;
+
 /// #1712 (`LAMP_SECOND_STT_WARM`, the first builder at 00:25): with the
 /// switch, each line's listener opens the next line's, so a line's sound
 /// goes to a socket already open; one found closed since is not used, and
@@ -5270,4 +5385,65 @@ async fn a_kept_listener_goes_after_its_time_or_when_listening_stops() {
         let expected = if gone == "kept" { 3 } else { 4 };
         assert_eq!(listened(&played), expected, "{gone}");
     }
+}
+
+/// #1712 (the first builder at 03:48): the journal counts a line's words in
+/// the line it cut short and in the lamp's own answer, as plain words, any
+/// case and punctuation, never the words.
+#[test]
+fn a_lines_words_are_counted_against_the_line_before_and_the_lamps_answer() {
+    assert_eq!(
+        super::shared_words("Hey Lamp, what time is it?", "hey lamp what time is it"),
+        6
+    );
+    assert_eq!(
+        super::shared_words("Four in the morning.", "Hey Lamp, what time is it?"),
+        0
+    );
+    assert_eq!(
+        super::shared_words("it's four in the morning", " It's four in the morning."),
+        5
+    );
+    assert_eq!(super::shared_words("", "anything"), 0);
+}
+
+/// The words of the latest answer sent to the voice are kept with its
+/// request, for that count; a newer answer replaces them.
+#[tokio::test]
+async fn the_latest_answers_words_are_kept_for_the_count() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("What time is it".to_owned()),
+                Ok("And tomorrow".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("It's four."), Ok(ChatEvent::Done)],
+                vec![text("Rain."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script.clone());
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    let said = engine.shared.lamp_said.lock().unwrap().clone();
+    assert_eq!(said.0, 1);
+    assert!(said.1.contains("It's four."), "{said:?}");
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    turn(&mut engine).await;
+    let said = engine.shared.lamp_said.lock().unwrap().clone();
+    assert_eq!(said.0, 2);
+    assert!(
+        said.1.contains("Rain.") && !said.1.contains("four"),
+        "{said:?}"
+    );
 }

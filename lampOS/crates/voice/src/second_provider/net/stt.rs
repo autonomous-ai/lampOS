@@ -8,7 +8,7 @@ use serde::Deserialize;
 use std::{
     sync::{
         Arc, OnceLock,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -96,6 +96,51 @@ fn secure(url: reqwest::Url) -> Result<reqwest::Url> {
 /// Audio seconds a final segment may end short of the audio sent and still
 /// cover it: a 20 ms frame and a little rounding.
 const COVERED: f64 = 0.05;
+
+/// A block is the line's sound, not its quiet, when its level is within
+/// this many dB of the line's loudest block so far: a bar relative to the
+/// line, so a far voice's soft last word still counts as sound (Jarvis on
+/// #1993). After the canceller, talk near the lamp is at -21 to -31 dBFS
+/// and the quiet between sounds near -75 dBFS (the first builder on #1712,
+/// 15:42).
+const SOUND_UNDER_PEAK_DB: f64 = 30.0;
+/// And over this RMS, about -60 dBFS, however quiet the line.
+const SOUND_FLOOR_RMS: f64 = 32.8;
+
+/// The RMS of a block of little-endian 16-bit samples; 0 for none.
+fn level(bytes: &[u8]) -> f64 {
+    let samples = bytes.len() / 2;
+    if samples == 0 {
+        return 0.0;
+    }
+    let energy: f64 = bytes
+        .chunks_exact(2)
+        .map(|pair| f64::from(i16::from_le_bytes([pair[0], pair[1]])).powi(2))
+        .sum();
+    (energy / samples as f64).sqrt()
+}
+
+/// Where a line's sound ends, in seconds of the audio sent: the end of its
+/// last block within [`SOUND_UNDER_PEAK_DB`] of the loudest block up to it
+/// and over [`SOUND_FLOOR_RMS`]. A level that stays up after the words, a
+/// noisy room's, keeps the end at the line's end, so such a line waits for
+/// `CloseStream` as before.
+#[derive(Debug, Default)]
+struct LineSound {
+    peak: f64,
+    to: f64,
+}
+
+impl LineSound {
+    /// A block sent, ending `ends_at` seconds into the audio.
+    fn sent(&mut self, bytes: &[u8], ends_at: f64) {
+        let level = level(bytes);
+        self.peak = self.peak.max(level);
+        if level > SOUND_FLOOR_RMS && level >= self.peak * 10f64.powf(-SOUND_UNDER_PEAK_DB / 20.0) {
+            self.to = ends_at;
+        }
+    }
+}
 
 /// One `Results` message: the best alternative's words (empty for
 /// silence), and where in the audio the segment ends, in seconds.
@@ -222,6 +267,22 @@ impl Transcript {
             && self
                 .covered
                 .is_some_and(|covered| covered + COVERED >= sent)
+    }
+
+    /// Whether the finals cover the line's sound, `sound_to` seconds in
+    /// ([`LineSound`]), to within one block ([`COVERED`]), with nothing
+    /// pending: what is not covered is the line's quiet end. On lamp-4ace on
+    /// 19 Oct `Finalize`'s answer reached about 0.48 s short of the audio
+    /// sent on 114 of 131 lines, so their words waited for `CloseStream`,
+    /// 652 ms after the line's end against 280 ms (#1712, the first builder
+    /// at 23:46). Any sound past the answer is a word left, however short
+    /// or soft (Jarvis on #1993: a word loud for 0.10 s after a 40 ms gap,
+    /// an "on" at -48 dBFS).
+    pub fn covers_the_sound(&self, sound_to: f64) -> bool {
+        self.pending.is_none()
+            && self
+                .covered
+                .is_some_and(|covered| covered + COVERED >= sound_to)
     }
     /// What [`Self::settled`] decided on for `sent` seconds, in ms and
     /// without words: the journal's account of the end of the line (#779).
@@ -360,6 +421,13 @@ pub struct SttStream {
     /// The words a line has before they are final, until taken
     /// ([`Self::take_early`]).
     early: Option<mpsc::UnboundedReceiver<Early>>,
+    /// Set by a request's [`Self::finish`]: its words may be `Finalize`'s
+    /// answer at once when what that leaves is quiet
+    /// ([`Transcript::covers_the_sound`]). A stop word's stream
+    /// ([`Self::finished`]) leaves it unset and waits for `CloseStream`:
+    /// over the lamp the canceller can take a stop word under any bar, 51 of
+    /// 88 with nothing over -28 dBFS left (#828).
+    quiet_end: Arc<AtomicBool>,
 }
 
 /// Words a stream has before they are final, for a chat begun on them
@@ -468,6 +536,7 @@ impl SttStream {
         let (said, words) = mpsc::unbounded_channel();
         let (early_words, early) = mpsc::unbounded_channel();
         let replies = Arc::new(Replies::default());
+        let quiet_end = Arc::new(AtomicBool::new(false));
         let task = if on_flux {
             tokio::spawn(flux::run(
                 socket,
@@ -483,6 +552,7 @@ impl SttStream {
                 Arc::clone(&words_at),
                 (said, early_words),
                 Arc::clone(&replies),
+                Arc::clone(&quiet_end),
             ))
         };
         Self {
@@ -492,6 +562,7 @@ impl SttStream {
             words: Some(words),
             replies,
             early: Some(early),
+            quiet_end,
         }
     }
 
@@ -557,7 +628,7 @@ impl SttStream {
     /// Dropping the stream instead abandons it at once. Journals, for
     /// `request`, what the words' state was when the line ended.
     pub async fn finish(self, request: u64) -> Result<String> {
-        let (words, at_end) = self.finish_told().await?;
+        let (words, at_end) = self.finish_told(true).await?;
         if let Some(at_end) = at_end {
             eprintln!("lamp-voice second: request {request} at the line's end: {at_end}");
         }
@@ -565,13 +636,16 @@ impl SttStream {
     }
 
     /// The same, without the journal's line: for a stop word's words
-    /// ([`crate::stop_words`], #828), which are not a request.
+    /// ([`crate::stop_words`], #828), which are not a request. They wait for
+    /// `CloseStream` when `Finalize`'s answer is short ([`Self::quiet_end`]).
     pub async fn finished(self) -> Result<String> {
-        self.finish_told().await.map(|(words, _)| words)
+        self.finish_told(false).await.map(|(words, _)| words)
     }
 
-    /// The words, and the journal's account of the end of the line.
-    async fn finish_told(mut self) -> Result<(String, Option<String>)> {
+    /// The words, and the journal's account of the end of the line;
+    /// `quiet_end` for a request's line ([`Self::quiet_end`]).
+    async fn finish_told(mut self, quiet_end: bool) -> Result<(String, Option<String>)> {
+        self.quiet_end.store(quiet_end, Ordering::Release);
         self.audio = None;
         match tokio::time::timeout(FINISH, &mut self.task).await {
             Ok(Ok(result)) => result,
@@ -740,6 +814,7 @@ async fn run<S>(
     words_at: Arc<OnceLock<Instant>>,
     (said, early): (mpsc::UnboundedSender<String>, mpsc::UnboundedSender<Early>),
     replies: Arc<Replies>,
+    quiet_end: Arc<AtomicBool>,
 ) -> Result<(String, Option<String>)>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
@@ -748,6 +823,8 @@ where
     let mut transcript = Transcript::default();
     let mut last_sent = Instant::now();
     let mut samples_sent = 0usize;
+    // Where the line's sound ends, in seconds of the audio sent.
+    let mut sound = LineSound::default();
     // Set at the end of the line, when `Finalize` went: until when its
     // final words are waited for.
     let mut finalize_by: Option<Instant> = None;
@@ -794,6 +871,7 @@ where
             frame = queued.recv(), if finalize_by.is_none() && !closing => {
                 match frame {
                     Some(Outgoing::Audio(bytes)) => {
+                        sound.sent(&bytes, (samples_sent + bytes.len() / 2) as f64 / 16_000.0);
                         samples_sent += bytes.len() / 2;
                         write
                             .send(Message::binary(bytes))
@@ -886,6 +964,24 @@ where
                                 // Closes the socket; its answer is not waited for.
                                 let _ = write.send(close_stream()).await;
                                 return Ok(ending(&transcript, &at_end, Some(answered), "finalize"));
+                            }
+                            if finalized
+                                && quiet_end.load(Ordering::Acquire)
+                                && transcript.covers_the_sound(sound.to)
+                            {
+                                // Short of the audio sent, but what is left is
+                                // the line's quiet end: its words are these.
+                                let _ = write.send(close_stream()).await;
+                                let (words, told) = ending(&transcript, &at_end, Some(answered), "finalize");
+                                return Ok((
+                                    words,
+                                    told.map(|told| {
+                                        format!(
+                                            "{told}, the rest quiet: sound to {} ms",
+                                            (sound.to * 1000.0).round() as i64
+                                        )
+                                    }),
+                                ));
                             }
                             if finalized {
                                 // `Finalize`'s answer short of the audio sent:
@@ -1018,6 +1114,102 @@ mod tests {
                 QUERY.replace("language=en", "language=vi")
             )
         );
+    }
+
+    /// #1712 (the first builder at 21:28 and 22:54): a local server stands
+    /// in for the proxy and reads the stream's query. `second.json`'s
+    /// `stt_language` `vi` asks Nova-3 for `vi`, with the key terms, even
+    /// with Flux on, which has no Vietnamese; English with Flux on asks
+    /// Flux; unset asks Nova-3 in English.
+    // The large error is tungstenite's own handshake callback signature.
+    #[allow(clippy::result_large_err)]
+    #[tokio::test]
+    async fn vietnamese_keeps_off_flux_and_reaches_the_stream_with_its_key_terms() {
+        let directory =
+            std::env::temp_dir().join(format!("lamp-voice-stt-language-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let key = directory.join("llm.key");
+        std::fs::write(&key, "secret\n").unwrap();
+        std::fs::set_permissions(&key, std::os::unix::fs::PermissionsExt::from_mode(0o600))
+            .unwrap();
+        for (stt_language, flux, model, language) in [
+            (Some("vi"), true, "nova-3-general", Some("vi")),
+            (Some("vi"), false, "nova-3-general", Some("vi")),
+            (Some("en-US"), true, "flux-general-en", None),
+            (None, true, "flux-general-en", None),
+            (None, false, "nova-3-general", Some("en")),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = tokio::spawn(async move {
+                let (stream, _) = listener.accept().await.unwrap();
+                let mut asked = String::new();
+                let _socket = tokio_tungstenite::accept_hdr_async(
+                    stream,
+                    |request: &tokio_tungstenite::tungstenite::handshake::server::Request,
+                     response| {
+                        asked = request.uri().to_string();
+                        Ok(response)
+                    },
+                )
+                .await
+                .unwrap();
+                asked
+            });
+            let config = directory.join("second.json");
+            std::fs::write(
+                &config,
+                format!(
+                    r#"{{"llm_base_url":"https://llm.example.invalid/v1","llm_model":"m","llm_credential_file":"{}","stt_base_url":"https://stt.example.invalid"}}"#,
+                    key.display()
+                ),
+            )
+            .unwrap();
+            std::fs::set_permissions(&config, std::os::unix::fs::PermissionsExt::from_mode(0o600))
+                .unwrap();
+            let mut route = crate::second_config::load_from_path(&config).unwrap();
+            route.stt_language = stt_language.map(str::to_owned);
+            // The file takes https only: the stream is pointed here after.
+            let Stt::Autonomous { key: secret, .. } = route.stt.clone() else {
+                panic!("the proxy's speech to text");
+            };
+            route.stt = Stt::Autonomous {
+                base_url: format!("http://{address}"),
+                key: secret,
+            };
+            route.stt_flux = flux;
+            route.stt_key_terms = vec!["Hanoi".to_owned()];
+            let _stream = SttStream::connect(&route).await.unwrap();
+            let asked = server.await.unwrap();
+            let query: Vec<(String, String)> = reqwest::Url::parse(&format!("ws://x{asked}"))
+                .unwrap()
+                .query_pairs()
+                .into_owned()
+                .collect();
+            let value = |name: &str| {
+                query
+                    .iter()
+                    .find(|(key, _)| key == name)
+                    .map(|(_, value)| value.as_str())
+            };
+            assert_eq!(
+                value("model"),
+                Some(model),
+                "{stt_language:?}, flux {flux}: {asked}"
+            );
+            assert_eq!(
+                value("language"),
+                language,
+                "{stt_language:?}, flux {flux}: {asked}"
+            );
+            let terms: Vec<&str> = query
+                .iter()
+                .filter(|(key, _)| key == "keyterm")
+                .map(|(_, value)| value.as_str())
+                .collect();
+            assert_eq!(terms, ["Lamp", "Hanoi"], "{stt_language:?}: {asked}");
+        }
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     #[test]
@@ -1172,20 +1364,190 @@ mod tests {
             SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
         // One second of audio, then its results have time to arrive.
         for _ in 0..50 {
-            stream.send(&[0; 320]).unwrap();
+            stream.send(&[SOUND; 320]).unwrap();
         }
         tokio::time::sleep(Duration::from_millis(300)).await;
         for _ in 0..more {
-            stream.send(&[0; 320]).unwrap();
+            stream.send(&[SOUND; 320]).unwrap();
         }
         let began = Instant::now();
-        let (words, at_end) = stream.finish_told().await.unwrap();
+        let (words, at_end) = stream.finish_told(true).await.unwrap();
         let took = began.elapsed();
         server.abort();
         (words, at_end.unwrap(), took)
     }
 
     const INTERIM: &str = r#"{"type":"Results","is_final":false,"speech_final":false,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hello"}]}}"#;
+
+    /// A sample of a line's sound: about -21 dBFS, talk near the lamp.
+    const SOUND: i16 = 3_000;
+
+    /// `sounding` 20 ms blocks of sound and then `quiet` of silence:
+    /// [`finish_sounding_as`] for a request.
+    async fn finish_sounding(
+        sounding: usize,
+        quiet: usize,
+        finalized: &'static str,
+    ) -> (String, String, Duration) {
+        finish_sounding_as(&[(sounding, SOUND), (quiet, 0)], finalized, true).await
+    }
+
+    /// 20 ms blocks, `runs` of them each holding one sample, an interim,
+    /// then `Finalize` answered with `finalized` at once and `CloseStream`
+    /// 800 ms later with "from close". Finished as a request's line
+    /// (`quiet_end`) or a stop word's. Returns the words, the journal's
+    /// account and how long finishing took.
+    async fn finish_sounding_as(
+        runs: &[(usize, i16)],
+        finalized: &'static str,
+        quiet_end: bool,
+    ) -> (String, String, Duration) {
+        use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
+        let (near, far) = tokio::io::duplex(1 << 16);
+        let server = tokio::spawn(async move {
+            let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+            let mut told = false;
+            while let Some(Ok(message)) = socket.next().await {
+                match message {
+                    Message::Binary(_) if !told => {
+                        told = true;
+                        socket.send(Message::text(INTERIM)).await.unwrap();
+                    }
+                    Message::Text(text) if text.contains("Finalize") => {
+                        socket.send(Message::text(finalized)).await.unwrap();
+                    }
+                    Message::Text(text) if text.contains("CloseStream") => break,
+                    _ => {}
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(800)).await;
+            let last = r#"{"type":"Results","is_final":true,"speech_final":true,"start":0.5,"duration":0.5,"channel":{"alternatives":[{"transcript":"from close"}]}}"#;
+            let _ = socket.send(Message::text(last)).await;
+            let _ = socket.close(None).await;
+        });
+        let stream =
+            SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+        for &(blocks, sample) in runs {
+            for _ in 0..blocks {
+                stream.send(&[sample; 320]).unwrap();
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let began = Instant::now();
+        let (words, at_end) = stream.finish_told(quiet_end).await.unwrap();
+        let took = began.elapsed();
+        server.abort();
+        (words, at_end.unwrap(), took)
+    }
+
+    /// #1712, lamp-4ace 19 Oct (the first builder at 23:46): on 114 of 131
+    /// lines `Finalize`'s answer reached about 0.48 s short of the audio
+    /// sent, and the words waited for `CloseStream`, 652 ms after the
+    /// line's end. When what is left is the line's quiet end, the answer's
+    /// words are the line's at once; when sound is left past the answer,
+    /// as "Hang" for "Hang on." (#828), `CloseStream` still flushes it.
+    #[tokio::test(start_paused = true)]
+    async fn a_finalize_answer_short_of_only_the_quiet_end_is_the_lines_words_at_once() {
+        const ANSWERED: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hello lamp"}]}}"#;
+        // 0.6 s of sound, then 0.4 s of quiet: the answer covers the sound.
+        let (words, at_end, took) = finish_sounding(30, 20, ANSWERED).await;
+        assert_eq!(words, "hello lamp");
+        assert_eq!(took, Duration::ZERO, "no wait for CloseStream");
+        assert!(
+            at_end.ends_with(", words from=finalize, the rest quiet: sound to 600 ms"),
+            "{at_end}"
+        );
+        // Sound 0.2 s past the answer: a word may be there, so it is flushed.
+        let (words, at_end, took) = finish_sounding(40, 10, ANSWERED).await;
+        assert_eq!(words, "hello lamp from close");
+        assert_eq!(took, Duration::from_millis(800));
+        assert!(at_end.ends_with(", words from=close_stream"), "{at_end}");
+        // Sound to within one block of the answer's end: taken; one block
+        // more is a word left.
+        let (words, _, took) = finish_sounding(32, 18, ANSWERED).await;
+        assert_eq!((words.as_str(), took), ("hello lamp", Duration::ZERO));
+        let (words, _, took) = finish_sounding(33, 17, ANSWERED).await;
+        assert_eq!(
+            (words.as_str(), took),
+            ("hello lamp from close", Duration::from_millis(800))
+        );
+    }
+
+    /// Jarvis on #1993: a whole word past `Finalize`'s answer, however short
+    /// or soft, is sound left, and `CloseStream` still flushes it as before:
+    /// "hang" answered to 0.30 s, then a word loud for 0.10 s after a 40 ms
+    /// gap, or an "on" at about -48 dBFS to 0.60 s. With only quiet after
+    /// it, "hang" is the line's at once.
+    #[tokio::test(start_paused = true)]
+    async fn a_short_or_soft_last_word_past_the_answer_still_waits_for_close_stream() {
+        const HANG: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.3,"channel":{"alternatives":[{"transcript":"hang"}]}}"#;
+        let short: &[(usize, i16)] = &[(15, SOUND), (2, 0), (5, SOUND), (28, 0)];
+        // An RMS of 130: -48 dBFS, 27 dB under the line's sound.
+        let soft: &[(usize, i16)] = &[(15, SOUND), (15, 130), (20, 0)];
+        for runs in [short, soft] {
+            let (words, at_end, took) = finish_sounding_as(runs, HANG, true).await;
+            assert_eq!(words, "hang from close", "{runs:?}");
+            assert_eq!(took, Duration::from_millis(800));
+            assert!(at_end.ends_with(", words from=close_stream"), "{at_end}");
+        }
+        let (words, at_end, took) = finish_sounding_as(&[(15, SOUND), (35, 0)], HANG, true).await;
+        assert_eq!((words.as_str(), took), ("hang", Duration::ZERO));
+        assert!(
+            at_end.ends_with("the rest quiet: sound to 300 ms"),
+            "{at_end}"
+        );
+    }
+
+    /// Jarvis's P3 on #1993: a stop word's stream ([`SttStream::finished`])
+    /// keeps `CloseStream` after a short answer, whatever is left: over the
+    /// lamp a stop word can be pushed under any bar (#828).
+    #[tokio::test(start_paused = true)]
+    async fn a_stop_words_stream_waits_for_close_stream_after_a_short_answer() {
+        const HANG: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.3,"channel":{"alternatives":[{"transcript":"hang"}]}}"#;
+        let (words, at_end, took) = finish_sounding_as(&[(15, SOUND), (35, 0)], HANG, false).await;
+        assert_eq!(
+            (words.as_str(), took),
+            ("hang from close", Duration::from_millis(800))
+        );
+        assert!(at_end.ends_with(", words from=close_stream"), "{at_end}");
+    }
+
+    /// A block is sound within 30 dB of the line's loudest so far, and over
+    /// -60 dBFS: a far voice's soft ending counts; the quiet between sounds,
+    /// and a level 30 dB under the words, do not.
+    #[test]
+    fn a_blocks_sound_is_told_from_its_quiet_against_the_lines_loudest() {
+        let block = |sample: i16| -> Vec<u8> {
+            std::iter::repeat_n(sample.to_le_bytes(), 320)
+                .flatten()
+                .collect()
+        };
+        let mut sound = LineSound::default();
+        let mut at = 0.0;
+        let mut sent = |sound: &mut LineSound, sample: i16| {
+            at += 0.02;
+            sound.sent(&block(sample), at);
+        };
+        sent(&mut sound, SOUND);
+        sent(&mut sound, -SOUND);
+        assert!((sound.to - 0.04).abs() < 1e-9);
+        // -48 dBFS, 27 dB under: sound. -51 dBFS, just over 30 dB under:
+        // quiet, as are -75 dBFS and silence.
+        sent(&mut sound, 130);
+        assert!((sound.to - 0.06).abs() < 1e-9);
+        for quiet in [92, 6, 0] {
+            sent(&mut sound, quiet);
+        }
+        assert!((sound.to - 0.06).abs() < 1e-9);
+        // A far voice: its -45 dBFS words and a -58 dBFS ending are sound,
+        // -62 dBFS is under the floor.
+        let mut far = LineSound::default();
+        far.sent(&block(184), 0.02);
+        far.sent(&block(41), 0.04);
+        far.sent(&block(26), 0.06);
+        assert!((far.to - 0.04).abs() < 1e-9);
+        assert_eq!(level(&[]), 0.0);
+    }
 
     /// #1712 (`LAMP_SECOND_STT_WARM`): a stream kept ready says it is still
     /// open while its socket is, and not once the service has closed it.
@@ -1267,7 +1629,7 @@ mod tests {
             stream.send(&[0; 320]).unwrap();
         }
         tokio::time::sleep(Duration::from_millis(300)).await;
-        let (words, at_end) = stream.finish_told().await.unwrap();
+        let (words, at_end) = stream.finish_told(true).await.unwrap();
         server.abort();
         let at_end = at_end.unwrap();
         assert_eq!(words, "hey lamp");
@@ -1378,13 +1740,13 @@ mod tests {
             SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
         let first_words = stream.first_words();
         let began = Instant::now();
-        stream.send(&[0; 320]).unwrap();
+        stream.send(&[SOUND; 320]).unwrap();
         tokio::time::sleep(Duration::from_millis(100)).await;
         assert!(
             first_words.get().is_none(),
             "a result with no words is not words"
         );
-        stream.send(&[0; 320]).unwrap();
+        stream.send(&[SOUND; 320]).unwrap();
         tokio::time::sleep(Duration::from_millis(500)).await;
         let at = *first_words.get().expect("the words never came");
         let after = at - began;
@@ -1392,7 +1754,7 @@ mod tests {
             (Duration::from_millis(400)..Duration::from_millis(450)).contains(&after),
             "{after:?}"
         );
-        let (words, _) = stream.finish_told().await.unwrap();
+        let (words, _) = stream.finish_told(true).await.unwrap();
         assert_eq!(words, "hello");
         assert_eq!(first_words.get().copied(), Some(at));
         server.abort();
@@ -1429,7 +1791,7 @@ mod tests {
             replies.told(),
             "0 results with words, 0 without, 0 speech starts, 0 other messages"
         );
-        stream.send(&[0; 320]).unwrap();
+        stream.send(&[SOUND; 320]).unwrap();
         tokio::time::sleep(Duration::from_millis(100)).await;
         assert_eq!(
             replies.told(),
@@ -1625,11 +1987,11 @@ mod tests {
             let mut early = stream.take_early().unwrap();
             assert!(stream.take_early().is_none(), "one taker");
             for _ in 0..50 {
-                stream.send(&[0; 320]).unwrap();
+                stream.send(&[SOUND; 320]).unwrap();
             }
             tokio::time::sleep(Duration::from_millis(300)).await;
             let began = Instant::now();
-            let finishing = tokio::spawn(stream.finish_told());
+            let finishing = tokio::spawn(stream.finish_told(true));
             if let Some(words) = early_words {
                 assert_eq!(early.recv().await, Some(Early::Words(words.to_owned())));
                 assert_eq!(began.elapsed(), Duration::ZERO, "before Finalize's answer");

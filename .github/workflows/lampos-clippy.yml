@@ -1,0 +1,65 @@
+name: lampOS clippy
+
+# Clippy over the whole lampOS workspace, every target, warnings as errors, on
+# x86 Linux, for every pull request into lamp-voice (and #1712's branch) and
+# every push to lamp-voice (the first builder, #1722, 20 Oct 2026 05:35). It is
+# the builders' gate (lampOS/docs/joining.md) for every crate at once. On 19
+# and 20 Oct two breaks passed unseen: a dead copy on lamp-voice (#2008), and
+# #1944's break of lamp-voice's tests on #1712, which ARM64 caught only on the
+# next pull request, because a pull request's ARM64 run builds and tests only
+# the crates it changes and their users (lampos-arm64.yml).
+#
+# A workflow of its own: ci.yml skips every lampOS change, and a step in the
+# ARM64 run would add to that run's time. Linux, so the cfg(target_os = "linux")
+# code a Mac's gate skips is checked too. Its triggers are the ARM64 run's.
+on:
+  push:
+    branches: ['lamp-voice']
+    paths: ['lampOS/**', '.github/workflows/lampos-clippy.yml']
+  pull_request:
+    branches: ['lamp-voice', 'first/voice-cascade-gemini']
+    paths:
+      - 'lampOS/**'
+      - '!lampOS/docs/**/*.md'
+      - '!lampOS/builders/**'
+      - 'lampOS/docs/brain-build.md'
+      - 'lampOS/docs/endpoint-detection.md'
+      - 'lampOS/docs/endpoint-pilot.md'
+      - 'lampOS/docs/install.md'
+      - 'lampOS/docs/memory.md'
+      - 'lampOS/docs/switches.md'
+      - '.github/workflows/lampos-clippy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: lampos-clippy-${{ github.event.pull_request.number || github.ref }}
+  # A newer push to a pull request makes the running one moot.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/lamp-voice' }}
+
+jobs:
+  clippy:
+    name: lampOS — clippy, every crate and target (x86 Linux)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: system packages
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev
+      - uses: actions/checkout@v4
+      - name: Rust 1.96.0
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            lampOS/target
+          key: lampos-clippy-u2204-${{ hashFiles('lampOS/Cargo.lock') }}
+          restore-keys: lampos-clippy-u2204-
+      - name: clippy (every crate and target, warnings as errors)
+        working-directory: lampOS
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings

@@ -39,8 +39,17 @@ const FIRST_WORDS_HEARD: usize = 320;
 /// reviewer and the first builder on #1130).
 const WAITED_HEARD: usize = 192;
 /// Yields in one reply that came to nothing before the mask stops yielding
-/// for the rest of that reply and masks as the conservative baseline does.
+/// for the rest of that reply and masks as the conservative baseline does,
+/// until one is forgiven ([`FORGIVE_FRUITLESS_US`]).
 pub const FRUITLESS_YIELDS: u8 = 2;
+/// How long a reply goes with no yield before one fruitless yield is
+/// forgiven, so at most [`FRUITLESS_YIELDS`] count in any 20 s. A long story
+/// that yielded twice to nothing went deaf for its rest: on lamp-4ace on
+/// 20 Oct at 03:45 a Hindi line and "What was that?" each yielded and
+/// resumed, and "Hey Lamp, what's the weather in Hanoi?" 30 s later made no
+/// request (#1712, the first builder at 04:11 and their yes at 04:40). A
+/// noise that trips it more often than this still falls back as before.
+pub const FORGIVE_FRUITLESS_US: u64 = 20_000_000;
 /// Blocks of the lamp's own sound that the render must have explained, since
 /// the lamp last had nothing to say or last went on after a pause, before a
 /// block can be a person over it. The evidence takes the start of every
@@ -141,8 +150,14 @@ struct Duplex {
     last_yield: Option<(u64, Yielded)>,
     /// The latest block came without evidence: mask it conservatively.
     blind: bool,
-    /// Yields since the reply began that ended in a resume.
+    /// Yields since the reply began that ended in a resume, less those
+    /// forgiven ([`FORGIVE_FRUITLESS_US`]).
     fruitless: u8,
+    /// When the latest yield began, or the latest fruitless yield was
+    /// forgiven: the next is forgiven [`FORGIVE_FRUITLESS_US`] after it.
+    last_yield_at_us: Option<u64>,
+    /// Fruitless yields forgiven since hearing began, for the record.
+    forgiven: u32,
     /// A forced yield (`stop/heard`) committed: the reply is to end
     /// ([`PlaybackMask::take_stop_committed`]).
     stop_committed: bool,
@@ -159,6 +174,9 @@ pub(crate) struct Listened {
     /// The score to give the turn detector for this block.
     pub score: f32,
     pub step: Step,
+    /// A fruitless yield was forgiven on this block
+    /// ([`FORGIVE_FRUITLESS_US`]).
+    pub forgiven: bool,
 }
 
 /// A piece of the lamp's own sound that the speaker took: whose turn, how
@@ -225,6 +243,8 @@ impl PlaybackMask {
                 last_yield: None,
                 blind: true,
                 fruitless: 0,
+                last_yield_at_us: None,
+                forgiven: 0,
                 stop_committed: false,
                 matched: 0,
                 listened_at_us: 0,
@@ -342,6 +362,7 @@ impl PlaybackMask {
             heard: None,
             score: probability,
             step: Step::Carry,
+            forgiven: false,
         };
         let Some(duplex) = self.duplex.as_mut() else {
             return Ok(unjudged);
@@ -350,6 +371,21 @@ impl PlaybackMask {
             return Err(invalid("hearing time moved backwards"));
         }
         duplex.listened_at_us = at_us;
+        // A fruitless yield is forgiven after a spell of the reply with no
+        // yield, so a long story is never deaf for its rest.
+        let forgiven = duplex.fruitless > 0
+            && duplex
+                .last_yield_at_us
+                .is_some_and(|at| at_us.saturating_sub(at) >= FORGIVE_FRUITLESS_US);
+        if forgiven {
+            duplex.fruitless -= 1;
+            duplex.forgiven = duplex.forgiven.saturating_add(1);
+            duplex.last_yield_at_us = Some(at_us);
+        }
+        let unjudged = Listened {
+            forgiven,
+            ..unjudged
+        };
         if duplex
             .heard
             .back()
@@ -419,6 +455,7 @@ impl PlaybackMask {
             heard: Some(heard),
             score: Self::held_open(duplex, score),
             step,
+            ..unjudged
         })
     }
     /// While the lamp has stopped for someone, what it hears is one
@@ -437,7 +474,10 @@ impl PlaybackMask {
     fn settle(duplex: &mut Duplex, sequence: u64, step: Step) {
         match step {
             Step::Carry => {}
-            Step::Yield => duplex.last_yield = Some((sequence, Yielded::Undecided)),
+            Step::Yield => {
+                duplex.last_yield = Some((sequence, Yielded::Undecided));
+                duplex.last_yield_at_us = Some(duplex.listened_at_us);
+            }
             Step::Commit => {
                 if let Some((_, state)) = duplex.last_yield.as_mut() {
                     *state = Yielded::Committed;
@@ -495,6 +535,7 @@ impl PlaybackMask {
     pub fn reply_closed(&mut self) {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.fruitless = 0;
+            duplex.last_yield_at_us = None;
             duplex.stop_committed = false;
         }
     }
@@ -520,6 +561,12 @@ impl PlaybackMask {
                 duplex.fruitless >= FRUITLESS_YIELDS,
             )
         })
+    }
+    /// Fruitless yields forgiven since hearing began
+    /// ([`FORGIVE_FRUITLESS_US`]): `fallen_back_at_end` says only whether the
+    /// last reply had fallen back when the session ended (Eighth on #2048).
+    pub fn fruitless_forgiven(&self) -> u32 {
+        self.duplex.as_ref().map_or(0, |duplex| duplex.forgiven)
     }
     /// Hearing, when the latest block was judged.
     fn hearing(&self) -> Option<&Duplex> {
@@ -1885,6 +1932,66 @@ mod tests {
         );
         assert_eq!(steps.len(), 1);
         assert_eq!(steps[0].1, Step::Yield);
+    }
+
+    /// #1712 (the first builder's yes at 04:40): two fruitless yields, then
+    /// 20 s of the reply with no yield forgives one, so a line over it
+    /// yields again; 10 s isn't enough.
+    #[test]
+    fn a_fruitless_yield_is_forgiven_after_twenty_seconds_with_no_yield() {
+        let quiet_blocks = |seconds: u64| seconds * 100;
+        for (after, yields) in [(20, true), (10, false)] {
+            let mut mask = PlaybackMask::duplex();
+            let mut sequence = 1;
+            for _ in 0..FRUITLESS_YIELDS {
+                mask.assume_matched();
+                let steps = hear(
+                    &mut mask,
+                    &mut sequence,
+                    ONSET,
+                    0.9,
+                    &evidence(0, OVER),
+                    true,
+                );
+                assert_eq!(steps.len(), 1);
+                hear(&mut mask, &mut sequence, 30, 0.1, &evidence(10, None), true);
+                let steps = hear(&mut mask, &mut sequence, 40, 0.1, &evidence(40, None), true);
+                assert_eq!(steps.last().unwrap().1, Step::Resume);
+            }
+            assert!(mask.duplex_summary().unwrap().1, "fallen back");
+            // The lamp goes on speaking, nobody over it. The block that
+            // forgives one says so, and the count keeps it (Eighth on #2048).
+            let mut forgiven = 0;
+            for _ in 0..quiet_blocks(after) {
+                let listened = mask
+                    .listen(
+                        sequence,
+                        0.1,
+                        Some(&evidence(40, None)),
+                        true,
+                        sequence * 10_000,
+                    )
+                    .unwrap();
+                forgiven += u32::from(listened.forgiven);
+                sequence += 1;
+            }
+            assert_eq!(forgiven, u32::from(yields), "{after} s after");
+            assert_eq!(mask.fruitless_forgiven(), forgiven);
+            mask.assume_matched();
+            let steps = hear(
+                &mut mask,
+                &mut sequence,
+                ONSET + 6,
+                0.9,
+                &evidence(0, OVER),
+                true,
+            );
+            assert_eq!(
+                steps.iter().any(|(_, step)| *step == Step::Yield),
+                yields,
+                "{after} s after: {steps:?}"
+            );
+        }
     }
 
     #[test]

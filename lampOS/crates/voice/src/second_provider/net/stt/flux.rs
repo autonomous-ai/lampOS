@@ -717,7 +717,7 @@ mod tests {
             stream.flush().unwrap();
         }
         let began = Instant::now();
-        let (words, at_end) = stream.finish_told().await.unwrap();
+        let (words, at_end) = stream.finish_told(true).await.unwrap();
         let took = began.elapsed();
         let audio = server.await.unwrap();
         (words, at_end.unwrap(), took, audio)
