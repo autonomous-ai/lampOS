@@ -1009,7 +1009,7 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
     A quieter lamp keeps more, but no check should count on a whole day of
     journal (`--since yesterday`).
   - **Read last:** "zz-" puts it after any other drop-in, so its numbers win.
-  - **Tests:** `lamp-update`'s `tests/image_journal.rs` checks the numbers
+  - **Tests:** `lamp-update`'s `tests/it/image_journal.rs` checks the numbers
     against the disk. Where `systemd-analyze` exists, it checks that systemd
     reads them last beside a 100M `persistent.conf`. lamp-75c9's systemd 252
     reads it last after its own `journald.conf` too.
@@ -1039,7 +1039,7 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
     `/etc/default/orangepi-ramlog` says `ENABLED` isn't `true`, as the base.
     `orangepi-truncate-logs` (over 75% of `/var/log`) runs logrotate without
     the service, so it never copies back.
-  - **Tests:** `lamp-update`'s `tests/image_ramlog.rs` runs the script on a
+  - **Tests:** `lamp-update`'s `tests/it/image_ramlog.rs` runs the script on a
     copy shaped as the lamp's (the journal kept, the text logs copied,
     compressed and numbered ones left out); a copy-back that names the
     journal fails it.

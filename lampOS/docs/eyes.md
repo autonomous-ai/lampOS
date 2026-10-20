@@ -1172,7 +1172,7 @@ Tests (`photo.rs`):
   public-domain astronaut portrait (scikit-image's sample, never committed).
 
 The asks' parsing is in `who.rs`, `--photo-dir` in `main.rs`, and the reset's
-wipe in `crates/setup/tests/reset.rs`. Not run on a lamp.
+wipe in `crates/setup/tests/it/reset.rs`. Not run on a lamp.
 
 ### How familiar a remembered person is (`--visits on`, #1670)
 

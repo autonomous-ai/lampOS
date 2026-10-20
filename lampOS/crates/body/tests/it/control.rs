@@ -1178,7 +1178,7 @@ fn position_bytes_match_the_pinned_sdk_executed_with_an_inert_port() {
         wire_bytes: Vec<u8>,
     }
     let fixture: Fixture =
-        serde_json::from_str(include_str!("fixtures/sdk-position-frames.json")).unwrap();
+        serde_json::from_str(include_str!("../fixtures/sdk-position-frames.json")).unwrap();
     assert_eq!(fixture.cases.len(), 3);
     for case in fixture.cases {
         let frame = PositionFrame::encode(
