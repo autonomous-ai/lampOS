@@ -377,7 +377,11 @@ struct Shared {
     /// The newest answer's pieces as sent, its request first: each one's
     /// words (none for a wait sound) and samples, so a cut answer is kept
     /// as what was heard of it (`LAMP_SAID_AS_HEARD`, [`Engine::said_as_heard`]).
-    said: Mutex<(u64, Vec<crate::said_as_heard::Piece>)>,
+    said: Mutex<(
+        u64,
+        Vec<crate::said_as_heard::Piece>,
+        crate::not_speech::CallsLeftOut,
+    )>,
     /// Audio packets sent by this process.
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
@@ -817,7 +821,7 @@ impl Engine {
                 clock,
                 answered_at: Mutex::new(None),
                 said_until_us: AtomicU64::new(0),
-                said: Mutex::default(),
+                said: Mutex::new((0, Vec::new(), crate::not_speech::CallsLeftOut::new())),
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
@@ -2071,8 +2075,14 @@ impl Shared {
     fn said_piece(&self, request: u64, words: Option<&str>) {
         if let Ok(mut said) = self.said.lock() {
             if said.0 != request {
-                *said = (request, Vec::new());
+                *said = (request, Vec::new(), crate::not_speech::CallsLeftOut::new());
             }
+            // A call written in the answer is left out of the thread
+            // (`Thread::lamp_for`), so its words are left out here too, on
+            // the same text: its sound still counts (the reviewer's P3 on
+            // #2145).
+            let words =
+                words.filter(|words| said.2.keeps(request, &format!("{} ", words.trim_start())));
             said.1.push(crate::said_as_heard::Piece {
                 words: words.map(str::to_owned),
                 samples: 0,

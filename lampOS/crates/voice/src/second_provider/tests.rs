@@ -5533,3 +5533,42 @@ async fn a_line_that_cuts_the_story_is_asked_with_the_story_as_heard() {
         asked[1]
     );
 }
+
+/// The reviewer's P3 on #2145: a call written as words mid-answer is left
+/// out of what was heard, as the thread leaves it out, and its sound still
+/// counts. Played whole, what was heard is what the thread keeps.
+#[tokio::test]
+async fn a_call_written_in_the_answer_is_left_out_of_what_was_heard() {
+    use crate::said_as_heard::HeardOfCut;
+    let (engine, _, _) = scripted(Arc::new(Script::default()));
+    let pieces = [
+        ("Sure.", 1_000),
+        (" set_timer{", 500),
+        ("\"minutes\": 5}", 500),
+        (" It is set.", 1_000),
+    ];
+    for (words, samples) in pieces {
+        engine.shared.said_piece(4, Some(words));
+        engine.shared.said_samples(4, samples);
+    }
+    let heard = |samples| {
+        engine
+            .said_as_heard(HeardOfCut {
+                request: 4,
+                samples,
+            })
+            .unwrap()
+            .0
+    };
+    assert_eq!(heard(3_000), "Sure. It is set.");
+    assert_eq!(heard(2_500), "Sure. It—");
+    assert_eq!(heard(1_500), "Sure.", "within the call's sound");
+    let mut thread = crate::thread::Thread::new();
+    let now = Instant::now();
+    thread.person("Set a timer.", true, now);
+    for (words, _) in pieces {
+        thread.lamp(4, &format!("{} ", words.trim_start()), now);
+    }
+    let kept = thread.recent(now, Duration::from_secs(300), 6);
+    assert_eq!(kept[0].lamp, heard(3_000));
+}

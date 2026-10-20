@@ -501,6 +501,15 @@ fn a_line_that_cuts_a_reply_is_told_how_much_of_it_was_played() {
         heard_of_cut(false, h.reply.as_ref(), &mut stop_cut, 1),
         None
     );
+    // A Stop that cuts the reply keeps how much was played, and its
+    // session, for the next line; off, nothing.
+    let session = h.reply.as_ref().unwrap().cloud.session;
+    assert_eq!(
+        stop_cut_of(true, h.reply.as_ref()),
+        Some((cut.unwrap(), session))
+    );
+    assert_eq!(stop_cut_of(false, h.reply.as_ref()), None);
+    assert_eq!(stop_cut_of(true, None), None);
     let stopped = HeardOfCut {
         request: 3,
         samples: 4_800,

@@ -4827,8 +4827,8 @@ fn conversation_with_gate(
                     .map(|current| current.cloud.session);
                 // How much of that answer was played, for the next line on
                 // its session (`LAMP_SAID_AS_HEARD`).
-                if said_as_heard && let Some(current) = cancellation.reply.as_ref() {
-                    stop_cut = Some((heard_of(current), current.cloud.session));
+                if let Some(cut) = stop_cut_of(said_as_heard, cancellation.reply.as_ref()) {
+                    stop_cut = Some(cut);
                 }
                 // A Stop, a head touch, the mute or a gap ends the unclear
                 // turn's asking too: nothing is asked again after it (#926).
@@ -9629,9 +9629,6 @@ fn hear_the_call(
     Ok(Some(began))
 }
 
-/// Whether the lamp's own answer could be heard: the reply in hand had sound
-/// or is playing, not only in hand and silent while it waits for an answer
-/// (#828, the reviewer on #1291).
 /// How much of `current` was played: its request and the samples handed to
 /// the speaker (`LAMP_SAID_AS_HEARD`).
 fn heard_of(current: &Reply) -> crate::said_as_heard::HeardOfCut {
@@ -9639,6 +9636,18 @@ fn heard_of(current: &Reply) -> crate::said_as_heard::HeardOfCut {
         request: current.owner.turn(),
         samples: current.handed,
     }
+}
+
+/// With `on` (`LAMP_SAID_AS_HEARD`), what a Stop that cut `cancelled` keeps
+/// for the next line on its session: how much of it was played, and that
+/// session.
+fn stop_cut_of(
+    on: bool,
+    cancelled: Option<&Reply>,
+) -> Option<(crate::said_as_heard::HeardOfCut, u64)> {
+    cancelled
+        .filter(|_| on)
+        .map(|current| (heard_of(current), current.cloud.session))
 }
 
 /// With `on` (`LAMP_SAID_AS_HEARD`), how much was played of the reply a line
@@ -9657,6 +9666,9 @@ fn heard_of_cut(
     on.then(|| reply.map(heard_of).or(stopped)).flatten()
 }
 
+/// Whether the lamp's own answer could be heard: the reply in hand had sound
+/// or is playing, not only in hand and silent while it waits for an answer
+/// (#828, the reviewer on #1291).
 fn lamps_voice_heard(reply: Option<&Reply>) -> bool {
     reply.is_some_and(|current| current.had_audio || current.playback.is_some())
 }

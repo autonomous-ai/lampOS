@@ -1664,7 +1664,9 @@ after a take-over, but now for every turn:
     the wire otherwise, and the session record's `input_admitted` says it.
   - **The route** keeps each piece's words and samples as sent
     (`said_as_heard::Piece`). A wait sound and the announcement count their
-    time with no words.
+    time with no words. So does a call written as words mid-answer, which
+    the thread leaves out (`CallsLeftOut`, on the same text), so a cut never
+    tells it back as the lamp's words (the reviewer's P3 on #2145).
   - **At that Start,** before the line is asked, the cut request's words in
     the thread become what was heard (`said_as_heard::heard`,
     `Thread::heard_only`):
@@ -1672,10 +1674,15 @@ after a take-over, but now for every turn:
     - then the played share of the words of the piece playing at the cut,
       rounded down, with "—" after them;
     - and nothing after.
-  - **Nothing more of that answer is kept.** A cut before any word leaves no
-    word, and the exchange is passed over as one where the lamp said none.
-    Its end is the heard end, so a question it never played isn't taken as
-    asked (`lamp_asked`).
+  - **Nothing more of that answer is kept.**
+    - **A cut before any word** keeps the exchange, with the lamp's part a
+      dash. The next line is still asked with the person's own question,
+      and memory is handed it too (the reviewer's P2 on #2145: "What's the
+      capital of Peru?", then "and how many people live there?" before the
+      answer sounded, had lost the question). A thread read back from its
+      file knows such an exchange by its dash.
+    - Its end is the heard end, so a question it never played isn't taken
+      as asked (`lamp_asked`).
   - **The journal says** `request N: H of its answer's W words were played,
     M ms of it, before it was cut; request K is asked with only those as
     the lamp's`.
@@ -1689,8 +1696,9 @@ after a take-over, but now for every turn:
     - the memory case above;
     - a Stop followed by a written request rather than a spoken line: a
       written request has no Start, so that answer stays as sent;
-    - the words of a piece the thread itself leaves out (a function's name
-      said aloud).
+    - the Stop's path through the session loop: its record of the cut is
+      tested as a function (`stop_cut_of`), and end to end only on a lamp
+      (a Stop over a story, then "go on").
 
     The share of a cut piece assumes its words are spread evenly over its
     sound.

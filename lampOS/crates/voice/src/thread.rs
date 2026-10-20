@@ -98,6 +98,10 @@ struct Exchange {
     tail: String,
     /// Handed on to the lamp's memory, or not for it to have.
     journalled: bool,
+    /// Cut before any of the lamp's answer played (`LAMP_SAID_AS_HEARD`): its
+    /// part is [`crate::said_as_heard::CUT`], and the exchange is still told,
+    /// so the person's words are (the reviewer's P2 on #2145).
+    unheard: bool,
     /// The memory id of the known person it was with; `None`: the room's.
     whose: Option<String>,
     /// The note the lamp was given in writing for it, when it began the
@@ -441,6 +445,7 @@ impl Thread {
                 request: u64::MAX - index as u64,
                 at,
                 person,
+                unheard: lamp.trim() == crate::said_as_heard::CUT,
                 tail: lamp.clone(),
                 lamp,
                 // The process that wrote the file handed it on.
@@ -574,6 +579,7 @@ impl Thread {
                 lamp: String::new(),
                 tail: String::new(),
                 journalled: false,
+                unheard: false,
                 whose,
                 written,
             });
@@ -601,17 +607,15 @@ impl Thread {
             })
             .filter_map(|exchange| {
                 exchange.journalled = true;
-                exchange
-                    .lamp
-                    .chars()
-                    .any(char::is_alphanumeric)
-                    .then(|| FinishedExchange {
+                (exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard).then(|| {
+                    FinishedExchange {
                         request: exchange.request,
                         age: now.saturating_duration_since(exchange.at),
                         heard: exchange.person.trim().to_owned(),
                         said: exchange.lamp.trim().to_owned(),
                         whose: exchange.whose.clone(),
-                    })
+                    }
+                })
             })
             .collect()
     }
@@ -648,9 +652,10 @@ impl Thread {
     /// The lamp's words for `request` are only `said`, what was played of its
     /// answer before a line or a Stop cut it (`LAMP_SAID_AS_HEARD`,
     /// [`crate::said_as_heard`]), and nothing more of that answer is kept.
-    /// With nothing played, `said` is empty and the exchange is passed over
-    /// as one where the lamp said no word. Nothing changes for an answer
-    /// the thread doesn't hold.
+    /// With no word played, the lamp's part is [`crate::said_as_heard::CUT`]
+    /// and the exchange is still told and handed on, so the person's words
+    /// are never lost with it (the reviewer's P2 on #2145). Nothing changes
+    /// for an answer the thread doesn't hold.
     pub fn heard_only(&mut self, request: u64, said: &str) {
         self.cut = Some(request);
         let Some(exchange) = self
@@ -660,6 +665,12 @@ impl Thread {
             .find(|exchange| exchange.request == request)
         else {
             return;
+        };
+        exchange.unheard = !said.chars().any(char::is_alphanumeric);
+        let said = if exchange.unheard {
+            crate::said_as_heard::CUT
+        } else {
+            said
         };
         exchange.lamp.clear();
         exchange.tail.clear();
@@ -783,7 +794,7 @@ impl Thread {
             .filter(|exchange| {
                 exchange.whose.as_deref() == scope
                     && now.saturating_duration_since(exchange.at) <= within
-                    && exchange.lamp.chars().any(char::is_alphanumeric)
+                    && (exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
             })
             .take(most)
             .map(|exchange| Recent {
@@ -1721,14 +1732,28 @@ mod tests {
         let recent = thread.recent(at(7), within, 6);
         assert_eq!(recent.len(), 2);
         assert_eq!(recent[1].lamp, "A keeper named Tom. He was kind.");
-        // Nothing played of it: the exchange is passed over.
+        // Nothing played of it: the person's words are still told, the
+        // lamp's part a dash (the reviewer's P2 on #2145), and handed on.
         thread.heard_only(2, "");
         let recent = thread.recent(at(7), within, 6);
-        assert_eq!(recent.len(), 1);
-        assert_eq!(recent[0].lamp, "Once a keeper lived—");
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[1].person, "Who was he?");
+        assert_eq!(recent[1].lamp, "—");
+        assert!(!thread.lamp_asked(3));
+        let finished = thread.finished(2, at(7));
+        assert!(
+            finished
+                .iter()
+                .any(|exchange| exchange.request == 2 && exchange.heard == "Who was he?"),
+            "{:?}",
+            finished
+                .iter()
+                .map(|exchange| exchange.request)
+                .collect::<Vec<_>>()
+        );
         // Nothing for an answer the thread doesn't hold.
         thread.heard_only(9, "Anything.");
-        assert_eq!(thread.recent(at(7), within, 6).len(), 1);
+        assert_eq!(thread.recent(at(7), within, 6).len(), 2);
     }
 
     /// #1505: the thread file as a later build writes it, with a field this
