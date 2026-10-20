@@ -127,9 +127,16 @@ unit takes port 80 with one capability, `CAP_NET_BIND_SERVICE`, and no
 other (`AmbientCapabilities=` and `CapabilityBoundingSet=`). It never runs
 beside setup, whose hotspot page and nginx have port 80:
 `ConditionPathExists=/var/lib/lampos-setup/done` keeps it off a lamp not
-set up, and `Conflicts=lamp-setup.service` stops it when a reset starts
-setup again. A lamp set up while it was off starts it at the next boot, or
-by hand.
+set up, and a reset reboots with that marker gone. It has no `Conflicts=`
+with `lamp-setup.service`: both are wanted by `multi-user.target`, and at
+boot after a reset systemd would keep this unit's start and drop setup's,
+and then this unit's condition fails and nothing listens (the reviewer on
+#2259). A lamp set up while it was off starts it at the next boot, or by
+hand.
+
+Before the drop-in, check nothing else holds port 80 on that lamp: an
+office lamp that still has V1's nginx enabled keeps it, and the page then
+fails to bind until its start limit (`StartLimitBurst=5`).
 
 Without a token it answers only when `Host` is `127.0.0.1`, `localhost` or
 `[::1]` (403 otherwise). Then no other page in the same browser can reach it
@@ -183,7 +190,8 @@ on a lamp), and reads the newest session's `events-*.jsonl` for its
 (`serve::STATUS_KEPT`), and a tab refreshing every 5 s reads them at most
 twice a minute. A read hasn't been timed on a lamp yet. Time one on the
 office lamp before a `/status` tab stays open beside a timed row. The one
-page's Overview and Health use the same rows, kept the same 30 s, so an open
+page's Overview and Health use the same rows, kept the same 30 s, and one
+read runs while the others wait for it (the reviewer on #2259), so an open
 page reads them twice a minute however many tabs show it.
 
 ## Tests
@@ -232,4 +240,6 @@ own, and asks for it over HTTP:
   - a long file is first read from near its end;
   - a newer session starts again.
 - `tests::the_unit_takes_port_80_only_once_setup_is_done`: the unit's
-  setup condition, its conflict with setup, and its one capability.
+  setup condition, no `Conflicts=` with setup, and its one capability.
+- `the_units_are_read_once_however_many_ask_at_once`: four asking at once
+  while the rows have run out make one read.

@@ -50,6 +50,26 @@ struct Rig {
 
 impl Rig {
     fn new(name: &str, token: Option<&str>) -> Self {
+        Self::with_units(
+            name,
+            token,
+            Arc::new(|| {
+                vec![UnitRow {
+                    id: "lamp-voice.service".into(),
+                    active: "active".into(),
+                    sub: "running".into(),
+                    ..UnitRow::default()
+                }]
+            }),
+        )
+    }
+
+    /// The same, with `units` as `/status` reads them.
+    fn with_units(
+        name: &str,
+        token: Option<&str>,
+        units: Arc<dyn Fn() -> Vec<UnitRow> + Send + Sync>,
+    ) -> Self {
         // A root short enough for a socket's path, which the system's own
         // temporary directory on a Mac is not.
         let root = PathBuf::from(format!("/tmp/lpk-{name}-{}", std::process::id()));
@@ -80,14 +100,7 @@ impl Rig {
             seen,
             token: token.map(str::to_owned),
             sessions: root.join("sessions"),
-            units: Arc::new(|| {
-                vec![UnitRow {
-                    id: "lamp-voice.service".into(),
-                    active: "active".into(),
-                    sub: "running".into(),
-                    ..UnitRow::default()
-                }]
-            }),
+            units,
         });
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
@@ -826,4 +839,39 @@ fn the_stream_reads_only_and_asks_for_the_token() {
     assert!(!body.contains("event:"), "{body}");
     let sections = stream_until(&rig, &format!("Cookie: peek={TOKEN}\r\n"), "<th>voice</th>");
     assert!(sections.contains_key("overview"));
+}
+
+/// The units are read once however many ask at once while the kept rows
+/// have run out: the others wait for that read (the reviewer on #2259,
+/// P3), so an open page and its tabs read systemd twice a minute at most.
+#[test]
+fn the_units_are_read_once_however_many_ask_at_once() {
+    let reads = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let rig = Arc::new(Rig::with_units(
+        "units",
+        None,
+        Arc::new({
+            let reads = Arc::clone(&reads);
+            move || {
+                reads.fetch_add(1, Ordering::SeqCst);
+                thread::sleep(Duration::from_millis(300));
+                vec![UnitRow {
+                    id: "lamp-voice.service".into(),
+                    ..UnitRow::default()
+                }]
+            }
+        }),
+    ));
+    let askers: Vec<_> = (0..4)
+        .map(|_| {
+            let rig = Arc::clone(&rig);
+            thread::spawn(move || rig.get("/status"))
+        })
+        .collect();
+    for asker in askers {
+        let (status, body) = asker.join().unwrap();
+        assert_eq!(status, 200);
+        assert!(body.contains("lamp-voice.service"), "{body}");
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 1);
 }

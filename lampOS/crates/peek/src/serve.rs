@@ -50,7 +50,9 @@ type Status = (Vec<UnitRow>, Option<(String, u64)>);
 /// the turns read so far with when they were last read on.
 struct Served {
     peek: Arc<Peek>,
-    status: Mutex<Option<(Instant, Status)>>,
+    /// Held across a read, so one read runs however many streams ask at
+    /// once (the reviewer on #2259, P3).
+    status: tokio::sync::Mutex<Option<(Instant, Status)>>,
     turns: Arc<Mutex<Turns>>,
     turns_read: Mutex<Option<Instant>>,
 }
@@ -71,7 +73,7 @@ pub struct Peek {
 pub fn router(peek: Arc<Peek>) -> Router {
     let served = Arc::new(Served {
         peek,
-        status: Mutex::new(None),
+        status: tokio::sync::Mutex::new(None),
         turns: Arc::default(),
         turns_read: Mutex::new(None),
     });
@@ -290,23 +292,19 @@ async fn status(State(served): State<Arc<Served>>) -> Html<String> {
 pub const PUSH_EVERY: Duration = Duration::from_millis(250);
 pub const SECTIONS_EVERY: u32 = 4;
 
-/// The units as last read, read again once they are [`STATUS_KEPT`] old.
+/// The units as last read, read again once they are [`STATUS_KEPT`] old:
+/// by one asker, while the others wait for what it reads.
 async fn status_now(served: &Arc<Served>) -> (Instant, Status) {
-    let kept = served
-        .status
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .clone()
-        .filter(|(at, _)| at.elapsed() < STATUS_KEPT);
-    if let Some(kept) = kept {
-        return kept;
+    let mut status = served.status.lock().await;
+    if let Some(kept) = status.as_ref().filter(|(at, _)| at.elapsed() < STATUS_KEPT) {
+        return kept.clone();
     }
     let (units, sessions) = (Arc::clone(&served.peek.units), served.peek.sessions.clone());
     let read = tokio::task::spawn_blocking(move || (units(), units::endpoint_worker(&sessions)))
         .await
         .unwrap_or_default();
     let at = Instant::now();
-    *served.status.lock().unwrap_or_else(PoisonError::into_inner) = Some((at, read.clone()));
+    *status = Some((at, read.clone()));
     (at, read)
 }
 
