@@ -355,7 +355,14 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                      give it something, without saying what it should do, never say you cannot; \
                      ask in a few words what it should work on, and call this with their answer.",
                     computer(place),
-                    asked_of(&all, &examples(staff), place.staff_note, computer(place)),
+                    // One of them, never all together (#1722, lamp-4ace
+                    // 00:06: "ask Claude Code to …" went to `not_for_me`).
+                    asked_of(
+                        &names(staff, "or"),
+                        &examples(staff),
+                        place.staff_note,
+                        computer(place)
+                    ),
                     read_back(place.lead_in, ", with who will do it,")
                 )
             } else {
@@ -584,6 +591,9 @@ pub fn session_note(place: &Place) -> Option<String> {
         return None;
     }
     let staff = staff_now(place);
+    // Two or more of the staff (#2297). With none read or one, which
+    // prepared 3 of 3, the note is as it was, word for word.
+    let several = choosing(place, &staff) && staff.len() >= 2;
     let whom = if choosing(place, &staff) {
         names(&staff, "or")
     } else if place.who {
@@ -606,14 +616,37 @@ pub fn session_note(place: &Place) -> Option<String> {
     } else {
         String::new()
     };
+    // Who they are, so that "ask Claude Code to …" said to the lamp is a
+    // hand-over, never talk to someone else (#1722, lamp-4ace 00:06:
+    // `not_for_me`, and "That's not mine to hand over, and nobody's asked
+    // me"); and "neither Claude Code nor Codex nor …", not "neither … or".
+    let (opening, neither) = if several {
+        let first = staff[0].kind.name;
+        (
+            format!(
+                "{} are the person's agents on their {computer}, never anyone in the room: when \
+                 the person asks you to have {whom} do something (\"ask {first} to …\", \"can you \
+                 get {first} to …\"), they are asking you to hand it over, not talking to someone \
+                 else, so never call not_for_me for it. Hand it over",
+                names(&staff, "and")
+            ),
+            names(&staff, "nor"),
+        )
+    } else {
+        (
+            format!(
+                "When the person asks to have {whom} do something, it is theirs to do, not yours: hand it over"
+            ),
+            whom.clone(),
+        )
+    };
     Some(format!(
-        "\nWhen the person asks to have {whom} do something, it is theirs to do, not yours: \
-         hand it over with start_agent_task every time, whatever it is, a story or a poem as \
+        "\n{opening} with start_agent_task every time, whatever it is, a story or a poem as \
          much as code, even one you could tell yourself, and even in the middle of a story you \
          are telling. Never do it yourself instead. A name that comes to you garbled, such as \
          \"Claude Co\" for Claude Code, still names them. Work on their {computer} is \
          theirs too, named or not.{accounts} But a story, a poem or anything else they ask of you that \
-         names neither {whom} nor work on their {computer}, however long, is yours: tell \
+         names neither {neither} nor work on their {computer}, however long, is yours: tell \
          it yourself, gladly, and never offer it to {whom} or ask whether {whom} should, even \
          after you handed something over earlier in this conversation."
     ))
@@ -4575,5 +4608,76 @@ pub(crate) mod tests {
         assert!(named_only(&flags(&[WHO_FLAG]), Some("on")));
         assert!(!named_only(&flags(&[WHO_FLAG]), Some("yes")));
         assert!(!named_only(&flags(&[]), Some("on")));
+    }
+
+    /// #1722, lamp-4ace 21 Oct 00:06, with two of the staff read (#2297):
+    /// "Hey Lamp, ask Claude Code to write a two-line poem about the rain."
+    /// was answered `not_for_me`, and "can you ask Claude Code to …" with
+    /// "That's not mine to hand over, and nobody's asked me". With two or
+    /// more of the staff, the note says they are the person's agents, never
+    /// anyone in the room, and that asking the lamp to have one of them do
+    /// something is a hand-over, not talk to someone else; the "neither"
+    /// clause reads; and `start_agent_task` asks for one of them, never all
+    /// together, inside the service's bound. With none read or one, which
+    /// prepared 3 of 3, both are as they were, word for word.
+    #[test]
+    fn asking_the_lamp_to_have_one_of_several_agents_do_something_is_a_hand_over() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _staff = STAFF_HELD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut on = place(Path::new("/run/t"), true);
+        on.asked = true;
+        let told = |place: &Place, staff: &[Member]| {
+            *STAFF.lock().unwrap() = staff.to_vec();
+            let note = session_note(place).unwrap();
+            STAFF.lock().unwrap().clear();
+            (note, declared(place, staff).remove(0))
+        };
+        for lead_in in [false, true] {
+            on.lead_in = lead_in;
+            let alone = vec![member("office-claude", "claude")];
+            for (staff, named_only) in [(Vec::new(), false), (alone.clone(), false), (alone, true)]
+            {
+                on.named_only = named_only;
+                let (note, start) = told(&on, &staff);
+                assert_eq!(
+                    note,
+                    "\nWhen the person asks to have Claude Code do something, it is theirs to do, not yours: hand it over with start_agent_task every time, whatever it is, a story or a poem as much as code, even one you could tell yourself, and even in the middle of a story you are telling. Never do it yourself instead. A name that comes to you garbled, such as \"Claude Co\" for Claude Code, still names them. Work on their office computer is theirs too, named or not. But a story, a poem or anything else they ask of you that names neither Claude Code nor work on their office computer, however long, is yours: tell it yourself, gladly, and never offer it to Claude Code or ask whether Claude Code should, even after you handed something over earlier in this conversation.",
+                    "{} of the staff, named only {named_only}",
+                    staff.len()
+                );
+                assert!(
+                    start.description.contains("whenever the person asks to have Claude Code do something (\"ask Claude Code to …\""),
+                    "{}",
+                    start.description
+                );
+            }
+            on.named_only = false;
+            let (note, start) = told(&on, &two());
+            assert!(
+                note.starts_with("\nClaude Code and Codex are the person's agents on their office computer, never anyone in the room: when the person asks you to have Claude Code or Codex do something (\"ask Claude Code to …\", \"can you get Claude Code to …\"), they are asking you to hand it over, not talking to someone else, so never call not_for_me for it. Hand it over with start_agent_task every time, whatever it is"),
+                "{note}"
+            );
+            assert!(!note.contains("it is theirs to do, not yours"), "{note}");
+            assert!(
+                note.contains("names neither Claude Code nor Codex nor work on their office computer, however long, is yours"),
+                "{note}"
+            );
+            assert!(!note.contains("neither Claude Code or"), "{note}");
+            assert!(
+                start.description.contains("whenever the person asks to have Claude Code or Codex do something (\"ask Claude Code to …\", \"get Codex to …\")"),
+                "{}",
+                start.description
+            );
+            assert!(
+                !start
+                    .description
+                    .contains("Claude Code and Codex do something")
+            );
+            assert!(start.validate().is_ok(), "{}", start.description.len());
+        }
     }
 }
