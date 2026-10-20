@@ -1115,6 +1115,7 @@ fn second_route_worker_environment(
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
+        crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1426,6 +1427,8 @@ mod tests {
                     || name == crate::speaking_faces::ENVIRONMENT
                 {
                     "on"
+                } else if name == crate::remember::FORGET_ASKED_ENVIRONMENT {
+                    "off"
                 } else if name == crate::second_provider::FIRST_WORDS_ENVIRONMENT {
                     "4"
                 } else {
@@ -1477,6 +1480,7 @@ mod tests {
                 "second",
                 vec![
                     "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
+                    "LAMP_FORGET_ASKED=off",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
