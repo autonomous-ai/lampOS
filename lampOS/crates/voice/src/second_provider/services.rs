@@ -514,7 +514,9 @@ mod tests {
     /// The next connection whose request carries `key`, the test's own, within
     /// 500 ms. Any other is answered 404 and not counted: another test's
     /// client, on a port the host has given again, made one of these count 3
-    /// for 2 in a full `--lib` run (#1569 row 50).
+    /// for 2 in a full `--lib` run (#1569 row 50). A connection that sends no
+    /// whole request head within 200 ms is passed over too, so one left open
+    /// and silent can't hold the stand-in (the reviewer on #2316).
     async fn next_ours(
         listener: &tokio::net::TcpListener,
         key: &str,
@@ -525,14 +527,16 @@ mod tests {
                 .await
                 .ok()?
                 .ok()?;
-            match head_of(&mut socket).await {
-                Some(head) if head.windows(key.len()).any(|w| w == key.as_bytes()) => {
+            let read_until =
+                until.min(tokio::time::Instant::now() + std::time::Duration::from_millis(200));
+            match tokio::time::timeout_at(read_until, head_of(&mut socket)).await {
+                Ok(Some(head)) if head.windows(key.len()).any(|w| w == key.as_bytes()) => {
                     return Some(socket);
                 }
-                Some(_) => {
+                Ok(Some(_)) => {
                     let _ = socket.write_all(NOT_HERE.as_bytes()).await;
                 }
-                None => {}
+                Ok(None) | Err(_) => {}
             }
         }
     }
@@ -620,8 +624,16 @@ mod tests {
             }
         };
         drop(tokio::net::TcpStream::connect(&address).await.unwrap());
-        assert!(ask("theirs-key").await.starts_with("HTTP/1.1 404"));
-        assert!(ask("ours-key").await.starts_with("HTTP/1.1 200"));
+        // One left open and silent is passed over, not waited on (the
+        // reviewer on #2316); the whole check is bounded, so a stand-in that
+        // waited on it fails here rather than hanging.
+        let _silent = tokio::net::TcpStream::connect(&address).await.unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            assert!(ask("theirs-key").await.starts_with("HTTP/1.1 404"));
+            assert!(ask("ours-key").await.starts_with("HTTP/1.1 200"));
+        })
+        .await
+        .expect("the stand-in waited on a silent connection");
         assert_eq!(came.await.unwrap(), 1);
     }
 
