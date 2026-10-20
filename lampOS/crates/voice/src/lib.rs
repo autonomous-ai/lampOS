@@ -57,6 +57,7 @@ pub mod first_output;
 pub mod fixture_provider;
 pub mod follows_on;
 pub mod going_on_asks;
+pub mod going_on_same_one;
 pub mod hand_controls;
 pub mod head_qualification;
 pub(crate) mod holding_answer;

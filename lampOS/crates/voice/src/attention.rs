@@ -921,6 +921,9 @@ pub struct Attention {
     /// With `spoken_to`: the request in hand was let out only as the
     /// conversation going on ([`Self::played_on_the_conversation_alone`]).
     conversation_alone: bool,
+    /// The same, with or without `spoken_to`
+    /// ([`Self::played_only_as_going_on`]).
+    going_on_alone: bool,
     /// The request in hand was judged with a conversation going on, and
     /// nobody else's line before it.
     went_on: bool,
@@ -1401,6 +1404,7 @@ impl Attention {
         let own = own_request().load(Ordering::Acquire) == request;
         self.judged_own = own;
         self.conversation_alone = false;
+        self.going_on_alone = false;
         self.went_on = false;
         let fresh = self.begun <= FRESH_REQUESTS;
         let another = self.another(room, own);
@@ -1564,8 +1568,7 @@ impl Attention {
                 || turned == Some(true)
                 || self.addressed
         };
-        self.conversation_alone = self.spoken_to
-            && !answering_another
+        self.going_on_alone = !answering_another
             && going_on
             && !(own
                 || called_in_text
@@ -1574,6 +1577,7 @@ impl Attention {
                 || turned == Some(true)
                 || self.addressed
                 || self.lamp_asked);
+        self.conversation_alone = self.spoken_to && self.going_on_alone;
         let verdict = match verdict {
             Verdict::Play(_) if self.spoken_to && !spoken_to => {
                 Verdict::Hold(if let Some(why) = another {
@@ -1698,6 +1702,16 @@ impl Attention {
 
     pub fn played_on_the_conversation_alone(&self) -> bool {
         self.conversation_alone && matches!(self.verdict, Some(Verdict::Play(_)))
+    }
+
+    /// Whether the request in hand was let out only as the conversation
+    /// going on, whether or not `spoken_to` is on: lamp-52e6 and lamp-4ace
+    /// run without it, and there [`Self::played_on_the_conversation_alone`]
+    /// is never true. The going-on holds read this one
+    /// (`LAMP_GOING_ON_SAME_ONE`, `LAMP_QUIET_GOING_ON_SAME_ONE`; 20 Oct at
+    /// 22:4x).
+    pub fn played_only_as_going_on(&self) -> bool {
+        self.going_on_alone && matches!(self.verdict, Some(Verdict::Play(_)))
     }
 
     /// Whether the answer to the request in hand was let out because the

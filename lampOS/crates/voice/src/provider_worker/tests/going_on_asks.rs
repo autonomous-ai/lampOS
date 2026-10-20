@@ -659,3 +659,25 @@ fn said_as_heard_is_read_after_messages() {
         .into();
     assert!(parse_flags(dir, &wrong).is_err());
 }
+
+/// #2191: `--going-on-same-one` comes right after `--others-answer`, as the
+/// coordinator writes them, on both routes' parsers.
+#[test]
+fn going_on_same_one_is_read_after_others_answer() {
+    let dir = std::path::Path::new("/run/test");
+    let flags: Vec<String> = [crate::others_answer::FLAG, crate::going_on_same_one::FLAG]
+        .map(String::from)
+        .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.others_answer && files.going_on_same_one);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.going_on_same_one);
+    let (_, _, files, _) = parse_flags(dir, &flags[1..]).unwrap();
+    assert!(files.going_on_same_one && !files.others_answer);
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert!(!files.going_on_same_one);
+    let wrong: Vec<String> = [crate::going_on_same_one::FLAG, crate::others_answer::FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+}

@@ -178,6 +178,11 @@ pub struct Files {
     /// nothing the lamp asked, said over its answer (`--others-answer`,
     /// `LAMP_OTHERS_ANSWER`, [`crate::others_answer`], #2136).
     pub others_answer: bool,
+    /// Whether, in a busy room, the second route's rule lets a line out as
+    /// the conversation going on only from the one the lamp answered
+    /// (`--going-on-same-one`, `LAMP_GOING_ON_SAME_ONE`,
+    /// [`crate::going_on_same_one`], #2191).
+    pub going_on_same_one: bool,
     /// Whether the second route holds an answer's hand-on to memory until
     /// it is known how much of it was heard (`--said-as-heard`,
     /// `LAMP_SAID_AS_HEARD`, [`crate::said_as_heard`]).
@@ -335,6 +340,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (holding_answer, flags) = crate::holding_answer::take(flags);
     let (messages, flags) = crate::messages::take(flags);
     let (others_answer, flags) = crate::others_answer::take(flags);
+    let (going_on_same_one, flags) = crate::going_on_same_one::take(flags);
     let (said_as_heard, flags) = crate::said_as_heard::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
@@ -384,6 +390,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         holding_answer,
         messages,
         others_answer,
+        going_on_same_one,
         said_as_heard,
     };
     Ok((continuation, sight, files, visual))
