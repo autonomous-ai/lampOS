@@ -621,7 +621,7 @@ async fn ask_observations(
 }
 
 /// How the journal names where DeepSeek is asked: never a URL.
-fn deepseek_where(hosted: &crate::second_config::Hosted) -> &'static str {
+pub(crate) fn deepseek_where(hosted: &crate::second_config::Hosted) -> &'static str {
     if hosted.deepseek_base_url.is_some() {
         "through the relay with its credential (deepseek_base_url, LAMP_SECOND_DEEPSEEK_BASE_URL)"
     } else {

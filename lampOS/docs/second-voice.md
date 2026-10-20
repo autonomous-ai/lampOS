@@ -2197,8 +2197,11 @@ lamp ended 20 steps louder. Live calls `volume_down`, then `volume_up`.
   (`/run/lampos-actions`), the way the voice reads them. On a lamp that's
   the light and volume with their installed descriptions. Without them it
   refuses to run.
-- **The arms**, on DeepSeek's own API (`hosted.deepseek_model`, thinking
-  off, the unit's `deepseek.key`):
+- **The arms**, on `hosted.deepseek_model`, thinking off, reached as the
+  live second route reaches it (#2176, `deepseek_route`): through the relay
+  with its credential (`llm_credential_file`) when `deepseek_base_url` or
+  `LAMP_SECOND_DEEPSEEK_BASE_URL` is set, else DeepSeek's own API with the
+  unit's `deepseek.key`:
   - `today`: every function;
   - `few`: narrowed as `LAMP_SECOND_FEW_TOOLS=on` narrows a spoken turn's;
   - `note`: today's, with one sentence after the changing part (`NOTE`):
@@ -2323,6 +2326,23 @@ systemd-run --pty --wait \
   /opt/lampOS/voice/current/lamp-voice probe-tools \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 20
 ```
+
+On a product lamp, which has only the relay's credential and no
+`deepseek.key`, give it the product unit's base URL
+(`deploy/product/lamp-voice.service`) instead, so it goes through the relay
+as the live route does:
+
+```sh
+systemd-run --pty --wait \
+  -E LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek \
+  /opt/lampOS/voice/current/lamp-voice probe-tools \
+  /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10
+```
+
+Its first line says which way it asks, through the relay or on DeepSeek's
+own API, as the voice's start line does: never the URL. The probe only asks the model and
+counts the functions it calls; it runs none of them, so it never writes to
+the memory store.
 
 ## Not done
 
