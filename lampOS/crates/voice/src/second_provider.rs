@@ -264,6 +264,12 @@ pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 /// `not_for_me` on it is not taken ([`Engine::answering_named_to_a_face`]).
 pub const NAMED_ALWAYS_ENVIRONMENT: &str = "LAMP_NAMED_ALWAYS";
 
+/// Where the worker reads whether the lamp's own answers to lines let out
+/// only as the conversation going on keep that conversation going: `on`, and
+/// nothing else, and they don't (the first builder's 17:2x task on Queue
+/// #1722, `Heeding::not_counting_own_answers`).
+pub const GOING_ON_NOT_OWN_ENVIRONMENT: &str = "LAMP_GOING_ON_NOT_OWN";
+
 /// What a `not_for_me` is answered in a turn named to a face
 /// ([`NAMED_ALWAYS_ENVIRONMENT`]): the model is asked once more.
 pub(crate) const NAMED_TO_A_FACE_ANSWER: &str =
@@ -355,8 +361,9 @@ pub enum Did {
     /// Its words sent so far will have been played by this time, as if the
     /// audio plays as it is sent, each packet after the one before: a
     /// conversation goes on from the end of what it said, not from when its
-    /// answer began (#1712, the first builder at 19:21).
-    Said(u64),
+    /// answer began (#1712, the first builder at 19:21). The first field is
+    /// the request its words answer (`LAMP_GOING_ON_NOT_OWN`).
+    Said(u64, u64),
 }
 /// Where the engine says what the lamp did.
 pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
@@ -3919,6 +3926,7 @@ async fn answer(
                 // before it or from now.
                 if answering && let Some(did) = &shared.did {
                     did(Did::Said(
+                        request,
                         shared.said_through(samples.len(), monotonic_us()),
                     ));
                 }

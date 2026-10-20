@@ -1984,6 +1984,18 @@ pub fn serve(
                     .is_ok_and(|heeding| heeding.named_to_a_face(request))
             }));
         }
+        // The lamp's own answers to lines let out only as the conversation
+        // going on keep no conversation going (`LAMP_GOING_ON_NOT_OWN=on`).
+        if std::env::var(crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: the lamp's answers to lines let out only as the conversation going on keep no conversation going (LAMP_GOING_ON_NOT_OWN)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.not_counting_own_answers();
+            }
+        }
         // The rule keeps the route's one reader of the Policy's decisions,
         // which a line going on reads too (`LAMP_GOING_ON_ASKS`, below).
         if let Some(verdicts) = verdicts {
@@ -2734,6 +2746,14 @@ pub(crate) struct Heeding {
     /// The request judged last, if it began with the lamp's name said to a
     /// face turned to the lamp ([`named_to_a_face`]).
     named_faced: Option<u64>,
+    /// `LAMP_GOING_ON_NOT_OWN=on` ([`Self::not_counting_own_answers`]).
+    not_own: bool,
+    /// With it: the lines let out only as the conversation going on since
+    /// the lamp last answered a line said to it. Its answers to them carry
+    /// no conversation; its other lines do, as before.
+    chain: Vec<u64>,
+    /// [`Self::said_until_us`] but for the words of answers to `chain`.
+    said_until_free_us: Option<u64>,
 }
 
 /// A line counts as begun with the lamp's name if a hearing of it began no
@@ -2818,6 +2838,12 @@ fn busy_bar(why: &str, heard: &str, lamp_asked: bool) -> Option<&'static str> {
     } else {
         None
     }
+}
+
+/// How long before `now_us` words to be played until `until_us` ended, zero
+/// while they still play.
+fn ended_ago(until_us: Option<u64>, now_us: u64) -> Option<Duration> {
+    until_us.map(|until| Duration::from_micros(now_us.saturating_sub(until)))
 }
 
 /// How long ago the lamp last said words, counted to their end: the
@@ -3061,6 +3087,9 @@ impl Heeding {
             voices: None,
             named_always: false,
             named_faced: None,
+            not_own: false,
+            chain: Vec::new(),
+            said_until_free_us: None,
         }
     }
 
@@ -3071,6 +3100,21 @@ impl Heeding {
     /// taken ([`Self::named_to_a_face`]).
     pub(crate) fn always_answering_named(&mut self) {
         self.named_always = true;
+    }
+
+    /// The lamp's own answers to lines let out only as the conversation
+    /// going on keep no conversation going (`LAMP_GOING_ON_NOT_OWN=on`, the
+    /// first builder's 17:2x task on Queue #1722): on lamp-4ace at 16:34, after
+    /// one question to the lamp, two people's own talk was answered line
+    /// after line, each answer opening the window for the next. The window
+    /// then runs from the lamp's words before the first such line, as they
+    /// stood, its answers to such lines left out, until a line said to it (a
+    /// call, a face, a reply to its question) is answered. Its other lines
+    /// (a reminder, news, a skill's say, an answer to a line said to it)
+    /// open their window as before, and a reply to the lamp's own question
+    /// is judged as before.
+    pub(crate) fn not_counting_own_answers(&mut self) {
+        self.not_own = true;
     }
 
     /// Whether `request` was judged as begun with the lamp's name said to
@@ -3124,8 +3168,11 @@ impl Heeding {
             && crate::room_told::room()
                 .lock()
                 .is_ok_and(|room| room.ended_only_by_another_voice())
+            // `LAMP_GOING_ON_NOT_OWN`: the answers to `chain` left out.
             && crate::thread::current(self.thread.as_deref(), |thread| {
-                thread.going_on(Instant::now())
+                thread
+                    .said_last_ago_but(Instant::now(), &self.chain)
+                    .is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR)
             })
             .unwrap_or_default();
         let at = voices.at_verdict(
@@ -3230,17 +3277,20 @@ impl Heeding {
         match did {
             crate::second_provider::Did::Worked(at_us) => self.attention.worked(at_us),
             crate::second_provider::Did::Spoke(at_us) => self.attention.news_told(at_us),
-            crate::second_provider::Did::Said(until_us) => {
+            crate::second_provider::Did::Said(request, until_us) => {
                 self.said_until_us = self.said_until_us.max(Some(until_us));
+                if !self.chain.contains(&request) {
+                    self.said_until_free_us = self.said_until_free_us.max(Some(until_us));
+                }
             }
         }
     }
 
     /// How long ago the lamp's words sent were played to their end
     /// ([`crate::second_provider::Did::Said`]), zero while they still play.
+    #[cfg(test)]
     fn said_ended_ago(&self, now_us: u64) -> Option<Duration> {
-        self.said_until_us
-            .map(|until| Duration::from_micros(now_us.saturating_sub(until)))
+        ended_ago(self.said_until_us, now_us)
     }
 
     /// The note `request` earned when it was judged, if any.
@@ -3411,16 +3461,32 @@ impl Heeding {
     /// What the bus and the thread say now of a line said in `began..=ended`.
     fn signs(&mut self, request: u64, (began, ended): (u64, u64)) -> Signs {
         let now = Instant::now();
-        let (said_going_on, lamp_asked, said_ago, person) =
+        // `LAMP_GOING_ON_NOT_OWN`: the lamp's answers to lines let out only
+        // as the conversation going on are left out, unless this line may
+        // answer its question.
+        let (lamp_asked, said_ago, person, but) =
             crate::thread::current(self.thread.as_deref(), |thread| {
+                let lamp_asked = thread.lamp_asked(request);
+                let but: &[u64] = if lamp_asked { &[] } else { &self.chain };
                 (
-                    thread.going_on(now),
-                    thread.lamp_asked(request),
-                    thread.said_last_ago(now),
+                    lamp_asked,
+                    thread.said_last_ago_but(now, but),
                     thread.opened_for().map(str::to_owned),
+                    !but.is_empty(),
                 )
             })
             .unwrap_or_default();
+        let said_going_on = said_ago.is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
+        let said_until_us = if but {
+            eprintln!(
+                "lamp-voice second: request {request}: the lamp's answers to {} requests (the newest {:?}), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)",
+                self.chain.len(),
+                self.chain.last()
+            );
+            self.said_until_free_us
+        } else {
+            self.said_until_us
+        };
         // A new person at the lamp begins a new session, as on Live.
         if self.session_for.as_ref() != Some(&person) {
             if self.session_for.is_some() {
@@ -3437,7 +3503,7 @@ impl Heeding {
         // which the thread keeps (#1712, the first builder at 19:21: "And what
         // about tomorrow?" 18 s after the weather line, a long answer, was
         // held in a busy room).
-        let said_ago = to_the_end(said_ago, self.said_ended_ago(monotonic_us()));
+        let said_ago = to_the_end(said_ago, ended_ago(said_until_us, monotonic_us()));
         let going_on = going_on_from(said_going_on, said_ago, called_ago);
         // What a busy room goes on by: the thread's window or the call,
         // never the quiet room's 20 s after the words (`went_on_told`).
@@ -3783,6 +3849,15 @@ impl Heeding {
         }
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
+        // `LAMP_GOING_ON_NOT_OWN`: the answer to a line let out only as the
+        // conversation going on renews nothing; one to a line said to the
+        // lamp does.
+        if self.not_own && self.alone.is_some() {
+            self.chain.push(request);
+        } else if played {
+            self.chain.clear();
+            self.said_until_free_us = self.said_until_us;
+        }
         self.busy = busy.then_some(request);
         // Its words or the name heard called the lamp, not a face alone.
         self.by_name =
@@ -4685,12 +4760,12 @@ mod tests {
         let s = Duration::from_secs;
         let mut heeding = super::Heeding::new(false, false, None, None);
         assert_eq!(heeding.said_ended_ago(100_000_000), None);
-        heeding.lamp_did(crate::second_provider::Did::Said(105_000_000));
+        heeding.lamp_did(crate::second_provider::Did::Said(1, 105_000_000));
         // Still playing, then over.
         assert_eq!(heeding.said_ended_ago(100_000_000), Some(Duration::ZERO));
         assert_eq!(heeding.said_ended_ago(114_000_000), Some(s(9)));
         // An earlier end told late moves nothing back.
-        heeding.lamp_did(crate::second_provider::Did::Said(101_000_000));
+        heeding.lamp_did(crate::second_provider::Did::Said(1, 101_000_000));
         assert_eq!(heeding.said_ended_ago(114_000_000), Some(s(9)));
         // The answer began 18 s ago and ended 9 s ago: it goes on.
         let said_ago = to_the_end(Some(s(18)), heeding.said_ended_ago(114_000_000));
@@ -4907,6 +4982,252 @@ mod tests {
         heeding.called_at = Some(Instant::now() - Duration::from_secs(10));
         assert_eq!(heeding.heed(210, said, "Okay yeah sure.", None), None);
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
+    /// The first builder's 17:2x task on Queue #1722 (lamp-4ace, the 16:34
+    /// played test): after one question to the lamp, two people's own talk
+    /// was answered line after line, "only as the conversation going on",
+    /// each answer opening the window for the next. With
+    /// `LAMP_GOING_ON_NOT_OWN=on` the lamp's answers to such lines renew
+    /// nothing: the line inside the window of the answer to the question is
+    /// judged as before, the ones after it are held, in a quiet room and in
+    /// a busy one, and after a name heard only in a busy room's sound (the
+    /// first builder's 18:20 case); a reply to the lamp's own question still
+    /// goes on.
+    #[test]
+    fn the_lamps_own_answers_to_talk_keep_no_conversation_going() {
+        let s = Duration::from_secs;
+        // Lines at a virtual second, each answered a second later if let
+        // out: `answer` says what the lamp answers it. A line with nothing
+        // heard is the lamp's own (a reminder), said at its second.
+        // `named`: the first line's name heard only in the room's sound, at
+        // that score, close to the lamp, its words not calling it.
+        let run = |not_own: bool,
+                   busy: bool,
+                   named: Option<f32>,
+                   lines: &[(u64, &str, &str)]|
+         -> Vec<bool> {
+            // The lamp's words for `request`, played to their end at virtual
+            // second `end`, told at virtual second `now` (`Did::Said`), so
+            // both the thread's window and the words' end are exercised.
+            let words_end = |heeding: &mut Heeding, request: u64, end: u64, now: u64| {
+                let end_us = (monotonic_us() + end * 1_000_000).saturating_sub(now * 1_000_000);
+                heeding.lamp_did(crate::second_provider::Did::Said(request, end_us));
+            };
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            crate::room_told::room()
+                .lock()
+                .unwrap()
+                .count_only_talk(true);
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if not_own {
+                heeding.not_counting_own_answers();
+            }
+            let mut answered: Vec<(u64, &str, &str, u64)> = Vec::new();
+            let mut was = 0;
+            let mut played = Vec::new();
+            for (request, (at, heard, answer)) in (1..).zip(lines) {
+                if heard.is_empty() {
+                    answered.push((request, heard, answer, *at));
+                    words_end(&mut heeding, request, at + 1, was);
+                    continue;
+                }
+                // Time passes: the thread's answers, the call and the words
+                // kept are that much older.
+                let passed = s(at - was);
+                was = *at;
+                let older = |until: Option<u64>| {
+                    until.map(|until| until.saturating_sub(passed.as_micros() as u64))
+                };
+                heeding.said_until_us = older(heeding.said_until_us);
+                heeding.said_until_free_us = older(heeding.said_until_free_us);
+                // Each line's own sound, a second long, at its second.
+                let said = (10_000_000 + at * 1_000_000, 11_000_000 + at * 1_000_000);
+                let now = Instant::now();
+                let mut thread = crate::thread::Thread::new();
+                for (asked, person, lamp, at_s) in &answered {
+                    let then = now - s(at - at_s);
+                    if !person.is_empty() {
+                        thread.person(person, true, then);
+                    }
+                    thread.lamp(*asked, lamp, then);
+                }
+                *crate::thread::THREAD.lock().unwrap() = thread;
+                heeding.called_at = heeding.called_at.map(|at| at - passed);
+                // Three lines left alone before the question: a busy room.
+                if busy && request == 1 {
+                    let mut room = crate::room_told::room().lock().unwrap();
+                    for other in 901..=903 {
+                        room.unanswered(other, monotonic_us());
+                    }
+                    assert_eq!(room.at(monotonic_us()), crate::room_told::Room::Busy);
+                }
+                let held = match named.filter(|_| request == 1) {
+                    Some(score) => {
+                        let mut signs = heeding.signs(request, said);
+                        signs.names = vec![(said.0 + 100_000, score)];
+                        signs.near = true;
+                        heeding.judge(request, said, heard, signs)
+                    }
+                    None => heeding.heed(request, said, heard, None),
+                };
+                if held.is_none() {
+                    answered.push((request, heard, answer, at + 1));
+                    words_end(&mut heeding, request, at + 2, was);
+                    let mut room = crate::room_told::room().lock().unwrap();
+                    room.spoke(request, monotonic_us());
+                }
+                played.push(held.is_none());
+            }
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            played
+        };
+        // A question to the lamp, then two people talking to each other: no
+        // name, no face, no reply to anything the lamp asked.
+        let quiet = [
+            (
+                0,
+                "Lamp, what's the weather today?",
+                "Sunny and warm today.",
+            ),
+            (
+                10,
+                "Did you finish the slides for Monday?",
+                "I can't see your slides.",
+            ),
+            (
+                50,
+                "Not yet, I will do them after lunch.",
+                "Lunch sounds good.",
+            ),
+            (
+                90,
+                "Do you want to grab coffee first then?",
+                "Coffee is a fine idea.",
+            ),
+            (
+                130,
+                "Sure, let me just get my jacket.",
+                "Enjoy your coffee.",
+            ),
+        ];
+        assert_eq!(
+            run(false, false, None, &quiet),
+            [true; 5],
+            "today: all answered"
+        );
+        assert_eq!(
+            run(true, false, None, &quiet),
+            [true, true, false, false, false],
+            "the lamp's own answers renew nothing"
+        );
+        // A busy room goes on 15 s from the end of the lamp's words.
+        let busy = [
+            (
+                0,
+                "Lamp, what's the weather today?",
+                "Sunny and warm today.",
+            ),
+            (
+                10,
+                "Did you finish the slides for Monday?",
+                "I can't see your slides.",
+            ),
+            (
+                24,
+                "Not yet, I will do them after lunch.",
+                "Lunch sounds good.",
+            ),
+            (
+                38,
+                "Do you want to grab coffee first then?",
+                "Coffee is a fine idea.",
+            ),
+            (52, "Sure, let me just get my jacket.", "Enjoy your coffee."),
+        ];
+        assert_eq!(
+            run(false, true, None, &busy),
+            [true; 5],
+            "today: all answered"
+        );
+        assert_eq!(
+            run(true, true, None, &busy),
+            [true, true, false, false, false]
+        );
+        // A reply to the lamp's own question goes on, and its answer renews.
+        let asked = [
+            (
+                0,
+                "Lamp, what's the weather today?",
+                "Sunny and warm today.",
+            ),
+            (
+                10,
+                "Did you finish the slides for Monday?",
+                "Shall I remind you?",
+            ),
+            (
+                50,
+                "Yes, remind me after lunch.",
+                "I will remind you at one.",
+            ),
+            (70, "Thanks, that is very helpful.", "You're welcome."),
+        ];
+        assert_eq!(run(true, false, None, &asked), [true; 4]);
+        // The reviewer's 21:39 case: once the chain is cut, a line the lamp
+        // says on its own (a reminder) opens its window as before, and the
+        // person's reply to it goes on.
+        let reminded = [
+            (
+                0,
+                "Lamp, what's the weather today?",
+                "Sunny and warm today.",
+            ),
+            (
+                10,
+                "Did you finish the slides for Monday?",
+                "I can't see your slides.",
+            ),
+            (
+                50,
+                "Not yet, I will do them after lunch.",
+                "Lunch sounds good.",
+            ),
+            (300, "", "Your tea is ready."),
+            (305, "Thanks, I'll go and get it now.", "Enjoy your tea."),
+        ];
+        assert_eq!(run(false, false, None, &reminded), [true; 4]);
+        assert_eq!(
+            run(true, false, None, &reminded),
+            [true, true, false, true],
+            "a reply to the lamp's own line goes on"
+        );
+        // The first builder's 18:20 case on lamp-4ace: a busy room, the
+        // lamp's name heard only in the room's sound (0.95) and answered,
+        // then four lines of talk not for the lamp. Today each answer lets
+        // the next out; with the switch, those after the first are held.
+        let named = [
+            (0, "What time is it now?", "It's twenty past six."),
+            (
+                10,
+                "We should leave before the traffic.",
+                "Traffic is heavy now.",
+            ),
+            (24, "Did you call the restaurant?", "I can't call them."),
+            (38, "Yes, they said seven is fine.", "Seven sounds good."),
+            (52, "Great, let me get my keys.", "Have a nice dinner."),
+        ];
+        assert_eq!(
+            run(false, true, Some(0.95), &named),
+            [true; 5],
+            "today: all answered"
+        );
+        assert_eq!(
+            run(true, true, Some(0.95), &named),
+            [true, true, false, false, false]
+        );
     }
 
     /// #1712: a line that called the lamp, let out, carries the person's
@@ -6810,6 +7131,7 @@ mod tests {
         assert!(!heeding.policy_turn(2).after_unanswered);
         // The lamp's words heard to their end 19 s ago, then 21 s ago.
         heeding.lamp_did(crate::second_provider::Did::Said(
+            1,
             lamp_ipc::monotonic_us() - 19 * S,
         ));
         heeding.judge(
@@ -6821,6 +7143,7 @@ mod tests {
         assert!(heeding.policy_turn(5).lamp_spoke_lately);
         let mut quiet = super::Heeding::new(false, true, None, None);
         quiet.lamp_did(crate::second_provider::Did::Said(
+            1,
             lamp_ipc::monotonic_us() - 21 * S,
         ));
         quiet.judge(

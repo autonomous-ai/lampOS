@@ -1864,6 +1864,36 @@ after a take-over, but now for every turn:
   unchanged, and the speaking face (`LAMP_SECOND_SPEAKING_FACE`) is not
   read here. The rule's own text call (`attention::called`) still lets out
   a line opening with a stand-in, with or without the switch.
+- **Its own answers keep nothing going** (`LAMP_GOING_ON_NOT_OWN=on`, the
+  first builder's 17:2x task on #1722). A conversation goes on, on this
+  route, by the thread's window (45 s from the start of any answer of the
+  lamp's), the 20 s after its words, a busy room's 15 s after them, or a
+  call (`Heeding::signs`, `going_on_from`, `went_on_told`). Every answer
+  renewed the first three, so one answer to two people's talk let their
+  next line out as the conversation going on, and so on: on lamp-4ace at
+  16:34 (`6225eb110c2c`), after scene 1's question, requests 31 to 35 were
+  each `its answer is played: …, only as the conversation going on`. With
+  the switch, once a line is let out only as the conversation going on
+  (`attention::Attention::played_on_the_conversation_alone`), the request
+  is kept (`Heeding::chain`), and the lamp's answers to the requests kept
+  open no window (`Thread::said_last_ago_but`; their words' end,
+  `Did::Said`, is left out too), in a quiet room or a busy one, and the
+  same-voice check's "under the mark" reads the same. Its other lines (a
+  reminder, news, Welcome back, a skill's say, an answer to a line said to
+  it) open their window as before, so a reply to them goes on (the
+  reviewer's 21:39 case: "Your tea is ready." 250 s after the chain was
+  cut, "Thanks, I'll go and get it now." 5 s later is answered). A line
+  said to the lamp (a call, a face, a reply to its question) and answered
+  empties the requests kept, and a line that may answer the lamp's own
+  question reads all its words. Still held: one person's follow-ups with no
+  name, face or question of the lamp's end 45 s (a busy room: 15 s after
+  the words) after the last answer to a line said to the lamp, however
+  many answers come between (five lines 15 s apart, the fifth held). The
+  journal says `the lamp's answers to requests [N, …], let out only as the
+  conversation going on, keep no conversation going
+  (LAMP_GOING_ON_NOT_OWN)`. Not changed: the session fact, the Policy's
+  `lamp_spoke_lately`, a checked sound's `lamp_just_asked`, and the Live
+  route.
 - **The look by its own call.** With a full look (`LAMP_EYES_LOOK_FILE` and
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::with_look`; texts are not) and
