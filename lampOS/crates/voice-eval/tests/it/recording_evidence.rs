@@ -1,5 +1,5 @@
 //! Synthetic file-only regressions. Never opens an audio device or transport.
-mod common;
+use crate::common;
 
 use lamp_sound_fixtures::hash;
 use lamp_voice_eval::{

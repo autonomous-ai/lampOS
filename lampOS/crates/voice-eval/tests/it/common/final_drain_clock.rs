@@ -225,7 +225,8 @@ pub(super) fn backend<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{session_end, start_line};
+    // `final_dispatch`, which loads this file as its `final_drain_clock`.
+    use super::super::{session_end, start_line};
     use lamp_voice_eval::{events::EventKind, runner::Backend};
     use std::process::{Child, ExitStatus, Stdio};
 

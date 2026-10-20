@@ -139,7 +139,7 @@ commits correct this without weakening packet freshness or identity checks.
 
 ## Offline regression path
 
-`tests/physical_loopback.rs` starts the real `lamp-session` subprocess and a
+`tests/it/physical_loopback.rs` starts the real `lamp-session` subprocess and a
 `fake-lamp-voice` subprocess. The fake supports both runtime command forms,
 uses the actual live `CueSink`, and receives declared stimulus intervals through
 a private fake-room socket. Cached synthetic tones validate the cache and
@@ -167,7 +167,7 @@ scheduling contention:
 
 ```sh
 cargo test --locked --offline -p lamp-voice-eval --lib
-cargo test --locked --offline -p lamp-voice-eval --test physical_loopback -- --test-threads=1
+cargo test --locked --offline -p lamp-voice-eval --test it physical_loopback:: -- --test-threads=1
 ```
 
 Local scheduling assertions are test sanity bounds, not hardware latency gates.

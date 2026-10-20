@@ -1,7 +1,7 @@
 //! Evaluator rules on imported lamp-voice traces, acoustic annotations and plan
 //! validation. Traces below follow the documented shape of retained physical
 //! trials; they are synthetic reconstructions, not the private recordings.
-mod common;
+use crate::common;
 
 use lamp_voice_eval::{
     annotations::{Annotations, AttemptAnnotation, StepAnnotation, template},

@@ -8,7 +8,7 @@
 //! Attempts run one at a time with real child processes and prepared threads.
 //! The coordinated path retains the unchanged 100 ms lateness bound, recorder
 //! lifetimes and full delayed-transport wait before actual relay registration.
-mod common;
+use crate::common;
 
 use lamp_voice_eval::{
     evaluate,

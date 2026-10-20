@@ -35,7 +35,7 @@ and does not label it background by inventing an infinite endpoint. Known
 interval comparisons use saturating tolerance arithmetic. Runtime completion
 checks still report an unterminated turn separately.
 
-`tests/acceptance_boundaries.rs` uses synthetic records to cover no human speech,
+`tests/it/acceptance_boundaries.rs` uses synthetic records to cover no human speech,
 a delayed human response, ambiguous echo versus interruption, explicitly
 attributed imports, and an unfinished background input. Before the fix, four
 regressions failed: two false passes, one false rejection and one integer

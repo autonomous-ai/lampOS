@@ -2,7 +2,7 @@
 //! real local pipe transport. A shell script stands in for the Lamp relay and
 //! writes scripted relay lines; a recording-only player shows whether audio
 //! would have started. Nothing is played.
-mod common;
+use crate::common;
 #[path = "common/final_drain_clock.rs"]
 mod final_drain_clock;
 

@@ -1,5 +1,5 @@
 //! Synthetic trace regression: playback retirement is not whole-turn completion.
-mod common;
+use crate::common;
 use lamp_voice_eval::{
     evaluate::{self, AnswerOutcome, Outcome},
     import::{ImportOptions, import_trace},

@@ -2,7 +2,7 @@
 //! an explicit stop, a closed runner transport, the hard deadline and a
 //! runtime that ignores SIGTERM. Each keeps its stop cause, signal, exit,
 //! forced kill and confirmed reap separately. No hardware; no audio.
-mod common;
+use crate::common;
 #[path = "common/serve_relay_clock.rs"]
 mod serve_relay_clock;
 

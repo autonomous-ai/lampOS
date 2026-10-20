@@ -238,7 +238,7 @@ slowest; blinks follow the pace; the ring's reader takes the breath from
 Mood's fresh, valid state on a real bus and nothing else; Expression's head
 holds the phase it is given and goes back to the plain breath without a
 leap (`alive_engine.rs`); and the ring's and the head's breath are the same
-at every phase and with none (`crates/voice-eval/tests/one_breath.rs`). Not
+at every phase and with none (`crates/voice-eval/tests/it/one_breath.rs`). Not
 yet seen on a lamp.
 
 Which way the ring counts was measured on lamp-4ace on 2026-10-14 at 19:54:

@@ -1,7 +1,7 @@
 //! The Lamp-side relay (`lamp-session`) with a shell script standing in for
 //! lamp-voice. Each case checks one explicit framing, trace or cleanup
 //! failure; nothing is truncated, lossily repaired or left running.
-mod common;
+use crate::common;
 
 use lamp_voice_eval::physical::{
     protocol::{MAX_LINE_BYTES, SessionLine},

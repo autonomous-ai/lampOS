@@ -3,7 +3,7 @@
 //! (`lamp-v2-chat` `3998a8dc`, `coordination/recording-import-examples.json`);
 //! only frame counts and digests are adapted to a generated WAV. File-only:
 //! no audio device or transport is opened.
-mod common;
+use crate::common;
 
 use lamp_sound_fixtures::hash;
 use lamp_voice_eval::{
@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fs, path::Path};
 
-const EXAMPLES: &str = include_str!("fixtures/recording-import-examples.json");
+const EXAMPLES: &str = include_str!("../fixtures/recording-import-examples.json");
 const FRAMES: u32 = 32_000;
 
 fn examples() -> Value {

@@ -1,6 +1,6 @@
 //! Fake-runtime scenarios: the runner's event triggering and the evaluator's
 //! findings against lamp-voice's directed turn policy. No audio is produced.
-mod common;
+use crate::common;
 
 use lamp_voice_eval::{
     evaluate::{self, AnswerOutcome, CheckStatus, FindingKind, Metric, Outcome},
@@ -900,7 +900,7 @@ fn multiple_generations_of_one_turn_still_wait_for_completion_and_keep_overlap()
 fn retained_v1_plan_bytes_still_parse_with_occurrence_retirement_triggers() {
     let s = setup();
     let old = LoadedPlan::parse(
-        include_str!("../../../fixtures/voice-eval-v1.json"),
+        include_str!("../../../../fixtures/voice-eval-v1.json"),
         &s.catalog,
     )
     .unwrap();
@@ -924,7 +924,7 @@ fn retained_v1_plan_bytes_still_parse_with_occurrence_retirement_triggers() {
 fn a_late_line_after_two_asides_is_played_25_s_and_10_s_after_the_second() {
     let catalog = StimulusCatalog::load().unwrap();
     let plan = LoadedPlan::parse(
-        include_str!("../../../fixtures/voice-eval-late-cut-in-v1.json"),
+        include_str!("../../../../fixtures/voice-eval-late-cut-in-v1.json"),
         &catalog,
     )
     .unwrap();

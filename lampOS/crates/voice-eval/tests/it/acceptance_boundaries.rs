@@ -1,5 +1,5 @@
 //! Synthetic records exercise evidence boundaries, not physical speech quality.
-mod common;
+use crate::common;
 
 use lamp_voice_eval::{
     evaluate::{self, CheckStatus, FindingKind, Outcome},
