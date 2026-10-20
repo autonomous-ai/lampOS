@@ -27,3 +27,18 @@ Ready for lamp-voice: no
   is done on the Mac, from `f524712bf`. No lamp was touched. Its findings
   are posted on #1722 for the first builder and twelve, and go into the
   review once the issue exists.
+
+## 2026-10-20: #2176 taken (the memory review)
+
+Ready for lamp-voice: no
+
+- The first builder opened #2176 at 12:1x +07, labelled `builder:friday`,
+  as Friday's one task. Taken at 12:15 (`status:taken`, session
+  `03bc4e44`), the first "taken" comment.
+- Rechecked at lamp-voice `be278c7da` and #1712's `9ad9416ad`: findings 1
+  (`journal_inhibited` never cleared) and 2 (linked kept facts expire, the
+  expiry at `days.rs:337`) still hold on both.
+- Order: finding 2 first (a test, then the fix: no shipped lamp makes such a
+  fact yet), finding 1's plan posted on #2176 for Twelve and Fourth before
+  any code, then 3 and 4. lamp-06c1 waits for El's release after the
+  re-set-up.
