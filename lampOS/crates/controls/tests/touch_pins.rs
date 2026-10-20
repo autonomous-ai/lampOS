@@ -507,8 +507,15 @@ fn the_products_files_one_release_ahead_are_read_and_their_new_fields_named() {
 fn privacy_keys_and_bad_values_are_still_refused_and_no_value_is_shown() {
     let root = Root::new();
     let path = root.0.join("controls-pins.json");
-    let pins = product("controls-pins.json");
-    assert!(pins.get("privacy").is_none());
+    // The product's pins name the privacy switch since the privacy route
+    // went on in the product (9ae36ac4e). These cases start from them
+    // without it, a file without `privacy`, and the last reads them whole.
+    let mut pins = product("controls-pins.json");
+    let switch = pins
+        .as_object_mut()
+        .unwrap()
+        .remove("privacy")
+        .expect("the product's pins name the privacy switch");
     let refused = |value: &serde_json::Value| {
         fs::write(&path, serde_json::to_vec_pretty(value).unwrap()).unwrap();
         TouchPinsConfig::read(&path).unwrap_err().to_string()
@@ -564,6 +571,13 @@ fn privacy_keys_and_bad_values_are_still_refused_and_no_value_is_shown() {
     fs::write(&path, serde_json::to_vec_pretty(&pins).unwrap()).unwrap();
     let (read, line) = TouchPinsConfig::read(&path).unwrap();
     assert_eq!((read.privacy, line), (None, None));
+    // As the product ships them, the switch is read with the rest.
+    let mut shipped = pins.clone();
+    shipped["privacy"] = switch;
+    fs::write(&path, serde_json::to_vec_pretty(&shipped).unwrap()).unwrap();
+    let (read, line) = TouchPinsConfig::read(&path).unwrap();
+    assert!(read.privacy.is_some(), "{read:?}");
+    assert_eq!(line, None);
 }
 
 #[test]
