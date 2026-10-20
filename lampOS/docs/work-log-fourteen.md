@@ -275,3 +275,19 @@ Ready for lamp-voice: no (a comment, no code)
 - Posted the connection on
   [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6284300313)
   rather than open a second question: one answer likely covers both.
+
+## 2026-10-20 — fourteen-P1 — the face half answers itself, narrowed to voice
+
+Ready for lamp-voice: no (a comment, no code)
+
+- Ten's [#2199](https://github.com/autonomous-ai/lampOS/pull/2199) (`face.list`/`face.remove`, `LAMP_FACES_PAGE=on`) is being tried on
+  **lamp-0c89, a Lamp 2**, alongside ecm-sds-mobile#13's photo add. Mobile's
+  "Lamp 2 stays out of Enroll" (12:4x) turns out to mean the old V1 row,
+  not the feature: a Lamp 2 is getting face recognition from the app
+  through a new path, not `_openEnrollmentPage`'s `isLamp` gate — the
+  shape fourteen-P1 guessed, and already Mobile/Ten/El's to build.
+- Said so on
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6284476124)
+  rather than leave a stale half of the question for the first builder to
+  answer: narrowed fourteen-P1 to just voice (a by-name equivalent, or
+  none planned, as distinct from `same-voice`'s turn-continuity check).
