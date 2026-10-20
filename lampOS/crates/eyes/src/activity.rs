@@ -59,10 +59,12 @@ const MOST_PRINTS: usize = 6;
 const CHECK_AFTER_US: u64 = 2_000_000;
 const CHECK_EVERY_US: u64 = 2_000_000;
 /// Standing up: within this long before the face was lost, it rose by
-/// [`STOOD_RISE`] of its height and shrank to [`STOOD_SHRINK`] of it.
+/// [`STOOD_RISE`] of its height. Its size is not asked: on lamp-52e6 the
+/// lead stood straight up and the face rose 1.90 of its height at 1.02 as
+/// tall, out of the picture's top (row 14 try 4, 20 Oct, #2196's line); a
+/// level camera sees a person rise, not move away.
 const STOOD_WITHIN_US: u64 = 2_000_000;
 const STOOD_RISE: f32 = 0.5;
-const STOOD_SHRINK: f32 = 0.85;
 /// And was not seen again for this long.
 const STOOD_GONE_US: u64 = 2_000_000;
 /// The side of the picture someone left by: their last centre across it,
@@ -426,11 +428,11 @@ impl Judge {
                 last.height / height,
             );
             self.lost_line = Some(format!(
-                "sitter's face lost: over its last {} looks it rose {rise:.2} of its height (standing up needs {STOOD_RISE:.2}) and was {size:.2} as tall (needs {STOOD_SHRINK:.2} or less), last {:.2} across, {:.2} tall: {}",
+                "sitter's face lost: over its last {} looks it rose {rise:.2} of its height (standing up needs {STOOD_RISE:.2}) and was {size:.2} as tall, last {:.2} across, {:.2} tall: {}",
                 self.recent.len(),
                 last.across,
                 last.height,
-                if rise >= STOOD_RISE && size <= STOOD_SHRINK {
+                if rise >= STOOD_RISE {
                     "rising"
                 } else {
                     "not standing up"
@@ -443,7 +445,6 @@ impl Judge {
                 .is_some_and(|last| now_us.saturating_sub(last) <= STOOD_WITHIN_US)
             && let (Some((_, first)), Some((_, last))) = (self.recent.front(), self.recent.back())
             && first.centre_y - last.centre_y >= STOOD_RISE * first.height
-            && last.height <= STOOD_SHRINK * first.height
         {
             let sitting = self
                 .sitting_from
@@ -908,7 +909,7 @@ mod tests {
     }
 
     #[test]
-    fn standing_up_is_said_once_when_the_face_rises_shrinks_and_is_gone() {
+    fn standing_up_is_said_once_when_the_face_rises_and_is_gone() {
         let mut judge = seated();
         looks(&mut judge, 125, 130, Some(SEATED));
         // Rising out of the chair over a second, then gone.
@@ -1060,5 +1061,60 @@ mod tests {
         // The nose 20 below the eyes of a 40 eyes-to-mouth span: 0.5.
         assert!((look.pitch - 0.5).abs() < 1e-6);
         assert!(Look::all(&[], (320, 240)).is_empty());
+    }
+
+    /// Row 14 try 4 on lamp-52e6 (#2196's line): the lead stood straight up
+    /// and the face rose 1.90 of its height at the same size, out of the
+    /// picture; on lamp-75c9 it rose and grew. Both are standing up; a face
+    /// only turned (no rise) is not.
+    #[test]
+    fn a_face_rising_out_of_the_picture_at_the_same_size_is_standing_up() {
+        let mut judge = seated();
+        looks(&mut judge, 125, 130, Some(SEATED));
+        for (k, centre) in [0.45, 0.35, 0.22, 0.10].iter().enumerate() {
+            judge.looked(
+                130 * S + k as u64 * 250_000,
+                &[Look {
+                    centre_y: *centre,
+                    ..SEATED
+                }],
+            );
+        }
+        judge.looked(131 * S, &[]);
+        let line = judge.lost_journal().unwrap();
+        assert!(
+            line.contains("as tall") && line.ends_with(": rising"),
+            "{line}"
+        );
+        judge.looked(133 * S, &[]);
+        assert!(judge.stood_up(133 * S).is_some());
+        // lamp-75c9 (Nine, #1678): leaning toward the lamp first, then up,
+        // the face rose 0.84 of its height and grew to 1.30 as tall as it
+        // sat. Standing up too.
+        let mut judge = seated();
+        looks(&mut judge, 125, 130, Some(SEATED));
+        for (k, (centre, grown)) in [(0.45, 1.0), (0.40, 1.15), (0.33, 1.25), (0.265, 1.30)]
+            .iter()
+            .enumerate()
+        {
+            judge.looked(
+                130 * S + k as u64 * 250_000,
+                &[Look {
+                    centre_y: *centre,
+                    height: SEATED.height * grown,
+                    ..SEATED
+                }],
+            );
+        }
+        judge.looked(131 * S, &[]);
+        let line = judge.lost_journal().unwrap();
+        assert!(
+            line.contains("rose 0.84 of its height")
+                && line.contains("was 1.30 as tall")
+                && line.ends_with(": rising"),
+            "{line}"
+        );
+        judge.looked(133 * S, &[]);
+        assert!(judge.stood_up(133 * S).is_some());
     }
 }
