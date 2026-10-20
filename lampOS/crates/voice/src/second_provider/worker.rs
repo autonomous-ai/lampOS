@@ -1892,6 +1892,19 @@ pub fn serve(
             ),
             (_, None) => {}
         }
+        // The name heard only in the room's sound opens nothing alone
+        // (`LAMP_NAME_SECOND_SIGN=on`, the first builder at 21:03 on
+        // #1722).
+        if std::env::var(crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: the lamp's name heard only in the room's sound counts only with a second sign: a face turned to it, said close to it, or its words calling it (LAMP_NAME_SECOND_SIGN)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.ask_a_second_sign_of_the_name(true);
+            }
+        }
         // Someone else's answer left alone (`LAMP_OTHERS_ANSWER=on`,
         // #2136): the rule learns which line began over the lamp's answer.
         if files.others_answer
@@ -2977,6 +2990,7 @@ fn hearing_hook(
 }
 
 /// What the bus and the thread say as a spoken turn is judged.
+#[derive(Clone)]
 pub(crate) struct Signs {
     pub room: crate::room_told::Room,
     pub going_on: bool,
@@ -3393,8 +3407,24 @@ impl Heeding {
             continues_from,
             ..self.signs(request, said)
         };
-        self.note_the_name(request, said, &signs);
-        self.judge(request, said, heard, signs)
+        self.heed_signs(request, said, heard, signs)
+    }
+
+    /// [`Self::heed`] once the signs are read: the line judged, then its
+    /// name note, which a name dropped in the judging does not earn
+    /// (`LAMP_NAME_SECOND_SIGN=on`, the reviewer's P3 on #2313).
+    fn heed_signs(
+        &mut self,
+        request: u64,
+        said: (u64, u64),
+        heard: &str,
+        signs: Signs,
+    ) -> Option<&'static str> {
+        let verdict = self.judge(request, said, heard, signs.clone());
+        if self.noted.is_none_or(|(judged, _)| judged != request) {
+            self.note_the_name(request, said, &signs);
+        }
+        verdict
     }
 
     /// What the Policy's gate is told of `request`, as the Live worker
@@ -3600,6 +3630,16 @@ impl Heeding {
         // builder on #1712, 20:22 and 20:29).
         if attention.judges_by_day() {
             attention.set_night((self.night)());
+        }
+        // `LAMP_NAME_SECOND_SIGN=on`: the name heard only in the room's
+        // sound needs a second sign; the eyes are read for it whatever the
+        // rule's form.
+        if self.attention.weigh_the_name(signs.turned) {
+            eprintln!(
+                "lamp-voice second: request {request}: its name, heard only in the room's sound, counts for nothing alone: nobody turned to the lamp, not said close to it, its words not calling it; the model is not told it was heard (LAMP_NAME_SECOND_SIGN)"
+            );
+            // The name note goes with the name (`heed_signs`).
+            self.noted = Some((request, None));
         }
         let turned = signs.turned.filter(|_| self.strict);
         let (going_on, other_voice) = self.voice_going_on(request, signs.going_on);
@@ -6427,6 +6467,142 @@ mod tests {
         assert_eq!(judged(true, true), None, "at night, played");
         assert_eq!(judged(false, false), None, "with on alone, by day");
         assert_eq!(judged(false, true), None, "with on alone, at night");
+    }
+
+    /// The 18:20 shape on lamp-4ace on 2026-10-20 (and 18:16, 18:17): the
+    /// name heard only in the room's sound at 0.9 to 0.95, nobody turned to
+    /// the lamp, nothing close, no call in the words, let the line out
+    /// ("its name was heard in the room's sound"), and the four lines after
+    /// it out as the conversation going on. With
+    /// `LAMP_NAME_SECOND_SIGN=on` the first is held, so no call opens
+    /// a conversation and the four are held too; without it, as before.
+    /// Quiet room and busy room, with `--spoken-to`.
+    #[test]
+    fn with_a_second_sign_asked_a_name_heard_only_in_the_rooms_sound_opens_nothing() {
+        use crate::room_told::Room;
+        let talk = [
+            "We should move the review to Thursday.",
+            "Did anyone book the room for that?",
+            "I think Sam has the slides already.",
+            "Then let us send the invite this afternoon.",
+        ];
+        for room in [Room::Quiet, Room::Busy] {
+            for on in [false, true] {
+                let mut heeding = room_name_heeding(on);
+                let first = heeding.judge(
+                    896,
+                    (10_000_000, 11_500_000),
+                    "So where do we put the lamp review?",
+                    room_name_signs(room, false, None, false, vec![(9_800_000, 0.95)]),
+                );
+                assert_eq!(first.is_none(), !on, "{room:?} {on}: the first line");
+                // Going on from the call let out, as `signs` reads it.
+                for (request, line) in (897..).zip(talk) {
+                    let going_on = heeding.called_at.is_some();
+                    let held = heeding.judge(
+                        request,
+                        (20_000_000, 21_500_000),
+                        line,
+                        room_name_signs(room, going_on, None, false, Vec::new()),
+                    );
+                    assert_eq!(held.is_none(), !on, "{room:?} {on}: {line}");
+                }
+            }
+        }
+    }
+
+    /// With `LAMP_NAME_SECOND_SIGN=on`, the name heard only in the
+    /// room's sound counts with a second sign: a face turned to the lamp,
+    /// said close to it, or its words calling it; at any score, the plain
+    /// hearing's 0.999 too. Quiet room and busy room.
+    #[test]
+    fn with_a_second_sign_asked_a_name_heard_in_the_rooms_sound_counts_with_one() {
+        use crate::room_told::Room;
+        let named = |score| vec![(9_800_000, score)];
+        let plain = "What is on my calendar today?";
+        for room in [Room::Quiet, Room::Busy] {
+            let judged = |turned, near, heard, score| {
+                room_name_heeding(true).judge(
+                    896,
+                    (10_000_000, 11_500_000),
+                    heard,
+                    room_name_signs(room, false, turned, near, named(score)),
+                )
+            };
+            assert_eq!(
+                judged(Some(true), false, plain, 0.95),
+                None,
+                "{room:?}: turned"
+            );
+            assert_eq!(judged(None, true, plain, 0.95), None, "{room:?}: near");
+            assert_eq!(
+                judged(None, false, "Hey Lamp, what is on my calendar today?", 0.95),
+                None,
+                "{room:?}: called in its words"
+            );
+            assert!(
+                judged(Some(false), false, plain, 0.95).is_some(),
+                "{room:?}"
+            );
+            assert!(
+                judged(None, false, plain, 0.999).is_some(),
+                "{room:?}: plainly"
+            );
+            assert_eq!(judged(Some(true), false, plain, 0.999), None, "{room:?}");
+        }
+    }
+
+    /// The reviewer's P3 on #2313: with `LAMP_NAME_NOTE=on`, a name the
+    /// switch drops is not told to the model either; without the switch,
+    /// or with a second sign, it is.
+    #[test]
+    fn a_name_the_second_sign_drops_earns_no_name_note() {
+        use crate::room_told::Room;
+        let noted = |on: bool, turned| {
+            let mut heeding = room_name_heeding(on);
+            heeding.telling_the_name(true, false);
+            heeding.heed_signs(
+                896,
+                (10_000_000, 11_500_000),
+                "What is on my calendar today?",
+                room_name_signs(Room::Quiet, false, turned, false, vec![(10_200_000, 0.95)]),
+            );
+            heeding.name_note_for(896)
+        };
+        assert_eq!(noted(true, None), None, "dropped");
+        assert_eq!(noted(false, None), Some(crate::called::note(false)), "off");
+        assert_eq!(
+            noted(true, Some(true)),
+            Some(crate::called::note(false)),
+            "turned"
+        );
+    }
+
+    /// The rule with `--spoken-to`, strict, and the eyes and the voice's
+    /// closeness read; the switch when `on`.
+    fn room_name_heeding(on: bool) -> super::Heeding {
+        let mut heeding = super::Heeding::new(true, true, None, None);
+        heeding.attention.speak_when_spoken_to(true);
+        heeding.attention.ask_a_second_sign_of_the_name(on);
+        heeding
+    }
+
+    fn room_name_signs(
+        room: crate::room_told::Room,
+        going_on: bool,
+        turned: Option<bool>,
+        near: bool,
+        names: Vec<(u64, f32)>,
+    ) -> super::Signs {
+        super::Signs {
+            room,
+            going_on,
+            lamp_asked: false,
+            turned,
+            names,
+            near,
+            continues_from: None,
+        }
     }
 
     /// #2191, `LAMP_NAMED_ALWAYS=on`: in a busy room a line that begins
