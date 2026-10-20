@@ -606,9 +606,10 @@ build). On a core this fast the share of a core is at the noise floor both
 ways; lamp-4ace's `pidstat` is what counts for it. The rig sends
 the speaker's render beside each block, so these numbers hold only when
 the render comes with each block. With the render 5 ms after each block,
-`with_the_render_5_ms_after_each_block_every_block_is_read_within_a_ms`
-(the same file) holds each read within 1 ms of the block: the wait follows
-the microphone, not the render:
+`with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms`
+(the same file) holds all but a few reads within 1 ms of the block, at most
+5 of 200 slower when the runner takes the capture thread off its core (#1569
+row 41): the wait follows the microphone, not the render:
 
 | | wakeups/s | capture thread | block read after it was there | frame sent after it was there |
 |---|---|---|---|---|
