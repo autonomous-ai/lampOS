@@ -137,6 +137,11 @@ pub const NEEDS_ENVIRONMENT: &str = "LAMP_TASKS_NEEDS";
 pub const NEEDS_FLAG: &str = "--tasks-needs";
 /// A skill may be made by voice (`crate::made_skill`, `LAMP_MAKE_SKILL=on`).
 pub const MAKE_SKILL_FLAG: &str = "--tasks-make-skill";
+/// Where it reads whether work goes only to the agent the person named
+/// ([`Place::named_only`], #1722). `on` only, and only with
+/// [`WHO_ENVIRONMENT`].
+pub const NAMED_ONLY_ENVIRONMENT: &str = "LAMP_TASKS_NAMED_ONLY";
+pub const NAMED_ONLY_FLAG: &str = "--tasks-named-only";
 pub const DEFAULT_TARGET: &str = "office";
 /// The model's two functions.
 pub const START: &str = "start_agent_task";
@@ -262,9 +267,35 @@ fn staff_now(place: &Place) -> Vec<Member> {
 }
 
 /// The person may name one of them: the switch is on and there is more
-/// than one.
+/// than one, or, with [`NAMED_ONLY_FLAG`], any at all, so that a name of
+/// one who isn't set up is heard as such (#1722).
 fn choosing(place: &Place, staff: &[Member]) -> bool {
-    place.who && staff.len() >= 2
+    place.who && (staff.len() >= 2 || (place.named_only && !staff.is_empty()))
+}
+
+/// The agent the voice knows that `said` names but who isn't among the
+/// staff, with [`NAMED_ONLY_FLAG`]: as the person calls them. None for one
+/// of the staff, a name the voice doesn't know, or without the switch.
+fn not_among(place: &Place, staff: &[Member], said: &str) -> Option<&'static str> {
+    if !place.named_only {
+        return None;
+    }
+    let said = plain(said);
+    let kind = KINDS
+        .iter()
+        .find(|kind| kind.close.contains(&said.as_str()))?;
+    (!staff.iter().any(|member| member.kind.name == kind.name)).then_some(kind.name)
+}
+
+/// What the model is told when the person named an agent the voice knows
+/// that isn't set up on this lamp (#1722): plainly that, and that nothing
+/// went to anyone else.
+fn named_not_set_up(who: &str) -> Value {
+    json!({"error": format!(
+        "Nothing was handed over: {who} isn't set up on this lamp. Say so plainly in a few \
+         words (\"{who} isn't set up on this lamp.\"), and do not give the work to anyone \
+         else unless the person asks you to."
+    )})
 }
 
 /// What `start_agent_task`'s description asks to be said, and when: after
@@ -344,10 +375,19 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                     "task": task,
                     "who": {
                         "type": "string",
-                        "enum": who,
+                        "enum": if place.named_only { agent_names().to_vec() } else { who },
                         "description": format!(
-                            "Who does it, if the person named one: {}. Leave it out if they named nobody: then {default} does it.{unsure}",
-                            sounds.join("; ")
+                            "Who does it, if the person named one: {}.{} Leave it out if they named nobody: then {default} does it.{unsure}",
+                            sounds.join("; "),
+                            if place.named_only {
+                                format!(
+                                    " Set up on this lamp: {all}, and nobody else. If they named \
+                                     another of these, give that name: you will be told it isn't \
+                                     set up, and nothing goes to anyone else."
+                                )
+                            } else {
+                                String::new()
+                            }
                         )
                     }
                 },
@@ -630,7 +670,10 @@ fn named<'a>(staff: &'a [Member], said: &str) -> Option<&'a Member> {
 /// Which of the staff the heard words of a request name, as the person
 /// calls them, in the order first named ([`crate::staff_note`]): the staff
 /// as last read, or Claude Code alone when the person may not name anyone
-/// (all work goes there). Empty when the words name nobody.
+/// (all work goes there). With [`NAMED_ONLY_FLAG`] and the staff read, any
+/// agent the voice knows, set up or not, so that "ask Codex" is handed to
+/// `start_agent_task` and answered there (#1722). Empty when the words name
+/// nobody.
 pub fn named_in_words(place: &Place, heard: &str) -> Vec<&'static str> {
     let staff = staff_now(place);
     let kinds: Vec<&'static Kind> = if staff.is_empty() {
@@ -638,6 +681,14 @@ pub fn named_in_words(place: &Place, heard: &str) -> Vec<&'static str> {
             .iter()
             .filter(|kind| kind.name == CLAUDE_CODE)
             .collect()
+    } else if choosing(place, &staff) && place.named_only {
+        let mut kinds: Vec<&'static Kind> = Vec::new();
+        for kind in &KINDS {
+            if !kinds.iter().any(|known| known.name == kind.name) {
+                kinds.push(kind);
+            }
+        }
+        kinds
     } else {
         staff.iter().map(|member| member.kind).collect()
     };
@@ -729,6 +780,11 @@ fn chosen<'a>(
     match said {
         None => Ok(default_member(staff, &place.target)),
         Some(said) => named(staff, said).map(Some).ok_or_else(|| {
+            // One the voice knows, not set up here: said so, and never
+            // given to another (#1722).
+            if let Some(who) = not_among(place, staff, said) {
+                return named_not_set_up(who);
+            }
             json!({"error": format!(
                 "Nothing was done: nobody by that name works here. Ask the person who should do it: {}.",
                 names(staff, "or")
@@ -1073,11 +1129,16 @@ pub struct Place {
     /// The model may ask for a skill to be made ([`MAKE_SKILL_FLAG`],
     /// `crate::made_skill`).
     pub make_skill: bool,
+    /// Work goes only to the agent the person named ([`NAMED_ONLY_FLAG`],
+    /// #1722): with the staff read, `who` is offered even with one of
+    /// them, as any agent the voice knows, and one named who isn't set up
+    /// prepares nothing and is said not to be.
+    pub named_only: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
 pub fn arguments_from_environment() -> Vec<String> {
-    arguments(
+    let mut arguments = arguments(
         std::env::var(ENVIRONMENT).ok().as_deref(),
         std::env::var(TARGET_ENVIRONMENT).ok().as_deref(),
         std::env::var(WHO_ENVIRONMENT).ok().as_deref(),
@@ -1089,7 +1150,20 @@ pub fn arguments_from_environment() -> Vec<String> {
         std::env::var(crate::made_skill::ENVIRONMENT)
             .ok()
             .as_deref(),
-    )
+    );
+    if named_only(
+        &arguments,
+        std::env::var(NAMED_ONLY_ENVIRONMENT).ok().as_deref(),
+    ) {
+        arguments.push(NAMED_ONLY_FLAG.to_owned());
+    }
+    arguments
+}
+
+/// Whether [`NAMED_ONLY_FLAG`] goes after `arguments`: `on`, and only with
+/// the tasks part and [`WHO_FLAG`], since it is about who is named.
+fn named_only(arguments: &[String], value: Option<&str>) -> bool {
+    value == Some("on") && arguments.iter().any(|flag| flag == WHO_FLAG)
 }
 
 // One value a switch, as the environment gives them, in their flags' order.
@@ -1148,7 +1222,7 @@ fn alias(text: &str) -> bool {
 
 /// Take a leading `--tasks-dir DIR [--tasks-target ALIAS] [--tasks-who]
 /// [--tasks-lead-in] [--tasks-asked [--tasks-accounts]] [--tasks-machine-names]
-/// [--tasks-needs PATH] [--tasks-make-skill]`
+/// [--tasks-needs PATH] [--tasks-make-skill] [--tasks-named-only]`
 /// off the flags.
 pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
     let [flag, rest @ ..] = flags else {
@@ -1205,6 +1279,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
         [flag, rest @ ..] if flag == MAKE_SKILL_FLAG => (true, rest),
         _ => (false, rest),
     };
+    let (named_only, rest) = match rest {
+        [flag, rest @ ..] if flag == NAMED_ONLY_FLAG && who => (true, rest),
+        _ => (false, rest),
+    };
     Ok((
         Some(Place {
             directory: PathBuf::from(directory),
@@ -1217,6 +1295,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
             needs,
             staff_note: false,
             make_skill,
+            named_only,
         }),
         rest,
     ))
@@ -1777,6 +1856,7 @@ pub(crate) mod tests {
             needs: needs.map(PathBuf::from),
             staff_note: false,
             make_skill: false,
+            named_only: false,
         };
         let told = |place: &Place, name: &str, args: Value| {
             let call = ToolCall {
@@ -2002,6 +2082,7 @@ pub(crate) mod tests {
                 needs: None,
                 staff_note: false,
                 make_skill: false,
+                named_only: false,
             })
         );
         assert_eq!(rest, &flags[2..]);
@@ -2042,7 +2123,14 @@ pub(crate) mod tests {
     pub(crate) static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
     /// Held by each test that writes or reads the shared [`STAFF`].
-    static STAFF_HELD: Mutex<()> = Mutex::new(());
+    pub(crate) static STAFF_HELD: Mutex<()> = Mutex::new(());
+
+    /// The staff and any task prepared forgotten, for a test elsewhere
+    /// that read or prepared them.
+    pub(crate) fn forget_staff() {
+        STAFF.lock().unwrap().clear();
+        *PENDING.lock().unwrap() = None;
+    }
 
     /// The reviewer on #1446: a named member keeps its own engine through
     /// `run`. Codex is named, its `office-codex` is gone, and only `office`
@@ -2149,6 +2237,7 @@ pub(crate) mod tests {
             needs: None,
             staff_note: false,
             make_skill: false,
+            named_only: false,
         };
         let not_set_up = "Claude Code isn't set up for the lamp yet, so this can't be handed over. \
                           Say so plainly in a few words: it needs setting up on the computer first.";
@@ -2334,6 +2423,7 @@ pub(crate) mod tests {
             needs: None,
             staff_note: false,
             make_skill: false,
+            named_only: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -2413,6 +2503,7 @@ pub(crate) mod tests {
             needs: None,
             staff_note: false,
             make_skill: false,
+            named_only: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -2500,6 +2591,7 @@ pub(crate) mod tests {
             needs: None,
             staff_note: false,
             make_skill: false,
+            named_only: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -2552,6 +2644,7 @@ pub(crate) mod tests {
             needs: None,
             staff_note: false,
             make_skill: false,
+            named_only: false,
         };
         let call = |task: &str| ToolCall {
             id: "c".into(),
@@ -2606,6 +2699,7 @@ pub(crate) mod tests {
             needs: None,
             staff_note: false,
             make_skill: false,
+            named_only: false,
         };
         let task = json!({"ok":true,"text":"Suggest three names","target":{"engine":"claude"},
             "observations":[{"id":4,"state":"idle"}]});
@@ -2682,6 +2776,7 @@ pub(crate) mod tests {
             needs: None,
             staff_note: false,
             make_skill: false,
+            named_only: false,
         };
         let seen = tasks_part(
             directory,
@@ -3145,6 +3240,7 @@ pub(crate) mod tests {
             needs: None,
             staff_note: false,
             make_skill: false,
+            named_only: false,
         }
     }
 
@@ -3154,6 +3250,16 @@ pub(crate) mod tests {
     fn handed_over(
         tag: &str,
         place_who: bool,
+        staff: Option<&[Member]>,
+        start: Value,
+    ) -> (Vec<Value>, Vec<Value>) {
+        handed_over_with(tag, |place| place.who = place_who, staff, start)
+    }
+
+    /// [`handed_over`] at a place the switches of which `set` sets.
+    fn handed_over_with(
+        tag: &str,
+        set: impl Fn(&mut Place),
         staff: Option<&[Member]>,
         start: Value,
     ) -> (Vec<Value>, Vec<Value>) {
@@ -3177,7 +3283,8 @@ pub(crate) mod tests {
                 ),
             ],
         );
-        let place = place(&directory, place_who);
+        let mut place = place(&directory, false);
+        set(&mut place);
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
             name: name.into(),
@@ -3623,10 +3730,13 @@ pub(crate) mod tests {
         // All four the tasks part takes, Devin among them (#1854).
         let four = [three.clone(), vec![member("office-devin", "devin")]].concat();
         let mut refused = Vec::new();
-        for staff in [Vec::new(), two(), three, four] {
-            for (((asked, lead_in), noted), accounts) in
+        // One alone, which `LAMP_TASKS_NAMED_ONLY` offers `who` for (#1722).
+        let one = vec![member("office-claude", "claude")];
+        for staff in [Vec::new(), one, two(), three, four] {
+            for ((((asked, lead_in), noted), accounts), named_only) in
                 [(false, false), (false, true), (true, false), (true, true)]
                     .into_iter()
+                    .flat_map(|switches| [(switches, false), (switches, true)])
                     .flat_map(|switches| [(switches, false), (switches, true)])
                     .flat_map(|switches| [(switches, false), (switches, true)])
             {
@@ -3635,10 +3745,11 @@ pub(crate) mod tests {
                 switched.lead_in = lead_in;
                 switched.staff_note = noted;
                 switched.accounts = accounts && asked;
+                switched.named_only = named_only;
                 for tool in super::declared(&switched, &staff) {
                     if tool.validate().is_err() {
                         refused.push(format!(
-                            "{} with {} of the staff, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}: {} bytes",
+                            "{} with {} of the staff, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}, named only {named_only}: {} bytes",
                             tool.name,
                             staff.len(),
                             tool.description.len()
@@ -3997,6 +4108,7 @@ pub(crate) mod tests {
                 needs: None,
                 staff_note: false,
                 make_skill: false,
+                named_only: false,
             })
         );
         assert_eq!(rest, ["--other"]);
@@ -4283,5 +4395,185 @@ pub(crate) mod tests {
             start.contains("(\"ask Claude Code to …\", \"get Codex to …\")"),
             "{start}"
         );
+    }
+
+    /// #1722, lamp-4ace on 20 Oct, 17:1x: "Ask codex to write a haiku about
+    /// coffee." was heard right and handed to Claude Code, the only one of
+    /// the staff there. With `LAMP_TASKS_NAMED_ONLY`, the model is offered
+    /// `who` even with one of the staff, as any agent the voice knows, and
+    /// told who is set up; one named who isn't set up is said plainly not
+    /// to be, and nothing is asked of the tasks part, so nothing goes to
+    /// anyone else. Nobody named is the default, as before.
+    #[test]
+    fn with_named_only_the_one_named_gets_the_work_or_is_said_not_set_up() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let alone = vec![member("office-claude", "claude")];
+        let named_only = |place: &mut Place| {
+            place.who = true;
+            place.asked = true;
+            place.named_only = true;
+        };
+        let mut on = place(Path::new("/nonexistent"), true);
+        named_only(&mut on);
+
+        // What the model is told: every name it may hear, and who is set up.
+        let told = declared(&on, &alone);
+        assert!(told.iter().all(|tool| tool.validate().is_ok()));
+        let who = &told[0].parameters.as_ref().unwrap()["properties"]["who"];
+        assert_eq!(
+            who["enum"],
+            json!(["Claude Code", "Codex", "OpenCode", "Devin"])
+        );
+        let hint = who["description"].as_str().unwrap();
+        assert!(
+            hint.contains("Set up on this lamp: Claude Code, and nobody else."),
+            "{hint}"
+        );
+        let both = declared(&on, &two());
+        let hint = both[0].parameters.as_ref().unwrap()["properties"]["who"]["description"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(
+            hint.contains("Set up on this lamp: Claude Code and Codex, and nobody else."),
+            "{hint}"
+        );
+
+        // Codex named and not set up: said plainly, and the tasks part
+        // (none listens at /nonexistent) is asked nothing.
+        for said in ["Codex", "codecs"] {
+            let call = ToolCall {
+                id: "c".into(),
+                name: START.into(),
+                args: json!({"task":"Write a haiku about coffee","who":said}),
+            };
+            let (told, answered) = run_for(&on, &alone, &call, 1, true, Duration::from_secs(1));
+            assert!(answered, "{told}");
+            let error = told["error"].as_str().unwrap();
+            assert!(
+                error.starts_with("Nothing was handed over: Codex isn't set up on this lamp."),
+                "{error}"
+            );
+        }
+        // A name the voice doesn't know is asked about, as before.
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task":"Write a file","who":"George Jones"}),
+        };
+        let (told, _) = run_for(&on, &alone, &call, 1, true, Duration::from_secs(1));
+        assert!(
+            told["error"].as_str().unwrap().contains("Ask the person"),
+            "{told}"
+        );
+
+        // Codex set up: it gets the work. Nobody named: the default.
+        for (tag, staff, said, target, name) in [
+            (
+                "named-codex",
+                two(),
+                json!("Codex"),
+                "office-codex",
+                "Codex",
+            ),
+            (
+                "named-nobody",
+                two(),
+                Value::Null,
+                "office-claude",
+                "Claude Code",
+            ),
+            (
+                "named-alone",
+                alone.clone(),
+                Value::Null,
+                "office-claude",
+                "Claude Code",
+            ),
+            (
+                "named-claude",
+                alone.clone(),
+                json!("Claude Code"),
+                "office-claude",
+                "Claude Code",
+            ),
+        ] {
+            let mut start = json!({"task":"Write a haiku about coffee"});
+            if !said.is_null() {
+                start["who"] = said;
+            }
+            let (sent, told) = handed_over_with(tag, named_only, Some(&staff), start);
+            assert_eq!(sent[1]["target"], target, "{tag}");
+            assert_eq!(told[1]["who"], name, "{tag}");
+        }
+    }
+
+    /// Without `LAMP_TASKS_NAMED_ONLY` one of the staff gets all the work,
+    /// whoever was named, as before #1722.
+    #[test]
+    fn without_named_only_the_one_there_is_gets_the_work_as_before() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let alone = vec![member("office-claude", "claude")];
+        let on = place(Path::new("/run/t"), true);
+        assert!(
+            declared(&on, &alone)[0].parameters.as_ref().unwrap()["properties"]["who"].is_null()
+        );
+        let (sent, told) = handed_over_with(
+            "unnamed-codex",
+            |place| place.who = true,
+            Some(&alone),
+            json!({"task":"Write a haiku about coffee","who":"Codex"}),
+        );
+        assert_eq!(sent[1]["target"], "office-claude");
+        assert_eq!(told[1]["who"], "Claude Code");
+    }
+
+    /// With `LAMP_TASKS_NAMED_ONLY` the staff's note names any agent the
+    /// voice knows, so "ask Codex" is handed to `start_agent_task` even
+    /// where only Claude Code is set up; without it, as before.
+    #[test]
+    fn with_named_only_the_words_name_an_agent_not_set_up() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _staff = STAFF_HELD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *STAFF.lock().unwrap() = vec![member("office-claude", "claude")];
+        let heard = "Ask codex to write a haiku about coffee.";
+        let mut on = place(Path::new("/run/t"), true);
+        assert!(named_in_words(&on, heard).is_empty());
+        on.named_only = true;
+        assert_eq!(named_in_words(&on, heard), ["Codex"]);
+        assert_eq!(named_in_words(&on, "ask OpenCode to reply"), ["OpenCode"]);
+        STAFF.lock().unwrap().clear();
+    }
+
+    /// The switch reaches the place only with `LAMP_TASKS_WHO`, after the
+    /// skill's flag.
+    #[test]
+    fn the_named_only_switch_is_on_only_with_who() {
+        let flags = |rest: &[&str]| -> Vec<String> {
+            [FLAG, "/run/t"]
+                .iter()
+                .chain(rest)
+                .map(|flag| (*flag).to_owned())
+                .collect()
+        };
+        let with = flags(&[WHO_FLAG, MAKE_SKILL_FLAG, NAMED_ONLY_FLAG]);
+        let (place, rest) = take(&with).unwrap();
+        assert!(place.unwrap().named_only);
+        assert!(rest.is_empty());
+        let without = flags(&[NAMED_ONLY_FLAG]);
+        let (place, rest) = take(&without).unwrap();
+        assert!(!place.unwrap().named_only);
+        assert_eq!(rest, [NAMED_ONLY_FLAG]);
+        assert!(named_only(&flags(&[WHO_FLAG]), Some("on")));
+        assert!(!named_only(&flags(&[WHO_FLAG]), Some("yes")));
+        assert!(!named_only(&flags(&[]), Some("on")));
     }
 }

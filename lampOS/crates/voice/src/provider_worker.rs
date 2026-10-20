@@ -9428,6 +9428,7 @@ pub(crate) mod tests {
                 needs: None,
                 staff_note: noted,
                 make_skill: false,
+                named_only: false,
             }),
             ..Default::default()
         });
@@ -9573,6 +9574,7 @@ pub(crate) mod tests {
                 needs: None,
                 staff_note: true,
                 make_skill: false,
+                named_only: false,
             }),
             ..Default::default()
         });
