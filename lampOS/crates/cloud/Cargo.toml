@@ -13,6 +13,9 @@ lamp-bus = { path = "../bus" }
 # The host's monotonic clock, which a light asked for that lapses is on.
 lamp-ipc = { path = "../ipc" }
 lamp-msgs = { path = "../msgs" }
+# The lamp's timers and reminders for the app (#2195), through the client the
+# voice's reminder functions use.
+lamp-actions = { path = "../actions" }
 # The company broker's MQTT v5 client (#1396, the first builder: a well-used
 # client, not our own). Pinned; TLS through rustls with no provider of its
 # own, the ring one installed here as the other lampOS clients do.
@@ -39,6 +42,8 @@ lamp-setup = { path = "../setup" }
 # (tests/ring.rs, the reviewer on #1464).
 lamp-voice = { path = "../voice" }
 lamp-ipc = { path = "../ipc" }
+# A stand-in lamp-schedule's times, as the store resolves them (#2195).
+lamp-schedule = { path = "../schedule" }
 # The tests' broker reads and writes with rumqttc's own codec.
 bytes = "1"
 tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "net", "sync", "io-util"] }

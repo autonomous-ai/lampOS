@@ -14,6 +14,7 @@ pub mod online;
 pub mod photos;
 pub mod ping;
 pub mod reports;
+pub mod schedule;
 pub mod settings;
 pub mod skills;
 pub mod wire;
