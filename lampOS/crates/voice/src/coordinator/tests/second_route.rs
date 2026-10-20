@@ -2747,12 +2747,14 @@ fn a_stop_during_a_slow_tool_call_lets_the_second_worker_exit_within_its_deadlin
         .build()
         .unwrap();
     let (taken, held) = std::sync::mpsc::channel();
+    let (release, released) = std::sync::mpsc::channel::<()>();
     let holder = std::thread::spawn(move || {
         let (call, _) = executive.accept().unwrap();
         let (stream, _) = chat.accept().unwrap();
         taken.send(()).unwrap();
-        // Held open, unanswered, until the test ends.
-        std::thread::sleep(Duration::from_secs(3));
+        // Held open, unanswered, until the test has timed the stop, not a
+        // fixed 3 s the test then waited out (#1806).
+        let _ = released.recv_timeout(Duration::from_secs(10));
         drop((call, stream));
     });
     runtime.block_on(async move {
@@ -2773,6 +2775,7 @@ fn a_stop_during_a_slow_tool_call_lets_the_second_worker_exit_within_its_deadlin
     let stopped = Instant::now();
     crate::second_provider::worker::finish(runtime);
     let took = stopped.elapsed();
+    release.send(()).unwrap();
     holder.join().unwrap();
     assert!(
         took < Duration::from_millis(300),
