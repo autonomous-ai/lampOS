@@ -653,7 +653,9 @@ job. Its 300 ms note and 1.5 s call budgets cover nonblocking socket I/O and
 reply validation; they do not measure provider connection or audible
 response time. Source overflow, uncertain mutations and confirmed forgetting
 inhibit new journal writes until a fresh worker; a restart also discards the
-old thread-file recap because it carries no provenance. These new paths
+old thread-file recap because it carries no provenance. The voice's journal
+says when that stop begins, why, and how many exchanges it has held back
+([memory-days.md](memory-days.md), #2176). These new paths
 have no task 29 lamp measurements.
 
 ### What a person teaches and corrects (#813)
