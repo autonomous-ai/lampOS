@@ -245,6 +245,16 @@ impl Told {
 /// builder at 18:56).
 pub const STEADY_FIRST_ENVIRONMENT: &str = "LAMP_SECOND_STEADY_FIRST";
 
+/// Where the worker reads whether, in a quiet room, a line let out only as
+/// the conversation going on holds only for the one the lamp answered: `on`,
+/// and nothing else (the first builder at 21:03 on Queue #1722,
+/// `Heeding::going_on_quiet_only_for_the_same_one`).
+pub const QUIET_GOING_ON_SAME_ONE_ENVIRONMENT: &str = "LAMP_QUIET_GOING_ON_SAME_ONE";
+
+/// Why that rule holds such a line, as its journal says it after "held
+/// back: ".
+pub(crate) const QUIET_GOING_ON_HELD: &str = "a quiet room: a conversation with the lamp is going on, but nothing shows the line is from the one it answered: not a reply to its question, not the conversation's voice, no face turned to it";
+
 /// Where the worker reads whether a spoken turn's chat is given only the
 /// functions a spoken turn mostly needs, and the rest behind one call
 /// (`worker::few_tools`): `on`, and nothing else (#1712, the first builder
@@ -838,6 +848,11 @@ pub struct Engine {
     memory: Option<(lamp_turn_owner::BootId, Arc<crate::memory_scope::FaceCache>)>,
     memory_camera_allowed: bool,
     memory_camera_generation: Option<u64>,
+    /// The camera's and the microphone's permission and generation last
+    /// installed, and what is told when they change
+    /// ([`Engine::forgetting_on_privacy`]).
+    privacy: Option<(bool, u64, bool, u64)>,
+    on_privacy: Option<Box<dyn FnMut() + Send>>,
 }
 
 /// The busy room as this route hears it, in this process's one room
@@ -943,6 +958,28 @@ impl Engine {
             memory: None,
             memory_camera_allowed: false,
             memory_camera_generation: None,
+            privacy: None,
+            on_privacy: None,
+        }
+    }
+
+    /// `forget` is told each time the camera or the microphone is closed or
+    /// opened, or its privacy generation changes (a close and reopen
+    /// coalesced), as the worker installs each authority: what was seen
+    /// before goes then (#2305's review). Before any turn only.
+    pub fn forgetting_on_privacy(mut self, forget: Box<dyn FnMut() + Send>) -> Self {
+        self.on_privacy = Some(forget);
+        self
+    }
+
+    /// The camera's and the microphone's permission and generation from an
+    /// installed authority; a change from the last tells
+    /// [`Self::forgetting_on_privacy`]'s hook.
+    pub(crate) fn privacy(&mut self, now: (bool, u64, bool, u64)) {
+        if self.privacy.replace(now).is_some_and(|was| was != now)
+            && let Some(forget) = self.on_privacy.as_mut()
+        {
+            forget();
         }
     }
 
