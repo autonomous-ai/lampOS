@@ -26,8 +26,8 @@ look = true
 
 [choice]
 name = "place"
-about = "Where to look: desk the first time, unless they named a place; then left, right, far_left, far_right, one at a time, only while the thing is not yet seen."
-one_of = ["desk", "left", "right", "far_left", "far_right"]
+about = "Where to look: desk the first time, unless they named a place; then left, right, far_left, far_right, one at a time, only while the thing is not yet seen. found, once you see it: the lamp stays looking at it."
+one_of = ["desk", "left", "right", "far_left", "far_right", "found"]
 default = "desk"
 
 # One search: its first look where the person named, or at the desk when
@@ -38,6 +38,9 @@ default = "desk"
 [search]
 looks = 5
 give_up = "That was the last look. Say kindly, in a few words, that you can't see it from here, and do not look again."
+# The model says it sees the thing by calling with found (#1871): nothing
+# moves, no look is counted, and the head stays on the place it was seen.
+found = "Say where it is by something near it, as \"there, by the mug\", in a few words. You stay looking at it; do not look again."
 
 # Every look: the head down over the desk, held two minutes or until
 # someone speaks (a look again holds it again); the desk lit white for as
@@ -46,7 +49,7 @@ give_up = "That was the last look. Say kindly, in a few words, that you can't se
 body = { mood = "reading", for = "2m" }
 light = { colour = "white", level = 4, for = "2m" }
 look = true
-say = "Say in a few words what you see as you go, as \"Not on the desk...\". If you see what they are looking for, say where it is by something near it, as \"there, by the mug\", and stop: you stay looking at it. If not, call look_for once more with the next place: left, then right, then far_left, then far_right. Never look toward a person."
+say = "Say in a few words what you see as you go, as \"Not on the desk...\". If you see what they are looking for, call look_for with found. If not, call look_for once more with the next place: left, then right, then far_left, then far_right. Never look toward a person."
 
 # A place to one side: the same pose, its base turned toward it, a quarter
 # of the picture across, or the whole half-picture (lamp-body turns 70% of
