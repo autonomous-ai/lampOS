@@ -7,18 +7,21 @@
 
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH] [--photo-dir ABSOLUTE_PATH]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there, and `tellable` beside it holds the names\nof those who said yes to being named in Who was here ({\"visits_yes\":\"NAME\"} on the\nsocket, taken only from the face at the lamp now; {\"visits_no\":\"NAME\"} takes it back). With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the journal says how open the largest\nface's mouth is each look, and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture; the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\nWith --photo-dir (the eyes' own folder, with --recogniser), {\"remember\":\"NAME\",\"photo\":\"FILE\"}\non the who socket takes the one face in that JPEG in the folder and removes the file once\nread (no picture is kept); the face is kept unconfirmed until its person says yes at the\nlamp, and deleted if not (off unless given).\n";
+const USAGE: &str = "lamp-eyes (--device ABSOLUTE_PATH --usb VENDOR:PRODUCT@TOPOLOGY | --usb VENDOR:PRODUCT) --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH] [--photo-dir ABSOLUTE_PATH]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4; with VENDOR:PRODUCT alone,\nthe one camera with those ids on any port, found at each open, and none or two refused\nwith a reason) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there, and `tellable` beside it holds the names\nof those who said yes to being named in Who was here ({\"visits_yes\":\"NAME\"} on the\nsocket, taken only from the face at the lamp now; {\"visits_no\":\"NAME\"} takes it back). With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the journal says how open the largest\nface's mouth is each look, and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture; the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\nWith --photo-dir (the eyes' own folder, with --recogniser), {\"remember\":\"NAME\",\"photo\":\"FILE\"}\non the who socket takes the one face in that JPEG in the folder and removes the file once\nread (no picture is kept); the face is kept unconfirmed until its person says yes at the\nlamp, and deleted if not (off unless given).\n";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Usb {
     vendor: u16,
     product: u16,
+    /// The port, or empty for any (#2190): then the one camera with the ids
+    /// is found at each open.
     topology: String,
 }
 
 #[derive(Debug, Eq, PartialEq)]
 struct Arguments {
-    device: PathBuf,
+    /// The camera's node; none when `--usb` names no port and it is found.
+    device: Option<PathBuf>,
     lock_directory: PathBuf,
     usb: Usb,
     model: PathBuf,
@@ -63,9 +66,10 @@ struct Arguments {
     seems: Option<PathBuf>,
 }
 
-/// `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits each.
+/// `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits each, or
+/// `VENDOR:PRODUCT` alone for the one camera with them on any port (#2190).
 fn usb_of(value: &str) -> Option<Usb> {
-    let (numbers, topology) = value.split_once('@')?;
+    let (numbers, topology) = value.split_once('@').unwrap_or((value, ""));
     let (vendor, product) = numbers.split_once(':')?;
     let hex = |text: &str| {
         (text.len() == 4 && text.bytes().all(|byte| byte.is_ascii_hexdigit()))
@@ -73,17 +77,43 @@ fn usb_of(value: &str) -> Option<Usb> {
             .flatten()
             .filter(|number| *number != 0)
     };
-    let plain = !topology.is_empty()
-        && topology.len() <= 64
-        && topology
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || b"-.".contains(&byte));
+    let plain = (topology.is_empty() && !value.contains('@'))
+        || topology.len() <= 64
+            && !topology.is_empty()
+            && topology
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || b"-.".contains(&byte));
     plain.then_some(())?;
     Some(Usb {
         vendor: hex(vendor)?,
         product: hex(product)?,
         topology: topology.into(),
     })
+}
+
+/// Resets the camera's USB device at `port`, said in the journal, as an
+/// unplug would (#2126); `reset_usb` checks the ids there first.
+#[cfg(target_os = "linux")]
+fn reset_camera(usb: &Usb, port: &str, reopen: &mut lamp_eyes::reopen::Reopen) {
+    let identity = lamp_camera::linux::UsbIdentity {
+        vendor: usb.vendor,
+        product: usb.product,
+        topology: port.to_owned(),
+        serial: None,
+        interface_number: 0,
+        capture_index: 0,
+    };
+    match lamp_camera::linux::reset_usb(&identity) {
+        Ok(node) => {
+            reopen.reset();
+            eprintln!(
+                "lamp-eyes: camera's USB device {port} reset ({}), as an unplug would; tried again in {} s",
+                node.display(),
+                lamp_eyes::reopen::RETRY_STUCK.as_secs()
+            );
+        }
+        Err(error) => eprintln!("lamp-eyes: camera's USB device {port} not reset: {error:?}"),
+    }
 }
 
 /// The camera's working size, the only one without `--full-look`.
@@ -240,14 +270,14 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
             Some("--usb") if usb.is_none() => {
                 usb =
                     Some(value.to_str().and_then(usb_of).ok_or(
-                        "--usb is VENDOR:PRODUCT@TOPOLOGY, for example 01da:5875@3-1.1.4",
+                        "--usb is VENDOR:PRODUCT@TOPOLOGY, for example 01da:5875@3-1.1.4, or VENDOR:PRODUCT for any port",
                     )?);
             }
             _ => return Err("unknown or duplicate option"),
         }
     }
     let result = Arguments {
-        device: device.ok_or("--device is required")?,
+        device,
         lock_directory: lock_directory.ok_or("--lock-directory is required")?,
         usb: usb.ok_or("--usb is required")?,
         model: model.ok_or("--model is required")?,
@@ -274,6 +304,15 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         seems,
         photo_dir,
     };
+    match (&result.device, result.usb.topology.is_empty()) {
+        (None, false) => return Err("--device is required with --usb VENDOR:PRODUCT@TOPOLOGY"),
+        (Some(_), true) => {
+            return Err(
+                "--usb VENDOR:PRODUCT finds the camera on any port; leave out --device, or name the port",
+            );
+        }
+        _ => {}
+    }
     if result.full_look.is_some() != result.full_look_file.is_some()
         || (result.full_look_file.is_some() && result.full_look_file == result.sight_file)
     {
@@ -295,13 +334,13 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         return Err("--mouth-runtime needs --mouth-model");
     }
     for path in [
-        &result.device,
         &result.lock_directory,
         &result.model,
         &result.permit_socket,
         &result.body_socket,
     ]
     .into_iter()
+    .chain(&result.device)
     .chain(&result.sight_file)
     .chain(&result.full_look_file)
     .chain(&result.presence_file)
@@ -657,6 +696,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     // camera (#2126); apart from `failures`, which the full size's turns
     // also set.
     let mut reopen = lamp_eyes::reopen::Reopen::default();
+    // With `--usb VENDOR:PRODUCT` alone: why no one camera was found, said
+    // once while it stays so, and the port it was last found on.
+    let (mut not_found, mut found_on): (Option<String>, Option<String>) = (None, None);
     let mut upgrade = lamp_eyes::full_look::Upgrade::default();
     let joints_bus = arguments
         .full_look
@@ -1157,15 +1199,74 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 std::thread::sleep(Duration::from_millis(50));
                 continue;
             }
+            // The node and port: as given, or the one camera with the ids
+            // on any port, found now, since a reset or a replug may move it
+            // (#2190).
+            let (device, usb_port) = match &arguments.device {
+                Some(device) => (device.clone(), arguments.usb.topology.clone()),
+                None => match lamp_camera::linux::find_camera(
+                    arguments.usb.vendor,
+                    arguments.usb.product,
+                ) {
+                    Ok(Ok(found)) => found,
+                    other => {
+                        let why = match &other {
+                            Ok(Err(lamp_camera::linux::NotFound::None)) => {
+                                "no camera with those ids".to_owned()
+                            }
+                            Ok(Err(lamp_camera::linux::NotFound::Several(ports))) => format!(
+                                "{} cameras with those ids, on {}: name one's port in --usb",
+                                ports.len(),
+                                ports.join(", ")
+                            ),
+                            Err(error) => format!("the cameras could not be listed: {error:?}"),
+                            Ok(Ok(_)) => unreachable!(),
+                        };
+                        if not_found.as_deref() != Some(why.as_str()) {
+                            eprintln!(
+                                "lamp-eyes: camera {:04x}:{:04x} not opened: {why}",
+                                arguments.usb.vendor, arguments.usb.product
+                            );
+                            not_found = Some(why);
+                        }
+                        camera = lamp_eyes::bus_out::Camera::NotOpening;
+                        retry_at = Instant::now() + RETRY;
+                        // Gone from its port's capture nodes but found
+                        // there before (a probe that failed after a reset):
+                        // a failed open at that port, so a stuck camera
+                        // without a node is reset too (the reviewer's P3 on
+                        // #2215). `reset_usb` checks the ids there.
+                        if let (Ok(Err(lamp_camera::linux::NotFound::None)), Some(at)) =
+                            (&other, found_on.as_deref())
+                        {
+                            let failed = reopen.failed(permit.holds());
+                            if failed.reset {
+                                reset_camera(&arguments.usb, at, &mut reopen);
+                            }
+                            retry_at = Instant::now() + failed.retry_after;
+                        }
+                        continue;
+                    }
+                },
+            };
+            if not_found.take().is_some() || found_on.as_deref() != Some(usb_port.as_str()) {
+                if arguments.device.is_none() {
+                    eprintln!(
+                        "lamp-eyes: camera found at {} on port {usb_port}",
+                        device.display()
+                    );
+                }
+                found_on = Some(usb_port.clone());
+            }
             epoch += 1;
             let config = LinuxConfig::new(
-                arguments.device.clone(),
+                device,
                 arguments.lock_directory.clone(),
                 source,
                 UsbIdentity {
                     vendor: arguments.usb.vendor,
                     product: arguments.usb.product,
-                    topology: arguments.usb.topology.clone(),
+                    topology: usb_port.clone(),
                     serial: None,
                     interface_number: 0,
                     capture_index: 0,
@@ -1249,28 +1350,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     }
                     if failed.reset {
                         // Closed above; nothing of ours holds the device.
-                        match lamp_camera::linux::reset_usb(&UsbIdentity {
-                            vendor: arguments.usb.vendor,
-                            product: arguments.usb.product,
-                            topology: arguments.usb.topology.clone(),
-                            serial: None,
-                            interface_number: 0,
-                            capture_index: 0,
-                        }) {
-                            Ok(node) => {
-                                reopen.reset();
-                                eprintln!(
-                                    "lamp-eyes: camera's USB device {} reset ({}), as an unplug would; tried again in {} s",
-                                    arguments.usb.topology,
-                                    node.display(),
-                                    lamp_eyes::reopen::RETRY_STUCK.as_secs()
-                                );
-                            }
-                            Err(error) => eprintln!(
-                                "lamp-eyes: camera's USB device {} not reset: {error:?}",
-                                arguments.usb.topology
-                            ),
-                        }
+                        reset_camera(&arguments.usb, &usb_port, &mut reopen);
                     }
                     retry_at = Instant::now() + failed.retry_after;
                     continue;
@@ -1957,7 +2037,6 @@ mod tests {
             .is_err()
         );
         for refused in [
-            "01da:5875",
             "1da:5875@3-1",
             "0000:5875@3-1",
             "01da:5875@",
@@ -1966,6 +2045,34 @@ mod tests {
         ] {
             assert_eq!(usb_of(refused), None, "{refused}");
         }
+    }
+
+    /// #2190: `--usb VENDOR:PRODUCT` alone takes the one camera with those
+    /// ids on any port, found at each open, so no `--device` goes with it;
+    /// with a port, `--device` is still required.
+    #[test]
+    fn the_camera_by_its_ids_alone_is_on_any_port_and_needs_no_device() {
+        assert_eq!(
+            usb_of("01da:5875"),
+            Some(Usb {
+                vendor: 0x01da,
+                product: 0x5875,
+                topology: String::new()
+            })
+        );
+        let any = [&FULL[2..4], &["--usb", "01da:5875"], &FULL[6..]].concat();
+        let value = parse(args(&any)).unwrap().unwrap();
+        assert_eq!((value.device, value.usb.topology.as_str()), (None, ""));
+        // A device beside ids alone is refused: the port it is on would be
+        // chosen by the device and not checked.
+        let both = [&FULL[..4], &["--usb", "01da:5875"], &FULL[6..]].concat();
+        assert!(parse(args(&both)).is_err());
+        // With a port, the device is still needed.
+        assert!(parse(args(&[&FULL[2..]].concat())).is_err());
+        assert_eq!(
+            parse(args(&FULL)).unwrap().unwrap().device,
+            Some(PathBuf::from("/dev/video0"))
+        );
     }
 
     #[test]
