@@ -977,7 +977,12 @@ for it.
   taken is `{"remove": NAME}`, exactly that one key with a string, and it
   runs `remove` above, which refuses a name that is not a skill's (1 to 64
   lowercase letters, digits and hyphens: no `/`, `..`, NUL, hidden name or
-  more) and a core skill, under the folder's lock. Anything else is
+  more) and a core skill, under the folder's lock. It waits at most 4 s
+  for that lock (`ASKED_LOCK_WAIT`, under `lamp-cloud`'s 5 s wait for its
+  answer), then refuses, `the lamp's skills can't be changed now`, with
+  nothing done. A skill renamed aside whose `.removed-NAME-PID` was not then
+  deleted is answered done (the next install deletes it); that folder's
+  path is in the journal only. Anything else is
   refused, `a request is one line, {"remove": NAME}`. `install` is refused
   (`install is not taken here yet: …`): it will be taken only for a package
   from the update channel under its key's signature, once the channel
