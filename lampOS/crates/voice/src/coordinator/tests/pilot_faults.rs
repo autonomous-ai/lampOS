@@ -2888,6 +2888,12 @@ impl Drop for HeldOnboardingStorage {
 }
 
 fn held_onboarding_storage() -> (SessionState, HeldOnboardingStorage) {
+    held_onboarding_storage_at(false)
+}
+
+/// The held operation is the progress commit, or with `near_call` the
+/// near-call bar's synchronous write and fsync (#1803).
+fn held_onboarding_storage_at(near_call: bool) -> (SessionState, HeldOnboardingStorage) {
     use crate::onboarding::storage::{Paths, ServiceStorage, Submit};
     let directory = std::env::temp_dir().join(format!(
         "lamp-held-onboarding-{}-{}",
@@ -2905,6 +2911,7 @@ fn held_onboarding_storage() -> (SessionState, HeldOnboardingStorage) {
             progress: file.clone(),
             checkpoint: directory.join("privacy.json"),
             mailbox: directory.join("mailbox"),
+            near_call: directory.join("near-call.json"),
         },
         Box::new(move |tag| {
             if tag.revision == 2 {
@@ -2930,10 +2937,16 @@ fn held_onboarding_storage() -> (SessionState, HeldOnboardingStorage) {
         assert!(Instant::now() < deadline, "storage initialization stalled");
         std::thread::yield_now();
     }
-    assert!(
-        matches!(client.commit(crate::onboarding::Progress::default(), false).unwrap(),
-        Submit::Queued(tag) if tag.revision == 2)
-    );
+    let held = if near_call {
+        let tries = [22.4, 25.0, 23.1].map(|rise_db| lamp_near_call::Try {
+            rise_db,
+            score: 0.98,
+        });
+        client.near_call(lamp_near_call::Calibrated::of(tries.to_vec(), 1))
+    } else {
+        client.commit(crate::onboarding::Progress::default(), false)
+    };
+    assert!(matches!(held.unwrap(), Submit::Queued(tag) if tag.revision == 2));
     entering
         .recv_timeout(SCENARIO_LIMIT)
         .expect("commit reached the held worker");
@@ -3019,6 +3032,11 @@ fn onboarding_storage_held_does_not_interrupt_capture_or_privacy() {
     assert_held_storage_progress(&run, &trace, &held);
     assert!(is_mute(&run.result), "{:?}", run.result);
     assert_eq!(run.outcomes()[&first(&run)], ["audio_written_unscored"]);
+    // The walk's inputs are recorded once, as nothing here changes them,
+    // storage started (row 10 on lamp-52e6).
+    let inputs = run.events("onboarding_inputs");
+    assert_eq!(inputs.len(), 1, "{inputs:?}");
+    assert_eq!(inputs[0]["storage"], true, "{inputs:?}");
     release_onboarding_storage(&mut trace, &held);
 }
 
@@ -3041,6 +3059,34 @@ fn stop_and_physical_mute_do_not_wait_for_onboarding_storage() {
             assert_eq!(run.events("service_stop_requested").len(), 1);
         } else {
             assert!(is_mute(&run.result), "{:?}", run.result);
+            assert_eq!(run.events("physical_mute").len(), 1);
+        }
+        release_onboarding_storage(&mut trace, &held);
+    }
+}
+
+#[test]
+fn a_held_near_call_write_does_not_interrupt_capture_privacy_or_stop() {
+    let _one = one_session();
+    let (mut trace, held) = held_onboarding_storage_at(true);
+    let run = run_in(Script::question(Answer::Complete(12)), &mut trace);
+    assert_held_storage_progress(&run, &trace, &held);
+    assert!(is_mute(&run.result), "{:?}", run.result);
+    release_onboarding_storage(&mut trace, &held);
+    for action in [Act::Sigterm, Act::Mute] {
+        let (mut trace, held) = held_onboarding_storage_at(true);
+        let run = run_in(
+            Script {
+                actions: vec![(When::Block(40), action)],
+                signals: action == Act::Sigterm,
+                ..Script::question(Answer::Hold(12))
+            },
+            &mut trace,
+        );
+        assert_held_storage_progress(&run, &trace, &held);
+        if action == Act::Sigterm {
+            assert!(run.result.is_ok(), "{:?}", run.result);
+        } else {
             assert_eq!(run.events("physical_mute").len(), 1);
         }
         release_onboarding_storage(&mut trace, &held);
