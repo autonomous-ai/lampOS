@@ -590,42 +590,58 @@ fn wake_pipe() -> io::Result<(std::os::fd::OwnedFd, std::os::fd::OwnedFd)> {
 }
 
 /// Until a topic's or the Policy's socket is readable, the wake is written,
-/// or `wait` passes; at once if one already holds a datagram read ahead.
-/// The wake is emptied. A socket that says an error or hang-up with nothing
-/// to read makes it wait out `wait` instead, so the loop cannot spin.
+/// or `wait` passes; at once if one already holds a datagram read ahead
+/// ([`wait_on`]). The wake is emptied.
 fn wait_any(
     subscribers: &[Subscriber],
     answers: Option<&Subscriber>,
     woken: &std::os::fd::OwnedFd,
     wait: Duration,
 ) {
-    use rustix::event::{PollFd, PollFlags, Timespec, poll};
+    use std::os::fd::AsFd;
     let mut drained = [0u8; 64];
     if !subscribers.iter().chain(answers).any(Subscriber::holds) {
-        let mut fds: Vec<PollFd<'_>> = subscribers
+        let sockets: Vec<_> = subscribers
             .iter()
             .chain(answers)
-            .map(|subscriber| PollFd::new(subscriber, PollFlags::IN))
+            .map(|subscriber| subscriber.as_fd())
             .collect();
-        fds.push(PollFd::new(woken, PollFlags::IN));
-        let timeout = Timespec::try_from(wait).unwrap_or(Timespec {
-            tv_sec: 0,
-            tv_nsec: 250_000_000,
-        });
-        let broken = match poll(&mut fds, Some(&timeout)) {
-            Ok(_) => fds.iter().any(|fd| {
-                let flags = fd.revents();
-                !flags.contains(PollFlags::IN)
-                    && flags.intersects(PollFlags::ERR | PollFlags::HUP | PollFlags::NVAL)
-            }),
-            Err(rustix::io::Errno::INTR) => false,
-            Err(_) => true,
-        };
-        if broken {
+        wait_on(&sockets, woken, wait);
+    }
+    while matches!(rustix::io::read(woken, &mut drained), Ok(read) if read > 0) {}
+}
+
+/// Until one of `sockets` is readable, `woken` is, or `wait` passes. A
+/// socket that says an error or hang-up with nothing to read makes it wait
+/// out `wait` on the wake alone instead, so the loop cannot spin and a
+/// call, a skip or a run's end still wakes it (Fourth on #2304).
+fn wait_on(sockets: &[std::os::fd::BorrowedFd<'_>], woken: &std::os::fd::OwnedFd, wait: Duration) {
+    use rustix::event::{PollFd, PollFlags, Timespec, poll};
+    let mut fds: Vec<PollFd<'_>> = sockets
+        .iter()
+        .map(|socket| PollFd::new(socket, PollFlags::IN))
+        .collect();
+    fds.push(PollFd::new(woken, PollFlags::IN));
+    let timeout = Timespec::try_from(wait).unwrap_or(Timespec {
+        tv_sec: 0,
+        tv_nsec: 250_000_000,
+    });
+    let broken = match poll(&mut fds, Some(&timeout)) {
+        Ok(_) => fds.iter().any(|fd| {
+            let flags = fd.revents();
+            !flags.contains(PollFlags::IN)
+                && flags.intersects(PollFlags::ERR | PollFlags::HUP | PollFlags::NVAL)
+        }),
+        Err(rustix::io::Errno::INTR) => false,
+        Err(_) => true,
+    };
+    if broken {
+        let mut wake = [PollFd::new(woken, PollFlags::IN)];
+        if matches!(poll(&mut wake, Some(&timeout)), Err(error) if error != rustix::io::Errno::INTR)
+        {
             std::thread::sleep(wait);
         }
     }
-    while matches!(rustix::io::read(woken, &mut drained), Ok(read) if read > 0) {}
 }
 
 /// Listens on `path` for a test: each line `{"skip_us": N}` skips the
@@ -3234,6 +3250,30 @@ fn action(sockets: &Sockets, name: &str, args: serde_json::Value) -> io::Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Fourth on #2304: a descriptor that says a hang-up with nothing to
+    /// read makes the wait wait on the wake alone, so a call still wakes it
+    /// at once, where a sleep of the whole wait held it (2 s here). Linux
+    /// only: there a pipe whose writer has gone says so; on macOS it says
+    /// it is readable too, as a stream whose peer has gone does.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_broken_socket_still_lets_a_wake_end_the_wait() {
+        use std::os::fd::AsFd;
+        let (socket, writer) = rustix::pipe::pipe().unwrap();
+        drop(writer);
+        let (woken, waker) = wake_pipe().unwrap();
+        let waking = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(20));
+            rustix::io::write(&waker, &[1]).unwrap();
+            waker
+        });
+        let began = std::time::Instant::now();
+        wait_on(&[socket.as_fd()], &woken, Duration::from_secs(2));
+        let took = began.elapsed();
+        drop(waking.join().unwrap());
+        assert!(took < Duration::from_secs(1), "{took:?}");
+    }
 
     fn clock_fixture(windowed: bool, enabled: bool) -> lamp_skills::Skill {
         let root = tempfile::tempdir().unwrap();

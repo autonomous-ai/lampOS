@@ -332,10 +332,12 @@ skills".)
 - It waits on every topic's socket, the Policy's answers and its own wake
   at once (`poll`), at most 250 ms. So a message, a tool call, a test's
   skip or a run's end is taken as it comes, and each topic still gives one
-  message a pass. Until 19 Oct it waited on each topic in its turn, the
+  message a pass. Before #2381 it waited on each topic in its turn, the
   250 ms shared among them, and a tool call waited out a topic's turn:
   about 49 ms each with three topics on the Intel Mac, against under 1 ms
-  after (#1806, `tests/call_wait.rs`).
+  after (#1806, `tests/call_wait.rs`). A socket that says an error or a
+  hang-up with nothing to read makes that pass wait on the wake alone, so
+  the loop doesn't spin and a call still wakes it at once.
 - **The ask.** `LAMP_SKILLS_ASK` says how a run that a trigger starts is
   allowed (a tool's run is asked for by a person and never is):
   - `policy`: the Policy's gate (#958, `lamp-policy --gate`). The run's
