@@ -4974,6 +4974,22 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#2119** is closed, since all of it is on #1712 through #2124 and #2146.
 - **Next:** the route's socket, behind `LAMP_SECOND_SPEECH_SOCKET`. It opens as the chat is asked, takes the first piece if it's open, and falls back to HTTP.
 
+## 2026-10-20, 13:00 ICT: #2173 merged; #2187 up folded; the route's speech socket built
+
+- **#2173** (`LAMP_SAID_AS_HEARD`) is merged into #1712.
+- **#2186 is Twelve's memory side of the held hand-on,** stacked on my worker commit `410a563cf`. It meets all four of Twelve's conditions, and the reviewer's 12:45 read had no P1 or P2. I said yes (13:00) to folding my commit and Twelve's into one there.
+- **#2187** is #2161 folded (`b6fd05b7f` on #1712's `9ad9416ad`), with the reviewer's three P3s in:
+  - the arms take turns going first, and their pieces differ;
+  - the lamp command gives the optional key;
+  - the wording is fixed.
+  
+  Gate green, 2649 passed, 0 failed, and the reviewer's 12:34 read says its earlier reads stand. #2161 is closed. It still waits for the lamp's run.
+- **The route's speech socket, built** (`290e40036`, stacked on #2187), behind `LAMP_SECOND_SPEECH_SOCKET=on`:
+  - as each answer begins, the configured ElevenLabs voice opens its socket while the chat thinks;
+  - the first piece that finds it open speaks on it, and one that fails or closes before any audio goes over HTTP.
+  - Five tests and three mutations. A hang the first mutation showed is now a 5 s failure. The gate is running.
+- **#2176 (Friday's memory review), answered at 12:2x:** no collision with my changes, and finding 1's (b) and (c) are Twelve's call.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -4992,7 +5008,8 @@ tried. The local judge remains shadow-only behind `--local-judge`,
 with unfitted weights and no proof that it improves the busy-room floor.
 `LAMP_REPLY_END_REACH` is off unless set and was not run on a lamp.
 `LAMP_SAID_AS_HEARD` is off unless set and was not run on a lamp; memory
-can still hold a cut answer whole when the route had sent it all first.
+takes a cut answer as heard only with #2186. `LAMP_SECOND_SPEECH_SOCKET` and
+`probe-cascade --wire --socket` were not run on a lamp.
 `probe-cascade --wire --speech` was tried only from this Mac with made-up
 keys (both targets answered 401), not on a lamp.
 Native Linux ARM64 execution so far is on GitHub runners, not on a lamp.
