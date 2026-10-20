@@ -35,6 +35,22 @@ pub const FIRST_LEVEL: f32 = 0.4;
 pub const FADE_IN: Duration = Duration::from_millis(1_500);
 /// And out over this, when the voice asks for the ring.
 pub const FADE_OUT: Duration = Duration::from_millis(600);
+
+/// How long the face takes to fade in and to fade out: [`FADE_IN`] and
+/// [`FADE_OUT`] on the lamp. A test passes short ones, to see the same
+/// fades in a fraction of the time (#1806).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Fades {
+    pub fade_in: Duration,
+    pub fade_out: Duration,
+}
+
+impl Fades {
+    pub const LAMP: Self = Self {
+        fade_in: FADE_IN,
+        fade_out: FADE_OUT,
+    };
+}
 /// From the asleep face's glow to the whole ring.
 pub const OPENING: Duration = Duration::from_secs(20);
 /// One breath while it wakes, as the asleep face breathes.
@@ -84,6 +100,7 @@ pub enum Paint {
 /// shows. Once dark after a let-go it stays dark.
 #[derive(Debug)]
 pub struct Painter {
+    fades: Fades,
     fade: f32,
     /// Breaths so far: the fraction is how far through this one.
     breaths: f32,
@@ -94,6 +111,7 @@ pub struct Painter {
 impl Default for Painter {
     fn default() -> Self {
         Self {
+            fades: Fades::LAMP,
             fade: FIRST_LEVEL,
             breaths: 0.0,
             last: Duration::ZERO,
@@ -108,6 +126,14 @@ fn share(now: Duration, start: Duration, long: Duration) -> f32 {
 }
 
 impl Painter {
+    /// A painter that fades in and out over `fades`.
+    pub fn faded(fades: Fades) -> Self {
+        Self {
+            fades,
+            ..Self::default()
+        }
+    }
+
     pub fn step(&mut self, now: Duration, let_go: bool) -> Paint {
         if self.dark {
             return Paint::Dark;
@@ -119,13 +145,13 @@ impl Painter {
             BREATH.as_secs_f32() + (UNWELL_BREATH.as_secs_f32() - BREATH.as_secs_f32()) * unwell;
         self.breaths = (self.breaths + elapsed / breath).fract();
         if let_go {
-            self.fade = (self.fade - elapsed / FADE_OUT.as_secs_f32()).max(0.0);
+            self.fade = (self.fade - elapsed / self.fades.fade_out.as_secs_f32()).max(0.0);
             if self.fade == 0.0 {
                 self.dark = true;
                 return Paint::Dark;
             }
         } else {
-            self.fade = (self.fade + elapsed / FADE_IN.as_secs_f32()).min(1.0);
+            self.fade = (self.fade + elapsed / self.fades.fade_in.as_secs_f32()).min(1.0);
         }
         // An eye opens fast at first and slowly at the end.
         let open = share(now, Duration::ZERO, OPENING);
@@ -164,9 +190,24 @@ pub enum Ended {
 /// write.
 pub fn run<S, O>(
     listener: UnixListener,
+    open: O,
+    log: impl Fn(&str) + Send + Sync + 'static,
+    retry: Duration,
+) -> Ended
+where
+    S: FrameSink,
+    O: FnMut() -> io::Result<WakingRing<S>>,
+{
+    run_faded(listener, open, log, retry, Fades::LAMP)
+}
+
+/// [`run`], fading in and out over `fades` rather than the lamp's.
+pub fn run_faded<S, O>(
+    listener: UnixListener,
     mut open: O,
     log: impl Fn(&str) + Send + Sync + 'static,
     retry: Duration,
+    fades: Fades,
 ) -> Ended
 where
     S: FrameSink,
@@ -181,7 +222,7 @@ where
     });
     let (held, changed) = &*state;
     let start = Instant::now();
-    let mut painter = Painter::default();
+    let mut painter = Painter::faded(fades);
     let mut ring: Option<WakingRing<S>> = None;
     let mut retry_at: Option<Instant> = None;
     let mut failing = false;
@@ -428,6 +469,36 @@ mod tests {
             panic!("dark");
         };
         assert_eq!(unwell, 1.0);
+    }
+
+    #[test]
+    fn a_painter_fades_over_the_fades_it_is_given_and_the_lamps_by_default() {
+        assert_eq!(
+            Fades::LAMP,
+            Fades {
+                fade_in: FADE_IN,
+                fade_out: FADE_OUT
+            }
+        );
+        let mut painter = Painter::faded(Fades {
+            fade_in: ms(100),
+            fade_out: ms(100),
+        });
+        // From its first level to full in the rest of 100 ms.
+        let Paint::Show { level, .. } = painter.step(ms(60), false) else {
+            panic!("dark");
+        };
+        assert_eq!(level, 1.0);
+        let Paint::Show { level, .. } = painter.step(ms(110), true) else {
+            panic!("dark");
+        };
+        assert!((level - 0.5).abs() < 0.01, "{level}");
+        assert!(matches!(painter.step(ms(160), true), Paint::Dark));
+        // The lamp's own is still fading in then.
+        let Paint::Show { level, .. } = Painter::default().step(ms(60), false) else {
+            panic!("dark");
+        };
+        assert!(level < 1.0, "{level}");
     }
 
     #[test]
