@@ -486,10 +486,14 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
     as the answer's wait hears them (`own_line_with_words`, through
     `with_waited_words`; the stream is kept ready while an own line hasn't
     sounded, `own_line_awaited`).
-    - A lone stop ("Stop.", "Wait.") or a lone put-off ("Not now.",
-      "Later.", "Not yet.", "No thanks."; `wait_words::only_a_put_off`) is
-      let go, never asked of the model, and the line is stopped
-      (`input_let_go_own_line` with `why` `stop_said`).
+    - A lone stop ("Stop.", "Wait.") is let go, never asked of the model, and
+      the line is stopped (`input_let_go_own_line` with `why` `stop_said`).
+    - So is a lone put-off ("Not now.", "Later.", "Not yet.", "No thanks.";
+      `wait_words::only_a_put_off`), but only in a room that isn't busy. In
+      a busy room a put-off is as usual between colleagues ("No thanks." to
+      a coffee, "In a minute.") as to the lamp, so it's the room's and
+      waits (the reviewer's P3 on #2322). A face turned to the lamp and
+      speaking is still decided as before, above.
     - Any other words are the room's: the sound waits and is let go as
       before. In a busy office two colleagues' talk has words too, and it
       mustn't end the hello (the reviewer's P2 on #2308). A face turned to
@@ -532,7 +536,8 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
   - the person at the lamp saying "not now" before a hello sounds, with the
     eyes judging speaking: the hello ends;
   - with `words`, "stop" or "not now" before it sounds stops it, and two
-    colleagues talking nearby don't;
+    colleagues talking nearby don't, nor a colleague's "no thanks" in a busy
+    room;
   - the cut-in test of a person speaking over one, unchanged.
 
 **With `LAMP_ASKER_FIRST=on`, the person asked comes first while the
