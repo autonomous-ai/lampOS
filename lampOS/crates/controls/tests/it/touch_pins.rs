@@ -724,11 +724,11 @@ fn empty_configuration_does_not_claim_a_functional_touch_source() {
 #[test]
 fn the_products_pins_name_the_reset_and_its_unit_serves_the_touch_path() {
     let pins: TouchPinsConfig = serde_json::from_str(include_str!(
-        "../../../deploy/product/settings/controls-pins.json"
+        "../../../../deploy/product/settings/controls-pins.json"
     ))
     .unwrap();
     let config: Config = serde_json::from_str(include_str!(
-        "../../../deploy/product/settings/controls.json"
+        "../../../../deploy/product/settings/controls.json"
     ))
     .unwrap();
     let touch = pins.check(&config).unwrap();
@@ -755,7 +755,7 @@ fn the_products_pins_name_the_reset_and_its_unit_serves_the_touch_path() {
     // A pat stays the old engine's Pet, as the product's voice and
     // Expression read no `controls/touch` (the reviewer on #1167).
     assert!(pins.legacy_head);
-    let unit = include_str!("../../../deploy/product/lamp-controls.service");
+    let unit = include_str!("../../../../deploy/product/lamp-controls.service");
     let serve = unit
         .lines()
         .find(|line| line.starts_with("ExecStart="))

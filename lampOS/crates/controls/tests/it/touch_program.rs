@@ -45,7 +45,7 @@ impl Root {
 
     fn restore(&self) {
         let mut config: Value =
-            serde_json::from_str(include_str!("../fixtures/strip-711-controls.json")).unwrap();
+            serde_json::from_str(include_str!("../../fixtures/strip-711-controls.json")).unwrap();
         config["enabled"] = true.into();
         fs::write(
             self.file("controls.json"),
@@ -54,12 +54,12 @@ impl Root {
         .unwrap();
         fs::write(
             self.file("pins.json"),
-            include_bytes!("../fixtures/strip-711-pins-example.json"),
+            include_bytes!("../../fixtures/strip-711-pins-example.json"),
         )
         .unwrap();
         fs::write(
             self.file("input.jsonl"),
-            include_bytes!("../fixtures/strip-711-replay.jsonl"),
+            include_bytes!("../../fixtures/strip-711-replay.jsonl"),
         )
         .unwrap();
     }
@@ -414,12 +414,12 @@ fn working_pad_cli_profile_preserves_the_trace_with_individual_threshold_setting
     expected(&successful(&baseline).0);
     fs::write(
         root.file("controls.json"),
-        include_bytes!("../fixtures/strip-711-working-controls.json"),
+        include_bytes!("../../fixtures/strip-711-working-controls.json"),
     )
     .unwrap();
     fs::write(
         root.file("pins.json"),
-        include_bytes!("../fixtures/strip-711-working-pins-example.json"),
+        include_bytes!("../../fixtures/strip-711-working-pins-example.json"),
     )
     .unwrap();
     let mut command = root.replay();

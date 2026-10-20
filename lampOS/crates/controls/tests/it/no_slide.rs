@@ -136,7 +136,7 @@ fn with_no_slide_the_touch_path_says_the_marker_fifty_times() {
     let root = Root::new();
     let bus = root.bus();
     let wiring: TouchPinsConfig = serde_json::from_str(include_str!(
-        "../fixtures/strip-711-working-pins-example.json"
+        "../../fixtures/strip-711-working-pins-example.json"
     ))
     .unwrap();
     assert!(wiring.buttons.is_empty() && wiring.privacy.is_none());
@@ -179,7 +179,7 @@ fn no_slide_is_refused_beside_a_slide_reader() {
     assert!(!state.no_privacy_slide && state.privacy.is_some());
     drop(service);
     let wiring: TouchPinsConfig = serde_json::from_str(include_str!(
-        "../fixtures/strip-711-working-pins-example.json"
+        "../../fixtures/strip-711-working-pins-example.json"
     ))
     .unwrap();
     let config = Config {

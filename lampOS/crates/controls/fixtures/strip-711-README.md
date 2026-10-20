@@ -104,8 +104,8 @@ staggered release, reversals, slow movement, and repeated holds. Run from
 `lampOS` with:
 
 ```sh
-cargo test --offline -p lamp-controls --test strip
-cargo test --offline -p lamp-controls --test touch_replay
+cargo test --offline -p lamp-controls --test it strip::
+cargo test --offline -p lamp-controls --test it touch_replay::
 ```
 
 Not shown: real acquisition continuity, threshold noise margins, capacitive

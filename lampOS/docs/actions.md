@@ -318,9 +318,9 @@ Linux-only and was not run on this Mac. Commands, from `lampOS`:
 
 ```sh
 cargo test --offline -p lamp-actions --all-targets -- --test-threads=1 --nocapture
-cargo test --offline -p lamp-schedule --test client -- --test-threads=1 --nocapture
+cargo test --offline -p lamp-schedule --test it client:: -- --test-threads=1 --nocapture
 cargo clippy --offline -p lamp-actions --all-targets -- -D warnings
-cargo clippy --offline -p lamp-schedule --lib --test client -- -D warnings
+cargo clippy --offline -p lamp-schedule --lib --test it -- -D warnings
 ```
 
 Both Clippy checks and scoped formatting passed. The timing fixture measured
