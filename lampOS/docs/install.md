@@ -490,7 +490,15 @@ active-high, so a line with nothing on it reads as not touched), the rest of
 the pins file kept; anything but two such lines writes nothing. On an MPR121
 it calibrates. Either way `lamp-controls` is started again however the step
 ends, and dry it only says what it would run, without stopping
-`lamp-controls`. A key already in place is kept
+`lamp-controls`. Written, step 4 stands the lamp up for the
+self-test's `head_move`, which checks only a lamp at rest and standing and
+never stands one itself (#2232): after the yes (a hand by the arm as it
+rises, not on it), the running `lamp-body` is told `listening` on its own
+mood socket, `/run/lampos-body/mood.sock`, with `lamp-body-mood`, five times
+0.2 s apart (an up voice tells it `resting` every 40 ms), and given 9 s
+(`HEAD_STAND_WAIT`) to stand and rest again, standing, before the self-test
+runs. It folds by itself 90 s after (`--awake-seconds`), however the steps
+end. With `lamp-body` not active nothing is stood and `head_move` says why. A key already in place is kept
 when it is the same and fails the step when it is not. A failed step stops
 the rest and says which; `--from N` goes on from it. It runs nothing but
 the lamp's own binaries and the shell. `deploy/factory/steps-test.sh` tests

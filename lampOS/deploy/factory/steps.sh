@@ -8,7 +8,9 @@
 #      each pad twice), into the pins file; on an MPR121, calibrate-touch
 #      only while lamp-controls runs with LAMP_CONTROLS_STRIP=on
 #   3. the update key's public half: /etc/lampOS/update/key.pub
-#   4. the self-test: lamp-selftest --occasion factory
+#   4. the self-test: lamp-selftest --occasion factory, the lamp first stood
+#      up by its running lamp-body ("listening" on its mood socket) so
+#      that head_move is checked whether or not the voice is up (#2232)
 # Run on the lamp, as root. Every step is dry unless --write: it reads and
 # says what it would write, and nothing is written to /etc. A step that
 # fails stops the rest and says which. Written, steps 1, 2 and 4 need a
@@ -26,16 +28,18 @@
 # The binaries are the installed ones; the body needs --let-go-at-stop (#1776).
 # For a test, MEASURE_BIN, BODY_BIN, MOOD_BIN, CONTROLS_BIN, SELFTEST_BIN,
 # SYSTEMCTL, JQ and ETC_ROOT (a folder standing for /) replace them;
-# STAND_WAIT is the seconds a stand is given (34).
+# STAND_WAIT is the seconds a stand is given (34), HEAD_STAND_WAIT the
+# seconds the running body is given to stand before the self-test (9).
 set -uo pipefail
 
-usage() { sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; }
 
 ROOT=${ETC_ROOT:-}
 MEASURE_BIN=${MEASURE_BIN:-/opt/lampOS/body/current/lamp-body-measure}
 BODY_BIN=${BODY_BIN:-/opt/lampOS/body/current/lamp-body}
 MOOD_BIN=${MOOD_BIN:-/opt/lampOS/body/current/lamp-body-mood}
 STAND_WAIT=${STAND_WAIT:-34}
+HEAD_STAND_WAIT=${HEAD_STAND_WAIT:-9}
 CONTROLS_BIN=${CONTROLS_BIN:-/opt/lampOS/controls/current/lamp-controls}
 SELFTEST_BIN=${SELFTEST_BIN:-/opt/lampOS/selftest/current/lamp-selftest}
 SYSTEMCTL=${SYSTEMCTL:-systemctl}
@@ -363,14 +367,44 @@ step_key() {
   fi
 }
 
-step_selftest() {
-  if [[ $WRITE != 1 ]]; then
-    say "would run: $SELFTEST_BIN --occasion factory (dry; it asks for a touch, moves the head a little and lights the ring)"
+# head_move is checked only on a lamp at rest and standing, and never stands
+# one up itself (selftest.md); with the voice down nothing else does, so it
+# stayed not_checked (#2232). The running lamp-body, the one the self-test
+# reads, is told "listening" on its own mood socket, as the voice tells it:
+# it stands (--stand-seconds 6), rests again 1.5 s after the last one
+# (MOOD_STALE), standing, and folds by itself --awake-seconds (90) after it,
+# however this script ends. Said a few times: a voice that is up tells it
+# "resting" every 40 ms, and the body keeps the newest in each step.
+BODY_MOOD=$ROOT/run/lampos-body/mood.sock
+HEAD_STOOD=0
+stand_for_head() {
+  local body_state
+  body_state=$("$SYSTEMCTL" is-active lamp-body 2>/dev/null)
+  if [[ $body_state != active ]]; then
+    say "lamp-body is $body_state: the lamp is not stood up, and head_move says why"
     return 0
   fi
-  ask "the self-test: it moves the head a little, lights the ring, and asks for a swipe, a touch on the head and a press of the button." || return 1
+  say "standing the lamp up for the head's small move"
+  local _
+  for _ in 1 2 3 4 5; do
+    as_body "$MOOD_BIN" --socket "$BODY_MOOD" --mood listening --level 128 \
+      || { fail "could not tell lamp-body to stand on $BODY_MOOD"; return 1; }
+    pause 0.2
+  done
+  pause "$HEAD_STAND_WAIT"
+  HEAD_STOOD=1
+}
+
+step_selftest() {
+  if [[ $WRITE != 1 ]]; then
+    say "would run: $SELFTEST_BIN --occasion factory (dry; it stands the lamp up for head_move, asks for a touch, moves the head a little and lights the ring)"
+    return 0
+  fi
+  ask "the self-test: the lamp stands up for the head's small move (keep a hand by the arm as it rises, not on it, and say stop at any time), then it moves the head a little, lights the ring, and asks for a swipe, a touch on the head and a press of the button." || return 1
+  stand_for_head || return 1
   "$SELFTEST_BIN" --occasion factory
   local status=$?
+  [[ $HEAD_STOOD == 1 ]] && say "the lamp folds by itself within 90 s of standing (lamp-body's --awake-seconds)"
   # Exit 3, a part not checked, counts as the unit's success (selftest.md).
   [[ $status == 0 || $status == 3 ]] || { fail "the self-test found a part that failed (exit $status)"; return 1; }
 }

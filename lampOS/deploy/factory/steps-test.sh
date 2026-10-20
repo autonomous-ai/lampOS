@@ -95,7 +95,7 @@ lamp() {
   rm -f "$T/log.let-go"
 }
 run() {
-  ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood STAND_WAIT=0 \
+  ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood STAND_WAIT=0 HEAD_STAND_WAIT=0 \
     CONTROLS_BIN=$T/bin/controls SELFTEST_BIN=$T/bin/selftest SYSTEMCTL=$T/bin/systemctl \
     FAKE_LOG=$T/log bash "$STEPS" --unit-id lamp-test "$@" </dev/null >"$T/out" 2>&1
 }
@@ -136,6 +136,17 @@ check "a no at the console moves nothing" '[[ $status == 1 ]] && ! grep -q "^bod
 # Going on from step 4 after the rest, with the steps before it untouched.
 lamp; : >"$T/log"; ASK_ANSWER=y run --write --from 4 --update-key "$KEYFILE"; status=$?
 check "--from 4 runs only step 4" '! grep -q "^measure" "$T/log" && grep -q "step 4 of 4" "$T/out" && [[ $status == 0 ]]'
+
+# The self-test's head_move needs the lamp standing (#2232): the running body
+# is told listening on its own socket before the self-test, after the yes.
+lamp; FAKE_BODY_STATE=active ASK_ANSWER=y run --write --from 4; status=$?
+check "step 4 stands the running body up before the self-test" '[[ $status == 0 ]] && [[ $(grep -c "^mood --socket $T/root/run/lampos-body/mood.sock --mood listening --level 128$" "$T/log") == 5 ]] && [[ $(grep "^mood\|^selftest" "$T/log" | tail -1) == "selftest --occasion factory" ]] && grep -q "folds by itself" "$T/out"'
+lamp; FAKE_BODY_STATE=inactive ASK_ANSWER=y run --write --from 4; status=$?
+check "step 4 with lamp-body down: nothing stood, the self-test says why" '[[ $status == 0 ]] && ! grep -q "^mood" "$T/log" && grep -q "lamp-body is inactive: the lamp is not stood up" "$T/out" && grep -q "^selftest" "$T/log"'
+lamp; FAKE_BODY_STATE=active ASK_ANSWER=n run --write --from 4; status=$?
+check "step 4 without a yes stands nothing" '[[ $status == 1 ]] && ! grep -q "^mood\|^selftest" "$T/log"'
+lamp; FAKE_BODY_STATE=active run --from 4; status=$?
+check "step 4 dry stands nothing" '[[ $status == 0 ]] && ! grep -q "^mood\|^selftest" "$T/log"'
 
 # One step at a time, as a station with a person at it runs them.
 lamp; : >"$T/log"; ASK_ANSWER=y run --write --from 2 --to 3 --update-key "$KEYFILE"; status=$?
