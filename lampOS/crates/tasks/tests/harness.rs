@@ -457,6 +457,26 @@ fn a_devin_cloud_answer_is_read_as_idle_and_it_is_never_asked_to_close() {
     assert!(observation.answer.starts_with("Posted:"));
     // Only `needs-input` is read so: a cloud agent working or failed is as
     // Harness says (the reviewer's P3 4 on #2240).
+    // A finished Devin Cloud session ends `stopped` (lamp-75c9, 20 Oct): with
+    // an answer it is done, in `show`, `wait` and `ps`; with none, stopped.
+    let mut reply = shown();
+    reply["id"] = json!(CLOUD);
+    reply["state"] = json!("stopped");
+    reply["answer"] = json!("I replied to the 4 new messages in #lamp-devin-demo.");
+    rig.show_step(step(reply.clone()));
+    assert_eq!(rig.cli().observe(MACHINE, CLOUD).unwrap().state, "idle");
+    reply["answer"] = json!("  ");
+    rig.show_step(step(reply));
+    assert_eq!(rig.cli().observe(MACHINE, CLOUD).unwrap().state, "stopped");
+    let row = json!({"harnesses":[{"id":CLOUD,"state":"stopped"}]}).to_string();
+    assert_eq!(parse_ps(row.as_bytes()).unwrap()[0].state, "idle");
+    assert_eq!(
+        parse_wait(Some(4), row.as_bytes(), &[CLOUD.to_owned()]).unwrap()[0].state,
+        "idle"
+    );
+    // A computer agent's `stopped` is as Harness says.
+    let row = json!({"harnesses":[{"id":AGENT,"state":"stopped"}]}).to_string();
+    assert_eq!(parse_ps(row.as_bytes()).unwrap()[0].state, "stopped");
     for state in ["working", "failed"] {
         let mut reply = shown();
         reply["id"] = json!(CLOUD);
