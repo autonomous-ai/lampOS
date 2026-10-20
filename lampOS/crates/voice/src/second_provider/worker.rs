@@ -1893,7 +1893,7 @@ pub(crate) fn few_tools(
     }
     let (mut given, rest): (Vec<_>, Vec<_>) = declared
         .into_iter()
-        .partition(|tool| given_at_once(&tool.name));
+        .partition(|tool| given_at_once(&tool.name) || named(messages, &tool.name));
     if !rest.is_empty() {
         let names: Vec<&str> = rest.iter().map(|tool| tool.name.as_str()).collect();
         given.push(lamp_gemini::Tool {
@@ -1907,6 +1907,33 @@ pub(crate) fn few_tools(
         });
     }
     given
+}
+
+/// Whether a system or user message the turn carries names the function
+/// `name` as a whole word: a note that says "call remember_my_face" is
+/// given it at once, not behind [`MORE`], where DeepSeek reached for a
+/// plain `remember` instead and never closed the step (row 10 on
+/// lamp-52e6).
+fn named(messages: &[Message], name: &str) -> bool {
+    let word = |c: char| c.is_alphanumeric() || c == '_';
+    let names = |text: &str| {
+        text.match_indices(name).any(|(at, _)| {
+            !text[..at].chars().next_back().is_some_and(word)
+                && !text[at + name.len()..].chars().next().is_some_and(word)
+        })
+    };
+    messages
+        .iter()
+        .filter(|message| matches!(message.role, "system" | "user"))
+        .filter_map(|message| message.content.as_ref())
+        .any(|content| match content {
+            serde_json::Value::String(text) => names(text.as_str()),
+            serde_json::Value::Array(parts) => parts
+                .iter()
+                .filter_map(|part| part.get("text").and_then(|text| text.as_str()))
+                .any(names),
+            _ => false,
+        })
 }
 
 /// One call of the model's, as both runners run it.
@@ -3951,6 +3978,47 @@ mod tests {
             .cloned()
             .collect();
         assert_eq!(few_tools(few.clone(), &asked), few);
+        // A note that names a function behind it is given that one at
+        // once, setup's step still among them; the rest stay behind it.
+        let noted = [
+            Message::system("You are a lamp."),
+            Message::system(crate::onboarding::WHO_NOTE),
+            Message::user("I'm Ana."),
+        ];
+        let given = names(&few_tools(declared.clone(), &noted));
+        assert!(
+            given.iter().any(|name| name == "remember_my_face"),
+            "{given:?}"
+        );
+        assert!(given.iter().any(|name| name == MORE), "{given:?}");
+        assert!(!given.iter().any(|name| name == "the_time"), "{given:?}");
+        let with_step: Vec<_> = declared
+            .iter()
+            .cloned()
+            .chain([tool(crate::onboarding::STEP)])
+            .collect();
+        let given = names(&few_tools(with_step.clone(), &noted));
+        assert!(
+            given.iter().any(|name| name == crate::onboarding::STEP),
+            "{given:?}"
+        );
+        // A plain turn still keeps it behind, and so does a word that only
+        // holds the name.
+        let given = names(&few_tools(with_step, &asked));
+        assert!(
+            given.iter().any(|name| name == crate::onboarding::STEP),
+            "{given:?}"
+        );
+        assert!(
+            !given.iter().any(|name| name == "remember_my_face"),
+            "{given:?}"
+        );
+        let inside = [Message::user("Say xremember_my_face.")];
+        let given = names(&few_tools(declared, &inside));
+        assert!(
+            !given.iter().any(|name| name == "remember_my_face"),
+            "{given:?}"
+        );
     }
 
     /// Its call is answered by the route itself, with nothing run.
