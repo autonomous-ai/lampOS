@@ -5341,6 +5341,19 @@ fn conversation_with_gate(
                             None => bus.heard(&text, finished, monotonic_us()),
                         }
                     }
+                    // A line the person finished: an answer to a step the
+                    // model ends (`docs/onboarding.md`, LAMP_ONBOARDING_NUDGE).
+                    if request.is_none()
+                        && finished
+                        && let Some(walk) = onboarding.as_mut()
+                    {
+                        walk.heard_line(&text);
+                    }
+                    if request.is_some()
+                        && let Some(walk) = onboarding.as_mut()
+                    {
+                        walk.lamp_said();
+                    }
                     // What the lamp says is its own, not a stop said over it
                     // (#828, `heard-always`), stamped with when it will be
                     // heard: the reply's audio queued ahead of it plays
@@ -7994,7 +8007,7 @@ fn conversation_with_gate(
                     owner,
                     reply,
                     &mut provider_queue,
-                    note,
+                    &note,
                     false,
                     "lamp_leads_setup",
                     provider_session,

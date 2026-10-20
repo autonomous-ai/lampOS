@@ -25,6 +25,11 @@ use std::{
 
 pub const ENVIRONMENT: &str = "LAMP_ONBOARDING";
 pub const FILE_ENVIRONMENT: &str = "LAMP_ONBOARDING_FILE";
+/// `on`: a step the model ends is nudged to report itself once answered,
+/// "who you are" falls back to the name heard, and "where you sit" takes a
+/// steady face after its guide while the head moves (row 10 try 4 on
+/// lamp-52e6). Off: the walk as before.
+pub const NUDGE_ENVIRONMENT: &str = "LAMP_ONBOARDING_NUDGE";
 /// The provider worker's flag: the onboarding file, whose mailbox it writes.
 pub const FLAG: &str = "--onboarding-file";
 pub const STEP: &str = "setup_step";
@@ -41,6 +46,9 @@ const GUIDE_EVERY_US: u64 = 8_000_000;
 /// A step the model leads and never reports has failed after this long,
 /// once the room has been quiet for [`TIMED_OUT_QUIET_US`].
 const STEP_GIVE_UP_US: u64 = 90_000_000;
+/// "Who you are", with the nudge on: the name heard is asked back no
+/// sooner than this after the nudge, so an answer on the face can come.
+const ASK_BACK_AFTER_US: u64 = 10_000_000;
 const TIMED_OUT_QUIET_US: u64 = 20_000_000;
 /// Nobody in front of the lamp this long: the step being led is dropped and
 /// asked again when someone is back.
@@ -51,11 +59,20 @@ const READ_EVERY_US: u64 = 500_000;
 /// middle of the picture its centre may be (-1 to 1 across and down).
 const NEAR: f32 = 0.14;
 const MIDDLE: f32 = 0.25;
+/// "Where you sit" after its guide, with the nudge on: how far a face's
+/// centre may wander and still be held.
+const STEADY: f32 = 0.1;
+/// "Where you sit", with the nudge on: the walk begins only once a face
+/// at least [`NEAR`] has stayed this long, so someone passing far behind
+/// an empty seat does not start it (row 10 try 5 on lamp-52e6: seated,
+/// 0.14 to 0.18).
+const LINGER_US: u64 = 2_000_000;
 /// A look on the bus older than this says nothing of now.
 const FRESH_MS: u64 = 700;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Step {
+    #[default]
     WhereYouSit,
     WhoYouAre,
     HowYouSound,
@@ -124,6 +141,18 @@ impl Step {
         }
     }
 
+    /// A step only the model's `setup_step` ends: the note to report it,
+    /// and how many answered lines it waits for first (row 10 try 4 on
+    /// lamp-52e6: the name heard, the step never reported).
+    fn nudge(self) -> Option<(&'static str, u8)> {
+        match self {
+            Step::WhoYouAre => Some((WHO_NUDGE, 1)),
+            // Two questions, one at a time: nudged after the second answer.
+            Step::Preferences => Some((PREFERENCES_NUDGE, 2)),
+            _ => None,
+        }
+    }
+
     /// The one move the body is asked for when the step is done (#841,
     /// First's addition 1): a nod when it sees them well, a greeting when
     /// it knows them, a nod for the rest. The body has no lean yet.
@@ -148,6 +177,10 @@ pub const SIT_DONE: &str =
     "(Now you can see them well where they sit. Tell them so in a few words.)";
 pub const SIT_FAILED: &str = "(You still cannot see them well where they sit. Tell them in a few light words that it is fine: they can turn you toward their seat later, or ask you to redo the setup.)";
 pub const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Then call setup_step with step \"who_you_are\": done, skipped if they would rather not, or failed if it could not be done, and then tell them in a few words what they can try later.)";
+pub const WHO_NUDGE: &str = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)";
+pub const PREFERENCES_NUDGE: &str = "(They have answered. Call setup_step with step \"preferences\" now, before you say anything else.)";
+pub const WHO_AGAIN: &str =
+    "(That was not their name. Ask them once more, in a few words, what you should call them.)";
 pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask them two short things, one at a time: whether there are hours when you should keep quiet, and whether you may say hello when they sit down. Keep each answer as a rule if you can. Then call setup_step with step \"preferences\", and tell them in a few words that is everything, and that they can ask you to redo the setup any time.)";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -183,6 +216,14 @@ impl Framing {
     fn good(&self) -> bool {
         self.size >= NEAR && self.x.abs() <= MIDDLE && self.y.abs() <= MIDDLE
     }
+
+    /// Still where `from` was: centre within [`STEADY`] each way, size
+    /// within a fifth.
+    fn steady(&self, from: &Framing) -> bool {
+        (self.x - from.x).abs() <= STEADY
+            && (self.y - from.y).abs() <= STEADY
+            && (self.size - from.size).abs() <= from.size * 0.2
+    }
 }
 
 /// What a step came to, as kept in the onboarding file.
@@ -203,11 +244,37 @@ pub struct Progress {
     pub steps: BTreeMap<String, Kept>,
 }
 
+#[derive(Default)]
 struct Led {
     step: Step,
     asked_us: Option<u64>,
     held_since: Option<u64>,
     guided_us: Option<u64>,
+    /// "Where you sit" after its guide: the framing the hold began at.
+    held_at: Option<Framing>,
+    /// Lines with words the person has said since the step was asked.
+    answers: u8,
+    /// When the one note to report the step was given.
+    nudged_us: Option<u64>,
+    /// "Who you are": whether the lamp has spoken since the ask, and
+    /// whether a line after that has been looked at for a name.
+    spoke: bool,
+    name_heard: bool,
+    /// "Who you are": the first line after the ask, when it could be a
+    /// name. Kept here only, never recorded.
+    name: Option<String>,
+    confirm: Confirm,
+}
+
+/// "Who you are"'s fallback: the name heard, asked back once.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Confirm {
+    #[default]
+    NotAsked,
+    /// "Did I get that right?" asked; their answer, once heard.
+    Asked(Option<bool>),
+    /// Said no: asked once more for the name, and no fallback again.
+    Over,
 }
 
 pub struct Onboarding {
@@ -233,6 +300,12 @@ pub struct Onboarding {
     available: fn(Step) -> bool,
     /// The move asked of the body for a step just done, until taken.
     gesture: Option<&'static str>,
+    /// [`NUDGE_ENVIRONMENT`].
+    nudge: bool,
+    /// Whether no hand was on the lamp at the body's last reading.
+    released: bool,
+    /// Since when a face at least [`NEAR`] has been seen without a break.
+    near_since: Option<u64>,
 }
 
 /// What a read of a body topic found: nothing ever, a message
@@ -293,6 +366,7 @@ impl Onboarding {
         )?;
         let mut walk = Self::at(file);
         walk.eyes = lamp_bus::Bus::from_environment().ok();
+        walk.nudge = std::env::var(NUDGE_ENVIRONMENT).as_deref() == Ok("on");
         Some(walk)
     }
 
@@ -318,6 +392,9 @@ impl Onboarding {
             felt: None,
             goals: None,
             body_heard: false,
+            nudge: false,
+            released: true,
+            near_since: None,
         }
     }
 
@@ -404,6 +481,7 @@ impl Onboarding {
             Heard::Never => !self.body_heard,
             Heard::Stale => false,
         };
+        self.released = released;
         head && released
     }
 
@@ -423,6 +501,54 @@ impl Onboarding {
         nearest(&message.parse::<lamp_msgs::Faces>().ok()?)
     }
 
+    /// A line the person finished saying: with the nudge on, an answer to
+    /// a step the model ends ([`Step::nudge`]) being led.
+    pub fn heard_line(&mut self, text: &str) {
+        let Some(led) = self
+            .led
+            .as_mut()
+            .filter(|led| self.nudge && led.asked_us.is_some() && led.step.nudge().is_some())
+        else {
+            return;
+        };
+        if !text.chars().any(char::is_alphanumeric) {
+            return;
+        }
+        led.answers = led.answers.saturating_add(1);
+        // Only the first line after the lamp has asked its question.
+        if led.step == Step::WhoYouAre && led.spoke && !led.name_heard {
+            led.name_heard = true;
+            led.name = name_in(text);
+        }
+        if led.confirm == Confirm::Asked(None) {
+            led.confirm = Confirm::Asked(yes_or_no(text));
+        }
+    }
+
+    /// The lamp's own words, as they come: after a step's ask, its
+    /// question has been spoken.
+    pub fn lamp_said(&mut self) {
+        if let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some()) {
+            led.spoke = true;
+        }
+    }
+
+    /// With the nudge on, once a step the model ends is over: whether its
+    /// note was answered, nudged and reported, as counts, never words.
+    fn nudge_record(&mut self, reported: bool, now_us: u64) {
+        if let Some(led) = self.led.as_ref()
+            && self.nudge
+            && led.asked_us.is_some()
+            && led.step.nudge().is_some()
+        {
+            self.records
+                .push(json!({"kind":"onboarding_nudge","step":led.step.name(),
+                "noted":true,"answers":led.answers,"nudged":led.nudged_us.is_some(),"reported":reported,
+                "name_asked_back":led.confirm != Confirm::NotAsked,
+                "name_confirmed":led.confirm == Confirm::Asked(Some(true)),"at_us":now_us}));
+        }
+    }
+
     /// Call every loop. `quiet_us` is how long nothing has been said to the
     /// lamp or by it; `can_speak` that it may begin a turn of its own now;
     /// `face` the near face; `still` that the head is still and no hand is
@@ -436,7 +562,7 @@ impl Onboarding {
         paused: bool,
         face: Option<Framing>,
         still: bool,
-    ) -> Option<&'static str> {
+    ) -> Option<String> {
         if self
             .read_us
             .is_none_or(|at| now_us.saturating_sub(at) >= READ_EVERY_US)
@@ -447,9 +573,15 @@ impl Onboarding {
         if face.is_some() {
             self.seen_us = Some(now_us);
         }
+        if face.is_some_and(|face| face.size >= NEAR) {
+            self.near_since.get_or_insert(now_us);
+        } else {
+            self.near_since = None;
+        }
         if paused {
             // The keeper's pause stops the walk; a step being led is asked
             // again afterwards.
+            self.nudge_record(false, now_us);
             if self.led.take().is_some_and(|led| led.asked_us.is_some()) {
                 self.records
                     .push(json!({"kind":"onboarding_stopped","why":"paused","at_us":now_us}));
@@ -460,7 +592,7 @@ impl Onboarding {
             && can_speak
         {
             self.owed = None;
-            return Some(note);
+            return Some(note.into());
         }
         let step = loop {
             let Some(step) = self.next_step() else {
@@ -479,9 +611,7 @@ impl Onboarding {
         if self.led.as_ref().is_none_or(|led| led.step != step) {
             self.led = Some(Led {
                 step,
-                asked_us: None,
-                held_since: None,
-                guided_us: None,
+                ..Led::default()
             });
         }
         let gone = self
@@ -489,7 +619,15 @@ impl Onboarding {
             .is_none_or(|seen| now_us.saturating_sub(seen) >= GONE_US);
         let led = self.led.as_mut()?;
         let Some(asked_us) = led.asked_us else {
-            if can_speak && face.is_some() && quiet_us >= START_QUIET_US {
+            // With the nudge on, the walk's first ask waits for someone
+            // near and staying ([`LINGER_US`]); before that, nothing is said.
+            let there = if self.nudge && step == Step::WhereYouSit {
+                self.near_since
+                    .is_some_and(|since| now_us.saturating_sub(since) >= LINGER_US)
+            } else {
+                face.is_some()
+            };
+            if can_speak && there && quiet_us >= START_QUIET_US {
                 led.asked_us = Some(now_us);
                 led.guided_us = Some(now_us);
                 let again = self.kept.steps.get_mut(step.name()).map(|kept| {
@@ -502,11 +640,12 @@ impl Onboarding {
                 if again.is_some() {
                     self.save();
                 }
-                return Some(step.note());
+                return Some(step.note().into());
             }
             return None;
         };
         if gone {
+            self.nudge_record(false, now_us);
             self.led = None;
             self.records.push(
                 json!({"kind":"onboarding_stopped","why":"nobody_there","step":step.name(),"at_us":now_us}),
@@ -516,31 +655,93 @@ impl Onboarding {
         if step != Step::WhereYouSit {
             if now_us.saturating_sub(asked_us) >= STEP_GIVE_UP_US && quiet_us >= TIMED_OUT_QUIET_US
             {
+                self.nudge_record(false, now_us);
                 self.finish(step, Outcome::Failed, None, now_us);
+                return None;
+            }
+            let (nudge, answers) = step.nudge().filter(|_| self.nudge)?;
+            // "Did I get that right?" answered yes: kept as the model's
+            // done would be. No: asked once more, then as before.
+            if led.confirm == Confirm::Asked(Some(true)) {
+                self.nudge_record(false, now_us);
+                self.finish(step, Outcome::Done, None, now_us);
+                return None;
+            }
+            let at_rest = can_speak && quiet_us >= START_QUIET_US;
+            if led.confirm == Confirm::Asked(Some(false)) && at_rest {
+                led.confirm = Confirm::Over;
+                return Some(WHO_AGAIN.into());
+            }
+            // Answered and not reported: one note, at the next quiet moment.
+            if led.answers >= answers && led.nudged_us.is_none() && at_rest {
+                led.nudged_us = Some(now_us);
+                return Some(nudge.into());
+            }
+            // Nudged and still not reported: the name heard, asked back,
+            // and not while an answer on the face may still be coming.
+            if led
+                .nudged_us
+                .is_some_and(|at| now_us.saturating_sub(at) >= ASK_BACK_AFTER_US)
+                && led.confirm == Confirm::NotAsked
+                && at_rest
+                && let Some(name) = led.name.as_ref()
+            {
+                let note = format!(
+                    "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, {name}?\" Nothing more.)"
+                );
+                led.confirm = Confirm::Asked(None);
+                return Some(note);
             }
             return None;
         }
         // Where you sit: what the eyes see ends it, and only while the head
         // is still and no hand is on the lamp: a lamp turning toward them,
         // or being turned, can pass through a good framing mid-move. Any
-        // motion starts the three seconds again.
-        match face.filter(|face| still && face.good()) {
+        // motion starts the three seconds again. With the nudge on, after a
+        // guide, any face that stays where it is ([`Framing::steady`]) is
+        // taken there while no hand is on the lamp, still head or not: a
+        // person beside the lamp would just say "there's fine", and the
+        // body's gaze kept nudging the head, so it was never still for 3 s
+        // (row 10 try 4 on lamp-52e6).
+        let settled = self.nudge && led.guided_us.is_some_and(|at| at > asked_us);
+        let released = self.released;
+        let held = if settled {
+            face.filter(|_| released)
+        } else {
+            face.filter(|face| still && face.good())
+        };
+        match held {
             Some(framing) => {
+                // A face that moved begins the hold again where it is now.
+                if settled && led.held_at.is_some_and(|from| !framing.steady(&from)) {
+                    led.held_since = None;
+                }
+                if led.held_since.is_none() {
+                    led.held_at = Some(framing);
+                }
                 let since = *led.held_since.get_or_insert(now_us);
                 if now_us.saturating_sub(since) >= HOLD_US {
                     self.finish(step, Outcome::Done, Some(framing), now_us);
                     self.owed = Some(SIT_DONE);
+                    return None;
                 }
-                return None;
+                // Settled, a face that never stays still fails at 60 s.
+                if !settled {
+                    return None;
+                }
             }
-            None => led.held_since = None,
+            None => {
+                led.held_since = None;
+                led.held_at = None;
+            }
         }
         if now_us.saturating_sub(asked_us) >= SIT_GIVE_UP_US {
             self.finish(step, Outcome::Failed, face, now_us);
             self.owed = Some(SIT_FAILED);
             return None;
         }
-        if can_speak
+        if held.is_none()
+            && can_speak
             && quiet_us >= GUIDE_EVERY_US
             && led
                 .guided_us
@@ -555,7 +756,7 @@ impl Onboarding {
             self.records.push(
                 json!({"kind":"onboarding_guide","step":step.name(),"face":face,"at_us":now_us}),
             );
-            return Some(note);
+            return Some(note.into());
         }
         None
     }
@@ -675,6 +876,7 @@ impl Onboarding {
                 .as_ref()
                 .is_some_and(|led| led.step == step && led.asked_us.is_some());
             if led && step.reportable(outcome) {
+                self.nudge_record(true, now_us);
                 self.finish(step, outcome, None, now_us);
             } else {
                 self.records.push(
@@ -735,6 +937,68 @@ fn head_still(joints: &lamp_msgs::JointState, goals: &mut Option<[f64; 3]>) -> b
     let unchanged = goals.is_none_or(|before| before == now);
     *goals = Some(now);
     unchanged
+}
+
+/// Words of a line, lower case, without the marks around them.
+fn words_of(text: &str) -> Vec<String> {
+    text.split_whitespace()
+        .map(|word| {
+            word.trim_matches(|c: char| !c.is_alphanumeric())
+                .to_lowercase()
+        })
+        .filter(|word| !word.is_empty())
+        .collect()
+}
+
+/// A short line's yes or no; anything else is neither.
+fn yes_or_no(text: &str) -> Option<bool> {
+    let words = words_of(text);
+    if words.is_empty() || words.len() > 4 {
+        return None;
+    }
+    let has = |set: &[&str]| words.iter().any(|word| set.contains(&word.as_str()));
+    if has(&["no", "nope", "nah", "not", "wrong"]) {
+        Some(false)
+    } else if has(&[
+        "yes", "yeah", "yep", "yup", "right", "correct", "exactly", "sure",
+    ]) {
+        Some(true)
+    } else {
+        None
+    }
+}
+
+/// A line that could be only a name: one or two words, after an "I'm",
+/// and no question, yes, no, greeting or thanks. English words only.
+fn name_in(text: &str) -> Option<String> {
+    let greets = ["hello", "hi", "hey", "okay", "ok", "thanks", "thank"];
+    if text.contains('?')
+        || yes_or_no(text).is_some()
+        || words_of(text)
+            .iter()
+            .any(|word| greets.contains(&word.as_str()))
+    {
+        return None;
+    }
+    let mut words: Vec<&str> = text
+        .split_whitespace()
+        .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()))
+        .filter(|word| !word.is_empty())
+        .collect();
+    if words
+        .first()
+        .is_some_and(|word| ["i'm", "im", "it's", "its"].contains(&word.to_lowercase().as_str()))
+    {
+        words.remove(0);
+    }
+    let asks = ["what", "why", "how", "who", "where", "when", "which"];
+    if words
+        .first()
+        .is_some_and(|word| asks.contains(&word.to_lowercase().as_str()))
+    {
+        return None;
+    }
+    (1..=2).contains(&words.len()).then(|| words.join(" "))
 }
 
 fn unix_ms() -> u64 {
@@ -892,7 +1156,14 @@ mod tests {
         }
 
         /// Ticks every quarter second for `for_us`, returning the notes begun.
-        fn wait(&mut self, for_us: u64, face: Option<Framing>) -> Vec<&'static str> {
+        /// A room with [`NUDGE_ENVIRONMENT`] on.
+        fn nudged(name: &str) -> Self {
+            let mut room = Self::new(name);
+            room.walk.nudge = true;
+            room
+        }
+
+        fn wait(&mut self, for_us: u64, face: Option<Framing>) -> Vec<String> {
             let mut notes = Vec::new();
             let until = self.at + for_us;
             while self.at < until {
@@ -908,6 +1179,22 @@ mod tests {
             notes
         }
 
+        /// As [`Self::wait`], the face jumping between `a` and `b` every
+        /// half second.
+        fn jumping(&mut self, for_us: u64, a: Framing, b: Framing) -> Vec<String> {
+            let until = self.at + for_us;
+            let mut notes = Vec::new();
+            while self.at < until {
+                let face = if (self.at / (S / 2)).is_multiple_of(2) {
+                    a
+                } else {
+                    b
+                };
+                notes.extend(self.wait(S / 2, Some(face)));
+            }
+            notes
+        }
+
         fn outcome(&self, step: Step) -> Option<Outcome> {
             self.walk
                 .kept()
@@ -918,6 +1205,11 @@ mod tests {
     }
 
     const NONE: [&str; 0] = [];
+    const LEFT: Framing = Framing {
+        size: 0.2,
+        x: -0.7,
+        y: -0.1,
+    };
     const SIDE: Framing = Framing {
         size: 0.2,
         x: 0.7,
@@ -1246,8 +1538,8 @@ mod tests {
         let mut room = Room::new("moving");
         room.still = false;
         let notes = room.wait(30 * S, Some(NEAR_MIDDLE));
-        assert_eq!(notes.first(), Some(&SIT_NOTE));
-        assert!(!notes.contains(&SIT_DONE));
+        assert_eq!(notes.first().map(String::as_str), Some(SIT_NOTE));
+        assert!(!notes.iter().any(|note| note == SIT_DONE));
         assert_eq!(room.outcome(Step::WhereYouSit), None);
         // Still now: three seconds complete it.
         room.still = true;
@@ -1264,6 +1556,190 @@ mod tests {
         assert_eq!(room.outcome(Step::WhereYouSit), None);
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Done));
+    }
+
+    #[test]
+    fn with_the_nudge_a_steady_face_after_the_guide_is_a_seat_while_the_gaze_moves_the_head() {
+        // Row 10 try 4 on lamp-52e6: the face in 39 of 40 looks, the head
+        // never still for 3 s.
+        let drifted = Framing {
+            size: 0.22,
+            x: 0.75,
+            y: -0.05,
+        };
+        let mut room = Room::nudged("gazed");
+        let mut notes = Vec::new();
+        // The head moving every other second, the face drifting a little.
+        for second in 0..16 {
+            room.still = second % 2 == 1;
+            let face = if second % 2 == 0 { SIDE } else { drifted };
+            notes.extend(room.wait(S, Some(face)));
+            if room.outcome(Step::WhereYouSit).is_some() {
+                break;
+            }
+        }
+        assert_eq!(notes, [SIT_NOTE, SIT_TURN, SIT_DONE]);
+        assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Done));
+        assert!(room.at <= 15 * S);
+        // Off: the same room is never done.
+        let mut off = Room::new("gazed-off");
+        for second in 0..30 {
+            off.still = second % 2 == 1;
+            off.wait(S, Some(if second % 2 == 0 { SIDE } else { drifted }));
+        }
+        assert_eq!(off.outcome(Step::WhereYouSit), None);
+        // A face jumping around is not one, and fails at 60 s.
+        let mut room = Room::nudged("jumping");
+        room.still = false;
+        assert_eq!(room.jumping(30 * S, SIDE, LEFT), [SIT_NOTE, SIT_TURN]);
+        assert_eq!(room.outcome(Step::WhereYouSit), None);
+        assert_eq!(room.jumping(35 * S, SIDE, LEFT), [SIT_FAILED]);
+        assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Failed));
+    }
+
+    #[test]
+    fn with_the_nudge_the_walk_waits_for_a_near_face_that_stays() {
+        // Row 10 try 5 on lamp-52e6: someone walking by far behind the empty
+        // seat started the walk; seated, the face was 0.14 to 0.18.
+        let passing = Framing {
+            size: 0.06,
+            x: 0.3,
+            y: -0.2,
+        };
+        let mut room = Room::nudged("passing");
+        assert_eq!(room.wait(30 * S, Some(passing)), NONE);
+        // Near, but gone again within two seconds: still nothing.
+        assert_eq!(room.wait(S + S / 2, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.wait(S, Some(passing)), NONE);
+        // Near and staying two seconds: the walk begins.
+        assert_eq!(room.wait(S + S * 3 / 4, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.wait(S / 2, Some(NEAR_MIDDLE)), [SIT_NOTE]);
+        // Off: the passing face starts it, as before.
+        let mut off = Room::new("passing-off");
+        assert_eq!(off.wait(4 * S, Some(passing)), [SIT_NOTE]);
+    }
+
+    #[test]
+    fn with_the_nudge_a_hand_on_the_lamp_still_keeps_the_seat_open() {
+        let pushed = || {
+            Heard::Fresh(lamp_msgs::Hand {
+                pushed: true,
+                since_us: 5,
+            })
+        };
+        let mut room = Room::nudged("hand");
+        felt(&mut room, 30 * S, || Heard::Fresh(body(1.0)), pushed);
+        assert_eq!(room.outcome(Step::WhereYouSit), None);
+        // Let go, the head still moving: the steady face is the seat.
+        felt(
+            &mut room,
+            4 * S,
+            || Heard::Fresh(body(1.0)),
+            || Heard::Fresh(RELEASED),
+        );
+        assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Done));
+    }
+
+    /// A room led to "who you are", with the nudge on or off.
+    fn at_who(name: &str, nudge: bool) -> Room {
+        let mut room = Room::new(name);
+        room.walk.nudge = nudge;
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room
+    }
+
+    fn nudge_records(room: &mut Room) -> Vec<Value> {
+        let records = room.walk.take_records();
+        assert!(!serde_json::to_string(&records).unwrap().contains("Tovi"));
+        records
+            .into_iter()
+            .filter(|line| line["kind"] == "onboarding_nudge")
+            .collect()
+    }
+
+    #[test]
+    fn a_step_the_model_ends_is_nudged_once_after_it_is_answered() {
+        // Row 10 try 4 on lamp-52e6: the name heard, no setup_step called.
+        let mut room = at_who("nudged", true);
+        room.walk.heard_line("My name is Tovi Ama.");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NUDGE]);
+        // A second line: no second note, and no name to ask back.
+        room.walk.heard_line("Okay.");
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        let counted = nudge_records(&mut room);
+        assert_eq!(counted.len(), 1);
+        assert_eq!(counted[0]["answers"], 2);
+        assert_eq!(counted[0]["nudged"], true);
+        assert_eq!(counted[0]["reported"], true);
+        // The preferences: nudged only after both answers.
+        room.walk.heard_line("After ten at night.");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), NONE);
+        room.walk.heard_line("Yes, please.");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NUDGE]);
+        // A line with no words: none.
+        let mut room = at_who("wordless", true);
+        room.walk.heard_line("...");
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        // Reported before the quiet moment: none.
+        let mut room = at_who("reported", true);
+        room.walk.heard_line("Tovi.");
+        report(&room.walk, "who_you_are", "done");
+        // The model's own words after its call.
+        room.said = room.at;
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        // Off: none.
+        let mut room = at_who("off", false);
+        room.walk.heard_line("Tovi.");
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(nudge_records(&mut room).is_empty());
+    }
+
+    #[test]
+    fn a_name_said_alone_is_asked_back_and_kept_on_a_yes() {
+        let asked = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, Tovi?\" Nothing more.)";
+        let mut room = at_who("yes", true);
+        room.walk.lamp_said();
+        room.walk.heard_line("I'm Tovi.");
+        assert_eq!(room.wait(3 * S, Some(NEAR_MIDDLE)), [WHO_NUDGE]);
+        // Not while an answer on the face may still be coming.
+        assert_eq!(room.wait(6 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [asked]);
+        room.walk.heard_line("Yes, that's right.");
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        let counted = nudge_records(&mut room);
+        assert_eq!(counted[0]["name_asked_back"], true);
+        assert_eq!(counted[0]["name_confirmed"], true);
+        assert_eq!(counted[0]["reported"], false);
+        // No: asked once more, then never asked back again.
+        let mut room = at_who("no", true);
+        room.walk.lamp_said();
+        room.walk.heard_line("Tovi");
+        assert_eq!(room.wait(3 * S, Some(NEAR_MIDDLE)), [WHO_NUDGE]);
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), [asked]);
+        room.walk.heard_line("No.");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_AGAIN]);
+        room.walk.heard_line("Tovina");
+        assert_eq!(room.wait(15 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        // A question is not a name.
+        let mut room = at_who("question", true);
+        room.walk.lamp_said();
+        room.walk.heard_line("Why do you ask?");
+        assert_eq!(room.wait(3 * S, Some(NEAR_MIDDLE)), [WHO_NUDGE]);
+        assert_eq!(room.wait(15 * S, Some(NEAR_MIDDLE)), NONE);
+        // Nor a line heard before the lamp asked its question.
+        let mut room = at_who("early", true);
+        room.walk.heard_line("Tovi");
+        assert_eq!(room.wait(3 * S, Some(NEAR_MIDDLE)), [WHO_NUDGE]);
+        assert_eq!(room.wait(15 * S, Some(NEAR_MIDDLE)), NONE);
+        for line in ["What?", "Sure.", "Hello", "Okay", "Thanks", "Hi there"] {
+            assert_eq!(name_in(line), None, "{line}");
+        }
+        assert_eq!(name_in("Tovi Ama"), Some("Tovi Ama".into()));
     }
 
     #[test]
@@ -1340,8 +1816,8 @@ mod tests {
             y: 0.0,
         };
         let notes = room.wait(64 * S, Some(far));
-        assert_eq!(notes.first(), Some(&SIT_NOTE));
-        assert_eq!(notes.last(), Some(&SIT_FAILED));
+        assert_eq!(notes.first().map(String::as_str), Some(SIT_NOTE));
+        assert_eq!(notes.last().map(String::as_str), Some(SIT_FAILED));
         assert!(
             notes[1..notes.len() - 1]
                 .iter()
