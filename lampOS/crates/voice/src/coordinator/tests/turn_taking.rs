@@ -2061,6 +2061,33 @@ fn a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds() {
         wait(&h, false, Some(trigger - call - 1), trigger),
         WhileOwnLineWaits::Wait
     );
+    // The line's own person (#2287's follow-up): a face seen speaking
+    // through the sound, turned to the lamp, decides it at once; the room's
+    // sound with no such face waits. The name still comes first.
+    let theirs = OwnLineWait {
+        theirs: true,
+        ..heard
+    };
+    assert_eq!(
+        while_own_line_waits(theirs, h.reply.as_ref(), &candidate, trigger),
+        WhileOwnLineWaits::Theirs
+    );
+    assert_eq!(
+        while_own_line_waits(
+            OwnLineWait {
+                name_began_us: Some(trigger),
+                ..theirs
+            },
+            h.reply.as_ref(),
+            &candidate,
+            trigger
+        ),
+        WhileOwnLineWaits::Decide
+    );
+    assert_eq!(
+        while_own_line_waits(heard, h.reply.as_ref(), &candidate, trigger),
+        WhileOwnLineWaits::Wait
+    );
     // The line sounds: one that waited is let go, one begun now is a cut-in
     // as before.
     h.reply.as_mut().unwrap().had_audio = true;
@@ -2182,4 +2209,115 @@ fn while_an_answer_waits_a_sound_begun_as_the_body_moves_is_its_own() {
         body_heard(unasked, None, false, None, &candidate),
         Judged::Still
     );
+}
+
+/// #2287's follow-up, way 1: with `LAMP_WAIT_KEEPS_ANSWER=words`, a sound
+/// waiting on the lamp's own line is judged by its words as the answer's
+/// wait judges them. A lone "Stop." stops the line; "Not now." asks
+/// something and is decided as before, so it takes the turn and the line
+/// ends; nothing said leaves it waiting. An outcome that isn't a wait or a
+/// let-go is passed on as it is, and nothing is asked.
+#[test]
+fn with_words_a_stop_said_before_the_own_line_sounds_stops_it() {
+    use crate::activity::ObservedAudio;
+    let base = 10_000_000;
+    let candidate = crate::admission::Candidate {
+        id: crate::admission::CandidateId::for_test(1),
+        capture: Harness::new(TurnTaking::Duplex).lineage,
+        displaced_owner: None,
+        trigger_sequence: 6,
+        trigger_read_at_us: base + 60_000,
+        first_read_at_us: base,
+        decision_deadline_us: base + 2_000_000,
+    };
+    let audio: Vec<ObservedAudio> = (0..30u64)
+        .map(|index| ObservedAudio {
+            sequence: index + 1,
+            captured_at_us: base + index * 10_000,
+            samples: [400; 160],
+        })
+        .collect();
+    let spoke_until = base + 29 * 10_000;
+    let quiet = crate::wait_words::ASK_AFTER_QUIET_BLOCKS;
+    for (said, then) in [
+        ("Stop.", WhileOwnLineWaits::Stop),
+        ("Not now.", WhileOwnLineWaits::Decide),
+        ("", WhileOwnLineWaits::Wait),
+    ] {
+        let (mut words, script) = crate::wait_words::tests::scripted();
+        words.follow(true, true);
+        let wait = WhileOwnLineWaits::Wait;
+        let (own, told) = own_line_with_words(
+            &mut words,
+            wait,
+            &candidate,
+            &audio,
+            false,
+            0,
+            spoke_until,
+            base + 300_000,
+        );
+        assert_eq!(
+            (own, told.is_some()),
+            (wait, false),
+            "{said}: heard while it speaks"
+        );
+        let (own, _) = own_line_with_words(
+            &mut words,
+            wait,
+            &candidate,
+            &audio,
+            false,
+            quiet,
+            spoke_until,
+            base + 400_000,
+        );
+        assert_eq!(own, wait, "{said}: asked, its words not back");
+        script.lock().unwrap().words = Some(said.into());
+        let (own, told) = own_line_with_words(
+            &mut words,
+            wait,
+            &candidate,
+            &audio,
+            false,
+            quiet,
+            spoke_until,
+            base + 500_000,
+        );
+        assert_eq!(own, then, "{said:?}");
+        if then != WhileOwnLineWaits::Wait {
+            let told = told.expect("what its words did is told once");
+            assert_eq!(told.stop, then == WhileOwnLineWaits::Stop, "{said}");
+        }
+    }
+    for own in [
+        WhileOwnLineWaits::AsBefore,
+        WhileOwnLineWaits::Decide,
+        WhileOwnLineWaits::Theirs,
+    ] {
+        let (mut words, script) = crate::wait_words::tests::scripted();
+        words.follow(true, true);
+        assert_eq!(
+            own_line_with_words(
+                &mut words,
+                own,
+                &candidate,
+                &audio,
+                false,
+                quiet,
+                spoke_until,
+                base
+            ),
+            (own, None)
+        );
+        assert!(
+            !script
+                .lock()
+                .unwrap()
+                .told
+                .iter()
+                .any(|told| told == "finalize"),
+            "nothing asked for {own:?}"
+        );
+    }
 }

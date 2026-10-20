@@ -411,6 +411,33 @@ over. A move is under a second.
   before.
   - **The lamp's name** heard as the sound began (`name/rising`, up to
     `CALL_BEFORE_US` before its trigger) takes the turn at once, as before.
+  - **The line's own person** (#2287's follow-up, the first builder at 17:49
+    on 20 Oct): a sound the eyes saw a face speak through, turned to the
+    lamp, is decided as before, at once.
+    - **What counts:** speaking and `facing` in at least half of the eyes'
+      looks since the sound's first read, and at least three looks
+      (`SpeakingFaces::turned_speakers`).
+    - **Why:** that is the person at the lamp whom the hello, the walk's line
+      or the reminder is for, and their "not now" is no room's talk. The
+      record says `own_line_theirs` once, and the journal says so.
+    - **The reader:** the coordinator reads the eyes' faces every 100 ms off
+      the audio path (`speaking_faces::read_from`), only with the switch.
+      It keeps passing ids and two booleans, and nothing past 30 s.
+    - **It needs the eyes to judge speaking while the sound waits:**
+      `LAMP_EYES_SPEAKING=on` with the mouth model running. With
+      `--mouth-on-heard on` they judge it only once the voice hears a line,
+      and a sound waiting here isn't heard yet. Without that reading, the
+      person's sound waits as the room's does.
+  - **With `LAMP_WAIT_KEEPS_ANSWER=words`,** a waiting sound's words are heard
+    as the answer's wait hears them (`own_line_with_words`, through
+    `with_waited_words`; the stream is kept ready while an own line hasn't
+    sounded, `own_line_awaited`).
+    - A lone stop ("Stop.", "Wait.") is let go, never asked of the model, and
+      the line is stopped (`input_let_go_own_line` with `why` `stop_said`).
+    - Words that ask something, "not now" among them, are decided as before:
+      they take the turn, and the line ends.
+    - The record's `wait_words` says `"for":"own_line"`, with the count of
+      words only.
   - **Any other sound** is let go once the line begins to sound, or 100 ms
     before the sound's own decision deadline (`WAIT_DECIDES_BEFORE_US`). The
     line goes on. The record says `own_line_waits` once for each sound
@@ -424,14 +451,24 @@ over. A move is under a second.
     block is kept only among the mask's last reads, so a sound held longer
     couldn't be held whole (the reviewer on #2242).
 - **Its cost:** someone who answers the lamp before its hello sounds, without
-  its name, is let go with the room, and says it again over the hello or
-  after it. That includes "not now" and "stop": said before the line sounds,
-  they don't stop it, and the line plays; said over it, they do.
-- **Tested** as a function
-  (`a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds`). The
-  loop's own call isn't driven by a test, as the wait's isn't. On a lamp:
-  played room noise over three hellos before and after, and the cut-in test
-  of a person speaking over one unchanged.
+  its name, and not seen speaking to it, is let go with the room. Without
+  `words`, that includes "not now" and "stop", unless the eyes saw them
+  speaking turned to the lamp. They then say it again over the line or after
+  it, and said over it, it stops it. So the first builder keeps the switch
+  off until a lamp shows the person's own "not now" ends the hello.
+- **Tested** as functions:
+  - `a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds`, with
+    the person's case;
+  - `with_words_a_stop_said_before_the_own_line_sounds_stops_it`;
+  - `speaking_faces`' `a_face_speaking_turned_to_the_lamp_is_told_apart_from_the_room`.
+
+  The loop's own calls aren't driven by a test, as the wait's aren't. On a
+  lamp:
+  - played room noise over three hellos, before and after;
+  - the person at the lamp saying "not now" before a hello sounds, with the
+    eyes judging speaking: the hello ends;
+  - with `words`, "stop" before it sounds;
+  - the cut-in test of a person speaking over one, unchanged.
 
 **With `LAMP_ASKER_FIRST=on`, the person asked comes first while the
 answer is awaited** (`crates/voice/src/asker_first.rs`, #829; off unless
