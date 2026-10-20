@@ -7,7 +7,7 @@
 //!
 //! At first boot it only listens to `light/state`, which says what the
 //! owner took, not what it drew, so that is at best `not_checked`.
-use crate::Check;
+use crate::{Check, Clock, Host};
 use lamp_bus::Bus;
 use lamp_msgs::{Light, PartResult, Verdict};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -144,24 +144,6 @@ pub fn colours(shown: &Shown) -> PartResult {
         PartResult::new(part, Verdict::Pass, "")
     };
     result.with("drawn", shown.drawn.len())
-}
-
-/// What the colour check waits on: the host's clock on the lamp, or a
-/// test's that moves on only when the check pauses.
-trait Clock {
-    fn now(&self) -> Instant;
-    fn pause(&mut self, pause: Duration);
-}
-
-struct Host;
-
-impl Clock for Host {
-    fn now(&self) -> Instant {
-        Instant::now()
-    }
-    fn pause(&mut self, pause: Duration) {
-        std::thread::sleep(pause);
-    }
 }
 
 /// Asks for each colour on `light/test` and watches `light/drawn`.
