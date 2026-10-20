@@ -198,11 +198,17 @@ fn header_newer_version(path: &Path, held: &File) -> io::Result<Option<u32>> {
 /// `tasks.sqlite3.newer-db<version>-<s>`, its `-wal`, `-shm` and `-journal`
 /// beside it as `<kept>-wal` and so on, never deleted, with a journal line
 /// naming only the file. Sidecars go first, so a crash between leaves the
-/// database to be kept again on the next start.
-fn keep_newer(held: &File, version: impl std::fmt::Display) -> io::Result<String> {
-    let since = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| since.as_secs());
+/// database to be kept again on the next start, under its sidecars' stamp
+/// ([`orphan_stamp`]).
+fn keep_newer(path: &Path, held: &File, version: impl std::fmt::Display) -> io::Result<String> {
+    let version = version.to_string();
+    let since = match orphan_stamp(path, &version)? {
+        Some(stamp) => stamp,
+        None => std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs())
+            .to_string(),
+    };
     let kept = format!("{DATABASE}.newer-db{version}-{since}");
     for suffix in ["-wal", "-shm", "-journal"] {
         let from = format!("{DATABASE}{suffix}");
@@ -225,6 +231,63 @@ fn keep_newer(held: &File, version: impl std::fmt::Display) -> io::Result<String
         "tasks: the store was written by a newer build (database version {version}, this build reads 1); it is set aside as {kept}, and this build starts with an empty store"
     );
     Ok(kept)
+}
+
+/// The `<s>` of an earlier set-aside at this `version` whose `-wal`, `-shm`
+/// or `-journal` was renamed but not its database: a crash between the
+/// renames. The newest such stamp, reused so the database joins its
+/// sidecars again rather than taking a new one (the reviewer's P3 on #2057).
+///
+/// Only a leftover this database's crash could have left: the database's
+/// mtime no later than the ctime of each of the stamp's sidecars (their
+/// rename set it), and none of the database's own sidecars landing on a name
+/// already there. A stale leftover from an older crash, or a complete
+/// earlier set-aside, takes a new stamp instead (the reviewer's P3 on #2138).
+fn orphan_stamp(path: &Path, version: &str) -> io::Result<Option<String>> {
+    let prefix = format!("{DATABASE}.newer-db{version}-");
+    let database = fs::symlink_metadata(path.join(DATABASE))?;
+    let written = (database.mtime(), database.mtime_nsec());
+    let mut newest: Option<(u64, String)> = None;
+    'entries: for entry in fs::read_dir(path)? {
+        let name = entry?.file_name();
+        let Some(rest) = name.to_str().and_then(|name| name.strip_prefix(&prefix)) else {
+            continue;
+        };
+        let Some(stamp) = ["-wal", "-shm", "-journal"]
+            .iter()
+            .find_map(|suffix| rest.strip_suffix(suffix))
+        else {
+            continue;
+        };
+        let Ok(at) = stamp.parse::<u64>() else {
+            continue;
+        };
+        match fs::symlink_metadata(path.join(format!("{prefix}{stamp}"))) {
+            Ok(_) => continue,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+        for suffix in ["-wal", "-shm", "-journal"] {
+            let leftover = match fs::symlink_metadata(path.join(format!("{prefix}{stamp}{suffix}")))
+            {
+                Ok(leftover) => leftover,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+                Err(error) => return Err(error),
+            };
+            if (leftover.ctime(), leftover.ctime_nsec()) < written {
+                continue 'entries;
+            }
+            match fs::symlink_metadata(path.join(format!("{DATABASE}{suffix}"))) {
+                Ok(_) => continue 'entries,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+        }
+        if newest.as_ref().is_none_or(|(newest, _)| at > *newest) {
+            newest = Some((at, stamp.to_owned()));
+        }
+    }
+    Ok(newest.map(|(_, stamp)| stamp))
 }
 
 fn validate(db: &Connection) -> io::Result<()> {
@@ -358,7 +421,7 @@ impl Store {
         // database in WAL mode, or with `-wal`/`-shm` beside it, is set
         // aside with them, not refused (#1680).
         if let Some(version) = header_newer_version(&path, &held)? {
-            keep_newer(&held, version)?;
+            keep_newer(&path, &held, version)?;
         }
         check_sidecars(&path, DATABASE)?;
         if check_file(&path.join(DATABASE), MAX_DATABASE_BYTES)?.is_none() {
@@ -382,7 +445,7 @@ impl Store {
             // told or closed here; their harnesses are left as they are.
             db.close().map_err(|(_, error)| sql(error))?;
             drop(file);
-            keep_newer(&held, version)?;
+            keep_newer(&path, &held, version)?;
             initialize(&path, &held)?;
             file = open_file(&held, DATABASE, false)?;
             db = connect(&path.join(DATABASE))?;
