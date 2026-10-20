@@ -1918,6 +1918,13 @@ pub fn serve(
         {
             heeding.leaving_others_answers();
         }
+        // A conversation going on holds only for the one the lamp answered
+        // (`LAMP_GOING_ON_SAME_ONE=on`, #2191).
+        if files.going_on_same_one
+            && let Ok(mut heeding) = heeding.lock()
+        {
+            heeding.going_on_only_for_the_same_one();
+        }
         if let Some(hook) = hearing_hook(&heeding, hears, files.others_answer) {
             engine = engine.hearing(hook);
         }
@@ -2789,6 +2796,9 @@ pub(crate) struct Heeding {
     /// Leave alone a reply that answers nothing the lamp asked, said over its
     /// answer ([`crate::others_answer`]).
     others_answer: bool,
+    /// In a busy room, a conversation going on holds only for the one the
+    /// lamp answered ([`crate::going_on_same_one`]).
+    going_on_same_one: bool,
     /// The newest request, if it began over the lamp's own answer (its
     /// Start's `over_the_lamps_voice`), as [`Self::hear`] is told.
     began_over: Option<u64>,
@@ -3234,6 +3244,7 @@ impl Heeding {
             caller_faces: Vec::new(),
             cut_in: None,
             others_answer: false,
+            going_on_same_one: false,
             began_over: None,
             voices: None,
             named_always: false,
@@ -3438,6 +3449,13 @@ impl Heeding {
     /// its answer ([`crate::others_answer`], `LAMP_OTHERS_ANSWER=on`).
     pub(crate) fn leaving_others_answers(&mut self) {
         self.others_answer = true;
+    }
+
+    /// In a busy room, a conversation going on holds only for the one the
+    /// lamp answered ([`crate::going_on_same_one`],
+    /// `LAMP_GOING_ON_SAME_ONE=on`).
+    pub(crate) fn going_on_only_for_the_same_one(&mut self) {
+        self.going_on_same_one = true;
     }
 
     /// `request` ended as a cut-in over the lamp's answer: judged as one.
@@ -4029,6 +4047,21 @@ impl Heeding {
             && crate::others_answer::begins_as_an_answer(heard)
         {
             verdict = Some(crate::attention::Verdict::Hold(crate::others_answer::HELD));
+        }
+        // In a busy room, a conversation going on is the one the lamp
+        // answered (#2191): a reply to its question, or, with the same-voice
+        // check, the conversation's own voice. Office talk after a named
+        // answer is neither. Not `alone`, which needs `LAMP_SPOKEN_TO`.
+        if self.going_on_same_one
+            && busy
+            && attention.played_only_as_going_on()
+            && matches!(verdict, Some(crate::attention::Verdict::Play(_)))
+            && !lamp_asked
+            && !seen.same_voice
+        {
+            verdict = Some(crate::attention::Verdict::Hold(
+                crate::going_on_same_one::HELD,
+            ));
         }
         if busy && let Some(crate::attention::Verdict::Play(why)) = verdict {
             verdict = busy_bar(why, heard, lamp_asked)
@@ -5205,6 +5238,190 @@ mod tests {
             None
         );
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
+    /// #2191 (lamp-52e6, 20 Oct 15:2x): in a busy room, after the lamp
+    /// answered one named line, office talk between two others that came
+    /// within the going-on window was answered, "a conversation with the
+    /// lamp is going on". With `LAMP_GOING_ON_SAME_ONE=on` such a line is
+    /// held; a reply to the lamp's question, a face turned to it, and a
+    /// quiet room are as before.
+    #[test]
+    fn going_on_holds_only_for_the_one_the_lamp_answered() {
+        use crate::room_told::Room;
+        let signs = |room, going_on, lamp_asked, turned| Signs {
+            room,
+            going_on,
+            lamp_asked,
+            turned: Some(turned),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        // The window as the route reads it, 5 s after the lamp's words.
+        let window = super::went_on_told(
+            2,
+            signs(Room::Busy, true, false, false),
+            Some(Duration::from_secs(5)),
+            None,
+            None,
+            true,
+        );
+        assert!(window.going_on, "inside the busy room's 15 s");
+        let said = (10_000_000, 11_000_000);
+        // The named line answered, then `line` going on from it.
+        let judge = |same_one: bool, line: &str, line_signs: Signs| {
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if same_one {
+                heeding.going_on_only_for_the_same_one();
+            }
+            let named = signs(line_signs.room, false, false, false);
+            assert_eq!(
+                heeding.judge(1, said, "Lamp, what's the weather today?", named),
+                None,
+                "the named line is answered"
+            );
+            heeding.judge(2, said, line, line_signs)
+        };
+        let office = "I'll send the quarterly numbers to finance after lunch.";
+        let asks = "Did you see the budget numbers?";
+        // Off: played, as today.
+        assert_eq!(
+            judge(false, office, signs(Room::Busy, true, false, false)),
+            None
+        );
+        // On: held, a question too.
+        for line in [office, asks] {
+            assert_eq!(
+                judge(true, line, signs(Room::Busy, true, false, false)),
+                Some(crate::going_on_same_one::HELD),
+                "{line}"
+            );
+        }
+        // On: a reply to the lamp's own question goes on.
+        assert_eq!(
+            judge(
+                true,
+                "The blue one, please.",
+                signs(Room::Busy, true, true, false)
+            ),
+            None
+        );
+        // On: a face turned to the lamp lets a question out, as without it.
+        let turned = "And what about tomorrow?";
+        assert_eq!(
+            judge(true, turned, signs(Room::Busy, true, false, true)),
+            None
+        );
+        // On: a quiet room is as without the switch.
+        assert_eq!(
+            judge(true, office, signs(Room::Quiet, true, false, false)),
+            judge(false, office, signs(Room::Quiet, true, false, false)),
+        );
+        assert_eq!(
+            judge(true, office, signs(Room::Quiet, true, false, false)),
+            None
+        );
+    }
+
+    /// #2191 on a lamp without `LAMP_SPOKEN_TO` (lamp-52e6 and lamp-4ace):
+    /// the hold read a mark only `LAMP_SPOKEN_TO` sets, and never ran.
+    #[test]
+    fn going_on_same_one_holds_without_spoken_to() {
+        use crate::room_told::Room;
+        let signs = |going_on| Signs {
+            room: Room::Busy,
+            going_on,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let said = (10_000_000, 11_000_000);
+        let judge = |same_one: bool| {
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, false, false);
+            if same_one {
+                heeding.going_on_only_for_the_same_one();
+            }
+            heeding.judge(1, said, "Lamp, what's the weather today?", signs(false));
+            heeding.judge(
+                2,
+                said,
+                "I'll send the quarterly numbers to finance after lunch.",
+                signs(true),
+            )
+        };
+        assert_eq!(judge(false), None, "off: played, as today");
+        assert_eq!(
+            judge(true),
+            Some(crate::going_on_same_one::HELD),
+            "on: held"
+        );
+    }
+
+    /// #2191's exception: with the switch on in a busy room, a line going on
+    /// from the lamp's answer that the same-voice check finds in the
+    /// conversation's voice is played; one it finds in another voice is held.
+    #[test]
+    fn going_on_same_one_plays_the_conversations_voice_and_holds_another() {
+        use crate::room_told::Room;
+        use crate::second_provider::Heard;
+        /// Prints by a line's first sample: 1 is A's voice, -1 B's.
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let signs = |going_on| Signs {
+            room: Room::Busy,
+            going_on,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let said = (10_000_000, 11_000_000);
+        let office = "I'll send the quarterly numbers to finance after lunch.";
+        // A names the lamp and is answered, then `voice` says `office`.
+        let judge = |voice: i16| {
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.going_on_only_for_the_same_one();
+            heeding.checking_the_voice(Box::new(Voice::default()));
+            for (request, voice) in [(1, 1), (2, voice)] {
+                heeding.hear(
+                    request,
+                    Heard::Began {
+                        over_the_lamps_voice: false,
+                    },
+                );
+                heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+                heeding.hear(request, Heard::Ended);
+            }
+            assert_eq!(
+                heeding.judge(1, said, "Lamp, what's the weather today?", signs(false)),
+                None,
+                "the named line is answered"
+            );
+            heeding.judge(2, said, office, signs(true))
+        };
+        assert_eq!(judge(1), None, "the conversation's voice goes on");
+        assert!(judge(-1).is_some(), "another voice is held");
     }
 
     /// #1712, the first builder at 17:26: a call the lamp never answered

@@ -3297,6 +3297,7 @@ fn provider_arguments(
     arguments.extend(crate::holding_answer::arguments_from_environment());
     arguments.extend(crate::messages::arguments_from_environment());
     arguments.extend(crate::others_answer::arguments_from_environment());
+    arguments.extend(crate::going_on_same_one::arguments_from_environment());
     arguments.extend(crate::said_as_heard::arguments_from_environment());
     arguments.extend(crate::scoped_session::arguments_from_environment());
     if let Some(camera) = camera {

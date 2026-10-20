@@ -1690,6 +1690,25 @@ after a take-over, but now for every turn:
   answer, so both go on (the reviewer's P2 on #2175). A "Yes, go on." to an
   offer of the lamp's that isn't a question, said over its answer, is held
   too, and a held cut-in has already stopped the lamp's answer.
+  **Only the one it answered** (`LAMP_GOING_ON_SAME_ONE=on`,
+  `crate::going_on_same_one`, #2191): in a busy room, such a line is held
+  unless it answers the lamp's own question or, with
+  `LAMP_SAME_VOICE_MODEL`, the same-voice check found it in the
+  conversation's voice, `held back: a busy room: a conversation with the
+  lamp is going on, but nothing shows the line is from the one it
+  answered: not a reply to its question, not the conversation's voice`. On
+  lamp-52e6 on 20 Oct at 15:2x, after one named line was answered, four to
+  five lines of two others' office talk were answered as the conversation
+  going on. A line ending in `?` is no exception (office talk asks too); a
+  face turned to the lamp still lets a line out, and a quiet room is as
+  before. Without the voice model, a follow-up from the person it answered
+  that answers no question of the lamp's, with no face turned, is held too
+  ("Lamp, what's the weather?" answered, then "and tomorrow?" said looking
+  at the screen); the lamp run that turns the switch on must count that
+  follow-up as well as the office talk, so the cost is measured, not only
+  the talk held. With or without `LAMP_SPOKEN_TO`
+  (`Attention::played_only_as_going_on`): it first read a mark only
+  `LAMP_SPOKEN_TO` sets, and lamp-52e6 and lamp-4ace run without it.
 - **Said by name, or perhaps not for the lamp** (`worker::call_note`,
   `Engine::noting_whether_called`). Each spoken line gets one note beside
   its words. A line whose words or the lamp's name heard in its sound
