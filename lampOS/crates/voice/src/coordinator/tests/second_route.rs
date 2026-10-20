@@ -209,8 +209,9 @@ struct Seen {
     live: Vec<ProviderInput>,
     second: Vec<ProviderInput>,
     chunks: Vec<Chunk>,
-    /// Owner and microphone of every authority the speaker's guard took.
-    installs: Vec<(Option<u64>, bool)>,
+    /// Owner, microphone and camera of every authority the speaker's guard
+    /// took.
+    installs: Vec<(Option<u64>, bool, bool)>,
     phases: Vec<RingPhase>,
     stopped: Vec<&'static str>,
 }
@@ -1026,6 +1027,7 @@ impl Peers {
             self.seen.lock().unwrap().installs.push((
                 snapshot.owner().map(|owner| owner.turn()),
                 snapshot.microphone_permission() == Permission::Allowed,
+                snapshot.camera_permission() == Permission::Allowed,
             ));
         }
     }
@@ -2981,5 +2983,46 @@ fn the_second_route_alone_gives_mood_what_was_heard_and_the_voices_phases() {
         RingPhase::Speaking,
     ] {
         assert!(phases.contains(&phase), "{phase:?}: {phases:?}");
+    }
+}
+
+/// #2233 through the session (the reviewer's P3, 16:46): with
+/// `LAMP_CAMERA_FOLLOWS_EYES=on`, a voice whose camera is the eyes' own (an
+/// eyes link and no camera of its own) publishes the camera permitted in the
+/// authority with the microphone, and denied with it after the mute. Without
+/// the switch, the camera is never permitted.
+#[test]
+fn with_the_switch_the_eyes_camera_is_permitted_with_the_microphone_through_the_session() {
+    let _one = super::pilot_faults::one_session();
+    for on in [false, true] {
+        let directory = std::env::temp_dir().join(format!(
+            "lamp-voice-eyes-camera-{on}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let permit = directory.join("permit.sock");
+        let _eyes = std::os::unix::net::UnixDatagram::bind(&permit).unwrap();
+        TEST_EYES.with(|eyes| {
+            *eyes.borrow_mut() = Some(crate::body_link::EyesLink::to(permit).unwrap())
+        });
+        TEST_CAMERA_FOLLOWS_EYES.with(|follows| follows.set(on));
+        let run = run(Script::question(Live::Answer(12)));
+        TEST_CAMERA_FOLLOWS_EYES.with(|follows| follows.set(false));
+        TEST_EYES.with(|eyes| eyes.borrow_mut().take());
+        let _ = std::fs::remove_dir_all(&directory);
+        run.assert_clean();
+        let installs = dedup(&run.seen.installs);
+        assert!(
+            installs.iter().any(|install| install.1),
+            "on {on}: {installs:?}"
+        );
+        assert!(
+            installs.last().is_some_and(|install| !install.1),
+            "on {on}: {installs:?}"
+        );
+        for install in &installs {
+            assert_eq!(install.2, on && install.1, "on {on}: {installs:?}");
+        }
     }
 }
