@@ -438,11 +438,15 @@ units stopped:
    and read differently (#1764): lamp-cb94's line 97 flipped at rest and read
    touched for 77 s with no hand on it, and lamp-c0a4's pulsed under a hand.
    So `lamp-controls discover-head --seconds 40 --rest-seconds 10`, hands
-   away for its first 11 s and then each pad touched twice, finds this
+   away for its first 11 s and then each pad held about 2 s (or touched
+   twice; on lamp-c0a4 a person's two touches merged into one long one,
+   thirteen-P4), finds this
    unit's pair and polarity, which go into `head_pads`, and each pad's own
    baseline, which goes into `head_rest` (its rest, and whether a touch holds
    its level or pulses; controls.md, "Each lamp's own head pads"). A pad
-   whose line changed with hands away is refused and nothing is written. The
+   whose line changed with hands away is refused and nothing is written.
+   The step names each pad as it is found (its line, its rest, and whether
+   it read level or pulses). The
    product's 37 and 96, active-high, with no `head_rest`, are only a
    default. On an MPR121 strip it is
    `lamp-controls calibrate-touch` (controls.md, "Run without a lamp, then
@@ -687,18 +691,37 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    - **Then:** Harness at boot as above, with its record, unless already
      recorded; then `systemctl restart lamp-tasks.service`, only when
      something changed.
-   - **Safe to repeat:** a Harness already at `/usr/local/bin/harness`, put
-     there by hand or by an earlier run, is kept as it is and never
-     installed over. Run again, it changes nothing and restarts nothing.
+   - **Safe to repeat:** a Harness already at `/usr/local/bin/harness` is
+     kept as it is when `harness version` (as `lampos`) says 0.4.23 or
+     later. Run again, it changes nothing and restarts nothing.
+   - **An older one it put there is brought up to date** (#1676, the first
+     builder at 09:46 on 20 Oct): signing in by a spoken code (`harness
+     login --code`, `lamp-tasks serve --sign-in-by-code`) needs Harness
+     0.4.23. When `/usr/local/bin/harness` is `harness-on`'s own link to
+     `/var/lib/lampos-tasks/.local/bin/harness` and says an older version,
+     Harness's own installer is run again, the same steps as above, to the
+     version it ships, and `harness version` is read before and after:
+     "Harness updated from 0.4.19 to 0.4.24 by its own installer". The
+     installer writes nothing it hasn't checked against Harness's sha256
+     metadata. Harness's running daemon updates itself from then on (its
+     installer's header); this is for a lamp where it hasn't run.
+   - **`harness_too_old`, and the rest goes on,** when the installer failed,
+     when it left a version still too old, or when an older Harness at
+     `/usr/local/bin/harness` wasn't put there by `harness-on` (one put
+     there by hand is never installed over). The Harness there is kept,
+     and hand-overs go on with it; only signing in by voice waits.
    - **A failing step stops there,** before the link, so a lamp is never
      left with a link to nothing. Nothing is recorded, and the next run
      starts again.
-   - **Signing in is the person's,** not done here. Harness's box ticket
-     (`harness login --ticket`) is the way for a lamp, once the app hands it
-     one (openharness#1410).
+   - **Signing in is the person's,** not done here: by a spoken code since
+     Harness 0.4.23 (openharness#1410), with `lamp-tasks serve
+     --sign-in-by-code` and the voice's `LAMP_TASKS_SIGN_IN`.
    - **Shown only in tests** (`crates/update/tests/install.rs`): the steps
      in their order through stand-ins; a Harness already there kept; each
-     failing step leaving no link and no record; run again, nothing. On a
+     failing step leaving no link and no record; run again, nothing; its
+     own older Harness updated, a failed or still too old install and one
+     put there otherwise each kept and said `harness_too_old`
+     (`harness_on_updates_its_own_older_harness_and_says_one_too_old`). On a
      lamp, only its "already there" path is shown: lamp-75c9, 19 Oct
      19:45 (Eighth, #1843), with Harness at `/usr/local/bin` after
      `harness-off`, it said "Harness is already at /usr/local/bin/harness:
@@ -863,6 +886,11 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   not from the lamps, and lamp-4ace's `LAMP.md` and its unit files already
   disagree on builds (updates.md, "Most likely wrong").
 - Two lamps, one board. A third lamp may show another line as its own.
+- The camera's USB node rule (`99-lamp-device.rules`, #2126) gives `video`
+  write access to the ZVCAI camera's USB node, so lamp-eyes can reset a
+  stuck camera. An update reloads udev's rules but triggers nothing, so the
+  rule applies at the next boot or replug of the camera: until then each
+  reset says `not reset: Io(13)` and only the 15 s retry applies.
 - `lamp-cmedia-speaker.service` (the speaker's level, from V1) is the
   image's, not the product's: `robots/lamp/rootfs/etc/systemd/system/`, at
   step 9 (−28 dB), with the `pro` override at step 6 (−31 dB). udev starts it

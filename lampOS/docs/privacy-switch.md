@@ -127,9 +127,11 @@ timestamp is retained. See [Ears](ears.md) for that boundary.
 
 ## A lamp with no slide (`no-slide`)
 
-No lamp's pins file has a `privacy` section, so with `on` the voice fails
-closed for good ("Controls has no selected privacy source") and the
-microphones never open. `LAMP_PRIVACY_CONTROLS=no-slide`, set in Controls,
+On a board with no slide fitted, the pins file has no `privacy` section, so
+with `on` the voice fails closed for good ("Controls has no selected privacy
+source") and the microphones never open. Every lamp built to the hardware
+contract has the slide (chip 1 line 9), and an update gives its own pins file
+the section (#2143), so this is for a board without one. `LAMP_PRIVACY_CONTROLS=no-slide`, set in Controls,
 Voice and Ears together, runs the same route on a lamp with no slide.
 
 **What grants.** Controls reads no line, and its start line says `privacy
@@ -220,6 +222,19 @@ Tests: `crates/controls/tests/no_slide.rs`, the no-slide tests in
 `a_no_slide_observation_regression_is_refused`. The real worker's
 `the_real_worker_with_no_slide_grants_from_its_controller_alone`
 (`privacy_worker.rs`) runs on Linux only. No lamp was used.
+
+## The switch in the lamp's health
+
+With the switch attached, Controls sends a second item on `diagnostics`
+beside its own report, once a second: `privacy switch`, from the switch's
+own fresh reading (`privacy::Source::health`, the first builder on #2143).
+Its message is `open` or `closed`. Until the switch has changed since
+Controls started, it adds `, not moved since Controls started`, and
+`changes` counts each change of the level read, so a lamp whose switch
+never moves is noticed on `lamp/health` and in `lamp-health show`. Either
+is well (`ok`): a still switch is not a fault, and a warning would mark the
+whole lamp all day. A reading that can't be had is `warn`, `unknown:` with
+its fault; Controls' own item already says the route is closed then.
 
 ## Muted appearance and timing
 

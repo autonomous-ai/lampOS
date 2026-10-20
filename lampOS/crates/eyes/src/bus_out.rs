@@ -194,7 +194,8 @@ pub enum Camera {
 /// build could not read them (`set_aside`, #1505), so that a person whose
 /// face the lamp no longer knows is told why. A count, never a name. The
 /// camera's warning comes first when there are both.
-pub fn health(camera: Camera, set_aside: usize) -> Diagnostic {
+/// `resets` counts the camera's USB device reset since it last opened (#2126).
+pub fn health(camera: Camera, set_aside: usize, resets: u32) -> Diagnostic {
     let (mut level, message, state) = match camera {
         Camera::Closed => (Level::Ok, "", "closed"),
         Camera::Open => (Level::Ok, "", "open"),
@@ -202,6 +203,14 @@ pub fn health(camera: Camera, set_aside: usize) -> Diagnostic {
         Camera::Failed => (Level::Warn, "the camera stopped giving pictures", "failed"),
     };
     let mut message = message.to_owned();
+    if resets > 0 && camera == Camera::NotOpening {
+        let times = if resets == 1 {
+            "once".to_owned()
+        } else {
+            format!("{resets} times")
+        };
+        message = format!("{message}; its USB device was reset {times}");
+    }
     if set_aside > 0 {
         if message.is_empty() {
             message = format!("the eyes set aside {set_aside} people's records they couldn't read");
@@ -211,6 +220,7 @@ pub fn health(camera: Camera, set_aside: usize) -> Diagnostic {
     Diagnostic::new(level, SOURCE, &message)
         .with("camera", state)
         .with("set_aside", set_aside)
+        .with("camera_resets", resets)
 }
 
 pub struct BusOut {
@@ -538,7 +548,7 @@ impl BusOut {
     /// Say how the eyes are. Call from the loop on every turn, whatever
     /// the camera is doing: it is said a little more often than once a
     /// second, as the topic promises, and no more.
-    pub fn report(&mut self, camera: Camera, set_aside: usize, now_us: u64) {
+    pub fn report(&mut self, camera: Camera, set_aside: usize, resets: u32, now_us: u64) {
         if self
             .reported_at_us
             .is_some_and(|at| now_us.saturating_sub(at) < 950_000)
@@ -546,7 +556,9 @@ impl BusOut {
             return;
         }
         self.reported_at_us = Some(now_us);
-        let _ = self.health.publish_json(now_us, &health(camera, set_aside));
+        let _ = self
+            .health
+            .publish_json(now_us, &health(camera, set_aside, resets));
     }
 }
 
@@ -694,7 +706,7 @@ mod tests {
         std::fs::remove_dir_all(&root).unwrap();
         out.saw(&[], &[], PICTURE, 7);
         out.tick(2_000_000);
-        out.report(Camera::Open, 0, 2_000_000);
+        out.report(Camera::Open, 0, 0, 2_000_000);
     }
 
     #[test]
@@ -715,12 +727,12 @@ mod tests {
                 "failed",
             ),
         ] {
-            let report = health(camera, 0);
+            let report = health(camera, 0, 0);
             assert_eq!(
                 (report.level, report.name.as_str(), report.message.as_str()),
                 (level, "eyes", message)
             );
-            assert_eq!(report.values.len(), 2);
+            assert_eq!(report.values.len(), 3);
             assert_eq!(
                 (
                     report.values[0].key.as_str(),
@@ -736,7 +748,7 @@ mod tests {
     /// comes first.
     #[test]
     fn set_aside_records_make_the_eyes_warn_with_a_count() {
-        let report = health(Camera::Open, 2);
+        let report = health(Camera::Open, 2, 0);
         assert_eq!(report.level, Level::Warn);
         assert_eq!(
             report.message,
@@ -750,10 +762,27 @@ mod tests {
             "{:?}",
             report.values
         );
-        let both = health(Camera::Failed, 1);
+        let both = health(Camera::Failed, 1, 0);
         assert_eq!(both.level, Level::Warn);
         assert_eq!(both.message, "the camera stopped giving pictures");
-        assert_eq!(health(Camera::Open, 0).level, Level::Ok);
+        assert_eq!(health(Camera::Open, 0, 0).level, Level::Ok);
+        // A stuck camera's resets are counted and said (#2126).
+        assert_eq!(
+            health(Camera::NotOpening, 0, 1).message,
+            "the camera does not open; its USB device was reset once"
+        );
+        let stuck = health(Camera::NotOpening, 0, 2);
+        assert_eq!(stuck.level, Level::Warn);
+        assert_eq!(
+            stuck.message,
+            "the camera does not open; its USB device was reset 2 times"
+        );
+        assert!(
+            stuck
+                .values
+                .iter()
+                .any(|value| value.key == "camera_resets" && value.value == "2")
+        );
     }
 
     #[test]
@@ -774,7 +803,7 @@ mod tests {
             } else {
                 Camera::NotOpening
             };
-            out.report(camera, 0, turn * 5_000);
+            out.report(camera, 0, 0, turn * 5_000);
         }
         let mut said = Vec::new();
         while let Some(message) = hears.recv(std::time::Duration::from_millis(50)).unwrap() {

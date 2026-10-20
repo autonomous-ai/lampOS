@@ -5,7 +5,7 @@ use lamp_ring::{
     EncodedFrame, FrameSink,
     waking::{AT_ONCE_WAIT, Ask, LetGo, Lock, RELEASE_WAIT, WakingRing, let_go_at, take_at},
 };
-use lamp_setup::wake::{self, Ended};
+use lamp_setup::wake::{self, Ended, Fades};
 use std::{
     fs::{File, OpenOptions},
     io,
@@ -57,6 +57,11 @@ fn place(name: &str) -> PathBuf {
 
 /// The waking face on a fresh ring; the first `missing` opens find no device.
 fn start(name: &str, missing: usize) -> Rig {
+    start_faded(name, missing, Fades::LAMP)
+}
+
+/// The same, fading in and out over `fades`.
+fn start_faded(name: &str, missing: usize, fades: Fades) -> Rig {
     let dir = place(name);
     let socket = dir.join("release.sock");
     let device = dir.join("spidev");
@@ -69,7 +74,7 @@ fn start(name: &str, missing: usize) -> Rig {
         let frames = Arc::clone(&frames);
         let mut missing = missing;
         move || {
-            wake::run(
+            wake::run_faded(
                 listener,
                 move || {
                     if missing > 0 {
@@ -83,6 +88,7 @@ fn start(name: &str, missing: usize) -> Rig {
                 },
                 |_| {},
                 Duration::from_millis(20),
+                fades,
             )
         }
     });
@@ -113,11 +119,17 @@ fn wait_lit(rig: &Rig) -> Duration {
 
 #[test]
 fn it_lights_at_once_and_the_voice_finds_the_ring_free_once_answered() {
-    let rig = start("fade", 0);
+    // The lamp's fades (1.5 s in, 0.6 s out) at a fifth and a third: the
+    // same fades, and the test 1.6 s shorter (#1806).
+    let quick = Fades {
+        fade_in: Duration::from_millis(300),
+        fade_out: Duration::from_millis(200),
+    };
+    let rig = start_faded("fade", 0, quick);
     let first = wait_lit(&rig);
     assert!(first < Duration::from_millis(300), "{first:?}");
     // Faded in: while it shows, the voice's lock fails, as on the lamp.
-    thread::sleep(wake::FADE_IN);
+    thread::sleep(quick.fade_in);
     assert_eq!(
         lock(&rig.device).unwrap_err().kind(),
         io::ErrorKind::WouldBlock
@@ -129,7 +141,7 @@ fn it_lights_at_once_and_the_voice_finds_the_ring_free_once_answered() {
     lock(&rig.device).expect("the voice's open");
     let took = asked.elapsed();
     assert!(took < Duration::from_secs(1), "{took:?}");
-    assert!(took >= wake::FADE_OUT - wake::FRAME, "it faded: {took:?}");
+    assert!(took >= quick.fade_out - wake::FRAME, "it faded: {took:?}");
     assert_eq!(
         *rig.frames.lock().unwrap().last().unwrap(),
         EncodedFrame::black()

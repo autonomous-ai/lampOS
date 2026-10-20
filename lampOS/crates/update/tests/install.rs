@@ -56,6 +56,9 @@ struct FakeHost {
     status_json: String,
     /// What `pgrep` finds; none makes it end with 1, as `pgrep` does.
     pids: String,
+    /// What each `harness version` says, in turn; when none is left, the
+    /// version `harness-on` needs.
+    versions: std::collections::VecDeque<Result<String, String>>,
 }
 
 /// `harness service status --json` once the service is gone (Harness
@@ -144,6 +147,8 @@ impl Host for FakeHost {
                     "ln" => {
                         let link = root.join(argv[3].trim_start_matches('/'));
                         fs::create_dir_all(link.parent().unwrap()).unwrap();
+                        // Never written through a link already there.
+                        let _ = fs::remove_file(&link);
                         fs::write(link, "#!/bin/sh\n").unwrap();
                         Ok(String::new())
                     }
@@ -158,6 +163,13 @@ impl Host for FakeHost {
     fn restart(&mut self, unit: &str) -> Result<(), String> {
         self.calls.push(format!("restart {unit}"));
         Ok(())
+    }
+
+    fn harness_version(&mut self, user: &str, home: &str) -> Result<String, String> {
+        self.calls.push(format!("harness version {user} {home}"));
+        self.versions
+            .pop_front()
+            .unwrap_or_else(|| Ok("0.4.23\n".into()))
     }
 
     fn harness_off(&mut self, user: &str, home: &str) -> Result<Vec<String>, String> {
@@ -291,6 +303,7 @@ impl Lamp {
             failing_step: None,
             status_json: STATUS_GONE.into(),
             pids: String::new(),
+            versions: Default::default(),
         };
         Self {
             _dir: dir,
@@ -2859,6 +2872,122 @@ fn harness_on_keeps_a_harness_already_there() {
     );
     assert_eq!(lamp.called("harness-on lampos /var/lib/lampos-tasks"), 0);
     assert!(lamp.host.steps.is_empty());
+}
+
+/// #1676, the first builder at 09:46: a Harness `harness-on` put there (the
+/// link to the launcher in its HOME) older than 0.4.23 is brought up to the
+/// version Harness's own installer ships, with `harness version` read before
+/// and after; one new enough is kept; a failed or still too old install
+/// keeps it and says `harness_too_old`, and so does an older Harness put
+/// there otherwise, which is never installed over.
+#[test]
+fn harness_on_updates_its_own_older_harness_and_says_one_too_old() {
+    let ours = |lamp: &Lamp| {
+        let link = lamp.on(install::HARNESS);
+        fs::create_dir_all(link.parent().unwrap()).unwrap();
+        let _ = fs::remove_file(&link);
+        std::os::unix::fs::symlink(
+            format!("{}/.local/bin/harness", install::HARNESS_HOME),
+            &link,
+        )
+        .unwrap();
+    };
+    let installs = |lamp: &Lamp| lamp.called("harness-on lampos /var/lib/lampos-tasks");
+    let too_old = |lamp: &Lamp| {
+        lamp.said
+            .iter()
+            .filter(|line| line.starts_with("harness_too_old:"))
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    // Updated: 0.4.19 before, 0.4.24 after.
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    ours(&lamp);
+    lamp.host.versions = [Ok("0.4.19\n".into()), Ok("v0.4.24\n".into())].into();
+    let changed = lamp.harness_on().unwrap();
+    assert_eq!(
+        changed,
+        [
+            "Harness updated from 0.4.19 to 0.4.24 by its own installer, for signing in by a spoken code",
+            "Harness starts at boot as lampos",
+            "lamp-tasks.service started again",
+        ]
+    );
+    assert_eq!(installs(&lamp), 1);
+    assert!(
+        lamp.host
+            .steps
+            .iter()
+            .any(|step| step.contains("install.sh | sh"))
+    );
+    // New enough: kept, nothing installed.
+    lamp.host.versions = [Ok("0.4.24\n".into())].into();
+    assert_eq!(lamp.harness_on().unwrap(), Vec::<String>::new());
+    assert_eq!(installs(&lamp), 1);
+    assert!(
+        lamp.said.iter().any(
+            |line| line == "Harness 0.4.24 is already at /usr/local/bin/harness: kept as it is"
+        )
+    );
+    // Its installer failed: kept, said, and the rest goes on.
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    ours(&lamp);
+    lamp.host.failing_step = Some("curl".into());
+    lamp.host.versions = [Ok("0.4.19\n".into()), Ok("0.4.19\n".into())].into();
+    let changed = lamp.harness_on().unwrap();
+    assert!(
+        !changed.iter().any(|line| line.contains("updated")),
+        "{changed:?}"
+    );
+    let said = too_old(&lamp);
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(said[0].contains("installer failed") && said[0].contains("Harness 0.4.19 is kept"));
+    assert!(
+        fs::symlink_metadata(lamp.on(install::HARNESS))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    // Installed, and still too old.
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    ours(&lamp);
+    lamp.host.versions = [Ok("0.4.19\n".into()), Ok("0.4.20\n".into())].into();
+    let changed = lamp.harness_on().unwrap();
+    assert!(
+        !changed.iter().any(|line| line.contains("updated")),
+        "{changed:?}"
+    );
+    assert!(too_old(&lamp)[0].contains("Harness is 0.4.20 after its own installer"));
+    // Put there otherwise, older: never installed over.
+    let mut lamp = Lamp::with_harness();
+    lamp.install().unwrap();
+    lamp.host.versions = [Err("harness version: not found".into())].into();
+    let changed = lamp.harness_on().unwrap();
+    assert!(
+        !changed.iter().any(|line| line.contains("updated")),
+        "{changed:?}"
+    );
+    assert_eq!(installs(&lamp), 0);
+    assert!(too_old(&lamp)[0].contains("wasn't put there by harness-on"));
+    assert!(lamp.host.steps.is_empty());
+}
+
+#[test]
+fn harness_versions_are_read_as_harness_prints_them() {
+    for (text, version) in [
+        ("0.4.23\n", Some((0, 4, 23))),
+        ("v0.4.24", Some((0, 4, 24))),
+        ("harness 0.5.0-beta.1", Some((0, 5, 0))),
+        ("0.4", None),
+        ("", None),
+    ] {
+        assert_eq!(install::harness_version_of(text), version, "{text}");
+    }
+    assert!(install::harness_version_of("0.4.19").unwrap() < install::HARNESS_LEAST);
+    assert!(install::harness_version_of("0.10.0").unwrap() > install::HARNESS_LEAST);
 }
 
 /// A step that fails stops there: no link to nothing, nothing recorded, the

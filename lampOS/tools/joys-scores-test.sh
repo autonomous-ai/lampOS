@@ -20,6 +20,10 @@ check() { # check WHAT CONDITION...
 cat >"$T/systemctl" <<'EOF'
 #!/usr/bin/env bash
 echo "$*" >>"$FAKE_DIR/systemctl.log"
+# At each restart, the route the drop-ins set and whether a yes is stored.
+if [[ $1 == restart ]]; then
+  echo "route $(cat "$FAKE_DIR"/units/*/zz-joys.conf 2>/dev/null | grep -o 'LAMP_PRIVACY_CONTROLS=[a-z-]*' | sort -u | tr '\n' ' ')yes $(cat "$FAKE_DIR/onboarding/room-sounds.json" 2>/dev/null | grep -o '"room_sounds":"[a-z]*"')" >>"$FAKE_DIR/systemctl.log"
+fi
 case $1 in
   is-active) exit 0 ;;
   show) echo "$FAKE_ENV" ;;
@@ -112,13 +116,13 @@ touch "$T/yamnet.onnx"
 
 run() { # run [ENV...] [-- ARG]: the laugh row, its output in $T/out
   local arg=
-  if [[ ${*: -1} == --with-privacy-controls ]]; then arg=--with-privacy-controls; set -- "${@:1:$#-1}"; fi
+  if [[ ${*: -1} == --* ]]; then arg=${*: -1}; set -- "${@:1:$#-1}"; fi
   rm -f "$T/systemctl.log"
   mkdir -p "$T/tmp"
   echo "$B" >"$T/now"
   env FAKE_DIR="$T" FAKE_ENV="LAMP_BUS=on LAMP_PRIVACY_CONTROLS=on" NOW_FILE="$T/now" \
     SYSTEMCTL="$T/systemctl" SLEEP="$T/sleep" BUS="$T/lamp-bus" SKILLS="$SKILLS" \
-    UNIT_DIR="$T/units" TMPDIR="$T/tmp" SKILL_DIR="$T/laugh" EARS_MODEL="$T/yamnet.onnx" \
+    UNIT_DIR="$T/units" ROOM_SOUNDS="$T/onboarding/room-sounds.json" TMPDIR="$T/tmp" SKILL_DIR="$T/laugh" EARS_MODEL="$T/yamnet.onnx" \
     QUIET_S=20 TRACK_S=20 OVER_S=10 "$@" bash "$SCRIPT" laugh $arg >"$T/out" 2>&1
 }
 
@@ -147,6 +151,33 @@ check "with --with-privacy-controls, the route on in Controls, Voice and Ears fo
   bash -c "[[ $status == 0 ]] && grep -q 'body.gaze asked: empty 0, track 1' '$T/out' &&
     [[ \$(grep '^restart' '$T/systemctl.log' | tr '\n' ' ') == 'restart lamp-controls.service restart lamp-voice.service restart lamp-ears.service restart lamp-controls.service restart lamp-voice.service restart lamp-ears.service ' ]] &&
     [[ -z \$(find '$T/units' -name zz-joys.conf) ]]"
+
+# A lamp with no slide and no yes stored (a no leaves no file, as "never
+# asked" does): refused, nothing touched, no yes written.
+rm -rf "$T/onboarding"
+run FAKE_ENV="LAMP_BUS=on" --no-slide
+status=$?
+check "with --no-slide and no person's yes, refused and nothing touched" \
+  bash -c "[[ $status == 3 && ! -e '$T/onboarding' ]] && ! grep -q restart '$T/systemctl.log' && grep -q 'says yes in setup first' '$T/out'"
+
+# With the person's own yes: the no-slide route in all three for the run, and
+# the yes left byte for byte.
+mkdir -p "$T/onboarding"
+echo '{"room_sounds":"yes","at_unix_s":1}' >"$T/onboarding/room-sounds.json"
+run FAKE_ENV="LAMP_BUS=on" --no-slide
+status=$?
+check "with --no-slide and the person's yes, the no-slide route in all three, the yes left" \
+  bash -c "[[ $status == 0 ]] && grep -q 'body.gaze asked: empty 0, track 1' '$T/out' &&
+    [[ \$(grep -c '^restart' '$T/systemctl.log') == 6 ]] &&
+    grep -q '^route LAMP_PRIVACY_CONTROLS=no-slide yes \"room_sounds\":\"yes\"' '$T/systemctl.log' &&
+    [[ \$(cat '$T/onboarding/room-sounds.json') == '{\"room_sounds\":\"yes\",\"at_unix_s\":1}' && -z \$(find '$T/units' -name zz-joys.conf) ]]"
+
+# Already on no-slide: Ears alone.
+run FAKE_ENV="LAMP_BUS=on LAMP_PRIVACY_CONTROLS=no-slide"
+status=$?
+check "on no-slide already with the person's yes, Ears alone restarted" \
+  bash -c "[[ $status == 0 ]] && [[ \$(grep '^restart' '$T/systemctl.log' | sort -u) == 'restart lamp-ears.service' ]]"
+rm -rf "$T/onboarding"
 
 # A lamp-skills that fails the skill's own cases (one without #1920's dotted
 # fields) is refused before anything is touched.
