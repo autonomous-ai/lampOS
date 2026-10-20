@@ -1541,6 +1541,7 @@ pub fn serve(
     .with_memory_scope(boot, face_cache.clone(), scoped_runner, scoped_system)
     .checking_sounds(checked)
     .telling_cut_ins(files.cut_in_told)
+    .holding_hand_on(files.said_as_heard)
     .waiting_with_a_sound(route.wait_cue)
     .saying_when_down(route.down_line)
     .doing_though_held(though_held)
@@ -3816,13 +3817,17 @@ pub const HISTORY_WITHIN: Duration = Duration::from_secs(300);
 /// thread to its file.
 #[cfg(test)]
 pub(crate) fn keep(event: &ProviderOutput, file: Option<&Path>) {
-    keep_scoped(event, file, None)
+    keep_scoped(event, file, None, None)
 }
 
+/// [`keep`] for a request's admitted scope (`lease`). With `held`
+/// (`LAMP_SAID_AS_HEARD`), an answer's hand-on to memory at its turn's end is
+/// held until it is known how much of it was heard.
 fn keep_scoped(
     event: &ProviderOutput,
     file: Option<&Path>,
     lease: Option<&crate::memory_scope::ScopeLease>,
+    held: Option<&mut crate::said_as_heard::HeldHandOn>,
 ) {
     if lease.is_some_and(|lease| !lease.is_current()) {
         return;
@@ -3865,7 +3870,14 @@ fn keep_scoped(
             }
         }
         ProviderOutput::TurnComplete { request, .. } => {
-            crate::remember::finished(*request);
+            match held {
+                Some(held) => {
+                    if let Some(older) = held.hold(*request, now) {
+                        crate::remember::finished(older);
+                    }
+                }
+                None => crate::remember::finished(*request),
+            }
             save(file);
         }
         ProviderOutput::TurnFailed { .. } => save(file),
@@ -3938,12 +3950,28 @@ pub async fn run(
     // for credit or a full socket.
     let mut retained: Option<ProviderInput> = None;
     let mut pending: Option<ProviderOutput> = None;
+    // An answer's hand-on to memory, held until it is known how much of it
+    // was heard (`LAMP_SAID_AS_HEARD`).
+    let mut held = crate::said_as_heard::HeldHandOn::default();
+    let holding = engine.holds_hand_on();
+    // What is held goes as the worker stops.
+    let stopped = |held: &mut crate::said_as_heard::HeldHandOn| {
+        if let Some(request) = held.release() {
+            crate::remember::finished(request);
+        }
+    };
     'tick: loop {
         // The turn tasks run while this waits.
         ticker.tick().await;
         engine.tick_room(monotonic_us());
+        if let Some(request) = held.due(Instant::now()) {
+            crate::remember::finished(request);
+        }
         match gate.drain(&mut channels.control, &mut engine)? {
-            Drain::Stopped => return Ok(()),
+            Drain::Stopped => {
+                stopped(&mut held);
+                return Ok(());
+            }
             Drain::Deferred => continue,
             Drain::Empty => {}
         }
@@ -3958,7 +3986,10 @@ pub async fn run(
             // The parent sends authority before its dependent input, possibly
             // after the first empty read: drain again before judging the input.
             match gate.drain(&mut channels.control, &mut engine)? {
-                Drain::Stopped => return Ok(()),
+                Drain::Stopped => {
+                    stopped(&mut held);
+                    return Ok(());
+                }
                 Drain::Deferred => continue 'tick,
                 Drain::Empty => {}
             }
@@ -3989,6 +4020,15 @@ pub async fn run(
                 {
                     keep_heard(&mut thread, &engine, &command);
                 }
+                // A new line or a written request begins: the answer before
+                // it is kept as heard, so its hand-on to memory goes now.
+                if matches!(
+                    command,
+                    ProviderInput::Start { .. } | ProviderInput::Written { .. }
+                ) && let Some(request) = held.release()
+                {
+                    crate::remember::finished(request);
+                }
                 engine.submit(command);
             }
         }
@@ -4007,7 +4047,12 @@ pub async fn run(
                     .scopes_context()
                     .then(|| engine.memory_lease())
                     .flatten();
-                keep_scoped(event, thread.as_deref(), lease.as_ref());
+                keep_scoped(
+                    event,
+                    thread.as_deref(),
+                    lease.as_ref(),
+                    holding.then_some(&mut held),
+                );
             }
             if let Some(event) = &pending {
                 link.output(monotonic_us(), event);
@@ -4902,6 +4947,24 @@ mod tests {
         assert!(gate.may_send(now_us, &late).is_err());
     }
 
+    /// `LAMP_SAID_AS_HEARD`: a turn's end holds its hand-on to memory, and an
+    /// older one held goes when a newer turn ends; without the switch nothing
+    /// is held.
+    #[test]
+    fn a_turns_end_holds_its_hand_on_to_memory_with_the_switch() {
+        let end = |request| ProviderOutput::TurnComplete {
+            request,
+            idle: true,
+        };
+        let mut held = crate::said_as_heard::HeldHandOn::default();
+        super::keep_scoped(&end(901), None, None, Some(&mut held));
+        super::keep_scoped(&end(902), None, None, Some(&mut held));
+        assert_eq!(held.release(), Some(902), "the newest is held");
+        assert_eq!(held.release(), None, "the older one went");
+        super::keep_scoped(&end(903), None, None, None);
+        assert_eq!(held.release(), None, "off: nothing held");
+    }
+
     fn strings(flags: &[&str]) -> Vec<String> {
         flags.iter().map(|flag| (*flag).to_owned()).collect()
     }
@@ -5492,7 +5555,7 @@ mod tests {
                     idle: true,
                 },
             ] {
-                keep_scoped(&event, None, Some(&lease));
+                keep_scoped(&event, None, Some(&lease), None);
             }
         }
         let now = Instant::now();

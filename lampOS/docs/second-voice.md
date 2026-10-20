@@ -1708,14 +1708,26 @@ after a take-over, but now for every turn:
   - **The journal says** `request N: H of its answer's W words were played,
     M ms of it, before it was cut; request K is asked with only those as
     the lamp's`.
-  - **The lamp's memory** takes the trimmed words only when the cut came
-    while the route was still sending the answer. A retired request's output
-    is dropped, so its exchange is handed on at the next request's end,
-    after the trim. When the route had sent all of it, and its turn had
-    ended, before the cut, memory already has the whole answer. That's the
-    usual case for a long story, sent in seconds and played for many more.
+  - **The lamp's memory takes the answer as heard.**
+    - The route sends a long story in seconds, and the lamp plays it for
+      many more. So the worker no longer hands an answer to memory at its
+      turn's end (`HeldHandOn`, with the worker's `--said-as-heard`).
+    - It holds the answer until the next line or a written request begins,
+      after that line's trim, or until 30 s have passed (`HAND_ON_WITHIN`,
+      the most a reply can hold, and before memory's 45 s idle end), or the
+      worker stops.
+    - An answer held is handed on when a newer turn ends.
+    - Memory's journal gets the same exchange as before, up to 30 s later,
+      and as heard.
+    - **Parked, not done:** Twelve's conditions (10:40 on #1722) are still
+      to meet: memory's job built at the turn's end and sent later with the
+      words as heard, a "forget that" said as the cutting line ordered after
+      it, and a release before the session closes.
   - **Not covered:**
-    - the memory case above;
+    - a Stop with no line after it within 30 s: the Stop's count reaches
+      the route only on the next Start, so that answer goes to memory whole;
+    - a crash while an answer is held: that one exchange is lost from
+      memory's journal, though the thread's file keeps it;
     - a Stop followed by a written request rather than a spoken line: a
       written request has no Start, so that answer stays as sent;
     - the Stop's path through the session loop: its record of the cut is

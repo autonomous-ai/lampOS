@@ -766,6 +766,9 @@ pub struct Engine {
     sounds_checked: bool,
     /// `--cut-in-told` ([`Engine::telling_cut_ins`]).
     cut_in_told: bool,
+    /// An answer's hand-on to memory is held until it is known how much of
+    /// it was heard (`--said-as-heard`, [`crate::said_as_heard::HeldHandOn`]).
+    holds_hand_on: bool,
     /// The eye a look reads, when the eyes keep a look file.
     look: Option<Look>,
     /// The last spoken line's sound, for a line that goes on from it
@@ -871,6 +874,7 @@ impl Engine {
             begun_last: None,
             sounds_checked: false,
             cut_in_told: false,
+            holds_hand_on: false,
             look: None,
             kept: None,
             reminders: false,
@@ -996,6 +1000,19 @@ impl Engine {
     pub fn telling_cut_ins(mut self, on: bool) -> Self {
         self.cut_in_told = on;
         self
+    }
+
+    /// With `on` (`--said-as-heard`, `LAMP_SAID_AS_HEARD=on`), the worker
+    /// holds each answer's hand-on to memory until it is known how much of it
+    /// was heard ([`crate::said_as_heard::HeldHandOn`]).
+    pub fn holding_hand_on(mut self, on: bool) -> Self {
+        self.holds_hand_on = on;
+        self
+    }
+
+    /// Whether answers' hand-ons to memory are held ([`Self::holding_hand_on`]).
+    pub fn holds_hand_on(&self) -> bool {
+        self.holds_hand_on
     }
 
     /// The Policy's decision for a line the rule says waits for it
