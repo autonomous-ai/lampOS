@@ -1829,6 +1829,28 @@ after a take-over, but now for every turn:
     sound.
   - **The Live route** is told nothing new: Gemini's server keeps what it
     made, so its history can't be put right this way.
+- **The name in the room's sound needs a second sign**
+  (`LAMP_NAME_SECOND_SIGN=on`, the first builder at 21:03 on #1722).
+  On lamp-4ace on 2026-10-20 at 18:16, 18:17 and 18:20 a `lamp-name`
+  hearing of 0.9 (office talk is heard as the name up to 0.997) let a line
+  out as "its name was heard in the room's sound", and the lines after it
+  out as the conversation going on. With the switch,
+  `attention::Attention::weigh_the_name`, called in `Heeding::judge` once a
+  line's signs are in, drops the hearing for that line unless a second sign
+  is there: the eyes' newest fresh look has a face turned to the lamp (read
+  whatever the rule's form), the line was said close to the lamp or to it
+  from close, or its words call it. At any score, `attention::SURE_SCORE`
+  too: a sure hearing alone is the same lone sign. Dropped, the line is
+  judged as one with no name: no `NAMED`, no `NAMED_PLAINLY`, no call, so no
+  conversation goes on from it, the Policy's gate is not told the name, and
+  neither is the model: the name note (`LAMP_NAME_NOTE`) is weighed after
+  the judging (`Heeding::heed_signs`) and a dropped name earns none; the
+  journal says `its name, heard only in the room's sound, counts for
+  nothing alone`. The face is anyone's (`someone_turned_to_lamp`), not the
+  speaker's: someone at the desk facing the lamp while talk across the room
+  is heard as the name counts as the second sign, as the rule's `TURNED`
+  does today; the lamp run includes someone facing the lamp and not
+  speaking. Not yet: the Live route and a bare call.
 - **The name note** (`LAMP_NAME_NOTE`) is given as on the Live route
   (`worker::Heeding::telling_the_name`): a line the lamp's name began, heard
   by `lamp-name` at `called::LEAST_SCORE` or more no more than

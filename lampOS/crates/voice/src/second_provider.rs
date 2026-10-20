@@ -258,6 +258,13 @@ pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 /// six forty-four and change.", 2 of the last 4 runs).
 pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 
+/// Where the worker reads whether the lamp's name heard only in the room's
+/// sound needs a second sign to count: a face turned to the lamp, said close
+/// to it, or its words calling it (`on`, and nothing else; at any score).
+/// On lamp-4ace on 2026-10-20 at 18:20 a hearing of 0.9 opened a
+/// conversation nobody began (the first builder at 21:03 on #1722).
+pub const NAME_SECOND_SIGN_ENVIRONMENT: &str = "LAMP_NAME_SECOND_SIGN";
+
 /// Where the worker reads whether a line that begins with the lamp's name,
 /// said to a face turned to the lamp, is always answered (#2191): `on`, and
 /// nothing else. In a busy room the rule does not hold it, and the model's

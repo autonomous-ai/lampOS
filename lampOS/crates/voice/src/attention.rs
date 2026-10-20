@@ -1040,6 +1040,9 @@ pub struct Attention {
     /// The request in hand was judged with a conversation going on, and
     /// nobody else's line before it.
     went_on: bool,
+    /// The name heard only in the room's sound counts only with a second
+    /// sign (`LAMP_NAME_SECOND_SIGN=on`, [`Self::weigh_the_name`]).
+    name_second_sign: bool,
 }
 
 /// The most text kept for one request.
@@ -1054,6 +1057,39 @@ impl Attention {
     /// Whether remarks are held ([`Self::hold_remarks`]).
     pub fn holds_remarks(&self) -> bool {
         self.remarks
+    }
+
+    /// The name heard only in the room's sound counts only with a second
+    /// sign ([`Self::weigh_the_name`]).
+    pub fn ask_a_second_sign_of_the_name(&mut self, on: bool) {
+        self.name_second_sign = on;
+    }
+
+    /// With [`Self::ask_a_second_sign_of_the_name`]: the name heard for the
+    /// request in hand only in the room's sound counts for nothing alone,
+    /// at any score, [`SURE_SCORE`] too. It counts with a second sign: a
+    /// face turned to the lamp (`turned`), said close to the lamp, said to
+    /// it from close, or its words calling it. On lamp-4ace on 2026-10-20
+    /// at 18:16, 18:17 and 18:20 a hearing of 0.9, where the office's false
+    /// hearings reach 0.997, opened a conversation with nobody calling the
+    /// lamp, and the lines after it were answered as that conversation
+    /// going on (the first builder at 21:03 on #1722). Called once a line's
+    /// signs are all in, before it is judged; whether the name was dropped.
+    pub fn weigh_the_name(&mut self, turned: Option<bool>) -> bool {
+        let text_calls = if self.name_in_passing_ignored {
+            called_by_name(&self.heard)
+        } else {
+            called(&self.heard)
+        };
+        let alone = self.name_second_sign
+            && self.named
+            && !(turned == Some(true) || self.near || self.addressed || text_calls);
+        if alone {
+            self.named = false;
+            self.named_sure = false;
+            self.best_score = 0.0;
+        }
+        alone
     }
 
     /// In a busy room, let a line out only as the conversation going on
