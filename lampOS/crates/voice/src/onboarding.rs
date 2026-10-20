@@ -168,7 +168,7 @@ pub const SIT_TURN: &str = "(You can see them, but at the edge of what you see. 
 pub const SIT_DONE: &str =
     "(Now you can see them well where they sit. Tell them so in a few words.)";
 pub const SIT_FAILED: &str = "(You still cannot see them well where they sit. Tell them in a few light words that it is fine: they can turn you toward their seat later, or ask you to redo the setup.)";
-pub const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Then call setup_step with step \"who_you_are\": done, skipped if they would rather not, or failed if it could not be done, and then tell them in a few words what they can try later.)";
+pub const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, and only if you have remember_my_face, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done, and then tell them in a few words what they can try later.)";
 /// The room sounds step (#1722 item 1): asked only on a lamp with no
 /// privacy slide (`LAMP_PRIVACY_CONTROLS=no-slide`), where music and
 /// laughter are off until a yes. A yes (`done`) is kept as [`ROOM_SOUNDS_PATH`]
