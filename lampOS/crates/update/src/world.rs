@@ -266,7 +266,7 @@ pub struct BusEars {
 }
 
 /// The name this program subscribes under.
-const NAME: &str = "update";
+pub(crate) const NAME: &str = "update";
 
 impl BusEars {
     /// Subscribed to `voice/state`, `voice/heard` and `voice/said`. A bus

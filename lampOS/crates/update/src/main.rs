@@ -684,6 +684,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     disk: &Statvfs,
                     clock: &clock,
                     say: &mut say,
+                    phase: &mut |_| {},
                 };
                 own::confirm(&config, &mut world, running.as_deref())
             };
@@ -720,8 +721,19 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         }
     }
     let mut last = String::new();
+    // `update/status` (#2194): where each round is, and how the last ended,
+    // only for a round that acts.
+    let records = config.on(&config.records);
+    let mut telling = config
+        .apply
+        .then(|| lamp_update::status::Telling::start(&bus_root, &records, &mut say));
     loop {
         let outcome = {
+            let mut phase = |now: &'static str| {
+                if let Some(telling) = &mut telling {
+                    telling.phase(now);
+                }
+            };
             let mut world = World {
                 channel: &mut channel,
                 systemd: &mut systemd,
@@ -729,9 +741,16 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 disk: &Statvfs,
                 clock: &clock,
                 say: &mut say,
+                phase: &mut phase,
             };
             round(&config, &mut world)
         };
+        if let Some(telling) = &mut telling {
+            let at_unix_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_millis() as u64);
+            telling.ended(&outcome, at_unix_ms);
+        }
         let text = outcome.to_string();
         if let Outcome::SelfSwitched { .. } | Outcome::Climbs { .. } = outcome {
             // Phase 1 done: the new build runs in this program's place,
