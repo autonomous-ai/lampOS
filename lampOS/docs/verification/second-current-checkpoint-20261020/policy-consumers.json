@@ -1,0 +1,35 @@
+{
+  "integration_base": "e26ebab90b1177379a7965cb0da276cdd3fdb153",
+  "changed_crates": [
+    "lamp-policy"
+  ],
+  "reverse_dependency_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-policy",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "workspace_crates": 45,
+  "grep_command": [
+    "rg",
+    "-n",
+    "LOOKUP_GATE|slow_lookup|LOOKUPS|LOOKED_UP_PORT",
+    "crates/"
+  ],
+  "matched_files": [
+    "crates/policy/src/decide/tests.rs",
+    "crates/setup/tests/wifi.rs",
+    "crates/update/src/fetch.rs"
+  ],
+  "grep_output_sha256": "835b5bcfdcac8946760d034202bf99c955db0bba898b2ee47ce54e3e195b7259",
+  "validation": "Complete crate tests for policy and all reverse consumers; no test filters."
+}
