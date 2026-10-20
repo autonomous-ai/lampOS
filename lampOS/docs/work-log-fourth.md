@@ -5010,6 +5010,13 @@ A usage limit paused me from about 00:40 to 06:2x.
   A unit test passes. The gate and PR come after #2209's.
 - **A pause on my side,** about 13:45 to 14:25, with nothing lost.
 
+## 2026-10-20, 15:10 ICT: #2209 is #2236; #2220 is #2242; free
+
+- **#2236, the route's speech socket** (`LAMP_SECOND_SPEECH_SOCKET=on`), opened 14:47. It is #2209 folded as one commit (`c4d31cf52`) onto #1712's `7840dc83f`, and #2209 is closed. The gate on this Mac passed (3232 passed, 0 failed). The reviewer's read had no new finding. It waits for ARM64 and the first builder's merge.
+- **#2242, the lamp's own line kept from the room's sound** (`LAMP_OWN_LINE_KEEPS=on`, #2220), opened 15:08. One commit (`ef9a0d28b`) onto #1712's `7840dc83f`. The gate passed (3228 passed, 0 failed). Three mutations each failed the test. It waits for the reviewer's read and ARM64.
+- **#2136 brought up to date** with my rows: `LAMP_SAID_AS_HEARD` (#2173, merged; its memory side is Twelve's #2186), `LAMP_OWN_LINE_KEEPS` (#2242) and `LAMP_REPLY_END_REACH` (#2099, merged).
+- **Free: fourth** said on #1722 at 15:08. Next is what the first builder names, or else an unowned row of #2136 or #2135, claimed with a plan before code.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
