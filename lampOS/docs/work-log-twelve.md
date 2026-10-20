@@ -457,3 +457,7 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   builder's merge. #2226: #2176 rows 1b/c onto lamp-voice, stacked on
   Friday's #2206: journalling resumes with a fresh session
   (`LAMP_MEMORY_JOURNAL_RESUMES`, off); known writes always settle.
+- #2186 rebased onto #1712's `c03e4dfc4` (`61d009897`), past #2136's flag.
+  #2226: Friday's P1/P2/P3 fixed (`5ac6d5839`): a fresh session is asked
+  for after a stop on both routes; only lost writes settle; rules settle.
+  Took #2176 row 5b.
