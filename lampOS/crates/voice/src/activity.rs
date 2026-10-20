@@ -727,6 +727,16 @@ pub struct ConfirmPolicy {
     /// finished turn (p 0.99) and cut the name off its question; in a busy
     /// room the question was then held for want of its name. 0: no floor.
     pub least_speech_blocks: u16,
+    /// A line under `least_speech_blocks` but with at least this many
+    /// speech blocks is sent to the model as well (`LAMP_ENDPOINT_SHORT_VERDICT`,
+    /// #2135). Its verdict ends it no sooner: a complete one waits for
+    /// `fallback_blocks` as above, an uncertain one ends there too, and only
+    /// a clearly incomplete one holds it to `incomplete_blocks`. On lamp-4ace
+    /// on 21 Oct 71 of 635 Ends (11%) were such lines, never asked, ended on
+    /// the silence window, among them "Hey Lamp, my name is" cut 0.66 s in
+    /// (the first builder on #1722 at 04:56). 0: they are not sent, as on
+    /// 14 Oct, when in a talkative office the model took a whole core.
+    pub short_verdict_blocks: u16,
 }
 
 impl Default for ConfirmPolicy {
@@ -740,6 +750,7 @@ impl Default for ConfirmPolicy {
             result_timeout_blocks: 50,
             fallback_blocks: V1_END_SILENCE_BLOCKS,
             least_speech_blocks: 0,
+            short_verdict_blocks: 0,
         }
     }
 }
@@ -767,7 +778,8 @@ impl ConfirmPolicy {
             && self.complete_probability > 0.0
             && self.complete_probability < 1.0
             && self.incomplete_probability >= 0.0
-            && self.incomplete_probability <= self.complete_probability;
+            && self.incomplete_probability <= self.complete_probability
+            && self.short_verdict_blocks <= self.least_speech_blocks;
         if valid {
             Ok(())
         } else {
@@ -795,6 +807,11 @@ pub struct EndpointDecision {
     /// lamp's name (`--call-wait-ms`, #782). Absent otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub call_wait_ms: Option<u64>,
+    /// The line was under the commit's floor and sent to the model all the
+    /// same (`ConfirmPolicy::short_verdict_blocks`): the submissions the
+    /// switch adds, counted from these. Absent otherwise.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub short_asked: bool,
 }
 
 impl EndpointDecision {
@@ -806,6 +823,7 @@ impl EndpointDecision {
             fallback: None,
             verdict: None,
             call_wait_ms: None,
+            short_asked: false,
         }
     }
 }
@@ -858,6 +876,9 @@ struct Confirmation {
     pause_blocks: u16,
     /// Speech blocks heard in this utterance.
     speech_blocks: u16,
+    /// This utterance was sent under the commit's floor
+    /// ([`ConfirmPolicy::short_verdict_blocks`]).
+    short_asked: bool,
 }
 
 impl Confirmation {
@@ -871,6 +892,7 @@ impl Confirmation {
             pause: Pause::Listening,
             pause_blocks: 0,
             speech_blocks: 0,
+            short_asked: false,
         }
     }
 
@@ -890,6 +912,7 @@ impl Confirmation {
         self.pause = Pause::Listening;
         self.pause_blocks = 0;
         self.speech_blocks = 0;
+        self.short_asked = false;
         self.audio.clear();
     }
 
@@ -989,8 +1012,11 @@ impl Confirmation {
             // office, the model took a whole core and the board 76 °C.
             Pause::Listening
                 if pause >= policy.check_blocks
-                    && self.speech_blocks >= policy.least_speech_blocks =>
+                    && (self.speech_blocks >= policy.least_speech_blocks
+                        || (policy.short_verdict_blocks > 0
+                            && self.speech_blocks >= policy.short_verdict_blocks)) =>
             {
+                self.short_asked |= self.speech_blocks < policy.least_speech_blocks;
                 self.submit()
             }
             Pause::Busy => self.submit(),
@@ -1001,6 +1027,7 @@ impl Confirmation {
             }
             _ => {}
         }
+        let short_asked = self.short_asked;
         let decide = |basis, heard: Option<Heard>, fallback| EndpointDecision {
             basis,
             silence_ms: u64::from(pause) * 10,
@@ -1008,6 +1035,7 @@ impl Confirmation {
             fallback,
             verdict: heard.map(|heard| heard.trace),
             call_wait_ms: None,
+            short_asked,
         };
         match self.pause {
             Pause::Heard(heard)

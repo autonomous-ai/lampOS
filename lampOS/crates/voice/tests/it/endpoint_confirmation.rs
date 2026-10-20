@@ -340,6 +340,87 @@ fn a_few_words_are_not_sent_to_the_model_and_end_on_the_silence_window() {
     assert_eq!(long.decision().silence_ms, 400);
 }
 
+/// #2135 (`LAMP_ENDPOINT_SHORT_VERDICT`): with the floor's short lines
+/// asked, a clearly unfinished one ("Hey Lamp, my…" cut 0.66 s in on
+/// lamp-4ace) holds to the incomplete window, and the rest that comes stays
+/// in the line; a complete one ("Yes.") and an uncertain one end on the
+/// silence window as before, never sooner. Under 20 blocks, or with the
+/// switch's floor 0, nothing is asked, and it ends as `short`.
+#[test]
+fn with_short_verdicts_an_unfinished_short_line_waits_and_a_finished_one_ends_as_before() {
+    let asked = ConfirmPolicy {
+        least_speech_blocks: 80,
+        short_verdict_blocks: 20,
+        incomplete_probability: 0.01,
+        incomplete_blocks: 150,
+        ..mechanics()
+    };
+    assert!(asked.validate().is_ok());
+    let window = asked.fallback_blocks;
+    // Unfinished: held past the window, to the incomplete one.
+    let mut unfinished = Rig::with(asked);
+    unfinished.speak(60);
+    unfinished.quiet(20);
+    let token = unfinished.script.submissions()[0];
+    unfinished.script.reply(token, 0.004);
+    // Held past the silence window (`quiet` fails on an End).
+    unfinished.quiet(window - 20);
+    // The rest comes: the same line goes on.
+    unfinished.speak(40);
+    unfinished.quiet(20);
+    assert_eq!(unfinished.script.submissions().len(), 2);
+    assert_eq!(
+        unfinished.script.submissions()[1].utterance,
+        token.utterance
+    );
+    // Unfinished and nothing more: ended at the incomplete window.
+    let mut alone = Rig::with(asked);
+    alone.speak(60);
+    alone.quiet(20);
+    alone.script.reply(alone.script.submissions()[0], 0.004);
+    assert_eq!(alone.quiet_until_end(400), Some(150 - 20));
+    assert_eq!(alone.decision().basis, "model_incomplete");
+    // Counted: the switch's own submission says so on its End.
+    assert!(alone.decision().short_asked);
+    // Finished, or uncertain: the silence window, as before.
+    for (probability, basis) in [(0.99, "model_complete"), (0.5, "model_uncertain")] {
+        let mut rig = Rig::with(asked);
+        rig.speak(60);
+        rig.quiet(20);
+        rig.script.reply(rig.script.submissions()[0], probability);
+        assert_eq!(rig.quiet_until_end(400), Some(window - 20), "{basis}");
+        assert_eq!(rig.decision().basis, basis);
+        assert_eq!(rig.decision().silence_ms, u64::from(window) * 10);
+        assert!(rig.decision().short_asked);
+    }
+    // A scrap under the switch's floor, or the switch off: not asked.
+    for (policy, blocks) in [
+        (asked, 5),
+        (
+            ConfirmPolicy {
+                short_verdict_blocks: 0,
+                ..asked
+            },
+            60,
+        ),
+    ] {
+        let mut rig = Rig::with(policy);
+        rig.speak(blocks);
+        rig.quiet(20);
+        assert!(rig.script.submissions().is_empty(), "{blocks}");
+        assert_eq!(rig.quiet_until_end(400), Some(window - 20));
+        assert_eq!(rig.decision().fallback, Some("short"));
+        assert!(!rig.decision().short_asked);
+    }
+    // A line long enough for the floor is asked as before, not counted.
+    let mut long = Rig::with(asked);
+    long.speak(90);
+    long.quiet(20);
+    long.script.reply(long.script.submissions()[0], 0.99);
+    long.quiet_until_end(400);
+    assert!(!long.decision().short_asked);
+}
+
 #[test]
 fn incomplete_verdict_holds_until_the_incomplete_window() {
     for (window, expected) in [(120u16, 120u16), (200, 200)] {
