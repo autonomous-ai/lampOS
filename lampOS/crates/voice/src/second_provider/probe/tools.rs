@@ -258,7 +258,7 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
     let actions = std::env::var_os(crate::tools::ACTIONS_ENVIRONMENT)
         .filter(|dir| !dir.is_empty())
         .map_or_else(|| "/run/lampos-actions".into(), std::path::PathBuf::from);
-    let declared = functions(Some(actions));
+    let declared = functions(Some(actions.clone()));
     let count = declared.len();
     if !["light_dimmer", "volume_down", "volume_up"]
         .iter()
@@ -268,6 +268,10 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
             "the actions part's light and volume functions aren't in its catalog (LAMP_ACTIONS_DIR): run it where lamp-actions runs",
         ));
     }
+    let heeding_declared = heeding_functions(Some(actions));
+    let schedule_declared = heeding_declared
+        .iter()
+        .any(|tool| tool.name == "set_reminder");
     let declare: net::Declare = Arc::new(move || declared.clone());
     let today =
         Chat::deepseek(model, key.expose(), declare.clone(), false).map_err(io::Error::other)?;
@@ -293,6 +297,22 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
     );
     for line in sayings_verdict(&ask_sayings(&today, &character, runs).await) {
         println!("{line}");
+    }
+    if schedule_declared {
+        let heeding_declare: net::Declare = Arc::new(move || heeding_declared.clone());
+        let heeding = Chat::deepseek(model, key.expose(), heeding_declare, false)
+            .map_err(io::Error::other)?;
+        println!(
+            "tools: the heeding's {} lines (#2054), with the schedule's functions, {runs} runs each",
+            HEEDING_LINES.len()
+        );
+        for line in heedings_verdict(&ask_heedings(&heeding, &character, runs).await) {
+            println!("{line}");
+        }
+    } else {
+        println!(
+            "tools heeding: not asked: the schedule's functions aren't in the actions part's catalog (LAMP_ACTIONS_DIR)"
+        );
     }
     println!(
         "tools: memory's quality, {} cases, {runs} runs of each (#1693)",
@@ -733,6 +753,198 @@ pub fn sayings_verdict(counts: &SayingCounts) -> Vec<String> {
     lines
 }
 
+/// #2054's lines (the first builder at 05:43 on #1722): said by one person
+/// after the two-person rounds of the hourly played test on lamp-4ace, each
+/// is let out only as the conversation going on. Each is judged by the
+/// route's own rule (`worker::Heeding`, `--spoken-to`), asked with the note
+/// the engine gives it then (`conversation_note_for`, else the call note),
+/// and its first call put to the rule's hold (`holds_call`), as the engine
+/// does. Before #2054 the first was held and the third told it may be
+/// people's talk:
+///
+/// - `remind`: "Remind me in two minutes to stretch.": right is
+///   `set_reminder`, not held.
+/// - `remind-split`: "Remind me, in two minutes, to drink some water.", cut
+///   short after "Remind me," and gone on with as the next request
+///   (`Signs::continues_from`): the same, judged on the whole chain's words
+///   (Eighth's P2 on #2054).
+/// - `to-someone`: "Yes, give me five minutes.", the lamp having asked
+///   nothing: said to someone else, so right is no schedule call run (none
+///   called, or held).
+/// - `remember`: "Remember that my favourite colour is green.": right is
+///   `remember`, never `not_for_me`.
+pub const HEEDING_LINES: [HeedingLine; 4] = [
+    HeedingLine {
+        name: "remind",
+        cut_after: None,
+        said: "Remind me in two minutes to stretch.",
+        right: |called, held| called == "set_reminder" && !held,
+    },
+    HeedingLine {
+        name: "remind-split",
+        cut_after: Some("Remind me,"),
+        said: "Remind me, in two minutes, to drink some water.",
+        right: |called, held| called == "set_reminder" && !held,
+    },
+    HeedingLine {
+        name: "to-someone",
+        cut_after: None,
+        said: "Yes, give me five minutes.",
+        right: |called, held| held || !crate::policy_holds::SCHEDULE_HELD.contains(&called),
+    },
+    HeedingLine {
+        name: "remember",
+        cut_after: None,
+        said: "Remember that my favourite colour is green.",
+        right: |called, _| called == "remember",
+    },
+];
+
+/// The conversation each heeding line goes on from: a person asked the lamp
+/// by name, and it answered with no question back.
+const TALK_ASKED: &str = "Hey Lamp, what's a good stretch for a stiff back?";
+const TALK_ANSWERED: &str = "Try a cat-cow: on your hands and knees, round your back up, then let it sag, slowly, ten times.";
+
+/// One of #2054's lines: what is said, and whether its first call (or
+/// [`NONE`]), and whether the rule held that call, is right.
+pub struct HeedingLine {
+    pub name: &'static str,
+    /// The first half's words, when the line was cut short there and the
+    /// rest went on from it as the next request.
+    pub cut_after: Option<&'static str>,
+    /// What the model is asked with: the whole line.
+    pub said: &'static str,
+    pub right: fn(&str, bool) -> bool,
+}
+
+impl HeedingLine {
+    /// The rule as the route keeps it with `--spoken-to`, having judged this
+    /// line, request 2, going on from the conversation, the lamp's question
+    /// not asked. A line cut short is first judged as request 1, its first
+    /// half, and request 2 goes on from it with the whole line, as the
+    /// engine gives it.
+    pub(crate) fn heeding(&self) -> super::super::worker::Heeding {
+        let mut heeding = super::super::worker::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        let signs = |continues_from| super::super::worker::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on: true,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from,
+        };
+        let continues_from = self.cut_after.map(|first| {
+            let _ = heeding.judge(1, (1_000_000_000, 1_000_800_000), first, signs(None));
+            1
+        });
+        let _ = heeding.judge(
+            2,
+            (1_001_000_000, 1_003_000_000),
+            self.said,
+            signs(continues_from),
+        );
+        heeding
+    }
+
+    /// The request: the spoken character with the memory's calls (as on a
+    /// lamp with memory) and the turn's changing part, the conversation
+    /// before, the engine's note as a system message beside the line, then
+    /// the line.
+    pub(crate) fn messages(
+        &self,
+        character: &str,
+        heeding: &super::super::worker::Heeding,
+    ) -> Vec<Message> {
+        let spoken = super::super::worker::spoken_character(character, false, true);
+        let note = heeding
+            .conversation_note_for(2)
+            .unwrap_or_else(|| heeding.call_note_for(2));
+        vec![
+            Message::system(format!("{spoken}\n\n{}", super::cache::changing(0))),
+            Message::user(TALK_ASKED),
+            Message::assistant(TALK_ANSWERED),
+            Message::system(note),
+            Message::user(self.said),
+        ]
+    }
+}
+
+/// The functions a heeding line is asked with: every one a spoken turn
+/// declares ([`functions`]), and the schedule's from the actions part's
+/// catalog in `actions`, as a voice with `--schedule-tools` reads them.
+pub fn heeding_functions(actions: Option<std::path::PathBuf>) -> Vec<lamp_gemini::Tool> {
+    let mut declared = functions(actions.clone());
+    let schedule = crate::tools::declared(&crate::tools::Settings {
+        exec: actions,
+        schedule_tools: true,
+        ..crate::tools::Settings::default()
+    });
+    for tool in schedule {
+        if !declared.iter().any(|ours| ours.name == tool.name) {
+            declared.push(tool);
+        }
+    }
+    declared
+}
+
+/// For each heeding line, how many requests called each function first,
+/// and how many were right.
+pub type HeedingCounts = BTreeMap<usize, (BTreeMap<String, u32>, u32)>;
+
+/// Each heeding line asked `runs` times.
+pub async fn ask_heedings(chat: &Chat, character: &str, runs: u32) -> HeedingCounts {
+    let mut counts = HeedingCounts::new();
+    for _ in 0..runs {
+        for (at, line) in HEEDING_LINES.iter().enumerate() {
+            let heeding = line.heeding();
+            match asked(chat, &line.messages(character, &heeding)).await {
+                Ok(called) => {
+                    let held = heeding.holds_call(2, &called);
+                    let count = counts.entry(at).or_default();
+                    count.1 += u32::from((line.right)(&called, held));
+                    *count.0.entry(called).or_default() += 1;
+                }
+                Err(error) => println!("tools heeding line={} failed: {error}", line.name),
+            }
+        }
+    }
+    counts
+}
+
+/// One line per heeding line, right of asked and the functions called
+/// first, then the verdict. Counts and names only, never the words.
+pub fn heedings_verdict(counts: &HeedingCounts) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut short = Vec::new();
+    for (at, line) in HEEDING_LINES.iter().enumerate() {
+        let (called, right) = counts.get(&at).cloned().unwrap_or_default();
+        let asked: u32 = called.values().sum();
+        if asked == 0 || right < asked {
+            short.push(line.name);
+        }
+        let shown: Vec<String> = called
+            .iter()
+            .map(|(name, n)| format!("{name}={n}"))
+            .collect();
+        lines.push(format!(
+            "tools heeding line={} right={right}/{asked}: {}",
+            line.name,
+            shown.join(" ")
+        ));
+    }
+    lines.push(if short.is_empty() {
+        "tools heeding verdict: right every time on every line".to_owned()
+    } else {
+        format!(
+            "tools heeding verdict: not every time: {}",
+            short.join(", ")
+        )
+    });
+    lines
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -874,6 +1086,27 @@ mod tests {
     }
 
     /// The actions part's catalog as it writes it, in a folder of its own.
+    /// [`heeding_functions`] from a catalog with the light, the volume and the
+    /// schedule, as lamp-actions offers them with the schedule on.
+    fn heeding_functions_here() -> Vec<lamp_gemini::Tool> {
+        let dir = std::env::temp_dir().join(format!(
+            "probe-heeding-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut offered = lamp_actions::catalog(true, true);
+        offered.extend(lamp_actions::schedule::catalog());
+        std::fs::write(
+            dir.join("tools.json"),
+            serde_json::to_string(&json!({"tools": offered})).unwrap(),
+        )
+        .unwrap();
+        let tools = heeding_functions(Some(dir.clone()));
+        std::fs::remove_dir_all(dir).unwrap();
+        tools
+    }
+
     fn functions_here() -> Vec<lamp_gemini::Tool> {
         let dir = std::env::temp_dir().join(format!(
             "probe-tools-{}-{:?}",
@@ -1201,6 +1434,142 @@ mod tests {
                 "tools sayings line=after-the-hum right=0/2",
                 "tools sayings line=go-on right=2/2",
                 "tools sayings verdict: not every time: after-the-hum",
+            ]
+        );
+    }
+
+    /// #2054 (the first builder at 05:43): each heeding line as the route's
+    /// rule keeps it. "Remind me …" is not held and "Remember …" not told
+    /// it may be people's talk (both were, before #2054); "Yes, give me five
+    /// minutes." with no question asked still is, and its call held.
+    #[test]
+    fn the_heeding_lines_are_judged_by_the_routes_own_rule() {
+        let alone = Some(super::super::super::worker::CONVERSATION_ALONE);
+        let [remind, split, to_someone, remember] = &HEEDING_LINES;
+        let rule = remind.heeding();
+        assert!(!rule.holds_call(2, "set_reminder"));
+        assert_eq!(rule.conversation_note_for(2), None);
+        // Cut short after "Remind me,": judged on the whole chain's words.
+        let rule = split.heeding();
+        assert!(!rule.holds_call(2, "set_reminder"));
+        assert_eq!(rule.conversation_note_for(2), None);
+        assert_eq!(text(&split.messages("CHARACTER", &rule)[4]), split.said);
+        let rule = to_someone.heeding();
+        assert!(rule.holds_call(2, "set_timer"));
+        assert_eq!(rule.conversation_note_for(2), alone);
+        let rule = remember.heeding();
+        assert_eq!(rule.conversation_note_for(2), None);
+        // Asked as the engine asks: the call note in its place, beside the
+        // line, after the conversation.
+        let messages = remember.messages("CHARACTER", &rule);
+        assert_eq!(messages.len(), 5);
+        assert!(text(&messages[0]).starts_with("CHARACTER"));
+        assert!(text(&messages[0]).contains("call remember"));
+        assert_eq!(text(&messages[1]), TALK_ASKED);
+        assert_eq!(text(&messages[3]), rule.call_note_for(2));
+        assert_eq!(text(&messages[4]), remember.said);
+        let messages = to_someone.messages("CHARACTER", &to_someone.heeding());
+        assert_eq!(Some(text(&messages[3]).as_str()), alone);
+        // What is right for each: the call, and whether the rule held it.
+        assert!((remind.right)("set_reminder", false));
+        assert!(!(remind.right)("set_reminder", true));
+        assert!(!(remind.right)(NONE, false));
+        assert!((to_someone.right)("set_timer", true));
+        assert!((to_someone.right)(NONE, false));
+        assert!(!(to_someone.right)("set_timer", false));
+        assert!((remember.right)("remember", false));
+        assert!(!(remember.right)("not_for_me", false));
+        // The schedule's functions are declared beside the rest, once.
+        let declared = heeding_functions_here();
+        for name in ["set_reminder", "set_timer", "remember", "not_for_me"] {
+            assert_eq!(
+                declared.iter().filter(|tool| tool.name == name).count(),
+                1,
+                "{name}"
+            );
+        }
+    }
+
+    /// Through a chat: each heeding line asked `runs` times, its first call
+    /// put to the rule's hold. A model that sets the reminder and the timer
+    /// is right on both (the timer held), and one that leaves "Remember …"
+    /// alone fails `remember`.
+    #[tokio::test]
+    async fn each_heeding_line_is_asked_and_its_call_put_to_the_rules_hold() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let total = 2 * HEEDING_LINES.len();
+        let server = tokio::spawn(async move {
+            let mut asked = 0;
+            while asked < total {
+                let Ok((mut socket, _)) = listener.accept().await else {
+                    break;
+                };
+                let mut request = Vec::new();
+                let mut buffer = [0; 65_536];
+                let body = loop {
+                    let n = socket.read(&mut buffer).await.unwrap();
+                    if n == 0 {
+                        break None;
+                    }
+                    request.extend_from_slice(&buffer[..n]);
+                    let text = String::from_utf8_lossy(&request).to_string();
+                    let Some((head, body)) = text.split_once("\r\n\r\n") else {
+                        continue;
+                    };
+                    let length: usize = head
+                        .lines()
+                        .find_map(|line| {
+                            line.to_lowercase()
+                                .strip_prefix("content-length: ")
+                                .map(|n| n.trim().parse().unwrap())
+                        })
+                        .unwrap();
+                    if body.len() >= length {
+                        break Some(serde_json::from_str::<serde_json::Value>(body).unwrap());
+                    }
+                };
+                let Some(body) = body else { continue };
+                asked += 1;
+                let last = body["messages"].as_array().unwrap().last().unwrap()["content"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned();
+                let name = if last == HEEDING_LINES[0].said || last == HEEDING_LINES[1].said {
+                    "set_reminder"
+                } else if last == HEEDING_LINES[2].said {
+                    "set_timer"
+                } else {
+                    "not_for_me"
+                };
+                let event = json!({"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c","type":"function","function":{"name":name,"arguments":"{}"}}]}}]});
+                socket
+                    .write_all(
+                        format!(
+                            "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\ndata: {event}\n\ndata: {}\n\ndata: [DONE]\n\n",
+                            json!({"choices":[{"delta":{},"finish_reason":"tool_calls"}]})
+                        )
+                        .as_bytes(),
+                    )
+                    .await
+                    .unwrap();
+            }
+            asked
+        });
+        let declared = heeding_functions_here();
+        let declare: net::Declare = Arc::new(move || declared.clone());
+        let base = format!("http://{address}/v1");
+        let chat = Chat::deepseek_at(&base, "m", "k", declare, false).unwrap();
+        let counts = ask_heedings(&chat, "CHARACTER", 2).await;
+        assert_eq!(server.await.unwrap(), total);
+        assert_eq!(
+            heedings_verdict(&counts),
+            [
+                "tools heeding line=remind right=2/2: set_reminder=2",
+                "tools heeding line=remind-split right=2/2: set_reminder=2",
+                "tools heeding line=to-someone right=2/2: set_timer=2",
+                "tools heeding line=remember right=0/2: not_for_me=2",
+                "tools heeding verdict: not every time: remember",
             ]
         );
     }

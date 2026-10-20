@@ -2148,6 +2148,31 @@ every function. It prints `right=N/M` per line and a verdict naming any line
 not right every time; counts only, never the words. The lost line asked
 again (#2001) asks the same chat again, so its check is the engine's tests.
 
+**Then the heeding's four lines** (`HEEDING_LINES`, #2054, the first
+builder's 05:43 on #1722): day lines of the hourly played test on lamp-4ace,
+said by one person after the two-person rounds, each let out only as the
+conversation going on. Each line is judged by the route's own rule
+(`worker::Heeding`, with `--spoken-to`) going on from a conversation in which
+the lamp asked nothing. It is asked with the note the engine gives it then:
+`CONVERSATION_ALONE`, or else the call note. Its first call is put to the
+rule's hold (`holds_call`):
+- `remind`: "Remind me in two minutes to stretch.": right is `set_reminder`,
+  not held;
+- `remind-split`: "Remind me, in two minutes, to drink some water.", cut
+  short after "Remind me," and gone on with as the next request
+  (`continues_from`): the same, judged on the whole chain's words;
+- `to-someone`: "Yes, give me five minutes.", said to someone else: right is
+  no schedule call run (none called, or held);
+- `remember`: "Remember that my favourite colour is green.": right is
+  `remember`, never `not_for_me`.
+
+Before #2054, `remind` was always held and `remember` was told it may be
+people's talk. The model is asked with every function and the schedule's,
+read from the actions part's catalog as a voice with `--schedule-tools`
+reads them. Where the catalog has no schedule, the lines aren't asked, and
+it says so. It prints `right=N/M` and the functions called first per line,
+then a verdict.
+
 **Then memory's quality** (`probe/quality.rs`, #1693, the first builder at
 03:05 on #1722). There are six cases, each a fresh session told what the lamp
 keeps as its frozen snapshot (with source ids), under the memory note and
