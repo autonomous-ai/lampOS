@@ -4930,6 +4930,20 @@ A usage limit paused me from about 00:40 to 06:2x.
   - **The fix:** the coordinator tells the cut-in's Start how much of the reply was played. The route then keeps only the pieces heard, with the piece playing at the cut kept to its played share and an em dash.
   - Off unless set, with tests, onto #1712.
 
+## 2026-10-20, 10:09 ICT: #2099 and #2119 merged; what the lamp said kept as heard, built
+
+- **Merged into #1712** through #2124 (`9519328f7`, 10:0x):
+  - #2099, the name past the reply;
+  - #2119, `--wire --speech`, at `e77f7aa3a`.
+- **#2119's P3 fix,** read by the reviewer at 09:45 with no finding, isn't in #2124. It's rebuilt on `9519328f7` as `faa835ee2`, to go up as its own PR once gated.
+- **The 03:44 split** was mine at 09:36 and Third's from 09:38. I posted what I'd ruled out at 09:40, and Third found the chain at 09:49 (#2095 breaks it).
+- **The relay** (the backend, 10:05 on #1934): its ~0.4 s is the trip to the US west coast; its own work is about 10 ms. Its ElevenLabs websocket is under `/ws/`, which corrects my 09:28. A socket opened ahead would save only about 0.1 s, so I'm not building it.
+- **`LAMP_SAID_AS_HEARD`,** built on `fourth/said-as-heard`, rebased onto `9519328f7` (`d99cef993`):
+  - the coordinator counts what each reply hands the speaker and tells the cutting line's Start (`heard_of_cut`);
+  - the route keeps its pieces' words and samples;
+  - the worker trims the thread before the line is asked.
+  - Five tests and four mutations. The gate is running.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -4947,6 +4961,8 @@ were not run on a lamp. `attention/addressed` is off unless
 tried. The local judge remains shadow-only behind `--local-judge`,
 with unfitted weights and no proof that it improves the busy-room floor.
 `LAMP_REPLY_END_REACH` is off unless set and was not run on a lamp.
+`LAMP_SAID_AS_HEARD` is off unless set and was not run on a lamp; memory
+can still hold a cut answer whole when the route had sent it all first.
 `probe-cascade --wire --speech` was tried only from this Mac with made-up
 keys (both targets answered 401), not on a lamp.
 Native Linux ARM64 execution so far is on GitHub runners, not on a lamp.
