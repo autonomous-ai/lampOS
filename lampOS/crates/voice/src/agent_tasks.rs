@@ -142,6 +142,11 @@ pub const MAKE_SKILL_FLAG: &str = "--tasks-make-skill";
 /// [`WHO_ENVIRONMENT`].
 pub const NAMED_ONLY_ENVIRONMENT: &str = "LAMP_TASKS_NAMED_ONLY";
 pub const NAMED_ONLY_FLAG: &str = "--tasks-named-only";
+/// Where the second route reads whether a line whose own words ask one of
+/// the staff by name to do something ("ask Claude Code to …") has its
+/// first chat round made to call [`START`] ([`named_ask`], #1722). `on`
+/// only.
+pub const NAMED_ASK_ENVIRONMENT: &str = "LAMP_TASKS_NAMED_ASK";
 pub const DEFAULT_TARGET: &str = "office";
 /// The model's two functions.
 pub const START: &str = "start_agent_task";
@@ -264,6 +269,97 @@ fn staff_now(place: &Place) -> Vec<Member> {
         return Vec::new();
     }
     STAFF.lock().map(|staff| staff.clone()).unwrap_or_default()
+}
+
+/// Whether [`NAMED_ASK_ENVIRONMENT`] is `on`.
+pub fn named_ask_on() -> bool {
+    std::env::var(NAMED_ASK_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// The asking words that need no "to" after the name when the person asks
+/// the lamp ("can you ask Claude Code …", "could you get Codex …").
+const ASKING_THE_LAMP: [&str; 2] = ["ask", "get"];
+/// The words before "you" that make it a request of the lamp.
+const CAN_YOU: [&str; 4] = ["can", "could", "would", "will"];
+/// The words before "you" that make it a question about what was done
+/// ("did you ask Claude Code to …").
+const DID_YOU: [&str; 6] = ["did", "didn", "have", "haven", "had", "has"];
+/// The words right before the verb that rule the ask out ("never ask
+/// Codex to …", "do not tell …"); "don't" is heard as "don" "t".
+const NOT: [&str; 3] = ["not", "never", "dont"];
+/// The words before "I" that make it a question the person asks themself
+/// ("should I ask Claude Code to …").
+const SHOULD_I: [&str; 3] = ["should", "shall", "do"];
+
+/// The one of the staff whose name the person's own words ask to do
+/// something (#1722, `LAMP_TASKS_NAMED_ASK`): "ask/tell/get/have <name> to
+/// …", or "can/could you ask/get <name> …". The name is the agent's own,
+/// whole ("Claude Code", "Codex"), of the staff as last read, or the one who
+/// does the work when none is read. A mention is none: "I told Claude Code
+/// yesterday", "is Codex done?", "what did Claude Code say?", "did you ask
+/// Codex to …", a negation right before the verb ("don't ask …", "never
+/// ask …") or a question to oneself ("should I ask …"); nor a name garbled ("Claude Co") or not of the staff.
+pub fn named_ask(place: &Place, heard: &str) -> Option<&'static str> {
+    let staff = staff_now(place);
+    let names: Vec<&'static str> = if staff.is_empty() {
+        vec![CLAUDE_CODE]
+    } else {
+        staff.iter().map(|member| member.kind.name).collect()
+    };
+    let words: Vec<String> = heard
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let word = |at: Option<usize>| at.and_then(|at| words.get(at)).map(String::as_str);
+    for name in names {
+        let said: Vec<String> = name.split(' ').map(str::to_lowercase).collect();
+        for at in 1..words.len() {
+            if words.get(at..at + said.len()) != Some(&said[..]) {
+                continue;
+            }
+            let verb = word(Some(at - 1)).unwrap_or_default();
+            if !ASKING.contains(&verb) {
+                continue;
+            }
+            let you = word(at.checked_sub(2)) == Some("you");
+            let before_you = word(at.checked_sub(3)).unwrap_or_default();
+            if you && DID_YOU.contains(&before_you) {
+                continue;
+            }
+            let before_verb = word(at.checked_sub(2)).unwrap_or_default();
+            let negated = NOT.contains(&before_verb)
+                || (before_verb == "t" && word(at.checked_sub(3)) == Some("don"));
+            if negated || (before_verb == "i" && SHOULD_I.contains(&before_you)) {
+                continue;
+            }
+            let to = word(Some(at + said.len())) == Some("to");
+            if to || (you && CAN_YOU.contains(&before_you) && ASKING_THE_LAMP.contains(&verb)) {
+                return Some(name);
+            }
+        }
+    }
+    None
+}
+
+/// The staff as if the tasks part had answered with these `(alias,
+/// engine)` pairs, for the hand-over probe
+/// (`second_provider::probe::handover`), which asks the model without the
+/// tasks part. An engine the voice doesn't know is left out.
+pub(crate) fn hold_staff(staff: &[(&str, &str)]) {
+    let members = staff
+        .iter()
+        .filter_map(|(alias, engine)| {
+            let kind = KINDS.iter().find(|kind| kind.engine == *engine)?;
+            Some(Member {
+                alias: (*alias).into(),
+                kind,
+            })
+        })
+        .collect();
+    if let Ok(mut held) = STAFF.lock() {
+        *held = members;
+    }
 }
 
 /// The person may name one of them: the switch is on and there is more
@@ -2130,6 +2226,86 @@ pub(crate) mod tests {
     pub(crate) fn forget_staff() {
         STAFF.lock().unwrap().clear();
         *PENDING.lock().unwrap() = None;
+    }
+
+    /// `LAMP_TASKS_NAMED_ASK` (#1722): an ask of one of the staff by name,
+    /// in the person's own words, is told apart from a mention of them, from
+    /// a name not of the staff and from a garbled one.
+    #[test]
+    fn a_named_ask_is_told_apart_from_a_mention() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _staff = STAFF_HELD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut on = place(Path::new("/run/t"), true);
+        on.asked = true;
+        *STAFF.lock().unwrap() = two();
+        let asked = |heard: &str| named_ask(&on, heard);
+        for (heard, who) in [
+            (
+                "Hey Lamp, ask Claude Code to write a two-line poem about the rain.",
+                "Claude Code",
+            ),
+            (
+                "Hey Lamp, can you ask Claude Code to write a short poem about the sea?",
+                "Claude Code",
+            ),
+            (
+                "Hey Lamp, ask Codex to write a haiku about coffee.",
+                "Codex",
+            ),
+            ("Tell Codex to fix the failing test.", "Codex"),
+            ("Get Claude Code to tidy my notes.", "Claude Code"),
+            ("have codex to look at the build", "Codex"),
+            ("Could you get Codex to check the logs?", "Codex"),
+            ("can you ask Codex what changed", "Codex"),
+            // A negation elsewhere, or "I" not after should/shall/do, keeps
+            // it an ask.
+            ("Don't wait, ask Codex to fix it.", "Codex"),
+            (
+                "I think you should ask Claude Code to fix it.",
+                "Claude Code",
+            ),
+            ("Why don't you ask Codex to check it?", "Codex"),
+        ] {
+            assert_eq!(asked(heard), Some(who), "{heard}");
+        }
+        for heard in [
+            "I told Claude Code yesterday.",
+            "Is Codex done?",
+            "What did Claude Code say?",
+            "Did you ask Codex to fix it?",
+            "Have you asked Claude Code to start?",
+            "Tell Claude Code I'm late.",
+            "Ask Devin to write a poem.",
+            "Ask OpenCode to write a poem.",
+            "Ask Claude Co to write a poem.",
+            "Ask cloud code to write a poem.",
+            "Tell me a story about a clever fox, at least eight sentences.",
+            "Write a poem about Codex.",
+            // The reviewer on #2365: a negation, or a question the person
+            // asks themself, is not an ask.
+            "Don't ask Claude Code to do that.",
+            "Never ask Codex to touch my notes.",
+            "Should I ask Claude Code to fix it?",
+            "Do not tell Codex to push it.",
+            "dont ask codex to merge it",
+            "Please don't get Claude Code to change the tests.",
+            "We should not ask Codex to touch the build.",
+            "Shall I ask Codex to look at it?",
+            "Do I tell Claude Code to stop?",
+        ] {
+            assert_eq!(asked(heard), None, "{heard}");
+        }
+        // With none of the staff read, the one who does the work.
+        STAFF.lock().unwrap().clear();
+        assert_eq!(
+            asked("ask Claude Code to write a poem"),
+            Some("Claude Code")
+        );
+        assert_eq!(asked("ask Codex to write a poem"), None);
     }
 
     /// The reviewer on #1446: a named member keeps its own engine through

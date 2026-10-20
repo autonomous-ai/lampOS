@@ -1438,6 +1438,23 @@ pub fn serve(
     } else {
         net
     };
+    // A line whose own words ask one of the staff by name to do something
+    // is handed over: its first round must call start_agent_task (#1722).
+    let net = match tools
+        .tasks
+        .clone()
+        .filter(|_| crate::agent_tasks::named_ask_on())
+    {
+        Some(place) => {
+            eprintln!(
+                "lamp-voice second: a line that asks one of the staff by name to do something is handed over: its first round must call {} ({})",
+                crate::agent_tasks::START,
+                crate::agent_tasks::NAMED_ASK_ENVIRONMENT
+            );
+            net.forcing(named_asks(place))
+        }
+        None => net,
+    };
     let thread = files.thread;
     let file = thread.clone();
     // Each turn is one person's, as a Live session is (#764): whose it is,
@@ -2372,6 +2389,20 @@ pub(crate) fn few_tools(
         });
     }
     given
+}
+
+/// What makes a spoken turn's first round call `start_agent_task`, with
+/// `LAMP_TASKS_NAMED_ASK=on` ([`crate::agent_tasks::named_ask`]): the last
+/// message is the person's, and its words ask one of the staff by name to
+/// do something. A round after a call ends with the call's result, never
+/// the person's words, and is asked as before. On lamp-4ace on 21 Oct, two
+/// of the staff read, the played asks of a poem by name were answered by
+/// the lamp itself or with `not_for_me` (#1722).
+pub(crate) fn named_asks(place: crate::agent_tasks::Place) -> crate::second_provider::net::Force {
+    Arc::new(move |messages: &[Message]| {
+        let last = messages.last().filter(|message| message.role == "user")?;
+        crate::agent_tasks::named_ask(&place, last.words()?).map(|_| crate::agent_tasks::START)
+    })
 }
 
 /// The calls [`run_call`] answers itself before any is routed: [`MORE`],
@@ -10338,5 +10369,67 @@ mod memory_observer {
         assert!(request.contains("untrusted history"), "{request}");
         assert!(request.contains("\\\"job\\\":\\\"j7\\\""), "{request}");
         assert!(!request.contains("\"tools\""), "{request}");
+    }
+
+    /// `LAMP_TASKS_NAMED_ASK` (#1722): with it, the first round of a line
+    /// that asks one of the staff by name must call `start_agent_task`; a
+    /// mention, a round after a call and a chat not forcing are asked as
+    /// before, with no `tool_choice`.
+    #[test]
+    fn a_named_ask_makes_the_first_round_call_start_agent_task_and_nothing_else_changes() {
+        use super::super::net::{Chat, Message};
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _staff = crate::agent_tasks::tests::STAFF_HELD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        crate::agent_tasks::hold_staff(&[("office-claude", "claude"), ("office-codex", "codex")]);
+        let place = crate::agent_tasks::Place {
+            directory: "/run/t".into(),
+            target: "office-claude".into(),
+            who: true,
+            lead_in: true,
+            asked: true,
+            accounts: false,
+            machine_names: false,
+            needs: None,
+            staff_note: true,
+            make_skill: false,
+            named_only: false,
+        };
+        let tools = crate::agent_tasks::tools(&place);
+        let declare: super::super::net::Declare = Arc::new(move || tools.clone());
+        let plain = Chat::deepseek("deepseek-chat", "k", declare.clone(), false).unwrap();
+        let forcing = Chat::deepseek("deepseek-chat", "k", declare, false).unwrap();
+        forcing.forcing(crate::second_provider::worker::named_asks(place));
+        let ask = vec![
+            Message::system("You are a lamp."),
+            Message::user("Hey Lamp, ask Claude Code to write a two-line poem about the rain."),
+        ];
+        let mention = vec![
+            Message::system("You are a lamp."),
+            Message::user("Is Codex done?"),
+        ];
+        let mut after = ask.clone();
+        after.push(Message::tool("1", "{\"ok\": true}"));
+        let choice =
+            |chat: &Chat, messages: &[Message]| chat.wire(messages).2.get("tool_choice").cloned();
+        assert_eq!(
+            choice(&forcing, &ask),
+            Some(serde_json::json!({"type": "function", "function": {"name": "start_agent_task"}}))
+        );
+        assert_eq!(choice(&forcing, &mention), None);
+        assert_eq!(choice(&forcing, &after), None);
+        // Off: the same request as before, word for word.
+        for messages in [&ask, &mention, &after] {
+            assert_eq!(choice(&plain, messages), None);
+            let mut forced = forcing.wire(messages).2;
+            if let Some(body) = forced.as_object_mut() {
+                body.remove("tool_choice");
+            }
+            assert_eq!(plain.wire(messages).2, forced);
+        }
+        crate::agent_tasks::tests::forget_staff();
     }
 }

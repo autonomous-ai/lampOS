@@ -189,6 +189,19 @@ impl Net {
         self
     }
 
+    /// The chat's requests must call the function `force` names for their
+    /// messages ([`net::Chat::forcing`]). Called after the chat is chosen.
+    pub fn forcing(self, force: net::Force) -> Self {
+        self.chat.forcing(force);
+        self
+    }
+
+    /// The chat as the route chose it, for the hand-over probe
+    /// (`probe::handover`), which asks it as a spoken turn would.
+    pub(crate) fn chat_client(&self) -> Arc<Chat> {
+        self.chat.clone()
+    }
+
     /// The chat's requests are given only the tools `narrow` keeps
     /// ([`net::Chat::narrowing`]). Called after the chat is chosen: one
     /// chosen later is given every tool.
