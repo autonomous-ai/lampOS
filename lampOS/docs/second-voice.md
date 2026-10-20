@@ -710,18 +710,18 @@ order is kept. A written turn is the same from the chat on.
     call me" still opens a name (the reviewer's P3s on #2355). Not a bare
     "I'm" or "I am": "Yes, I am." ends a line.
   - **The second route holds the answer** (`Engine::waiting_for_a_name`):
-    such a line is answered no sooner than `CARRY_AFTER_END` (1.5 s) after
+    such a line is answered no sooner than `OPEN_NAME_WITHIN` (2.5 s) after
     its end. A newer line drops the request, and the wait with it; with
     none, it is answered as it is.
   - **The coordinator lets the name go on** (`coordinator/open_name.rs`).
     The route gives it the line's final words before the answer
     (`Transcript` with no request). When they end before a name and none of
-    the turn's answer has been heard, a sound that began within 1.5 s of
+    the turn's answer has been heard, a sound that began within 2.5 s of
     the turn's end isn't let go by the answer wait (#1123, with its words)
     or the body's motors. The keeper's pause, the busy-room hold and
     asker-first (#829) still judge it: they keep the room's next voice off
     an awaited answer, so a colleague's "…see you at lunch" begun in those
-    1.5 s, in a busy room or well under the person's voice, is never taken
+    2.5 s, in a busy room or well under the person's voice, is never taken
     as the name (the reviewer's P3 on #2355). In a quiet room a colleague
     at the person's own level could still be joined; the route's
     same-voice print would tell them apart, and is to be read here once
@@ -733,7 +733,13 @@ order is kept. A written turn is the same from the chat on.
     the turn's `open_name` record says when it ended.
   - **Only while the second route answers** (`provider.role` is
     `second`): the Live route has no such hold.
-  - **What it costs:** at most 1.5 s before the answer, on lines whose
+  - **The window is its own, 2.5 s** (`OPEN_NAME_WITHIN`, longer than
+    `CARRY_AFTER_END`'s 1.5 s for the kept-sound carry): on lamp-4ace at
+    05:53 a name came about 2.05 s after "my name is" ended, past 1.5 s,
+    and the body's move let it go; a person who says "my name is" and stops
+    is about to say it, and may think a moment (the first builder on #1722,
+    06:00).
+  - **What it costs:** at most 2.5 s before the answer, on lines whose
     final words end before a name, and nothing on any other.
   - **What it doesn't do:**
     - A sound let go before the line's words came is not brought back. On
@@ -760,7 +766,7 @@ order is kept. A written turn is the same from the chat on.
   - **For a lamp:** played name lines that pause 400–800 ms before the
     name. Count the names that go on (`goes_on_from_its_name`) and the
     candidates let go after an end, with the switch and without. Then one
-    in a busy room, someone else speaking within 1.5 s of "my name is": it
+    in a busy room, someone else speaking within 2.5 s of "my name is": it
     is not joined.
 - **With `LAMP_SECOND_PREPARED=on` the chat is begun on the line's early
   words** (off unless set; #1712, the first builder at 17:02: the route's

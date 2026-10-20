@@ -1834,7 +1834,7 @@ pub fn serve(
         == Some("on")
     {
         eprintln!(
-            "lamp-voice second: a line whose words end before a name is answered no sooner than 1.5 s after its end (LAMP_SECOND_OPEN_NAME)"
+            "lamp-voice second: a line whose words end before a name is answered no sooner than 2.5 s after its end (LAMP_SECOND_OPEN_NAME)"
         );
         engine = engine.waiting_for_a_name(true);
     }
