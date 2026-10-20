@@ -4,6 +4,17 @@
 
 Newest first. Times from `date` (+07).
 
+- 10:12 #2129 read (Sixth, camera USB reset): no P1/P2, four P3s (stale camera-runtime/hardware-contract docs, reset not gated on the permit, udev rule needs a reboot after update, wording), fold two commits; item 4 for the first builder; gate 482/0, 2 mutations caught
+- 10:11 Merged #2128 (`ring_asleep` tests on a short timing, for #1806) as `5f0d5949f`; #1806 stays open.
+- 10:02 Merged #2127 (onboarding head-touch step) as `56bcb4c1a` on green ARM64 and clippy; it names no open issue to close.
+- 10:01 #2132 (Blendshape V2 reader behind `--seems-blendshapes`) sized: one commit, +573 -37; first read started.
+- 09:59 #2115 (Who was here part 3) and #2131 (Harness sign-in by a spoken code) sent to second passes
+- 09:59 merged #2125 (second-route stop test released, not slept, #1806) as f908b93df on green
+- 09:51 #2129 (camera USB reset after a mute; udev rule) sent to a second pass; privacy path and a device grant
+- 09:50 merged #2121 (search give-up test on Tokio's clock, #1806) as b459edefe on green
+- 09:50 merged #2120 (arm-hour row 10 on 56afa2a8e) as 408fd0864 on green
+- 09:45 #2119 P3s answered (route's host rule); two commits now, #2124 has the old head
+- 09:43 #2127 read (onboarding touch by Controls' head-pad event): no finding; merge on green
 - 09:38 #1699 fold re-read: no P1/P2; three unannounced behaviour changes named; P3 30 s timeout after Ready; first builder's after row 1
 - 09:37 #2123 read (onboarding_inputs record): no finding; first builder's (Seventh's stack)
 - 09:37 #2124 (seven reviewed PRs onto #1712 in one run): each merge is the PR head I read, no resolutions
