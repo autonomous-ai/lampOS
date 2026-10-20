@@ -879,8 +879,10 @@ With the switch:
     sibling who said yes to "are you Minh?" would have taken Minh's face,
     and with it Minh's memory (the reviewer's P1 on #2202). It also keeps
     a known person's name from someone who isn't them (P2).
-  - **Spelled as the known name:** kept under it. The same name spelled
-    again: called with `"apart":true`, and kept beside the near one.
+  - **Once spelled,** the model calls again with the spelled name and
+    `"apart":true`, whatever the first call held, so the person is asked
+    once (Reviewer-lead's P3 on #2252). The known name spelled: judged
+    against theirs, as below. Another name: kept beside the near one.
     `apart` is sent only when true, since eyes from before it refuse a
     field they don't know.
 - **A known name never takes a face that isn't theirs**, whatever is asked

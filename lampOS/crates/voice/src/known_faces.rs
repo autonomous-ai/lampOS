@@ -526,8 +526,12 @@ const NOT_HEARD: &str = "You did not hear that name in what they said. Say the n
 const NOT_AGREED: &str = "They have not said yes to that name yet. Say the new name back and ask whether they want to be known by it instead. Only if they say yes, call this again with the new name and replace true.";
 /// What the model is told when the face is near someone known by a name one
 /// letter from the one heard (#2176 row 4): the name may be misheard, so
-/// they spell it, and no known name is said back.
-const NEAR_TO: &str = "You may have misheard their name. Do not say any name you know. Ask them to spell their name, letter by letter, then call this again with the name as they spelled it. If they spell the name you already called this with, call it with that name and apart true.";
+/// they spell it, and no known name is said back. The spelled name goes with
+/// `apart`, whatever the first call held, so a sibling heard as exactly a
+/// known name is asked once, not twice (Reviewer-lead's P3 on #2252):
+/// `name_heard` proves the spelling, and the eyes still judge a known
+/// name's face.
+const NEAR_TO: &str = "You may have misheard their name. Do not say any name you know. Ask them to spell their name, letter by letter, then call this again with the name as they spelled it and apart true.";
 /// What the model is told when the face can't be kept under that name (it
 /// is someone's the lamp knows, and this face isn't near theirs). It says
 /// nothing of who the lamp knows, and no yes changes it (the reviewer's P1
@@ -572,7 +576,7 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
                     "properties": {
                         "name": {"type": "string", "description": "Their name, as they said or spelled it."},
                         "replace": {"type": "boolean", "description": "Only when you were told this face is known by another name, and they said yes to being known by this one instead."},
-                        "apart": {"type": "boolean", "description": "Only when you were told you may have misheard their name, and they spelled the same name again."}
+                        "apart": {"type": "boolean", "description": "Only when you were told you may have misheard their name, and they then spelled it."}
                     },
                     "required": ["name"]
                 })
@@ -1551,7 +1555,10 @@ mod tests {
             &Said::now("Remember my face, I'm Linh."),
         );
         let told = words["error"].as_str().unwrap();
-        assert!(told.contains("spell") && !told.contains("Minh"), "{told}");
+        assert!(
+            told.contains("spell") && told.contains("apart true") && !told.contains("Minh"),
+            "{told}"
+        );
         // "Are you Minh?" "Yes." is not Minh's name heard.
         let (words, _) = run_with(
             &socket,
