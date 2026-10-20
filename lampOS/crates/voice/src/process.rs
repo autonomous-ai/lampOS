@@ -899,6 +899,10 @@ fn worker_command(
             role,
             var(crate::remember::FORGET_ABOUT_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_room_not_asker_worker_environment(
+            role,
+            var(crate::remember::ROOM_NOT_ASKER_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_observe_worker_environment(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
@@ -1076,6 +1080,17 @@ fn memory_threads_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::THREADS_ENVIRONMENT, "on"))
+}
+
+// The room's kept things told as someone in the room's (#2176), passed the
+// same narrow way: the exact `on`, to the two routes that open the sessions
+// told of them (each through `remember::told_for_session`).
+fn memory_room_not_asker_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::ROOM_NOT_ASKER_ENVIRONMENT, "on"))
 }
 
 // The clock's switch (#830), passed the same narrow way: the exact `on`, to
@@ -1451,6 +1466,12 @@ mod tests {
                         "LAMP_MEMORY_FORGET_ABOUT",
                         ["provider", "second"].as_slice(),
                     ),
+                    // The room's kept things as someone's (#2176): both routes.
+                    (
+                        memory_room_not_asker_worker_environment,
+                        "LAMP_MEMORY_ROOM_NOT_ASKER",
+                        ["provider", "second"].as_slice(),
+                    ),
                     // The observation pass, the route with a model (#1693 (2)).
                     (
                         memory_observe_worker_environment,
@@ -1584,6 +1605,7 @@ mod tests {
                     "LAMP_MEMORY_DAYS",
                     crate::rules::ENVIRONMENT,
                     crate::remember::FORGET_ALL_ENVIRONMENT,
+                    crate::remember::ROOM_NOT_ASKER_ENVIRONMENT,
                     crate::remember::FORGET_ABOUT_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
@@ -1692,6 +1714,7 @@ mod tests {
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
+                    "LAMP_MEMORY_ROOM_NOT_ASKER=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
@@ -1714,6 +1737,7 @@ mod tests {
                     "LAMP_MEMORY_OBSERVE=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
+                    "LAMP_MEMORY_ROOM_NOT_ASKER=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_NAMED_ALWAYS=on",

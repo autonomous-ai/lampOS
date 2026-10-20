@@ -902,6 +902,40 @@ then use that person's scope:
   (`remember::tests::with_nobody_known_every_line_to_the_memory_is_as_before`
   pins the bytes).
 
+- **The room's isn't the asker's** (#2176, the "Dylan" case,
+  `LAMP_MEMORY_ROOM_NOT_ASKER=on`, with the Days client only; off unless
+  set; both voice routes, since each opens its sessions through
+  `remember::told_for_session`). On lamp-4ace a played "my name is Dylan",
+  with no face known, was kept as the room's. Every later session's note
+  carried it under the rule "The speaker is unknown: never say 'you told
+  me'", and the model called the one asking "Dylan". With the switch:
+  - **The rule** for the room's snapshot, and for the earlier exchanges a
+    turn is given, says they were said by whoever was in the room then,
+    not necessarily the one asking now: never say "you told me", never take
+    a name or anything else about a person in them as the asker's own, and
+    if it comes up, say someone here said it and ask.
+  - **A room-kept fact about a person** is put in the note as "Someone in
+    the room said: ..." (`remember::about_a_person`): one with the word
+    `name`, `names`, `named`, `nickname` or `called`, or `I'm`, `I am`,
+    `call me`, lower-cased with a curly apostrophe read as a straight one.
+    Simple on purpose: every room-kept thing *was* said by someone in the
+    room, so a fact it catches wrongly is still told truly.
+  - **A known person's own snapshot** is told as before: their own kept
+    name stays theirs.
+  - **The journal**, at each session's open, after the open has let go of
+    the client's context: "a session's memory note carried N of the room's
+    kept things (M as someone in the room's) and K of the person's own".
+    Counts only, never a word.
+  - Off, the note is byte for byte what it was. The legacy client's note is
+    unchanged either way. Tests:
+    `remember::tests::with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s`,
+    `remember::tests::with_the_switch_a_known_person_s_own_kept_name_is_still_theirs`,
+    `remember::tests::without_the_switch_the_note_is_byte_identical`,
+    `remember::tests::a_fact_about_a_person_is_one_that_names_them_or_says_who_they_are`,
+    `remember::tests::the_session_s_counts_line_says_no_word_kept`. The
+    probe's quality case waits for a base with the relay probe (#2279);
+    until then these tests are its check.
+
 ### A session for each person (#764 follow-up)
 
 Scopes alone did not reach what the open provider session had already
