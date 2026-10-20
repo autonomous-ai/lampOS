@@ -12,10 +12,18 @@ publish.workspace = true
 name = "lamp-eyes"
 path = "src/main.rs"
 
+# How often the face read was wrong, from `--seems-log` and a labelled
+# session (#1671, step 0). Numbers only; removed with the measure.
+[[bin]]
+name = "lamp-seems-measure"
+path = "src/bin/seems_measure.rs"
+
 [dependencies]
 lamp-ipc = { path = "../ipc" }
 serde.workspace = true
 serde_json.workspace = true
+# O_NOFOLLOW for the seems log (#2306), as lamp-skills opens its files.
+libc = "0.2"
 lamp-bus = { path = "../bus" }
 lamp-msgs = { path = "../msgs" }
 lamp-local-time = { path = "../local-time" }
