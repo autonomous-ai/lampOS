@@ -93,7 +93,7 @@ fn every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths() {
     let mut read = Vec::new();
     for file in &files {
         // This file's own examples, in the test below, are not reads.
-        if file.ends_with("update/tests/ci_paths.rs") {
+        if file.ends_with("update/tests/it/ci_paths.rs") {
             continue;
         }
         let text = fs::read_to_string(file).unwrap_or_default();
@@ -149,12 +149,12 @@ fn named_back(paths: &[String], read: &[(String, PathBuf)], workflow_path: &str)
 #[test]
 fn the_scan_sees_paths_in_strings_and_not_in_comments_or_prose() {
     let text = r#"
-        let page = include_str!("../../../docs/install.md");
+        let page = include_str!("../../../../docs/install.md");
         let other = fs::read_to_string(root.join("docs/verification/x/README.md"));
         // See docs/memory.md for why.
         #[ignore = "requires the pinned model; see docs/endpoint-pilot.md"]
         let role = Path::new("../builders/tests.md");
-        let picture = include_bytes!("../../../docs/verification/x/face.png");
+        let picture = include_bytes!("../../../../docs/verification/x/face.png");
     "#;
     assert_eq!(
         named_in(text),

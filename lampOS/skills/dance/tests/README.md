@@ -23,6 +23,6 @@ sends its second clip when the body says on `body/gesture` that the
 first is over (and none after `dropped`, or with no `over`), sends no
 second after a push, refuses a call while it plays, and
 gives the light back at its end is the program's, tested in
-`crates/skills/tests/skills.rs` against a stand-in voice and a stand-in
+`crates/skills/tests/it/skills.rs` against a stand-in voice and a stand-in
 body that drops a gesture sent while one plays, as the body does. Whether
 it looks like dancing is for a lamp, with its person (#999).
