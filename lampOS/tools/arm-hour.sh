@@ -34,8 +34,9 @@
 #               beside it, copied there before the hour. Checked at the start
 #               when a row to run has a trial.
 #   ARM_LOG     where the log goes (./arm-hour-YYYYmmdd-HHMM.log)
-#   ARM_LAMP_HOST  the lamp for a file copied from the Mac, as scp takes it
-#               (orangepi@lamp-4ace.local)
+#   ARM_LAMP_HOST  the lamp for a file copied from the Mac, as scp and ssh
+#               take it (user@host): the builder's own, with no default, and
+#               needed by the rows that copy a file or run presence-check.sh
 #   ARM_SCP     the command that copies a file to the lamp (scp), so one with
 #               its own key and known hosts can be given
 #   ARM_PRESENCE_CHECK  #1677's presence-check.sh on the Mac, in a checkout's
@@ -87,7 +88,7 @@ sheet | #1722, Fifth, 20 Oct 04:43, row 1 without the reboot (any lamp; scripted
 need | running | lamp-body lamp-voice lamp-expression lamp-skills
 mac | d=/tmp/fifth-row1; rm -rf $d && mkdir -p $d && gh api repos/autonomous-ai/lampOS/issues/comments/6278063826 --jq .body | awk '/^```bash$/{f=1;next} f&&/^```$/{exit} f' >$d/fifth-rows.sh && echo "d8a06babff6bf85043dadefc69039451d57951b43d52bdd52aef50c78b115b70  $d/fifth-rows.sh" | shasum -a 256 -c && gh run download 39313641196 -R autonomous-ai/lampOS -n lampos-arm64-396e8a2b3eea57322bf38a27ec453e2d0cebb74c -D $d/a && mv $d/a/lamp-voice $d/a/lamp-expression $d/a/lamp-body $d/a/lamp-skills $d/ && rm -rf $d/a && for f in skill.toml SKILL.md; do gh api -H 'Accept: application/vnd.github.raw' "repos/autonomous-ai/lampOS/contents/lampOS/skills/prepare-unplug/$f?ref=396e8a2b3eea57322bf38a27ec453e2d0cebb74c" >$d/$f || exit 1; done
 lamp | rm -rf /tmp/fifth-row1 && mkdir -m 700 /tmp/fifth-row1
-mac | ${ARM_SCP:-scp} -q /tmp/fifth-row1/* "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/fifth-row1/
+mac | ${ARM_SCP:-scp} -q /tmp/fifth-row1/* "${ARM_LAMP_HOST:?the lamp, as scp and ssh take it}":/tmp/fifth-row1/
 lamp | cd /tmp/fifth-row1 && echo "d8a06babff6bf85043dadefc69039451d57951b43d52bdd52aef50c78b115b70  fifth-rows.sh" | sha256sum -c --quiet && sudo bash /tmp/fifth-row1/fifth-rows.sh 1 preflight
 tell | On the camera: is the arm folded and still? If not, q now.
 lamp | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 install
@@ -161,7 +162,7 @@ sheet | #1722, Fifth, 20 Oct 03:57 (any lamp; scripted, fifth-rows.sh)
 need | running | lamp-body lamp-eyes
 mac | d=/tmp/fifth-row8; rm -rf $d && mkdir -p $d && gh api repos/autonomous-ai/lampOS/issues/comments/6277160673 --jq .body | awk '/^```bash$/{f=1;next} f&&/^```$/{exit} f' >$d/fifth-rows.sh && echo "1be88030af34ef0096781a0103c69a6451e795024706d67fc7aa35de3c182133  $d/fifth-rows.sh" | shasum -a 256 -c && gh run download 39299260822 -R autonomous-ai/lampOS -n lampos-arm64-782e6ef34547008443828158fe3540fd2cd23cec -D $d/a && mv $d/a/lamp-skills $d/a/lamp-health $d/ && rm -rf $d/a && for f in skill.toml SKILL.md; do gh api -H 'Accept: application/vnd.github.raw' "repos/autonomous-ai/lampOS/contents/lampOS/skills/not-feeling-well/$f?ref=782e6ef34547008443828158fe3540fd2cd23cec" >$d/$f || exit 1; done
 lamp | rm -rf /tmp/fifth-row8 && mkdir -m 700 /tmp/fifth-row8
-mac | ${ARM_SCP:-scp} -q /tmp/fifth-row8/* "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/fifth-row8/
+mac | ${ARM_SCP:-scp} -q /tmp/fifth-row8/* "${ARM_LAMP_HOST:?the lamp, as scp and ssh take it}":/tmp/fifth-row8/
 lamp | cd /tmp/fifth-row8 && echo "1be88030af34ef0096781a0103c69a6451e795024706d67fc7aa35de3c182133  fifth-rows.sh" | sha256sum -c --quiet && sudo bash /tmp/fifth-row8/fifth-rows.sh 8 preflight
 lamp | sudo bash /var/lib/lampos-fifth/row8/fifth-rows.sh 8 install
 lamp | sudo bash /var/lib/lampos-fifth/row8/fifth-rows.sh 8 stop-eyes
@@ -187,24 +188,25 @@ end
 row | 10 | The first five minutes | moves | 15 min
 do | A new person in the chair, a hand near the arm. Once they sit, the lamp starts its first five minutes on its own; they answer each step as it asks. Say "stop" at any jerk.
 watch | In order: where they sit (still for 3 s, face seen); their name, and whether it may remember their face (kept only on a yes); "Hey Lamp" called from the chair up to 5 times, with no answer to those; privacy, not available here; giving way (they push the head gently, more than a nudge, hold 1 to 2 s, let go: it says it felt that and nods); preferences, one question at a time.
-sheet | #1964, Seventh, 20 Oct 04:34 and 04:39 (build c334d25ae: #1792, #2004, #1964, #1998; ARM64 39328531309)
-need | run | 39328531309 lampos-arm64-c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d
+sheet | #1964, Seventh, 20 Oct 04:34, 04:39, 07:5x and 08:2x (build b3cf3334a: #1792, #2004, #1964, #1998 and #2031, the sentence part too; ARM64 39346411411; LAMP_SAY and LAMP_BUS on, or how_you_sound and giving_way are not_available)
+need | run | 39346411411 lampos-arm64-b3cf3334ab5427ccda67b666f4936676e09ffba0
 need | running | lamp-voice lamp-name lamp-ears lamp-body lamp-eyes
 need | the voice's body socket (LAMP_BODY_MOOD_SOCKET) | sudo -n cat /proc/$(systemctl show -p MainPID --value lamp-voice)/environ | tr '\0' '\n' | grep -q '^LAMP_BODY_MOOD_SOCKET='
-mac | R=39328531309 S=c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d; [ "$(gh run view $R -R autonomous-ai/lampOS --json conclusion -q .conclusion)" = success ] || { echo "run $R is not green: skip this row"; exit 1; }; mkdir -p /tmp/seventh-$S && gh run download $R -R autonomous-ai/lampOS -n lampos-arm64-$S -D /tmp/seventh-$S
-mac | S=c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d; ${ARM_SCP:-scp} -q /tmp/seventh-$S/lamp-voice "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/lamp-voice-$S
+need | lamp-body with the hand on (--give-way), for giving way | tr '\0' ' ' </proc/$(systemctl show -p MainPID --value lamp-body)/cmdline | grep -q -- '--give-way'
+mac | R=39346411411 S=b3cf3334ab5427ccda67b666f4936676e09ffba0; [ "$(gh run view $R -R autonomous-ai/lampOS --json conclusion -q .conclusion)" = success ] || { echo "run $R is not green: skip this row"; exit 1; }; mkdir -p /tmp/seventh-$S && gh run download $R -R autonomous-ai/lampOS -n lampos-arm64-$S -D /tmp/seventh-$S
+mac | S=b3cf3334ab5427ccda67b666f4936676e09ffba0; ${ARM_SCP:-scp} -q /tmp/seventh-$S/lamp-voice "${ARM_LAMP_HOST:?the lamp, as scp and ssh take it}":/tmp/lamp-voice-$S
 lamp | systemctl cat lamp-voice | grep -E '^(ExecStart|Environment)='
-tell | Is that today's voice, with LAMP_BODY_MOOD_SOCKET set? If not, q now.
-lamp | systemctl is-active lamp-name lamp-ears
+tell | Is that today's voice, with LAMP_BODY_MOOD_SOCKET set, and lamp-body running with the hand on? If not, q now: without them giving way is not_available.
+lamp | systemctl is-active lamp-name lamp-ears lamp-body
 lamp | b=/var/lib/lampos-seventh/row10; sudo mkdir -p $b && for p in /var/lib/lampOS/voice/onboarding /var/lib/lampOS/voice/near-call.json; do if [ -e $p ]; then sudo cp -a $p $b/ && echo "set aside: $p" || exit 1; else echo "not there: $p"; fi; done && sudo touch $b/taken && sudo rm -rf /var/lib/lampOS/voice/onboarding /var/lib/lampOS/voice/near-call.json && sudo install -d -m 0700 /var/lib/lampOS/voice/onboarding
-lamp | S=c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d; sudo install -D -m 0755 /tmp/lamp-voice-$S /var/lib/lampos-seventh/$S/lamp-voice && sudo mkdir -p /run/systemd/system/lamp-voice.service.d && { printf '[Service]\nExecStart=\n'; systemctl cat lamp-voice | grep '^ExecStart=' | tail -1 | sed -E "s#^ExecStart=[^ ]+#ExecStart=/var/lib/lampos-seventh/$S/lamp-voice#"; printf 'Environment=LAMP_ONBOARDING=on\nEnvironment=LAMP_ONBOARDING_FILE=/var/lib/lampOS/voice/onboarding/progress.json\nEnvironment=LAMP_VOICE_ROUTE=second\nEnvironment=LAMP_MEMORY_DAYS=on\nEnvironment=LAMP_MEMORY_RULES=on\n'; } | sudo tee /run/systemd/system/lamp-voice.service.d/60-seventh.conf >/dev/null && sudo systemctl daemon-reload && sudo systemctl restart lamp-voice && sudo cat /proc/$(systemctl show -p MainPID --value lamp-voice)/environ | tr '\0' '\n' | grep -E '^LAMP_(ONBOARDING|VOICE_ROUTE)'
+lamp | S=b3cf3334ab5427ccda67b666f4936676e09ffba0; sudo install -D -m 0755 /tmp/lamp-voice-$S /var/lib/lampos-seventh/$S/lamp-voice && sudo mkdir -p /run/systemd/system/lamp-voice.service.d && { printf '[Service]\nExecStart=\n'; systemctl cat lamp-voice | grep '^ExecStart=' | tail -1 | sed -E "s#^ExecStart=[^ ]+#ExecStart=/var/lib/lampos-seventh/$S/lamp-voice#"; printf 'Environment=LAMP_ONBOARDING=on\nEnvironment=LAMP_ONBOARDING_FILE=/var/lib/lampOS/voice/onboarding/progress.json\nEnvironment=LAMP_VOICE_ROUTE=second\nEnvironment=LAMP_MEMORY_DAYS=on\nEnvironment=LAMP_MEMORY_RULES=on\nEnvironment=LAMP_SAY=on\nEnvironment=LAMP_BUS=on\n'; } | sudo tee /run/systemd/system/lamp-voice.service.d/60-seventh.conf >/dev/null && sudo systemctl daemon-reload && sudo systemctl restart lamp-voice && sudo cat /proc/$(systemctl show -p MainPID --value lamp-voice)/environ | tr '\0' '\n' | grep -E '^LAMP_(ONBOARDING|VOICE_ROUTE)'
 tell | The new person sits in the chair. Time each step from the lamp's ask to its answer. If nothing is asked within 30 s: "Lamp, let's redo the setup."
 tell | Enter once the lamp says the walk is finished, or after 10 minutes.
 proof | sudo sh -c 'cat /var/lib/lampOS/voice/sessions/$(systemctl show -p InvocationID --value lamp-voice)/metadata/events-*.jsonl' | grep -E 'onboarding_(step|near_call|giving_way_try|stopped|redo|finished)|setup_step' | tail -30
 tell | If they said yes to being remembered: "Hey Lamp, forget my face." Any rule they gave in preferences: ask the lamp to forget it.
 question | Each step: outcome and seconds from the ask (step, outcome, s)? Did anything jerk or read as a machine?
-back | S=c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d b=/var/lib/lampos-seventh/row10; ok=1; sudo rm -f /run/systemd/system/lamp-voice.service.d/60-seventh.conf; sudo systemctl daemon-reload; if [ -e $b/taken ]; then sudo systemctl stop lamp-voice; sudo rm -rf /var/lib/lampOS/voice/onboarding /var/lib/lampOS/voice/near-call.json; for n in onboarding near-call.json; do [ ! -e $b/$n ] || sudo cp -a $b/$n /var/lib/lampOS/voice/ || ok=0; done; fi; sudo systemctl restart lamp-voice || ok=0; [ $ok = 1 ] && sudo rm -rf $b /var/lib/lampos-seventh/$S /tmp/lamp-voice-$S && echo "put back: the voice on its own build, its onboarding as it was"; [ $ok = 1 ]
-back | mac: rm -rf /tmp/seventh-c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d
+back | S=b3cf3334ab5427ccda67b666f4936676e09ffba0 b=/var/lib/lampos-seventh/row10; ok=1; sudo rm -f /run/systemd/system/lamp-voice.service.d/60-seventh.conf; sudo systemctl daemon-reload; if [ -e $b/taken ]; then sudo systemctl stop lamp-voice; sudo rm -rf /var/lib/lampOS/voice/onboarding /var/lib/lampOS/voice/near-call.json; for n in onboarding near-call.json; do [ ! -e $b/$n ] || sudo cp -a $b/$n /var/lib/lampOS/voice/ || ok=0; done; fi; sudo systemctl restart lamp-voice || ok=0; [ $ok = 1 ] && sudo rm -rf $b /var/lib/lampos-seventh/$S /tmp/lamp-voice-$S && echo "put back: the voice on its own build, its onboarding as it was"; [ $ok = 1 ]
+back | mac: rm -rf /tmp/seventh-b3cf3334ab5427ccda67b666f4936676e09ffba0
 end
 row | 11 | Setup for a home, the 5 s reset | still | 3 min
 do | Nothing at the lamp: a read-only check only. The reset itself waits for the owner (it wipes the lamp's person and key and takes it off the office network).
@@ -293,7 +295,7 @@ need | running | lamp-eyes lamp-voice
 tell | A, today's voice: five rounds of mute, 3 s, unmute.
 proof | sudo journalctl -u lamp-eyes --since -5min -o short-monotonic | grep 'camera closed' | tail -10
 mac | mkdir -p /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063 && gh run download 39266127252 -R autonomous-ai/lampOS -n lampos-arm64-05f8290d316825f0b6f5a9d4a72af0d093e7d063 -D /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063
-mac | ${ARM_SCP:-scp} /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063
+mac | ${ARM_SCP:-scp} /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice "${ARM_LAMP_HOST:?the lamp, as scp and ssh take it}":/tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063
 lamp | systemctl cat lamp-voice | grep '^ExecStart=' | tail -1
 tell | Is that today's voice? If not, q now. Otherwise Enter to put #1941's voice in.
 lamp | sudo install -D -m 0755 /tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063 /var/lib/lampos-seventh/05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice && sudo mkdir -p /run/systemd/system/lamp-voice.service.d && systemctl cat lamp-voice | grep '^ExecStart=' | tail -1 | sed -E 's#^ExecStart=[^ ]+#ExecStart=/var/lib/lampos-seventh/05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice#' | { printf '[Service]\nExecStart=\n'; cat; } | sudo tee /run/systemd/system/lamp-voice.service.d/60-seventh.conf >/dev/null && sudo systemctl daemon-reload && sudo systemctl restart lamp-voice
@@ -315,10 +317,10 @@ watch | The light fades to the ember over about 30 s with no step, after 10 minu
 sheet | #1677, Nine, 19 Oct 18:59Z; #1722, Nine, 20 Oct 03:26 (from the Mac: presence-check.sh, a phone filming from the doorway)
 need | presence-check.sh on the Mac (ARM_PRESENCE_CHECK) | mac: test -x "${ARM_PRESENCE_CHECK:-/nonexistent}"
 tell | Run 1: sit 2 minutes, then leave view and earshot for 10 minutes, then come back.
-mac | p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && SECONDS_FOR=960 ./presence-check.sh "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}" quiet
+mac | p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && SECONDS_FOR=960 ./presence-check.sh "${ARM_LAMP_HOST:?the lamp, as scp and ssh take it}" quiet
 tell | Run 2: sit 30 s, leave within earshot; once the light is out, say "Hey Lamp, what time is it?" from out of view.
-mac | p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && NOBODY_S=60 SECONDS_FOR=300 ./presence-check.sh "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}" quiet
-back | mac: p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && ./presence-check.sh "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}" restore
+mac | p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && NOBODY_S=60 SECONDS_FOR=300 ./presence-check.sh "${ARM_LAMP_HOST:?the lamp, as scp and ssh take it}" quiet
+back | mac: p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && ./presence-check.sh "${ARM_LAMP_HOST:?the lamp, as scp and ssh take it}" restore
 end
 ROWS
 [[ -n ${ARM_ROWS_FILE:-} ]] && ROWS_TABLE=$(cat "$ARM_ROWS_FILE")
@@ -653,6 +655,14 @@ preflight() {
   local row lines needs runs missing not_ready=0
   say_ "The lamp's parts as they run now (program, SHA-256 start), for the morning build:"
   on_lamp "$PARTS_CHECK" || say_ "  the lamp could not be read"
+  # The rows that copy a file to the lamp, or run presence-check.sh, need
+  # ARM_LAMP_HOST: it has no default (the reviewer on #2093).
+  local host_rows
+  host_rows=$(for row in $(row_numbers); do row_lines "$row" | grep -q 'ARM_LAMP_HOST' && printf '%s ' "$row"; done)
+  if [[ -n $host_rows && -z ${ARM_LAMP_HOST:-} ]]; then
+    say_ "  ARM_LAMP_HOST: MISSING (rows ${host_rows% } copy files or run presence-check.sh with it)"
+    not_ready=1
+  fi
   local endpoint
   endpoint=$(on_lamp "${ENDPOINT_CHECK//@SESSIONS@/${ARM_VOICE_SESSIONS:-/var/lib/lampOS/voice/sessions}}" 2>/dev/null)
   if [[ ${endpoint%% *} == ready ]]; then
