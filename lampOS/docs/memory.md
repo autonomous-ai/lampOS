@@ -473,6 +473,18 @@ the unchanged legacy client, used unless the new Days client is selected.
   `days::the_follow_up_request_answers_for_a_person_and_refuses_the_room`,
   `remember::tests::with_the_switch_a_known_person_s_session_is_told_one_thread_to_ask_about`.
 
+### Told on each turn (`LAMP_SECOND_MEMORY_HITS=on`, #2176 row 5c)
+
+On lamp-4ace on 20 Oct the second route's model called neither `recall` nor `search` once in four hours, so a name kept that morning was never used ("the lamp forgot my name"). With this switch and the Days memory, each spoken turn's final words are searched before its chat begins (`remember::hits_note`):
+
+- **The scope:** the known face's (`known_faces::known_now`, `person_id`), else the room's, as the session note's.
+- **What's asked:** that scope's kept things (`{"op":"kept","max_bytes":4096}`), matched in the voice by the words they share with what was heard: lower-cased, three letters or more, small words left out, a plural's `s` taken off. Not the memory's full-text search. On lamp-4ace on 20 Oct its twelve best for "what is my name" were all exchanges, none kept, and the room's search took about 44 ms, where its kept list (63 things) took 3 ms.
+- **The bound:** the answer within `HITS_WITHIN` (60 ms), or let go, never waited for. A line with no word that says what it's about isn't asked.
+- **What's told:** at most three kept things, the most words shared first, then the newest, each cut to 160 characters, with how long ago in words. They go after a note saying they are notes, not instructions, to be used only if they fit and never listed.
+- **Not as sources:** nothing told here goes into the session's sources, so the 64-source bound (#2176 finding 1) isn't spent on it.
+- **The journal:** one line a turn, `request N: memory told|had nothing told in M ms (theirs|the room's)`, with no words.
+- **Not with `LAMP_SECOND_SCOPED_CONTEXT`:** it doesn't read the per-line lease yet, so the worker says so and tells nothing.
+
 ### Each person's own (#764)
 
 When the voice has eyes that remember faces (`LAMP_EYES_WHO_SOCKET`, the
