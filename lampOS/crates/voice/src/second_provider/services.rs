@@ -78,6 +78,11 @@ pub trait Listener: Send {
     fn open(&self) -> bool {
         true
     }
+    /// Ask for the words so far and keep the line open, at a pause
+    /// (`LAMP_SECOND_EARLY_FINALIZE`); nothing for a listener that can't.
+    fn flush(&self) -> net::Result<()> {
+        Ok(())
+    }
 }
 
 impl Listener for SttStream {
@@ -89,6 +94,9 @@ impl Listener for SttStream {
     }
     fn early(&mut self) -> Option<mpsc::UnboundedReceiver<net::Early>> {
         self.take_early()
+    }
+    fn flush(&self) -> net::Result<()> {
+        SttStream::paused(self)
     }
     fn finish(self: Box<Self>, request: u64) -> BoxFuture<'static, net::Result<String>> {
         Box::pin(SttStream::finish(*self, request))

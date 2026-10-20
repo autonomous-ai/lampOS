@@ -68,6 +68,7 @@ mod cleanup;
 mod cloud;
 use cleanup::{Failures as ShutdownFailures, Stage as CleanupStage};
 mod early_end;
+pub mod early_finalize;
 mod endpoint;
 mod hand;
 mod holding;
@@ -837,6 +838,9 @@ struct Rig {
     end_silence_blocks: Option<u16>,
     /// The end sent early, after this many blocks of quiet (`--early-end-ms`).
     early_end_blocks: Option<u16>,
+    /// A line's words asked for at a pause (`LAMP_SECOND_EARLY_FINALIZE`,
+    /// [`early_finalize`]).
+    early_finalize: bool,
     faint_level: Option<u8>,
     playout_start: PlayoutStart,
     /// `directed-fixture --fixture-at-ms`: the fixture's own turn, this long
@@ -2763,6 +2767,7 @@ fn flush_provider_input_with(
             | ProviderInput::Audio { request, .. }
             | ProviderInput::End { request, .. }
             | ProviderInput::Called { request, .. }
+            | ProviderInput::Paused { request, .. }
             | ProviderInput::Reminder { request, .. }
             | ProviderInput::Written { request, .. } => *request,
         };
@@ -3287,6 +3292,7 @@ fn spawn_rig(
         turn_taking: options.turn_taking,
         end_silence_blocks: options.end_silence_blocks,
         early_end_blocks: options.early_end_blocks,
+        early_finalize: early_finalize::from_environment(),
         faint_level: options.faint_level,
         playout_start: options.playout_start,
         fixture_at_ms,
@@ -4325,6 +4331,11 @@ fn conversation_with_gate(
     // the provider after a short quiet, and its answer held until the
     // detector's own end of speech confirms it (`early_end`).
     let mut early = rig.early_end_blocks.map(EarlyEnd::new);
+    // The words asked for at a pause, the stream kept open
+    // (`LAMP_SECOND_EARLY_FINALIZE`): off unless set.
+    let mut early_finalize = rig
+        .early_finalize
+        .then(early_finalize::EarlyFinalize::default);
     if let Some(early) = early.as_ref() {
         record(
             trace,
@@ -6476,6 +6487,16 @@ fn conversation_with_gate(
                             audio,
                             provider_queue_bound,
                         )?;
+                        if let Some(early_finalize) = early_finalize.as_mut()
+                            && early_finalize.heard(turn, detector.pause_blocks())
+                        {
+                            queue_input_paused(
+                                &mut provider_queue,
+                                current,
+                                snapshot.microphone_generation(),
+                                provider_queue_bound,
+                            );
+                        }
                         // The end sent early, after a short quiet. Not for
                         // what would be thrown out as a sound if the quiet
                         // went on: that is judged when the lamp is sure, as
@@ -10323,6 +10344,25 @@ fn queue_input(
     Ok(())
 }
 
+/// The request's line has gone quiet for a moment
+/// (`LAMP_SECOND_EARLY_FINALIZE`): nothing for a local-only turn (#830),
+/// whose request never went out, nor with the queue at its bound, since it
+/// only saves time.
+fn queue_input_paused(
+    queue: &mut VecDeque<ProviderInput>,
+    reply: &Reply,
+    privacy_generation: u64,
+    bound: usize,
+) {
+    if reply.local_only.is_some() || queue.len() >= bound {
+        return;
+    }
+    queue.push_back(ProviderInput::Paused {
+        request: reply.owner.turn(),
+        privacy_generation,
+    });
+}
+
 /// What tells the model that the request ending now was only the lamp's
 /// name, to go just before its end: when its end is a call's wait that ran
 /// out (`--call-wait-ms`, #782). Nothing for any other end, nor for a
@@ -11050,6 +11090,7 @@ mod tests {
             second: None,
             end_silence_blocks: None,
             early_end_blocks: None,
+            early_finalize: false,
             faint_level: None,
             microphone: crate::options::Microphone::Mic2,
             speaker,

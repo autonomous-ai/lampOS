@@ -43,6 +43,9 @@ struct Script {
     /// Each listener's stream drops after this many samples sent, as a
     /// connection lost mid-line does (#1844's D); `None`, never.
     drops_after: Mutex<VecDeque<Option<usize>>>,
+    /// How many times a listener was asked for its words so far, at a pause
+    /// ([`Listener::flush`], `LAMP_SECOND_EARLY_FINALIZE`).
+    flushed: Arc<AtomicUsize>,
 }
 
 struct ScriptListener {
@@ -53,8 +56,13 @@ struct ScriptListener {
     closed: Arc<AtomicBool>,
     drops_after: Option<usize>,
     sent: AtomicUsize,
+    flushed: Arc<AtomicUsize>,
 }
 impl Listener for ScriptListener {
+    fn flush(&self) -> net::Result<()> {
+        self.flushed.fetch_add(1, Ordering::Relaxed);
+        Ok(())
+    }
     fn open(&self) -> bool {
         !self.closed.load(Ordering::Relaxed)
     }
@@ -102,6 +110,7 @@ impl Services for Script {
                 closed: self.closed.clone(),
                 drops_after: self.drops_after.lock().unwrap().pop_front().flatten(),
                 sent: AtomicUsize::new(0),
+                flushed: self.flushed.clone(),
             }) as Box<dyn Listener>),
         };
         Box::pin(async move { result })
@@ -239,6 +248,12 @@ fn end(request: u64) -> ProviderInput {
         privacy_generation: 1,
         sound: false,
         cut_in: false,
+    }
+}
+fn paused(request: u64) -> ProviderInput {
+    ProviderInput::Paused {
+        request,
+        privacy_generation: 1,
     }
 }
 fn written(request: u64, words: &str) -> ProviderInput {
@@ -1759,6 +1774,52 @@ fn waiting(first_event_after: Option<Duration>, chats: Vec<Vec<net::Result<ChatE
     });
     let (engine, _, _) = scripted(script);
     engine.waiting_with_a_sound(true)
+}
+
+/// `LAMP_SECOND_EARLY_FINALIZE` (the first builder on #1722, 07:20): a
+/// pause the coordinator tells asks the line's listener for its words so
+/// far, once, and the line goes on; one told for another request asks
+/// nothing; a line with no pause asks nothing.
+#[tokio::test]
+async fn a_pause_asks_the_lines_listener_for_its_words_so_far() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What time is it?".to_owned()), Ok("Hello.".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![text("Noon."), Ok(ChatEvent::Done)],
+                vec![text("Hi."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script.clone());
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(paused(2));
+    engine.submit(paused(1));
+    engine.submit(audio(1, 2));
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    assert_eq!(script.flushed.load(Ordering::Relaxed), 1);
+    assert_eq!(
+        script.samples_heard.load(Ordering::Relaxed),
+        2 * lamp_audio::CAPTURE_SAMPLES,
+        "the sound after the pause still went"
+    );
+    spoken_turn_as(&mut engine, 3);
+    turn(&mut engine).await;
+    assert_eq!(
+        script.flushed.load(Ordering::Relaxed),
+        1,
+        "no pause, no ask"
+    );
+}
+
+fn spoken_turn_as(engine: &mut Engine, request: u64) {
+    engine.submit(start(request));
+    engine.submit(audio(request, 1));
+    engine.submit(end(request));
 }
 
 fn spoken_turn(engine: &mut Engine) {

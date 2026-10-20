@@ -99,6 +99,7 @@ fn run_with_notice_policy(
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
         early_end_blocks: None,
+        early_finalize: false,
         faint_level: None,
         speaker: spawn("speaker"),
         capture: spawn("capture"),
@@ -438,7 +439,8 @@ fn run_with_notice_policy(
                                 Some(
                                     ProviderInput::Audio { .. }
                                     | ProviderInput::Written { .. }
-                                    | ProviderInput::Called { .. },
+                                    | ProviderInput::Called { .. }
+                                    | ProviderInput::Paused { .. },
                                 ) => {}
                                 None => break,
                             }
