@@ -42,8 +42,10 @@ another voice, which would make the lamp ignore them.
 - **Another voice never read as the same one:** 56 of 56 pairs on mic2
   were at 0.29 or under, quiet or not.
 - **One person's own voice falls low when the lamp is speaking over it:**
-  20 of 49 same-voice pairs were under 0.45. The voice never judges a line
-  begun over the lamp's sound, so that doesn't reach the rules.
+  20 of 49 same-voice pairs were under 0.45, and 11 under 0.30, every one of
+  those 11 with a clip said over the lamp. The voice never judges a line
+  begun over the lamp's sound (`Seen.likeness` leaves it out), so that
+  doesn't reach the rules.
 - **With both clips quiet,** the same voice was 0.35 and up, other voices
   0.25 and down. At 0.45, 3 of 20 same-voice pairs would hold the person's
   own line. At 0.30, none would.
