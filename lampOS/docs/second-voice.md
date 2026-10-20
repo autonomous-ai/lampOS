@@ -1015,7 +1015,9 @@ When the coordinator switches (below):
   time and place (the time as the request is built, "Second only" below),
   then the memory note (the
   Days note frozen for the process, or the memory writer's, read for each
-  turn), then the conversation thread in the room the rest leave of
+  turn; with `LAMP_MEMORY_ROOM_NOT_ASKER=on` the room's kept things are told
+  as someone in the room's, never the asker's, [memory.md](memory.md)
+  "Each person's own"), then the conversation thread in the room the rest leave of
   16,384 bytes. Built when each turn's chat begins.
 - **Thread:** the same file as the Gemini worker (`--thread-file`).
   Before each turn the route takes the file if Gemini wrote it since, and
