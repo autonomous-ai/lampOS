@@ -743,8 +743,11 @@ pub(crate) mod tests {
         assert!(lamp.there());
         std::thread::sleep(Duration::from_millis(300));
         assert!(lamp.there());
-        // Gone for longer than the grace: not there.
-        std::thread::sleep(grace);
+        // Gone for longer than the grace: not there. The state was last
+        // seen a grace ago, as a wait of the grace would leave it, without
+        // the test waiting two seconds for it (#1806).
+        lamp.seen = lamp.seen.and_then(|at| at.checked_sub(grace));
+        assert!(lamp.seen.is_some());
         assert!(!lamp.there(), "past its grace");
         assert_eq!(LIGHT_GRACE, Duration::from_secs(15));
         std::fs::remove_dir_all(root).unwrap();
