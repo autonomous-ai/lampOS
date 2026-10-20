@@ -2213,6 +2213,66 @@ fn while_an_answer_waits_a_sound_begun_as_the_body_moves_is_its_own() {
     );
 }
 
+/// `LAMP_MOTION_VOICE` (the first builder on #1722, 21 Oct 03:27): a sound
+/// the body rule found begun as a joint moved is read against the asker of
+/// the answer awaited, on its own speech blocks from its first read. The
+/// asker going on as the body turns to them (lamp-4ace, 03:11) is kept with
+/// `on`; motor sound well under them is let go; with no asker's level, or
+/// asker-first off, it is let go as before.
+#[test]
+fn a_sound_begun_as_the_body_moves_is_the_askers_when_about_as_loud() {
+    use crate::motion_voice::{Decision, Mode};
+    let h = Harness::new(TurnTaking::Duplex);
+    let turn = h.reply.as_ref().unwrap().owner.turn();
+    let trigger = h.base + 300_000;
+    let candidate = crate::admission::Candidate {
+        id: crate::admission::CandidateId::for_test(1),
+        capture: h.lineage,
+        displaced_owner: None,
+        trigger_sequence: 6,
+        trigger_read_at_us: trigger,
+        first_read_at_us: trigger - 100_000,
+        decision_deadline_us: trigger + 200_000,
+    };
+    let asked = |level: u8| {
+        let mut rule = crate::asker_first::AskerFirst::default();
+        for _ in 0..50 {
+            rule.asking(turn, 150);
+        }
+        rule.asked(turn, h.base);
+        // Its own blocks, every 20 ms from its first read.
+        for block in 0..8 {
+            rule.heard(candidate.first_read_at_us + block * 20_000, level);
+        }
+        rule
+    };
+    let at = trigger + 50_000;
+    let voice = asked(145);
+    let (decision, levels) =
+        motion_voice_heard(Mode::On, Some(&voice), h.reply.as_ref(), &candidate, at);
+    assert_eq!(decision, Decision::Kept);
+    let levels = levels.unwrap();
+    assert_eq!((levels.asker, levels.upper, levels.blocks), (150, 145, 8));
+    assert_eq!(
+        motion_voice_heard(Mode::Record, Some(&voice), h.reply.as_ref(), &candidate, at).0,
+        Decision::LetGo { would_keep: true }
+    );
+    let motors = asked(30);
+    assert_eq!(
+        motion_voice_heard(Mode::On, Some(&motors), h.reply.as_ref(), &candidate, at).0,
+        Decision::LetGo { would_keep: false }
+    );
+    // No asker-first rule, or no answer awaited: nothing to read against.
+    assert_eq!(
+        motion_voice_heard(Mode::On, None, h.reply.as_ref(), &candidate, at),
+        (Decision::LetGo { would_keep: false }, None)
+    );
+    assert_eq!(
+        motion_voice_heard(Mode::On, Some(&voice), None, &candidate, at),
+        (Decision::LetGo { would_keep: false }, None)
+    );
+}
+
 /// #2287's follow-up, way 1: with `LAMP_WAIT_KEEPS_ANSWER=words`, a sound
 /// waiting on the lamp's own line is judged by its words as the answer's
 /// wait judges them. A lone "Stop." stops the line, and so does a lone

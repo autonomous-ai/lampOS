@@ -389,6 +389,43 @@ starts speaking just as the lamp moves, while it thinks, is let go at
 that start; the rest of what they say begins a new line once the move is
 over. A move is under a second.
 
+**The asker's voice isn't the motors (`LAMP_MOTION_VOICE=record|on`, the
+first builder on #1722, 21 Oct 03:27; off unless set, and it needs
+`LAMP_ASKER_FIRST` on or `record` for the asker's level).** The rule above
+was built on that one 04:34 line, whose level was never recorded. On
+lamp-4ace on 21 Oct its 168 let-gos all fell on played lines (within 0.2 s
+before to 0.3 s after one), and at 03:11 the rest of "my name is" was let
+go four times as the body turned to the voice. The resting sway is
+inaudible on mic2 (-84 dBFS, the same as stillness, 40 dB under speech);
+the big moves (turning to a voice, standing for a question) are still to
+be measured, with a person at the arm.
+- A sound the rule finds begun as a joint moved is read on its own speech
+  blocks, from its first read to the rule's decision, against the asker's
+  level as the asker-first rule keeps it: the middle of their own speech
+  blocks, away from the lamp's echo (`AskerFirst::levels_since`).
+- With at least 6 of its own speech blocks, and their upper tenth no more
+  than 6 dB under the asker's (`motion_voice::MARGIN`, asker-first's, until
+  the big moves are measured), it is the asker's
+  (`crate::motion_voice`). The upper tenth, as asker-first judges: a voice's
+  loud blocks are its words, and a motor's whine is flat. On 6 to 10 blocks
+  it's about the loudest, so this leans to keeping (a few loud motor blocks
+  over a quiet hum pass it). `record` writes the middle too, so the bar can
+  be set on either before `on` (Fourth's P3 2 on #2371).
+- Decided once for each sound: a sound kept is not judged again when a
+  later rule holds it and it's seen on more blocks (the reviewer's P3 1).
+- `record`: it is let go as before, and `input_let_go_body_moving` also
+  carries `asker_level`, `heard_level`, `heard_upper_tenth`, `blocks` and
+  `would_keep`, so the bar comes from real lines.
+- `on`: the asker's goes on to the rules after this one, as if the body
+  were still (`input_kept_body_moving`, with the same levels).
+- Without the asker's level (asker-first off, or too little of the request
+  heard), or with too few blocks of its own, it is let go as before.
+- No new wait: it judges the blocks the sound has when the rule decides,
+  inside its wait for the body's word.
+- **The known cost of `on`:** a motor sound as loud as the asker is
+  theirs too, as at 04:34 if that line was so loud. It goes on to the
+  answer wait, which lets it go only if it ends or goes quiet first.
+
 **Counting it** (#1866). On lamp-4ace after a played test, for both routes,
 with `lamp-voice-eval` from the ARM64 build:
 
