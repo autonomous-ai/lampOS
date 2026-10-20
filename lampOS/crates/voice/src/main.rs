@@ -46,9 +46,9 @@ fn stt_check_options(rest: &[String]) -> Result<(u32, u32)> {
     Ok((rounds, held))
 }
 
-/// `probe-cascade`'s `[RUNS] [--look JPEG | --wire [--kept] [--speech]]`,
+/// `probe-cascade`'s `[RUNS] [--look JPEG | --wire [--kept] [--speech] | --wire --socket]`,
 /// in that order: five runs, every candidate and no look unless said; at
-/// most 50 runs, 20 with `--kept`. With `--wire`, `Some`, holding how it
+/// most 50 runs, 20 with `--kept` or `--socket`. With `--wire`, `Some`, holding how it
 /// asks.
 fn probe_options(
     rest: &[String],
@@ -60,7 +60,7 @@ fn probe_options(
     use lamp_voice::second_provider::probe::wire::Mode;
     let usage = || {
         io::Error::other(
-            "usage: probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG | --wire [--kept] [--speech]]",
+            "usage: probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG | --wire [--kept] [--speech] | --wire --socket]",
         )
     };
     let (runs, rest) = match rest {
@@ -72,19 +72,27 @@ fn probe_options(
         [flag, jpeg] if flag == "--look" => (Some(std::path::PathBuf::from(jpeg)), None),
         [flag, how @ ..] if flag == "--wire" => {
             let how: Vec<&str> = how.iter().map(String::as_str).collect();
-            let (kept, speech) = match how.as_slice() {
-                [] => (false, false),
-                ["--kept"] => (true, false),
-                ["--speech"] => (false, true),
-                ["--kept", "--speech"] => (true, true),
+            let (kept, speech, socket) = match how.as_slice() {
+                [] => (false, false, false),
+                ["--kept"] => (true, false, false),
+                ["--speech"] => (false, true, false),
+                ["--kept", "--speech"] => (true, true, false),
+                ["--socket"] => (false, false, true),
                 _ => return Err(usage().into()),
             };
-            (None, Some(Mode { kept, speech }))
+            (
+                None,
+                Some(Mode {
+                    kept,
+                    speech,
+                    socket,
+                }),
+            )
         }
         _ => return Err(usage().into()),
     };
     if !(1..=50).contains(&runs)
-        || (wire.is_some_and(|mode| mode.kept)
+        || (wire.is_some_and(|mode| mode.kept || mode.socket)
             && runs > lamp_voice::second_provider::probe::wire::MOST_KEPT_RUNS)
     {
         return Err(usage().into());
@@ -709,7 +717,7 @@ fn run() -> Result<()> {
                 lamp_voice::second_provider::probe::tools::run(Path::new(provider_config), Path::new(second_config), runs),
             )?;
         }
-        // probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG | --wire [--kept] [--speech]]
+        // probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG | --wire [--kept] [--speech] | --wire --socket]
         [command, provider_config, second_config, rest @ ..] if command == "probe-cascade" => {
             let (runs, look, wire) = probe_options(rest)?;
             let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
