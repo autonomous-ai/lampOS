@@ -545,8 +545,17 @@ const TASKS_UNIT: &str = "lamp-tasks.service";
 const HARNESS_DONE: &str = "harness-at-boot";
 
 /// Binaries a build carries that live in another part's folder: the voice
-/// starts its turn-end worker from its own (docs/endpoint-detection.md).
+/// starts its turn-end worker from its own (docs/endpoint-detection.md). A
+/// build without one is refused whole.
 const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
+
+/// Tools put beside a part when the build carries them, and left out, said
+/// once, when it does not: the factory's steps run the body's from the
+/// body's folder (`deploy/factory/steps.sh`, #2189), and a build from before
+/// they were made (19 Oct) must still install, as a lamp put back on one
+/// does (the reviewer on #2249).
+const BESIDE_IF_CARRIED: &[(&str, &[&str])] =
+    &[("lamp-body", &["lamp-body-measure", "lamp-body-mood"])];
 
 /// Services started by a timer of their own, and never enabled themselves.
 const TIMED: &[&str] = &[
@@ -989,6 +998,21 @@ pub fn install(
         let mut names = vec![part.binary.clone()];
         if let Some((_, beside)) = BESIDE.iter().find(|(binary, _)| *binary == part.binary) {
             names.extend(beside.iter().map(|name| (*name).to_owned()));
+        }
+        if let Some((_, tools)) = BESIDE_IF_CARRIED
+            .iter()
+            .find(|(binary, _)| *binary == part.binary)
+        {
+            for tool in *tools {
+                if manifest.files.iter().any(|file| file.name == *tool) {
+                    names.push((*tool).to_owned());
+                } else {
+                    say(&format!(
+                        "build {} carries no {tool}: it is not put beside {}",
+                        manifest.sequence, part.binary
+                    ));
+                }
+            }
         }
         let files: Vec<&manifest::File> = names
             .iter()
@@ -2092,6 +2116,48 @@ fn saved_zone(config: &Install) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #2189: every program the factory's steps run from a part's `current`
+    /// folder (`*_BIN=${*_BIN:-/opt/lampOS/<part>/current/<binary>}`) is
+    /// one install puts there: the part's own binary, or one beside it.
+    /// Read from steps.sh, so a step that needs a new tool fails here first.
+    #[test]
+    fn every_tool_the_factory_steps_run_is_installed_where_they_look() {
+        const STEPS: &str = include_str!("../../../deploy/factory/steps.sh");
+        let wanted: Vec<(String, String)> = STEPS
+            .lines()
+            .filter_map(|line| {
+                let default = line.split_once(":-")?.1.strip_suffix('}')?;
+                let (folder, binary) = default.rsplit_once("/current/")?;
+                folder
+                    .starts_with("/opt/lampOS/")
+                    .then(|| (format!("{folder}/"), binary.to_owned()))
+            })
+            .collect();
+        assert!(
+            wanted
+                .iter()
+                .any(|(_, binary)| binary == "lamp-body-measure"),
+            "{wanted:?}"
+        );
+        let parts = parts();
+        for (folder, binary) in &wanted {
+            let part = parts
+                .iter()
+                .find(|part| &part.folder == folder)
+                .unwrap_or_else(|| panic!("no part installs {folder}"));
+            let beside = BESIDE
+                .iter()
+                .chain(BESIDE_IF_CARRIED)
+                .filter(|(owner, _)| *owner == part.binary)
+                .flat_map(|(_, beside)| beside.iter())
+                .any(|name| name == binary);
+            assert!(
+                &part.binary == binary || beside,
+                "steps.sh runs {folder}current/{binary}, which install does not put there"
+            );
+        }
+    }
 
     #[test]
     fn every_product_part_starts_through_its_current_link() {

@@ -283,7 +283,16 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
 - **Builds** under `/opt/lampOS/<part>/<sha256>/` as now, and the voice
   under `/opt/lampOS/voice/`. Each part's unit names
   `/opt/lampOS/<part>/current/lamp-<part>`, `current` being a link to the
-  build's folder, so an update changes the link and not the unit.
+  build's folder, so an update changes the link and not the unit. A few
+  binaries go into another part's folder. The voice's `lamp-turn-end` is
+  required (`install::BESIDE`): a build without it is refused whole. The
+  body's factory tools `lamp-body-measure` and `lamp-body-mood` go beside
+  `lamp-body`, where `deploy/factory/steps.sh` runs them (#2189), but only
+  when the build carries them (`install::BESIDE_IF_CARRIED`). A build from
+  before they were made (19 Oct) still installs every part, and install says
+  once for each tool that it was left out, so a lamp can be put back on an
+  older build (#2249). A test reads steps.sh's `*_BIN` defaults and fails when
+  a step runs a tool that install does not put there.
 - **What a build does not carry**, never inside a build's folder: models in
   `/opt/lampOS/<part>/models/` (the eyes' two, the name's), beside
   `current`; the product's settings in `/etc/lampOS/<part>/` (decided by the
