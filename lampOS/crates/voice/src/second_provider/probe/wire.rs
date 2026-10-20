@@ -41,17 +41,31 @@
 //! `net.ipv4.tcp_slow_start_after_idle` is 0; their difference is what that
 //! setting would buy. Each request has its own changing part, as turns do.
 //!
+//! With `--speech` (#1934, 08:36), the route's speech instead of its chat:
+//! a piece an answer's first sentence long ([`PIECES`]), asked of
+//! ElevenLabs as `Tts` asks it, through the relay (`tts_base_url`, which is
+//! `llm_base_url` unless set, with the route's speech credential) and, with
+//! an `elevenlabs.key` unit credential, on ElevenLabs' own API. Each is
+//! timed as a chat is, to the answer's first byte, its **first audio** (the
+//! body's first byte) and **done** (the whole piece downloaded); with
+//! `--kept`, on one kept connection as well. An answer's first sound waits
+//! for its first piece's first audio, so the relay's share of that is what
+//! each turn pays before the lamp speaks.
+//!
 //! The relay is `deepseek_base_url` (or `LAMP_SECOND_DEEPSEEK_BASE_URL`),
 //! with the route's credential; DeepSeek's own API takes the unit's
 //! `deepseek.key`. Each request is the route's own as `Chat` builds it,
 //! `hosted.deepseek_model` with thinking off. It prints counts and
 //! milliseconds only: never the words asked or answered, a key, a host or a
 //! URL.
-use super::super::net::{self, Chat, Declare, Message};
+use super::super::net::{self, Chat, Declare, Message, SpeechRequest, speech_request};
 use super::{cache, percentile};
-use crate::second_config::{CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, unit_credential};
+use crate::second_config::{
+    CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, SecondConfig, TtsProvider, unit_credential,
+};
 use serde_json::Value;
 use std::{
+    ffi::OsStr,
     io::{self, Read, Write},
     net::{TcpStream, ToSocketAddrs},
     path::Path,
@@ -120,13 +134,101 @@ impl Arm {
 }
 
 /// The most runs `--kept` takes: each makes 12 paid requests and waits 5 s
-/// four times (the reviewer on #2044).
+/// four times (the reviewer on #2044), or with `--speech` 6 and twice.
 pub const MOST_KEPT_RUNS: u32 = 20;
 
 /// How long the kept connection sits idle before [`Arm::Idle`]: past any
 /// retransmission timeout, so the kernel restarts slow start unless
 /// `net.ipv4.tcp_slow_start_after_idle` is 0 (the first builder on #1934).
 pub const IDLE: Duration = Duration::from_secs(5);
+
+/// How an answer's body is read: a chat's event stream, or a piece of
+/// speech's audio.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Reading {
+    Events,
+    Audio,
+}
+
+/// The pieces `--speech` asks for, one a run in turn: each an answer's
+/// first sentence long, as the route's first piece of an answer is.
+pub const PIECES: [&str; 4] = [
+    "Sure, I can look into that for you.",
+    "Good morning! The coffee smells great.",
+    "Okay, give me just a second to think.",
+    "That sounds like a lovely plan to me.",
+];
+
+/// ElevenLabs' own API, for `--speech`'s direct target.
+pub const ELEVENLABS_BASE_URL: &str = "https://api.elevenlabs.io/v1";
+/// The unit credential with an ElevenLabs key of its own, for the direct
+/// target; the route itself has none (its speech goes through the relay).
+pub const ELEVENLABS_CREDENTIAL: &str = "elevenlabs.key";
+
+/// One request as the probe sends it: where, its key header and value, its
+/// JSON body, and how its answer is read.
+pub struct Wired {
+    pub url: reqwest::Url,
+    pub header: &'static str,
+    pub value: String,
+    pub body: Vec<u8>,
+    pub reading: Reading,
+}
+
+impl Wired {
+    /// A chat request, as the route's `Chat` builds it.
+    pub fn chat(chat: &Chat, messages: &[Message]) -> io::Result<Self> {
+        let (url, auth, body) = chat.wire(messages);
+        Ok(Self {
+            url: reqwest::Url::parse(url).map_err(|_| io::Error::other("url"))?,
+            header: "Authorization",
+            value: auth.to_owned(),
+            body: serde_json::to_vec(&body)?,
+            reading: Reading::Events,
+        })
+    }
+
+    /// A piece of speech, as the route's `Tts` asks for it.
+    pub(crate) fn speech(request: SpeechRequest) -> io::Result<Self> {
+        Ok(Self {
+            url: reqwest::Url::parse(&request.url).map_err(|_| io::Error::other("url"))?,
+            header: request.header,
+            value: request.value,
+            body: serde_json::to_vec(&request.body)?,
+            reading: Reading::Audio,
+        })
+    }
+}
+
+/// `run`'s piece of [`PIECES`], as the route asks ElevenLabs for it at
+/// `base_url` with `key`.
+fn piece(
+    base_url: &str,
+    key: &str,
+    voice: Option<&str>,
+    model: &str,
+    run: u32,
+) -> io::Result<SpeechRequest> {
+    let text = PIECES[run as usize % PIECES.len()];
+    speech_request(
+        TtsProvider::ElevenLabs,
+        base_url,
+        key,
+        voice,
+        Some(model),
+        text,
+    )
+    .map_err(io::Error::other)?
+    .ok_or_else(|| io::Error::other("nothing to speak"))
+}
+
+/// Whether `url` is on ElevenLabs' own API, not the relay.
+fn on_elevenlabs(url: &reqwest::Url) -> bool {
+    url.host_str().is_some_and(|host| {
+        let host = host.to_ascii_lowercase();
+        host == "elevenlabs.io" || host.ends_with(".elevenlabs.io")
+    })
+}
 
 /// One request's times, in ms: the connection's steps, then from the
 /// request's last byte written.
@@ -154,6 +256,9 @@ pub struct Answer {
     /// The connection can carry another request: answered 200, its body
     /// read to its end, and not told to close.
     pub kept: bool,
+    /// Speech: the body's first byte, and how many bytes it had.
+    pub audio: Option<u64>,
+    pub audio_bytes: usize,
 }
 
 impl Answer {
@@ -172,25 +277,36 @@ fn shown(value: Option<u64>) -> String {
 }
 
 impl Times {
-    /// The run's line, for a request of `bytes`.
-    pub fn shown(&self, bytes: usize) -> String {
+    /// The run's line, for a request of `bytes` read as `reading`.
+    pub fn shown(&self, bytes: usize, reading: Reading) -> String {
         let a = &self.answer;
-        format!(
-            "bytes={bytes} status={} dns_ms={} tcp_ms={} tls_ms={} send_ms={} first_byte_ms={} \
-             first_event_ms={} second_event_ms={} gap_ms={} words_ms={} done_ms={} events={}",
+        let steps = format!(
+            "bytes={bytes} status={} dns_ms={} tcp_ms={} tls_ms={} send_ms={} first_byte_ms={}",
             a.status,
             self.dns,
             self.tcp,
             self.tls,
             self.send,
             shown(a.first_byte),
-            shown(a.first_event),
-            shown(a.second_event),
-            shown(a.gap()),
-            shown(a.words),
-            a.done,
-            a.events
-        )
+        );
+        match reading {
+            Reading::Events => format!(
+                "{steps} first_event_ms={} second_event_ms={} gap_ms={} words_ms={} done_ms={} \
+                 events={}",
+                shown(a.first_event),
+                shown(a.second_event),
+                shown(a.gap()),
+                shown(a.words),
+                a.done,
+                a.events
+            ),
+            Reading::Audio => format!(
+                "{steps} first_audio_ms={} done_ms={} audio_bytes={}",
+                shown(a.audio),
+                a.done,
+                a.audio_bytes
+            ),
+        }
     }
 }
 
@@ -303,12 +419,18 @@ impl Events {
     }
 }
 
-/// Reads an HTTP/1.1 response's head and its event stream from `reader`,
-/// timing each from `written`: `done` at `[DONE]` or the stream's end. The
+/// Reads an HTTP/1.1 response's head and its body from `reader`, timing
+/// each from `written`: a chat's event stream ([`Reading::Events`]), `done`
+/// at `[DONE]` or the stream's end, or a piece of speech's audio
+/// ([`Reading::Audio`]), its first byte and `done` at the body's end. The
 /// body is read on to its end (its last chunk, or its `Content-Length`), so
 /// the connection can carry another request ([`Answer::kept`]). An answer
 /// other than 200 is told by its status, and its body is not read.
-pub fn read_answer<R: Read + ?Sized>(reader: &mut R, written: Instant) -> io::Result<Answer> {
+pub fn read_answer<R: Read + ?Sized>(
+    reader: &mut R,
+    written: Instant,
+    reading: Reading,
+) -> io::Result<Answer> {
     let mut answer = Answer::default();
     let mut head = Vec::new();
     let mut chunked: Option<Chunked> = None;
@@ -372,21 +494,28 @@ pub fn read_answer<R: Read + ?Sized>(reader: &mut R, written: Instant) -> io::Re
             Some(chunks) => chunks.feed(bytes, &mut body)?,
             None => body.extend_from_slice(bytes),
         }
-        for event in events.feed(&body) {
-            if finished.is_some() {
-                break;
+        if reading == Reading::Audio {
+            if !body.is_empty() {
+                answer.audio.get_or_insert(at);
+                answer.audio_bytes += body.len();
             }
-            match event {
-                Event::Done => finished = Some(at),
-                Event::Data(words) => {
-                    answer.events += 1;
-                    match answer.events {
-                        1 => answer.first_event = Some(at),
-                        2 => answer.second_event = Some(at),
-                        _ => {}
-                    }
-                    if words {
-                        answer.words.get_or_insert(at);
+        } else {
+            for event in events.feed(&body) {
+                if finished.is_some() {
+                    break;
+                }
+                match event {
+                    Event::Done => finished = Some(at),
+                    Event::Data(words) => {
+                        answer.events += 1;
+                        match answer.events {
+                            1 => answer.first_event = Some(at),
+                            2 => answer.second_event = Some(at),
+                            _ => {}
+                        }
+                        if words {
+                            answer.words.get_or_insert(at);
+                        }
                     }
                 }
             }
@@ -412,24 +541,18 @@ fn step(name: &'static str) -> impl Fn(io::Error) -> io::Error {
     move |error| io::Error::new(error.kind(), format!("{name}: {:?}", error.kind()))
 }
 
-/// `body` posted to `url` with `auth`, on a connection of its own, timed
-/// at each step. HTTPS with `tls`; a plain `http` URL only in tests.
-pub fn ask(
-    url: &reqwest::Url,
-    auth: &str,
-    body: &[u8],
-    tls: Option<Arc<rustls::ClientConfig>>,
-) -> io::Result<Times> {
+/// `wired` posted on a connection of its own, timed at each step. HTTPS
+/// with `tls`; a plain `http` URL only in tests.
+pub fn ask(wired: &Wired, tls: Option<Arc<rustls::ClientConfig>>) -> io::Result<Times> {
     let mut times = Times::default();
-    let mut connection = Connection::open(url, tls, &mut times)?;
-    (times.send, times.answer) = connection.post(auth, body, false)?;
+    let mut connection = Connection::open(&wired.url, tls, &mut times)?;
+    (times.send, times.answer) = connection.post(wired, false)?;
     Ok(times)
 }
 
 /// A connection made by hand to one service, for one request or several.
 pub struct Connection {
     stream: Box<dyn ReadWrite>,
-    path: String,
     named: String,
 }
 
@@ -463,10 +586,6 @@ impl Connection {
         tcp.set_nodelay(true)?;
         tcp.set_read_timeout(Some(STALL))?;
         tcp.set_write_timeout(Some(STALL))?;
-        let path = match url.query() {
-            Some(query) => format!("{}?{query}", url.path()),
-            None => url.path().to_owned(),
-        };
         let named = match url.port() {
             Some(port) => format!("{host}:{port}"),
             None => host.to_owned(),
@@ -487,34 +606,41 @@ impl Connection {
             None if secure => return Err(io::Error::other("tls: no configuration")),
             None => Box::new(tcp),
         };
-        Ok(Self {
-            stream,
-            path,
-            named,
-        })
+        Ok(Self { stream, named })
     }
 
-    /// `body` posted with `auth`, asking the service to keep the connection
-    /// for another when `keep`: how long it took to hand over, and its
-    /// answer.
-    pub fn post(&mut self, auth: &str, body: &[u8], keep: bool) -> io::Result<(u64, Answer)> {
+    /// `wired` posted, asking the service to keep the connection for
+    /// another when `keep`: how long it took to hand over, and its answer.
+    pub fn post(&mut self, wired: &Wired, keep: bool) -> io::Result<(u64, Answer)> {
+        let url = &wired.url;
+        let path = match url.query() {
+            Some(query) => format!("{}?{query}", url.path()),
+            None => url.path().to_owned(),
+        };
+        // A chat asks for its event stream; speech takes any, as `Tts`.
+        let accept = match wired.reading {
+            Reading::Events => "text/event-stream",
+            Reading::Audio => "*/*",
+        };
         let request = format!(
-            "POST {} HTTP/1.1\r\nHost: {}\r\nAuthorization: {auth}\r\n\
-             Content-Type: application/json\r\nAccept: text/event-stream\r\n\
+            "POST {path} HTTP/1.1\r\nHost: {}\r\n{}: {}\r\n\
+             Content-Type: application/json\r\nAccept: {accept}\r\n\
              Content-Length: {}\r\nConnection: {}\r\n\r\n",
-            self.path,
             self.named,
-            body.len(),
+            wired.header,
+            wired.value,
+            wired.body.len(),
             if keep { "keep-alive" } else { "close" }
         );
         let from = Instant::now();
         self.stream
             .write_all(request.as_bytes())
             .map_err(step("send"))?;
-        self.stream.write_all(body).map_err(step("send"))?;
+        self.stream.write_all(&wired.body).map_err(step("send"))?;
         self.stream.flush().map_err(step("send"))?;
         let send = ms(from);
-        let answer = read_answer(&mut *self.stream, Instant::now()).map_err(step("answer"))?;
+        let answer = read_answer(&mut *self.stream, Instant::now(), wired.reading)
+            .map_err(step("answer"))?;
         Ok((send, answer))
     }
 }
@@ -523,7 +649,7 @@ impl Connection {
 trait ReadWrite: Read + Write {}
 impl<T: Read + Write> ReadWrite for T {}
 
-/// One target's and size's times over the runs, for the summary.
+/// One target's and kind's times over the runs, for the summary.
 #[derive(Default)]
 pub struct Kept {
     pub bytes: usize,
@@ -535,8 +661,12 @@ pub struct Kept {
     pub gap: Vec<u64>,
     pub words: Vec<u64>,
     pub done: Vec<u64>,
+    /// Speech: the first audio byte, and the audio's bytes.
+    pub audio: Vec<u64>,
+    pub audio_bytes: Vec<u64>,
     pub failed: u32,
-    /// Requests not made because the service did not keep the connection.
+    /// Requests not timed: refused, or not made because the service did
+    /// not keep the connection.
     pub closed: u32,
 }
 
@@ -550,37 +680,56 @@ impl Kept {
         self.gap.extend(times.answer.gap());
         self.words.extend(times.answer.words);
         self.done.push(times.answer.done);
+        if let Some(audio) = times.answer.audio {
+            self.audio.push(audio);
+            self.audio_bytes.push(times.answer.audio_bytes as u64);
+        }
     }
 
-    fn medians(&self) -> [Option<u64>; 7] {
-        [
-            &self.tcp,
-            &self.tls,
-            &self.send,
-            &self.first_byte,
-            &self.first_event,
-            &self.gap,
-            &self.words,
-        ]
-        .map(|values| percentile(values, 50))
+    /// A request on a connection of its own: timed when answered 200. A
+    /// refused one is counted `closed`, as on a kept connection, so its
+    /// quick answer never lowers the medians.
+    pub fn answered(&mut self, times: &Times) {
+        if times.answer.status == 200 {
+            self.keep(times);
+        } else {
+            self.closed += 1;
+        }
     }
 
-    pub fn summary(&self, target: &str, size: Size) -> String {
-        self.summary_as(&format!("target={target} size={}", size.name()))
+    /// The steps compared between two targets, by name: a chat's to its
+    /// words, or speech's to its first audio and its end.
+    fn steps(&self, reading: Reading) -> Vec<(&'static str, &[u64])> {
+        let mut steps = vec![
+            ("tcp", &self.tcp[..]),
+            ("tls", &self.tls[..]),
+            ("send", &self.send[..]),
+            ("first_byte", &self.first_byte[..]),
+        ];
+        match reading {
+            Reading::Events => steps.extend([
+                ("first_event", &self.first_event[..]),
+                ("gap", &self.gap[..]),
+                ("words", &self.words[..]),
+            ]),
+            Reading::Audio => {
+                steps.extend([("first_audio", &self.audio[..]), ("done", &self.done[..])]);
+            }
+        }
+        steps
     }
 
-    /// The summary's line, after `label`.
-    pub fn summary_as(&self, label: &str) -> String {
+    /// The summary's line, after `label`, for requests read as `reading`.
+    pub fn summary(&self, label: &str, reading: Reading) -> String {
         let show = |values: &[u64], p| shown(percentile(values, p));
         let closed = if self.closed > 0 {
             format!(" closed={}", self.closed)
         } else {
             String::new()
         };
-        format!(
+        let head = format!(
             "wire {label} runs={} failed={} bytes={} tcp_p50_ms={} tls_p50_ms={} \
-             send_p50_ms={} first_byte_p50_ms={} first_byte_p90_ms={} first_event_p50_ms={} \
-             first_event_p90_ms={} gap_p50_ms={} words_p50_ms={} words_p90_ms={} done_p50_ms={}{closed}",
+             send_p50_ms={} first_byte_p50_ms={} first_byte_p90_ms={}",
             self.done.len() as u32 + self.failed + self.closed,
             self.failed,
             self.bytes,
@@ -589,61 +738,86 @@ impl Kept {
             show(&self.send, 50),
             show(&self.first_byte, 50),
             show(&self.first_byte, 90),
-            show(&self.first_event, 50),
-            show(&self.first_event, 90),
-            show(&self.gap, 50),
-            show(&self.words, 50),
-            show(&self.words, 90),
-            show(&self.done, 50),
-        )
+        );
+        let rest = match reading {
+            Reading::Events => format!(
+                "first_event_p50_ms={} first_event_p90_ms={} gap_p50_ms={} words_p50_ms={} \
+                 words_p90_ms={} done_p50_ms={}",
+                show(&self.first_event, 50),
+                show(&self.first_event, 90),
+                show(&self.gap, 50),
+                show(&self.words, 50),
+                show(&self.words, 90),
+                show(&self.done, 50),
+            ),
+            Reading::Audio => format!(
+                "first_audio_p50_ms={} first_audio_p90_ms={} done_p50_ms={} done_p90_ms={} \
+                 audio_bytes_p50={}",
+                show(&self.audio, 50),
+                show(&self.audio, 90),
+                show(&self.done, 50),
+                show(&self.done, 90),
+                show(&self.audio_bytes, 50),
+            ),
+        };
+        format!("{head} {rest}{closed}")
     }
 }
 
-/// The relay's medians less DeepSeek's own, step by step, for one size.
-pub fn difference(relay: &Kept, direct: &Kept, size: Size) -> String {
-    less(
-        &format!("relay-less-direct size={}", size.name()),
-        relay,
-        direct,
-    )
-}
-
 /// `a`'s medians less `b`'s, step by step, after `label`.
-pub fn less(label: &str, a: &Kept, b: &Kept) -> String {
-    let names = [
-        "tcp",
-        "tls",
-        "send",
-        "first_byte",
-        "first_event",
-        "gap",
-        "words",
-    ];
+pub fn less(label: &str, a: &Kept, b: &Kept, reading: Reading) -> String {
     let steps = a
-        .medians()
+        .steps(reading)
         .into_iter()
-        .zip(b.medians())
-        .zip(names)
-        .map(|((a, b), name)| match (a, b) {
-            (Some(a), Some(b)) => format!(" {name}_ms={:+}", i128::from(a) - i128::from(b)),
-            _ => format!(" {name}_ms=none"),
-        })
+        .zip(b.steps(reading))
+        .map(
+            |((name, a), (_, b))| match (percentile(a, 50), percentile(b, 50)) {
+                (Some(a), Some(b)) => format!(" {name}_ms={:+}", i128::from(a) - i128::from(b)),
+                _ => format!(" {name}_ms=none"),
+            },
+        )
         .collect::<String>();
     format!("wire {label}{steps}")
 }
 
-/// What both modes ask with: the character, each target's two chats (the
-/// lamp's request and the small one) and the TLS setup.
+/// One kind of request each target is asked: a chat's two sizes
+/// ([`Size`]), or a piece of speech.
+struct Kind {
+    /// Its words in each line, before `target=` and after it.
+    before: &'static str,
+    after: String,
+    reading: Reading,
+    /// Its request in a run, each with its own changing part or piece.
+    request: Box<dyn Fn(u32) -> io::Result<Wired>>,
+}
+
+impl Kind {
+    /// `what` with the kind's words around it, after `mode`.
+    fn named(&self, mode: &str, what: &str) -> String {
+        format!("{mode}{}{what}{}", self.before, self.after)
+    }
+}
+
+/// What both modes ask with: each target's kinds, the same kinds on each,
+/// and the TLS setup.
 struct Prepared {
-    character: String,
-    targets: Vec<(&'static str, [Chat; 2])>,
+    targets: Vec<(&'static str, Vec<Kind>)>,
     tls: Arc<rustls::ClientConfig>,
 }
 
-/// The probe, as `lamp-voice probe-cascade … --wire [--kept]` runs it.
-pub fn run(provider_config: &Path, second_config: &Path, runs: u32, kept: bool) -> io::Result<()> {
-    let prepared = prepare(provider_config, second_config, runs, kept)?;
-    if kept {
+/// How `--wire` asks: on one kept connection (`--kept`), and the route's
+/// speech instead of its chat (`--speech`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Mode {
+    pub kept: bool,
+    pub speech: bool,
+}
+
+/// The probe, as `lamp-voice probe-cascade … --wire [--kept] [--speech]`
+/// runs it.
+pub fn run(provider_config: &Path, second_config: &Path, runs: u32, mode: Mode) -> io::Result<()> {
+    let prepared = prepare(provider_config, second_config, runs, mode)?;
+    if mode.kept {
         run_kept(&prepared, runs)
     } else {
         run_cold(&prepared, runs)
@@ -654,13 +828,47 @@ fn prepare(
     provider_config: &Path,
     second_config: &Path,
     runs: u32,
-    kept: bool,
+    mode: Mode,
 ) -> io::Result<Prepared> {
-    let provider = crate::config::ProviderConfig::load(provider_config)?;
-    let character = provider.instruction(false)?;
     let config = crate::second_config::load_from_path(second_config)?
         .with_environment(|name| std::env::var_os(name))?;
     let credentials = std::env::var_os(CREDENTIALS_ENV);
+    let tls = Arc::new(net::tls().map_err(io::Error::other)?);
+    let how = |each: &str| {
+        if mode.kept {
+            format!(
+                "{each} on one kept connection: a first request, one straight after, one after {} s idle",
+                IDLE.as_secs()
+            )
+        } else {
+            "each request on a connection of its own".to_owned()
+        }
+    };
+    let targets = if mode.speech {
+        speech_targets(&config, credentials.as_deref(), runs, &how("each target"))?
+    } else {
+        chat_targets(
+            provider_config,
+            &config,
+            credentials.as_deref(),
+            runs,
+            &how("each target and size"),
+        )?
+    };
+    Ok(Prepared { targets, tls })
+}
+
+/// The chat's targets, the relay and DeepSeek's own API, each asked the
+/// lamp's request and the small one.
+fn chat_targets(
+    provider_config: &Path,
+    config: &SecondConfig,
+    credentials: Option<&OsStr>,
+    runs: u32,
+    how: &str,
+) -> io::Result<Vec<(&'static str, Vec<Kind>)>> {
+    let provider = crate::config::ProviderConfig::load(provider_config)?;
+    let character: Arc<str> = provider.instruction(false)?.into();
     let actions = std::env::var_os(crate::tools::ACTIONS_ENVIRONMENT)
         .filter(|dir| !dir.is_empty())
         .map_or_else(|| "/run/lampos-actions".into(), std::path::PathBuf::from);
@@ -669,89 +877,155 @@ fn prepare(
     let all: Declare = Arc::new(move || declared.clone());
     let none: Declare = Arc::new(Vec::new);
     let model = &config.hosted.deepseek_model;
-    let chats = |base: &str, key: &str| -> io::Result<[Chat; 2]> {
-        Ok([
-            Chat::deepseek_at(base, model, key, all.clone(), false).map_err(io::Error::other)?,
-            Chat::deepseek_at(base, model, key, none.clone(), false).map_err(io::Error::other)?,
-        ])
+    let kinds = |base: &str, key: &str| -> io::Result<Vec<Kind>> {
+        Size::ALL
+            .into_iter()
+            .map(|size| {
+                let declare = match size {
+                    Size::Lamp => all.clone(),
+                    Size::Small => none.clone(),
+                };
+                let chat = Chat::deepseek_at(base, model, key, declare, false)
+                    .map_err(io::Error::other)?;
+                let character = character.clone();
+                Ok(Kind {
+                    before: "",
+                    after: format!(" size={}", size.name()),
+                    reading: Reading::Events,
+                    request: Box::new(move |run| {
+                        Wired::chat(&chat, &size.messages(&character, run))
+                    }),
+                })
+            })
+            .collect()
     };
-    let mut targets: Vec<(&'static str, [Chat; 2])> = Vec::new();
+    let mut targets = Vec::new();
     match &config.hosted.deepseek_base_url {
-        Some(base) => targets.push(("relay", chats(base, config.llm_key.expose())?)),
+        Some(base) => targets.push(("relay", kinds(base, config.llm_key.expose())?)),
         None => println!(
             "wire target=relay: left out: no deepseek_base_url (systemd-run does not carry the voice unit's LAMP_SECOND_DEEPSEEK_BASE_URL: give it with -E)"
         ),
     }
-    match unit_credential(credentials.as_deref(), DEEPSEEK_CREDENTIAL) {
+    match unit_credential(credentials, DEEPSEEK_CREDENTIAL) {
         Ok(key) => targets.push((
             "direct",
-            chats(crate::second_config::DEEPSEEK_BASE_URL, key.expose())?,
+            kinds(crate::second_config::DEEPSEEK_BASE_URL, key.expose())?,
         )),
         Err(error) => println!("wire target=direct: left out: {error}"),
     }
-    let tls = Arc::new(net::tls().map_err(io::Error::other)?);
-    let how = if kept {
-        format!(
-            "each target and size on one kept connection: a first request, one straight after, one after {} s idle",
-            IDLE.as_secs()
-        )
-    } else {
-        "each request on a connection of its own".to_owned()
-    };
     println!(
         "wire: DeepSeek's {model}, thinking off, {count} functions on the lamp's request, {runs} runs, {how}"
     );
-    Ok(Prepared {
-        character,
-        targets,
-        tls,
-    })
+    Ok(targets)
+}
+
+/// The speech's targets: the route's own (`tts_base_url`: the relay,
+/// unless that is ElevenLabs' own API) and, with an
+/// [`ELEVENLABS_CREDENTIAL`] unit credential, ElevenLabs' own API, each
+/// asked [`PIECES`] with the route's voice and model.
+fn speech_targets(
+    config: &SecondConfig,
+    credentials: Option<&OsStr>,
+    runs: u32,
+    how: &str,
+) -> io::Result<Vec<(&'static str, Vec<Kind>)>> {
+    if config.tts_provider != TtsProvider::ElevenLabs {
+        println!(
+            "wire speech: left out: the route's speech is OpenAI's, and only ElevenLabs' is timed"
+        );
+        return Ok(Vec::new());
+    }
+    let model = config
+        .tts_model
+        .clone()
+        .unwrap_or_else(|| net::default_model(TtsProvider::ElevenLabs).to_owned());
+    // The kind, and whether it is on ElevenLabs' own API.
+    let kind = |base: &str, key: &str| -> io::Result<(Kind, bool)> {
+        let (base, key) = (base.to_owned(), key.to_owned());
+        let (voice, model) = (config.tts_voice.clone(), model.clone());
+        let request =
+            move |run: u32| Wired::speech(piece(&base, &key, voice.as_deref(), &model, run)?);
+        let own = on_elevenlabs(&request(0)?.url);
+        let kind = Kind {
+            before: "speech ",
+            after: String::new(),
+            reading: Reading::Audio,
+            request: Box::new(request),
+        };
+        Ok((kind, own))
+    };
+    let mut targets = Vec::new();
+    let (route, own) = kind(&config.tts_base_url, config.tts_key.expose())?;
+    if own {
+        println!(
+            "wire speech target=relay: left out: the route's speech goes to ElevenLabs' own API"
+        );
+        targets.push(("direct", vec![route]));
+    } else {
+        targets.push(("relay", vec![route]));
+        match unit_credential(credentials, ELEVENLABS_CREDENTIAL) {
+            Ok(key) => targets.push(("direct", vec![kind(ELEVENLABS_BASE_URL, key.expose())?.0])),
+            Err(error) => println!("wire speech target=direct: left out: {error}"),
+        }
+    }
+    let characters = PIECES.map(|piece| piece.chars().count());
+    println!(
+        "wire speech: ElevenLabs' {model}, pieces of {} to {} characters, {runs} runs, {how}",
+        characters.iter().min().unwrap_or(&0),
+        characters.iter().max().unwrap_or(&0),
+    );
+    Ok(targets)
 }
 
 /// Each request on a connection of its own.
 fn run_cold(prepared: &Prepared, runs: u32) -> io::Result<()> {
-    let Prepared {
-        character,
-        targets,
-        tls,
-    } = prepared;
-    let mut kept: Vec<[Kept; 2]> = targets.iter().map(|_| Default::default()).collect();
+    let Prepared { targets, tls } = prepared;
+    let kinds = targets.first().map_or(0, |(_, kinds)| kinds.len());
+    let mut kept: Vec<Vec<Kept>> = targets
+        .iter()
+        .map(|_| (0..kinds).map(|_| Kept::default()).collect())
+        .collect();
     for run in 1..=runs {
-        for (index, size) in Size::ALL.into_iter().enumerate() {
-            for ((name, chats), kept) in targets.iter().zip(&mut kept) {
-                let (url, auth, body) = chats[index].wire(&size.messages(character, run));
-                let body = serde_json::to_vec(&body)?;
-                let url = reqwest::Url::parse(url).map_err(|_| io::Error::other("url"))?;
+        for index in 0..kinds {
+            for ((name, kinds), kept) in targets.iter().zip(&mut kept) {
+                let kind = &kinds[index];
+                let label = kind.named("", &format!("target={name}"));
+                let wired = (kind.request)(run)?;
                 let kept = &mut kept[index];
-                kept.bytes = body.len();
-                match ask(&url, auth, &body, Some(tls.clone())) {
+                kept.bytes = wired.body.len();
+                match ask(&wired, Some(tls.clone())) {
                     Ok(times) => {
                         println!(
-                            "wire target={name} size={} run={run} {}",
-                            size.name(),
-                            times.shown(body.len())
+                            "wire {label} run={run} {}",
+                            times.shown(wired.body.len(), kind.reading)
                         );
-                        kept.keep(&times);
+                        kept.answered(&times);
                     }
                     Err(error) => {
-                        println!(
-                            "wire target={name} size={} run={run} failed: {error}",
-                            size.name()
-                        );
+                        println!("wire {label} run={run} failed: {error}");
                         kept.failed += 1;
                     }
                 }
             }
         }
     }
-    for ((name, _), kept) in targets.iter().zip(&kept) {
-        for (index, size) in Size::ALL.into_iter().enumerate() {
-            println!("{}", kept[index].summary(name, size));
+    for ((name, kinds), kept) in targets.iter().zip(&kept) {
+        for (kind, kept) in kinds.iter().zip(kept) {
+            let label = kind.named("", &format!("target={name}"));
+            println!("{}", kept.summary(&label, kind.reading));
         }
     }
-    if targets.len() == 2 {
-        for (index, size) in Size::ALL.into_iter().enumerate() {
-            println!("{}", difference(&kept[0][index], &kept[1][index], size));
+    if let [(_, kinds), _] = targets.as_slice() {
+        for (index, kind) in kinds.iter().enumerate() {
+            println!(
+                "{}",
+                less(
+                    &kind.named("", "relay-less-direct"),
+                    &kept[0][index],
+                    &kept[1][index],
+                    kind.reading,
+                )
+            );
         }
     }
     Ok(())
@@ -770,7 +1044,7 @@ pub enum Asked {
 }
 
 /// One run's three arms ([`Arm::ALL`]) on `connection`, whose making took
-/// `connected`: `body(at)` is each arm's request, and the idle one waits
+/// `connected`: `wired(at)` is each arm's request, and the idle one waits
 /// `idle` first. Only a 200 is timed, so a refused answer never mixes into
 /// an arm's medians. Once an answer doesn't keep the connection, or a post
 /// fails, the arms after it are [`Asked::Closed`]: a real turn would then pay
@@ -778,8 +1052,7 @@ pub enum Asked {
 pub fn kept_arms(
     connection: Connection,
     connected: Times,
-    auth: &str,
-    body: impl Fn(usize) -> io::Result<Vec<u8>>,
+    wired: impl Fn(usize) -> io::Result<Wired>,
     idle: Duration,
 ) -> io::Result<Vec<Asked>> {
     let mut connection = Some(connection);
@@ -792,8 +1065,8 @@ pub fn kept_arms(
         if arm == Arm::Idle {
             std::thread::sleep(idle);
         }
-        let body = body(at)?;
-        let posted = open.post(auth, &body, true);
+        let wired = wired(at)?;
+        let posted = open.post(&wired, true);
         match posted {
             Ok((send, answer)) => {
                 if !answer.kept {
@@ -807,7 +1080,7 @@ pub fn kept_arms(
                     };
                     times.send = send;
                     times.answer = answer;
-                    asked.push(Asked::Timed(times, body.len()));
+                    asked.push(Asked::Timed(times, wired.body.len()));
                 } else {
                     asked.push(Asked::Closed(Some(answer.status)));
                 }
@@ -821,28 +1094,25 @@ pub fn kept_arms(
     Ok(asked)
 }
 
-/// Three requests a target and size on one kept connection ([`Arm`]).
+/// Three requests a target and kind on one kept connection ([`Arm`]).
 fn run_kept(prepared: &Prepared, runs: u32) -> io::Result<()> {
-    let Prepared {
-        character,
-        targets,
-        tls,
-    } = prepared;
-    // Target, then size, then arm.
-    let mut kept: Vec<[[Kept; 3]; 2]> = targets.iter().map(|_| Default::default()).collect();
+    let Prepared { targets, tls } = prepared;
+    let kinds = targets.first().map_or(0, |(_, kinds)| kinds.len());
+    // Target, then kind, then arm.
+    let mut kept: Vec<Vec<[Kept; 3]>> = targets
+        .iter()
+        .map(|_| (0..kinds).map(|_| Default::default()).collect())
+        .collect();
     for run in 1..=runs {
-        for (index, size) in Size::ALL.into_iter().enumerate() {
-            for ((name, chats), kept) in targets.iter().zip(&mut kept) {
+        for index in 0..kinds {
+            for ((name, kinds), kept) in targets.iter().zip(&mut kept) {
+                let kind = &kinds[index];
                 let kept = &mut kept[index];
-                let line = |arm: Arm| {
-                    format!(
-                        "wire kept target={name} size={} run={run} arm={}",
-                        size.name(),
-                        arm.name()
-                    )
-                };
-                let (url, _, _) = chats[index].wire(&size.messages(character, run));
-                let url = reqwest::Url::parse(url).map_err(|_| io::Error::other("url"))?;
+                let label = kind.named("kept ", &format!("target={name}"));
+                let line = |arm: Arm| format!("wire {label} run={run} arm={}", arm.name());
+                // Each request its own changing part, as turns are.
+                let wired = |at: usize| (kind.request)(run * 3 + at as u32);
+                let url = wired(0)?.url;
                 let mut times = Times::default();
                 let connection = match Connection::open(&url, Some(tls.clone()), &mut times) {
                     Ok(connection) => connection,
@@ -852,18 +1122,11 @@ fn run_kept(prepared: &Prepared, runs: u32) -> io::Result<()> {
                         continue;
                     }
                 };
-                // Each request its own changing part, as turns are.
-                let (_, auth, _) = chats[index].wire(&size.messages(character, run));
-                let body = |at: usize| {
-                    let (_, _, body) =
-                        chats[index].wire(&size.messages(character, run * 3 + at as u32));
-                    serde_json::to_vec(&body).map_err(io::Error::from)
-                };
-                let asked = kept_arms(connection, times, auth, body, IDLE)?;
+                let asked = kept_arms(connection, times, wired, IDLE)?;
                 for ((at, arm), asked) in Arm::ALL.into_iter().enumerate().zip(asked) {
                     match asked {
                         Asked::Timed(times, bytes) => {
-                            println!("{} {}", line(arm), times.shown(bytes));
+                            println!("{} {}", line(arm), times.shown(bytes, kind.reading));
                             kept[at].bytes = bytes;
                             kept[at].keep(&times);
                             if !times.answer.kept {
@@ -884,42 +1147,41 @@ fn run_kept(prepared: &Prepared, runs: u32) -> io::Result<()> {
             }
         }
     }
-    for ((name, _), kept) in targets.iter().zip(&kept) {
-        for (index, size) in Size::ALL.into_iter().enumerate() {
+    for ((name, kinds), kept) in targets.iter().zip(&kept) {
+        for (kind, kept) in kinds.iter().zip(kept) {
+            let label = kind.named("kept ", &format!("target={name}"));
             for (at, arm) in Arm::ALL.into_iter().enumerate() {
                 println!(
                     "{}",
-                    kept[index][at].summary_as(&format!(
-                        "kept target={name} size={} arm={}",
-                        size.name(),
-                        arm.name()
-                    ))
+                    kept[at].summary(&format!("{label} arm={}", arm.name()), kind.reading)
                 );
             }
             // What restarting slow start after idle costs a turn.
             println!(
                 "{}",
                 less(
-                    &format!("kept idle-less-straight target={name} size={}", size.name()),
-                    &kept[index][2],
-                    &kept[index][1],
+                    &kind.named("kept ", &format!("idle-less-straight target={name}")),
+                    &kept[2],
+                    &kept[1],
+                    kind.reading,
                 )
             );
         }
     }
-    if targets.len() == 2 {
-        for (index, size) in Size::ALL.into_iter().enumerate() {
+    if let [(_, kinds), _] = targets.as_slice() {
+        for (index, kind) in kinds.iter().enumerate() {
             for (at, arm) in Arm::ALL.into_iter().enumerate() {
                 println!(
                     "{}",
                     less(
                         &format!(
-                            "kept relay-less-direct size={} arm={}",
-                            size.name(),
+                            "{} arm={}",
+                            kind.named("kept ", "relay-less-direct"),
                             arm.name()
                         ),
                         &kept[0][index][at],
                         &kept[1][index][at],
+                        kind.reading,
                     )
                 );
             }
@@ -932,6 +1194,17 @@ fn run_kept(prepared: &Prepared, runs: u32) -> io::Result<()> {
 mod tests {
     use super::*;
     use std::collections::VecDeque;
+
+    /// A chat request of `body` to `url`, as the route's key header gives it.
+    fn wired(url: &reqwest::Url, body: &[u8]) -> Wired {
+        Wired {
+            url: url.clone(),
+            header: "Authorization",
+            value: "Bearer k".to_owned(),
+            body: body.to_vec(),
+            reading: Reading::Events,
+        }
+    }
 
     /// A reader that gives its parts one read each, `pause` apart.
     struct Parts {
@@ -984,7 +1257,7 @@ mod tests {
             parts: parts.into(),
             pause: Duration::from_millis(15),
         };
-        let answer = read_answer(&mut reader, Instant::now()).unwrap();
+        let answer = read_answer(&mut reader, Instant::now(), Reading::Events).unwrap();
         assert_eq!(answer.status, 200);
         assert_eq!(answer.events, 3, "{answer:?}");
         let (first, second) = (answer.first_event.unwrap(), answer.second_event.unwrap());
@@ -1024,7 +1297,7 @@ mod tests {
                 parts: parts.into(),
                 pause: Duration::ZERO,
             };
-            let answer = read_answer(&mut reader, Instant::now()).unwrap();
+            let answer = read_answer(&mut reader, Instant::now(), Reading::Events).unwrap();
             (answer, reader.parts.len())
         };
         let mut closing = chunked(&[WORDS, "data: [DONE]"]);
@@ -1111,8 +1384,7 @@ mod tests {
             let asked = kept_arms(
                 connection,
                 connected,
-                "Bearer k",
-                |_| Ok(b"{}".to_vec()),
+                |_| Ok(wired(&url, b"{}")),
                 Duration::ZERO,
             )
             .unwrap();
@@ -1183,7 +1455,7 @@ mod tests {
         let mut times = Times::default();
         let mut connection = Connection::open(&url, None, &mut times).unwrap();
         for _ in 0..2 {
-            let (_, answer) = connection.post("Bearer k", b"{}", true).unwrap();
+            let (_, answer) = connection.post(&wired(&url, b"{}"), true).unwrap();
             assert_eq!((answer.status, answer.events, answer.kept), (200, 2, true));
         }
         let (heads, alone) = server.join().unwrap();
@@ -1206,14 +1478,14 @@ mod tests {
             .into(),
             pause: Duration::ZERO,
         };
-        let answer = read_answer(&mut reader, Instant::now()).unwrap();
+        let answer = read_answer(&mut reader, Instant::now(), Reading::Events).unwrap();
         assert_eq!((answer.status, answer.events), (401, 0));
         assert_eq!(reader.parts.len(), 1);
         let mut garbled = Parts {
             parts: [b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n".to_vec()].into(),
             pause: Duration::ZERO,
         };
-        assert!(read_answer(&mut garbled, Instant::now()).is_err());
+        assert!(read_answer(&mut garbled, Instant::now(), Reading::Events).is_err());
     }
 
     /// The request goes as the route makes it, to a local server that
@@ -1258,7 +1530,7 @@ mod tests {
         let url =
             reqwest::Url::parse(&format!("http://127.0.0.1:{port}/v1/chat/completions")).unwrap();
         let body = br#"{"model":"m","stream":true}"#;
-        let times = ask(&url, "Bearer k", body, None).unwrap();
+        let times = ask(&wired(&url, body), None).unwrap();
         let (head, asked) = server.join().unwrap();
         assert!(
             head.starts_with("POST /v1/chat/completions HTTP/1.1\r\n"),
@@ -1279,7 +1551,7 @@ mod tests {
         assert_eq!(answer.words, answer.second_event);
         assert!(
             times
-                .shown(body.len())
+                .shown(body.len(), Reading::Events)
                 .starts_with("bytes=27 status=200 dns_ms=")
         );
     }
@@ -1287,7 +1559,7 @@ mod tests {
     #[test]
     fn a_failed_step_is_told_by_its_kind_without_the_host() {
         let url = reqwest::Url::parse("https://127.0.0.1:9/v1/chat/completions").unwrap();
-        let error = ask(&url, "Bearer k", b"{}", None).unwrap_err();
+        let error = ask(&wired(&url, b"{}"), None).unwrap_err();
         // Port 9 refuses, or there is no TLS configuration: either way no
         // address is in the words.
         assert!(!error.to_string().contains("127.0.0.1"), "{error}");
@@ -1348,6 +1620,7 @@ mod tests {
                 done: first_byte + 100,
                 events: 9,
                 kept: true,
+                ..Answer::default()
             },
         };
         let mut relay = Kept::default();
@@ -1357,18 +1630,31 @@ mod tests {
             direct.keep(&times(tcp - 20, first_byte - 600));
         }
         relay.failed = 1;
-        assert!(relay.summary("relay", Size::Lamp).starts_with(
+        assert!(relay.summary("target=relay size=lamp", Reading::Events).starts_with(
             "wire target=relay size=lamp runs=4 failed=1 bytes=0 tcp_p50_ms=35 tls_p50_ms=70 "
         ));
         assert_eq!(
-            difference(&relay, &direct, Size::Lamp),
+            less(
+                "relay-less-direct size=lamp",
+                &relay,
+                &direct,
+                Reading::Events
+            ),
             "wire relay-less-direct size=lamp tcp_ms=+20 tls_ms=+40 send_ms=+0 first_byte_ms=+600 first_event_ms=+600 gap_ms=+0 words_ms=+600"
         );
-        assert!(difference(&relay, &Kept::default(), Size::Small).ends_with("words_ms=none"));
+        assert!(
+            less(
+                "relay-less-direct size=small",
+                &relay,
+                &Kept::default(),
+                Reading::Events
+            )
+            .ends_with("words_ms=none")
+        );
         // `--kept`'s lines: an arm's label, and requests a closed
         // connection could not carry counted apart.
         relay.closed = 2;
-        let line = relay.summary_as("kept target=relay size=lamp arm=idle");
+        let line = relay.summary("kept target=relay size=lamp arm=idle", Reading::Events);
         assert!(
             line.starts_with("wire kept target=relay size=lamp arm=idle runs=6 failed=1 "),
             "{line}"
@@ -1378,9 +1664,212 @@ mod tests {
             less(
                 "kept idle-less-straight target=relay size=lamp",
                 &relay,
-                &direct
+                &direct,
+                Reading::Events,
             )
             .starts_with("wire kept idle-less-straight target=relay size=lamp tcp_ms=+20 ")
         );
+    }
+
+    /// `--speech`: a piece's answer is timed to its first audio byte and
+    /// read to its body's end; audio that happens to read like an event is
+    /// never taken for one.
+    #[test]
+    fn a_speech_answer_is_timed_to_its_first_audio_and_read_to_its_end() {
+        let audio = |bytes: &[u8]| {
+            let mut chunk = format!("{:x}\r\n", bytes.len()).into_bytes();
+            chunk.extend_from_slice(bytes);
+            chunk.extend_from_slice(b"\r\n");
+            chunk
+        };
+        // The head at once, then the audio, as a voice is made.
+        let mut reader = Parts {
+            parts: [
+                b"HTTP/1.1 200 OK\r\nContent-Type: audio/pcm\r\nTransfer-Encoding: chunked\r\n\r\n"
+                    .to_vec(),
+                audio(&[0u8; 960]),
+                audio(b"\ndata: [DONE]\n"),
+                audio(&[1u8; 480]),
+                b"0\r\n\r\n".to_vec(),
+            ]
+            .into(),
+            pause: Duration::from_millis(20),
+        };
+        let answer = read_answer(&mut reader, Instant::now(), Reading::Audio).unwrap();
+        assert_eq!((answer.status, answer.events), (200, 0));
+        assert_eq!(answer.audio_bytes, 960 + 14 + 480);
+        let (first_byte, first_audio) = (answer.first_byte.unwrap(), answer.audio.unwrap());
+        assert!(first_audio >= first_byte + 15, "{answer:?}");
+        assert!(answer.done >= first_audio + 45, "read past it: {answer:?}");
+        assert!(answer.kept && reader.parts.is_empty(), "{answer:?}");
+        // With no length and no chunks, the audio ends with the connection.
+        let mut closing = Parts {
+            parts: [b"HTTP/1.1 200 OK\r\n\r\n".to_vec(), vec![7u8; 100]].into(),
+            pause: Duration::ZERO,
+        };
+        let answer = read_answer(&mut closing, Instant::now(), Reading::Audio).unwrap();
+        assert_eq!((answer.audio_bytes, answer.kept), (100, false));
+    }
+
+    /// `--speech` asks as the route's `Tts` does: through the relay's
+    /// `/elevenlabs` path or on ElevenLabs' own API, the key in `xi-api-key`,
+    /// the route's model, one piece a run.
+    #[test]
+    fn a_piece_of_speech_is_asked_as_the_route_asks_for_it() {
+        let relay = piece(
+            "https://relay.example.invalid/api/v1/ai/v1",
+            "k",
+            Some("Rachel"),
+            "eleven_v4_turbo",
+            1,
+        )
+        .unwrap();
+        let relay = Wired::speech(relay).unwrap();
+        assert_eq!(
+            relay.url.as_str(),
+            "https://relay.example.invalid/api/v1/ai/v1/elevenlabs/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream?output_format=pcm_24000"
+        );
+        assert!(!on_elevenlabs(&relay.url));
+        assert_eq!(
+            (relay.header, relay.value.as_str(), relay.reading),
+            ("xi-api-key", "k", Reading::Audio)
+        );
+        let body: Value = serde_json::from_slice(&relay.body).unwrap();
+        assert_eq!(body["model_id"], "eleven_v4_turbo");
+        assert_eq!(body["text"], PIECES[1]);
+        let direct = piece(ELEVENLABS_BASE_URL, "k", None, "eleven_flash_v2_5", 5).unwrap();
+        let direct = Wired::speech(direct).unwrap();
+        assert!(
+            direct
+                .url
+                .as_str()
+                .starts_with("https://api.elevenlabs.io/v1/text-to-speech/"),
+            "{}",
+            direct.url
+        );
+        assert!(on_elevenlabs(&direct.url));
+        let body: Value = serde_json::from_slice(&direct.body).unwrap();
+        assert_eq!(body["text"], PIECES[1], "run 5 is run 1's piece again");
+        for text in PIECES {
+            assert!((30..=45).contains(&text.chars().count()), "{text}");
+        }
+    }
+
+    /// The piece goes with its own key header and the audio's `Accept`, on
+    /// its path and query, and its answer is counted in audio bytes.
+    #[test]
+    fn a_speech_request_is_made_by_hand_with_its_own_key_header() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut asked = Vec::new();
+            let mut buffer = [0u8; 4096];
+            let end = loop {
+                if let Some(end) = asked.windows(4).position(|four| four == b"\r\n\r\n") {
+                    break end;
+                }
+                let n = socket.read(&mut buffer).unwrap();
+                asked.extend_from_slice(&buffer[..n]);
+            };
+            // The body, read whole before answering.
+            while asked.len() < end + 4 + 2 {
+                let n = socket.read(&mut buffer).unwrap();
+                asked.extend_from_slice(&buffer[..n]);
+            }
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\n\x01\x02\x03\x04")
+                .unwrap();
+            String::from_utf8(asked[..end].to_vec()).unwrap()
+        });
+        let url = reqwest::Url::parse(&format!(
+            "http://127.0.0.1:{port}/v1/text-to-speech/abc/stream?output_format=pcm_24000"
+        ))
+        .unwrap();
+        let wired = Wired {
+            url,
+            header: "xi-api-key",
+            value: "k".to_owned(),
+            body: b"{}".to_vec(),
+            reading: Reading::Audio,
+        };
+        let times = ask(&wired, None).unwrap();
+        let head = server.join().unwrap();
+        assert!(
+            head.starts_with(
+                "POST /v1/text-to-speech/abc/stream?output_format=pcm_24000 HTTP/1.1\r\n"
+            ),
+            "{head}"
+        );
+        for line in ["xi-api-key: k", "Accept: */*", "Connection: close"] {
+            assert!(head.contains(line), "{line} in {head}");
+        }
+        assert!(!head.contains("Authorization"), "{head}");
+        assert_eq!((times.answer.status, times.answer.audio_bytes), (200, 4));
+        let shown = times.shown(2, Reading::Audio);
+        assert!(shown.starts_with("bytes=2 status=200 dns_ms="), "{shown}");
+        assert!(shown.ends_with(" audio_bytes=4"), "{shown}");
+        assert!(!shown.contains("events"), "{shown}");
+    }
+
+    /// `--speech`'s summary gives the first audio and the end, and the
+    /// relay's extra on each, never a chat's events or words.
+    #[test]
+    fn a_speech_summary_gives_its_first_audio_and_its_end() {
+        let times = |first_byte, audio| Times {
+            dns: 1,
+            tcp: 10,
+            tls: 20,
+            send: 1,
+            answer: Answer {
+                status: 200,
+                first_byte: Some(first_byte),
+                done: audio + 300,
+                kept: true,
+                audio: Some(audio),
+                audio_bytes: 96_000,
+                ..Answer::default()
+            },
+        };
+        let mut relay = Kept::default();
+        let mut direct = Kept::default();
+        for (first_byte, audio) in [(400, 700), (420, 760), (380, 720)] {
+            relay.keep(&times(first_byte, audio));
+            direct.keep(&times(first_byte - 300, audio - 350));
+        }
+        let line = relay.summary("speech target=relay", Reading::Audio);
+        assert!(
+            line.starts_with("wire speech target=relay runs=3 failed=0 bytes=0 tcp_p50_ms=10 "),
+            "{line}"
+        );
+        assert!(
+            line.ends_with(
+                " first_byte_p50_ms=400 first_byte_p90_ms=420 first_audio_p50_ms=720 \
+                 first_audio_p90_ms=760 done_p50_ms=1020 done_p90_ms=1060 audio_bytes_p50=96000"
+            ),
+            "{line}"
+        );
+        assert!(!line.contains("words") && !line.contains("event"), "{line}");
+        assert_eq!(
+            less("speech relay-less-direct", &relay, &direct, Reading::Audio),
+            "wire speech relay-less-direct tcp_ms=+0 tls_ms=+0 send_ms=+0 first_byte_ms=+300 first_audio_ms=+350 done_ms=+350"
+        );
+        // A chat's summary is as before, with no audio in it.
+        assert!(
+            !relay
+                .summary("target=relay size=lamp", Reading::Events)
+                .contains("audio")
+        );
+        // On connections of their own too, only a 200 is timed: a quick
+        // refusal is counted apart.
+        let mut cold = Kept::default();
+        cold.answered(&times(400, 700));
+        let mut refused = times(90, 90);
+        refused.answer.status = 401;
+        cold.answered(&refused);
+        let line = cold.summary("speech target=relay", Reading::Audio);
+        assert!(line.contains(" runs=2 failed=0 "), "{line}");
+        assert!(line.contains(" first_byte_p50_ms=400 "), "{line}");
+        assert!(line.ends_with(" closed=1"), "{line}");
     }
 }
