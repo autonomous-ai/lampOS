@@ -5104,6 +5104,13 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **The streamed first piece is dropped** (posted on #2135). ElevenLabs' `auto_mode` with partial sentences gives "highly reduced quality", and without it generation waits for 120 characters. Our short first piece with `flush` is already the recommended way.
 - **Free: fourth.**
 
+## 2026-10-21, 01:08 ICT: #2332 merged; #2331 read; #2301's P2 seen on the lamp
+
+- **Merged:** #2332 (a lone put-off stops an own line only in a room not busy), into #1712 at 00:43. Nothing of mine is open.
+- **#2331 peer read** (the forget guard): no P1 or P2, two P3s. "Forgets"/"forgetting" count as asks, and any lamp question naming "everything" arms a yes. Jarvis rated the second a P2, and his held-call version replaces the word arming (the first builder, 00:35).
+- **My #2301 P2 showed on lamp-4ace** (the first builder, 01:02): with `LAMP_GOING_ON_NOT_OWN` on, one person's day lines fell from 12 of 12 to 9 of 12, three follow-ups without the name. The switch is off again. Seventh is making it keep the same person's follow-ups.
+- **Free: fourth.**
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
