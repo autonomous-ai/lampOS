@@ -62,6 +62,11 @@ const MIDDLE: f32 = 0.25;
 /// "Where you sit" after its guide, with the nudge on: how far a face's
 /// centre may wander and still be held.
 const STEADY: f32 = 0.1;
+/// "Where you sit", with the nudge on: the walk begins only once a face
+/// at least [`NEAR`] has stayed this long, so someone passing far behind
+/// an empty seat does not start it (row 10 try 5 on lamp-52e6: seated,
+/// 0.14 to 0.18).
+const LINGER_US: u64 = 2_000_000;
 /// A look on the bus older than this says nothing of now.
 const FRESH_MS: u64 = 700;
 
@@ -299,6 +304,8 @@ pub struct Onboarding {
     nudge: bool,
     /// Whether no hand was on the lamp at the body's last reading.
     released: bool,
+    /// Since when a face at least [`NEAR`] has been seen without a break.
+    near_since: Option<u64>,
 }
 
 /// What a read of a body topic found: nothing ever, a message
@@ -387,6 +394,7 @@ impl Onboarding {
             body_heard: false,
             nudge: false,
             released: true,
+            near_since: None,
         }
     }
 
@@ -565,6 +573,11 @@ impl Onboarding {
         if face.is_some() {
             self.seen_us = Some(now_us);
         }
+        if face.is_some_and(|face| face.size >= NEAR) {
+            self.near_since.get_or_insert(now_us);
+        } else {
+            self.near_since = None;
+        }
         if paused {
             // The keeper's pause stops the walk; a step being led is asked
             // again afterwards.
@@ -606,7 +619,15 @@ impl Onboarding {
             .is_none_or(|seen| now_us.saturating_sub(seen) >= GONE_US);
         let led = self.led.as_mut()?;
         let Some(asked_us) = led.asked_us else {
-            if can_speak && face.is_some() && quiet_us >= START_QUIET_US {
+            // With the nudge on, the walk's first ask waits for someone
+            // near and staying ([`LINGER_US`]); before that, nothing is said.
+            let there = if self.nudge && step == Step::WhereYouSit {
+                self.near_since
+                    .is_some_and(|since| now_us.saturating_sub(since) >= LINGER_US)
+            } else {
+                face.is_some()
+            };
+            if can_speak && there && quiet_us >= START_QUIET_US {
                 led.asked_us = Some(now_us);
                 led.guided_us = Some(now_us);
                 let again = self.kept.steps.get_mut(step.name()).map(|kept| {
@@ -1574,6 +1595,28 @@ mod tests {
         assert_eq!(room.outcome(Step::WhereYouSit), None);
         assert_eq!(room.jumping(35 * S, SIDE, LEFT), [SIT_FAILED]);
         assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Failed));
+    }
+
+    #[test]
+    fn with_the_nudge_the_walk_waits_for_a_near_face_that_stays() {
+        // Row 10 try 5 on lamp-52e6: someone walking by far behind the empty
+        // seat started the walk; seated, the face was 0.14 to 0.18.
+        let passing = Framing {
+            size: 0.06,
+            x: 0.3,
+            y: -0.2,
+        };
+        let mut room = Room::nudged("passing");
+        assert_eq!(room.wait(30 * S, Some(passing)), NONE);
+        // Near, but gone again within two seconds: still nothing.
+        assert_eq!(room.wait(S + S / 2, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.wait(S, Some(passing)), NONE);
+        // Near and staying two seconds: the walk begins.
+        assert_eq!(room.wait(S + S * 3 / 4, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.wait(S / 2, Some(NEAR_MIDDLE)), [SIT_NOTE]);
+        // Off: the passing face starts it, as before.
+        let mut off = Room::new("passing-off");
+        assert_eq!(off.wait(4 * S, Some(passing)), [SIT_NOTE]);
     }
 
     #[test]

@@ -136,6 +136,12 @@ second route, DeepSeek) found two things it changes:
   a hand on the lamp (or one not freshly released) still holds it open. A
   face that moves starts the 3 s again where it is now, and one that never
   stays fails at 60 s as before. Before a guide, the rule is as above.
+- **The walk waits for someone near before it asks.** Row 10 try 5 on
+  lamp-52e6: with the seat empty, a person walking by in the background
+  started `where_you_sit`, and its guides went on. Its first ask now also
+  needs a face at least 0.14 high (the hello's near bar; seated, try 5's
+  face was 0.14 to 0.18) seen without a break for 2 s. Before that the
+  lamp says nothing (`with_the_nudge_the_walk_waits_for_a_near_face_that_stays`).
 
 Each step the model ends also gets one `onboarding_nudge` record when it is
 over: `answers` (lines with words), `nudged`, `reported` (the model called
