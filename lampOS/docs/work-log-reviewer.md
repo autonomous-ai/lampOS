@@ -4,6 +4,38 @@
 
 Newest first. Times from `date` (+07).
 
+- 07:17 #2068 and #2083 merged into #1712 by the first builder
+- 07:14 #1067 rebase read right; conflicts again after the landing (speaking.rs); asked Fifth to rebase
+- 07:13 #1994 merged into #1712 at 9739777be before Sixth's P3 push; asked for a follow-up PR
+- 07:12 merged #2080 (burst test's second-long leases, #1569) as e99e2a421 on its green ARM64
+- 07:11 #2086: #1923 merged into #1712 at 07:10, so the classes fix goes on #2086
+- 07:11 #2086 read (Third: privacy no-slide): no P1; P2 with #1923 (classes would run under no-slide); two P3s; first builder's. Note on #1923 too
+- 07:09 merged #2045 (trials.sh guard row) as c56e73e65 and #2074 (trials-test mark wait) as 4b84e4000, both on green ARM64
+- 07:08 #1994 read (Sixth: several people on the second route): no P1/P2, three P3s (standby runs it too); first builder's
+- 07:07 #2084 re-read (#2076 folded, my three P3s in): no finding; 457/0, two mutations caught; first builder's
+- 07:07 #2083 read (Nine: the air's note spent once heard): no finding, 29/0, two mutations caught; small P3
+- 07:06 #2087 (#2078 folded): tree byte-identical to 64aa7fdd1; my reads stand
+- 07:05 #2079 (the third landing) merged by the first builder
+- 07:02 merged #2082 (workspace clippy in CI, x86 Linux) as d57a72f4d on the read; P3 ci_paths guard reads only the ARM64 file
+- 07:01 #2085 (Tests: arm-hour.sh, #2058 folded with my fixes): both P2s and four P3s fixed; merge when out of draft and green
+- 07:00 #2078 re-read (the paused-cleanup health line): no finding; fold two commits
+- 07:00 #2063 re-read (Twelve: memory-use note, probe only): no finding; fold two commits
+- 06:59 #2077 read (Jarvis: cloud reports one forward): P2, a no given while a newer yes reads as off is lost or half done; rebase and fold; first builder's
+- 06:54 #2067 re-read (El: every forget removes the set-aside file): forget half fixed, 226/0, mutation caught; keep_days half still open
+- 06:52 #2074 rebased (one wait for both branches, Tests' P3 in); Mac runs and ARM64 under way
+- 06:50 merged #2072 (speaking-ab.sh, sound-shape.sh) as e2d05fea1, on its green ARM64
+- 06:50 #2078 read (records one forward): no P1/P2, three P3s; yes to the first builder's health line; first builder's
+- 06:49 #2075 read (El: update's stores): P2, a cut inside settle turns the put-back around; needs a rebase; first builder's
+- 06:49 #2058 read (Tests: arm-hour.sh): two P2s (put-back runs twice on a ^C; Python in row 9), four P3s
+- 06:47 #2073 held until #2079 lands (#1993's finish_told argument breaks its new test together)
+- 06:47 #2079 read (Fourth: the third landing): three merges keep both sides, two fixes right; first builder's; it lands before #2073
+- 06:45 #2076 read (controls one forward): privacy path, first builder's; no P1/P2, three P3s (reset pin read past is the one to fix); fold the merge commit
+- 06:44 #2071 re-read (strict, as the first builder chose): no finding; 472/0
+- 06:44 #2070 re-read (Ten's fix: set-aside forgets merged back): no finding; 154/0, two mutations caught
+- 06:42 #2073 ARM64 failed on a capture_hold_worker timing test (not Flux); reran the failed job
+- 06:40 #2073 read (Nine: Flux closed_early): no finding; gate stt 42/0, mutation caught
+- 06:37 #2054 glance for the first builder (Third's whole-chain fix): no finding
+- 06:36 #2045 conflicts again after #2042's mood row; asked Nine to rebase
 - 06:33 #2074 read (trials-test thread flake): no finding, 434/0; merge after rebase and green ARM64
 - 06:31 #2060: corrected my P3 line (the product has LAMP_SAY=on; silent only offline)
 - 06:31 #2060 re-read (El: reset plan by the agreed rule): my P2 fixed, no new P1/P2; gate 116/0, two mutations caught; first builder's
