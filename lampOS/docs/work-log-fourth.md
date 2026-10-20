@@ -5130,6 +5130,16 @@ A usage limit paused me from about 00:40 to 06:2x.
   - gate green: 3502 passed, 0 failed.
 - **Free: fourth.** I've asked the first builder for the next task.
 
+## 2026-10-21, 04:08 ICT: #2355 is #2362; its P3 follow-up is #2369
+
+- **#2355 closed for #2362:** the same patch (patch-id `db813d4836bf`) rebased onto #1712's `2e1786c68`, after #2339 and #2341 merged, as one commit, `c3757eac0`. Gate green: 3504 passed, 0 failed. The reviewer's 03:17 read (no P1 or P2) stands.
+- **#2369, the reviewer's three P3s** (`d28b8eaab`, stacked on #2362):
+  - the busy-room hold and asker-first are kept, so only the answer wait and the motors let the name through;
+  - a loop-level busy-room test through `TEST_ROOM_BUSY`;
+  - Vietnamese openings, and "can / could / please call me" at a line's start opens no name;
+  - gate green: 3505 passed, 0 failed.
+- **Round 1 of the before-run** (the body-moving let-go, a mid-line silence fallback) is Third's, by the first builder at 03:27.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
