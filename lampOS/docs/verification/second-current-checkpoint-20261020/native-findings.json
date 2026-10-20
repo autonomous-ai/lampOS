@@ -1,0 +1,83 @@
+{
+  "historical_run": 39298987458,
+  "historical_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39298987458",
+  "historical_log_sha256": "1c99989de6e2559f8d7aacde682c80e26221093bed33faf5c54df0d792b8bb2a",
+  "leaky_test": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+  "classification": "Pre-existing in the recorded earlier native run. The relevant source and duplicate example files are unchanged by either refreshed PR. This does not claim the leak is fixed.",
+  "warnings": [
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost",
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp",
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost",
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+  ],
+  "current": {
+    "music": {
+      "run": 39451960133,
+      "leak_lines": [
+        "2026-10-20T16:12:38.0312795Z         LEAK [   0.238s] (7345/8985) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      ],
+      "base": "dfc5f73c00dbf10a65b668156914d44a19fb4575",
+      "unchanged_files": [
+        {
+          "file": "lampOS/crates/voice/src/same_voice.rs",
+          "unchanged_from_base": true,
+          "sha256": "aee7ac7ca12379978bc25da3802f99909c5ed43f8a00f40e7a0a345cf7ff1ff9"
+        },
+        {
+          "file": "lampOS/crates/controls/examples/replay_cost.rs",
+          "unchanged_from_base": true,
+          "sha256": "89dbd5557c93596a1effa3e4961a9f1d1a8232bd32ccd51cc751c718543ef2df"
+        },
+        {
+          "file": "lampOS/crates/expression/examples/replay_cost.rs",
+          "unchanged_from_base": true,
+          "sha256": "13cabe07608834d2e26d01a3fe92942cb78e7d9baa6389d5d4986f894b5c551f"
+        },
+        {
+          "file": "lampOS/crates/policy/examples/progress_cost.rs",
+          "unchanged_from_base": true,
+          "sha256": "1a7f4d3d1ff41a7cded4703d9274fba7c73221b67ec95ef4bd75b08f597daa2f"
+        },
+        {
+          "file": "lampOS/crates/tasks/examples/progress_cost.rs",
+          "unchanged_from_base": true,
+          "sha256": "984059c8503a32c85e6c19d6260d478a3460c3c78fe540c4b675270db8522e97"
+        }
+      ]
+    },
+    "policy": {
+      "run": 39452151680,
+      "leak_lines": [
+        "2026-10-20T16:14:44.5449752Z         LEAK [   0.303s] (3994/5608) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      ],
+      "base": "e26ebab90b1177379a7965cb0da276cdd3fdb153",
+      "unchanged_files": [
+        {
+          "file": "lampOS/crates/voice/src/same_voice.rs",
+          "unchanged_from_base": true,
+          "sha256": "aee7ac7ca12379978bc25da3802f99909c5ed43f8a00f40e7a0a345cf7ff1ff9"
+        },
+        {
+          "file": "lampOS/crates/controls/examples/replay_cost.rs",
+          "unchanged_from_base": true,
+          "sha256": "89dbd5557c93596a1effa3e4961a9f1d1a8232bd32ccd51cc751c718543ef2df"
+        },
+        {
+          "file": "lampOS/crates/expression/examples/replay_cost.rs",
+          "unchanged_from_base": true,
+          "sha256": "13cabe07608834d2e26d01a3fe92942cb78e7d9baa6389d5d4986f894b5c551f"
+        },
+        {
+          "file": "lampOS/crates/policy/examples/progress_cost.rs",
+          "unchanged_from_base": true,
+          "sha256": "1a7f4d3d1ff41a7cded4703d9274fba7c73221b67ec95ef4bd75b08f597daa2f"
+        },
+        {
+          "file": "lampOS/crates/tasks/examples/progress_cost.rs",
+          "unchanged_from_base": true,
+          "sha256": "984059c8503a32c85e6c19d6260d478a3460c3c78fe540c4b675270db8522e97"
+        }
+      ]
+    }
+  }
+}

@@ -8,7 +8,10 @@
     "mergeable": true,
     "arm64": 39451960133,
     "clippy": 39451960115,
-    "status": "in_progress"
+    "status": "completed",
+    "conclusion": "success",
+    "tested_checkout": "7f8d5ee98bb0edf211218fa784a8d0ae336c7b21",
+    "tested_base": "14b38dc6a53cc8d792aedacefc0a7cdaef57fb92"
   },
   "policy": {
     "pr": 2005,
@@ -18,6 +21,10 @@
     "mergeable": true,
     "arm64": 39452151680,
     "clippy": 39452151740,
-    "status": "in_progress"
-  }
+    "status": "completed",
+    "conclusion": "success",
+    "tested_checkout": "81b029e76f5d9902dffe8854bf8f963bc36bc3b2",
+    "tested_base": "e26ebab90b1177379a7965cb0da276cdd3fdb153"
+  },
+  "results_verified_at_utc": "2026-10-20T16:18:32.304305+00:00"
 }
