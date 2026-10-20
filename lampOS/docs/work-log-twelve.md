@@ -453,3 +453,7 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #2186: the reviewer's read, no P1/P2; P3s fixed (`b81da41ab`): `hold`
   takes the context lock, the forget count's reach said in memory-days.md.
   The fold into one waits for Fourth's yes.
+- #2186 folded with Fourth's yes (`29863310d`, ARM64 green), for the first
+  builder's merge. #2226: #2176 rows 1b/c onto lamp-voice, stacked on
+  Friday's #2206: journalling resumes with a fresh session
+  (`LAMP_MEMORY_JOURNAL_RESUMES`, off); known writes always settle.
