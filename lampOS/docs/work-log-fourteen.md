@@ -487,3 +487,22 @@ Ready for lamp-voice: no (review comments, no code of my own)
 - In the same stretch: first builder answered #2223's open question (a
   machine reboot, not `lampos.target`) — doesn't change ecm-sds-mobile#15,
   confirmed earlier that the wire contract is identical either way.
+
+## 2026-10-20 — the lead's new rule: `Fixes #N` / `Part of #N` in every PR
+
+Ready for lamp-voice: no (a convention to follow from now, no code)
+
+- The first builder, 16:40 on #1722, to every builder (the lead's rule,
+  #1711): a PR that finishes an issue says `Fixes #N`; one that does part
+  of it says `Part of #N` and what's left; a "done" claim on an issue says
+  what was delivered and what wasn't.
+- Applied it to [ecm-sds-mobile#15](https://github.com/autonomous-ai/ecm-sds-mobile/pull/15):
+  already said "Part of" for #2193, but as `lampOS#2193` — not the form
+  GitHub cross-repo-links. Corrected to `autonomous-ai/lampOS#2193` and
+  spelled out why it says "Part of", not "Fixes": a PR in this repo can't
+  auto-close an issue in `lampOS` either way (`Fixes`/`Closes` only works
+  within one repo, same as joining.md already says), so #2193 closes once
+  the lamp side (#2223) is in too, not on this merge alone.
+- Left [ecm-sds-mobile#11](https://github.com/autonomous-ai/ecm-sds-mobile/pull/11)
+  as it is: already merged before the rule, and editing a closed PR's body
+  changes nothing mechanical. Future PRs follow the rule from here.
