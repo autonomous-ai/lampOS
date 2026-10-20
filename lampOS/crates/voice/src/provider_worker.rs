@@ -534,6 +534,12 @@ pub enum ProviderInput {
         /// wire when false.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         over_the_lamps_voice: bool,
+        /// With `LAMP_SAID_AS_HEARD=on`, the reply this line cut, or the one
+        /// the Stop before it cut: its request and how much of it was played
+        /// ([`crate::said_as_heard::HeardOfCut`]). The second route then keeps
+        /// only those words of it as the lamp's. Left off the wire otherwise.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        heard_of_cut: Option<crate::said_as_heard::HeardOfCut>,
     },
     Audio {
         request: u64,
@@ -6231,6 +6237,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         }
     }
 
@@ -6375,6 +6382,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             }
         ));
         for field in ["request", "session", "privacy_generation"] {
@@ -6399,6 +6407,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         };
         // Without `LAMP_CUT_KEEPS_NAME` the coordinator never sets it, and
         // the line on the worker's socket is the one it always was.
@@ -6417,6 +6426,45 @@ mod tests {
         ));
     }
 
+    /// `LAMP_SAID_AS_HEARD`: a Start that cut a reply says how much of it
+    /// was played, and one that cut nothing is written as it always was.
+    #[test]
+    fn a_start_says_how_much_of_the_reply_it_cut_was_played_only_when_told() {
+        let start = |heard_of_cut| ProviderInput::Start {
+            request: 5,
+            session: 7,
+            privacy_generation: 2,
+            continues: false,
+            continues_cut_off: false,
+            over_the_lamp: true,
+            after_stop: false,
+            follows_on: false,
+            over_the_lamps_voice: true,
+            heard_of_cut,
+        };
+        let plain = serde_json::to_string(&start(None)).unwrap();
+        assert!(!plain.contains("heard_of_cut"), "{plain}");
+        let cut = crate::said_as_heard::HeardOfCut {
+            request: 4,
+            samples: 36_000,
+        };
+        let said = serde_json::to_value(start(Some(cut))).unwrap();
+        assert_eq!(
+            said["heard_of_cut"],
+            serde_json::json!({"request": 4, "samples": 36_000})
+        );
+        assert!(matches!(
+            serde_json::from_value::<ProviderInput>(said.clone()).unwrap(),
+            ProviderInput::Start {
+                heard_of_cut: Some(read),
+                ..
+            } if read == cut
+        ));
+        let mut odd = said;
+        odd["heard_of_cut"]["played"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<ProviderInput>(odd).is_err());
+    }
+
     /// A request that goes on from one ended early says so on the wire;
     /// every other Start is written exactly as it was before the flag, and
     /// a Start written without it reads as not going on from anything.
@@ -6432,6 +6480,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         };
         assert_eq!(
             serde_json::to_string(&plain).unwrap(),
@@ -6447,6 +6496,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         };
         let written = serde_json::to_value(&cut_off).unwrap();
         assert_eq!(written["continues_cut_off"], true);
@@ -6467,6 +6517,7 @@ mod tests {
             after_stop: true,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         };
         assert_eq!(serde_json::to_value(&stopped).unwrap()["after_stop"], true);
         let old =
@@ -6661,6 +6712,7 @@ mod tests {
                         after_stop: false,
                         follows_on: false,
                         over_the_lamps_voice: false,
+                        heard_of_cut: None,
                     },
                     NOW,
                     &sink
@@ -6782,6 +6834,7 @@ mod tests {
                                 after_stop: false,
                                 follows_on: false,
                                 over_the_lamps_voice: false,
+                                heard_of_cut: None,
                             })?;
                         }
                         Ok(control)
@@ -6844,6 +6897,7 @@ mod tests {
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 })
                 .unwrap();
             assert_eq!(rig.tick(NOW).unwrap(), ControlDrain::Empty);
@@ -6919,6 +6973,7 @@ mod tests {
                                     after_stop: false,
                                     follows_on: false,
                                     over_the_lamps_voice: false,
+                                    heard_of_cut: None,
                                 },
                                 ProviderInput::Audio {
                                     request: new.turn(),
@@ -7064,6 +7119,7 @@ mod tests {
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 })
                 .unwrap();
             rig.parent
@@ -7169,6 +7225,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         let error = rig.tick(NOW).unwrap_err();
@@ -7296,6 +7353,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             },
             ProviderInput::Audio {
                 request: next.turn(),
@@ -8535,6 +8593,7 @@ mod tests {
                     after_stop,
                     follows_on,
                     over_the_lamps_voice,
+                    heard_of_cut: None,
                 })
                 .unwrap();
             self.parent
@@ -10498,6 +10557,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         };
 
         first.service.send(resumable()).await;
@@ -10580,6 +10640,7 @@ mod tests {
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 },
                 NOW,
                 &provider,
@@ -11058,6 +11119,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         assert!(
@@ -11392,6 +11454,7 @@ mod tests {
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 },
                 NOW,
                 &provider,
@@ -11468,6 +11531,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         rig.parent
@@ -11671,6 +11735,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         let message = rig.exit().await.0.unwrap_err().to_string();
@@ -12216,6 +12281,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         rig.parent
@@ -12952,6 +13018,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             },
             ProviderInput::Audio {
                 request: next,
@@ -13097,6 +13164,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         assert!(matches!(
@@ -13288,6 +13356,7 @@ mod tests {
                         after_stop: false,
                         follows_on: false,
                         over_the_lamps_voice: false,
+                        heard_of_cut: None,
                     })
                     .unwrap();
                 loop {

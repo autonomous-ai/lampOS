@@ -374,6 +374,14 @@ struct Shared {
     answered_at: Mutex<Option<Instant>>,
     /// When the words sent so far will have been played ([`Did::Said`]).
     said_until_us: AtomicU64,
+    /// The newest answer's pieces as sent, its request first: each one's
+    /// words (none for a wait sound) and samples, so a cut answer is kept
+    /// as what was heard of it (`LAMP_SAID_AS_HEARD`, [`Engine::said_as_heard`]).
+    said: Mutex<(
+        u64,
+        Vec<crate::said_as_heard::Piece>,
+        crate::not_speech::CallsLeftOut,
+    )>,
     /// Audio packets sent by this process.
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
@@ -813,6 +821,7 @@ impl Engine {
                 clock,
                 answered_at: Mutex::new(None),
                 said_until_us: AtomicU64::new(0),
+                said: Mutex::new((0, Vec::new(), crate::not_speech::CallsLeftOut::new())),
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
@@ -1851,6 +1860,20 @@ impl Engine {
         true
     }
 
+    /// With `LAMP_SAID_AS_HEARD=on`, the words of `cut.request`'s answer
+    /// played before a line or a Stop cut it ([`crate::said_as_heard::heard`]),
+    /// and how many words it sent in all. `None` when this route sent no
+    /// answer for it, or a newer one since.
+    pub fn said_as_heard(&self, cut: crate::said_as_heard::HeardOfCut) -> Option<(String, usize)> {
+        let said = self.shared.said.lock().ok()?;
+        (said.0 == cut.request && !said.1.is_empty()).then(|| {
+            (
+                crate::said_as_heard::heard(&said.1, cut.samples),
+                crate::said_as_heard::words_in(&said.1),
+            )
+        })
+    }
+
     /// Requests up to `through` are over (spoken over, completed or
     /// abandoned): their task stops and their unsent output is dropped.
     pub fn retire_through(&mut self, through: u64) {
@@ -2045,6 +2068,36 @@ impl Shared {
                 Some(until)
             });
         until
+    }
+
+    /// A piece of `request`'s answer begins: its words, none for a wait
+    /// sound. The first of a newer request's starts its record afresh.
+    fn said_piece(&self, request: u64, words: Option<&str>) {
+        if let Ok(mut said) = self.said.lock() {
+            if said.0 != request {
+                *said = (request, Vec::new(), crate::not_speech::CallsLeftOut::new());
+            }
+            // A call written in the answer is left out of the thread
+            // (`Thread::lamp_for`), so its words are left out here too, on
+            // the same text: its sound still counts (the reviewer's P3 on
+            // #2145).
+            let words =
+                words.filter(|words| said.2.keeps(request, &format!("{} ", words.trim_start())));
+            said.1.push(crate::said_as_heard::Piece {
+                words: words.map(str::to_owned),
+                samples: 0,
+            });
+        }
+    }
+
+    /// `samples` more of `request`'s newest piece sent.
+    fn said_samples(&self, request: u64, samples: usize) {
+        if let Ok(mut said) = self.said.lock()
+            && said.0 == request
+            && let Some(piece) = said.1.last_mut()
+        {
+            piece.samples += samples as u64;
+        }
     }
 
     fn announcement_due(&self) -> bool {
@@ -2971,6 +3024,8 @@ enum Stop {
 /// is kept in the thread, and it does not count as an answer for the
 /// announcement's spell.
 async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> {
+    // Its time counts in what was heard of the answer, with no words.
+    shared.said_piece(request, None);
     for part in clip.chunks(PACKET_SAMPLES) {
         let audio = ProviderOutput::Audio {
             request,
@@ -2983,6 +3038,7 @@ async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> 
         if !shared.emit(audio).await {
             return Err(Stop::Gone);
         }
+        shared.said_samples(request, part.len());
     }
     Ok(())
 }
@@ -3462,6 +3518,9 @@ async fn answer(
             // Sentences come trimmed: each after the first is said after a
             // space, so the lamp's words read "just now. Hmm," (#1014).
             let answering = text != ANNOUNCEMENT;
+            // The announcement's time counts in what was heard, its words
+            // don't: they are never kept as the lamp's.
+            shared.said_piece(request, answering.then_some(text.as_str()));
             if answering {
                 words_out.fetch_add(text.split_whitespace().count(), Ordering::Relaxed);
                 whole.push(' ');
@@ -3493,6 +3552,7 @@ async fn answer(
                     if !shared.emit(audio).await {
                         return Err(Stop::Gone);
                     }
+                    shared.said_samples(request, part.len());
                     spoke.store(true, Ordering::Relaxed);
                     // The answer's, never the announcement's or a cue's.
                     if answering && !answered.swap(true, Ordering::Relaxed) {
