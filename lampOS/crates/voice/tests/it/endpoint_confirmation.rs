@@ -381,7 +381,20 @@ fn with_short_verdicts_an_unfinished_short_line_waits_and_a_finished_one_ends_as
     assert_eq!(alone.quiet_until_end(400), Some(150 - 20));
     assert_eq!(alone.decision().basis, "model_incomplete");
     // Counted: the switch's own submission says so on its End.
-    assert!(alone.decision().short_asked);
+    assert_eq!(alone.decision().short_asks, 1);
+    // Paused twice before the floor: asked twice, counted twice (the
+    // reviewer's P3 on #2380).
+    let mut twice = Rig::with(asked);
+    twice.speak(30);
+    twice.quiet(20);
+    twice.script.reply(twice.script.submissions()[0], 0.004);
+    twice.quiet(10);
+    twice.speak(10);
+    twice.quiet(20);
+    assert_eq!(twice.script.submissions().len(), 2);
+    twice.script.reply(twice.script.submissions()[1], 0.99);
+    twice.quiet_until_end(400);
+    assert_eq!(twice.decision().short_asks, 2);
     // Finished, or uncertain: the silence window, as before.
     for (probability, basis) in [(0.99, "model_complete"), (0.5, "model_uncertain")] {
         let mut rig = Rig::with(asked);
@@ -391,7 +404,7 @@ fn with_short_verdicts_an_unfinished_short_line_waits_and_a_finished_one_ends_as
         assert_eq!(rig.quiet_until_end(400), Some(window - 20), "{basis}");
         assert_eq!(rig.decision().basis, basis);
         assert_eq!(rig.decision().silence_ms, u64::from(window) * 10);
-        assert!(rig.decision().short_asked);
+        assert_eq!(rig.decision().short_asks, 1);
     }
     // A scrap under the switch's floor, or the switch off: not asked.
     for (policy, blocks) in [
@@ -410,7 +423,7 @@ fn with_short_verdicts_an_unfinished_short_line_waits_and_a_finished_one_ends_as
         assert!(rig.script.submissions().is_empty(), "{blocks}");
         assert_eq!(rig.quiet_until_end(400), Some(window - 20));
         assert_eq!(rig.decision().fallback, Some("short"));
-        assert!(!rig.decision().short_asked);
+        assert_eq!(rig.decision().short_asks, 0);
     }
     // A line long enough for the floor is asked as before, not counted.
     let mut long = Rig::with(asked);
@@ -418,7 +431,7 @@ fn with_short_verdicts_an_unfinished_short_line_waits_and_a_finished_one_ends_as
     long.quiet(20);
     long.script.reply(long.script.submissions()[0], 0.99);
     long.quiet_until_end(400);
-    assert!(!long.decision().short_asked);
+    assert_eq!(long.decision().short_asks, 0);
 }
 
 #[test]
