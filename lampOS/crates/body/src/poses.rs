@@ -114,23 +114,7 @@ pub fn rest_read(report: &InspectionReport) -> Result<RestRead, String> {
 /// pitch servo's limits, a stand farther from folded than the body allows,
 /// or a position past 4095.
 pub fn lamp_env(unit_id: &str, read: &RestRead, measured_at: &str) -> Result<String, String> {
-    let all = [read.yaw, read.shoulder, read.elbow, read.roll, read.pitch];
-    if all.iter().any(|position| *position > 4095) {
-        return Err(format!("a position past 4095: {all:?}"));
-    }
-    let (low, high) = PITCH_WINDOW;
-    if read.pitch < PITCH_FLOOR || !(low..=high).contains(&read.pitch) {
-        return Err(format!(
-            "the head's pitch rests at {}, outside the window {low}-{high}: measure this lamp's own --pitch-window first (body.md)",
-            read.pitch
-        ));
-    }
-    let (min, max) = read.pitch_limits;
-    if low < min || high > max {
-        return Err(format!(
-            "the window {low}-{high} is outside the pitch servo's own limits {min}-{max}: measure this lamp's own --pitch-window first (body.md)"
-        ));
-    }
+    let ((low, high), (min, max)) = head_checked(read)?;
     for (joint, folded, standing) in [
         ("shoulder", read.shoulder, STAND_SHOULDER),
         ("elbow", read.elbow, STAND_ELBOW),
@@ -159,6 +143,72 @@ pub fn lamp_env(unit_id: &str, read: &RestRead, measured_at: &str) -> Result<Str
         text,
         "BODY_POSES=\"--home {},{},{} --folded-arm {},{} --stand {STAND_PITCH},{},{},{STAND_SHOULDER},{STAND_ELBOW} --pitch-window {low},{high} --torque on\"",
         read.pitch, read.roll, read.yaw, read.shoulder, read.elbow, read.roll, read.yaw
+    );
+    Ok(text)
+}
+
+/// A low and a high count.
+type Span = (u16, u16);
+
+/// The checks a seated and a standing lamp share: every position inside
+/// 4095, the rest pitch inside the default window and over the head's
+/// floor, and the window inside the pitch servo's own limits. Returns the
+/// window and the servo's limits.
+fn head_checked(read: &RestRead) -> Result<(Span, Span), String> {
+    let all = [read.yaw, read.shoulder, read.elbow, read.roll, read.pitch];
+    if all.iter().any(|position| *position > 4095) {
+        return Err(format!("a position past 4095: {all:?}"));
+    }
+    let (low, high) = PITCH_WINDOW;
+    if read.pitch < PITCH_FLOOR || !(low..=high).contains(&read.pitch) {
+        return Err(format!(
+            "the head's pitch rests at {}, outside the window {low}-{high}: measure this lamp's own --pitch-window first (body.md)",
+            read.pitch
+        ));
+    }
+    let (min, max) = read.pitch_limits;
+    if low < min || high > max {
+        return Err(format!(
+            "the window {low}-{high} is outside the pitch servo's own limits {min}-{max}: measure this lamp's own --pitch-window first (body.md)"
+        ));
+    }
+    Ok(((low, high), (min, max)))
+}
+
+/// A seated `lamp.env` for this lamp, from its rest read (#2163): `--home`,
+/// the pitch window and `--torque on`, so the body commands the head and the
+/// base alone and never writes a goal to the shoulder or the elbow, nor
+/// torque except off, to let go as V1 does (no `--stand`, no
+/// `--folded-arm`). `--torque on` takes hold only of the three it commands
+/// when there is no stand (Fifth on #2228); without it the body, read with
+/// torque off, refuses to start. For a lamp
+/// whose first stand no person has confirmed yet; the standing file
+/// ([`lamp_env`]) is written after that, at the factory's watched stand.
+/// Refused, with why, as [`lamp_env`] is for the head.
+pub fn seated_lamp_env(
+    unit_id: &str,
+    read: &RestRead,
+    measured_at: &str,
+) -> Result<String, String> {
+    let ((low, high), (min, max)) = head_checked(read)?;
+    let mut text = String::new();
+    let _ = writeln!(
+        text,
+        "# {unit_id}, read at rest with torque off by lamp-body-measure --seated, {measured_at}."
+    );
+    let _ = writeln!(
+        text,
+        "# At rest: yaw {}, shoulder {}, elbow {}, roll {}, pitch {}; the pitch servo's limits {min}-{max}.",
+        read.yaw, read.shoulder, read.elbow, read.roll, read.pitch
+    );
+    let _ = writeln!(
+        text,
+        "# SEATED: the first stand is not confirmed by a person yet, so no stand and no folded arm; torque is taken on the head and base only. home: found at rest. pitch-window: the default, checked. gaze: NOT measured."
+    );
+    let _ = writeln!(
+        text,
+        "BODY_POSES=\"--home {},{},{} --pitch-window {low},{high} --torque on\"",
+        read.pitch, read.roll, read.yaw
     );
     Ok(text)
 }
@@ -286,6 +336,40 @@ mod tests {
         ));
         assert!(text.contains("gaze: NOT measured"));
         assert!(text.lines().filter(|line| !line.starts_with('#')).count() == 1);
+    }
+
+    /// #2163, Fifth's condition: the seated file holds only `--home`, the
+    /// pitch window and `--torque on`, nothing that stands or folds the arm; an arm too
+    /// far to stand is still seated, and a head the body would refuse is
+    /// refused here too.
+    #[test]
+    fn a_seated_read_holds_only_the_head_and_its_window() {
+        let read = rest_read(&inspection(LAMP_06C1, None)).unwrap();
+        let text = seated_lamp_env("lamp-06c1", &read, "2026-10-20T08:00Z").unwrap();
+        let poses: Vec<&str> = text.lines().filter(|line| !line.starts_with('#')).collect();
+        assert_eq!(
+            poses,
+            ["BODY_POSES=\"--home 1772,2057,2034 --pitch-window 1740,2030 --torque on\""]
+        );
+        for standing in ["--stand", "--folded-arm"] {
+            assert!(!poses[0].contains(standing), "{standing}");
+        }
+        assert!(text.contains("SEATED"));
+        let far = RestRead {
+            shoulder: STAND_SHOULDER - TRAVEL_CAP - 1,
+            ..read
+        };
+        assert!(seated_lamp_env("x", &far, "t").is_ok());
+        let low = RestRead {
+            pitch: 1700,
+            ..read
+        };
+        assert!(
+            seated_lamp_env("x", &low, "t")
+                .unwrap_err()
+                .contains("--pitch-window")
+        );
+        assert!(seated_lamp_env("x", &RestRead { yaw: 4096, ..read }, "t").is_err());
     }
 
     /// A read with torque on, an unfinished one, or one missing a joint is
