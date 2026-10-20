@@ -24,9 +24,13 @@ pub const KEEP_ALIVE: Duration = Duration::from_secs(60);
 pub const SESSION_EXPIRY_S: u32 = 60;
 /// The largest packet taken from the broker, and told it: a `faces.add_photo`
 /// with the largest photo lamp-cloud takes (`crate::photos::MOST_BYTES`, as
-/// base64), with room for its envelope. rumqttc's own is 10 KiB, which
-/// dropped the connection on every photo (Mobile on lamp-0c89, 20 Oct).
-pub const MOST_PACKET_BYTES: u32 = (crate::photos::MOST_BYTES.div_ceil(3) * 4 + 64 * 1_024) as u32;
+/// base64), with 1 MiB more for its envelope and for a sender that writes
+/// base64's `/` as `\/` (one character in 64, about 170 KiB on the largest
+/// photo; Reviewer-lead on #2272). rumqttc's own is 10 KiB, which dropped
+/// the connection on every photo (Mobile on lamp-0c89, 20 Oct). The broker
+/// holds back a packet past this one, so a photo over it gets no answer
+/// rather than `photos::asked`'s refusal: the app sends at most 1 MiB.
+pub const MOST_PACKET_BYTES: u32 = (crate::photos::MOST_BYTES.div_ceil(3) * 4 + (1 << 20)) as u32;
 
 /// The client's options for `account`: V1's, with this lamp's keepalive.
 pub fn options(account: &Account) -> MqttOptions {
@@ -831,18 +835,29 @@ mod tests {
 
     /// Mobile on lamp-0c89 (20 Oct): a `faces.add_photo` with the largest
     /// photo lamp-cloud takes is read on the connection and answered on
-    /// `fd/d-42`, not dropped with it as over rumqttc's 10 KiB. The broker is
-    /// told the same limit.
+    /// `fd/d-42`, not dropped with it as over rumqttc's 10 KiB, even from a
+    /// sender that writes base64's `/` as `\/` (Reviewer-lead on #2272). The
+    /// broker is told the same limit.
     #[tokio::test]
     async fn a_command_with_the_largest_photo_is_read_and_answered() {
         use base64::{Engine, engine::general_purpose::STANDARD};
-        let mut photo = vec![0u8; crate::photos::MOST_BYTES];
+        // A photo's bytes look random, so its base64 has `/` once in 64.
+        let mut seed = 0x2545_f491_4f6c_dd1du64;
+        let mut photo: Vec<u8> = (0..crate::photos::MOST_BYTES)
+            .map(|_| {
+                seed ^= seed << 13;
+                seed ^= seed >> 7;
+                seed ^= seed << 17;
+                seed as u8
+            })
+            .collect();
         photo[..2].copy_from_slice(&[0xFF, 0xD8]);
         let command = format!(
-            r#"{{"cmd":"data","kind":"faces.add_photo","data":{{"name":"Lan","photo":"{}"}}}}"#,
-            STANDARD.encode(&photo)
+            r#"{{"cmd":"data","kind":"faces.add_photo","data":{{"name":"Quillo","photo":"{}"}}}}"#,
+            STANDARD.encode(&photo).replace('/', "\\/")
         );
-        assert!(command.len() > 10 * 1_024 * 1_024);
+        let largest = crate::photos::MOST_BYTES.div_ceil(3) * 4;
+        assert!(command.len() > largest + 128 * 1_024, "{}", command.len());
         let (port, seen) = broker(Broker::Takes, vec![command.leak()]).await;
         let lines = against(port, &seen, Duration::from_millis(50), |seen| {
             publishes(seen)
