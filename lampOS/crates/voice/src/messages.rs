@@ -65,6 +65,109 @@ pub fn typed(note: &str) -> String {
         .unwrap_or_else(|| note.to_owned())
 }
 
+/// How long news of work asked for by text waits untold before it goes to
+/// the phone unasked (#1673, the first builder, 20 Oct 21:14). In that time
+/// the voice's own reader tells it aloud if someone is at the lamp, and news
+/// told aloud is kept as told, so it is never sent too.
+pub const UNASKED_AFTER: Duration = Duration::from_secs(60);
+/// What the model is told for news no text asked about.
+pub const UNASKED: &str = "(News you have not told the person yet, from work you handed over for them. Nobody wrote just now, and nobody at the lamp heard it: tell them the news in a sentence or two of plain text, for their phone. Don't ask them anything else. The notes below were written for a turn you begin aloud; here it is typed.)";
+/// The tries one piece of unasked news gets, a minute apart, before it
+/// waits for the person's next text instead.
+pub const UNASKED_TRIES: u8 = 3;
+/// How often the news waiting is looked at for the phone.
+pub const UNASKED_LOOK_EVERY: Duration = Duration::from_secs(1);
+
+/// The news waiting for the phone: when each was first seen, and its tries.
+#[derive(Default)]
+pub struct Unasked {
+    seen: HashMap<String, (Instant, u8)>,
+}
+
+impl Unasked {
+    /// The news in `waiting` due at `now`: untold for [`UNASKED_AFTER`]
+    /// since it was first seen, or since its last try, and not out of tries.
+    fn due(
+        &mut self,
+        waiting: &[crate::task_news::News],
+        now: Instant,
+    ) -> Vec<crate::task_news::News> {
+        self.seen
+            .retain(|key, _| waiting.iter().any(|news| &news.key == key));
+        for news in waiting {
+            self.seen.entry(news.key.clone()).or_insert((now, 0));
+        }
+        waiting
+            .iter()
+            .filter(|news| {
+                self.seen.get(&news.key).is_some_and(|(at, tries)| {
+                    *tries < UNASKED_TRIES && now.saturating_duration_since(*at) >= UNASKED_AFTER
+                })
+            })
+            .cloned()
+            .collect()
+    }
+}
+
+/// News of work asked for by text that nobody was told, sent to the phone
+/// unasked: one `task_news` piece with no run, whose text is only the
+/// model's words for it, cut to one message ([`fitted`]). The model is given
+/// no functions' results and none are run: nobody asked for anything. Once
+/// sent, the news is kept as told, so it is sent once and never told aloud
+/// after. A fault, or no words, sends nothing, and it is tried again a
+/// minute on, at most [`UNASKED_TRIES`] times.
+pub async fn tell_unasked(
+    model: &impl Model,
+    system: &System,
+    news: &dyn Untold,
+    unasked: &mut Unasked,
+    now: Instant,
+    mut say: impl FnMut(ChatOut) + Send,
+) {
+    let due = unasked.due(&news.untold(), now);
+    if due.is_empty() {
+        return;
+    }
+    let told = system();
+    let mut note = UNASKED.to_owned();
+    for item in &due {
+        note.push('\n');
+        note.push_str(&typed(&item.note));
+    }
+    let messages = vec![
+        Message::system(format!("{}\n\n{NOTE}", told.text)),
+        Message::user(note),
+    ];
+    let mut said = String::new();
+    let result = model
+        .round(&messages, &mut |words: &str| said.push_str(words))
+        .await;
+    let text = fitted(said.trim());
+    if let Err(error) = &result {
+        eprintln!("lamp-voice second: news for the phone wasn't sent: {error}");
+    }
+    if result.is_err() || text.is_empty() {
+        for item in &due {
+            if let Some((at, tries)) = unasked.seen.get_mut(&item.key) {
+                *at = now;
+                *tries += 1;
+            }
+        }
+        return;
+    }
+    say(ChatOut {
+        run_id: None,
+        session_id: None,
+        part: ChatPart::TaskNews,
+        text,
+    });
+    let keys: Vec<String> = due.into_iter().map(|item| item.key).collect();
+    news.given(&keys);
+    for key in &keys {
+        unasked.seen.remove(key);
+    }
+}
+
 /// What the person reads when the model could not be reached.
 pub const NOT_NOW: &str = "Sorry, I can't answer just now. Please try again in a moment.";
 /// The most exchanges a chat keeps, as user and assistant messages.
@@ -228,6 +331,8 @@ pub async fn serve(
         "lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)"
     );
     let mut chats = Chats::default();
+    let mut unasked = Unasked::default();
+    let mut unasked_looked = Instant::now();
     let mut look = tokio::time::interval(LOOK_EVERY);
     look.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
@@ -248,6 +353,21 @@ pub async fn serve(
                 &mut chats,
                 &text,
                 request,
+                |piece| {
+                    let _ = output.publish_json(lamp_ipc::monotonic_us(), &piece);
+                },
+            )
+            .await;
+        }
+        // Between texts, the news nobody was told goes to the phone.
+        if unasked_looked.elapsed() >= UNASKED_LOOK_EVERY {
+            unasked_looked = Instant::now();
+            tell_unasked(
+                &model,
+                &system,
+                news.as_ref(),
+                &mut unasked,
+                Instant::now(),
                 |piece| {
                     let _ = output.publish_json(lamp_ipc::monotonic_us(), &piece);
                 },
@@ -468,6 +588,111 @@ mod tests {
             finished: None,
             also: Vec::new(),
         }
+    }
+
+    /// #1673 (the first builder, 20 Oct 21:14): news of work asked for by
+    /// text that nobody was told in a minute goes to the phone unasked, as
+    /// exactly one `task_news` piece with no run, whose text is the model's
+    /// words and nothing else; once sent it is kept as told and never sent
+    /// again. Before the minute, nothing.
+    #[tokio::test]
+    async fn news_nobody_was_told_goes_to_the_phone_once_in_the_models_words() {
+        let waiting = Waiting::default();
+        waiting.news.lock().unwrap().push(news(
+            "s1:1:1",
+            "(Nobody has spoken. News from work you handed over for the person. Claude Code just finished the names: \"Quilla, Brembo and Oskit.\")",
+        ));
+        let words = "Claude Code finished the names: Quilla, Brembo and Oskit.";
+        let model = scripted(vec![(
+            vec![
+                "Claude Code finished ",
+                "the names: Quilla, Brembo and Oskit.",
+            ],
+            Vec::new(),
+        )]);
+        let mut unasked = Unasked::default();
+        let start = Instant::now();
+        let mut out = Vec::new();
+        for after in [0, 59, 60, 61, 120, 600] {
+            tell_unasked(
+                &model,
+                &system(),
+                &waiting,
+                &mut unasked,
+                start + Duration::from_secs(after),
+                |piece| out.push((after, piece)),
+            )
+            .await;
+        }
+        assert_eq!(
+            out,
+            [(
+                60,
+                ChatOut {
+                    run_id: None,
+                    session_id: None,
+                    part: ChatPart::TaskNews,
+                    text: words.into(),
+                }
+            )]
+        );
+        assert!(out[0].1.check().is_ok());
+        assert_eq!(*waiting.given.lock().unwrap(), ["s1:1:1"]);
+        let sent = model.sent.lock().unwrap();
+        assert_eq!(sent.len(), 1, "the model is asked once");
+        let asked = format!("{:?}", sent[0].last().unwrap());
+        assert!(asked.contains("Quilla, Brembo and Oskit"), "{asked}");
+        assert!(!asked.contains("Nobody has spoken."), "{asked}");
+    }
+
+    /// A model that can't be reached, or says no words, sends nothing: the
+    /// news is not kept as told, and is tried again a minute on, at most
+    /// three times, then waits for the person's next text.
+    #[tokio::test]
+    async fn news_for_the_phone_waits_on_a_fault_and_stops_after_its_tries() {
+        let waiting = Waiting::default();
+        waiting
+            .news
+            .lock()
+            .unwrap()
+            .push(news("s1:2:1", "(Nobody has spoken. Codex stopped.)"));
+        // No words, only a call: nothing to send, and the call isn't run.
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "set_volume".into(),
+            args: json!({"volume": 10}),
+            extra: None,
+        };
+        let model = scripted(vec![(Vec::new(), vec![call])]);
+        let mut unasked = Unasked::default();
+        let start = Instant::now();
+        let mut out = Vec::new();
+        let mut asked = Vec::new();
+        for after in [0, 60, 61, 120, 180, 240, 300, 900] {
+            tell_unasked(
+                &model,
+                &system(),
+                &waiting,
+                &mut unasked,
+                start + Duration::from_secs(after),
+                |piece| out.push(piece),
+            )
+            .await;
+            asked.push(model.sent.lock().unwrap().len());
+        }
+        assert_eq!(asked, [0, 1, 1, 2, 3, 3, 3, 3], "a minute between tries");
+        assert!(out.is_empty(), "{out:?}");
+        assert!(waiting.given.lock().unwrap().is_empty());
+        assert_eq!(
+            waiting.news.lock().unwrap().len(),
+            1,
+            "it waits for the next text"
+        );
+        assert_eq!(
+            model.sent.lock().unwrap().len(),
+            3,
+            "tried at 60, 120 and 180 s only"
+        );
     }
 
     /// #1673: news not told aloud is given with the answer to the next text,
