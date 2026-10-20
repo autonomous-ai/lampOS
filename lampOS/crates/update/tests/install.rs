@@ -226,13 +226,16 @@ struct Lamp {
     said: Vec<String>,
 }
 
-/// Every binary the product starts, and the voice's worker: a line of text each.
+/// Every binary the product starts, the voice's worker and the body's
+/// factory tools: a line of text each.
 fn binaries() -> Vec<String> {
     let mut names: Vec<String> = install::parts()
         .into_iter()
         .map(|part| part.binary)
         .collect();
     names.push("lamp-turn-end".into());
+    names.push("lamp-body-measure".into());
+    names.push("lamp-body-mood".into());
     names
 }
 
@@ -373,6 +376,14 @@ fn a_blank_lamp_gets_every_part_its_units_and_nothing_started() {
     }
     // The voice's worker beside the voice, where the voice starts it.
     assert!(lamp.on("/opt/lampOS/voice/current/lamp-turn-end").is_file());
+    // The body's factory tools beside the body, where steps.sh runs them (#2189).
+    for tool in ["lamp-body-measure", "lamp-body-mood"] {
+        assert!(
+            lamp.on(&format!("/opt/lampOS/body/current/{tool}"))
+                .is_file(),
+            "{tool}"
+        );
+    }
 
     for (name, text) in PRODUCT {
         let written = fs::read_to_string(lamp.on(&format!("/etc/systemd/system/{name}"))).unwrap();
@@ -506,6 +517,31 @@ fn a_build_without_a_part_is_refused_before_anything_is_written() {
     assert!(why.contains("build 188 carries no lamp-eyes"), "{why}");
     assert!(!lamp.on("/opt/lampOS").exists());
     assert!(!lamp.on("/etc/systemd").exists());
+}
+
+/// #2249 (the reviewer's P2): a build from before the body's factory tools
+/// (19 Oct) still installs every part; the tools are said missing, once
+/// each, and not put beside the body.
+#[test]
+fn a_build_without_the_bodys_factory_tools_still_installs() {
+    let mut lamp = Lamp::new(188, &["lamp-body-measure", "lamp-body-mood"]);
+    lamp.install().unwrap();
+    assert!(lamp.on("/opt/lampOS/body/current/lamp-body").is_file());
+    assert!(lamp.on("/opt/lampOS/voice/current/lamp-turn-end").is_file());
+    for tool in ["lamp-body-measure", "lamp-body-mood"] {
+        assert!(
+            !lamp
+                .on(&format!("/opt/lampOS/body/current/{tool}"))
+                .exists()
+        );
+        let said: Vec<&String> = lamp
+            .said
+            .iter()
+            .filter(|line| line.contains(tool))
+            .collect();
+        assert_eq!(said.len(), 1, "{tool}: {:?}", lamp.said);
+        assert!(said[0].contains("build 188 carries no"), "{said:?}");
+    }
 }
 
 #[test]
