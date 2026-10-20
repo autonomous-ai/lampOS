@@ -644,7 +644,7 @@ fn capture_loop<D: CaptureDevice>(
         };
         last_tick = tick;
         for index in 0..=bound {
-            let Some(control) = channels.control.receive::<Control>()? else {
+            let Some(control) = channels.control.receive_renewed(Control::is_renewal)? else {
                 break;
             };
             if index == bound {
@@ -1395,7 +1395,7 @@ fn speaker_loop(
         let tick = Instant::now();
         let stall_pass = stalls.begin();
         for index in 0..=MAX_CONTROL {
-            let Some(control) = channels.control.receive::<Control>()? else {
+            let Some(control) = channels.control.receive_renewed(Control::is_renewal)? else {
                 break;
             };
             if index == MAX_CONTROL {

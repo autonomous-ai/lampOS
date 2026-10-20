@@ -372,6 +372,24 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   `closed` with the channel, with its count and its oldest, and its first
   line names the bound it failed, the receiver's held-up time included (the
   reviewer on #1660).
+- **An audio worker's stale authority renewal, with the next renewal behind
+  it.** A worker that starts slowly (the speaker opens its device before it
+  first reads) finds its control messages queued: the first passes on its
+  grace, the second as the one late message in order, and the third, the
+  20 ms authority renewal, was refused as stale and ended the worker
+  (`speaker.c.w: … sequence 3 after 2, sent 113195 us before now, bound
+  100000 us`, three times on ARM64 on 20 Oct, #1569 row 42). The capture and
+  speaker workers now read their control channel with
+  `Channel::receive_renewed`: a renewal stale by its age alone, with the next
+  renewal in order queued right behind it, is passed over, since that one
+  carries the authority now, and at most it costs the gap a lapse costs
+  (#1178). The next is judged by the channel's own rules in turn, and the
+  pass is said (`a renewal … us old (bound … us) passed over: the next
+  renewal is behind it`). A stale renewal alone or followed by any other
+  message, a stale message of any other kind (a `ConnectReference`, a
+  `Stop`), and reordered and wrong-boot messages still end the worker, since
+  those carry state a skip would lose (the first builder on #1722, 20 Oct
+  17:46).
 - **A late privacy observation while the voice waits to open.** lamp-4ace's
   power cut at 18:15 ended the voice at 13.56 s with "invalid or stale
   privacy observation while waiting", while every other part was starting.
