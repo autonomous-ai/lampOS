@@ -4,6 +4,26 @@
 
 Newest first. Times from `date` (+07).
 
+- 09:38 #1699 fold re-read: no P1/P2; three unannounced behaviour changes named; P3 30 s timeout after Ready; first builder's after row 1
+- 09:37 #2123 read (onboarding_inputs record): no finding; first builder's (Seventh's stack)
+- 09:37 #2124 (seven reviewed PRs onto #1712 in one run): each merge is the PR head I read, no resolutions
+- 09:34 #2122 read (few_tools gives a function a note names): no finding; merge on green
+- 09:28 #2119 read (speech wire probe): no P1/P2, two P3s; keys stay out of output; first builder's
+- 09:27 merged #2118 (speaker_lapse_worker: cores to themselves, the worker's account on a refused send; #1569 row 42) as b1c8cf27c on green
+- 09:23 #2119 (probe-cascade --wire --speech) sent to a second pass, credential focus
+- 09:21 merged #2117 (arm-hour row 19's put-back with nothing to undo) as d9d011f54 on green
+- 09:14 #2113 path follows #2110's consent folder: no finding
+- 09:00 merged #2112 (capture_hold_worker: a few slow blocks, never more; #1569 row 41) as 4a3a15877 on green
+- 08:58 merged #2114 (where_you_sit after one guide) as f55142fc6 on green
+- 08:58 #2102 re-read (Jarvis's P2, soft word after the pause): fixed; Rig field touches no other open #1712 PR
+- 08:58 #2110 re-read (consent folder, forget removes it, unknown steps read past): no finding
+- 08:49 merged #2111 (arm-hour row 10 on b3cf3334a; ARM_LAMP_HOST no default) as 547d0ebc4 on green
+- 08:47 #2116 read (a final said twice): no P1/P2; P3 only the last segment compared
+- 08:43 #2113 P2 fixed (the tool never writes the yes)
+- 08:39 #2114 read (where_you_sit after one guide; preferences reported at once): no finding; merge on green
+- 08:38 #2113 read (joys-scores --no-slide): P2, the tool's yes overrides a person's no (no is no file) and can outlive the run; first builder's
+- 08:37 #1998 P3 fixed (giving_way_tries kept in progress.json, read past by older builds)
+- 08:36 #2102 P3 1 fixed (Paused moves no clock on Live)
 - 08:30 #2105 P3 1 test in (a later yes doesn't name an earlier visit)
 - 08:29 merged #2108 (endpoint: no link followed; docs) as b5db27501 on green
 - 08:27 merged #2073 (Flux closed_early) as de3b9ca47 on its green third run
