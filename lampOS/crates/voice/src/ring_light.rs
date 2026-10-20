@@ -30,6 +30,11 @@
 //! the person's light is over it, is said on `light/outranked`, naming
 //! what is over it, so its asker is told it lost (#940).
 //!
+//! With `LAMP_SKILL_LIGHT_SPEAKING=on` as well (El on #1722), a request's
+//! light shown also tints the Speaking face ([`RingLight::held`],
+//! [`crate::ring_face::Face::skill_light`]), so a skill's light held through
+//! its words is seen with them; the other faces of a turn are their own.
+//!
 //! With `LAMP_LIGHT_KEEP=on` (the first builder on #1464) the person's light
 //! is also kept on disk ([`KEEP_PATH`]), written when it changes, at most
 //! once a second, so a lamp set warm at level 3 wakes up at level 3: the bus
@@ -76,6 +81,10 @@ const FRAMES_APART_US: u64 = 100_000;
 /// The switch for lights asked for that lapse (#940), off unless `on`.
 pub const REQUESTS_ENVIRONMENT: &str = "LAMP_LIGHT_REQUESTS";
 const REQUESTS_FLAG: &str = "--light-requests";
+/// The switch for a skill's light held tinting the Speaking face (El on
+/// #1722), off unless `on`; it needs [`REQUESTS_ENVIRONMENT`].
+pub const SPEAKING_ENVIRONMENT: &str = "LAMP_SKILL_LIGHT_SPEAKING";
+const SPEAKING_FLAG: &str = "--skill-light-speaking";
 /// The switch for keeping the person's light across a restart, off unless
 /// `on`, and where it is kept (the reset wipes it).
 pub const KEEP_ENVIRONMENT: &str = "LAMP_LIGHT_KEEP";
@@ -105,6 +114,28 @@ fn requests_arguments(value: Option<&str>) -> Vec<String> {
 pub fn take(flags: &[String]) -> (bool, &[String]) {
     match flags {
         [flag, rest @ ..] if flag == REQUESTS_FLAG => (true, rest),
+        _ => (false, flags),
+    }
+}
+
+/// The ring worker's flag for a skill's light on the Speaking face, with
+/// `LAMP_SKILL_LIGHT_SPEAKING=on`.
+pub fn speaking_arguments_from_environment() -> Vec<String> {
+    speaking_arguments(std::env::var(SPEAKING_ENVIRONMENT).ok().as_deref())
+}
+
+fn speaking_arguments(value: Option<&str>) -> Vec<String> {
+    match value {
+        Some("on") => vec![SPEAKING_FLAG.to_owned()],
+        _ => Vec::new(),
+    }
+}
+
+/// Take a leading `--skill-light-speaking` off the ring worker's flags,
+/// after [`take`].
+pub fn take_speaking(flags: &[String]) -> (bool, &[String]) {
+    match flags {
+        [flag, rest @ ..] if flag == SPEAKING_FLAG => (true, rest),
         _ => (false, flags),
     }
 }
@@ -253,6 +284,9 @@ pub struct RingLight {
     outranked: Option<Publisher>,
     /// The request the face shows, until its light is said reached.
     reaching: Option<Reaching>,
+    /// Whether the request shown tints the Speaking face too
+    /// (`LAMP_SKILL_LIGHT_SPEAKING=on`, [`RingLight::held`]).
+    speaking: bool,
 }
 
 /// A shown request's pattern, and its asker and light, so that only a new
@@ -331,6 +365,7 @@ impl RingLight {
                 reached: None,
                 outranked: None,
                 reaching: None,
+                speaking: false,
                 keep: keep.map(|path| Keep {
                     path: path.to_owned(),
                     written,
@@ -620,6 +655,28 @@ impl RingLight {
             }
         }
         moving.since_us = Some(since_us);
+    }
+
+    /// Let the request shown tint the Speaking face as well, with
+    /// `LAMP_SKILL_LIGHT_SPEAKING=on` and requests taken (El on #1722).
+    pub fn tint_speaking(&mut self, on: bool) {
+        self.speaking = on;
+    }
+
+    /// Whether the request shown tints the Speaking face
+    /// ([`crate::ring_face::Face::tints_speaking`]).
+    pub fn tints_speaking(&self) -> bool {
+        self.speaking
+    }
+
+    /// The light a request holds on the face now, as the face's light: none
+    /// under a self-test, for the person's own light, or without requests.
+    /// For the Speaking face's tint ([`crate::ring_face::Face::skill_light`]).
+    pub fn held(&self) -> Option<Lit> {
+        self.requested
+            .as_ref()
+            .filter(|_| self.testing.is_none())
+            .and_then(lit)
     }
 
     /// The light given to the face now: a test's, a request's that holds,
@@ -1053,6 +1110,13 @@ mod tests {
         let flags = ["--light-requests".to_owned(), "--x".to_owned()];
         assert_eq!(take(&flags), (true, &flags[1..]));
         assert_eq!(take(&flags[1..]), (false, &flags[1..]));
+        // A skill's light on the Speaking face (El on #1722): its own flag.
+        assert_eq!(speaking_arguments(Some("on")), ["--skill-light-speaking"]);
+        assert!(speaking_arguments(Some("true")).is_empty());
+        assert!(speaking_arguments(None).is_empty());
+        let flags = ["--skill-light-speaking".to_owned(), "--x".to_owned()];
+        assert_eq!(take_speaking(&flags), (true, &flags[1..]));
+        assert_eq!(take_speaking(&flags[1..]), (false, &flags[1..]));
     }
 
     /// The reviewer on #993: off unless switched on. A ring without
@@ -1114,6 +1178,8 @@ mod tests {
         ring.tick(at);
         asks.publish_json(1, &light(true, "blue", 2)).unwrap();
         assert_eq!(taken(&mut ring, &mut at), Lit::of(true, "blue", 2));
+        // The person's own light is held by no skill (El on #1722).
+        assert_eq!(ring.held(), None);
         std::thread::sleep(Duration::from_millis(2));
         let until = at + 10_000_000;
         glows
@@ -1124,6 +1190,7 @@ mod tests {
             .unwrap();
         assert_eq!(taken(&mut ring, &mut at), Lit::of(true, "green", 4));
         assert_eq!(ring.face(), &light(true, "green", 4));
+        assert_eq!(ring.held(), Lit::of(true, "green", 4));
         assert_eq!(state(&bus), Some(light(true, "blue", 2)));
         // From another boot, it is not shown.
         let mut other = request("skill:other", lamp_msgs::Priority::Safety, until, "red");
@@ -1137,6 +1204,7 @@ mod tests {
         // Its time passes: the person's light again, with no one asking.
         assert_eq!(ring.tick(until), Lit::of(true, "blue", 2));
         assert_eq!(ring.face(), &light(true, "blue", 2));
+        assert_eq!(ring.held(), None, "given back, nothing tints Speaking");
     }
 
     /// Resting frames at the ring's 25 ms pace from `at` for `for_us`,

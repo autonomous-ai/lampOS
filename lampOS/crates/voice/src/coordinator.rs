@@ -3181,6 +3181,9 @@ fn spawn_rig(
     // And whether lights asked for that lapse are shown over the person's
     // (`LAMP_LIGHT_REQUESTS=on`, #940), on that bus too.
     let ring_requests = crate::ring_light::arguments_from_environment();
+    // And whether the one shown tints the Speaking face
+    // (`LAMP_SKILL_LIGHT_SPEAKING=on`, El on #1722), after that flag.
+    let ring_speaking = crate::ring_light::speaking_arguments_from_environment();
     // And whether the person's light is kept across a restart
     // (`LAMP_LIGHT_KEEP=on`, #1464).
     let ring_keep = crate::ring_light::keep_arguments_from_environment();
@@ -3189,6 +3192,7 @@ fn spawn_rig(
         ring_arguments.extend(ring_eye.iter().map(String::as_str));
         ring_arguments.extend(ring_head.iter().map(String::as_str));
         ring_arguments.extend(ring_requests.iter().map(String::as_str));
+        ring_arguments.extend(ring_speaking.iter().map(String::as_str));
         ring_arguments.extend(ring_keep.iter().map(String::as_str));
     }
     let mut ring = if options.ring_channel_ceiling.is_some() {

@@ -622,6 +622,29 @@ that takes the light (`src/ring_light.rs`). Started with
   it. A ring without fades eases at its own 70 ms. A boot
   clock that cannot be read is said once and the ring takes the person's
   light alone.
+- With `LAMP_SKILL_LIGHT_SPEAKING=on` as well (El on #1722, the first
+  builder's 14:43; off unless `on`, and nothing without
+  `LAMP_LIGHT_REQUESTS=on`), the request shown also tints the **Speaking**
+  face, so a skill's light held through its words (Welcome back's warm
+  glow, held exactly as long as its hello) is seen with them rather than
+  covered by the turn for its whole life. The face keeps its own motion,
+  following the lamp's voice with its slow two-lobed turn, and takes 60% of
+  its colour from the light and 40% from its own warm (`ring_face.rs`,
+  `SKILL_TINT_SHARE`); its least glow, with the voice quiet, becomes that
+  of the light's level, at least level 3 (`SKILL_LEVEL_LEAST`), since the
+  ring can't tell a level the skill named from one `lamp-skills` filled in
+  from the light shown, and a level 1 or 2 is under Speaking's own least.
+  Only Speaking: listening, thinking (the amber point), offline, a tap's
+  face and rest are as before, and a gesture's accent still rides over the
+  tinted face. A self-test over the request, the person's own light, or a
+  light that is out (#1677's ember) tints nothing. Given back or lapsed,
+  the next frame is plain Speaking, eased at the face's 70 ms. The tinted
+  face is a turn's frame like any other, written only under the turn's
+  permit, so the privacy switch closing refuses it as it refuses every turn
+  frame (`ring_face.rs`,
+  `a_tinted_speaking_frame_is_refused_once_the_privacy_switch_closes`).
+  Nothing is said `reached` for it: that is still for resting frames
+  only. Not seen on a lamp.
 
 Whoever asks never writes the ring: the actions program publishes the
 light wanted and reads the state back ([actions.md](actions.md)). A bus
