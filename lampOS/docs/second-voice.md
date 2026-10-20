@@ -1082,6 +1082,36 @@ rule (`LAMP_ATTENTION`), this route holds those calls as Live does, by the
 Policy's decision about the turn. Its gate then says Live's own lines with
 the real wait ([attention.md](attention.md#on-the-second-route-1712)).
 
+## The first sound's start horizon (`LAMP_SECOND_PLAYOUT_START_MS`)
+
+Every unit runs the voice with `--playout-start-ms 350` (`deploy/product`,
+lamp-4ace, lamp-52e6). The coordinator holds an answer's first write to the
+speaker until the time since its first audio, plus the audio in hand,
+reaches that horizon (`lamp_audio::playout::StartGate::open`). It was set
+for Live, whose audio fell up to 153 ms short of real time after its first
+burst (`PlayoutStart::LONGEST_MS`). A second-route answer pays it too,
+after `first_answer_audio_ms`: so it isn't in `answer_stages`, but the
+person hears it.
+
+**With `LAMP_SECOND_PLAYOUT_START_MS=0..500`** (#2135; the first builder on
+#1722 at 17:46; off unless set), a reply begun while the second route's
+worker is the provider takes that horizon instead (`playout_for`,
+`Rig::playout_start_now`). That's the second route as the only voice, or
+standing in for Gemini. A reply begun while Gemini's worker is the provider
+keeps the unit's, continuity included. A value `--playout-start-ms` doesn't
+take (over 500, or not a number) leaves the unit's, and the journal says so
+at start. Set, it says
+`while the second route answers, a reply's first sound waits for N ms of
+audio, not the unit's M ms`.
+
+**Choosing the value** from a lamp's session records (counts and ms
+only): each `turn_finished` has `start_gate.horizon_us` (the horizon that
+reply had), `start_gate.age_since_first_audio_us` (what the hold cost it),
+`start_horizon_needed_us` (the horizon it needed to play without a gap) and
+`playback_gaps`. Take the second-route replies' `start_horizon_needed_us`
+near their 90th percentile. Then check `playback_gaps` and
+`age_since_first_audio_us` before and after, over the played test.
+
 ## Coordinator switch
 
 `coordinator/second.rs`. With `LAMP_VOICE_SECOND_CONFIG` set in the

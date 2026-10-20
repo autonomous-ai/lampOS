@@ -136,6 +136,44 @@ const HOLD_FLOOR_US: u64 = 1_800_000;
 /// after a question, ended 4 of 10 waiting answers as `user_interrupted`;
 /// the owner's session on lamp-4ace had dozens. Off unless set.
 pub const WAIT_KEEPS_ANSWER_ENVIRONMENT: &str = "LAMP_WAIT_KEEPS_ANSWER";
+
+/// `LAMP_SECOND_PLAYOUT_START_MS=0..500` (#2135, the first builder on
+/// #1722 at 17:46): the start horizon of a reply the second route answers,
+/// in place of the unit's `--playout-start-ms` (350 on the lamps). That 350
+/// was set for Live, whose audio fell up to 153 ms short of real time after
+/// its first burst ([`PlayoutStart::LONGEST_MS`]); every second-route answer
+/// pays it too, between its first audio and its first sound. Unset, the
+/// unit's horizon as before.
+pub const SECOND_PLAYOUT_START_ENVIRONMENT: &str = "LAMP_SECOND_PLAYOUT_START_MS";
+
+/// [`SECOND_PLAYOUT_START_ENVIRONMENT`]'s horizon, when `value` is one
+/// `--playout-start-ms` takes (0 to 500); anything else is none.
+fn second_playout_start_from(value: Option<&str>) -> Option<PlayoutStart> {
+    value.and_then(|value| value.parse().ok())
+}
+
+/// [`SECOND_PLAYOUT_START_ENVIRONMENT`] in this process's environment, read
+/// once: the coordinator is one a process.
+fn second_playout_start() -> Option<PlayoutStart> {
+    static READ: std::sync::OnceLock<Option<PlayoutStart>> = std::sync::OnceLock::new();
+    *READ.get_or_init(|| {
+        second_playout_start_from(
+            std::env::var(SECOND_PLAYOUT_START_ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        )
+    })
+}
+
+/// The start horizon of a reply begun while `role` answers: the second
+/// route's own, when it has one, while the second route's worker is the
+/// provider; else the unit's.
+fn playout_for(unit: PlayoutStart, second: Option<PlayoutStart>, role: &str) -> PlayoutStart {
+    match second {
+        Some(second) if role == "second" => second,
+        _ => unit,
+    }
+}
 /// How long after its trigger a new sound waits, with the switch, before it
 /// may take the turn; and how long before its own decision deadline it is
 /// decided at the latest, so that a real follow-up is never let go for
@@ -1284,6 +1322,16 @@ fn mandatory(worker: &Worker, standby: bool) -> bool {
 }
 
 impl Rig {
+    /// The start horizon of a reply begun now ([`playout_for`]): the route
+    /// answering is the provider's slot's.
+    fn playout_start_now(&self) -> PlayoutStart {
+        playout_for(
+            self.playout_start,
+            second_playout_start(),
+            &self.provider.role,
+        )
+    }
+
     /// A hand cancellation has already reached the speaker. Deliver revocation
     /// to every remaining child even if one local channel has gone away.
     fn publish_hand_revocation(&mut self, snapshot: Snapshot) -> io::Result<()> {
@@ -3442,6 +3490,20 @@ fn spawn_rig(
             (None, None) => {}
             _ => return Err(io::Error::other("audio diagnostic startup identity mismatch").into()),
         }
+    }
+    match (
+        std::env::var_os(SECOND_PLAYOUT_START_ENVIRONMENT),
+        second_playout_start(),
+    ) {
+        (Some(_), Some(second)) => eprintln!(
+            "lamp-voice: while the second route answers, a reply's first sound waits for {} ms of audio, not the unit's {} ms ({SECOND_PLAYOUT_START_ENVIRONMENT})",
+            second.as_micros() / 1_000,
+            options.playout_start.as_micros() / 1_000
+        ),
+        (Some(_), None) => eprintln!(
+            "lamp-voice: {SECOND_PLAYOUT_START_ENVIRONMENT} is not 0 to 500: the unit's start horizon stays"
+        ),
+        (None, _) => {}
     }
     Ok(Rig {
         expression_out: None,
@@ -6722,7 +6784,7 @@ fn conversation_with_gate(
                                 &mut speaker_pending,
                                 &mut provider_queue,
                                 accepted,
-                                rig.playout_start,
+                                rig.playout_start_now(),
                                 service_down && !offline,
                                 trace,
                                 |state| rig.publish(state),
@@ -6790,7 +6852,7 @@ fn conversation_with_gate(
                         stop_untold.take_for(provider_session, monotonic_us()),
                         heard_of_cut,
                         follows_on,
-                        rig.playout_start,
+                        rig.playout_start_now(),
                         trace,
                         |state| rig.publish(state),
                     )?;
@@ -6929,7 +6991,7 @@ fn conversation_with_gate(
                                     opening,
                                     provider_session,
                                     rig.cut_keeps_name,
-                                    rig.playout_start,
+                                    rig.playout_start_now(),
                                     trace,
                                     |state| rig.publish(state),
                                 )?;
@@ -7780,7 +7842,7 @@ fn conversation_with_gate(
                             with_picture,
                             "lamp_looks",
                             provider_session,
-                            rig.playout_start,
+                            rig.playout_start_now(),
                             trace,
                             |state| rig.publish(state),
                         )?;
@@ -7912,7 +7974,7 @@ fn conversation_with_gate(
                             false,
                             "asked_again",
                             provider_session,
-                            rig.playout_start,
+                            rig.playout_start_now(),
                             trace,
                             |state| rig.publish(state),
                         )?;
@@ -7972,7 +8034,7 @@ fn conversation_with_gate(
                 owner,
                 reply,
                 &mut provider_queue,
-                rig.playout_start,
+                rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
             )? {
@@ -8003,7 +8065,7 @@ fn conversation_with_gate(
             owner,
             reply,
             &mut provider_queue,
-            rig.playout_start,
+            rig.playout_start_now(),
             trace,
             |state| rig.publish(state),
         )? {
@@ -8035,7 +8097,7 @@ fn conversation_with_gate(
                     false,
                     "lamp_looks_again",
                     provider_session,
-                    rig.playout_start,
+                    rig.playout_start_now(),
                     trace,
                     |state| rig.publish(state),
                 )?;
@@ -8071,9 +8133,10 @@ fn conversation_with_gate(
                 )
                 && owner.snapshot(now())?.microphone_permission() == Permission::Allowed
             {
-                snapshot = commit_back_online(owner, reply, rig.playout_start, trace, |state| {
-                    rig.publish(state)
-                })?;
+                snapshot =
+                    commit_back_online(owner, reply, rig.playout_start_now(), trace, |state| {
+                        rig.publish(state)
+                    })?;
                 last_publish = monotonic_us();
                 back_owed_since = None;
             }
@@ -8142,7 +8205,7 @@ fn conversation_with_gate(
                 offer,
                 reminders,
                 provider_session,
-                rig.playout_start,
+                rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
             )?;
@@ -8203,7 +8266,7 @@ fn conversation_with_gate(
                 false,
                 "skill_says",
                 provider_session,
-                rig.playout_start,
+                rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
             )?;
@@ -8249,7 +8312,7 @@ fn conversation_with_gate(
                 at_us,
                 owner,
                 reply,
-                rig.playout_start,
+                rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
             )? {
@@ -8364,7 +8427,7 @@ fn conversation_with_gate(
                     false,
                     "lamp_leads_setup",
                     provider_session,
-                    rig.playout_start,
+                    rig.playout_start_now(),
                     trace,
                     |state| rig.publish(state),
                 )?;
@@ -8414,7 +8477,7 @@ fn conversation_with_gate(
                     "head_tap_cue",
                     "a tap on the head: nothing heard, nothing sent to the provider",
                     0,
-                    rig.playout_start,
+                    rig.playout_start_now(),
                     trace,
                     |state| rig.publish(state),
                 )?;
@@ -8520,7 +8583,7 @@ fn conversation_with_gate(
                             "the lamp's own \"Sorry?\" said nothing: nothing heard, nothing sent to the provider"
                         },
                         0,
-                        rig.playout_start,
+                        rig.playout_start_now(),
                         trace,
                         |state| rig.publish(state),
                     )?;
@@ -8588,7 +8651,7 @@ fn conversation_with_gate(
                     false,
                     "lamp_speaks_first",
                     provider_session,
-                    rig.playout_start,
+                    rig.playout_start_now(),
                     trace,
                     |state| rig.publish(state),
                 )?;
@@ -8715,7 +8778,7 @@ fn conversation_with_gate(
                 false,
                 "lamp_tells_news",
                 provider_session,
-                rig.playout_start,
+                rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
             )?;
