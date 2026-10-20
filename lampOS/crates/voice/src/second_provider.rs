@@ -302,6 +302,13 @@ pub const GOING_ON_NOT_OWN_ENVIRONMENT: &str = "LAMP_GOING_ON_NOT_OWN";
 /// (`crate::attention::Attention::narrow_the_call`).
 pub const BUSY_CALLED_STRICT_ENVIRONMENT: &str = "LAMP_BUSY_CALLED_STRICT";
 
+/// Where the worker reads whether a busy room ends sooner (the first
+/// builder on Queue #1722, 04:00): `on`, and nothing else. A minute after
+/// the last talk when the lamp has not answered since, and a minute after
+/// its first answer since when it has (`room_told::RoomTold::end_busy_sooner`,
+/// `room_told::RoomTold::end_busy_once_answered`).
+pub const BUSY_ENDS_SOONER_ENVIRONMENT: &str = "LAMP_BUSY_ENDS_SOONER";
+
 /// What a `not_for_me` is answered in a turn named to a face
 /// ([`NAMED_ALWAYS_ENVIRONMENT`]): the model is asked once more.
 pub(crate) const NAMED_TO_A_FACE_ANSWER: &str =
