@@ -164,6 +164,7 @@ impl Rig {
             },
             online: false,
             reach: None,
+            reach_idle: false,
             needs: Vec::new(),
         };
         change(&mut options);
@@ -1326,5 +1327,51 @@ fn lamp_online_asks_the_internet_only_while_the_voice_link_is_down() {
         .subscribe_typed(lamp_msgs::Online::TOPIC, "test", lamp_msgs::Online::TYPE)
         .unwrap();
     link_then_online(&mut voice, &mut online, "down", Some(false), "reach");
+    rig.stop();
+}
+
+/// #1844 (lamp-06c1, 20 Oct): with `--reach-idle on`, the internet not
+/// answering is offline from `reach` with the voice's link still ready, as
+/// on the second route through an outage nobody spoke in; answering, it is
+/// online from the voice as before.
+#[test]
+fn with_the_idle_probe_no_internet_is_offline_with_the_link_ready() {
+    let closed: std::net::SocketAddr = "127.0.0.1:1".parse().unwrap();
+    let mut rig = Rig::with(
+        "reach-idle",
+        |options| {
+            options.online = true;
+            options.reach = Some(vec![closed]);
+            options.reach_idle = true;
+        },
+        None,
+        |_| {},
+    );
+    let mut voice = rig.part("voice");
+    let mut online = rig
+        .bus
+        .subscribe_typed(lamp_msgs::Online::TOPIC, "test", lamp_msgs::Online::TYPE)
+        .unwrap();
+    link_then_online(&mut voice, &mut online, "ready", Some(false), "reach");
+    rig.stop();
+
+    let internet = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let target = internet.local_addr().unwrap();
+    let mut rig = Rig::with(
+        "reach-idle-up",
+        |options| {
+            options.online = true;
+            options.reach = Some(vec![target]);
+            options.reach_idle = true;
+        },
+        None,
+        |_| {},
+    );
+    let mut voice = rig.part("voice");
+    let mut online = rig
+        .bus
+        .subscribe_typed(lamp_msgs::Online::TOPIC, "test", lamp_msgs::Online::TYPE)
+        .unwrap();
+    link_then_online(&mut voice, &mut online, "ready", Some(true), "voice");
     rig.stop();
 }
