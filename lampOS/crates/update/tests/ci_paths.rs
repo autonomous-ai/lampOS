@@ -3,6 +3,9 @@
 //! leave out `lampOS/docs/**/*.md` and `lampOS/builders/**`, and name back
 //! the docs that code or tests read. A doc a test reads but the workflow
 //! leaves out would let a change to it merge without the run that tests it.
+//! The clippy workflow (#2082) has the same paths, so both are held to it:
+//! a doc named back in one and not the other would drift (the reviewer's P3
+//! on #2082).
 //! This holds the list to the code: every `docs/…/*.md` or `builders/…` path
 //! named in a string in a crate's code (`include_str!`, a path a test opens)
 //! must be named back after the line that leaves it out.
@@ -14,7 +17,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const WORKFLOW: &str = "../.github/workflows/lampos-arm64.yml";
+/// The workflows whose `pull_request` paths leave docs out and name back the
+/// ones code reads.
+const WORKFLOWS: [&str; 2] = [
+    "../.github/workflows/lampos-arm64.yml",
+    "../.github/workflows/lampos-clippy.yml",
+];
 
 /// Each Rust file under `dir`.
 fn sources(dir: &Path, found: &mut Vec<PathBuf>) {
@@ -79,17 +87,6 @@ fn pull_request_paths(workflow: &str) -> Vec<String> {
 #[test]
 fn every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths() {
     let lampos = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    // A copy of lampOS alone (a podman export) has no workflow; GitHub's
-    // checkout always has it.
-    let Ok(workflow) = fs::read_to_string(lampos.join(WORKFLOW)) else {
-        assert!(
-            std::env::var_os("GITHUB_ACTIONS").is_none(),
-            "no {WORKFLOW} on GitHub Actions"
-        );
-        eprintln!("no {WORKFLOW} beside this lampOS: not checked");
-        return;
-    };
-    let paths = pull_request_paths(&workflow);
     let mut files = Vec::new();
     sources(&lampos.join("crates"), &mut files);
     assert!(files.len() > 100, "{} files", files.len());
@@ -108,7 +105,25 @@ fn every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths() {
         read.iter().any(|(path, _)| path == "docs/switches.md"),
         "the scan found what it should: {read:?}"
     );
-    for (path, file) in &read {
+    for workflow_path in WORKFLOWS {
+        // A copy of lampOS alone (a podman export) has no workflow; GitHub's
+        // checkout always has it.
+        let Ok(workflow) = fs::read_to_string(lampos.join(workflow_path)) else {
+            assert!(
+                std::env::var_os("GITHUB_ACTIONS").is_none(),
+                "no {workflow_path} on GitHub Actions"
+            );
+            eprintln!("no {workflow_path} beside this lampOS: not checked");
+            continue;
+        };
+        named_back(&pull_request_paths(&workflow), &read, workflow_path);
+    }
+}
+
+/// Each doc in `read` that `paths` leave out is named back after the line
+/// that leaves it out.
+fn named_back(paths: &[String], read: &[(String, PathBuf)], workflow_path: &str) {
+    for (path, file) in read {
         let left_out = if path.starts_with("builders/") {
             "!lampOS/builders/**"
         } else {
@@ -123,9 +138,9 @@ fn every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths() {
             .rposition(|named| *named == format!("lampOS/{path}"));
         assert!(
             back.is_some_and(|back| back > out),
-            "{} reads {path}, which the ARM64 workflow's pull_request paths leave out \
+            "{} reads {path}, which {workflow_path}'s pull_request paths leave out \
              ({left_out}) and don't name back after it: add '- 'lampOS/{path}'' below that \
-             line in {WORKFLOW}",
+             line there",
             file.display()
         );
     }
