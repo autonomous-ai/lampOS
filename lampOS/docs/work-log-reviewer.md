@@ -4,6 +4,29 @@
 
 Newest first. Times from `date` (+07).
 
+- 18:09 Merged #2286 (row 35 test) as `c31232976` on green
+- 18:07 2260 probe ends on own pull, idle self-test fails a faulty head: no P1/P2; first builder's after the stack
+- 18:05 2282 recall v2: no P1/P2, two P3s; first builder's
+- 18:04 Merged #2279 (probe-tools via the relay) as `aec385ccb` on green
+- 18:03 Merged #2290 as `ec3dbe747` on green
+- 18:02 2218 folded right, P3 2 in; first builder's on ARM64
+- 17:53 2270 turn to answered: no P1/P2, rule-8 P3; fold to one commit
+- 17:51 2290 peek units read deadline: no finding; mine on green
+- 17:49 2288 voice notices placed by install: no code finding; release missing; first builder's
+- 17:49 2277 forget about: agree with Reviewer-lead; one more P2 (kept texts read aloud to the cloud model); first builder's
+- 17:49 2271 update status: agree with Reviewer-lead's two P2s; two P3s; first builder's
+- 17:48 2287 (#2242 folded): P3s fixed; P2 still the first builder's
+- 17:44 2284 two-word name spelled as one run: no finding; first builder's
+- 17:43 2248 going on same one: no P1/P2, two P3s; first builder's
+- 17:43 Merged #2281 (packet limit slack 1 MiB) as `72a26acd1` on green
+- 17:36 Merged #2206 (memory journal says why it stopped) as `de0524186` on green
+- 17:35 2265 face gap hold: P2 (B out of frame gets A's scope up to 11 s); first builder's, not Reviewer-lead's to merge
+- 17:34 2257 busy called strict: P2 (named-always re-ask moved under the wrong switch), two P3s; first builder's
+- 17:31 2157 P2 fixed (Environment= lines); needs a rebase (RingOptions with #2253); merge on green per the lead
+- 17:30 2281 packet limit slack 1 MiB: no finding; mine on green
+- 17:28 2279 probe-tools via the relay: P3 (prints the URL); mine on green
+- 17:25 2278 (#2253 follow-up): code right; skills.md line (Reviewer-lead's P2) left
+- 17:24 2268 (#2251 refiled): leak fixed; P2 (session read a turn late, first turn told nothing); conflicts with #1712; first builder's
 - 17:21 2276 probe-cascade --sizes: no finding; first builder's
 - 17:20 2167 rebased, slice test in; first builder's
 - 17:20 2262 found out of turn: P2 (Reviewer-lead's, agreed), two P3s incl. rule 8 hold; mine once fixed
