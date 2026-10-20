@@ -195,9 +195,23 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             at_unix_ms,
             text,
             source_ids,
+            once: false,
         } => value(Response::Added {
             id: store.remember_from(&one(person)?, at_unix_ms, &text, &source_ids)?,
         }),
+        // #2176: what this person already keeps (the same words, ignoring
+        // case, spacing and a final punctuation mark) is that kept thing; no
+        // entry is written, and it gains these `source_ids`.
+        Request::Remember {
+            person,
+            at_unix_ms,
+            text,
+            source_ids,
+            once: true,
+        } => match store.remember_once_from(&one(person)?, at_unix_ms, &text, &source_ids, true)? {
+            (id, true) => json!({"ok":true,"id":id,"existing":true}),
+            (id, false) => value(Response::Added { id }),
+        },
         Request::Kept { person, max_bytes } => value(Response::Kept {
             entries: store.kept(&one(person)?, max_bytes.unwrap_or(4096).min(16384) as usize)?,
         }),
@@ -397,7 +411,8 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             let outcome = format!("ok entries={count}");
             // Reads, maintenance and successful no-op removals must not
             // clear an earlier failure to add a record.
-            let wrote = matches!(op.as_str(), "append" | "remember" | "append_linked");
+            let wrote = matches!(op.as_str(), "append" | "remember" | "append_linked")
+                && response["existing"] != true;
             (response, outcome, false, wrote)
         }
         Err(e) => (
@@ -497,6 +512,62 @@ mod tests {
             assert_eq!(response["ok"], true, "{request}: {}", answer.line);
             assert!(response.get("wrote").is_none());
             assert!(response.get("storage_fault").is_none());
+        }
+    }
+
+    /// #2176, `LAMP_MEMORY_REMEMBER_ONCE`: with `once`, what this person
+    /// already keeps, active and the same words ignoring case, spacing and
+    /// a final punctuation mark, is that kept thing, and nothing is written.
+    /// Anything else is kept as before.
+    #[test]
+    fn a_remember_once_the_same_person_already_keeps_word_for_word_is_that_kept_thing() {
+        let (_scratch, mut store) = Scratch::new("remember-once");
+        const MAI: &str = "p-0123456789abcdef";
+        let mut ask = |request: Value| {
+            let answer = answer(&mut store, request.to_string().as_bytes(), NOW);
+            let line: Value = serde_json::from_str(&answer.line).unwrap();
+            assert_eq!(line["ok"], true, "{line}");
+            (line, answer.wrote)
+        };
+        let once = |text: &str, person: &str| json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":text,"once":true});
+        let (first, wrote) = ask(once("Takes her coffee black.", MAI));
+        assert_eq!(first, json!({"ok":true,"id":1}));
+        assert!(wrote);
+        // Word for word, then differing only by case, space and the stop.
+        for text in ["Takes her coffee black.", "  takes HER   coffee black "] {
+            let (again, wrote) = ask(once(text, MAI));
+            assert_eq!(again, json!({"ok":true,"id":1,"existing":true}), "{text}");
+            assert!(!wrote, "{text}");
+        }
+        // Another text, and the same text of someone else: kept anew.
+        assert_eq!(ask(once("takes her tea black", MAI)).0["id"], 2);
+        assert_eq!(
+            ask(once("Takes her coffee black.", "everyone")).0,
+            json!({"ok":true,"id":1})
+        );
+        let kept = |store: &Days, person: &str| {
+            store
+                .kept(&Person::new(person).unwrap(), 16384)
+                .unwrap()
+                .len()
+        };
+        assert_eq!(kept(&store, MAI), 2);
+        assert_eq!(kept(&store, "everyone"), 1);
+        let line = |store: &mut Days, request: Value| {
+            answer(store, request.to_string().as_bytes(), NOW).line
+        };
+        // Forgotten, it is kept anew (one no longer active: `days`'s test).
+        store.forget(&Person::new(MAI).unwrap(), 1).unwrap();
+        let fresh = line(&mut store, once("takes her coffee black", MAI));
+        assert_eq!(fresh, json!({"ok":true,"id":3}).to_string());
+        // Without `once`, the same text twice is two kept things, as before.
+        for id in [4, 5] {
+            let request =
+                json!({"op":"remember","person":MAI,"at_unix_ms":NOW,"text":"takes her tea black"});
+            assert_eq!(
+                line(&mut store, request),
+                json!({"ok":true,"id":id}).to_string()
+            );
         }
     }
 

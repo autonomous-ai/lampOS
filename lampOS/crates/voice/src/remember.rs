@@ -107,6 +107,11 @@ pub fn switch_recall_v2(on: bool) -> bool {
 /// own bound (#2176).
 const SPAN_DAYS: u64 = 14;
 
+/// Only the exact value `on`, with the Days client: `remember` asks the
+/// store for `once`, so what this person already keeps (the same words,
+/// ignoring case, spacing and a final punctuation mark) is
+/// answered as kept already and not kept again (#2176). Off, as before.
+pub const REMEMBER_ONCE_ENVIRONMENT: &str = "LAMP_MEMORY_REMEMBER_ONCE";
 /// Only the exact value `on`, with the Days client: a session opened for
 /// someone known may be told one open thread of theirs to ask about, once
 /// (#1693 (3)). Off, the session is told what it was.
@@ -578,7 +583,11 @@ fn answer_for(
         return Some(match name {
             REMEMBER => {
                 answer.get("id")?;
-                json!({"remembered": true})
+                if answer["existing"] == true {
+                    json!({"remembered": true, "note": "That was already kept."})
+                } else {
+                    json!({"remembered": true})
+                }
             }
             FORGET => match answer.get("removed")? {
                 Value::Null => {
@@ -1082,6 +1091,8 @@ pub struct DaysClient {
     forget_all: AtomicBool,
     /// [`recall_v2_on`], read when the client is made (#2176).
     recall_v2: AtomicBool,
+    /// [`REMEMBER_ONCE_ENVIRONMENT`], read when the client is made.
+    remember_once: AtomicBool,
     /// The conversation the writer is in: whose, and the exchanges of it
     /// journalled so far. With [`forget_all_on`], a thing remembered in it
     /// is kept with them, so forgetting it removes them too (#1693).
@@ -1322,6 +1333,9 @@ impl DaysClient {
             ),
             forget_all: AtomicBool::new(forget_all_on()),
             recall_v2: AtomicBool::new(recall_v2_on()),
+            remember_once: AtomicBool::new(
+                std::env::var(REMEMBER_ONCE_ENVIRONMENT).ok().as_deref() == Some("on"),
+            ),
             current,
         })
     }
@@ -1619,6 +1633,9 @@ impl DaysClient {
             && !current.1.is_empty()
         {
             request["source_ids"] = json!(current.1);
+        }
+        if call.name == REMEMBER && self.remember_once.load(Ordering::Acquire) {
+            request["once"] = json!(true);
         }
         let writes = matches!(call.name.as_str(), REMEMBER | FORGET | FORGET_EVERYTHING);
         if writes {
@@ -4181,6 +4198,40 @@ mod tests {
         }
     }
 
+    /// #2176, `LAMP_MEMORY_REMEMBER_ONCE`: with the switch, `remember` asks
+    /// for `once`, and a thing kept already is told as such; off, the
+    /// request is as before.
+    #[test]
+    fn with_the_switch_remember_asks_once_and_says_what_was_kept_already() {
+        let (socket, served) = memory("remember-once", 2, |request| {
+            if request["once"] == true {
+                json!({"ok":true,"id":24,"existing":true})
+            } else {
+                json!({"ok":true,"id":25})
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let remember = || {
+            let args = json!({"text":"takes coffee black"});
+            client.run_at(&call(REMEMBER, args), FIRST_READ, NOW, Some(&EAST), None)
+        };
+        assert!(!client.remember_once.load(Ordering::Acquire));
+        assert_eq!(remember(), (json!({"remembered": true}), true));
+        client.remember_once.store(true, Ordering::Release);
+        assert_eq!(
+            remember(),
+            (
+                json!({"remembered": true, "note": "That was already kept."}),
+                true
+            )
+        );
+        let read = served.join().unwrap();
+        assert!(read[0].get("once").is_none(), "{}", read[0]);
+        assert_eq!(read[1]["once"], true, "{}", read[1]);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
     /// The switch-off proof: with nobody known, every line the voice sends
     /// the memory is exactly the line it sent before #764.
     #[test]
@@ -4562,6 +4613,7 @@ mod tests {
             threads: AtomicBool::new(false),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
+            remember_once: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
         };
         hand_on_days(batch(), NOW, &client);

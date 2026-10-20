@@ -19,6 +19,7 @@ use std::{
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
 };
+use unicode_normalization::UnicodeNormalization;
 
 pub const DATABASE: &str = "memory-days.sqlite3";
 /// A follow-up's observation is at least this old: not the same conversation.
@@ -409,6 +410,24 @@ impl Days {
         text: &str,
         from: &[u64],
     ) -> Result<u64> {
+        self.remember_once_from(person, at, text, from, false)
+            .map(|(id, _)| id)
+    }
+
+    /// [`Self::remember_from`]; with `once` (#2176,
+    /// `LAMP_MEMORY_REMEMBER_ONCE`), a text this person already keeps, active
+    /// and the same words ignoring case, spacing and a final punctuation mark
+    /// ([`same_text`]), is that kept thing: its id, `true`, and no entry is
+    /// written; it gains `from` as sources, so forgetting it removes both
+    /// conversations' exchanges. Without `once`, as before.
+    pub fn remember_once_from(
+        &mut self,
+        person: &Person,
+        at: u64,
+        text: &str,
+        from: &[u64],
+        once: bool,
+    ) -> Result<(u64, bool)> {
         for id in from {
             let exchange: bool = self.db.query_row(
                 "SELECT EXISTS(SELECT 1 FROM entries WHERE person=? AND id=? AND kind='exchange')",
@@ -425,6 +444,10 @@ impl Days {
         if text.is_empty() {
             return Err(Error::new("empty", "there is no text to remember"));
         }
+        if once && let Some(id) = self.kept_already(person, &text)? {
+            self.link_sources(person, id, from)?;
+            return Ok((id, true));
+        }
         let count: u64 = self.db.query_row(
             "SELECT count(*) FROM entries WHERE person=? AND kind='kept'",
             [person.as_str()],
@@ -437,6 +460,43 @@ impl Days {
             ));
         }
         self.add(person, at, "", "", &text, from, &[])
+            .map(|id| (id, false))
+    }
+
+    /// The id of this person's active kept thing with `text`, the same by
+    /// [`same_text`].
+    fn kept_already(&self, person: &Person, text: &str) -> Result<Option<u64>> {
+        let wanted = same_text(text);
+        let mut statement = self.db.prepare(
+            "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 ORDER BY id",
+        )?;
+        let mut rows = statement.query([person.as_str()])?;
+        while let Some(row) = rows.next()? {
+            let kept: String = row.get(1)?;
+            if same_text(&kept) == wanted {
+                return Ok(Some(row.get(0)?));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Links `from`, validated as a new remember's are, to the kept thing
+    /// `id` that `once` found (#2176): forgetting it then removes this
+    /// conversation's exchanges too. Links it already has stay one.
+    fn link_sources(&mut self, person: &Person, id: u64, from: &[u64]) -> Result<()> {
+        if from.is_empty() {
+            return Ok(());
+        }
+        let tx = self.db.transaction()?;
+        validate_sources(&tx, person, from, false)?;
+        for source in from {
+            tx.execute(
+                "INSERT OR IGNORE INTO sources(child,parent) SELECT c.rid,p.rid FROM entries c JOIN entries p ON p.person=c.person WHERE c.person=?1 AND c.id=?2 AND p.id=?3",
+                params![person.as_str(), id, source],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
     }
     // The one private writer of an exchange or a kept entry: each argument
     // is a column or its links.
@@ -1289,6 +1349,20 @@ impl Days {
     }
 }
 
+/// What two kept things are compared by (#2176): NFC, lower case, white
+/// space trimmed and collapsed, and punctuation at the end dropped.
+fn same_text(text: &str) -> String {
+    let lower: String = text.nfc().flat_map(char::to_lowercase).nfc().collect();
+    let words = lower.split_whitespace().collect::<Vec<_>>().join(" ");
+    words
+        .trim_end_matches(|c: char| c.is_whitespace() || is_punctuation(c))
+        .to_owned()
+}
+
+fn is_punctuation(c: char) -> bool {
+    c.is_ascii_punctuation() || matches!(c, '…' | '。' | '！' | '？' | '，' | '、' | '；' | '：')
+}
+
 fn identifier(value: &str) -> Result<()> {
     if (1..=64).contains(&value.len())
         && value
@@ -1629,6 +1703,81 @@ mod tests {
             drop(reopened);
             fs::remove_dir_all(dir).unwrap();
         }
+    }
+
+    /// #2176: a kept thing no longer active (replaced) is not what `once`
+    /// finds; the same text is kept anew.
+    #[test]
+    fn a_remember_once_passes_over_a_kept_thing_no_longer_active() {
+        let dir = std::env::temp_dir().join(format!("lamp-days-once-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let now = 1_791_892_800_000;
+        let options = Options {
+            dir: dir.clone(),
+            keep_days: 30,
+            local: LocalTime::Offset(0),
+        };
+        let mut store = Days::open(options, now).unwrap();
+        let everyone = Person::everyone();
+        let first = store.remember_once_from(&everyone, now, "coffee black", &[], true);
+        assert_eq!(first.unwrap(), (1, false));
+        let again = store.remember_once_from(&everyone, now, "Coffee black!", &[], true);
+        assert_eq!(again.unwrap(), (1, true));
+        store
+            .db
+            .execute("UPDATE entries SET active=0 WHERE id=1", [])
+            .unwrap();
+        let anew = store.remember_once_from(&everyone, now, "coffee black", &[], true);
+        assert_eq!(anew.unwrap(), (2, false));
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #2176: a remember `once` that finds the kept thing links the new
+    /// conversation's exchanges to it, so forgetting it removes both.
+    #[test]
+    fn a_remember_once_links_its_sources_to_the_kept_thing_it_finds() {
+        let dir = std::env::temp_dir().join(format!("lamp-days-once-src-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let now = 1_791_892_800_000;
+        let options = Options {
+            dir: dir.clone(),
+            keep_days: 30,
+            local: LocalTime::Offset(0),
+        };
+        let mut store = Days::open(options, now).unwrap();
+        let mai = Person::new("p-0123456789abcdef").unwrap();
+        let a = store
+            .append(&mai, now, "I take coffee black", "noted", &[])
+            .unwrap();
+        let b = store
+            .append(&mai, now, "coffee black, remember", "sure", &[])
+            .unwrap();
+        let other = store.append(&mai, now, "nice day", "it is", &[]).unwrap();
+        let (k, existing) = store
+            .remember_once_from(&mai, now, "coffee black", &[a], true)
+            .unwrap();
+        assert!(!existing);
+        let again = store.remember_once_from(&mai, now, "Coffee black.", &[b], true);
+        assert_eq!(again.unwrap(), (k, true));
+        assert_eq!(
+            store.record(&mai, k).unwrap().unwrap().source_ids,
+            vec![a, b]
+        );
+        // A source that isn't the person's exchange is refused, nothing linked.
+        assert!(
+            store
+                .remember_once_from(&mai, now, "coffee black", &[k], true)
+                .is_err()
+        );
+        assert_eq!(store.kept(&mai, 16384).unwrap().len(), 1);
+        store.forget(&mai, k).unwrap();
+        for id in [k, a, b] {
+            assert!(store.record(&mai, id).unwrap().is_none(), "{id}");
+        }
+        assert!(store.record(&mai, other).unwrap().is_some());
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
