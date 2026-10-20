@@ -86,7 +86,17 @@ pub struct Real {
     /// The lamp's software update for the app, with `LAMP_APP_UPDATE=on`
     /// (#2194, `crate::update`).
     pub update_page: bool,
+    /// The keeper's restart socket, with `LAMP_APP_RESTART=on` (#2193,
+    /// `system.reboot`).
+    pub restart: Option<PathBuf>,
 }
+
+/// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
+pub const RESTART_ENVIRONMENT: &str = "LAMP_APP_RESTART";
+
+/// The keeper reads one line and checks one lock before it answers: bounded
+/// short, as the broker's loop waits on it (`crate::photos::DEADLINE`).
+pub const RESTART_WAIT: Duration = Duration::from_secs(2);
 
 /// Texts from the app (`crate::chat`, #1673): whether they are taken, the
 /// bus's `chat/in` and `chat/out`, made at first use, and the runs waited
@@ -570,6 +580,20 @@ impl Lamp for Real {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
 
+    fn restart(&mut self) -> Result<Value, String> {
+        let socket = self
+            .restart
+            .as_deref()
+            .ok_or_else(|| crate::wire::not_here("system.reboot"))?;
+        // The settings helper's line protocol, the keeper's words.
+        crate::settings::ask(socket, lamp_keeper::restart::REQUEST, RESTART_WAIT)
+            .map_err(|why| {
+                why.replace("the lamp's settings are", "the lamp's keeper is")
+                    .replace("the lamp's settings", "the lamp's keeper")
+            })
+            .map(Option::unwrap_or_default)
+    }
+
     fn new_run(&mut self, now_ms: u64) -> String {
         self.texts.stream.new_run(now_ms)
     }
@@ -712,6 +736,7 @@ mod tests {
             faces: None,
             schedule: None,
             update_page: false,
+            restart: None,
         };
         let level = Volume {
             volume: 35,
@@ -838,6 +863,7 @@ mod tests {
             faces: None,
             schedule: None,
             update_page: false,
+            restart: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.

@@ -183,6 +183,12 @@ fn main() -> ExitCode {
         schedule: lamp_cloud::schedule::from_environment(),
         // The lamp's software update for the app (#2194): only with LAMP_APP_UPDATE=on.
         update_page: lamp_cloud::update::from_environment(),
+        // A restart from the app, asked of the keeper (#2193): only with LAMP_APP_RESTART=on.
+        restart: (std::env::var(lamp_cloud::lamp::RESTART_ENVIRONMENT)
+            .ok()
+            .as_deref()
+            == Some("on"))
+        .then(|| lamp_keeper::restart::SOCKET.into()),
     };
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -211,6 +217,7 @@ fn main() -> ExitCode {
         faces: None,
         schedule: None,
         update_page: false,
+        restart: None,
     };
     runtime.block_on(async move {
         let looks = async move {

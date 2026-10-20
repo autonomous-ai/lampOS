@@ -37,6 +37,7 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
         faces: None,
         schedule: None,
         update_page: false,
+        restart: None,
     };
     (lamp, bus_root)
 }

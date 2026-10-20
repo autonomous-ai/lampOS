@@ -140,6 +140,7 @@ const PARTS: &[&str] = &[
     "lamp-expression",
     "lamp-eyes",
     "lamp-health",
+    "lamp-keeper-restart",
     "lamp-memory",
     "lamp-mood",
     "lamp-name",
