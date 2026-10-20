@@ -831,12 +831,37 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         None => serde_json::json!({"who": null}),
                     },
                     Some(Ask::List) => serde_json::json!({"people": who.people.names()}),
+                    // Only lamp-cloud's ask, for the owner's page that sent
+                    // them (`face.list`, #2192): with --photo-dir, the faces
+                    // from photos that wait for a yes too.
+                    Some(Ask::ListWaiting) => serde_json::json!({
+                        "people": who.people.names(),
+                        "waiting": who
+                            .unconfirmed
+                            .as_ref()
+                            .map(|unconfirmed| unconfirmed.names())
+                            .unwrap_or_default(),
+                    }),
                     Some(Ask::Forget(name)) => {
-                        // "Forget my face" takes a face from a photo too.
-                        if let Some(unconfirmed) = who.unconfirmed.as_mut() {
-                            let _ = unconfirmed.let_go(&name);
-                        }
-                        match who.people.forget(&name) {
+                        // "Forget my face" takes a face from a photo too, and
+                        // one let go is a face forgotten.
+                        // A let-go its store couldn't write is an error, not
+                        // "not known": after a restart that face would be back
+                        // (the reviewer on #2199). The people's forget runs
+                        // either way.
+                        let let_go = match who.unconfirmed.as_mut() {
+                            Some(unconfirmed) => {
+                                unconfirmed.let_go(&name).map_err(|error| error.to_string())
+                            }
+                            None => Ok(false),
+                        };
+                        let forgot = who.people.forget(&name).map_err(|error| error.to_string());
+                        match let_go.and_then(|let_go| {
+                            forgot.map(|forgot| lamp_eyes::who::Forgot {
+                                forgot: forgot.forgot || let_go,
+                                ..forgot
+                            })
+                        }) {
                             // Set-aside files it could not search: said, with the
                             // forget waiting for them (#1586).
                             Ok(lamp_eyes::who::Forgot { forgot, unsearched }) if unsearched > 0 => {

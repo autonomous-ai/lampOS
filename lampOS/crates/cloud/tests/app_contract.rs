@@ -164,6 +164,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         skills: None,
         changes: None,
         photos: None,
+        faces: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -218,6 +219,94 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
     // answered `system.info`, so they stay out of it.
     for absent in ["versions.openclaw_detected", "versions.openclaw"] {
         assert!(field(info, absent).is_none(), "{absent} in {info}");
+    }
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// The Lamp 2 page's faces (#2192, `face.list` and `face.remove`): what it
+/// reads of each, by name and type, from `lamp-cloud`'s own answer to a
+/// stand-in for the eyes' request socket, in V1's envelope. Without
+/// `LAMP_FACES_PAGE` the kinds aren't on this lamp, and the page shows no
+/// row.
+#[test]
+fn the_faces_page_reads_names_and_removes_one() {
+    let root = PathBuf::from(format!("/tmp/lcf-{}", std::process::id()));
+    let places = lamp(&root);
+    let socket = root.join("who.sock");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let eyes = std::thread::spawn(move || {
+        let mut asked = Vec::new();
+        for answer in [
+            json!({"people": ["Lan"], "waiting": ["Bo"]}),
+            json!({"forgot": true}),
+        ] {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            asked.push(serde_json::from_str::<Value>(line.trim()).unwrap());
+            writeln!(&stream, "{answer}").unwrap();
+        }
+        asked
+    });
+    let mut real = Real {
+        places,
+        bus: None,
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: Some(lamp_cloud::faces::Eyes {
+            socket,
+            memory: None,
+        }),
+    };
+    let me = Identity {
+        device: "lamp".into(),
+        version: "812+460a1a1aa2b3".into(),
+        id: "d-42".into(),
+        mac: "lamp-7f72".into(),
+        ..Identity::default()
+    };
+    let reply = |real: &mut Real, kind: &str, data: Value| -> Value {
+        let result = answer(real, kind, &data);
+        let sent = me.data("2026-10-20T12:00:00Z", kind, &result).to_string();
+        serde_json::from_str(&sent).unwrap()
+    };
+    let listed = reply(&mut real, "face.list", Value::Null);
+    assert_eq!(listed["status"], "success", "{listed}");
+    let faces = listed["data"]["faces"].as_array().unwrap();
+    for face in faces {
+        assert!(is(&face["name"], Type::Text), "{face}");
+        assert!(is(&face["waiting"], Type::Flag), "{face}");
+        // Names only: no print, photo or anything else of a face.
+        assert_eq!(face.as_object().unwrap().len(), 2, "{face}");
+    }
+    assert_eq!(faces.len(), 2);
+    let removed = reply(&mut real, "face.remove", json!({"name": "Lan"}));
+    assert_eq!(removed["status"], "success", "{removed}");
+    assert!(is(&removed["data"]["removed"], Type::Text), "{removed}");
+    // Whether memory went too, and why not when it didn't (the first
+    // builder on #2199, 13:08): `memory` text, and `reason` with `kept`.
+    // This lamp gives lamp-cloud no memory socket.
+    assert_eq!(removed["data"]["memory"], "kept", "{removed}");
+    assert!(is(&removed["data"]["reason"], Type::Text), "{removed}");
+    assert_eq!(
+        eyes.join().unwrap(),
+        [
+            json!({"list": true, "waiting": true}),
+            json!({"forget": "Lan"})
+        ]
+    );
+    // Without the switch, neither is on this lamp.
+    real.faces = None;
+    for kind in ["face.list", "face.remove"] {
+        let refused = reply(&mut real, kind, json!({"name": "Lan"}));
+        assert_ne!(refused["status"], "success", "{kind}: {refused}");
     }
     let _ = std::fs::remove_dir_all(root);
 }

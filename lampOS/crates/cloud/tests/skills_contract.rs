@@ -67,6 +67,7 @@ fn real(skills: Option<skills::Places>) -> Real {
         skills,
         changes: None,
         photos: None,
+        faces: None,
     }
 }
 

@@ -863,6 +863,10 @@ pub enum Ask {
     VisitsNo(String),
     Forget(String),
     List,
+    /// The names, and with `--photo-dir` the faces from photos that wait
+    /// for their person's yes: only lamp-cloud asks this, for the owner's
+    /// page (`face.list`, #2192). The plain list never names those.
+    ListWaiting,
     Who,
 }
 
@@ -930,6 +934,19 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             } => Some(Ask::VisitsNo(name)),
             _ => None,
         };
+    }
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct ListWaiting {
+        list: bool,
+        waiting: bool,
+    }
+    if let Ok(ListWaiting {
+        list: true,
+        waiting: true,
+    }) = serde_json::from_slice(line)
+    {
+        return Some(Ask::ListWaiting);
     }
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -1945,6 +1962,12 @@ mod tests {
         );
         assert_eq!(ask_of(br#"{"forget":"A","photo":"a.jpg"}"#), None);
         assert_eq!(ask_of(br#"{"list":true}"#), Some(Ask::List));
+        assert_eq!(
+            ask_of(br#"{"list":true,"waiting":true}"#),
+            Some(Ask::ListWaiting)
+        );
+        assert_eq!(ask_of(br#"{"list":true,"waiting":false}"#), None);
+        assert_eq!(ask_of(br#"{"waiting":true}"#), None);
         assert_eq!(ask_of(br#"{"who":true}"#), Some(Ask::Who));
         for nothing in [
             &br#"{"who":false}"#[..],

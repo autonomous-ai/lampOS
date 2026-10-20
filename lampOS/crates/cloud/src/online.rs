@@ -48,6 +48,15 @@ pub fn options(account: &Account) -> MqttOptions {
     options
 }
 
+/// Whether a message on `topic` is a command for this lamp: only its own
+/// account channel, `fa_channel`, which only the lamp's signed-in account
+/// may publish to. Every kind rests on this, `face.remove` and
+/// `faces.add_photo` among them (the reviewer on #2199): the whole topic,
+/// never a part of it.
+pub fn commanded(topic: &[u8], account: &Account) -> bool {
+    !account.fa_channel.is_empty() && topic == account.fa_channel.as_bytes()
+}
+
 /// The reply to one message on `fa_channel`, or nothing for one that is no
 /// command or a preview done (`QUIET_WHEN_DONE`).
 pub fn reply(
@@ -355,7 +364,7 @@ async fn session(
                 );
             }
             Ok(Event::Incoming(Packet::Publish(message))) => {
-                if message.topic.as_ref() != account.fa_channel.as_bytes() {
+                if !commanded(message.topic.as_ref(), account) {
                     continue;
                 }
                 let me = identity.borrow().clone();
@@ -393,6 +402,34 @@ async fn session(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Only the lamp's own account channel commands it: not its reply
+    /// channel, another lamp's, a longer or shorter topic, or an empty one.
+    #[test]
+    fn only_the_lamps_own_account_channel_commands_it() {
+        let account: Account = serde_json::from_value(serde_json::json!({
+            "mqtt_endpoint": "broker.example", "mqtt_port": 8883,
+            "mqtt_username": "u", "mqtt_password": "p",
+            "fa_channel": "fa/d-42", "fd_channel": "fd/d-42", "llm_base_url": ""
+        }))
+        .unwrap();
+        assert!(commanded(b"fa/d-42", &account));
+        for other in [
+            &b"fd/d-42"[..],
+            b"fa/d-43",
+            b"fa/d-42/x",
+            b"fa/d-4",
+            b"",
+            b"FA/D-42",
+        ] {
+            assert!(!commanded(other, &account), "{other:?}");
+        }
+        let unset = Account {
+            fa_channel: String::new(),
+            ..account
+        };
+        assert!(!commanded(b"", &unset));
+    }
 
     #[test]
     fn the_time_is_rfc3339_in_utc() {

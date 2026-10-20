@@ -329,6 +329,13 @@ impl Unconfirmeds {
         Ok(gone)
     }
 
+    /// The names that wait for their person's yes: only for the lamp's
+    /// owner's own page (`face.list`, #2192), who sent them. Never said at
+    /// the lamp, counted or greeted.
+    pub fn names(&self) -> Vec<String> {
+        self.kept.iter().map(|kept| kept.name.clone()).collect()
+    }
+
     pub fn len(&self) -> usize {
         self.kept.len()
     }
@@ -538,6 +545,8 @@ mod tests {
         // Read back as written.
         let mut faces = Unconfirmeds::open(path.clone());
         assert_eq!(faces.len(), 2);
+        // Named, for the owner's page only (`face.list`, #2192).
+        assert_eq!(faces.names(), ["Lan", "Minh"]);
         // Yes: taken out, to be kept as an ordinary print.
         let taken = faces.confirmed("lan").unwrap().unwrap();
         assert_eq!((taken.name(), taken.print()), ("Lan", unit(0)));
