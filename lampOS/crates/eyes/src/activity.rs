@@ -59,12 +59,22 @@ const MOST_PRINTS: usize = 6;
 const CHECK_AFTER_US: u64 = 2_000_000;
 const CHECK_EVERY_US: u64 = 2_000_000;
 /// Standing up: within this long before the face was lost, it rose by
-/// [`STOOD_RISE`] of its height. Its size is not asked: on lamp-52e6 the
-/// lead stood straight up and the face rose 1.90 of its height at 1.02 as
-/// tall, out of the picture's top (row 14 try 4, 20 Oct, #2196's line); a
-/// level camera sees a person rise, not move away.
+/// [`STOOD_RISE`] of its height, or shrank to [`STOOD_AWAY`] of it. Which
+/// one depends on the lamp's head: on lamp-52e6 resting (head low) the lead's
+/// face rose 1.90 of its height at 1.02 as tall (row 14 try 4); with the
+/// head up it fell 0.28 and shrank to 0.47 (try 5); on lamp-75c9 it rose
+/// 0.84 and grew to 1.30 (Nine). A head turned while sitting shrank to
+/// 0.84 at most, and leaning back sits at 0.68 or more (presence.md).
 const STOOD_WITHIN_US: u64 = 2_000_000;
 const STOOD_RISE: f32 = 0.5;
+const STOOD_AWAY: f32 = 0.6;
+
+/// Whether looks that went from `first` to `last` before the face was lost
+/// are someone standing up: rising, or moving away.
+fn standing(first: &Look, last: &Look) -> bool {
+    first.centre_y - last.centre_y >= STOOD_RISE * first.height
+        || last.height <= STOOD_AWAY * first.height
+}
 /// And was not seen again for this long.
 const STOOD_GONE_US: u64 = 2_000_000;
 /// The side of the picture someone left by: their last centre across it,
@@ -438,11 +448,11 @@ impl Judge {
                 last.height / height,
             );
             self.lost_line = Some(format!(
-                "sitter's face lost: over its last {} looks it rose {rise:.2} of its height (standing up needs {STOOD_RISE:.2}) and was {size:.2} as tall, last {:.2} across, {:.2} tall: {}",
+                "sitter's face lost: over its last {} looks it rose {rise:.2} of its height (standing up needs {STOOD_RISE:.2}) and was {size:.2} as tall (or {STOOD_AWAY:.2} or less), last {:.2} across, {:.2} tall: {}",
                 self.recent.len(),
                 last.across,
                 last.height,
-                if rise >= STOOD_RISE {
+                if standing(first, last) {
                     "rising"
                 } else {
                     "not standing up"
@@ -454,7 +464,7 @@ impl Judge {
                 .last_face
                 .is_some_and(|last| now_us.saturating_sub(last) <= STOOD_WITHIN_US)
             && let (Some((_, first)), Some((_, last))) = (self.recent.front(), self.recent.back())
-            && first.centre_y - last.centre_y >= STOOD_RISE * first.height
+            && standing(first, last)
         {
             let sitting = self
                 .sitting_from
@@ -1134,5 +1144,62 @@ mod tests {
         );
         judge.looked(133 * S, &[]);
         assert!(judge.stood_up(133 * S).is_some());
+    }
+
+    /// Row 14 try 5 on lamp-52e6, the lamp's head up: standing up, the face
+    /// fell 0.28 of its height and shrank to 0.47 as tall, then was gone:
+    /// moving away. A head turned while sitting (try 5 at 15:23:42: down
+    /// 0.25, 0.84 as tall) is not.
+    #[test]
+    fn a_face_shrinking_away_is_standing_up_and_a_turned_head_is_not() {
+        // As on 52e6, a face sat 0.30 tall, 0.14 at the end of the leave:
+        // still a near face (`NEAR`) all the way.
+        let tall = Look {
+            height: 0.30,
+            ..SEATED
+        };
+        let mut judge = Judge::default();
+        looks(&mut judge, 0, 130, Some(tall));
+        for (k, (centre, size)) in [(0.45, 1.0), (0.48, 0.80), (0.50, 0.62), (0.51, 0.47)]
+            .iter()
+            .enumerate()
+        {
+            judge.looked(
+                130 * S + k as u64 * 250_000,
+                &[Look {
+                    centre_y: *centre,
+                    height: 0.30 * size,
+                    ..SEATED
+                }],
+            );
+        }
+        judge.looked(131 * S, &[]);
+        let line = judge.lost_journal().unwrap();
+        assert!(
+            line.contains("was 0.47 as tall") && line.ends_with(": rising"),
+            "{line}"
+        );
+        judge.looked(133 * S, &[]);
+        assert!(judge.stood_up(133 * S).is_some());
+        // A head turned while sitting: down a little, 0.84 as tall, gone.
+        let mut judge = seated();
+        looks(&mut judge, 125, 130, Some(SEATED));
+        for (k, (centre, size)) in [(0.45, 1.0), (0.48, 0.92), (0.505, 0.84)]
+            .iter()
+            .enumerate()
+        {
+            judge.looked(
+                130 * S + k as u64 * 250_000,
+                &[Look {
+                    centre_y: *centre,
+                    height: SEATED.height * size,
+                    ..SEATED
+                }],
+            );
+        }
+        judge.looked(131 * S, &[]);
+        assert!(judge.lost_journal().unwrap().ends_with(": not standing up"));
+        judge.looked(133 * S, &[]);
+        assert_eq!(judge.stood_up(133 * S), None);
     }
 }
