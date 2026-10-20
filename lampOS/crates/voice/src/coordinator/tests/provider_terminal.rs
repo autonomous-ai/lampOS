@@ -442,7 +442,8 @@ fn run_with_notice_policy(
                                     ProviderInput::Audio { .. }
                                     | ProviderInput::Written { .. }
                                     | ProviderInput::Called { .. }
-                                    | ProviderInput::Paused { .. },
+                                    | ProviderInput::Paused { .. }
+                                    | ProviderInput::CountOnly { .. },
                                 ) => {}
                                 None => break,
                             }

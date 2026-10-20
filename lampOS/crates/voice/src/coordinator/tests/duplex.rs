@@ -349,6 +349,7 @@ impl Harness {
                 false,
                 None,
                 false,
+                false,
                 PlayoutStart::default(),
                 &mut self.trace,
                 |_| Ok(()),
