@@ -42,3 +42,20 @@ Ready for lamp-voice: no
   fact yet), finding 1's plan posted on #2176 for Twelve and Fourth before
   any code, then 3 and 4. lamp-06c1 waits for El's release after the
   re-set-up.
+
+## 2026-10-20: #2176 rows 2, 1a and 4d up
+
+Ready for lamp-voice: yes (#2198, #2206, #2197)
+
+- Row 2, #2198 (`961b6d487`): expiry keeps a kept fact whose conversation
+  expired. Off unless set (`LAMP_MEMORY_FORGET_ALL`). lamp-memory 230
+  passed, 0 failed, 5 ignored on the Mac (Homebrew 1.99, not 1.96). The
+  reviewer read it with no finding.
+- Row 1a, #2206 (`2f4ed31a3`): the voice's journal says when memory's
+  journal stopped, why, and how many exchanges it held back. No behaviour
+  change. lamp-voice lib 2476 passed, 12 failed (#739's timing groups,
+  73 passed on a rerun by group), 13 ignored.
+- Row 4d, #2197 (`589861921`): five memory docs agree with the code.
+- Clippy under 1.99 trips lints new in 1.99, in untouched crates; each PR's
+  ARM64 and clippy runs are the 1.96 gate.
+- Not shown on a lamp yet: lamp-06c1 is El's until about 14:00.
