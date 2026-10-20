@@ -179,7 +179,9 @@ build hash taken out. Same board (Orange Pi 4 Pro), two lamps.
 
 The camera's USB path, `--usb 01da:5875@3-1.1.4`, is the same on both: a
 property of the board and its cable, so the product's, as long as every
-lamp's camera goes in the same port.
+lamp's camera goes in the same port. lamp-dbda's is on `3-1.3.4`; `--usb
+01da:5875` without `--device` takes the one camera with those ids on any
+port (eyes.md, #2190).
 
 **Different: one lamp behind the other.** lamp-4ace has switches lamp-52e6
 lacks: the voice's `LAMP_TASKS_DIR`, `LAMP_SCHEDULE_TOOLS`,

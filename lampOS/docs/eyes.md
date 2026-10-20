@@ -456,7 +456,7 @@ restart of lamp-eyes included (#1941, row 17). Each ioctl returned, only
 late: lamp-eyes was not hung, the device was. A stuck camera's USB
 device is reset (`lamp_camera::linux::reset_usb`, USBDEVFS_RESET), as an
 unplug would: at the sixth failure, then at most once every ten minutes
-(`reopen::reset_now`), never a reboot. It is found by `--usb`'s topology
+(`reopen::reset_now`), never a reboot. It is found by `--usb`'s topology, or with the ids alone the port the camera was found on at that open (also when it has since lost its capture node, as a probe failing after a reset would leave it)
 and reset only when its vendor and product are the expected ones; the
 journal says "camera's USB device … reset" or why not, and health counts it
 (`camera_resets`). The eyes' user needs write access to the camera's USB
@@ -1414,7 +1414,17 @@ lamp-eyes --device /dev/video0 --lock-directory /home/WORKER/private-camera-lock
 ```
 
 Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`, and `--mouth-model ABSOLUTE_PATH` (with `--mouth-on-heard on` and `--mouth-runtime ABSOLUTE_PATH`).
-`--usb` is `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits; the
+`--usb` is `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits; or
+`VENDOR:PRODUCT` alone, without `--device` (#2190): then at each open the eyes
+take the one camera with those ids on whatever port it is on, its capture
+node found by following each `/sys/class/video4linux` node up to its USB
+device (`lamp_camera::linux::find_camera`), and open it as before, port
+checked. None, or two or more (their ports named, so one can be given), is
+refused and said once in the journal ("camera 01da:5875 not opened: …"), and
+tried again every five seconds; "camera found at /dev/videoN on port P" is
+said when it is found, or found on another port. On lamp-dbda the camera is
+on `3-1.3.4`, where the product unit names `3-1.1.4`. The product unit still
+names the port; the ids alone are for a lamp that differs. The
 lock directory must be private to the user it runs as. A camera that does not open, or fails, is tried again every five
 seconds while permission lasts. A start is given a 2 s budget (`OPEN_BUDGET_US`)
 and a close 250 ms, so a camera slow to answer after a close is opened rather
