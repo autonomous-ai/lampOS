@@ -148,6 +148,27 @@ pub(super) struct Gates<'a> {
     pub submission_draining: bool,
 }
 
+/// Whether a written continuation may begin now: nothing queued or owed to
+/// the speaker, no input, a fresh second of quiet (`last_speech_us` is the
+/// continuation's own last speech) and the speaker's tail played. Shared
+/// with the look's note (`look_note`).
+pub(super) fn ready(gates: &Gates<'_>, queue_empty: bool, last_speech_us: u64) -> bool {
+    queue_empty
+        && !gates.speaker_pending
+        && gates.admission.idle_for_reminder()
+        && !gates.submission_draining
+        && gates
+            .snapshot
+            .listening_ready(MonoTime::from_micros(gates.at_us))
+        && reminder_quiet(
+            gates.at_us,
+            gates.cycle_started_us,
+            gates.last_speech_us.max(last_speech_us),
+            gates.last_capture_us,
+        )
+        && gates.playback.available(gates.at_us)
+}
+
 /// Shared by the live loop and the stepped owner tests: no new output may
 /// pass a pending input, stale capture, privacy boundary, or speaker tail.
 #[allow(clippy::too_many_arguments)]
@@ -161,20 +182,7 @@ pub(super) fn start(
     trace: &mut SessionState,
     publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Option<Snapshot>> {
-    let ready = queue.is_empty()
-        && !gates.speaker_pending
-        && gates.admission.idle_for_reminder()
-        && !gates.submission_draining
-        && gates
-            .snapshot
-            .listening_ready(MonoTime::from_micros(gates.at_us))
-        && reminder_quiet(
-            gates.at_us,
-            gates.cycle_started_us,
-            gates.last_speech_us.max(state.last_speech_us),
-            gates.last_capture_us,
-        )
-        && gates.playback.available(gates.at_us);
+    let ready = ready(&gates, queue.is_empty(), state.last_speech_us);
     let Some(promise) = state.take(
         gates.at_us,
         reply.as_ref().map(|current| current.owner.turn()),

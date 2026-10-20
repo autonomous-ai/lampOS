@@ -275,6 +275,13 @@ pub(crate) const NAMED_TO_A_FACE_ANSWER: &str =
 /// `on`, and nothing else.
 pub const SKILL_LOOK_ENVIRONMENT: &str = "LAMP_SECOND_SKILL_LOOK";
 
+/// Where the worker and the coordinator read whether a look's turn whose
+/// answer called nothing is told so (`LookNoCall`), so that a skill's
+/// search the model left after one look gets one note to go on
+/// ([`Engine::noting_looks`], `coordinator::look_note`): `on`, and nothing
+/// else. Only with [`SKILL_LOOK_ENVIRONMENT`].
+pub const LOOK_NOTE_ENVIRONMENT: &str = "LAMP_SECOND_LOOK_NOTE";
+
 /// The note after a round's call results, when that round said `said`
 /// before its calls: the person heard it, so the next round says only what
 /// the results add ([`Engine::saying_once`]).
@@ -418,6 +425,9 @@ struct Shared {
     /// [`Engine::holding_answers`]: a spoken turn answered only with a
     /// holding phrase sends `HoldingAnswer`.
     holding_answer: bool,
+    /// [`Engine::noting_looks`]: a look's turn whose answer called nothing
+    /// sends `LookNoCall`.
+    note_looks: bool,
     /// [`Engine::saying_once`]: a round that said words before its calls
     /// tells the next one so ([`said_once_note`]).
     said_once: bool,
@@ -868,6 +878,7 @@ impl Engine {
                 ask_again: None,
                 misheard_at_us: Mutex::new(None),
                 holding_answer: false,
+                note_looks: false,
                 said_once: false,
                 resend: None,
                 hearing: None,
@@ -1146,6 +1157,19 @@ impl Engine {
     pub fn holding_answers(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.holding_answer = on;
+        }
+        self
+    }
+
+    /// `LAMP_SECOND_LOOK_NOTE=on` ([`LOOK_NOTE_ENVIRONMENT`]): a look's turn
+    /// (`Written` with `look`) whose whole answer called nothing in any
+    /// round sends `ProviderOutput::LookNoCall` before its idle
+    /// `TurnComplete`; the coordinator decides whether it was a skill's
+    /// search and notes it once (`coordinator::look_note`). Before any turn
+    /// only.
+    pub fn noting_looks(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.note_looks = on;
         }
         self
     }
@@ -1788,6 +1812,7 @@ impl Engine {
                 session,
                 text,
                 look,
+                search,
                 ..
             } => {
                 // A skill's note for the picture of the look it asked, kept
@@ -1875,7 +1900,7 @@ impl Engine {
                         &shared,
                         (request, lease),
                         text,
-                        Asker::Written { looking },
+                        Asker::Written { looking, search },
                         picture,
                         Vec::new(),
                         Times::new(begun),
@@ -2097,6 +2122,7 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::HoldingAnswer { request, .. }
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
+        | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::NewsAnswered { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }
@@ -3031,8 +3057,9 @@ enum Asker {
     /// a tool runs as heard.
     Spoken,
     /// The lamp wrote it (a hello, a "Sorry?", a skill's say), or a look
-    /// with `looking`.
-    Written { looking: bool },
+    /// with `looking`; with `search`, a skill's search's own turn
+    /// (`ProviderInput::Written`'s `search`).
+    Written { looking: bool, search: bool },
     /// A due reminder, said as the Live route says it: a note to say it, and
     /// no tool runs (`provider_worker::reminder_note`).
     Reminder,
@@ -3189,9 +3216,10 @@ fn picture_note(answer: &Value) -> Option<String> {
 }
 
 /// Asks the coordinator for `request`'s full look (`LookAsked`), made by a
-/// call of `name`'s: dropped, and why, in a turn the lamp wrote itself or
-/// one that is no longer the turn in hand. True when the look was asked;
-/// then `note`, a skill's for the picture, is kept for the look turn.
+/// call of `name`'s: dropped, and why, in a turn the lamp wrote itself
+/// (unless `heard` says it may look all the same: a skill's search's own
+/// turn) or one that is no longer the turn in hand. True when the look was
+/// asked; then `note`, a skill's for the picture, is kept for the look turn.
 async fn ask_look(
     shared: &Shared,
     request: u64,
@@ -3199,6 +3227,9 @@ async fn ask_look(
     name: &str,
     note: Option<String>,
 ) -> Result<bool, Stop> {
+    // A skill's look is a search's, which may go on in the lamp's own
+    // turns; the route's own look call is not.
+    let search = name != LOOK_CALL;
     let session = shared
         .begun
         .lock()
@@ -3228,6 +3259,7 @@ async fn ask_look(
         request,
         session: session.unwrap_or_default(),
         dropped: dropped.map(str::to_owned),
+        search,
     };
     if !shared.emit(asked_look).await {
         return Err(Stop::Gone);
@@ -3314,7 +3346,8 @@ async fn answer(
 ) {
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
-    let looking = asked == Asker::Written { looking: true };
+    let looking = matches!(asked, Asker::Written { looking: true, .. });
+    let searching = matches!(asked, Asker::Written { search: true, .. });
     let heard_at = Instant::now();
     // Its speech socket opened now, while the chat thinks, with the switch
     // (`LAMP_SECOND_SPEECH_SOCKET`).
@@ -3772,9 +3805,13 @@ async fn answer(
             // will look itself rather than wait a round for the model to.
             // A look dropped (a turn the lamp wrote itself) ends nothing:
             // the next round answers with the skill's answer, as with the
-            // switch off.
+            // switch off. In a search's own turn (its look's or its note's)
+            // the skill's next look is taken though the lamp wrote the turn:
+            // the person asked for the search, and lamp-skills ends it after
+            // its last look. Every other turn the lamp wrote takes none
+            // (#1146: pictures never chain with nobody speaking).
             if let Some((name, note)) = skill_looked
-                && ask_look(shared, request, heard, &name, note).await?
+                && ask_look(shared, request, heard || searching, &name, note).await?
             {
                 if !queue.started {
                     queue.push(LOOKING.to_owned()).await?;
@@ -3917,6 +3954,11 @@ async fn answer(
         && asked == Asker::Spoken
         && !called.load(Ordering::Relaxed)
         && matches!(&ended, Ok((_, whole)) if crate::holding_answer::holding_only(whole));
+    // A look's turn answered with nothing called: neither the next place
+    // nor anything else (`LAMP_SECOND_LOOK_NOTE`). The coordinator knows
+    // whether the look was a skill's search.
+    let look_left =
+        shared.note_looks && looking && ended.is_ok() && !called.load(Ordering::Relaxed);
     // The voice's line on the turn's pieces (#1712).
     shared.services.spoken(request);
     let gave_up = matches!(ended, Err(Stop::GaveUp));
@@ -3972,23 +4014,38 @@ async fn answer(
     if !shared.stages(request, &times).await {
         return;
     }
+    let session = shared
+        .begun
+        .lock()
+        .ok()
+        .and_then(|begun| *begun)
+        .filter(|(of, _)| *of == request)
+        .map(|(_, session)| session);
     // Before its idle `TurnComplete`, as the Live worker sends it, for the
     // session the turn was begun in.
     if holding
         && matches!(last, ProviderOutput::TurnComplete { idle: true, .. })
-        && let Some(session) = shared
-            .begun
-            .lock()
-            .ok()
-            .and_then(|begun| *begun)
-            .filter(|(of, _)| *of == request)
-            .map(|(_, session)| session)
+        && let Some(session) = session
     {
         eprintln!(
             "lamp-voice second: request {request} was answered only with a holding phrase: the coordinator may ask it to go on"
         );
         if !shared
             .emit(ProviderOutput::HoldingAnswer { request, session })
+            .await
+        {
+            return;
+        }
+    }
+    if look_left
+        && matches!(last, ProviderOutput::TurnComplete { idle: true, .. })
+        && let Some(session) = session
+    {
+        eprintln!(
+            "lamp-voice second: request {request} answered a look with nothing called: the coordinator may note a search to go on"
+        );
+        if !shared
+            .emit(ProviderOutput::LookNoCall { request, session })
             .await
         {
             return;

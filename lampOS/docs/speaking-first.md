@@ -129,7 +129,8 @@ giving the model one with everything said was switched off).
   a hello, a "Sorry?", a reminder) the words ask nothing, so looks never
   chain with nobody speaking (`coordinator::own_turn`, the worker's
   `heard` rule; cleared with each service cycle, whose turns number from 1
-  again).
+  again). A skill's search on the second route goes on in its own turns
+  by the skill's call, never by these words ([second-voice.md](second-voice.md)).
 - When the lamp has finished saying so, the next turn is its own: a written
   request with `look` set. The provider worker puts the eyes' newest frame
   with the note (`--eyes-look PATH`, from `LAMP_EYES_LOOK_FILE`; a frame

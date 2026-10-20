@@ -265,6 +265,7 @@ fn paused(request: u64) -> ProviderInput {
 }
 fn written(request: u64, words: &str) -> ProviderInput {
     ProviderInput::Written {
+        search: false,
         request,
         session: 1,
         privacy_generation: 1,
@@ -2100,6 +2101,7 @@ async fn a_look_without_a_picture_tells_the_model_it_saw_nothing() {
     });
     let (mut engine, _, _) = scripted(script.clone());
     engine.submit(ProviderInput::Written {
+        search: false,
         request: 1,
         session: 1,
         privacy_generation: 1,
@@ -2139,6 +2141,7 @@ async fn a_look_sends_the_eyes_picture_or_says_there_is_none() {
         }
     }));
     let look = |request| ProviderInput::Written {
+        search: false,
         request,
         session: 1,
         privacy_generation: 1,
@@ -2177,6 +2180,7 @@ async fn a_look_sends_the_eyes_picture_or_says_there_is_none() {
 async fn a_look_s_picture_goes_once_and_never_otherwise() {
     let eye = || -> Look { Arc::new(|| Ok(vec![0xFF, 0xD8, 0xFF])) };
     let look = |request| ProviderInput::Written {
+        search: false,
         request,
         session: 1,
         privacy_generation: 1,
@@ -2833,6 +2837,7 @@ async fn a_look_waits_five_seconds_and_then_says_it_could_not_look() {
         let (engine, _, _) = scripted(script);
         let mut engine = engine.looking(Arc::new(|| Ok(vec![0xFF, 0xD8, 0xFF])));
         engine.submit(ProviderInput::Written {
+            search: false,
             request: 1,
             session: 1,
             privacy_generation: 1,
@@ -2883,6 +2888,7 @@ async fn a_full_look_without_its_still_still_says_it_could_not_look() {
     });
     let (mut engine, _, _) = scripted(script.clone());
     engine.submit(ProviderInput::Written {
+        search: false,
         request: 1,
         session: 1,
         privacy_generation: 1,
@@ -4089,6 +4095,7 @@ async fn a_skill_answer_with_a_look_asks_the_coordinator_for_the_turns_look() {
                     request,
                     session,
                     dropped,
+                    ..
                 } => asked = Some((request, session, dropped)),
                 ProviderOutput::Transcript {
                     request: Some(_),
@@ -4145,6 +4152,7 @@ async fn look_and_words(engine: &mut Engine) -> (Option<(u64, u64, Option<String
                 request,
                 session,
                 dropped,
+                ..
             } => asked = Some((request, session, dropped)),
             ProviderOutput::Transcript {
                 request: Some(_),
@@ -4204,6 +4212,7 @@ async fn a_skills_note_for_its_picture_goes_once_with_its_look_turn() {
     );
     let mut engine = skill_looking(script.clone(), &answer);
     let look = |request| ProviderInput::Written {
+        search: false,
         request,
         session: 1,
         privacy_generation: 1,
@@ -6045,4 +6054,165 @@ async fn each_answer_asks_for_its_speech_socket_as_it_begins() {
     engine.submit(written(2, "Say ORCHID."));
     turn(&mut engine).await;
     assert_eq!(*script.sockets_asked.lock().unwrap(), [1, 2]);
+}
+
+/// A skill's search goes on in its own turns (look-for-things on the
+/// second route): in a written turn the coordinator marks as the search's
+/// (`search`: its look's turn, or its note's), a skill's `look_for`
+/// answered with a look asks the coordinator for it, as in a turn the
+/// person spoke. Every other turn the lamp wrote (a skill's say, a hello)
+/// still drops it (#1146), and the route's own `take_a_look` is dropped
+/// even in a search's turn.
+#[tokio::test]
+async fn a_searchs_own_written_turn_takes_the_skills_next_look() {
+    let looking = r#"{"next":"Look.","look":true}"#;
+    let cases = [
+        ("the search's look turn", true, true, "look_for", None),
+        ("the search's note turn", false, true, "look_for", None),
+        (
+            "a skill's say",
+            false,
+            false,
+            "look_for",
+            Some("the turn is one the lamp wrote itself"),
+        ),
+        (
+            "a look turn of no search",
+            true,
+            false,
+            "look_for",
+            Some("the turn is one the lamp wrote itself"),
+        ),
+        (
+            "take_a_look in the search's turn",
+            true,
+            true,
+            LOOK_CALL,
+            Some("the turn is one the lamp wrote itself"),
+        ),
+    ];
+    for (case, look, search, name, dropped) in cases {
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "c1",
+                            name,
+                            json!({"place": "left"}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("All done."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let answer: Value = serde_json::from_str(looking).unwrap();
+        let tools: ToolRunner = Arc::new(move |_, _, _, _| {
+            let answer = answer.clone();
+            Box::pin(async move { answer })
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .looking_by_call()
+        .looking_for_skills(Arc::new(|name| name == "look_for"));
+        engine.submit(ProviderInput::Written {
+            request: 2,
+            session: 1,
+            privacy_generation: 1,
+            text: "Go on.".into(),
+            look,
+            search,
+        });
+        let mut asked = None;
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+                .await
+                .expect("the turn ends");
+            match event {
+                ProviderOutput::LookAsked {
+                    request,
+                    session,
+                    dropped,
+                    search,
+                } => asked = Some((request, session, dropped, search)),
+                ProviderOutput::TurnComplete { .. } => break,
+                _ => {}
+            }
+        }
+        assert_eq!(
+            asked,
+            Some((2, 1, dropped.map(str::to_owned), name != LOOK_CALL)),
+            "{case}"
+        );
+    }
+}
+
+/// `LAMP_SECOND_LOOK_NOTE` (look-for-things, step 2): a look's turn whose
+/// answer called nothing in any round tells the coordinator so
+/// (`LookNoCall`, for its session, before its `TurnComplete`). One whose
+/// answer called something (the next place), a written turn that is no
+/// look, and the switch off tell nothing.
+#[tokio::test]
+async fn a_looks_answer_with_no_call_is_told_to_the_coordinator() {
+    let said = || vec![text("Not on the desk."), Ok(ChatEvent::Done)];
+    let called = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                "look_for",
+                json!({"place": "left"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let cases = [
+        ("look, no call, on", true, said(), true, true),
+        ("look, a call, on", true, called(), true, false),
+        ("no look, no call, on", false, said(), true, false),
+        ("look, no call, off", true, said(), false, false),
+    ];
+    for (case, look, chat, on, told) in cases {
+        let script = Arc::new(Script {
+            chats: Mutex::new([chat, said()].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.noting_looks(on);
+        engine.submit(ProviderInput::Written {
+            request: 2,
+            session: 1,
+            privacy_generation: 1,
+            text: "Here is what you see.".into(),
+            look,
+            search: false,
+        });
+        let mut events = Vec::new();
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+                .await
+                .expect("the turn ends");
+            match event {
+                ProviderOutput::LookNoCall { request, session } => {
+                    events.push(format!("no_call:{request}:{session}"));
+                }
+                ProviderOutput::TurnComplete { .. } => {
+                    events.push("complete".to_owned());
+                    break;
+                }
+                _ => {}
+            }
+        }
+        if told {
+            assert_eq!(events, ["no_call:2:1", "complete"], "{case}");
+        } else {
+            assert_eq!(events, ["complete"], "{case}");
+        }
+    }
 }

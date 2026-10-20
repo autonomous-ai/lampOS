@@ -86,6 +86,19 @@ enum Written {
     Said(usize),
 }
 
+/// How the second route, alone, answers a look's turn or the look's note
+/// (`LAMP_SECOND_LOOK_NOTE`): as its engine tells them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum LookAnswer {
+    /// Calls `look_for` for the next place: `LookAsked`, before its audio,
+    /// dropped as the engine drops it in a turn that is no search's.
+    Next,
+    /// Calls nothing: `LookNoCall`, after its audio.
+    Nothing,
+    /// Calls something else (a found place, another tool): neither.
+    Other,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum When {
     /// This many turns have been settled by the coordinator.
@@ -109,10 +122,24 @@ struct Script {
     /// (`LAMP_SECOND_SKILL_LOOK`, #941): `LookAsked` for the session that
     /// began it, before its audio.
     second_looks: bool,
+    /// `second_looks`' look is the route's own `take_a_look`, no skill's
+    /// search.
+    own_look: bool,
+    /// Alone, how the second route answers each look's turn in order, then
+    /// `Other`.
+    look_answers: &'static [LookAnswer],
+    /// Alone, how the second route answers the look's note.
+    note_answer: LookAnswer,
     /// Packets of a wait cue the second route plays before its words.
     second_cue: usize,
     /// Speech starts again (a new turn, or speaking over an answer).
     speak_again: Option<When>,
+    /// A murmur of two capture frames, too short to be a turn: the room is
+    /// not quiet for a second after it.
+    murmur: Option<When>,
+    /// A hand Stop (the button's tap) comes through Controls this many
+    /// capture frames after the murmur.
+    hand_stop: Option<u64>,
     /// Privacy reports muted once this many turns are settled.
     turns: usize,
     /// The Live link is Ready again, with a new session, once this many
@@ -169,8 +196,13 @@ impl Script {
             second_packets: 12,
             second_says: None,
             second_looks: false,
+            own_look: false,
+            look_answers: &[],
+            note_answer: LookAnswer::Other,
             second_cue: 0,
             speak_again: None,
+            murmur: None,
+            hand_stop: None,
             turns: 1,
             live_back_after: None,
             live_late: None,
@@ -379,6 +411,12 @@ struct Peers {
     second_session: u64,
     /// The second route has asked its look (`Script::second_looks`).
     second_looked: bool,
+    /// Look's turns the second route has answered (`Script::look_answers`).
+    look_turns: usize,
+    /// The capture frame the murmur began at (`Script::murmur`).
+    murmur_at: Option<u64>,
+    /// Controls' queue into the voice's hand controls (`Script::hand_stop`).
+    hand: Option<crate::hand_controls::TestControls>,
 }
 
 impl Peers {
@@ -391,6 +429,9 @@ impl Peers {
             || self
                 .speech_offset
                 .is_some_and(|offset| (offset..offset + 60).contains(&frame))
+            || self
+                .murmur_at
+                .is_some_and(|at| (at..at + 2).contains(&frame))
     }
 
     fn tick(&mut self, deadline: Option<Instant>) -> io::Result<()> {
@@ -403,6 +444,23 @@ impl Peers {
                 self.script.speak_again = None;
                 self.speech_offset = Some(self.frames);
             }
+        }
+        if let Some(when) = self.script.murmur {
+            let due = match when {
+                When::Settled(count) => self.settled >= count,
+                When::Accepted(count) => self.accepted >= count,
+            };
+            if due {
+                self.script.murmur = None;
+                self.murmur_at = Some(self.frames);
+            }
+        }
+        if let (Some(after), Some(at)) = (self.script.hand_stop, self.murmur_at)
+            && self.frames >= at + after
+            && let Some(hand) = self.hand.as_ref()
+        {
+            self.script.hand_stop = None;
+            hand.send(hand_stop_state(monotonic_us()));
         }
         // A voice still serving a second after its second route died can
         // be muted then, which ends the run cleanly.
@@ -714,7 +772,12 @@ impl Peers {
                 // Alone, the second route answers the lamp's own turns as
                 // the Live route would, with its own samples.
                 ProviderInput::Written {
-                    request, session, ..
+                    request,
+                    session,
+                    text,
+                    look,
+                    search,
+                    ..
                 } if live || self.script.only => {
                     let queued = &mut self.peers[index].queued;
                     let started = ProviderOutput::Started {
@@ -739,7 +802,45 @@ impl Peers {
                         }
                         Written::Said(packets) => {
                             queued.push_back(started);
+                            // Alone, a look's turn or the look's note is
+                            // answered as the script says.
+                            let answer = if live {
+                                None
+                            } else if look {
+                                self.look_turns += 1;
+                                Some(
+                                    self.script
+                                        .look_answers
+                                        .get(self.look_turns - 1)
+                                        .copied()
+                                        .unwrap_or(LookAnswer::Other),
+                                )
+                            } else if text == super::look_note::NOTE {
+                                Some(self.script.note_answer)
+                            } else {
+                                None
+                            };
+                            // As the engine: the skill's next look is taken
+                            // only in a search's own turn, and dropped in any
+                            // other the lamp wrote (#1146).
+                            if answer == Some(LookAnswer::Next) {
+                                self.peers[index]
+                                    .queued
+                                    .push_back(ProviderOutput::LookAsked {
+                                        request,
+                                        session,
+                                        dropped: (!search).then(|| {
+                                            "the turn is one the lamp wrote itself".to_owned()
+                                        }),
+                                        search: true,
+                                    });
+                            }
                             self.audio(index, request, packets, if live { LIVE } else { SECOND });
+                            if answer == Some(LookAnswer::Nothing) {
+                                self.peers[index]
+                                    .queued
+                                    .push_back(ProviderOutput::LookNoCall { request, session });
+                            }
                             self.finish(index, request);
                         }
                     }
@@ -809,6 +910,7 @@ impl Peers {
                                     request,
                                     session: self.second_session,
                                     dropped: None,
+                                    search: !self.script.own_look,
                                 });
                         }
                         // A wait cue first: audio with no words.
@@ -868,6 +970,7 @@ impl Peers {
                                     request,
                                     session,
                                     dropped: None,
+                                    search: false,
                                 });
                             self.audio(index, request, packets, LIVE);
                             self.finish(index, request);
@@ -896,6 +999,7 @@ impl Peers {
                                 request,
                                 session: 1,
                                 dropped: None,
+                                search: false,
                             });
                             match answer {
                                 Live::LookSilent => {
@@ -1048,6 +1152,49 @@ impl PrivacyPeer {
     }
 }
 
+/// The clock the run's hand controls are stamped with (`Script::hand_stop`).
+const HAND_CLOCK: &str = "second-route-hand";
+
+/// Controls' state with one tap of the button that stops, at `at_us`.
+fn hand_stop_state(at_us: u64) -> lamp_msgs::ControlsState {
+    use lamp_msgs::{ClockStamp, ControlGesture, ControlIntent, ControlSource, Gesture, HoldTier};
+    let stamp = || ClockStamp {
+        clock_id: HAND_CLOCK.into(),
+        at_us,
+        sequence: 1,
+    };
+    let state = lamp_msgs::ControlsState {
+        stamp: stamp(),
+        session_id: "second-route-controls".into(),
+        enabled: true,
+        ready: true,
+        fault: None,
+        buttons: vec![],
+        head_active: false,
+        base_ready: false,
+        base_held_us: None,
+        base_tier: HoldTier::None,
+        latest_stop: Some(ControlGesture {
+            stamp: stamp(),
+            session_id: "second-route-controls".into(),
+            source: ControlSource::Button,
+            name: "primary".into(),
+            gesture: Gesture::Tap,
+            intent: ControlIntent::Stop,
+            duration_us: 100_000,
+            released_us: at_us,
+            enabled: true,
+        }),
+        latest_mute: None,
+        event_sequence: 1,
+        rejected_inputs: 0,
+        privacy: None,
+        no_privacy_slide: false,
+    };
+    state.check().unwrap();
+    state
+}
+
 fn run(script: Script) -> Run {
     let directory = SessionDirectory::create().unwrap();
     let mut peers = Vec::new();
@@ -1184,6 +1331,14 @@ fn run(script: Script) -> Run {
     }
     let seen = Arc::new(Mutex::new(Seen::default()));
     let muted = Arc::new(AtomicBool::new(false));
+    let (mut controls, hand) = match script.hand_stop {
+        Some(_) => {
+            let (controls, hand) =
+                HandControls::with_test_sender(HAND_CLOCK, monotonic_us()).unwrap();
+            (Some(controls), Some(hand))
+        }
+        None => (None, None),
+    };
     let privacy_at = peers.iter().position(|p| p.role == "privacy").unwrap();
     let mut privacy = PrivacyPeer {
         peer: peers.remove(privacy_at),
@@ -1214,6 +1369,9 @@ fn run(script: Script) -> Run {
         second_died_at: None,
         second_session: 0,
         second_looked: false,
+        look_turns: 0,
+        murmur_at: None,
+        hand,
     };
     let started = crate::scenario_clock::instant();
     let mut reported = false;
@@ -1242,7 +1400,7 @@ fn run(script: Script) -> Run {
         .unwrap();
     let mut reply = None;
     let mut trace = SessionState::default();
-    let result = conversation(
+    let result = conversation_with_controls(
         &mut rig,
         &mut owner,
         Lifetime::Serve,
@@ -1252,6 +1410,8 @@ fn run(script: Script) -> Run {
         &mut None,
         &Termination::inactive(),
         &FailureNotices::none(),
+        &mut controls,
+        &mut None,
     );
     let result = finish_active_run(
         &mut rig, &mut owner, &mut reply, &mut trace, &mut None, result,
@@ -1616,6 +1776,374 @@ fn a_skills_look_on_the_second_route_is_dropped_when_the_person_speaks() {
             .iter()
             .any(|input| matches!(input, ProviderInput::Written { look: true, .. }))
     );
+}
+
+/// A skill's search on the second route alone (`LAMP_SECOND_SKILL_LOOK`),
+/// its look's turns answered as `look_answers` says, the note's as `note`,
+/// with `LAMP_SECOND_LOOK_NOTE` on or off.
+fn search(
+    on: bool,
+    look_answers: &'static [LookAnswer],
+    note: LookAnswer,
+    speak_again: Option<When>,
+) -> Run {
+    search_with(on, look_answers, note, speak_again, None)
+}
+
+/// As [`search`], with a murmur and a hand Stop that many capture frames
+/// after it (`Script::murmur`, `Script::hand_stop`).
+fn search_with(
+    on: bool,
+    look_answers: &'static [LookAnswer],
+    note: LookAnswer,
+    speak_again: Option<When>,
+    murmur_then_stop: Option<(When, u64)>,
+) -> Run {
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-note-{}.jpg",
+        std::process::id()
+    ));
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    TEST_LOOK_NOTE.set(on);
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_looks: true,
+        look_answers,
+        note_answer: note,
+        speak_again,
+        murmur: murmur_then_stop.map(|(murmur, _)| murmur),
+        hand_stop: murmur_then_stop.map(|(_, after)| after),
+        turns: if speak_again.is_some() { 3 } else { 1 },
+        turn_taking: TurnTaking::VadOnly,
+        mute_at_frame: Some(1_100),
+        written: Written::Said(6),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_LOOK_NOTE.set(false);
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    run
+}
+
+/// The look's notes the second route was sent, by request.
+fn look_notes(run: &Run) -> Vec<u64> {
+    run.seen
+        .second
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::Written { request, text, .. } if text == super::look_note::NOTE => {
+                Some(*request)
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// The written turns sent to the second route as a search's own.
+fn search_turns(run: &Run) -> Vec<u64> {
+    run.seen
+        .second
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::Written {
+                request,
+                search: true,
+                ..
+            } => Some(*request),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The look's turns (`lamp_looks`) the second route was sent, by request.
+fn look_turns(run: &Run) -> Vec<u64> {
+    run.trace
+        .iter()
+        .filter(|e| e["kind"] == "input_admitted" && e["admission_basis"] == "lamp_looks")
+        .map(|e| e["turn"].as_u64().unwrap())
+        .collect()
+}
+
+/// (a) The first builder's step 2 for look-for-things on the second route
+/// (20 Oct): a skill's search whose look got an answer that called nothing
+/// is sent one note to go on, once that answer has played and the room has
+/// been quiet a second, on the same session; the note's answer is said.
+#[test]
+fn a_skills_look_answered_with_no_call_gets_one_note_after_it_plays() {
+    let _one = super::pilot_faults::one_session();
+    let run = search(true, &[LookAnswer::Nothing], LookAnswer::Other, None);
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 1, "{}", run.summary());
+    let notes = look_notes(&run);
+    assert_eq!(notes.len(), 1, "{:?}", run.events("look_note_dropped"));
+    let sent = run.events("look_note_sent");
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0]["turn"], looks[0]);
+    assert_eq!(sent[0]["next_turn"], notes[0]);
+    // After the look's answer played whole, and a second of quiet.
+    let at = |kind: &str, turn: u64| {
+        run.trace
+            .iter()
+            .position(|e| e["kind"] == kind && e["turn"] == turn)
+            .unwrap_or_else(|| panic!("no {kind} for {turn}: {}", run.summary()))
+    };
+    assert!(at("turn_finished", looks[0]) < at("look_note_sent", looks[0]));
+    assert_eq!(run.played(looks[0]), vec![SECOND; 24]);
+    assert_eq!(run.played(notes[0]), vec![SECOND; 24]);
+    let session = run.seen.second.iter().find_map(|input| match input {
+        ProviderInput::Start { session, .. } => Some(*session),
+        _ => None,
+    });
+    assert!(run.seen.second.iter().any(|input| matches!(input,
+        ProviderInput::Written { request, session: of, look: false, .. }
+            if *request == notes[0] && Some(*of) == session)));
+    assert!(run.events("look_note_dropped").is_empty());
+}
+
+/// (b) Once a search: the note's answer calls the next place, its look is
+/// taken there (the note's turn goes on with the search), and that look's
+/// answer calls nothing again: no second note.
+#[test]
+fn a_second_look_left_in_the_same_search_gets_no_second_note() {
+    let _one = super::pilot_faults::one_session();
+    let run = search(
+        true,
+        &[LookAnswer::Nothing, LookAnswer::Nothing],
+        LookAnswer::Next,
+        None,
+    );
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 2, "{}", run.summary());
+    let notes = look_notes(&run);
+    assert_eq!(notes.len(), 1, "{}", run.summary());
+    // The search's own turns, in order: look, note, look.
+    assert_eq!(search_turns(&run), [looks[0], notes[0], looks[1]]);
+    assert!(run.events("look_dropped").is_empty());
+    let dropped: Vec<_> = run
+        .events("look_note_dropped")
+        .into_iter()
+        .map(|e| (e["turn"].clone(), e["why"].clone()))
+        .collect();
+    assert_eq!(
+        dropped,
+        [(json!(looks[1]), json!("its search had its note"))]
+    );
+}
+
+/// (c) The chain: the look's answer calls `look_for` for the next place,
+/// that look is taken in the look's own turn and the next `lamp_looks` turn
+/// goes, also the search's; its answer called something else: no note.
+#[test]
+fn a_look_answer_that_called_gets_no_note() {
+    let _one = super::pilot_faults::one_session();
+    // The chain needs only `LAMP_SECOND_SKILL_LOOK`; the note's switch
+    // changes nothing of it.
+    for on in [true, false] {
+        let run = search(
+            on,
+            &[LookAnswer::Next, LookAnswer::Other],
+            LookAnswer::Other,
+            None,
+        );
+        run.assert_clean();
+        let looks = look_turns(&run);
+        assert_eq!(looks.len(), 2, "note {on}: {}", run.summary());
+        assert_eq!(search_turns(&run), looks, "note {on}");
+        assert!(run.events("look_dropped").is_empty(), "note {on}");
+        assert_eq!(run.events("look_full_still").len(), 2, "note {on}");
+        assert!(look_notes(&run).is_empty(), "note {on}");
+        assert!(run.events("look_note_sent").is_empty(), "note {on}");
+    }
+}
+
+/// The voice's own bound on a search (`look_note::SEARCH_LOOKS_AT_MOST`,
+/// lamp-skills' 8): every look's answer calls the next place, the search's
+/// looks are taken in its own turns up to the 8th, and the 9th, asked in
+/// the 8th look's turn, is dropped as in any turn the lamp wrote (#1146),
+/// saying the search took its looks. No note follows.
+#[test]
+fn a_searchs_ninth_chained_look_is_dropped() {
+    let _one = super::pilot_faults::one_session();
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-cap-{}.jpg",
+        std::process::id()
+    ));
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    TEST_LOOK_NOTE.set(true);
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_looks: true,
+        look_answers: &[LookAnswer::Next; 8],
+        turn_taking: TurnTaking::VadOnly,
+        mute_at_frame: Some(3_000),
+        written: Written::Said(6),
+        limit: Duration::from_secs(40),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_LOOK_NOTE.set(false);
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    run.assert_clean();
+    let at_most = super::look_note::SEARCH_LOOKS_AT_MOST as usize;
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), at_most, "{}", run.summary());
+    assert_eq!(run.events("look_full_still").len(), at_most);
+    // Every look's turn but the last is the search's own.
+    assert_eq!(search_turns(&run), looks[..at_most - 1]);
+    let dropped: Vec<_> = run
+        .events("look_dropped")
+        .into_iter()
+        .map(|e| (e["turn"].clone(), e["why"].clone()))
+        .collect();
+    assert_eq!(
+        dropped,
+        [(
+            json!(looks[at_most - 1]),
+            json!("the search took its looks")
+        )]
+    );
+    assert!(look_notes(&run).is_empty());
+}
+
+/// #1146 kept: a look's turn that is no skill's search (the route's own
+/// `take_a_look`) is a turn the lamp wrote itself like any other: a skill's
+/// look its answer asks for is dropped, and no second still goes.
+#[test]
+fn a_look_asked_in_a_turn_that_is_no_searchs_is_still_dropped() {
+    let _one = super::pilot_faults::one_session();
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-own-{}.jpg",
+        std::process::id()
+    ));
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_looks: true,
+        own_look: true,
+        look_answers: &[LookAnswer::Next],
+        turn_taking: TurnTaking::VadOnly,
+        mute_at_frame: Some(1_100),
+        written: Written::Said(6),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 1, "{}", run.summary());
+    assert!(search_turns(&run).is_empty());
+    let dropped: Vec<_> = run
+        .events("look_dropped")
+        .into_iter()
+        .map(|e| (e["turn"].clone(), e["why"].clone()))
+        .collect();
+    assert_eq!(
+        dropped,
+        [(
+            json!(looks[0]),
+            json!("the turn is one the lamp wrote itself")
+        )]
+    );
+    assert_eq!(run.events("look_full_still").len(), 1);
+}
+
+/// (d) The person speaks while the look's answer plays (the speaker has
+/// taken 48 chunks of the question's answer and 12 of the look's 24): the
+/// answer is cut, no note goes, and why is recorded.
+#[test]
+fn the_person_speaking_after_the_look_drops_the_note() {
+    let _one = super::pilot_faults::one_session();
+    let run = search(
+        true,
+        &[LookAnswer::Nothing],
+        LookAnswer::Other,
+        Some(When::Accepted(60)),
+    );
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 1, "{}", run.summary());
+    assert!(look_notes(&run).is_empty(), "{}", run.summary());
+    let dropped = run.events("look_note_dropped");
+    assert_eq!(dropped.len(), 1, "{}", run.summary());
+    assert_eq!(dropped[0]["turn"], looks[0]);
+    assert!(
+        [
+            "the person is speaking",
+            "another turn began",
+            "its answer was not heard whole"
+        ]
+        .contains(&dropped[0]["why"].as_str().unwrap()),
+        "{dropped:?}"
+    );
+}
+
+/// A hand Stop after the look's answer has played whole ends the search
+/// (the reviewer's P3 on #2266): the note owed for it is not sent once the
+/// room is quiet, after the person said stop, nor recorded as dropped.
+#[test]
+fn a_hand_stop_after_a_looks_answer_drops_its_note() {
+    let _one = super::pilot_faults::one_session();
+    let run = search_with(
+        true,
+        &[LookAnswer::Nothing],
+        LookAnswer::Other,
+        None,
+        Some((When::Accepted(70), 50)),
+    );
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 1, "{}", run.summary());
+    // The look's answer played whole, so the note was owed; the murmur
+    // near its end kept it waiting for a quiet second.
+    assert_eq!(run.played(looks[0]), vec![SECOND; 24]);
+    let at = |kind: &str| {
+        run.trace
+            .iter()
+            .position(|e| {
+                e["kind"] == kind
+                    && (kind != "turn_finished" || e["turn"] == looks[0])
+                    && (kind != "hand_control_cancel" || e["reason"] == "hand_stop")
+            })
+            .unwrap_or_else(|| panic!("no {kind}: {}", run.summary()))
+    };
+    // The Stop came by hand once the look's turn had finished.
+    assert!(at("turn_finished") < at("hand_control_cancel"));
+    // The quiet came after it: no note, and no turn written for one.
+    assert!(look_notes(&run).is_empty(), "{}", run.summary());
+    assert!(run.events("look_note_sent").is_empty());
+    assert!(
+        !run.trace
+            .iter()
+            .any(|e| e["kind"] == "input_admitted" && e["admission_basis"] == "look_note"),
+        "{}",
+        run.summary()
+    );
+    // The search ended with the Stop: nothing owed is left to drop.
+    assert!(run.events("look_note_dropped").is_empty());
+}
+
+/// (e) Without `LAMP_SECOND_LOOK_NOTE`, a look left with no call is as
+/// before: no note, nothing recorded of one.
+#[test]
+fn without_the_switch_a_look_left_gets_no_note() {
+    let _one = super::pilot_faults::one_session();
+    let run = search(false, &[LookAnswer::Nothing], LookAnswer::Other, None);
+    run.assert_clean();
+    assert_eq!(look_turns(&run).len(), 1, "{}", run.summary());
+    assert!(look_notes(&run).is_empty());
+    assert!(run.events("look_note_sent").is_empty());
+    assert!(run.events("look_note_dropped").is_empty());
 }
 
 #[test]

@@ -1116,6 +1116,7 @@ fn second_route_worker_environment(
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
+        crate::second_provider::LOOK_NOTE_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1161,6 +1162,7 @@ mod tests {
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
+            crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -1426,6 +1428,7 @@ mod tests {
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
+                    || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                 {
                     "on"
@@ -1497,6 +1500,7 @@ mod tests {
                     "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_KNOWN_NAMES=on",
+                    "LAMP_SECOND_LOOK_NOTE=on",
                     "LAMP_SECOND_MEMORY_HITS=on",
                     "LAMP_SECOND_PREPARED=on",
                     "LAMP_SECOND_SAID_ONCE=on",
