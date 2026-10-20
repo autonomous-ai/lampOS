@@ -4,6 +4,32 @@
 
 Newest first. Times from `date` (+07).
 
+- 06:34 #2217 rebased onto lamp-voice, same patch: 16:09 P2 still open
+- 06:31 #2390 (joys-scores reads the skill's bar): no finding; first builder's
+- 06:24 #1998 rebase over #2110, both sides kept
+- 06:18 Merged #2384 (storage_idle helper order, row 55) as f4b74d7e5
+- 06:18 #2387 first read: no P1/P2, two P3s; first builder's
+- 06:17 #2388 (my #2380 P3s): closed; first builder's
+- 06:03 #2031 at 682b93540: Reviewer-lead's P2 fix reads right; first builder's
+- 06:00 #2376 rebase + docs measurement; first builder's
+- 05:50 Merged #2379 (policy wait cap as value) as 027f05aa0; #2383 read: no finding, first builder's
+- 05:44 #2340 at 98b94a42d: my P2 and P3 closed; first builder's
+- 05:41 #2382 (#2375 refiled) same patch
+- 05:37 #2380 first read: no P1/P2, two P3s (heat in a busy room; count reads low); first builder's
+- 05:37 #2376 at 718e55ad6: my P2 and P3 closed; first builder's
+- 05:34 #2031 retargeted same patch; #2378 (#2304 rebased) same patch; first builder's
+- 05:30 #1998 retargeted to lamp-voice, same patch; first builder's
+- 05:23 #2110 at 2483778c0: rebase over #1964, both sides kept
+- 05:19 #2340 re-read at 2b4bb9e1b: P2 hold stands on any question with delete/clear/remove (face forget runs on a reminder's yes); needs rebase; first builder's
+- 05:18 #2376 first read: P2 a cut-and-continued line turns a mid-line name into a start one; P3; first builder's
+- 05:16 #2367 at c58129b68: my P3 closed; first builder's
+- 05:05 #2365 rebase only
+- 05:00 #2365 P2/P3 closed; #2371 rebase both guards kept
+- 04:57 #2110 at 12d20bec5: rebase + client_with line; first builder's
+- 04:55 Merged #2373 (moved tests' doc paths, my #2357 P3) as 35fbfa59d
+- 04:51 #2375 (#2369 one commit): same patch; first builder's
+- 04:44 #2372 at f497534a0: my P2 and P3 closed; first builder's
+- 04:42 #2371 at f8fbc590b: my two P3s closed; first builder's
 - 04:40 #2374 (sixth landing) read: no finding, every conflict keeps both sides; first builder's
 - 04:34 Merged #2370 (voice-eval one test binary) as d4f50491e; told builders on #1722 about --test it switches::
 - 04:33 #2372 first read: P2 busy ends while people still talk (held lines not counted), P3 wiring untested; first builder's
