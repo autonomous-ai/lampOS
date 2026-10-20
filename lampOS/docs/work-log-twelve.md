@@ -450,3 +450,6 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #2186 opened onto #1712 (stacked on #2173 and Fourth's `410a563cf`): the
   held hand-on's memory side. #2063's next head `cdb21e020`: the preference
   line first in the use note.
+- #2186: the reviewer's read, no P1/P2; P3s fixed (`b81da41ab`): `hold`
+  takes the context lock, the forget count's reach said in memory-days.md.
+  The fold into one waits for Fourth's yes.
