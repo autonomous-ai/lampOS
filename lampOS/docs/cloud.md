@@ -259,7 +259,10 @@ lamp-cloud keeps nothing; both go to the eyes as the voice's own asks do.
   `finishing`. Then memory is asked, as the voice's `forget_everything`
   asks it, `{"op":"forget_all","person":ID}` for the person's id
   (`faces::person_id`, the voice's `p-` and 16 hex digits of the name's
-  hash) and again for their rules' (`r-`, the same digits). `memory` says
+  hash) and again for their rules' (`r-`, the same digits). With the
+  stable memory id (#2176), the id the eyes say too, and the name's own
+  only when the eyes say it is nobody else's (`name_id_free`, #2330;
+  memory.md). `memory` says
   `forgotten` only when both were done, else `kept` with a `reason`: memory
   not reached, refused, or not given to lamp-cloud (no `LAMP_MEMORY_SOCKET`),
   so the app never says gone when it isn't. Memory's socket is mode 0600

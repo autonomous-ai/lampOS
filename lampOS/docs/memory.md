@@ -681,6 +681,45 @@ then use that person's scope:
   lower-cased name (`remember::person_id`): "Minh" is `p-be9688998f085098`.
   It fits `[a-z0-9_-]{1,32}`, so no name is ever in a path or a log line.
   The name itself stays between the eyes and the voice.
+- **One id through a rename** (`LAMP_MEMORY_STABLE_ID=on`, read by the
+  eyes and the voice; off unless set; #2176 row 3; `lamp_msgs::known`).
+  Off, a rename (`replace`, A to B) moves the person's memory: B's scope
+  is `person_id("B")`, and what they told the lamp as A is left under A's.
+  With the switch, the eyes give each person a memory id when first
+  remembered and keep it in `people.json` (`id`) through every later
+  remembering and a rename, which carries A's id to B; the known file
+  holds it on the line after the name ([eyes.md](eyes.md#who-is-there)),
+  and the voice keys their memory on it (`known_faces::person_of`, the
+  one resolver every scope goes through; a file of the name alone is
+  `person_id` of the name, as before). **Nobody's memory moves:** a new
+  person's id, and that of anyone remembered before the switch (no `id`
+  yet), is exactly `person_id` of their name, written the next time their
+  record is written. **Two people never share one:** a new "Minh" after
+  the first Minh was renamed is given Minh's id with `-2`. **Ids already
+  held go first:** as the file is read, every id a record holds is kept
+  (of two with one, the earlier keeps it), and only then is each record
+  without one given `person_id` of its name or the lowest free `-N`, so a
+  record from an older build never takes a later record's id. **One
+  switch, the voice follows the eyes:** the voice uses an id only when its
+  own switch is on and the eyes give one (an id line in the known file);
+  when the two differ (on here and no id, or an id and off here) it uses
+  no ids, `person_id` of the name, and says so once in the journal
+  (`lamp-voice: ... memory uses no ids`, no name and no id). The eyes'
+  answer to a forget says the id (`"id"`), and the app's remove
+  (`lamp-cloud` `face.remove`) forgets the memory kept under it and,
+  when it is not the name's own, `person_id` of the name too, each with
+  its `r-` rules, so whichever the voice keyed on, nothing of the person
+  is left half-removed. `person_id` of the name goes only when the eyes'
+  answer says it is free (`"name_id_free":true`, #2330): no other person
+  they keep holds it. "Lan" renamed "Mai" keeps `p-` of "Lan"; when a
+  later "Minh" renamed "Lan" is removed, only `p-` of "Minh" and its rules
+  go, and Mai's memory and rules stay. lamp-cloud can't know the voice's
+  switch, so the eyes' word alone decides; with the eyes on and the voice
+  off in that chain, memory the voice kept under the removed person's
+  name stays, which is the safe side. With no id said, the name is the
+  only key, and it goes. An older build of the eyes reads past `id` and its next
+  save drops it: a renamed person's memory is then under the old name's
+  id until the switch is on again with this build.
 - **`remember`** and **`forget`** go to their scope: `forget` removes the
   last thing *they* asked to keep, and nothing of the room's.
 - **`recall`** (and Days' `search`) asks their scope first and then the

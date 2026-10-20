@@ -1787,7 +1787,6 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
- "sha2",
  "tokio",
  "toml",
  "webpki-roots 1.0.9",
@@ -1974,6 +1973,7 @@ dependencies = [
  "lamp-bus",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]

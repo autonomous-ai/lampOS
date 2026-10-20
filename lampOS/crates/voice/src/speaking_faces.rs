@@ -239,7 +239,7 @@ fn face_in(path: &Path) -> Option<String> {
 /// leaves the line as it was admitted.
 pub fn someone_elses(speakers: &[String], person: &str, known: Option<(String, String)>) -> bool {
     let theirs = known
-        .filter(|(name, _)| crate::remember::person_id(name) == person)
+        .filter(|(name, _)| crate::known_faces::memory_person(name) == person)
         .map(|(_, face)| face);
     speakers
         .iter()

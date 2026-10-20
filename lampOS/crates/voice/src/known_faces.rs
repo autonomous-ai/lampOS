@@ -782,6 +782,10 @@ fn told(answer: &Value) -> Value {
 #[derive(Clone, Debug)]
 pub struct FaceObservation {
     name: String,
+    /// The memory id the eyes keep beside the name (#2176), with
+    /// `LAMP_MEMORY_STABLE_ID=on` on their side; `None` in a file of the
+    /// name alone.
+    id: Option<String>,
     valid_until: Instant,
 }
 
@@ -800,7 +804,15 @@ impl FaceObservation {
             return None;
         }
         let text = String::from_utf8(bytes).ok()?;
-        let observation = Self::from_source(text.trim(), modified, wall, now)?;
+        // The name, and the id on the line after it when the eyes keep one
+        // (#2176): anything else on that line is no observation.
+        let (name, id) = lamp_msgs::known::read_known(&text)?;
+        let mut observation = Self::from_source(name, modified, wall, now)?;
+        observation.id = id.map(str::to_owned);
+        if let Some(line) = disagreement(stable_ids(), id.is_some(), &SAID_DISAGREE) {
+            eprintln!("{line}");
+        }
+        note_seen(&observation.name, observation.id.as_deref());
         observation.is_fresh(Instant::now()).then_some(observation)
     }
 
@@ -821,6 +833,7 @@ impl FaceObservation {
         }
         Some(Self {
             name: name.to_owned(),
+            id: None,
             valid_until: now.checked_add(remaining)?,
         })
     }
@@ -828,12 +841,118 @@ impl FaceObservation {
     pub fn name(&self) -> &str {
         &self.name
     }
+    /// Whose memory this face is: [`person_of`] its name and id.
+    pub fn person(&self) -> String {
+        person_of(&self.name, self.id.as_deref(), stable_ids())
+    }
     pub fn valid_until(&self) -> Instant {
         self.valid_until
     }
     pub fn is_fresh(&self, now: Instant) -> bool {
         now < self.valid_until
     }
+}
+
+/// Whether memory is keyed on the eyes' stable id
+/// ([`lamp_msgs::known::ENVIRONMENT`]), read once for the process.
+fn stable_ids() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(lamp_msgs::known::stable_ids)
+}
+
+/// Whether the voice's switch and the eyes' disagree, said in the journal
+/// once for the process.
+static SAID_DISAGREE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The journal line, the first time only, when the voice's own
+/// `LAMP_MEMORY_STABLE_ID` (`on`) and what the eyes say (`eyes_id`: an id
+/// line in the known file) differ. The voice follows the eyes only when
+/// both agree; on a mismatch it uses no ids ([`person_of`] gives
+/// `person_id` of the name). No name and no id in the line.
+fn disagreement(
+    on: bool,
+    eyes_id: bool,
+    said: &std::sync::atomic::AtomicBool,
+) -> Option<&'static str> {
+    if on == eyes_id || said.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        return None;
+    }
+    Some(if on {
+        "lamp-voice: LAMP_MEMORY_STABLE_ID is on here but the eyes keep no memory id; memory uses no ids"
+    } else {
+        "lamp-voice: the eyes keep a memory id but LAMP_MEMORY_STABLE_ID is off here; memory uses no ids"
+    })
+}
+
+/// The one resolver for whose memory a known person's is (#2176): with the
+/// stable id `on` here and an id from the eyes (theirs on too), that id;
+/// else `person_id` of the name, the memory's key before the stable id, so
+/// off, or with the two switches apart, nothing moves.
+pub fn person_of(name: &str, id: Option<&str>, on: bool) -> String {
+    match id {
+        Some(id) if on && lamp_msgs::known::is_person_id(id) => id.to_owned(),
+        _ => lamp_msgs::known::person_id(name),
+    }
+}
+
+/// The ids the eyes last gave beside each name, as the known file was read:
+/// so a name the voice holds (the one counted at the lamp, the one at its
+/// start) resolves to the id it was read with. A file of the name alone
+/// takes the name's id away. At most [`MOST_SEEN_IDS`], the oldest let go.
+#[derive(Default)]
+pub struct SeenIds(Vec<(String, String)>);
+
+/// More than the eyes keep (20 people).
+const MOST_SEEN_IDS: usize = 32;
+
+impl SeenIds {
+    fn key(name: &str) -> String {
+        name.trim().to_lowercase()
+    }
+    /// `name` was read with `id` beside it, or none.
+    pub fn note(&mut self, name: &str, id: Option<&str>) {
+        let key = Self::key(name);
+        self.0.retain(|(seen, _)| *seen != key);
+        if let Some(id) = id.filter(|id| lamp_msgs::known::is_person_id(id)) {
+            self.0.push((key, id.to_owned()));
+            if self.0.len() > MOST_SEEN_IDS {
+                self.0.remove(0);
+            }
+        }
+    }
+    /// [`person_of`] `name` and the id it was last read with.
+    pub fn person(&self, name: &str, on: bool) -> String {
+        let key = Self::key(name);
+        let id = self
+            .0
+            .iter()
+            .find(|(seen, _)| *seen == key)
+            .map(|(_, id)| id.as_str());
+        person_of(name, id, on)
+    }
+}
+
+static SEEN_IDS: std::sync::Mutex<SeenIds> = std::sync::Mutex::new(SeenIds(Vec::new()));
+
+fn note_seen(name: &str, id: Option<&str>) {
+    if stable_ids()
+        && let Ok(mut seen) = SEEN_IDS.lock()
+    {
+        seen.note(name, id);
+    }
+}
+
+/// Whose memory the known person by this name is ([`person_of`]): every
+/// place the voice makes a memory id from a name the eyes gave comes here.
+pub fn memory_person(name: &str) -> String {
+    let on = stable_ids();
+    if !on {
+        return lamp_msgs::known::person_id(name);
+    }
+    SEEN_IDS.lock().map_or_else(
+        |_| lamp_msgs::known::person_id(name),
+        |seen| seen.person(name, on),
+    )
 }
 
 /// Existing face lookup, backed by a bounded observation read. Future or
@@ -1091,6 +1210,16 @@ mod tests {
             .unwrap();
         assert_eq!(known_now(&path), None);
         std::fs::write(&path, "Minh\u{7}\n").unwrap();
+        assert_eq!(known_now(&path), None);
+        // The eyes' memory id after the name (#2176): the name is read, and
+        // a second line that is not an id is nothing.
+        std::fs::write(
+            &path,
+            format!("Minh\n{}\n", crate::remember::person_id("Sam")),
+        )
+        .unwrap();
+        assert_eq!(known_now(&path).as_deref(), Some("Minh"));
+        std::fs::write(&path, "Minh\nSam\n").unwrap();
         assert_eq!(known_now(&path), None);
         std::fs::remove_file(&path).unwrap();
         assert!(hello("Minh").contains("Minh") && note("Minh").contains("Minh"));
@@ -1677,5 +1806,72 @@ mod tests {
             ]
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// #2176 row 3: with the stable id on, a renamed person's memory is the
+    /// id the eyes keep beside the new name, their old name's; a file of the
+    /// name alone (a person from before, or the stable id off) keys it on
+    /// `person_id` of the name, as before; off, an id is never used.
+    #[test]
+    fn whose_memory_is_the_eyes_id_with_the_stable_id_else_the_names() {
+        use crate::remember::person_id;
+        let minh = person_id("Minh");
+        // Renamed Minh to Sam: Sam's memory is Minh's.
+        assert_eq!(person_of("Sam", Some(&minh), true), minh);
+        // An old record, no id: unchanged.
+        assert_eq!(person_of("Lan", None, true), person_id("Lan"));
+        // Off: the name's, whatever the file says.
+        assert_eq!(person_of("Sam", Some(&minh), false), person_id("Sam"));
+        // Not an id: the name's.
+        assert_eq!(person_of("Sam", Some("../x"), true), person_id("Sam"));
+        // A name the voice holds resolves to the id it was read with.
+        let mut seen = SeenIds::default();
+        seen.note("Sam", Some(&minh));
+        assert_eq!(seen.person("sam", true), minh);
+        assert_eq!(seen.person("Sam", false), person_id("Sam"));
+        seen.note("Sam", None);
+        assert_eq!(seen.person("Sam", true), person_id("Sam"));
+        // The observation itself, read from the eyes' file.
+        let path = std::env::temp_dir().join(format!("lamp-voice-known-id-{}", std::process::id()));
+        std::fs::write(&path, format!("Sam\n{minh}\n")).unwrap();
+        let observation = FaceObservation::read(&path).unwrap();
+        assert_eq!(observation.name(), "Sam");
+        assert_eq!(
+            person_of(observation.name(), observation.id.as_deref(), true),
+            minh
+        );
+        // Off (no LAMP_MEMORY_STABLE_ID in tests): the name's, as before.
+        assert_eq!(observation.person(), person_id("Sam"));
+        std::fs::remove_file(&path).unwrap();
+    }
+
+    /// The voice follows the eyes (#2176): when its own switch and the eyes'
+    /// id line differ, it says so once, with no name and no id, and uses no
+    /// ids; when they agree it says nothing.
+    #[test]
+    fn a_switch_apart_from_the_eyes_is_said_once_and_uses_no_ids() {
+        use crate::remember::person_id;
+        use std::sync::atomic::AtomicBool;
+        let said = AtomicBool::new(false);
+        assert_eq!(disagreement(true, true, &said), None);
+        assert_eq!(disagreement(false, false, &said), None);
+        let line = disagreement(false, true, &said).unwrap();
+        assert!(
+            line.starts_with("lamp-voice: ") && line.contains("off here"),
+            "{line}"
+        );
+        assert!(!line["lamp-voice: ".len()..].contains("p-"), "{line}");
+        assert_eq!(disagreement(false, true, &said), None, "once");
+        assert_eq!(disagreement(true, false, &said), None, "once in all");
+        let said = AtomicBool::new(false);
+        let line = disagreement(true, false, &said).unwrap();
+        assert!(
+            line.contains("on here") && line.contains("no ids"),
+            "{line}"
+        );
+        // Apart, no ids: on with no id, or off with one, is the name's.
+        let minh = person_id("Minh");
+        assert_eq!(person_of("Sam", None, true), person_id("Sam"));
+        assert_eq!(person_of("Sam", Some(&minh), false), person_id("Sam"));
     }
 }

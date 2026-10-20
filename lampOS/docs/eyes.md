@@ -637,7 +637,11 @@ this room" until someone asks to be recognised.
   (the camera can give 640 by 480 if not).
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
   in a directory of mode 0700 and a file of mode 0600). Per person: the
-  name, up to five prints and when they were added. At most 20 people. No
+  name, up to five prints and when they were added; with
+  `LAMP_MEMORY_STABLE_ID=on`, their memory `id` too (#2176), kept through a
+  rename, `person_id` of the name for anyone remembered before it, never
+  two people's (ids already held are kept first, then the rest given one;
+  the voice follows the eyes' switch) ([memory.md](memory.md#each-persons-own-764)). At most 20 people. No
   picture is kept, and no print leaves the lamp. With `LAMP_ACTIVITY=on`
   the sitter's prints (up to six, for telling the sitter from others) are
   held in memory for the sitting only, never in this file
@@ -681,6 +685,15 @@ this room" until someone asks to be recognised.
     people, or with a person whose `name` is no plain string. **Then the
     forget waits for it** (#1586): the answer is `{"forgot":…,
     "unsearched":N}`, never "not known" and never a fault.
+  - **The memory keys, with the answer** (#2176, #2330). With
+    `LAMP_MEMORY_STABLE_ID=on` the answer says the person's memory `id`.
+    Every answer says `name_id_free`: whether `person_id` of the name
+    (the voice's key without the stable id) is nobody else's once they are
+    forgotten. It is `false` only with the switch on and another record,
+    someone renamed from that name who kept its id, holding it ("Lan"
+    renamed "Mai" keeps `p-` of "Lan"; a later "Lan" forgotten is then not
+    free). Off, always `true` (`People::name_id_free`). The app's remove
+    forgets `person_id` of the name only when it is free (cloud.md).
     - **What's kept:** a hash of the name, which a guess can undo, with when
       it was asked, in `set-aside/forgets-pending` (0600), until the forget
       finishes or a factory reset. The hash is a plain SHA-256 of its lower
@@ -733,7 +746,12 @@ this room" until someone asks to be recognised.
 - **Said.** With `--known-file` (on lamp-4ace `/run/lampos-eyes/known`,
   beside the socket), the name of the known person at the lamp is kept
   there and renewed every two seconds while they are there. The file is
-  removed when nobody is near.
+  removed when nobody is near. With `LAMP_MEMORY_STABLE_ID=on` the
+  person's memory id is on the line after the name (`NAME\nID\n`,
+  `lamp_msgs::known`); off, the name alone, as before. Every reader (the
+  voice's `known_faces`, the skills' `known::name_in`) reads the first
+  line as the name and passes over an id on the second; any other second
+  line is no name.
 - **Their face.** With `LAMP_EYES_SPEAKING=on` and `LAMP_BUS=on` too,
   `known-face` beside the known file (mode 0600) holds the passing id
   their face has on `humans/faces/tracked` (`f3`), written just after the

@@ -75,7 +75,7 @@ impl FaceCache {
         let next = observation.map(|observation| CachedFace {
             generation: token.generation,
             scope: ScopeSnapshot {
-                person: Some(Arc::from(crate::remember::person_id(observation.name()))),
+                person: Some(Arc::from(observation.person())),
             },
             valid_until: observation.valid_until(),
         });

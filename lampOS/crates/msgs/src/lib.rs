@@ -102,6 +102,9 @@ pub use seems::*;
 mod activity;
 pub use activity::*;
 
+/// The memory's id for a person the eyes know, and the `known` file (#2176).
+pub mod known;
+
 /// Why a message is not one its type allows, in words.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Invalid(pub String);

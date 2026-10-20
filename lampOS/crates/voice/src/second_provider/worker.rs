@@ -3630,7 +3630,7 @@ impl Sessions {
     fn open(&mut self, who: Option<&Path>, now: Instant) -> (bool, Option<String>) {
         let known = who
             .and_then(crate::known_faces::known_now)
-            .map(|name| crate::remember::person_id(&name));
+            .map(|name| crate::known_faces::memory_person(&name));
         let whose = who.and(self.presence.seen(known.clone(), now).map(str::to_owned));
         let Ok(mut thread) = crate::thread::THREAD.lock() else {
             return (false, None);

@@ -2136,11 +2136,11 @@ async fn serve_with_visual<C: Connect>(
                     let camera = intake.handoff.authority.filter(|state| state.camera_allowed(MonoTime::from_micros(monotonic_us()))).is_some();
                     let observation = camera.then(|| crate::known_faces::FaceObservation::read(path)).flatten();
                     let fresh = observation.as_ref().map(|face| face.name().to_owned());
+                    let named = observation.as_ref().map(crate::known_faces::FaceObservation::person);
                     intake.handoff.memory_face.replace(refresh, observation);
-                    let named = fresh.as_deref().map(crate::remember::person_id);
                     crate::early_words::look(camera, faces_bus.as_ref(), named.clone(), Instant::now());
                     counted = presence.seen(fresh, Instant::now()).map(str::to_owned);
-                    let whose = counted.as_deref().map(crate::remember::person_id);
+                    let whose = counted.as_deref().map(crate::known_faces::memory_person);
                     let turn_open = intake.handoff.visual_turn().is_some();
                     let due = crate::thread::THREAD.lock().is_ok_and(|mut thread| {
                         thread.at_lamp(whose);
