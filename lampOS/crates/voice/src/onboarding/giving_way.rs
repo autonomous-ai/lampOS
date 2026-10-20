@@ -36,8 +36,9 @@ const BODY: &str = "body";
 /// their body.
 const WINDOW_US: u64 = SIT_GIVE_UP_US;
 const WINDOW_MS: u64 = WINDOW_US / 1_000;
-/// Whole invitations per walk, the privacy step's budget.
-const MOST_TRIES: u8 = 2;
+/// Invitations per setup/redo, the privacy step's budget, kept in the
+/// onboarding file (`Progress::giving_way_tries`) across restarts.
+pub(super) const MOST_TRIES: u8 = 2;
 /// The bus is read at most this often.
 const LOOK_EVERY_US: u64 = 20_000;
 
@@ -176,6 +177,8 @@ struct Offer {
     attempt: u8,
     ready: bool,
     claimed: bool,
+    /// Its attempt is committed to the onboarding file.
+    persisted: bool,
     offered_us: u64,
     bound: Option<(BootId, u64)>,
 }
@@ -194,9 +197,6 @@ pub(super) struct GivingWayFlow {
     pub(super) generation: u64,
     offer: Option<Offer>,
     window: Option<Window>,
-    /// Invitations handed to the model this walk (memory: a restart may
-    /// ask again).
-    tries: u8,
     retry_after_us: u64,
     /// The head's goals at the last reading with no hand on it.
     before: Option<[f64; 3]>,
@@ -218,7 +218,7 @@ impl Onboarding {
     /// service. Without them the step is `not_available`.
     pub(crate) fn set_giving_way_available(&mut self, available: bool) {
         if self.giving.available && !available {
-            self.forget_giving();
+            self.invalidate_giving();
         }
         self.giving.available = available;
     }
@@ -227,11 +227,24 @@ impl Onboarding {
         self.giving.available
     }
 
-    /// Redo: the walk's tries and identity are forgotten too.
+    /// Redo: the walk's identity is forgotten too (its kept tries go with
+    /// the rest of the onboarding file).
     pub(super) fn redo_giving(&mut self) {
         self.forget_giving();
-        self.giving.tries = 0;
         self.giving.generation = 0;
+    }
+
+    /// Drop everything in flight for this step. An offer never handed to the
+    /// model gives its try back; a claimed one counts.
+    fn invalidate_giving(&mut self) {
+        if let Some(offer) = self.giving.offer.as_ref()
+            && !offer.claimed
+            && self.desired.giving_way_tries == offer.attempt
+        {
+            self.desired.giving_way_tries = offer.attempt - 1;
+            self.save();
+        }
+        self.forget_giving();
     }
 
     /// Memory only: an offer or try in flight is dropped.
@@ -249,7 +262,7 @@ impl Onboarding {
             .as_ref()
             .is_some_and(|led| led.step == Step::GivingWay && led.asked_us.is_some());
         if led || self.giving.offer.is_some() || self.giving.window.is_some() {
-            self.forget_giving();
+            self.invalidate_giving();
             self.finish(Step::GivingWay, Outcome::NotAvailable, None, now_us);
         }
     }
@@ -279,7 +292,6 @@ impl Onboarding {
         }
         offer.claimed = true;
         offer.ready = false;
-        self.giving.tries = offer.attempt;
         Some(GIVE_ASK.to_owned())
     }
 
@@ -425,7 +437,7 @@ impl Onboarding {
                     .push(json!({"kind":"onboarding_stopped","why":"nobody_there",
                     "step":Step::GivingWay.name(),"at_us":now_us}));
             }
-            self.forget_giving();
+            self.invalidate_giving();
             self.led = None;
             return;
         }
@@ -440,6 +452,15 @@ impl Onboarding {
         }
         let ready = can_speak && present && quiet_us >= START_QUIET_US;
         if let Some(offer) = self.giving.offer.as_mut() {
+            if !offer.persisted {
+                if self.committed.giving_way_tries >= offer.attempt {
+                    offer.persisted = true;
+                } else {
+                    self.desired.giving_way_tries = offer.attempt;
+                    self.save();
+                    return;
+                }
+            }
             offer.ready = ready && !offer.claimed;
             if offer.bound.is_none()
                 && now_us.saturating_sub(offer.offered_us) >= STEP_GIVE_UP_US
@@ -450,21 +471,31 @@ impl Onboarding {
             }
             return;
         }
+        // A walk rebuilt (a restart, a mute's end) with its budget spent
+        // does not ask again.
+        if self.desired.giving_way_tries >= MOST_TRIES {
+            flow_end(self, now_us);
+            return;
+        }
         if !ready || now_us < self.giving.retry_after_us {
             return;
         }
         let Ok(token) = fresh_token() else {
             return;
         };
-        let attempt = self.giving.tries.saturating_add(1);
+        let attempt = self.desired.giving_way_tries + 1;
         self.giving.offer = Some(Offer {
             token,
             attempt,
-            ready: true,
+            ready: false,
             claimed: false,
+            persisted: false,
             offered_us: now_us,
             bound: None,
         });
+        // Its budget is committed before the invitation is published.
+        self.desired.giving_way_tries = attempt;
+        self.save();
         if let Some(led) = self.led.as_mut() {
             led.asked_us = Some(now_us);
         }
@@ -479,7 +510,7 @@ impl Onboarding {
 /// else failed and said so.
 fn flow_end(walk: &mut Onboarding, now_us: u64) {
     walk.forget_giving();
-    if walk.giving.tries < MOST_TRIES {
+    if walk.desired.giving_way_tries < MOST_TRIES {
         walk.giving.retry_after_us = now_us.saturating_add(1_000_000);
         return;
     }
