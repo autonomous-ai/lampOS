@@ -1811,7 +1811,10 @@ dependencies = [
  "lamp-bus",
  "lamp-ipc",
  "lamp-msgs",
+ "rustfft",
  "serde_json",
+ "sha2",
+ "tract-onnx",
 ]
 
 [[package]]

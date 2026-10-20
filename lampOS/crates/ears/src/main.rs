@@ -22,6 +22,9 @@ While the voice says it is speaking, and half a second after, nothing is sudden.
 By default it keeps no sound and writes none down; only metadata leaves it.
 LAMP_BUS_AUDIO=on exports raw mic1/audio (16 kHz mono S16LE), only with
 LAMP_PRIVACY_CONTROLS=on. Missing privacy enablement refuses startup.
+LAMP_EARS_CLASSES=on scores speech, music and laughter on ears/classes with the
+pinned YAMNet at LAMP_EARS_CLASSES_MODEL (yamnet.onnx, yamnet.data beside it),
+only with LAMP_PRIVACY_CONTROLS=on; without it no classifier runs.
 Ears remains the only microphone reader; an explicit bus recorder may retain PCM.
 
 lamp-ears check FILE... runs the same listening over files of sound (16 kHz, one channel,
@@ -199,6 +202,9 @@ mod serve {
         )?;
         if lamp_ears::privacy::enabled(privacy.as_deref()) {
             return crate::privacy_runtime::run(arguments);
+        }
+        if lamp_ears::classes::enabled(std::env::var("LAMP_EARS_CLASSES").ok().as_deref()) {
+            log("LAMP_EARS_CLASSES=on needs LAMP_PRIVACY_CONTROLS=on; no classifier runs");
         }
         if let Some(value) = privacy.filter(|value| !value.is_empty() && value != "off") {
             eprintln!(

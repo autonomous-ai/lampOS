@@ -73,6 +73,12 @@ impl PublicationGate {
         }
     }
 
+    /// Whether any lease is live at `now`: none while muted, lapsed or
+    /// before the first grant.
+    pub fn live(&self, now: u64) -> bool {
+        now < self.until_us.load(Ordering::Acquire)
+    }
+
     pub fn allows(&self, permit: Permit, generation: u64, now: u64) -> bool {
         generation != u64::MAX
             && generation == self.generation()
