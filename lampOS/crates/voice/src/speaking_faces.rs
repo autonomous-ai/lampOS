@@ -170,6 +170,17 @@ impl SpeakingFaces {
         self.counted(from, to, |look| look.turned.clone())
     }
 
+    /// As [`Self::turned_speakers`], each id with the eyes' boot, as
+    /// [`Self::speakers_with_boot`] gives them.
+    pub fn turned_speakers_with_boot(&self, from: Instant, to: Instant) -> Speakers {
+        self.counted(from, to, |look| {
+            look.turned
+                .iter()
+                .map(|id| format!("{}/{id}", look.boot))
+                .collect()
+        })
+    }
+
     /// The ids `of` each look gives in at least half of the looks from
     /// `from` to `to`, and none with fewer than [`FEWEST_LOOKS`].
     fn counted(&self, from: Instant, to: Instant, of: impl Fn(&Look) -> Vec<String>) -> Speakers {

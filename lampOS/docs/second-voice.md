@@ -1742,27 +1742,46 @@ after a take-over, but now for every turn:
 - **Only the one it answered, in a quiet room too**
   (`LAMP_QUIET_GOING_ON_SAME_ONE=on`, `Heeding::going_on_quiet_only_for_the_same_one`,
   the first builder at 21:03 on Queue #1722; off unless set): #2191's
-  busy-room rule (`LAMP_GOING_ON_SAME_ONE`) in a quiet room. A line let out
-  only as the conversation going on (no name, no call, no face turned, not
-  said close to it) is held unless it answers the lamp's own question or,
-  with `LAMP_SAME_VOICE_MODEL`, the same-voice check found it in the
-  conversation's voice, `held back: a quiet room: a conversation with the
-  lamp is going on, but nothing shows the line is from the one it answered:
-  not a reply to its question, not the conversation's voice, no face turned
-  to it`. On lamp-52e6 at 20:1x (#2301's runs), #829's two-people scene
+  busy-room rule (`LAMP_GOING_ON_SAME_ONE`) in a quiet room, turned round
+  by the first builder at 01:21 on Queue #1722. A line let out only as the
+  conversation going on (no name, no call, no face turned, not said close
+  to it) is held only when it is surely someone else's and answers no
+  question of the lamp's (`Heeding::someone_else`, the one check
+  `LAMP_GOING_ON_NOT_OWN` reads too): with `LAMP_SAME_VOICE_MODEL`, another
+  voice: a print scored under 0.30 against the caller's
+  (`same_voice::SOMEONE_ELSE_BELOW`, the first builder at 02:33: on
+  lamp-4ace's mic2 on 21 Oct at 02:29 the same voice in a quiet room scored
+  down to 0.35, other voices up to 0.29); no print, a line begun over the
+  lamp's voice or under 1.5 s, is never another voice and goes on (02:19).
+  #829's own bar stays 0.45 (`same_voice::DIFFERENT_BELOW`) and holds a
+  line under it before this rule reads it, so while it stands the 0.30 bar
+  holds nothing by voice that #829 lets out; with the eyes' speaking faces
+  (`LAMP_EYES_SPEAKING=on` on lamp-eyes, read from `humans/faces/tracked` on
+  the bus), a face seen speaking it not turned to the lamp, none of them the answered
+  caller's, whether or not the caller's face is known (the first builder at
+  01:51 on #2341: people talking to each other face each other; someone
+  following up with the lamp faces it). After a call no face was seen
+  speaking, the first face seen speaking a line going on turned to the lamp
+  becomes the caller's, so it stays theirs said looking away; until then,
+  follow-ups said looking away are someone else's. The costs: two people
+  both facing the lamp while talking to each other go on, and after an
+  unseen call a bystander who faces the lamp while answering someone else
+  can become the caller. `held back: a
+  quiet room: a conversation with the lamp is going on, but the line is
+  someone else's: another voice than the conversation's, or a face speaking
+  it, not turned to the lamp, that is not the one it answered`. With no sign of someone else the line
+  is the caller's follow-up and goes on: on lamp-4ace at 01:03, with no face
+  and no voice model, reading no sign as someone else held one person's own
+  follow-ups ("Can you make your light a little warmer?", "What do you see
+  right now?", "Remember that my favourite colour is green.", "Remind me in
+  two minutes to stretch.", "What's my favourite colour?", "What time is
+  it?"), day lines 6/12. So without the voice model and the speaking faces
+  the rule does nothing, and two people's talk after a call goes on as
+  without it. On lamp-52e6 at 20:1x (#2301's runs), #829's two-people scene
   opened by "Hey Lamp, what time is it?" had its first three or four talk
   lines answered as the conversation going on before the room was judged
-  busy. With or without `LAMP_SPOKEN_TO` (`Attention::played_only_as_going_on`):
-  lamp-52e6's first run with the switch at 22:4x, without it, still played
-  the talk, the rule having read a mark only `LAMP_SPOKEN_TO` sets. A face
-  turned to the lamp counts only in `LAMP_ATTENTION`'s busy forms (`strict`,
-  `busy-near`); with plain `on` it lets no line out here. Two more ways the
-  caller's own line goes on (the first builder at 23:01 on #2305): with the
-  eyes' speaking faces (`LAMP_EYES_SPEAKING=on` on lamp-eyes, read from
-  `humans/faces/tracked` on the bus), a line the face seen speaking through
-  the call let out is seen speaking through again; and a line too short for
-  a likeness (under `same_voice::LEAST_SAMPLES`, 1.5 s: "And tomorrow?")
-  begun within 20 s of the lamp's last words (`SHORT_GOES_ON_FOR`). The
+  busy; with a voice model or speaking faces those are held. With or
+  without `LAMP_SPOKEN_TO` (`Attention::played_only_as_going_on`). The
   caller's face ids are passing ids kept in memory only, each with the
   eyes' boot (`SpeakingFaces::speakers_with_boot`), so an id from before
   lamp-eyes started again matches nobody; they go when a line comes with no
@@ -1770,13 +1789,14 @@ after a take-over, but now for every turn:
   opened, a mute or unmute, or either's privacy generation changing, as the
   worker installs each authority: `Engine::forgetting_on_privacy`,
   `Heeding::privacy_changed`), with the eyes' looks kept for them. No face
-  id outlives a camera close. The trade left: with neither the voice model nor the speaking face, the
-  answered person's longer follow-up said looking away ("And what would
-  you drink with that?" with no face turned), or a short one 20 s after the
-  lamp's words, is held too; another person's short line soon after the
-  lamp's words goes on. The lamp run that turns it on passes only if, with
-  the scene's talk held, the caller's follow-up said looking away is
-  answered and a second person's line to the lamp is answered. The second
+  id outlives a camera close. A passing id lasts only while the face's box
+  stays within 1.5 s of where it was (`SAME_WITHIN_US`): the caller out of
+  view longer comes back with a new id, which is theirs again only turned to
+  the lamp; said looking away, that follow-up is held. The lamp run that
+  turns it on where lamp-eyes reads speaking passes only if the caller's
+  follow-up after a call the eyes did not see, and after the caller looks
+  away 2 s, is answered, with a second person facing the lamp first. The busy room's `LAMP_GOING_ON_SAME_ONE` is not
+  turned round: a busy room is itself the sign that others talk. The second
   route only; the Live route is unchanged.
 - **A line going on from the last one hears its sound first.** The
   coordinator ends a line at a short pause, so the owner's "Lamp, … what's
@@ -2013,11 +2033,12 @@ after a take-over, but now for every turn:
   caller's (`same_voice::SOMEONE_ELSE_BELOW`, the first builder at 02:33:
   on lamp-4ace's mic2 on 21 Oct at 02:29 the same voice in a quiet room
   scored down to 0.35, other voices up to 0.29), or the eyes saw a face
-  speaking it and none of them the answered caller's (`Heeding::someone_else`,
-  #2305's `caller_faces` and speaking-faces reader, read with this switch
-  too). No print (a line begun over the lamp's voice, or under 1.5 s) is
-  never another voice and goes on as the conversation (the first builder
-  at 02:19). The conversation's own check keeps its bar of 0.45
+  speaking it not turned to the lamp, none of them the answered caller's,
+  as the quiet rule above reads it (`Heeding::someone_else`, #2305's
+  `caller_faces` and speaking-faces reader, read with this switch too). No
+  print (a line begun over the lamp's voice, or under 1.5 s) is never
+  another voice and goes on as the conversation (the first builder at
+  02:19). The conversation's own check keeps its bar of 0.45
   (`same_voice::DIFFERENT_BELOW`): #829 holds a line under it at
   its verdict, or, known after its answer, ends the conversation at the
   next line, with the switch as without it, so a line #829 lets out scored
