@@ -2174,6 +2174,36 @@ systemd-run --pty --wait \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10 --wire --socket
 ```
 
+**The route's speech socket** (`LAMP_SECOND_SPEECH_SOCKET=on`, off unless
+set; #2135's row, the first builder on #1722, 20 Oct 10:37), the change
+`--wire --socket` measures:
+- **As each answer begins,** while its chat thinks, the configured voice
+  opens ElevenLabs' `stream-input` socket for that request and sends the
+  voice's settings (`Tts::open_ahead`, `Services::open_speech_ahead`).
+  - It's the configured voice only, and ElevenLabs only; Gemini's voice and
+    OpenAI's have none.
+  - A socket opened before, for an older request, is closed.
+  - The journal says `request N: the speech socket is open, M ms after it
+    was asked`, or that it didn't open and why, in kinds only.
+- **The first of the request's pieces that finds it open** speaks on it:
+  - the piece, made at once (`flush`), and the end;
+  - its audio comes as the HTTP piece's does, in packets as loud;
+  - the socket is used once.
+  - A piece that finds it still opening (the announcement, usually) goes
+    over HTTP and leaves it for a later piece.
+  - The piece's journal line says `on the speech socket opened M ms
+    before`.
+- **A socket that fails or closes before any audio** sends that piece over
+  HTTP instead, saying so. That includes ElevenLabs closing an idle socket
+  after 20 s, when the chat runs long on tools. So a piece is never lost to
+  the socket, and is never slower than over HTTP by more than the failed
+  send.
+- **The worker** reads `LAMP_SECOND_SPEECH_SOCKET` (`=on` only), which the
+  voice passes to the second worker as it passes `LAMP_SECOND_SPEECH_WARM`.
+- **Not measured on a lamp.** `--wire --socket` says whether it saves a
+  piece anything over the kept HTTP connection. If it doesn't, the switch
+  stays off.
+
 ### How much the prompt cache holds (`probe-cache`)
 
 `lamp-voice probe-cache PROVIDER_CONFIG SECOND_CONFIG [RUNS]` (1 to 20,

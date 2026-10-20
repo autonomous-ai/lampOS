@@ -68,7 +68,10 @@ pub mod probe;
 mod services;
 pub mod worker;
 
-pub use services::{CHAT_WARM_ENVIRONMENT, Listener, Net, SPEECH_WARM_ENVIRONMENT, Services};
+pub use services::{
+    CHAT_WARM_ENVIRONMENT, Listener, Net, SPEECH_SOCKET_ENVIRONMENT, SPEECH_WARM_ENVIRONMENT,
+    Services,
+};
 
 #[cfg(test)]
 mod tests;
@@ -3007,6 +3010,9 @@ async fn answer(
     let heard = asked == Asker::Spoken;
     let looking = asked == Asker::Written { looking: true };
     let heard_at = Instant::now();
+    // Its speech socket opened now, while the chat thinks, with the switch
+    // (`LAMP_SECOND_SPEECH_SOCKET`).
+    shared.services.open_speech_ahead(request);
     // Started now, with the chat request, so it is ready first.
     let mut speech = JoinSet::new();
     let announcement = (shared.announce && shared.announcement_due()).then(|| {
