@@ -75,6 +75,7 @@ pub mod head_cue;
 pub mod not_speech;
 pub mod onboarding;
 pub mod options;
+pub mod others_answer;
 #[cfg(target_os = "linux")]
 pub mod physical_privacy;
 #[cfg(any(target_os = "linux", test))]

@@ -1624,7 +1624,22 @@ after a take-over, but now for every turn:
   (`not_speech::short_word`: "louder", "thanks", "stop"), is held before
   the model sees it (`worker::LONE_WORDS`): "What's the price of gold?"
   heard as "Surprise" was answered "Oh! I do like a surprise." "And
-  Paris?" is a question and goes on.
+  Paris?" is a question and goes on. **Someone else's answer**
+  (`LAMP_OTHERS_ANSWER=on`, `crate::others_answer`, #2136): such a line that
+  begins as a yes ("yes", "yeah", "yep", "yup") and asks nothing (no `?`),
+  began over the lamp's own answer (its Start's `over_the_lamps_voice`) and
+  answers nothing the lamp asked is held, `held back: it answers nothing the lamp asked and began
+  over the lamp's answer: someone else's answer`. In the 11:10 played test
+  on 20 Oct, A asked for a story by name; over it B asked "Daniel, are you
+  coming to the meeting at two?", never admitted, and A's "Yes, give me five
+  minutes." was answered "Five minutes, counting." with no timer set. When
+  the rule heard the question to the other person, it already holds the
+  reply (`Attention::began_at`); this is for when it heard only the reply.
+  A "no" over the lamp's answer is far more often a correction to it ("No,
+  the fox one."), and a question ("Yes, but who was he?") follows its
+  answer, so both go on (the reviewer's P2 on #2175). A "Yes, go on." to an
+  offer of the lamp's that isn't a question, said over its answer, is held
+  too, and a held cut-in has already stopped the lamp's answer.
 - **Said by name, or perhaps not for the lamp** (`worker::call_note`,
   `Engine::noting_whether_called`). Each spoken line gets one note beside
   its words. A line whose words or the lamp's name heard in its sound
