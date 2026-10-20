@@ -262,9 +262,10 @@ pub fn said_by_them(name: &str, said: &str) -> bool {
     let (name, theirs) = (folded_words(name), folded_words(said));
     let spelled = spelled_runs(&theirs);
     !name.is_empty()
-        && name
-            .iter()
-            .all(|word| theirs.contains(word) || spelled.iter().any(|letters| letters == word))
+        && (spelled_whole(&name, &spelled)
+            || name
+                .iter()
+                .all(|word| theirs.contains(word) || spelled.iter().any(|letters| letters == word)))
 }
 
 /// Whether each of `name`'s words is spelled letter by letter in `said`
@@ -275,9 +276,18 @@ pub fn spelled_by_them(name: &str, said: &str) -> bool {
     let name = folded_words(name);
     let spelled = spelled_runs(&folded_words(said));
     !name.is_empty()
-        && name
-            .iter()
-            .all(|word| spelled.iter().any(|letters| letters == word))
+        && (spelled_whole(&name, &spelled)
+            || name
+                .iter()
+                .all(|word| spelled.iter().any(|letters| letters == word)))
+}
+
+/// Whether a name of more than one word is spelled as one run of letters
+/// ("M A R Y A N N" for "Mary Ann"), with no pause between its words
+/// (Reviewer-lead's P3 on #2275: such a person was asked to spell on every
+/// try).
+fn spelled_whole(name: &[String], spelled: &[String]) -> bool {
+    name.len() > 1 && spelled.iter().any(|letters| *letters == name.concat())
 }
 
 /// The runs of single letters in `theirs`, each put together as a word
@@ -1203,6 +1213,14 @@ mod tests {
             assert!(!said_by_them(name, said), "{name}: {said}");
         }
         assert!(said_by_them("Jim", "It\u{2019}s J I M."));
+        // Reviewer-lead's P3 on #2275: a name of two words spelled as one
+        // run counts, said or spelled, and a part of it spelled doesn't.
+        assert!(said_by_them("Mary Ann", "M A R Y A N N."));
+        assert!(spelled_by_them("Mary Ann", "It's M, A, R, Y, A, N, N."));
+        assert!(spelled_by_them("Mary Ann", "M A R Y, A N N."));
+        assert!(!spelled_by_them("Mary Ann", "Mary Ann."));
+        assert!(!said_by_them("Mary Ann", "M A R Y."));
+        assert!(!spelled_by_them("Mary Ann", "M A R Y A N."));
         // The reviewer on #1057: accents count for nothing, and "double N"
         // is two.
         for (name, said) in [

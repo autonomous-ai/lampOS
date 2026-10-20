@@ -897,7 +897,8 @@ With the switch:
     once (Reviewer-lead's P3 on #2252). The known name spelled: judged
     against theirs, as below. Another name: kept beside the near one. The
     voice takes `apart` only when the turn in hand spells the name letter
-    by letter (`known_faces::spelled_by_them`). A name said again can be
+    by letter (`known_faces::spelled_by_them`), a name of two words spelled
+    as one run ("M A R Y A N N") included. A name said again can be
     misheard again as exactly the near name, so it goes without `apart`,
     as does a yes, and is asked about again (both reviewers' P2 on #2269).
     `apart` is sent only when true, since eyes from before it refuse a
