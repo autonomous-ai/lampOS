@@ -456,3 +456,34 @@ Ready for lamp-voice: no (acknowledgment only, no code)
   waiting on the pin, no app code before it (same discipline as #2094).
   #2188/#2189 still show open as of this entry, though their PRs (#2225,
   #2249) are approved and queued to merge.
+
+## 2026-10-20 — peer reads of ecm-sds-mobile#13 and #14
+
+Ready for lamp-voice: no (review comments, no code of my own)
+
+- The first builder, 16:1x on #1722 (while waiting on #2194's pin): peer
+  read Mobile's ecm-sds-mobile#13 (photo faces, `faces.add_photo`/
+  `face.list`/`face.remove`) and #14 (reminders, `schedule.list`/
+  `schedule.cancel`), run under that repo's gates, findings posted there.
+- Did not take either PR's claimed numbers on faith: checked out each
+  branch (merged with `v3`'s current head) and ran `flutter analyze` and
+  `flutter test` myself. Both matched exactly: 28/28 analyze; 758 (#13)
+  and 730 (#14) tests passed, 1 skipped, 1 failed — the same pre-existing
+  `key_insight_period_test.dart` failure on each, nothing new.
+- Also checked the single-reply (no `starting` ack) assumption both PRs
+  make against `lamp-voice`'s real `crates/cloud/src/answer.rs`, not just
+  their own descriptions — `faces.add_photo`, `face.list`, `face.remove`,
+  `schedule.list`, `schedule.cancel` are all in the same synchronous match
+  arm as `system.info`/`system.reboot`. Confirmed, not assumed, the same
+  discipline I'd want applied to my own #2193/#2094 work.
+- Findings:
+  [#13](https://github.com/autonomous-ai/ecm-sds-mobile/pull/13#issuecomment-6287714904) —
+  one P3 (a cosmetic ordering inconsistency in `LampPhotoFaces.withAnswer`:
+  the new face goes first in `sent` but last in `listed`), no P1/P2.
+  [#14](https://github.com/autonomous-ai/ecm-sds-mobile/pull/14#issuecomment-6287726226) —
+  clean, nothing to add.
+- Reported done on
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6287732887).
+- In the same stretch: first builder answered #2223's open question (a
+  machine reboot, not `lampos.target`) — doesn't change ecm-sds-mobile#15,
+  confirmed earlier that the wire contract is identical either way.
