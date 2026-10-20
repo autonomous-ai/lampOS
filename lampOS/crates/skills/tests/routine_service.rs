@@ -42,6 +42,9 @@ struct Fixture {
     events: Subscriber,
     say: UnixListener,
     reply: Option<(Request, Phase)>,
+    /// When each request, by its sequence, reached this fixture: after the
+    /// run issued it, so a causal bound on its deadline (#1569 row 52).
+    received_us: std::collections::HashMap<u64, u64>,
     root: tempfile::TempDir,
 }
 
@@ -187,6 +190,7 @@ rest = {{ op = "wake" }}
             events,
             say,
             reply: None,
+            received_us: std::collections::HashMap::new(),
             root,
         };
         let until = Instant::now() + WAIT;
@@ -312,6 +316,9 @@ rest = {{ op = "wake" }}
             self.alive_before(until, "a matching rest request or renewal");
             if let Some(message) = self.requests.recv(POLL).unwrap() {
                 let request: Request = message.parse().unwrap();
+                self.received_us
+                    .entry(request.stamp.sequence)
+                    .or_insert_with(monotonic_us);
                 request.check().unwrap();
                 assert_eq!(message.header.source, Request::SOURCE);
                 assert_eq!(request.skill, SKILL);
@@ -381,6 +388,9 @@ rest = {{ op = "wake" }}
                 );
             }
         };
+        // On macOS an accepted socket keeps its listener's non-blocking mode,
+        // and the read below then failed with WouldBlock (#1569 row 52).
+        stream.set_nonblocking(false).unwrap();
         stream.set_read_timeout(Some(WAIT)).unwrap();
         stream.set_write_timeout(Some(WAIT)).unwrap();
         let mut line = String::new();
@@ -392,8 +402,14 @@ rest = {{ op = "wake" }}
             .as_u64()
             .expect("the presentation keeps the original wake deadline");
         assert!(start_before_us > monotonic_us());
+        // The deadline is fixed when the run issues the wake, 12 s on. The
+        // wake's stamp is the main loop's tick, which can come a little
+        // before the issue (Second on #1569 row 52), so the bound is when
+        // the wake reached this fixture, after both. A renewal or the
+        // completion, answered later still, granting a fresh 12 s fails it.
+        let first_received_us = self.received_us[&first_wake.stamp.sequence];
         assert!(
-            start_before_us <= first_wake.stamp.at_us + 12_000_000,
+            start_before_us <= first_received_us + 12_000_000,
             "renewal or completion must not grant another 12 seconds"
         );
         expected["skill"] = json!(SKILL);
