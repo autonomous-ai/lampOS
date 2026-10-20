@@ -641,6 +641,14 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
                 &mut self.counts,
                 self.diagnostic.publish_json(at_us, &report),
             );
+            // The switch's own item, beside Controls' (#2143).
+            if let Some(privacy) = &mut self.privacy {
+                let switch = privacy.health(at_us);
+                account(
+                    &mut self.counts,
+                    self.diagnostic.publish_json(at_us, &switch),
+                );
+            }
             self.last_report_us = Some(at_us);
         }
         self.counts.steps += 1;

@@ -123,6 +123,19 @@ read/discard and process scheduling still require device timing measurements.
 Derived metadata already inside a Bus send cannot be retracted; its original
 timestamp is retained. See [Ears](ears.md) for that boundary.
 
+## The switch in the lamp's health
+
+With the switch attached, Controls sends a second item on `diagnostics`
+beside its own report, once a second: `privacy switch`, from the switch's
+own fresh reading (`privacy::Source::health`, the first builder on #2143).
+Its message is `open` or `closed`. Until the switch has changed since
+Controls started, it adds `, not moved since Controls started`, and
+`changes` counts each change of the level read, so a lamp whose switch
+never moves is noticed on `lamp/health` and in `lamp-health show`. Either
+is well (`ok`): a still switch is not a fault, and a warning would mark the
+whole lamp all day. A reading that can't be had is `warn`, `unknown:` with
+its fault; Controls' own item already says the route is closed then.
+
 ## Muted appearance and timing
 
 During the quiet physical-mute wait a separate ring worker may show the V1
