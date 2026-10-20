@@ -825,6 +825,78 @@ async fn not_for_me_ends_the_turn_in_silence() {
     assert!(calls.lock().unwrap().is_empty());
 }
 
+/// #2191, `LAMP_NAMED_ALWAYS=on`: in a turn the hook says began with the
+/// lamp's name, said to a face turned to the lamp, the model's `not_for_me`
+/// is not taken: it is asked once more, told it was called, and its answer is
+/// said. A second decline ends the turn in silence; without the hook, or
+/// for a turn it does not name, the first does, as before.
+#[tokio::test]
+async fn a_decline_of_a_line_named_to_a_face_is_not_taken_once() {
+    let decline = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                NOT_FOR_ME,
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let answer = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+    let cases = [
+        ("named", Some(true), vec![decline(), answer()], true, 2),
+        (
+            "named twice",
+            Some(true),
+            vec![decline(), decline()],
+            false,
+            2,
+        ),
+        (
+            "not named",
+            Some(false),
+            vec![decline(), answer()],
+            false,
+            1,
+        ),
+        ("no switch", None, vec![decline(), answer()], false, 1),
+    ];
+    for (case, named, rounds, said, asked) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Lamp, what time is it?".to_owned())].into()),
+            chats: Mutex::new(rounds.into()),
+            ..Script::default()
+        });
+        let (engine, calls, _) = scripted(script.clone());
+        let mut engine = match named {
+            Some(named) => engine.answering_named_to_a_face(Arc::new(move |_| named)),
+            None => engine,
+        };
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        assert_eq!(out.last().map(String::as_str), Some("complete"), "{case}");
+        assert_eq!(
+            out.iter().any(|o| o == "said:It is noon."),
+            said,
+            "{case}: {out:?}"
+        );
+        assert!(calls.lock().unwrap().is_empty(), "{case}");
+        let asked_rounds = script.asked.lock().unwrap();
+        assert_eq!(asked_rounds.len(), asked, "{case}");
+        if asked == 2 {
+            assert!(
+                asked_rounds[1].contains(&Message::tool(
+                    "c1".to_owned(),
+                    NAMED_TO_A_FACE_ANSWER.to_owned()
+                )),
+                "{case}"
+            );
+        }
+    }
+}
+
 /// Words the heed judges not said to the lamp end the turn after them,
 /// with no chat asked; it is given the microphone's times of the line's
 /// first and last packets (#1014).

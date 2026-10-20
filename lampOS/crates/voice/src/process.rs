@@ -1113,6 +1113,7 @@ fn second_route_worker_environment(
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
+        crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1156,6 +1157,7 @@ mod tests {
             crate::second_provider::STEADY_FIRST_ENVIRONMENT,
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
+            crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -1418,6 +1420,7 @@ mod tests {
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
+                    || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                 {
                     "on"
@@ -1478,6 +1481,7 @@ mod tests {
                     "LAMP_MEMORY_OBSERVE=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
+                    "LAMP_NAMED_ALWAYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_SECOND_CHAT_WARM=on",

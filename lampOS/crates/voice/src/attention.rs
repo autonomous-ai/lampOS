@@ -565,6 +565,37 @@ pub fn only_the_name(heard: &str) -> bool {
         && called_by_name(heard)
 }
 
+/// Whether what was heard opens with the lamp's name set off as a call:
+/// "Lamp" or "Lamb" after a greeting ("Hey Lamp …"), or followed by a
+/// pause ("Lamp, …", "Lamp."). Never a stand-in ([`called`]'s "man",
+/// "plan", "mom" are everyday words), and not "Lamp is broken, …" or
+/// "Lamb for dinner tonight?" (#2191, the reviewer's P2 on #2210).
+pub fn begins_with_the_name(heard: &str) -> bool {
+    let is = |word: &str, list: &[&str]| list.iter().any(|known| word.eq_ignore_ascii_case(known));
+    let mut rest = heard;
+    let mut greeted = false;
+    loop {
+        let start = rest.find(char::is_alphanumeric);
+        let Some(start) = start else { return false };
+        rest = &rest[start..];
+        let end = rest
+            .find(|c: char| !c.is_alphanumeric())
+            .unwrap_or(rest.len());
+        let (word, after) = rest.split_at(end);
+        if is(word, GREETINGS) {
+            greeted = true;
+            rest = after;
+            continue;
+        }
+        let set_off = after
+            .trim_start()
+            .chars()
+            .next()
+            .is_none_or(|c| matches!(c, ',' | '.' | '?' | '!' | ';' | ':'));
+        return (greeted || set_off) && is(word, &["lamp", "lamb"]);
+    }
+}
+
 /// What the service has written in the name's place, first or after a
 /// greeting ([`called`]).
 fn called_by_stand_in(words: &[&str]) -> bool {
@@ -701,6 +732,11 @@ pub(crate) const GOING_ON: &str = "a conversation with the lamp is going on";
 /// let out so had another sign as well (the second route names it, #1712).
 pub(crate) const TRUSTED: &str = "the session has heard enough to be trusted";
 pub(crate) const ROOM_NOT_BUSY: &str = "the room is not known to be busy";
+/// The strict busy rule's holds ([`decide_busy`]).
+pub(crate) const BUSY_NAMED_UNTURNED: &str =
+    "a busy room: its name was heard in the sound, and nobody is turned to the lamp";
+pub(crate) const BUSY_UNCALLED: &str =
+    "a busy room, and nothing shows it was called or that anyone is turned to the lamp";
 /// The text calling the lamp, as the rule says it.
 pub(crate) const CALLED_IN_TEXT: &str = "the text shows it was called";
 const SOUND_A_WORD: &str = "a short sound, heard as a short word said to the lamp";
@@ -773,13 +809,9 @@ fn decide_called(
     } else if named && !strict {
         Verdict::Play(NAMED)
     } else if strict && named {
-        Verdict::Hold(
-            "a busy room: its name was heard in the sound, and nobody is turned to the lamp",
-        )
+        Verdict::Hold(BUSY_NAMED_UNTURNED)
     } else if strict {
-        Verdict::Hold(
-            "a busy room, and nothing shows it was called or that anyone is turned to the lamp",
-        )
+        Verdict::Hold(BUSY_UNCALLED)
     } else {
         Verdict::Hold("a new session in a busy room, and nothing shows it was called")
     }

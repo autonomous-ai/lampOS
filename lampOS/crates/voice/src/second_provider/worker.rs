@@ -1866,6 +1866,25 @@ pub fn serve(
                     .is_ok_and(|heeding| heeding.judged_busy(request))
             }));
         }
+        // A line that begins with the lamp's name, said to a face turned to
+        // the lamp, is answered in a busy room (`LAMP_NAMED_ALWAYS=on`,
+        // #2191).
+        if std::env::var(crate::second_provider::NAMED_ALWAYS_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a line that begins with the lamp's name, said to a face turned to the lamp, is answered in a busy room (LAMP_NAMED_ALWAYS)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.always_answering_named();
+            }
+            let heeding = heeding.clone();
+            engine = engine.answering_named_to_a_face(Arc::new(move |request| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.named_to_a_face(request))
+            }));
+        }
         // The rule keeps the route's one reader of the Policy's decisions,
         // which a line going on reads too (`LAMP_GOING_ON_ASKS`, below).
         if let Some(verdicts) = verdicts {
@@ -2566,6 +2585,49 @@ pub(crate) struct Heeding {
     /// The same-voice check (`LAMP_SAME_VOICE_MODEL`, #829,
     /// [`Self::checking_the_voice`]), as the Live worker keeps it.
     voices: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
+    /// `LAMP_NAMED_ALWAYS=on` (#2191, [`Self::always_answering_named`]).
+    named_always: bool,
+    /// The request judged last, if it began with the lamp's name said to a
+    /// face turned to the lamp ([`named_to_a_face`]).
+    named_faced: Option<u64>,
+}
+
+/// A line counts as begun with the lamp's name if a hearing of it began no
+/// later than this into the line (#2191): "Lamp, …" or "Hey Lamp, …".
+pub(crate) const NAME_STARTS_WITHIN_US: u64 = 1_000_000;
+
+/// Held in a busy room, then let out: the line began with the lamp's name,
+/// said to a face turned to the lamp (`LAMP_NAMED_ALWAYS=on`, #2191).
+pub(crate) const NAMED_TO_A_FACE: &str =
+    "it began with the lamp's name, said to a face turned to the lamp";
+
+/// Whether a line begun at `began_us` with the words `heard` began with
+/// the lamp's name, said to a face turned to the lamp (#2191): the name
+/// heard in the sound (at [`crate::called::LEAST_SCORE`] or more, from
+/// [`crate::called::BEFORE_US`] before the line to [`NAME_STARTS_WITHIN_US`]
+/// into it), or its words opening with it
+/// ([`crate::attention::begins_with_the_name`]: on lamp-52e6 on 20 Oct the
+/// part that listens for the name heard none of three such lines); and
+/// `turned`, the eyes seeing a face turned to the lamp, not any face in
+/// view, which in a busy room is nearly always there (the reviewer's P2 on
+/// #2210). The face is what tells the name from office talk heard as it
+/// at 0.9 to 0.997, so the model's `not_for_me` is overruled only with the
+/// speaker facing the lamp. On a production floor on 19 Oct the name was
+/// heard at 0.976 to 0.978 and a face seen in 36 to 40 of 40 looks, and
+/// every such line was held as a busy room or declined by the model
+/// (#1722, hw-first-P1 finding 4).
+pub(crate) fn named_to_a_face(
+    names: &[(u64, f32)],
+    began_us: u64,
+    heard: &str,
+    turned: Option<bool>,
+) -> bool {
+    let heard_named = names.iter().any(|(at, score)| {
+        *score >= crate::called::LEAST_SCORE
+            && at.saturating_add(crate::called::BEFORE_US) >= began_us
+            && *at <= began_us.saturating_add(NAME_STARTS_WITHIN_US)
+    });
+    turned == Some(true) && (heard_named || crate::attention::begins_with_the_name(heard))
 }
 
 /// What let a line out, as the journal says it: the sign itself where the
@@ -2730,6 +2792,9 @@ struct Seen {
     busy: bool,
     lamp_asked: bool,
     heard: String,
+    /// Begun with the lamp's name said to a face turned to the lamp, with
+    /// the switch ([`named_to_a_face`]).
+    named_faced: bool,
     /// Held as another voice than the conversation's (#829), which the
     /// room counts as talk past the lamp.
     other_voice: bool,
@@ -2848,7 +2913,24 @@ impl Heeding {
             others_answer: false,
             began_over: None,
             voices: None,
+            named_always: false,
+            named_faced: None,
         }
+    }
+
+    /// A line that begins with the lamp's name, said to a face turned to the
+    /// lamp, is answered in a busy room (`LAMP_NAMED_ALWAYS=on`, #2191): the
+    /// strict busy rule's and `busy_bar`'s holds are not kept for it
+    /// ([`NAMED_TO_A_FACE`]), and the model's `not_for_me` on it is not
+    /// taken ([`Self::named_to_a_face`]).
+    pub(crate) fn always_answering_named(&mut self) {
+        self.named_always = true;
+    }
+
+    /// Whether `request` was judged as begun with the lamp's name said to
+    /// a face turned to the lamp, with the switch.
+    pub(crate) fn named_to_a_face(&self, request: u64) -> bool {
+        self.named_faced == Some(request)
     }
 
     /// A line in another voice than the conversation's is no part of it
@@ -3321,6 +3403,9 @@ impl Heeding {
             }
         };
         self.judged = Some((request, session, heard.to_owned(), whole.to_owned()));
+        let named_faced =
+            self.named_always && named_to_a_face(&signs.names, began_us, heard, signs.turned);
+        self.named_faced = named_faced.then_some(request);
         attention.ended(request, ended_us);
         if self.cut_in == Some(request) {
             attention.ended_as_cut_in(request);
@@ -3381,6 +3466,7 @@ impl Heeding {
             busy,
             lamp_asked,
             heard: heard.to_owned(),
+            named_faced,
         };
         // #1522 on this route (`LAMP_GOING_ON_ASKS`): what the Policy said of
         // the line is given before it is judged, and in a busy room a line
@@ -3509,8 +3595,28 @@ impl Heeding {
                 .map(crate::attention::Verdict::Hold)
                 .or(verdict);
         }
+        // #2191: begun with the lamp's name, said to a face turned to the
+        // lamp, a line is not held by the strict busy rule or `busy_bar`;
+        // any other hold (`LONE_WORDS`, an unclear language) stands.
+        if busy
+            && seen.named_faced
+            && let Some(crate::attention::Verdict::Hold(why)) = verdict
+            && [
+                crate::attention::BUSY_NAMED_UNTURNED,
+                crate::attention::BUSY_UNCALLED,
+                BUSY_SHORT,
+                BUSY_TURNED,
+            ]
+            .contains(&why)
+        {
+            eprintln!(
+                "lamp-voice second: request {request}: held as \"{why}\" no longer: it began with the lamp's name, said to a face turned to the lamp (LAMP_NAMED_ALWAYS)"
+            );
+            verdict = Some(crate::attention::Verdict::Play(NAMED_TO_A_FACE));
+        }
         let played = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
-        let called = played && (attention.called_for_itself() || turned == Some(true));
+        let called =
+            played && (attention.called_for_itself() || turned == Some(true) || seen.named_faced);
         // Let out as the conversation going on, or for itself: a line that
         // called the lamp begins a conversation of its own (Eighth on #829).
         if let (Some(voices), Some(_)) = (self.voices.as_mut(), verdict) {
@@ -3533,7 +3639,8 @@ impl Heeding {
             .then_some(request);
         self.busy = busy.then_some(request);
         // Its words or the name heard called the lamp, not a face alone.
-        self.by_name = (played && attention.called_for_itself()).then_some(request);
+        self.by_name =
+            (played && (attention.called_for_itself() || seen.named_faced)).then_some(request);
         // A call let out: the conversation goes on from it.
         if called {
             self.called_at = Some(Instant::now());
@@ -5888,6 +5995,157 @@ mod tests {
         assert_eq!(judged(true, true), None, "at night, played");
         assert_eq!(judged(false, false), None, "with on alone, by day");
         assert_eq!(judged(false, true), None, "with on alone, at night");
+    }
+
+    /// #2191, `LAMP_NAMED_ALWAYS=on`: in a busy room a line that begins
+    /// with the lamp's name (heard in its sound, as on the production floor
+    /// at 0.976 to 0.978, or in its words, as on lamp-52e6 with no hearing
+    /// at all), said to a face turned to the lamp, is answered: not held,
+    /// and marked so the model's `not_for_me` is not taken. With no face
+    /// turned to the lamp (only one in view, or none), with the name heard
+    /// late in the line, or with no name, it is judged as before; and
+    /// without the switch, nothing changes.
+    #[test]
+    fn with_named_always_a_line_begun_with_the_name_to_a_face_is_answered_in_a_busy_room() {
+        let at_start = vec![(1_000_200_000, 0.977)];
+        let late = vec![(1_002_000_000, 0.977)];
+        let judged = named_always_judged;
+        let plain = "turn the light on please.";
+        // Someone turned to the lamp, no question: the busy room's bar held
+        // it before.
+        assert_eq!(
+            judged(false, Some(true), at_start.clone(), plain).0,
+            Some(super::BUSY_TURNED)
+        );
+        assert_eq!(
+            judged(true, Some(true), at_start.clone(), plain),
+            (None, true)
+        );
+        // Its words open with the name, nothing heard in the sound: marked
+        // named, so a `not_for_me` is not taken.
+        let words = "Hey Lamp, turn the light on.";
+        assert_eq!(judged(true, Some(true), vec![], words), (None, true));
+        assert!(!judged(false, Some(true), vec![], words).1);
+        // No face turned to the lamp (a face in view not judged turned, or
+        // turned away, or none): as before.
+        for turned in [None, Some(false)] {
+            assert_eq!(
+                judged(true, turned, at_start.clone(), plain),
+                judged(false, turned, at_start.clone(), plain),
+                "{turned:?}"
+            );
+            assert!(!judged(true, turned, vec![], words).1, "{turned:?}");
+        }
+        // The name heard two seconds into the line, or not at all.
+        // The name heard two seconds into the line, or not at all: someone
+        // turned to the lamp is held by the busy room's bar as before.
+        assert_eq!(
+            judged(true, Some(true), late, plain),
+            (Some(super::BUSY_TURNED), false)
+        );
+        assert_eq!(
+            judged(true, Some(true), vec![], "Pass me the stapler."),
+            (Some(super::BUSY_TURNED), false)
+        );
+    }
+
+    /// The reviewer's P2 on #2210: office talk that opens with a word like
+    /// the name ("Man", "Plan" and "Mom" are no call, nor "Lamp" or "Lamb"
+    /// not set off as one), said with nobody turned to the lamp or with
+    /// someone turned to it, is never marked named, so the switch neither
+    /// lifts a hold for it nor overrules the model's `not_for_me` on it: it
+    /// is judged as without the switch.
+    #[test]
+    fn with_named_always_office_talk_that_opens_like_the_name_is_not_named() {
+        for heard in [
+            "Man, that meeting ran long.",
+            "Plan the sprint for tomorrow.",
+            "Mom, can you pick me up?",
+            "Lamp is broken, can you fix it?",
+            "Lamb for dinner tonight?",
+        ] {
+            assert!(!crate::attention::begins_with_the_name(heard), "{heard}");
+            for turned in [None, Some(true)] {
+                let (held, named) = named_always_judged(true, turned, vec![], heard);
+                assert!(!named, "{heard} {turned:?}");
+                assert_eq!(
+                    held,
+                    named_always_judged(false, turned, vec![], heard).0,
+                    "{heard} {turned:?}"
+                );
+            }
+        }
+    }
+
+    /// The reviewer's P3 on #2210: with the switch, a line named to a face
+    /// turned to the lamp lifts only the strict busy rule's and `busy_bar`'s
+    /// holds; a conversation's line heard in another script is still held
+    /// and asked again.
+    #[test]
+    fn with_named_always_an_unclear_line_named_to_a_face_stays_held() {
+        use crate::room_told::Room;
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        heeding.always_answering_named();
+        heeding.asking_again(false);
+        let signs = super::Signs {
+            room: Room::Busy,
+            going_on: true,
+            lamp_asked: false,
+            turned: Some(true),
+            names: vec![(1_000_200_000, 0.977)],
+            near: false,
+            continues_from: None,
+        };
+        let held = heeding.judge(9, (1_000_000_000, 1_003_000_000), "नमस्ते, आप कैसे हैं?", signs);
+        assert_eq!(held, Some(crate::not_speech::OTHER_SCRIPT));
+    }
+
+    /// One line judged in a busy room, with `LAMP_NAMED_ALWAYS` when
+    /// `always`: (held, marked named to a face).
+    fn named_always_judged(
+        always: bool,
+        turned: Option<bool>,
+        names: Vec<(u64, f32)>,
+        heard: &str,
+    ) -> (Option<&'static str>, bool) {
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        if always {
+            heeding.always_answering_named();
+        }
+        let signs = super::Signs {
+            room: crate::room_told::Room::Busy,
+            going_on: false,
+            lamp_asked: false,
+            turned,
+            names,
+            near: false,
+            continues_from: None,
+        };
+        let held = heeding.judge(9, (1_000_000_000, 1_003_000_000), heard, signs);
+        (held, heeding.named_to_a_face(9))
+    }
+
+    #[test]
+    fn a_line_begins_with_the_name_only_when_it_is_set_off_as_a_call() {
+        for heard in [
+            "Lamp, what time is it?",
+            "Hey Lamp, turn the light on.",
+            "hey lamp turn the light on",
+            "Lamb. What time is it?",
+        ] {
+            assert!(crate::attention::begins_with_the_name(heard), "{heard}");
+        }
+        for heard in [
+            "I left the lamp on in the kitchen.",
+            "lamp turn the light on",
+            "Okay, hey Len. How are you today?",
+            "Milan, what is the capital of Italy?",
+            "Len said she would come.",
+            "Hey there, lamp.",
+            "",
+        ] {
+            assert!(!crate::attention::begins_with_the_name(heard), "{heard}");
+        }
     }
 
     /// #1712: the name note, as the Live route gives it: the model is told
