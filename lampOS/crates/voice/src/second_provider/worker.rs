@@ -161,6 +161,10 @@ impl Gate {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::Paused {
+                request,
+                privacy_generation,
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,
@@ -1668,6 +1672,18 @@ pub fn serve(
     // A holding-only answer is asked to go on, as on Live
     // (`LAMP_HOLDING_ANSWER=on`; the first builder's 22:54 on #1722).
     engine = engine.holding_answers(files.holding_answer);
+    // Words said before a call are not said again after it
+    // (`LAMP_SECOND_SAID_ONCE=on`; the first builder at 06:56 on #1722).
+    let said_once = std::env::var(crate::second_provider::SAID_ONCE_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if said_once {
+        eprintln!(
+            "lamp-voice second: a round's words said before its calls are told to the next round, which adds only what is new (LAMP_SECOND_SAID_ONCE)"
+        );
+    }
+    engine = engine.saying_once(said_once);
     // A line lost on the network is asked once more when a service host
     // answers again, the link's own check (`LAMP_RESEND_LOST_LINE=on`; the
     // first builder's 00:02 on #1722). As the only voice, with its hosts.
@@ -1696,7 +1712,9 @@ pub fn serve(
         )));
         // The same-voice check (#829), as the Live worker starts it: its
         // child loads its model now, and only beside `LAMP_SPOKEN_TO=on`.
-        match (files.spoken_to, files.same_voice.clone()) {
+        // Only as the lamp's only voice: a standby beside Live loads none.
+        let same_voice = files.same_voice.clone().filter(|_| route.only_voice);
+        match (files.spoken_to, same_voice) {
             (true, Some(model)) => match crate::same_voice::Prints::beside_voice(model) {
                 Ok(prints) => {
                     if let Ok(mut heeding) = heeding.lock() {
@@ -1815,8 +1833,10 @@ pub fn serve(
             }));
         }
         // Before the levels' sampling begins, which reads the eyes beside
-        // them for it.
+        // them for it. Only as the lamp's only voice, so a standby beside
+        // Live adds no second `attention/addressed` publisher.
         if files.addressed
+            && route.only_voice
             && let (Ok(mut heeding), Some(root)) = (heeding.lock(), files.bus_root.as_deref())
         {
             heeding.judging_addressed(root);

@@ -309,6 +309,12 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
         for line in heedings_verdict(&ask_heedings(&heeding, &character, runs).await) {
             println!("{line}");
         }
+        println!(
+            "tools: the timer said once (#2089, LAMP_SECOND_SAID_ONCE), round 2 with and without the note, {runs} runs each"
+        );
+        for line in said_once_verdict(&ask_said_once(&heeding, &character, runs).await) {
+            println!("{line}");
+        }
     } else {
         println!(
             "tools heeding: not asked: the schedule's functions aren't in the actions part's catalog (LAMP_ACTIONS_DIR)"
@@ -945,6 +951,86 @@ pub fn heedings_verdict(counts: &HeedingCounts) -> Vec<String> {
     lines
 }
 
+/// #2089 (the first builder at 06:56 on #1722): "Set a timer for one
+/// minute." said "A minute, starting now." and called `set_timer`; given
+/// the result, round 2 confirmed again ("One minute, counting from now").
+/// Round 2 is asked as the engine asks it: the line, round 1's words with
+/// its call, the schedule's committed result, and with `note` the
+/// `LAMP_SECOND_SAID_ONCE` note ([`super::super::said_once_note`]). Right is
+/// nothing called and no second confirmation: no "minute", "starting",
+/// "counting" or "started" (the time it goes off, or nothing, is right).
+pub const SAID_ONCE_ASKED: &str = "Set a timer for one minute.";
+pub const SAID_ONCE_SAID: &str = "A minute, starting now.";
+
+/// Round 2 of the timer, with or without the note.
+pub fn said_once_messages(character: &str, note: bool) -> Vec<Message> {
+    let spoken = super::super::worker::spoken_character(character, false, false);
+    let call = ToolCall {
+        id: "call_0".to_owned(),
+        name: "set_timer".to_owned(),
+        args: json!({"text": "timer", "seconds": 60}),
+        extra: None,
+    };
+    let result = json!({"ok": true, "result": {"status": "committed", "id": 7, "delivery": 1,
+        "due_unix_ms": 1_792_454_700_000_u64, "local": "06:45",
+        "message": "The timer or reminder is saved for the returned local time."}});
+    let mut messages = vec![
+        Message::system(format!("{spoken}\n\n{}", super::cache::changing(0))),
+        Message::user(SAID_ONCE_ASKED),
+        Message::assistant_calls(Some(SAID_ONCE_SAID.to_owned()), std::slice::from_ref(&call)),
+        Message::tool(call.id.clone(), result.to_string()),
+    ];
+    if note {
+        messages.push(Message::system(super::super::said_once_note(
+            SAID_ONCE_SAID,
+        )));
+    }
+    messages
+}
+
+/// Round 2 said once: nothing called, and no second confirmation.
+pub fn said_once(text: &str, called: bool) -> bool {
+    !called
+        && !says(
+            text,
+            &["minute", "minutes", "starting", "started", "counting"],
+        )
+}
+
+/// For each arm (without the note, with it), right of asked.
+pub type SaidOnceCounts = [(u32, u32); 2];
+
+/// Round 2 asked `runs` times without the note and with it.
+pub async fn ask_said_once(chat: &Chat, character: &str, runs: u32) -> SaidOnceCounts {
+    let mut counts = SaidOnceCounts::default();
+    for _ in 0..runs {
+        for (arm, note) in [false, true].into_iter().enumerate() {
+            match said(chat, &said_once_messages(character, note)).await {
+                Ok((text, called)) => {
+                    counts[arm].0 += u32::from(said_once(&text, called));
+                    counts[arm].1 += 1;
+                }
+                Err(error) => println!("tools said-once note={note} failed: {error}"),
+            }
+        }
+    }
+    counts
+}
+
+/// One line per arm, then the verdict on the note's arm. Counts only.
+pub fn said_once_verdict(counts: &SaidOnceCounts) -> Vec<String> {
+    let [(plain, plain_of), (noted, noted_of)] = *counts;
+    vec![
+        format!("tools said-once arm=without right={plain}/{plain_of}"),
+        format!("tools said-once arm=note right={noted}/{noted_of}"),
+        if noted_of > 0 && noted == noted_of {
+            "tools said-once verdict: with the note, confirmed once every time".to_owned()
+        } else {
+            "tools said-once verdict: with the note, not every time".to_owned()
+        },
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1570,6 +1656,38 @@ mod tests {
                 "tools heeding line=to-someone right=2/2: set_timer=2",
                 "tools heeding line=remember right=0/2: not_for_me=2",
                 "tools heeding verdict: not every time: remember",
+            ]
+        );
+    }
+
+    /// #2089: round 2 of the timer is asked as the engine asks it, the note
+    /// last with the switch; a second confirmation is wrong, the time alone
+    /// or nothing right.
+    #[test]
+    fn the_timer_round_two_is_asked_as_the_engine_asks_it_and_judged_once() {
+        let without = said_once_messages("CHARACTER", false);
+        let with = said_once_messages("CHARACTER", true);
+        assert_eq!(without.len(), 4);
+        assert_eq!(with[..4], without[..]);
+        assert_eq!(text(&with[1]), SAID_ONCE_ASKED);
+        assert_eq!(with[2].role, "assistant");
+        assert_eq!(text(&with[2]), SAID_ONCE_SAID);
+        assert_eq!(with[3].role, "tool");
+        assert_eq!(
+            with[4],
+            Message::system(crate::second_provider::said_once_note(SAID_ONCE_SAID))
+        );
+        assert!(said_once("It goes off at six forty-five.", false));
+        assert!(said_once("", false));
+        assert!(!said_once("One minute, counting from now.", false));
+        assert!(!said_once("Okay, one minute starting now. Done.", false));
+        assert!(!said_once("", true));
+        assert_eq!(
+            said_once_verdict(&[(1, 2), (2, 2)]),
+            [
+                "tools said-once arm=without right=1/2",
+                "tools said-once arm=note right=2/2",
+                "tools said-once verdict: with the note, confirmed once every time",
             ]
         );
     }

@@ -307,6 +307,7 @@ fn request_of(input: &ProviderInput) -> u64 {
         | ProviderInput::Audio { request, .. }
         | ProviderInput::End { request, .. }
         | ProviderInput::Called { request, .. }
+        | ProviderInput::Paused { request, .. }
         | ProviderInput::Written { request, .. }
         | ProviderInput::Reminder { request, .. } => *request,
     }
@@ -1066,6 +1067,7 @@ fn run(script: Script) -> Run {
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
         early_end_blocks: None,
+        early_finalize: false,
         faint_level: None,
         speaker: spawn("speaker"),
         capture: spawn("capture"),

@@ -484,6 +484,21 @@ order is kept. A written turn is the same from the chat on.
   time right after the character. A text's request is unchanged. Each turn's
   journal says how much the cache held (above): the A/B is the played check
   both ways, by H and by the first event's time.
+- **With `LAMP_SECOND_SAID_ONCE=on` words said before a call are not said
+  again after it** (off unless set; the first builder at 06:56 on #1722). On
+  lamp-4ace "Set a timer for one minute." got "A minute, starting now. One
+  minute, counting from now — six forty-four and change.", 2 of the last 4
+  runs. The round that called had said its words, and the next round, given
+  the timer's result, confirmed again. With the switch, a round that said
+  words before its calls tells the next round, as a system message after
+  the calls' results, that the person heard them
+  (`second_provider::said_once_note`). It is told to say only what the
+  results add, such as the time it is set for or that it failed, or nothing.
+  A round that said nothing before its calls, or a call written as words
+  (which isn't said), tells nothing. The journal says `chat round N said
+  words before its calls: the next round is told they were heard`. The
+  check is on the lamp: the day lines' timer and reminder at 4 of 4 runs,
+  one confirmation each.
 - **With `LAMP_SECOND_FEW_TOOLS=on` a spoken turn's chat is given its few
   functions first** (off unless set; #1712, the first builder at 18:56:
   "light, volume, timer, search, look, tasks"). The others are behind one,
@@ -580,6 +595,33 @@ order is kept. A written turn is the same from the chat on.
 
   The cost is one idle socket to the relay's proxy during a conversation:
   Deepgram bills the audio sent, and `KeepAlive` sends none.
+- **With `LAMP_SECOND_EARLY_FINALIZE=on` a line's words are asked for at a
+  pause** (off unless set; the first builder on #1722, 20 Oct 07:20 and
+  07:36). On lamp-4ace Deepgram never ends a line itself: the lamp's quiet
+  tail (its noise floor, the canceller's residue) isn't silence to its
+  `endpointing=300`, so every line's end sent `Finalize` and waited
+  270–300 ms, and the early words were a stale interim. With the switch:
+  - **the coordinator's own quiet count** (`TurnDetector::pause_blocks`, no
+    second detector) at 150 ms of a pause, once a pause and only after
+    300 ms of speech since the last ask, so a halting speaker doesn't cut
+    the service's segments every word, sends `ProviderInput::Paused`
+    (`coordinator/early_finalize.rs`);
+  - **the second route asks for the words so far** (`Listener::flush`,
+    `SttStream::paused`, a `Finalize` with the stream kept open). Speech
+    that goes on comes as new finals, appended in order;
+  - **at the line's end**, if that answer came, its finals cover the
+    line's sound (`covers_the_sound`, the rest quiet) and no block since
+    the pause's `Finalize` was over the absolute floor (`SOUND_FLOOR_RMS`:
+    a soft last word, however far under the line's peak, is kept, Jarvis on
+    #2102), they are the line's words at once, with no second `Finalize`
+    (`words from=flush` in the journal's end line). Otherwise the end asks
+    as before. Such a line gives `LAMP_SECOND_PREPARED` no early words, so
+    no chat is begun early on it: its words come at once anyway, and an
+    A/B's "0 early rounds" on those lines isn't a fault;
+  - **not on Flux**, whose flush would end its turn (`ForceEndTurn`) and
+    which ends its turns itself; **not the stop words' stream**, which
+    never takes a pause's answer as its end. The Live worker takes nothing
+    from `Paused`.
 - **With `LAMP_SECOND_PREPARED=on` the chat is begun on the line's early
   words** (off unless set; #1712, the first builder at 17:02: the route's
   first word came about 3.4 s after a line, Live's 2.4 s, and the bar is
@@ -1443,10 +1485,12 @@ after a take-over, but now for every turn:
   going on (`LAMP_GOING_ON_ASKS`, which also ends a busy room sooner once
   answered). The busy-room battery on lamp-4ace is its check.
 - **The same-voice check** (`LAMP_SAME_VOICE_MODEL`, beside
-  `LAMP_SPOKEN_TO=on`, [same-voice.md](same-voice.md)): as on Live. The
-  worker starts the same `lamp-same-voice` child, gives it each spoken
-  line's first samples (`Engine::hearing`; a line begun over the lamp's
-  voice is not printed), and at the line's verdict (`Heeding::judge`) a
+  `LAMP_SPOKEN_TO=on`, [same-voice.md](same-voice.md)): as on Live, and
+  only as the lamp's only voice (a standby beside Live loads none). The
+  worker starts the same `lamp-same-voice` child; the engine hands it every
+  chunk of a spoken line (`Engine::hearing`), of which `Voices` keeps the
+  first ones to print (a line begun over the lamp's voice is not printed),
+  and at the line's verdict (`Heeding::judge`) a
   line in another voice than the conversation's is no part of it: "request
   N: another voice than the conversation's (cosine …): no conversation is
   going on for it", and the room counts it as talk past the lamp. A late
@@ -2002,6 +2046,10 @@ the words), and,
 with both targets, the relay's medians less DeepSeek's own, step by step
 (`wire relay-less-direct size=lamp tcp_ms=+… tls_ms=+… …`).
 
+Only a 200 is timed, on a connection of its own as on a kept one: a
+refused answer's line says its status, and it is counted `closed`, so its
+quick answer never lowers the medians.
+
 A failed step is told by its name and kind only (`tcp: TimedOut`). Like
 the rest of the probe it prints counts and milliseconds only, never the
 words asked or answered, a key, a host or a URL. Five runs unless said, at
@@ -2022,6 +2070,45 @@ systemd-run --pty --wait \
 `--wire --kept` takes the same command with `--kept` after `--wire`, at most
 20 runs (`MOST_KEPT_RUNS`). Its 10 runs ask 120 requests and wait 5 s 40
 times, about 4 minutes.
+
+**The route's speech** (`--wire --speech`, #1934, 20 Oct 08:36). The second
+route's speech goes through the relay too: `tts_base_url` is
+`llm_base_url` unless set, and ElevenLabs is then reached on the relay's
+`…/elevenlabs` path (`tts.rs`, `service_base`). With `--speech`, each run
+asks each target for a piece of speech instead of the chat:
+- **The piece** is the route's own request as `Tts` makes it, with the
+  route's voice and model. It is one of four sentences of 35 to 38
+  characters (`PIECES`), an answer's first sentence long, one a run in
+  turn, the same on both targets.
+- **relay:** `tts_base_url` with the route's speech credential, as the
+  route asks. When that is ElevenLabs' own API, it is the direct target and
+  the relay is left out.
+- **direct:** ElevenLabs' own API (`https://api.elevenlabs.io/v1`) with an
+  `elevenlabs.key` unit credential. The route has no ElevenLabs key of its
+  own, so without one the direct target is left out, saying so.
+- **Timed** as a chat is, to the first byte (the head), then to the
+  **first audio** (`first_audio_ms`, the body's first byte) and **done**
+  (`done_ms`, the whole piece downloaded), with its `audio_bytes`. An
+  answer's first sound waits for its first piece's first audio, so the
+  relay's share of that is what each turn pays before the lamp speaks.
+- **With `--kept`** as well (`--wire --kept --speech`), on one kept
+  connection, as the chat's arms are.
+
+The lines are `wire speech target=… run=…` (`wire kept speech target=…
+run=… arm=…` with `--kept`), then each target's medians with the 90th
+percentile of the first byte, the first audio and done, and
+`wire speech relay-less-direct`, step by step to done. Its 10 runs ask 20
+pieces, about 740 characters billed, or 60 pieces and about 2,200
+characters with `--kept`. The first line names the model asked:
+`systemd-run` doesn't carry the voice unit's environment, so give the
+unit's `LAMP_SECOND_SPEECH_MODEL` with `-E` when it sets one.
+
+```sh
+systemd-run --pty --wait \
+  -p LoadCredential=elevenlabs.key:/path/to/elevenlabs.key \
+  /opt/lampOS/voice/current/lamp-voice probe-cascade \
+  /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10 --wire --speech
+```
 
 ### How much the prompt cache holds (`probe-cache`)
 
@@ -2173,6 +2260,15 @@ reads them. Where the catalog has no schedule, the lines aren't asked, and
 it says so. It prints `right=N/M` and the functions called first per line,
 then a verdict.
 
+**Then the timer said once** (#2089, `LAMP_SECOND_SAID_ONCE`, asked with the
+heeding's functions). This is round 2 of "Set a timer for one minute.", as
+the engine asks it: round 1's "A minute, starting now." with its `set_timer`
+call, then the schedule's committed result. It is asked once without the
+switch's note and once with it (`said_once_note`). Right is nothing called
+and no second confirmation: no "minute", "starting", "started" or
+"counting". The time it goes off at, or nothing, is right. It prints
+`right=N/M` per arm, then whether the note's arm was right every time.
+
 **Then memory's quality** (`probe/quality.rs`, #1693, the first builder at
 03:05 on #1722). There are six cases, each a fresh session told what the lamp
 keeps as its frozen snapshot (with source ids), under the memory note and
@@ -2273,7 +2369,8 @@ Reported by the builders:
   close faces turned to the lamp (`humans/faces/tracked`), both sampled
   every 100 ms, over the line's sound. Each spoken line is judged once as
   it is judged for whom it answers, published on `attention/addressed`, and
-  in a busy room it lets the line out. Off unless set; off on lamp-4ace.
+  in a busy room it lets the line out. Only as the lamp's only voice (a
+  standby beside Live publishes nothing). Off unless set; off on lamp-4ace.
 - **The name signal (`LAMP_NAME_SIGNAL=on`)** offers spoken turns
   `heard_my_name`, as the Live route's sessions are offered it, given at
   once with `LAMP_SECOND_FEW_TOOLS`. Its call is answered as declined and

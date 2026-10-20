@@ -68,6 +68,7 @@ mod cleanup;
 mod cloud;
 use cleanup::{Failures as ShutdownFailures, Stage as CleanupStage};
 mod early_end;
+pub mod early_finalize;
 mod endpoint;
 mod hand;
 mod holding;
@@ -250,6 +251,33 @@ fn reply_sounding(mask: &PlaybackMask, reply: &Option<Reply>, at_us: u64) -> boo
 /// the decision fails (the reviewer's P1 on #1352).
 fn may_hold_once_decided(wait: AnswerWait) -> bool {
     wait.waited && wait.sounding && wait.heard
+}
+
+/// #1712's B (the first builder at 06:44, `LAMP_MOTION_KEEPS_ANSWER=on`):
+/// what the body's motion makes of `candidate`, a new sound while an answer
+/// is awaited and has not sounded (the request in flight, its first words
+/// not yet played). One that began as the body moved a joint is the lamp's
+/// own sound, its motors, as its playout is, and takes no turn
+/// ([`crate::body_motion::Judged::Moved`]). The lamp's name heard with it
+/// is still a call (as for [`while_answer_waits`]). Anything else is heard
+/// as before: no answer awaited, an answer that has sounded, or the lamp
+/// sounding now, where the duplex hears what is its own.
+fn body_heard(
+    judged: impl FnOnce() -> crate::body_motion::Judged,
+    reply: Option<&Reply>,
+    sounding: bool,
+    name_began_us: Option<u64>,
+    candidate: &crate::admission::Candidate,
+) -> crate::body_motion::Judged {
+    let awaited = reply.is_some_and(|current| current.local_input_ended && !current.had_audio);
+    let named = name_began_us.is_some_and(|began| {
+        began.saturating_add(crate::activity::CALL_BEFORE_US) >= candidate.trigger_read_at_us
+    });
+    if awaited && !sounding && !named {
+        judged()
+    } else {
+        crate::body_motion::Judged::Still
+    }
 }
 
 /// [`WhileAnswerWaits`] for `candidate` at `at_us`: `ended` if its sound is
@@ -810,6 +838,9 @@ struct Rig {
     end_silence_blocks: Option<u16>,
     /// The end sent early, after this many blocks of quiet (`--early-end-ms`).
     early_end_blocks: Option<u16>,
+    /// A line's words asked for at a pause (`LAMP_SECOND_EARLY_FINALIZE`,
+    /// [`early_finalize`]).
+    early_finalize: bool,
     faint_level: Option<u8>,
     playout_start: PlayoutStart,
     /// `directed-fixture --fixture-at-ms`: the fixture's own turn, this long
@@ -2736,6 +2767,7 @@ fn flush_provider_input_with(
             | ProviderInput::Audio { request, .. }
             | ProviderInput::End { request, .. }
             | ProviderInput::Called { request, .. }
+            | ProviderInput::Paused { request, .. }
             | ProviderInput::Reminder { request, .. }
             | ProviderInput::Written { request, .. } => *request,
         };
@@ -3260,6 +3292,7 @@ fn spawn_rig(
         turn_taking: options.turn_taking,
         end_silence_blocks: options.end_silence_blocks,
         early_end_blocks: options.early_end_blocks,
+        early_finalize: early_finalize::from_environment(),
         faint_level: options.faint_level,
         playout_start: options.playout_start,
         fixture_at_ms,
@@ -4234,6 +4267,14 @@ fn conversation_with_gate(
         .is_some()
         .then(|| crate::bus_out::NameIn::from_environment_on(lamp_msgs::NameHeard::RISING_TOPIC))
         .flatten();
+    // #1712's B: the body's joints, so that a sound its motors make while
+    // an answer is awaited takes no turn (`LAMP_MOTION_KEEPS_ANSWER=on`).
+    let mut motion_in = crate::body_motion::MotionIn::from_environment();
+    if motion_in.is_some() {
+        eprintln!(
+            "lamp-voice: motion keeps the answer: while an answer is awaited, a sound that begins as the body moves a joint (4 servo counts or more a message) is the lamp's own, unless its name is heard"
+        );
+    }
     if asker_first.is_some() {
         eprintln!(
             "lamp-voice: asker first{}: for {} s while an answer is awaited, speech more than {:.0} dB under the asker's takes no turn; {}",
@@ -4290,6 +4331,11 @@ fn conversation_with_gate(
     // the provider after a short quiet, and its answer held until the
     // detector's own end of speech confirms it (`early_end`).
     let mut early = rig.early_end_blocks.map(EarlyEnd::new);
+    // The words asked for at a pause, the stream kept open
+    // (`LAMP_SECOND_EARLY_FINALIZE`): off unless set.
+    let mut early_finalize = rig
+        .early_finalize
+        .then(early_finalize::EarlyFinalize::default);
     if let Some(early) = early.as_ref() {
         record(
             trace,
@@ -4310,6 +4356,9 @@ fn conversation_with_gate(
     // A yield's request begins at the person's first words, said under the
     // lamp's voice, as far back as 1.6 s (#828). Off unless set.
     let first_words = duplex && crate::activity::first_words_kept();
+    // And a line begun as the lamp's sound ends, at the onset that sound
+    // hid (#1722, `LAMP_REPLY_END_REACH=on`). Off unless set.
+    let reply_end_reach = first_words && crate::activity::reply_end_reach();
     // Listening gaps (#828, `LAMP_LISTEN_GAPS=on`): a long reply's
     // sentence ends held quiet, and a person heard in the lamp's own
     // silence. Off unless set; only with ears.
@@ -4430,6 +4479,7 @@ fn conversation_with_gate(
             "fruitless_yield_forgiven_after_ms":crate::turn_taking::FORGIVE_FRUITLESS_US / 1_000,
             "decision_budget_us":hold.decision_budget_us,
             "first_words_kept_blocks":first_words.then_some(crate::activity::REACH_BACK_BLOCKS),
+            "reply_end_reach_within_blocks":reply_end_reach.then_some(lamp_audio::evidence::QUIET_BLOCKS_CEILING),
             "listen_gaps":listen_gaps.then_some(json!({"after_ms":crate::listen_gaps::AFTER_FRAMES * 1_000 / u64::from(lamp_audio::RENDER_RATE),"quiet_run_ms":crate::listen_gaps::LOW_RUN_CHUNKS * 10,"gap_ms":crate::listen_gaps::GAP_US / 1_000,"silence_heard":true})),
             "stop_words_after_still_blocks":(stop_words.is_some() && !always).then_some(crate::stop_words::FINALIZE_AFTER_STILL_BLOCKS),
             "stop_words_always":(stop_words.is_some() && always).then_some(true),
@@ -5845,6 +5895,8 @@ fn conversation_with_gate(
             // evidence, by each block's own score (#828).
             if yielded {
                 detector.reach_back();
+            } else if reaches_past_reply(reply_end_reach, frame.echo.as_ref()) {
+                detector.reach_back_to_onset();
             }
             let samples = observation.samples;
             let captured_at_us = observation.captured_at_us;
@@ -6036,6 +6088,55 @@ fn conversation_with_gate(
                             )?;
                         }
                         continue;
+                    }
+                    // #1712's B: a new sound that began as the body moved a
+                    // joint, while an answer is awaited, is the lamp's own
+                    // motors: let go, and the answer goes on. Until the
+                    // body has said where it was then, it waits.
+                    if let Some(motion) = motion_in.as_mut() {
+                        let waits_until_us = candidate
+                            .trigger_read_at_us
+                            .saturating_add(crate::body_motion::WAITS_US)
+                            .min(candidate.decision_deadline_us.saturating_sub(20_000));
+                        match body_heard(
+                            || {
+                                motion.judge(
+                                    candidate.first_read_at_us,
+                                    candidate.trigger_read_at_us,
+                                    at_us,
+                                    crate::privacy_bus::wall_ms(),
+                                    waits_until_us,
+                                )
+                            },
+                            reply.as_ref(),
+                            reply_sounding(&playback_mask, reply, at_us),
+                            name_began_us,
+                            &candidate,
+                        ) {
+                            crate::body_motion::Judged::Moved { began, ended } => {
+                                if let Some(rejection) =
+                                    admission.release_prospective(monotonic_us())?
+                                {
+                                    record_input_rejection(trace, rejection)?;
+                                }
+                                detector.clear_prospective();
+                                eprintln!(
+                                    "lamp-voice: a sound that began as the body moved a joint was let go; the answer goes on"
+                                );
+                                record(
+                                    trace,
+                                    json!({"kind":"input_let_go_body_moving","at_us":at_us,
+                                        "turn":reply.as_ref().map(|current| current.owner.turn()),
+                                        "onset_from_us":candidate.first_read_at_us,
+                                        "onset_to_us":candidate.trigger_read_at_us,
+                                        "moved_from_us":began,"moved_until_us":ended,
+                                        "boundary":"a new sound began as the body moved a joint while an answer was awaited: the lamp's own motors"}),
+                                )?;
+                                continue;
+                            }
+                            crate::body_motion::Judged::Waits => continue,
+                            crate::body_motion::Judged::Still => {}
+                        }
                     }
                     // #1123: while an answer is awaited and has not
                     // sounded, a new sound takes the turn only once it has
@@ -6386,6 +6487,16 @@ fn conversation_with_gate(
                             audio,
                             provider_queue_bound,
                         )?;
+                        if let Some(early_finalize) = early_finalize.as_mut()
+                            && early_finalize.heard(turn, detector.pause_blocks())
+                        {
+                            queue_input_paused(
+                                &mut provider_queue,
+                                current,
+                                snapshot.microphone_generation(),
+                                provider_queue_bound,
+                            );
+                        }
                         // The end sent early, after a short quiet. Not for
                         // what would be thrown out as a sound if the quiet
                         // went on: that is judged when the lamp is sure, as
@@ -8248,6 +8359,17 @@ fn clear_capture_lineage(
     detector.discard_inactive_prefix();
     mask.clear_read_lineage();
     Ok(())
+}
+
+/// Whether a start heard now comes as the lamp's sound ends, so that with
+/// `LAMP_REPLY_END_REACH=on` it may begin at the onset that sound hid
+/// ([`crate::activity::TurnDetector::reach_back_to_onset`], #1722): the
+/// lamp's sound quiet under [`lamp_audio::evidence::QUIET_BLOCKS_CEILING`]
+/// blocks, 640 ms, past the 300 ms the duplex rule waits before it lets a
+/// person start.
+fn reaches_past_reply(on: bool, echo: Option<&lamp_audio::evidence::EchoEvidence>) -> bool {
+    on && echo
+        .is_some_and(|echo| echo.render_quiet_blocks < lamp_audio::evidence::QUIET_BLOCKS_CEILING)
 }
 
 /// Duplex hearing for one capture block, before admission sees it. Returns
@@ -10222,6 +10344,25 @@ fn queue_input(
     Ok(())
 }
 
+/// The request's line has gone quiet for a moment
+/// (`LAMP_SECOND_EARLY_FINALIZE`): nothing for a local-only turn (#830),
+/// whose request never went out, nor with the queue at its bound, since it
+/// only saves time.
+fn queue_input_paused(
+    queue: &mut VecDeque<ProviderInput>,
+    reply: &Reply,
+    privacy_generation: u64,
+    bound: usize,
+) {
+    if reply.local_only.is_some() || queue.len() >= bound {
+        return;
+    }
+    queue.push_back(ProviderInput::Paused {
+        request: reply.owner.turn(),
+        privacy_generation,
+    });
+}
+
 /// What tells the model that the request ending now was only the lamp's
 /// name, to go just before its end: when its end is a call's wait that ran
 /// out (`--call-wait-ms`, #782). Nothing for any other end, nor for a
@@ -10949,6 +11090,7 @@ mod tests {
             second: None,
             end_silence_blocks: None,
             early_end_blocks: None,
+            early_finalize: false,
             faint_level: None,
             microphone: crate::options::Microphone::Mic2,
             speaker,

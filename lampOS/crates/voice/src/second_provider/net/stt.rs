@@ -249,6 +249,17 @@ pub(crate) struct Transcript {
 
 impl Transcript {
     pub fn add(&mut self, heard: Heard) {
+        // A final that ends no later than the finals before it, with the
+        // last one's words, is that one again (a second copy, as a proxy
+        // or a `Finalize` might send): its words are not said twice.
+        // Finals never overlap, so a new one always ends later.
+        if heard.is_final
+            && !heard.transcript.is_empty()
+            && self.covered.is_some_and(|covered| heard.end <= covered)
+            && self.segments.last() == Some(&heard.transcript)
+        {
+            return;
+        }
         if !heard.is_final {
             if !heard.transcript.is_empty() {
                 self.pending = Some(Pending::Interim(heard.end));
@@ -438,6 +449,9 @@ pub struct SttStream {
     /// over the lamp the canceller can take a stop word under any bar, 51 of
     /// 88 with nothing over -28 dBFS left (#828).
     quiet_end: Arc<AtomicBool>,
+    /// On Flux, whose flush ends its turn (`ForceEndTurn`): a pause asks
+    /// nothing of it ([`Self::paused`]).
+    on_flux: bool,
 }
 
 /// Words a stream has before they are final, for a chat begun on them
@@ -573,6 +587,7 @@ impl SttStream {
             replies,
             early: Some(early),
             quiet_end,
+            on_flux,
         }
     }
 
@@ -620,6 +635,17 @@ impl SttStream {
     /// come only once `Finalize` asks for them, 269 ms after its audio).
     pub fn flush(&self) -> Result<()> {
         self.queue(Outgoing::Flush)
+    }
+
+    /// The line has gone quiet for a moment (`LAMP_SECOND_EARLY_FINALIZE`):
+    /// its words so far are asked for ([`Self::flush`]) and the stream goes
+    /// on. Not on Flux, where a flush would end the turn, and Flux ends its
+    /// turns itself.
+    pub fn paused(&self) -> Result<()> {
+        if self.on_flux {
+            return Ok(());
+        }
+        self.flush()
     }
 
     fn queue(&self, outgoing: Outgoing) -> Result<()> {
@@ -844,6 +870,16 @@ where
     // from `CloseStream`, and whether `Finalize` was ignored or answered
     // short was not told).
     let mut answered: Option<(Duration, f64)> = None;
+    // A `Finalize` asked for mid-line, at a pause (`flush`), and its answer:
+    // with the rest of the line quiet, its words are the line's at the end,
+    // with no second `Finalize` (`LAMP_SECOND_EARLY_FINALIZE`, the first
+    // builder on #1722, 20 Oct 07:20).
+    let mut flushed: Option<Instant> = None;
+    let mut flush_answered: Option<(Duration, f64)> = None;
+    // A block over the absolute floor sent since that `Finalize`: a word,
+    // however soft, that its answer can't hold (Jarvis on #2102: a soft
+    // "on" 31 dB under the line's peak, under `LineSound`'s bar, was lost).
+    let mut sounded_since_flush = false;
     // `CloseStream` went: its final words, or its close, are waited for.
     let mut closing = false;
     let mut last_final: Option<Instant> = None;
@@ -881,6 +917,9 @@ where
             frame = queued.recv(), if finalize_by.is_none() && !closing => {
                 match frame {
                     Some(Outgoing::Audio(bytes)) => {
+                        if flushed.is_some() && level(&bytes) > SOUND_FLOOR_RMS {
+                            sounded_since_flush = true;
+                        }
                         sound.sent(&bytes, (samples_sent + bytes.len() / 2) as f64 / 16_000.0);
                         samples_sent += bytes.len() / 2;
                         write
@@ -898,6 +937,9 @@ where
                             .await
                             .map_err(|_| Error::Transport("speech-to-text send"))?;
                         last_sent = Instant::now();
+                        flushed = Some(last_sent);
+                        flush_answered = None;
+                        sounded_since_flush = false;
                         continue;
                     }
                     None => {}
@@ -912,6 +954,25 @@ where
                 if transcript.settled(sent) {
                     let _ = write.send(close_stream()).await;
                     return Ok(ending(&transcript, &at_end, None, "settled"));
+                }
+                // A pause's `Finalize` was answered, and what came after it
+                // is the line's quiet end: its words are the line's now.
+                if flush_answered.is_some()
+                    && !sounded_since_flush
+                    && quiet_end.load(Ordering::Acquire)
+                    && transcript.covers_the_sound(sound.to)
+                {
+                    let _ = write.send(close_stream()).await;
+                    let (words, told) = ending(&transcript, &at_end, Some(flush_answered), "flush");
+                    return Ok((
+                        words,
+                        told.map(|told| {
+                            format!(
+                                "{told}, the rest quiet: sound to {} ms",
+                                (sound.to * 1000.0).round() as i64
+                            )
+                        }),
+                    ));
                 }
                 // The words so far, the last interim's among them, while
                 // `Finalize`'s answer comes: a chat may begin on them.
@@ -962,6 +1023,13 @@ where
                             && answered.is_none()
                         {
                             answered = Some((went.elapsed(), words.end));
+                        }
+                        if let Some(went) = flushed
+                            && finalized
+                            && finalize_went.is_none()
+                            && flush_answered.is_none()
+                        {
+                            flush_answered = Some((went.elapsed(), words.end));
                         }
                         transcript.add(words);
                         if closing && transcript.settled(sent) {
@@ -1260,6 +1328,35 @@ mod tests {
         assert_eq!(transcript.words().0, "what time is it");
     }
 
+    /// A second copy of a final (the same words, ending no later) is not
+    /// said twice; a new final, or the same words later in the audio, is.
+    #[test]
+    fn a_final_said_again_is_not_heard_twice() {
+        let result = |text: &str, is_final, end| Heard {
+            transcript: text.to_owned(),
+            is_final,
+            speech_final: true,
+            from_finalize: false,
+            end,
+        };
+        let mut transcript = Transcript::default();
+        transcript.add(result("hey lamp", true, 0.6));
+        transcript.add(result("hey lamp", true, 0.6));
+        assert_eq!(transcript.words().0, "hey lamp");
+        transcript.add(result("what time is it", true, 1.8));
+        transcript.add(result("what time is it", true, 1.7));
+        assert_eq!(transcript.words().0, "hey lamp what time is it");
+        // The same words said again later are new.
+        transcript.add(result("what time is it", true, 3.0));
+        assert_eq!(
+            transcript.words().0,
+            "hey lamp what time is it what time is it"
+        );
+        // An interim of the same words is a preview, as before.
+        transcript.add(result("what time is it", false, 3.0));
+        assert!(!transcript.settled(3.0), "an interim with words is pending");
+    }
+
     #[test]
     fn the_end_of_the_line_is_told_in_ms_without_words() {
         let mut transcript = Transcript::default();
@@ -1421,6 +1518,129 @@ mod tests {
         let took = began.elapsed();
         server.abort();
         (words, at_end.unwrap(), took)
+    }
+
+    /// 20 ms blocks as `runs`, with a `Finalize` asked for mid-line after
+    /// the run numbered `flush_after` (a pause, `LAMP_SECOND_EARLY_FINALIZE`);
+    /// the service answers its Nth `Finalize` with `answers[N]`, the first
+    /// result an interim. Finished as a request's line. The words, the
+    /// journal's account, how long finishing took and how many `Finalize`s
+    /// went.
+    async fn finish_flushed(
+        runs: &[(usize, i16)],
+        flush_after: usize,
+        answers: &'static [&'static str],
+        quiet_end: bool,
+    ) -> (String, String, Duration, usize) {
+        use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
+        let (near, far) = tokio::io::duplex(1 << 16);
+        let server = tokio::spawn(async move {
+            let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+            let (mut told, mut finalizes) = (false, 0);
+            while let Some(Ok(message)) = socket.next().await {
+                match message {
+                    Message::Binary(_) if !told => {
+                        told = true;
+                        socket.send(Message::text(INTERIM)).await.unwrap();
+                    }
+                    Message::Text(text) if text.contains("Finalize") => {
+                        if let Some(answer) = answers.get(finalizes) {
+                            socket.send(Message::text(*answer)).await.unwrap();
+                        }
+                        finalizes += 1;
+                    }
+                    Message::Text(text) if text.contains("CloseStream") => break,
+                    _ => {}
+                }
+            }
+            // A service closes as it should once CloseStream comes.
+            let _ = socket.close(None).await;
+            finalizes
+        });
+        let stream =
+            SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+        for (run, &(blocks, sample)) in runs.iter().enumerate() {
+            for _ in 0..blocks {
+                stream.send(&[sample; 320]).unwrap();
+            }
+            if run == flush_after {
+                stream.flush().unwrap();
+                tokio::time::sleep(Duration::from_millis(300)).await;
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let began = Instant::now();
+        let (words, at_end) = stream.finish_told(quiet_end).await.unwrap();
+        let took = began.elapsed();
+        (words, at_end.unwrap(), took, server.await.unwrap())
+    }
+
+    /// The first builder on #1722, 20 Oct 07:20 (`LAMP_SECOND_EARLY_FINALIZE`):
+    /// a `Finalize` asked for at a pause is answered while the line's quiet
+    /// end goes on; at the end its words are the line's at once, with no
+    /// second `Finalize` and no wait.
+    #[tokio::test(start_paused = true)]
+    async fn a_pauses_finalize_answer_is_the_lines_words_at_its_end() {
+        const ANSWERED: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hello lamp"}]}}"#;
+        // 0.6 s of sound, the pause's Finalize, then 0.4 s of quiet.
+        let (words, at_end, took, finalizes) =
+            finish_flushed(&[(30, SOUND), (20, 0)], 0, &[ANSWERED], true).await;
+        assert_eq!(words, "hello lamp");
+        assert_eq!(took, Duration::ZERO, "no wait at the end");
+        assert_eq!(finalizes, 1, "no second Finalize");
+        assert!(
+            at_end.contains(", words from=flush, the rest quiet: sound to 600 ms"),
+            "{at_end}"
+        );
+    }
+
+    /// Speech goes on after the pause: the end asks again, and the words
+    /// are all the line's finals in order.
+    #[tokio::test(start_paused = true)]
+    async fn speech_after_a_pauses_finalize_keeps_every_word_in_order() {
+        const FIRST: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hello lamp"}]}}"#;
+        const REST: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.6,"duration":1.0,"channel":{"alternatives":[{"transcript":"what time is it"}]}}"#;
+        let (words, at_end, _, finalizes) = finish_flushed(
+            &[(30, SOUND), (20, 0), (30, SOUND), (10, 0)],
+            1,
+            &[FIRST, REST],
+            true,
+        )
+        .await;
+        assert_eq!(words, "hello lamp what time is it");
+        assert_eq!(finalizes, 2);
+        assert!(at_end.contains(", words from=finalize"), "{at_end}");
+    }
+
+    /// Jarvis on #2102: a soft last word after the pause's `Finalize`, 31 dB
+    /// under the line's peak (under `LineSound`'s bar) but over the absolute
+    /// floor, is kept as with the switch off: the end asks again.
+    #[tokio::test(start_paused = true)]
+    async fn a_soft_word_after_a_pauses_finalize_is_kept() {
+        const HANG: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hang"}]}}"#;
+        const ON: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.6,"duration":0.9,"channel":{"alternatives":[{"transcript":"on"}]}}"#;
+        let (words, at_end, _, finalizes) = finish_flushed(
+            &[(30, SOUND), (20, 0), (15, 80), (10, 0)],
+            1,
+            &[HANG, ON],
+            true,
+        )
+        .await;
+        assert_eq!(words, "hang on");
+        assert_eq!(finalizes, 2, "{at_end}");
+        assert!(!at_end.contains("words from=flush"), "{at_end}");
+    }
+
+    /// The stop words' stream (`finished`, no quiet end) is left as it was
+    /// (the first builder, 07:36): a pause's answer never ends its line;
+    /// its end still asks again.
+    #[tokio::test(start_paused = true)]
+    async fn a_stop_words_stream_never_takes_a_pauses_answer_as_its_end() {
+        const ANSWERED: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"stop"}]}}"#;
+        let (_, at_end, _, finalizes) =
+            finish_flushed(&[(30, SOUND), (20, 0)], 0, &[ANSWERED, ANSWERED], false).await;
+        assert_eq!(finalizes, 2, "its end asks again");
+        assert!(!at_end.contains("words from=flush"), "{at_end}");
     }
 
     /// #1712, lamp-4ace 19 Oct (the first builder at 23:46): on 114 of 131
