@@ -287,6 +287,8 @@ for fields, errors, retries, invalidation and caller responsibilities.
   at most 16384; more is lowered, not refused. Bytes are of text; the first
   entry that does not fit whole ends the answer. A query's words are those of
   two characters or more, the first 16. `kept`: 4096 bytes unless given.
+  The Days memory also takes `day_from`/`day_to` and `recall_v2` here
+  (#2176, memory-days.md); this legacy store refuses them as unknown fields.
 - `at_unix_ms` outside the years 1970 to 9999: `bad_time`.
 
 ## How the voice uses it
@@ -385,6 +387,32 @@ the unchanged legacy client, used unless the new Days client is selected.
     (requests and scopes, the switch off), and `crates/memory/tests/voice_forget.rs`
     (through the voice's Days client against the real store: what recall
     gave goes and something else stays; everything goes, journal included).
+
+- **Recall's second version** (#2176, `LAMP_MEMORY_RECALL_V2=on`, with
+  the Days client only; off unless set; both voice routes).
+  - **Words that match everything:** the memory leaves common English and
+    Vietnamese words ("what", "is", "my", "của", "tôi", "là" …) out of a
+    recall's query. "What is my drink order" searches "drink" and "order"
+    only, and a question of nothing else finds nothing. A known limit:
+    Vietnamese words that only differ by accents from a common word
+    (chó/cho, đỏ/đó, má/mà, lá/là) are kept as key words, but the index
+    folds accents, so they also match entries with the common word, and
+    ranking does not put the exact word first; folding before the check
+    would drop the real word instead.
+  - **A span of days:** `recall` also takes `days_ago_from` and
+    `days_ago_to`, both ends counted, at most 14 days: "last week" is 7 to
+    1. The function's description tells the model so. The voice sends the
+    memory `day_from` and `day_to`.
+  - **Kept things by day:** a day or a span also finds what was kept on
+    those days, not only the conversations.
+  - **Off:** the function and every request are as before.
+  - Tests: `remember::tests::with_the_switch_recall_asks_a_span_of_days_and_the_second_version`
+    (the requests, the clamp, the function, the switch off) and
+    `crates/memory/tests/days_recall.rs` (the store: the drink order, common
+    words only, a keyword beside them, an accented word matching its
+    common fold, 7 to 1 finding three days ago and
+    not nine, a kept thing by span, bad spans, and without the option the
+    same answers).
 
 - **Kept without being asked** (#1693 (2), `LAMP_MEMORY_OBSERVE=on`,
   with the Days client, on the second route only; off unless set).

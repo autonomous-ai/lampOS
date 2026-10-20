@@ -82,6 +82,29 @@ pub fn forget_all_on() -> bool {
 pub fn switch_forget_all(on: bool) -> bool {
     *FORGET_ALL.get_or_init(|| on)
 }
+/// Only the exact value `on`, with the Days client: recall's second version
+/// (#2176). A question's common words ("what", "my", "của", "tôi") match
+/// nothing, recall takes a span of days (`days_ago_from`, `days_ago_to`),
+/// and a day or span finds what was kept on it too. Off, recall is as
+/// before.
+pub const RECALL_V2_ENVIRONMENT: &str = "LAMP_MEMORY_RECALL_V2";
+static RECALL_V2: OnceLock<bool> = OnceLock::new();
+
+/// Whether recall's second version is on ([`RECALL_V2_ENVIRONMENT`]).
+pub fn recall_v2_on() -> bool {
+    RECALL_V2.get() == Some(&true)
+}
+
+/// Set it once for this process, as [`start`] does from the environment;
+/// the first setting stands.
+pub fn switch_recall_v2(on: bool) -> bool {
+    *RECALL_V2.get_or_init(|| on)
+}
+
+/// The most days a recall's span names, both ends counted: the memory's
+/// own bound (#2176).
+const SPAN_DAYS: u64 = 14;
+
 /// Only the exact value `on`, with the Days client: a session opened for
 /// someone known may be told one open thread of theirs to ask about, once
 /// (#1693 (3)). Off, the session is told what it was.
@@ -162,6 +185,69 @@ pub fn tools() -> Vec<Tool> {
     tools_with(crate::rules::on())
 }
 
+/// The recall function; with its second version ([`RECALL_V2_ENVIRONMENT`])
+/// it also takes a span of days.
+fn recall_tool(second: bool) -> Tool {
+    let mut description = "Call this when someone asks about something from an earlier conversation or an earlier \
+                          day that you do not already know: what they told you, what you talked about yesterday, \
+                          something they asked you to remember. Not for what was said in this conversation. \
+                          If nothing is found, say you do not remember; never make something up. You cannot tell who \
+                          is speaking now, so do not say 'you told me': just give what you remember, roughly \
+                          and without dates or times."
+        .to_owned();
+    let mut parameters = json!({
+        "type": "object",
+        "properties": {
+            "about": {"type": "string", "description": "One to four key words to look for, such as 'coffee' or 'dentist appointment'. Leave out for the most recent conversations."},
+            "days_ago": {"type": "integer", "description": "Only that day: 0 for today, 1 for yesterday. Leave out for any day."}
+        }
+    });
+    if second {
+        description.push_str(
+            " For a span of days, such as last week or the past few days, give days_ago_from and days_ago_to \
+             instead of days_ago: last week is 7 to 1. A span is at most 14 days.",
+        );
+        parameters["properties"]["days_ago_from"] = json!({"type": "integer", "description": "The span's oldest day, in days ago: 7 for a week ago."});
+        parameters["properties"]["days_ago_to"] = json!({"type": "integer", "description": "The span's newest day, in days ago: 1 for yesterday, 0 for today."});
+    }
+    Tool {
+        name: RECALL.into(),
+        description,
+        parameters: Some(parameters),
+        silent: false,
+    }
+}
+
+/// What recall's second version adds to a recall's request (#2176): the
+/// option, and a span's first and last days when the call names one. A
+/// span given with only one end runs from it to today, or is that one day;
+/// one longer than [`SPAN_DAYS`] keeps its newest days.
+fn recall_v2_request(
+    request: &mut Value,
+    call: &ToolCall,
+    now_unix_ms: u64,
+    zone: Option<&LocalTime>,
+) {
+    request["recall_v2"] = json!(true);
+    let ago = |name| {
+        call.args
+            .get(name)
+            .and_then(Value::as_u64)
+            .filter(|days| *days <= 3_650)
+    };
+    let (from, to) = match (ago("days_ago_from"), ago("days_ago_to")) {
+        (None, None) => return,
+        (Some(from), None) => (from, 0),
+        (None, Some(to)) => (to, to),
+        (Some(from), Some(to)) => (from.max(to), from.min(to)),
+    };
+    let from = from.min(to + SPAN_DAYS - 1);
+    let today = local_day(now_unix_ms, zone);
+    request["day"] = Value::Null;
+    request["day_from"] = json!(day_name(today - from as i64));
+    request["day_to"] = json!(day_name(today - to as i64));
+}
+
 /// [`tools`] with the rules switched on or off.
 pub fn tools_with(rules: bool) -> Vec<Tool> {
     let mut tools = vec![
@@ -179,24 +265,7 @@ pub fn tools_with(rules: bool) -> Vec<Tool> {
             })),
             silent: false,
         },
-        Tool {
-            name: RECALL.into(),
-            description: "Call this when someone asks about something from an earlier conversation or an earlier \
-                          day that you do not already know: what they told you, what you talked about yesterday, \
-                          something they asked you to remember. Not for what was said in this conversation. \
-                          If nothing is found, say you do not remember; never make something up. You cannot tell who \
-                          is speaking now, so do not say 'you told me': just give what you remember, roughly \
-                          and without dates or times."
-                .into(),
-            parameters: Some(json!({
-                "type": "object",
-                "properties": {
-                    "about": {"type": "string", "description": "One to four key words to look for, such as 'coffee' or 'dentist appointment'. Leave out for the most recent conversations."},
-                    "days_ago": {"type": "integer", "description": "Only that day: 0 for today, 1 for yesterday. Leave out for any day."}
-                }
-            })),
-            silent: false,
-        },
+        recall_tool(recall_v2_on()),
         if forget_all_on() {
             Tool {
                 name: FORGET.into(),
@@ -640,6 +709,8 @@ pub fn start(socket: PathBuf, known: Option<PathBuf>) {
     crate::rules::switch(days && crate::rules::from_environment());
     // Forgetting that reaches everything lives only in the Days memory.
     switch_forget_all(days && std::env::var(FORGET_ALL_ENVIRONMENT).ok().as_deref() == Some("on"));
+    // So does recall's second version (#2176).
+    switch_recall_v2(days && std::env::var(RECALL_V2_ENVIRONMENT).ok().as_deref() == Some("on"));
     if days {
         DAYS.get_or_init(|| {
             // The optional thread file contains no source IDs. A new Days
@@ -1007,6 +1078,8 @@ pub struct DaysClient {
     threads: AtomicBool,
     /// [`forget_all_on`], read when the client is made (#1693).
     forget_all: AtomicBool,
+    /// [`recall_v2_on`], read when the client is made (#2176).
+    recall_v2: AtomicBool,
     /// The conversation the writer is in: whose, and the exchanges of it
     /// journalled so far. With [`forget_all_on`], a thing remembered in it
     /// is kept with them, so forgetting it removes them too (#1693).
@@ -1246,6 +1319,7 @@ impl DaysClient {
                 std::env::var(THREADS_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
             forget_all: AtomicBool::new(forget_all_on()),
+            recall_v2: AtomicBool::new(recall_v2_on()),
             current,
         })
     }
@@ -1527,6 +1601,9 @@ impl DaysClient {
                 true,
             );
         };
+        if call.name == RECALL && self.recall_v2.load(Ordering::Acquire) {
+            recall_v2_request(&mut request, call, now, zone);
+        }
         if call.name == RECALL && request["query"].is_string() {
             request["op"] = json!("search");
         }
@@ -2933,6 +3010,80 @@ mod tests {
         assert_eq!(read[1]["op"], "recall");
         drop(client);
         std::fs::remove_file(socket).unwrap();
+    }
+
+    /// #2176, `LAMP_MEMORY_RECALL_V2`: recall asks the memory's second
+    /// version, with a span of days when the model gives one ("last week"
+    /// is 7 to 1, at most 14 days); the function says so. Off, the same
+    /// calls ask what they always did.
+    #[test]
+    fn with_the_switch_recall_asks_a_span_of_days_and_the_second_version() {
+        let (socket, served) = memory("recall-v2", 4, |_| json!({"ok":true,"entries":[]}));
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.recall_v2.store(true, Ordering::Release);
+        let run = |args| client.run_at(&call(RECALL, args), FIRST_READ, NOW, Some(&EAST), None);
+        assert!(run(json!({"about":"drink order","days_ago_from":7,"days_ago_to":1})).1);
+        assert!(run(json!({"days_ago_from":1,"days_ago_to":30})).1);
+        assert!(run(json!({"days_ago":1})).1);
+        assert!(run(json!({"about":"tea","days_ago_from":3})).1);
+        let read = served.join().unwrap();
+        assert_eq!(
+            read[0],
+            json!({"op":"search","query":"drink order","day":null,"day_from":"2026-10-06","day_to":"2026-10-12","limit":6,"max_bytes":2400,"recall_v2":true})
+        );
+        assert_eq!(
+            read[1],
+            json!({"op":"recall","query":null,"day":null,"day_from":"2026-09-29","day_to":"2026-10-12","limit":6,"max_bytes":2400,"recall_v2":true})
+        );
+        assert_eq!(
+            read[2],
+            json!({"op":"recall","query":null,"day":"2026-10-12","limit":6,"max_bytes":2400,"recall_v2":true})
+        );
+        assert_eq!(
+            read[3],
+            json!({"op":"search","query":"tea","day":null,"day_from":"2026-10-10","day_to":"2026-10-13","limit":6,"max_bytes":2400,"recall_v2":true})
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+
+        // Off: a span is passed over, and nothing new is asked.
+        let (socket, served) = memory("recall-v2-off", 2, |_| json!({"ok":true,"entries":[]}));
+        let client = DaysClient::new(socket.clone()).unwrap();
+        assert!(!client.recall_v2.load(Ordering::Acquire));
+        let run = |args| client.run_at(&call(RECALL, args), FIRST_READ, NOW, Some(&EAST), None);
+        run(json!({"about":"drink order","days_ago_from":7,"days_ago_to":1}));
+        run(json!({"about":"drink order"}));
+        let read = served.join().unwrap();
+        assert_eq!(read[0], read[1]);
+        assert_eq!(
+            read[0],
+            json!({"op":"search","query":"drink order","day":null,"limit":6,"max_bytes":2400})
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+
+        // The function: the span only with the switch.
+        let plain = recall_tool(false);
+        let second = recall_tool(true);
+        assert!(
+            plain.parameters.as_ref().unwrap()["properties"]
+                .get("days_ago_from")
+                .is_none()
+        );
+        assert!(!plain.description.contains("days_ago_from"));
+        let properties = &second.parameters.as_ref().unwrap()["properties"];
+        assert_eq!(properties["days_ago_from"]["type"], "integer");
+        assert_eq!(properties["days_ago_to"]["type"], "integer");
+        assert!(second.description.contains("last week is 7 to 1"));
+        assert!(second.description.starts_with(&plain.description));
+        assert_eq!(
+            tools_with(false)
+                .iter()
+                .find(|tool| tool.name == RECALL)
+                .unwrap()
+                .description,
+            plain.description
+        );
     }
 
     fn snapshot(session: &str) -> Value {
@@ -4408,6 +4559,7 @@ mod tests {
             lost: Arc::new(AtomicU64::new(0)),
             threads: AtomicBool::new(false),
             forget_all: AtomicBool::new(false),
+            recall_v2: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
         };
         hand_on_days(batch(), NOW, &client);

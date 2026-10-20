@@ -1,7 +1,7 @@
 //! Opt-in requests, plus the unchanged legacy response shapes. Model payloads
 //! are data for an offline caller; no request here invokes inference.
 use crate::{
-    days::{Days, Error, Result},
+    days::{Days, Error, Result, Wider},
     protocol::{self, Request, Response, Who},
     store::{Ask, Day, Person},
     tidy,
@@ -38,6 +38,33 @@ enum Extra {
         max_bytes: Option<u64>,
         #[serde(default)]
         history: bool,
+        #[serde(default)]
+        day_from: Option<String>,
+        #[serde(default)]
+        day_to: Option<String>,
+        #[serde(default)]
+        recall_v2: bool,
+    },
+    /// The legacy `recall` with any of #2176's fields: a span of days
+    /// (`day_from`, `day_to`) or `recall_v2`. Without them a recall is the
+    /// legacy request, answered as it always was.
+    Recall {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        query: Option<String>,
+        #[serde(default)]
+        day: Option<String>,
+        #[serde(default)]
+        limit: Option<u64>,
+        #[serde(default)]
+        max_bytes: Option<u64>,
+        #[serde(default)]
+        day_from: Option<String>,
+        #[serde(default)]
+        day_to: Option<String>,
+        #[serde(default)]
+        recall_v2: bool,
     },
     Forget {
         #[serde(default)]
@@ -116,6 +143,39 @@ fn ask<'a>(
         max_bytes: bytes.unwrap_or(4096).min(16384) as usize,
     })
 }
+/// The most days a span names, both ends counted (#2176): "last week" is
+/// seven.
+const SPAN_DAYS: u32 = 14;
+
+/// The days a request names: one `day`, or a span from `day_from` to
+/// `day_to`, both ends counted, oldest first and at most [`SPAN_DAYS`].
+/// The ask's day is the span's first; [`Wider::last_day`] its last.
+fn span(
+    day: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
+) -> Result<(Option<String>, Option<Day>)> {
+    let bad = || {
+        Error::new(
+            "bad_day",
+            "a span is day_from and day_to, YYYY-MM-DD, oldest first, at most 14 days, without day",
+        )
+    };
+    match (day, from, to) {
+        (day, None, None) => Ok((day, None)),
+        (None, Some(from), Some(to)) => {
+            let (first, last) = (
+                Day::parse(&from).ok_or_else(bad)?,
+                Day::parse(&to).ok_or_else(bad)?,
+            );
+            if first > last || last.before(SPAN_DAYS - 1).is_some_and(|edge| first < edge) {
+                return Err(bad());
+            }
+            Ok((Some(from), Some(last)))
+        }
+        _ => Err(bad()),
+    }
+}
 fn value(response: Response) -> Value {
     serde_json::to_value(response).expect("the response contains JSON values only")
 }
@@ -183,8 +243,39 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             limit,
             max_bytes,
             history,
+            day_from,
+            day_to,
+            recall_v2,
         } => {
-            json!({"ok":true,"entries":store.search(&one(person)?,&ask(Some(&query),day.as_deref(),limit,max_bytes)?,history)?})
+            let (day, last_day) = span(day, day_from, day_to)?;
+            let wider = Wider {
+                last_day,
+                second: recall_v2,
+            };
+            json!({"ok":true,"entries":store.search_wider(&one(person)?,&ask(Some(&query),day.as_deref(),limit,max_bytes)?,history,wider)?})
+        }
+        Extra::Recall {
+            person,
+            query,
+            day,
+            limit,
+            max_bytes,
+            day_from,
+            day_to,
+            recall_v2,
+        } => {
+            let (day, last_day) = span(day, day_from, day_to)?;
+            let wider = Wider {
+                last_day,
+                second: recall_v2,
+            };
+            value(Response::Recalled {
+                entries: store.recall_wider(
+                    &one(person)?,
+                    &ask(query.as_deref(), day.as_deref(), limit, max_bytes)?,
+                    wider,
+                )?,
+            })
         }
         Extra::Forget { person, id } => {
             json!({"ok":true,"removed":store.forget(&one(person)?,id)?})
@@ -278,7 +369,12 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             Some(Value::String(s)) if Person::new(s).is_some() => s.clone(),
             _ => "?".into(),
         };
-        if NEW.contains(&name) {
+        // #2176: a recall with a span or the second version is the new one.
+        let wider = name == "recall"
+            && ["day_from", "day_to", "recall_v2"]
+                .iter()
+                .any(|field| parsed.get(field).is_some());
+        if NEW.contains(&name) || wider {
             extra(
                 store,
                 serde_json::from_value(parsed)
