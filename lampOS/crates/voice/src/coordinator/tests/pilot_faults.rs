@@ -3033,6 +3033,11 @@ fn onboarding_storage_held_does_not_interrupt_capture_or_privacy() {
     assert_held_storage_progress(&run, &trace, &held);
     assert!(is_mute(&run.result), "{:?}", run.result);
     assert_eq!(run.outcomes()[&first(&run)], ["audio_written_unscored"]);
+    // The walk's inputs are recorded once, as nothing here changes them,
+    // storage started (row 10 on lamp-52e6).
+    let inputs = run.events("onboarding_inputs");
+    assert_eq!(inputs.len(), 1, "{inputs:?}");
+    assert_eq!(inputs[0]["storage"], true, "{inputs:?}");
     release_onboarding_storage(&mut trace, &held);
 }
 
