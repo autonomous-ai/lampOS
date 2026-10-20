@@ -471,3 +471,8 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   its run. #2226: Friday's re-read: both routes' choices tested through
   `opens_anew`/`presents_resumption` in child processes, Live drops its
   resumption only after a stop, a failed fresh open backs off 30 s.
+- #2226: Friday's blocking P2 fixed (Live drops its resumption after a stop
+  whatever the backoff); #2176 row 13 in (conversation_end passes over ids
+  the store no longer has, counted). #2265: the reviewer's P2 (way out 1,
+  held only for someone the lamp was answering) and P3s; the reviewer-lead's
+  doc fix. Both say Part of #2176.
