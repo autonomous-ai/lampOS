@@ -336,11 +336,14 @@ fn while_own_line_waits(
 /// `own`, [`while_own_line_waits`] for `candidate`, with its words
 /// (`LAMP_WAIT_KEEPS_ANSWER=words`) as the answer's wait hears them
 /// ([`with_waited_words`]): a sound that waits or is let go is judged by
-/// them too. A lone stop, or a lone put-off ("Not now.", "Later.",
-/// [`crate::wait_words::only_a_put_off`]), stops the line, never asked of
-/// the model. Any other words are as `own` has them: in a busy office two
-/// colleagues' talk has words too, and is the room's (the reviewer's P2 on
-/// #2308). Any other `own` is as it is.
+/// them too. A lone stop, or in a room not `busy` a lone put-off ("Not
+/// now.", "Later.", [`crate::wait_words::only_a_put_off`]), stops the line,
+/// never asked of the model. In a busy room a put-off is as usual between
+/// colleagues ("No thanks.", "In a minute.") as to the lamp, so it is the
+/// room's, as other words are: in a busy office two colleagues' talk has
+/// words too (the reviewer's P2 on #2308 and P3 on #2322). A face turned to
+/// the lamp and speaking is decided before this ([`WhileOwnLineWaits::Theirs`]).
+/// Any other `own` is as it is.
 #[allow(clippy::too_many_arguments)]
 fn own_line_with_words(
     words: &mut crate::wait_words::WaitWords,
@@ -350,6 +353,7 @@ fn own_line_with_words(
     ended: bool,
     pause_blocks: u16,
     last_speech_us: u64,
+    busy: bool,
     at_us: u64,
 ) -> (WhileOwnLineWaits, Option<WordsTold>) {
     let as_answer = match own {
@@ -371,7 +375,7 @@ fn own_line_with_words(
     let (own, told) = match then {
         // Words that ask something: a put-off stops the line as a stop does;
         // anything else is the room's, and the sound is as it was.
-        WhileAnswerWaits::Decide if words.put_off(candidate.id) => (
+        WhileAnswerWaits::Decide if !busy && words.put_off(candidate.id) => (
             WhileOwnLineWaits::Stop,
             told.map(|told| WordsTold {
                 took: false,
@@ -6611,6 +6615,7 @@ fn conversation_with_gate(
                                 admission.pending_ended(),
                                 detector.pause_blocks(),
                                 last_speech_us,
+                                room.busy(),
                                 at_us,
                             );
                             if let Some(told) = told {

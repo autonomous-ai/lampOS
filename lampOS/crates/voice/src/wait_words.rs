@@ -545,10 +545,9 @@ pub(crate) mod tests {
         assert_eq!(then(true, Verdict::Pending, true, 0, 100), Then::LetGo);
     }
 
-    /// The reviewer's P3 on #1277: words that only tell the lamp to stop,
-    /// by the stop words' own list, stop it, ended or not, before `on`
-    /// would decide or after. A stop with something more asked takes the
-    /// turn as before, and "Don't stop." is no stop.
+    /// #2287's follow-up (the reviewer on #2308): a put-off is a line made
+    /// only of one, with words that ask nothing or go with it; one that goes
+    /// on to ask something, or a lone "No.", is not.
     #[test]
     fn a_put_off_is_only_what_puts_the_lamp_off() {
         for put_off in [
@@ -576,6 +575,10 @@ pub(crate) mod tests {
         }
     }
 
+    /// The reviewer's P3 on #1277: words that only tell the lamp to stop,
+    /// by the stop words' own list, stop it, ended or not, before `on`
+    /// would decide or after. A stop with something more asked takes the
+    /// turn as before, and "Don't stop." is no stop.
     #[test]
     fn words_that_only_say_stop_stop_and_more_take_the_turn() {
         for said in [

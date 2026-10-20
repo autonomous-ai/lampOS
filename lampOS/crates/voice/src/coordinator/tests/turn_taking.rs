@@ -2214,9 +2214,11 @@ fn while_an_answer_waits_a_sound_begun_as_the_body_moves_is_its_own() {
 /// #2287's follow-up, way 1: with `LAMP_WAIT_KEEPS_ANSWER=words`, a sound
 /// waiting on the lamp's own line is judged by its words as the answer's
 /// wait judges them. A lone "Stop." stops the line, and so does a lone
-/// put-off, "Not now." (told as a stop, taking no turn). Other words are the
-/// room's: two colleagues talking nearby still wait, told as not taken (the
-/// reviewer's P2 on #2308). Nothing said leaves it waiting. An outcome that
+/// put-off, "Not now." (told as a stop, taking no turn), in a room not busy;
+/// in a busy one a put-off is the room's, as usual between colleagues (the
+/// reviewer's P3 on #2322). Other words are the room's: two colleagues
+/// talking nearby still wait, told as not taken (the reviewer's P2 on
+/// #2308). Nothing said leaves it waiting. An outcome that
 /// isn't a wait or a let-go is passed on as it is, and nothing is asked.
 #[test]
 fn with_words_a_stop_said_before_the_own_line_sounds_stops_it() {
@@ -2240,14 +2242,21 @@ fn with_words_a_stop_said_before_the_own_line_sounds_stops_it() {
         .collect();
     let spoke_until = base + 29 * 10_000;
     let quiet = crate::wait_words::ASK_AFTER_QUIET_BLOCKS;
-    for (said, then) in [
-        ("Stop.", WhileOwnLineWaits::Stop),
-        ("Not now.", WhileOwnLineWaits::Stop),
+    // (what was said, a busy room, what the line does)
+    for (said, busy, then) in [
+        ("Stop.", false, WhileOwnLineWaits::Stop),
+        ("Stop.", true, WhileOwnLineWaits::Stop),
+        ("Not now.", false, WhileOwnLineWaits::Stop),
+        // In a busy room a put-off is as usual between colleagues: the
+        // room's (the reviewer's P3 on #2322).
+        ("Not now.", true, WhileOwnLineWaits::Wait),
+        ("No thanks.", true, WhileOwnLineWaits::Wait),
         (
             "Did you send the report to the team?",
+            false,
             WhileOwnLineWaits::Wait,
         ),
-        ("", WhileOwnLineWaits::Wait),
+        ("", false, WhileOwnLineWaits::Wait),
     ] {
         let (mut words, script) = crate::wait_words::tests::scripted();
         words.follow(true, true);
@@ -2260,6 +2269,7 @@ fn with_words_a_stop_said_before_the_own_line_sounds_stops_it() {
             false,
             0,
             spoke_until,
+            busy,
             base + 300_000,
         );
         assert_eq!(
@@ -2275,6 +2285,7 @@ fn with_words_a_stop_said_before_the_own_line_sounds_stops_it() {
             false,
             quiet,
             spoke_until,
+            busy,
             base + 400_000,
         );
         assert_eq!(own, wait, "{said}: asked, its words not back");
@@ -2287,9 +2298,10 @@ fn with_words_a_stop_said_before_the_own_line_sounds_stops_it() {
             false,
             quiet,
             spoke_until,
+            busy,
             base + 500_000,
         );
-        assert_eq!(own, then, "{said:?}");
+        assert_eq!(own, then, "{said:?}, busy {busy}");
         if then == WhileOwnLineWaits::Stop {
             let told = told.expect("what its words did is told once");
             assert!(told.stop && !told.took, "{said}: {told:?}");
@@ -2314,6 +2326,7 @@ fn with_words_a_stop_said_before_the_own_line_sounds_stops_it() {
                 false,
                 quiet,
                 spoke_until,
+                false,
                 base
             ),
             (own, None)
