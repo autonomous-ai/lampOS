@@ -82,6 +82,7 @@ face the lamp knows.
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules. `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
+| `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms"} \| null, "stale"}`, from lamp-update's kept `update/status`; `unknown` and nulls before lamp-update has said anything. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
@@ -283,6 +284,28 @@ cancel one by voice. With the switch the owner's app can too, and their
 words then pass through the broker to the app, where before they left the
 lamp only to the voice's model. Tests: `app_contract.rs`'s
 `schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without`.
+
+## The lamp's software update (#2194, `update.status`)
+
+Off unless `LAMP_APP_UPDATE=on` in lamp-cloud's unit. lamp-update says on
+the bus, as a kept value, `update/status` (`lamp_msgs::UpdateStatus`,
+`lamp_update::status`): the build its records say the lamp runs, what its
+round is doing now (`checking` the channel, `fetching` and checking the new
+build's files beside the old, `switching` at a quiet moment, `watching` the
+parts for a minute after, `restoring` while a rollback puts the previous
+build back and watches it, `idle` between rounds), and how the last round
+ended, by the outcome's name (`up-to-date`, `switched`, `refused`,
+`rolled-back`, `failed`, ...) and the build it was about. It carries no reason
+text, which may name paths. lamp-cloud answers from that value and never
+reads lamp-update's records, which stay root's alone (0700). Before
+lamp-update has said anything, `now` is `unknown`. Only a round that acts
+(`--apply on`) says it. The last result is read back from lamp-update's own
+log when it starts, so a restart, a reboot or its own switch never says it
+as none. The value is said again every minute and lasts three: `stale` is
+true when lamp-update stopped saying it (it died mid-round), and its `now` is
+then not to be believed. Tests: `app_contract.rs`'s
+`the_software_update_is_answered_from_lamp_updates_status`, and
+`lamp-update`'s `status` tests and `a_round_with_nothing_to_change_only_checks`.
 
 ## The skills page (#1722, `skills.list`)
 

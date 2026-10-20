@@ -103,6 +103,17 @@ pub trait Lamp {
     fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
         None
     }
+
+    /// Whether the app may read the lamp's software update
+    /// (`LAMP_APP_UPDATE=on`, #2194, `crate::update`).
+    fn update_page(&self) -> bool {
+        false
+    }
+
+    /// lamp-update's kept `update/status`, if it has said one.
+    fn update_status(&self) -> Option<lamp_bus::Message> {
+        None
+    }
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -231,6 +242,9 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 crate::schedule::cancel(adapter, data)
             }
         }
+        // The lamp's software update, for the app's Lamp 2 page (#2194):
+        // only with `LAMP_APP_UPDATE=on`.
+        "update.status" if lamp.update_page() => crate::update::status(lamp.update_status()),
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).

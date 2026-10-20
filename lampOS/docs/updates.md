@@ -491,6 +491,19 @@ the link and the build it named; the way back by hand), `log.jsonl` (one line pe
 with one old file kept) and `lock`. Every line it says also goes to its
 journal (`journalctl -u lamp-update`).
 
+The records stay root's alone. What a part may know of them is said on the
+bus instead: a round that acts says `update/status` (#2194,
+`lamp_update::status`) as each phase begins (`checking`, `fetching`,
+`switching`, `watching`, and `restoring` for a rollback's put-back) and
+`idle` with its outcome's name and build when it ends, with the build
+`state.json` says the lamp runs and no reason text. A round's end is logged
+in `log.jsonl` with `"round": true` and its build, and read back when
+lamp-update starts, so the last result outlives a restart and its own
+switch. It is said again every minute and lasts three, so a lamp-update that
+died mid-round reads stale.
+lamp-cloud answers the app's `update.status` from it ([cloud.md](cloud.md)).
+A bus that cannot be used is said once, and the round goes on.
+
 To go back by hand to the build before the last switch:
 
 ```sh

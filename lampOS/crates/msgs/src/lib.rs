@@ -1016,6 +1016,68 @@ impl Pause {
     }
 }
 
+/// What lamp-update is doing and last did (`update/status`, #2194), for the
+/// app's Lamp 2 page through lamp-cloud. Read from lamp-update's own records
+/// and where its round is, never kept anywhere else: `running` is the build
+/// the lamp runs, `now` one of [`UpdateStatus::NOW`], `last` the last round's
+/// outcome by its name (`up-to-date`, `switched`, `refused`, ...), the build
+/// it was about where it names one, and when. No reason text, which may
+/// carry paths. Said at each phase and again every minute, and stale three
+/// minutes after the last.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateStatus {
+    pub running: Option<UpdateBuild>,
+    pub now: String,
+    pub last: Option<UpdateResult>,
+}
+
+/// A build, by its sequence on the channel and its commit.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateBuild {
+    pub sequence: u64,
+    pub commit: String,
+}
+
+/// One round's end.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateResult {
+    pub outcome: String,
+    pub sequence: Option<u64>,
+    pub at_unix_ms: u64,
+}
+
+impl UpdateStatus {
+    pub const TYPE: &str = "lamp_msgs/UpdateStatus";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "update/status";
+    /// Between rounds; reading the channel; fetching and checking the new
+    /// build's files beside the old; waiting for a quiet moment and
+    /// restarting the parts; watching them for a minute after; putting the
+    /// previous build back and watching it (a rollback).
+    pub const NOW: [&str; 6] = [
+        "idle",
+        "checking",
+        "fetching",
+        "switching",
+        "watching",
+        "restoring",
+    ];
+    /// Said again at least this often while lamp-update runs.
+    pub const EVERY: Duration = Duration::from_secs(60);
+    /// A value older than this is stale: lamp-update stopped saying it (it
+    /// died mid-round, or stopped), and its `now` is not to be believed.
+    pub const LASTING: Duration = Duration::from_secs(180);
+
+    /// Said at each phase and kept, and said again every [`Self::EVERY`]:
+    /// a reader that comes late reads where the round is, and one that
+    /// finds it older than [`Self::LASTING`] knows it is stale.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+            .every(Self::EVERY)
+            .lasting(Self::LASTING)
+    }
+}
+
 /// Whether a hand is pushing the lamp now (`body/hand`), as the body feels
 /// it: a head or base joint that met resistance and is held where it gave
 /// way, for as long as it is held. `since_us` is the body's own clock

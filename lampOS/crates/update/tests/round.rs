@@ -332,6 +332,8 @@ struct Lamp {
     talking: Option<Talk>,
     free: u64,
     said: Vec<String>,
+    /// The phases the round said, for `update/status` (#2194).
+    phases: Vec<&'static str>,
     config: Config,
 }
 
@@ -443,6 +445,7 @@ impl Lamp {
             talking: None,
             free: 10_000_000_000,
             said: Vec::new(),
+            phases: Vec::new(),
             config,
         }
     }
@@ -523,6 +526,8 @@ impl Lamp {
         let disk = FakeDisk(self.free);
         let said = &mut self.said;
         let mut say = |line: &str| said.push(line.to_owned());
+        let phases = &mut self.phases;
+        let mut phase = |now: &'static str| phases.push(now);
         let mut world = World {
             channel: &mut self.channel,
             systemd: &mut self.systemd,
@@ -530,6 +535,7 @@ impl Lamp {
             disk: &disk,
             clock: &clock,
             say: &mut say,
+            phase: &mut phase,
         };
         let outcome = round(&self.config, &mut world);
         self.talking = Some(ears.talking);
@@ -651,6 +657,11 @@ fn a_new_build_is_installed_beside_the_old_and_switched() {
     build_two(&mut lamp);
     let started = lamp.now.get();
     assert_eq!(lamp.round(), Outcome::Switched(2));
+    // `update/status`'s phases, in order (#2194).
+    assert_eq!(
+        lamp.phases,
+        ["checking", "fetching", "switching", "watching"]
+    );
 
     let (old, new) = (sha("voice 1"), sha("voice 2"));
     // The new folder beside the old one: the new voice and worker, and the
@@ -704,6 +715,22 @@ fn a_new_build_is_installed_beside_the_old_and_switched() {
     // The same build again: nothing to do.
     assert_eq!(lamp.round(), Outcome::UpToDate(2));
     assert_eq!(lamp.calls().len(), 2);
+}
+
+/// #2194: a round with nothing to change says only that it checked, and a
+/// round without `apply` says no phase at all.
+#[test]
+fn a_round_with_nothing_to_change_only_checks() {
+    let mut lamp = Lamp::new();
+    build_two(&mut lamp);
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+    lamp.phases.clear();
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(lamp.phases, ["checking"]);
+    lamp.phases.clear();
+    lamp.config.apply = false;
+    lamp.round();
+    assert!(lamp.phases.is_empty(), "{:?}", lamp.phases);
 }
 
 #[test]
@@ -783,6 +810,9 @@ fn a_part_that_dies_is_put_back_and_its_build_refused() {
     );
     let before = lamp.lamp_files();
     let outcome = lamp.round();
+    // `update/status` says the put-back as its own phase, not as the
+    // forward watch (the reviewer-lead on #2271).
+    assert_eq!(lamp.phases.last(), Some(&"restoring"), "{:?}", lamp.phases);
     let Outcome::RolledBack {
         sequence,
         why,
@@ -2381,6 +2411,7 @@ impl Lamp {
             disk: &disk,
             clock: &clock,
             say: &mut say,
+            phase: &mut |_| {},
         };
         own::confirm(&self.config, &mut world, Some(running)).unwrap()
     }

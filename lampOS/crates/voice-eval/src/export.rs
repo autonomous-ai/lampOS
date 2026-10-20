@@ -710,6 +710,7 @@ const BUS_TOPICS: &[&str] = &[
     "skills/events",
     "stop/heard",
     "tasks/status",
+    "update/status",
     "voice/activity",
     "voice/arrival",
     "voice/heard",

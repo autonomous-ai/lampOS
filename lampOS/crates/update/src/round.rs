@@ -125,6 +125,9 @@ pub struct World<'a> {
     pub clock: &'a dyn Clock,
     /// One line for a person: the journal.
     pub say: &'a mut dyn FnMut(&str),
+    /// Where the round is, one of `lamp_msgs::UpdateStatus::NOW`, for
+    /// `update/status` (#2194): said as each phase begins.
+    pub phase: &'a mut dyn FnMut(&'static str),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -212,6 +215,17 @@ impl Outcome {
             }
             .to_string(),
             other => other.to_string(),
+        }
+    }
+
+    /// The build this outcome is about, where it names one.
+    pub fn sequence(&self) -> Option<u64> {
+        match self {
+            Self::UpToDate(sequence) | Self::Switched(sequence) => Some(*sequence),
+            Self::SelfSwitched { sequence, .. }
+            | Self::Climbs { sequence, .. }
+            | Self::RolledBack { sequence, .. } => Some(*sequence),
+            _ => None,
         }
     }
 
@@ -420,6 +434,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         Ok(lock) => lock,
         Err(error) => return Outcome::Failed(error.to_string()),
     };
+    (run.world.phase)("checking");
     // A switch of lamp-update's own not yet confirmed: no round acts, so
     // an updater restarted in phase 2, or the old one run by hand, never
     // begins a second round (#1680). The new one confirms before its first.
@@ -448,7 +463,8 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
     };
     if let Some(why) = waits {
         let outcome = Outcome::Refused(why);
-        run.records.log(outcome.kind(), &outcome.kept());
+        run.records
+            .log_round(outcome.kind(), &outcome.kept(), outcome.sequence());
         return outcome;
     }
     let mut outcome = run.acting();
@@ -463,7 +479,8 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
     {
         outcome = switched;
     }
-    run.records.log(outcome.kind(), &outcome.kept());
+    run.records
+        .log_round(outcome.kind(), &outcome.kept(), outcome.sequence());
     outcome
 }
 
@@ -599,12 +616,14 @@ impl Run<'_, '_> {
             }
             Err(why) => return Outcome::Failed(format!("systemd cannot be asked: {why}")),
         }
+        (self.world.phase)("fetching");
         if let Err(outcome) = self.install(&mut state, &manifest, &changes) {
             return outcome;
         }
         if let Err(outcome) = self.skills_still_load(&manifest, &changes, placing.as_ref()) {
             return outcome;
         }
+        (self.world.phase)("switching");
         if changes.is_empty() && self.placings.is_empty() && self.setting_writes.is_empty() {
             // Only the product skills change: lamp-skills reloads its
             // folder by itself, so nothing is restarted.
@@ -1800,6 +1819,7 @@ impl Run<'_, '_> {
             }
             watches.push(Watch::new(&back.unit, &back.part, back.before.clone()));
         }
+        (self.world.phase)("watching");
         if let Err((unit, why, judged)) = self.watch(&mut watches) {
             let told = if judged {
                 self.told(&unit)
@@ -1999,6 +2019,7 @@ impl Run<'_, '_> {
             }
         }
         let mut told = String::new();
+        (self.world.phase)("restoring");
         if let Err((unit, why, judged)) = self.watch(&mut watches) {
             if judged {
                 told = self.told(&unit);
