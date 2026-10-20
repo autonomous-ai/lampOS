@@ -4143,6 +4143,11 @@ thread_local! {
     /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
     static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
         const { std::cell::RefCell::new(None) };
+    /// A loop test's eyes link, as `TEST_TASK_NEWS`, with its
+    /// `LAMP_CAMERA_FOLLOWS_EYES=on` (#2233).
+    static TEST_EYES: std::cell::RefCell<Option<crate::body_link::EyesLink>> =
+        const { std::cell::RefCell::new(None) };
+    static TEST_CAMERA_FOLLOWS_EYES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4247,6 +4252,14 @@ fn conversation_with_gate(
     } else {
         None
     };
+    #[cfg(test)]
+    if let Some(given) = TEST_EYES.with(|eyes| eyes.borrow_mut().take()) {
+        eyes_link = Some(given);
+    }
+    #[cfg(not(test))]
+    let follows_eyes = camera_follows_eyes();
+    #[cfg(test)]
+    let follows_eyes = camera_follows_eyes() || TEST_CAMERA_FOLLOWS_EYES.with(std::cell::Cell::get);
     let mut attention = crate::body_link::Attention::default();
     // The same count kept whether or not there is a body to tell: whether
     // the talk in the room has been for the lamp lately.
@@ -5303,7 +5316,7 @@ fn conversation_with_gate(
             // denies both (`hand.rs`).
             eyes_look_with_the_microphone(
                 owner,
-                eyes_link.is_some() && camera_follows_eyes(),
+                eyes_link.is_some() && follows_eyes,
                 rig.camera.is_some(),
             )?;
             permitted = true;
