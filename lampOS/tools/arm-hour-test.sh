@@ -496,6 +496,15 @@ order "$T/calls" "SLOW back one" "back two" && ok || bad "the put-back out of or
 has "the stop came after the put-back" "$T/out" "Stopped at row 1"
 kill $pid 2>/dev/null; wait $pid 2>/dev/null
 
+# Row 19 without ARM_PRESENCE_CHECK or ARM_LAMP_HOST: it stops at its first
+# Mac step, and its put-back, with nothing to undo, doesn't fail (the
+# reviewer's P3 on #2111).
+reset
+printf '\n\n' | env -u ARM_PRESENCE_CHECK -u ARM_LAMP_HOST ARM_ROWS_FILE= "$SCRIPT" --only 19 >"$T/out" 2>&1
+has "row 19 without its settings: stopped at its step" "$T/out" "FAILED at: mac"
+has "row 19 without its settings: nothing to put back" "$T/out" "nothing to put back: presence-check.sh can't have run"
+hasnt "row 19 without its settings: the put-back didn't fail" "$T/out" "PUT BACK FAILED"
+
 # The real table, the morning's 19 rows and Nine's three nudges after row 12
 # (12b to 12d): all there, in order, each with its
 # two lines and its run sheet, and every row that moves asks for the hand.
