@@ -40,6 +40,7 @@ pub mod air_told;
 pub mod asker_first;
 pub mod attention;
 pub mod body_link;
+pub mod body_motion;
 pub mod bus_out;
 pub mod called;
 pub mod camera_config;

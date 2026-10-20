@@ -1873,3 +1873,70 @@ fn with_words_a_sound_decided_without_echo_evidence_is_never_held_for_its_words(
     assert!(!stop.stopped, "{:?}", stop.told);
     assert!(stop.accepted.is_none() && stop.let_go.is_empty() && stop.told.is_empty());
 }
+
+/// #1712's B (the first builder at 06:44, `LAMP_MOTION_KEEPS_ANSWER=on`):
+/// while an answer is awaited and has not sounded, a sound that began as
+/// the body moved a joint is the lamp's own motors and takes no turn, and
+/// one the body hasn't yet said of waits. The lamp's name heard with it, an
+/// answer that has sounded, the lamp sounding now, or no answer awaited,
+/// each hears it as before, and the body is not asked.
+#[test]
+fn while_an_answer_waits_a_sound_begun_as_the_body_moves_is_its_own() {
+    use crate::body_motion::Judged;
+    let h = Harness::new(TurnTaking::Duplex);
+    let trigger = h.base + 300_000;
+    let candidate = crate::admission::Candidate {
+        id: crate::admission::CandidateId::for_test(1),
+        capture: h.lineage,
+        displaced_owner: None,
+        trigger_sequence: 6,
+        trigger_read_at_us: trigger,
+        first_read_at_us: trigger - 60_000,
+        decision_deadline_us: trigger + 200_000,
+    };
+    let moved = Judged::Moved {
+        began: trigger - 100_000,
+        ended: trigger + 80_000,
+    };
+    for judged in [moved, Judged::Waits, Judged::Still] {
+        assert_eq!(
+            body_heard(|| judged, h.reply.as_ref(), false, None, &candidate),
+            judged
+        );
+    }
+    let unasked = || -> Judged { panic!("the body was asked") };
+    // The name, heard as the sound began (up to `CALL_BEFORE_US` before).
+    let named = Some(trigger - crate::activity::CALL_BEFORE_US);
+    assert_eq!(
+        body_heard(unasked, h.reply.as_ref(), false, named, &candidate),
+        Judged::Still
+    );
+    // An older name is no call.
+    let older = Some(trigger - crate::activity::CALL_BEFORE_US - 1);
+    assert_eq!(
+        body_heard(|| moved, h.reply.as_ref(), false, older, &candidate),
+        moved
+    );
+    // The lamp sounding now: the duplex hears it.
+    assert_eq!(
+        body_heard(unasked, h.reply.as_ref(), true, None, &candidate),
+        Judged::Still
+    );
+    // An answer that has sounded, a request still being said, or none.
+    let mut sounded = Harness::new(TurnTaking::Duplex);
+    sounded.reply.as_mut().unwrap().had_audio = true;
+    assert_eq!(
+        body_heard(unasked, sounded.reply.as_ref(), false, None, &candidate),
+        Judged::Still
+    );
+    let mut said = Harness::new(TurnTaking::Duplex);
+    said.reply.as_mut().unwrap().local_input_ended = false;
+    assert_eq!(
+        body_heard(unasked, said.reply.as_ref(), false, None, &candidate),
+        Judged::Still
+    );
+    assert_eq!(
+        body_heard(unasked, None, false, None, &candidate),
+        Judged::Still
+    );
+}
