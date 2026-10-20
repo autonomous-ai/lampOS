@@ -642,15 +642,15 @@ fn touch_reader(
 }
 
 /// Before Controls takes the lines: which head pad lines a pad drives, read
-/// once with each pull (#1798), about 20 ms a line. Pins naming bare lines
+/// once with each pull, ending on the pad's own (#1798), about 20 ms a line. Pins naming bare lines
 /// read no touch and said nothing.
 #[cfg(target_os = "linux")]
 fn head_lines(
     wiring: &lamp_controls::touch_pins::TouchPinsConfig,
 ) -> Option<lamp_controls::touch_pins::HeadLines> {
     (!wiring.head_pads.is_empty()).then(|| {
-        lamp_controls::touch_pins::HeadLines::probed(&wiring.head_pads, |line| {
-            lamp_controls::pins::GpioLines::probe(&wiring.chip, line)
+        lamp_controls::touch_pins::HeadLines::probed(&wiring.head_pads, |pad| {
+            lamp_controls::pins::GpioLines::probe_ending(&wiring.chip, pad.line, pad.pull)
         })
     })
 }

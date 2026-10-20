@@ -91,7 +91,7 @@ pub fn head_unread(health: &listen::Heard<Health>) -> Option<HeadUnread> {
     Some(HeadUnread {
         why: format!("{HEAD_PADS_ITEM}: {message} ({})", item.level.as_str()),
         fault: message.contains("left out until let go")
-            || (message.contains("nothing wired on lines") && !message.contains("not probed")),
+            || (message.contains("nothing wired on line") && !message.contains("not probed")),
     })
 }
 

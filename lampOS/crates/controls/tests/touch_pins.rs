@@ -204,8 +204,8 @@ fn the_head_pads_are_the_pins_and_the_settings_may_name_fewer_or_more() {
 #[test]
 fn the_probe_at_start_says_which_head_lines_a_pad_drives() {
     // lamp-52e6: 97 and 98 driven low at rest; 37 and 96 follow the pull.
-    let lamp_52e6 = |line: u32| -> std::io::Result<(bool, bool)> {
-        Ok(if [97, 98].contains(&line) {
+    let lamp_52e6 = |pad: &Pin| -> std::io::Result<(bool, bool)> {
+        Ok(if [97, 98].contains(&pad.line) {
             (false, false)
         } else {
             (false, true)
@@ -245,14 +245,14 @@ fn the_probe_at_start_says_which_head_lines_a_pad_drives() {
     let touched = HeadLines::probed(&pads(&[97]), |_| Ok((true, true)));
     assert_eq!(touched.wired, [97]);
     // Held by another program: not probed, and said.
-    let held = HeadLines::probed(&pads(&[97, 98]), |line| {
-        if line == 98 {
+    let held = HeadLines::probed(&pads(&[97, 98]), |pad| {
+        if pad.line == 98 {
             Err(std::io::Error::other("busy"))
         } else {
-            lamp_52e6(line)
+            lamp_52e6(pad)
         }
     });
-    assert_eq!(held.said(), "wired on lines 97; lines 98 not probed");
+    assert_eq!(held.said(), "wired on line 97; line 98 not probed");
     let none = HeadLines::probed(&pads(&[97]), |_| Err(std::io::Error::other("busy")));
     assert_eq!(none.health(&[]).level, lamp_msgs::Level::Warn);
     // A pad left out since the start warns, with its line.
@@ -260,7 +260,7 @@ fn the_probe_at_start_says_which_head_lines_a_pad_drives() {
     assert_eq!(report.level, lamp_msgs::Level::Warn);
     assert_eq!(
         report.message,
-        "wired on lines 97, 98; nothing on 37, 96; line 97 touched since Controls started: left out until let go"
+        "wired on lines 97, 98; nothing on 37, 96; line 97 touched since the head was first read: left out until let go"
     );
     assert_eq!(value(&report, "left_out"), "97");
 }
