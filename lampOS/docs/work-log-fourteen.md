@@ -588,3 +588,28 @@ Ready for lamp-voice: n/a (status note, no code)
   whoever has one — same pairing shape as #1968 (Mobile + Ten) — rather
   than waiting to discover that after #2271 lands. Offered to write the
   exact steps for whoever runs it.
+
+## 2026-10-20 — #2194: wrote the end-to-end steps for Mobile, applied Mobile's P3
+
+Ready for lamp-voice: yes (same branch, ecm-sds-mobile#19, pushed as a
+third commit)
+
+- First builder, 02:13, to Fourteen and Mobile: write the end-to-end
+  steps on #2194 now, not after #2271, marking which need #2271 so
+  Mobile can run the rest today.
+- Read the real source before writing anything (no crate edits —
+  "Crates: none"): `round.rs`'s phase transitions by line number,
+  `Outcome::kind`'s unchanged 10-value set, `quiet.rs`'s 45 s
+  `--quiet-wait-s`, and `msgs/src/lib.rs`'s `UpdateStatus::EVERY`
+  (60 s) / `LASTING` (180 s) — confirmed Migrate's secondhand numbers
+  were exactly right. Confirmed `lamp-update once --apply on` forces a
+  real round on demand (no waiting for the 900 s `serve` loop), and
+  that `restoring` is inherently staged (a newly-switched unit has to
+  fail its 60 s watch), not something flipped on demand.
+- Posted the steps on [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6299314217):
+  one today-runnable step (no row before #2271), the rest gated on
+  #2271 being live with `LAMP_APP_UPDATE=on`.
+- Also applied Mobile's P3 from the ecm-sds-mobile#19 read: `summary`
+  now says "The lamp's updater hasn't said anything lately" when
+  `stale`, instead of parroting the possibly-wrong phase. 14/14,
+  analyze 28 (baseline). Noted on the PR.
