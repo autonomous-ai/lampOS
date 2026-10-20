@@ -165,6 +165,21 @@ pub fn with_reach(online: Online, verdict: Option<bool>) -> Online {
     }
 }
 
+/// [`with_reach`], and with the idle probe (`--reach-idle on`, #1844) the
+/// internet not answering is offline from `reach` with the link up too: on
+/// the second route as the only voice the link stays ready until a turn
+/// fails, so the lamp would say online through an outage nobody spoke in.
+pub fn with_idle_reach(online: Online, verdict: Option<bool>) -> Online {
+    match (online.online, verdict) {
+        (Some(true), Some(false)) => Online {
+            online: Some(false),
+            from: "reach".into(),
+            down_for_s: None,
+        },
+        _ => with_reach(online, verdict),
+    }
+}
+
 /// Whether a part can be called this: something, on one line, of 48 bytes
 /// at most, with no space before or after it.
 pub fn is_name(name: &str) -> bool {

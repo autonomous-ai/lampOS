@@ -53,7 +53,7 @@ has not been measured.
 
 ## The commands
 
-    lamp-health serve [--bus-root ABSOLUTE_DIR] [--expect NAME]... [--stale-ms N] [--judge-zone BEGINNING]... [--proc DIR] [--sys DIR] [--run DIR] [--disk PATH] [--clock timesync|kernel] [--online on|off] [--reach-probe on|off] [--needs NAME=PATH]...
+    lamp-health serve [--bus-root ABSOLUTE_DIR] [--expect NAME]... [--stale-ms N] [--judge-zone BEGINNING]... [--proc DIR] [--sys DIR] [--run DIR] [--disk PATH] [--clock timesync|kernel] [--online on|off] [--reach-probe on|off] [--reach-idle on|off] [--needs NAME=PATH]...
     lamp-health [show] [--bus-root ABSOLUTE_DIR] [--json]
     lamp-health --help
 
@@ -73,6 +73,7 @@ has not been measured.
 | `--clock` | Who says whether the clock is set: `timesync`, systemd-timesyncd's marker under `--run`; or `kernel`, the kernel's own answer (`adjtimex`, as `timedatectl`'s `NTPSynchronized`), which any time client sets, with the marker still believed first (#830, [offline.md](offline.md)) | `timesync` |
 | `--online` | `on` to publish `lamp/online` too, once each report's time: whether the lamp can reach the internet, from the voice's `link` fact on `diagnostics` (`ready` and `connecting` are online, `down` is not, a voice not reporting or stale, or saying `closed` while it waits with its microphones off (#1371), is unknown), with its `down_for_s` (#830, [offline.md](offline.md)) | `off` |
 | `--reach-probe` | `on`, with `--online on` only: while the voice's link is down, ask the internet itself (a TCP connection to 1.1.1.1:443 or 8.8.8.8:443, never port 53, at most every 30 s, each try bounded at 2 s, on its own thread). Its verdict goes in `lamp/online`, from `reach`: online if it answers (a relay down with the internet up is the service's trouble, not the home's), offline if not, and unknown while no probe has ended in the outage (#830, [offline.md](offline.md), "The relay is not the internet") | `off` |
+| `--reach-idle` | `on`, with `--reach-probe on` only: the probe also asks with the voice's link up, every 30 s, and every 5 s once the internet doesn't answer; not answering is offline in `lamp/online`, from `reach`, with the link still ready. On the second route as the only voice the link goes down only when a turn fails on the network, so with nobody speaking the lamp said online through a Wi-Fi cut (lamp-06c1, 20 Oct: 38 s and 13 s), and Expression's offline look and the light couldn't follow (#1844, [offline.md](offline.md)) | `off` |
 
 Every path is absolute. A wrong option prints the usage and exits with 2.
 A bus that cannot be subscribed to exits with 1 before anything is listened
