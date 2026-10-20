@@ -1291,10 +1291,13 @@ record is written.
   (`PROBE_WITHIN`). One answering: a service was slow or refused, and
   nothing changes (a status, 401, 429 or 5xx, never checks: the service
   answered). None: the link is Unavailable with the turn's fault, and the
-  check runs every 30 s (`PROBE_EVERY_US`, as `--reach-probe`) until one
-  answers, when it is Ready again in a new session. The journal says
+  check runs every 5 s (`PROBE_EVERY_US`; it was 30 s until #1844's run
+  on lamp-06c1 found the Wi-Fi back 38 s before the lamp knew), and at once
+  when the kernel's default route comes back (`/proc/net/route`, read every
+  500 ms while down, `ROUTE_EVERY_US`), until one answers, when it is Ready
+  again in a new session. The journal says
   `lamp-voice second: no service host answers after a turn failed on the
-  network: the link is down, checked every 30 s` and `… a service host
+  network: the link is down, checked every 5 s` and `… a service host
   answers again: the link is back`. So the offline logic follows it as it
   follows Gemini's ([offline.md](offline.md)): with `LAMP_OFFLINE_VOICE=on`
   the offline line once and the breath, `lamp/online` false from health and

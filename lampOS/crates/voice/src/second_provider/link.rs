@@ -20,8 +20,29 @@ use std::time::Duration;
 
 /// How long a check waits for any host to answer.
 pub const PROBE_WITHIN: Duration = Duration::from_secs(2);
-/// How often a down link checks again (as `lamp-health --reach-probe`).
-pub const PROBE_EVERY_US: u64 = 30_000_000;
+/// How often a down link checks again: every 5 s, so the link is back
+/// within seconds of the network (#1844: on lamp-06c1 at 30 s the Wi-Fi
+/// was back 38 s before the lamp knew, 20 Oct 16:15). A check is a bare
+/// connection to each host, nothing sent.
+pub const PROBE_EVERY_US: u64 = 5_000_000;
+/// While down, how often the kernel's routes are read: a default route
+/// appearing (the Wi-Fi rejoined) checks at once ([`Watch::tick`]).
+pub const ROUTE_EVERY_US: u64 = 500_000;
+/// Where the kernel lists its IPv4 routes.
+pub const ROUTES: &str = "/proc/net/route";
+
+/// Whether the kernel's route table (`/proc/net/route`'s text) has a
+/// default route that is up: destination 0.0.0.0 with the up flag.
+pub fn has_default_route(table: &str) -> bool {
+    table.lines().skip(1).any(|line| {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        fields.get(1) == Some(&"00000000")
+            && fields
+                .get(3)
+                .and_then(|flags| u32::from_str_radix(flags, 16).ok())
+                .is_some_and(|flags| flags & 0x1 != 0)
+    })
+}
 
 /// Whether a turn's fault says the network may be gone, rather than a
 /// service that answered and refused (a status) or misspoke.
@@ -134,6 +155,13 @@ impl Link {
         true
     }
 
+    /// The network's route came back while down: the next check is now.
+    pub fn route_back(&mut self, now_us: u64) {
+        if let State::Down { probe_at_us, .. } = &mut self.state {
+            *probe_at_us = (*probe_at_us).min(now_us);
+        }
+    }
+
     /// Whether a down link's next check is due.
     pub fn probe_due(&self, now_us: u64) -> bool {
         matches!(self.state, State::Down { probe_at_us, .. } if now_us >= probe_at_us)
@@ -215,6 +243,10 @@ pub struct Watch {
     targets: Option<Vec<String>>,
     /// A check running, and when it began.
     probing: Option<(u64, tokio::task::JoinHandle<bool>)>,
+    /// The route table read while down ([`ROUTES`]), when it was last read,
+    /// and whether it had a default route then.
+    routes: std::path::PathBuf,
+    route_read: Option<(u64, bool)>,
 }
 
 impl Watch {
@@ -225,6 +257,8 @@ impl Watch {
             link,
             targets,
             probing: None,
+            routes: ROUTES.into(),
+            route_read: None,
         };
         (watch, ready)
     }
@@ -241,6 +275,28 @@ impl Watch {
         }
     }
 
+    /// While down, every [`ROUTE_EVERY_US`]: a default route that wasn't
+    /// there at the last read makes the next check now. Up, nothing is read.
+    fn watch_routes(&mut self, now_us: u64) {
+        if !self.link.down() {
+            self.route_read = None;
+            return;
+        }
+        if self
+            .route_read
+            .is_some_and(|(at, _)| now_us.saturating_sub(at) < ROUTE_EVERY_US)
+        {
+            return;
+        }
+        let routed = std::fs::read_to_string(&self.routes)
+            .map(|table| has_default_route(&table))
+            .unwrap_or(false);
+        if routed && self.route_read.is_some_and(|(_, had)| !had) {
+            self.link.route_back(now_us);
+        }
+        self.route_read = Some((now_us, routed));
+    }
+
     fn check(&mut self, now_us: u64) {
         if let Some(targets) = &self.targets {
             self.probing = Some((now_us, tokio::spawn(any_answers(targets.clone()))));
@@ -250,6 +306,7 @@ impl Watch {
     /// Once a tick: a due check begun, a finished one read. The link to
     /// tell the coordinator if it changed, and whether it came back.
     pub async fn tick(&mut self, now_us: u64) -> Option<(ProviderLink, bool)> {
+        self.watch_routes(now_us);
         if self.probing.is_none() && self.link.probe_due(now_us) {
             self.check(now_us);
         }
@@ -349,7 +406,7 @@ mod tests {
         assert!(link.down());
         // No further failure while down asks for another check.
         assert!(!link.failed(13 * S, Fault::Transport));
-        // Checked every 30 s.
+        // Checked every 5 s.
         assert!(!link.probe_due(12 * S + PROBE_EVERY_US - 1));
         assert!(link.probe_due(12 * S + PROBE_EVERY_US));
         assert_eq!(link.probed(42 * S, 44 * S, false), None);
@@ -372,6 +429,45 @@ mod tests {
         // And it can go down again.
         assert!(link.failed(90 * S, Fault::ResponseTimeout));
         assert_eq!(link.probed(90 * S, 92 * S, false).unwrap().revision, 4);
+    }
+
+    /// #1844 (lamp-06c1, 20 Oct): a down link checks every 5 s, and at once
+    /// when the kernel's default route comes back.
+    #[test]
+    fn down_it_checks_every_five_seconds_and_at_once_when_the_route_comes_back() {
+        assert_eq!(PROBE_EVERY_US, 5 * S);
+        let table = |default: bool| {
+            let mut text = String::from(
+                "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\tMTU\tWindow\tIRTT\n\
+                 wlan0\t0014A8AC\t00000000\t0001\t0\t0\t3006\t00FFFFFF\t0\t0\t0\n",
+            );
+            if default {
+                text.push_str("wlan0\t00000000\t0114A8AC\t0003\t0\t0\t3006\t00000000\t0\t0\t0\n");
+            }
+            text
+        };
+        assert!(has_default_route(&table(true)));
+        assert!(!has_default_route(&table(false)));
+        assert!(!has_default_route(""));
+        let dir = std::env::temp_dir().join(format!("link-routes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let routes = dir.join("route");
+        std::fs::write(&routes, table(false)).unwrap();
+        let (mut watch, _) = Watch::new(None, S, S + 10);
+        watch.routes = routes.clone();
+        assert!(watch.link.failed(10 * S, Fault::Transport));
+        watch.link.probed(10 * S, 12 * S, false).expect("down");
+        // No route yet: the next check stays at 17 s.
+        watch.watch_routes(12 * S);
+        assert!(!watch.link.probe_due(13 * S));
+        // Read again only after 500 ms; the route is back: due now.
+        std::fs::write(&routes, table(true)).unwrap();
+        watch.watch_routes(12 * S + ROUTE_EVERY_US - 1);
+        assert!(!watch.link.probe_due(13 * S), "read too soon");
+        watch.watch_routes(12 * S + ROUTE_EVERY_US);
+        assert!(watch.link.probe_due(12 * S + ROUTE_EVERY_US));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
