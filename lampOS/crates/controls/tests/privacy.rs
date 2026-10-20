@@ -690,3 +690,128 @@ fn synthetic_line_to_bus_latency_with_stalled_strip() {
         serde_json::json!({"boundary":"injected GPIO high() entry through retained Bus read/parse/validation", "synthetic_clock_step_us":5000, "first_us":first, "repeated_count":times.len(), "repeated_p50_us":times[49], "repeated_p95_us":times[94], "repeated_max_us":times[99], "strip":"one initial sample then no acquisitions", "hardware_measured":false})
     );
 }
+
+/// The first builder on #2143: health says the switch's own reading, open or
+/// closed, and that it hasn't moved since Controls started until it does,
+/// with how often it has; a line that can't be read is a warning with its
+/// fault.
+#[test]
+fn health_says_the_switch_open_or_closed_and_whether_it_has_moved() {
+    let (lines, high, fail, _) = line(true);
+    let mut source = Source::new(
+        Box::new(LineReader::new(lines, CLOCK, "privacy-reader")),
+        CLOCK,
+    );
+    let said = |source: &mut Source, at: u64| {
+        source.poll(|| at);
+        let report = source.health(at);
+        assert_eq!(report.name, lamp_controls::privacy::SWITCH_ITEM);
+        let changes = report
+            .values
+            .iter()
+            .find(|value| value.key == "changes")
+            .map(|value| value.value.clone());
+        (report.level, report.message, changes)
+    };
+    let changes = |n: &str| Some(n.to_owned());
+    assert_eq!(
+        said(&mut source, 1_000),
+        (
+            lamp_msgs::Level::Ok,
+            "open, not moved since Controls started".to_owned(),
+            changes("0")
+        )
+    );
+    high.set(false);
+    assert_eq!(
+        said(&mut source, 7_000),
+        (lamp_msgs::Level::Ok, "closed".to_owned(), changes("1"))
+    );
+    high.set(true);
+    assert_eq!(
+        said(&mut source, 13_000),
+        (lamp_msgs::Level::Ok, "open".to_owned(), changes("2"))
+    );
+    fail.set(true);
+    let (level, message, moved) = said(&mut source, 19_000);
+    assert_eq!(level, lamp_msgs::Level::Warn);
+    assert!(message.starts_with("unknown: Some("), "{message}");
+    assert_eq!(moved, changes("2"));
+}
+
+/// #2143: Controls sends the switch's own item on `diagnostics`, beside its
+/// own report, where lamp-health reads it: from the legacy loop and from the
+/// touch loop, the product's.
+#[test]
+fn controls_says_the_switch_on_diagnostics_beside_its_own_report() {
+    let said = |touch: bool| {
+        // A short root: a subscriber's socket address holds 103 bytes.
+        let root = Root(PathBuf::from(format!(
+            "/tmp/cps-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        )));
+        std::fs::create_dir_all(&root.0).unwrap();
+        let bus = root.bus();
+        let mut reports = bus
+            .subscribe_typed(
+                lamp_msgs::Diagnostic::TOPIC,
+                "test",
+                lamp_msgs::Diagnostic::TYPE,
+            )
+            .unwrap();
+        let (lines, _, _, _) = line(false);
+        let source = Source::new(
+            Box::new(LineReader::new(lines, CLOCK, "privacy-reader")),
+            CLOCK,
+        );
+        if touch {
+            let wiring: TouchPinsConfig = serde_json::from_str(include_str!(
+                "../fixtures/strip-711-working-pins-example.json"
+            ))
+            .unwrap();
+            let config = Config {
+                base_selected_mask: Some(
+                    wiring
+                        .base
+                        .as_ref()
+                        .unwrap()
+                        .pads
+                        .iter()
+                        .fold(0, |mask, &pad| mask | (1 << pad)),
+                ),
+                ..Config::default()
+            };
+            let mut service =
+                touch_runtime::Service::new(&bus, config, wiring, NoGpio, None::<Worker>, CLOCK)
+                    .unwrap();
+            service.attach_privacy(&bus, source).unwrap();
+            service.strip_unavailable(0, "no strip");
+            service.step(|| 0);
+        } else {
+            let mut service = Service::new(&bus, Config::default(), MissingPins, CLOCK).unwrap();
+            service.attach_privacy(source);
+            service.step(|| 0);
+        }
+        let mut said = Vec::new();
+        while let Ok(Some(message)) = reports.recv(std::time::Duration::from_millis(100)) {
+            let report: lamp_msgs::Diagnostic = message.parse().unwrap();
+            said.push((report.name, report.message));
+        }
+        said
+    };
+    for touch in [false, true] {
+        let said = said(touch);
+        assert!(
+            said.iter().any(|(name, _)| name == "controls"),
+            "{touch}: {said:?}"
+        );
+        assert!(
+            said.contains(&(
+                lamp_controls::privacy::SWITCH_ITEM.to_owned(),
+                "closed, not moved since Controls started".to_owned()
+            )),
+            "{touch}: {said:?}"
+        );
+    }
+}
