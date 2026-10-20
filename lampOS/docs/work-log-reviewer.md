@@ -4,6 +4,17 @@
 
 Newest first. Times from `date` (+07).
 
+- 13:36 2211 two P1s (three replace paths; a team member's name in tests), one P2
+- 13:36 2210 P2: common-word stand-ins plus any face overrule not_for_me in a busy room; two P3s
+- 13:36 2199 re-read: P2 and P3s fixed, two small P3s, (b) for memory access; first builder's
+- 13:36 2106 same patch rebased (7dd87ea4f), no finding
+- 13:31 Merged #2207 (call-times header comment) as `a49b009ef` on green
+- 13:26 Merged #2131 (Harness sign-in by a spoken code, lamp-tasks) as `0a0caae9e` on green, approved
+- 13:25 #2209 (speech socket opened ahead) read: no P1/P2, three P3s, rebase needed; first builder's. #2213 (skills test ending skip) read: merge on green
+- 13:24 Merged #2204 (arm-hour comment) as `23631f0d7` on green
+- 13:22 #2212 (two-person run fixes) read: no finding; I merge on green
+- 13:17 Merged #2201 (tasks store tests take turns with spawns) as `70552f4ef` on green
+- 13:15 #2206 (memory journal says why it stopped) read: no behaviour change; P2 it doesn't compile with #2110 (DaysClient field); P3 printing under the lock; mine once the pair is settled
 - 13:11 #2207 (call-times header comment) read: merge on green; #2152 merge of #2205 clean, fold before #1712
 - 13:10 #2202 (near name) read: P1 a yes replaces the known person's face prints (identity and memory handed over), on by default; P2 name said without tellable; three P3s; first builder's
 - 13:07 #2199 (faces page) read: P2 a removed face leaves the person's memory; three P3s; first builder's. #2205 (nudge waits for a near face 2 s) read: no finding; with #2152
