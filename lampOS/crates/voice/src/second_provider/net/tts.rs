@@ -155,14 +155,20 @@ fn service_base(provider: TtsProvider, base_url: &str) -> Result<String> {
     if provider == TtsProvider::OpenAi {
         return Ok(base);
     }
-    let host = reqwest::Url::parse(&base).map_err(|_| Error::Url)?;
-    let direct = host
-        .host_str()
-        .is_some_and(|h| ELEVENLABS_HOSTS.iter().any(|d| h.eq_ignore_ascii_case(d)));
-    Ok(if direct {
+    reqwest::Url::parse(&base).map_err(|_| Error::Url)?;
+    Ok(if on_elevenlabs(&base) {
         base
     } else {
         format!("{base}/elevenlabs")
+    })
+}
+
+/// Whether `base_url` is ElevenLabs' own API ([`ELEVENLABS_HOSTS`]), not
+/// the Autonomous proxy.
+pub(crate) fn on_elevenlabs(base_url: &str) -> bool {
+    reqwest::Url::parse(&openai_base(base_url)).is_ok_and(|url| {
+        url.host_str()
+            .is_some_and(|h| ELEVENLABS_HOSTS.iter().any(|d| h.eq_ignore_ascii_case(d)))
     })
 }
 
