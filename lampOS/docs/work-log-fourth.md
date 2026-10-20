@@ -5055,6 +5055,26 @@ A usage limit paused me from about 00:40 to 06:2x.
   - **P3 1:** the answer wait's `heard` check. **P3 2:** the test's place and the "once" wording. Both done, with a mutation each.
   - **The P2** ("not now" said before the line sounds doesn't stop it) is the first builder's call. I recommended way 1, the waited words with `LAMP_WAIT_KEEPS_ANSWER=words`. The doc now names the cost.
 
+## 2026-10-20, 21:13 ICT: #2276, #2287, #2290 merged; #2295 up; #2287's follow-up gating
+
+- **Merged:**
+  - #2276 (`--wire --sizes`), into #1712;
+  - #2287 (`LAMP_OWN_LINE_KEEPS`, off), into #1712;
+  - #2290 (lamp-peek's units deadline), into lamp-voice.
+- **#2135's size probe on lamp-4ace** (the first builder, 18:23): the request's size isn't the wait. Half the character saves ~70 ms of 1.26 s, and the few-functions set nothing. So no trimming.
+- **The speech leg** (claimed 17:49):
+  - **Request 31:** ElevenLabs' first byte was 403 ms on a reused connection, and the first piece waited ~100 ms for its words.
+  - **The start horizon:** every unit's `--playout-start-ms 350` holds each answer's first write, roughly 90–175 ms more.
+  - **#2295** (`451bd87c3`, into #1712, gate 3260/0, ARM64 green) gives the second route its own horizon, `LAMP_SECOND_PLAYOUT_START_MS`. Its value is from the records' `start_horizon_needed_us`, read on lamp-4ace.
+  - **For the 403 ms,** two lamp runs are asked on #2135: `--wire --speech` with Flash, and `--wire --socket`.
+- **The warm-up's 404** (the first builder's ask): the backend confirmed the connection was kept, so the warm-up already saved connect and TLS. Their new route answers 401 until their access is added.
+- **#2287's follow-up** (`fourth/own-line-person`, claimed 18:33):
+  - **Way 2:** a sound the eyes saw a face speak through, turned to the lamp, is decided as before.
+  - **Way 1:** with `words`, a lone stop stops the line, and "not now" takes the turn.
+  - Tests and two mutations are done. It's gating on #1712's `1f27dcce0`.
+- **The Mac's disk was full** (17:55, 119 MiB free). I dropped my target's incremental caches and old scratch exports, and the other owners cleaned theirs (74 GiB free at 18:05).
+- **A pause on my side,** about 18:40 to 21:00 (a usage limit), with nothing lost.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
