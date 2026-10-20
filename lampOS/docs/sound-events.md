@@ -4,7 +4,7 @@ Status: the first builder accepted this topic and model direction on
 [19 October at 09:02](https://github.com/autonomous-ai/lampOS/issues/1669#issuecomment-6258073073).
 Third reviewed the typed contract on 19 October. A publisher now exists in
 Ears behind `LAMP_EARS_CLASSES=on`, off unless set and only with
-`LAMP_PRIVACY_CONTROLS=on` (see "The publisher behind LAMP_EARS_CLASSES"
+`LAMP_PRIVACY_CONTROLS=on`, or `no-slide` with a stored yes (see "The publisher behind LAMP_EARS_CLASSES"
 below). Third's privacy read of its two-second retention found no P1 or P2
 (19 October); its scores still need the empty-room and busy-room
 measurement, and the owner's word, before any unit sets it.
@@ -152,8 +152,12 @@ counts. It does not export score payloads or make them behavioral evidence.
 
 `lamp-ears` with `LAMP_EARS_CLASSES=on` (exactly `on`) and
 `LAMP_PRIVACY_CONTROLS=on` publishes `ears/classes`
-(`crates/ears/src/classes.rs`). With the switch on and privacy controls off,
-one journal line says no classifier runs, and none does. Off, nothing below
+(`crates/ears/src/classes.rs`), and with `no-slide` only when the person's
+yes to room sounds is stored (`room_sounds_yes`, read at the start and
+every 2 s while it runs, so a forget stops it;
+[privacy-switch.md](privacy-switch.md)). With the switch on and privacy
+controls off, or `no-slide` without the yes, one journal line says no
+classifier runs, and none does. Off, nothing below
 exists: no queue, thread or model.
 
 **Model.** `LAMP_EARS_CLASSES_MODEL` is the absolute path to `yamnet.onnx`,

@@ -187,13 +187,18 @@ with no slide has no switch to close, so a head tap looks up as on a lamp
 without the route, muted by software or not. The unknown lease, with the
 Controls word stale, still counts as closed.
 
-**Classes stay off.** lamp-ears' room sound classes (#1923,
-`LAMP_EARS_CLASSES=on`) start only on `on`, a lamp with a slide
-(`privacy::slide`, `start_classes`): with `no-slide` no classifier runs,
-whatever that switch says, and the journal says so once (the reviewer's P2
-on #2086). The lead's decision (#1711, 07:33 on #1722): on a lamp with no
-slide they stay off until the person says yes in setup; that stored yes is
-read beside this check in lamp-ears (Sixth's).
+**Classes stay off without a yes.** lamp-ears' room sound classes (#1923,
+`LAMP_EARS_CLASSES=on`) start on `on`, a lamp with a slide, as built. With
+`no-slide` they start only with the person's stored yes from setup (the
+lead's decision, #1711, 07:33 on #1722): `classes::start` reads
+`/var/lib/lampOS/consent/room-sounds.json` (Seventh's #2110, `root:lampos`
+0640) as lamp-ears starts, and only a JSON object whose `room_sounds` is
+exactly `"yes"` counts. Missing, unreadable, over 4096 bytes or anything else
+is no; then no classifier runs, whatever the switch says, and the journal
+says so once. While it runs, the classifier reads the yes again every 2 s
+(`YES_EVERY_US`): once a forget or a redo of setup has removed it, the
+window is dropped, `ears/classes` says `privacy`, the journal says so once
+and the classifier stays stopped until lamp-ears starts again.
 
 **Only for a board with no slide.** Controls refuses `no-slide` only when the
 pins file has a `privacy` section, and no pins file has one today. A slide

@@ -17,6 +17,7 @@ use lamp_msgs::{
 };
 use std::{
     io,
+    path::Path,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -427,25 +428,36 @@ fn pump(
 
 /// Room sound classes (#1669): model loading and inference run on their own
 /// thread, never on capture or the pump; capture only offers blocks. Off
-/// unless `LAMP_EARS_CLASSES` is exactly `on`, and never on a lamp with no
-/// slide (`route`, `LAMP_PRIVACY_CONTROLS=no-slide`; the reviewer's P2 on
-/// #2086): then no thread, no model, no handoff for capture and no
+/// unless `LAMP_EARS_CLASSES` is exactly `on`. On a lamp with no slide
+/// (`route`, `LAMP_PRIVACY_CONTROLS=no-slide`) only with the person's stored
+/// yes (`room_sounds`, read here and again every `YES_EVERY_US` while it
+/// runs; the lead's decision, First on #1722 at 07:33). Otherwise no thread, no model, no handoff for capture and no
 /// publisher for the pump.
 fn start_classes(
     switch: Option<&str>,
     route: Option<&str>,
+    room_sounds: &Path,
     model: Option<String>,
     shared: &Arc<Shared>,
 ) -> io::Result<(
     Option<lamp_ears::classes::Handoff>,
     Option<Receiver<Classified>>,
 )> {
-    match lamp_ears::classes::start(switch, route) {
+    match lamp_ears::classes::start(switch, route, || {
+        lamp_ears::classes::room_sounds_yes(room_sounds)
+    }) {
         lamp_ears::classes::Start::Off => return Ok((None, None)),
         lamp_ears::classes::Start::NotOnThisRoute => {
             log(
-                "LAMP_EARS_CLASSES=on needs LAMP_PRIVACY_CONTROLS=on, a lamp with a slide; with no-slide no classifier runs",
+                "LAMP_EARS_CLASSES=on needs LAMP_PRIVACY_CONTROLS=on or no-slide: no classifier runs",
             );
+            return Ok((None, None));
+        }
+        lamp_ears::classes::Start::NoYes => {
+            log(&format!(
+                "LAMP_EARS_CLASSES=on on a lamp with no slide: no yes to room sounds in {}, so no classifier runs",
+                room_sounds.display()
+            ));
             return Ok((None, None));
         }
         lamp_ears::classes::Start::Start => {}
@@ -453,6 +465,10 @@ fn start_classes(
     let (handoff, intake) = lamp_ears::classes::handoff();
     let (send_classes, receive_classes) = mpsc::sync_channel(4);
     let worker_shared = shared.clone();
+    // On a lamp with no slide the yes is asked again while it runs, so a
+    // forget or a redo of setup stops it (Third's P2 on #2109).
+    let asks_again = route == Some("no-slide");
+    let room_sounds = room_sounds.to_path_buf();
     thread::Builder::new()
         .name("ears-classes".into())
         .spawn(move || {
@@ -470,6 +486,16 @@ fn start_classes(
                 |classified| {
                     // A stalled pump drops results; they would go stale.
                     let _ = send_classes.try_send(classified);
+                },
+                || {
+                    let yes = !asks_again || lamp_ears::classes::room_sounds_yes(&room_sounds);
+                    if !yes {
+                        log(&format!(
+                            "no yes to room sounds in {} any more: the classifier stops until lamp-ears starts again",
+                            room_sounds.display()
+                        ));
+                    }
+                    yes
                 },
             );
         })?;
@@ -549,6 +575,7 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
     let (classes, receive_classes) = start_classes(
         std::env::var("LAMP_EARS_CLASSES").ok().as_deref(),
         std::env::var("LAMP_PRIVACY_CONTROLS").ok().as_deref(),
+        Path::new(lamp_ears::classes::ROOM_SOUNDS_FILE),
         std::env::var("LAMP_EARS_CLASSES_MODEL").ok(),
         &shared,
     )?;
@@ -714,7 +741,9 @@ mod tests {
     fn classes_start_nothing_unless_the_switch_is_on() {
         let shared = Arc::new(Shared::new(false));
         for switch in [None, Some(""), Some("off"), Some("ON"), Some("on ")] {
-            let (handoff, receiver) = start_classes(switch, Some("on"), None, &shared).unwrap();
+            let (handoff, receiver) =
+                start_classes(switch, Some("on"), Path::new("/nonexistent"), None, &shared)
+                    .unwrap();
             assert!(handoff.is_none() && receiver.is_none(), "{switch:?}");
         }
         assert_eq!(
@@ -724,21 +753,38 @@ mod tests {
         );
     }
 
-    /// The reviewer's P2 on #2086: on a lamp with no slide
-    /// (`LAMP_PRIVACY_CONTROLS=no-slide`) the switch on starts no
-    /// classifier: no thread, no handoff, no publisher. Only `on` does.
+    /// On a lamp with no slide (`LAMP_PRIVACY_CONTROLS=no-slide`) the switch
+    /// on starts no classifier without the person's stored yes (the lead's
+    /// decision, 07:33), nor on any other route but `on`: no thread, no
+    /// handoff, no publisher.
     #[test]
-    fn with_no_slide_classes_start_nothing() {
+    fn with_no_slide_classes_start_nothing_without_a_yes() {
+        let folder = std::env::temp_dir().join(format!("ears-no-yes-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let no = folder.join("room-sounds.json");
+        std::fs::write(&no, r#"{"room_sounds":"no"}"#).unwrap();
+        let yes = folder.join("yes.json");
+        std::fs::write(&yes, r#"{"room_sounds":"yes"}"#).unwrap();
         let shared = Arc::new(Shared::new(false));
-        for route in [Some("no-slide"), None, Some("off")] {
-            let (handoff, receiver) = start_classes(Some("on"), route, None, &shared).unwrap();
-            assert!(handoff.is_none() && receiver.is_none(), "{route:?}");
+        for (route, file) in [
+            (Some("no-slide"), folder.join("missing.json")),
+            (Some("no-slide"), no),
+            (None, yes.clone()),
+            (Some("off"), yes),
+        ] {
+            let (handoff, receiver) =
+                start_classes(Some("on"), route, &file, None, &shared).unwrap();
+            assert!(
+                handoff.is_none() && receiver.is_none(),
+                "{route:?} {file:?}"
+            );
         }
         assert_eq!(
             Arc::strong_count(&shared),
             1,
             "no thread holds the shared state"
         );
+        std::fs::remove_dir_all(folder).unwrap();
     }
 
     /// Third's yes (04:37): said once, after 10 s with no permission, and

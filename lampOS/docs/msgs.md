@@ -414,7 +414,7 @@ topic catalogue. Neither carries any sound.
 |---|---|---|---|---|
 | `RoomSound` | `ears/level` | latest | 100 ms / none | The room microphone's last 100 ms in dBFS, the room's quiet (none for the first two seconds), whether the lamp's own voice is in it |
 | `SuddenSound` | `ears/sudden` | event | none / none | A sound that rose suddenly out of the quiet: its loudest 20 ms, the quiet, how long it stayed loud in 300 ms, whether that was short, how long ago it began |
-| `SoundClasses` | `ears/classes` | latest | 500 ms / 1,500 ms | Unavailable with no scores, or multi-label speech/music/laughter scores with original window times, completion, capture epoch, model id and own-voice evidence; Ears publishes it only with `LAMP_EARS_CLASSES=on` and `LAMP_PRIVACY_CONTROLS=on` (never with `no-slide`), off by default (#1669, sound-events.md) |
+| `SoundClasses` | `ears/classes` | latest | 500 ms / 1,500 ms | Unavailable with no scores, or multi-label speech/music/laughter scores with original window times, completion, capture epoch, model id and own-voice evidence; Ears publishes it only with `LAMP_EARS_CLASSES=on` and `LAMP_PRIVACY_CONTROLS=on`, or `no-slide` with the person's stored yes, off by default (#1669, sound-events.md) |
 
 Levels are dBFS from -120 (digital silence) to 0; `check()` refuses
 anything else, and a peak under its quiet.
