@@ -177,8 +177,10 @@ pub(crate) fn local_socket(response: &reqwest::Response) -> Option<std::net::Soc
 
 /// A connection opened ahead with a `GET` of `url` (#1712), unless `used`
 /// says one went within `after`: at most `max` bytes of the answer are read,
-/// so the connection goes back to the pool. The status, how long it took and
-/// the connection's local socket; `None` when not due, or when it failed.
+/// so the connection goes back to the pool. The status, how long it took,
+/// the connection's local socket, whether its answer was read to its end and
+/// whether it keeps its connection ([`keeps_its_connection`]; only with both
+/// is the connection kept); `None` when not due, or when it failed.
 pub(crate) async fn warm_get(
     client: &reqwest::Client,
     used: &std::sync::Mutex<Option<std::time::Instant>>,
@@ -186,7 +188,7 @@ pub(crate) async fn warm_get(
     url: &str,
     auth: (&'static str, &str),
     max: usize,
-) -> Option<(u16, Duration, Option<std::net::SocketAddr>)> {
+) -> Option<(u16, Duration, Option<std::net::SocketAddr>, bool, bool)> {
     let began = std::time::Instant::now();
     {
         let mut used = used.lock().ok()?;
@@ -202,14 +204,30 @@ pub(crate) async fn warm_get(
         .ok()?;
     let status = response.status().as_u16();
     let socket = local_socket(&response);
+    let keeps = keeps_its_connection(&response);
     let mut read = 0;
+    let mut ended = false;
     while read <= max {
         match tokio::time::timeout(STALL, response.chunk()).await {
             Ok(Ok(Some(bytes))) => read += bytes.len(),
+            Ok(Ok(None)) => {
+                ended = true;
+                break;
+            }
             _ => break,
         }
     }
-    Some((status, began.elapsed(), socket))
+    Some((status, began.elapsed(), socket, ended, keeps))
+}
+
+/// Whether `response` leaves its connection for another request: not with
+/// `connection: close`.
+pub(crate) fn keeps_its_connection(response: &reqwest::Response) -> bool {
+    !response
+        .headers()
+        .get(reqwest::header::CONNECTION)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.to_ascii_lowercase().contains("close"))
 }
 
 /// The next piece of a streamed body; `None` at its end.

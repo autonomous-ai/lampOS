@@ -560,6 +560,19 @@ order is kept. A written turn is the same from the chat on.
   first piece's line says `reused`. A warming runs beside the line and
   never holds a piece up: a piece asked while it is in flight opens its own
   connection, and one that fails changes nothing.
+- **A line begun with no speech connection known idle is warmed too,**
+  though a piece went within the 60 s (#1722, the first builder at 01:52 on
+  21 Oct: on lamp-4ace 20 of 221 first pieces went on a new connection, first
+  audio about 600 ms against about 385 ms reused, and 13 of the 20 came within
+  10 s of the piece before). The connections are HTTP/1.1, one request on
+  each at a time, so the last answer's pieces still streaming hold theirs,
+  and a piece dropped mid-body, as at a cut-in, closes its own. `Tts` keeps
+  the latest connections' local sockets, each marked idle once its answer
+  is read to its end (none with `connection: close`), in use while it
+  streams, and forgotten when it is dropped before its end. At most one
+  warming is in flight. With an idle connection known, nothing more goes.
+  With the switch off nothing warms, and the pieces' connections are as
+  before.
 - **The answer's first piece goes after a few words** if no clause or
   sentence ended sooner: 4 with the configured voice
   (`CONFIGURED_FIRST_WORDS`; the first builder at 18:26: a 9-word first
