@@ -139,25 +139,44 @@ impl Rig {
             self.renew_leases();
             let snapshot = self.controller.snapshot(now()).unwrap();
             self.privacy = snapshot.microphone_generation();
-            self.parent
-                .control
-                .send(Control::Authority { snapshot })
-                .unwrap();
+            let sent = self.parent.control.send(Control::Authority { snapshot });
+            self.unless_ended(sent, "sending the worker its authority");
             self.authority_at = Some(Instant::now());
         }
         self.take_events();
-        if !self.capture.connect_step().unwrap() {
+        let linked = self.capture.connect_step();
+        if !self.unless_ended(linked, "connecting the reference link") {
             return;
         }
         self.linked = true;
         if self.prepare && !self.prepared_sent {
-            self.capture
+            let sent = self
+                .capture
                 .control
                 .send(ReferenceControl::CapturePrepared {
                     privacy_generation: self.privacy,
-                })
-                .unwrap();
+                });
+            self.unless_ended(sent, "telling the worker the capture side is ready");
             self.prepared_sent = true;
+        }
+    }
+
+    /// What `result` holds, or, if it failed because the worker had ended
+    /// (its sockets closed: "Connection refused"), the worker's own account,
+    /// as `alive` gives it. An unwrap here hid it (#1569 row 42: both
+    /// tests failed at 0.25 s on ARM64 with only "speaker.c.p: Connection
+    /// refused").
+    fn unless_ended<T>(&mut self, result: std::io::Result<T>, what: &str) -> T {
+        match result {
+            Ok(value) => value,
+            Err(error) => {
+                let from = Instant::now();
+                while from.elapsed() < Duration::from_secs(1) {
+                    self.alive(what);
+                    sleep(Duration::from_millis(2));
+                }
+                panic!("{what}: {error}, and the speaker worker is still running");
+            }
         }
     }
 

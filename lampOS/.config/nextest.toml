@@ -44,6 +44,16 @@ priority = 100
 # turns a run red (the reviewer on #1299).
 success-output = "final"
 
+# speaker_lapse_worker's two tests start a speaker worker, which ends when a
+# control message reaches it more than 100 ms after it was sent (the
+# channel's bound). On ARM64, beside the rest of a pull request's tests, its
+# third message was read 126 to 138 ms late, three times, both tests
+# together (#1569 row 42). With every core to themselves, nothing else runs
+# while they start. They take about 0.6 s each.
+[[profile.default.overrides]]
+filter = 'binary_id(lamp-voice::it) & test(/^speaker_lapse_worker::/)'
+threads-required = "num-cpus"
+
 # Pull requests and pushes to lamp-voice on GitHub Actions
 # (.github/workflows/lampos-arm64.yml): every test, the realtime group
 # included. A filter given on the command line is intersected with this.
