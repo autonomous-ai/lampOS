@@ -942,6 +942,21 @@ The lamp's answer is kept under the same scope (`Thread::lamp_for`), and a
 written request's note is kept as the room's, as it is admitted. The context is
 still built on the turn's task, so a slow memory service delays that turn's
 first round as before; nothing new is read on the input path.
+A request is admitted for a person only while the authority permits the
+camera (`memory_camera_allowed`): the eyes' known file is otherwise not
+read. With the eyes a process of their own (`LAMP_EYES_PERMIT_SOCKET`, no
+camera of the voice's own), they may look exactly while the microphone is
+permitted, and with `LAMP_CAMERA_FOLLOWS_EYES=on` (off unless set) the
+coordinator says so in the authority (`eyes_look_with_the_microphone`); a
+mute denies both. Without it, as on every product lamp today, the camera is
+never permitted there, and every turn on both routes is the room's. **Turned
+on, it starts per-person memory and #764's per-person Live sessions on a
+product lamp**: Live opens a new session between turns when the person at
+the lamp changes, telling it only that person's thread and kept things, and
+on the second route with `LAMP_SECOND_SCOPED_CONTEXT=on` each heard turn is
+the person's the eyes name. On lamp-52e6 (#1895, 20 Oct) the two-person run
+went from 0 of 12, every turn the room's and codes crossing, to 11 of 12
+with no code crossed (the one miss an answer too late).
 
 Off, a turn is told and kept as before, for the person the session was opened
 for. The Live route is not covered: its provider session already holds earlier
