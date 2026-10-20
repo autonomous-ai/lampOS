@@ -397,10 +397,26 @@ fn partial_or_foreign_gpio_observations_are_not_filled_with_false_levels() {
     }
 }
 
+/// #1680: a newer build's field at any depth of the touch path's file is
+/// read past, what this build knows reads as before, and the field is named
+/// once by its path. The legacy schema stays strict: the touch file is never
+/// read as its. A missing known field still refuses.
 #[test]
-fn new_wiring_rejects_unknown_fields_and_does_not_relax_legacy_schema() {
+fn new_wiring_reads_a_newer_builds_fields_past_and_the_legacy_schema_stays_strict() {
+    let root = Root::new();
+    let path = root.0.join("touch.json");
     let original = serde_json::to_value(wiring()).unwrap();
-    for pointer in ["", "/buttons/0", "/reset", "/base", "/base/profile"] {
+    for (pointer, named) in [
+        ("", "unknown"),
+        ("/buttons/0", "buttons[0].unknown"),
+        ("/reset", "reset.unknown"),
+        ("/base", "base.unknown"),
+        ("/base/profile", "base.profile.unknown"),
+        (
+            "/base/profile/autoconfig",
+            "base.profile.autoconfig.unknown",
+        ),
+    ] {
         let mut value = original.clone();
         value
             .pointer_mut(pointer)
@@ -408,8 +424,18 @@ fn new_wiring_rejects_unknown_fields_and_does_not_relax_legacy_schema() {
             .as_object_mut()
             .unwrap()
             .insert("unknown".into(), json!(1));
-        assert!(
-            serde_json::from_value::<TouchPinsConfig>(value).is_err(),
+        fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+        let (read, line) = TouchPinsConfig::read(&path).unwrap();
+        assert_eq!(read, wiring(), "{pointer}");
+        assert_eq!(
+            line.as_deref(),
+            Some(
+                format!(
+                    "{}: fields this build does not read, ignored: {named}",
+                    path.display()
+                )
+                .as_str()
+            ),
             "{pointer}"
         );
     }
@@ -420,6 +446,124 @@ fn new_wiring_rejects_unknown_fields_and_does_not_relax_legacy_schema() {
         .unwrap()
         .remove("touch_thresholds");
     assert!(serde_json::from_value::<TouchPinsConfig>(missing).is_err());
+}
+
+/// The product's settings as the next release might write them.
+fn product(name: &str) -> serde_json::Value {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../deploy/product/settings")
+        .join(name);
+    serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
+}
+
+/// #2052's audit, the controls row (#1680): the product's `controls.json`
+/// and pins file one release ahead, each with a field this build doesn't
+/// know, are read as this build reads its own, and the fields are named
+/// once. Before, either one stopped the controls at start.
+#[test]
+fn the_products_files_one_release_ahead_are_read_and_their_new_fields_named() {
+    let root = Root::new();
+    let mut pins = product("controls-pins.json");
+    let ours: TouchPinsConfig = serde_json::from_value(pins.clone()).unwrap();
+    pins["head_hold_ms"] = json!(900);
+    pins["head_pads"][1]["sensitivity"] = json!("high");
+    let path = root.0.join("controls-pins.json");
+    fs::write(&path, serde_json::to_vec_pretty(&pins).unwrap()).unwrap();
+    let (read, line) = TouchPinsConfig::read(&path).unwrap();
+    assert_eq!(read, ours);
+    let line = line.unwrap();
+    for named in ["head_hold_ms", "head_pads[1].sensitivity"] {
+        assert!(line.contains(named), "{line}");
+    }
+    assert!(!line.contains("high") && !line.contains("900"), "{line}");
+    assert_eq!(TouchPinsConfig::load(&path).unwrap(), ours);
+
+    let mut controls = product("controls.json");
+    let ours: Config = serde_json::from_value(controls.clone()).unwrap();
+    controls["hold_tiers_ms"] = json!([2000, 5000]);
+    let path = root.0.join("controls.json");
+    let bytes = serde_json::to_vec_pretty(&controls).unwrap();
+    let (read, line) = lamp_controls::forward::read::<Config>(&path, &bytes).unwrap();
+    assert_eq!(read, ours);
+    assert_eq!(
+        line.as_deref(),
+        Some(
+            format!(
+                "{}: fields this build does not read, ignored: hold_tiers_ms",
+                path.display()
+            )
+            .as_str()
+        )
+    );
+}
+
+/// Third's design C (#1722): the privacy slide is read only as this build
+/// knows it. A field about privacy it doesn't know is refused by name, as
+/// any unknown field was before; one inside `privacy` is refused; a file
+/// without `privacy` reads as before. A key-like field is refused by name,
+/// and a bad known value is refused with serde's category, line and column,
+/// never its message, so no value is shown.
+#[test]
+fn privacy_keys_and_bad_values_are_still_refused_and_no_value_is_shown() {
+    let root = Root::new();
+    let path = root.0.join("controls-pins.json");
+    let pins = product("controls-pins.json");
+    assert!(pins.get("privacy").is_none());
+    let refused = |value: &serde_json::Value| {
+        fs::write(&path, serde_json::to_vec_pretty(value).unwrap()).unwrap();
+        TouchPinsConfig::read(&path).unwrap_err().to_string()
+    };
+    for (field, said) in [
+        ("privacy_slide", "privacy_slide is about privacy"),
+        ("no_slide", "no_slide is about privacy"),
+        ("relay_token", "relay_token is named like a key"),
+    ] {
+        let mut newer = pins.clone();
+        newer[field] = json!("sk-not-shown");
+        let text = refused(&newer);
+        assert!(text.contains(said), "{text}");
+        assert!(!text.contains("sk-not-shown"), "{text}");
+    }
+    // The reviewer on #2076: whatever the value, `false` and `null` too.
+    for value in [json!(false), json!(null)] {
+        let mut newer = pins.clone();
+        newer["mute_on_slide"] = value.clone();
+        let text = refused(&newer);
+        assert!(
+            text.contains("mute_on_slide is about privacy"),
+            "{value}: {text}"
+        );
+    }
+    // A reset renamed or misspelt stops the controls, as before, rather
+    // than leave the lamp with no reset button.
+    let mut renamed = pins.clone();
+    let reset = renamed.as_object_mut().unwrap().remove("reset").unwrap();
+    renamed["reset_pin"] = reset;
+    let text = refused(&renamed);
+    assert!(
+        text.contains("reset_pin is about the reset button"),
+        "{text}"
+    );
+    let mut misspelt = pins.clone();
+    misspelt["rest"] = json!(null);
+    misspelt["Reset"] = misspelt["reset"].clone();
+    assert!(refused(&misspelt).contains("Reset is about the reset button"));
+    let mut inside = pins.clone();
+    inside["privacy"] = json!({
+        "chip": "/dev/gpiochip1", "line": 9, "active_low": true, "pull": "up",
+        "mode": "sk-not-shown"
+    });
+    let text = refused(&inside);
+    assert!(text.contains("not read (data error at line"), "{text}");
+    assert!(!text.contains("sk-not-shown"), "{text}");
+    let mut bad = pins.clone();
+    bad["head_pads"][0]["pull"] = json!("sk-not-shown");
+    let text = refused(&bad);
+    assert!(text.contains("not read (data error at line"), "{text}");
+    assert!(!text.contains("sk-not-shown"), "{text}");
+    fs::write(&path, serde_json::to_vec_pretty(&pins).unwrap()).unwrap();
+    let (read, line) = TouchPinsConfig::read(&path).unwrap();
+    assert_eq!((read.privacy, line), (None, None));
 }
 
 #[test]
@@ -532,9 +676,15 @@ fn head_rest_names_each_pad_in_order_with_its_polarity_and_how_it_reads() {
     ] {
         assert!(rest(rests).check(&config()).is_err(), "{why}");
     }
-    let mut unknown = serde_json::to_value(measured).unwrap();
+    // A newer build's field in a pad's baseline is read past and named
+    // (#1680).
+    let mut unknown = serde_json::to_value(&measured).unwrap();
     unknown["head_rest"][0]["idle"] = json!("high");
-    assert!(serde_json::from_value::<TouchPinsConfig>(unknown).is_err());
+    let file = Path::new("/etc/lampOS/controls/controls-pins.json");
+    let bytes = serde_json::to_vec(&unknown).unwrap();
+    let (read, line) = lamp_controls::forward::read::<TouchPinsConfig>(file, &bytes).unwrap();
+    assert_eq!(read, measured);
+    assert!(line.unwrap().ends_with("ignored: head_rest[0].idle"));
     // Without it, every pad reads its level, as before.
     assert!(
         wiring()
