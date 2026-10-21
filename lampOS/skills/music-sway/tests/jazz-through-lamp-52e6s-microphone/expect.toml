@@ -1,0 +1,12 @@
+# lamp-52e6's own scores (#2399, 21 Oct, Fifth's rerun): 20 s of an empty
+# office, then a jazz vocal track from a speaker beside the lamp, then a
+# spoken line over it. Its scores dip under 0.6 between phrases, never past
+# the 5 s gap, so one sway about 22 s into the track; the voice resting
+# (added beside the recording).
+clock = "12:00"
+
+[[expect]]
+at = "43100ms"
+within = "1s"
+call = "body.move"
+args = { move = "sway" }

@@ -153,6 +153,17 @@ ever held two windows in a row over 0.3. In 16.8 minutes of people talking
 0.09. So Laugh glance takes **one window over 0.3**, no longer two over 0.5:
 5 of the 9 laughs, and none of the talk (the tables are on #1669).
 
+**Through a lamp's microphone** (lamp-52e6, #2399, 21 Oct, `tools/joys-scores.sh`
+with `KEEP_DIR`, from a speaker beside the lamp in a talking office): laughs
+score about five times lower, 0.04 to 0.15, and nothing else (music, a line
+over it, the office) went over 0.015 in 2,430 windows. So Laugh glance now
+takes **one window over 0.05**: 2 of the 5 laughs, none of the rest. Music
+reads as off the lamp in spells (up to 0.98) but dips under 0.6 between
+phrases. Music sway's 0.6 for 20 s with a 5 s gap swayed once on piano and
+on a jazz vocal (60 s and 22 s in), never on the empty office, and not on an
+upbeat track whose 60 s held under the bar too often. Each skill keeps one
+case made of that run's own scores.
+
 The first of them, the music sway, is built and held out of the product
 (`skills/music-sway`, `install::NOT_PRODUCT_SKILLS`); it reads
 `scores.music` and does nothing without this topic.

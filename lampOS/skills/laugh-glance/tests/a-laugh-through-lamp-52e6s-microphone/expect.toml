@@ -1,0 +1,11 @@
+# lamp-52e6's own scores (#2399, 21 Oct, Fifth's rerun): 20 s of an empty
+# office, then laughs from a speaker beside the lamp, then a spoken line. With
+# a face in view and the voice resting (added beside the recording), one glance
+# at the first laugh (0.05 there), and none at the others within the cooldown.
+clock = "12:00"
+
+[[expect]]
+at = "22800ms"
+within = "1s"
+call = "body.gaze"
+args = { look_at = "face" }
