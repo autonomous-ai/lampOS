@@ -467,24 +467,43 @@ mod tests {
         });
         forget_asked();
         let watch = Watch::start(socket.clone());
-        let drive = |until: Duration| {
+        let looks = || {
+            lines
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|line| line.get("photo_here").is_some())
+                .count()
+        };
+        // Driven until `done` says so of the questions said and the eyes'
+        // looks, then four more of the watch's passes (100 ms each) for a
+        // second question to show: not two fixed 4.5 s (#1806). The looks
+        // are the watch's own, every `LOOK_EVERY` of the host's.
+        let drive = |done: &dyn Fn(usize, usize) -> bool| {
             let mut said = 0;
-            let end = std::time::Instant::now() + until;
-            while std::time::Instant::now() < end {
+            let until = std::time::Instant::now() + Duration::from_secs(10);
+            let mut settled: Option<std::time::Instant> = None;
+            while settled.is_none_or(|at| at.elapsed() < Duration::from_millis(400)) {
+                assert!(std::time::Instant::now() < until, "not done in 10 s");
                 if watch.asked().is_some() {
                     said += 1;
                 } else if let Some(name) = watch.to_ask() {
                     watch.ask(name);
                 }
+                if settled.is_none() && done(said, looks()) {
+                    settled = Some(std::time::Instant::now());
+                }
                 std::thread::sleep(Duration::from_millis(5));
             }
             said
         };
-        // Asked once, and not again while it is the same face.
-        assert_eq!(drive(Duration::from_millis(4500)), 1);
-        // Let go and added again: the eyes' new face isn't asked yet.
+        // Asked once, and not again at the eyes' next look, which says it is
+        // the same face.
+        assert_eq!(drive(&|said, looks| said >= 1 && looks >= 2), 1);
+        // Let go and added again: the eyes' new face isn't asked yet, and is
+        // asked at their next look.
         ASKED_IN_EYES.store(false, Ordering::SeqCst);
-        assert_eq!(drive(Duration::from_millis(4500)), 1);
+        assert_eq!(drive(&|said, _| said >= 1), 1);
         drop(watch);
         let told = lines
             .lock()
@@ -508,10 +527,18 @@ mod tests {
         );
         forget_asked();
         let watch = Watch::start(socket.clone());
-        let end = std::time::Instant::now() + Duration::from_millis(2500);
-        while std::time::Instant::now() < end {
+        // Until the eyes' first answer is taken in, then four of the watch's
+        // passes more, not a fixed 2.5 s (#1806): their mark is in that
+        // answer, and each later look gives the same one.
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        let mut taken: Option<std::time::Instant> = None;
+        while taken.is_none_or(|at| at.elapsed() < Duration::from_millis(400)) {
+            assert!(std::time::Instant::now() < until, "the eyes never answered");
             assert!(watch.to_ask().is_none());
             assert!(watch.asked().is_none());
+            if taken.is_none() && watch.state.lock().unwrap().here.is_some() {
+                taken = Some(std::time::Instant::now());
+            }
             std::thread::sleep(Duration::from_millis(20));
         }
         drop(watch);
