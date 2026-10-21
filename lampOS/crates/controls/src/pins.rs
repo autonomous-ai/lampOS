@@ -201,6 +201,56 @@ impl<L: Lines> PinReader for LinePins<L> {
     }
 }
 
+/// The head pads' lines read from a test input (`serve --touch --touch-from
+/// FILE`, for a test on a lamp, #2602), in place of their GPIO lines. FILE
+/// names the pads touched now, by their names in the pins, separated by
+/// spaces or new lines; `none` or nothing is none touched. It is read at each
+/// acquisition, the pads' own poll, so whoever writes it touches the head with
+/// real timing and the gesture behind [`LinePins`] runs unchanged. A missing
+/// file or a word that is no pad is a read that failed, as a lost chip is.
+/// Every other line (the buttons, reset) is read from `others`, the real
+/// lines. No product unit passes the flag.
+pub struct FileLines {
+    path: std::path::PathBuf,
+    pads: Vec<Pin>,
+    others: Option<Box<dyn Lines>>,
+}
+
+impl FileLines {
+    pub fn new(path: &std::path::Path, pads: Vec<Pin>, others: Option<Box<dyn Lines>>) -> Self {
+        Self {
+            path: path.to_path_buf(),
+            pads,
+            others,
+        }
+    }
+}
+
+impl Lines for FileLines {
+    fn high(&mut self, line: u32) -> io::Result<bool> {
+        let Some(pad) = self.pads.iter().find(|pad| pad.line == line) else {
+            return match &mut self.others {
+                Some(others) => others.high(line),
+                None => Err(io::Error::other(format!("line {line} is not read"))),
+            };
+        };
+        let said = std::fs::read_to_string(&self.path)?;
+        let mut touched = false;
+        for word in said.split_whitespace() {
+            if word == pad.name {
+                touched = true;
+            } else if word != "none" && !self.pads.iter().any(|pad| pad.name == word) {
+                return Err(io::Error::other(format!(
+                    "{} says {word:?}: not none or a head pad",
+                    self.path.display()
+                )));
+            }
+        }
+        // Electrical high, as the pad would drive it.
+        Ok(touched != pad.active_low)
+    }
+}
+
 /// The lines themselves, held for as long as this lives.
 #[cfg(target_os = "linux")]
 pub struct GpioLines {

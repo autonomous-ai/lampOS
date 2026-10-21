@@ -1485,6 +1485,31 @@ No product unit passes it, and a test checks every unit under `deploy/`
 covers the words read, `controls/state` following the file and going stale
 on a gap, and the flag refused without the route.
 
+### A test input in place of the head pads (#2602)
+
+`serve --touch --touch-from FILE` is for tests on a lamp only, after the head
+pads were shown by a hand once (lamp-52e6's lines 97/98, #1362). The head
+pads' lines are read from FILE instead (`pins::FileLines`), at their own poll
+(`every_ms` in the pins, 5 ms on the product), so whoever writes the file
+touches the head with real timing. FILE names the pads touched now, by their
+names in the pins, separated by spaces or new lines; `none` or an empty file
+is none touched. For example, `head-3` for 3.5 s and then `none` is the hold
+that asks for sleep; `head-3` for 0.2 s and then `none` is the tap that wakes.
+A missing file or a word that is no pad's name fails the read, as a lost chip
+does. Only the lines are swapped: the buttons and reset stay on their own
+lines, and the acquisition, the head's gesture (touch, stroke, hold, tap),
+`controls/touch` and the touch state are the real path.
+
+The flag needs `--touch` and head pads in `--pins`, and is refused otherwise.
+The head lines aren't probed at start. The journal says once `lamp-controls:
+head pads from a test input: FILE, not their lines`, and the reader session is
+`touch-test-input-…` in place of `touch-gpio-…`, so every TouchEvent's
+`reader_session_id` and the touch state's head source name the test input. No
+product unit passes it, and a test checks every unit under `deploy/`
+(`no_deployed_unit_passes_touch_from`). Tests: `tests/it/touch_from.rs`
+covers the words read, a hold and a tap from the file giving the same events
+as the lines (sleep and wake), and the flag refused without `--touch`.
+
 ## Replay and local records
 
 One written scenario exercises both button taps, a base tap, a released hold,
