@@ -75,8 +75,15 @@ pub fn note(name: &str) -> String {
 
 /// The unconfirmed face at the lamp now, if the eyes say one is.
 pub fn here(socket: &Path) -> Option<String> {
+    here_asked(socket).map(|(name, _)| name)
+}
+
+/// The face from a photo here, and whether the eyes say it was asked about:
+/// `None` from eyes that don't say.
+pub fn here_asked(socket: &Path) -> Option<(String, Option<bool>)> {
     let answer = crate::tools::exchange(socket, &json!({"photo_here": true}), HERE_DEADLINE)?;
-    answer["photo_here"].as_str().map(str::to_owned)
+    let name = answer["photo_here"].as_str()?.to_owned();
+    Some((name, answer["asked"].as_bool()))
 }
 
 /// Tell the eyes the voice is asking about `name`; `true` if they took it,
@@ -88,6 +95,15 @@ pub fn asking(socket: &Path, name: &str) -> bool {
         *asked = Some(name.to_owned());
     }
     taken
+}
+
+/// The asked mark for `name` let go: a new face under that name.
+fn forget_name(name: &str) {
+    if let Ok(mut asked) = ASKED.lock()
+        && asked.as_deref() == Some(name)
+    {
+        *asked = None;
+    }
 }
 
 /// Whether `name` was the one asked already in this run: never asked twice.
@@ -108,6 +124,9 @@ pub struct Watch {
 #[derive(Default)]
 struct WatchState {
     here: Option<String>,
+    /// Whether the eyes say the face here was asked about (`None` from eyes
+    /// that don't say).
+    here_asked: Option<bool>,
     want: Option<String>,
     asked: Option<String>,
     stop: bool,
@@ -137,9 +156,19 @@ impl Watch {
                 }
                 if looked.is_none_or(|at| at.elapsed() >= LOOK_EVERY) {
                     looked = Some(std::time::Instant::now());
-                    let found = here(&socket);
+                    let found = here_asked(&socket);
+                    // The eyes mark a face asked before they answer the
+                    // asking, so a name asked here that they now say is not
+                    // asked is a new face under it: let go and added again
+                    // (Mobile on #1968). It is asked once more.
+                    if let Some((name, Some(false))) = &found
+                        && was_asked(name)
+                    {
+                        forget_name(name);
+                    }
                     if let Ok(mut state) = shared.lock() {
-                        state.here = found;
+                        state.here_asked = found.as_ref().and_then(|(_, asked)| *asked);
+                        state.here = found.map(|(name, _)| name);
                     }
                 }
                 std::thread::sleep(Duration::from_millis(100));
@@ -148,10 +177,13 @@ impl Watch {
         Self { state }
     }
 
-    /// The face from a photo here, not yet asked about.
+    /// The face from a photo here, not yet asked about: neither in this run
+    /// nor, by the eyes' own saved mark, before a restart of the voice (the
+    /// reviewer-lead's P3 on #2575).
     pub fn to_ask(&self) -> Option<String> {
-        let here = self.state.lock().ok()?.here.clone()?;
-        (!was_asked(&here)).then_some(here)
+        let state = self.state.lock().ok()?;
+        let here = state.here.clone()?;
+        (!was_asked(&here) && state.here_asked != Some(true)).then_some(here)
     }
 
     /// Ask about `name`: the thread tells the eyes, then [`Self::asked`].
@@ -403,6 +435,83 @@ mod tests {
             .count();
         assert_eq!((said, told), (1, 1));
         forget_asked();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    /// Mobile on #1968 (lamp-0c89): a face let go and added again under the
+    /// same name is a new face the eyes haven't asked about, and is asked
+    /// once more; the same face is never asked twice.
+    #[test]
+    fn a_face_added_again_under_the_same_name_is_asked_again() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static ASKED_IN_EYES: AtomicBool = AtomicBool::new(false);
+        let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+        ASKED_IN_EYES.store(false, Ordering::SeqCst);
+        let (socket, lines) = eyes("again", |line| {
+            if line.get("photo_here").is_some() {
+                json!({"photo_here": "Quillo", "asked": ASKED_IN_EYES.load(Ordering::SeqCst)})
+            } else {
+                ASKED_IN_EYES.store(true, Ordering::SeqCst);
+                json!({"asked": true})
+            }
+        });
+        forget_asked();
+        let watch = Watch::start(socket.clone());
+        let drive = |until: Duration| {
+            let mut said = 0;
+            let end = std::time::Instant::now() + until;
+            while std::time::Instant::now() < end {
+                if watch.asked().is_some() {
+                    said += 1;
+                } else if let Some(name) = watch.to_ask() {
+                    watch.ask(name);
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            said
+        };
+        // Asked once, and not again while it is the same face.
+        assert_eq!(drive(Duration::from_millis(4500)), 1);
+        // Let go and added again: the eyes' new face isn't asked yet.
+        ASKED_IN_EYES.store(false, Ordering::SeqCst);
+        assert_eq!(drive(Duration::from_millis(4500)), 1);
+        drop(watch);
+        let told = lines
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|line| line.get("photo_asked").is_some())
+            .count();
+        assert_eq!(told, 2);
+        forget_asked();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    /// A voice started again finds the eyes' saved mark: a face they say was
+    /// asked about is not asked again (the reviewer-lead's P3 on #2575).
+    #[test]
+    fn a_face_the_eyes_saved_as_asked_is_not_asked_after_a_restart() {
+        let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+        let (socket, lines) = eyes(
+            "restart",
+            |_| json!({"photo_here": "Quillo", "asked": true}),
+        );
+        forget_asked();
+        let watch = Watch::start(socket.clone());
+        let end = std::time::Instant::now() + Duration::from_millis(2500);
+        while std::time::Instant::now() < end {
+            assert!(watch.to_ask().is_none());
+            assert!(watch.asked().is_none());
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        drop(watch);
+        assert!(
+            lines
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|line| line.get("photo_asked").is_none())
+        );
         let _ = std::fs::remove_file(socket);
     }
 
