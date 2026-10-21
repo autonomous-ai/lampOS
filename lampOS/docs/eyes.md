@@ -1144,7 +1144,9 @@ socket; `crates/voice/src/photo_faces.rs`):
   the loop never waits on them (`photo_faces::Watch`).
 - When an unconfirmed face is here and wasn't asked about yet, and the lamp
   is quiet (no turn under way, nothing queued, nothing said for 3 s, input
-  ready, a session open), the thread tells the eyes `photo_asked`. The
+  ready, a session open), the thread tells the eyes `photo_asked`, once:
+  a name the loop wants again while the eyes are still answering is not
+  told twice (on lamp-0c89 it was asked twice, 16 s apart, #1968). The
   voice then says, once, as its own written turn (`photo_face_ask`): "Someone
   added your face from a photo, as NAME. Shall I remember you?" It doesn't
   use the name as theirs unless they agree.
