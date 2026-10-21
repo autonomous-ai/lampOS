@@ -141,7 +141,7 @@ Friday also runs probes and #2176's memory cases here. One person serves all thr
 | `lamp-health --reach-idle` (El) | #1844 | A Wi-Fi minute with nobody speaking: `lamp/online` false within about 30 s of the cut, true within about 5 s of it back. | the Wi-Fi cut by hand | #1712 |
 | `LAMP_REACH_PROBE` (El) | #1247 | A minute with the Wi-Fi off (offline, the line once) and a minute with only the relay unreachable (online, no line). | the Wi-Fi cut; the relay blocked | #1712 |
 | `LAMP_VOICE_LINK` (El) | #884 | `lamp/online` false 5 s after the link drops, with `lamp-health --online on`. | the Wi-Fi cut | #1712 |
-| `LAMP_START_OFFLINE` (El) | #884 | Wi-Fi off, restart the voice: it stays up and logs "listening with no link". | the Wi-Fi cut | #1712 |
+| `LAMP_START_OFFLINE` (El) | #884 | Wi-Fi off, restart the voice: it stays up and logs "listening with no link" on Live; on the second route (`LAMP_VOICE_ROUTE=second`), `listening_ready` and the voice still active a minute later, with no such line. | the Wi-Fi cut | #1712 |
 | `lamp-expression --offline-face` (El) | #978 | Its minute on a lamp, with the Wi-Fi off. | the Wi-Fi cut | lamp-voice |
 | `LAMP_SERVICE_DOWN_LINE` (El) | #830 | Only the relay blocked for a minute, the recorded line heard. It follows the notices' ear check (#1844, #2288). | the relay blocked; an ear | #1712 |
 | `LAMP_SECOND_DOWN_LINE` (El) | #1195 | Heard with the relay's chat down. | the relay blocked | #1712 |

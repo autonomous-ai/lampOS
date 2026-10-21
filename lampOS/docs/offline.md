@@ -125,6 +125,15 @@ capture never comes up still fails at 25 s, and so does every finite
 covers the link as before (`crates/voice/src/session_lifetime.rs`, tests
 `serve_started_offline_*` and `started_offline_without_*`).
 
+The line is printed only by a voice still not ready when the budget runs
+out, which is Live waiting for its link. The second route
+(`LAMP_VOICE_ROUTE=second`) says its link is Ready at start
+(`crates/voice/src/second_provider/link.rs`), so with no internet it shows
+`listening_ready` as soon as the route is up, with no link wait, stays
+active, and never prints the line: the 25 s budget does not apply there at
+all. On the second route it is `LAMP_OFFLINE_VOICE` and `LAMP_REACH_PROBE`
+that make an offline start useful, not `LAMP_START_OFFLINE` (#1844).
+
 Kind: off unless set. Not yet shown on a host with its network cut or on a
 lamp.
 
