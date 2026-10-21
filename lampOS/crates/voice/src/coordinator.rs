@@ -4652,6 +4652,21 @@ fn conversation_with_gate(
     // What the voice is doing, heard and said, for whoever listens on the
     // lamp's bus. Nothing here waits for a listener.
     let mut bus_out = crate::bus_out::BusOut::from_environment();
+    // How each line sounded, against the person's own way of speaking
+    // (`LAMP_VOICE_TONE`, [`crate::voice_tone`]): measured on its speech
+    // blocks, read at its End, told with its words' valence.
+    let tone_on = crate::voice_tone::on(
+        std::env::var(crate::voice_tone::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    );
+    let mut tone_meter = tone_on.then(crate::voice_tone::ToneMeter::default);
+    let mut tone_baseline = crate::voice_tone::Baseline::default();
+    let mut tone_out = tone_on
+        .then(crate::bus_out::ToneOut::from_environment)
+        .flatten();
+    // A line's reading, waiting for its words: its turn and when it ended.
+    let mut tone_pending: Option<(u64, crate::voice_tone::Reading)> = None;
     // The voice's own timing, for the part that plans what the lamp shows
     // (docs/expression.md). Only if that is switched on.
     let mut expression_out = rig
@@ -5833,6 +5848,26 @@ fn conversation_with_gate(
                     {
                         walk.heard_line(&text);
                     }
+                    // The line's words: its tone is told now, with their
+                    // valence. Never the words themselves.
+                    if request.is_none()
+                        && finished
+                        && let Some((turn, reading)) = tone_pending.take()
+                    {
+                        let told = crate::voice_tone::told(
+                            turn,
+                            reading,
+                            crate::voice_tone::valence_of(&text),
+                        );
+                        record(
+                            trace,
+                            json!({"kind":"voice_tone","turn":turn,"arousal":told.arousal,
+                                "sure":told.sure,"valence":told.valence,"at_us":monotonic_us()}),
+                        )?;
+                        if let Some(out) = tone_out.as_mut() {
+                            out.tell(monotonic_us(), &told);
+                        }
+                    }
                     // A line whose words end before a name, its answer
                     // unheard: a sound begun just after its end goes on
                     // from it (`LAMP_SECOND_OPEN_NAME`). The second route
@@ -6363,6 +6398,9 @@ fn conversation_with_gate(
             // How loud what the detector calls speech has been lately, for
             // the record of each utterance: its last eight seconds.
             if probability.is_finite() && probability >= 0.5 {
+                if let Some(meter) = tone_meter.as_mut() {
+                    meter.speech_block(&frame.samples);
+                }
                 speech_levels.push_back((frame.read_completed_at_us, heard_level));
                 last_speech_us = frame.read_completed_at_us;
                 // For the asker-first rule: the asker's own speech while
@@ -7468,6 +7506,9 @@ fn conversation_with_gate(
                     }
                     speech_levels.clear();
                     loud_blocks.clear();
+                    if let Some(meter) = tone_meter.as_mut() {
+                        meter.clear();
+                    }
                     // Its End never went: the Stop it was to tell of goes to
                     // the next request (the first builder on #1148).
                     if let Some(stop) = reply.as_ref().and_then(|current| current.told_stop) {
@@ -7605,6 +7646,27 @@ fn conversation_with_gate(
                         speech_levels.clear();
                     }
                     loud_blocks.clear();
+                    // How it sounded against the person's own way: read now,
+                    // told with its words. A line before it whose words
+                    // never came is told without them. A sound let through
+                    // is not a line.
+                    if let Some(meter) = tone_meter.as_mut() {
+                        let tone = meter.finish().filter(|_| !as_sound);
+                        if let (Some((turn, reading)), Some(out)) =
+                            (tone_pending.take(), tone_out.as_mut())
+                        {
+                            out.tell(
+                                monotonic_us(),
+                                &crate::voice_tone::told(turn, reading, None),
+                            );
+                        }
+                        if let Some(tone) = tone {
+                            let reading = tone_baseline.hear(&tone);
+                            endpoint_record["tone"] = json!({"tone": tone, "reading": reading,
+                                "baseline_lines": tone_baseline.lines()});
+                            tone_pending = Some((current.owner.turn(), reading));
+                        }
+                    }
                     // The asker's level, for what is said while its answer
                     // is awaited: its own blocks, away from the lamp's
                     // sound. A sound let through has none.
