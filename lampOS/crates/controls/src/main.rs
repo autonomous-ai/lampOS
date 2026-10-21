@@ -19,7 +19,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "lamp-controls serve [--config FILE] [--pins FILE] [--touch] [--enable] [--bus-root PATH] [--clock-id ID] [--record FILE] [--seconds N]\n\
+const USAGE: &str = "lamp-controls serve [--config FILE] [--pins FILE] [--touch] [--enable] [--bus-root PATH] [--clock-id ID] [--record FILE] [--seconds N] [--privacy-from FILE]\n\
 lamp-controls replay --input FILE --config FILE --clock-id ID [--touch --pins FILE] [--enable] [--output FILE] [--until-us N]\n\
 lamp-controls probe --pins FILE\n\
 lamp-controls discover-head --seconds N [--rest-seconds R]\n\
@@ -38,6 +38,8 @@ readings; --replay works from kept readings instead of the chip.\n\
 The base strip (MPR121) is off unless LAMP_CONTROLS_STRIP=on: serve keeps a pins file's base section unread and starts no strip worker; the head pads, button and reset are served as before.\n\
 Without --touch, no new reader, touch topic or gesture interpretation is selected.\n\
 Only LAMP_PRIVACY_CONTROLS=on selects an explicit privacy section in --pins; absent/off never opens chip 1.\n\
+--privacy-from FILE is for tests on a lamp only: the privacy section's slide is read from FILE instead (open, closed,\n\
+gap for no reading, fault for an unreadable switch), and the journal says so. No product unit passes it.\n\
 LAMP_PRIVACY_CONTROLS=no-slide is the route on a lamp with no slide: it refuses a privacy section, opens no chip 1,\n\
 and serve's controls/state says no_privacy_slide at the route's cadence. Replay under it is as off.\n\
 Replay never opens a bus or hardware. Times are CLOCK_MONOTONIC microseconds.\n\
@@ -64,6 +66,8 @@ struct Args {
     session: Option<String>,
     plan: lamp_controls::touch_calibrate::Plan,
     replay: Option<PathBuf>,
+    /// `serve --privacy-from FILE`: the slide read from a test input.
+    privacy_from: Option<PathBuf>,
 }
 
 fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String> {
@@ -104,6 +108,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
                 "--record",
                 "--seconds",
                 "--touch",
+                "--privacy-from",
             ]
             .contains(&option.as_str()),
             "replay" => [
@@ -160,6 +165,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
             "--output" => out.output = Some(value.into()),
             "--record" => out.record = Some(value.into()),
             "--replay" => out.replay = Some(value.into()),
+            "--privacy-from" => out.privacy_from = Some(value.into()),
             "--clock-id" => out.clock = Some(value),
             "--bus-root" => {
                 let path = PathBuf::from(value);
@@ -535,19 +541,45 @@ fn no_slide_selected() -> bool {
     lamp_controls::privacy::no_slide(std::env::var_os(lamp_controls::privacy::ENV).as_deref())
 }
 
+/// `--privacy-from` stands in for a slide only: the route must be on with a
+/// privacy section.
+fn check_privacy_from(
+    from: Option<&std::path::Path>,
+    privacy: &PrivacyRoute,
+) -> Result<(), String> {
+    if from.is_some() && !matches!(privacy, PrivacyRoute::Slide(_)) {
+        return Err(format!(
+            "--privacy-from needs {}=on and a privacy section in --pins",
+            lamp_controls::privacy::ENV
+        ));
+    }
+    Ok(())
+}
+
 fn privacy_source(
     pins: &lamp_controls::privacy::Pins,
     clock: &str,
+    from: Option<&std::path::Path>,
 ) -> Result<lamp_controls::privacy::Source, Box<dyn std::error::Error>> {
     let session = format!(
         "privacy-{}-{}",
         std::process::id(),
         lamp_ipc::monotonic_us()
     );
-    Ok(lamp_controls::privacy::Source::new(
-        lamp_controls::privacy::open(pins, clock, &session)?,
-        clock,
-    ))
+    let reader: Box<dyn lamp_controls::privacy::Reader> = match from {
+        // A test on a lamp (#2602): the slide's reading from a file.
+        Some(path) => {
+            eprintln!(
+                "lamp-controls: privacy from a test input: {}, not the slide (--privacy-from, a test flag no product unit passes)",
+                path.display()
+            );
+            Box::new(lamp_controls::privacy::FileReader::new(
+                path, clock, &session,
+            ))
+        }
+        None => lamp_controls::privacy::open(pins, clock, &session)?,
+    };
+    Ok(lamp_controls::privacy::Source::new(reader, clock))
 }
 
 fn serve(
@@ -568,9 +600,12 @@ fn serve(
         bus
     };
     let mut service = Service::new(&bus, config, reader, clock)?;
+    check_privacy_from(args.privacy_from.as_deref(), &privacy)?;
     say_privacy(&privacy);
     match privacy {
-        PrivacyRoute::Slide(pins) => service.attach_privacy(privacy_source(&pins, clock)?),
+        PrivacyRoute::Slide(pins) => {
+            service.attach_privacy(privacy_source(&pins, clock, args.privacy_from.as_deref())?)
+        }
         PrivacyRoute::NoSlide => service.mark_no_slide()?,
         PrivacyRoute::None => {}
     }
@@ -775,9 +810,13 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
         eprintln!("lamp-controls: head pads: {}", lines.said());
         service.head_probed(lines);
     }
+    check_privacy_from(args.privacy_from.as_deref(), &privacy)?;
     say_privacy(&privacy);
     match privacy {
-        PrivacyRoute::Slide(pins) => service.attach_privacy(&bus, privacy_source(&pins, clock)?)?,
+        PrivacyRoute::Slide(pins) => service.attach_privacy(
+            &bus,
+            privacy_source(&pins, clock, args.privacy_from.as_deref())?,
+        )?,
         PrivacyRoute::NoSlide => service.mark_no_slide(&bus, clock)?,
         PrivacyRoute::None => {}
     }

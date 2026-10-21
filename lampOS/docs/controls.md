@@ -1441,6 +1441,28 @@ separate final intention boundary must use its locally safe controlled stop;
 no gesture supplies raw joint targets, torque-off or clearance for a new move.
 Controls emits no spoken listening cue and no feedback claims capture readiness.
 
+### A test input in place of the slide (#2602)
+
+`serve --privacy-from FILE` is for tests on a lamp only. The privacy section's
+slide is read from FILE instead of chip 1, so a run that needs the switch
+moved, or its readings lapsed, needs no hand on it. The first word of FILE is
+read at the slide's own poll (`privacy::POLL_US`, 5 ms), so whoever writes
+the file moves the switch:
+- `open` and `closed` read as the slide would;
+- `gap` takes no reading at all, so the last one ages past its life and
+  `controls/state` says it's stale, as when Controls' loop stalled on
+  lamp-75c9 (21 Oct);
+- `fault`, a missing file, or any other word reads as an unreadable switch.
+
+The flag needs `LAMP_PRIVACY_CONTROLS=on` and a privacy section in `--pins`,
+and is refused otherwise. At start the journal says `lamp-controls: privacy
+from a test input: FILE, not the slide`. Nothing else changes: the topic,
+`controls/state`'s privacy reading and the voice's side are as with the slide.
+No product unit passes it, and a test checks every unit under `deploy/`
+(`no_deployed_unit_passes_privacy_from`). Tests: `tests/it/privacy_from.rs`
+covers the words read, `controls/state` following the file and going stale
+on a gap, and the flag refused without the route.
+
 ## Replay and local records
 
 One written scenario exercises both button taps, a base tap, a released hold,

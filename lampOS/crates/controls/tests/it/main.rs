@@ -12,6 +12,7 @@ mod mpr121;
 mod mute;
 mod no_slide;
 mod privacy;
+mod privacy_from;
 mod privacy_program;
 mod program;
 mod receiver;

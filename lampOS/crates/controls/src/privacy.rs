@@ -111,6 +111,61 @@ impl<L: Lines> Reader for LineReader<L> {
     }
 }
 
+/// The slide's reading from a test input (`serve --privacy-from FILE`, for a
+/// test on a lamp, #2602): the file's first word, read at the slide's own
+/// [`POLL_US`], so whoever writes it moves the switch. `open` and `closed`
+/// read as the slide would; `gap` takes no reading at all, so the last one
+/// ages as when Controls' loop stalls (lamp-75c9, 21 Oct); `fault`, and a
+/// file that is missing or says anything else, reads as an unreadable
+/// switch. No product unit passes the flag.
+pub struct FileReader {
+    path: std::path::PathBuf,
+    clock: String,
+    session: String,
+    sequence: u64,
+    next_us: u64,
+}
+
+impl FileReader {
+    pub fn new(path: &std::path::Path, clock: &str, session: &str) -> Self {
+        Self {
+            path: path.to_path_buf(),
+            clock: clock.into(),
+            session: session.into(),
+            sequence: 0,
+            next_us: 0,
+        }
+    }
+}
+
+impl Reader for FileReader {
+    fn read(&mut self, now_us: u64) -> Option<PrivacySwitch> {
+        if now_us < self.next_us {
+            return None;
+        }
+        self.next_us = now_us.saturating_add(POLL_US);
+        let said = std::fs::read_to_string(&self.path).unwrap_or_default();
+        let (muted, fault) = match said.split_whitespace().next() {
+            Some("open") => (Some(false), None),
+            Some("closed") => (Some(true), None),
+            Some("gap") => return None,
+            _ => (None, Some(ControlFault::Missing)),
+        };
+        let sequence = self.sequence.checked_add(1)?;
+        self.sequence = sequence;
+        Some(PrivacySwitch {
+            stamp: ClockStamp {
+                clock_id: self.clock.clone(),
+                at_us: now_us,
+                sequence,
+            },
+            reader_session_id: self.session.clone(),
+            muted,
+            fault,
+        })
+    }
+}
+
 /// An unavailable selected chip remains unknown, never an implicit HIGH.
 pub struct MissingLine;
 impl Lines for MissingLine {
