@@ -506,6 +506,65 @@ fn the_start_counts_toward_the_floor_only_with_the_switch() {
     );
 }
 
+/// The first builder's P2 on #2751 (22 Oct 06:10): at 400 ms the replay
+/// committed "Hey Lamp," said alone, the line the 0.8 s floor was set for
+/// on 14 Oct, so the switch takes 500 at the least. That floor alone does
+/// not hold the name: "Hey Lamp," is about 0.6 s of speech, its start
+/// counted, over 500, and a plain 0.6 s line with a complete verdict is
+/// committed at 400 ms (the second case). What holds it is the call's wait
+/// as the lamp runs it (`--call-wait-ms 2000`, #782; `call_wait_policy`'s
+/// most speech 1,200 ms): with the name's sign, the complete verdict ends
+/// nothing, a 1 s pause later the question comes, and the line ends on the
+/// question's own commit. A line under 500 is still held to the window.
+#[test]
+fn the_name_alone_still_waits_for_the_rest_with_a_lower_floor() {
+    let policy = ConfirmPolicy::responsive().with_floor_ms(500);
+    let script = Scripted::default();
+    let detector = TurnDetector::v1_baseline()
+        .with_end_silence(60)
+        .unwrap()
+        .with_call_wait(200)
+        .unwrap()
+        .with_confirmation(Box::new(script.clone()), policy)
+        .unwrap();
+    let mut called = Rig {
+        detector,
+        script,
+        sequence: 0,
+    };
+    // "Hey Lamp," (six start blocks and 54), the name's sign as it began.
+    called.speak(54);
+    assert!(called.detector.name_heard(1_010_000));
+    called.quiet(20);
+    called.script.reply(called.script.submissions()[0], 0.99);
+    // A second's pause: not ended at the 400 ms commit, nor the window.
+    called.quiet(80);
+    // The question: the same line, ended on its own complete verdict.
+    called.speak(100);
+    called.quiet(20);
+    let asked = called.script.submissions();
+    assert_eq!(asked.len(), 2);
+    assert_eq!(asked[1].utterance, asked[0].utterance);
+    called.script.reply(asked[1], 0.99);
+    assert_eq!(called.quiet_until_end(200), Some(20));
+    let decision = called.decision();
+    assert_eq!(
+        (decision.basis, decision.silence_ms, decision.call_wait_ms),
+        ("model_complete", 400, None)
+    );
+    assert_eq!(decision.speech_ms, Some(1_660));
+    // No name's sign: the same 0.6 s line is over the floor and committed.
+    assert_eq!(
+        end_after(lamp(policy), 54),
+        ("model_complete", 400, Some(600))
+    );
+    // Under the floor (0.4 s): held to the window, never asked.
+    assert_eq!(
+        end_after(lamp(policy), 34),
+        ("silence_fallback", 600, Some(400))
+    );
+}
+
 /// #2135 (`ConfirmPolicy::recheck_uncertain`, off unless set; kept to
 /// measure, the first builder on #1722 at 07:48): an uncertain verdict is
 /// asked again at once with the pause so far. A complete second ends the

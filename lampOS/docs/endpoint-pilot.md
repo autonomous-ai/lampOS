@@ -876,14 +876,20 @@ them under the floor:
   count, and a line needs 0.86 s of speech to be asked.
 
 With `LAMP_ENDPOINT_LEAST_SPEECH_MS=MS` (off unless set), a whole number of
-ms from 200 to the profile's own floor (800 with `--end-silence-ms 600`):
+ms from 500 to the profile's own floor (800 with `--end-silence-ms 600`):
 
 - the floor is `MS` (`ConfirmPolicy::least_speech_blocks`, MS / 10 blocks),
   and the short lines' floor (`LAMP_ENDPOINT_SHORT_VERDICT`) is kept under it;
 - the line's start counts toward it (`ConfirmPolicy::count_start`): the
   count begins at the speech blocks the detector heard to start the line.
 
-Anything else (not a number, under 200, over the profile's floor, or the
+Not under 500 (the first builder's P2 on #2751, 22 Oct 06:10): at 400
+the replay committed "Hey Lamp," said alone, the line the floor was set
+for. At 500 a 0.6 s line is over the floor and a complete verdict commits
+it at 400 ms; what holds "Hey Lamp," alone is the call's wait, which the
+lamp runs (`--call-wait-ms 2000`), so the switch is for a lamp with it.
+
+Anything else (not a number, under 500, over the profile's floor, or the
 parity profile, which has none) leaves the floor as it is, and the voice
 says so once on stderr; with it on, it says the floor once. Off, the policy
 and its record are as before (`count_start` is absent from
@@ -897,7 +903,9 @@ the replay (`start` below) can try floors on the same lines.
 Tests: `a_lower_floor_ends_a_short_finished_line_at_the_commit` and
 `the_start_counts_toward_the_floor_only_with_the_switch`
 (`tests/it/endpoint_confirmation.rs`), and
-`coordinator::endpoint::tests::the_floor_is_lowered_only_by_ms_from_200_to_the_profiles`.
+`coordinator::endpoint::tests::the_floor_is_lowered_only_by_ms_from_500_to_the_profiles`;
+`the_name_alone_still_waits_for_the_rest_with_a_lower_floor` shows the
+call's wait holding "Hey Lamp," and a plain 0.6 s line committed.
 
 For a lamp: the played day both ways, the `silence_fallback: short` count
 and the `speech_ms` of each; "Hey Lamp," alone with `--call-wait-ms` (it
