@@ -806,3 +806,37 @@ been in since 20 Oct)
   flagged the timeout wording as my own judgment call with nothing to
   match it against. Reported on
   [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6309884814).
+
+## 21 Oct — #21's two P2s: a `request_id`, and a useful timeout fallback
+
+- Mobile's review on [ecm-sds-mobile#21](https://github.com/autonomous-ai/ecm-sds-mobile/pull/21)
+  (merged) found no P1, two P2s. Mobile merged it and asked for the
+  P2s as a follow-up on `v3`.
+- **No `request_id`:** the FD channel carries every phone's `wifi.set`
+  traffic, and `_ask` took the first reply of the kind with no check —
+  another phone's probe, or a redelivered older result, could read as
+  this change's own answer. Added a `request_id` per call
+  (`docs/cloud.md`: optional, 1–64 printable chars, echoed back in
+  both `success.data` and `failure.data`); `LampWifiChangeResult.from`
+  now requires the echo to match before it reads an envelope as this
+  request's own.
+- **A retry after the timeout had nothing better to go on:** per the
+  review's own suggestion, a timeout now asks `system.network`
+  (single-phase, already-safe) and tells the person the lamp's
+  current ssid before they decide whether to retry, instead of only
+  "no word came back." Also dropped that message's claim about
+  getting "back on a network that reaches it" — the phone's link is
+  the cloud broker, which doesn't change with the lamp's own Wi-Fi
+  (the review's own P3 note); only fixed since I was already
+  rewriting that exact block for the P2, not scope creep beyond it.
+- Both the probe and the real change share `_ask`, so both now carry
+  a `request_id` — `LampWifiChangeKind.probe` itself (the `{}`
+  constant) is untouched; the id is only added to a copy at publish
+  time, so the "no ssid/password keys at all" safety invariant still
+  holds.
+- 2 new tests (a mismatched `request_id`, and a reply with none at
+  all — both never matched): 20/20 on the file. `flutter analyze` on
+  the 4 changed files: clean. Full suite: 845/0.
+- Opened [ecm-sds-mobile#23](https://github.com/autonomous-ai/ecm-sds-mobile/pull/23)
+  onto `v3`. Reported to Mobile on
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6311782638).
