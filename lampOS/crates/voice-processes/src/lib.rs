@@ -130,7 +130,44 @@ impl WorkerRole {
             .into_iter()
             .find(|role| role.as_str() == word)
     }
+
+    /// What the worker runs at under the voice's real-time RR 20 (#1608):
+    /// it takes this on its first thread, before any other starts.
+    pub const fn scheduling(self) -> Scheduling {
+        match self {
+            // The sound in and out: the audio path the RR 20 is for.
+            WorkerRole::Capture | WorkerRole::Speaker => Scheduling::KeepsVoices,
+            // Light work whose timing is seen, so above the lamp's ordinary
+            // parts but below the voice's own threads.
+            WorkerRole::Ring => Scheduling::Realtime(RING_REALTIME_PRIORITY),
+            // The network, pictures and leases: nothing for which a busy
+            // real-time thread should take the CPU from `lamp-controls`
+            // (its privacy leases) or the eyes.
+            WorkerRole::Provider
+            | WorkerRole::Second
+            | WorkerRole::Camera
+            | WorkerRole::Privacy
+            | WorkerRole::Probe => Scheduling::Ordinary,
+        }
+    }
 }
+
+/// How a worker runs beside the voice (`WorkerRole::scheduling`, #1608).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Scheduling {
+    /// The voice's own real-time policy and priority, RR 20.
+    KeepsVoices,
+    /// Round-robin at this lower real-time priority, if it started higher.
+    Realtime(u8),
+    /// The ordinary policy at nice 0, or nicer if it started nicer.
+    Ordinary,
+}
+
+/// The ring's real-time priority: below the voice's RR 20.
+pub const RING_REALTIME_PRIORITY: u8 = 10;
+/// The voice's own, as its units set it (`CPUSchedulingPriority=20`).
+pub const VOICE_REALTIME_PRIORITY: u8 = 20;
+const _: () = assert!(RING_REALTIME_PRIORITY < VOICE_REALTIME_PRIORITY);
 
 /// Programs the voice starts that are not itself, by file name: they run in
 /// the voice's service too.
@@ -140,6 +177,20 @@ pub const HELPERS: [&str; 1] = ["lamp-turn-end"];
 mod tests {
     use super::*;
     use std::collections::HashSet;
+
+    /// #1608: only the sound in and out keep the voice's RR 20; the ring is
+    /// below it, and every other role at the ordinary policy.
+    #[test]
+    fn only_the_audio_keeps_the_voices_real_time_priority() {
+        for role in WorkerRole::ALL {
+            let expected = match role.as_str() {
+                "capture" | "speaker" => Scheduling::KeepsVoices,
+                "ring" => Scheduling::Realtime(10),
+                _ => Scheduling::Ordinary,
+            };
+            assert_eq!(role.scheduling(), expected, "{role:?}");
+        }
+    }
 
     #[test]
     fn every_name_is_parsed_back_and_none_is_given_twice() {

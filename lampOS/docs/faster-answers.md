@@ -1082,6 +1082,41 @@ That is a played battery, not the verdict-time bench each switch's row
 names (`switches.md`): no verdict times with each on and off are recorded
 here, and neither switch is in the product unit.
 
+### The voice's workers below its RR 20 (21 Oct, #1608)
+
+The voice's units run it at round-robin 20 and don't reset on fork, so every
+worker it starts began there too (Twelve's 13:4x read on #1722). With
+`LAMP_WORKER_SCHEDULING=on`, each takes its role's own scheduling on its
+first thread, before any other starts, in `main` (`worker_scheduling.rs`).
+So every thread it makes takes it on.
+
+| Worker | Runs at | Why |
+|---|---|---|
+| capture, speaker | round-robin 20, the voice's | the sound in and out, what the real-time priority is for |
+| ring | round-robin 10 | light work whose timing is seen: above the ordinary parts, below the voice |
+| provider, second, camera, privacy | the ordinary policy, nice 0 | network, pictures and leases: a busy one at real time took the CPU from `lamp-controls`' privacy leases once (18 Oct) |
+
+- **Already below it, and unchanged:** the same-voice child (nice 10,
+  `lamp_same_voice::ordinary_priority`), the schedule consumer (nice 19),
+  and the end-of-turn worker with its two switches above (round-robin 10,
+  not spinning; still only in lamp-4ace's unit, until their verdict-time
+  run).
+- **Left, short-lived or off:** `lamp-skills pack` (with
+  `LAMP_MAKE_SKILL=on` only), the motor supervisor's child (only with
+  `--motor-worker`), and `systemctl`'s status calls.
+- **Tests:**
+  - each role's scheduling (`lamp-voice-processes`);
+  - the setter, from `SCHED_BATCH` (any thread may take it), and from
+    round-robin 20 where the host allows a test real time (a container with
+    `SYS_NICE`);
+  - a real probe worker, started with the switch on, at the ordinary policy
+    on every thread (`/proc/<pid>/task/*/stat`), and with it off, as it
+    started;
+  - the switch reaching every listed worker and no other.
+- **Not shown:** whether the network and camera workers at the ordinary
+  policy wait behind a busy eyes or skill on a lamp. That's the switch's
+  lamp run, with the answer times and `capture_gap` both ways.
+
 ## What was not shown
 
 - **Nothing was timed.** No service was called, nothing ran on a lamp,
