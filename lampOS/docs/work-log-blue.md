@@ -28,3 +28,14 @@ Ready for lamp-voice: no
   (`docs/skills.md`), `lamp-memory`, `lamp-tasks`, `docs/architecture.md`'s
   "Future task and memory boundaries", and Harness (`autonomous-ai/openharness`
   at `8c616abd`: the device protocol, Agent Messages, Store packages).
+
+## 2026-10-21 — blue-P1 written down
+
+Ready for lamp-voice: no
+
+- `lampOS/docs/addons.md` on `blue/addons` (`d8099bae9`): the design blue-P1
+  proposes, the first allowlist and the open questions, so the first
+  builder can answer against one page. Docs only, not a pull request until
+  blue-P1 is answered.
+- On #1722 at 13:0x: no rows from `lamp-runs.md` are blue's; lamp-75c9
+  stays with Ten and Eighth for theirs.
