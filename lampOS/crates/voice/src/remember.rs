@@ -768,8 +768,8 @@ fn dated(mut tools: Vec<Tool>, events: bool) -> Vec<Tool> {
     tools
 }
 
-/// `remember` with `replaces` (#2510, [`REPLACES_ENVIRONMENT`]): the other
-/// functions as they are.
+/// `remember` with `replaces` (#2510, [`REPLACES_ENVIRONMENT`]), and
+/// `recall` with `history`: the other functions as they are.
 fn replaces_described(mut tools: Vec<Tool>) -> Vec<Tool> {
     for tool in tools.iter_mut().filter(|tool| tool.name == REMEMBER) {
         tool.description.push_str(
@@ -781,6 +781,20 @@ fn replaces_described(mut tools: Vec<Tool>) -> Vec<Tool> {
         );
         if let Some(parameters) = tool.parameters.as_mut() {
             parameters["properties"]["replaces"] = json!({"type": "integer", "description": "Only for a correction: the id or source_id of the kept thing it corrects, as you were shown it."});
+        }
+    }
+    // Take #4: recall can give what a person changed, only when they ask
+    // about their own past; each kept thing found says since when.
+    for tool in tools.iter_mut().filter(|tool| tool.name == RECALL) {
+        tool.description.push_str(
+            " A kept thing found says since when it has been so. Give history true only when the person \
+             asks about their own past, what they used to like or said before (\"what did I use to like?\", \
+             \"what colour did I say before?\"): then what they changed is found too, each with until when \
+             it was so, such as 'you used to like violet, until 3 days ago'. Never otherwise, and never \
+             bring up what they used to say yourself.",
+        );
+        if let Some(parameters) = tool.parameters.as_mut() {
+            parameters["properties"]["history"] = json!({"type": "boolean", "description": "Only true when the person asks what they themselves used to like or say before; leave out otherwise."});
         }
     }
     tools
@@ -1009,6 +1023,14 @@ fn scope_current(lease: Option<&crate::memory_scope::ScopeLease>) -> bool {
     lease.is_none_or(crate::memory_scope::ScopeLease::is_current)
 }
 
+/// Whether a recall may ask for a person's history (#2510 take #4): only
+/// for someone known, whose own scope the request's lease, when there is
+/// one, still holds; never the room's, a narrowed or a revoked line.
+fn history_allowed(person: Option<&str>, lease: Option<&crate::memory_scope::ScopeLease>) -> bool {
+    person.is_some()
+        && lease.is_none_or(|lease| lease.scope().is_some_and(|scope| scope.person() == person))
+}
+
 /// Uses only the admitted request's immutable scope. Revoked is never room.
 /// Revocation suppresses undispatched work and late results; it cannot undo a
 /// write the memory already accepted. Such uncertain writes retain the existing
@@ -1190,6 +1212,10 @@ fn recall_both(
         return Some((answer, None));
     }
     let mut room = request.clone();
+    // The room's scope never gives history (#2510 take #4).
+    if let Some(room) = room.as_object_mut() {
+        room.remove("history");
+    }
     room["limit"] = json!(limit);
     room["max_bytes"] = json!(bytes);
     let left = deadline.checked_sub(started.elapsed())?;
@@ -2816,6 +2842,17 @@ impl DaysClient {
         if call.name == RECALL && request["query"].is_string() {
             request["op"] = json!("search");
         }
+        // #2510 take #4: what a person changed, only when they ask about
+        // their own past, in their own scope: never the room's, nor a line
+        // whose lease no longer holds them ([`history_allowed`]).
+        if call.name == RECALL
+            && self.replaces.load(Ordering::Acquire)
+            && request["op"] == "search"
+            && call.args.get("history") == Some(&json!(true))
+            && history_allowed(person, lease)
+        {
+            request["history"] = json!(true);
+        }
         // Kept with the conversation it came up in, this person's own, so
         // "forget that" removes those exchanges too (#1693). Never waited
         // for: a writer busy at this moment leaves it kept as before.
@@ -3270,15 +3307,19 @@ impl DaysClient {
         zone: Option<&LocalTime>,
         lease: Option<&crate::memory_scope::ScopeLease>,
     ) -> Option<(Value, Vec<(Option<String>, u64)>)> {
+        // #2510 take #4: kept things say since when; history only theirs,
+        // and only when it was asked for.
+        let dated = self.replaces.load(Ordering::Acquire);
+        let history = dated && request["history"] == true;
         let Some(person) = person else {
             let answer = bounded_exchange_scoped(&self.socket, request, deadline, lease)?;
-            let (told, ids) = days_answer(&answer, now, zone)?;
+            let (told, ids) = days_answer(&answer, now, zone, dated.then_some(false))?;
             return Some((told, ids.into_iter().map(|id| (None, id)).collect()));
         };
         let (theirs, room) = recall_both(request, person, deadline, |line, left| {
             bounded_exchange_scoped(&self.socket, line, left, lease)
         })?;
-        let (theirs, their_ids) = days_answer(&theirs, now, zone)?;
+        let (theirs, their_ids) = days_answer(&theirs, now, zone, dated.then_some(history))?;
         let mut found = theirs["found"].as_array()?.clone();
         for item in &mut found {
             item["theirs"] = json!(true);
@@ -3288,7 +3329,7 @@ impl DaysClient {
             .map(|id| (Some(person.to_owned()), id))
             .collect();
         if let Some(room) = room {
-            let (room, room_ids) = days_answer(&room, now, zone)?;
+            let (room, room_ids) = days_answer(&room, now, zone, dated.then_some(false))?;
             found.extend(room["found"].as_array()?.iter().cloned());
             ids.extend(room_ids.into_iter().map(|id| (None, id)));
         }
@@ -3878,7 +3919,18 @@ fn snapshot_ids(snapshot: &Value, session: &str, scope: &str) -> Option<Vec<u64>
     (found.len() == source_ids.len()).then_some(source_ids)
 }
 
-fn days_answer(answer: &Value, now: u64, zone: Option<&LocalTime>) -> Option<(Value, Vec<u64>)> {
+/// A Days answer told to the model, with its source ids. With
+/// `LAMP_MEMORY_REPLACES` (#2510 take #4) `dated`:
+/// each kept thing found says `since` when, in words; with `Some(true)`,
+/// asked for a person's own history, a replaced one also says `until`
+/// when, from the store's `until_unix_ms`; with `Some(false)` a replaced
+/// one is never told. `None`, as before.
+fn days_answer(
+    answer: &Value,
+    now: u64,
+    zone: Option<&LocalTime>,
+    dated: Option<bool>,
+) -> Option<(Value, Vec<u64>)> {
     if answer["ok"] != true {
         return None;
     }
@@ -3896,9 +3948,24 @@ fn days_answer(answer: &Value, now: u64, zone: Option<&LocalTime>) -> Option<(Va
         if sources.contains(&id) {
             return None;
         }
+        // History never told unless asked for (#2510 take #4).
+        let replaced =
+            entry.get("active") == Some(&json!(false)) || entry.get("until_unix_ms").is_some();
+        if dated == Some(false) && entry["kind"] == "kept" && replaced {
+            continue;
+        }
         sources.push(id);
-        let when = when(local_day(now, zone) - local_day(entry.get("at_unix_ms")?.as_u64()?, zone));
+        let ago = |at: u64| when(local_day(now, zone) - local_day(at, zone));
+        let at = entry.get("at_unix_ms")?.as_u64()?;
+        let when = ago(at);
         let item = match entry.get("kind")?.as_str()? {
+            "kept" if dated.is_some() => {
+                let mut item = json!({"source_id":id,"when":when,"asked_to_remember":entry.get("text")?.as_str()?,"since":format!("since {when}")});
+                if let Some(until) = entry.get("until_unix_ms").and_then(Value::as_u64) {
+                    item["until"] = json!(format!("until {}", ago(until)));
+                }
+                item
+            }
             "kept" => {
                 json!({"source_id":id,"when":when,"asked_to_remember":entry.get("text")?.as_str()?})
             }
@@ -6111,16 +6178,21 @@ mod tests {
             json!({"id":1,"kind":"exchange","at_unix_ms":NOW,"heard":"x"}),
         ] {
             assert_eq!(
-                days_answer(&json!({"ok":true,"entries":[entry]}), NOW, Some(&EAST)),
+                days_answer(
+                    &json!({"ok":true,"entries":[entry]}),
+                    NOW,
+                    Some(&EAST),
+                    None
+                ),
                 None
             );
         }
         assert_eq!(
-            days_answer(&json!({"ok":false,"entries":[]}), NOW, Some(&EAST)),
+            days_answer(&json!({"ok":false,"entries":[]}), NOW, Some(&EAST), None),
             None
         );
         assert_eq!(
-            days_answer(&json!({"ok":true,"entries":[]}), NOW, Some(&EAST))
+            days_answer(&json!({"ok":true,"entries":[]}), NOW, Some(&EAST), None)
                 .unwrap()
                 .0["found"],
             json!([])
@@ -9478,7 +9550,26 @@ mod tests {
                     .is_none()
             );
             let on = replaces_described(off.clone());
-            assert_eq!(on[1..], off[1..]);
+            assert_eq!(on[2..], off[2..]);
+            assert_eq!(
+                (on[0].name.as_str(), on[1].name.as_str()),
+                (REMEMBER, RECALL)
+            );
+            assert_eq!(
+                on[1].parameters.as_ref().unwrap()["properties"]["history"]["type"],
+                "boolean"
+            );
+            assert!(
+                off[1].parameters.as_ref().unwrap()["properties"]
+                    .get("history")
+                    .is_none()
+            );
+            assert!(on[1].description.starts_with(&off[1].description));
+            assert!(
+                on[1]
+                    .description
+                    .contains("only when the person asks about their own past")
+            );
             assert!(on[0].parameters.as_ref().unwrap()["properties"]["replaces"].is_object());
             assert!(on[0].description.starts_with(&off[0].description));
             assert!(on[0].description.contains("give that id as replaces"));
@@ -9504,5 +9595,151 @@ mod tests {
         assert_eq!(context.shown(Some("p-1")), [4]);
         assert!(context.shown(None).is_empty());
         assert!(context.of(Some("p-1")).is_empty());
+    }
+
+    /// #2510 take #4: with the switch a kept thing found says since when,
+    /// in words; asked for history, a replaced one says until when; never
+    /// asked, a replaced one is not told. Off, no `since` or `until`.
+    #[test]
+    fn recall_tells_since_and_until_in_words_and_history_only_when_asked() {
+        let answer = json!({"ok":true,"entries":[
+            {"kind":"kept","id":9,"at_unix_ms":NOW-3*DAY,"text":"Her favourite colour is green.","active":true},
+            {"kind":"kept","id":8,"at_unix_ms":NOW-8*DAY,"text":"Her favourite colour is violet.","active":false,"until_unix_ms":NOW-3*DAY}
+        ]});
+        let (asked, ids) = days_answer(&answer, NOW, Some(&EAST), Some(true)).unwrap();
+        assert_eq!(ids, [9, 8]);
+        assert_eq!(
+            asked["found"],
+            json!([
+                {"source_id":9,"when":"3 days ago","asked_to_remember":"Her favourite colour is green.","since":"since 3 days ago"},
+                {"source_id":8,"when":"last week","asked_to_remember":"Her favourite colour is violet.","since":"since last week","until":"until 3 days ago"}
+            ])
+        );
+        let (unasked, ids) = days_answer(&answer, NOW, Some(&EAST), Some(false)).unwrap();
+        assert_eq!(ids, [9]);
+        assert_eq!(unasked["found"], json!([asked["found"][0]]));
+        // Off: as before, the bytes of `days_answer`.
+        let current = json!({"ok":true,"entries":[answer["entries"][0]]});
+        let (off, _) = days_answer(&current, NOW, Some(&EAST), None).unwrap();
+        assert_eq!(
+            off["found"][0],
+            json!({"source_id":9,"when":"3 days ago","asked_to_remember":"Her favourite colour is green."})
+        );
+        assert!(off["found"][0].get("since").is_none());
+        assert!(off["found"][0].get("until").is_none());
+    }
+
+    /// #2510 take #4: `history` is sent only with the switch, for a search,
+    /// in the person's own scope while the lease holds them: never the
+    /// room's, nor the room's part of a known person's recall, nor a line
+    /// narrowed to the room. Off, the request is as before.
+    #[test]
+    fn history_is_asked_only_for_the_persons_own_scope_with_the_switch() {
+        fn answer(request: &Value) -> Value {
+            let history = request["history"] == true;
+            // The room's green is 7, theirs 9.
+            let id = if request.get("person").is_some() {
+                9
+            } else {
+                7
+            };
+            let mut entries =
+                vec![json!({"kind":"kept","id":id,"at_unix_ms":NOW,"text":"green","active":true})];
+            if history {
+                entries.push(json!({"kind":"kept","id":8,"at_unix_ms":NOW-DAY,"text":"violet","active":false,"until_unix_ms":NOW}));
+            }
+            json!({"ok":true,"entries":entries})
+        }
+        const MAI: &str = "p-0123456789abcdef";
+        let (socket, served) = memory_lines("since-until", 5, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let recall = |args: Value, person: Option<&str>| {
+            client
+                .run_at(&call(RECALL, args), FIRST_READ, NOW, Some(&EAST), person)
+                .0
+        };
+        let history = json!({"about":"colour","history":true});
+        // Off: no `history` sent, no `since`.
+        let off = recall(history.clone(), Some(MAI));
+        assert!(off["found"][0].get("since").is_none(), "{off}");
+        client.replaces.store(true, Ordering::Release);
+        // The room's: never history.
+        let room = recall(history.clone(), None);
+        assert_eq!(room["found"].as_array().unwrap().len(), 1, "{room}");
+        assert_eq!(room["found"][0]["since"], "since today");
+        // Their own: history, only theirs.
+        let theirs = recall(history, Some(MAI));
+        let found = theirs["found"].as_array().unwrap();
+        assert_eq!(found.len(), 3, "{theirs}");
+        assert_eq!(found[1]["until"], "until today");
+        assert_eq!(found[1]["theirs"], true);
+        assert_eq!(found[2]["source_id"], 7);
+        assert!(found[2].get("theirs").is_none() && found[2].get("until").is_none());
+        let read: Vec<Value> = served
+            .join()
+            .unwrap()
+            .iter()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert!(read[0].get("history").is_none() && read[1].get("history").is_none());
+        assert!(read[2].get("history").is_none(), "{:?}", read[2]);
+        assert_eq!(read[3]["history"], true);
+        assert_eq!(read[3]["person"], MAI);
+        assert!(read[4].get("history").is_none() && read[4].get("person").is_none());
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+        // The lease gate: a person's own scope while it holds them only.
+        let mai = crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+                session: 1,
+                request: 1,
+            },
+            crate::memory_scope::ScopeSnapshot::of("Mai"),
+        );
+        let lease = mai.lease();
+        let person = lease.scope().unwrap().person().map(str::to_owned);
+        assert!(history_allowed(person.as_deref(), Some(&lease)));
+        assert!(history_allowed(person.as_deref(), None));
+        assert!(!history_allowed(None, None));
+        assert!(!history_allowed(Some("p-fedcba9876543210"), Some(&lease)));
+        lease.narrow_to_room();
+        assert!(!history_allowed(person.as_deref(), Some(&lease)));
+    }
+
+    /// #2510 take #4 (the reviewer-lead's P3 on #2605): `history` reaches
+    /// only a `search`. A recall with nothing to look for stays the legacy
+    /// `recall`, for the person's own scope too, and never carries it.
+    #[test]
+    fn history_never_reaches_a_legacy_recall() {
+        fn answer(_: &Value) -> Value {
+            json!({"ok":true,"entries":[]})
+        }
+        const MAI: &str = "p-0123456789abcdef";
+        let (socket, served) = memory_lines("no-legacy-history", 2, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        let (_, ok) = client.run_at(
+            &call(RECALL, json!({"history":true})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(MAI),
+        );
+        assert!(ok);
+        let read: Vec<Value> = served
+            .join()
+            .unwrap()
+            .iter()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(read[0]["op"], "recall");
+        assert_eq!(read[0]["person"], MAI);
+        assert!(
+            read.iter().all(|line| line.get("history").is_none()),
+            "{read:?}"
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
     }
 }

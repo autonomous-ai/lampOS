@@ -854,6 +854,17 @@ impl Days {
         read_record(&self.db, person, id)
     }
 
+    /// When this person's record `id` was replaced (#2510): the
+    /// `at_unix_ms` of the newer version that replaced it, through
+    /// `replacements`; `None` for one never replaced.
+    pub fn replaced_at(&self, person: &Person, id: u64) -> Result<Option<u64>> {
+        Ok(self.db.query_row(
+            "SELECT min(n.at_unix_ms) FROM replacements r JOIN entries o ON o.rid=r.older JOIN entries n ON n.rid=r.newer WHERE o.person=?1 AND o.id=?2 AND n.person=?1",
+            params![person.as_str(), id],
+            |r| r.get::<_, Option<u64>>(0),
+        )?)
+    }
+
     pub fn forget(&mut self, person: &Person, id: u64) -> Result<u64> {
         let count = self.forget_here(person, id)?;
         self.forget_set_aside()?;

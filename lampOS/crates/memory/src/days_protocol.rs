@@ -335,7 +335,26 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                 last_day,
                 second: recall_v2,
             };
-            json!({"ok":true,"entries":store.search_wider(&one(person)?,&ask(Some(&query),day.as_deref(),limit,max_bytes)?,history,wider)?})
+            let person = one(person)?;
+            let records = store.search_wider(
+                &person,
+                &ask(Some(&query), day.as_deref(), limit, max_bytes)?,
+                history,
+                wider,
+            )?;
+            let mut entries = serde_json::to_value(&records).expect("records are JSON values only");
+            // #2510: with history, a replaced version says until when it
+            // held, the newer version's `at_unix_ms`. Without, as before.
+            if history && let Some(entries) = entries.as_array_mut() {
+                for (entry, record) in entries.iter_mut().zip(&records) {
+                    if !record.active
+                        && let Some(until) = store.replaced_at(&person, record.id)?
+                    {
+                        entry["until_unix_ms"] = json!(until);
+                    }
+                }
+            }
+            json!({"ok":true,"entries":entries})
         }
         Extra::Recall {
             person,
@@ -825,6 +844,18 @@ mod tests {
             let mut both = ids(&ask(colour(true)).0);
             both.sort();
             assert_eq!(both, [1, 3]);
+            // Take #4: with history, the replaced one says until when, the
+            // newer version's time; the current one, and every one without
+            // history, carries no `until_unix_ms`.
+            let history = ask(colour(true)).0;
+            for entry in history["entries"].as_array().unwrap() {
+                match entry["id"].as_u64() {
+                    Some(1) => assert_eq!(entry["until_unix_ms"], NOW + 1, "{history}"),
+                    _ => assert!(entry.get("until_unix_ms").is_none(), "{history}"),
+                }
+            }
+            let current = ask(colour(false)).0;
+            assert!(current["entries"][0].get("until_unix_ms").is_none());
             let kept = ask(json!({"op":"kept","person":MAI})).0;
             assert_eq!(kept["entries"].as_array().unwrap().len(), 1, "{kept}");
             assert_eq!(kept["entries"][0]["id"], 3);

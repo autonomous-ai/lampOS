@@ -713,8 +713,24 @@ the unchanged legacy client, used unless the new Days client is selected.
       lower-case letters, digits and `_` is `other`), and whether the chat
       begun on the line's early words (`LAMP_SECOND_PREPARED`) stood for
       round 1.
+  - **Since and until** (take #4): with the switch, each kept thing recall
+    finds says `"since":"since last week"`, from its `at_unix_ms`, in the
+    words `when` uses (the lamp's local days, never a date). Recall takes
+    `history` (a boolean): its description tells the model to give it only
+    when the person asks about their own past ("what did I use to like?",
+    "what colour did I say before?") and never to bring up what they used
+    to say itself. The voice sends `history:true` to the store's `search`
+    only for someone known, in their own scope while the request's lease
+    still holds them (`history_allowed`); never for the room's, nor the
+    room's part of a known person's recall, nor a line narrowed to the
+    room. Then a replaced version is found too, with
+    `"until":"until 3 days ago"` from the store's `until_unix_ms`
+    ([the rule](memory-days.md#request-contract)). Not asked, a replaced
+    version is never told, and the session note and the per-turn hits never
+    hold one (they read only active kept things).
   - Off, the functions, the hit lines and every request are as before; a
-    `replaces` the model gives is not sent, and neither line is written.
+    `replaces` or `history` the model gives is not sent, recall's answers
+    carry no `since` or `until`, and neither journal line is written.
   - **A thing kept in the same session can be corrected:** an ok
     `remember` is told with the kept id, `{"remembered":true,"id":8}` (with
     `replaced` or the kept-already note beside it; kept already by
@@ -745,7 +761,11 @@ the unchanged legacy client, used unless the new Days client is selected.
     `remember::noted::tests::the_stores_answer_is_told_by_its_kind_and_codes_alone`,
     `remember::noted::tests::new_words_are_the_texts_content_words_neither_old_nor_heard`,
     `remember::noted::tests::the_line_says_each_field_in_counts_and_yes_or_no` and
-    `second_provider::tests::a_turns_tools_are_journalled_by_name_and_count_never_words`.
+    `second_provider::tests::a_turns_tools_are_journalled_by_name_and_count_never_words`;
+    since and until: `remember::tests::recall_tells_since_and_until_in_words_and_history_only_when_asked`,
+    `remember::tests::history_is_asked_only_for_the_persons_own_scope_with_the_switch`
+    and `tests/voice_since_until.rs` (the real store: violet, then green by
+    `replaces`; the room's scope never gives history).
 
 - **Forgetting what a thing was about** (#2176, `LAMP_MEMORY_FORGET_ABOUT=on`,
   with the Days client only; off unless set; both voice routes).
