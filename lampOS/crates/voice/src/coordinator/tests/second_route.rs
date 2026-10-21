@@ -199,6 +199,9 @@ struct Script {
     limit: Duration,
     /// No person's input: only authored skill output is under test.
     silent: bool,
+    /// The person's speech is a voice, a 150 Hz tone, not a flat level, so
+    /// the voice's tone can read it (`LAMP_VOICE_TONE`).
+    voiced: bool,
     /// One parsed Say request, read at this capture frame's scenario time.
     say_at_frame: Option<(u64, crate::say::LineForTest)>,
 }
@@ -242,6 +245,7 @@ impl Script {
             limit: LIMIT,
             silent: false,
             say_at_frame: None,
+            voiced: false,
         }
     }
 }
@@ -715,7 +719,16 @@ impl Peers {
                 probability: if speech { 0.99 } else { 0.0 },
                 echo: None,
                 reference: Default::default(),
-                samples: vec![if speech { 2_000 } else { 7 }; 160],
+                samples: if speech && self.script.voiced {
+                    (0..160u64)
+                        .map(|at| {
+                            let t = (frame * 160 + at) as f32 / 16_000.0;
+                            (2_000.0 * (2.0 * std::f32::consts::PI * 150.0 * t).sin()) as i16
+                        })
+                        .collect()
+                } else {
+                    vec![if speech { 2_000 } else { 7 }; 160]
+                },
                 timing: CaptureTiming {
                     first_read_started_at_us: at,
                     last_read_started_at_us: at,
@@ -2381,6 +2394,94 @@ fn spoken_over_the_second_routes_answer_stops_as_gemini_does() {
     }
     assert!(switched.played(1).iter().all(|&v| v == SECOND));
     assert_eq!(dedup(&live.seen.installs), dedup(&switched.seen.installs));
+}
+
+/// The reviewer's P2 on #2427: a line spoken over the lamp's answer is read
+/// only from what was heard once the lamp fell silent, never the speech
+/// heard while its answer still played.
+#[test]
+fn a_lines_tone_takes_no_speech_heard_while_the_lamp_answers() {
+    let _one = super::pilot_faults::one_session();
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_packets: 60,
+        speak_again: Some(When::Accepted(8)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(60))
+    });
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    run.assert_clean();
+    assert_eq!(run.finished(1)["outcome"], "user_interrupted");
+    let read: Vec<(u64, u64)> = run
+        .events("local_endpoint")
+        .into_iter()
+        .filter_map(|end| {
+            Some((
+                end["turn"].as_u64()?,
+                end["tone"]["tone"]["blocks"].as_u64()?,
+            ))
+        })
+        .collect();
+    // The first line is all its 60 blocks. The second's 60 began while the
+    // answer played: here 53 are read, and the 7 heard before it stopped
+    // are not; taken while it played, 59 would be (and before the fix,
+    // all 60 since the first line's end).
+    assert_eq!(read.first(), Some(&(1, 60)), "{}", run.summary());
+    let (turn, blocks) = read.get(1).copied().unwrap();
+    assert!(turn == 2 && blocks <= 55, "{read:?}");
+}
+
+/// Each line's tone is told once its words come, under its own turn and
+/// with their valence; the first line says nothing of its arousal, and the
+/// second is read against it.
+#[test]
+fn each_lines_tone_is_told_with_its_own_words() {
+    let _one = super::pilot_faults::one_session();
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_hears: Some("I'm so happy today"),
+        speak_again: Some(When::Settled(1)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    run.assert_clean();
+    let told: Vec<_> = run
+        .events("voice_tone")
+        .into_iter()
+        .map(|told| {
+            (
+                told["turn"].clone(),
+                told["words"].clone(),
+                told["valence"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        told,
+        [
+            (json!(1), json!(true), json!(1.0)),
+            (json!(2), json!(true), json!(1.0))
+        ],
+        "{}",
+        run.summary()
+    );
+    let tones = run.events("voice_tone");
+    assert_eq!(tones[0]["sure"], 0.0);
+    assert!(tones[1]["sure"].as_f64().unwrap() > 0.0, "{}", tones[1]);
+    assert!(
+        tones[1]["arousal"].as_f64().unwrap().abs() < 0.1,
+        "{}",
+        tones[1]
+    );
 }
 
 /// (h) Gemini is Ready 1 s after the voice starts and the question began

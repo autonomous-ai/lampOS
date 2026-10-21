@@ -680,6 +680,42 @@ pub fn waiting_health(waiting: Waiting, owed: bool) -> lamp_msgs::Diagnostic {
 /// What the waiting voice's report adds while a due reminder waits.
 pub const OWED: &str = "a reminder is owed, to be said when they open";
 
+/// How each line sounded (`voice/tone`, `LAMP_VOICE_TONE`, [`crate::voice_tone`]).
+pub struct ToneOut {
+    tone: Publisher,
+}
+
+impl ToneOut {
+    /// With `LAMP_BUS=on`, `LAMP_VOICE_TONE=on` and a bus that can be used;
+    /// else nothing.
+    pub fn from_environment() -> Option<Self> {
+        if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on")
+            || !crate::voice_tone::on(
+                std::env::var(crate::voice_tone::ENVIRONMENT)
+                    .ok()
+                    .as_deref(),
+            )
+        {
+            return None;
+        }
+        Bus::from_environment().and_then(|bus| Self::on(&bus)).ok()
+    }
+
+    pub fn on(bus: &Bus) -> io::Result<Self> {
+        Ok(Self {
+            tone: bus.publisher_declared(
+                lamp_msgs::VoiceTone::TOPIC,
+                &lamp_msgs::VoiceTone::declaration(),
+                SOURCE,
+            )?,
+        })
+    }
+
+    pub fn tell(&mut self, now_us: u64, tone: &lamp_msgs::VoiceTone) {
+        let _ = self.tone.publish_json(now_us, tone);
+    }
+}
+
 /// The voice's health while it waits (#1371), as a running voice says it:
 /// a little more often than once a second, and at once when why changes.
 pub struct WaitHealth {
