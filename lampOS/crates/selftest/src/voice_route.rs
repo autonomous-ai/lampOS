@@ -11,6 +11,13 @@
 //! can be. Run as `lampos` (the timer's), root's configuration is not
 //! readable, and then the key it names is taken as the product's, the relay
 //! key install places ([`RELAY_KEY`]).
+//!
+//! A file that cannot be looked at at all, as on a lamp whose
+//! `/etc/lampOS/voice` is root's alone (lamp-06c1, 21 Oct), is not seen,
+//! not missing: the voice runs as root and may well have it. With nothing
+//! else wrong the part is not checked, never failed, so the lamp's health
+//! is not made `error` (and "Not feeling well" does not droop) for what
+//! this user cannot see.
 use crate::Check;
 use lamp_msgs::{PartResult, Verdict};
 use std::{
@@ -39,6 +46,10 @@ pub struct Unit {
     pub second: Option<String>,
     /// `(id, path)` of each `LoadCredential=`.
     pub credentials: Vec<(String, String)>,
+    /// Each `ConfigurationDirectory=`, under `/etc`: systemd makes it before
+    /// it loads credentials, so a credential's folder named here need not
+    /// be there yet (the own keys', `own-keys-voice.conf`).
+    pub configuration_directories: Vec<String>,
 }
 
 impl Unit {
@@ -57,6 +68,12 @@ impl Unit {
                             _ => {}
                         }
                     }
+                } else if let Some(folders) = line.strip_prefix("ConfigurationDirectory=") {
+                    if folders.is_empty() {
+                        unit.configuration_directories.clear();
+                    }
+                    unit.configuration_directories
+                        .extend(folders.split_whitespace().map(str::to_owned));
                 } else if let Some(credential) = line.strip_prefix("LoadCredential=") {
                     match credential.split_once(':') {
                         Some((id, path)) => unit.credentials.push((id.into(), path.into())),
@@ -67,6 +84,17 @@ impl Unit {
             }
         }
         unit
+    }
+
+    /// Whether systemd makes the folder `path` at the unit's start, as one of
+    /// its `ConfigurationDirectory=`.
+    pub fn made_at_start(&self, path: &str) -> bool {
+        path.strip_prefix("/etc/").is_some_and(|under| {
+            let under = under.trim_end_matches('/');
+            self.configuration_directories
+                .iter()
+                .any(|folder| folder.trim_matches('/') == under)
+        })
     }
 
     /// Whether the voice is the second route, as `lamp-voice` takes it:
@@ -201,15 +229,21 @@ pub fn judge(
     };
     let config_path = Path::new(config);
     let mut wrong: Vec<String> = Vec::new();
+    // Each file that could not be looked at as this user, said apart.
+    let mut unseen: Vec<String> = Vec::new();
     let mut keys: Vec<(String, String)> = Vec::new();
     let mut note = String::new();
-    let config_fault = fault(
-        config,
-        "the second route's configuration",
-        look(config_path),
-    );
+    let config_looked = look(config_path);
+    let config_fault = fault(config, "the second route's configuration", config_looked);
     let config_there = config_fault.is_none();
-    wrong.extend(config_fault);
+    if config_looked == Looked::Closed {
+        unseen.extend(config_fault);
+        // Its key is the relay key the product names, as when it is
+        // root's to read.
+        keys.push((RELAY_KEY.into(), "its key".into()));
+    } else {
+        wrong.extend(config_fault);
+    }
     if config_there {
         match read(config_path) {
             Ok(text) => match named_keys(&text) {
@@ -237,13 +271,31 @@ pub fn judge(
     for (at, (path, what)) in keys.iter().enumerate() {
         let looked = look(Path::new(path));
         // A credential's folder is loaded file by file, an empty one as
-        // none: the person's own keys (#2094), there or not.
-        if at >= named && looked == Looked::Folder {
+        // none: the person's own keys (#2094), there or not. One the unit's
+        // `ConfigurationDirectory=` names systemd makes at start, so not
+        // there yet is none either; the voice then uses the relay's key.
+        if at >= named
+            && (looked == Looked::Folder || (looked == Looked::Missing && unit.made_at_start(path)))
+        {
             continue;
         }
-        wrong.extend(fault(path, what, looked));
+        let found = fault(path, what, looked);
+        if looked == Looked::Closed {
+            unseen.extend(found);
+        } else {
+            wrong.extend(found);
+        }
     }
-    if wrong.is_empty() {
+    if wrong.is_empty() && !unseen.is_empty() {
+        PartResult::new(
+            PART,
+            Verdict::NotChecked,
+            &format!(
+                "{}: not checked as this user (the voice, root, may have them){note}",
+                unseen.join("; ")
+            ),
+        )
+    } else if wrong.is_empty() {
         PartResult::new(
             PART,
             Verdict::Pass,
@@ -258,7 +310,12 @@ pub fn judge(
             Verdict::Fail,
             &format!(
                 "{}: the voice does not start on the second route{note}",
-                wrong.join("; ")
+                wrong
+                    .iter()
+                    .chain(&unseen)
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+                    .join("; ")
             ),
         )
     }
@@ -435,6 +492,46 @@ mod tests {
         assert!(result.reason.contains("the configuration is root's"));
     }
 
+    /// lamp-06c1, 21 Oct: `/etc/lampOS/voice` root's alone (0700), so run
+    /// as `lampos` nothing in it can be looked at, while the voice, root,
+    /// runs the second route. Not seen is not missing: not checked, never
+    /// a fail. A key the self-test can look at that is wrong still fails.
+    #[test]
+    fn a_closed_voice_folder_is_not_checked_and_a_missing_key_outside_it_still_fails() {
+        let with = Unit::read(&[
+            PRODUCT.to_owned(),
+            include_str!("../../../deploy/product/own-keys-voice.conf").to_owned(),
+        ]);
+        let closed = [
+            ("/etc/lampOS/voice/second.json", Looked::Closed),
+            (RELAY_KEY, Looked::Closed),
+            ("/etc/lampOS/voice/own", Looked::Closed),
+        ];
+        let result = judged(&with, &closed, Err(true));
+        assert_eq!(result.verdict, Verdict::NotChecked, "{result:?}");
+        assert!(
+            result
+                .reason
+                .contains("/etc/lampOS/voice/second.json cannot be looked at"),
+            "{result:?}"
+        );
+        let elsewhere = Unit::read(&[format!(
+            "{PRODUCT}LoadCredential=deepseek.key:/etc/keys/deepseek.key\n"
+        )]);
+        let missing = judged(
+            &elsewhere,
+            &[("/etc/lampOS/voice/second.json", Looked::Closed)],
+            Err(true),
+        );
+        assert_eq!(missing.verdict, Verdict::Fail, "{missing:?}");
+        assert!(
+            missing
+                .reason
+                .contains("the unit's credential deepseek.key /etc/keys/deepseek.key is missing"),
+            "{missing:?}"
+        );
+    }
+
     #[test]
     fn live_is_not_fitted_and_a_second_route_without_its_configuration_fails() {
         let live = judged(&unit("Environment=LAMP_BUS=on\n"), &[], Ok("{}"));
@@ -455,6 +552,156 @@ mod tests {
             Ok("[1, 2]"),
         );
         assert!(odd.reason.contains("is not one the voice reads"), "{odd:?}");
+    }
+
+    /// A voice unit at `root`: the product's, its second configuration and
+    /// relay key there (each a regular file, never a real key), and the own
+    /// keys' drop-in as `own-keys-voice.conf` writes it, pointed at `own`.
+    fn lamp(root: &Path, own: &Path) -> VoiceRoute {
+        let _ = fs::remove_dir_all(root);
+        let drop_ins = root.join("lamp-voice.service.d");
+        fs::create_dir_all(&drop_ins).unwrap();
+        let config = root.join("second.json");
+        let key = root.join("credential");
+        fs::write(
+            &config,
+            format!(
+                r#"{{"llm_model":"m","llm_credential_file":"{}"}}"#,
+                key.display()
+            ),
+        )
+        .unwrap();
+        fs::write(&key, "x").unwrap();
+        fs::write(
+            root.join("lamp-voice.service"),
+            format!(
+                "[Service]\nEnvironment=LAMP_VOICE_ROUTE=second\nEnvironment=LAMP_VOICE_SECOND_CONFIG={}\n",
+                config.display()
+            ),
+        )
+        .unwrap();
+        let shipped = include_str!("../../../deploy/product/own-keys-voice.conf");
+        fs::write(
+            drop_ins.join("own-keys.conf"),
+            shipped.replace("/etc/lampOS/voice/own", own.to_str().unwrap()),
+        )
+        .unwrap();
+        VoiceRoute {
+            unit: root.join("lamp-voice.service"),
+            drop_ins,
+        }
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("lamp-selftest-route-{name}-{}", std::process::id()))
+    }
+
+    /// lamp-06c1, 21 Oct, its voice folder opened to 0755: the own keys'
+    /// drop-in loads the folder `own`, empty (no person's keys, the relay's
+    /// used). systemd takes a folder for `LoadCredential=`, so it passes.
+    #[test]
+    fn the_own_keys_empty_folder_passes_as_on_lamp_06c1() {
+        let root = scratch("own-empty");
+        let own = root.join("own");
+        let mut check = lamp(&root, &own);
+        fs::create_dir_all(&own).unwrap();
+        let result = check.run(Instant::now());
+        assert_eq!(result.verdict, Verdict::Pass, "{result:?}");
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn the_own_keys_folder_holding_keys_passes() {
+        let root = scratch("own-keys");
+        let own = root.join("own");
+        let mut check = lamp(&root, &own);
+        fs::create_dir_all(&own).unwrap();
+        fs::write(own.join("deepseek.key"), "x").unwrap();
+        fs::write(own.join("deepgram.key"), "x").unwrap();
+        let result = check.run(Instant::now());
+        assert_eq!(result.verdict, Verdict::Pass, "{result:?}");
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// The own keys are optional, and the drop-in's
+    /// `ConfigurationDirectory=` has systemd make the folder before it
+    /// loads it: not there yet is no fault.
+    #[test]
+    fn the_own_keys_folder_not_made_yet_passes() {
+        let root = scratch("own-unmade");
+        let mut check = lamp(&root, Path::new("/etc/lampOS/voice/own"));
+        let unit = check.unit().unwrap();
+        assert_eq!(unit.configuration_directories, ["lampOS/voice/own"]);
+        let result = judge(
+            Some(&unit),
+            |path| match path.to_str().unwrap() {
+                "/etc/lampOS/voice/own" => Looked::Missing,
+                _ => look(path),
+            },
+            read_config,
+        );
+        assert_eq!(result.verdict, Verdict::Pass, "{result:?}");
+        let _ = check.run(Instant::now());
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// An empty `ConfigurationDirectory=` in a later drop-in clears those
+    /// before it: systemd no longer makes the own keys' folder, so its
+    /// being missing is a fault again.
+    #[test]
+    fn the_own_keys_folder_not_made_fails_once_a_later_drop_in_clears_it() {
+        let root = scratch("own-cleared");
+        let check = lamp(&root, Path::new("/etc/lampOS/voice/own"));
+        fs::write(
+            check.drop_ins.join("zz-clear.conf"),
+            "[Service]\nConfigurationDirectory=\n",
+        )
+        .unwrap();
+        let unit = check.unit().unwrap();
+        assert!(unit.configuration_directories.is_empty(), "{unit:?}");
+        let result = judge(
+            Some(&unit),
+            |path| match path.to_str().unwrap() {
+                "/etc/lampOS/voice/own" => Looked::Missing,
+                _ => look(path),
+            },
+            read_config,
+        );
+        assert_eq!(result.verdict, Verdict::Fail, "{result:?}");
+        assert!(
+            result
+                .reason
+                .contains("the unit's credential own /etc/lampOS/voice/own is missing"),
+            "{result:?}"
+        );
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_credential_file_that_is_missing_still_fails() {
+        let root = scratch("cred-missing");
+        let own = root.join("own");
+        let mut check = lamp(&root, &own);
+        fs::create_dir_all(&own).unwrap();
+        let gone = root.join("deepseek.key");
+        fs::write(
+            check.drop_ins.join("deepseek.conf"),
+            format!(
+                "[Service]\nLoadCredential=deepseek.key:{}\n",
+                gone.display()
+            ),
+        )
+        .unwrap();
+        let result = check.run(Instant::now());
+        assert_eq!(result.verdict, Verdict::Fail, "{result:?}");
+        assert!(
+            result.reason.contains(&format!(
+                "the unit's credential deepseek.key {} is missing",
+                gone.display()
+            )),
+            "{result:?}"
+        );
+        fs::remove_dir_all(&root).unwrap();
     }
 
     /// A key is only looked at, never read: the real look on files.
