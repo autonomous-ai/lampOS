@@ -2131,6 +2131,75 @@ fn news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live() {
     }
 }
 
+/// lamp-52e6 on 21 October: with the person seated quietly, the lamp's fan
+/// opened 11 wordless requests in two minutes, each held the quiet the
+/// lamp's own turns wait for (`last_turn_us`) until it ended, and the
+/// onboarding walk's 3 s never came. Now only talk holds it: the detector's
+/// own speech, words or none (a line in a language the route takes no
+/// words from), the person's words heard, and the lamp speaking. A request
+/// that heard no words and was not answered aloud holds it through its
+/// speech and no longer: not through its end's silence or the wait for its
+/// answer. Read from the news told at the first pause after it.
+#[test]
+fn speech_holds_the_quiet_with_or_without_words_and_a_wordless_requests_tail_does_not() {
+    let _one = super::pilot_faults::one_session();
+    let told = |hears: &'static [&'static str]| {
+        let (news, _heard) = crate::task_news::TaskNews::waiting_for_test_heard(
+            crate::task_news::News {
+                key: "s1:2:4".into(),
+                note: "Claude Code just finished the story you asked for.".into(),
+                until: None,
+                progress: None,
+                finished: None,
+                also: Vec::new(),
+            },
+            Duration::from_secs(30),
+        );
+        TEST_TASK_NEWS.with(|given| *given.borrow_mut() = Some(news));
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(true));
+        let run = run(Script {
+            second: false,
+            live_hears: hears,
+            written: Written::Said(12),
+            mute_at_frame: Some(800),
+            ..Script::question(Live::Answer(0))
+        });
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(false));
+        TEST_TASK_NEWS.with(|given| given.borrow_mut().take());
+        run
+    };
+    for (hears, words) in [(&[][..], false), (&["what time is it"][..], true)] {
+        let run = told(hears);
+        run.assert_clean();
+        assert_eq!(run.finished(1)["outcome"], "no_audio_answer", "{words}");
+        let news = run.events("task_news");
+        assert_eq!(news.len(), 1, "{words}: {}", run.summary());
+        let quiet_from =
+            news[0]["at_us"].as_u64().unwrap() - news[0]["since_turn_ms"].as_u64().unwrap() * 1_000;
+        let started = run
+            .events("provider_input_started")
+            .into_iter()
+            .find(|event| event["turn"] == 1)
+            .unwrap()["at_us"]
+            .as_u64()
+            .unwrap();
+        // Speech with no transcript holds it as words do.
+        assert!(quiet_from >= started, "{words}: {quiet_from} < {started}");
+        if !words {
+            // From its last speech, not its end's silence (0.6 s) or after.
+            let finished = run.finished(1)["at_us"].as_u64().unwrap();
+            assert!(
+                quiet_from + 300_000 < finished,
+                "{quiet_from} not before {finished}"
+            );
+        }
+        assert!(
+            news[0]["since_turn_ms"].as_u64().unwrap() >= crate::task_news::PAUSE_US / 1_000,
+            "{words}"
+        );
+    }
+}
+
 /// `LAMP_SAY` (#939) on the second route alone, as on Live: a skill's say
 /// is begun as the lamp's own turn once the person's answer is over and the
 /// room is quiet, sent to the voice that answers, said whole, and its asker

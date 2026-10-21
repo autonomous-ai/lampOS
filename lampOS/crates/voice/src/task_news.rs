@@ -113,7 +113,7 @@ pub fn at_pause(value: Option<&str>) -> bool {
 }
 
 /// Whether it is quiet enough now (`now_us`) to tell news: [`QUIET_US`]
-/// since the last turn, by or to the lamp (`last_turn_us`); or, `at_pause`,
+/// since the last talk: the lamp's words, a person's, or any speech (`last_turn_us`); or, `at_pause`,
 /// the first pause: [`PAUSE_US`] since the turn, with nobody heard speaking
 /// for as long (`speech_paused`, as the coordinator judges it for a
 /// reminder), and, unless anyone's speech (`last_speech_us`) was heard past
