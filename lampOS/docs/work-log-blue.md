@@ -133,3 +133,19 @@ Ready for lamp-voice: no
   lamp-75c9 run and a `lamp-runs.md` row. All off unless `LAMP_ADDONS=on`.
 - Claimed at 15:0x: `status:taken`, "taken by blue · session b602ea5d… ·
   lamp-75c9"; the first taken line is blue's.
+
+## 2026-10-21 — #2530 part 1 up as #2553
+
+Ready for lamp-voice: yes (#2553), once its ARM64 run is green
+
+- `lamp-addons` (`crates/addons`): the rules, the situation folded from the
+  bus, a kept light asked of the ring at `Idle` as `addon:<name>`, and each
+  verdict on a new `addon/decision`; `lamp-addons.service`, off unless
+  `LAMP_ADDONS=on`. One commit, rebased on lamp-voice `533b1dae0`.
+- The two questions on #2530 (15:1x) had no answer by 15:4x; taken in their
+  narrowest safe reading (joining.md): `lamp-mood` untouched (a kept mood is
+  said, not carried out), `lamp_msgs::Decision` unchanged.
+- Gate on the laptop: fmt, clippy -D warnings and tests for lamp-addons,
+  lamp-msgs, lamp-update, lamp-cloud, lamp-voice-eval; workspace build and
+  `--no-run`. Next: a lamp-75c9 run of the two examples on #2553's ARM64
+  build, watched with the laptop's camera and mic.
