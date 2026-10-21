@@ -1,0 +1,145 @@
+=== mutant-no-set-aside-compile | exit 0 | 6.114046 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-memory-20261022/lampOS/crates/memory#lamp-memory@0.1.0","manifest_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-memory v0.1.0 (/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory)
+    Finished `test` profile [unoptimized] target(s) in 6.03s
+=== end mutant-no-set-aside-compile ===
+=== mutant-no-set-aside | exit 101 | 2.378864 s ===
+--- stdout ---
+
+running 1 test
+test health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves ... FAILED
+
+failures:
+
+failures:
+    health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 139 filtered out; finished in 1.58s
+
+--- stderr ---
+
+thread 'health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves' (686512389) panicked at crates/memory/tests/it/health.rs:384:17:
+memory fixture report wait: memory fixture operation exceeds its logical window; last=Some(Diagnostic { level: Warn, name: "memory", message: "memory set aside a database from a newer build; its records are not read", values: [KeyValue { key: "exchanges", value: "0" }, KeyValue { key: "kept", value: "0" }, KeyValue { key: "counts_age_ms", value: "59" }, KeyValue { key: "answered", value: "0" }, KeyValue { key: "recent_answers", value: "0" }, KeyValue { key: "recent_seconds", value: "60" }, KeyValue { key: "slowest_answer_ms", value: "none" }, KeyValue { key: "slowest_note_ms", value: "none" }, KeyValue { key: "slowest_call_ms", value: "none" }, KeyValue { key: "active_answer_ms", value: "none" }, KeyValue { key: "note_budget_ms", value: "300" }, KeyValue { key: "call_budget_ms", value: "1500" }, KeyValue { key: "timing", value: "complete request to serialized answer; excludes socket waits and delivery" }] })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+=== end mutant-no-set-aside ===
+=== mutant-early-release-compile | exit 0 | 5.921780 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-memory-20261022/lampOS/crates/memory#lamp-memory@0.1.0","manifest_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-memory v0.1.0 (/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory)
+    Finished `test` profile [unoptimized] target(s) in 5.84s
+=== end mutant-early-release-compile ===
+=== mutant-early-release | exit 101 | 1.687982 s ===
+--- stdout ---
+
+running 1 test
+test voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled ... FAILED
+
+failures:
+
+failures:
+    voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 139 filtered out; finished in 0.99s
+
+--- stderr ---
+
+thread 'voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled' (686516058) panicked at crates/memory/tests/it/voice_people.rs:766:5:
+{"kept_rule":true,"note":"Follow it from now on, with them, without being reminded."}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+=== end mutant-early-release ===
+=== mutant-unlinked-journal-compile | exit 0 | 29.246268 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-memory-20261022/lampOS/crates/memory#lamp-memory@0.1.0","manifest_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-memory-20261022/lampOS/crates/voice)
+   Compiling lamp-memory v0.1.0 (/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory)
+    Finished `test` profile [unoptimized] target(s) in 29.16s
+=== end mutant-unlinked-journal-compile ===
+=== mutant-unlinked-journal | exit 101 | 3.156172 s ===
+--- stdout ---
+
+running 1 test
+test voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled ... FAILED
+
+failures:
+
+failures:
+    voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 139 filtered out; finished in 2.47s
+
+--- stderr ---
+
+thread 'voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled' (686520803) panicked at crates/memory/tests/it/voice_people.rs:771:5:
+assertion failed: !client.finished_exchange_for(fixture.now - 1_000, "who am I",
+        "You are Orchid.", Some(&minh))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+lamp-voice provider: Days memory is answering
+lamp-voice provider: memory conversation end was not acknowledged; no retry
+=== end mutant-unlinked-journal ===
+=== mutant-unwind-before-release-compile | exit 0 | 29.478755 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-memory-20261022/lampOS/crates/memory#lamp-memory@0.1.0","manifest_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-memory-20261022/lampOS/crates/voice)
+   Compiling lamp-memory v0.1.0 (/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory)
+    Finished `test` profile [unoptimized] target(s) in 29.39s
+=== end mutant-unwind-before-release-compile ===
+=== mutant-unwind-before-release | exit 101 | 3.130624 s ===
+--- stdout ---
+
+running 1 test
+test voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled ... FAILED
+
+failures:
+
+failures:
+    voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 139 filtered out; finished in 2.43s
+
+--- stderr ---
+
+thread 'voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled' (686525571) panicked at crates/memory/tests/it/voice_people.rs:766:5:
+controlled unwind before release
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+=== end mutant-unwind-before-release ===
+=== mutant-leaked-release-compile | exit 0 | 3.666184 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-memory-20261022/lampOS/crates/memory#lamp-memory@0.1.0","manifest_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-memory v0.1.0 (/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory)
+    Finished `test` profile [unoptimized] target(s) in 3.58s
+=== end mutant-leaked-release-compile ===
+=== mutant-leaked-release | exit 101 | 11.687681 s ===
+--- stdout ---
+
+running 1 test
+test voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled ... FAILED
+
+failures:
+
+failures:
+    voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 139 filtered out; finished in 10.99s
+
+--- stderr ---
+
+thread 'voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled' (686526844) panicked at crates/memory/tests/it/voice_people.rs:426:5:
+{"error":"My memory is not answering right now, so I could not do that."}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread '<unnamed>' (686526875) panicked at crates/memory/tests/it/voice_people.rs:728:13:
+assertion `left == right` failed: the held rule acknowledgement was not released before the fixture watchdog
+  left: Err(Timeout)
+ right: Err(Disconnected)
+=== end mutant-leaked-release ===

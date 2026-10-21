@@ -1,0 +1,131 @@
+=== gate-fmt | exit 0 | 10.065159 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-fmt ===
+=== gate-clippy | exit 0 | 31.059223 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-clippy ===
+=== gate-tests | exit 0 | 181.176735 s ===
+--- stdout ---
+
+running 96 tests
+................i...................................................................... 87/96
+.........
+test result: ok. 95 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 20.89s
+
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.56s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+
+running 23 tests
+.......................
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+
+running 140 tests
+..............................................................i..............test days::a_full_kept_list_refuses_the_next_fact_without_evicting_an_explicit_memory has been running for over 60 seconds
+.......i.i 87/140
+.............i......test days::a_relevant_old_fact_remains_available_to_correct_after_thirty_two_unrelated_observations has been running for over 60 seconds
+.................i.test days::observations_in_a_newer_category_take_no_previous_slot has been running for over 60 seconds
+.........test days::replaced_kept_versions_do_not_use_the_kept_lists_room has been running for over 60 seconds
+.....
+test result: ok. 135 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 129.59s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.34s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.49s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.27s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- stderr ---
+lamp-memory: health reports off: no --bus-root
+lamp-memory: health worker could not start; serving without reports
+lamp-memory: health reports off: no --bus-root
+lamp-memory: health worker could not start; serving without reports
+=== end gate-tests ===
+=== gate-dependent-clippy | exit 0 | 40.373852 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-dependent-clippy ===
+=== gate-dependent-tests | exit 0 | 111.805539 s ===
+--- stdout ---
+
+running 367 tests
+...............................................................{"seconds":0,"status":"listening_ready"}
+.{"seconds":8,"status":"listening_ready"}
+....................... 87/367
+....................................................................................... 174/367
+....................................................................................... 261/367
+....................................................................................... 348/367
+...................
+test result: ok. 367 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.27s
+
+
+running 234 tests
+....................................................................................... 87/234
+....................................................................................... 174/234
+............................................................
+test result: ok. 234 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 41.96s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- stderr ---
+=== end gate-dependent-tests ===
+=== gate-build | exit 0 | 55.290419 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-build ===
+=== gate-diff | exit 0 | 0.044793 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-diff ===

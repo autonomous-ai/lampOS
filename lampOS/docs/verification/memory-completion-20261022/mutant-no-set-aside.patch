@@ -1,0 +1,11 @@
+--- a/lampOS/crates/memory/src/health.rs
++++ b/lampOS/crates/memory/src/health.rs
+@@ -313,7 +313,7 @@
+             .with("counts_age_ms", "unknown"),
+     };
+     let report = match &snapshot.set_aside {
+-        Some(name) => report.with("set_aside", name.as_str()),
++        Some(_) => report,
+         None => report,
+     };
+     report

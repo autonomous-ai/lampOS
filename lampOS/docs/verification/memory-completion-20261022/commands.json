@@ -1,0 +1,475 @@
+[
+  {
+    "label": "before-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-memory",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 41.123424,
+    "stdout": "before-compile.stdout",
+    "stderr": "before-compile.stderr"
+  },
+  {
+    "label": "before-health-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.388316,
+    "stdout": "before-health-1.stdout",
+    "stderr": "before-health-1.stderr"
+  },
+  {
+    "label": "before-late-rule-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.80864,
+    "stdout": "before-late-rule-1.stdout",
+    "stderr": "before-late-rule-1.stderr"
+  },
+  {
+    "label": "before-health-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.095228,
+    "stdout": "before-health-2.stdout",
+    "stderr": "before-health-2.stderr"
+  },
+  {
+    "label": "before-late-rule-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.749616,
+    "stdout": "before-late-rule-2.stdout",
+    "stderr": "before-late-rule-2.stderr"
+  },
+  {
+    "label": "before-health-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.093809,
+    "stdout": "before-health-3.stdout",
+    "stderr": "before-health-3.stderr"
+  },
+  {
+    "label": "before-late-rule-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.749481,
+    "stdout": "before-late-rule-3.stdout",
+    "stderr": "before-late-rule-3.stderr"
+  },
+  {
+    "label": "after-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-memory",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 3.671371,
+    "stdout": "after-compile.stdout",
+    "stderr": "after-compile.stderr"
+  },
+  {
+    "label": "after-health-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.422018,
+    "stdout": "after-health-1.stdout",
+    "stderr": "after-health-1.stderr"
+  },
+  {
+    "label": "after-late-rule-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.502752,
+    "stdout": "after-late-rule-1.stdout",
+    "stderr": "after-late-rule-1.stderr"
+  },
+  {
+    "label": "after-health-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.046182,
+    "stdout": "after-health-2.stdout",
+    "stderr": "after-health-2.stderr"
+  },
+  {
+    "label": "after-late-rule-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.487739,
+    "stdout": "after-late-rule-2.stdout",
+    "stderr": "after-late-rule-2.stderr"
+  },
+  {
+    "label": "after-health-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.055995,
+    "stdout": "after-health-3.stdout",
+    "stderr": "after-health-3.stderr"
+  },
+  {
+    "label": "after-late-rule-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.480766,
+    "stdout": "after-late-rule-3.stdout",
+    "stderr": "after-late-rule-3.stderr"
+  },
+  {
+    "label": "mutant-no-set-aside-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-memory",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 6.114046,
+    "stdout": "mutant-no-set-aside-compile.stdout",
+    "stderr": "mutant-no-set-aside-compile.stderr"
+  },
+  {
+    "label": "mutant-no-set-aside",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 2.378864,
+    "stdout": "mutant-no-set-aside.stdout",
+    "stderr": "mutant-no-set-aside.stderr"
+  },
+  {
+    "label": "mutant-early-release-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-memory",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 5.92178,
+    "stdout": "mutant-early-release-compile.stdout",
+    "stderr": "mutant-early-release-compile.stderr"
+  },
+  {
+    "label": "mutant-early-release",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 1.687982,
+    "stdout": "mutant-early-release.stdout",
+    "stderr": "mutant-early-release.stderr"
+  },
+  {
+    "label": "mutant-unlinked-journal-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-memory",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 29.246268,
+    "stdout": "mutant-unlinked-journal-compile.stdout",
+    "stderr": "mutant-unlinked-journal-compile.stderr"
+  },
+  {
+    "label": "mutant-unlinked-journal",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 3.156172,
+    "stdout": "mutant-unlinked-journal.stdout",
+    "stderr": "mutant-unlinked-journal.stderr"
+  },
+  {
+    "label": "mutant-unwind-before-release-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-memory",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 29.478755,
+    "stdout": "mutant-unwind-before-release-compile.stdout",
+    "stderr": "mutant-unwind-before-release-compile.stderr"
+  },
+  {
+    "label": "mutant-unwind-before-release",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 3.130624,
+    "stdout": "mutant-unwind-before-release.stdout",
+    "stderr": "mutant-unwind-before-release.stderr"
+  },
+  {
+    "label": "mutant-leaked-release-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-memory",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 3.666184,
+    "stdout": "mutant-leaked-release-compile.stdout",
+    "stderr": "mutant-leaked-release-compile.stderr"
+  },
+  {
+    "label": "mutant-leaked-release",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+      "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 11.687681,
+    "stdout": "mutant-leaked-release.stdout",
+    "stderr": "mutant-leaked-release.stderr"
+  },
+  {
+    "label": "gate-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 10.065159,
+    "stdout": "gate-fmt.stdout",
+    "stderr": "gate-fmt.stderr"
+  },
+  {
+    "label": "gate-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-q",
+      "-p",
+      "lamp-memory",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-Dwarnings"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 31.059223,
+    "stdout": "gate-clippy.stdout",
+    "stderr": "gate-clippy.stderr"
+  },
+  {
+    "label": "gate-tests",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-memory"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 181.176735,
+    "stdout": "gate-tests.stdout",
+    "stderr": "gate-tests.stderr"
+  },
+  {
+    "label": "gate-dependent-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-q",
+      "-p",
+      "lamp-voice-eval",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-Dwarnings"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 40.373852,
+    "stdout": "gate-dependent-clippy.stdout",
+    "stderr": "gate-dependent-clippy.stderr"
+  },
+  {
+    "label": "gate-dependent-tests",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-voice-eval"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 111.805539,
+    "stdout": "gate-dependent-tests.stdout",
+    "stderr": "gate-dependent-tests.stderr"
+  },
+  {
+    "label": "gate-build",
+    "command": [
+      "cargo",
+      "build",
+      "-q",
+      "--workspace"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 55.290419,
+    "stdout": "gate-build.stdout",
+    "stderr": "gate-build.stderr"
+  },
+  {
+    "label": "gate-diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.044793,
+    "stdout": "gate-diff.stdout",
+    "stderr": "gate-diff.stderr"
+  }
+]
