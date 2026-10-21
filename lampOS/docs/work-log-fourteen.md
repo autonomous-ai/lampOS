@@ -694,3 +694,16 @@ Ready for lamp-voice: n/a (status/roadmap, no code yet)
     until that's answered.
 - Posted all three on [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6305189004),
   within the lead's 09:00 GMT+7 deadline.
+
+## 2026-10-21 — LAMP_APP_UPDATE's switches.md row (#2423)
+
+Ready for lamp-voice: yes
+
+- Reviewer-lead's P3 on #2412: switches.md was missing LAMP_APP_UPDATE
+  and LAMP_OWN_KEYS (El's, separately). Added one row, same columns
+  and conventions as the other lamp-cloud app-page switches, counted
+  as `until`.
+- `cargo test -p lamp-voice-eval --test it switches:: -- --nocapture`:
+  226 switches total (was 225), counted correctly under "Other parts."
+- Opened [lampOS#2423](https://github.com/autonomous-ai/lampOS/pull/2423),
+  reported on [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6305807894).
