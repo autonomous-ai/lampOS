@@ -180,6 +180,22 @@ check "on no-slide already with the person's yes, Ears alone restarted" \
   bash -c "[[ $status == 0 ]] && [[ \$(grep '^restart' '$T/systemctl.log' | sort -u) == 'restart lamp-ears.service' ]]"
 rm -rf "$T/onboarding"
 
+# A voice that said nothing in the recording (its topic declared, no
+# message): the counts still come, none while the voice spoke (#2399).
+cp "$T/rec/voice_state.jsonl" "$T/voice_state.full"
+head -1 "$T/voice_state.full" >"$T/rec/voice_state.jsonl"
+run
+status=$?
+check "a voice with no message in the recording still gives its asked line" \
+  bash -c "[[ $status == 0 ]] && grep -q '^body.gaze asked: empty [0-9]*, track [0-9]*, over [0-9]*; while the voice spoke 0' '$T/out'"
+cp "$T/voice_state.full" "$T/rec/voice_state.jsonl"
+
+# KEEP_DIR: the sound scores alone kept there, the rest still deleted.
+run KEEP_DIR="$T/kept"
+status=$?
+check "with KEEP_DIR, ears_classes.jsonl alone kept" \
+  bash -c "[[ $status == 0 ]] && cmp -s '$T/rec/ears_classes.jsonl' '$T/kept/ears_classes.jsonl' && [[ \$(ls '$T/kept') == ears_classes.jsonl && -z \$(ls -A '$T/tmp') ]]"
+
 # A lamp-skills that fails the skill's own cases (one without #1920's dotted
 # fields) is refused before anything is touched.
 printf '#!/usr/bin/env bash\necho "skills/x/tests/a: made 0 calls, 1 expected: []"\nexit 1\n' >"$T/old-skills"

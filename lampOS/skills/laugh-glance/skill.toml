@@ -20,8 +20,8 @@ body = true
 [trigger]
 topic = "ears/classes"
 field = "scores.laughter" # YAMNet's laughter score, 0 to 1; an unavailable message has none and never holds
-above = 0.3               # one window: a laugh lands high in one 0.96 s window, rarely two (#1669, 21 Oct: 5 of 9 free laughs over 0.3, 0 of 2,016 windows of people talking; sound-events.md); the lamp check confirms it
-rearm = { below = 0.2, for = "20s" }  # once a burst of laughter; again only after twenty seconds without it
+above = 0.05              # one window: through lamp-52e6's microphone a laugh scores 0.04 to 0.15, everything else at most 0.015 (#2399, 21 Oct: 5 laughs from a speaker at the lamp, 4 windows over 0.03, 2 over 0.05; 2,430 windows of music, speech over it and an office talking, none over 0.015). Off the lamp, laughs scored over 0.3 (sound-events.md): the lamp hears them about five times lower
+rearm = { below = 0.03, for = "20s" }  # once a burst of laughter; again only after twenty seconds without it (under the bar, over the room's 0.015)
 cooldown = "5m"           # now and then, never at every laugh in a merry room
 
 [[while]]                 # never in the middle of a turn: not while it speaks, listens or thinks

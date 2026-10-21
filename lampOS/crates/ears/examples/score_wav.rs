@@ -20,7 +20,7 @@ const MUSIC_ABOVE: f32 = 0.6;
 const MUSIC_FOR_S: f32 = 20.0;
 const MUSIC_GAP_S: f32 = 5.0;
 /// `skills/laugh-glance/skill.toml`'s `above`.
-const LAUGHTER_ABOVE: f32 = 0.3;
+const LAUGHTER_ABOVE: f32 = 0.05;
 const RATE: usize = 16_000;
 
 fn main() -> Result<(), String> {
