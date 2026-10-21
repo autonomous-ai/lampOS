@@ -599,6 +599,38 @@ pub fn turn_topics() -> Vec<(&'static str, Declaration)> {
     vec![(VoiceTurn::TOPIC, VoiceTurn::declaration())]
 }
 
+/// How a person's voice sounded on a line, against their own way of
+/// speaking (`voice/tone`, `LAMP_VOICE_TONE`; "Reads your mood from your
+/// face or voice"): its arousal, calm (-1) to lively (+1), from the line's
+/// prosody, how sure that is, and its valence, down (-1) to glad (+1), from
+/// its words when a word says it. Numbers only: never the words or the
+/// sound.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VoiceTone {
+    /// The line's request, as `voice/heard` numbers it.
+    pub request: u64,
+    pub arousal: f32,
+    pub sure: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub valence: Option<f32>,
+}
+
+impl VoiceTone {
+    pub const TYPE: &str = "lamp_msgs/VoiceTone";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "voice/tone";
+
+    /// One a line, once its words are in: no period is promised.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
+/// The voice's tone of each line, apart from the first topics.
+pub fn tone_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(VoiceTone::TOPIC, VoiceTone::declaration())]
+}
+
 /// The lamp's own light: what is asked for (`light/command`) and what is
 /// shown (`light/state`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1397,6 +1429,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(online_topics())
         .chain(arrival_topics())
         .chain(turn_topics())
+        .chain(tone_topics())
         .chain(skill_ask_topics())
         .chain(privacy_topics())
         .chain(sound_class_topics())
@@ -1742,6 +1775,39 @@ mod tests {
         assert_eq!(
             declaration_of(VoiceTurn::TOPIC),
             Some(VoiceTurn::declaration())
+        );
+    }
+
+    /// A line's tone (`voice/tone`): numbers only, the valence left out
+    /// when no word said it; its own topic, known by name.
+    #[test]
+    fn a_lines_tone_is_its_arousal_how_sure_and_its_words_valence() {
+        round_trip(
+            &VoiceTone {
+                request: 7,
+                arousal: 0.5,
+                sure: 1.0,
+                valence: Some(-0.5),
+            },
+            "{\"request\":7,\"arousal\":0.5,\"sure\":1.0,\"valence\":-0.5}",
+        );
+        round_trip(
+            &VoiceTone {
+                request: 7,
+                arousal: -0.25,
+                sure: 0.5,
+                valence: None,
+            },
+            "{\"request\":7,\"arousal\":-0.25,\"sure\":0.5}",
+        );
+        assert_eq!(VoiceTone::declaration().kind, Kind::Event);
+        assert_eq!(
+            tone_topics(),
+            [(VoiceTone::TOPIC, VoiceTone::declaration())]
+        );
+        assert_eq!(
+            declaration_of(VoiceTone::TOPIC),
+            Some(VoiceTone::declaration())
         );
     }
 
