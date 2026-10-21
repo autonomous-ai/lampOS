@@ -48,8 +48,8 @@ recording yet"). To fill one, record on a lamp with an air sensor
 
 then set the case's `clock` and each call's `at` from it. The skill's
 numbers (the rise, the level, the hold) and any steam or combustion rule
-are decided from those replays, and the skill stays out of the product's
-install (`install::NOT_PRODUCT_SKILLS`) until then.
+are decided from those replays, and the skill is installed disabled
+(`install::PRODUCT_SKILLS_OFF`) until then.
 
 What no case shows: the say service's own gates (a line in the first pause,
 never over speech, spent after 2 minutes), the sleeping lamp saying

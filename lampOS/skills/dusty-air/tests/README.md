@@ -30,7 +30,7 @@ lamp-skills`, which runs every skill's cases).
 Changed by hand, the cases catch each number: a 1-hour cooldown, quiet
 hours from 23:30, or a level of 99 each fails one of them.
 
-The skill stays out of the product's install (`install::NOT_PRODUCT_SKILLS`)
+The skill is installed disabled (`install::PRODUCT_SKILLS_OFF`)
 until it is measured: Smoky air's four traces (its `tests/README.md`) and an
 office's own days, recorded read only on a lamp with an air sensor and
 replayed here. What no case shows: the Policy's gate (`nudge`), which

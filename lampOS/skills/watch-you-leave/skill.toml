@@ -6,8 +6,8 @@
 # turns back. From the middle, no clear side: it does not move. No search,
 # no second look. Written to lamp-skills' schema (docs/skills.md).
 needs = ["eyes", "body"]
-# A core skill (docs/skills.md, "Core and installable skills"), held out of
-# the product's install until its lamp check (install::NOT_PRODUCT_SKILLS).
+# A core skill (docs/skills.md, "Core and installable skills"), installed
+# disabled until its lamp check (install::PRODUCT_SKILLS_OFF).
 # It moves the body, so it is tried only with someone at the arm.
 kind = "core"
 version = "1.0.0"

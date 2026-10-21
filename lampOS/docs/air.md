@@ -181,21 +181,21 @@ out, a match) are placeholders, to be replaced by the real recording
 
 ### Smoky air and Dusty air on a trial lamp
 
-They are off unless put on: `lamp-update install` does not write them
-(`install::NOT_PRODUCT_SKILLS`), and there is no switch to turn on. Both
+They are off unless put on: `lamp-update install` and a round write them
+disabled, `enabled = false` above each `skill.toml`
+(`install::PRODUCT_SKILLS_OFF`), and there is no switch to turn on. Both
 say `kind = "core"`, so `lamp-skills install` refuses them ("a core skill
-comes with the lamp"). For a trial, as root on the lamp, copy each folder
-into the skills folder, which `lamp-skills` looks at every 2 s:
+comes with the lamp"). For a trial, as root on the lamp, copy each folder's
+own files over the installed ones, which `lamp-skills` looks at every 2 s:
 
-    install -d -m 0755 /var/lib/lampOS/skills/smoky-air /var/lib/lampOS/skills/dusty-air
     cp skills/smoky-air/skill.toml skills/smoky-air/SKILL.md /var/lib/lampOS/skills/smoky-air/
     cp skills/dusty-air/skill.toml skills/dusty-air/SKILL.md /var/lib/lampOS/skills/dusty-air/
 
-`lamp-skills list` then shows both. With no air sensor, publish `air/state`
+`lamp-skills list` then shows both enabled. With no air sensor, publish `air/state`
 by hand, as Stuffy air's check did
 (`docs/verification/stuffy-air-lamp-06c1-20261017/`). To turn them off,
-remove the two folders (`lamp-skills remove` refuses a core skill too); a
-later `lamp-update install` does not remove them.
+put `enabled = false` back at the top of each `skill.toml` (`lamp-skills
+remove` refuses a core skill); a later round keeps a file the lamp changed.
 
 ## Not shown
 

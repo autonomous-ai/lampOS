@@ -201,8 +201,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
 
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
-/// Eight are installed; all but Bedtime and Morning are enabled, and it
-/// remains disabled until its lamp comparison (#1672).
+/// Every core skill is one (the owner: core skills are always installed;
+/// `tests/install.rs` holds the two lists equal). Ten keep their folders'
+/// own default: nine enabled, and Bedtime and Morning disabled by its own
+/// `enabled = false` until its lamp comparison (#1672); those of
+/// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
+/// so none of their functions reach a session.
 /// Every behaviour that has a skill runs as the skill (the owner, 19 Oct):
 /// the voice's own hello is off in `lamp-voice.service`, and its reminders
 /// and task news wait for the skill's ask (`LAMP_SCHEDULE_SPEAK=skill`,
@@ -221,29 +225,23 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // lamp-52e6 with the lead, 20 Oct 11:35, read it as unwell, not broken.
     "not-feeling-well",
     "prepare-unplug",
+    // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
+    "light-out",
+    "watch-you-leave",
+    "music-sway",
+    "light-scenes",
+    "point-light",
+    "light-show",
+    "smoky-air",
+    "dusty-air",
 ];
 
-/// The skills of `lampOS/skills/` a lamp does not get yet, each with why.
-/// A product session's functions are 31 of the 32 it takes
-/// (`tests/functions.rs`): the two tools of Desk tutor and its marks would
-/// put the last of them past it, left out without a word.
-pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
-    (
-        "desk-tutor",
-        "it reads handwriting from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`), \
-         which the product doesn't run: its look is the working frame, 320 across; and with its \
-         marks its two functions would be 33 of a session's 32",
-    ),
-    (
-        "desk-tutor-marks",
-        "it is called only after Desk tutor's look, and Desk tutor isn't in the product",
-    ),
-    (
-        "guard-mode",
-        "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
-         (`LAMP_PRESENCE=on`), and its texts reach the phone only with `LAMP_MESSAGES=on` in \
-         `lamp-cloud`, which carries `messages/out` up as unasked news",
-    ),
+/// The product skills installed disabled, each with why: install and a
+/// round's bundle write [`OFF_LINE`] above the folder's own `skill.toml`,
+/// so the folder in `lampOS/skills/` (and a lamp run from it) keeps its own
+/// default and its cases. A skill leaves this list once its lamp check has
+/// passed; until then a person or a trial turns it on on the lamp itself.
+pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
     (
         "light-out",
         "it reads `room/presence`, which the eyes say only with `LAMP_PRESENCE=on` (#1677), off \
@@ -255,11 +253,6 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "not yet tried on a lamp (#1669 (e)): it turns the base when the sitter leaves \
          (`room/stood_up`, `LAMP_ACTIVITY=on`), so it is tried at the arm hour with someone at the \
          arm, and whether the small turn reads as watching someone go is for that check",
-    ),
-    (
-        "laugh-glance",
-        "PARKED (#1669): dropped, the owner never asked to listen for other people laughing \
-         (the lead, #1711, 21 Oct); kept, and off by being listed here",
     ),
     (
         "music-sway",
@@ -284,6 +277,58 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "light-show",
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
          32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
+    ),
+    // #1684's two core skills, merged off (the first builder, #1722): a
+    // trial puts them on by hand. Each comes with the product once the four
+    // real traces are recorded on a lamp with an air sensor and its
+    // provisional numbers are set again from them.
+    (
+        "smoky-air",
+        "not measured for false alarms yet (#1684): its numbers wait for real traces of kettle \
+         steam, toast, a candle blown out and a match, recorded on a lamp with an air sensor and \
+         replayed",
+    ),
+    (
+        "dusty-air",
+        "not measured for false alarms yet (#1684): its hour at 125 ug/m3 waits for the same \
+         traces and an office's own days, replayed",
+    ),
+];
+
+/// The line written above the `skill.toml` of each of
+/// [`PRODUCT_SKILLS_OFF`] on a lamp: top-level, so before any table.
+macro_rules! off_line {
+    () => {
+        "# Installed off until its lamp check (lamp-update's install::PRODUCT_SKILLS_OFF).\nenabled = false\n"
+    };
+}
+pub const OFF_LINE: &str = off_line!();
+
+/// The skills of `lampOS/skills/` a lamp does not get yet, each with why.
+/// A product session's functions are 31 of the 32 it takes
+/// (`tests/functions.rs`): the two tools of Desk tutor and its marks would
+/// put the last of them past it, left out without a word.
+pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
+    (
+        "desk-tutor",
+        "it reads handwriting from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`), \
+         which the product doesn't run: its look is the working frame, 320 across; and with its \
+         marks its two functions would be 33 of a session's 32",
+    ),
+    (
+        "desk-tutor-marks",
+        "it is called only after Desk tutor's look, and Desk tutor isn't in the product",
+    ),
+    (
+        "guard-mode",
+        "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
+         (`LAMP_PRESENCE=on`), and its texts reach the phone only with `LAMP_MESSAGES=on` in \
+         `lamp-cloud`, which carries `messages/out` up as unasked news",
+    ),
+    (
+        "laugh-glance",
+        "PARKED (#1669): dropped, the owner never asked to listen for other people laughing \
+         (the lead, #1711, 21 Oct); kept, and off by being listed here",
     ),
     // An installable skill (#1685): its owner puts it on; not in the
     // product's install until it has been tried on a lamp.
@@ -319,21 +364,6 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          owner's own bedtime, and its hand-over to Bedtime and Morning (#1732) is for the lamp \
          check",
     ),
-    // #1684's two core skills, merged off (the first builder, #1722): a
-    // trial puts them on by hand. Each comes with the product once the four
-    // real traces are recorded on a lamp with an air sensor and its
-    // provisional numbers are set again from them.
-    (
-        "smoky-air",
-        "not measured for false alarms yet (#1684): its numbers wait for real traces of kettle \
-         steam, toast, a candle blown out and a match, recorded on a lamp with an air sensor and \
-         replayed",
-    ),
-    (
-        "dusty-air",
-        "not measured for false alarms yet (#1684): its hour at 125 ug/m3 waits for the same \
-         traces and an office's own days, replayed",
-    ),
     (
         "who-was-here",
         "an installable skill, not yet tried on a lamp (#1685): it reads `room/presence`, which the \
@@ -349,6 +379,18 @@ macro_rules! skill_file {
         (
             concat!("/var/lib/lampOS/skills/", $skill, "/", $file),
             include_str!(concat!("../../../skills/", $skill, "/", $file)),
+        )
+    };
+}
+/// A [`PRODUCT_SKILLS_OFF`] skill's `skill.toml`, with [`OFF_LINE`] above it.
+macro_rules! skill_file_off {
+    ($skill:literal) => {
+        (
+            concat!("/var/lib/lampOS/skills/", $skill, "/skill.toml"),
+            concat!(
+                off_line!(),
+                include_str!(concat!("../../../skills/", $skill, "/skill.toml"))
+            ),
         )
     };
 }
@@ -401,6 +443,29 @@ pub const SETTINGS: &[(&str, &str)] = &[
     // Core skill #1674 is installed but not advertised until LAMP_UNPLUG=on.
     skill_file!("prepare-unplug", "skill.toml"),
     skill_file!("prepare-unplug", "SKILL.md"),
+    // Installed disabled (PRODUCT_SKILLS_OFF).
+    skill_file_off!("light-out"),
+    skill_file!("light-out", "SKILL.md"),
+    skill_file_off!("watch-you-leave"),
+    skill_file!("watch-you-leave", "SKILL.md"),
+    skill_file!("watch-you-leave", "moves/watch-left.json"),
+    skill_file!("watch-you-leave", "moves/watch-right.json"),
+    skill_file_off!("music-sway"),
+    skill_file!("music-sway", "SKILL.md"),
+    skill_file!("music-sway", "moves/sway.json"),
+    skill_file_off!("light-scenes"),
+    skill_file!("light-scenes", "SKILL.md"),
+    skill_file_off!("point-light"),
+    skill_file!("point-light", "SKILL.md"),
+    skill_file_off!("light-show"),
+    skill_file!("light-show", "SKILL.md"),
+    skill_file!("light-show", "shows/calm.toml"),
+    skill_file!("light-show", "shows/music.toml"),
+    skill_file!("light-show", "shows/party.toml"),
+    skill_file_off!("smoky-air"),
+    skill_file!("smoky-air", "SKILL.md"),
+    skill_file_off!("dusty-air"),
+    skill_file!("dusty-air", "SKILL.md"),
 ];
 
 /// Setup's own page (docs/setup.md, "On a lamp"), written only with
