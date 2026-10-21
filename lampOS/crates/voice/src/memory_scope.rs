@@ -18,13 +18,17 @@ use std::{
 pub const GAP_ENVIRONMENT: &str = "LAMP_FACE_GAP_HOLD";
 
 /// How long past its last fresh sighting (the known file's 3 s freshness, so
-/// about 11 s after the eyes last saw it), and past the lamp's last answer to
-/// them, a known face's scope is held while the eyes see no face at all: a
-/// hand across, a step out of the picture. A head turned away is usually
-/// still a face in the eyes' look, so it holds nothing. On lamp-4ace on 20
-/// October at 12:13 a known person lost for a moment went back to the room's
-/// scope mid-conversation.
-pub const GAP: Duration = Duration::from_secs(8);
+/// about 15 s after the eyes last saw it), and past the end of the lamp's
+/// last answer to them, a known face's scope is held while the eyes see no
+/// face at all: a hand across, a step out of the picture. A head turned away
+/// is usually still a face in the eyes' look, so it holds nothing. On
+/// lamp-4ace on 20 October at 12:13 a known person lost for a moment went
+/// back to the room's scope mid-conversation. 12 s, not 8: on lamp-c0a4 a
+/// person who turned away and asked again took 8 to 9 s from the end of the
+/// lamp's answer (the first builder on #1722, 21 Oct). One window for both
+/// bounds: a face last seen as the answer ends is fresh 3 s more, so the
+/// answer's 12 s end first.
+pub const GAP: Duration = Duration::from_secs(12);
 
 /// [`GAP`] when [`GAP_ENVIRONMENT`] is `on`.
 pub fn gap_from_environment() -> Option<Duration> {
@@ -35,6 +39,11 @@ pub fn gap_from_environment() -> Option<Duration> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ScopeSnapshot {
     person: Option<Arc<str>>,
+    /// A known face's scope kept only by its held gap, not seen now
+    /// (`LAMP_FACE_GAP_HOLD`): its line is answered from the conversation as
+    /// it stood, never from memory's reads, and runs no held forget (the
+    /// first builder's 22:10 and 01:43 on #2265).
+    held: bool,
 }
 impl ScopeSnapshot {
     pub fn room() -> Self {
@@ -43,11 +52,16 @@ impl ScopeSnapshot {
     pub fn person(&self) -> Option<&str> {
         self.person.as_deref()
     }
+    /// Whether this scope is a known face's held only through its gap.
+    pub fn held(&self) -> bool {
+        self.held
+    }
     /// A known person's scope, for other parts' tests.
     #[cfg(test)]
     pub fn of(name: &str) -> Self {
         Self {
             person: Some(Arc::from(crate::remember::person_id(name))),
+            held: false,
         }
     }
 }
@@ -77,12 +91,18 @@ pub struct FaceCache {
     gap: Option<Duration>,
     /// Whom the lamp last answered, and when ([`Self::answered`]).
     answered: Mutex<Option<(ScopeSnapshot, Instant)>>,
+    /// The faces the eyes saw at the last refresh, plus one; 0 when not
+    /// known. For the journal only ([`Self::gap_told`]).
+    in_view: AtomicU64,
 }
 impl FaceCache {
     /// The lamp has answered a turn of `scope`'s at `at`: a gap is held only
     /// for someone known the lamp answered within it, so mid-conversation
     /// (the reviewer's P2 on #2265). Someone who has left the picture and
-    /// isn't being talked with is not held for whoever speaks next.
+    /// isn't being talked with is not held for whoever speaks next. `at` is
+    /// the answer's end (its turn complete); only a turn the lamp spoke in
+    /// marks it, so a sound with no words between the answer and the next
+    /// question neither starts the gap again nor ends it.
     pub fn answered(&self, scope: &ScopeSnapshot, at: Instant) {
         if self.gap.is_some()
             && scope.person().is_some()
@@ -148,6 +168,7 @@ impl FaceCache {
             generation: token.generation,
             scope: ScopeSnapshot {
                 person: Some(Arc::from(observation.person())),
+                held: false,
             },
             valid_until: observation.valid_until(),
             seen_until: observation.valid_until(),
@@ -169,21 +190,58 @@ impl FaceCache {
         let held = || {
             let gap = self.gap?;
             let was = face.as_ref()?;
-            let (whom, at) = answered.filter(|(whom, _)| *whom == was.scope)?;
+            let (whom, at) = answered.filter(|(whom, _)| whom.person == was.scope.person)?;
             // Only a face cached in this generation: one from before a
             // privacy change is never carried into the new one.
             (faces_in_view == Some(0) && was.generation == token.generation).then(|| CachedFace {
                 generation: was.generation,
-                scope: whom,
+                scope: ScopeSnapshot { held: true, ..whom },
                 valid_until: (was.seen_until + gap).min(at + gap),
                 seen_until: was.seen_until,
             })
         };
         let next = next.or_else(held);
         *face = next;
+        self.in_view.store(
+            faces_in_view.map_or(0, |faces| faces as u64 + 1),
+            Ordering::Release,
+        );
         // Invalidation racing the assignment is enforced by the entry's
         // generation at snapshot, and reported here when already observed.
         current()
+    }
+
+    /// For the journal, with a gap held ([`Self::holding_gaps`]): what a
+    /// line's scope was decided on, in ms and counts, never a name. The
+    /// known face's last sighting ends [`crate::known_faces`]'s freshness
+    /// after the eyes' last known file; negative while it is still fresh.
+    pub fn gap_told(&self, now: Instant) -> Option<String> {
+        self.gap?;
+        let ago = |at: Instant| match now.checked_duration_since(at) {
+            Some(after) => after.as_millis() as i64,
+            None => -(at.duration_since(now).as_millis() as i64),
+        };
+        let answered = self
+            .answered
+            .try_lock()
+            .ok()
+            .and_then(|answered| answered.as_ref().map(|(_, at)| ago(*at)))
+            .map_or("never".to_owned(), |ms| format!("{ms} ms ago"));
+        let in_view = match self.in_view.load(Ordering::Acquire) {
+            0 => "not known".to_owned(),
+            faces => (faces - 1).to_string(),
+        };
+        let face = self.face.try_lock().ok()?;
+        let face = face.as_ref().map_or("none cached".to_owned(), |face| {
+            format!(
+                "{}, its sighting ends {} ms ago",
+                if face.scope.held { "held" } else { "seen" },
+                ago(face.seen_until)
+            )
+        });
+        Some(format!(
+            "known face {face}, the lamp's last answer to someone known {answered}, faces in view {in_view}"
+        ))
     }
 
     pub fn snapshot(&self, now: Instant) -> ScopeSnapshot {
@@ -305,6 +363,7 @@ mod tests {
             generation: cache.generation.load(Ordering::Acquire),
             scope: ScopeSnapshot {
                 person: Some(Arc::from(crate::remember::person_id(name))),
+                held: false,
             },
             valid_until: until,
             seen_until: until,
@@ -403,6 +462,7 @@ mod tests {
     fn a_narrowed_lease_reads_the_room_at_every_later_boundary() {
         let person = ScopeSnapshot {
             person: Some(Arc::from("p-0123456789abcdef")),
+            held: false,
         };
         let owner = RequestScope::new(key(1), person.clone());
         let handed = owner.lease();
@@ -478,6 +538,7 @@ mod tests {
     fn talked_with(cache: &FaceCache, name: &str, at: Instant) {
         let scope = ScopeSnapshot {
             person: Some(Arc::from(crate::remember::person_id(name))),
+            held: false,
         };
         cache.answered(&scope, at);
     }
@@ -501,6 +562,90 @@ mod tests {
         // Seen again: theirs, fresh.
         let until = seen(&cache, "Example Name", Some(1));
         assert_eq!(whose(&cache, until - Duration::from_millis(1)), known);
+    }
+
+    /// The first builder on #1722 (21 Oct 14:1x): lamp-c0a4's timeline,
+    /// replayed. The known person is answered and looks away as the answer
+    /// ends; the eyes' known file, last renewed then, stays fresh up to 3 s
+    /// and then goes, with no face in view; the next line, from out of the
+    /// picture, is decided 4 to 6 s after the answer. It is held, so it is
+    /// told only ([`ScopeSnapshot::held`]); off, it is the room's.
+    #[test]
+    fn lamp_c0a4s_timeline_a_line_decided_4_to_6_s_after_the_answer_is_held() {
+        let known = Some(crate::remember::person_id("Example Name"));
+        for gap in [Some(GAP), None] {
+            let cache = FaceCache::holding_gaps(gap);
+            let until = seen(&cache, "Example Name", Some(1));
+            let answer_ends = until - crate::known_faces::FRESH;
+            talked_with(&cache, "Example Name", answer_ends);
+            lost(&cache, Some(0));
+            for decided in [4, 5, 6] {
+                let at = answer_ends + Duration::from_secs(decided);
+                let scope = cache.snapshot(at);
+                if gap.is_some() {
+                    assert!(scope.held(), "{decided} s");
+                    assert_eq!(whose(&cache, at), known, "{decided} s");
+                } else {
+                    assert!(!scope.held());
+                    assert_eq!(whose(&cache, at), None, "off: {decided} s");
+                }
+            }
+            // The journal's account of it: ms and counts, never a name.
+            let told = cache.gap_told(answer_ends + Duration::from_secs(5));
+            match gap {
+                Some(_) => {
+                    let told = told.unwrap();
+                    assert!(
+                        told.starts_with("known face held, its sighting ends 2"),
+                        "{told}"
+                    );
+                    assert!(told.ends_with("ms ago, faces in view 0"), "{told}");
+                    assert!(
+                        told.contains("last answer to someone known 5000 ms ago"),
+                        "{told}"
+                    );
+                    assert!(!told.contains("Example"), "{told}");
+                }
+                None => assert_eq!(told, None),
+            }
+        }
+    }
+
+    /// The first builder on #1722 (21 Oct): on lamp-c0a4 a person who
+    /// turned away and asked again took 8 to 9 s from the end of the lamp's
+    /// answer, and the turn-away's sound came first as a request of no words.
+    /// That request, about 1.5 s after the answer, is admitted held but ends
+    /// unanswered, so it marks no one: the gap neither starts again nor ends
+    /// with it. The question admitted 9 s after the answer's end is still
+    /// held and theirs; off, the room's; 12 s on, the room's.
+    #[test]
+    fn lamp_c0a4s_question_9_s_after_the_answer_is_held_past_a_sound_of_no_words() {
+        let known = Some(crate::remember::person_id("Example Name"));
+        for gap in [Some(GAP), None] {
+            let cache = FaceCache::holding_gaps(gap);
+            let until = seen(&cache, "Example Name", Some(1));
+            let answer_ends = until - crate::known_faces::FRESH;
+            talked_with(&cache, "Example Name", answer_ends);
+            lost(&cache, Some(0));
+            // The sound with no words: admitted, never answered.
+            let sound = answer_ends + Duration::from_millis(1_500);
+            assert_eq!(cache.snapshot(sound).held(), gap.is_some());
+            // The eyes go on looking, and still see no face.
+            lost(&cache, Some(0));
+            let question = answer_ends + Duration::from_secs(9);
+            let scope = cache.snapshot(question);
+            if gap.is_some() {
+                assert!(scope.held(), "9 s after the answer's end");
+                assert_eq!(whose(&cache, question), known);
+                let past = answer_ends + Duration::from_secs(12);
+                assert_eq!(whose(&cache, past - Duration::from_millis(1)), known);
+                assert!(!cache.snapshot(past).held());
+                assert_eq!(whose(&cache, past), None, "12 s on");
+            } else {
+                assert!(!scope.held());
+                assert_eq!(whose(&cache, question), None, "off");
+            }
+        }
     }
 
     /// Any face in view may be someone else's, and not knowing is not
@@ -558,9 +703,9 @@ mod tests {
         talked_with(&cache, "Another Name", until);
         lost(&cache, Some(0));
         assert_eq!(whose(&cache, five_on(until)), None, "answered someone else");
-        // Answered 6 s before the last sighting: held 2 s past it, not 8.
+        // Answered 10 s before the last sighting: held 2 s past it, not 12.
         let until = seen(&cache, "Example Name", Some(1));
-        talked_with(&cache, "Example Name", until - Duration::from_secs(6));
+        talked_with(&cache, "Example Name", until - Duration::from_secs(10));
         lost(&cache, Some(0));
         assert_eq!(whose(&cache, until + Duration::from_secs(1)), known);
         assert_eq!(whose(&cache, until + Duration::from_secs(2)), None);

@@ -440,8 +440,14 @@ impl Chat {
     /// [`Self::body`], with only the tools named in `only` when given, and
     /// then never narrowed: a held line's round is told those alone.
     fn body_only(&self, messages: &[Message], only: Option<&[&str]>) -> Value {
+        self.body_without(messages, only, &[])
+    }
+
+    /// [`Self::body_only`], never declaring the tools named in `without`.
+    fn body_without(&self, messages: &[Message], only: Option<&[&str]>, without: &[&str]) -> Value {
         let mut body = json!({"model": self.model, "stream": true, "messages": messages});
         let mut declared = (self.declare)();
+        declared.retain(|tool| !without.contains(&tool.name.as_str()));
         if let Some(only) = only {
             declared.retain(|tool| only.contains(&tool.name.as_str()));
         } else if let Some(narrow) = self.narrow.get() {
@@ -493,7 +499,17 @@ impl Chat {
         messages: &[Message],
         only: Option<&[&str]>,
     ) -> Result<ChatStream> {
-        let body = self.body_only(messages, only);
+        self.send_without(messages, only, &[]).await
+    }
+
+    /// [`Self::send_only`], never declaring the tools named in `without`.
+    pub async fn send_without(
+        &self,
+        messages: &[Message],
+        only: Option<&[&str]>,
+        without: &[&str],
+    ) -> Result<ChatStream> {
+        let body = self.body_without(messages, only, without);
         let asked = std::time::Instant::now();
         let before = self
             .last_sent
@@ -1142,6 +1158,42 @@ data: [DONE]
             chat.body_only(&asked, Some(&["remember"]))
                 .get("tools")
                 .is_none()
+        );
+    }
+
+    /// #2265's follow-up: a line held only by a known face's gap is never
+    /// told memory's read, whatever else it is told.
+    #[test]
+    fn a_body_without_leaves_out_only_the_named_functions() {
+        let offered: Vec<lamp_gemini::Tool> = serde_json::from_value(json!([
+            {"name": "light_on", "description": "Light."},
+            {"name": "recall", "description": "Recall."},
+            {"name": "remember", "description": "Remember."}
+        ]))
+        .unwrap();
+        let chat = Chat::with(
+            "http://127.0.0.1:9/v1/",
+            "m",
+            "k",
+            Arc::new(move || offered.clone()),
+        )
+        .unwrap();
+        let names = |body: Value| -> Vec<String> {
+            body["tools"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|tool| tool["function"]["name"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let asked = [Message::user("And what else?")];
+        assert_eq!(
+            names(chat.body_only(&asked, None)),
+            ["light_on", "recall", "remember"]
+        );
+        assert_eq!(
+            names(chat.body_without(&asked, None, &["recall"])),
+            ["light_on", "remember"]
         );
     }
 

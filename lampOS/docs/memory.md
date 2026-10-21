@@ -1498,15 +1498,32 @@ a gap, only while all of these hold:
   answer's audio went). A line left unclear, judged not for the lamp
   (`not_for_me`), held or given up marks no one. So someone who gets up and
   goes isn't held for whoever speaks next from out of the picture, unless
-  they go within 8 s of the lamp's last answer to them: that window is
-  still held, and only told-only held lines (no `recall` or `search`) would
-  close it (the reviewers' P2 on #2265, the first builder's call). On the
-  first exchange there is no answer yet, so a face lost before it ends is
-  the room's.
-- **Within the gap:** up to 8 s (`GAP`) past the face's last fresh
-  sighting, which is the known file's 3 s freshness, so up to about 11 s
-  after the eyes last saw it, and up to 8 s past the lamp's last answer to
-  them, whichever ends first. Holding never renews it.
+  they go within 12 s of the lamp's last answer to them. The answer is
+  marked at its end (the turn's complete). A request of no words, such as
+  the sound of someone turning away, is never answered, so it marks no one:
+  it neither starts the gap again nor ends it, and the question after it
+  is held. On the first
+  exchange there is no answer yet, so a face lost before it ends is the
+  room's.
+- **A held line is answered from the conversation as it stood** (the first
+  builder's 22:10 and 01:43 on #2265): someone who left within that window
+  may not be the one speaking. A line whose scope is kept only by the gap
+  (`ScopeSnapshot::held`) is declared none of the functions that read or
+  write someone's memory, rules or face (`recall` and its search,
+  `remember`, `forget`, `forget_everything`, the rules' and the face's;
+  `Services::chat_without`), and any of them written anyway is refused and
+  told why (`run_tool`). It is told no memory note and no memory hits
+  (`LAMP_SECOND_MEMORY_HITS`), and its scope runs no one's held forget
+  (`forget_asker`, #2340); the reviewer's P2 on #2449. It is told the
+  conversation as it stood, its exchanges, as before.
+- **Within the gap:** up to 12 s (`GAP`) past the face's last fresh
+  sighting, which is the known file's 3 s freshness, so up to about 15 s
+  after the eyes last saw it, and up to 12 s past the end of the lamp's last
+  answer to them, whichever ends first. Holding never renews it. It was
+  8 s until lamp-c0a4, where a person who turned away and asked again took
+  8 to 9 s from the end of the lamp's answer (the first builder on #1722,
+  21 Oct). A face last seen as the answer ends stays fresh 3 s more, so
+  there the answer's 12 s end first.
 
 A different known face is theirs at once, and a privacy change revokes a held
 face as it does a fresh one. The exchange itself already stays with the person

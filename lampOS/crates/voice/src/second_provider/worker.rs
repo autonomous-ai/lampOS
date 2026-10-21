@@ -259,6 +259,47 @@ impl Gate {
     }
 }
 
+/// A request's answer sound as it goes out: when its first samples went and
+/// how many, so its end is when they have all been played (the first sound
+/// plus their length at [`super::net::TTS_SAMPLE_RATE`]).
+#[derive(Debug, Default)]
+struct AnswerSound {
+    request: Option<u64>,
+    first: Option<Instant>,
+    samples: u64,
+}
+
+impl AnswerSound {
+    fn heard(&mut self, event: &ProviderOutput, at: Instant) {
+        if let ProviderOutput::Audio {
+            request, samples, ..
+        } = event
+        {
+            if self.request != Some(*request) {
+                *self = Self {
+                    request: Some(*request),
+                    first: Some(at),
+                    samples: 0,
+                };
+            }
+            self.samples += samples.len() as u64;
+        }
+    }
+
+    /// When `request`'s answer ends playing; now for one with no sound.
+    fn ends(&self, request: u64) -> Instant {
+        match (self.request == Some(request), self.first) {
+            (true, Some(first)) => {
+                first
+                    + Duration::from_micros(
+                        self.samples * 1_000_000 / u64::from(super::net::TTS_SAMPLE_RATE),
+                    )
+            }
+            _ => Instant::now(),
+        }
+    }
+}
+
 /// Whether a turn is told and kept for its admitted memory scope (#1675):
 /// its recall, history, Days note and answer that person's or the room's,
 /// never the sticky session owner's. `on` only; otherwise as before.
@@ -1778,7 +1819,14 @@ pub fn serve(
                 (sessions.told_for(&person), person)
             }
         };
+        // A line held only by a known face's gap is told no one's memory
+        // note: it may not be theirs (the reviewer's P2 on #2449). Its
+        // exchanges, the conversation as it stood, are told as before.
+        let held = lease
+            .and_then(crate::memory_scope::ScopeLease::scope)
+            .is_some_and(crate::memory_scope::ScopeSnapshot::held);
         let memory = match &socket {
+            _ if held => String::new(),
             // Every request here is built afresh from the thread and the
             // session's snapshot: a new session is a fresh context (#2176
             // row 1b).
@@ -5454,6 +5502,9 @@ pub async fn run(
     // for credit or a full socket.
     let mut retained: Option<ProviderInput> = None;
     let mut pending: Option<ProviderOutput> = None;
+    // The answer's sound as it goes out, for when the lamp has finished
+    // saying it (`AnswerSound::ends`).
+    let mut answer_sound = AnswerSound::default();
     // An answer's hand-on to memory, held until it is known how much of it
     // was heard (`LAMP_SAID_AS_HEARD`).
     let mut held = crate::said_as_heard::HeldHandOn::default();
@@ -5558,9 +5609,14 @@ pub async fn run(
                     lease.as_ref(),
                     holding.then_some(&mut held),
                 );
-                // Whom the lamp answered, for a known face's held gap.
+                // Whom the lamp answered, for a known face's held gap: as
+                // its answer ends playing, not as its turn completes, which
+                // is about when its first sound goes out (lamp-c0a4 on
+                // #2449: a 3.5 s answer took that much off the window).
+                answer_sound.heard(event, Instant::now());
                 if let ProviderOutput::TurnComplete { request, .. } = event {
-                    engine.memory_answered(*request, Instant::now());
+                    let now = Instant::now();
+                    engine.memory_answered(*request, answer_sound.ends(*request).max(now));
                 }
             }
             if let Some(event) = &pending {
@@ -7631,6 +7687,32 @@ mod tests {
     }
 
     use super::*;
+
+    /// lamp-c0a4 on #2449 (17:31): the held gap's window is measured from
+    /// when the lamp's answer ends playing, not from its turn completing,
+    /// which comes about as its first sound goes out.
+    #[test]
+    fn an_answer_ends_when_its_sound_has_all_been_played() {
+        let audio = |request, samples: usize| ProviderOutput::Audio {
+            request,
+            sequence: 0,
+            provider_event_at_us: 0,
+            source_frames: samples,
+            source_offset: 0,
+            samples: vec![0; samples],
+        };
+        let start = Instant::now();
+        let mut sound = AnswerSound::default();
+        sound.heard(&audio(4, 24_000), start);
+        sound.heard(&audio(4, 60_000), start + Duration::from_millis(300));
+        // 84,000 samples at 24 kHz: 3.5 s after its first sound.
+        assert_eq!(sound.ends(4), start + Duration::from_millis(3_500));
+        // Another request's answer starts its own count; one with no sound
+        // ends now.
+        sound.heard(&audio(5, 2_400), start);
+        assert_eq!(sound.ends(5), start + Duration::from_millis(100));
+        assert!(sound.ends(6) >= start);
+    }
     use crate::second_provider::{Listener, Services, net};
 
     /// #1712, the first builder at 18:56: with `LAMP_SECOND_FEW_TOOLS=on` a
