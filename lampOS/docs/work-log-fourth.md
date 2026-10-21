@@ -5650,6 +5650,30 @@ are merged.
   has no lamp and made no device/provider request. No implementation
   remains uncommitted or unpublished.
 
+## 2026-10-22, 06:56 ICT: resumed; reviewed PR rebases and the memory quality row claimed
+
+Ready for lamp-voice: no (#2684 and #2691 are being rebased and requalified).
+
+- Resumed by the owner. #2684 and #2691 have no review finding requiring
+  source changes, but their checks predate shared-file drift. Both are
+  being rebased onto the fetched `e2b2f596d` lamp-voice head, with one
+  commit each, explicit leases, literal range-diffs on Queue #2602 and
+  new ARM64 plus workspace Clippy gates. First owns their merges.
+- Claimed the quality row **Remembers you: your name and what you told
+  it**, from 0.40 toward 0.90, before code; session
+  `fourth-20261022-0652`. The plan and concrete next PR are due on the
+  Queue by **07:22 ICT**. The audit includes merged #2627, Friday's
+  #2673, and #2510's replacement work, including newer #2713/#2721.
+  Friday keeps #2673's P2 and the newly found worker switch pass-through
+  and census. Fourth does not duplicate either.
+- #2540 remains claimed from its earlier work, with code merged as #2627.
+  The six-minute spoken name-retention run is still owed. Current role
+  and all lamp owner files grant Fourth no lamp. The Queue's released
+  locks do not grant ownership; no device action has been taken.
+- Next work is the row's code/evidence plan while the reviewed PRs run.
+  The turn stays active through CI and review; a waiting PR is not the
+  end of the work. Each step is posted on Queue #2602.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
