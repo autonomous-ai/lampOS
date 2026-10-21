@@ -1,11 +1,13 @@
 # The runner publishes only an eligible, nonpersonal invitation identity.
 # No authority to open either sensor, no body move, and no additional tool.
+# The core grant "onboarding" is what lets it say from the invitations.
 kind = "core"
 version = "1.0.0"
 needs = ["voice"]
 
 [permissions]
 topics = ["onboarding/pending"]
+core = ["onboarding"]
 speak = true
 
 [trigger]

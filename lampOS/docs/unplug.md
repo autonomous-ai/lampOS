@@ -5,13 +5,15 @@ or turn off the lamp. It is installed with the product, but its tool is not
 advertised unless Skills runs with `LAMP_UNPLUG=on`. Body, Expression and Voice
 need the same opt-in. All defaults stay off until a physical lamp trial passes.
 
-`body.prepare_unplug` is reserved to the skill named `prepare-unplug` with the
-exact tool `prepare_to_unplug` and `kind = "core"`. Packages cannot install,
-replace or remove it. The loader rejects other skill or tool names,
-as well as automatic triggers and additional steps. Runtime admission rechecks
-both names, and the bus request boundary refuses aliases before reading or
-writing the latch. Ordinary skills cannot opt into this operation under another
-name. This is an operation restriction within the trusted local skill runtime,
+`body.prepare_unplug` is reserved to a `kind = "core"` skill declaring the
+core-only grant `core = ["prepare_unplug"]` in `[permissions]` (the shipped
+`prepare-unplug`, tool `prepare_to_unplug`). Packages cannot install, replace
+or remove it, and an installable or add-on declaring the grant is refused. The
+loader rejects a skill without the grant, as well as automatic triggers and
+additional steps. Runtime admission rechecks the grant, and the bus request
+boundary refuses a caller without it before reading or writing the latch. The
+runtime never knows the operation by the skill's name: a renamed copy without
+the declaration gets nothing of it. This is an operation restriction within the trusted local skill runtime,
 not cryptographic authentication or proof of a person's spoken consent.
 Installed skill definitions and callers of the local tool socket remain trusted;
 this check does not exclude another local process with bus write access.

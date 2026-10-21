@@ -242,7 +242,9 @@ whole time. Whether the model calls `setup_step` reliably, and whether
 ## Physical privacy step (#841)
 
 Privacy is an explicitly measured step, not a model-reported success. The
-`onboarding` core skill reads `onboarding/pending` and asks the existing say
+`onboarding` core skill, granted `core = ["onboarding"]` in `[permissions]`
+(the runtime knows it by that declaration, not its name), reads
+`onboarding/pending` and asks the existing say
 service for the exact invitation token. The runner retains the words, evidence
 and persistence; there is no second conversational runner and no automatic
 voice fallback when the skill is absent. Stale, skipped, redone or restarted

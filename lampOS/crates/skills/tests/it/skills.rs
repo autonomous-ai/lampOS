@@ -10124,6 +10124,15 @@ fn onboarding_refuses_wrong_kind_wrong_trigger_and_unbounded_pending_identity() 
         front.replace("name: onboarding", "name: other-core"),
     )
     .unwrap();
+    // The grant is declared, not known by name: a renamed copy that keeps
+    // it is the same skill; one without it gets nothing.
+    assert!(load(&renamed).is_ok());
+    let manifest = fs::read_to_string(renamed.join("skill.toml")).unwrap();
+    fs::write(
+        renamed.join("skill.toml"),
+        manifest.replace("core = [\"onboarding\"]\n", ""),
+    )
+    .unwrap();
     assert!(load(&renamed).unwrap_err().contains("core onboarding"));
     let skill = load(&skills_root().join("onboarding")).unwrap();
     for bad in [
@@ -10605,19 +10614,57 @@ fn unplug_is_only_an_explicit_single_step_and_admission_is_never_readiness() {
 }
 
 #[test]
-fn unplug_operation_rejects_an_ordinary_skill_name_and_an_alias_tool() {
+fn unplug_operation_is_the_core_grant_not_the_skill_name() {
     let dir = tempfile::tempdir().unwrap();
-    for (name, tool) in [
-        ("desk-rest", "prepare_to_unplug"),
-        ("prepare-unplug", "desk_rest"),
-    ] {
-        let source = include_str!("../../../../skills/prepare-unplug/skill.toml")
-            .replace("prepare_to_unplug", tool);
-        let why = load(&skill_with(dir.path(), name, &source)).unwrap_err();
+    let valid = include_str!("../../../../skills/prepare-unplug/skill.toml");
+    let ungranted = valid.replace("core = [\"prepare_unplug\"]\n", "");
+    assert_ne!(ungranted, valid);
+    for name in ["desk-rest", "prepare-unplug"] {
+        let why = load(&skill_with(&dir.path().join(name), name, &ungranted)).unwrap_err();
         assert!(
-            why.contains("belongs only to prepare-unplug / prepare_to_unplug"),
+            why.contains("belongs only to a core skill granted core = [\"prepare_unplug\"]"),
             "{why}"
         );
+    }
+    // A core skill declaring the grant gets it, whatever its name.
+    let renamed = load(&skill_with(&dir.path().join("granted"), "desk-rest", valid)).unwrap();
+    assert!(renamed.prepares_unplug());
+    for wrong in [
+        "[\"prepare_unplug\", \"prepare_unplug\"]",
+        "[\"everything\"]",
+    ] {
+        let text = valid.replace("[\"prepare_unplug\"]", wrong);
+        let why = load(&skill_with(
+            &dir.path().join("wrong"),
+            "prepare-unplug",
+            &text,
+        ))
+        .unwrap_err();
+        assert!(why.contains("[permissions] core"), "{why}");
+    }
+}
+
+#[test]
+fn an_installable_or_addon_declaring_a_core_grant_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    for (kind, grant) in [
+        ("installable", "onboarding"),
+        ("addon", "prepare_unplug"),
+        ("installable", "prepare_unplug"),
+    ] {
+        let text = format!(
+            "kind = \"{kind}\"\nversion = \"1.0.0\"\n\n[permissions]\nspeak = true\ncore = [\"{grant}\"]\n\n[[do]]\nsay = \"Hi.\"\n"
+        );
+        let source = skill_with(&dir.path().join(kind).join(grant), "greeter", &text);
+        let why = load(&source).unwrap_err();
+        assert!(
+            why.contains("requires kind = core") && why.contains(kind),
+            "{why}"
+        );
+        let installed = dir.path().join("installed");
+        fs::create_dir_all(&installed).unwrap();
+        assert!(lamp_skills::package::install(&installed, &source).is_err());
+        assert!(!installed.join("greeter").exists());
     }
 }
 

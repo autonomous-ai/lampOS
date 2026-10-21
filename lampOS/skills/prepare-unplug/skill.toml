@@ -7,6 +7,7 @@ still = "I am still preparing. Please wait; it is not confirmed safe to unplug."
 
 [permissions]
 body = true
+core = ["prepare_unplug"]
 speak = true
 topics = ["body/unplug_request", "body/unplug_state", "expression/unplug_state", "ring/unplug_state", "body/unplug_cancel"]
 

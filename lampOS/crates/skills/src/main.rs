@@ -2210,11 +2210,6 @@ fn tool_call(
     run.calls
         .retain(|call| *call != Call::Look || sockets.may.refuses(call).is_none());
     if run.calls.contains(&Call::PrepareUnplug)
-        && !lamp_skills::unplug::core_identity(&run.skill, &name)
-    {
-        return refuse("Unplug preparation belongs only to prepare-unplug / prepare_to_unplug.");
-    }
-    if run.calls.contains(&Call::PrepareUnplug)
         && let Some(why) = sockets.may.refuses(&Call::PrepareUnplug)
     {
         return refuse(&why);
@@ -2436,7 +2431,7 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
         return "unplug preparation is disabled; nothing requested".into();
     }
     let began = clock::now_us();
-    let (request, since) = match unplug::begin(bus, skill, unplug::TOOL, began) {
+    let (request, since) = match unplug::begin(bus, &sockets.may.permissions, began) {
         Ok(request) => request,
         Err(error) => return format!("unplug preparation could not start: {error}"),
     };
@@ -2483,12 +2478,14 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
 /// on their own thread.
 fn stay_call((name, args, reply, admission): ToolAsk, engine: &Engine, runner: &Runner) {
     use lamp_skills::unplug;
-    let sockets = runner.sockets_for(unplug::SKILL);
-    let checked = if !engine
+    // The skill granted the operation speaks the line, whatever its name.
+    let granted = engine
         .skills()
         .iter()
-        .any(lamp_skills::Skill::prepares_unplug)
-    {
+        .find(|skill| skill.prepares_unplug())
+        .map(|skill| skill.name.clone());
+    let sockets = runner.sockets_for(granted.as_deref().unwrap_or_default());
+    let checked = if granted.is_none() {
         Err("Preparing to unplug is not enabled.".to_owned())
     } else if let Some(why) = sockets.may.refuses(&Call::PrepareUnplug) {
         Err(why)
@@ -2524,7 +2521,7 @@ fn stay(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String {
     let outcome = say(
         &sockets.say,
         "staying plugged in",
-        lamp_skills::unplug::SKILL,
+        &sockets.may.skill,
         json!({"note": line, "priority": 8}),
         &[],
         || cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us())),
@@ -2570,7 +2567,7 @@ fn say_check(sockets: &Sockets) -> String {
     say(
         &sockets.say,
         "unplug needs checking",
-        lamp_skills::unplug::SKILL,
+        &sockets.may.skill,
         json!({"note": lamp_skills::unplug::CHECK_LINE, "priority": 8}),
         &[],
         || {},
@@ -3955,6 +3952,7 @@ mod tests {
                 .iter()
                 .map(|topic| (*topic).to_owned())
                 .collect(),
+            core: vec!["prepare_unplug".into()],
             ..Permissions::default()
         }
     }
@@ -3976,6 +3974,9 @@ mod tests {
         let mut speak = unplug_grants();
         speak.speak = false;
         denied.push(speak);
+        let mut ungranted = unplug_grants();
+        ungranted.core.clear();
+        denied.push(ungranted);
         for topic in lamp_skills::unplug::READ_TOPICS {
             let mut permission = unplug_grants();
             permission.topics.retain(|given| given != topic);
@@ -3985,7 +3986,7 @@ mod tests {
             let sockets = nowhere(dir.path(), permission.clone());
             let (made, _) = mpsc::channel();
             let outcome = perform(
-                lamp_skills::unplug::SKILL,
+                "prepare-unplug",
                 (&[Call::PrepareUnplug], &[]),
                 &sockets,
                 &bus,
@@ -3999,13 +4000,10 @@ mod tests {
                     .unwrap()
                     .is_none()
             );
-            let error =
-                say_unplug_ready(lamp_skills::unplug::SKILL, &sockets, &bus, "r", 1).unwrap_err();
+            let error = say_unplug_ready("prepare-unplug", &sockets, &bus, "r", 1).unwrap_err();
             assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
             if !permission.speak {
-                assert!(
-                    say_unplug_failure(lamp_skills::unplug::SKILL, &sockets).contains("refused")
-                );
+                assert!(say_unplug_failure("prepare-unplug", &sockets).contains("refused"));
             }
             assert_eq!(
                 listener.accept().unwrap_err().kind(),
@@ -4262,7 +4260,7 @@ mod tests {
             clock_waiting: Cell::new(false),
             rest_client: None,
             permissions: RefCell::new(HashMap::from([(
-                lamp_skills::unplug::SKILL.to_owned(),
+                "prepare-unplug".to_owned(),
                 unplug_grants(),
             )])),
             watching: RefCell::new(Watching {
@@ -4275,12 +4273,12 @@ mod tests {
             }),
             proposals: None,
         };
-        let admitted = runner.sockets_for(lamp_skills::unplug::SKILL);
+        let admitted = runner.sockets_for("prepare-unplug");
         runner.permissions.borrow_mut().clear();
         assert!(admitted.may.refuses(&Call::PrepareUnplug).is_none());
         assert!(
             runner
-                .sockets_for(lamp_skills::unplug::SKILL)
+                .sockets_for("prepare-unplug")
                 .may
                 .refuses(&Call::PrepareUnplug)
                 .is_some()
