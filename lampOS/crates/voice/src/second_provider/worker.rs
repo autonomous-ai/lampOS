@@ -1746,6 +1746,16 @@ pub fn serve(
             "lamp-voice second: a spoken turn's request begins with the character and the skills, and the memory, the time, the room and the thread go after the exchanges (LAMP_SECOND_STEADY_FIRST)"
         );
     }
+    // The known person's name, as the Live route tells it (#2539).
+    let known_name = std::env::var(crate::second_provider::FACE_NAME_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if known_name {
+        eprintln!(
+            "lamp-voice second: a turn that is the known face's own person is told their name, as the Live route tells it (LAMP_SECOND_FACE_NAME)"
+        );
+    }
     // With a lease, the turn is told for its admitted scope alone: that
     // person's (or the room's) Days note and exchanges, never those of the
     // person the eyes or the sticky session name when its chat begins.
@@ -1806,7 +1816,9 @@ pub fn serve(
             ),
         );
         let time = crate::agent_tasks::noted(time, tasks.as_ref());
-        let facts = facts(session_fact && !going_on, room) + &health_fact(health.as_deref());
+        let facts = facts(session_fact && !going_on, room)
+            + &health_fact(health.as_deref())
+            + &known_name_told(known_name, who.as_deref(), person.as_deref());
         if steady_first {
             steady_first_message(
                 format!("{character}{skills}"),
@@ -3083,6 +3095,23 @@ pub(crate) fn staff_noting(place: crate::agent_tasks::Place) -> super::StaffNote
 /// (`crate::attention`, 17 October).
 pub(crate) fn lamp_just_asked(thread: &crate::thread::Thread, request: u64, now: Instant) -> bool {
     thread.going_on(now) && thread.lamp_asked(request)
+}
+
+/// The known person's name for a turn (#2539, `LAMP_SECOND_FACE_NAME=on`),
+/// as the Live route tells it (`known_faces::note`): when the face the eyes
+/// know now, in `who`, is this turn's own person. A room's turn, a line
+/// narrowed to the room, or another person's has none; nor does a face gone.
+pub(crate) fn known_name_told(on: bool, who: Option<&Path>, person: Option<&str>) -> String {
+    if !on {
+        return String::new();
+    }
+    let Some(name) = who.and_then(crate::known_faces::known_now) else {
+        return String::new();
+    };
+    if person != Some(crate::known_faces::memory_person(&name).as_str()) {
+        return String::new();
+    }
+    format!("\n\n{}", crate::known_faces::note(&name))
 }
 
 /// What a Live session is told of the moment beside what it hears, told
@@ -8413,6 +8442,62 @@ mod tests {
         ] {
             assert!(parse_flags(dir, &refused).is_err(), "{refused:?}");
         }
+    }
+
+    /// #2539 (`LAMP_SECOND_FACE_NAME`): a turn that is the known face's own
+    /// person is told their name, as the Live route tells it; the room's
+    /// turn (or a line narrowed to the room), another person's, a face gone,
+    /// no eyes, and the switch off are told none. Made-up names.
+    #[test]
+    fn a_turn_of_the_known_persons_own_is_told_their_name() {
+        let dir = std::env::temp_dir().join(format!("lv-known-name-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        let known = dir.join("known");
+        std::fs::write(&known, "Pippa").unwrap();
+        let pippa = crate::known_faces::memory_person("Pippa");
+        let told = known_name_told(true, Some(&known), Some(&pippa));
+        assert_eq!(
+            told,
+            "\n\n(The person at the lamp now is Pippa: you know their face.)"
+        );
+        // After the memory in the turn's system message, so "what's my
+        // name?" is asked with it.
+        let message = system_message(
+            "You are a lamp.",
+            None,
+            &format!("\n\nYour memory\n- tea, no sugar{told}"),
+            None,
+            Some(&pippa),
+        );
+        assert!(
+            message
+                .text
+                .contains("- tea, no sugar\n\n(The person at the lamp now is Pippa"),
+            "{}",
+            message.text
+        );
+        let jim = crate::known_faces::memory_person("Jim");
+        for (on, who, person) in [
+            // The room's turn, or a line narrowed to the room.
+            (true, Some(known.as_path()), None),
+            // Someone else's turn.
+            (true, Some(known.as_path()), Some(jim.as_str())),
+            // The switch off: as today.
+            (false, Some(known.as_path()), Some(pippa.as_str())),
+            // No eyes.
+            (true, None, Some(pippa.as_str())),
+        ] {
+            assert_eq!(
+                known_name_told(on, who, person),
+                "",
+                "{on} {who:?} {person:?}"
+            );
+        }
+        // The face gone: no known file.
+        std::fs::remove_file(&known).unwrap();
+        assert_eq!(known_name_told(true, Some(&known), Some(&pippa)), "");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     /// A finished turn goes to the thread, its file and the journal, and
