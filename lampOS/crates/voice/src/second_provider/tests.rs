@@ -20,7 +20,7 @@ struct Script {
     asked: Mutex<Vec<Vec<Message>>>,
     /// A chat stream that, after its script, never ends.
     hold_chat: bool,
-    /// A chat's first event waits this long (on the test's clock).
+    /// A chat's first  waits this long (on the test's clock).
     first_event_after: Option<Duration>,
     /// Speech of this sentence starts late.
     slow: Option<&'static str>,
@@ -3898,6 +3898,38 @@ async fn a_chat_refused_before_any_word_says_the_down_line_at_most_once_a_minute
     assert!(on[4].contains(&line), "past the minute: {on:?}");
     let off = turns(false).await;
     assert!(off.iter().all(|turn| !turn.contains(&line)), "{off:?}");
+}
+
+/// lamp-52e6, 21 Oct (#1195's run): the very first spoken turn after a start,
+/// its chat never begun, says the down line too: the line is rendered as
+/// that turn's line begins, not only after a turn is out. Before, that
+/// turn was silent, the line rendered only once it had failed.
+#[tokio::test(start_paused = true)]
+async fn the_first_turn_after_a_start_says_the_down_line() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(2)
+                .collect(),
+        ),
+        chats: Mutex::new([vec![], vec![]].into()),
+        hold_chat: true,
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    let line = format!("audio:{}", DOWN_LINE.len());
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let first = sent(&mut engine).await;
+    assert!(first.contains(&line), "the first turn: {first:?}");
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let second = sent(&mut engine).await;
+    assert!(!second.contains(&line), "within the minute: {second:?}");
 }
 
 /// The rule is told which request a turn goes on from (`continues`): the one

@@ -1818,6 +1818,13 @@ impl Engine {
                 // The voice's connection opened while the person speaks, not
                 // by the answer's first sentence (#1712).
                 tokio::spawn(self.shared.services.warm());
+                // The down line rendered by a person's first line too, not
+                // only after a turn: a lamp started while the relay is down
+                // has it for that line (lamp-52e6, #1195's run of 21 Oct).
+                // Once only; a turn's chat begins after the line ends.
+                if let Some(down) = &self.shared.down {
+                    down.render(&self.shared.services);
+                }
                 // A new line is not the sentence unless it is said to be.
                 crate::thread::count_only(None);
                 // Going on from a request whose end went early and was given
