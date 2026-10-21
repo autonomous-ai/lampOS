@@ -71,6 +71,12 @@ struct Look {
     /// Of those, the ones turned to the lamp (`facing`), for a line the lamp
     /// began itself (#2287's follow-up, [`SpeakingFaces::turned_speakers`]).
     turned: Vec<String>,
+    /// The faces turned to the lamp whose mouth read still (`no`), for
+    /// [`SpeakingFaces::turned_only_silent`].
+    turned_silent: Vec<String>,
+    /// A face turned to the lamp whose mouth was not read (`unknown`, or not
+    /// judged at all) was in this look.
+    turned_unread: bool,
 }
 
 #[derive(Default)]
@@ -138,6 +144,24 @@ impl SpeakingFaces {
             .filter(|face| face.facing == Some(true))
             .map(|face| face.id.clone())
             .collect();
+        let state = |face: &&lamp_msgs::Face| face.speaking.map(|speaking| speaking.state);
+        let turned_faces: Vec<_> = frame
+            .map(|(_, faces)| {
+                faces
+                    .faces
+                    .iter()
+                    .filter(|face| face.facing == Some(true))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let turned_silent = turned_faces
+            .iter()
+            .filter(|face| state(face) == Some(SpeakingState::No))
+            .map(|face| face.id.clone())
+            .collect();
+        let turned_unread = turned_faces
+            .iter()
+            .any(|face| !matches!(state(face), Some(SpeakingState::Yes | SpeakingState::No)));
         let boot = frame
             .map(|((boot, _), _)| boot.to_owned())
             .unwrap_or_default();
@@ -154,6 +178,8 @@ impl SpeakingFaces {
             boot,
             speaking,
             turned,
+            turned_silent,
+            turned_unread,
         });
     }
 
@@ -199,6 +225,34 @@ impl SpeakingFaces {
                 .map(|id| format!("{}/{id}", look.boot))
                 .collect()
         })
+    }
+
+    /// Whether the only faces turned to the lamp from `from` to `to` were
+    /// seen not speaking: one turned to it read still in at least half of the
+    /// looks, none turned to it read speaking in any look (a real asker's
+    /// mouth reads still between words: the reviewer-lead's P2 on #2546),
+    /// and none turned to it went unread in any look. Someone at the lamp looking at a screen
+    /// beside it while two other people talk is not talking to it (lamp-4ace,
+    /// 21 Oct 14:00, `LAMP_TURNED_SPEAKING`). A mouth the eyes could not read
+    /// says nothing, so with `LAMP_EYES_SPEAKING` off this is never true.
+    pub fn turned_only_silent(&self, from: Instant, to: Instant) -> bool {
+        let (unread, spoke) = self.looks.lock().map_or((true, true), |looks| {
+            let during = || {
+                looks
+                    .kept
+                    .iter()
+                    .filter(|look| look.at >= from && look.at <= to)
+            };
+            (
+                during().any(|look| look.turned_unread),
+                during().any(|look| !look.turned.is_empty()),
+            )
+        });
+        !unread
+            && !spoke
+            && !self
+                .counted(from, to, |look| look.turned_silent.clone())
+                .is_empty()
     }
 
     /// The ids `of` each look gives in at least half of the looks from
@@ -396,6 +450,67 @@ mod tests {
             quiet.look(from + EVERY * index, Some((("b", u64::from(index)), &seen)));
         }
         assert!(quiet.turned_speakers(from, from + EVERY * 3).is_empty());
+    }
+
+    /// `LAMP_TURNED_SPEAKING` (lamp-4ace, 21 Oct 14:00): the faces turned to
+    /// the lamp are all silent only when one read still in half the looks,
+    /// none turned to it spoke, and none turned to it went unread.
+    #[test]
+    fn only_silent_faces_turned_to_the_lamp_are_told_apart() {
+        // Each look's faces: id, its mouth, and whether it is turned to the lamp.
+        let only_silent = |looks: &[&[(&str, Option<SpeakingState>, bool)]]| {
+            let eyes = SpeakingFaces::default();
+            let from = Instant::now();
+            for (index, look) in looks.iter().enumerate() {
+                let mut seen = faces(&[]);
+                for (id, state, turned) in look.iter() {
+                    let mut face = faces(&[(id, No)]).faces.remove(0);
+                    face.speaking = state.map(|state| Speaking {
+                        state,
+                        score: 0.0,
+                        from: None,
+                    });
+                    face.facing = turned.then_some(true);
+                    seen.faces.push(face);
+                }
+                eyes.look(
+                    from + EVERY * index as u32,
+                    Some((("b", index as u64), &seen)),
+                );
+            }
+            eyes.turned_only_silent(from, from + EVERY * looks.len() as u32)
+        };
+        let at_the_desk: &[(&str, Option<SpeakingState>, bool)] = &[("f1", Some(No), true)];
+        assert!(only_silent(&[at_the_desk; 4]), "someone at the desk, still");
+        // Two other people speaking, turned away: still only the silent one.
+        let talking: &[(&str, Option<SpeakingState>, bool)] =
+            &[("f1", Some(No), true), ("f2", Some(Yes), false)];
+        assert!(only_silent(&[talking; 4]));
+        // The one turned to it speaks: someone talking to the lamp.
+        let speaking: &[(&str, Option<SpeakingState>, bool)] =
+            &[("f1", Some(No), true), ("f2", Some(Yes), true)];
+        assert!(!only_silent(&[speaking; 4]));
+        // A real asker: speaking in 2 looks of 5, still between words in 3.
+        let between: &[(&str, Option<SpeakingState>, bool)] = &[("f1", Some(No), true)];
+        let word: &[(&str, Option<SpeakingState>, bool)] = &[("f1", Some(Yes), true)];
+        assert!(!only_silent(&[between, word, between, word, between]));
+        let alone: &[(&str, Option<SpeakingState>, bool)] = &[("f1", Some(Yes), true)];
+        assert!(!only_silent(&[alone; 4]));
+        // A mouth not read says nothing, in any look.
+        let unknown: &[(&str, Option<SpeakingState>, bool)] = &[("f1", Some(Unknown), true)];
+        assert!(!only_silent(&[unknown; 4]));
+        let not_judged: &[(&str, Option<SpeakingState>, bool)] = &[("f1", None, true)];
+        assert!(!only_silent(&[not_judged; 4]));
+        assert!(!only_silent(&[
+            at_the_desk,
+            at_the_desk,
+            at_the_desk,
+            &[("f1", Some(No), true), ("f3", Some(Unknown), true)],
+        ]));
+        // Nobody turned to the lamp, or too few looks: nothing to tell.
+        let turned_away: &[(&str, Option<SpeakingState>, bool)] = &[("f1", Some(No), false)];
+        assert!(!only_silent(&[turned_away; 4]));
+        assert!(!only_silent(&[at_the_desk; 2]));
     }
 
     /// A face speaking in at least half of the line's looks spoke through
