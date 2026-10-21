@@ -10,11 +10,14 @@
 //!   the joints lie at rest, read here;
 //! - `--stand`: lamp-4ace's standing pitch, shoulder and elbow, with this
 //!   lamp's own roll and yaw;
-//! - `--pitch-window`: the default (lamp-4ace's), checked to hold the rest
-//!   pitch and to lie inside the pitch servo's own stored limits;
+//! - `--pitch-window`: the default (lamp-4ace's), checked to lie inside the
+//!   pitch servo's own stored limits; `--home`'s pitch is brought inside the
+//!   body's home range (`Limits::FOLDED.pitch_home`) when it rests within
+//!   [`HOME_PITCH_TOLERANCE`] of it, and refused farther out;
 //! - `--gaze`: not here. It is measured with a face and the camera
 //!   (body.md), so the file says it is not measured and the body runs
 //!   without it.
+use crate::body::Limits;
 use crate::inspection::{InspectionReport, Readback, Stage};
 use std::fmt::Write as _;
 
@@ -32,8 +35,11 @@ pub const STAND_SHOULDER: u16 = 2657;
 pub const STAND_ELBOW: u16 = 2602;
 /// The body's default pitch window (`lamp-body --pitch-window`, lamp-4ace's).
 pub const PITCH_WINDOW: (u16, u16) = (1740, 2030);
-/// The head's floor, under which no window may reach (`lamp-body`).
-pub const PITCH_FLOOR: u16 = 1670;
+/// How far outside the body's home range a rest pitch may read and still be
+/// a head resting on its stop (#2396: lamp-0c89 rests at 1755, five under
+/// 1760): it is brought to the nearest edge. Farther out, the head is off
+/// its stop and the read is refused.
+pub const HOME_PITCH_TOLERANCE: u16 = 20;
 /// How far the shoulder and the elbow may each stand from folded
 /// (`body.rs`'s `TRAVEL_CAP`).
 pub const TRAVEL_CAP: u16 = 1_400;
@@ -110,11 +116,12 @@ pub fn rest_read(report: &InspectionReport) -> Result<RestRead, String> {
 /// `lamp.env`'s text for this lamp, from its rest read: the poses as the
 /// body takes them (`BODY_POSES`), and comments saying where each came
 /// from. Refused, with why, where the body itself would refuse them: a rest
-/// pitch outside the window or under the head's floor, a window outside the
+/// pitch more than [`HOME_PITCH_TOLERANCE`] outside the body's home range
+/// (within it, brought to its edge and said), a window outside the
 /// pitch servo's limits, a stand farther from folded than the body allows,
 /// or a position past 4095.
 pub fn lamp_env(unit_id: &str, read: &RestRead, measured_at: &str) -> Result<String, String> {
-    let ((low, high), (min, max)) = head_checked(read)?;
+    let ((low, high), (min, max), pitch, clamp) = head_checked(read)?;
     for (joint, folded, standing) in [
         ("shoulder", read.shoulder, STAND_SHOULDER),
         ("elbow", read.elbow, STAND_ELBOW),
@@ -139,10 +146,13 @@ pub fn lamp_env(unit_id: &str, read: &RestRead, measured_at: &str) -> Result<Str
         text,
         "# home, folded-arm: found at rest. stand: lamp-4ace's with this lamp's roll and yaw. pitch-window: the default, checked. gaze: NOT measured (body.md, with a face and the camera)."
     );
+    if let Some(clamp) = clamp {
+        let _ = writeln!(text, "# {clamp}");
+    }
     let _ = writeln!(
         text,
-        "BODY_POSES=\"--home {},{},{} --folded-arm {},{} --stand {STAND_PITCH},{},{},{STAND_SHOULDER},{STAND_ELBOW} --pitch-window {low},{high} --torque on\"",
-        read.pitch, read.roll, read.yaw, read.shoulder, read.elbow, read.roll, read.yaw
+        "BODY_POSES=\"--home {pitch},{},{} --folded-arm {},{} --stand {STAND_PITCH},{},{},{STAND_SHOULDER},{STAND_ELBOW} --pitch-window {low},{high} --torque on\"",
+        read.roll, read.yaw, read.shoulder, read.elbow, read.roll, read.yaw
     );
     Ok(text)
 }
@@ -151,28 +161,52 @@ pub fn lamp_env(unit_id: &str, read: &RestRead, measured_at: &str) -> Result<Str
 type Span = (u16, u16);
 
 /// The checks a seated and a standing lamp share: every position inside
-/// 4095, the rest pitch inside the default window and over the head's
-/// floor, and the window inside the pitch servo's own limits. Returns the
-/// window and the servo's limits.
-fn head_checked(read: &RestRead) -> Result<(Span, Span), String> {
+/// 4095, `--home`'s pitch inside the body's home range (see
+/// [`home_pitch`]), and the window inside the pitch servo's own limits.
+/// Returns the window, the servo's limits, `--home`'s pitch and the clamp's
+/// line when it was brought inside.
+fn head_checked(read: &RestRead) -> Result<(Span, Span, u16, Option<String>), String> {
     let all = [read.yaw, read.shoulder, read.elbow, read.roll, read.pitch];
     if all.iter().any(|position| *position > 4095) {
         return Err(format!("a position past 4095: {all:?}"));
     }
     let (low, high) = PITCH_WINDOW;
-    if read.pitch < PITCH_FLOOR || !(low..=high).contains(&read.pitch) {
-        return Err(format!(
-            "the head's pitch rests at {}, outside the window {low}-{high}: measure this lamp's own --pitch-window first (body.md)",
-            read.pitch
-        ));
-    }
+    let (pitch, clamp) = home_pitch(read.pitch)?;
     let (min, max) = read.pitch_limits;
     if low < min || high > max {
         return Err(format!(
             "the window {low}-{high} is outside the pitch servo's own limits {min}-{max}: measure this lamp's own --pitch-window first (body.md)"
         ));
     }
-    Ok(((low, high), (min, max)))
+    Ok(((low, high), (min, max), pitch, clamp))
+}
+
+/// `--home`'s pitch from the rest pitch, inside the body's home range
+/// (`Limits::FOLDED.pitch_home`, where the body must find the head to
+/// start, which lies inside `--pitch-window` and over the head's floor). A
+/// rest pitch within [`HOME_PITCH_TOLERANCE`] outside it is the head on its
+/// stop: brought to the nearest edge, with the line saying so. Farther out
+/// it is refused.
+fn home_pitch(pitch: u16) -> Result<(u16, Option<String>), String> {
+    let (low, high) = Limits::FOLDED.pitch_home;
+    let (edge, side, off) = if pitch < low {
+        (low, "under", low - pitch)
+    } else if pitch > high {
+        (high, "over", pitch - high)
+    } else {
+        return Ok((pitch, None));
+    };
+    if off > HOME_PITCH_TOLERANCE {
+        return Err(format!(
+            "home pitch {pitch} is {off} {side} the body's home range {low}..{high}, more than {HOME_PITCH_TOLERANCE}: a head off its stop, not a rest reading. Fold the head down onto its stop and measure again; a head that still rests there is outside where this body starts (body.md)"
+        ));
+    }
+    Ok((
+        edge,
+        Some(format!(
+            "home pitch {pitch} is {side} the body's home range {low}..{high}: {edge} kept"
+        )),
+    ))
 }
 
 /// A seated `lamp.env` for this lamp, from its rest read (#2163): `--home`,
@@ -190,7 +224,7 @@ pub fn seated_lamp_env(
     read: &RestRead,
     measured_at: &str,
 ) -> Result<String, String> {
-    let ((low, high), (min, max)) = head_checked(read)?;
+    let ((low, high), (min, max), pitch, clamp) = head_checked(read)?;
     let mut text = String::new();
     let _ = writeln!(
         text,
@@ -205,10 +239,13 @@ pub fn seated_lamp_env(
         text,
         "# SEATED: the first stand is not confirmed by a person yet, so no stand and no folded arm; torque is taken on the head and base only. home: found at rest. pitch-window: the default, checked. gaze: NOT measured."
     );
+    if let Some(clamp) = clamp {
+        let _ = writeln!(text, "# {clamp}");
+    }
     let _ = writeln!(
         text,
-        "BODY_POSES=\"--home {},{},{} --pitch-window {low},{high} --torque on\"",
-        read.pitch, read.roll, read.yaw
+        "BODY_POSES=\"--home {pitch},{},{} --pitch-window {low},{high} --torque on\"",
+        read.roll, read.yaw
     );
     Ok(text)
 }
@@ -367,7 +404,7 @@ mod tests {
         assert!(
             seated_lamp_env("x", &low, "t")
                 .unwrap_err()
-                .contains("--pitch-window")
+                .contains("off its stop")
         );
         assert!(seated_lamp_env("x", &RestRead { yaw: 4096, ..read }, "t").is_err());
     }
@@ -402,7 +439,7 @@ mod tests {
         assert!(
             lamp_env("x", &low, "t")
                 .unwrap_err()
-                .contains("--pitch-window")
+                .contains("off its stop")
         );
         let narrow = RestRead {
             pitch_limits: (1800, 3067),
@@ -424,5 +461,84 @@ mod tests {
         );
         let past = RestRead { yaw: 4096, ..read };
         assert!(lamp_env("x", &past, "t").is_err());
+    }
+
+    /// #2396: lamp-0c89's head rests on its stop at 1755, five under the
+    /// body's home range, so `--home` takes 1760 and the file says both.
+    #[test]
+    fn a_home_pitch_just_outside_the_body_s_range_is_brought_to_its_edge() {
+        let read = rest_read(&inspection(LAMP_06C1, None)).unwrap();
+        let under = lamp_env(
+            "x",
+            &RestRead {
+                pitch: 1755,
+                ..read
+            },
+            "t",
+        )
+        .unwrap();
+        assert!(
+            under
+                .contains("# home pitch 1755 is under the body's home range 1760..2020: 1760 kept")
+        );
+        assert!(under.contains("--home 1760,2057,2034 "));
+        assert!(under.contains("pitch 1755;"));
+        let over = seated_lamp_env(
+            "x",
+            &RestRead {
+                pitch: 2040,
+                ..read
+            },
+            "t",
+        )
+        .unwrap();
+        assert!(
+            over.contains("# home pitch 2040 is over the body's home range 1760..2020: 2020 kept")
+        );
+        assert!(over.contains("--home 2020,2057,2034 "));
+        // Neither file says --wake: lamp-body wakes unless given off, and the
+        // product unit and the factory's stands say --wake themselves, where
+        // a second one is refused. Waking is what lets the live 1755 start.
+        assert!(!under.contains("--wake") && !over.contains("--wake"));
+    }
+
+    /// More than HOME_PITCH_TOLERANCE outside is a head off its stop.
+    #[test]
+    fn a_home_pitch_far_outside_the_body_s_range_is_refused() {
+        let read = rest_read(&inspection(LAMP_06C1, None)).unwrap();
+        let error = lamp_env(
+            "x",
+            &RestRead {
+                pitch: 1739,
+                ..read
+            },
+            "t",
+        )
+        .unwrap_err();
+        assert!(error.contains("home pitch 1739 is 21 under"), "{error}");
+        assert!(error.contains("a head off its stop, not a rest reading"));
+        assert!(error.contains("measure again"), "{error}");
+        assert!(
+            seated_lamp_env(
+                "x",
+                &RestRead {
+                    pitch: 2041,
+                    ..read
+                },
+                "t"
+            )
+            .is_err()
+        );
+    }
+
+    /// A rest pitch inside the range, its edges too, is kept as read.
+    #[test]
+    fn a_home_pitch_inside_the_body_s_range_is_kept_as_read() {
+        let read = rest_read(&inspection(LAMP_06C1, None)).unwrap();
+        for pitch in [1760, 1772, 2020] {
+            let text = lamp_env("x", &RestRead { pitch, ..read }, "t").unwrap();
+            assert!(text.contains(&format!("--home {pitch},2057,2034 ")));
+            assert!(!text.contains("kept"));
+        }
     }
 }

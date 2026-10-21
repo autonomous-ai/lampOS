@@ -1771,9 +1771,22 @@ other owner of the port first.
 **`lamp-body-measure`** (#1682) is the factory's per-lamp step: the same
 read-only rest read, made into this lamp's `lamp.env` (`lamp_body::poses`):
 `--home` and `--folded-arm` as found, `--stand` as lamp-4ace's with this
-lamp's roll and yaw, the default `--pitch-window` checked against the rest
-pitch and the pitch servo's limits, `--torque on`, and `--gaze` left for its
-own measurement. It writes the file only with `--write`, never over one
+lamp's roll and yaw, the default `--pitch-window` checked against the pitch
+servo's limits, `--torque on`, and `--gaze` left for its own measurement.
+`--home`'s pitch is brought inside the body's home range, where the body
+must find the head to start (`Limits::FOLDED.pitch_home`, 1760..2020 as the
+code reads it): a rest pitch within `poses::HOME_PITCH_TOLERANCE` (20) counts
+outside it is the head resting on its stop and takes the nearest edge, said
+in a comment line of the file (lamp-0c89, #2396, rests at 1755 and gets the
+low edge). Farther out it is refused, a head off its stop, and the refusal
+says to fold the head onto its stop and measure again. The body's own start
+check is unchanged: it also reads the live pitch, which lies outside the
+range, and lets it through only to wake it home, so the clamp helps a body
+that wakes. `lamp-body` wakes unless given `--wake off`, so the product unit,
+the factory's stands and the seated template unit all do; neither file says
+`--wake` (the product unit and the stands say it themselves, and a second
+one is refused). A run with `--wake off` still refuses a head on its stop
+under the range. `lamp-body-measure` writes the file only with `--write`, never over one
 already there, and refuses a read taken with torque on (install.md, "At the
 factory, once per lamp").
 

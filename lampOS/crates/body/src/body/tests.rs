@@ -4376,6 +4376,29 @@ fn held_at_1755(arm: [u16; 2], folded_arm: Option<[u16; 2]>) -> (Lamp, BodyRepor
     (lamp, report)
 }
 
+/// #2396, a seated lamp (no --stand) resting on its stop at 1755 with the
+/// measured --home 1760: woken (lamp-body's default), its head is brought
+/// home and it runs; with --wake off its start refuses the live 1755.
+#[test]
+fn a_seated_lamp_at_1755_with_home_1760_wakes_home_and_without_waking_is_refused() {
+    let at_1755 = |limits: Limits| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(20));
+        lamp.servos[PITCH].position = 1_755.0;
+        lamp.servos[PITCH].goal = 1_755;
+        let home = [1_760, HOME[1], HOME[2]];
+        run(&mut lamp, &mut clock, limits, Some(home), || None, |_| {})
+    };
+    let woken = at_1755(waking());
+    assert_eq!(woken.stop, Stop::Cancelled, "{woken:?}");
+    assert_eq!(woken.woke.unwrap().to[0], 1_760);
+    assert_eq!(
+        at_1755(Limits::FOLDED).stop,
+        Stop::Refused {
+            why: "head pitch 1755 is outside 1760..=2020".into()
+        }
+    );
+}
+
 /// A let-go run outside the window, its arm at the folded counts given,
 /// is let go: torque off on all five, no goal, until asked to stop.
 #[test]
