@@ -147,10 +147,17 @@ body_once() {
   STAND_LOG=$log
   body=("$BODY_BIN" --device "$DEVICE" --unit-id "$UNIT_ID" --lock-directory "$LOCKS"
     --mood-socket "$dir/mood.sock" --reach 150,15,1,250 --speed 120 --servo-speed 1000
-    --servo-acceleration 60 --force-limit 600 --wake off --rest-glance off --look-at-name off
+    --servo-acceleration 60 --force-limit 600 --rest-glance off --look-at-name off
     --let-go-at-stop on)
+  # A stand wakes a head that sagged when the lamp was let go (lamp-a63e,
+  # #2396: pitch 1754 under its start window) slowly home first, as the
+  # product unit's body does, within 400 counts; the let-go run moves nothing.
   # shellcheck disable=SC2206 # the poses are flags, split as the unit splits them
-  [[ -n $share ]] && body+=(--stand-share "$share" --stand-seconds 6 --awake-seconds 20 --idle off $poses)
+  if [[ -n $share ]]; then
+    body+=(--wake on --stand-share "$share" --stand-seconds 6 --awake-seconds 20 --idle off $poses)
+  else
+    body+=(--wake off)
+  fi
   [[ -z $ROOT && $(id -u) == 0 ]] && body=(runuser -u "$BODY_USER" -- "${body[@]}")
   # Started as itself, never through a function: "as_body ... &" would make
   # $! a subshell, and SIGTERM to it would leave the body running, arm up.
