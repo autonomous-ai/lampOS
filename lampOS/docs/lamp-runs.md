@@ -218,6 +218,7 @@ Its voice can't reach speech until #2231 is fixed, so only the move itself runs 
 | Row or switch | PR | The run | Needs | Build |
 |---|---|---|---|---|
 | #2396: a V1 lamp to V2 with one `ACTIVATE=1` | #2163 (#2170, #2225, #2228, #2245, #2249) | One promotion: every part active, the poses measured, the body seated until its person confirms, then the first stand. No fleet promotion. | person at the arm | lamp-voice |
+| #2396: the first stand, confirmed at the lamp (#2541) | #2541, main #2544 | Done on lamp-a63e, 21 Oct 15:47, seated: the ask spoken ("the ask was spoken"), a head touch held 1 s taken as the yes, the arm stood at 30% and 100%, `lamp.env` written with shoulder 2632, elbow 2603 (the hand-run stand on 21 Oct: 2633, 2603), the body started on it ("it may stand"). Two runs before were stopped by a second head touch while it stood, as built. | person at the arm | lamp-a63e by hand (`/tmp/fs`), before the package |
 | "Updates cover the whole lamp, V3 to V5" row (Migrate, with Tests) | #1369, #1505, #2421 | After #2396's move, only what 19 and 20 Oct's lamp-4ace trials (#737, #1788) didn't show: a round from the installed `lamp-update.service` under its sandbox, build A to B; models, settings and the image's files in one update (`LAMP_UPDATE_MODELS`, `_APPLY`, `_IMAGE` on for the run); the body in the update; a failed part put back under the unit. A test key made for this run only. The run sheet goes on #2396 first. | a63e's person, at the arm for the body | lamp-voice |
 
 ## lamp-dbda (the hardware side)
