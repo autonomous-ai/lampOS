@@ -177,8 +177,11 @@ pub fn call_as_heard(call: &ToolCall, request: u64, heard: bool) -> Option<(Tool
     call_with(call, words.as_deref())
 }
 
-/// [`call_as_heard`] with the words heard in its line.
-fn call_with(call: &ToolCall, heard: Option<&str>) -> Option<(ToolCall, String)> {
+/// [`call_as_heard`] with the words heard in its line. A heard line kept
+/// instead is sent without the model's `replaces` (#2510, reviewer-lead
+/// P2): it may lack the fact's subject ("They said: it's green now"), so
+/// the old fact stays and the heard line is kept beside it.
+pub(super) fn call_with(call: &ToolCall, heard: Option<&str>) -> Option<(ToolCall, String)> {
     if call.name != super::REMEMBER {
         return None;
     }
@@ -332,6 +335,11 @@ mod tests {
             None
         );
         assert_eq!(call_with(&call(super::super::REMEMBER, WRONG), None), None);
+        // A correction (#2510) whose heard line is kept drops its `replaces`.
+        let mut correction = call(super::super::REMEMBER, WRONG);
+        correction.args["replaces"] = json!(4);
+        let (sent, kept) = call_with(&correction, Some(TEA)).unwrap();
+        assert_eq!(sent.args, json!({"text": kept}));
     }
 
     #[test]
@@ -351,5 +359,12 @@ mod tests {
         ] {
             assert_eq!(super::told(answer.clone(), "They said: y"), answer);
         }
+        // A correction (#2510) that kept the heard line says so too.
+        let told = super::told(json!({"remembered": true, "replaced": 4}), "They said: y");
+        assert_eq!(
+            (told["replaced"].as_u64(), told["kept"].as_str()),
+            (Some(4), Some("They said: y"))
+        );
+        assert!(told["note"].is_string());
     }
 }

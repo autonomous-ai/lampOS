@@ -1035,6 +1035,48 @@ fn a_full_kept_list_refuses_the_next_fact_without_evicting_an_explicit_memory() 
     assert_eq!(store.kept(&room, 16_384).unwrap().len(), ids.len());
 }
 
+/// #2510 (reviewer-lead P3): a replaced kept thing is history, not a slot.
+/// One fact corrected five times leaves the room of one active thing, and a
+/// list with 199 active things and its replaced versions still keeps one more.
+#[test]
+fn replaced_kept_versions_do_not_use_the_kept_lists_room() {
+    let scratch = Scratch::new("kept-cap-replaced");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    let mut current = store.remember(&room, NOW, "Favourite colour 0").unwrap();
+    for version in 1..=5 {
+        current = store
+            .remember_replacing(
+                &room,
+                NOW,
+                &format!("Favourite colour {version}"),
+                &[],
+                current,
+                &[current],
+            )
+            .unwrap();
+    }
+    assert_eq!(store.kept(&room, 16_384).unwrap().len(), 1);
+    for index in 1..lamp_memory::store::KEPT_ENTRIES - 1 {
+        store
+            .remember(&room, NOW, &format!("Kept preference {index}"))
+            .unwrap();
+    }
+    // 199 active and 5 replaced: one more fits, then the list is full.
+    store.remember(&room, NOW, "The last that fits").unwrap();
+    assert_eq!(
+        store.kept(&room, 16_384).unwrap().len(),
+        lamp_memory::store::KEPT_ENTRIES
+    );
+    assert_eq!(
+        store
+            .remember(&room, NOW, "A fact beyond the cap")
+            .unwrap_err()
+            .code,
+        "full"
+    );
+}
+
 #[test]
 fn unused_observations_lapse_but_kept_facts_do_not_and_note_reads_do_not_extend_use() {
     let scratch = Scratch::new("unused");

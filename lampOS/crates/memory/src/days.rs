@@ -42,11 +42,25 @@ const MAX_IMPORT_FILE: u64 = 64 * 1024 * 1024;
 pub struct Error {
     pub code: &'static str,
     pub message: &'static str,
+    /// Why a `refused` request was refused (#2510): a code, no content.
+    pub reason: Option<&'static str>,
 }
 pub type Result<T> = std::result::Result<T, Error>;
 impl Error {
     pub fn new(code: &'static str, message: &'static str) -> Self {
-        Self { code, message }
+        Self {
+            code,
+            message,
+            reason: None,
+        }
+    }
+    /// A request refused for `reason` (#2510): nothing was written.
+    pub fn refused(reason: &'static str, message: &'static str) -> Self {
+        Self {
+            code: "refused",
+            message,
+            reason: Some(reason),
+        }
     }
 }
 impl std::fmt::Display for Error {
@@ -394,7 +408,7 @@ impl Days {
         if heard.is_empty() && said.is_empty() {
             return Err(Error::new("empty", "there is no exchange to remember"));
         }
-        self.add(person, at, &heard, &said, "", sources, rules)
+        self.add(person, at, &heard, &said, "", sources, rules, None)
     }
     pub fn remember(&mut self, person: &Person, at: u64, text: &str) -> Result<u64> {
         self.remember_from(person, at, text, &[])
@@ -428,6 +442,72 @@ impl Days {
         from: &[u64],
         once: bool,
     ) -> Result<(u64, bool)> {
+        let text = self.kept_text(person, text, from)?;
+        if once && let Some(id) = self.kept_already(person, &text)? {
+            self.link_sources(person, id, from)?;
+            return Ok((id, true));
+        }
+        self.kept_room(person)?;
+        self.add(person, at, "", "", &text, from, &[], None)
+            .map(|id| (id, false))
+    }
+
+    /// A correction (#2510, the voice's `LAMP_MEMORY_REPLACES`): `text`
+    /// kept as [`Self::remember_from`] keeps it, replacing this person's
+    /// kept thing `old`, which `shown` (what the asking session was shown)
+    /// must hold, and which must be kept, active and not newer than `at`.
+    /// The new one, the link `replacements(newer, older)` and the old one
+    /// made inactive commit together; refused, nothing is written. Never
+    /// `once`: a correction is always its new version. Forgetting either
+    /// removes both ([`versions`]).
+    pub fn remember_replacing(
+        &mut self,
+        person: &Person,
+        at: u64,
+        text: &str,
+        from: &[u64],
+        old: u64,
+        shown: &[u64],
+    ) -> Result<u64> {
+        // Not shown first: an id this session never saw says nothing of
+        // what it is, or whether it is.
+        if !shown.contains(&old) {
+            return Err(Error::refused(
+                "not_shown",
+                "only a kept thing this session was shown can be replaced",
+            ));
+        }
+        let Some(record) = self.record(person, old)? else {
+            return Err(Error::refused(
+                "unknown",
+                "the replaced ID is not this person's",
+            ));
+        };
+        if record.kind != "kept" {
+            return Err(Error::refused(
+                "not_kept",
+                "only a kept thing can be replaced",
+            ));
+        }
+        if !record.active {
+            return Err(Error::refused(
+                "inactive",
+                "the kept thing was already replaced",
+            ));
+        }
+        if record.at_unix_ms > at {
+            return Err(Error::refused(
+                "not_older",
+                "a correction cannot be older than what it replaces",
+            ));
+        }
+        let text = self.kept_text(person, text, from)?;
+        self.kept_room(person)?;
+        self.add(person, at, "", "", &text, from, &[], Some(old))
+    }
+
+    /// A remember's `from`, the person's own exchanges, and its text tidied.
+    fn kept_text(&self, person: &Person, text: &str, from: &[u64]) -> Result<String> {
         for id in from {
             let exchange: bool = self.db.query_row(
                 "SELECT EXISTS(SELECT 1 FROM entries WHERE person=? AND id=? AND kind='exchange')",
@@ -444,12 +524,14 @@ impl Days {
         if text.is_empty() {
             return Err(Error::new("empty", "there is no text to remember"));
         }
-        if once && let Some(id) = self.kept_already(person, &text)? {
-            self.link_sources(person, id, from)?;
-            return Ok((id, true));
-        }
+        Ok(text)
+    }
+
+    /// Whether this person's kept list has room for one more. Only active
+    /// kept things count: a replaced version (#2510) is history, not a slot.
+    fn kept_room(&self, person: &Person) -> Result<()> {
         let count: u64 = self.db.query_row(
-            "SELECT count(*) FROM entries WHERE person=? AND kind='kept'",
+            "SELECT count(*) FROM entries WHERE person=? AND kind='kept' AND active=1",
             [person.as_str()],
             |r| r.get(0),
         )?;
@@ -459,8 +541,7 @@ impl Days {
                 "the kept list is full; nothing was removed",
             ));
         }
-        self.add(person, at, "", "", &text, from, &[])
-            .map(|id| (id, false))
+        Ok(())
     }
 
     /// The id of this person's active kept thing with `text`, the same by
@@ -510,6 +591,7 @@ impl Days {
         text: &str,
         sources: &[u64],
         rules: &[u64],
+        supersedes: Option<u64>,
     ) -> Result<u64> {
         if Day::at(at, &self.local).is_none() {
             return Err(Error::new(
@@ -553,7 +635,7 @@ impl Days {
             text: text.into(),
             category: None,
             source_ids: sources.to_vec(),
-            supersedes: None,
+            supersedes,
             active: true,
         };
         insert_record(&tx, &record, &self.local, self.now)?;
@@ -575,7 +657,8 @@ impl Days {
     }
 
     pub fn kept(&self, person: &Person, max_bytes: usize) -> Result<Vec<Kept>> {
-        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=? AND kind='kept' ORDER BY id DESC")?;
+        // A replaced kept thing (#2510) is no longer kept: only its history.
+        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=? AND kind='kept' AND active=1 ORDER BY id DESC")?;
         let rows = statement.query_map([person.as_str()], |r| {
             Ok(Kept {
                 id: r.get(0)?,
@@ -1434,7 +1517,7 @@ impl Days {
             ("observation", MAX_OBSERVATIONS),
         ] {
             let after: u64 = tx.query_row(
-                "SELECT count(*) FROM entries WHERE kind=?2 AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
+                "SELECT count(*) FROM entries WHERE kind=?2 AND (kind!='kept' OR active=1) AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
                 params![to.as_str(), kind],
                 |r| r.get(0),
             )?;

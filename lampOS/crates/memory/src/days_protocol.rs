@@ -197,12 +197,34 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
         } => value(Response::Added {
             id: store.append(&one(person)?, at_unix_ms, &heard, &said, &[])?,
         }),
+        // #2510: a correction, checked here, of a kept thing the session
+        // was shown; refused, nothing is written.
+        Request::Remember {
+            person,
+            at_unix_ms,
+            text,
+            source_ids,
+            replaces: Some(old),
+            shown,
+            ..
+        } => {
+            let id = store.remember_replacing(
+                &one(person)?,
+                at_unix_ms,
+                &text,
+                &source_ids,
+                old,
+                &shown,
+            )?;
+            json!({"ok":true,"id":id,"replaced":old})
+        }
         Request::Remember {
             person,
             at_unix_ms,
             text,
             source_ids,
             once: false,
+            ..
         } => value(Response::Added {
             id: store.remember_from(&one(person)?, at_unix_ms, &text, &source_ids)?,
         }),
@@ -215,6 +237,7 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             text,
             source_ids,
             once: true,
+            ..
         } => match store.remember_once_from(&one(person)?, at_unix_ms, &text, &source_ids, true)? {
             (id, true) => json!({"ok":true,"id":id,"existing":true}),
             (id, false) => value(Response::Added { id }),
@@ -455,8 +478,16 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             (response, outcome, false, wrote)
         }
         Err(e) => (
-            json!({"ok":false,"error":e.code,"message":e.message}),
-            format!("refused error={}", e.code),
+            match e.reason {
+                None => json!({"ok":false,"error":e.code,"message":e.message}),
+                Some(reason) => {
+                    json!({"ok":false,"error":e.code,"reason":reason,"message":e.message})
+                }
+            },
+            match e.reason {
+                None => format!("refused error={}", e.code),
+                Some(reason) => format!("refused error={} reason={reason}", e.code),
+            },
             e.code == "storage",
             false,
         ),
@@ -708,6 +739,138 @@ mod tests {
                 json!({"ok":true,"id":id}).to_string()
             );
         }
+    }
+
+    /// #2510, `LAMP_MEMORY_REPLACES`: a correction replaces a kept thing
+    /// by link, only one of this person's, kept, active, not newer and
+    /// shown this session; each refusal says why and writes nothing. The
+    /// old one is then only history, and forgetting either removes both.
+    #[test]
+    fn a_correction_replaces_a_kept_thing_this_session_was_shown_by_link() {
+        const MAI: &str = "p-0123456789abcdef";
+        const BEN: &str = "p-fedcba9876543210";
+        let violet = json!({"op":"remember","person":MAI,"at_unix_ms":NOW,"text":"Her favourite colour is violet."});
+        let green = |person: &str, at: u64, replaces: u64, shown: Value| json!({"op":"remember","person":person,"at_unix_ms":at,"text":"Her favourite colour is green.","replaces":replaces,"shown":shown});
+        let colour =
+            |history: bool| json!({"op":"search","person":MAI,"query":"colour","history":history});
+        let ids = |line: &Value| -> Vec<u64> {
+            line["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|e| e["id"].as_u64().unwrap())
+                .collect()
+        };
+        for forget_newer in [true, false] {
+            let (_scratch, mut store) = Scratch::new(&format!("replaces-{forget_newer}"));
+            let mut ask = |request: Value| {
+                let answer = answer(&mut store, request.to_string().as_bytes(), NOW + 9);
+                let line: Value = serde_json::from_str(&answer.line).unwrap();
+                (line, answer.wrote, answer.log)
+            };
+            assert_eq!(ask(violet.clone()).0, json!({"ok":true,"id":1}));
+            assert_eq!(
+                ask(json!({"op":"append","person":MAI,"at_unix_ms":NOW,"heard":"hello"})).0["id"],
+                2
+            );
+            let mai = ask(json!({"op":"status","person":MAI})).0;
+            for (request, reason) in [
+                (green(MAI, NOW + 1, 1, json!([])), "not_shown"),
+                (green(MAI, NOW + 1, 1, json!([2])), "not_shown"),
+                (green(BEN, NOW + 1, 1, json!([1])), "unknown"),
+                (green(MAI, NOW + 1, 9, json!([9])), "unknown"),
+                (green(MAI, NOW + 1, 2, json!([2])), "not_kept"),
+                (green(MAI, NOW - 1, 1, json!([1])), "not_older"),
+            ] {
+                let (line, wrote, log) = ask(request.clone());
+                assert_eq!(line["error"], "refused", "{request}: {line}");
+                assert_eq!(line["reason"], reason, "{request}: {line}");
+                assert!(!wrote, "{request}");
+                assert!(
+                    log.ends_with(&format!("refused error=refused reason={reason}")),
+                    "{log}"
+                );
+                assert_eq!(ask(json!({"op":"status","person":MAI})).0, mai, "{request}");
+                assert_eq!(ids(&ask(colour(false)).0), [1], "{request}");
+            }
+            // Accepted: the new one, linked; the old one is only history.
+            let (line, wrote, _) = ask(green(MAI, NOW + 1, 1, json!([2, 1])));
+            assert_eq!(line, json!({"ok":true,"id":3,"replaced":1}));
+            assert!(wrote);
+            assert_eq!(ids(&ask(colour(false)).0), [3]);
+            let mut both = ids(&ask(colour(true)).0);
+            both.sort();
+            assert_eq!(both, [1, 3]);
+            let kept = ask(json!({"op":"kept","person":MAI})).0;
+            assert_eq!(kept["entries"].as_array().unwrap().len(), 1, "{kept}");
+            assert_eq!(kept["entries"][0]["id"], 3);
+            // Replaced once, never again.
+            let (line, wrote, _) = ask(green(MAI, NOW + 2, 1, json!([1])));
+            assert_eq!(line["reason"], "inactive", "{line}");
+            assert!(!wrote);
+            let forgotten =
+                ask(json!({"op":"forget","person":MAI,"id":if forget_newer {3} else {1}})).0;
+            assert_eq!(forgotten["removed"], 2, "{forgotten}");
+            assert!(ids(&ask(colour(true)).0).is_empty());
+            assert!(
+                ask(json!({"op":"kept","person":MAI})).0["entries"]
+                    .as_array()
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+    }
+
+    /// #2510 (reviewer-lead P3): `replaces` with `once` is a correction,
+    /// never deduplicated, even with the very words it replaces; and a
+    /// `replaces` that is no store id is refused with nothing written.
+    #[test]
+    fn a_correction_with_once_is_never_deduplicated_and_an_id_out_of_range_is_refused() {
+        const MAI: &str = "p-0123456789abcdef";
+        let (_scratch, mut store) = Scratch::new("replaces-once");
+        let mut ask = |request: Value| {
+            let answer = answer(&mut store, request.to_string().as_bytes(), NOW + 9);
+            let line: Value = serde_json::from_str(&answer.line).unwrap();
+            (line, answer.wrote)
+        };
+        let violet = "Her favourite colour is violet.";
+        assert_eq!(
+            ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW,"text":violet})).0,
+            json!({"ok":true,"id":1})
+        );
+        let status = ask(json!({"op":"status","person":MAI})).0;
+        for (replaces, error) in [
+            (json!(0), "refused"),
+            (json!(i64::MAX as u64 + 1), "refused"),
+            (json!(u64::MAX), "refused"),
+            (json!(-1), "bad_request"),
+        ] {
+            let (line, wrote) = ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW+1,
+                "text":"Her favourite colour is green.","once":true,"replaces":replaces,"shown":[1]}));
+            assert_eq!(line["ok"], false, "{replaces}: {line}");
+            assert_eq!(line["error"], error, "{replaces}: {line}");
+            assert!(!wrote, "{replaces}");
+            assert_eq!(
+                ask(json!({"op":"status","person":MAI})).0,
+                status,
+                "{replaces}"
+            );
+        }
+        // The same words, once: the replaces arm comes first, so it is a new
+        // version, not the existing one.
+        let (line, wrote) = ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW+1,
+            "text":violet,"once":true,"replaces":1,"shown":[1]}));
+        assert_eq!(line, json!({"ok":true,"id":2,"replaced":1}));
+        assert!(wrote);
+        let kept = ask(json!({"op":"kept","person":MAI})).0;
+        assert_eq!(kept["entries"].as_array().unwrap().len(), 1, "{kept}");
+        assert_eq!(kept["entries"][0]["id"], 2);
+        // Without replaces, once finds the new version.
+        assert_eq!(
+            ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW+2,"text":violet,"once":true}))
+                .0,
+            json!({"ok":true,"id":2,"existing":true})
+        );
     }
 
     /// #2176 row 13 (the first builder, 18:20): a conversation's end that
