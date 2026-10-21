@@ -1,5 +1,49 @@
 # Tests work log
 
+## 2026-10-22 00:47:48 +0700 — cloud ready on ARM64; setup light clock pushed as #2699
+
+Ready for lamp-voice: [#2698](https://github.com/autonomous-ai/lampOS/pull/2698)
+yes, pending review; [#2699](https://github.com/autonomous-ai/lampOS/pull/2699)
+no, draft for native checks. Both are test harness only.
+
+#2698 at `2525000185b26cd14e7ef17b27d5b98e7675b391` passed exact-head
+[ARM64 #5229](https://github.com/autonomous-ai/lampOS/actions/runs/39644520470)
+in 10m49s: 9,759 passed (one leaky), 63 skipped, nextest 160.014 s,
+plus doc and own-harness checks. [Linux Clippy #1238](https://github.com/autonomous-ai/lampOS/actions/runs/39644520298)
+passed in 2m33s. Stale-link / will / backoff: 1.379 / 1.371 / 3.224 s,
+5.974 s combined, versus #5220's 14.898 s. Native bases/runners differ;
+the same-base Mac series remains in the PR. Whole-job build/cache time is
+not credited to this fixture change. [Extracted native rows](verification/cloud-helper-finish-20261022/arm64-after-5229.json).
+Posted [the ready result on Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6322611642).
+
+#2699 is pushed at `716ed0b1c6ebc45a70d7e04aae1abf4a5c39bd68`, branch
+`tests/1806-setup-light-clock`, base `4efcf4eb0`, Part of #1806,
+`builder:tests`. Its shutdown fixture uses the existing Fast frame clock
+and unchanged RETRY. White before stop, successful stop, and the exact
+black-frame-then-closed-ring tail stay unchanged, as do product source,
+fade durations and the real two-second stop deadline.
+
+Same-base Mac exact processes, 3/3 each: 2.1536 / 1.4018 / 1.4128 s
+before, 0.7302 / 0.0482 / 0.0487 s after. First use still exceeds the
+0.5 s target. A compiled mutant skipping blackout failed the original tail
+assertion, showing a last frame (8,7,5), not black; source was restored.
+Fmt, setup all-target Clippy and 157 setup tests, workspace build and diff
+check, then dependent-cloud all-target Clippy and 165 cloud tests passed.
+Each crate retains one existing ignored manual fixture writer; no failures.
+[Verification record](https://github.com/autonomous-ai/lampOS/tree/716ed0b1c6ebc45a70d7e04aae1abf4a5c39bd68/lampOS/docs/verification/setup-light-clock-20261022).
+[ARM64 #5232](https://github.com/autonomous-ai/lampOS/actions/runs/39646769139)
+and [Linux Clippy #1241](https://github.com/autonomous-ai/lampOS/actions/runs/39646769059)
+are running. Posted [the PR on Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6322658248).
+
+The policy audit leaves explicit timing assertions intact and finds no
+suitable input acknowledgement for remaining propagation waits. Voice-eval's
+physical fixture idle poll is already covered by #2645; its remaining
+serve-session cases run their full scenarios and stop on relay receipts,
+channel EOF and actual child/thread exit. No new change is justified there.
+Memory and self-test fixture audits continue while native CI runs.
+No ARM64 build on the Mac, no device access, and all implemented source is
+committed and pushed.
+
 ## 2026-10-22 00:32:49 +0700 — cloud helpers end with their scenarios; #2698 pushed
 
 Ready for lamp-voice: no — [#2698](https://github.com/autonomous-ai/lampOS/pull/2698)
