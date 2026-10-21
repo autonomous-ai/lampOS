@@ -387,3 +387,15 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - one daily-journal lock race in lamp-skills under load passed alone three times;
   - the full workspace run was stopped for low memory, so CI is the full gate.
 - The ARM64 build of `8826f0bf2` is staged for the morning's 75c9 row.
+
+## 22 Oct, 04:5x–05:1x: `move` merged; the judge-test flake
+
+- **#2738 (`move`)** was read clean by the first builder and merged as `669f7de53`.
+- **First builder (04:50):** the judge's say test flaked on #2737's run (`judge.rs:438`, "asked"). There were two races in the test:
+  - **the early start:** it waited only for the judge's first subscription;
+  - **privacy said once:** 50 ms at most, so it could be passed over under load.
+- **Fixed as #2741 (tests only):**
+  - `listening()` waits for `policy/decisions`, the judge's last subscription;
+  - `calm()` keeps privacy said every 20 ms behind a `#[must_use]` guard.
+- **Shown:** with a temporary 1 s pause in the judge, the old test fails as on CI, and the fixed one passes.
+- The first builder read it clean. It was rebased over #2738, and `moved()` now uses both fixes.
