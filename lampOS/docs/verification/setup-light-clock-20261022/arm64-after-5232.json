@@ -1,0 +1,13 @@
+{
+  "run": 39646769139,
+  "head": "716ed0b1c6ebc45a70d7e04aae1abf4a5c39bd68",
+  "summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-21T17:50:42.8645025Z      Summary [ 170.168s] 9759 tests run: 9759 passed (1 leaky), 63 skipped",
+  "rows": [
+    {
+      "status": "PASS",
+      "seconds": 0.033,
+      "binary": "lamp-setup::it",
+      "test": "light::stopping_ends_with_black_and_a_closed_ring"
+    }
+  ]
+}

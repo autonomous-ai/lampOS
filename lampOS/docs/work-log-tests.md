@@ -1,5 +1,30 @@
 # Tests work log
 
+## 2026-10-22 00:56:20 +0700 — setup light ready on ARM64; memory completion batch begun
+
+Ready for lamp-voice: [#2699](https://github.com/autonomous-ai/lampOS/pull/2699)
+yes, pending review, at `716ed0b1c6ebc45a70d7e04aae1abf4a5c39bd68`.
+Exact-head [ARM64 #5232](https://github.com/autonomous-ai/lampOS/actions/runs/39646769139)
+passed in 4m33s: 9,759 passed (one leaky), 63 skipped, nextest 170.168 s,
+plus doc and own-harness checks. The changed setup shutdown fixture passed
+in 0.033 s. [Linux Clippy #1241](https://github.com/autonomous-ai/lampOS/actions/runs/39646769059)
+passed in 2m37s. [Extracted native row](verification/setup-light-clock-20261022/arm64-after-5232.json).
+The PR retains its same-base Mac measurements and blackout-skipping control;
+whole-job speed and cross-base runner differences are not attributed to the
+fixture. [Ready result posted on Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6322809641).
+
+Next batch: `tests/1806-memory-completion`, frozen base `4efcf4eb0`.
+The existing controlled report schedule can serve the set-aside health case;
+a held rule acknowledgement can release once the original client timeout
+assertion passes. The real 1.5 s client deadline and all assertions remain.
+Before measurements are complete, 3/3 each. Health: 2.3883 / 1.0952 /
+1.0938 s; held-rule: 2.8086 / 2.7496 / 2.7495 s. No implementation yet.
+The Linux-only self-test readiness audit found a bounded first-publication
+signal could replace 300 ms startup padding, while its real 1.5 s stale
+reading and host-clock settling windows must remain. Microphone's one-second
+listen window and memory's actual timeout cases also stay intact.
+No ARM64 build on the Mac and no device access. #1806 remains open.
+
 ## 2026-10-22 00:47:48 +0700 — cloud ready on ARM64; setup light clock pushed as #2699
 
 Ready for lamp-voice: [#2698](https://github.com/autonomous-ai/lampOS/pull/2698)
