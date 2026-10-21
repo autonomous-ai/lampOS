@@ -740,12 +740,18 @@ impl Run<'_, '_> {
         let taken = self.models_of(&manifest, state, &installed)?;
         self.settings_of(&manifest, state, envelope)?;
         // A part that reads a model or a setting the switch changes is
-        // restarted with it.
+        // restarted with it. Not for the reset plan: the reset reads it
+        // again each time the button is held (#806).
         let touched: Vec<String> = self
             .placings
             .iter()
             .map(|placing| placing.model.path.clone())
-            .chain(self.setting_writes.iter().cloned())
+            .chain(
+                self.setting_writes
+                    .iter()
+                    .filter(|path| *path != manifest::RESET_PLAN)
+                    .cloned(),
+            )
             .collect();
         // And a part an image file is read by without its unit naming it:
         // the voice, by /etc/asound.conf. It is switched, as every switch
@@ -924,8 +930,8 @@ impl Run<'_, '_> {
         self.setting_writes.clear();
         self.image_writes.clear();
         let mut writes = Vec::new();
-        if !manifest.settings.is_empty() {
-            let steps = apply::plan(
+        if !manifest.settings.is_empty() || manifest.reset_plan.is_some() {
+            let mut steps = apply::plan(
                 &self.config.root,
                 &manifest.settings,
                 &state.settings,
@@ -933,6 +939,14 @@ impl Run<'_, '_> {
                 &BTreeMap::new(),
             )
             .map_err(|error| Outcome::Failed(format!("the settings cannot be read: {error}")))?;
+            // Setup's reset plan, over any plan the lamp has (#806).
+            if let Some(plan) = &manifest.reset_plan {
+                steps.extend(
+                    apply::reset_plan_step(&self.config.root, plan, &state.settings).map_err(
+                        |error| Outcome::Failed(format!("the reset plan cannot be read: {error}")),
+                    )?,
+                );
+            }
             let these = apply::writes(&steps);
             if !self.config.settings {
                 if !these.is_empty() {
@@ -1044,6 +1058,28 @@ impl Run<'_, '_> {
             ));
         }
         missing
+    }
+
+    /// Said when the build's reset plan was to be written and was not: a
+    /// lamp-update-back from before the field passes it over (#806). The
+    /// rest of the build goes on.
+    fn reset_plan_not_written(&mut self, state: &State) {
+        let plan = self
+            .seen
+            .as_ref()
+            .and_then(|seen| seen.reset_plan.as_ref())
+            .and_then(|plan| plan.sha256.clone());
+        if self
+            .setting_writes
+            .iter()
+            .any(|path| path == manifest::RESET_PLAN)
+            && state.settings.get(manifest::RESET_PLAN) != plan.as_ref()
+        {
+            self.say(&format!(
+                "{} was not written: this lamp's lamp-update-back is older than it, so install again",
+                manifest::RESET_PLAN
+            ));
+        }
     }
 
     /// The units of `changes` restarted only for an image file that was
@@ -1745,6 +1781,7 @@ impl Run<'_, '_> {
             if let Err(why) = applied {
                 return self.put_back(state, &build, &backs, None, why, String::new());
             }
+            self.reset_plan_not_written(state);
             if !self.image_writes.is_empty() {
                 let image = self
                     .seen
@@ -2151,6 +2188,7 @@ impl Run<'_, '_> {
             models: Vec::new(),
             settings: Vec::new(),
             image: Vec::new(),
+            reset_plan: None,
         };
         match self.own_switch(&only_the_updater) {
             Ok(Some(Outcome::SelfSwitched { from, to, .. })) => Some(Outcome::Climbs {

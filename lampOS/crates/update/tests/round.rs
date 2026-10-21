@@ -527,6 +527,7 @@ impl Lamp {
             models: Vec::new(),
             settings: Vec::new(),
             image: Vec::new(),
+            reset_plan: None,
         }
     }
 
@@ -4370,4 +4371,157 @@ fn an_unreadable_journal_is_set_aside_and_the_round_goes_on() {
     assert_eq!(lamp.set_aside("journal.json").len(), 1);
     assert!(!lamp.records().join("journal.json").exists());
     assert!(lamp.logged("journal-set-aside"));
+}
+
+const RESET_PLAN: &str = "/etc/lampOS/setup/reset-plan.json";
+/// The product's reset plan as of 4de8ebe1c (19 Oct): lamp-06c1's until
+/// 21 Oct, which lacked ten of the build's stores (#806).
+const PLAN_19_OCT: &str = include_str!("fixtures/reset-plan-4de8ebe1c.json");
+/// As of ef6a2b9a7 (20 Oct 10:36): lamp-0c89's, from its app setup.
+const PLAN_20_OCT: &str = include_str!("fixtures/reset-plan-ef6a2b9a7.json");
+
+/// Build `sequence`: build 1's binaries, the controls' setting `controls`,
+/// and the build's own reset plan, as `lamp-update manifest --settings on`
+/// writes it.
+fn publish_with_plan(lamp: &mut Lamp, sequence: u64, controls: &str) -> Vec<u8> {
+    let mut manifest = lamp.manifest(
+        sequence,
+        &[
+            ("lamp-voice", "voice 1"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+    manifest.min_updater = Some(manifest::RESET_PLAN_UPDATER);
+    manifest.settings = vec![Setting::new(CONTROLS_JSON, controls)];
+    manifest.reset_plan = Some(Box::new(lamp_update::install::reset_plan_setting()));
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let envelope = manifest::seal(&bytes, &lamp.key).unwrap();
+    lamp.channel
+        .files
+        .insert(format!("{CHANNEL}{}", manifest::ENVELOPE), envelope);
+    // What a lamp-update-back from before the field reads of it: the same
+    // build with the plan passed over, as its lenient read does.
+    manifest.reset_plan = None;
+    manifest::seal(&serde_json::to_vec(&manifest).unwrap(), &lamp.key).unwrap()
+}
+
+fn put_plan(lamp: &Lamp, text: &str) {
+    let at = lamp.root.join(RESET_PLAN.trim_start_matches('/'));
+    fs::create_dir_all(at.parent().unwrap()).unwrap();
+    fs::write(at, text).unwrap();
+}
+
+/// The first builder on #1722, 08:24: a lamp with the 19 Oct plan (and
+/// lamp-0c89's of 20 Oct), updated by a round, ends with the build's plan,
+/// its record, and the old one kept in the records. Never "this lamp's own".
+#[test]
+fn a_lamp_with_an_old_reset_plan_updated_by_a_round_ends_with_the_builds_and_a_backup() {
+    for (old, sha_start) in [(PLAN_19_OCT, "5dff6f81"), (PLAN_20_OCT, "de872e78cb60")] {
+        assert!(sha(old).starts_with(sha_start));
+        let (mut lamp, _) = lamp_with_settings();
+        put_plan(&lamp, old);
+        assert!(lamp.state()["settings"].get(RESET_PLAN).is_none());
+        publish_with_plan(&mut lamp, 2, "controls 2");
+        assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+        assert_eq!(lamp.read(RESET_PLAN), lamp_update::install::RESET_PLAN);
+        assert_eq!(
+            lamp.read("/var/lib/lampos-update/reset-plan.json.before-2"),
+            old
+        );
+        assert_eq!(
+            lamp.state()["settings"][RESET_PLAN],
+            sha(lamp_update::install::RESET_PLAN)
+        );
+        assert_eq!(lamp.read(CONTROLS_JSON), "controls 2");
+        assert!(
+            !lamp
+                .said
+                .iter()
+                .any(|line| line.contains(RESET_PLAN) && line.contains("own")),
+            "{:?}",
+            lamp.said
+        );
+        // The watcher reads the plan again at each reset: nothing restarted
+        // for it.
+        assert!(
+            !lamp.calls().iter().any(|call| call.contains("lamp-setup")),
+            "{:?}",
+            lamp.calls()
+        );
+        // The next round: nothing more to write, and no second backup.
+        publish_with_plan(&mut lamp, 3, "controls 2");
+        lamp.round();
+        assert!(!lamp.exists("/var/lib/lampos-update/reset-plan.json.before-3"));
+    }
+}
+
+/// A plan the lamp changed by hand is replaced too, and kept: a changed plan
+/// can only make the reset wipe less.
+#[test]
+fn a_reset_plan_changed_on_the_lamp_is_replaced_by_a_round_never_kept() {
+    let (mut lamp, _) = lamp_with_settings();
+    put_plan(&lamp, "{\"the lamp's own\": true}\n");
+    publish_with_plan(&mut lamp, 2, "controls 2");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(RESET_PLAN), lamp_update::install::RESET_PLAN);
+    assert_eq!(
+        lamp.read("/var/lib/lampos-update/reset-plan.json.before-2"),
+        "{\"the lamp's own\": true}\n"
+    );
+}
+
+/// A lamp with no plan (set up by hand, as lamp-4ace) gets none from a
+/// round: with setup's marker, a plan would arm the 5 s reset.
+#[test]
+fn a_lamp_with_no_reset_plan_gets_none_from_a_round() {
+    let (mut lamp, _) = lamp_with_settings();
+    publish_with_plan(&mut lamp, 2, "controls 2");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(!lamp.exists(RESET_PLAN));
+    assert!(lamp.state()["settings"].get(RESET_PLAN).is_none());
+}
+
+/// A build put back puts the old plan back too, byte for byte.
+#[test]
+fn a_build_put_back_puts_the_old_reset_plan_back() {
+    let (mut lamp, _) = lamp_with_settings();
+    put_plan(&lamp, PLAN_19_OCT);
+    lamp.systemd.crashing.push("lamp-controls.service".into());
+    publish_with_plan(&mut lamp, 2, "controls 2");
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::RolledBack { sequence: 2, .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(RESET_PLAN), PLAN_19_OCT);
+    assert!(lamp.state()["settings"].get(RESET_PLAN).is_none());
+}
+
+/// The stores rule (#1505, #1680): a lamp-update-back one version behind,
+/// which knows no `reset_plan`, passes it over and writes the rest; the
+/// round goes on, and says the plan waits for an install.
+#[test]
+fn a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so() {
+    let (mut lamp, _) = lamp_with_settings();
+    put_plan(&lamp, PLAN_19_OCT);
+    let older = publish_with_plan(&mut lamp, 2, "controls 2");
+    let (root, key) = (lamp.root.clone(), lamp.config.key);
+    lamp.systemd.applier = Some(Box::new(move || {
+        let records = root.join("var/lib/lampos-update");
+        fs::write(records.join("apply/envelope.json"), &older).unwrap();
+        apply::run(&root, &records, &key, &mut |_| Ok(()), &mut |_| {})
+    }));
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 2");
+    assert_eq!(lamp.read(RESET_PLAN), PLAN_19_OCT);
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains(RESET_PLAN) && line.contains("lamp-update-back is older")),
+        "{:?}",
+        lamp.said
+    );
 }
