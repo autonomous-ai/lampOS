@@ -1604,13 +1604,25 @@ a gap, only while all of these hold:
   builder's 22:10 and 01:43 on #2265): someone who left within that window
   may not be the one speaking. A line whose scope is kept only by the gap
   (`ScopeSnapshot::held`) is declared none of the functions that read or
-  write someone's memory, rules or face (`recall` and its search,
-  `remember`, `forget`, `forget_everything`, the rules' and the face's;
+  write someone's memory, rules or face, or grant something as them
+  (`MEMORY_CALLS`: `recall` and its search, `remember`, `forget`,
+  `forget_everything`, the three rules', `remember_my_face`,
+  `forget_my_face`, `tell_others_i_was_here` and `photo_face_yes`;
   `Services::chat_without`), and any of them written anyway is refused and
-  told why (`run_tool`). It is told no memory note and no memory hits
+  told why (`run_tool`), even if the face is back by the time it runs: the
+  line's scope is fixed as it is admitted. So a held line grants nothing,
+  and a yes to being named in Who was here said out of view is never saved
+  as the absent person's consent. Only the two refusals,
+  `dont_tell_others_i_was_here` and `photo_face_no`, stay: a no grants
+  nothing, whoever says it. It is told no memory note and no memory hits
   (`LAMP_SECOND_MEMORY_HITS`), and its scope runs no one's held forget
-  (`forget_asker`, #2340); the reviewer's P2 on #2449. It is told the
-  conversation as it stood, its exchanges, as before.
+  (`forget_asker`, #2340); the reviewer's P2s on #2449 and #2616. It is told
+  the conversation as it stood, its exchanges, as before.
+- **A held line is never journalled** (the reviewer's P2 on #2616): it is
+  kept out (`remember::keep_out`) as it is admitted and again before its
+  words reach the thread (`keep_scoped`), so neither its end nor a later
+  hand-on sends it to the journal, as theirs or anyone's. Its exchange stays
+  in the spoken thread, so the conversation carries on when they look back.
 - **Within the gap:** up to 12 s (`GAP`) past the face's last fresh
   sighting, which is the known file's 3 s freshness, so up to about 15 s
   after the eyes last saw it, and up to 12 s past the end of the lamp's last
@@ -1622,11 +1634,11 @@ a gap, only while all of these hold:
 
 A different known face is theirs at once, and a privacy change revokes a held
 face as it does a fresh one. With `LAMP_SECOND_SCOPED_CONTEXT=on` the held
-scope also decides the exchange's thread and journal, like any admitted scope:
-a line held for them is journalled as theirs, and the first line past the gap,
-admitted as the room's, as the room's. With that switch off the exchange stays
-with the person counted at the lamp (`known_faces::Presence`, 30 s), and this
-keeps only the memory calls with them. Without a bus root for the eyes' looks, nothing is held.
+scope also decides the exchange's thread, like any admitted scope: a line held
+for them is kept in the thread as theirs but never journalled, and the first
+line past the gap, admitted as the room's, is journalled as the room's. With
+that switch off the exchange stays with the person counted at the lamp
+(`known_faces::Presence`, 30 s), and a held line is still never journalled. Without a bus root for the eyes' looks, nothing is held.
 The Live route is not covered.
 
 ### Live route session scope

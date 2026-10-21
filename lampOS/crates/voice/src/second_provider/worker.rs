@@ -5396,6 +5396,18 @@ fn keep_scoped(
     if lease.is_some_and(|lease| !lease.is_current()) {
         return;
     }
+    // A line held only by a known face's gap (`LAMP_FACE_GAP_HOLD`) may not
+    // be theirs: it is never journalled, as theirs or anyone's, so it is kept
+    // out before its words reach the thread or its end hands anything on
+    // (the reviewer's P2 on #2616). Its exchange stays in the spoken thread,
+    // so the conversation as it stood carries on when they look back.
+    if let Some(lease) = lease
+        && lease
+            .scope()
+            .is_some_and(crate::memory_scope::ScopeSnapshot::held)
+    {
+        crate::remember::keep_out(lease.key().request);
+    }
     let now = Instant::now();
     match event {
         ProviderOutput::Transcript {

@@ -5263,6 +5263,131 @@ async fn a_memory_call_on_a_gap_held_line_runs_for_no_one() {
     }
 }
 
+/// The reviewer's P2 on #2616: A is answered and leaves view, someone says
+/// yes out of view within the gap, and A comes back silently while the
+/// model and the call are on their way. The held line is never declared a
+/// yes to being named (or any other grant), and one called anyway runs for
+/// no one: the lease is A's held one, whoever is seen by the time it runs.
+/// A no (`dont_tell_others_i_was_here`) is still declared and still runs.
+#[tokio::test]
+async fn a_held_lines_yes_runs_for_no_one_though_the_face_is_back_before_the_call() {
+    use crate::memory_scope::{FaceCache, GAP, ScopeLease};
+    for (name, runs) in [
+        (crate::known_faces::TELL, false),
+        (crate::photo_faces::YES, false),
+        (crate::known_faces::DONT_TELL, true),
+    ] {
+        let path =
+            std::env::temp_dir().join(format!("twelve-gap-yes-{}-{name}", std::process::id()));
+        std::fs::write(&path, "A").unwrap();
+        let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Hello.".to_owned()), Ok("Yes, you may.".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![text("Hi."), Ok(ChatEvent::Done)],
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "c1",
+                            name,
+                            json!({"name":"A"}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Okay."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let ran = Arc::new(Mutex::new(Vec::new()));
+        let running = ran.clone();
+        let runner: ScopedToolRunner = Arc::new(move |_, _, name, _, lease: ScopeLease| {
+            running
+                .lock()
+                .unwrap()
+                .push((name, lease.scope().unwrap().held()));
+            Box::pin(async { json!({"ok":true}) })
+        });
+        let mut engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            None,
+        );
+        engine.memory_camera(true, 1);
+        let seen = || crate::known_faces::FaceObservation::read(&path).unwrap();
+        cache.replace_seen(cache.begin_refresh(), Some(seen()), Some(1));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        turn(&mut engine).await;
+        engine.memory_answered(1, Instant::now());
+        cache.replace_seen(cache.begin_refresh(), None, Some(0));
+        engine.submit(start(2));
+        assert!(engine.memory_lease().unwrap().scope().unwrap().held());
+        // Kept out of the journal as it is admitted.
+        assert!(crate::remember::kept_out(2), "{name}");
+        // A is back, silently, after the line began and before the call.
+        cache.replace_seen(cache.begin_refresh(), Some(seen()), Some(1));
+        assert!(!cache.snapshot(Instant::now()).held());
+        engine.submit(audio(2, 1));
+        engine.submit(end(2));
+        turn(&mut engine).await;
+        let withheld = script.withheld.lock().unwrap().clone();
+        assert_eq!(withheld[1].contains(&name), !runs, "{name}: {withheld:?}");
+        let ran = ran.lock().unwrap().clone();
+        if runs {
+            assert_eq!(ran, [(name.to_owned(), true)], "{name}");
+        } else {
+            assert!(ran.is_empty(), "{name}: {ran:?}");
+            let asked = script.asked.lock().unwrap();
+            let told = format!("{:?}", asked.last().unwrap());
+            assert!(told.contains("can't see who is talking"), "{name}: {told}");
+        }
+        std::fs::remove_file(&path).unwrap();
+    }
+}
+
+/// Every function that keeps, reads, forgets or says yes for someone, the
+/// memory's or the eyes', is withheld from a line held only by a gap; of
+/// those that take the line's person, only the eyes' refusals are left.
+#[test]
+fn every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line() {
+    let names: Vec<String> = crate::remember::tools_with(true)
+        .into_iter()
+        .chain(crate::rules::tools())
+        .chain(crate::known_faces::tools_for(
+            crate::known_faces::FaceSwitches {
+                checked: true,
+                visits: true,
+            },
+        ))
+        .chain(crate::photo_faces::tools())
+        .map(|tool| tool.name)
+        .chain([crate::remember::FORGET_EVERYTHING.to_owned()])
+        .collect();
+    for name in &names {
+        let name = name.as_str();
+        assert!(
+            // `forget_everything` is the memory's only with its switch on.
+            name == crate::remember::FORGET_EVERYTHING
+                || crate::remember::is_tool_with(name, true)
+                || crate::known_faces::is_tool(name)
+                || crate::photo_faces::is_tool(name),
+            "{name}"
+        );
+        assert!(
+            super::MEMORY_CALLS.contains(&name) != super::HELD_REFUSALS.contains(&name),
+            "{name}: withheld, or a refusal, not both"
+        );
+    }
+    for name in super::MEMORY_CALLS.iter().chain(super::HELD_REFUSALS) {
+        assert!(names.iter().any(|known| known == name), "{name}");
+    }
+}
+
 #[tokio::test]
 async fn memory_scope_is_bound_before_answer_and_revoked_with_the_turn() {
     use crate::memory_scope::{FaceCache, ScopeLease};
