@@ -16,17 +16,30 @@ pub fn source(addon: &str) -> String {
     source
 }
 
+/// How long an add-on's light may lie over a person's own light that rests:
+/// a passing glow, never their colour (the first builder on #2530, 20:1x;
+/// the evening glow's rule, #1672).
+pub const BRIEF_GLOW_US: u64 = 5_000_000;
+
 /// The ring's request for a kept `light` proposal, on `clock_id` at
 /// `now_us`, holding as long as the proposal does (at most
-/// [`Claim::MOST_US`]). `None` for any other act, or a light that does not
-/// pass the ring's own check.
+/// [`Claim::MOST_US`]), or over the person's own light (`over_persons`, one
+/// that rests) only [`BRIEF_GLOW_US`]: the ring then shows their light again
+/// by itself. `None` for any other act, or a light that does not pass the
+/// ring's own check.
 pub fn light_request(
     proposal: &AddonProposal,
     clock_id: &str,
     now_us: u64,
+    over_persons: bool,
 ) -> Option<LightRequest> {
     let light = proposal.light.as_ref()?;
-    let holds_us = (u64::from(proposal.holds_ms) * 1_000).min(Claim::MOST_US);
+    let most_us = if over_persons {
+        BRIEF_GLOW_US
+    } else {
+        Claim::MOST_US
+    };
+    let holds_us = (u64::from(proposal.holds_ms) * 1_000).min(most_us);
     let request = LightRequest {
         claim: Claim {
             source: source(&proposal.addon),
@@ -96,7 +109,7 @@ mod tests {
 
     #[test]
     fn a_kept_light_is_asked_of_the_ring_at_idle_for_as_long_as_it_holds() {
-        let request = light_request(&glow(), "boot-a", 1_000).unwrap();
+        let request = light_request(&glow(), "boot-a", 1_000, false).unwrap();
         assert_eq!(request.claim.source, "addon:evening-glow");
         assert_eq!(request.claim.priority, Priority::Idle);
         assert_eq!(request.claim.clock_id, "boot-a");
@@ -119,7 +132,7 @@ mod tests {
             ..glow()
         };
         assert_eq!(
-            light_request(&short, "b", 0).unwrap().claim.until_us,
+            light_request(&short, "b", 0, false).unwrap().claim.until_us,
             5_000_000
         );
         let lift = AddonProposal {
@@ -132,11 +145,20 @@ mod tests {
             }),
             ..glow()
         };
-        assert!(light_request(&lift, "b", 0).is_none());
+        assert!(light_request(&lift, "b", 0, false).is_none());
         let nudge = mood_nudge(&lift, "b", 5, 1).unwrap();
         assert_eq!((nudge.energy, nudge.warmth), (0.1, 0.0));
         assert_eq!(nudge.until_us, 5 + 600_000_000);
         assert!(mood_nudge(&glow(), "b", 5, 1).is_none());
+    }
+
+    /// Over a person's own light, which rests, a few seconds only: then the
+    /// ring shows theirs again by itself.
+    #[test]
+    fn over_a_persons_light_a_glow_is_brief() {
+        let request = light_request(&glow(), "b", 1_000, true).unwrap();
+        assert_eq!(request.claim.until_us, 1_000 + BRIEF_GLOW_US);
+        assert_eq!(request.claim.priority, Priority::Idle);
     }
 
     #[test]

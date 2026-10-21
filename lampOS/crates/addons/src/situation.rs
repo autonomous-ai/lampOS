@@ -4,8 +4,8 @@
 //! the time it was read; nothing here reads the bus or a clock itself.
 use crate::rules::{ASLEEP_FRESH_US, Reading, Situation};
 use lamp_msgs::{
-    ExpressionRestPhase, ExpressionRestState, Light, MicrophonePrivacy, OnboardingPending, Pause,
-    Room, RoomState, Voice, VoiceMute, VoiceState,
+    ExpressionRestPhase, ExpressionRestState, Light, MicrophonePrivacy, MoodState,
+    OnboardingPending, Pause, Room, RoomState, Voice, VoiceMute, VoiceState,
 };
 
 /// Who writes `light/command` when a person sets the light: the actions part
@@ -13,8 +13,13 @@ use lamp_msgs::{
 /// (the app). Its header's `source` says which.
 pub const PERSONS_LIGHT_SOURCES: [&str; 2] = ["actions", "cloud"];
 
+/// A person's light rests this long after they set it, if the lamp has not
+/// slept since: then an add-on may lay a brief glow over it (the first
+/// builder on #2530, 20:1x).
+pub const PERSONS_LIGHT_RESTS_US: u64 = 12 * 3_600_000_000;
+
 /// The topics the judge reads, each with what it tells.
-pub const TOPICS: [&str; 9] = [
+pub const TOPICS: [&str; 10] = [
     MicrophonePrivacy::TOPIC,
     Pause::TOPIC,
     VoiceMute::TOPIC,
@@ -24,6 +29,7 @@ pub const TOPICS: [&str; 9] = [
     RoomState::TOPIC,
     "light/command",
     "light/state",
+    MoodState::TOPIC,
 ];
 
 /// The readings as they came.
@@ -43,8 +49,18 @@ pub struct Watcher {
     voice_boot: Option<String>,
     voice_resting: Option<Reading<bool>>,
     room_quiet: Option<Reading<bool>>,
-    /// The newest light a person set this boot, if any.
-    persons: Option<Light>,
+    /// The newest light a person set this boot, if any, and when, on the
+    /// boot's clock (its message's own time, so one read at the judge's
+    /// start keeps its age).
+    persons: Option<(Light, u64)>,
+    /// Mood has said `asleep` since the person set it.
+    slept_since_persons: bool,
+    /// The boot's clock the judge's times are on: Mood's stamps on another
+    /// are not compared with them.
+    clock_id: Option<String>,
+    /// Until when a glow the judge asked of the ring holds: while it shows,
+    /// the ring's light is the add-on's, over the person's still there.
+    glow_until_us: u64,
     /// The light the ring says is the person's (`light/state`).
     shown: Option<Light>,
 }
@@ -53,6 +69,12 @@ pub struct Watcher {
 const REST_FRESH_US: u64 = 1_000_000;
 
 impl Watcher {
+    /// Mood's stamps count only on `clock_id`, the judge's own.
+    pub fn on_clock(mut self, clock_id: &str) -> Self {
+        self.clock_id = Some(clock_id.to_owned());
+        self
+    }
+
     /// A watcher that began reading at `began_us`.
     pub fn new(began_us: u64) -> Self {
         Self {
@@ -118,12 +140,34 @@ impl Watcher {
         self.room_quiet = Some(Reading::new(room.state == Room::Quiet, at_us));
     }
 
-    /// `light/command`, with its header's `source`: a person's light when the
-    /// actions part or the app wrote it.
-    pub fn light_command(&mut self, light: &Light, source: &str) {
+    /// `light/command`, with its header's `source` and time (`at_us`): a
+    /// person's light when the actions part or the app wrote it.
+    pub fn light_command(&mut self, light: &Light, source: &str, at_us: u64) {
         if PERSONS_LIGHT_SOURCES.contains(&source) {
-            self.persons = Some(light.clone());
+            self.persons = Some((light.clone(), at_us));
+            self.slept_since_persons = false;
         }
+    }
+
+    /// `mood/state`: Mood asleep after the person set their light.
+    pub fn mood(&mut self, mood: &MoodState) {
+        if mood.asleep
+            && self
+                .clock_id
+                .as_deref()
+                .is_none_or(|clock_id| clock_id == mood.stamp.clock_id)
+            && self
+                .persons
+                .as_ref()
+                .is_some_and(|(_, at_us)| mood.stamp.at_us > *at_us)
+        {
+            self.slept_since_persons = true;
+        }
+    }
+
+    /// The judge asked the ring for a glow holding until `until_us`.
+    pub fn glowing_until(&mut self, until_us: u64) {
+        self.glow_until_us = self.glow_until_us.max(until_us);
     }
 
     /// `light/state`.
@@ -139,7 +183,9 @@ impl Watcher {
     /// [`ASLEEP_FRESH_US`] means it has no sleep to say, and the rest skill
     /// alone tells it. A mute said once and then gone stale stays cautious.
     /// The person's light is shown while the ring's light is the one a
-    /// person set this boot; with none set, the ring shows its own.
+    /// person set this boot, or one of the judge's own glows is over it;
+    /// with none set, the ring shows its own. It rests once the lamp has
+    /// slept since it was set, or [`PERSONS_LIGHT_RESTS_US`] have passed.
     pub fn situation(&self, now_us: u64) -> Situation {
         let resting = self.resting.is_some_and(|reading| {
             reading.value && now_us.saturating_sub(reading.at_us) <= REST_FRESH_US
@@ -158,12 +204,20 @@ impl Watcher {
             voice_resting: self.voice_resting,
             room_quiet: self.room_quiet,
             persons_light: match (&self.persons, &self.shown) {
-                (Some(persons), Some(shown)) => same_light(persons, shown),
+                (Some(_), _) if now_us < self.glow_until_us => true,
+                (Some((persons, _)), Some(shown)) => same_light(persons, shown),
                 // A person set one, and the ring has not said what it shows:
                 // theirs, the cautious way.
                 (Some(_), None) => true,
                 (None, _) => false,
             },
+            // A light they set off never rests: off stays dark (the
+            // reviewer-lead's P2 on #2640).
+            persons_light_rests: self.persons.as_ref().is_some_and(|(persons, at_us)| {
+                persons.on
+                    && (self.slept_since_persons
+                        || now_us.saturating_sub(*at_us) >= PERSONS_LIGHT_RESTS_US)
+            }),
         }
     }
 }
@@ -198,17 +252,17 @@ mod tests {
             "the ring's own, as it starts"
         );
         // A skill's or the ring's own word is not a person's.
-        watcher.light_command(&light(true, "blue", 3), "skills");
+        watcher.light_command(&light(true, "blue", 3), "skills", 0);
         assert!(!watcher.situation(0).persons_light);
-        watcher.light_command(&light(true, "blue", 3), "actions");
+        watcher.light_command(&light(true, "blue", 3), "actions", 0);
         watcher.light_state(&light(true, "blue", 3));
         assert!(watcher.situation(0).persons_light);
         // The app's too.
-        watcher.light_command(&light(true, "green", 2), "cloud");
+        watcher.light_command(&light(true, "green", 2), "cloud", 0);
         watcher.light_state(&light(true, "green", 2));
         assert!(watcher.situation(0).persons_light);
         // Off is off, whatever colour was asked.
-        watcher.light_command(&light(false, "green", 2), "cloud");
+        watcher.light_command(&light(false, "green", 2), "cloud", 0);
         watcher.light_state(&light(false, "warm", 1));
         assert!(watcher.situation(0).persons_light);
         // Shown differently from what they set: not theirs now.
@@ -216,10 +270,100 @@ mod tests {
         assert!(!watcher.situation(0).persons_light);
     }
 
+    fn mood(asleep: bool, at_us: u64) -> MoodState {
+        MoodState {
+            stamp: lamp_msgs::ClockStamp {
+                clock_id: "boot".into(),
+                at_us,
+                sequence: 1,
+            },
+            session_id: "s".into(),
+            awake: if asleep { 0.0 } else { 0.8 },
+            energy: 0.3,
+            warmth: 0.6,
+            asleep,
+            attention: None,
+            familiarity: lamp_msgs::Familiarity::Unknown,
+            familiar: None,
+            breath: None,
+        }
+    }
+
+    /// The first builder on #2530 (20:1x): a person's light rests once the
+    /// lamp has slept since they set it, or 12 h have passed; a newer
+    /// choice of theirs is fresh again.
+    #[test]
+    fn a_persons_light_rests_after_a_sleep_or_twelve_hours() {
+        let mut watcher = Watcher::default();
+        let orange = light(true, "orange", 1);
+        watcher.light_command(&orange, "actions", 1_000);
+        watcher.light_state(&orange);
+        let s = watcher.situation(2_000);
+        assert!(s.persons_light && !s.persons_light_rests);
+        // A sleep said before they chose it does not count.
+        watcher.mood(&mood(true, 500));
+        assert!(!watcher.situation(2_000).persons_light_rests);
+        watcher.mood(&mood(false, 1_500));
+        assert!(!watcher.situation(2_000).persons_light_rests);
+        watcher.mood(&mood(true, 1_600));
+        assert!(watcher.situation(2_000).persons_light_rests);
+        // Chosen again: fresh until 12 h on.
+        watcher.light_command(&orange, "cloud", 10_000);
+        assert!(
+            !watcher
+                .situation(10_000 + PERSONS_LIGHT_RESTS_US - 1)
+                .persons_light_rests
+        );
+        assert!(
+            watcher
+                .situation(10_000 + PERSONS_LIGHT_RESTS_US)
+                .persons_light_rests
+        );
+    }
+
+    /// The reviewer-lead's P2 on #2640: a light they set off never rests,
+    /// slept since or not, however long ago: off stays dark.
+    #[test]
+    fn a_light_set_off_never_rests() {
+        let mut watcher = Watcher::default();
+        let off = light(false, "warm", 1);
+        watcher.light_command(&off, "actions", 1_000);
+        watcher.light_state(&off);
+        watcher.mood(&mood(true, 2_000));
+        let s = watcher.situation(1_000 + 2 * PERSONS_LIGHT_RESTS_US);
+        assert!(s.persons_light && !s.persons_light_rests);
+    }
+
+    /// The P3: Mood's sleep counts only on the judge's own clock.
+    #[test]
+    fn a_sleep_on_another_boots_clock_does_not_rest_it() {
+        let mut watcher = Watcher::default().on_clock("this-boot");
+        watcher.light_command(&light(true, "orange", 1), "actions", 1_000);
+        watcher.mood(&mood(true, 2_000)); // stamped on "boot"
+        assert!(!watcher.situation(3_000).persons_light_rests);
+        let mut ours = mood(true, 2_500);
+        ours.stamp.clock_id = "this-boot".into();
+        watcher.mood(&ours);
+        assert!(watcher.situation(3_000).persons_light_rests);
+    }
+
+    /// While the judge's own glow shows over it, the person's light is still
+    /// there: the ring's other colour is the add-on's, not the lamp's own.
+    #[test]
+    fn the_judges_own_glow_over_a_persons_light_keeps_it_theirs() {
+        let mut watcher = Watcher::default();
+        watcher.light_command(&light(true, "orange", 1), "actions", 0);
+        watcher.light_state(&light(true, "warm", 2));
+        assert!(!watcher.situation(1_000).persons_light);
+        watcher.glowing_until(5_000);
+        assert!(watcher.situation(1_000).persons_light);
+        assert!(!watcher.situation(5_000).persons_light);
+    }
+
     #[test]
     fn a_light_set_with_nothing_shown_yet_counts_as_theirs() {
         let mut watcher = Watcher::default();
-        watcher.light_command(&light(true, "blue", 3), "actions");
+        watcher.light_command(&light(true, "blue", 3), "actions", 0);
         assert!(watcher.situation(0).persons_light);
     }
 

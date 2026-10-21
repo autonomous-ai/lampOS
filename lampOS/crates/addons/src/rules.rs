@@ -61,6 +61,10 @@ pub struct Situation {
     /// `light/state` shows it. False while the ring shows the lamp's own
     /// idle light, as before anyone set one.
     pub persons_light: bool,
+    /// The person's light rests: the lamp has slept since they set it, or
+    /// 12 h have passed. It stays their base for good, but an add-on may
+    /// lay a brief glow over it ([`crate::carry::BRIEF_GLOW_US`]).
+    pub persons_light_rests: bool,
 }
 
 /// Why a proposal is dropped, as the journal and the decision say it.
@@ -199,7 +203,7 @@ impl Judge {
         {
             return Some(Drop::BusyRoom);
         }
-        if proposal.act == "light" && s.persons_light {
+        if proposal.act == "light" && s.persons_light && !s.persons_light_rests {
             return Some(Drop::PersonsLight);
         }
         let kept = self.kept.entry(proposal.addon.clone()).or_default();
@@ -272,6 +276,7 @@ mod tests {
             voice_resting: now(true),
             room_quiet: now(true),
             persons_light: false,
+            persons_light_rests: false,
         }
     }
 
@@ -351,6 +356,21 @@ mod tests {
             );
             assert!(!drop.why().is_empty());
         }
+    }
+
+    /// The first builder on #2530 (20:1x): a person's light that rests
+    /// lets an add-on's light through, which the ring is asked for briefly.
+    #[test]
+    fn a_resting_persons_light_lets_a_light_through() {
+        let rests = Situation {
+            persons_light: true,
+            persons_light_rests: true,
+            ..calm()
+        };
+        assert_eq!(
+            Judge::default().judge(&light("glow"), 0, &rests, NOW),
+            Verdict::Kept
+        );
     }
 
     #[test]
