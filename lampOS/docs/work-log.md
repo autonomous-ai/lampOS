@@ -1,3 +1,36 @@
+## Current checkpoint: 2026-10-22 01:30 +07, updater recovery pushed; next slice started
+
+**Ready for lamp-voice: no (#2709, native gates running).**
+[#2709](https://github.com/autonomous-ai/lampOS/pull/2709) carries #2700 at
+`52b2f5f3dc21dabda8f043650295dd8984ccb657`, one commit on
+`second/updater-self-handover`, rebased cleanly onto `849c0829f`.
+The [committed evidence](https://github.com/autonomous-ai/lampOS/blob/52b2f5f3dc21dabda8f043650295dd8984ccb657/lampOS/docs/verification/update-self-recovery-20261022/README.md)
+records fmt and strict Clippy passing, **296 passed / 0 failed / 2 ignored /
+0 filtered out**, and both compiled expected-failure controls. The runtime,
+fixtures and manifest match the gated source hashes after rebase; native CI
+qualifies the newer integration. [ARM64 39652804662](https://github.com/autonomous-ai/lampOS/actions/runs/39652804662)
+and [Linux Clippy 39652804524](https://github.com/autonomous-ai/lampOS/actions/runs/39652804524)
+are running. No device run. First owns the updater integration.
+
+**Ready for lamp-voice: yes (#1757, #2692, #2694).** Their qualified heads and
+native evidence are unchanged below. #2462 remains with its merger.
+
+**Next: second-P8, failure-only Music metadata diagnostics.**
+[Scope and validation plan](proposals/second-audio-metadata-20261022.md).
+The source/fixture audit is complete and implementation has started separately
+from #1757's frozen head, on `second/audio-metadata-diagnostics`. The original
+refusal's cause remains unproved. The [Queue post](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6323472887)
+requests the next named routing and records this recommendation/start; #694 is
+Nine's active work and #1812 is already represented by #2462.
+
+| Proposal | Scope | State |
+|---|---|---|
+| second-P8 | Role, phase and changed-stamp evidence for a Music file-stability refusal | Implementation started; named routing requested |
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 01:00 +07, updater recovery slice claimed
 
 **Ready for lamp-voice: no (#2700, implementation starting).** First approved
