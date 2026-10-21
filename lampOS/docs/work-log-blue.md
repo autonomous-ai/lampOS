@@ -99,3 +99,9 @@ Ready for lamp-voice: yes (#2514), once its ARM64 run is green
   `addon/proposal` yet.
 - openharness#1485: the reviewer's 8 findings fixed in `a7af5bb85`, each
   answered; its CI waits for a maintainer's approval (a fork's PR).
+- 14:3x, #2514: the reviewer-lead found no P1/P2 and one P3: the app's skills
+  page showed an add-on working while `LAMP_ADDONS` was off. Folded in as
+  `e9ca4f398`: lamp-cloud reads the switch from its own unit and lists it
+  "add-ons are off on this lamp". Reviewer-two leaves the shared message
+  type to the reviewer and the first builder. openharness#1485 is approved
+  on re-review; it waits for a repo admin to approve its held CI run.
