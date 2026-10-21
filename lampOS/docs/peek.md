@@ -51,6 +51,30 @@ release, the first read of a 63 MB session took 7.5 ms, a read of one more
 turn 0.26 ms, a read with nothing new 0.08 ms, and making the section of 20
 turns 0.03 ms. Not yet timed on a lamp.
 
+### Two sessions' stages side by side: `tools/day-stages.sh`
+
+For comparing two sessions stage by stage (the first builder, 22 Oct: day
+lines whose median grew from 1.59 s to 2.06 s), `tools/day-stages.sh
+[--turns 3,5,7] [--last N] SESSION [SESSION_B]` reads a session's
+`metadata/events-*.jsonl` (its folder, its `metadata/`, or one file; a copy
+with text blanked does). One row a turn, in ms: **wait**, end of speech to
+the line's end; **words**, **cue**, **chat** and **audio** after the line's
+end; **sound**, the first sound written after the end of speech. Then each
+column's median and p90, and with two sessions the second's medians less
+the first's. Of a record it keeps only `kind` and these fields:
+
+- `local_endpoint`: `at_us` (the line's end, the decision),
+  `last_block_host_read_us` less `includes_silence_wait_ms` (the end of
+  speech), `early_end.before_this_ms`; one with `not_speech` or
+  `onboarding_near_call` is no line;
+- `answer_stages`: `decided_at_us`, `words_ms`, `cue_ms`, `chat_first_ms`,
+  each less `early_end.before_this_ms` when the line went early (row
+  marked `e`), so all count from the decision;
+- `answer_first_audio`: `after_decision_ms`;
+- `speaker_first_write`: the turn's earliest `at_us` (a wait cue counts).
+
+Tests: `tools/day-stages-test.sh`. Needs `jq`.
+
 ## The three views
 
 | View | What it shows | Where it comes from |
