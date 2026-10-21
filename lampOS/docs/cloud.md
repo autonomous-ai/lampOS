@@ -16,6 +16,11 @@ against lamp-06c1.
 - **Stays on the broker.** MQTT v5 (`rumqttc`, pinned) to
   `mqtt://{mqtt_endpoint}:{mqtt_port}` with the account's login, V1's client
   id `os-server-{device_id}`, a clean start and a 60 s session expiry, as V1.
+  With `LAMP_CLOUD_TLS=on` the connection is TLS (1.2 and 1.3, the webpki
+  roots, as the backend's ping already is), on the account's port, which is
+  then the broker's TLS port; if TLS cannot be set up it does not connect,
+  never falling back to a plain connection. Off unless set, until the
+  backend's broker is shown taking it on a lamp.
   The keepalive is 60 s (V1 asks 65,535 s, which never notices a dead link).
   It takes, and tells the broker it takes, packets of up to about 11.7 MiB
   (`MOST_PACKET_BYTES`): a `faces.add_photo` with the largest photo, in
