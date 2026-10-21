@@ -985,6 +985,21 @@ pub fn search_for(
     Ok(Some(search))
 }
 
+/// The functions each chat request of this route is given, before a spoken
+/// turn's own (the look, the name signal): the lamp's ([`crate::tools::declared`]),
+/// [`crate::tools::THE_TIME`] only for elsewhere (the time here is told in
+/// every request), then the search's ([`with_search`]).
+pub fn chat_tools(
+    tools: &crate::tools::Settings,
+    search: &[lamp_gemini::Tool],
+) -> Vec<lamp_gemini::Tool> {
+    let places = tools.clock && tools.places;
+    with_search(
+        time_elsewhere(crate::tools::declared(tools), places),
+        search,
+    )
+}
+
 /// The lamp's functions, then the search's, within Live's bound of
 /// [`lamp_gemini::MAX_TOOLS`]: the search is given room before a skill's
 /// function, and the fetch only when room is left.
@@ -1572,12 +1587,8 @@ pub fn serve(
     // With `use_skill` the skills' lines are told after the character, as
     // the Live route tells them (#1668).
     let skills_told = tools.clone();
-    let declare: crate::second_provider::net::Declare = Arc::new(move || {
-        with_search(
-            time_elsewhere(crate::tools::declared(&declared), places),
-            &searched,
-        )
-    });
+    let declare: crate::second_provider::net::Declare =
+        Arc::new(move || chat_tools(&declared, &searched));
     // Texts from the Autonomous app (#1673): a client of their own, on the
     // same model, beside the spoken turns.
     let texts = match (&files.bus_root, files.messages) {
