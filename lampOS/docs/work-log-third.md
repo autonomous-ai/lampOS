@@ -28,12 +28,37 @@ Ready for review: yes (native gates passed; stacked on #2651).
   [39632029374](https://github.com/autonomous-ai/lampOS/actions/runs/39632029374)
   were dispatched on the PR head because its stacked base is outside the
   automatic workflow filter. Both passed on `b671a8435`. ARM64 built the
-  release binaries and ran 9,628 nextest tests: all passed, one reported
-  leaky, 63 skipped. Its separate timed tests, doc tests and 12 own-harness
-  tests passed too. No Mac ARM64 link is a gate.
+  release binaries and ran 9,628 nextest tests, including the realtime
+  group: all passed, one reported leaky, 63 skipped. Its separate four doc
+  tests and both custom harnesses (`relay_signals` and 12 process tests)
+  passed too. No Mac ARM64 link is a gate.
 - Posted on #2602. The owner confirmed 4ace and 75c9's kernel results:
   `5.15.147-sun60iw2`, no `CONFIG_RT_GROUP_SCHED`. Mobile and Twelve own the
   other two lamps. The first builder measures latency on 4ace after merge.
+
+## 2026-10-22 — six resumed duplex yields — evidence audit
+
+Ready for lamp-voice: no (diagnostic read only; no policy change).
+
+- First's 21 Oct 20:4x assignment and Fourth's 23:52 update on #2602 leave
+  these six cases with Third; Seventh owns the broader Cutting in work.
+- Fourth reports four cases in `ab1840base` and two in `ab1913po350`, about
+  740 ms each with audio queued. PR #2684's committed bundle contains the
+  aggregate count, not the six case timelines. The documented timing-only
+  exports under `~/lamp-voice-data/sessions/gaps-1021/` are absent here.
+- The existing acknowledgment fixture resumes 71 capture blocks after
+  yield (710 ms); the hard deadline is 110 blocks (1.1 s). Thus 740 ms is
+  consistent with the intended short-sound pause, but the six cases cannot
+  be attributed from aggregate durations. No threshold change is proposed.
+- Requested the six sanitized event slices on
+  [#2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6321836281):
+  gap keys and worker/coordinator/source times, complete hearing chunks,
+  enqueue/readiness and any stop-word or discontinuity metadata. No words
+  or audio. Missing telemetry stays missing; queued audio alone does not
+  show it was dispatchable throughout the gap.
+- Next diagnostic: compare accepted-zero duration, withholding duration,
+  capture-block count, source-read elapsed time and decision delay at each
+  boundary. The privacy-worker fix remains first while its gates run.
 
 ## 2026-10-21 — privacy worker expiry ride — taken
 
