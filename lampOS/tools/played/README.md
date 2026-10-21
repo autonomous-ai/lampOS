@@ -49,7 +49,7 @@ Four more you can run on their own:
   lamp-tasks is older than #2702 (no `--sign-in-by-code` in the binary) is told so, and
   nothing is played. Give `TASKS=` an ARM64 `lamp-tasks` from the same
   artifact, and it's used for the run only. The lamp side is
-  `stand-in.sh`, run as root, with the stand-in's HOME given to
+  `stand-in.sh`, run as root, giving lamp-tasks an empty store of its own for the run (the real one is never touched), with the stand-in's HOME given to
   lamp-tasks' own user. If a setup step fails, it says which, and nothing
   is played. `stand-in-test.sh` runs that setup against a stand-in
   `systemctl`, with no lamp and no root: run it after changing the setup.
