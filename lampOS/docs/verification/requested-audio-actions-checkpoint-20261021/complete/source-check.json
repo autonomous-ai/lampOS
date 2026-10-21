@@ -1,0 +1,23 @@
+{
+  "all_source_hashes_still_match": true,
+  "checkout_fixture_hashes": {
+    ".github/workflows/lampos-arm64.yml": "5dbf1acd94e27dc1d11990f6618c7a7c979a6998902a654369c4143418fa2b44",
+    ".github/workflows/lampos-clippy.yml": "c6da2562a7f98f2d81fdc0da3a52370f15aac72075c82dd56be7f06bff185734",
+    "robots/lamp/rootfs/etc/systemd/journald.conf.d/zz-lamp-journal.conf": "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b",
+    "robots/lamp/rootfs/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf": "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405",
+    "robots/lamp/rootfs/usr/local/libexec/lamp-ramlog-postrotate": "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
+  },
+  "checkout_fixtures_match": true,
+  "manifest_reconstructed_from": "source-delta.json",
+  "mismatches": {
+    "checkout_fixtures": [],
+    "original_checkout": [],
+    "source_only_copy": []
+  },
+  "original_checkout_matches": true,
+  "scope": "All frozen non-document inputs and five checkout-only parent fixtures; original documentation is outside the non-document freeze.",
+  "source_file_count": 2204,
+  "source_manifest_raw_sha256": "f36368d9568fab87012545a4b36e3ce487cd993027b8a6fe7f80754d5c7e4afc",
+  "source_only_copy_matches": true,
+  "source_tree_sha256": "1e624e3d1ca0f315399c851ef1076668bcef57b11c86970ce934d70d9a4c2d40"
+}

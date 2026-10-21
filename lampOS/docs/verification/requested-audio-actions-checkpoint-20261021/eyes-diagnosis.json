@@ -1,0 +1,56 @@
+{
+  "base_source_sha256": "7fd3e7adee06b18e8f25e71d66df0b463ebcb661726fb678233e7861b3c74069",
+  "base_source_url": "https://github.com/autonomous-ai/lampOS/blob/bd43346de29bba069f741baa3eb32d03c6d5794f/lampOS/crates/eyes/src/seems_log.rs#L312",
+  "completed_process_exit_code": 1,
+  "diagnosis": "The unchanged frozen test opens /dev/full unconditionally and unwraps the result before its failed-write assertions. That open returned OS error 2 (NotFound) on the recorded macOS host. The failed host gate is preserved, not replaced by historical Linux results.",
+  "documentation_preparation": {
+    "device_access": false,
+    "network_access": false,
+    "source_edits": false,
+    "tests_run": 0
+  },
+  "failure": "lamp-eyes::seems_log::tests::a_failed_write_is_said_once",
+  "frozen_source_equals_integration_base": true,
+  "frozen_source_sha256": "7fd3e7adee06b18e8f25e71d66df0b463ebcb661726fb678233e7861b3c74069",
+  "gate_status": "failed",
+  "historical_native": {
+    "head": "c74b0f710ecac48f8668c6ab8258777788068c0a",
+    "line_numbers_1_based": {
+      "checkout_sha": 273,
+      "eyes_test_pass": 2762,
+      "merge_identity": 270
+    },
+    "qualification": "Historical only: excludes the later uncommitted Actions/Voice correction.",
+    "raw_log_basename": "second-music-integration-native-20261021-complete-final.log",
+    "raw_log_sha256": "faa46a88b8e695ab686bc074a76a912195751c79329b9ea2123db8b675af9294",
+    "run": 39553990174,
+    "supplies_corrected_runtime_qualification": false,
+    "test_duration_seconds": 0.004,
+    "test_result": "PASS",
+    "tested_base": "bd43346de29bba069f741baa3eb32d03c6d5794f",
+    "tested_merge": "3fd5914f5adb88fc3bd17054736cb47ad1a2693d",
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39553990174"
+  },
+  "host": "aarch64-apple-darwin",
+  "host_failure": {
+    "eyes_library_counts": {
+      "failed": 1,
+      "filtered_out": 0,
+      "ignored": 5,
+      "passed": 198
+    },
+    "line_numbers_1_based": {
+      "error": 2660,
+      "eyes_library_summary": 2667,
+      "failure_header": 2657,
+      "panic_location": 2659
+    },
+    "observed_error": "called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: \"No such file or directory\" }",
+    "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-tests.log",
+    "raw_log_sha256": "d3007247f44ff206648f936d773e3ba28f9ebc1530ec188f1dae30a0cb150e98"
+  },
+  "integration_base": "bd43346de29bba069f741baa3eb32d03c6d5794f",
+  "source_line": 312,
+  "source_path": "lampOS/crates/eyes/src/seems_log.rs",
+  "source_tree_sha256": "1e624e3d1ca0f315399c851ef1076668bcef57b11c86970ce934d70d9a4c2d40"
+}
