@@ -646,22 +646,22 @@ impl MemoryForgot {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
     }
 
-    /// A person is one of memory's ids: 1 to 32 bytes of lower-case
-    /// letters, digits, `_` and `-`, as memory keeps them.
+    /// A person is one of memory's own ids, never a name: a person's
+    /// ([`known::is_person_id`]), its rules' twin (`r-` for `p-`), or the
+    /// room's (`everyone`). Memory tells no other id it was asked to forget
+    /// (the reviewer's P3 1 on #2488).
     pub fn check(&self) -> Result<(), &'static str> {
         match self.person.as_deref() {
+            None | Some("everyone") => Ok(()),
+            Some(person) if known::is_person_id(person) => Ok(()),
             Some(person)
-                if !(1..=32).contains(&person.len())
-                    || !person.bytes().all(|byte| {
-                        byte.is_ascii_lowercase()
-                            || byte.is_ascii_digit()
-                            || byte == b'_'
-                            || byte == b'-'
-                    }) =>
+                if person
+                    .strip_prefix("r-")
+                    .is_some_and(|rest| known::is_person_id(&format!("p-{rest}"))) =>
             {
-                Err("a person is one of memory's ids")
+                Ok(())
             }
-            _ => Ok(()),
+            Some(_) => Err("a person is memory's own id: p-…, its r-… twin, or everyone"),
         }
     }
 }
@@ -1868,13 +1868,18 @@ mod tests {
             declaration_of(MemoryForgot::TOPIC),
             Some(MemoryForgot::declaration())
         );
-        for person in ["p-0123456789abcdef", "r-0123456789abcdef", "everyone"] {
+        for person in [
+            "p-0123456789abcdef",
+            "p-0123456789abcdef-2",
+            "r-0123456789abcdef",
+            "everyone",
+        ] {
             let told = MemoryForgot {
                 person: Some(person.into()),
             };
             assert!(told.check().is_ok(), "{person}");
         }
-        for person in ["", "P-ABC", "a name", &"x".repeat(33)] {
+        for person in ["", "P-ABC", "a name", "mai", "p-0123", &"x".repeat(33)] {
             let told = MemoryForgot {
                 person: Some(person.into()),
             };

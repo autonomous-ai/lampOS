@@ -107,9 +107,11 @@ fn a_forget_of_everything_kept_under_a_person_is_told_on_the_bus_and_nothing_els
         next(&mut told, Duration::from_secs(5)),
         Some(MemoryForgot { person: None })
     );
-    // A refused forget, a forget of the last thing, and a status: none told.
+    // A refused forget, one of an id memory doesn't make (which could be a
+    // name), a forget of the last thing, and a status: none told.
     for request in [
         json!({"op":"forget_all","person":"NOT AN ID"}),
+        json!({"op":"forget_all","person":"mai"}),
         json!({"op":"forget_last","person":"p-0123456789abcdef"}),
         json!({"op":"status","person":null}),
     ] {

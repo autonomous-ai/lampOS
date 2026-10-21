@@ -183,7 +183,9 @@ That covers a forget asked by the app (lamp-cloud's `faces.rs`) and one
 asked by voice (`forget_everything`).
 - **What it says:** the person's id only (`p-…`, `r-…` for their rules,
   `everyone` for the room's), or no person for a forget of every person.
-  Never a name or anything kept.
+  Never a name or anything kept: a forget of any other id memory takes (a
+  slug a caller chose, such as a name) is done but never told
+  (`MemoryForgot::check`, the reviewer's P3 1 on #2488).
 - **When:** after the asker has its answer, so a forget never waits for the
   bus, and whether or not the asker took the answer, since the forget was
   done either way.
@@ -195,7 +197,8 @@ asked by voice (`forget_everything`).
 - **Its readers:** the voice's tone baselines ([voice-tone.md](voice-tone.md)),
   with `LAMP_VOICE_TONE=on`.
 - **Tests:** `tests/forgot.rs` (the real server with a bus: a person's
-  forget, every person's, and three that aren't told), and each protocol's
+  forget, every person's, and four that aren't told, one of them an id
+  memory doesn't make), and each protocol's
   `only_a_forget_all_that_was_done_says_whose`.
 
 ## On the disk

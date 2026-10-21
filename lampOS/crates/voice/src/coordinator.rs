@@ -4306,6 +4306,10 @@ thread_local! {
     /// End in turn, told just before it: `None`, nothing at that End.
     static TEST_TONE_FORGOT: std::cell::RefCell<VecDeque<Option<String>>> =
         const { std::cell::RefCell::new(VecDeque::new()) };
+    /// A loop test's reader of memory's forgets on a bus of its own, in
+    /// place of the environment's (`memory/forgot`).
+    pub(super) static TEST_FORGOT_IN: std::cell::RefCell<Option<crate::bus_out::ForgotIn>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// Memory has forgotten everything under `person` (`memory/forgot`), or
@@ -4750,6 +4754,10 @@ fn conversation_with_gate(
     let mut forgot_in = tone_on
         .then(crate::bus_out::ForgotIn::from_environment)
         .flatten();
+    #[cfg(test)]
+    if tone_on && let Some(given) = TEST_FORGOT_IN.with(|slot| slot.borrow_mut().take()) {
+        forgot_in = Some(given);
+    }
     // A line's reading, waiting for its words: its turn and when it ended.
     let mut tone_pending: Option<(u64, crate::voice_tone::Reading)> = None;
     // The voice's own timing, for the part that plans what the lamp shows

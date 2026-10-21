@@ -411,6 +411,13 @@ impl Peer {
     }
 }
 
+thread_local! {
+    /// Memory, telling the voice it forgot a person once this many Ends have
+    /// been sent (`memory/forgot`), on the bus `TEST_FORGOT_IN` reads.
+    static TEST_MEMORY_FORGETS: std::cell::RefCell<Option<(usize, String, lamp_bus::Publisher)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 struct Peers {
     script: Script,
     peers: Vec<Peer>,
@@ -463,6 +470,24 @@ impl Peers {
     }
 
     fn tick(&mut self, deadline: Option<Instant>) -> io::Result<()> {
+        let ended = self.ended.len();
+        TEST_MEMORY_FORGETS.with(|slot| {
+            if slot
+                .borrow()
+                .as_ref()
+                .is_some_and(|(after, ..)| ended >= *after)
+                && let Some((_, person, mut memory)) = slot.borrow_mut().take()
+            {
+                memory
+                    .publish_json(
+                        monotonic_us(),
+                        &lamp_msgs::MemoryForgot {
+                            person: Some(person),
+                        },
+                    )
+                    .unwrap();
+            }
+        });
         if self
             .script
             .say_at_frame
@@ -2600,6 +2625,69 @@ fn a_name_memory_forgot_starts_a_fresh_tone_baseline_when_enrolled_again() {
     let (kept, none, summary) = lines(Some(rules));
     assert_eq!(kept, [json!(1), json!(2)], "{summary}");
     assert!(none.is_empty(), "{summary}");
+}
+
+/// The reviewer's P3 2 on #2488: the voice's loop reads memory's forgets
+/// from the bus itself (`ForgotIn` beside the hello's watch, not a test
+/// seam at the End): memory tells it forgot a known person after their first
+/// line, and their second line starts a fresh baseline.
+#[test]
+fn the_loop_reads_memorys_forget_from_the_bus_and_the_next_line_starts_fresh() {
+    let _one = super::pilot_faults::one_session();
+    let person = lamp_msgs::known::person_id("Jim");
+    let root = PathBuf::from(format!("/tmp/lv-forgot-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    TEST_FORGOT_IN.with(|slot| {
+        *slot.borrow_mut() = Some(crate::bus_out::ForgotIn::on(&bus).unwrap());
+    });
+    let memory = bus
+        .publisher_declared(
+            lamp_msgs::MemoryForgot::TOPIC,
+            &lamp_msgs::MemoryForgot::declaration(),
+            "memory",
+        )
+        .unwrap();
+    TEST_MEMORY_FORGETS.with(|slot| *slot.borrow_mut() = Some((1, person.clone(), memory)));
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    TEST_TONE_PERSON.with(|known| *known.borrow_mut() = Some(person.clone()));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_hears: Some("What a nice day"),
+        speak_again: Some(When::Settled(1)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_TONE_PERSON.with(|known| *known.borrow_mut() = None);
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    let told = TEST_MEMORY_FORGETS
+        .with(|slot| slot.borrow_mut().take())
+        .is_none();
+    TEST_FORGOT_IN.with(|slot| *slot.borrow_mut() = None);
+    let _ = std::fs::remove_dir_all(&root);
+    run.assert_clean();
+    assert!(told, "memory's forget was never told");
+    let lines: Vec<_> = run
+        .events("local_endpoint")
+        .into_iter()
+        .map(|end| end["tone"]["baseline_lines"].clone())
+        .collect();
+    assert_eq!(lines, [json!(1), json!(1)], "{}", run.summary());
+    let forgot: Vec<_> = run
+        .events("voice_tone_forgot")
+        .into_iter()
+        .map(|forgot| (forgot["by"].clone(), forgot["whose"].clone()))
+        .collect();
+    assert_eq!(
+        forgot,
+        [(json!("memory"), json!("person"))],
+        "{}",
+        run.summary()
+    );
 }
 
 /// (h) Gemini is Ready 1 s after the voice starts and the question began

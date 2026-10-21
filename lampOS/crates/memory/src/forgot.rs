@@ -35,7 +35,14 @@ impl ForgotOut {
         }
     }
 
+    /// Tells `forgot`, unless its person is no id of memory's own (a slug
+    /// a caller chose, which could be a name): that is never told
+    /// ([`MemoryForgot::check`]).
     pub fn tell(&mut self, forgot: &Forgot) -> io::Result<()> {
+        let message = Self::message(forgot);
+        if message.check().is_err() {
+            return Ok(());
+        }
         if self.publisher.is_none() {
             self.publisher = Some(self.bus.publisher_declared(
                 MemoryForgot::TOPIC,
@@ -47,7 +54,7 @@ impl ForgotOut {
             .publisher
             .as_mut()
             .expect("just made")
-            .publish_json(lamp_ipc::monotonic_us(), &Self::message(forgot))
+            .publish_json(lamp_ipc::monotonic_us(), &message)
             .map(|_| ());
         if result.is_err() {
             // Made again at the next forget, as the health reports' is.
