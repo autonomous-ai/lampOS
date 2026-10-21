@@ -4046,14 +4046,24 @@ mod tests {
 
     /// A say service that answers each line `begun` then `spoken`, noting for
     /// each whether the cancel was already published when the line arrived.
-    fn voice(listener: UnixListener, bus: Bus) -> std::thread::JoinHandle<Vec<(String, bool)>> {
+    /// It stops after 3 s, or at [`Voice::join`]: a line is answered before
+    /// its caller returns, so every line the test's calls said is heard by
+    /// then, and one more look takes any still waiting.
+    fn voice(listener: UnixListener, bus: Bus) -> Voice {
         listener.set_nonblocking(false).unwrap();
-        std::thread::spawn(move || {
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let stopped = std::sync::Arc::clone(&stop);
+        let thread = std::thread::spawn(move || {
             let mut heard = Vec::new();
             listener.set_nonblocking(true).unwrap();
             let until = Instant::now() + Duration::from_secs(3);
-            while Instant::now() < until {
+            loop {
+                // Read before the look, so the look comes after the stop.
+                let stopping = stopped.load(std::sync::atomic::Ordering::SeqCst);
                 let Ok((stream, _)) = listener.accept() else {
+                    if stopping || Instant::now() >= until {
+                        break;
+                    }
                     std::thread::sleep(Duration::from_millis(10));
                     continue;
                 };
@@ -4070,7 +4080,22 @@ mod tests {
                 writeln!(stream, "{}", json!({"outcome": "spoken"})).unwrap();
             }
             heard
-        })
+        });
+        Voice { stop, thread }
+    }
+
+    /// The say service [`voice`] runs.
+    struct Voice {
+        stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+        thread: std::thread::JoinHandle<Vec<(String, bool)>>,
+    }
+
+    impl Voice {
+        /// What it heard, once it is stopped.
+        fn join(self) -> std::thread::Result<Vec<(String, bool)>> {
+            self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
+            self.thread.join()
+        }
     }
 
     #[test]
