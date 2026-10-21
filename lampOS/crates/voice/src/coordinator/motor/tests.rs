@@ -1537,10 +1537,14 @@ fn failed_reap_after_stopped_is_latched_and_reported_once() {
         process::Worker,
         session_state::SessionState,
     };
-    let (dir, mut motor, mut controller) = fixture("gated_exit_failure");
+    // On one stepped clock with its child: on the host's, a pause of the
+    // test thread past the supervisor's 20 ms inhibit deadline after
+    // `begin_shutdown` failed it on a loaded host (#1569 row 75). The 5 s
+    // limits below are for a test gone wrong.
+    let (_scope, dir, mut motor, mut controller) = stepped_fixture("gated_exit_failure");
     wait(&mut motor, &mut controller, OptionalMotor::is_ready);
     motor.begin_shutdown();
-    let deadline = Instant::now() + Duration::from_secs(1);
+    let deadline = Instant::now() + Duration::from_secs(5);
     let mut stopped = false;
     while !stopped {
         assert!(
@@ -1548,7 +1552,7 @@ fn failed_reap_after_stopped_is_latched_and_reported_once() {
             "gated child did not report Stopped"
         );
         motor.poll(|event| stopped |= matches!(event, Event::Stopped { .. }));
-        std::thread::park_timeout(Duration::from_millis(1));
+        pause();
     }
     assert!(motor.failure().is_none());
     assert!(
@@ -1564,7 +1568,7 @@ fn failed_reap_after_stopped_is_latched_and_reported_once() {
     // the optional adapter. Its valid Stopped receipt was already consumed, so
     // poll skips the closed socket on every platform. A nonzero exit discovered
     // afterward is a real stored-status fault without a returned Err or Event.
-    let deadline = Instant::now() + Duration::from_secs(1);
+    let deadline = Instant::now() + Duration::from_secs(5);
     let child = motor.child.as_mut().unwrap();
     while !child.reaped() {
         assert!(Instant::now() < deadline, "gated child not reaped");
@@ -1572,7 +1576,7 @@ fn failed_reap_after_stopped_is_latched_and_reported_once() {
             child.poll().unwrap().is_none(),
             "crash must have no new event"
         );
-        std::thread::park_timeout(Duration::from_millis(1));
+        pause();
     }
     assert_eq!(child.failure(), Some("motor child failed or was killed"));
     assert!(
