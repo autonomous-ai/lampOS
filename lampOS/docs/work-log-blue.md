@@ -233,3 +233,28 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **lamp-75c9:** asked its holders on #2602 for a slot after 18:00. I
   cancelled my waiting acquire so as not to take the lamp before then.
 - **#2553:** next in the reviewer-lead's merge queue (17:17).
+
+## 2026-10-21 18:00–20:1x — #2553 merged; the first lamp-75c9 run
+
+- **#2553 merged** into lamp-voice as `27130e95e` (the reviewer-lead),
+  after two drift rebases (`docs/install.md`, then `install.rs`), each a
+  range-diff `=`.
+- **#2577:** retargeted to lamp-voice through the REST API (`gh pr edit`
+  failed on Projects classic). Rebased as `815eb09ec`; both CI runs are
+  green, and it is in the reviewer's queue.
+- **The lamp-75c9 run, 18:05–18:13**, on #2553's head `513da9128` (ARM64
+  run 39585921049):
+  - root steps through the helper's `[hand-off]`;
+  - a probe mood was kept; a probe light was dropped by the person's own
+    light (orange, 1, set this boot, up since 19 Oct);
+  - later proposals were dropped by a busy room;
+  - **not reached:** the evening and music triggers (laptop screen locked,
+    `ears/classes` off) and the rate and pause rows (session stopped).
+- **My mistake:** my lock-renew loop held 75c9 to 20:01 after my session
+  stopped at 18:13; the timer had restored the lamp at 18:31. Apologised
+  on #2602, and noted in memory: renew loops get a hard end.
+- **Asked the first builder on #2530:** should a person's light stay theirs
+  for the whole boot (a), or 12 h or until the lamp sleeps (b)?
+- **Tests' #2630** (faster judge tests): yes, and it passes merged with
+  #2577. Said yes on #1806 to the `ASLEEP_FRESH_US` `serve` option for
+  tests.
