@@ -62,6 +62,7 @@ mod tests {
                 zone: None,
                 memory_days: false,
                 bus_root: None,
+                forget: None,
             }))
         );
         assert_eq!(
@@ -83,6 +84,7 @@ mod tests {
                 zone: None,
                 memory_days: false,
                 bus_root: None,
+                forget: None,
             }))
         );
         let west = arguments(&[
@@ -159,6 +161,59 @@ mod tests {
             &["--bus-root", ""],
             &["--bus-root", "/b", "--bus-root", "/b"],
             &["--bus-root", "/b", "--help"],
+        ] {
+            assert!(with(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn the_forget_socket_is_off_unless_set_and_needs_its_group_and_an_absolute_path() {
+        let base = ["--dir", "/m", "--socket", "/s"];
+        let with = |more: &[&str]| arguments(&[&base[..], more].concat());
+        assert_eq!(with(&[]).unwrap().unwrap().forget, None);
+        assert_eq!(
+            with(&[
+                "--forget-socket",
+                "/f/forget.sock",
+                "--forget-group",
+                "lamp-app"
+            ])
+            .unwrap()
+            .unwrap()
+            .forget,
+            Some(("/f/forget.sock".into(), "lamp-app".into()))
+        );
+        for bad in [
+            &["--forget-socket", "/f/forget.sock"][..],
+            &["--forget-group", "lamp-app"],
+            &[
+                "--forget-socket",
+                "forget.sock",
+                "--forget-group",
+                "lamp-app",
+            ],
+            &["--forget-socket", "/", "--forget-group", "lamp-app"],
+            &["--forget-socket", "/s", "--forget-group", "lamp-app"],
+            &["--forget-socket", "/f/a", "--forget-group", ""],
+            &["--forget-socket", "/f/a", "--forget-group", "a:b"],
+            &[
+                "--forget-socket",
+                "/f/a",
+                "--forget-socket",
+                "/f/a",
+                "--forget-group",
+                "g",
+            ],
+            &[
+                "--forget-socket",
+                "/f/a",
+                "--forget-group",
+                "g",
+                "--forget-group",
+                "g",
+            ],
+            &["--forget-socket"],
+            &["--forget-group", "g", "--help"],
         ] {
             assert!(with(bad).is_err(), "{bad:?}");
         }

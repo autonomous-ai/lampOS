@@ -761,29 +761,28 @@ impl Days {
     }
     pub fn forget_all(&mut self, person: Option<&Person>) -> Result<u64> {
         let tx = self.db.transaction()?;
-        tx.execute("DELETE FROM doomed", [])?;
-        tx.execute(
-            "INSERT INTO doomed SELECT rid FROM entries WHERE ?1 IS NULL OR person=?1",
-            [person.map(Person::as_str)],
-        )?;
-        let count = erase(&tx)?;
-        // Empty people also have job and snapshot metadata, but keep the high
-        // water mark so a stale external reference can never name a new entry.
-        tx.execute(
-            "UPDATE sessions SET note='',ids='[]',invalidated=1 WHERE ?1 IS NULL OR person=?1",
-            [person.map(Person::as_str)],
-        )?;
-        tx.execute(
-            "DELETE FROM jobs WHERE ?1 IS NULL OR person=?1",
-            [person.map(Person::as_str)],
-        )?;
-        tx.execute(
-            "UPDATE people SET skipped=0 WHERE ?1 IS NULL OR person=?1",
-            [person.map(Person::as_str)],
-        )?;
+        let count = empty(&tx, person)?;
         tx.commit()?;
         self.forget_set_aside()?;
         Ok(count)
+    }
+
+    /// Everything kept for one person and every rule in their rules scope
+    /// (`Person::rules`), in one transaction: the app's removal of the
+    /// person (`docs/memory.md`, "Forgetting a person"). The same erase as
+    /// [`Self::forget_all`] of each, so a crash between them never leaves
+    /// the person forgotten and their rules kept. The removed entries, then
+    /// the removed rules.
+    pub fn forget_person(&mut self, person: &Person) -> Result<(u64, u64)> {
+        let rules = person
+            .rules()
+            .ok_or_else(|| Error::new("bad_person", "the person has no rules scope"))?;
+        let tx = self.db.transaction()?;
+        let removed = empty(&tx, Some(person))?;
+        let ruled = empty(&tx, Some(&rules))?;
+        tx.commit()?;
+        self.forget_set_aside()?;
+        Ok((removed, ruled))
     }
 
     /// A set-aside database is the person's memory too, and this build can't
@@ -1769,6 +1768,31 @@ fn descendants(db: &Connection, with_versions: bool) -> Result<()> {
         db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept') INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
     }
     Ok(())
+}
+/// Every entry of `person`, or of every person for `None`, erased in the
+/// caller's transaction, with their session notes, jobs and skipped count.
+fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
+    tx.execute("DELETE FROM doomed", [])?;
+    tx.execute(
+        "INSERT INTO doomed SELECT rid FROM entries WHERE ?1 IS NULL OR person=?1",
+        [person.map(Person::as_str)],
+    )?;
+    let count = erase(tx)?;
+    // Empty people also have job and snapshot metadata, but keep the high
+    // water mark so a stale external reference can never name a new entry.
+    tx.execute(
+        "UPDATE sessions SET note='',ids='[]',invalidated=1 WHERE ?1 IS NULL OR person=?1",
+        [person.map(Person::as_str)],
+    )?;
+    tx.execute(
+        "DELETE FROM jobs WHERE ?1 IS NULL OR person=?1",
+        [person.map(Person::as_str)],
+    )?;
+    tx.execute(
+        "UPDATE people SET skipped=0 WHERE ?1 IS NULL OR person=?1",
+        [person.map(Person::as_str)],
+    )?;
+    Ok(count)
 }
 fn erase(tx: &Transaction<'_>) -> Result<u64> {
     let people: Vec<String> = tx

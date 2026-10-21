@@ -31,6 +31,7 @@ impl Scratch {
             zone: None,
             memory_days: days,
             bus_root: bus.then(|| self.0.join("b")),
+            forget: None,
         }
     }
 }

@@ -31,7 +31,7 @@ sha2.workspace = true
 rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
 unicode-normalization = "0.1"
 # Used only by the explicit fixture transport and its bounded host watchdogs.
-rustix = { version = "1.1", features = ["fs", "event"] }
+rustix = { version = "1.1", features = ["fs", "event", "process"] }
 
 [lints]
 workspace = true

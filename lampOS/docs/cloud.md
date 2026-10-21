@@ -91,7 +91,7 @@ lamp says so.
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
-| `face.remove` (`{"name"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules. `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
+| `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
 | `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms"} \| null, "stale"}`, from lamp-update's kept `update/status`; `unknown` and nulls before lamp-update has said anything. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
@@ -290,20 +290,35 @@ lamp-cloud keeps nothing; both go to the eyes as the voice's own asks do.
   prints, their familiarity number, a face from a photo by that name, and
   their name in set-aside records. If set-aside records couldn't all be
   searched, the forget waits for them (#1586) and the answer says
-  `finishing`. Then memory is asked, as the voice's `forget_everything`
-  asks it, `{"op":"forget_all","person":ID}` for the person's id
+  `finishing`. Then, unless the app asked for the face only, memory is
+  asked `{"op":"forget_person","person":ID}` for the person's id
   (`faces::person_id`, the voice's `p-` and 16 hex digits of the name's
-  hash) and again for their rules' (`r-`, the same digits). With the
-  stable memory id (#2176), the id the eyes say too, and the name's own
-  only when the eyes say it is nobody else's (`name_id_free`, #2330;
-  memory.md). `memory` says
-  `forgotten` only when both were done, else `kept` with a `reason`: memory
-  not reached, refused, or not given to lamp-cloud (no `LAMP_MEMORY_SOCKET`),
-  so the app never says gone when it isn't. Memory's socket is mode 0600
-  and its own user's, so a lamp giving lamp-cloud the socket must also give
-  it the access; until then the answer is `kept`, and the app shows that
-  the person's memories stay on the lamp, never "removed" alone. "Forget my
-  face" at the lamp stays the face only (eyes.md).
+  hash), which forgets them and their rules (`r-`, the same digits) in one
+  request (memory.md, "Forgetting a person"). With the stable memory id
+  (#2176), the id the eyes say too, and the name's own only when the eyes
+  say it is nobody else's (`name_id_free`, #2330; memory.md): one
+  `forget_person` for each. Memory then tells the lamp's other parts on
+  `memory/forgot`, as for "forget everything" by voice. `memory` says
+  `forgotten` only when each was done, else `kept` with a `reason`: memory
+  not reached, refused, or not given to lamp-cloud (no
+  `LAMP_MEMORY_FORGET_SOCKET`), so the app never says gone when it isn't.
+  "Forget my face" at the lamp stays the face only (eyes.md).
+- **`entirely`** (agreed with the mobile app): `true`, or left out as
+  before, is the eyes and then memory; `false` is the eyes' forget only,
+  and the answer carries `"memory": "not asked"`; any other value is
+  refused before the eyes are asked. `{"entirely": true}` with no name is
+  refused by the name's check: that refusal is the app's probe for a lamp
+  with `face.remove`, where a lamp without it answers `not on this lamp`.
+  A lamp of before `entirely` takes the field as unknown and forgets
+  memory too.
+- **`LAMP_MEMORY_FORGET_SOCKET`** is memory's narrow socket
+  (`lamp-memory --forget-socket … --forget-group …`): mode 0660 for one
+  group, taking `forget_person` only, so lamp-cloud can forget a person and
+  read nothing; lamp-cloud's user must be in that group. Memory's own
+  socket (`LAMP_MEMORY_SOCKET`, 0600) is no longer asked by lamp-cloud,
+  with no fallback to it. The product units don't set either yet: until a
+  lamp sets both, the answer is `kept`, and the app shows that the
+  person's memories stay on the lamp, never "removed" alone.
 - **A face already gone can't take its memories from the page.** After
   "forget my face" at the lamp, or a remove whose photo face couldn't be
   let go after the people's forget ran, the eyes no longer know the name:
