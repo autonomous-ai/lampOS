@@ -1936,7 +1936,9 @@ mod tests {
 
     /// #1712 (the first builder's yes at 04:40): two fruitless yields, then
     /// 20 s of the reply with no yield forgives one, so a line over it
-    /// yields again; 10 s isn't enough.
+    /// yields again, and a person who goes on stops the story: the third
+    /// cut-in of lamp-4ace's 20 Oct 03:45 story (the first builder on #1722,
+    /// 21 Oct 16:2x). 10 s isn't enough.
     #[test]
     fn a_fruitless_yield_is_forgiven_after_twenty_seconds_with_no_yield() {
         let quiet_blocks = |seconds: u64| seconds * 100;
@@ -1991,6 +1993,20 @@ mod tests {
                 yields,
                 "{after} s after: {steps:?}"
             );
+            if yields {
+                // The person goes on as the lamp's sound dies away: the
+                // third line stops the story.
+                assert_eq!(
+                    hear(&mut mask, &mut sequence, 30, 0.9, &evidence(10, None), true),
+                    []
+                );
+                let steps = hear(&mut mask, &mut sequence, 6, 0.9, &evidence(40, None), true);
+                assert_eq!(
+                    steps.last().map(|(_, step)| *step),
+                    Some(Step::Commit),
+                    "{steps:?}"
+                );
+            }
         }
     }
 
