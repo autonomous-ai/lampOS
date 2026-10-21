@@ -5272,6 +5272,14 @@ A usage limit paused me from about 00:40 to 06:2x.
   - **Next:** guard mode's and who was here's words.
 - **A slip:** `;` chains ran on past failed steps twice today. Once a broken commit reached my own branch (deleted); once a PR opened with placeholders (edited). Folds and PR steps are now chained with `&&`.
 
+## 2026-10-21, 20:32 ICT: #2621 merged; #2632 → #2643 (the unplug words, a fallback for one release); #2582 → #2638 (rebased); guard mode's words in their gate; the silences next
+
+- **#2621 merged:** the duplex route's tone words.
+- **#2643 replaces #2632** (prepare-unplug's words into its `[unplug]`), for the first builder's P2. A lamp can keep an older `skill.toml` past a newer lamp-skills: an updater from before the skills bundle, a unit with its own `--dir` (lamp-4ace's), or a file changed on the lamp. So a granted skill without `[unplug]` says the built-in words for one release, and the journal says so. Gate with lamp-skills' five readers: 4849 passed, 1 failed (lamp-eyes' Mac-only `/dev/full` test, given to Tests).
+- **#2638 replaces #2582** (`LAMP_MOOD_TONE`), rebased for a `voice-tone.md` conflict with #2621. The reviewer-lead found nothing, and it merges on green ARM64. The rerun on its base: 719 passed, 0 failed. Ten runs it on lamp-75c9 tonight.
+- **Guard mode's words** (row 42): every line it says or tells the model is in its `[watch.words]`. A visit's text is put together from `{who}`, `{at}` and `{long}`, each line checked for only its own slots. A copy from before (guard mode is installable) says the built-in words for one release. Tests: byte for byte against the old words, the slots, the older copy; both mutations fail them. In its gate.
+- **Next, from the first builder at 19:4x:** the second route's silences mid-answer, the breakdown by cause, then the fix. It waits on the two lamp-4ace sessions, which I asked for; a waiter picks them up.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
