@@ -546,9 +546,17 @@ impl Tts {
         }
     }
 
-    /// The service refused the socket's model (`error`, a 44xx close): no
-    /// socket is opened ahead for it again, said once.
+    /// The service refused the socket's model (`error`, a 4400, 4404 or
+    /// 4422 close): no socket is opened ahead for it again, said once, and
+    /// the rest of `request`'s answer goes in the route's model, since none
+    /// of it was heard from the socket and a model the socket refuses may
+    /// be one HTTP refuses too (the review of #2629).
     fn refuse(&self, request: u64, error: &Error) {
+        if let Ok(mut socketed) = self.socketed.lock()
+            && *socketed == Some(request)
+        {
+            *socketed = None;
+        }
         let model = self.socket_model().to_owned();
         let Ok(mut refused) = self.refused.lock() else {
             return;
@@ -585,6 +593,12 @@ impl Tts {
         if let Ok(mut ahead) = self.ahead.lock() {
             *ahead = Some(Ahead::Opening(request));
         }
+        // From the ask, not the open: a piece that goes over HTTP while the
+        // socket still opens is said in the socket's model too, so one
+        // answer keeps one voice (the review of #2629).
+        if let Ok(mut socketed) = self.socketed.lock() {
+            *socketed = Some(request);
+        }
         let from = Instant::now();
         let opened = open_socket(socket).await;
         let Ok(mut ahead) = self.ahead.lock() else {
@@ -601,9 +615,6 @@ impl Tts {
                     from.elapsed().as_millis()
                 );
                 *ahead = Some(Ahead::Open(request, Box::new(socket), Instant::now()));
-                if let Ok(mut socketed) = self.socketed.lock() {
-                    *socketed = Some(request);
-                }
             }
             Err(error) => {
                 eprintln!(
@@ -787,7 +798,9 @@ impl Tts {
                         "lamp-voice second: request {}: the speech socket failed before its first audio ({error}); the piece goes over HTTP",
                         turn.request
                     );
-                    if matches!(error, Error::Status(400..=499)) {
+                    // The model or the request refused, not a rate or a
+                    // timeout, which pass (the review of #2629).
+                    if matches!(error, Error::Status(400 | 404 | 422)) {
                         self.refuse(turn.request, &error);
                     }
                 }
@@ -976,7 +989,12 @@ impl TtsStream {
         let bytes = match &mut self.source {
             None => return Ok(false),
             Some(Source::Http(response)) => chunk(response).await?,
-            Some(Source::Socket(socket)) => socket_audio(socket).await?,
+            // A close after its first audio ends the piece, as it did
+            // before: what was said stands (the review of #2629).
+            Some(Source::Socket(socket)) => match socket_audio(socket).await {
+                Err(Error::Status(_)) if self.piece.is_none() => None,
+                other => other?,
+            },
         };
         match bytes {
             Some(bytes) => {
@@ -1508,6 +1526,61 @@ mod tests {
         };
         *set.socketed.lock().unwrap() = Some(9);
         assert_eq!(set.model_for(Some(turn(9))), Some("eleven_turbo_v2_5"));
+    }
+
+    /// The review of #2629: only a refusal of the model or the request
+    /// (4400, 4404, 4422) stops the sockets; a rate limit's 4429 sends its
+    /// piece over HTTP and refuses nothing. A refusal puts the rest of that
+    /// answer in the route's model.
+    #[tokio::test]
+    async fn only_a_refused_model_stops_the_sockets_and_its_answer_goes_on_in_the_routes_model() {
+        let (address, _server) = socket_serving(vec!["close:4429:rate limited"]).await;
+        let (url, _, asked) = keeping(vec![5, 0, 6, 0], false).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap();
+        tts.open_ahead_on(8, &local_socket(&address)).await;
+        assert_eq!(said(&tts, "Hello there.", 8).await, [10, 12]);
+        assert_eq!(asked.lock().unwrap().len(), 1);
+        assert!(
+            tts.refused.lock().unwrap().is_none(),
+            "a rate limit refuses nothing"
+        );
+        assert!(tts.opens_ahead());
+        let (address, _server) =
+            socket_serving(vec!["close:4400:ElevenLabs 400: unsupported_model"]).await;
+        let tts = Tts {
+            model: Some("eleven_v4_turbo".to_owned()),
+            ..Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap()
+        };
+        tts.open_ahead_on(9, &local_socket(&address)).await;
+        assert_eq!(tts.model_for(Some(turn(9))), Some("eleven_flash_v2_5"));
+        assert_eq!(said(&tts, "Hello there.", 9).await, [10, 12]);
+        assert_eq!(
+            tts.model_for(Some(turn(9))),
+            Some("eleven_v4_turbo"),
+            "refused: the rest of the answer in the route's model"
+        );
+    }
+
+    /// The review of #2629: a close after the piece's first audio ends the
+    /// piece with what was said, as before, never the whole answer; and a
+    /// socket that couldn't open still keeps the answer in one voice.
+    #[tokio::test]
+    async fn a_close_after_the_first_audio_ends_only_the_piece() {
+        let (address, _server) = socket_serving(vec![
+            r#"{"audio":"AQACAA==","isFinal":false}"#,
+            "close:4400:ElevenLabs 400: late",
+        ])
+        .await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, PROXY, "k", None).unwrap();
+        tts.open_ahead_on(7, &local_socket(&address)).await;
+        assert_eq!(said(&tts, "Hello there.", 7).await, [2, 4]);
+        let refused = SocketRequest {
+            url: "ws://127.0.0.1:9/x".to_owned(),
+            header: "authorization",
+            value: "Bearer k".to_owned(),
+        };
+        tts.open_ahead_on(10, &refused).await;
+        assert_eq!(tts.model_for(Some(turn(10))), Some("eleven_flash_v2_5"));
     }
 
     /// A piece that finds its socket still opening goes over HTTP and
