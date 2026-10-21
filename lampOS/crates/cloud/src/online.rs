@@ -1533,19 +1533,26 @@ mod tests {
     #[tokio::test]
     async fn a_refused_login_backs_off_and_is_said_once() {
         let (port, seen) = broker(Broker::Refuses, Vec::new()).await;
+        let connects = |seen: &[Seen]| {
+            seen.iter()
+                .filter(|seen| matches!(seen, Seen::Connect { .. }))
+                .count()
+        };
         let began = tokio::time::Instant::now();
-        let lines = against(port, &seen, Duration::from_millis(50), |_| {
-            began.elapsed() >= Duration::from_millis(1_000)
+        // Until the third try, not a second of them (#1806): after waits of
+        // 50 and 100 ms, so 150 ms at least. In a tight loop, or with waits
+        // that do not double, it comes sooner.
+        let lines = against(port, &seen, Duration::from_millis(50), |seen| {
+            connects(seen) >= 3
         })
         .await;
-        let connects = seen
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|seen| matches!(seen, Seen::Connect { .. }))
-            .count();
-        // 50, 100, 200, 400 ms of waiting in the second: five tries at most.
-        assert!((2..=6).contains(&connects), "{connects}");
+        let connects = connects(&seen.lock().unwrap());
+        assert!(connects >= 3, "{connects}");
+        assert!(
+            began.elapsed() >= Duration::from_millis(150),
+            "{connects} tries in {:?}",
+            began.elapsed()
+        );
         assert_eq!(lines.len(), 1, "{lines:?}");
         assert!(lines[0].starts_with("offline, trying again"), "{lines:?}");
         assert!(lines[0].contains("BadUserNamePassword"), "{lines:?}");

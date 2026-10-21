@@ -1010,19 +1010,26 @@ mod tests {
         let now = Instant::now();
         assert_eq!(wifi.ssid("wlan0", now), "Example Home");
         wifi.program = hung.clone();
-        wifi.within = IW_WITHIN;
+        // The bound itself is shown above: here only that the name is
+        // empty, at a test's 50 ms, not 500 (#1806).
+        wifi.within = Duration::from_millis(50);
         // Kept: the hung `iw`, asked, would have said nothing.
         assert_eq!(
             wifi.ssid("wlan0", now + SSID_KEPT - Duration::from_secs(1)),
             "Example Home"
         );
         assert_eq!(wifi.ssid("wlan0", now + SSID_KEPT), "");
-        // The killed stand-in is gone by the next ask, however loaded the
-        // machine, and is reaped there.
-        std::thread::sleep(Duration::from_millis(200));
+        // The killed stand-in is reaped at an ask once it is gone, and no
+        // other is started while it is there: asked until it answers, not
+        // after a fixed 200 ms (#1806).
         wifi.program = answering.clone();
         wifi.within = roomy;
-        assert_eq!(wifi.ssid("wlan1", now + SSID_KEPT), "Example Home");
+        let until = Instant::now() + Duration::from_secs(5);
+        while wifi.ssid("wlan1", now + SSID_KEPT).is_empty() {
+            assert!(Instant::now() < until, "the killed stand-in never went");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(wifi.stuck.is_none());
         for path in [answering, hung] {
             std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
         }
