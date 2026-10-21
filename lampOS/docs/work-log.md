@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-21 15:26 UTC, release cache correction qualified and Music Linux failure under diagnosis
+
+**Release #2462: ready for reviewer integration.** Head
+`924933afe34277d9a16efd4352417eb56b72bd3d` passed fresh host checks and
+[ARM64, x86 and artifact verification](verification/second-release-cache-20261021/README.md):
+**9,650 nextest passes (one leaky), 63 skipped**, four doctests, 12 own-harness
+tests, relay signals and native **35 + 12 + 7** Python passes. All **49/49
+payload checksums** match. The ordinary PR skipped cleanup/cache save and
+publication; three fresh host fixtures cover the narrow cleanup. General CI
+is path-excluded. The tested merge/base and exact limits are in the receipt.
+Reviewer integration and #1812's agreed workflow/docs handoff remain pending.
+
+**Music #1757: ready: no.** The complete Linux gate is still running on the
+frozen integration source. Its requested-audio focus failed **49 passed /
+1 failed**: the real worker cancelled before the test's expected renewal.
+The current log does not establish the cancellation cause. A bounded
+first-cancellation diagnostic is being prepared without changing the frozen
+source or weakening permission rules. No failing stage is replaced by a
+later passing repetition. The complete Mac **9,268 / 2 / 49** failure record
+below remains unchanged. Public Music head is still draft `c74b0f710`.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-21 15:07 UTC, Linux gate running and release cache correction pushed
 
 **Music #1757: ready: no.** The complete Mac gate is preserved as a

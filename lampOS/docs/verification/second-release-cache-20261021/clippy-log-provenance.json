@@ -1,0 +1,156 @@
+{
+  "archive": {
+    "basename": "second-release-cache-clippy-20261021-logs.zip",
+    "sha256": "52f64c8ca8c97ed84bb88f3b953d5cb94605bffe80e96676bbfc10b947650e1d"
+  },
+  "archive_bytes": 23818,
+  "binding": "Owner-confirmed completed official log ZIP, pinned SHA-256, exact API step numbers and observed archive filenames. No timestamp-window attribution.",
+  "body_comparison_transform": "splitlines, remove a leading BOM and the full timestamp prefix where present; preserve literal continuation lines and every message byte, ordering and multiplicity. Subsecond timestamp representations differ between GitHub combined and numbered logs.",
+  "line_reference_rule": "Result log_line fields identify this ordered record stream; member ranges map each line to its exact numbered archive file and line. The original gh payload stream has the same message count and order.",
+  "no_log_files_modified_or_extracted": true,
+  "normalized_message_stream_encoding": "UTF-8 of ordered timestamp-free message lines joined by newline, with one final newline.",
+  "normalized_message_stream_sha256": "5f8795b5322aedf3bfd2bc1b1e9f8196752d00a2e1eb781b899633d4d11cfb62",
+  "numbered_and_combined_message_bodies_identical_in_order": true,
+  "origin": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/39622328446/logs",
+  "original_gh_log": {
+    "basename": "second-release-cache-clippy-20261021-final.log",
+    "sha256": "608d5e42ede8278876d7e2c239f0568c65db20b540db7f1e0c58b8a4c94fedd1"
+  },
+  "original_payload_binding": "The original scoped gh payloads exactly equal the numbered members in API step order, after splitlines only.",
+  "original_unknown_step_labels": false,
+  "other_members": [
+    {
+      "archive_member": "0_lampOS \u2014 clippy, every crate and target (x86 Linux).txt",
+      "bytes": 37213,
+      "sha256": "a4c03ac2bcc68113a10dd03d7266cf11951046ae5bb607b63cd4f9dc7864cc34"
+    },
+    {
+      "archive_member": "lampOS \u2014 clippy, every crate and target (x86 Linux)/system.txt",
+      "bytes": 585,
+      "sha256": "8b70c889aa6e08abd9565850780e0cf8e3accd8c96f18d135c2f14207d1af472"
+    }
+  ],
+  "record_line_count": 477,
+  "skipped_api_steps_without_members": [
+    {
+      "name": "save the cache",
+      "number": 8
+    }
+  ],
+  "source_api": {
+    "basename": "second-release-cache-clippy-20261021-raw.json",
+    "sha256": "1e376e99775c5ec3f7deb2080e60017326edc58867e14fb83ad32a44556f9f78"
+  },
+  "step_member_count": 9,
+  "step_members": [
+    {
+      "api_job_id": 119298774059,
+      "api_job_name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "api_step_name": "Set up job",
+      "api_step_number": 1,
+      "archive_member": "lampOS \u2014 clippy, every crate and target (x86 Linux)/1_Set up job.txt",
+      "bytes": 2106,
+      "line_count": 34,
+      "record_first_line": 1,
+      "record_last_line": 34,
+      "sha256": "d1ee9846ab28a2373db3e5d8cff2eff975446a04368a4fdd9f0ed13be934e464"
+    },
+    {
+      "api_job_id": 119298774059,
+      "api_job_name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "api_step_name": "system packages",
+      "api_step_number": 2,
+      "archive_member": "lampOS \u2014 clippy, every crate and target (x86 Linux)/2_system packages.txt",
+      "bytes": 14455,
+      "line_count": 187,
+      "record_first_line": 35,
+      "record_last_line": 221,
+      "sha256": "e0cb84f21e96642c534da6f7a9f980f20c3b99dcfd93ed5e9b3dee2b0f0f10f2"
+    },
+    {
+      "api_job_id": 119298774059,
+      "api_job_name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "api_step_name": "Run actions/checkout@v4",
+      "api_step_number": 3,
+      "archive_member": "lampOS \u2014 clippy, every crate and target (x86 Linux)/3_Run actions_checkout@v4.txt",
+      "bytes": 8061,
+      "line_count": 109,
+      "record_first_line": 222,
+      "record_last_line": 330,
+      "sha256": "799989d7d62f4e1466f6f64da4e9498d54e6de87708f761c16eba72082acb1d1"
+    },
+    {
+      "api_job_id": 119298774059,
+      "api_job_name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "api_step_name": "Rust 1.96.0",
+      "api_step_number": 4,
+      "archive_member": "lampOS \u2014 clippy, every crate and target (x86 Linux)/4_Rust 1.96.0.txt",
+      "bytes": 3489,
+      "line_count": 49,
+      "record_first_line": 331,
+      "record_last_line": 379,
+      "sha256": "f8491b21e9821fc4b110ebb3e735638bcdeef28bdf47e6bd75777ab7cf2a13c6"
+    },
+    {
+      "api_job_id": 119298774059,
+      "api_job_name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "api_step_name": "restore the cache",
+      "api_step_number": 5,
+      "archive_member": "lampOS \u2014 clippy, every crate and target (x86 Linux)/5_restore the cache.txt",
+      "bytes": 5048,
+      "line_count": 61,
+      "record_first_line": 380,
+      "record_last_line": 440,
+      "sha256": "b5bbd00f1babb0c77ae0ceb0feb4699d4990250becbfe4f72847ab67d498cab3"
+    },
+    {
+      "api_job_id": 119298774059,
+      "api_job_name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "api_step_name": "unchanged source files get the cached build's times back",
+      "api_step_number": 6,
+      "archive_member": "lampOS \u2014 clippy, every crate and target (x86 Linux)/6_unchanged source files get the cached build's times back.txt",
+      "bytes": 440,
+      "line_count": 5,
+      "record_first_line": 441,
+      "record_last_line": 445,
+      "sha256": "0e522b20da2f357392beefc6d0914e03448e7519302d3e7c0002a572fb8d6c29"
+    },
+    {
+      "api_job_id": 119298774059,
+      "api_job_name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "api_step_name": "clippy (every crate and target, warnings as errors)",
+      "api_step_number": 7,
+      "archive_member": "lampOS \u2014 clippy, every crate and target (x86 Linux)/7_clippy (every crate and target, warnings as errors).txt",
+      "bytes": 1557,
+      "line_count": 16,
+      "record_first_line": 446,
+      "record_last_line": 461,
+      "sha256": "5928ad425f792a4d4ba43736a231fc1afcf806645145b6174c58540071f94635"
+    },
+    {
+      "api_job_id": 119298774059,
+      "api_job_name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "api_step_name": "Post Run actions/checkout@v4",
+      "api_step_number": 16,
+      "archive_member": "lampOS \u2014 clippy, every crate and target (x86 Linux)/16_Post Run actions_checkout@v4.txt",
+      "bytes": 1707,
+      "line_count": 14,
+      "record_first_line": 462,
+      "record_last_line": 475,
+      "sha256": "b1f0294021e563521bf5c4d0f65461a15a8f515d9f004818f16108a4867bb86a"
+    },
+    {
+      "api_job_id": 119298774059,
+      "api_job_name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "api_step_name": "Complete job",
+      "api_step_number": 17,
+      "archive_member": "lampOS \u2014 clippy, every crate and target (x86 Linux)/17_Complete job.txt",
+      "bytes": 374,
+      "line_count": 2,
+      "record_first_line": 476,
+      "record_last_line": 477,
+      "sha256": "1bdf287d56f23cdb49b30de5aeb99d73d1fbf6694d83fcd82ad39fee1a0aee03"
+    }
+  ],
+  "system_member_not_counted_as_test_output": true
+}
