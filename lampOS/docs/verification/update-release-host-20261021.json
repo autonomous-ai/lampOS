@@ -1,0 +1,243 @@
+{
+  "schema": 1,
+  "qualification": "Passed bounded host release checks for the exact two-file working patch. This is not a native CI result or a committed-head qualification.",
+  "base": "38064be09ec7f6e9673802509b46ce969b050ba1",
+  "starting_head": "1399893f45101fdb181b9615fce31daf523034a8",
+  "working_patch": {
+    "changed_files": {
+      ".github/workflows/lampos-arm64.yml": "cd487036102e1a311f84d1454c758ef0ad7db8568e11b9eb2f323fd4f89bfcf7",
+      "lampOS/docs/updates.md": "030465fb86a7deb68a498db8159af3defa72a33e1db8f3acc0330a749fd84fef"
+    },
+    "diff_sha256": "9567a0ae553c9f0a3fe7c6d36b9faacdf5c5b64d31979176715896d8f267014e",
+    "index_unchanged": true,
+    "only_allowed_dirty_paths": true,
+    "summary": "Remove only the isolated example target immediately before cache save under the exact save condition; preserve all example builds, artifact export/upload and checksums, cache keys and other cache paths. Document the later rebuild cost."
+  },
+  "host": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "python": "3.14.7",
+    "rust_toolchain": "1.96.0",
+    "actionlint": "1.7.12",
+    "actionlint_optional_shellcheck_pyflakes": "disabled; all 17 run blocks separately pass bash -n and all five publisher Python files pass ast.parse"
+  },
+  "process_exit_code": 0,
+  "fresh_target": {
+    "initially_absent": true,
+    "final_bytes": 144632395,
+    "budget_bytes_exclusive": 214748364,
+    "build_seconds": 14.119,
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_PROFILE_DEV_INCREMENTAL": "false",
+      "CARGO_NET_OFFLINE": "true"
+    },
+    "updater_level": 5,
+    "updater_sha256": "7a1f5b3560f223c1c0ea7ed184ba1c7ccbe5bf43819adcf61f28f68b8d454081",
+    "cargo_lock_sha256": "6c26d24783a83bb301b83e4133417574c4022c6d54ef7f7bee807e877e516564"
+  },
+  "input_invariance": {
+    "source_file_count": 2282,
+    "source_tree_sha256": "5033563329e9110549ad38f55cbe350871e99602f832930c6285fa7f5db61d73",
+    "unchanged": true,
+    "changed_paths": [],
+    "scope": "Tracked regular files under .github and lampOS, excluding lampOS/docs except the changed updates.md. The file map includes both changed files; the unchanged historical receipt was separately compared byte-for-byte with the starting head.",
+    "aggregate_encoding": "SHA-256 of json.dumps(path_to_sha256_map, sort_keys=True).encode(), without final newline"
+  },
+  "stages": [
+    {
+      "stage": "publisher-tests",
+      "exit_code": 0,
+      "seconds": 0.53,
+      "raw_log_basename": "publisher-tests.log",
+      "raw_log_sha256": "08028860fdabb52ee4182d0131b79debcf0a9a63f1981a850e40097e52a28c4f",
+      "target_bytes_after_stage": 0,
+      "tests_run": 35,
+      "result_lines": [
+        "Ran 35 tests in 0.413s",
+        "OK"
+      ],
+      "command": [
+        "python3",
+        "-B",
+        "-I",
+        ".github/scripts/lampos-publish-test.py"
+      ],
+      "working_directory": "repository root"
+    },
+    {
+      "stage": "provenance-tests",
+      "exit_code": 0,
+      "seconds": 0.976,
+      "raw_log_basename": "provenance-tests.log",
+      "raw_log_sha256": "d71ba659e00f51cdd1d3b7f31fd993ddbc6561cf29563ad8e191424009d5ee18",
+      "target_bytes_after_stage": 0,
+      "tests_run": 12,
+      "result_lines": [
+        "Ran 12 tests in 0.885s",
+        "OK"
+      ],
+      "command": [
+        "python3",
+        "-B",
+        "-I",
+        ".github/scripts/lampos-publish-artifact-test.py",
+        "--cargo",
+        "cargo"
+      ],
+      "working_directory": "repository root"
+    },
+    {
+      "stage": "actionlint",
+      "exit_code": 0,
+      "seconds": 0.08,
+      "raw_log_basename": "actionlint.log",
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "target_bytes_after_stage": 0,
+      "tests_run": null,
+      "result_lines": [],
+      "command": [
+        "actionlint",
+        "-shellcheck=",
+        "-pyflakes=",
+        ".github/workflows/lampos-arm64.yml"
+      ],
+      "working_directory": "repository root"
+    },
+    {
+      "stage": "workflow-checks",
+      "exit_code": 0,
+      "seconds": 0.859,
+      "raw_log_basename": "workflow-checks.log",
+      "raw_log_sha256": "5111359be1369801f1b176998c401b102e1af11a5a57fca4395133e935a72515",
+      "target_bytes_after_stage": 0,
+      "tests_run": null,
+      "result_lines": [
+        "PASS: 72 gate cases, 6 cold-target cases, 3 hash-bound cleanup fixtures, 17 bash blocks, 5 Python ASTs, YAML and diff checks",
+        "PASS: both path triggers, upstream cache settings/conditions, fresh-record preservation, selected environment and upstream workflow concurrency"
+      ],
+      "command": [
+        "python3",
+        "-B",
+        "validate_workflow.py"
+      ],
+      "working_directory": "repository root"
+    },
+    {
+      "stage": "build",
+      "exit_code": 0,
+      "seconds": 14.119,
+      "raw_log_basename": "build.log",
+      "raw_log_sha256": "3d1d9ef4d17d8ef257e1495ba5fbd5276337c24b66b29712f4aba1288d348270",
+      "target_bytes_after_stage": 144632395,
+      "tests_run": null,
+      "result_lines": [
+        "    Finished `dev` profile [unoptimized] target(s) in 14.07s"
+      ],
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--bin",
+        "lamp-update"
+      ],
+      "working_directory": "lampOS"
+    },
+    {
+      "stage": "cli-tests",
+      "exit_code": 0,
+      "seconds": 3.587,
+      "raw_log_basename": "cli-tests.log",
+      "raw_log_sha256": "c4084ec4815a56543bfc09a9df31eeaf6f25bde760fd3746bd9c37f69478441e",
+      "target_bytes_after_stage": 144632395,
+      "tests_run": 7,
+      "result_lines": [
+        "Ran 7 tests in 3.513s",
+        "OK"
+      ],
+      "command": [
+        "python3",
+        "-B",
+        "-I",
+        ".github/scripts/lampos-publish-cli-test.py",
+        "--updater",
+        "<fresh-target>/debug/lamp-update"
+      ],
+      "working_directory": "repository root"
+    }
+  ],
+  "workflow_checks": {
+    "gate_cases": 72,
+    "workflow_eligible_cases": 2,
+    "publisher_admitted_cases": 1,
+    "case_note": "Actions comparisons admit on and ON to the protected cold path; the publisher admits only exact lowercase on.",
+    "cold_target_cases": 6,
+    "bash_syntax_blocks": 17,
+    "python_ast_files": 5,
+    "yaml": "passed",
+    "diff_check": "passed",
+    "existing_workflow_preserved_except_cleanup": true,
+    "cleanup_condition_identical_to_cache_save": true,
+    "cleanup_after_upload_immediately_before_cache_save": true,
+    "cleanup_fixtures": {
+      "count": 3,
+      "cases": [
+        "Populated isolated target removed; main target, cached source times, similarly named sibling, registry and complete copied artifact retain exact bytes.",
+        "Absent isolated target is harmless.",
+        "An isolated-target symlink is removed without removing its artifact destination."
+      ],
+      "artifact_checksums_retained": true
+    }
+  },
+  "inventory": {
+    "binary_targets": 47,
+    "classification_counts": {
+      "core": 13,
+      "optional": 16,
+      "provisioning": 2,
+      "development": 16
+    },
+    "retained_binary_targets": 31,
+    "selected_examples": {
+      "schedule_check": "lamp-schedule",
+      "replay_cost": "lamp-expression"
+    },
+    "package_classification_sha256": "ee509e10c9182021aaabd9033c1f902dcd834f551ca4b808fcf0595196f665fb"
+  },
+  "private_evidence": {
+    "note": "Basenames identify retained private evidence. Command executable and temporary target paths are normalized here; exact commands remain in the hash-bound private stage records.",
+    "files": {
+      "change.patch": "9567a0ae553c9f0a3fe7c6d36b9faacdf5c5b64d31979176715896d8f267014e",
+      "result.json": "7a6a51cfb9ed2aa6264ac4c66ffeab958e5d0d10ef48696fef83fb906908cd47",
+      "stages.json": "f9452b00f5f4144c51e474f18060cac476f586e9866a26f7c23e667a59194a8d",
+      "source-inputs.json": "a44221157285a9ab451642ed36b426edc4cc5b423f5bf6bf244a04866e984619",
+      "source-check.json": "cbd0b7d5111847ea35f4d29f3ba2d15923aa6e2c755a7db3cf2106c3311eacc8",
+      "cleanup-checks.json": "7110d2b88ec23cfbae6abd7c4e5b5b0ce56c47b3a99a9c6235e5fe8ebfdea2c4",
+      "cleanup-checks.log": "1a0a8f9aea37ad31c738c769ec58131e3cde3babb9b954301039a446e1dfbd73",
+      "workflow-checks.json": "98e2ca2af71837ffacfb62a060dc898e1e7ff6c003298a24c154b9984b8d9bbc",
+      "inventory.json": "f0a7b12c346fdda96c485091bf126dd8a43c75a68531a7fc0a8a88ee0acc3e58",
+      "driver.log": "7227e477e0e74f7ef5edce5f27bdcce3d65e2f773f7dd9da6632c00621639b89",
+      "metadata-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "run_checks.py": "936adf8b274533f04fa794eea9294b3f673396fccffdf1685f434986b69b6a70",
+      "validate_workflow.py": "71b0a5a71ebf9a8a50e54560f46928b55b9f86d1fee9fb1cb65bbadbd6decefd",
+      "check_cleanup.py": "98ca6dae52d63cfd170e974fa733879665252157d4cec4533221f5443c57de55"
+    }
+  },
+  "unchanged_historical_receipt": {
+    "url": "https://github.com/autonomous-ai/lampOS/blob/1399893f45101fdb181b9615fce31daf523034a8/lampOS/docs/verification/update-release-host-20261021.json",
+    "sha256": "f6dbaf1f0a417b33e488dffa91a07659cf65d38af528c62f347c68590cb0ba46"
+  },
+  "limits": [
+    "No committed tests were added for the cleanup; the three disposable fixtures are private.",
+    "The host gate builds the updater for the local host and exercises simulated GitHub with local test keys. It does not execute GitHub Actions or save a real remote cache.",
+    "No full workspace or native ARM64 CI qualification is claimed for this uncommitted patch; prior CI remains historical.",
+    "No publication setting, signing secret, environment, device or release was changed. Publication remains off by default; live repository settings were not queried."
+  ]
+}
