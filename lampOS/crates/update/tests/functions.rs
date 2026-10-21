@@ -25,6 +25,8 @@ const VOICE_SIDE: &str = "the_product_voice_s_functions_in_a_process_of_their_ow
 /// test's name.
 const DECLARED: &str = "declared: ";
 const LEFT_OUT: &str = "left out: ";
+/// Each function a chat request of the product's voice route is given.
+const CHAT: &str = "chat: ";
 
 /// What a product lamp declares now: the voice's own 13, the actions part's
 /// 17 and the skills' 1 (Dance's), one under the bound. A change to it is a
@@ -76,6 +78,18 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
     for why in left_out {
         println!("{LEFT_OUT}{why}");
     }
+    // The product's route (LAMP_VOICE_ROUTE=second): its chat requests add
+    // the web search's functions, LAMP_SECOND_SEARCH=deepseek's two.
+    let search =
+        match std::env::var(lamp_voice::second_provider::worker::SEARCH_ENVIRONMENT).as_deref() {
+            Ok("deepseek") => lamp_voice::second_provider::net::search::Search::deepseek("test")
+                .unwrap()
+                .declarations(),
+            _ => Vec::new(),
+        };
+    for tool in lamp_voice::second_provider::worker::chat_tools(&settings, &search) {
+        println!("{CHAT}{}", tool.name);
+    }
 }
 
 /// What the product voice declares, run in a process of its own with the
@@ -87,6 +101,7 @@ struct Product {
     skill_tools: Vec<String>,
     declared: Vec<String>,
     left_out: Vec<String>,
+    chat: Vec<String>,
 }
 
 fn product_with(extra: &[(&str, &str)]) -> Product {
@@ -153,6 +168,7 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
             .collect(),
         declared: found(DECLARED),
         left_out: found(LEFT_OUT),
+        chat: found(CHAT),
     }
 }
 
@@ -166,6 +182,7 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
         skill_tools,
         declared,
         left_out,
+        ..
     } = product_with(&[]);
     assert!(left_out.is_empty(), "left out by the link: {left_out:?}");
     for name in executive
@@ -198,6 +215,30 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
     );
 }
 
+/// A product lamp's chat request (lamp-0c89, 21 Oct: "Lamp. Please dance
+/// for me." answered "I've no legs to dance with" with no call, 32 tools
+/// sent): the 31 above and the search, at the bound, and Dance's `dance`
+/// among them. The bound leaves out the search's fetch, never a core
+/// skill's function.
+#[test]
+fn a_product_chat_request_offers_dance_at_the_bound() {
+    let Product {
+        declared,
+        chat,
+        skill_tools,
+        ..
+    } = product_with(&[]);
+    assert_eq!(chat.len(), lamp_gemini::MAX_TOOLS, "{chat:?}");
+    assert_eq!(skill_tools, ["dance"]);
+    assert!(chat.iter().any(|name| name == "dance"), "{chat:?}");
+    assert!(
+        chat.iter()
+            .any(|name| name == lamp_voice::second_provider::net::search::NAME),
+        "{chat:?}"
+    );
+    assert_eq!(chat[..declared.len()], declared[..]);
+}
+
 /// The reviewer's P3 on #1906: with `LAMP_REPORTS=on` the product voice
 /// declares its two reports functions too, `reports_stop` and
 /// `reports_state`, before the actions part's and the skills'. The voice's
@@ -210,6 +251,7 @@ fn with_reports_on_a_product_lamp_is_at_32_and_dance_is_cut() {
         skill_tools,
         declared,
         left_out,
+        ..
     } = product_with(&[(lamp_voice::reports_stop::ENVIRONMENT, "on")]);
     assert!(left_out.is_empty(), "left out by the link: {left_out:?}");
     assert_eq!(declared.len(), lamp_gemini::MAX_TOOLS, "{declared:?}");

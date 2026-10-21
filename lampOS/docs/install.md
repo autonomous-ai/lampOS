@@ -242,7 +242,13 @@ fails on a folder in `lampOS/skills/` that is in neither list. With them a
 product lamp tells each session 31 functions of the 32 a session takes
 (`lamp_gemini::MAX_TOOLS`): the voice's own 13, the actions part's 17 and
 Dance's (`crates/update/tests/functions.rs`, which fails if one is left out
-or the count changes). The voice leaves out by order, without a word, what
+or the count changes). On the product's route each chat request adds the
+web search's `web_search`, the 32nd, and leaves out its `fetch_page`, so
+`dance` reaches the model
+(`a_product_chat_request_offers_dance_at_the_bound`). The built-in
+instruction tells the model its head sits on an arm that moves and that a
+dance is a call (lamp-0c89, 21 Oct, answered "I've no legs to dance with"
+with `dance` given; `crates/voice/src/config.rs`). The voice leaves out by order, without a word, what
 is past 32, so Desk tutor's two would push its marks' `show_verdict` out. lamp-4ace's
 own unit keeps `LAMP_SCHEDULE_SPEAK=on` and the voice's own news until the
 skills have run there; the voice's own code for them is removed after.
