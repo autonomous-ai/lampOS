@@ -298,6 +298,38 @@ const LEAN_SECONDS: f32 = 1.5;
 /// cubic does, never faster than `GESTURE_STEP`, so it neither snaps back
 /// nor stops dead.
 const EASE_OUT: Duration = Duration::from_millis(700);
+/// A skill's or idle gesture paused as listening began picks up again where
+/// it was if the voice goes back to resting within this, with no answer
+/// (#2602: the line was music, a cough, or not said to the lamp). A longer
+/// hold ends it, eased out, so the arm never takes a move back up long
+/// after the moment.
+const RESUME_WITHIN: Duration = Duration::from_secs(3);
+/// The switch for [`Limits::gesture_pause`]; only the exact value `on`
+/// turns it on.
+pub const GESTURE_PAUSE: &str = "LAMP_GESTURE_PAUSE";
+
+/// Whether a value of [`GESTURE_PAUSE`] turns the pause on.
+pub fn gesture_pause_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// A gesture paused at offsets `from`, moving `speed` a step, `held` into
+/// its pause (#2602): where it is, eased as the ease out does but to a
+/// stop a third of the way it would carry on, so it neither snaps still
+/// nor swings back; and how much of its own clip's time that carried it,
+/// so that going on takes the clip up from there and not from `from`.
+fn held_at(held: Duration, from: [f32; 5], speed: [f32; 5]) -> ([f32; 5], Duration) {
+    let span = EASE_OUT.as_secs_f32() / TICK.as_secs_f32();
+    let t = (held.as_secs_f32() / EASE_OUT.as_secs_f32()).min(1.0);
+    let (carries, arrives) = (t * t * t - 2.0 * t * t + t, -2.0 * t * t * t + 3.0 * t * t);
+    // `from·stays + speed·span·carries + (from + speed·span/3)·arrives`,
+    // stays and arrives summing to one.
+    let along = carries + arrives / 3.0;
+    (
+        std::array::from_fn(|index| from[index] + speed[index] * span * along),
+        EASE_OUT.mul_f32(along),
+    )
+}
 /// While a gesture plays, and for half a second after, a joint of the head
 /// may be this far from its goal and read this load before the gesture is
 /// dropped; the shoulder and the elbow may be this far from theirs. A quick
@@ -660,6 +692,13 @@ pub struct Limits {
     /// asked while another plays is dropped, whoever asks.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub arbitration: bool,
+    /// `LAMP_GESTURE_PAUSE=on` (#2602): a skill's or idle gesture playing
+    /// as listening begins pauses, eased to a hold, and ends only when the
+    /// lamp answers or the hold reaches [`RESUME_WITHIN`]; back to resting
+    /// before that, it goes on where it was. Off: it ends the moment a
+    /// conversation begins (#2668).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub gesture_pause: bool,
     /// A load above this on `load_steps` steps in a row makes the joint give
     /// way, and ends the run if it stays or comes back too often.
     pub load: [u16; 3],
@@ -788,6 +827,7 @@ impl Limits {
         rest_glance: false,
         look_at_name: false,
         arbitration: false,
+        gesture_pause: false,
     };
 }
 
@@ -4010,6 +4050,14 @@ fn run_on<P: PortIo, R: Runtime>(
     // The last step's mood was a conversation's (listening, thinking or
     // speaking): one beginning ends an unprompted gesture.
     let mut talked = false;
+    // A skill's or idle gesture paused as listening began (#2602): when,
+    // when the gesture playing then began (it is that one's pause only),
+    // and its offsets and their speed a step then, which it eases to a hold
+    // from.
+    let mut paused: Option<(Duration, Duration, [f32; 5], [f32; 5])> = None;
+    // One that went on again: when, and the offsets it was held at, which
+    // it eases from into its clip over `EASE_OUT` so it starts from still.
+    let mut resumed: Option<(Duration, [f32; 5])> = None;
     let mut over_load = [0u8; 3];
     let mut off_track = [0u8; 3];
     // With `--wake on`: the goal and the position a joint short of its goal
@@ -4257,12 +4305,60 @@ fn run_on<P: PortIo, R: Runtime>(
         let spoken_to = talking && !talked;
         talked = talking;
         let unprompted = |clip: &Clip, by: Priority| from_outside(clip) && by <= Priority::Skill;
+        // #2602, under `gesture_pause`: listening only pauses it, as a
+        // creature stops mid-stretch to hear; the lamp answering (thinking
+        // or speaking) ends it, and so does a hold of `RESUME_WITHIN` or
+        // more. Back to resting before that, with no answer, it goes on
+        // from where it was. Off, a conversation beginning ends it (#2668).
+        paused = paused.filter(|(_, of, ..)| playing.is_some_and(|(_, since)| since == *of));
+        let answering = matches!(mood, Mood::Thinking | Mood::Speaking);
         let ends = if in_hand_now {
             Some(crate::moves::ENDED_BY_HAND)
+        } else if let Some((at, ..)) = paused {
+            (answering || now.saturating_sub(at) >= RESUME_WITHIN)
+                .then(|| crate::moves::ended(Priority::Conversation))
         } else {
-            spoken_to.then(|| crate::moves::ended(Priority::Conversation))
+            (spoken_to && (answering || !limits.gesture_pause))
+                .then(|| crate::moves::ended(Priority::Conversation))
         };
+        if ends.is_none()
+            && !talking
+            && let Some((at, _, from, speed)) = paused.take()
+            && let Some((clip, since)) = playing
+        {
+            // Its clock goes on from where the hold carried it, and its
+            // pose from where it is held.
+            let hold = now.saturating_sub(at);
+            let (offsets, along) = held_at(hold, from, speed);
+            playing = Some((clip, since + hold.saturating_sub(along)));
+            resumed = Some((now, offsets));
+        }
+        if ends.is_none()
+            && limits.gesture_pause
+            && spoken_to
+            && let Some((_, since)) = playing.filter(|(old, _)| unprompted(old, playing_by.0))
+        {
+            paused = Some((now, since, gesture_now, gesture_moved));
+        }
+        // One still waiting to begin goes as a conversation begins, so it
+        // never begins over the person (#2668); off, the ends below drops it.
+        if limits.gesture_pause
+            && spoken_to
+            && !in_hand_now
+            && let Some((old, _)) = pending.filter(|(old, _)| unprompted(old, pending_by.0))
+        {
+            gesture_fates.push_told(
+                (old.name, crate::moves::busy(Priority::Conversation)),
+                Told {
+                    source: pending_by.1,
+                    by: None,
+                },
+            );
+            pending = None;
+        }
         if let Some(why) = ends {
+            paused = None;
+            resumed = None;
             if let Some((old, _)) = playing.filter(|(old, _)| unprompted(old, playing_by.0)) {
                 gesture_fates.push_told(
                     (old.name, why),
@@ -4698,8 +4794,29 @@ fn run_on<P: PortIo, R: Runtime>(
         let mut gesture_wanted = [0.0f32; 5];
         if let Some((clip, since)) = playing {
             let elapsed = now.saturating_sub(since).as_micros();
-            match clip.at(elapsed.try_into().unwrap_or(u64::MAX)) {
-                Some(offsets) if upright => gesture_wanted = offsets,
+            match (paused, clip.at(elapsed.try_into().unwrap_or(u64::MAX))) {
+                // Paused (#2602): eased to a hold where it is; its own clock
+                // stands still meanwhile.
+                (Some((at, _, from, speed)), _) if upright => {
+                    gesture_wanted = held_at(now.saturating_sub(at), from, speed).0;
+                }
+                // Gone on again: from the held pose into the clip, eased in
+                // from still over `EASE_OUT` (a smoothstep), the clip
+                // already taken up from where the hold carried it.
+                (None, Some(offsets)) if upright => {
+                    gesture_wanted = offsets;
+                    if let Some((at, held)) = resumed {
+                        let t = now.saturating_sub(at).as_secs_f32() / EASE_OUT.as_secs_f32();
+                        if t < 1.0 {
+                            let into = t * t * (3.0 - 2.0 * t);
+                            gesture_wanted = std::array::from_fn(|index| {
+                                held[index] + (offsets[index] - held[index]) * into
+                            });
+                        } else {
+                            resumed = None;
+                        }
+                    }
+                }
                 _ => playing = None,
             }
         }
