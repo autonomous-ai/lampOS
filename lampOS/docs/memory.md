@@ -1452,7 +1452,17 @@ for its admitted scope in the same way (`told`), never for the sticky session
 owner (Second's P2 on #1925). The unscoped builder is used only for a request
 with no lease, or with this switch off.
 The lamp's answer is kept under the same scope (`Thread::lamp_for`), and a
-written request's note is kept as the room's, as it is admitted. The context is
+written request's note is kept as the room's, as it is admitted. The
+exchange's journal follows it: at the turn's end `append_linked` is written
+for that scope (`FinishedExchange::whose`), linked only to that scope's
+sources, never the conversation's person or the person the session was
+opened for. So once a known face is lost, a line admitted as the room's goes
+to the room's journal (`everyone`), however soon after: the person's
+conversation ends (`conversation_end` for them) and the room's begins, and
+the room's turn has its own Days session (its note is asked for the room).
+On lamp-c0a4 on 21 October, with this switch off, lines 15 to 45 s after the
+face was lost were journalled as the known person's (#2449); a line with no
+lease (this switch off, or the Live route) still is, as before. The context is
 still built on the turn's task, so a slow memory service delays that turn's
 first round as before; nothing new is read on the input path.
 A request is admitted for a person only while the authority permits the
@@ -1526,9 +1536,12 @@ a gap, only while all of these hold:
   there the answer's 12 s end first.
 
 A different known face is theirs at once, and a privacy change revokes a held
-face as it does a fresh one. The exchange itself already stays with the person
-counted at the lamp (`known_faces::Presence`, 30 s); this keeps the memory
-calls with them too. Without a bus root for the eyes' looks, nothing is held.
+face as it does a fresh one. With `LAMP_SECOND_SCOPED_CONTEXT=on` the held
+scope also decides the exchange's thread and journal, like any admitted scope:
+a line held for them is journalled as theirs, and the first line past the gap,
+admitted as the room's, as the room's. With that switch off the exchange stays
+with the person counted at the lamp (`known_faces::Presence`, 30 s), and this
+keeps only the memory calls with them. Without a bus root for the eyes' looks, nothing is held.
 The Live route is not covered.
 
 ### Live route session scope

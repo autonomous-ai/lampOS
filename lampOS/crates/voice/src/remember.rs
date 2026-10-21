@@ -7403,6 +7403,138 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    /// The first builder on #2449 (lamp-c0a4, 21 Oct): on the second route a
+    /// line is journalled under the scope its request was admitted with,
+    /// never the conversation's person. Known A's line is A's; with A's face
+    /// lost, the next line, admitted as the room's, goes to the room
+    /// (`append_linked` with no person), linked to the room's sources only,
+    /// though the session was opened for A and A is still counted at the
+    /// lamp; a line admitted for A again is A's. A line with no lease (the
+    /// switch off) stays with the conversation's person, as before.
+    #[test]
+    fn a_line_admitted_as_the_rooms_after_the_face_is_lost_is_journalled_as_the_rooms() {
+        use crate::memory_scope::{FaceCache, RequestKey, RequestScope};
+        use crate::provider_worker::ProviderOutput;
+        let _one = crate::provider_worker::tests::one_thread();
+        let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
+        let known = std::env::temp_dir().join(format!("journal-scope-{}", std::process::id()));
+        std::fs::write(&known, "A").unwrap();
+        let cache = FaceCache::default();
+        let a = person_id("A");
+        // A is the one at the lamp, named by the eyes, and the session was
+        // opened for them: the conversation's person.
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.at_lamp(Some(a.clone()));
+            thread.seen_now(Some(a.clone()));
+            thread.opening(Instant::now());
+        }
+        let first = u64::MAX - 400;
+        let line = |request: u64, words: &str, admitted: bool| {
+            let scope = RequestScope::new(
+                RequestKey {
+                    worker: lamp_turn_owner::BootId::new([17; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                cache.snapshot(Instant::now()),
+            );
+            for event in [
+                ProviderOutput::Transcript {
+                    request: None,
+                    text: words.into(),
+                    finished: true,
+                },
+                ProviderOutput::Transcript {
+                    request: Some(request),
+                    text: "Noted.".into(),
+                    finished: true,
+                },
+            ] {
+                if admitted {
+                    crate::second_provider::worker::keep_admitted(&event, &scope.lease());
+                } else {
+                    crate::second_provider::worker::keep(&event, None);
+                }
+            }
+        };
+        let seen = || crate::known_faces::FaceObservation::read(&known);
+        cache.replace(cache.begin_refresh(), seen());
+        line(first, "My tea is green.", true);
+        // The face is lost: the next line is admitted as the room's.
+        cache.replace(cache.begin_refresh(), None);
+        line(first + 1, "Who was that?", true);
+        cache.replace(cache.begin_refresh(), seen());
+        line(first + 2, "I'm back.", true);
+        // No lease: the conversation's person, as before.
+        cache.replace(cache.begin_refresh(), None);
+        line(first + 3, "Still here.", false);
+        let done = crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .finished(first + 3, Instant::now());
+        *crate::thread::THREAD.lock().unwrap() = kept;
+        std::fs::remove_file(known).unwrap();
+        let whose: Vec<_> = done.iter().map(|done| done.whose.clone()).collect();
+        assert_eq!(
+            whose,
+            [Some(a.clone()), None, Some(a.clone()), Some(a.clone())]
+        );
+
+        // Handed on and written: each to its own scope, linked within it.
+        let (jobs, work) = sync_channel(8);
+        let client = held_test_client(jobs);
+        {
+            let mut context = client.context.lock().unwrap();
+            assert_eq!(context.include(Some(&a), &[5]), None);
+            assert_eq!(context.include(None, &[7]), None);
+        }
+        hand_on_days(done, NOW, &client);
+        let (send, receive) = sync_channel(8);
+        while let Ok(job) = work.try_recv() {
+            send.send(job).unwrap();
+        }
+        send.send(DaysJob::Close("barrier".into(), None)).unwrap();
+        drop(send);
+        let (socket, served) = memory("journal-scope", 7, |request| match request["op"].as_str() {
+            Some("append_linked") => json!({"ok":true,"id":11}),
+            Some("conversation_end") => {
+                json!({"ok":true,"submitted":false,"reason":"model_unconfigured"})
+            }
+            _ => json!({"ok":true}),
+        });
+        days_writer(
+            &socket,
+            "voice-test",
+            &receive,
+            Duration::from_secs(45),
+            &AtomicU64::new(0),
+            &Mutex::new(Current::default()),
+            &HandOns::default(),
+            None,
+        );
+        let read = served.join().unwrap();
+        std::fs::remove_file(socket).unwrap();
+        let a_ops = |op: &str| format!("{op} {a}");
+        assert_eq!(
+            ops(&read),
+            [
+                a_ops("append_linked"),
+                a_ops("conversation_end"),
+                "append_linked room".into(),
+                "conversation_end room".into(),
+                a_ops("append_linked"),
+                a_ops("append_linked"),
+                "session_close room".into(),
+            ]
+        );
+        assert_eq!(read[2]["heard"], "Who was that?");
+        // Each linked to its own scope's sources only.
+        assert_eq!(read[0]["source_ids"], json!([5]));
+        assert_eq!(read[2]["source_ids"], json!([7]));
+        assert_eq!(read[4]["source_ids"], json!([5]));
+    }
+
     #[test]
     fn both_journal_backends_preserve_each_stored_scope_and_keep_out() {
         let private = u64::MAX - 160;
