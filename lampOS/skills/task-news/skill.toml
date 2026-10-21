@@ -1,11 +1,12 @@
 # Task news: when work the lamp handed to Claude Code or Codex comes back,
-# done or failed, the lamp tells the person once, briefly, the way someone
-# at the next desk would (#1021, from #939). Written to lamp-skills' schema
-# (docs/skills.md, "The schema, as lamp-skills reads it").
+# done, failed, stopped or asking something, the lamp tells the person once,
+# briefly, the way someone at the next desk would (#1021, from #939; stopped
+# and asking from #1722). Written to lamp-skills' schema (docs/skills.md,
+# "The schema, as lamp-skills reads it").
 #
 # On every product lamp (lamp-update's install), with the voice's
 # LAMP_TASK_NEWS=skill: the voice keeps the news and waits for this skill's
-# ask until 10 s after it had the news, then tells it itself, so each task
+# ask until 10 s after it had the news, then tells it itself, so each piece
 # is told once whether the skill asks or not. 5 of 5 on lamp-4ace come before the voice's own
 # timing of it (crates/voice/src/task_news.rs) is taken out.
 needs = ["eyes", "voice", "body", "light"]
@@ -23,10 +24,13 @@ light = true
 body = true
 
 # tasks/status keeps, for two minutes, each task whose agent settled, in
-# its `settled` list (#1048): `idle` (finished, with an answer) or `failed`,
-# among others. Each is watched on its own, by its number, and counts when
-# it comes into the list so (or turns so in it). What is already there at
-# the program's start, or at a reload, is not news.
+# its `settled` list (#1048): `idle` (finished, with an answer), `failed`,
+# `stopped` or `needs_input` (stopped to ask the person something). Each is
+# watched on its own, by its number, and counts when it comes into the list
+# so (or turns so in it). What is already there at the program's start, or
+# at a reload, is not news. A task that asked and then finished (lamp-tasks
+# follows a question for an hour, #2543) turns from `needs_input` to `idle`,
+# or comes back as `idle`: one asking, then one done, each told once.
 [[trigger]]
 name = "done"
 topic = "tasks/status"
@@ -43,6 +47,24 @@ each = "settled"
 key = "task"
 field = "state"
 equals = "failed"
+when = "appears"
+
+[[trigger]]
+name = "stopped"
+topic = "tasks/status"
+each = "settled"
+key = "task"
+field = "state"
+equals = "stopped"        # the agent stopped without finishing
+when = "appears"
+
+[[trigger]]
+name = "asking"
+topic = "tasks/status"
+each = "settled"
+key = "task"
+field = "state"
+equals = "needs_input"    # the agent stopped to ask the person something
 when = "appears"
 
 [ask]                     # the Policy's moment question (#958), before anything is done
@@ -68,4 +90,18 @@ say = { from = "tasks" }
 on = "failed"
 body = { gesture = "caring" }
 light = { dim = 1 }
+say = { from = "tasks" }
+
+# Stopped: look at the person if a face is in view, and the news, what it
+# last said. No sway and no droop: nothing went wrong, it only ended.
+[[do]]
+on = "stopped"
+body = { look_at = "face" }
+say = { from = "tasks" }
+
+# Asking: look at the person if a face is in view, a curious tilt, as a
+# question is put, and the news: what the agent is waiting on them for.
+[[do]]
+on = "asking"
+body = { look_at = "face", gesture = "curious" }
 say = { from = "tasks" }

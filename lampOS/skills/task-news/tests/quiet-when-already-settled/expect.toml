@@ -1,5 +1,15 @@
 # The program starts with task 2 (idle) and task 3 (failed) already in
 # `settled`: what is there at the first message is not news, and they stay
-# there at 30 s and 60 s. Task 9 comes into it at 60 s as needs_input,
-# neither done nor failed. Nothing is done.
-none = true
+# there at 30 s and 60 s: nothing for them. Task 9 comes into it at 60 s as
+# needs_input: that is news, the asking run, a curious tilt and the news
+# (no look: the face seen at 0 s is a minute old). Still listed at 120 s:
+# not told again.
+[[expect]]
+at = "60s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "60s"
+call = "say"
+args = { from = "tasks", task = 9 }

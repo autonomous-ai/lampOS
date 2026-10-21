@@ -17,7 +17,10 @@ lamp-skills`, which runs every skill's cases).
 | `done-with-nobody-near` | Nobody in view; task 7 working at 10 s, in `settled` as idle at 40 s, gone at 160 s | Pass: no look, `happy` and a say `from = "tasks"` at 40 s |
 | `failed` | A face at 39 s; task 3 working at 10 s, in `settled` as failed at 40 s | Pass: `caring`, the light one step dimmer, a say `from = "tasks"`; no look, no colour |
 | `two-done-in-a-row` | Tasks 4 and 5 working; 4 into `settled` at 40 s, 5 at 42 s, a face at both, both staying there; tasks 6 and 8 into it in one message at 70 s, nobody in view | Pass: four runs, each its own look (when a face is in view), sway and say, never one put together |
-| `quiet-when-already-settled` | Tasks 2 (idle) and 3 (failed) already in `settled` at the program's first message, staying; task 9 into it as `needs_input` | Pass: nothing |
+| `quiet-when-already-settled` | Tasks 2 (idle) and 3 (failed) already in `settled` at the program's first message, staying; task 9 into it as `needs_input` at 60 s | Pass: nothing for 2 and 3; for 9, `curious` and a say `from = "tasks"` at 60 s (the face is a minute old: no look) |
+| `stopped` | A face at 39 s; task 11 working at 10 s, in `settled` as stopped at 40 s, gone at 160 s | Pass: a look and a say `from = "tasks"`; no gesture, no light |
+| `asking` | A face at 39 s; task 12 working at 10 s, in `settled` as `needs_input` at 40 s and still at 60 s, gone at 160 s | Pass: a look, `curious` and a say `from = "tasks"` at 40 s, once |
+| `asking-then-done` | Tasks 5 and 6 working; 5 asks at 40 s and turns to idle in `settled` at 70 s; 6 asks at 45 s, leaves unanswered at 165 s and comes back idle at 300 s (#2543's follow look) | Pass: each question told once (look, `curious`, say), then each end once (look, `happy`, say), at 40, 45, 70 and 300 s |
 
 **What the replay does not show:**
 

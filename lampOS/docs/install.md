@@ -228,8 +228,9 @@ talk ended, is told at once when it can be, by the voice, without the sway.
 The voice says a reminder itself 10 s after it can when `lamp-skills` is
 down, or when the ask came too early: at a pause after which the talk went
 on for over 20 s, or while the voice rested but could not say it (paused
-or muted: what `voice/state` says then was not checked). It says news that
-stopped or asks something, which no skill takes, 10 s after it came in. Left out, with
+or muted: what `voice/state` says then was not checked). Task news takes news that
+stopped or asks something too (#1722), with a look, and a curious tilt for a
+question; the voice only words it, as it does done and failed. Left out, with
 why (`install::NOT_PRODUCT_SKILLS`): Desk tutor, which reads handwriting
 from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`) that
 the product doesn't run, and its marks, called only after its look; and

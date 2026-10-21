@@ -449,7 +449,8 @@ No lamp has shipped. V2 is installed on the current lamps before they ship, so n
 | Light scenes (GO-2.1, HAL-4.20) | Core skill | #1679 |
 | Light shows and effects | Core skill | #1679 |
 | The light dims and goes out when nobody is there | Core skill | #1677 |
-| A light while booting, and a face for a failed part (GO-3.17) | System | #1681 |
+| A light while booting (GO-3.17) | System | #1681 |
+| A face for a failed part (GO-3.17, `not-feeling-well`) | Core skill: the droop is a behaviour the lamp shows; the health facts it reads stay system | #1681 |
 | "I'm unplugging you": the arm folds first | Core skill | #1674 |
 | Smoke and bad-air alerts (HAL-3.4) | Core skill, never worded as a certified alarm | #1684 |
 | Health and crash reports reaching the company (GO-3.13, HAL-5.17) | System, opt-in at setup: only health and crashes, never sound, pictures or words | #1683 |
