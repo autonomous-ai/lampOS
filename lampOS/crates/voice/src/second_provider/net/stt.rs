@@ -2654,6 +2654,27 @@ mod tests {
         assert!(told.contains("quiet held back 240 ms"), "{told}");
     }
 
+    /// The reviewer-lead's P3 on #2527: at most 10 s is held after a pause
+    /// ([`MOST_HELD`]); the block past it sends them all, in order, and the
+    /// hold ends, so a long quiet is never held without limit.
+    #[test]
+    fn at_most_ten_seconds_of_quiet_is_held() {
+        let quiet = [5i16; 320]
+            .iter()
+            .flat_map(|sample| sample.to_le_bytes())
+            .collect::<Vec<u8>>();
+        let mut held = QuietHeld::default();
+        held.pause(true);
+        for _ in 0..MOST_HELD {
+            assert!(held.block(quiet.clone()).is_none());
+        }
+        assert_eq!(
+            held.block(quiet.clone()).map(|out| out.len()),
+            Some(MOST_HELD + 1)
+        );
+        assert!(held.block(quiet).is_some(), "the hold ended with them");
+    }
+
     /// A soft block over the floor, under any line-relative bar, ends the
     /// hold: a word however quiet is never held back and dropped.
     #[test]
