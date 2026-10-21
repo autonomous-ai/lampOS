@@ -199,11 +199,21 @@ fn a_skills_line_on_messages_out_comes_off_the_bus_as_task_news() {
                 },
             )
             .unwrap();
-        let due = lines_until(&mut lamp, 1);
         if !texting {
+            // Without texts taken it never listens on `messages/out`, so
+            // nothing can come: one look, not a second of them (#1806).
+            assert!(
+                skills
+                    .subscribers(MessageOut::TOPIC)
+                    .unwrap()
+                    .iter()
+                    .all(|listener| !listener.socket.starts_with("cloud")),
+            );
+            let due = lamp.unasked(lamp_cloud::chat::now_ms(), true).due;
             assert!(due.is_empty(), "{due:?}");
             continue;
         }
+        let due = lines_until(&mut lamp, 1);
         assert_eq!(due.len(), 1, "{due:?}");
         assert_eq!(due[0].skill, "guard-mode");
         let data = &due[0].data;
@@ -244,24 +254,27 @@ fn a_line_from_another_publisher_on_messages_out_is_not_sent() {
             .publish_json(lamp_ipc::monotonic_us(), &line("Someone was at your desk."))
             .unwrap();
     }
-    let until = Instant::now() + Duration::from_secs(1);
-    let mut journal = Vec::new();
-    while Instant::now() < until {
-        let heard = lamp.unasked(lamp_cloud::chat::now_ms(), true);
-        assert!(heard.due.is_empty(), "{:?}", heard.due);
-        journal.extend(heard.lines);
-        std::thread::sleep(Duration::from_millis(5));
-    }
-    assert_eq!(journal.len(), 1, "{journal:?}");
-    assert!(journal[0].contains("lamp_bus_cli"), "{journal:?}");
-    assert!(!journal[0].contains("desk"), "{journal:?}");
+    // The skill's line after them, on the same socket: once it is due, the
+    // shell's two have been read before it, not a second of quiet (#1806).
     let mut skills = bus
         .publisher_declared(MessageOut::TOPIC, &MessageOut::declaration(), "skills")
         .unwrap();
     skills
         .publish_json(lamp_ipc::monotonic_us(), &line("From the skill."))
         .unwrap();
-    let due = lines_until(&mut lamp, 1);
+    let until = Instant::now() + Duration::from_secs(5);
+    let mut journal = Vec::new();
+    let mut due = Vec::new();
+    while due.is_empty() {
+        assert!(Instant::now() < until, "the skill's line never came");
+        let heard = lamp.unasked(lamp_cloud::chat::now_ms(), true);
+        journal.extend(heard.lines);
+        due.extend(heard.due);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(journal.len(), 1, "{journal:?}");
+    assert!(journal[0].contains("lamp_bus_cli"), "{journal:?}");
+    assert!(!journal[0].contains("desk"), "{journal:?}");
     assert_eq!(due.len(), 1, "{due:?}");
     assert_eq!(due[0].data["event"]["detail"]["message"], "From the skill.");
 }
