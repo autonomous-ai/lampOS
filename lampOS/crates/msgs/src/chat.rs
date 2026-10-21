@@ -127,9 +127,9 @@ pub const MESSAGE_TEXT_BYTES: usize = 280;
 /// A short text the lamp sends unasked, for the person's phone
 /// (`messages/out`): a skill's news while they are away, as guard mode's
 /// "Someone was at your desk at 14:31, for about 2 minutes."
-/// (`docs/guard-mode.md`). Nothing carries it off the lamp yet: `lamp-cloud`
-/// and the app's push relay are to take it (`docs/messages.md`, "Unasked
-/// texts").
+/// (`docs/guard-mode.md`). With `LAMP_MESSAGES=on`, `lamp-cloud` carries it
+/// up as unasked news, which the backend pushes to the owner's phones
+/// (`lamp_cloud::unasked`, `docs/messages.md`, "Unasked texts").
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MessageOut {
     /// Who sends it: `skill:<name>`, stamped by the part that publishes it,

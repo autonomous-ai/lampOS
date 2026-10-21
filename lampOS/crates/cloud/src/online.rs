@@ -144,6 +144,12 @@ pub fn rfc3339(at: SystemTime) -> String {
 struct Handed {
     in_order: VecDeque<Tagged>,
     by_packet: HashMap<u16, Tagged>,
+    /// The skills' lines for the phone the broker acknowledged, by skill,
+    /// for the journal.
+    unasked_acked: Vec<String>,
+    /// Those the connection took before their ack, oldest first, to go
+    /// again.
+    unasked_lost: Vec<crate::unasked::Piece>,
 }
 
 /// What a handed publish was.
@@ -153,6 +159,9 @@ enum Tagged {
     Report(u64),
     /// A change's result, said again if it is lost before its ack.
     Change(crate::settings::Outcome),
+    /// A skill's line for the phone, sent again if it is lost before its
+    /// ack (`crate::unasked`).
+    Unasked(crate::unasked::Piece),
 }
 
 impl Handed {
@@ -202,6 +211,10 @@ impl Handed {
     fn acked(&mut self, pkid: u16) -> Option<u64> {
         match self.by_packet.remove(&pkid) {
             Some(Tagged::Report(seq)) => Some(seq),
+            Some(Tagged::Unasked(piece)) => {
+                self.unasked_acked.push(piece.skill);
+                None
+            }
             _ => None,
         }
     }
@@ -218,6 +231,10 @@ impl Handed {
             .chain(self.in_order.drain(..))
             .filter_map(|tag| match tag {
                 Tagged::Change(outcome) => Some(outcome),
+                Tagged::Unasked(piece) => {
+                    self.unasked_lost.push(piece);
+                    None
+                }
                 _ => None,
             })
             .collect()
@@ -343,6 +360,30 @@ async fn session(
                             let event = me.data(&now(), "chat.event", &Ok(Some(data))).to_string();
                             handed.publish(&client, account.fd_channel.as_str(), event, None);
                         }
+                        // A skill's lines for the phone (`crate::unasked`):
+                        // taken off the bus always, sent only while
+                        // connected, and kept until the broker's ack.
+                        let heard = lamp.unasked(crate::chat::now_ms(), connected);
+                        for line in heard.lines {
+                            say.line(&line);
+                        }
+                        let mut owed = Vec::new();
+                        for piece in heard.due {
+                            if !owed.is_empty() {
+                                owed.push(piece);
+                                continue;
+                            }
+                            let event = me
+                                .data(&now(), "chat.event", &Ok(Some(piece.data.clone())))
+                                .to_string();
+                            let tag = Tagged::Unasked(piece.clone());
+                            if !handed.publish_tagged(&client, account.fd_channel.as_str(), event, tag) {
+                                owed.push(piece);
+                            }
+                        }
+                        if !owed.is_empty() {
+                            lamp.owe_unasked(owed);
+                        }
                     }
                     // Only while connected, and kept until the broker's ack:
                     // a Wi-Fi change's result is often ready only once the
@@ -403,11 +444,20 @@ async fn session(
                 if let (Some(seq), Some(shared)) = (handed.acked(ack.pkid), &reports) {
                     shared.with(|reports| reports.acked(seq));
                 }
+                // One line a piece, the skill and the count, never its text.
+                for skill in std::mem::take(&mut handed.unasked_acked) {
+                    let count = lamp.unasked_sent();
+                    say.line(&crate::unasked::sent_line(&skill, count));
+                }
             }
             Ok(_) => {}
             Err(error) => {
                 connected = false;
                 let again = handed.lost();
+                let unasked = std::mem::take(&mut handed.unasked_lost);
+                if !unasked.is_empty() {
+                    lamp.owe_unasked(unasked);
+                }
                 if let Some(changes) = &changes {
                     changes.owe(again);
                 }
@@ -1177,6 +1227,156 @@ mod tests {
         assert_eq!(refused["status"], "failure");
         assert_eq!(refused["error"], crate::wire::not_here("chat.send"));
         assert!(lamp.texts.is_empty());
+    }
+
+    /// The guard's line in the tests, and a second.
+    const VISIT: &str = "Someone was at your desk at 14:31, for about 2 minutes.";
+    const VISIT_TWO: &str = "Someone was at your desk at 15:02, for about 5 minutes.";
+
+    /// A lamp with texts taken or not, and two of guard mode's lines on
+    /// `messages/out` taken, as `Real` takes them (`crate::unasked`).
+    fn lamp_with_lines(texting: bool) -> Fake {
+        let mut lamp = Fake {
+            texting,
+            ..Fake::default()
+        };
+        let mut stream = crate::chat::Stream::default();
+        for (seq, text) in [(1, VISIT), (2, VISIT_TWO)] {
+            let out = lamp_msgs::MessageOut {
+                from: "skill:guard-mode".into(),
+                text: text.into(),
+            };
+            let at = 1_792_296_000_000 + seq * 1_000;
+            let taken = lamp.unasked.take(("skills", "b1", seq), &out, at, |text| {
+                stream.unasked(text, at)
+            });
+            assert_eq!(taken, crate::unasked::Taken::Kept);
+        }
+        lamp
+    }
+
+    /// Runs `lamp` against a broker that `behaves` until `enough` lines are
+    /// said, or 5 s: what the broker saw and the lines.
+    async fn lines_against(
+        behaves: Broker,
+        lamp: Fake,
+        enough: impl Fn(&[String]) -> bool,
+    ) -> (Vec<Seen>, Vec<String>) {
+        let (port, seen) = broker(behaves, Vec::new()).await;
+        let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+        let (_identity_tx, me) = watch::channel(identity());
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let said = lines.clone();
+        let task = tokio::spawn(async move {
+            let mut lamp = lamp;
+            let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
+            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+        });
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while !enough(&lines.lock().unwrap()) && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        drop(accounts_tx);
+        task.await.unwrap();
+        let seen = seen.lock().unwrap().clone();
+        (seen, Arc::try_unwrap(lines).unwrap().into_inner().unwrap())
+    }
+
+    fn chat_events(seen: &[Seen]) -> Vec<(String, serde_json::Value)> {
+        publishes(seen)
+            .into_iter()
+            .filter(|(_, reply)| reply["kind"] == "chat.event")
+            .collect()
+    }
+
+    /// With `LAMP_MESSAGES=on`, a skill's line on `messages/out` goes up
+    /// through the test broker as the backend reads unasked news (#1722):
+    /// a `chat.event` with the lamp's id and no run, a `task_news` event
+    /// with its own `id` and `time`, the text whole as its `summary` and
+    /// `detail.message`. In order; the journal says one line a piece, the
+    /// skill and the count, never the text.
+    #[tokio::test]
+    async fn a_skills_line_goes_up_as_task_news_with_no_run_and_the_journal_has_no_text() {
+        let sent = crate::unasked::sent_line("guard-mode", 2);
+        let (seen, lines) = lines_against(Broker::Takes, lamp_with_lines(true), |lines| {
+            lines.contains(&sent)
+        })
+        .await;
+        let events = chat_events(&seen);
+        assert_eq!(events.len(), 2, "{events:?}");
+        for ((topic, reply), (text, id)) in
+            events.iter().zip([(VISIT, "evt-1"), (VISIT_TWO, "evt-2")])
+        {
+            assert_eq!(topic, "fd/d-42");
+            assert_eq!(reply["kind"], "chat.event");
+            assert_eq!(reply["type"], "data");
+            assert_eq!(reply["status"], "success");
+            assert_eq!(reply["id"], "d-42", "the lamp's own id");
+            let data = &reply["data"];
+            assert!(data.get("run_id").is_none(), "{data}");
+            assert!(data.get("session_id").is_none(), "{data}");
+            let event = &data["event"];
+            assert_eq!(event["type"], "task_news");
+            assert_eq!(event["id"], id);
+            let time = event["time"].as_str().unwrap();
+            assert!(time.starts_with("2026-") && time.ends_with('Z'), "{time}");
+            assert_eq!(event["summary"], text);
+            assert_eq!(event["detail"]["message"], text);
+            assert!(event.get("runId").is_none(), "{event}");
+            // Nothing added: no picture, no name.
+            let keys: Vec<_> = event.as_object().unwrap().keys().cloned().collect();
+            assert_eq!(keys, ["detail", "id", "summary", "time", "type"]);
+        }
+        assert!(lines.contains(&crate::unasked::sent_line("guard-mode", 1)));
+        assert!(lines.contains(&sent));
+        for line in &lines {
+            assert!(!line.contains("desk") && !line.contains("14:31"), "{line}");
+        }
+    }
+
+    /// Without `LAMP_MESSAGES=on` nothing of a skill's goes up.
+    #[tokio::test]
+    async fn without_the_switch_no_skills_line_goes_up() {
+        // Online, and six of the texts' ticks after.
+        let start = std::time::Instant::now();
+        let (seen, _) = lines_against(Broker::Takes, lamp_with_lines(false), |lines| {
+            lines.iter().any(|line| line.starts_with("online"))
+                && start.elapsed() >= Duration::from_millis(300)
+        })
+        .await;
+        assert!(chat_events(&seen).is_empty(), "{seen:?}");
+        assert!(
+            publishes(&seen)
+                .iter()
+                .any(|(_, reply)| reply["type"] == "info")
+        );
+    }
+
+    /// A line the connection takes before its ack goes again on the next,
+    /// with the same event `id` and `time`, so the backend pushes it once;
+    /// in order.
+    #[tokio::test]
+    async fn a_skills_line_lost_with_the_connection_goes_again_unchanged() {
+        let sent = crate::unasked::sent_line("guard-mode", 2);
+        let (seen, _) = lines_against(Broker::DropsOnce, lamp_with_lines(true), |lines| {
+            lines.contains(&sent)
+        })
+        .await;
+        let events = chat_events(&seen);
+        let ids: Vec<_> = events
+            .iter()
+            .map(|(_, reply)| {
+                let event = &reply["data"]["event"];
+                format!("{}@{}", event["id"], event["time"])
+            })
+            .collect();
+        let mut once = ids.clone();
+        once.dedup();
+        assert_eq!(once.len(), 2, "{ids:?}");
+        assert!(
+            once[0].contains("evt-1") && once[1].contains("evt-2"),
+            "{once:?}"
+        );
     }
 
     /// #1683, against the test broker: a report goes on `<fd_channel>/report`

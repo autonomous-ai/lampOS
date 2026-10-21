@@ -182,6 +182,13 @@ impl Stream {
         sent
     }
 
+    /// News no text asked for, at `now_ms`: a `task_news` event with no
+    /// run and no session, its own `id` and `time`, and `text` whole, as a
+    /// skill's line on `messages/out` goes (`crate::unasked`).
+    pub fn unasked(&mut self, text: &str, now_ms: u64) -> Value {
+        self.event(None, None, news(text), now_ms)
+    }
+
     /// The runs waited on.
     pub fn waiting(&self) -> usize {
         self.runs.len()

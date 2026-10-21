@@ -6,7 +6,7 @@
 //! needs root.
 use crate::answer::{Lamp, Mic, PREVIEW_HOLDS, Volume};
 use lamp_bus::{Bus, Publisher, Subscriber};
-use lamp_msgs::{ChatIn, ChatOut, Claim, Light, LightRequest, Priority};
+use lamp_msgs::{ChatIn, ChatOut, Claim, Light, LightRequest, MessageOut, Priority};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, UdpSocket};
@@ -107,6 +107,10 @@ pub struct Texts {
     input: Option<Publisher>,
     output: Option<Subscriber>,
     stream: crate::chat::Stream,
+    /// The skills' lines for the phone (`messages/out`, `crate::unasked`),
+    /// listened for from the start, and those waiting to go.
+    unasked: Option<Subscriber>,
+    outbox: crate::unasked::Outbox,
 }
 
 impl Texts {
@@ -624,6 +628,52 @@ impl Lamp for Real {
         }
         self.texts.stream.acked(text, now_ms);
         Ok(())
+    }
+
+    fn unasked(&mut self, now_ms: u64, give: bool) -> crate::unasked::Heard {
+        if !self.texts.on {
+            return crate::unasked::Heard::default();
+        }
+        if self.texts.unasked.is_none()
+            && let Some(bus) = self.bus.as_ref()
+        {
+            self.texts.unasked = bus
+                .subscribe_typed(MessageOut::TOPIC, SOURCE, MessageOut::TYPE)
+                .ok();
+        }
+        let mut heard = crate::unasked::Heard::default();
+        let texts = &mut self.texts;
+        if let Some(input) = texts.unasked.as_mut() {
+            while let Ok(Some(message)) = input.recv(Duration::ZERO) {
+                let Ok(out) = message.parse::<MessageOut>() else {
+                    continue;
+                };
+                let header = &message.header;
+                let stream = &mut texts.stream;
+                let taken = texts.outbox.take(
+                    (&header.source, &header.boot, header.seq),
+                    &out,
+                    now_ms,
+                    |text| stream.unasked(text, now_ms),
+                );
+                heard.lines.extend(crate::unasked::dropped_line(
+                    &crate::unasked::skill_of(&out.from),
+                    &taken,
+                ));
+            }
+        }
+        if give {
+            heard.due = texts.outbox.due();
+        }
+        heard
+    }
+
+    fn owe_unasked(&mut self, pieces: Vec<crate::unasked::Piece>) {
+        self.texts.outbox.owe(pieces);
+    }
+
+    fn unasked_sent(&mut self) -> u64 {
+        self.texts.outbox.sent()
     }
 
     fn chat_events(&mut self, now_ms: u64) -> Vec<Value> {

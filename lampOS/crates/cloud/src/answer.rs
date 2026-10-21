@@ -70,6 +70,20 @@ pub trait Lamp {
     fn chat_events(&mut self, _now_ms: u64) -> Vec<Value> {
         Vec::new()
     }
+    /// The skills' lines for the phone (`messages/out`, `crate::unasked`),
+    /// with texts taken: those heard by `now_ms` are taken off the bus, and
+    /// the pieces waiting are handed back to send when `give`, as the
+    /// broker is there. With the journal's lines about those not sent.
+    fn unasked(&mut self, _now_ms: u64, _give: bool) -> crate::unasked::Heard {
+        crate::unasked::Heard::default()
+    }
+    /// Pieces not handed to the client, or lost before the broker's ack, to
+    /// go again first.
+    fn owe_unasked(&mut self, _pieces: Vec<crate::unasked::Piece>) {}
+    /// A piece the broker acknowledged: how many have been since the start.
+    fn unasked_sent(&mut self) -> u64 {
+        0
+    }
     /// Health and crash reports (#1683, `crate::reports`): there only with
     /// `LAMP_CLOUD=on` and `LAMP_REPORTS=on`.
     fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
@@ -303,6 +317,9 @@ pub mod tests {
         pub texting: bool,
         pub texts: Vec<lamp_msgs::ChatIn>,
         pub to_give: Vec<Value>,
+        /// The skills' lines for the phone (`crate::unasked`): those to
+        /// give, and those owed back.
+        pub unasked: crate::unasked::Outbox,
         /// Reports (#1683), with their switch.
         pub reports: Option<std::sync::Arc<crate::reports::Shared>>,
         /// The skills page (#1722), with its switch.
@@ -372,6 +389,18 @@ pub mod tests {
         fn send_text(&mut self, text: &lamp_msgs::ChatIn, _now_ms: u64) -> Result<(), String> {
             self.texts.push(text.clone());
             Ok(())
+        }
+        fn unasked(&mut self, _now_ms: u64, give: bool) -> crate::unasked::Heard {
+            crate::unasked::Heard {
+                due: if give { self.unasked.due() } else { Vec::new() },
+                lines: Vec::new(),
+            }
+        }
+        fn owe_unasked(&mut self, pieces: Vec<crate::unasked::Piece>) {
+            self.unasked.owe(pieces);
+        }
+        fn unasked_sent(&mut self) -> u64 {
+            self.unasked.sent()
         }
         fn chat_events(&mut self, _now_ms: u64) -> Vec<Value> {
             if self.texts.is_empty() {
