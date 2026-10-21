@@ -13,69 +13,75 @@ of the Queue issue (#705), a finished task is one pull request from its
 log and nothing a lamp runs ([joining.md](joining.md),
 [builders/second.md](../builders/second.md)).
 
-## Current checkpoint: 2026-10-21, resumed builder work
+## Current checkpoint: 2026-10-21, Music rebase and release workflow
 
-Ready for lamp-voice: no — Music's rebase and asset-scan fix are under validation.
+Music remains under validation; the release workflow is in draft
+[#2462](https://github.com/autonomous-ai/lampOS/pull/2462) with native CI running.
+Review follow-up and the next assigned task remain part of this builder loop.
 
-First restored Music and Internet Updates to Second in the
-[07:53 assignment](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6305254890).
-Music is first, with Sixth reading and First running lamp-4ace. Updates is next;
-V3–V5 compatibility stays with Tests. Review follow-up and the next task remain
-part of this builder loop after a PR's gate passes.
+Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757) was pushed as
+one commit, `301ad8e2f9b019fc8d088fd9226131a7902a6d21`, after its full host gate:
+**8,620 passed / 0 failed / 36 ignored / 0 filtered** across 36 consumers.
+Formatting, strict workspace/all-target Clippy, workspace build and the
+renderer/package/disposable-install checks passed. Every one of 2,152 frozen
+source hashes matched; all installed files matched their staged hashes.
+[Exact evidence](https://github.com/autonomous-ai/lampOS/tree/301ad8e2f9b019fc8d088fd9226131a7902a6d21/lampOS/docs/verification/requested-audio-host-20261021).
+The focused repeats and five compiled, detected mutants are separate from
+those complete test totals. The prepared handoff was **213 / 186 microseconds**
+first/repeated, ending at authored speaker IPC acceptance, not acoustic onset.
 
-- Music #1757 is draft while the revision is checked. It is rebased locally
-  onto `892b1d3233efb1f339ca60e64e4004b40659e006`, preserving the newer
-  Actions and Skills readiness waits. Its old CI qualifies only the old head.
-- The asset-scan correction checks inode, size, permissions, owner and both
-  nanosecond modification/change times. A stable scan reads no payload;
-  changed metadata rechecks the bounded bytes. The proof is copied back only
-  into the accepted generation. Restored-mtime changes, revoked inventory,
-  stale scan results and path replacements have explicit regressions.
-- The pre-fix host scan of sixteen 60-second WAVs took **1,380.945167 ms**
-  first, then **1,401.177416 / 1,407.403209 ms**, reading **46,085,516 bytes**
-  each time. This is host debug timing of `Scan::unchanged` after load,
-  excluding fixture creation, snapshot cloning and copyback. No sound played.
-  [Benchmark evidence](verification/second-music-scan-20261021/README.md).
-- The current frozen run measured **1.481916 ms** first and
-  **0.749791 / 0.762500 ms** repeated, with **zero payload bytes** read.
-  [Before/after record](verification/second-music-scan-20261021/scan-benchmark.json).
-- The fresh source-only gate covers **36 crates**, with **2,152** source
-  inputs frozen. Formatting and strict workspace/all-target Clippy passed,
-  as did the focused file checks (2), scan measurement (1), Voice integration
-  (12), Voice audio (49), Skills audio (30) and prepared handoff (1).
-  Complete consumer tests, build and packaging are running. Final counts
-  and new native results have not been claimed. Three failed preflights are
-  retained: cache layout, needless box replacement, and one new test's use
-  of a TOML value parser instead of the document parser. Each was corrected
-  before this fresh run.
-- The separate caps behavior is documented: with `LAMP_OUTPUT_CAPS=on`,
-  rejected volume arguments that never touch the mixer retain a confirmed
-  cap, including when requested audio is off.
-- #2005 has merged. #694 is Nine's, and #871's remaining replay requires
-  lamp-4ace; those stale Second labels are not concurrent host tasks.
+The asset-scan fix measured **1.481916 / 0.749791 / 0.762500 ms** after load,
+reading **zero payload bytes**, against **1,380.945167 / 1,401.177416 /
+1,407.403209 ms** and **46,085,516 bytes** before. These are three host-debug
+samples of `Scan::unchanged`; cloning, loading, copyback and logging are outside
+the boundary. The proof binds previously hashed bytes to descriptor/path/parent
+identity and filesystem metadata, including ctime; changed metadata rehashes
+bounded bytes. Voice still verifies the bytes it will play. The cache assumes
+trustworthy local filesystem change times.
+[Comparison](verification/second-music-scan-20261021/README.md).
 
-The Internet Updates row remains **0.65**. [#1812](https://github.com/autonomous-ai/lampOS/issues/1812)
-requires a published real-key release fetched over the internet, a quiet switch,
-automatic bad-release recovery and an attended run including the body. The
-[20 Oct 06:11 proof](https://github.com/autonomous-ai/lampOS/pull/1788#issuecomment-6279387052)
-shows updater-only recovery on a local test-key channel: **107 s** after exit,
-**about 693 s** without confirmation. No product part changed. Publication and
-the real key remain explicitly deferred until about 20 November in #1812;
-First has the question of reconciling that deferral with the current priority.
-The documentation correction is [#2421](https://github.com/autonomous-ai/lampOS/pull/2421),
-one commit `426080c984`, onto observed integration `34aa8f18c13e`.
-`git diff --check` passed and seven referenced source-file hashes matched the
-reviewed source. Its Markdown-only path is excluded by both native workflow
-triggers, so no ARM64 result is claimed for it. No runtime or lamp tests were
-run for this documentation change.
+New integration changes made the pushed revision conflict before native CI
+started. It is now rebased locally onto
+`99f2ecfcd4ebb3b9279750bee42f219c0c4895ed` as `a589871a5c3115c30772209c53f25bcdb0702ebc`.
+The two Actions conflicts preserve both the newer optional-controller recovery
+and startup/health warnings and Music's speaker restriction/teardown guards.
+The resolution had no P1/P2 finding in a separate read. A fresh source-only
+gate now freezes **2,180 source inputs** and the same **36 consumers**.
+Formatting, strict workspace/all-target Clippy and all focused checks passed;
+the complete tests are running. Old host and native counts qualify only their
+recorded revisions. The next push follows this new gate. The PR body retains
+the `LAMP_OUTPUT_CAPS` behavior, including its effect when Music is disabled.
+The [planned lamp-4ace check](https://github.com/autonomous-ai/lampOS/blob/301ad8e2f9b019fc8d088fd9226131a7902a6d21/lampOS/docs/requested-audio-lamp-run.md)
+is written; First owns that run. Second performed no lamp or provider action.
 
-The [release preparation proposal](proposals/second-internet-release-20261021.md)
-binds artifact and checkout identity, requires CI checksums, reuses the existing
-manifest/signature format, checks complete assets before promotion and refuses
-a channel sequence that moves backward. Its
-[source record](verification/second-update-plan-20261021/sources.json) names the
-inspected revision and hashes. The plan is for offline preparation; it does not
-change the publication deferral, provision a key or claim any lamp acceptance.
+The [lead's #1812 split](https://github.com/autonomous-ai/lampOS/issues/1812#issuecomment-6305700703)
+assigns Second the release workflow and docs, then hands wider OTA to Migrate.
+The evidence correction [#2421](https://github.com/autonomous-ai/lampOS/pull/2421)
+merged as `f6e26cc573088a3f4169b0049c93682d868c46bb` after its documentation read.
+The implementation [#2462](https://github.com/autonomous-ai/lampOS/pull/2462)
+is one commit `5b15091dac6c2905704276073dabd3896b88700c` on `99f2ecfcd4`.
+**29 simulated failure tests and 6 real updater CLI tests passed**, with an
+exact-checkout offline build, actionlint 1.7.12, Python/YAML/shell syntax and
+diff checks. [Host receipt](https://github.com/autonomous-ai/lampOS/blob/5b15091dac6c2905704276073dabd3896b88700c/lampOS/docs/verification/update-release-host-20261021.json).
+Automatic [ARM64](https://github.com/autonomous-ai/lampOS/actions/runs/39540037529)
+and [x86 Clippy](https://github.com/autonomous-ai/lampOS/actions/runs/39540037671)
+are running; their completion is not yet claimed.
+
+Publication is off unless the owner explicitly enables it and supplies the
+real key. It accepts only its successful same-run lamp-voice push artifact,
+verifies checksums and uploaded bytes, rejects stale sequences and requires
+explicit initial bootstrap. The channel envelope is staged before two
+non-atomic renames, with previous bytes retained and restoration attempted
+on failure. Interrupted or failed restoration can need owner repair; no
+release or envelope pruning is implemented. No key/variable provisioning,
+real publication or device acceptance was performed. The owner still checks
+installed trial sequences and provisions the key before activation. After
+review/merge, #1812 closes with this delivered slice and the unperformed
+real-key internet, quiet recovery and attended-body acceptance handed to
+Migrate. The Tests/Migrate whole-lamp row remains theirs. The previous
+[preparation plan](proposals/second-internet-release-20261021.md) remains a
+historical input; the implementation and current ownership above supersede
+its unresolved assignment questions.
 
 ## Previous checkpoint: 2026-10-20
 
