@@ -5520,6 +5520,111 @@ async fn a_held_second_half_of_the_same_persons_request_is_answered_with_the_fir
     );
 }
 
+/// The review of #2620: words answered in a held line's place are another
+/// line's. When the line after the held one cuts them short, the held
+/// line's speaker going on says nothing about whose they were, so they are
+/// never joined: A's "What's the weather like" carried through B's held
+/// "Yes, give me five minutes." isn't asked with B's next line.
+#[tokio::test]
+async fn words_carried_through_a_held_line_are_never_joined() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("What's the weather like".to_owned()),
+                Ok("Yes, give me five minutes.".to_owned()),
+                Ok("in Saigon this weekend?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "web_search",
+                        json!({"query": "weather"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        "web_search",
+                        json!({"query": "weather"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("It's sunny there."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (searching, searched) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+        let searching = searching.clone();
+        Box::pin(async move {
+            let _ = searching.send(());
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            json!({"results": []})
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .heeding(Arc::new(|request, _, _, _| {
+        (request == 2).then_some("not said to the lamp")
+    }))
+    // A and B two people; B's held line and its next, one.
+    .joining_cut_words(Arc::new(|cut, request| match (cut, request) {
+        (1, 2) => Joined::Not("two voices (cosine 0.12)".to_owned()),
+        _ => Joined::Same("the same voice said both"),
+    }));
+    async fn searched_by(engine: &mut Engine, searched: &std::sync::mpsc::Receiver<()>) {
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        while searched.try_recv().is_err() {
+            assert!(std::time::Instant::now() < until, "no search");
+            let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+        }
+    }
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    searched_by(&mut engine, &searched).await;
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    // Held: request 1's words are answered in its place, and searched again.
+    searched_by(&mut engine, &searched).await;
+    engine.submit(start(3));
+    engine.retire_through(2);
+    engine.submit(audio(3, 1));
+    engine.submit(end(3));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the third line's turn ends");
+        if matches!(event, ProviderOutput::TurnComplete { request: 3, .. }) {
+            break;
+        }
+    }
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(
+        asked[1].last().unwrap(),
+        &Message::user("What's the weather like")
+    );
+    assert_eq!(
+        asked[2].last().unwrap(),
+        &Message::user("in Saigon this weekend?"),
+        "not joined with words carried through the held line"
+    );
+}
+
 /// `LAMP_JOIN_CUT_WORDS`: a print still to come is waited for, up to
 /// `JOIN_WAIT`; past it, what the eyes saw decides, and with nothing seen
 /// the first line's words are let go.

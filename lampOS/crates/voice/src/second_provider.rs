@@ -718,6 +718,11 @@ struct Carried {
     request: u64,
     text: String,
     at: Instant,
+    /// The request whose line said these words: `request`'s own, or, for
+    /// words answered in a held line's place, the line they came from. A
+    /// join compares that line's speaker, never the held line's
+    /// ([`joined_with_cut`]).
+    said_by: u64,
 }
 
 /// A stop to be told beside a request's chat ([`crate::provider_worker::STOPPED_NOTE`]).
@@ -3031,13 +3036,13 @@ async fn spoken(
             // The same person going on: its own words after them
             // (`LAMP_JOIN_CUT_WORDS`), so a request's second half held on
             // its own is not lost either.
-            let words = if empty {
-                carried.text.clone()
+            let (words, said_by) = if empty {
+                (carried.text.clone(), carried.said_by)
             } else {
                 match joined_with_cut(&shared, request, &marks, carried.clone(), text.clone()).await
                 {
-                    (joined, None) => joined,
-                    (_, Some(carried)) => carried.text,
+                    (joined, None) => (joined, request),
+                    (_, Some(carried)) => (carried.text, carried.said_by),
                 }
             };
             eprintln!(
@@ -3049,6 +3054,7 @@ async fn spoken(
                     request,
                     text: words.clone(),
                     at: carried.at,
+                    said_by,
                 });
             }
             let lease = scope.clone();
@@ -3237,6 +3243,7 @@ async fn spoken(
             request,
             text: text.clone(),
             at: Instant::now(),
+            said_by: request,
         });
     }
     if let Some(heard) = &shared.words_heard {
@@ -3286,6 +3293,15 @@ async fn joined_with_cut(
             carried.request
         );
     };
+    // Words carried through a held line are another line's: whose they are
+    // is not what the held line's voice or face tells (the review of #2620).
+    if carried.said_by != carried.request {
+        not_joined(&format!(
+            "its words were said in request {}, answered in a held line's place",
+            carried.said_by
+        ));
+        return (text, Some(carried));
+    }
     let Some((_, gap)) = marks.after_end.filter(|(of, _)| *of == carried.request) else {
         not_joined("its sound or words began this line already, or it was not the line before");
         return (text, Some(carried));

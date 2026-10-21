@@ -3873,6 +3873,8 @@ impl Heeding {
     /// Whether one person said `cut`, a line cut short before any of its
     /// answer was heard, and `request`, the line that cut it
     /// (`LAMP_JOIN_CUT_WORDS`, `Engine::joining_cut_words`):
+    /// - the eyes first: more than one face seen speaking either line, or
+    ///   each line's face another, is two people, whatever the voices say;
     /// - their prints, when both have come: under
     ///   [`crate::same_voice::DIFFERENT_BELOW`] two people, whatever the eyes
     ///   saw; at or over [`crate::same_voice::SAME_FROM`] the same one;
@@ -3884,6 +3886,26 @@ impl Heeding {
     ///
     /// Nothing to tell is two people: the cut words go, as without it.
     pub(crate) fn same_speaker(&mut self, cut: u64, request: u64) -> Joined {
+        let spoke = |of: u64| {
+            self.spoke
+                .iter()
+                .rev()
+                .find(|(line, _)| *line == of)
+                .map(|(_, faces)| faces.clone())
+        };
+        let (cut_faces, faces) = (spoke(cut), spoke(request));
+        // Two people seen, whatever the voices say: more than one face
+        // speaking a line, or each line's face another (the review of #2620:
+        // a voice at 0.70 is 0.01 over the office set's highest two-person
+        // pair, and a family's voices may be closer).
+        let two_faces = |a: &[String], b: &[String]| {
+            a.len() > 1 || b.len() > 1 || (!a.is_empty() && !b.is_empty() && a != b)
+        };
+        if let (Some(a), Some(b)) = (&cut_faces, &faces)
+            && two_faces(a, b)
+        {
+            return Joined::Not("two faces were seen speaking them".to_owned());
+        }
         let likeness = self
             .voices
             .as_mut()
@@ -3897,14 +3919,7 @@ impl Heeding {
             }
             _ => {}
         }
-        let spoke = |of: u64| {
-            self.spoke
-                .iter()
-                .rev()
-                .find(|(line, _)| *line == of)
-                .map(|(_, faces)| faces.as_slice())
-        };
-        let one_face = match (spoke(cut), spoke(request)) {
+        let one_face = match (cut_faces.as_deref(), faces.as_deref()) {
             (Some([a]), Some([b])) => a == b,
             _ => false,
         };
@@ -4147,6 +4162,8 @@ impl Heeding {
     /// looks go, so no passing id outlives a privacy change.
     pub(crate) fn privacy_changed(&mut self) {
         self.caller_faces.clear();
+        // The lines' speaking faces too, for a join (`Self::same_speaker`).
+        self.spoke.clear();
         if let Some((eyes, _)) = &self.eyes {
             eyes.forget();
         }
@@ -10062,6 +10079,23 @@ mod tests {
         line(&mut heeding, 1, 1);
         line(&mut heeding, 2, 1);
         assert_eq!(heeding.same_speaker(1, 2), Joined::Same(SAME_VOICE_JOINS));
+        // The same voice, but the eyes saw two faces: two people (the review
+        // of #2620), each line's face another, or two faces on one line.
+        let two = Joined::Not("two faces were seen speaking them".to_owned());
+        for (first, second) in [(&["a"][..], &["b"][..]), (&["a"][..], &["a", "b"][..])] {
+            let mut heeding = voiced(false);
+            line(&mut heeding, 1, 1);
+            line(&mut heeding, 2, 1);
+            faces(&mut heeding, 1, first);
+            faces(&mut heeding, 2, second);
+            assert_eq!(heeding.same_speaker(1, 2), two, "{first:?} {second:?}");
+        }
+        // A camera closed or a mute since: no face is kept to join on.
+        let mut heeding = Heeding::new(true, true, None, None);
+        faces(&mut heeding, 1, &["a"]);
+        faces(&mut heeding, 2, &["a"]);
+        heeding.privacy_changed();
+        assert!(matches!(heeding.same_speaker(1, 2), Joined::Not(_)));
         // Two voices: two people, though one face was seen speaking both.
         let mut heeding = voiced(false);
         line(&mut heeding, 1, 1);
@@ -10104,12 +10138,8 @@ mod tests {
         assert_eq!(unvoiced(&["a"], &["a"]), Joined::Same(SAME_FACE_JOINS));
         // Each refusal says what was missing, for the journal.
         let nothing = Joined::Not("no voice check, and no eyes read".to_owned());
-        assert_eq!(unvoiced(&["a"], &["b"]), nothing, "two faces");
-        assert_eq!(
-            unvoiced(&["a"], &["a", "b"]),
-            nothing,
-            "another face spoke too"
-        );
+        assert_eq!(unvoiced(&["a"], &["b"]), two, "two faces");
+        assert_eq!(unvoiced(&["a"], &["a", "b"]), two, "another face spoke too");
         assert_eq!(unvoiced(&[], &["a"]), nothing, "nobody seen speaking");
         assert_eq!(
             Heeding::new(true, true, None, None).same_speaker(1, 2),
