@@ -677,6 +677,7 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
                                 samples,
                                 &shared.publication,
                                 stamp,
+                                shared.speaking.load(Ordering::Acquire),
                                 lamp_ipc::monotonic_us(),
                             );
                         }

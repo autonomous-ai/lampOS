@@ -214,8 +214,15 @@ era's first patch reflects at its start and needs 15,456 samples; later
 patches take 15,712 real samples. A window's `start_us`/`end_us` are whole
 20 ms blocks on the capture clock (read-completion time minus 20 ms, and the
 last block's read completion), so they cover the patch's full FFT extent.
-`own_voice` is always `unknown`: Ears' speaking flag turns a stale voice
-state into "not speaking", which is not evidence of a quiet lamp.
+`own_voice` is `present` for a window with a block captured while the
+voice said, freshly, that the lamp was speaking (ears' speaking flag, the
+one its sudden sounds use), so Laugh glance's `own_voice` guard holds at the
+lamp's own sound (#1757's read, 22 Oct). Otherwise it is `unknown`, never
+`clear`: the flag turns a stale voice state into "not speaking", which is
+not evidence of a quiet lamp. A `voice/state` of `listening` while the lamp
+plays something (#1757's music, its input kept open for "stop") is not
+counted; the skills' `voice/state` `equals = "resting"` guards still hold
+then.
 
 **Handoff and retention.** After the capture owner's post-read lease and
 fence checks, the same callback that feeds the PCM export offers the block

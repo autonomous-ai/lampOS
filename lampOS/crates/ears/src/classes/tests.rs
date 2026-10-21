@@ -44,6 +44,7 @@ fn block(signal: &[i16], index: usize, stamp: CaptureStamp) -> Block {
             .try_into()
             .unwrap(),
         stamp,
+        own: false,
     }
 }
 
@@ -119,7 +120,7 @@ fn capture_handoff_is_bounded_and_never_waits_for_a_slow_classifier() {
     let mut times = Vec::new();
     for sequence in 0..1000 {
         let started = Instant::now();
-        assert!(handoff.offer(&samples, &gate, stamp(1, sequence, 1), 2));
+        assert!(handoff.offer(&samples, &gate, stamp(1, sequence, 1), false, 2));
         times.push(started.elapsed().as_nanos());
         assert!(intake.receiver.try_recv().is_ok());
     }
@@ -127,7 +128,7 @@ fn capture_handoff_is_bounded_and_never_waits_for_a_slow_classifier() {
     let mut stalled = Vec::new();
     for sequence in 0..(QUEUE as u64 + 100) {
         let started = Instant::now();
-        let kept = handoff.offer(&samples, &gate, stamp(1, sequence, 1), 2);
+        let kept = handoff.offer(&samples, &gate, stamp(1, sequence, 1), false, 2);
         stalled.push(started.elapsed().as_nanos());
         assert_eq!(kept, sequence < QUEUE as u64);
     }
@@ -150,10 +151,10 @@ fn capture_handoff_is_bounded_and_never_waits_for_a_slow_classifier() {
 fn unauthorized_or_future_blocks_are_never_copied() {
     let (handoff, intake) = handoff();
     let gate = gate(1);
-    assert!(!handoff.offer(&[1; BLOCK], &gate, stamp(2, 0, 1), 2));
-    assert!(!handoff.offer(&[1; BLOCK], &gate, stamp(1, 0, 3), 2));
+    assert!(!handoff.offer(&[1; BLOCK], &gate, stamp(2, 0, 1), false, 2));
+    assert!(!handoff.offer(&[1; BLOCK], &gate, stamp(1, 0, 3), false, 2));
     gate.fence();
-    assert!(!handoff.offer(&[1; BLOCK], &gate, stamp(1, 0, 1), 2));
+    assert!(!handoff.offer(&[1; BLOCK], &gate, stamp(1, 0, 1), false, 2));
     assert!(matches!(
         intake.receiver.try_recv(),
         Err(TryRecvError::Empty)
@@ -312,7 +313,7 @@ fn the_worker_publishes_scores_then_unavailable_and_the_pump_rechecks_authority(
         let samples: &[i16; BLOCK] = signal[index * BLOCK..(index + 1) * BLOCK]
             .try_into()
             .unwrap();
-        assert!(handoff.offer(samples, &gate, stamp(1, index as u64, at), at));
+        assert!(handoff.offer(samples, &gate, stamp(1, index as u64, at), false, at));
         thread::sleep(Duration::from_millis(1));
     }
     let mut scored = Vec::new();
@@ -337,6 +338,59 @@ fn the_worker_publishes_scores_then_unavailable_and_the_pump_rechecks_authority(
         }
     };
     assert_eq!(reason, SoundUnavailable::Privacy);
+    stop.store(true, Ordering::Release);
+    worker.join().unwrap();
+}
+
+/// A window the lamp spoke into says its own sound is there, and the next
+/// window, after the lamp stopped, says unknown, not clear: a stale voice
+/// state reads as not speaking (#1757's read: Laugh glance's `own_voice`
+/// guard had nothing to act on).
+#[test]
+fn a_window_the_lamp_spoke_into_is_its_own_and_the_next_is_unknown() {
+    let (handoff, intake) = handoff();
+    let gate = Arc::new(gate(1));
+    let stop = Arc::new(AtomicBool::new(false));
+    let (sent, received) = mpsc::channel();
+    let worker = {
+        let (gate, stop) = (gate.clone(), stop.clone());
+        thread::spawn(move || {
+            serve(
+                intake,
+                &gate,
+                &stop,
+                lamp_ipc::monotonic_us,
+                Some(|_: &[f32]| {
+                    Ok(SoundScores {
+                        speech: 0.1,
+                        music: 0.9,
+                        laughter: 0.0,
+                    })
+                }),
+                |classified| sent.send(classified).unwrap(),
+                || true,
+            )
+        })
+    };
+    // The first patch is blocks 0 to 48 and the second begins at block 24:
+    // the lamp speaks in blocks 0 to 20 only.
+    let signal = tone(74);
+    for index in 0..74 {
+        let at = lamp_ipc::monotonic_us();
+        let samples: &[i16; BLOCK] = signal[index * BLOCK..(index + 1) * BLOCK]
+            .try_into()
+            .unwrap();
+        assert!(handoff.offer(samples, &gate, stamp(1, index as u64, at), index <= 20, at));
+        thread::sleep(Duration::from_millis(1));
+    }
+    let mut own = Vec::new();
+    while own.len() < 2 {
+        let classified = received.recv_timeout(Duration::from_secs(5)).unwrap();
+        if let SoundClasses::Scored { own_voice, .. } = classified.classes {
+            own.push(own_voice);
+        }
+    }
+    assert_eq!(own, [OwnVoiceEvidence::Present, OwnVoiceEvidence::Unknown]);
     stop.store(true, Ordering::Release);
     worker.join().unwrap();
 }
