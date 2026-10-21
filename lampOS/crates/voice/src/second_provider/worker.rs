@@ -2438,9 +2438,10 @@ pub fn serve(
             }
             let same = heeding.clone();
             engine = engine.joining_cut_words(Arc::new(move |cut, request| {
-                same.lock().map_or(Joined::Not, |mut heeding| {
-                    heeding.same_speaker(cut, request)
-                })
+                same.lock().map_or(
+                    Joined::Not("the rule is not readable".to_owned()),
+                    |mut heeding| heeding.same_speaker(cut, request),
+                )
             }));
         }
         // The rule keeps the route's one reader of the Policy's decisions,
@@ -3888,7 +3889,9 @@ impl Heeding {
             .as_mut()
             .and_then(|voices| voices.alike(cut, request));
         match likeness {
-            Some(likeness) if likeness < crate::same_voice::DIFFERENT_BELOW => return Joined::Not,
+            Some(likeness) if likeness < crate::same_voice::DIFFERENT_BELOW => {
+                return Joined::Not(format!("two voices (cosine {likeness:.2})"));
+            }
             Some(likeness) if likeness >= crate::same_voice::SAME_FROM => {
                 return Joined::Same(SAME_VOICE_JOINS);
             }
@@ -3914,7 +3917,29 @@ impl Heeding {
         match (face, coming) {
             (face, true) => Joined::Coming(face),
             (Some(why), false) => Joined::Same(why),
-            (None, false) => Joined::Not,
+            (None, false) => {
+                // What was missing, for the journal: the voices, then the
+                // eyes.
+                let voice = match (likeness, self.voices.as_mut()) {
+                    (Some(likeness), _) => {
+                        format!("a likeness between the bars (cosine {likeness:.2})")
+                    }
+                    (None, None) => "no voice check".to_owned(),
+                    (None, Some(voices)) => match (voices.printed(cut), voices.printed(request)) {
+                        (false, false) => "neither has a voice print".to_owned(),
+                        (false, true) => format!("request {cut} has no voice print"),
+                        _ => format!(
+                            "request {request} has no voice print (too short, or begun over the lamp's sound)"
+                        ),
+                    },
+                };
+                let eyes = if self.eyes.is_none() {
+                    "no eyes read"
+                } else {
+                    "no one face was seen speaking both"
+                };
+                Joined::Not(format!("{voice}, and {eyes}"))
+            }
         }
     }
 
@@ -10043,12 +10068,18 @@ mod tests {
         line(&mut heeding, 2, -1);
         faces(&mut heeding, 1, &["a"]);
         faces(&mut heeding, 2, &["a"]);
-        assert_eq!(heeding.same_speaker(1, 2), Joined::Not);
+        assert_eq!(
+            heeding.same_speaker(1, 2),
+            Joined::Not("two voices (cosine 0.00)".to_owned())
+        );
         // A middling likeness tells nothing: the face does.
         let mut heeding = voiced(false);
         line(&mut heeding, 1, 1);
         line(&mut heeding, 2, 2);
-        assert_eq!(heeding.same_speaker(1, 2), Joined::Not);
+        assert_eq!(
+            heeding.same_speaker(1, 2),
+            Joined::Not("a likeness between the bars (cosine 0.50), and no eyes read".to_owned())
+        );
         faces(&mut heeding, 1, &["a"]);
         faces(&mut heeding, 2, &["a"]);
         assert_eq!(heeding.same_speaker(1, 2), Joined::Same(SAME_FACE_JOINS));
@@ -10071,17 +10102,28 @@ mod tests {
             heeding.same_speaker(1, 2)
         };
         assert_eq!(unvoiced(&["a"], &["a"]), Joined::Same(SAME_FACE_JOINS));
-        assert_eq!(unvoiced(&["a"], &["b"]), Joined::Not, "two faces");
+        // Each refusal says what was missing, for the journal.
+        let nothing = Joined::Not("no voice check, and no eyes read".to_owned());
+        assert_eq!(unvoiced(&["a"], &["b"]), nothing, "two faces");
         assert_eq!(
             unvoiced(&["a"], &["a", "b"]),
-            Joined::Not,
+            nothing,
             "another face spoke too"
         );
-        assert_eq!(unvoiced(&[], &["a"]), Joined::Not, "nobody seen speaking");
+        assert_eq!(unvoiced(&[], &["a"]), nothing, "nobody seen speaking");
         assert_eq!(
             Heeding::new(true, true, None, None).same_speaker(1, 2),
-            Joined::Not,
+            nothing,
             "nothing known"
+        );
+        let mut heeding = voiced(false);
+        line(&mut heeding, 1, 1);
+        assert_eq!(
+            heeding.same_speaker(1, 2),
+            Joined::Not(
+                "request 2 has no voice print (too short, or begun over the lamp's sound), and no eyes read"
+                    .to_owned()
+            )
         );
     }
 

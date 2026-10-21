@@ -678,6 +678,13 @@ impl<P: Printer> Voices<P> {
         cosine(self.print(a)?, self.print(b)?)
     }
 
+    /// Whether the line `request` has a print, come and kept, for the
+    /// journal of a line not joined ([`Self::alike`]).
+    pub fn printed(&mut self, request: u64) -> bool {
+        self.poll();
+        self.print(request).is_some()
+    }
+
     /// The highest cosine of `print` against the conversation's prints.
     fn likest(&self, print: &[f32]) -> Option<f32> {
         self.conversation

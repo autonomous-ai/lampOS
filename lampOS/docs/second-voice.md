@@ -2038,9 +2038,14 @@ after a take-over, but now for every turn:
     out, the new line is asked with the words it cut short before its own,
     as one line, when one person said both: `request M goes on from
     request N's words, cut short D ms before it began: WHY; both are asked
-    as one line (LAMP_JOIN_CUT_WORDS)`. Only when it began within 1.5 s
-    (`CARRY_AFTER_END`) of that line's end, in the same session, and
-    neither that line's sound nor its words began it already. One person
+    as one line (LAMP_JOIN_CUT_WORDS)`. Only when it began within 2.5 s
+    (`JOIN_WITHIN`, longer than the sound's 1.5 s since a join needs one
+    person's sign too: on lamp-4ace on 21 Oct a 1.2 s pause began the
+    second half 1635 ms after the first's end) of that line's end, in the
+    same session, and neither that line's sound nor its words began it
+    already. Otherwise the journal says why: `request M: not joined with
+    request N's words, cut short by it: WHY (LAMP_JOIN_CUT_WORDS)`, with
+    the gap, the cosine, which line has no print, or no one face seen. One person
     is the two lines' prints at 0.70 or over (`same_voice::SAME_FROM`, over
     every pair of two voices on 18 Oct's labelled set), when the same-voice
     check runs for another rule; or else one face, the same passing id,
@@ -2051,7 +2056,11 @@ after a take-over, but now for every turn:
     times, most in two-person scenes, where answering the second person
     alone is right; Eighth's long request with a pause lost its first half
     the same way. Risk: two people with one face in view, one silent, and
-    a speaking read that takes one for the other, are joined.
+    a speaking read that takes one for the other, are joined. Found on
+    lamp-4ace on 21 Oct at 18:36: the lamp's wait sound, played 1.5 s
+    after a line with no chat begun, fell into the person's pause, so the
+    second half began over the lamp's sound and was never printed; the
+    eyes are then the join's only sign.
 - **What the lamp said is kept as what was heard** (`LAMP_SAID_AS_HEARD=on`,
   off unless set; #1712, the first builder's yes on #1722, 20 Oct 09:38).
   - **The fault it fixes:** this route sends each piece of an answer, its

@@ -137,6 +137,13 @@ pub const KEEP_AFTER_END: Duration = Duration::from_secs(2);
 pub const JOIN_WAIT: Duration = Duration::from_millis(300);
 /// How often it asks again meanwhile.
 const JOIN_POLL: Duration = Duration::from_millis(25);
+/// How soon after the cut line's end a line must begin to be joined with
+/// its words ([`Engine::joining_cut_words`]): its own, longer than
+/// [`CARRY_AFTER_END`], as [`OPEN_NAME_WITHIN`] is, since a join needs one
+/// person's sign as well. On lamp-4ace on 21 Oct at 18:36 a played request
+/// with a 1.2 s pause in it began its second half 1635 ms after the first
+/// half's end, past 1.5 s.
+pub const JOIN_WITHIN: Duration = Duration::from_millis(2_500);
 /// The function the model looks with on this route ([`Engine::looking_by_call`]).
 pub const LOOK_CALL: &str = "take_a_look";
 /// What the lamp says as it looks by a call the model made with no words.
@@ -388,7 +395,7 @@ pub type Heed =
     Arc<dyn Fn(u64, (u64, u64), &str, Option<u64>) -> Option<&'static str> + Send + Sync>;
 /// Whether the same person said a line cut short and the line that cut it
 /// ([`Engine::joining_cut_words`]).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Joined {
     /// The same person, and why: the two lines' voices, or one face seen
     /// speaking both.
@@ -396,8 +403,9 @@ pub enum Joined {
     /// A print still to come, and what is known without it: the face's why
     /// if one face spoke both, once [`JOIN_WAIT`] is over.
     Coming(Option<&'static str>),
-    /// Two people, or nothing to tell: the cut line's words go, as today.
-    Not,
+    /// Two people, or nothing to tell, and which: the cut line's words go,
+    /// as today, and the journal says why.
+    Not(String),
 }
 /// Asked of the line cut short and the line that cut it, by request.
 pub type SameSpeaker = Arc<dyn Fn(u64, u64) -> Joined + Send + Sync>;
@@ -1524,7 +1532,7 @@ impl Engine {
     /// A line that cut the one before it short, that one's answer not yet
     /// heard, is asked with that one's words before its own, as one line,
     /// when `same` says one person said both (`LAMP_JOIN_CUT_WORDS`): begun
-    /// within [`CARRY_AFTER_END`] of that one's end, in the same session.
+    /// within [`JOIN_WITHIN`] of that one's end, in the same session.
     /// Let out, it is answered so; held, so are the words it cut short,
     /// which alone would be answered in its place. Otherwise as without it:
     /// in a two-person scene the second person's line let out is answered
@@ -3259,8 +3267,9 @@ pub const KEPT_FOR: Duration = Duration::from_secs(180);
 /// `text`, the words of `request`, which is answered, and `carried`, the
 /// words of the line it cut short, none of whose answer was heard: the two
 /// asked as one line when one person said both ([`Engine::joining_cut_words`]),
-/// and nothing carried then. A print still to come is waited for up to
-/// [`JOIN_WAIT`]. Otherwise both as they came: the carried words are let go.
+/// begun within [`JOIN_WITHIN`] of its end, and nothing carried then. A print
+/// still to come is waited for up to [`JOIN_WAIT`]. Otherwise both as they
+/// came, and the journal says why.
 async fn joined_with_cut(
     shared: &Shared,
     request: u64,
@@ -3271,23 +3280,45 @@ async fn joined_with_cut(
     let Some(same) = shared.same_speaker.as_ref() else {
         return (text, Some(carried));
     };
-    let Some((_, gap)) = marks
-        .after_end
-        .filter(|(of, gap)| *of == carried.request && *gap <= CARRY_AFTER_END)
-    else {
+    let not_joined = |why: &str| {
+        eprintln!(
+            "lamp-voice second: request {request}: not joined with request {}'s words, cut short by it: {why} (LAMP_JOIN_CUT_WORDS)",
+            carried.request
+        );
+    };
+    let Some((_, gap)) = marks.after_end.filter(|(of, _)| *of == carried.request) else {
+        not_joined("its sound or words began this line already, or it was not the line before");
         return (text, Some(carried));
     };
+    if gap > JOIN_WITHIN {
+        not_joined(&format!(
+            "begun {} ms after its end, past {} ms",
+            gap.as_millis(),
+            JOIN_WITHIN.as_millis()
+        ));
+        return (text, Some(carried));
+    }
     let bound = tokio::time::Instant::now() + JOIN_WAIT;
     let why = loop {
         match same(carried.request, request) {
-            Joined::Same(why) => break Some(why),
-            Joined::Not => break None,
-            Joined::Coming(why) if tokio::time::Instant::now() >= bound => break why,
+            Joined::Same(why) => break Ok(why),
+            Joined::Not(why) => break Err(why),
+            Joined::Coming(Some(why)) if tokio::time::Instant::now() >= bound => break Ok(why),
+            Joined::Coming(None) if tokio::time::Instant::now() >= bound => {
+                break Err(format!(
+                    "a voice print did not come in {} ms, and no one face was seen speaking both",
+                    JOIN_WAIT.as_millis()
+                ));
+            }
             Joined::Coming(_) => tokio::time::sleep(JOIN_POLL).await,
         }
     };
-    let Some(why) = why else {
-        return (text, Some(carried));
+    let why = match why {
+        Ok(why) => why,
+        Err(why) => {
+            not_joined(&why);
+            return (text, Some(carried));
+        }
     };
     eprintln!(
         "lamp-voice second: request {request} goes on from request {}'s words, cut short {} ms before it began: {why}; both are asked as one line (LAMP_JOIN_CUT_WORDS)",

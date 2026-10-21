@@ -5433,7 +5433,7 @@ async fn asked_after_a_cut(
 
 /// `LAMP_JOIN_CUT_WORDS` (Eighth's long request with a pause, the first
 /// builder on Queue #2602 at 17:22): a line answered that cut the one before
-/// it short, begun within `CARRY_AFTER_END` of its end, is asked with that
+/// it short, begun within `JOIN_WITHIN` of its end, is asked with that
 /// one's words before its own when one person said both. Two people, too
 /// long a pause, or the switch off: that one's words are let go, as before,
 /// so in a two-person scene the second person is answered alone.
@@ -5445,7 +5445,7 @@ async fn a_line_cut_short_by_the_same_person_is_asked_with_the_line_that_cut_it(
     let saying = |joined: Joined| -> Option<SameSpeaker> {
         Some(Arc::new(move |cut, request| {
             assert_eq!((cut, request), (1, 2));
-            joined
+            joined.clone()
         }))
     };
     let soon = Duration::from_millis(600);
@@ -5461,14 +5461,31 @@ async fn a_line_cut_short_by_the_same_person_is_asked_with_the_line_that_cut_it(
         "the same person: one line"
     );
     assert_eq!(
-        asked_after_a_cut(lines, soon, saying(Joined::Not), false).await,
+        asked_after_a_cut(
+            lines,
+            Duration::from_millis(1_700),
+            saying(Joined::Same("the same voice said both")),
+            false,
+        )
+        .await,
+        joined,
+        "past the sound's 1.5 s, as a 1.2 s pause began its second half 1635 ms after on lamp-4ace"
+    );
+    assert_eq!(
+        asked_after_a_cut(
+            lines,
+            soon,
+            saying(Joined::Not("two voices (cosine 0.12)".to_owned())),
+            false
+        )
+        .await,
         alone,
         "two people: the second answered alone"
     );
     assert_eq!(
         asked_after_a_cut(
             lines,
-            CARRY_AFTER_END + Duration::from_millis(100),
+            JOIN_WITHIN + Duration::from_millis(100),
             saying(Joined::Same("the same voice said both")),
             false,
         )
@@ -5490,7 +5507,7 @@ async fn a_line_cut_short_by_the_same_person_is_asked_with_the_line_that_cut_it(
 async fn a_held_second_half_of_the_same_persons_request_is_answered_with_the_first() {
     let lines = ("What's the weather like", "in Saigon this weekend?");
     let same: SameSpeaker = Arc::new(|_, _| Joined::Same("the same voice said both"));
-    let two: SameSpeaker = Arc::new(|_, _| Joined::Not);
+    let two: SameSpeaker = Arc::new(|_, _| Joined::Not("two voices (cosine 0.12)".to_owned()));
     let soon = Duration::from_millis(600);
     assert_eq!(
         asked_after_a_cut(lines, soon, Some(same), true).await,
