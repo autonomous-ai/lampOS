@@ -1816,6 +1816,86 @@ mod tests {
         std::fs::remove_dir_all(&directory).unwrap();
     }
 
+    /// The thread files kept as fixtures, one for each change of the
+    /// file's shape, each written by its day's build
+    /// ([`write_a_thread_fixture`]). The file outlives the voice's restart
+    /// (`RuntimeDirectoryPreserve=yes`), so an update's new build reads the
+    /// old build's file. Every later build reads each with every exchange
+    /// in it, under whose it was, the written note kept, so an update never
+    /// sets the conversation aside (the build row "Updates cover the whole
+    /// lamp, V3 to V5").
+    #[test]
+    fn each_kept_thread_file_reads_back_as_it_was_said() {
+        let kept: [(&str, &str); 1] = [(
+            "2026-10-21",
+            include_str!("../tests/fixtures/stores/thread-2026-10-21.json"),
+        )];
+        // A's memory id as the file holds it, not worked out again here.
+        let a = "p-ca978112ca1bbdca";
+        let said = |written: Option<&str>, person: &str, lamp: &str| Recent {
+            written: written.map(str::to_owned),
+            person: person.to_owned(),
+            lamp: lamp.to_owned(),
+        };
+        for (day, text) in kept {
+            // Read a minute after its newest exchange, within the ten
+            // minutes a thread is remembered.
+            let newest = serde_json::from_str::<Vec<serde_json::Value>>(text)
+                .unwrap()
+                .iter()
+                .filter_map(|exchange| exchange["at_unix_ms"].as_u64())
+                .max()
+                .unwrap();
+            let now = Instant::now() + Duration::from_secs(3_600);
+            let wall = UNIX_EPOCH + Duration::from_millis(newest + 60_000);
+            let thread = Thread::read(text, now, wall).unwrap_or_else(|why| panic!("{day}: {why}"));
+            let recent = |scope| thread.recent_for(scope, now, REMEMBERED_FOR, EXCHANGES);
+            assert_eq!(
+                recent(None),
+                [said(None, "What time is it?", "Ten past nine.")],
+                "{day}"
+            );
+            assert_eq!(
+                recent(Some(a)),
+                [
+                    said(None, "Remind me to water the plants.", "I will, at six."),
+                    said(
+                        Some("The parcel came at noon."),
+                        "",
+                        "Your parcel came at noon."
+                    ),
+                ],
+                "{day}"
+            );
+        }
+    }
+
+    /// Writes this build's thread file to the path in
+    /// `LAMP_VOICE_THREAD_FIXTURE`: the room's exchange, then a known
+    /// person's (A, made up) spoken one and written one. Run by hand when the
+    /// file's shape changes, keeping the ones kept.
+    #[test]
+    #[ignore = "writes a thread fixture: run by hand with LAMP_VOICE_THREAD_FIXTURE set"]
+    fn write_a_thread_fixture() {
+        let target =
+            std::env::var_os("LAMP_VOICE_THREAD_FIXTURE").expect("LAMP_VOICE_THREAD_FIXTURE");
+        let start = Instant::now() + Duration::from_secs(3_600);
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        // 21 Oct 2026, 02:40 UTC.
+        let wall = UNIX_EPOCH + Duration::from_secs(1_792_550_400);
+        let mut thread = Thread::new();
+        thread.person("What time is it?", true, at(0));
+        thread.lamp(1, "Ten past nine.", at(1));
+        let a = crate::remember::person_id("A");
+        assert_eq!(a, "p-ca978112ca1bbdca");
+        thread.at_lamp(Some(a));
+        thread.person("Remind me to water the plants.", true, at(10));
+        thread.lamp(2, "I will, at six.", at(11));
+        thread.written(3, "The parcel came at noon.");
+        thread.lamp(3, "Your parcel came at noon.", at(20));
+        std::fs::write(target, thread.save(at(30), wall).unwrap()).unwrap();
+    }
+
     #[test]
     fn a_saved_thread_is_told_again_by_the_process_that_reads_it_back() {
         let mut thread = Thread::new();
