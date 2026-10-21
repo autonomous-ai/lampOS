@@ -1,5 +1,58 @@
 # Tests work log
 
+## 2026-10-22 00:08:24 +0700 — skills add-on pair pushed as #2693
+
+Ready for lamp-voice: no — [#2693](https://github.com/autonomous-ai/lampOS/pull/2693)
+is draft until its exact-head native checks pass. Kind: test harness only.
+
+Pushed `bd53fd51c56bea9763bcf7bb211024321a7c75f7` on
+`tests/1806-addon-trigger-ack`, one commit from `f349d63c7`, Part of #1806,
+labelled `builder:tests`. Posted on
+[Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6321830148).
+
+Each enabled trigger waits for quiet-note's Done before publishing the
+next. Disabled startup waits for the loaded announcement then a zero-skip
+acknowledgement, which follows subscription setup; subsequent inputs get
+zero-skip acknowledgements too. Zero skips are not used as enabled-run
+completion. The existing 500/100 ms absence drains and every assertion
+remain. The test helper exposes only the Clock items its sibling needs.
+No product source, default or ten-second proposal limit changes.
+
+Same-base Mac runs, seconds in run order:
+- Enabled: 3.0274 / 1.6089 / 1.6143 before; 2.0284 / 0.6933 / 0.6918 after.
+- Disabled: 1.9027 / 1.9135 / 1.9067 before; 0.6475 / 0.6463 / 0.6467 after.
+- All before/after runs passed. The warm target of less than one second
+  holds; first enabled use remains over one second. No device-latency claim.
+
+Three isolated mutants compiled and failed the intended checks: resetting
+proposal limits (3 rather than 1), ignoring the off filter plus a 500 ms
+post-load/pre-subscription stall (unwanted subscriber), and suppressing
+Done (publication 1's ten-second bound, stderr included). All four recorded
+source hashes matched after restoration and after the final gate.
+
+Passed sequentially from `lampOS/`: `cargo fmt --all --check`;
+`cargo clippy -q -p lamp-skills --all-targets --message-format=short -- -Dwarnings`;
+`cargo test -q -p lamp-skills` (129 library + 19 binary + 238 integration,
+386 passed, none failed/ignored); `cargo build -q --workspace`;
+`git diff --check`. Only docs/evidence were finalized afterward.
+[Verification record](https://github.com/autonomous-ai/lampOS/tree/bd53fd51c56bea9763bcf7bb211024321a7c75f7/lampOS/docs/verification/skills-addon-completion-20261021)
+holds all commands, raw output, source hashes and the three Rust patches.
+Python remains outside lampOS.
+
+Native [ARM64 #5221](https://github.com/autonomous-ai/lampOS/actions/runs/39640557447)
+and [Linux Clippy #1230](https://github.com/autonomous-ai/lampOS/actions/runs/39640557462)
+are running on this head. Earlier #5191's 1.568/1.822 s for these two
+cases is before-only context from a different base and machine.
+#2679 and #2647 are already ready with their exact-head green results.
+No ARM64 build on the Mac, no device access, and no uncommitted task source.
+
+Read-only next-candidate audit: the body fold test explicitly asserts
+at least 2.9 s and exit 7 after a stand-in's 3 s SIGTERM handler; removing
+that time would change what it checks. The Gemini progressing-consumer
+case has a possible output-only test-clock boundary after `ended_turn`,
+with its 48 ordered chunks and 120 ms delivery bound kept; not changed or
+claimed validated here.
+
 ## 2026-10-21 23:58:47 +0700 — add-on judge ready; 19.064 s to 0.648 s on native ARM64
 
 Ready for lamp-voice: [#2647](https://github.com/autonomous-ai/lampOS/pull/2647)
