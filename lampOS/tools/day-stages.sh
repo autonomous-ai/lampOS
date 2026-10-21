@@ -6,15 +6,27 @@
 # a word heard or said. Run it where the records are, on the lamp or on a
 # copy (one with its text fields blanked does as well):
 #
-#   lampOS/tools/day-stages.sh [--turns 3,5,7] [--last N] SESSION [SESSION_B]
+#   lampOS/tools/day-stages.sh [--turns 3,5,7] [--last N] [--lines [GAP_MS]]
+#                              SESSION [SESSION_B]
 #
 # SESSION is a session's folder (/var/lib/lampOS/voice/sessions/<id>), its
 # `metadata/` folder, or one `events-*.jsonl` file. A folder's files are read
 # in name order. With two, each gets its table, then one line per stage: the
 # second's median less the first's.
 #
-#   --turns 3,5,7  keep only these turns (the day lines)
-#   --last N       keep only the last N turns (after --turns)
+#   --turns 3,5,7    keep only these turns (the day lines)
+#   --last N         keep only the last N turns (after --turns)
+#   --lines [GAP_MS] after the table, the kept turns grouped into the lines
+#                    the person said (default gap 2000 ms; below)
+#
+# A folder's `events-0..3.jsonl` are one run's rolling segments, not one run
+# each: the service opens all four when the run starts (service_trace.rs
+# `Files::open`, its folder created afresh, never reused, store.rs) and
+# writes them in turn, 4 MB each, so one turn's records can sit in two of
+# them. Turns are therefore joined across a folder's files by number, as
+# `lamp-voice turn-times` keys them by folder and turn (turn_times.rs); a
+# voice restart, where numbers count afresh, is a new session folder. Two
+# runs are two SESSION arguments, never merged.
 #
 # Of each record only `kind` and the timing fields below are taken (jq builds
 # a new object of those fields; nothing else reaches the table):
@@ -36,6 +48,12 @@
 #                       `AnswerAudio`, never a wait cue).
 #   speaker_first_write `at_us`, the earliest of the turn: the first sound
 #                       handed to the speaker (a wait cue counts).
+#   input_admitted      (--lines only) `prefix_first_host_read_us`, the
+#                       first block of the admitted speech, else `at_us`;
+#                       the earliest of the turn is its speech start.
+#   and of local_endpoint (--lines only) `endpoint.basis`, what ended the
+#                       line (activity.rs `EndpointDecision`: `silence`,
+#                       `model_complete`, `silence_fallback`, ...).
 # Every time is the lamp's monotonic clock; turns count afresh each run, so
 # a session is one run.
 #
@@ -52,19 +70,45 @@
 # early is marked `e`. A stage a turn never reached is `-`. A turn with no
 # line end (the lamp's own line) is no row. Under the rows: each column's
 # median and p90 (nearest rank), with how many turns had it.
+#
+# --lines (the first builder, 22 Oct: the same twelve day lines gave 23
+# turns against 18; how many lines were heard as two turns or more). The
+# turns the table kept (--turns and --last apply), in time order, each from
+# its speech start to its end of speech (the same line end as the table's
+# `wait`). A turn whose speech starts less than GAP_MS after the previous
+# turn's end of speech is the same line, heard in parts; a turn with no
+# speech start or end starts a line of its own. One row a line:
+#   line      its first turn's number
+#   turns     its turns
+#   bases     each turn's `endpoint.basis`, `-` when it has none
+#   answered  each turn: `y` when it had an answer's first audio, else `-`
+# Under the rows: how many lines, how many were heard as two turns or more
+# (and their turns), how often each basis ended a part that was not the
+# line's last (the fragment ends), and each basis over all turn ends. With
+# two sessions, then one line comparing "heard as 2+ turns".
 set -euo pipefail
 
 usage() {
-  echo "usage: day-stages.sh [--turns 3,5,7] [--last N] SESSION [SESSION_B]" >&2
+  echo "usage: day-stages.sh [--turns 3,5,7] [--last N] [--lines [GAP_MS]] SESSION [SESSION_B]" >&2
   exit 2
 }
 
-turns="" last=""
+turns="" last="" gap=""
 files=()
 while [[ $# -gt 0 ]]; do
   case $1 in
     --turns) [[ $# -ge 2 && $2 =~ ^[0-9]+(,[0-9]+)*$ ]] || usage; turns=$2; shift 2 ;;
     --last) [[ $# -ge 2 && $2 =~ ^[1-9][0-9]*$ ]] || usage; last=$2; shift 2 ;;
+    --lines=*) gap=${1#--lines=}; [[ $gap =~ ^[1-9][0-9]*$ ]] || usage; shift ;;
+    --lines)
+      # The gap is optional: only an all-digit word that is not a path is
+      # taken as it, so `--lines SESSION` keeps its session.
+      if [[ $# -ge 2 && $2 =~ ^[0-9]+$ && ! -e $2 ]]; then
+        [[ $2 =~ ^[1-9][0-9]*$ ]] || usage
+        gap=$2; shift 2
+      else
+        gap=2000; shift
+      fi ;;
     -h | --help) usage ;;
     -*) usage ;;
     *) files+=("$1"); shift ;;
@@ -88,60 +132,131 @@ event_files() {
   fi
 }
 
-# One TSV row per turn: turn, early mark, wait, words, cue, chat, audio, sound.
-rows() {
+# The timing records of SESSION, one compact object a line: `kind`, `turn`
+# and the timing fields named above, nothing else.
+records() {
   local list=() one
   while IFS= read -r one; do list+=("$one"); done < <(event_files "$1")
   [[ ${#list[@]} -gt 0 ]] || { echo "day-stages.sh: no events-*.jsonl in $1" >&2; exit 1; }
   # grep only narrows the lines read; jq keeps the named kinds and fields.
-  { grep -hE '"kind": ?"(local_endpoint|answer_stages|answer_first_audio|speaker_first_write)"' \
+  { grep -hE '"kind": ?"(local_endpoint|answer_stages|answer_first_audio|speaker_first_write|input_admitted)"' \
     "${list[@]}" || true; } |
     jq -cR 'fromjson? | objects
       | select(.kind == "local_endpoint" or .kind == "answer_stages"
-               or .kind == "answer_first_audio" or .kind == "speaker_first_write")
+               or .kind == "answer_first_audio" or .kind == "speaker_first_write"
+               or .kind == "input_admitted")
       | select((.turn | type) == "number")
       | {kind, turn, at_us, last_block_host_read_us, includes_silence_wait_ms,
          early_ms: .early_end.before_this_ms?,
          no_line: (.not_speech != null or .onboarding_near_call != null),
-         decided_at_us, words_ms, cue_ms, chat_first_ms, after_decision_ms}' |
-    jq -rs --arg turns "$turns" --arg last "$last" '
+         basis: (.endpoint | if type == "object" and (.basis | type) == "string" then .basis else null end),
+         prefix_us: .prefix_first_host_read_us,
+         decided_at_us, words_ms, cue_ms, chat_first_ms, after_decision_ms}'
+}
+
+# jq: the records (slurped) to one object a turn the table keeps, in turn
+# order, after --turns and --last.
+# shellcheck disable=SC2016 # $names here are jq's, not the shell's.
+KEPT='
+  def less(a; b): if a == null or b == null then null else a - b end;
+  def kept:
+    group_by(.turn) | map(
+      . as $all
+      | ($all | map(select(.kind == "answer_stages")) | last) as $st
+      | ($all | map(select(.kind == "local_endpoint" and (.no_line | not)))) as $ends
+      # The decision the stages go with, else the last, as AnswerAudio keeps.
+      | (($ends | map(select(.at_us == $st.decided_at_us)) | last) // ($ends | last)) as $endpoint
+      | select($endpoint != null and ($endpoint.at_us | type) == "number")
+      | {turn: $all[0].turn, st: $st, endpoint: $endpoint, all: $all,
+         line: $endpoint.at_us,
+         speech: (if ($endpoint.last_block_host_read_us | type) == "number"
+                    and ($endpoint.includes_silence_wait_ms | type) == "number"
+                  then $endpoint.last_block_host_read_us - $endpoint.includes_silence_wait_ms * 1000
+                  else null end),
+         audio: ($all | map(select(.kind == "answer_first_audio")
+                            | .after_decision_ms | numbers) | first)})
+    | sort_by(.turn)
+    | (if $turns == "" then . else
+         ($turns | split(",") | map(tonumber)) as $keep
+         | map(select(.turn as $t | $keep | index($t))) end)
+    | (if $last == "" then . else .[(- ($last | tonumber)):] end)
+    # A slice of an empty list is null.
+    | (. // []);'
+
+# One TSV row per turn: turn, early mark, wait, words, cue, chat, audio, sound.
+rows() {
+  jq -rs --arg turns "$turns" --arg last "$last" "$KEPT"'
       def ms(us): if us == null then null else ((us / 1000) + 0.5 | floor) end;
-      def less(a; b): if a == null or b == null then null else a - b end;
       def cell: if . == null then "-" else tostring end;
-      group_by(.turn) | map(
-        . as $all
-        | ($all | map(select(.kind == "answer_stages")) | last) as $st
-        | ($all | map(select(.kind == "local_endpoint" and (.no_line | not)))) as $ends
-        # The decision the stages go with, else the last, as AnswerAudio keeps.
-        | (($ends | map(select(.at_us == $st.decided_at_us)) | last) // ($ends | last)) as $endpoint
-        | select($endpoint != null and ($endpoint.at_us | type) == "number")
-        | ($endpoint.at_us) as $line
-        | (if ($endpoint.last_block_host_read_us | type) == "number"
-             and ($endpoint.includes_silence_wait_ms | type) == "number"
-           then $endpoint.last_block_host_read_us - $endpoint.includes_silence_wait_ms * 1000
-           else null end) as $speech
-        | ($endpoint.early_ms // 0) as $early
-        | ($all | map(select(.kind == "speaker_first_write"
-                             and (.at_us | type) == "number"
-                             and .at_us >= ($speech // $line)) | .at_us) | min) as $sound
-        | ($all | map(select(.kind == "answer_first_audio")
-                      | .after_decision_ms | numbers) | first) as $audio
-        | [ $all[0].turn,
-            (if $early > 0 then "e" else "" end),
-            ms(less($line; $speech)),
-            less($st.words_ms; $early),
-            less($st.cue_ms; $early),
-            less($st.chat_first_ms; $early),
-            $audio,
-            ms(less($sound; $speech)) ])
-      | sort_by(.[0])
-      | (if $turns == "" then . else
-           ($turns | split(",") | map(tonumber)) as $keep
-           | map(select(.[0] as $t | $keep | index($t))) end)
-      | (if $last == "" then . else .[(- ($last | tonumber)):] end)
-      # A slice of an empty list is null.
-      | (. // [])
-      | .[] | [.[0], .[1]] + (.[2:] | map(cell)) | @tsv'
+      kept | .[]
+      | (.endpoint.early_ms // 0) as $early
+      | .speech as $speech | .line as $line
+      | (.all | map(select(.kind == "speaker_first_write"
+                           and (.at_us | type) == "number"
+                           and .at_us >= ($speech // $line)) | .at_us) | min) as $sound
+      | [ .turn,
+          (if $early > 0 then "e" else "" end),
+          ms(less($line; $speech)),
+          less(.st.words_ms; $early),
+          less(.st.cue_ms; $early),
+          less(.st.chat_first_ms; $early),
+          .audio,
+          ms(less($sound; $speech)) ]
+      | [.[0], .[1]] + (.[2:] | map(cell)) | @tsv' "$1"
+}
+
+# One TSV row per heard line: its first turn, then its turns, bases and
+# answered marks, each comma-separated, in time order.
+lines() {
+  jq -rs --arg turns "$turns" --arg last "$last" --argjson gap "$gap" "$KEPT"'
+      kept
+      | map({turn,
+             start: (.all | map(select(.kind == "input_admitted")
+                                | (.prefix_us // .at_us) | numbers) | min),
+             stop: .speech,
+             basis: (.endpoint.basis // "-"),
+             answered: (if .audio == null then "-" else "y" end)})
+      | sort_by(.start // .stop // 0, .turn)
+      # A turn joins the line before it when its speech starts less than
+      # the gap after that line'"'"'s last end of speech.
+      | reduce .[] as $t ([];
+          if length > 0 and $t.start != null and .[-1][-1].stop != null
+             and $t.start - .[-1][-1].stop < $gap * 1000
+          then .[-1] += [$t] else . + [[$t]] end)
+      | .[]
+      | [.[0].turn,
+         (map(.turn | tostring) | join(",")),
+         (map(.basis) | join(",")),
+         (map(.answered) | join(","))]
+      | @tsv' "$1"
+}
+
+# The lines table of one session ($1: its lines file).
+lines_table() {
+  echo "#### heard lines (gap $gap ms)"
+  echo
+  echo "| line | turns | bases | answered |"
+  echo "|---|---|---|---|"
+  awk -F'\t' '{ printf "| %s | %s | %s | %s |\n", $1, $2, $3, $4 }' "$1"
+  echo
+  awk -F'\t' '
+    { n++; k = split($2, t, ","); split($3, b, ",")
+      if (k > 1) { m++; in_m += k; for (j = 1; j < k; j++) frag[b[j]]++ }
+      for (j = 1; j <= k; j++) ends[b[j]]++ }
+    # "basis count, ..." in name order (for-in order is awk'"'"'s own).
+    function counts(a,   k, n, i, j, x, s) {
+      n = 0; for (x in a) k[++n] = x
+      for (i = 2; i <= n; i++) for (j = i; j > 1 && k[j - 1] > k[j]; j--) { x = k[j]; k[j] = k[j - 1]; k[j - 1] = x }
+      s = ""; for (i = 1; i <= n; i++) s = s (s == "" ? "" : ", ") k[i] " " a[k[i]]
+      return s == "" ? "none" : s
+    }
+    END {
+      printf "lines %d\n", n
+      printf "heard as 2+ turns %d (turns in them %d)\n", m, in_m
+      printf "fragment ends: %s\n", counts(frag)
+      printf "turn ends: %s\n", counts(ends)
+    }' "$1"
+  echo
 }
 
 COLUMNS_=(wait words cue chat audio sound)
@@ -179,8 +294,13 @@ stat_of() {
 i=0
 for f in "${files[@]}"; do
   i=$((i + 1))
-  rows "$f" >"$T/rows$i"
+  records "$f" >"$T/records$i"
+  rows "$T/records$i" >"$T/rows$i"
   table "$T/rows$i" "$f"
+  if [[ -n $gap ]]; then
+    lines "$T/records$i" >"$T/lines$i"
+    lines_table "$T/lines$i"
+  fi
 done
 
 if [[ ${#files[@]} -eq 2 ]]; then
@@ -197,4 +317,11 @@ if [[ ${#files[@]} -eq 2 ]]; then
   echo "$head"
   echo "|---|---|---|---|---|---|"
   echo "$line"
+  if [[ -n $gap ]]; then
+    # Lines with a comma in their turns were heard as two turns or more.
+    a=$(grep -c $'\t[^\t]*,' "$T/lines1" || true)
+    b=$(grep -c $'\t[^\t]*,' "$T/lines2" || true)
+    echo
+    echo "heard as 2+ turns: first $a, second $b ($(awk -v a="$a" -v b="$b" 'BEGIN { printf "%+d", b - a }'))"
+  fi
 fi
