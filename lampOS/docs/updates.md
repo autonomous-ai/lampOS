@@ -388,7 +388,9 @@ lamp-skills, for good. `crates/update/src/product_skills.rs`:
 - **Carried:** `lamp-update manifest --skills lampOS/skills` writes
   `lamp-product-skills` beside the binaries: JSON (`lampos-skills/1`) of
   every file of each `install::PRODUCT_SKILLS` folder but its `tests/` and
-  hidden files, each text, at most 1 MiB. It is listed in the manifest's
+  hidden files, each text, at most 1 MiB; the `skill.toml` of each of
+  `install::PRODUCT_SKILLS_OFF` with `enabled = false` above it
+  (`install::OFF_LINE`), as install writes it. It is listed in the manifest's
   `files` with its SHA-256 and size, as a binary is, so it is signed with
   the manifest. No field is added to the manifest: it denies unknown
   fields, so a new one would make every older updater refuse every build.

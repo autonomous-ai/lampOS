@@ -5,8 +5,8 @@
 # when music has played in the room for a while. Written to lamp-skills'
 # schema (docs/skills.md).
 needs = ["ears", "body"]
-# A core skill (docs/skills.md, "Core and installable skills"), held out of
-# the product's install until its lamp check (install::NOT_PRODUCT_SKILLS).
+# A core skill (docs/skills.md, "Core and installable skills"), installed
+# disabled until its lamp check (install::PRODUCT_SKILLS_OFF).
 # Without the ears' classes it does nothing.
 kind = "core"
 version = "1.0.0"

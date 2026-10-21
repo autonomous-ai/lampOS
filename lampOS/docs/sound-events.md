@@ -165,7 +165,7 @@ upbeat track whose 60 s held under the bar too often. Each skill keeps one
 case made of that run's own scores.
 
 The first of them, the music sway, is built and held out of the product
-(`skills/music-sway`, `install::NOT_PRODUCT_SKILLS`); it reads
+(`skills/music-sway`, installed disabled, `install::PRODUCT_SKILLS_OFF`); it reads
 `scores.music` and does nothing without this topic.
 
 Only after this evidence do the `kind = "core"` skills use the topic: a small

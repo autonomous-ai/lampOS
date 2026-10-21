@@ -1075,6 +1075,35 @@ fn every_skill_folder_is_in_the_product_or_says_why_not() {
     }
 }
 
+/// The owner: core skills are always installed, installable ones as apps.
+/// Every folder of `lampOS/skills` whose `kind` is core is a product skill
+/// (installed off if it is in `PRODUCT_SKILLS_OFF`), and every product
+/// skill is core. Laugh glance is parked (#2524, #1669): out of both.
+#[test]
+fn the_product_skills_are_exactly_the_core_skills() {
+    const PARKED: &[&str] = &["laugh-glance"];
+    let mut core: Vec<String> = fs::read_dir(skills_root())
+        .unwrap()
+        .flatten()
+        .filter(|entry| entry.path().join("skill.toml").is_file())
+        .map(|entry| lamp_skills::load(&entry.path()).unwrap())
+        .filter(|skill| skill.kind == lamp_skills::SkillKind::Core)
+        .map(|skill| skill.name)
+        .filter(|name| !PARKED.contains(&name.as_str()))
+        .collect();
+    core.sort();
+    let mut product: Vec<String> = install::PRODUCT_SKILLS
+        .iter()
+        .map(|name| (*name).to_owned())
+        .collect();
+    product.sort();
+    assert_eq!(core, product);
+    for (name, why) in install::PRODUCT_SKILLS_OFF {
+        assert!(install::PRODUCT_SKILLS.contains(name), "{name}");
+        assert!(!why.is_empty(), "{name}");
+    }
+}
+
 /// #811, from lamp-06c1, and every skill since (the owner, 19 Oct): a home
 /// lamp gets `lamp-skills` and every product skill whole but its tests,
 /// byte for byte, and no other skill. The voice speaks them through its say
@@ -1094,7 +1123,15 @@ fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
         assert!(files.contains(&"SKILL.md".to_owned()), "{skill}");
         for file in files {
             let path = format!("/var/lib/lampOS/skills/{skill}/{file}");
-            let ours = fs::read(folder.join(&file)).unwrap();
+            let mut ours = fs::read(folder.join(&file)).unwrap();
+            // Installed disabled: the off line above its own file.
+            if file == "skill.toml"
+                && install::PRODUCT_SKILLS_OFF
+                    .iter()
+                    .any(|(off, _)| off == skill)
+            {
+                ours.splice(0..0, install::OFF_LINE.bytes());
+            }
             assert_eq!(fs::read(lamp.on(&path)).unwrap(), ours, "{path}");
             installed.push(path);
         }
@@ -1165,8 +1202,9 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         .iter()
         .map(|name| lamp_skills::load(&root.join(name)).unwrap())
         .collect();
-    // Not feeling well came with the product after its lamp check (#1681).
-    assert_eq!(installed.len(), 10);
+    // Not feeling well came with the product after its lamp check (#1681);
+    // the eight of PRODUCT_SKILLS_OFF come installed disabled.
+    assert_eq!(installed.len(), 18);
     let bedtime = installed
         .iter()
         .find(|skill| skill.name == "bedtime-morning")
@@ -1191,7 +1229,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     // contribute functions. The nine live skills offer Dance and
     // prepare_to_unplug, the latter hidden at run time unless LAMP_UNPLUG=on.
     let inventory = lamp_skills::load_each(&root);
-    assert_eq!(inventory.len(), 10);
+    assert_eq!(inventory.len(), 18);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
     let listed = lamp_skills::package::list(&root).unwrap();
     let row = listed
@@ -1214,6 +1252,19 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(live.len(), 9);
     assert!(live.iter().all(|skill| skill.name != bedtime.name));
+    // Each core skill installed off is disabled on the lamp and adds no
+    // function, its tool or not: the 2 above are all a session is told.
+    for (name, _) in install::PRODUCT_SKILLS_OFF {
+        let skill = installed.iter().find(|skill| skill.name == *name).unwrap();
+        assert!(!skill.enabled, "{name}");
+        assert_eq!(skill.kind, lamp_skills::SkillKind::Core, "{name}");
+        assert!(live.iter().all(|live| live.name != *name), "{name}");
+        assert_eq!(
+            lamp_skills::tools_file(std::slice::from_ref(skill)),
+            serde_json::json!({"tools":[]}),
+            "{name}"
+        );
+    }
     assert_eq!(
         lamp_skills::tools_file(&installed),
         lamp_skills::tools_file(&live)

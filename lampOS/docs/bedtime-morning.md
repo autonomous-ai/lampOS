@@ -2,11 +2,13 @@
 
 The product installer includes the [core skill](../skills/bedtime-morning/skill.toml)
 at `/var/lib/lampOS/skills/bedtime-morning/`, disabled with `enabled = false`.
-It copies `skill.toml` and `SKILL.md`, excluding `tests/`: nine product skills
-are installed and eight are enabled (Not feeling well came with the product
-after its lamp check, #1681). Desk tutor, Desk tutor marks, Light out, Light
-scenes, Point the light and Light show remain outside the product install
-(`install::NOT_PRODUCT_SKILLS`). Bedtime's
+It copies `skill.toml` and `SKILL.md`, excluding `tests/`: eighteen product
+skills are installed and nine are enabled (Not feeling well came with the
+product after its lamp check, #1681). Light out, Watches you leave, Music
+sway, Light scenes, Point the light, Light show, Smoky air and Dusty air are
+installed disabled by install itself (`install::PRODUCT_SKILLS_OFF`); Desk
+tutor, Desk tutor marks and the other installable skills remain outside the
+product install (`install::NOT_PRODUCT_SKILLS`). Bedtime's
 hours, movements, sound and ceilings are authored defaults awaiting a lamp
 comparison. Host validation does not authorize an installation or establish
 physical, optical or acoustic behavior.
