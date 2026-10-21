@@ -8,8 +8,10 @@
 # PLAYS SOUND IN THE ROOM. About 4 minutes. Needs `sudo -n` on the lamp and the lamp's voice quiet for 45 s.
 # argv: LABEL FIXTURE, FIXTURE being an ARM64 lamp-tasks-harness-fixture (from a lampOS ARM64 run's artifact).
 # TASKS=PATH (optional): an ARM64 lamp-tasks from the same build, for a lamp whose own is older (as ask-again.sh).
-# Prints PASS or FAIL for each step: offered (start_agent_task), handed over (the stand-in's `new`), the answer read
-# (its `show`), told (the news), and heard whole: not cut short, and both made-up events in the lamp's words.
+# Prints PASS or FAIL for each step: asked to confirm (the lamp's own question before a hand-over, answered "Yes,
+# please." once its answer has played; passed too when it offers at once), offered (start_agent_task), handed over
+# (the stand-in's `new`), the answer read (its `show`), told (the news), and heard whole: not cut short, and both
+# made-up events in the lamp's words.
 cd "${0:A:h}" || exit 9
 . ./settings.sh
 L=${1:?LABEL}
@@ -45,6 +47,19 @@ wait_for() {  # PATTERN SECONDS: wait until the journal has a line matching PATT
   while (( $(date +%s) < until )); do
     hit=$(journal | grep -E -- "$1" | tail -1)
     [[ -n $hit ]] && { print -r -- "$hit"; return 0; }
+    sleep 1
+  done
+  return 1
+}
+answered() {  # how many of the lamp's answers have played to their end in this session: one number
+  local n
+  n=$(./lamp_ssh 'sudo -n sh -c '"'"'d=/var/lib/lampOS/voice/sessions; s=$(ls -t $d | head -n 1); cat $d/$s/metadata/events-*.jsonl | grep "\"kind\":\"turn_finished\"" | grep -c "\"outcome\":\"audio_written" || true'"'" </dev/null 2>/dev/null)
+  print -r -- "${n:-0}"
+}
+wait_answered() {  # COUNT SECONDS: wait until more than COUNT of the lamp's answers have played to their end
+  local until=$(( $(date +%s) + $2 ))
+  while (( $(date +%s) < until )); do
+    (( $(answered) > $1 )) && { print "the lamp's answer played to its end"; return 0; }
     sleep 1
   done
   return 1
@@ -88,10 +103,26 @@ check() {  # NAME LINE-OR-EMPTY; kept here, not in a pipe's subshell
   if [[ -n $2 ]]; then result[$1]=PASS; else result[$1]=FAIL; fi
   print -r -- "${result[$1]} $1${2:+: ${2:0:200}}" | tee -a "$OUT"
 }
+# The ask. The lamp may first ask whether the computer's agent should look (its own confirm before a hand-over,
+# lamp-4ace 22 Oct 05:0x), or offer the hand-over at once: either passes "asked to confirm".
+before=$(answered)
 line Samantha "Hey Lamp, what's on my calendar today?"
-check "offered" "$(wait_for 'asked for start_agent_task' 40)"
-# Its read-back ends with "Shall I start it?": the yes after it.
-[[ ${result[offered]} == PASS ]] && { sleep 8; line Samantha "Yes, please."; }
+offered=$(wait_for 'asked for start_agent_task' 12)
+if [[ -n $offered ]]; then
+  check "asked to confirm" "not needed: offered at once"
+else
+  check "asked to confirm" "$(wait_answered $before 40)"
+  [[ ${result[asked to confirm]} == PASS ]] && { sleep 1; line Samantha "Yes, please."; }
+  offered=$(wait_for 'asked for start_agent_task' 40)
+fi
+check "offered" "$offered"
+# Its read-back ends with "Shall I start it?": the yes once it has played to its end.
+if [[ ${result[offered]} == PASS ]]; then
+  before=$(answered)
+  wait_answered $before 40 >/dev/null
+  sleep 1
+  line Samantha "Yes, please."
+fi
 check "handed over" "$(wait_called new 40)"
 check "the answer read" "$(wait_called show 90)"
 told=$(wait_for 'telling news from the work handed over' 120)
