@@ -65,6 +65,8 @@ pub struct Ids {
     pub mouths: Option<speaking::Mouths>,
     /// The last look's ids, in the detector's order.
     last: Vec<u32>,
+    /// The last look's ids whose mouth read speaking.
+    talking: Vec<u32>,
 }
 
 fn overlap(a: &[f32; 4], b: &[f32; 4]) -> f32 {
@@ -110,6 +112,12 @@ impl Ids {
         self.last.clone_from(&ids);
         ids
     }
+
+    /// Where the face with this passing id is in the last look, in the
+    /// detector's order.
+    pub fn index_of(&self, id: u32) -> Option<usize> {
+        self.last.iter().position(|seen| *seen == id)
+    }
 }
 
 /// A face's box as fractions of the picture: (xmin, ymin, xmax, ymax).
@@ -144,6 +152,7 @@ pub fn message(
     let (width, height) = (filled.0.max(1) as f32, filled.1.max(1) as f32);
     let boxes: Vec<[f32; 4]> = found.iter().map(|face| edges(face, filled)).collect();
     let numbers = ids.of(&boxes, now_us);
+    ids.talking.clear();
     let faces = found
         .iter()
         .zip(&boxes)
@@ -162,6 +171,9 @@ pub fn message(
                 let open = opens.get(index).copied().flatten();
                 mouths.judge(id, &face.marks, turn, open, now_us)
             });
+            if speaking.is_some_and(|speaking| speaking.state == lamp_msgs::SpeakingState::Yes) {
+                ids.talking.push(id);
+            }
             Face {
                 speaking,
                 id: format!("f{id}"),
@@ -519,6 +531,17 @@ impl BusOut {
     pub fn speaking_id(&self, index: usize) -> Option<String> {
         self.ids.mouths.as_ref()?;
         self.ids.last.get(index).map(|id| format!("f{id}"))
+    }
+
+    /// The passing ids that read speaking in the last look (none unless
+    /// speaking is judged), and the detector's index of a passing id in it:
+    /// for turning to the one the lamp answers (`crate::answered`).
+    pub fn talking(&self) -> &[u32] {
+        &self.ids.talking
+    }
+
+    pub fn index_of(&self, id: u32) -> Option<usize> {
+        self.ids.index_of(id)
     }
 
     /// Call from the loop whether or not the camera is open: with it closed
@@ -1163,6 +1186,14 @@ mod tests {
         let mut off = Ids::default();
         let text = serde_json::to_string(&message(&looks, &[], PICTURE, &mut off, 0)).unwrap();
         assert!(!text.contains("speaking"), "{text}");
+        // Nobody reads speaking with it off, so nobody is turned to (#1810).
+        assert!(off.talking.is_empty());
+        // A passing id is found where the detector put its face (#2270).
+        let first = off.last[1];
+        let moved = [looks[1], looks[0]];
+        message(&moved, &[], PICTURE, &mut off, 100_000);
+        assert_eq!(off.index_of(first), Some(0));
+        assert_eq!(off.index_of(first + 100), None);
         let mut on = Ids {
             mouths: Some(speaking::Mouths::default()),
             ..Ids::default()
@@ -1177,6 +1208,8 @@ mod tests {
             }
             let text = serde_json::to_string(&seen).unwrap();
             assert_eq!(text.matches("\"speaking\":").count(), 2, "{text}");
+            // `unknown` is not speaking.
+            assert!(on.talking.is_empty());
         }
     }
 

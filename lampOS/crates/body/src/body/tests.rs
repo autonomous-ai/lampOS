@@ -2097,6 +2097,73 @@ fn with_eyes_the_head_turns_to_the_face_while_it_listens_and_not_beyond_its_reac
     assert_eq!(lamp.servos[PITCH].goal, 2_000);
 }
 
+/// The eyes may send the face the lamp answers (#1810), but a hand on the
+/// base still wins: a base turning to that face meets the hand, is left
+/// where it is for the whole ease, and is not turned on to the face. This
+/// guards the body's existing rule, which #1810 rests on: the body can't
+/// tell which face the eyes chose, so it is not a test of that choice.
+#[test]
+fn a_base_turning_to_a_face_that_meets_a_hand_is_left_where_it_is() {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+    let looking = Looking::new([342, 200], [400, 120]).unwrap();
+    let limits = Limits::folded_with(Tuning {
+        reach: [100, 15, 30, 150],
+        speed: 120,
+        servo_speed: 300,
+        servo_acceleration: 60,
+    })
+    .unwrap();
+    let seen_from = Rc::new(Cell::new((f32::from(HOME[2]), f32::from(HOME[0]))));
+    // The one answered, 300 counts to one side, about 26 degrees.
+    let eyes = face_at(seen_from.clone(), &clock.time, (300.0, 0.0));
+    let (hand_from, hand_until) = (ms(3_000), ms(3_200));
+    lamp.strains = vec![(hand_from, hand_until, YAW, 300)];
+    let news = || Some((Mood::Speaking, 100));
+    let watched = clock.time.clone();
+    let mut seen = Vec::new();
+    let report = run_looking(
+        &mut lamp,
+        &mut clock,
+        limits,
+        None,
+        None,
+        Some(looking),
+        news,
+        eyes,
+        |glimpse| {
+            seen_from.set((
+                f32::from(glimpse.positions[2]),
+                f32::from(glimpse.positions[0]),
+            ));
+            seen.push((watched.get(), *glimpse));
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    // It was turning to the face when the hand came.
+    let before = seen.iter().rfind(|step| step.0 < hand_from).unwrap().1;
+    assert!(before.look[0] > 0.0, "{before:?}");
+    // It met the hand once, and was left where it was for the whole ease,
+    // the face still to one side.
+    assert_eq!(report.eased[2], 1, "{report:?}");
+    let gave = seen.iter().position(|step| step.1.eased[2] == 1).unwrap();
+    let held = seen[gave].1.goals[2];
+    assert!(
+        seen[gave..gave + usize::from(EASE_STEPS) - 1]
+            .iter()
+            .all(|step| step.1.goals[2] == held)
+    );
+    assert!(held < 2_015 + 300 - 30, "{held}");
+    // And it goes on to the face once the ease is over.
+    let after = seen[gave + usize::from(EASE_STEPS)..]
+        .iter()
+        .filter(|step| step.1.mood == Mood::Speaking)
+        .map(|step| step.1.goals[2])
+        .max()
+        .unwrap();
+    assert!(after > held, "{after} {held}");
+}
+
 #[test]
 fn without_a_face_or_without_eyes_nothing_is_added_to_what_the_mood_wants() {
     let run_with = |looking: Option<Looking>| {
