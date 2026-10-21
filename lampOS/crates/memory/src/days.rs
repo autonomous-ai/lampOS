@@ -1076,6 +1076,33 @@ impl Days {
         Ok(found)
     }
 
+    /// A conversation end's sources as this store has them, and how many it
+    /// named that it no longer has at all (#2176 row 13): a voice can name
+    /// exchanges a forget has since removed, and the end goes on with the
+    /// rest rather than being refused. An id another person's scope still has
+    /// is kept, for the checks after to refuse as before (the reviewer-lead's
+    /// P3 on #2226): a wrong person's ids never look like a forget. Duplicates
+    /// and bad numbers are kept for those checks too.
+    pub(crate) fn known_sources(&self, _person: &Person, ids: &[u64]) -> Result<(Vec<u64>, usize)> {
+        let mut known = Vec::with_capacity(ids.len());
+        let mut unknown = 0;
+        for id in ids {
+            let exists = *id == 0
+                || *id > i64::MAX as u64
+                || self.db.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM entries WHERE id=?)",
+                    params![id],
+                    |r| r.get(0),
+                )?;
+            if exists {
+                known.push(*id);
+            } else {
+                unknown += 1;
+            }
+        }
+        Ok((known, unknown))
+    }
+
     pub fn conversation_end_with(
         &mut self,
         person: &Person,
