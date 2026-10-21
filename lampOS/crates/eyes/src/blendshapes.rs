@@ -42,6 +42,18 @@ pub const SCORES: usize = 52;
 const MOUTH_FROWN: [usize; 2] = [30, 31];
 const MOUTH_SMILE: [usize; 2] = [44, 45];
 const NOSE_SNEER: [usize; 2] = [50, 51];
+const BROW_DOWN: [usize; 2] = [1, 2];
+/// With `LAMP_SEEMS_BROW_LOW=on`, a face is also `negative` with the brows
+/// drawn down at or over [`BROW_LOW_FROM`] and the smiles under
+/// [`BROW_LOW_SMILE_UNDER`], its confidence the brows' (#2132). The frowns
+/// never rise on a long face here: on the screen man's long-face clips they
+/// scored 0.03 at most, while the brows held 0.84–0.94 against 0.63–0.72 on
+/// his smiles, and this line named 33 of 70 long-face frames and none of 50
+/// others (Ten on #2602, 22 Oct 02:1x). Authored, for the measure to set.
+pub const BROW_LOW_FROM: f32 = 0.80;
+pub const BROW_LOW_SMILE_UNDER: f32 = 0.3;
+/// The switch for the brows' long face: `on` only, off unless set.
+pub const BROW_LOW_ENVIRONMENT: &str = "LAMP_SEEMS_BROW_LOW";
 /// A kind is named only at or over this; under it, the read is `unsure`.
 /// Authored, to be set from the week's measure (#1671).
 pub const NAMED_FROM: f32 = 0.5;
@@ -72,12 +84,24 @@ pub fn points(landmarks: &[f32], eye_line: (f32, f32)) -> Option<Vec<f32>> {
 /// the two. Each movement is its left and right's mean. `None` for scores
 /// that aren't 52 numbers.
 pub fn judge(scores: &[f32]) -> Option<HumanSeems> {
+    judge_with(scores, false)
+}
+
+/// [`judge`], and with `brow_low` (`LAMP_SEEMS_BROW_LOW=on`) the brows'
+/// long face counts as `negative` too ([`BROW_LOW_FROM`]).
+pub fn judge_with(scores: &[f32], brow_low: bool) -> Option<HumanSeems> {
     if scores.len() != SCORES || scores.iter().any(|score| !score.is_finite()) {
         return None;
     }
     let both = |pair: [usize; 2]| (scores[pair[0]] + scores[pair[1]]) / 2.0;
     let positive = both(MOUTH_SMILE);
-    let negative = both(MOUTH_FROWN).max(both(NOSE_SNEER));
+    let brows = both(BROW_DOWN);
+    let long_face = if brow_low && brows >= BROW_LOW_FROM && positive < BROW_LOW_SMILE_UNDER {
+        brows
+    } else {
+        0.0
+    };
+    let negative = both(MOUTH_FROWN).max(both(NOSE_SNEER)).max(long_face);
     let (kind, confidence) = if positive >= NAMED_FROM && positive >= negative {
         (SeemsKind::Positive, positive)
     } else if negative >= NAMED_FROM {
@@ -94,6 +118,7 @@ pub fn judge(scores: &[f32]) -> Option<HumanSeems> {
 
 pub struct Reader {
     plan: Arc<TypedRunnableModel>,
+    brow_low: bool,
 }
 
 impl Reader {
@@ -120,7 +145,17 @@ impl Reader {
             .with_input_fact(0, f32::fact([1, POINTS.len(), 2]).into())?
             .into_optimized()?
             .into_runnable()?;
-        Ok(Self { plan })
+        Ok(Self {
+            plan,
+            brow_low: false,
+        })
+    }
+
+    /// The brows' long face counts as `negative` too
+    /// (`LAMP_SEEMS_BROW_LOW=on`, [`judge_with`]).
+    pub fn with_brow_low(mut self, on: bool) -> Self {
+        self.brow_low = on;
+        self
     }
 
     /// The 52 scores for one face's [`points`].
@@ -138,7 +173,8 @@ impl Reader {
 
     /// How the face whose [`points`] these are seems.
     pub fn read(&self, points: &[f32]) -> Result<HumanSeems> {
-        judge(&self.scores(points)?).ok_or_else(|| "the model gave no 52 scores".into())
+        judge_with(&self.scores(points)?, self.brow_low)
+            .ok_or_else(|| "the model gave no 52 scores".into())
     }
 }
 
@@ -152,6 +188,43 @@ mod tests {
             out[at] = score;
         }
         out
+    }
+
+    /// #2132: with the switch, the brows drawn down with no smile are a long
+    /// face, at the line and not under it, and not with a smile; without
+    /// it, as before. Its confidence is the brows'.
+    #[test]
+    fn with_the_switch_the_brows_drawn_down_with_no_smile_seem_negative() {
+        let brows =
+            |down: f32, smile: f32| scores(&[(1, down), (2, down), (44, smile), (45, smile)]);
+        let long_face = judge_with(&brows(0.85, 0.1), true).unwrap();
+        assert_eq!(long_face.kind, SeemsKind::Negative);
+        assert!((long_face.confidence - 0.85).abs() < 1e-6);
+        assert_eq!(
+            judge_with(&brows(BROW_LOW_FROM, 0.0), true).unwrap().kind,
+            SeemsKind::Negative
+        );
+        assert_eq!(
+            judge_with(&brows(0.79, 0.0), true).unwrap().kind,
+            SeemsKind::Unsure
+        );
+        assert_eq!(
+            judge_with(&brows(0.95, BROW_LOW_SMILE_UNDER), true)
+                .unwrap()
+                .kind,
+            SeemsKind::Unsure
+        );
+        // A smile with the brows down stays a smile.
+        assert_eq!(
+            judge_with(&brows(0.84, 0.95), true).unwrap().kind,
+            SeemsKind::Positive
+        );
+        // Off: the brows say nothing, as before.
+        assert_eq!(
+            judge_with(&brows(0.95, 0.0), false).unwrap().kind,
+            SeemsKind::Unsure
+        );
+        assert_eq!(judge(&brows(0.95, 0.0)).unwrap().kind, SeemsKind::Unsure);
     }
 
     #[test]
