@@ -6,6 +6,8 @@
 # Harness, its HOME and its sign-in are not touched; hand-overs fail while it runs.
 # PLAYS SOUND IN THE ROOM. About 3 minutes. Needs `sudo -n` on the lamp and the lamp's voice quiet for 45 s.
 # argv: LABEL FIXTURE, FIXTURE being an ARM64 lamp-tasks-harness-fixture (from a lampOS ARM64 run's artifact).
+# TASKS=PATH (optional): an ARM64 lamp-tasks from the same build, used for this run only, for a lamp whose own
+# lamp-tasks is older than #2702 (no --sign-in-by-code: the setup says so and nothing is played).
 # Prints each step and PASS or FAIL: the question told, talk over its first second cutting it short, "offered again"
 # about 30 s after it was taken (ASK_AGAIN_AFTER), the question told again and heard whole ("question told in
 # request N"), and the yes then taken ("answered yes", "signed in").
@@ -14,6 +16,7 @@ cd "${0:A:h}" || exit 9
 L=${1:?LABEL}
 FIXTURE=${2:?FIXTURE: an ARM64 lamp-tasks-harness-fixture}
 [[ -f $FIXTURE ]] || { echo "no file at $FIXTURE" >&2; exit 2; }
+[[ -z ${TASKS:-} || -f $TASKS ]] || { echo "no file at TASKS=$TASKS" >&2; exit 2; }
 RATE=${LAMP_SAY_RATE:-185}
 OUT="$PLAYED_OUT/scenarios/ask-again-$L.txt"
 REMOTE=/usr/local/lib/played-ask-again   # /run may be noexec; this folder is removed when the run ends
@@ -41,6 +44,12 @@ wait_for() {  # PATTERN SECONDS: wait until the journal has a line matching PATT
 
 print "ask-again $L  $(date -u +%Y-%m-%dT%H:%M:%SZ)  fixture $(shasum -a 256 "$FIXTURE" | cut -c1-16)" | tee "$OUT"
 ./lamp_ssh "sudo -n mkdir -p $REMOTE && sudo -n tee $REMOTE/harness-fixture >/dev/null && sudo -n chmod 0755 $REMOTE/harness-fixture" < "$FIXTURE" || exit 9
+SETUP_ENV="PLAYED_REMOTE=$REMOTE"
+if [[ -n ${TASKS:-} ]]; then
+  print "lamp-tasks for this run: $(shasum -a 256 "$TASKS" | cut -c1-12)" | tee -a "$OUT"
+  ./lamp_ssh "sudo -n tee $REMOTE/lamp-tasks >/dev/null && sudo -n chmod 0755 $REMOTE/lamp-tasks" < "$TASKS" || exit 9
+  SETUP_ENV="$SETUP_ENV PLAYED_TASKS=$REMOTE/lamp-tasks"
+fi
 
 # The stand-in in (ask-again-setup.sh, on the lamp as root), and put back whatever happens. A setup that fails says
 # which step and stops here: nothing is played (#2715's first run, lamp-4ace, 22 Oct 02:5x).
@@ -48,7 +57,7 @@ put_back() {
   ./lamp_ssh "sudo -n env PLAYED_REMOTE=$REMOTE sh -s -- out" < ask-again-setup.sh
 }
 trap 'put_back 2>&1 | tee -a "$OUT"' EXIT
-if ! ./lamp_ssh "sudo -n env PLAYED_REMOTE=$REMOTE sh -s -- in" < ask-again-setup.sh >> "$OUT" 2>&1; then
+if ! ./lamp_ssh "sudo -n env $SETUP_ENV sh -s -- in" < ask-again-setup.sh >> "$OUT" 2>&1; then
   tail -2 "$OUT" >&2
   echo "ask-again $L: the stand-in's setup failed; nothing was played (see $OUT)" | tee -a "$OUT" >&2
   exit 9

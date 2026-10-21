@@ -5,6 +5,8 @@
 #      swapped and --sign-in-by-code added, the voice's switch on, both restarted; `out` takes it all out.
 #   2. lamp-tasks naming a user that doesn't exist: setup fails at the chown, says so, writes no drop-in.
 #   3. lamp-tasks with no --harness: setup fails, says so, writes no drop-in.
+#   4. a lamp-tasks without --sign-in-by-code (older than #2702, as lamp-4ace's): setup fails, says so, no drop-in.
+#   5. the same, with a newer lamp-tasks given for the run (TASKS=): it runs in the drop-in's ExecStart.
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
@@ -22,17 +24,21 @@ is-active) echo active ;;
 esac
 EOF
 chmod 0755 "$root/systemctl"
-run() {  # USER EXECSTART MODE: the setup against the stand-in; its output in $root/out
+# Two lamp-tasks: one that knows --sign-in-by-code, one older that doesn't.
+printf '#!/bin/sh\necho "  --harness PATH"\necho "  --sign-in-by-code"\n' > "$root/new-tasks"
+printf '#!/bin/sh\necho "  --harness PATH"\n' > "$root/old-tasks"
+chmod 0755 "$root/new-tasks" "$root/old-tasks"
+run() {  # USER EXECSTART MODE [TASKS]: the setup against the stand-in; its output in $root/out
   rm -rf "$root/remote" "$root/units" "$root/calls"
   mkdir -p "$root/remote"
   printf '#!/bin/sh\n' > "$root/remote/harness-fixture"
   chmod 0755 "$root/remote/harness-fixture"
   printf 'Group=%s\nUser=%s\n' "$(id -gn)" "$1" > "$root/show"
   printf '[Service]\nUser=%s\nExecStart=%s\n' "$1" "$2" > "$root/unit"
-  STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
+  STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl PLAYED_TASKS=${4:-} \
     sh "$here/ask-again-setup.sh" "$3" > "$root/out" 2>&1
 }
-line='/opt/lampOS/tasks/current/lamp-tasks serve --enable --harness-as-person --harness /usr/local/bin/harness --watch'
+line="$root/new-tasks serve --enable --harness-as-person --harness /usr/local/bin/harness --watch"
 tasks_drop=$root/units/lamp-tasks.service.d/zz-played-ask-again.conf
 voice_drop=$root/units/lamp-voice.service.d/zz-played-ask-again.conf
 
@@ -53,9 +59,20 @@ check "2. an unknown user fails" '[ $code -ne 0 ]'
 check "2. it says the chown failed" 'grep -q "chown no-such-user-played" "$root/out"'
 check "2. no drop-in written, nothing restarted" '[ ! -e "$tasks_drop" ] && [ ! -e "$voice_drop" ] && ! grep -q restart "$root/calls"'
 
-run "$(id -un)" '/opt/lampOS/tasks/current/lamp-tasks serve --enable' in; code=$?
+run "$(id -un)" "$root/new-tasks serve --enable" in; code=$?
 check "3. no --harness fails" '[ $code -ne 0 ]'
 check "3. it says so" 'grep -q "has no --harness" "$root/out"'
 check "3. no drop-in written, nothing restarted" '[ ! -e "$tasks_drop" ] && [ ! -e "$voice_drop" ] && ! grep -q restart "$root/calls"'
+
+old_line="$root/old-tasks serve --enable --harness /usr/local/bin/harness"
+run "$(id -un)" "$old_line" in; code=$?
+check "4. a lamp-tasks without --sign-in-by-code fails" '[ $code -ne 0 ]'
+check "4. it says it's older than #2702" 'grep -q "older than #2702" "$root/out"'
+check "4. no drop-in written, nothing restarted" '[ ! -e "$tasks_drop" ] && [ ! -e "$voice_drop" ] && ! grep -q restart "$root/calls"'
+
+run "$(id -un)" "$old_line" in "$root/new-tasks"; code=$?
+check "5. with TASKS= a newer one, setup succeeds" '[ $code -eq 0 ]'
+check "5. the drop-in runs it, with its own arguments" \
+  'grep -qx "ExecStart=$root/new-tasks serve --enable --harness $root/remote/harness --sign-in-by-code" "$tasks_drop"'
 
 exit $failed
