@@ -5,6 +5,48 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-21 — Controls CPU pacing follow-up — PR #2677
+
+Ready for lamp-voice: no (native gates running; stacked on #2651).
+
+- Changes every lamp's default Controls pacing. Branch
+  `third/controls-cpu-pacing`, head `b671a8435`, based on #2651's unchanged
+  `f9cfecded`. [PR #2677](https://github.com/autonomous-ai/lampOS/pull/2677)
+  targets `third/controls-privacy-stall` so #2651 can merge as reviewed.
+- Both executable loops share CPU-time pacing and gap diagnostics. The old
+  touch loop's 30 ms blocked step slept another 30 ms; the actual-monitor
+  regression now keeps readings fresh 30.2 ms apart with 0.2 ms CPU work.
+  Both units set `CPUSchedulingResetOnFork=yes`. Source audit and host
+  timing boundaries are in `docs/controls.md` on that branch.
+- Host gate passed: fmt, workspace Clippy with warnings denied, workspace
+  build, Controls ARM64 Clippy, and all 14 affected/dependent crates'
+  tests: 6,616 passed, zero failed, 27 ignored. Exact commands and retained
+  limitations are in the PR. `cargo clean` removed 22.0 GiB.
+- Native ARM64 run
+  [39631928900](https://github.com/autonomous-ai/lampOS/actions/runs/39631928900)
+  and x86 Linux Clippy run
+  [39632029374](https://github.com/autonomous-ai/lampOS/actions/runs/39632029374)
+  were dispatched on the PR head because its stacked base is outside the
+  automatic workflow filter. Results pending. No Mac ARM64 link is a gate.
+- Posted on #2602. The owner confirmed 4ace and 75c9's kernel results:
+  `5.15.147-sun60iw2`, no `CONFIG_RT_GROUP_SCHED`. Mobile and Twelve own the
+  other two lamps. The first builder measures latency on 4ace after merge.
+
+## 2026-10-21 — privacy worker expiry ride — taken
+
+Ready for lamp-voice: no.
+
+- First builder's 22:15 assignment on #2602, following Eighth's 22:11
+  evidence: the worker's own `physical privacy source expired` ends the
+  conversation before the coordinator can ride its unavailable state.
+- Claimed on #2602 after re-reading its latest comments; Eighth had not
+  claimed the fix. Sixth separately owns the refused-socket crash.
+- Behind `LAMP_PRIVACY_GAP_RIDE`, keep the worker reading after expiry and
+  report `Unavailable` for up to `RIDE_US`. Test a 60 ms Controls silence,
+  began/reopened events in one conversation, closed microphones through the
+  gap, timeout past the bound, and unchanged behavior with the switch off.
+- No lamp access; the native ARM64 PR run is the target build/test gate.
+
 ## 2026-10-14 — expression — taken
 
 - Task: 4, Expression: one part that authors what the lamp shows.
